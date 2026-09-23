@@ -1,0 +1,11 @@
+{
+  "package": {
+    "kind": "rust-lib",
+    "name": "rustev-contract",
+    "path": "crates/rustev-contract",
+    "specRef": "002-decision-contract-and-pure-core",
+    "version": "0.1.0"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "df4d500db42b0b36322da66033cad15bdce1d70d8ffa240f7f7221919cc596c7"
+}

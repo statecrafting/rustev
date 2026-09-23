@@ -2,7 +2,7 @@
 id: "002-decision-contract-and-pure-core"
 title: "Decision contract and pure core"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-23"
 summary: >
   Increment 1: the versioned wire contract (`rustev-contract`) and the pure
@@ -20,6 +20,8 @@ establishes:
 extends:
   # Adds the crates/ member glob and workspace dependencies.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.toml" }, nature: additive }
+  # Records the two crates' resolved dependencies (serde, serde_json, sha2).
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.lock" }, nature: additive }
   # Adds 002 to the specs `make verify` runs.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
 depends_on:
@@ -229,31 +231,35 @@ outputs, before any runtime or model exists.
 A closed registry, `rustev.exact/1`. Each operator is referenced by name and
 version; an unknown name or version is refused at compile time. Expressions
 and predicates inside operator arguments are part of the same registry
-version: references to inputs, steps, list items and `now`; typed literals;
-`add`, `sub`, `mul`, `div` (with `scale`), `fx`, `len`, `to_decimal`;
+version: references to inputs (`input:<name>`, record fields as
+`input:<name>/<field>`), steps (`step:<id>`), list items
+(`item:<field>.<field>`) and `now`; typed literals; `add`, `sub`, `mul`,
+`div` (decimals, half-even at 10^-9), `round` (with `scale`), `fx`, `len`,
+`to_decimal`;
 comparisons (`eq`, `ne` on every scalar; ordering on integer, decimal,
 timestamp and duration); `all`, `any`, `not`, `member`, `present`.
 
 | Operator | Result | Empty input | Failure |
 |---|---|---|---|
-| `count_where@1` | integer count of items satisfying a predicate | 0 | none |
+| `count_where@1` | integer count of items satisfying a predicate | 0 | a predicate fault (overflow) is `invalid_input` |
 | `window_filter@1` | items whose timestamp field is within `[now - within_ms, now]` and satisfy a predicate | empty list | an item timestamp after `now` is `invalid_input` |
 | `extremum@1` | `min` or `max` of a field, as `maybe` | `none` | none |
 | `timestamp_diff@1` | `floor((later - earlier) / unit_ms)` as `maybe` integer | `none` in, `none` out | negative difference or overflow is `invalid_input` |
-| `compare@1` | bool | n/a | overflow in an operand is `invalid_input` |
+| `compare@1` | bool | n/a | overflow in an operand is `invalid_input`; an `fx` operand fails as `fx_convert@1` |
 | `arith@1` | decimal or integer expression | n/a | overflow or division by zero is `invalid_input` |
 | `fx_convert@1` | `amount / rate(from) * rate(to)`, rescaled half-even to `scale` | n/a | missing rate is `missing_evidence`; two different rates for one currency is `conflict` |
-| `member_of@1` | bool | n/a | none |
+| `member_of@1` | bool | n/a | a fault in the value expression is `invalid_input` |
 | `field_presence@1` | declared inputs that are absent or have no accepted provenance, in declared order | empty list | a present input that is stale, invalid or conflicting makes the step unresolved with that reason |
-| `filter_with_reasons@1` | eligible ids, excluded ids with every failed rule in rule order, and a count per rule | empty result | an item whose rule cannot be evaluated is excluded with `unevaluable:<rule>` |
+| `filter_with_reasons@1` | eligible ids, excluded ids with every failed rule in rule order, and a count per rule | empty result | an item whose rule cannot be evaluated is excluded with `unevaluable:<rule>`; a duplicate or missing id is `invalid_input` |
 | `top_k@1` | the first `k` eligible ids ordered by a key (ties by id ascending), with the count truncated | empty | as `filter_with_reasons@1` |
 | `weighted_rank@1` | `RankPosition` over candidates from declared components and decimal weights | empty ranking | a candidate whose component is unresolved is excluded and listed with the reason |
 
 `weighted_rank@1` components: the weighted mean of a proposition's `true`
 mass over a second index with weights from a table keyed by an item field
-(zero items gives 0); a rubric's expectation divided by its highest level
-index; and a shortlist position `1 - i / (n - 1)` (1 when `n = 1`). The score
-is `sum(weight * component)` in declared component order; ties are broken by
+(zero items gives 0; an item whose class has no declared weight excludes the
+candidate); a rubric's expectation divided by its highest level index; and a
+shortlist position `1 - i / (n - 1)` (1 when `n = 1`). The score is
+`sum(weight * component)` in declared component order; ties are broken by
 candidate id ascending.
 
 ### 3.9 Definitions and compilation
@@ -316,13 +322,20 @@ candidate id ascending.
 1. `Evaluation::start(plan, snapshot, now)` validates the context and computes
    every exact step whose inputs are available. `pending()` lists semantic
    requests (step, instance key, backend, canonical projection) in step order
-   and then instance order. `supply` accepts one backend output or unresolved
-   reason per request; a request not pending is refused. `finish(decision_id)`
+   and then instance order. `supply` accepts one backend output, or one
+   runtime failure (`backend_unavailable`, `invalid_backend_output`,
+   `budget_exhausted`, `deadline_exceeded`), per request; any other reason,
+   and a request not pending, is refused. `finish(decision_id)`
    refuses while requests are pending and otherwise returns the judgment and
    its evidence record.
-2. Supplied outputs are validated against the plan: output kind as bound,
-   keys exactly the declared options, finite masses, distributions within
-   tolerance. A failure is `invalid_backend_output` for that instance.
+2. Supplied outputs are validated against the plan: output kind exactly as
+   bound (a distribution supplied to a logits binding is invalid), the bound
+   artifact when a document names one, keys exactly the declared options or
+   candidates, finite values, distributions within tolerance. A failure is
+   `invalid_backend_output` for that instance. A fan-out step's instance
+   failures stay in its instances; the step itself is unresolved only when a
+   dependency is. An instance whose bound item cannot be found is
+   `invalid_input`.
 3. Requests beyond `max_semantic_requests` under `truncate_visible` are not
    issued; those instances are `budget_exhausted{semantic_requests}` and the
    judgment carries a truncation notice.
@@ -347,8 +360,10 @@ candidate id ascending.
    `nonempty`, `all`, `any`, `not`. `mass_at_least` and `top_mass_below` are
    probability thresholds (3.9.5 category 6). `top_label` breaks ties by
    declared option order.
-4. Outcomes: `propose{action, params}` (never a grant), `escalate{reason}`,
-   `missing_evidence_from{step}` (a list of field names from the step).
+4. Outcomes: `propose{action, params}` (never a grant; parameters are exact
+   values or literals, never semantic values), `escalate{reason}`,
+   `missing_evidence_from{step}` (a list of field names from the step). The
+   policy reads semantic steps without fan-out only.
    Adjustments raise a named proposal parameter one position on a declared
    ordered scale, saturating at its top.
 5. Evaluation is a pure function of the plan, the validated context, the step
@@ -455,6 +470,48 @@ open to the owner's review; none reopens R-01 to R-06.
 | E-05 | Ties by declared option order (labels) and byte order of ids (candidates, backends). | Deterministic and visible in the document. |
 | E-06 | Operator and registry versions are integers and `rustev.exact/1`. | A change in operator meaning is a new version, never an edit. |
 | E-07 | A snapshot entry list, not a map, so conflicts between sources are representable. | Conflict is an explicit outcome (3.7). |
+
+## Implementation record
+
+Increment 1 landed with this spec marked `complete`. While implementing, the
+agent settled these points within the approved scope; they are recorded here
+rather than made silently, and the text above now states them:
+
+- Record fields of an input are addressed as `input:<name>/<field>` (needed
+  by the lodging plan's date, budget and currency rules). Division rounds
+  half-even at 10^-9 and `round` rescales; the draft attached `scale` to
+  `div`.
+- `count_where@1`, `member_of@1` and `compare@1` can fail on arithmetic
+  faults inside their expressions; the draft table said "none" for two of
+  them.
+- `supply` accepts only runtime failure reasons, so a caller cannot inject
+  `missing_evidence` or `conflict` as a backend result.
+- An output kind must equal the bound kind exactly; there is no implicit
+  distribution-for-logits acceptance at supply time.
+- Policy parameters are exact values, and the policy reads only non-fan-out
+  semantic steps. Both are compile-time `kind_mismatch` refusals.
+- `Compiled::load` accepts a plan document only if recompiling its embedded
+  definition against the supplied descriptors and calibrations reproduces it
+  byte for byte.
+- Independent review found four defects, fixed with regression tests in
+  `crates/rustev-core/tests/regressions.rs`: filter, shortlist and ranking
+  summaries had no sound projection bound and are now refused as projections
+  (`kind_mismatch`; project their ids through `for_each`), and a projection
+  that ever exceeded its compiled bound is not dispatched
+  (`budget_exhausted{projection_bytes}`); record-field references in the
+  policy read the field instead of reporting the input missing, and count
+  against `as_unmet` by their input; step-id uniqueness is judged in
+  declaration order within phase b, and duplicate backend ids are a phase-b
+  refusal; an input is model-derived when any accepted entry is. Also: an
+  eligible id missing from `top_k`'s list is `invalid_input`, and temperature
+  calibration shifts by the maximum before dividing so large logits cannot
+  overflow.
+- A mutation check killed 20 of 21 seeded defects; the survivor (canonical
+  key sorting, unobservable without `serde_json/preserve_order`) is now
+  covered by a direct test of the sort.
+
+Evidence: `spec-spine verify 002` runs the block above; the goldens for both
+reference plans are under `crates/rustev-core/tests/golden/`.
 
 ## Decision history
 

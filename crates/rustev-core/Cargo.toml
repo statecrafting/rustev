@@ -1,0 +1,20 @@
+[package]
+name = "rustev-core"
+version = "0.1.0"
+description = "Rustev's pure core: validation, value kinds, exact operators, compiler, calibration binding and selection policy."
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[package.metadata.spec-spine]
+spec = "002-decision-contract-and-pure-core"
+
+[dependencies]
+rustev-contract = { path = "../rustev-contract" }
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

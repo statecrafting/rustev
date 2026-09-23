@@ -1,19 +1,4 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '002-decision-contract-and-pure-core' directory unit 'crates/rustev-contract/' is not a directory",
-        "path": "crates/rustev-contract/"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '002-decision-contract-and-pure-core' directory unit 'crates/rustev-core/' is not a directory",
-        "path": "crates/rustev-core/"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "000-bootstrap",
@@ -21,17 +6,41 @@
     ],
     "implementingPaths": [
       {
+        "path": "Cargo.lock",
+        "source": "spec-edge"
+      },
+      {
         "path": "Cargo.toml",
         "source": "spec-edge"
       },
       {
         "path": "Makefile",
         "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-contract",
+        "source": "manifest-metadata"
+      },
+      {
+        "path": "crates/rustev-contract/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-core",
+        "source": "manifest-metadata"
+      },
+      {
+        "path": "crates/rustev-core/",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rustev-contract/"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -40,12 +49,29 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rustev-core/"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
           "kind": "directory",
           "path": "crates/rustev-core/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.lock"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
         }
       },
       {
@@ -79,5 +105,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "0ea557ad39b762721f8324fa6b5a661935dd48a311a2315813db62082c501f6c"
+  "shardHash": "d9ce5aaea6a918e17b59e262443a5ce6cd3d7b2dbda184f641dd4f0577629b6c"
 }
