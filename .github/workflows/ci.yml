@@ -37,3 +37,5 @@ jobs:
           .tooling/bin/spec-spine couple --base "origin/${{ github.base_ref }}" --pr-body "$RUNNER_TEMP/pr-body.md"
       - name: Code
         run: make code
+      - name: Declared acceptance
+        run: make verify

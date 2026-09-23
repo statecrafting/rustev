@@ -1,29 +1,17 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '001-boundaries-and-authority' file unit 'Cargo.toml' does not exist",
-        "path": "Cargo.toml"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '001-boundaries-and-authority' file unit 'Cargo.lock' does not exist",
-        "path": "Cargo.lock"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '001-boundaries-and-authority' directory unit 'tools/rustev-boundaries/' is not a directory",
-        "path": "tools/rustev-boundaries/"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "000-bootstrap"
     ],
     "implementingPaths": [
+      {
+        "path": "Cargo.lock",
+        "source": "spec-edge"
+      },
+      {
+        "path": "Cargo.toml",
+        "source": "spec-edge"
+      },
       {
         "path": "Makefile",
         "source": "spec-edge"
@@ -35,11 +23,23 @@
       {
         "path": "standards/spec/constitution.md",
         "source": "spec-edge"
+      },
+      {
+        "path": "tools/rustev-boundaries",
+        "source": "manifest-metadata"
+      },
+      {
+        "path": "tools/rustev-boundaries/",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "tools/rustev-boundaries/"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -48,7 +48,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "Cargo.lock"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -57,7 +61,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "Cargo.toml"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -114,5 +122,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "a6d990459aef782e2eeb4acf330d58428280cddc0f8ba2bc87f3e331914aa127"
+  "shardHash": "b0bea82dc961861901d5a051a6779fd4caef97dff023b81865498514f3f7e019"
 }
