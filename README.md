@@ -16,13 +16,19 @@ without any of them.
 Increment 1 is implemented: `rustev-contract` (versioned documents, bounded
 parsing, canonical identities) and `rustev-core` (value kinds, exact
 operators, the plan compiler with typed refusals, staged evaluation and
-selection policy). There is no runtime, backend, CLI or model yet, and no
-quality or calibration claim: the reference plans run on synthetic fixtures.
-Nothing is released.
+selection policy). The first runtime slice is implemented in
+`rustev-runtime`: bounded admission and concurrency, one end-to-end deadline
+on an injectable clock, cost budgets reserved before dispatch, declared
+retries and runtime fallback that are part of the plan's identity, honest
+cancellation, and run records delivered under a declared sink policy. It is
+verified against scripted test backends only. There is no production
+backend, CLI or model yet, and no quality or calibration claim: the
+reference plans run on synthetic fixtures. Batching, duplicate suppression
+and caches are deferred. Nothing is released.
 
 - Design (proposed): [docs/design/001-decision-engine-architecture.md](docs/design/001-decision-engine-architecture.md)
 - Decisions: [docs/decisions/00-founding-decisions.md](docs/decisions/00-founding-decisions.md)
-- Specs: `001` boundaries and authority, `002` decision contract and pure core (both approved and complete).
+- Specs: `001` boundaries and authority, `002` decision contract and pure core, `003` runtime execution and evidence (approved and complete); `004` to `006` are drafts.
 
 ## Governance
 

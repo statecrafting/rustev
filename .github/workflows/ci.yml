@@ -12,6 +12,9 @@ jobs:
   governance:
     name: gate
     runs-on: ubuntu-latest
+    # The runtime tests use a manual clock and never sleep on wall time, so a
+    # hang is a defect; fail it instead of waiting for the platform limit.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:

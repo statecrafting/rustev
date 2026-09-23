@@ -15,6 +15,9 @@ repository = "https://github.com/statecrafting/rustev"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = { version = "0.10", default-features = false }
+# The runtime's executor (R-03); never a dependency of rustev-contract or
+# rustev-core (spec 001, 3.4.1). Added by spec 003.
+tokio = { version = "1.53", default-features = false }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
