@@ -420,6 +420,7 @@ backend. Specs `003` to `006`.
   descriptor is added.
 - Ties in `top_label`, `top_k` and `weighted_rank` resolve as specified.
 - Both reference plans evaluate end to end on supplied semantic values.
+- `rustev-contract` builds alone (spec `001` 3.7, partial adoption).
 - `make code` (build, test, clippy, fmt, boundaries) passes; the value-kind
   types have compile-fail doctests for conversion.
 
@@ -433,6 +434,8 @@ cargo test -p rustev-contract --locked
 cargo test -p rustev-core --locked
 # 3.1: dependency rules for both crates.
 cargo run -p rustev-boundaries --locked --quiet
+# 001 3.7: the contract crate builds with no other workspace crate.
+cargo build -p rustev-contract --locked
 cargo clippy -p rustev-contract -p rustev-core --all-targets --locked -- -D warnings
 cargo fmt -p rustev-contract -p rustev-core --check
 ```

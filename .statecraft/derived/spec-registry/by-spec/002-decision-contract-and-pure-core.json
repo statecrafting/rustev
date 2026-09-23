@@ -36,7 +36,7 @@
     "id": "002-decision-contract-and-pure-core",
     "implementation": "pending",
     "sectionDigests": {
-      "002-decision-contract-and-pure-core": "f58083e87fafa35d85d989e5f88f778cafa66852bb7ff4cdedada410a69515dc",
+      "002-decision-contract-and-pure-core": "0bf00afd671fcb2776679cc333bf6ce9b295296a610e572cce1788d3c22cb12a",
       "1-purpose": "efd6bb9c309da706ab17fe0263a710e07f25af759e95d4fdbf81da098b975dfd",
       "2-territory": "e229a2080dae05d3467052ac12d03e255c0064138cdf2df4b9f7e8c000d08be3",
       "3-1-purity": "1172db9f90fbb5bfeda4e0a12c246f621d7643a405fc11e43468de87bcc67939",
@@ -55,10 +55,10 @@
       "3-behavior": "5f22050d9340b7b5a430c3b12f0716a766b3d2b12ceaa8b5938a3b552a7d4cea",
       "4-out-of-scope": "c81f733e15396d9d21494f9350333a3a25a42aba9d8b2be3bf9fbb57c8e13cd5",
       "5-observable-negative-cases": "938c88fb31fa7948543f607992d27120d411697e3983139927cadf4aab36c79a",
-      "acceptance": "5d06aa25589e5122ee4299ace023b1ab186f1200c152d02e388b1a9d631f9a74",
+      "acceptance": "17d006ce0597943c7e053483738b1f04376a944ef29cde6f3068bda644284251",
       "decision-history": "8626eecc35c69482618395c51843d8c12f85fe851372ed39f6b4432e897d6a9d",
       "engineering-choices": "ad4c7add3dff980a4b0fdca87ae8e9396362b87b0f2a5e89fd1a242847d3d9b1",
-      "verification": "44051e44bf180619a83c7d5b7849485980193c45e38a2dcd765715acafbb0abe"
+      "verification": "a381b4b3cb4aeb5468a033e82d000b4f78ed6e8fd9b30a3ffd8c06f402e19d3d"
     },
     "sectionHeadings": [
       "002: Decision contract and pure core",
@@ -90,6 +90,6 @@
     "summary": "Increment 1: the versioned wire contract (`rustev-contract`) and the pure core (`rustev-core`). Bounded parsing, canonical form and identities, value kinds without silent conversion, fixed-point decimals and millisecond time, input validation with provenance, freshness and conflict, a closed versioned exact-operator registry, decision definitions entered through a typed builder or canonical JSON, the plan compiler with capability matching, declared fallbacks and typed refusals, calibration binding, deterministic selection policy with explicit unresolved handling, and derivation classes with lineage. No I/O, no clock, no async executor, no model.\n",
     "title": "Decision contract and pure core"
   },
-  "shardHash": "7bb1b916c39bff46e91916ac3ca055c94b69ee3c6d4fe1569df4ca9d0e55b3b8",
+  "shardHash": "49d7878b85828d13a9be497ab9e1579104975e30541930cf53ad1f93ec00d875",
   "specVersion": "1.8.0"
 }
