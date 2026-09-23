@@ -177,7 +177,11 @@ fn validate_input(
             return Err(Unresolved::stale([name.to_string()]));
         }
     }
-    let class = if newest.provenance == ProvenanceClass::ModelDerived {
+    // The most derived accepted entry decides (spec 002, 3.12.2).
+    let class = if accepted
+        .iter()
+        .any(|e| e.provenance == ProvenanceClass::ModelDerived)
+    {
         "model"
     } else {
         "exact"
@@ -734,6 +738,17 @@ impl<'c> Evaluation<'c> {
                     continue;
                 }
             };
+            if projection.len() as u64 > binding.max_projection_bytes {
+                // The compiler's bound is an upper bound; exceeding it is a
+                // defect, reported rather than dispatched.
+                values.insert(
+                    key,
+                    Err(Unresolved::BudgetExhausted {
+                        resource: "projection_bytes".into(),
+                    }),
+                );
+                continue;
+            }
             if self.issued >= limits.max_semantic_requests {
                 truncated += 1;
                 values.insert(
@@ -940,13 +955,28 @@ impl<'c> Evaluation<'c> {
 
 impl View for Evaluation<'_> {
     fn get(&self, r: &str) -> Result<Seen<'_>, Unresolved> {
-        if let Some(n) = r.strip_prefix("input:") {
-            self.status(r)?;
-            return self
+        if let Some(rest) = r.strip_prefix("input:") {
+            let mut parts = rest.split('/');
+            let n = parts.next().unwrap_or_default();
+            self.status(&format!("input:{n}"))?;
+            let mut v = self
                 .input_values
                 .get(n)
-                .map(Seen::Exact)
-                .ok_or_else(|| Unresolved::missing([n.to_string()]));
+                .ok_or_else(|| Unresolved::missing([n.to_string()]))?;
+            for f in parts {
+                v = match v {
+                    Value::Record(m) => m.get(f).ok_or_else(|| {
+                        Unresolved::invalid([n.to_string()], format!("no field {f:?}"))
+                    })?,
+                    _ => {
+                        return Err(Unresolved::invalid(
+                            [n.to_string()],
+                            format!("no field {f:?}"),
+                        ));
+                    }
+                };
+            }
+            return Ok(Seen::Exact(v));
         }
         let s = r.strip_prefix("step:").unwrap_or(r);
         self.status(r)?;

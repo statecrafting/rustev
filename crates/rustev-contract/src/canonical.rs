@@ -91,8 +91,7 @@ fn write_value(v: &Value, out: &mut Vec<u8>, path: &mut String) -> Result<(), Ca
             out.push(b']');
         }
         Value::Object(map) => {
-            let mut keys: Vec<&String> = map.keys().collect();
-            keys.sort_by(|a, b| a.as_bytes().cmp(b.as_bytes()));
+            let keys = sorted_keys(map.keys());
             out.push(b'{');
             for (i, k) in keys.into_iter().enumerate() {
                 if i > 0 {
@@ -110,6 +109,14 @@ fn write_value(v: &Value, out: &mut Vec<u8>, path: &mut String) -> Result<(), Ca
         }
     }
     Ok(())
+}
+
+/// Object keys in byte order, whatever order the map iterates in (a
+/// `serde_json` built with `preserve_order` iterates in insertion order).
+fn sorted_keys<'k>(keys: impl Iterator<Item = &'k String>) -> Vec<&'k String> {
+    let mut keys: Vec<&String> = keys.collect();
+    keys.sort_by(|a, b| a.as_bytes().cmp(b.as_bytes()));
+    keys
 }
 
 /// `sha256:` and the lowercase hex SHA-256 of `tag || 0x00 || bytes`.
@@ -141,6 +148,13 @@ mod tests {
             canonical_value_bytes(&v).unwrap(),
             br#"{"B":{"y":18446744073709551615,"z":-2},"a":[true,null,"x"],"b":1}"#
         );
+    }
+
+    #[test]
+    fn keys_are_sorted_whatever_the_iteration_order() {
+        let (b, a, upper) = ("b".to_string(), "a".to_string(), "B".to_string());
+        let keys = sorted_keys([&b, &a, &upper].into_iter());
+        assert_eq!(keys, vec![&upper, &a, &b]);
     }
 
     #[test]

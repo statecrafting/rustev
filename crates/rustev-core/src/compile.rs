@@ -375,7 +375,17 @@ pub fn compile(
         }
     }
 
-    // (b) Structure.
+    // (b) Structure. Supplied backend ids must be unique.
+    let mut backend_ids = BTreeSet::new();
+    for d in descriptors {
+        if !backend_ids.insert(d.backend_id.as_str()) {
+            return refuse(
+                C::InvalidDefinition,
+                format!("backend:{}", d.backend_id),
+                "two descriptors share a backend id",
+            );
+        }
+    }
     let inv = |subject: String, detail: String| -> Result<(), Refusal> {
         refuse(C::InvalidDefinition, subject, detail)
     };
@@ -410,16 +420,7 @@ pub fn compile(
         check_type_decl(&i.ty).or_else(|e| inv(subject, e))?;
         inputs.insert(i.name.clone(), (Ty::from_decl(&i.ty), i.clone()));
     }
-    let mut ids: Vec<String> = Vec::new();
-    for s in &def.steps {
-        if !valid_name(&s.id) || ids.contains(&s.id) {
-            inv(
-                format!("step:{}", s.id),
-                "step ids must be unique, non-empty, without ':' or whitespace".into(),
-            )?;
-        }
-        ids.push(s.id.clone());
-    }
+    let ids: Vec<String> = def.steps.iter().map(|s| s.id.clone()).collect();
     let known = |r: &str| -> Result<(), String> {
         match Ref::parse(r)? {
             Ref::Input(n, _) if !inputs.contains_key(&n) => Err(format!("unknown input {n:?}")),
@@ -435,8 +436,14 @@ pub fn compile(
             StepBody::Exact(_) => None,
         })
         .collect();
-    for s in &def.steps {
+    for (i, s) in def.steps.iter().enumerate() {
         let subject = format!("step:{}", s.id);
+        if !valid_name(&s.id) || ids[..i].contains(&s.id) {
+            inv(
+                subject.clone(),
+                "step ids must be unique, non-empty, without ':' or whitespace".into(),
+            )?;
+        }
         match &s.body {
             StepBody::Exact(_) => {
                 if let Some(a) = decoded.get(&s.id) {
@@ -822,6 +829,13 @@ pub fn compile(
                         )
                         .map_err(km)?,
                         Ref::Step(n) => match &step_tys[&n] {
+                            StepTy::Exact(
+                                Ty::Filtered { .. } | Ty::Shortlist { .. } | Ty::Ranking { .. },
+                            ) => {
+                                return Err(km(format!(
+                                    "{r} is a filter, shortlist or ranking summary; project its ids through for_each instead"
+                                )));
+                            }
                             StepTy::Exact(t) => t.clone(),
                             StepTy::Semantic(..) => {
                                 return Err(km(format!(
@@ -868,15 +882,7 @@ pub fn compile(
     // (f) Bind backends, fallbacks and calibration artifacts.
     let mut sorted: Vec<&BackendDescriptor> = descriptors.iter().collect();
     sorted.sort_by(|a, b| a.backend_id.as_bytes().cmp(b.backend_id.as_bytes()));
-    for w in sorted.windows(2) {
-        if w[0].backend_id == w[1].backend_id {
-            return refuse(
-                C::InvalidDefinition,
-                format!("backend:{}", w[0].backend_id),
-                "two descriptors share a backend id",
-            );
-        }
-    }
+
     let mut notices: Vec<Notice> = Vec::new();
     let mut details: BTreeMap<String, PlanStepDetail> = BTreeMap::new();
     for s in &def.steps {
@@ -1586,7 +1592,11 @@ fn check_policy(
     if let Some(last) = policy.rules.last() {
         let mut refs = Vec::new();
         outcome_refs(&last.then, &mut refs);
-        if let Some(r) = refs.iter().find(|r| unmet.contains(r.as_str())) {
+        if let Some(r) = refs
+            .iter()
+            .map(|r| crate::expr::base_ref(r))
+            .find(|r| unmet.contains(r.as_str()))
+        {
             return refuse(
                 C::UnhandledUnresolved,
                 format!("policy:rule:{}", last.id),

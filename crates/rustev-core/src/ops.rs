@@ -963,6 +963,13 @@ impl OpArgs {
                     Value::Filtered(fl) => fl.eligible.into_iter().collect(),
                     _ => return Err(f(Fault::Invalid("top_k among a non-filter".into()))),
                 };
+                if let Some(missing) = among.iter().find(|id| !keyed.iter().any(|(k, _)| k == *id))
+                {
+                    return Err(f(Fault::Invalid(format!(
+                        "eligible id {missing:?} is not in {}",
+                        a.list
+                    ))));
+                }
                 let mut scored = Vec::new();
                 let mut excluded = Vec::new();
                 for (id, it) in keyed.into_iter().filter(|(id, _)| among.contains(id)) {

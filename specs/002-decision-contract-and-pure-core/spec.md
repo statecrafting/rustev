@@ -493,6 +493,22 @@ rather than made silently, and the text above now states them:
 - `Compiled::load` accepts a plan document only if recompiling its embedded
   definition against the supplied descriptors and calibrations reproduces it
   byte for byte.
+- Independent review found four defects, fixed with regression tests in
+  `crates/rustev-core/tests/regressions.rs`: filter, shortlist and ranking
+  summaries had no sound projection bound and are now refused as projections
+  (`kind_mismatch`; project their ids through `for_each`), and a projection
+  that ever exceeded its compiled bound is not dispatched
+  (`budget_exhausted{projection_bytes}`); record-field references in the
+  policy read the field instead of reporting the input missing, and count
+  against `as_unmet` by their input; step-id uniqueness is judged in
+  declaration order within phase b, and duplicate backend ids are a phase-b
+  refusal; an input is model-derived when any accepted entry is. Also: an
+  eligible id missing from `top_k`'s list is `invalid_input`, and temperature
+  calibration shifts by the maximum before dividing so large logits cannot
+  overflow.
+- A mutation check killed 20 of 21 seeded defects; the survivor (canonical
+  key sorting, unobservable without `serde_json/preserve_order`) is now
+  covered by a direct test of the sort.
 
 Evidence: `spec-spine verify 002` runs the block above; the goldens for both
 reference plans are under `crates/rustev-core/tests/golden/`.

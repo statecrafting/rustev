@@ -148,13 +148,26 @@ pub fn apply(
             ))));
         }
         z.push(if is_logits {
-            v / t
+            v
         } else if v == 0.0 {
             f64::NEG_INFINITY
         } else {
-            v.ln() / t
+            v.ln()
         });
     }
+    // Shift by the maximum before dividing, so a large logit and a small
+    // temperature cannot overflow: softmax is shift-invariant.
+    let max = z.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    let z: Vec<f64> = z
+        .iter()
+        .map(|v| {
+            if *v == f64::NEG_INFINITY {
+                *v
+            } else {
+                (v - max) / t
+            }
+        })
+        .collect();
     if !is_logits {
         // The input must itself be a distribution before it is recalibrated.
         let sum: f64 = check.options.iter().fold(0.0, |acc, o| acc + map[o]);

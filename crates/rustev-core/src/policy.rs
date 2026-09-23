@@ -110,7 +110,7 @@ impl<V: View> Run<'_, V> {
                     .map_err(|f| Unresolved::invalid([], format!("{f:?}")))?
             }
             Cond::Empty(r) | Cond::Nonempty(r) => {
-                if self.unmet.contains(r) {
+                if self.unmet.contains(&crate::expr::base_ref(r)) {
                     return Ok(false);
                 }
                 self.read(r);
@@ -180,7 +180,7 @@ impl<V: View> Run<'_, V> {
                     let v = match &p.value {
                         ParamSource::Lit(l) => Value::from_literal(l).to_out(),
                         ParamSource::Ref(r) => {
-                            if self.unmet.contains(r) {
+                            if self.unmet.contains(&crate::expr::base_ref(r)) {
                                 return Ok(None);
                             }
                             self.read(r);
