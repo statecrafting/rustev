@@ -104,7 +104,7 @@
           {
             "file": "standards/spec/constitution.md",
             "span": {
-              "endLine": 126,
+              "endLine": 127,
               "startLine": 57
             }
           }
@@ -122,5 +122,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "23a7d198faaedb5b763e40ed663dd90ae89ef08fac780f8c941ff7b03aa36c93"
+  "shardHash": "d191d922d06638253c08bb46150696a74b82e574dd9033dc34ec5320d3fd11d7"
 }

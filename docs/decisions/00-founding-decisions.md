@@ -30,6 +30,11 @@ design's section 18. Recorded here as the owner's decisions, not the agent's.
 | R-04 | Clearly labeled synthetic fixtures implement and verify increment 1 and infrastructure behavior. Real labeled data gates empirical quality, calibration and usefulness claims, not infrastructure. Before semantic quality qualification, an appropriately licensed public dataset or an independently human-labeled dataset is identified, with provenance, licensing, labeling method, splits and limitations recorded. Generated examples are not independent evidence of semantic quality. |
 | R-05 | Primitive names `classify`, `proposition`, `rubric`, `rank`, with distinct semantics. No vendor-specific names; no claim of Jev compatibility. |
 | R-06 | The versioned evaluation report envelope lives in `rustev-contract`. Metrics, datasets, evaluation execution and calibration fitting live outside the contract crate. Extraction into a separate crate requires a demonstrated need. |
+| R-07 | O-01 closed (2026-09-23). The bootstrap's `determinism-requirement` anchor and principle IV are read as governing compiled governance artifacts. Principle XIII governs Rustev's own distinction between canonical compilation, defined exact computation, backend numerical repeatability and runtime observations. The missing anchor text (C-07) remains a defect of the scaffold; this reading does not repair it, and the frozen bootstrap is not edited. |
+| R-08 | The first runtime slice (spec `003`) includes bounded execution, admission, deadlines, concurrency, budget accounting, cancellation, bounded retries, explicit runtime fallback and evidence delivery. Automatic batching, cross-request duplicate suppression, reusable inference caches and persistent caches are deferred to a separately specified optimization increment, and the deferral is recorded in spec `003` rather than dropped silently. |
+| R-09 | The runtime is verified with deterministic scripted test backends whose dispatch, completion, cancellation and cost are observable. They are test fixtures, not spec `005`'s production backends. No inference dependency, checkpoint download, paid provider call or real-user dataset is needed. |
+| R-10 | Compile-time capability fallback and runtime failure fallback are different policies. Runtime retries and fallback are explicitly declared, validated and included in plan identity, and are never inferred from whichever backend happens to be installed. |
+| R-11 | Delivery authority for spec `003`: the bounded contract changes it needs, its implementation, tests and documentation, local commits, scoped pushes and pull requests, remediation of review and CI findings, and merge after verification. It does not extend to approving specs `004` to `006`. |
 
 ## Approvals
 
@@ -37,14 +42,19 @@ design's section 18. Recorded here as the owner's decisions, not the agent's.
 |---|---|---|
 | A-01 | The owner approved spec `001` with bounded corrections: proposals never grants, with the signature-restriction limitation stated; no Rustev-owned authorization type; derivation classes with lineage; network implementations under `integrations/`; ownership of workspace machinery; constitution principles VI onward under the existing `VI onward` heading. | 2026-09-23 |
 | A-02 | The owner approved spec `002` with bounded corrections: enforceable parse bounds with transport buffering owned separately; calibration as identity and binding, with one explicit initial method and fitting deferred; determinism scoped to canonical compilation and defined exact computation; explicit acceptance and executable verification. Its lifecycle fields are recorded in the change that makes it concrete. | 2026-09-23 |
+| A-03 | The owner approved spec `003` within the bounded requirements of their runtime brief: time, admission and concurrency, budgets, retries and fallback, cancellation, evidence and judgment equivalence as stated there, with the optimization deferral of R-08 and executable acceptance. The concrete rules were then written by the agent within those bounds and are reviewable in the change that recorded this approval. | 2026-09-23 |
 
-Neither approval authorizes ratifying any other spec.
+No approval authorizes ratifying any other spec.
 
 ## Open
 
-| Id | Question | Recommendation |
+None. O-01 was closed by the owner as R-07.
+
+## Closed
+
+| Id | Question | Resolution |
 |---|---|---|
-| O-01 | The bootstrap freezes the anchor `determinism-requirement`, and its summary says "every artifact is a deterministic function of (config, file contents)". Its body has no text for that anchor (C-07). Does the anchor reach Rustev's runtime outputs (evidence records with latency, backend outputs), which cannot be byte-deterministic? | Read it as governing this corpus's compiled artifacts, as the constitution's own text scopes principles I to V to the corpus, and as spec-spine's own bootstrap section 6 does. Principle XIII is written under that reading. No bootstrap edit is needed; the owner confirming the reading closes this. Work proceeds under it because no delivered code depends on a different reading. |
+| O-01 | The bootstrap freezes the anchor `determinism-requirement`, and its summary says "every artifact is a deterministic function of (config, file contents)". Its body has no text for that anchor (C-07). Does the anchor reach Rustev's runtime outputs (evidence records with latency, backend outputs), which cannot be byte-deterministic? | Closed by the owner on 2026-09-23 (R-07): it governs compiled governance artifacts; principle XIII governs Rustev's runtime outputs. C-07 stands. |
 
 ## Facts
 
@@ -58,3 +68,4 @@ Neither approval authorizes ratifying any other spec.
 | C-05 | `.statecraft/derived/` is committed, so `check` is a freshness gate on the committed shards. | the managed `.gitignore` block |
 | C-06 | Aicortex and Rahi were not assessed beyond their README summaries, which describe Aicortex as specified and largely `pending` and Rahi as a 0.2.0 candidate. Nothing here claims their readiness. No Rustev component depends on or waits for either. | their READMEs, 2026-09-21 |
 | C-07 | The scaffolded bootstrap lists five `unamendable` anchors (`markdown-truth-boundary`, `json-truth-boundary`, `determinism-requirement`, `typed-authority-graph`, `refusal-rule`). None is a heading slug in its body, and three have no body text at all; spec-spine's lint does not check them. A dogfood finding for the scaffold. | `specs/000-bootstrap/spec.md`; `make gate` |
+| C-08 | Review of spec `002`'s implementation record against its approved text (`git diff 75462ff 96a794c -- specs/002-*`), made before spec `003` consumed it. No contradiction with an approved requirement was found. Clarifications: record-field references `input:<name>/<field>` give the approved `record` type an address; arithmetic faults in `count_where@1`, `member_of@1` and `compare@1` follow approved 3.4.2 (no saturation, no wrapping) where the approved operator table said "none"; `supply` accepting only the four runtime reasons is required for approved 3.11.2's static coverage to be sound; exact output-kind matching is the literal reading of "output kind as bound". For the owner's attention: (1) "policy parameters are exact values, never semantic values" narrows approved 3.11.4 beyond what A-02 stated; it refuses rather than permits, so it is safe, and relaxing it later is additive; (2) `div` rounds at 10^-9 and `round` rescales, so `round(div(a, b), s)` and `fx` round more than once; this follows approved 3.4.2, differs from a single rounding at `s`, and a change would be a new operator version (E-06); (3) approved normative text in sections 3.8, 3.10 and 3.11 was edited in the implementing change, with the edits listed in its implementation record. | the diff above; `crates/rustev-core/src/expr.rs` |

@@ -117,10 +117,11 @@ Byte determinism is promised for canonical compilation (definitions, plans and
 their identities) and for explicitly defined exact computation. Backend
 numerical repeatability is a measured, per-artifact tolerance. Runtime
 observations (latency, cost, scheduling) are recorded, not reproduced.
-Whether principle IV and the bootstrap's `determinism-requirement` anchor
-reach Rustev's runtime outputs is open item O-01 in
-`docs/decisions/00-founding-decisions.md`; this principle is written under
-the reading recommended there, pending the owner's confirmation.
+Principle IV and the bootstrap's `determinism-requirement` anchor govern
+compiled governance artifacts; this principle governs Rustev's runtime
+outputs. The owner closed O-01 under that reading (R-07 in
+`docs/decisions/00-founding-decisions.md`); the anchor's missing text (C-07)
+is unchanged.
 
 ---
 
