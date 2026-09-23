@@ -2,7 +2,7 @@
 id: "003-runtime-execution-and-evidence"
 title: "Runtime execution and evidence emission"
 status: approved
-implementation: pending
+implementation: in-progress
 created: "2026-09-23"
 summary: >
   Increment 2: `rustev-runtime` drives the pure core's staged evaluation
@@ -492,6 +492,27 @@ cargo fmt -p rustev-runtime --check
 # Negative control: seeded defects must each be detected.
 sh crates/rustev-runtime/mutation/seeds.sh
 ```
+
+## Implementation record
+
+- Contract amendment (3.1, 3.2), landed separately before the runtime:
+  `rustev.plan/2` with `execution`; `rustev.execution/1` with
+  `ExecutionPolicyId`; `rustev.run/1` and the cost and cancellation
+  vocabulary; `compile_with` and category 12 in `rustev-core`, validated in
+  `crates/rustev-core/src/execution.rs`; `Evaluation::check_output`; the
+  amended seams and `CancelSignal`. The candidate checks of spec 002 3.9.4
+  were extracted into one function that binding and runtime fallback
+  validation share, so a fallback target is judged by exactly the checks a
+  primary binding is. Both reference plans' plan goldens were re-emitted: the
+  only differences are the schema string and `"execution":"none"`; their
+  definition goldens and `DefinitionId`s are unchanged. Golden `PlanId`s:
+  support routing `sha256:75918b3c...17a8` to
+  `sha256:0dea602c05735b02b1eeffa5db6f421034381a602379d4acc00c9007eea17a55`;
+  lodging `sha256:88302969...7120` to
+  `sha256:595b77f667962db41a1ac154368b29ae6c13d28457a8fb7782bd006ba577c5be`.
+  Tests:
+  `crates/rustev-core/tests/execution.rs` and two document tests in
+  `crates/rustev-contract/tests/documents.rs`.
 
 ## Decision history
 

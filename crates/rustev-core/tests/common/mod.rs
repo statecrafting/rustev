@@ -19,6 +19,10 @@ use rustev_contract::definition::{
 use rustev_contract::descriptor::{
     BackendDescriptor, InputExcess, InputLimit, OperationSupport, OutputKind,
 };
+use rustev_contract::execution::{
+    AttemptTimeout, CostPolicy, Delay, ExecutionPolicy, FailureClass, FallbackPolicy, RetryPolicy,
+    StepExecution,
+};
 use rustev_contract::ids::{ArtifactId, DatasetId};
 use rustev_contract::output::RawOutput;
 use rustev_contract::snapshot::{Entry, Snapshot};
@@ -104,6 +108,69 @@ pub fn label_only() -> BackendDescriptor {
 
 pub fn descriptors() -> Vec<BackendDescriptor> {
     vec![linear_head(), label_only()]
+}
+
+/// A SYNTHETIC second deployment of the linear head's artifact, for runtime
+/// fallback (spec 003): same artifact, same output kinds.
+pub fn linear_head_replica() -> BackendDescriptor {
+    BackendDescriptor {
+        backend_id: "synthetic-linear-head-replica".into(),
+        ..linear_head()
+    }
+}
+
+/// A SYNTHETIC linear head over a different artifact.
+pub fn other_head() -> BackendDescriptor {
+    BackendDescriptor {
+        backend_id: "synthetic-other-head".into(),
+        artifact: artifact('c'),
+        ..linear_head()
+    }
+}
+
+/// Descriptors with every runtime fallback candidate above.
+pub fn descriptors_with_fallbacks() -> Vec<BackendDescriptor> {
+    vec![
+        linear_head(),
+        label_only(),
+        linear_head_replica(),
+        other_head(),
+    ]
+}
+
+/// An execution policy (spec 003, 3.2.2) with a generous attempt ceiling.
+pub fn execution(cost: CostPolicy, steps: Vec<StepExecution>) -> ExecutionPolicy {
+    ExecutionPolicy {
+        schema: schema::EXECUTION.into(),
+        max_attempts_per_decision: 1_000,
+        cost,
+        steps,
+    }
+}
+
+/// A step policy: `attempts` per target retried on `retry_on`, a fixed
+/// delay, and `fallbacks` taken on `fallback_on`.
+pub fn step_exec(
+    step: &str,
+    attempts: u32,
+    retry_on: &[FailureClass],
+    delay: Delay,
+    fallbacks: &[&str],
+    fallback_on: &[FailureClass],
+) -> StepExecution {
+    StepExecution {
+        step: step.into(),
+        retry: RetryPolicy {
+            max_attempts: attempts,
+            on: retry_on.to_vec(),
+            delay,
+        },
+        attempt_timeout: AttemptTimeout::None,
+        fallback: FallbackPolicy {
+            backends: strings(fallbacks),
+            on: fallback_on.to_vec(),
+        },
+    }
 }
 
 pub const TOPICS: [&str; 4] = ["billing", "integration_defect", "account_access", "other"];

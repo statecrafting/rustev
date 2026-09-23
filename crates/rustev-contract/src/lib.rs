@@ -19,11 +19,13 @@ pub mod descriptor;
 pub mod document;
 pub mod eval_report;
 pub mod evidence;
+pub mod execution;
 pub mod ids;
 pub mod judgment;
 pub mod limits;
 pub mod output;
 pub mod plan;
+pub mod run;
 pub mod snapshot;
 pub mod time;
 
@@ -31,10 +33,11 @@ pub use decimal::Decimal;
 pub use document::{Document, DocumentError, Identified};
 pub use time::{DurationMs, Timestamp};
 
-/// Schema strings of every document at contract version 1 (spec 002, 3.2.1).
+/// Schema strings of every document (spec 002, 3.2.1, as amended by spec 003,
+/// 3.2: plans are at version 2; execution policies and run records are new).
 pub mod schema {
     pub const DEFINITION: &str = "rustev.definition/1";
-    pub const PLAN: &str = "rustev.plan/1";
+    pub const PLAN: &str = "rustev.plan/2";
     pub const BACKEND: &str = "rustev.backend/1";
     pub const CALIBRATION: &str = "rustev.calibration/1";
     pub const SNAPSHOT: &str = "rustev.snapshot/1";
@@ -42,6 +45,8 @@ pub mod schema {
     pub const JUDGMENT: &str = "rustev.judgment/1";
     pub const EVIDENCE: &str = "rustev.evidence/1";
     pub const EVAL_REPORT: &str = "rustev.eval-report/1";
+    pub const EXECUTION: &str = "rustev.execution/1";
+    pub const RUN: &str = "rustev.run/1";
     /// The exact-operator registry version a plan was compiled against.
     pub const EXACT_REGISTRY: &str = "rustev.exact/1";
 }

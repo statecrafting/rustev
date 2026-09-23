@@ -104,6 +104,10 @@ identity!(
     SnapshotId
 );
 identity!(
+    /// Identity of a canonical execution policy (spec 003, 3.2.2).
+    ExecutionPolicyId
+);
+identity!(
     /// A backend artifact (model, tokenizer, preprocessing, truncation,
     /// precision), identified by its producer.
     ArtifactId
