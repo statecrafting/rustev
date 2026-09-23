@@ -1,9 +1,10 @@
 # 001: Rustev decision engine architecture
 
-Status: **proposed**, 2026-09-23. Not normative. The normative contract is the
-spec corpus under `specs/`, and nothing here binds code until the spec that
-carries it is `approved`. The discussion archive under `discussions/` is
-rationale, not contract.
+Status: **proposed**, 2026-09-23; reconciled the same day with the owner's
+decisions R-01 to R-06 and the approved corrections to specs `001` and `002`.
+Not normative. The normative contract is the spec corpus under `specs/`, and
+nothing here binds code except through an `approved` spec. The discussion
+archive under `discussions/` is rationale, not contract.
 
 This document answers the first architectural deliverable named in the
 ecosystem brief: a Rustev design covering its boundaries, its extension
@@ -82,22 +83,27 @@ semantic judgment is required. This design commits to that center.
    default, with snapshot retention chosen per plan. A case whose inputs were
    erased replays as `incomparable: inputs-erased`, never as a pass or a
    silent drop. Section 10.
-3. **Where authority can still leak.** "Confidence must never enlarge
-   authority" is enforceable when the authority function cannot see the
-   judgment. Section 5.2 states it as a signature rule: the permitted set is
-   computed from trusted facts alone, and the judgment may only narrow within
-   it (act, confirm, escalate).
+3. **Where authority can still leak.** Rustev produces proposals, never
+   grants. Keeping the judgment out of the authority function's signature is a
+   useful restriction, but it is not proof: a model-derived value can still be
+   copied into an input the application treats as a trusted fact. Section 5.2
+   states the rule and its limit; provenance (section 12) is what lets the
+   application refuse model-derived values as authority inputs.
 4. **Calibration is not a backend capability.** A backend returns what it
    computes. A calibration map is a separate artifact, bound to a backend
    artifact, a task, a question, a dataset and a method, and applied by the
-   core. Only a plan bound to one may emit `CalibratedProbability`.
+   core. Only a plan bound to one may emit `CalibratedProbability`. Applying
+   it establishes which transformation was applied and its binding; whether
+   the result is calibrated is measured on named evaluation data and
+   conditions, and can fail under distribution shift.
 5. **Evaluation as governance evidence.** When Statecraft accepts a change to a
    plan, a model binding or a calibration artifact, the evaluator
    configuration and the datasets it reads are members of the authority set:
    they are read at the trusted base, never from the candidate. Otherwise a
    candidate could lower its own bar.
-6. **Self-generated evidence.** A recommendation Rustev produced is never
-   admitted as evidence of the preference it was based on. Outcome adapters
+6. **Self-generated evidence.** A recommendation Rustev produced is evidence
+   that the system produced it, never independent evidence of the preference
+   or fact it was based on. Outcome adapters
    record what the actor did, with the exposure that preceded it. Section 12.
 
 ### 1.4 Risks the inputs understate
@@ -105,11 +111,10 @@ semantic judgment is required. This design commits to that center.
 - **No real datasets exist yet** for either reference domain. Synthetic
   fixtures establish mechanics (validation, abstention, replay, capability
   refusal). They cannot establish quality, and increment 2's baseline must say
-  which of the two it measured. Open decision `R-04`.
-- **Aicortex and Rahi are specified, not complete.** Aicortex's corpus is
-  `approved` and largely `pending`; Rahi is at a 0.2.0 candidate with an N=1
-  supported topology. Rustev integrations target their published contracts
-  only, and nothing in Rustev's core may wait on either.
+  which of the two it measured. Owner decision `R-04`.
+- **Aicortex and Rahi were not assessed beyond their README summaries**,
+  and nothing here claims their readiness. Rustev integrations target their
+  published contracts only, and nothing in Rustev's core may wait on either.
 - **The traveler application is referenced but not present** in this
   workspace. It is treated as an external consumer whose needs inform the
   lodging reference plan, not as a source of requirements.
@@ -136,12 +141,13 @@ service as a requirement.
 
 | Component | Owns | Must not absorb |
 |---|---|---|
-| **spec-spine** | Contracts, obligations, ownership, declared dependencies | Runtime inference, operational permissions, application state |
-| **Rustev** | Compiling and executing typed decision plans: exact computation, semantic backends behind capability contracts, selection policy, runtime bounds, evidence emission, evaluation machinery | The knowledge store, authority, arbitrary agent workflows, identity |
+| **spec-spine** | Governance semantics and contract identity: obligations, ownership, declared dependencies | Runtime inference, operational permissions, application state |
+| **Rustev** | Decision computation and selection policy: exact computation, semantic backends behind capability contracts, selection policy, runtime bounds, evidence emission, evaluation machinery | The knowledge store, authority, action execution, arbitrary agent workflows, identity |
 | **Aicortex** | Attributed claims: sources, actors, trust classes, revisions, validity, corrections, retrieval, lifecycle, outcome-derived observations | Deciding that recalled content is authoritative, or that an action is permitted |
-| **Rahi** | Identity, storage, operational enforcement, durable audit, hosting chassis | Domain judgment, model-quality assessment |
+| **Rahi** | Optional operational infrastructure and enforcement: identity, storage, durable audit, hosting chassis | Domain judgment, model-quality assessment |
 | **statecraft-cli** | Governing development; independently accepting changes to all of the above and to application packages | Serving production decision requests |
 | **Domain packages** | Task schemas, decision definitions, evaluators, integrations, selection policy for their domain | Reimplementing shared machinery |
+| **Applications** | Authorization, action execution, domain-specific authority policy | Delegating authorization to a judgment |
 
 ### 3.2 Dependency direction
 
@@ -158,8 +164,10 @@ service as a requirement.
 
 Arrows point at what is depended on. `rustev-contract` is the only Rustev
 crate an outside project needs in order to read Rustev's records and reports.
-No Rustev crate outside `integrations/` depends on Aicortex, Rahi or
-statecraft-cli.
+No Rustev crate outside `integrations/` depends on Aicortex, Rahi,
+statecraft-cli or an HTTP stack; `rustev-contract` and `rustev-core` also
+depend on no async runtime executor. Rustev is usable without any of the other
+ecosystem projects.
 
 ### 3.3 Partial adoption
 
@@ -200,30 +208,35 @@ with no path dependency on the omitted crates.
 | 2 | Validate structure, provenance and freshness requirements | Rustev core | `ValidatedContext` or `Unresolved::MissingEvidence` / `InvalidInput` |
 | 3 | Run exact and semantic steps | Rustev runtime over core | step values, trace |
 | 4 | Produce a typed judgment, possibly unresolved | Rustev core (selection policy) | `Judgment<P>` |
-| 5 | Apply authority policy | Application | `Permitted<A>` or refusal |
+| 5 | Apply authority policy | Application | an application-owned authorization, or refusal |
 | 6 | Execute the permitted effect | Action executor | `ExecutionRecord` |
 | 7 | Record the observed outcome | Outcome adapter, evidence sink | `OutcomeRecord`, optional proposed `Observation` |
 
 Steps 1 to 4 are Rustev's. Steps 5 and 6 are the application's. Step 7 is
 shared through contracts.
 
-### 5.2 The authority rule, as a signature property
+### 5.2 Proposals, never grants
+
+Rustev produces proposals and unresolved outcomes. Before any effect, the
+application validates the requested action, resource, parameters, principal,
+scope and current revision against its own authority policy. Model output
+cannot create or broaden permissions: a judgment may lead the application to a
+narrower disposition (act, confirm, escalate, refuse) within what it permits,
+never to a wider one.
 
 ```rust
-// Application-owned. The signature has no Judgment in it: what is permitted is
-// computed from trusted facts alone.
-fn permitted(principal: &Principal, scope: &Scope, revision: &Revision) -> PermittedSet<A>;
-
-// The judgment may only choose within, or narrow, what was permitted.
-fn resolve<A>(proposal: &Proposal<A>, permitted: &PermittedSet<A>) -> Disposition<A>;
-// Disposition::{Act(A), Confirm(A), Escalate(reason), Refuse(reason)}
+// Application-owned, sketched for illustration only. No Judgment in the
+// signature: what is permitted is computed from trusted facts.
+fn authorize(action: &RequestedAction, principal: &Principal, scope: &Scope,
+             revision: &Revision) -> Result<AppAuthorization, Refusal>;
 ```
 
-Rustev's crates do not define `Principal`, `Permitted` or any type an
-executor accepts as authorization. The optional `rustev-act` helper (section
-15) may supply the `resolve` shape generically, but never `permitted`. A
-confidence threshold may turn `Act` into `Confirm`; nothing turns a refusal
-into `Act`.
+Rustev's crates define no `Principal`, no `Permitted` and no type an executor
+accepts as authorization. The limit of this rule is stated in spec `001`: a
+signature that excludes `Judgment` restricts Rustev-supplied interfaces; it
+does not prove a model-derived value was not copied into another input. Every
+Rustev value therefore carries its derivation class (section 12), so the
+application can refuse model-derived values as authority inputs.
 
 Example from the brief: a model judges that an imported statement probably
 expresses a durable preference. The judgment is a `Proposal` to write. The
@@ -287,19 +300,22 @@ Rules the core enforces:
 - **Selection policy**: a deterministic table or expression over values.
 - **Outputs**: schema of the judgment, and the evidence it must carry.
 
-### 7.2 Authoring form (recommendation `R-02`)
+### 7.2 Authoring form (owner decision `R-02`)
 
-Packages author definitions with a typed Rust builder. The builder emits the
-**canonical definition document** (canonical JSON), which is what is
-identified, reviewed and compiled. Each package commits the emitted document
-as a golden file, so a review sees a data diff and statecraft can classify it.
-Operators referenced by the document are registered, versioned Rust
-implementations; the document never carries code.
+Owner decision R-02. Packages author definitions with a typed Rust builder
+or supply versioned canonical JSON; both enter the same validated
+representation, so there is one source of behavior. Each package commits the
+emitted document as a golden compatibility fixture, so a review sees a data
+diff and statecraft can classify it. Operators referenced by the document are
+registered, versioned Rust implementations; the document never carries code.
 
 ### 7.3 Compilation phases
 
-1. **Parse and bound**: byte and depth limits before allocation, duplicate
-   keys refused, unknown fields refused, fallible constructors only.
+1. **Parse and bound**: the supplied bytes are scanned against total-size,
+   nesting, string, collection and cumulative value-count limits before any
+   typed value is constructed; duplicate keys and unknown fields are refused;
+   constructors are fallible. Reading bytes from a transport, and bounding that
+   buffer, is the transport's job, not the parser's.
 2. **Resolve**: operator ids and versions, input schemas, calibration
    artifacts.
 3. **Type check**: value kinds flow correctly across the DAG (section 6).
@@ -320,8 +336,8 @@ implementations; the document never carries code.
 
 ### 7.4 Identities
 
-All identities are digests over canonical bytes (candidate library:
-`canonical-keysort-json`, to be evaluated rather than assumed).
+All identities are digests over canonical bytes; spec `002` fixes the
+canonical form and the digest composition.
 `DefinitionId`, `PlanId`, `ArtifactId` (model, tokenizer, preprocessing,
 truncation policy, precision), `CalibrationId`, `SnapshotId`, `DatasetId`,
 `EvaluatorConfigId`, `DecisionId` (a per-execution id, not a digest).
@@ -329,8 +345,10 @@ truncation policy, precision), `CalibrationId`, `SnapshotId`, `DatasetId`,
 ## 8. The five seams
 
 First implementation: Rust traits with explicit composition for trusted,
-in-process components, plus a versioned request/response protocol in
-`rustev-contract` for remote adapters. No dynamic loading.
+in-process components, plus a versioned, transport-neutral request/response
+protocol in `rustev-contract` for remote adapters. Network implementations of
+that protocol (HTTP client and server) live under `integrations/`. No dynamic
+loading.
 
 Every seam call receives a `CallContext`: deadline, budget reservation,
 cancellation signal, trace id, and an opaque tenant/principal handle supplied
@@ -403,17 +421,17 @@ loss is never silent.
 
 ### 8.5 Action executor
 
-Contract only; Rustev core never calls one. Lives in the optional
-`rustev-act` helper for adopters who want the shape.
+Not part of increment 1, and never called by Rustev core. If an optional
+helper is ever supplied, its interface is generic over an authorization type
+the application owns, which Rustev never constructs:
 
 ```rust
-trait ActionExecutor<A> {
-    fn execute(&self, action: Permitted<A>, key: IdempotencyKey, cx: &CallContext)
-        -> BoxFuture<'_, Result<ExecutionRecord, ExecError>>;
+trait ActionExecutor<A, Auth> {
+    fn execute(&self, action: A, authorization: Auth, key: IdempotencyKey,
+               cx: &CallContext) -> BoxFuture<'_, Result<ExecutionRecord, ExecError>>;
 }
 ```
 
-`Permitted<A>` is constructed only by the application's authority policy.
 Validation, idempotency and outcome recording are the executor's obligations.
 
 ## 9. Runtime
@@ -441,9 +459,10 @@ Validation, idempotency and outcome recording are the executor's obligations.
 - **Cancellation honesty**: the evidence record states when a cancelled
   remote call may still have run or been charged, as the backend declared.
 
-Recommendation `R-03`: the runtime is executor-agnostic (`futures` plus an
-injected clock and spawner), with a `tokio` feature that supplies defaults.
-The core has no clock at all; time is an input.
+Owner decision R-03: contract and core are executor-independent; the first
+runtime uses Tokio, behind explicit time, cancellation and scheduling
+boundaries where useful. No general executor abstraction is built and no
+other executor is promised. The core has no clock at all; time is an input.
 
 ## 10. Evidence and replay
 
@@ -504,8 +523,11 @@ The cycle:
 
 Rules:
 
-- A Rustev output is `model-derived` provenance. It is never admitted as
-  evidence of the preference, fact or claim it was computed from.
+- Every Rustev value carries a derivation class, `exact-derived`,
+  `model-derived` or `mixed-derived`, and its input lineage. Not every result
+  is model-derived: an exact count over system-of-record events is
+  exact-derived. A decision is evidence that the system produced it, never
+  independent evidence of the preference, fact or claim it was computed from.
 - Correction, revocation and erasure arrive through the context source's
   invalidation stream and purge caches keyed on the affected snapshot fields;
   derived artifacts (calibration maps, evaluation datasets) record their
@@ -524,17 +546,23 @@ The enforceable boundary, carried from `005`:
 - Model output is validated before selection policy reads it.
 - Authorization uses trusted application facts and never a judgment (5.2).
 - Missing or invalid evidence produces `Unresolved`, never a default.
-- Input bounds are separate controls: transport byte limits, bounded parsing,
-  aggregate token and work budgets, fallible validated constructors.
+- Input bounds are separate controls: transport byte limits (owned by the
+  transport), bounded parsing of supplied bytes before typed construction,
+  aggregate token and work budgets, fallible validated constructors. A check
+  after deserialization cannot undo an allocation already made, so the bounds
+  that matter are enforced before it.
 
 Not claimed: resistance of any semantic backend to adversarial content.
 Injection heuristics may contribute a signal step; they establish nothing.
 
 ## 14. Determinism promises
 
-1. **Deterministic selection**: identical validated inputs, `PlanId` and step
-   values produce an identical judgment and control flow. Tested by property
-   tests and replay.
+1. **Byte determinism**, scoped: canonical compilation (definition and plan
+   documents and their identities) and explicitly defined exact computation
+   (spec `002` lists which operations qualify) produce identical bytes for
+   identical inputs. Selection over identical validated inputs, `PlanId` and
+   step values produces an identical judgment. Runtime observations (latency,
+   cost, scheduling) are recorded, never promised to repeat.
 2. **Numerical repeatability**: per backend, measured tolerances for a pinned
    artifact and configuration, declared in its capabilities and checked by
    `rustev-eval`.
@@ -558,12 +586,13 @@ rustev/
     rustev-eval/                   datasets, replay comparison, metrics, calibration fitting,
                                    regression reports.
     rustev-cli/                    `rustev`: plan check|show|compile, run, replay, eval, calibrate.
-    rustev-act/                    optional: Proposal/Disposition/Permitted shapes, ActionExecutor.
+    rustev-act/                    optional, not before evidence of need: ActionExecutor<A, Auth>
+                                   generic over an application-owned authorization type.
   backends/
     rustev-backend-rules/          deterministic backend: rules, lookup tables, linear heads over
                                    exact features. Reference and test double.
     rustev-backend-<semantic>/     first semantic backend (R-01).
-    rustev-backend-remote/         client and server for the remote adapter protocol.
+                                   (the remote protocol's messages are in rustev-contract)
   packages/
     rustev-pkg-support-routing/    reference plan 16.1: definition, golden document, evaluator.
     rustev-pkg-lodging/            reference plan 16.2.
@@ -571,6 +600,9 @@ rustev/
     rustev-aicortex/               context source over Aicortex claims; observation proposer.
     rustev-rahi/                   hosting and evidence sink on Rahi.
     rustev-serve/                  optional HTTP surface.
+    rustev-remote-http/            HTTP client and server for the remote adapter protocol.
+  tools/
+    rustev-boundaries/             workspace dependency-rule check (spec 001).
   fixtures/                        synthetic datasets, golden definitions and plans, replay cases.
 ```
 
@@ -580,9 +612,11 @@ Dependency rules, enforced by a workspace test over `cargo metadata`:
 - `backends/*` depend on `core` and `contract`, never on `runtime`.
 - `packages/*` depend on `core` and `contract`; `runtime`, backends and
   `eval` only as dev-dependencies.
-- Only `integrations/*` may depend on Aicortex, Rahi or HTTP stacks, and no
-  crate depends on an integration.
-- `rustev-core` has no dependency that performs I/O or reads the clock.
+- Only `integrations/*` may depend on Aicortex, Rahi, statecraft-cli or HTTP
+  stacks, and no crate depends on an integration.
+- `rustev-contract` and `rustev-core` have no async runtime executor, HTTP or
+  ecosystem dependency, even transitively; `rustev-core` has no dependency
+  that performs I/O or reads the clock.
 
 One crate has one owning spec, the convention statecraft-cli uses.
 
@@ -689,7 +723,7 @@ proposition calibration where labels exist.
 |---|---|---|
 | 1. Contract and pure core | `rustev-contract`, `rustev-core`: value kinds, identities, validation, operator registry, compiler with capability matching, selection policy, unresolved outcomes | Both reference definitions compile; each refusal class in section 7.3 has a failing case; property tests for determinism promise 1 |
 | 2. Runtime and evaluation | `rustev-runtime`, `rustev-eval`, `rustev-backend-rules`, one semantic backend, `rustev-cli` | Traces and replay reproduce judgments; a baseline report exists for each reference task, labeled synthetic or real; failure behavior (deadline, budget, backend error, sink failure) covered |
-| 3. Two domain packages | `rustev-pkg-support-routing`, `rustev-pkg-lodging`, second semantic backend or remote adapter | No core change was needed for the second package; a backend swap produces a comparable report and no change in any authority path; partial adoption builds (3.3) pass |
+| 3. Two domain packages | `rustev-pkg-support-routing`, `rustev-pkg-lodging`, second semantic backend or remote adapter (network side under `integrations/`) | No core change was needed for the second package; a backend swap produces a comparable report and no change in any authority path; partial adoption builds (3.3) pass |
 | 4. Ecosystem integrations | `rustev-aicortex`, `rustev-rahi`, `rustev-serve`, spec-spine contract references, statecraft acceptance of a plan change | Standalone library build still passes with no integration crate |
 
 Behind later evidence gates, by name: custom model training, distributed
@@ -713,16 +747,17 @@ Ordinals are build order. Only `001` and `002` are filed now, as drafts.
 | 009 | Remote adapter protocol | 3 |
 | 010 | Integrations | 4 |
 
-## 18. Open decisions for the owner
+## 18. Owner decisions
 
-| Id | Decision | Recommendation |
-|---|---|---|
-| R-01 | First semantic backend | Frozen sentence embeddings plus a linear head, served via ONNX Runtime (`ort`): honest logits, local, cheap to calibrate. A remote LLM adapter follows in increment 3 as the swap that proves pluggability. |
-| R-02 | Definition authoring form | Typed Rust builder emitting a canonical JSON document, committed as a golden file. |
-| R-03 | Async stance | Executor-agnostic runtime with a `tokio` feature; no clock in core. |
-| R-04 | Datasets for the reference domains | Owner to name a source for real labeled data in at least one domain before increment 2's gate; synthetic otherwise, labeled as such. |
-| R-05 | Primitive names | `classify`, `proposition`, `rubric`, `rank`; no Jev naming. |
-| R-06 | Eval report contract location | A module of `rustev-contract` until a second consumer justifies a crate. |
+The six questions this section raised were decided by the owner on
+2026-09-23. The decisions, with their limits, are recorded in
+`docs/decisions/00-founding-decisions.md` (R-01 to R-06): frozen embeddings
+plus a linear head as the first semantic-backend candidate, with `ort` subject
+to a bounded check; a typed builder and canonical JSON entering one validated
+representation; Tokio for the first runtime with an executor-independent
+core; synthetic fixtures for infrastructure and real, independently labeled
+data before quality claims; `classify`, `proposition`, `rubric`, `rank`; and
+the evaluation report envelope in `rustev-contract`.
 
 ## 19. Deferred, by name
 

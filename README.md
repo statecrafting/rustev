@@ -6,17 +6,18 @@ compiled into a plan: exact computation in Rust, semantic questions answered by
 interchangeable backends that disclose what they can return, explicit
 abstention, bounded execution, and an evidence record for every decision.
 
-Rustev produces judgments. It does not grant authority, own knowledge, or
-execute effects; those belong to the application and to neighbouring
-components (Aicortex, Rahi, statecraft-cli), each optional.
+Rustev produces proposals, never grants. It does not authorize, own knowledge,
+or execute effects; those belong to the application and to neighbouring
+components (Aicortex, Rahi, statecraft-cli), each optional. Rustev is usable
+without any of them.
 
 ## Status
 
-Specified in draft, not implemented. Nothing is released.
+Spec `001` (boundaries and authority) is approved. Nothing is released.
 
 - Design (proposed): [docs/design/001-decision-engine-architecture.md](docs/design/001-decision-engine-architecture.md)
 - Decisions: [docs/decisions/00-founding-decisions.md](docs/decisions/00-founding-decisions.md)
-- Specs: `001` boundaries and authority, `002` decision contract and pure core, both `draft`.
+- Specs: `001` boundaries and authority (approved), `002` decision contract and pure core.
 
 ## Governance
 

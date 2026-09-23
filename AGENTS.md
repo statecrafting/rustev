@@ -23,16 +23,24 @@ capability contracts, and explicit abstention. Start with
 
 ## Boundaries that bind every change
 
-- Judgment is not authority: no Rustev crate defines or produces a value an
-  action executor accepts as authorization, and no authority function takes a
-  judgment as input.
-- Value kinds (scores, distributions, calibrated probabilities, ordinal levels,
-  ranks) never convert silently; missing or invalid evidence is `Unresolved`,
-  never a default.
-- Only `integrations/*` may depend on Aicortex, Rahi or an HTTP stack.
+Normative text: spec `001` and constitution principles VI onward.
+
+- Proposals, never grants: no Rustev crate defines or produces a value an
+  action executor accepts as authorization, and none defines a `Permitted`
+  type. Excluding `Judgment` from a signature is a restriction, not proof
+  against laundering; derivation classes are the mitigation.
+- Every value carries a derivation class (`exact-derived`, `model-derived`,
+  `mixed-derived`) and its lineage.
+- Value kinds (scores, distributions, calibrated probabilities, labels,
+  ordinal levels, ranks) never convert silently; missing, stale, conflicting
+  or invalid evidence is `Unresolved`, never a default.
+- Only `integrations/*` may depend on Aicortex, Rahi, statecraft-cli or an
+  HTTP stack; `rustev-contract` and `rustev-core` also take no async runtime.
+  `make boundaries` checks this.
 - `rustev-core` performs no I/O, reads no clock, and forbids `unsafe`.
 
 ## Code checks
 
-`make code` runs build, test, clippy (`-D warnings`) and fmt across the
-workspace once a crate exists.
+`make code` runs build, test, clippy (`-D warnings`), fmt and the boundary
+check across the workspace. `spec-spine verify <id>` runs a spec's declared
+acceptance.
