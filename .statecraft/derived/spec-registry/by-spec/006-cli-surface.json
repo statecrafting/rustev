@@ -4,7 +4,8 @@
     "dependsOn": [
       "002-decision-contract-and-pure-core",
       "003-runtime-execution-and-evidence",
-      "004-evaluation-and-replay"
+      "004-evaluation-and-replay",
+      "005-reference-backends"
     ],
     "establishes": [
       {
@@ -15,12 +16,12 @@
     "id": "006-cli-surface",
     "implementation": "pending",
     "sectionDigests": {
-      "006-cli-surface": "cba17238285dce8bc30202489f8e2c46e62161f04b191b1d3c42a252c630b856",
+      "006-cli-surface": "49aeaf1610a56084fde68cc8e1e5eabe7fad2551c0efdebac49d30a6414d1583",
       "1-purpose": "efa6849c78b10d39c954a1a681df2c5ff8b9e181111433a7a01260cd4d2b4c7e",
       "2-territory": "32ca40a82d9e4c63d91d54cf682bae44d53fed45d1eff494eb1278bde0db3eb3",
-      "3-behavior-to-be-made-concrete-before-approval": "7b8b258051bfd675735190e36b69f032c11d1a71440b0472e6f5b24672517168",
+      "3-behavior-to-be-made-concrete-before-approval": "23449b293e324bc92333e81581b15bc2b015ea36db308a9dc0a4edb3345d5724",
       "4-out-of-scope": "0a8604d7d5563d1a160ad95e110e095e464b9b5626adf4d52b3e8a20eb2cf6ac",
-      "acceptance-draft": "9013bbf085688585e532c7c02bde58008027e62ef107831d803f263243c2f503"
+      "acceptance-draft": "67759cba17f487a7603fb871dfd01d37e951542320c70e620d09167185928598"
     },
     "sectionHeadings": [
       "006: CLI surface",
@@ -32,9 +33,9 @@
     ],
     "specPath": "specs/006-cli-surface/spec.md",
     "status": "draft",
-    "summary": "Increment 2: `rustev`, a command-line surface over the library: plan check, show and compile against descriptor and calibration files; run and replay with a declared backend configuration; eval and calibrate over named datasets. No hosting, no HTTP.\n",
+    "summary": "Increment 2: `rustev`, a command-line surface over the library: plan check, show and compile against descriptor, calibration and execution-policy files; run and replay with a declared backend configuration through `rustev-runtime`; eval and calibrate over named datasets. No hosting, no HTTP.\n",
     "title": "CLI surface"
   },
-  "shardHash": "b6a4c3df23c53c9df6935b1a2424b71e068f57ca8340f3c64e8029bc5b16bb05",
+  "shardHash": "714f0282721f02f802441b3b5e29c8912603caa5028ce75944bce3ebc934e107",
   "specVersion": "1.8.0"
 }

@@ -14,12 +14,12 @@
     "id": "004-evaluation-and-replay",
     "implementation": "pending",
     "sectionDigests": {
-      "004-evaluation-and-replay": "f2d55963c57ab78f20fec23c2d928a4665261903c46272fe72fd9bd1de831cb3",
+      "004-evaluation-and-replay": "c527b75ed4c0f9f12b8bb73e0ac6da20d1191ab7d06d96114a5853b669d5eff3",
       "1-purpose": "2720718c19fe86121254b250f54005a150c681be0f564a917e6d7f07ca0ed131",
-      "2-territory": "8de0181b73ff95f6174f01d81a4e0ab7ce4b7f15402a875f086af5b1271054cb",
-      "3-behavior-to-be-made-concrete-before-approval": "0c2f2d4658a63baa9ffa46a42b75a2c6706dddb67281c2a952b781453ef5a03d",
+      "2-territory": "e98c2c680a8a3461bbe45cf299151a072625079e6779695d9135b0917de02b17",
+      "3-behavior-to-be-made-concrete-before-approval": "146256b04cc6632f77ad0a00bf9a341caa1734933e2225f0ca4b6ff8b7d68299",
       "4-out-of-scope": "1a961660da5313a0aeac4bc82299ed671efb8f7e7c56b318f25fce608bc82aa4",
-      "acceptance-draft": "cb24fc129c1df80da3760b5dc0f696e51ac6a456f34025e8f6134d96394eec87"
+      "acceptance-draft": "20dc56a3747d1cbdc5fe26d749aae4fd010239063006ee12e48f5ec52ece2d38"
     },
     "sectionHeadings": [
       "004: Evaluation and replay",
@@ -31,9 +31,9 @@
     ],
     "specPath": "specs/004-evaluation-and-replay/spec.md",
     "status": "draft",
-    "summary": "Increment 2: `rustev-eval` replays plans over recorded snapshots, compares baseline and candidate per case and subgroup, computes metrics including calibration and coverage against error among accepted decisions, fits calibration artifacts on a named split, and emits the versioned report envelope from `rustev-contract` (R-06). Quality claims require real, independently labeled data (R-04).\n",
+    "summary": "Increment 2: `rustev-eval` replays plans over retained snapshots and backend outputs, compares baseline and candidate per case and subgroup, computes metrics including calibration and coverage against error among accepted decisions, fits calibration artifacts on a named split, and emits the versioned report envelope from `rustev-contract` (R-06). Reads `rustev.run/1` records for latency and cost with their certainty labels. Quality claims require real, independently labeled data (R-04).\n",
     "title": "Evaluation and replay"
   },
-  "shardHash": "c0f1465951e261df548b6c049461d83ee250bb7a9f452a77b14b8fabe719ed93",
+  "shardHash": "6f141f81c3a4655b53926181c4e81b34bc6a1ac00ae8830f4394bc30faa24b96",
   "specVersion": "1.8.0"
 }

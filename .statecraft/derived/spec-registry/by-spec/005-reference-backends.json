@@ -2,7 +2,8 @@
   "record": {
     "created": "2026-09-23",
     "dependsOn": [
-      "002-decision-contract-and-pure-core"
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence"
     ],
     "establishes": [
       {
@@ -13,12 +14,12 @@
     "id": "005-reference-backends",
     "implementation": "pending",
     "sectionDigests": {
-      "005-reference-backends": "2994fe80b119d8d7b5f222e597428aeb668477b740336dd02e83001fc8d25b1c",
-      "1-purpose": "2e6448579c0ce5a4f19347897e6dad6f275d822f2254c50bcbfa71b2897e9df5",
-      "2-territory": "54d25645b152fe5c51845539be0e7d0cd39b0a5204423c957d462f15808c05fd",
-      "3-behavior-to-be-made-concrete-before-approval": "eeba04ef209ad34ddcb19b350bd4780deaec6aa9c2a71868fc5fab3ae9164a2f",
+      "005-reference-backends": "17cf6389f548086377aff385ac572a4f5faee6256dd18306cb98ae090ec21261",
+      "1-purpose": "9046ea37cd9d4fbdc15f6e5c50347a7e410cce9d9231248798c19898e09bc7d4",
+      "2-territory": "c73b3483fdc110282c2a0b05948ac96f5cf4694eb009ffa67166c7f9cf8ab726",
+      "3-behavior-to-be-made-concrete-before-approval": "d93fd82edb5fd6c815651247348f5cf172f20242372254d934bda8e43dfd956e",
       "4-out-of-scope": "f45381b6e6bdd48a914ba802480812554d2586a9708a9861f0b9fc76b6759c86",
-      "acceptance-draft": "cdb29b21a5762aa9eece4bc6374a6c1169c7d4aac68e0a434504880bfb85e255"
+      "acceptance-draft": "2f41303225aa81132d20e11c8d987d13b8ed29af5805a1ac5b6bba08bcee0af2"
     },
     "sectionHeadings": [
       "005: Reference backends",
@@ -30,9 +31,9 @@
     ],
     "specPath": "specs/005-reference-backends/spec.md",
     "status": "draft",
-    "summary": "Increment 2: `rustev-backend-rules`, a deterministic backend (rules, lookup tables, linear heads over exact features) used as reference and test double; and the first semantic backend candidate, frozen embeddings plus a task-specific linear head (R-01), with ONNX Runtime through `ort` preferred only after a bounded compatibility, licensing, operator, linking, packaging and resource check.\n",
+    "summary": "Increment 2: `rustev-backend-rules`, a deterministic backend (rules, lookup tables, linear heads over exact features) implementing the backend seam as amended by spec 003, used as a reference and in spec 004 and 006; and the first semantic backend candidate, frozen embeddings plus a task-specific linear head (R-01), with ONNX Runtime through `ort` preferred only after a bounded compatibility, licensing, operator, linking, packaging and resource check.\n",
     "title": "Reference backends"
   },
-  "shardHash": "e26b5bad79a343bd30acd90a71027c66568c4c5618a9247ef07fee2d039ea756",
+  "shardHash": "66b93c7ebe372e12a5eb6a1173bfce8e4169d7799c62e37d0ce2f65b048535df",
   "specVersion": "1.8.0"
 }
