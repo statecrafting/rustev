@@ -70,6 +70,7 @@ extra_hashed_inputs = [
   "AGENTS.md",
   "Makefile",
   ".gitignore",
+  "Cargo.toml",
 ]
 # Directories the symbol resolver and the coverage walk skip.
 resolver_exclusions = ["target", "node_modules", ".statecraft/derived", "dist", "build", ".next", ".tooling"]
@@ -93,7 +94,7 @@ bypass_prefixes = []
 # C-002: refuse a changed source file that no spec specifically claims.
 # Off to start: a corpus turns this on once its coverage debt is retired.
 # `spec-spine index coverage` reports where you stand.
-require_ownership = false
+require_ownership = true
 # Clear a diff whose every non-bypassed path is a dependency-only
 # manifest edit. Off to start; turn it on if a bot opens bump PRs, which
 # cannot add a waiver line to their own body.
@@ -107,6 +108,9 @@ require_ordinal_monotonic_depends_on = false
 # L-008 suppression: claimed paths deliberately in no content hash.
 # `index check` still reports the count, so an exception stays explicit.
 # unwitnessed_allowed = ["crates/**/*.rs"]
+# The lockfile is generated and bypassed by the coupling floor; hashing it
+# would restamp every shard on each dependency resolution (spec 001).
+unwitnessed_allowed = ["Cargo.lock"]
 
 [coverage]
 # Paths the ownership ratchet governs whatever their extension and
@@ -115,6 +119,8 @@ require_ordinal_monotonic_depends_on = false
 # extra_hashed_inputs, trap included: `dir/**` matches no files, use
 # `dir/**/*`. A bypassed or resolver-excluded path stays out.
 # governed_scope = ["AGENTS.md", "scripts/*"]
+# Enabled 2026-09-23 with the first source file (spec 001).
+governed_scope = ["Cargo.toml", "Makefile"]
 # Carved back out of governed_scope only (generated or vendored files).
 # governed_scope_exclusions = []
 

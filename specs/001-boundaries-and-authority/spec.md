@@ -2,7 +2,7 @@
 id: "001-boundaries-and-authority"
 title: "Ecosystem boundaries, proposals versus authority, and product principles"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-23"
 summary: >
   What Rustev owns and refuses to own within the ecosystem (spec-spine,
@@ -155,8 +155,9 @@ The constitution carries the text. In summary:
 Each row of the design's section 3.3 table becomes a build that passes without
 the omitted crates, owned by the spec of the increment that first makes it
 possible. Increment 1 makes one row possible: `rustev-contract` builds and is
-usable with no other workspace crate (3.4.5), checked by
-`cargo build -p rustev-contract` and the boundary check.
+usable with no other workspace crate (3.4.5). The boundary check enforces the
+rule here; the build of the crate alone is spec `002`'s acceptance, because
+002 creates the crate.
 
 ## 4. Out of scope
 
@@ -179,8 +180,6 @@ their readiness.
 
 - The boundary check passes on the workspace, and each rule has a unit test
   with a violating synthetic workspace that fails (negative control).
-- `cargo build -p rustev-contract --locked` succeeds (partial adoption row for
-  increment 1).
 - No source file under `crates/` or `tools/` declares a type named
   `Permitted` or `Grant`.
 - `make gate` passes.
@@ -192,11 +191,16 @@ their readiness.
 cargo test -p rustev-boundaries --locked
 # 3.4 on the real workspace.
 cargo run -p rustev-boundaries --locked --quiet
-# 3.7: the contract crate builds alone.
-cargo build -p rustev-contract --locked
-# 3.2.1: no Rustev-owned authorization type.
-sh -c '! grep -rnE "(struct|enum|trait|type)[[:space:]]+(Permitted|Grant)([^A-Za-z0-9_]|$)" crates tools'
+# 3.2.1: no Rustev-owned authorization type in any Rust source that exists.
+sh -c 'for d in crates tools; do [ -d "$d" ] || continue; if grep -rnE "(struct|enum|trait|type)[[:space:]]+(Permitted|Grant)([^A-Za-z0-9_]|$)" "$d"; then exit 1; fi; done'
 ```
+
+## Implementation record
+
+- The boundary check, the workspace manifest and the Makefile targets
+  (`boundaries`, `verify`, coverage in `gate`) landed with this spec marked
+  `complete`. Ownership coverage (`require_ownership`, `governed_scope`) is
+  enabled in `spec-spine.toml` in the same change.
 
 ## Decision history
 

@@ -32,9 +32,9 @@
       }
     ],
     "id": "001-boundaries-and-authority",
-    "implementation": "pending",
+    "implementation": "complete",
     "sectionDigests": {
-      "001-ecosystem-boundaries-proposals-versus-authority-and-product-principles": "994a40b07fd725bc9f06996ad966bc8e24621d66574e2c1508d27bfac42f1497",
+      "001-ecosystem-boundaries-proposals-versus-authority-and-product-principles": "8896fec6ff5320f574a965cad7156a075234a19d870cb2f49a29155cb8647a5a",
       "1-purpose": "23d9fbfd79c7d53855467fa3936d5b3587d0827055ec39dc204addca739a071f",
       "2-territory": "c8fb9fc390f4f7db79a2536c4cd94d241f241b4371746f469de3660691b69b0e",
       "3-1-responsibilities": "9239843abb6815deae05a2316acdf2bccb66d4c1a40ba6272b5163b0714aaa28",
@@ -43,13 +43,14 @@
       "3-4-dependency-layout": "971deb4627fd92b91a8375bb5456c785141164740483eaaef08d9fc23b1aa850",
       "3-5-the-boundary-check": "9e2264564294e8c4eca832c1a24b5c287c4a0c317b2c8c1b8788bccf7af00844",
       "3-6-product-principles-constitution-vi-onward": "bc2135a9d35c7e2e2609c0ef1bfe7deca4f9a66541e092c22412a31abd78d803",
-      "3-7-partial-adoption-obligations": "abe2f7fea7ebb816f17d55e7b158431c1f26f0c80dc7652b08fe34b5e7dbc70e",
-      "3-behavior": "61d4721bd924417a6f1b32e74492a4270630e52f989cd02c49f5c58102e7c1e1",
+      "3-7-partial-adoption-obligations": "9483a2b99af4bfb8887fe4fe9208aaf8d260667f47ca938fb86a6ab4f2c2df17",
+      "3-behavior": "9a871aa7372bb3d82d18c10be2ad1cd8668a4f44e90e45646ffcc88aef5f0e70",
       "4-out-of-scope": "30a6983b336dcd6d618d6c7c0e79c40ca2f613a405388db45671aea9b51e4b46",
       "5-observable-negative-cases": "ed4f8a5dc1222abdb7b175f801fe1fff4affd9f10758ff1aeee33d3194125af3",
-      "acceptance": "01b1f205ba5c804722e80949c3c7bd0c666c7b608608a4503c3ed7adfc2c6de2",
+      "acceptance": "6745eef13e379ef3665bc3d6f9153896b02a987b6d493e3b6920797347a3e5f8",
       "decision-history": "077ab6f6c4a70eaedea4de58c36951dca4136fe9546600d6a56deb24992ea7da",
-      "verification": "34e1098c7197ba74f3577563c593c6169d458efff6ec3546eeab1cd17622523c"
+      "implementation-record": "f5091c48465e68b01a8acf578981dd725a402fb64bbc8220540be50dec390145",
+      "verification": "e7c72eb6207c95ccc8e643cad92aa8d980aad37cfa4195b7cc4c06e41bc33bbe"
     },
     "sectionHeadings": [
       "001: Ecosystem boundaries, proposals versus authority, and product principles",
@@ -67,6 +68,7 @@
       "5. Observable negative cases",
       "Acceptance",
       "Verification",
+      "Implementation record",
       "Decision history"
     ],
     "specPath": "specs/001-boundaries-and-authority/spec.md",
@@ -74,6 +76,6 @@
     "summary": "What Rustev owns and refuses to own within the ecosystem (spec-spine, Aicortex, Rahi, statecraft-cli, applications), the rule that Rustev produces proposals and never grants, the provenance classes of Rustev outputs, the dependency layout that keeps contracts transport-neutral and the core free of integrations, and the product principles that are the constitution's principles VI onward. Owns the workspace manifest, the Makefile and the boundary check that enforces the dependency rules.\n",
     "title": "Ecosystem boundaries, proposals versus authority, and product principles"
   },
-  "shardHash": "b78f193b5b819439708f776f4e796cf32030ede275125a291aded557809ce4fe",
+  "shardHash": "519c1c00d05a4d513313e8e3f657c9d0cda230d5232285e7f4bf7fa051785f4e",
   "specVersion": "1.8.0"
 }

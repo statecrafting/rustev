@@ -1,0 +1,19 @@
+[package]
+name = "rustev-boundaries"
+version = "0.1.0"
+description = "Checks the workspace dependency rules of spec 001."
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[package.metadata.spec-spine]
+spec = "001-boundaries-and-authority"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true
