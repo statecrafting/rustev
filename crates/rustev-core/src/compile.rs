@@ -19,10 +19,11 @@ use rustev_contract::definition::{
     UncalibratedThreshold,
 };
 use rustev_contract::descriptor::{BackendDescriptor, InputExcess, OutputKind};
+use rustev_contract::execution::ExecutionPolicy;
 use rustev_contract::ids::{CalibrationId, PlanId};
 use rustev_contract::judgment::{Derivation, Notice, NoticeKind};
 use rustev_contract::plan::{
-    BoundCalibration, Normalization, Plan, PlanStep, PlanStepDetail, SemanticBinding,
+    BoundCalibration, Normalization, Plan, PlanExecution, PlanStep, PlanStepDetail, SemanticBinding,
 };
 use rustev_contract::{Document, Identified, schema};
 use serde_json::json;
@@ -50,6 +51,8 @@ pub enum Category {
     InvalidFallback = 9,
     CalibrationBinding = 10,
     InvalidDefinition = 11,
+    /// An execution policy that is not valid (spec 003, 3.2.3).
+    InvalidExecution = 12,
 }
 
 /// Why one candidate backend cannot serve a step.
@@ -168,15 +171,20 @@ impl Compiled {
         self.plan.canonical().unwrap_or_default()
     }
 
-    /// Load a plan document by recompiling its embedded definition against
-    /// the same descriptors and calibrations; refused unless the result is
-    /// byte-identical to the document.
+    /// Load a plan document by recompiling its embedded definition, with its
+    /// embedded execution policy, against the same descriptors and
+    /// calibrations; refused unless the result is byte-identical to the
+    /// document.
     pub fn load(
         plan: &Plan,
         descriptors: &[BackendDescriptor],
         calibrations: &[CalibrationArtifact],
     ) -> Result<Compiled, Refusal> {
-        let c = compile(&plan.definition, descriptors, calibrations)?;
+        let execution = match &plan.execution {
+            PlanExecution::None => None,
+            PlanExecution::Declared(d) => Some(&d.policy),
+        };
+        let c = compile_inner(&plan.definition, descriptors, calibrations, execution)?;
         if plan.canonical().ok() != Some(c.canonical()) {
             return refuse(
                 Category::Parse,
@@ -292,6 +300,63 @@ fn sem_kind(op: Operation, required: RequiredKind) -> SemKind {
     }
 }
 
+/// Why `b` cannot serve semantic step `d` with `required`, or the output
+/// kind it would serve it with (spec 002, 3.9.4; spec 003, 3.2.3 for
+/// runtime fallback targets).
+pub(crate) fn check_candidate(
+    d: &SemanticDecl,
+    b: &BackendDescriptor,
+    required: RequiredKind,
+    options_needed: u64,
+    bound: u64,
+) -> Result<OutputKind, Vec<ShortfallReason>> {
+    let mut reasons = Vec::new();
+    let supports: Vec<_> = b
+        .operations
+        .iter()
+        .filter(|o| o.operation == d.operation)
+        .collect();
+    if supports.is_empty() {
+        reasons.push(ShortfallReason::Operation(d.operation));
+    }
+    let chosen = supports.iter().find(|o| satisfies(o.output, required));
+    match (chosen, supports.first()) {
+        (None, Some(o)) => reasons.push(ShortfallReason::OutputKind {
+            offered: o.output,
+            required,
+        }),
+        (Some(o), _) if o.max_options < options_needed => reasons.push(ShortfallReason::Options {
+            max: o.max_options,
+            needed: options_needed,
+        }),
+        _ => {}
+    }
+    if bound > b.input_limit.max_bytes && b.input_limit.on_excess == InputExcess::Refuse {
+        reasons.push(ShortfallReason::InputLimit {
+            max: b.input_limit.max_bytes,
+            needed: bound,
+        });
+    }
+    if b.determinism < d.backend.min_determinism {
+        reasons.push(ShortfallReason::Determinism {
+            offered: format!("{:?}", b.determinism),
+            required: format!("{:?}", d.backend.min_determinism),
+        });
+    }
+    if let ArtifactPin::Pinned(a) = &d.backend.artifact {
+        if a != &b.artifact {
+            reasons.push(ShortfallReason::ArtifactPin {
+                pinned: a.to_string(),
+                offered: b.artifact.to_string(),
+            });
+        }
+    }
+    match chosen {
+        Some(o) if reasons.is_empty() => Ok(o.output),
+        _ => Err(reasons),
+    }
+}
+
 fn condition_refs(c: &Cond, out: &mut Vec<String>) {
     match c {
         Cond::Always => {}
@@ -321,11 +386,33 @@ fn outcome_refs(o: &OutcomeDecl, out: &mut Vec<String>) {
 }
 
 /// Compile a definition against supplied backend descriptors and calibration
-/// artifacts. Pure: no I/O, no clock.
+/// artifacts, with no execution policy (`execution: none`). Pure: no I/O, no
+/// clock.
 pub fn compile(
     def: &Definition,
     descriptors: &[BackendDescriptor],
     calibrations: &[CalibrationArtifact],
+) -> Result<Compiled, Refusal> {
+    compile_inner(def, descriptors, calibrations, None)
+}
+
+/// Compile with a runtime execution policy (spec 003, 3.2.3). The policy is
+/// validated after every step is bound and embedded in the plan, so it is
+/// part of the `PlanId`.
+pub fn compile_with(
+    def: &Definition,
+    descriptors: &[BackendDescriptor],
+    calibrations: &[CalibrationArtifact],
+    execution: &ExecutionPolicy,
+) -> Result<Compiled, Refusal> {
+    compile_inner(def, descriptors, calibrations, Some(execution))
+}
+
+fn compile_inner(
+    def: &Definition,
+    descriptors: &[BackendDescriptor],
+    calibrations: &[CalibrationArtifact],
+    execution: Option<&ExecutionPolicy>,
 ) -> Result<Compiled, Refusal> {
     use Category as C;
 
@@ -885,6 +972,7 @@ pub fn compile(
 
     let mut notices: Vec<Notice> = Vec::new();
     let mut details: BTreeMap<String, PlanStepDetail> = BTreeMap::new();
+    let mut bind_ctx: BTreeMap<String, (u64, u64)> = BTreeMap::new();
     for s in &def.steps {
         let subject = format!("step:{}", s.id);
         let StepBody::Semantic(d) = &s.body else {
@@ -908,6 +996,7 @@ pub fn compile(
             },
             Candidates::None => d.options.len() as u64,
         };
+        bind_ctx.insert(s.id.clone(), (options_needed, bound));
         let candidates: Vec<&BackendDescriptor> = match &d.backend.binding {
             BindingChoice::Backend(b) => match sorted.iter().find(|x| &x.backend_id == b) {
                 Some(x) => vec![*x],
@@ -953,60 +1042,13 @@ pub fn compile(
             |required: RequiredKind| -> (Option<(&BackendDescriptor, OutputKind)>, Vec<Shortfall>) {
                 let mut shortfalls = Vec::new();
                 for b in &candidates {
-                    let mut reasons = Vec::new();
-                    let supports: Vec<_> = b
-                        .operations
-                        .iter()
-                        .filter(|o| o.operation == d.operation)
-                        .collect();
-                    if supports.is_empty() {
-                        reasons.push(ShortfallReason::Operation(d.operation));
-                    }
-                    let chosen = supports.iter().find(|o| satisfies(o.output, required));
-                    match (chosen, supports.first()) {
-                        (None, Some(o)) => reasons.push(ShortfallReason::OutputKind {
-                            offered: o.output,
-                            required,
+                    match check_candidate(d, b, required, options_needed, bound) {
+                        Ok(o) => return (Some((*b, o)), vec![]),
+                        Err(reasons) => shortfalls.push(Shortfall {
+                            backend_id: b.backend_id.clone(),
+                            reasons,
                         }),
-                        (Some(o), _) if o.max_options < options_needed => {
-                            reasons.push(ShortfallReason::Options {
-                                max: o.max_options,
-                                needed: options_needed,
-                            })
-                        }
-                        _ => {}
                     }
-                    if bound > b.input_limit.max_bytes
-                        && b.input_limit.on_excess == InputExcess::Refuse
-                    {
-                        reasons.push(ShortfallReason::InputLimit {
-                            max: b.input_limit.max_bytes,
-                            needed: bound,
-                        });
-                    }
-                    if b.determinism < d.backend.min_determinism {
-                        reasons.push(ShortfallReason::Determinism {
-                            offered: format!("{:?}", b.determinism),
-                            required: format!("{:?}", d.backend.min_determinism),
-                        });
-                    }
-                    if let ArtifactPin::Pinned(a) = &d.backend.artifact {
-                        if a != &b.artifact {
-                            reasons.push(ShortfallReason::ArtifactPin {
-                                pinned: a.to_string(),
-                                offered: b.artifact.to_string(),
-                            });
-                        }
-                    }
-                    if reasons.is_empty() {
-                        if let Some(o) = chosen {
-                            return (Some((*b, o.output)), vec![]);
-                        }
-                    }
-                    shortfalls.push(Shortfall {
-                        backend_id: b.backend_id.clone(),
-                        reasons,
-                    });
                 }
                 (None, shortfalls)
             };
@@ -1120,6 +1162,13 @@ pub fn compile(
         details.insert(s.id.clone(), PlanStepDetail::Semantic(Box::new(binding)));
     }
 
+    // (f) continued: the execution policy, once every step is bound
+    // (spec 003, 3.2.3).
+    let plan_execution = match execution {
+        None => PlanExecution::None,
+        Some(policy) => crate::execution::validate(policy, def, &sorted, &details, &bind_ctx)?,
+    };
+
     // (g) Budget.
     let mut total: u64 = 0;
     for s in &def.steps {
@@ -1189,6 +1238,7 @@ pub fn compile(
             })
             .collect(),
         notices,
+        execution: plan_execution,
     };
     let id = plan.id().map_err(|e| Refusal {
         category: C::Parse,

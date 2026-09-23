@@ -206,3 +206,63 @@ fn an_unknown_metric_stays_unknown() {
     );
     assert!(EvalReport::parse(pass.as_bytes()).is_err());
 }
+
+const POLICY: &str = r#"{"schema":"rustev.execution/1","max_attempts_per_decision":6,
+"cost":{"hard":{"max_units":100}},
+"steps":[{"step":"topic","retry":{"max_attempts":3,"on":["transient","timed_out"],
+"delay":{"exponential":{"initial_ms":10,"max_ms":40}}},"attempt_timeout":{"ms":250},
+"fallback":{"backends":["b"],"on":["permanent","invalid_output"]}}]}"#;
+
+#[test]
+fn an_execution_policy_parses_round_trips_and_is_identified() {
+    use rustev_contract::execution::{CostPolicy, ExecutionPolicy};
+    let p = ExecutionPolicy::parse(POLICY.as_bytes()).unwrap();
+    assert_eq!(p.cost, CostPolicy::Hard { max_units: 100 });
+    let c = p.canonical().unwrap();
+    assert_eq!(ExecutionPolicy::parse(&c).unwrap(), p);
+    assert!(p.id().unwrap().as_str().starts_with("sha256:"));
+    let unknown = POLICY.replace("\"cost\"", "\"jitter\":1,\"cost\"");
+    assert!(ExecutionPolicy::parse(unknown.as_bytes()).is_err());
+    let other = POLICY.replace("rustev.execution/1", "rustev.execution/2");
+    assert!(matches!(
+        ExecutionPolicy::parse(other.as_bytes()),
+        Err(DocumentError::Schema { .. })
+    ));
+}
+
+#[test]
+fn a_run_record_parses_under_record_limits() {
+    use rustev_contract::run::{
+        CostMode, CostSummary, FinalCost, RecordedExecution, RunRecord, Termination, Timing,
+    };
+    let record = RunRecord {
+        schema: "rustev.run/1".into(),
+        decision_id: "d-1".into(),
+        plan_id: rustev_contract::ids::PlanId::parse(
+            "sha256:0000000000000000000000000000000000000000000000000000000000000abc",
+        )
+        .unwrap(),
+        execution: RecordedExecution::None,
+        termination: Termination::Cancelled,
+        core: rustev_contract::run::CoreEvidence::NotProduced,
+        timing: Timing {
+            queued_ms: 0,
+            elapsed_ms: 5,
+            deadline_ms: 100,
+            deadline_expired: false,
+        },
+        requests: vec![],
+        cost: CostSummary {
+            mode: CostMode::Unlimited,
+            limit: 0,
+            observed: 0,
+            estimated: 0,
+            liability: 0,
+            bound_violations: 0,
+            final_cost: FinalCost::Known,
+            within_guaranteed_cap: false,
+        },
+    };
+    let bytes = serde_json::to_vec(&record).unwrap();
+    assert_eq!(RunRecord::parse(&bytes).unwrap(), record);
+}

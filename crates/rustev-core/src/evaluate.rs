@@ -384,6 +384,26 @@ impl<'c> Evaluation<'c> {
         self.record(step, instance.to_vec(), value)
     }
 
+    /// What `supply` would record for `raw`, without consuming the request
+    /// (spec 003, 3.2.4): `Ok(Ok(()))` for a valid output, `Ok(Err(_))` with
+    /// the `invalid_backend_output` it would record, or `Err` when no such
+    /// request is pending. A pure read; `supply` still validates.
+    pub fn check_output(
+        &self,
+        step: &str,
+        instance: &[String],
+        raw: &RawOutput,
+    ) -> Result<Result<(), Unresolved>, SupplyError> {
+        let req = self
+            .pending
+            .get(&(step.to_string(), instance.to_vec()))
+            .ok_or_else(|| SupplyError::NotPending {
+                step: step.into(),
+                instance: instance.to_vec(),
+            })?;
+        Ok(self.validate_output(step, req, raw).map(|_| ()))
+    }
+
     fn take(&mut self, step: &str, instance: &[String]) -> Result<SemanticRequest, SupplyError> {
         self.pending
             .remove(&(step.to_string(), instance.to_vec()))

@@ -1,13 +1,17 @@
-//! Compiled plans, `rustev.plan/1` (spec 002, 3.3.4). A plan embeds its
-//! canonical definition and every binding that affects behavior, so its
-//! identity changes whenever behavior can.
+//! Compiled plans, `rustev.plan/2` (spec 002, 3.3.4, amended by spec 003,
+//! 3.2.1). A plan embeds its canonical definition, every binding that affects
+//! behavior and its execution policy, so its identity changes whenever
+//! behavior can.
 
 use serde::{Deserialize, Serialize};
 
 use crate::calibration::CalibrationBinding;
 use crate::definition::{Definition, RequiredKind};
 use crate::descriptor::OutputKind;
-use crate::ids::{ArtifactId, CalibrationId, DefinitionId, DescriptorId, PlanId};
+use crate::execution::ExecutionPolicy;
+use crate::ids::{
+    ArtifactId, CalibrationId, DefinitionId, DescriptorId, ExecutionPolicyId, PlanId,
+};
 use crate::judgment::{Derivation, Notice};
 use crate::limits::PLAN_V1;
 use crate::schema;
@@ -27,9 +31,42 @@ pub struct Plan {
     /// One entry per step, in declaration order.
     pub steps: Vec<PlanStep>,
     pub notices: Vec<Notice>,
+    /// The runtime execution policy (spec 003, 3.2.1); `none` means one
+    /// attempt per request on the bound backend, nothing else.
+    pub execution: PlanExecution,
 }
 
 crate::document::document!(Plan, schema::PLAN, PLAN_V1, PlanId);
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum PlanExecution {
+    None,
+    Declared(Box<DeclaredExecution>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DeclaredExecution {
+    pub id: ExecutionPolicyId,
+    pub policy: ExecutionPolicy,
+    /// Every runtime fallback target, by step in policy order, then position.
+    pub fallbacks: Vec<FallbackBinding>,
+}
+
+/// A runtime fallback target bound at compile time.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FallbackBinding {
+    pub step: String,
+    /// 1 for the first fallback; the bound backend is target 0.
+    pub target: u32,
+    pub backend_id: String,
+    pub artifact: ArtifactId,
+    pub descriptor: DescriptorId,
+    /// Always the primary binding's output kind.
+    pub output: OutputKind,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

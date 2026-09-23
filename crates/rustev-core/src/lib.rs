@@ -14,6 +14,7 @@ pub mod builder;
 pub mod calibrate;
 pub mod compile;
 pub mod evaluate;
+pub(crate) mod execution;
 pub mod expr;
 pub mod kinds;
 pub mod ops;
@@ -22,5 +23,5 @@ pub mod seams;
 pub mod sem;
 pub mod value;
 
-pub use compile::{Category, Compiled, Refusal, compile, compile_bytes};
+pub use compile::{Category, Compiled, Refusal, compile, compile_bytes, compile_with};
 pub use evaluate::{Evaluation, SemanticRequest, Supplied};

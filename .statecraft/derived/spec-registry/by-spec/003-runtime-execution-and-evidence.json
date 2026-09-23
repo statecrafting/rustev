@@ -57,9 +57,9 @@
       }
     ],
     "id": "003-runtime-execution-and-evidence",
-    "implementation": "pending",
+    "implementation": "in-progress",
     "sectionDigests": {
-      "003-runtime-execution-and-evidence-emission": "37b0240a4a3edbca2b051dfc20bcac5c67f7ba0b403ab1762f8c502581a1fee2",
+      "003-runtime-execution-and-evidence-emission": "1ee7f013371c1efa65379b60d5672d84333595b2a884b56a54429a6799def715",
       "1-purpose": "dfd31f066b5e596d296043dda73157b8e22b957f2090ed652189f4e03326c5b8",
       "2-territory": "e01a590b847d0a25ca9cb02f4882a34c43aa451c8607295c047266cd1a85332b",
       "3-1-relation-to-spec-002-and-compatibility": "15095131169d08e3e6470c77f78b36c132aae0ac34c2e815d889e2a96caca204",
@@ -80,6 +80,7 @@
       "acceptance": "8d937cc0d6127da1b16df87ec03bac056628e9369743cede203ef3228f9358ba",
       "decision-history": "0c17f66256b6e7e0498627e2e2b7ecad32f058766ac2d6e8a710a4a1249c5555",
       "engineering-choices": "98619abbd1dcc263e0e8c113e65a362127ef8bcd3cc5022e440d6112674680ad",
+      "implementation-record": "8781e85f1b5874981ff20dbb4b5e983778904c02b13deaf2a48526b953d2b249",
       "verification": "eb750b21ce5d1131856cedd2579647224dc45968b318132d60dc8ea7b875888c"
     },
     "sectionHeadings": [
@@ -103,6 +104,7 @@
       "5. Observable negative cases",
       "Acceptance",
       "Verification",
+      "Implementation record",
       "Decision history",
       "Engineering choices"
     ],
@@ -111,6 +113,6 @@
     "summary": "Increment 2: `rustev-runtime` drives the pure core's staged evaluation through backend seams on Tokio (R-03) under explicit bounds: injectable monotonic time and one end-to-end deadline, bounded admission and concurrency, cost budgets reserved before dispatch with honest settlement, bounded retries and runtime fallback declared in an identified execution policy that is part of plan identity, cancellation that never claims more than the backend acknowledged, and evidence delivery under a declared sink policy. Amends spec 002: plan schema 2, the execution-policy and run-record documents, a pre-supply output check, and the backend and sink seams. Batching, duplicate suppression and caches are deferred by name.\n",
     "title": "Runtime execution and evidence emission"
   },
-  "shardHash": "81b94ee35296d0fe9c649917131c7228d1098e14fdd7398a6896bc653b46ec9a",
+  "shardHash": "2ed32411b2437c310e1731ef27f7e7bfd622ed59a28e106e8f7086f78743ecc2",
   "specVersion": "1.8.0"
 }
