@@ -1,0 +1,48 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '002-decision-contract-and-pure-core' directory unit 'crates/rustev-contract/' is not a directory",
+        "path": "crates/rustev-contract/"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '002-decision-contract-and-pure-core' directory unit 'crates/rustev-core/' is not a directory",
+        "path": "crates/rustev-core/"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "000-bootstrap",
+      "001-boundaries-and-authority"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-contract/"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-core/"
+        }
+      }
+    ],
+    "specId": "002-decision-contract-and-pure-core",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "449c651a58c8ce8ad3d0b971f1449b0137fab01c588dbf011ba0593aba928e95"
+}

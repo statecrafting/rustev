@@ -1,0 +1,52 @@
+{
+  "record": {
+    "created": "2026-09-23",
+    "dependsOn": [
+      "000-bootstrap"
+    ],
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "docs/design/001-decision-engine-architecture.md"
+      },
+      {
+        "anchor": "vi-onward-the-principles-of-the-system-you-are-specifying",
+        "file": "standards/spec/constitution.md",
+        "kind": "section"
+      }
+    ],
+    "id": "001-boundaries-and-authority",
+    "sectionDigests": {
+      "001-ecosystem-boundaries-judgment-versus-authority-and-product-principles": "785a450b2849a5b6697c04562c1f7ec6a7a267a84bc0b1c49fcc212af341f4a1",
+      "1-purpose": "cb1a193d562650abb0463f6933c7abd9dfceeb98c4a229d2761145025ce6c380",
+      "2-territory": "a716f9ba7f4b5c78c1a0c01bfd6d1ace84d76d126ed4fd1ac7560c2e027b4347",
+      "3-1-responsibilities": "d53c4390e29b6b0316f323371383ee2a5ba21211b0b00c0ec42bab8e76d7b134",
+      "3-2-dependency-direction": "e06eaedfc237cba9815800e94a0aae9e73c649b64383290f1066930ce6bdb133",
+      "3-3-judgment-versus-authority": "4a013144e0af0d9dffc661877d703bb438ba48c695784c839908c6c07a0e1bf3",
+      "3-4-product-principles-constitution-vi-onward-on-approval": "0d2fdf2b1707d8830029c0244db237af4ae0b382ad3f71c02ede92194b73c2df",
+      "3-5-partial-adoption-obligations": "80d6b74d58897ea9c068c20bd69cf0e17dbc30d91d32f281d4c24503aa167d44",
+      "3-behavior": "741d4fd9e7779cde1a31c9e7bebd1874160f4ca8d0af9961bcf44d42466ea127",
+      "4-out-of-scope": "0ee3d8f0a200ad80e6ae21d3cc5ac20ac39494ea39b725ca7d303a5c2a75b424",
+      "5-observable-negative-cases": "22745eced1672b6f19f9deae58340ee2bf548b6523de0021e9664ccdd5aa9a89"
+    },
+    "sectionHeadings": [
+      "001: Ecosystem boundaries, judgment versus authority, and product principles",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 Responsibilities",
+      "3.2 Dependency direction",
+      "3.3 Judgment versus authority",
+      "3.4 Product principles (constitution VI onward, on approval)",
+      "3.5 Partial adoption obligations",
+      "4. Out of scope",
+      "5. Observable negative cases"
+    ],
+    "specPath": "specs/001-boundaries-and-authority/spec.md",
+    "status": "draft",
+    "summary": "What Rustev owns and refuses to own within the ecosystem (spec-spine, Aicortex, Rahi, statecraft-cli, domain packages), the separation of judgment from authority as a property of signatures rather than convention, the partial-adoption obligations, and the product principles that become constitution principles VI onward when this spec is approved.\n",
+    "title": "Ecosystem boundaries, judgment versus authority, and product principles"
+  },
+  "shardHash": "c0ca051c37fef76acb9eedb14d63738c346d9546eae3bc7cada264f7934b9985",
+  "specVersion": "1.8.0"
+}

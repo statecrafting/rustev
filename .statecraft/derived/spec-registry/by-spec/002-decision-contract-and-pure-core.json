@@ -1,0 +1,56 @@
+{
+  "record": {
+    "created": "2026-09-23",
+    "dependsOn": [
+      "000-bootstrap",
+      "001-boundaries-and-authority"
+    ],
+    "establishes": [
+      {
+        "kind": "directory",
+        "path": "crates/rustev-contract/"
+      },
+      {
+        "kind": "directory",
+        "path": "crates/rustev-core/"
+      }
+    ],
+    "id": "002-decision-contract-and-pure-core",
+    "sectionDigests": {
+      "002-decision-contract-and-pure-core": "8373bf23594eacbed3a495335533391199c75a2d08d1f14ad3e7952066c1c9dc",
+      "1-purpose": "ddfb60a02b2c319124f86f30089ae1777b75c3108b1600b0dbe74b891134bb3c",
+      "2-territory": "ccd795b2982abb21b2aab939caaebbd743fa72e57f5aecea18f6aa3edd85196c",
+      "3-1-purity": "05bea0ea091b4889581903b11173e74498e2579ec7497eec623563dcf5435d18",
+      "3-2-value-kinds": "5bba597bed1345a9763fb09bd9e7633e78b9b26a8230205513126482504b7a54",
+      "3-3-validation": "a70f31bf9f393382ce0a8bac626bc256fb6ee3afc7e4157feef555636dd8736c",
+      "3-4-exact-operators": "293ddf8a61daaaaa1e33a048f334371e7c579922be7d0f93362a5d8b97d8e9d3",
+      "3-5-definitions-and-compilation": "b0a48bf58841c70a1fa454dcbe667dcd92e1d4532f0728263ceda0284d5992ea",
+      "3-6-selection-policy": "12ea761e6d28360ab9d7a0c60a74901013826e4040561693dca260f766e121d4",
+      "3-7-fixtures": "a7df3f0b4c8c21112b99b3eff9b556ed548da04144bdacf22ec6a592a82f4866",
+      "3-behavior": "5cab3007c9c38dc83ad27bb937a7b637f3d37b5dc9af94aad057453123e411f1",
+      "4-out-of-scope": "51994b2a9d6bb97f1eb20d62d2ed5d8259e54f72ff573c4822e47bb6b3d80fac",
+      "5-observable-negative-cases": "91f6e3e18a7b3673fdaef13b330f76efa4ee1fa6a0efd7fbfda333ddabe814c0"
+    },
+    "sectionHeadings": [
+      "002: Decision contract and pure core",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 Purity",
+      "3.2 Value kinds",
+      "3.3 Validation",
+      "3.4 Exact operators",
+      "3.5 Definitions and compilation",
+      "3.6 Selection policy",
+      "3.7 Fixtures",
+      "4. Out of scope",
+      "5. Observable negative cases"
+    ],
+    "specPath": "specs/002-decision-contract-and-pure-core/spec.md",
+    "status": "draft",
+    "summary": "Increment 1: the versioned wire contract (`rustev-contract`) and the pure core (`rustev-core`). Value kinds and their conversion rules, identities, bounded input validation with provenance and freshness, the exact operator registry, decision definitions, the plan compiler with capability matching and explicit refusal, selection policy evaluation, and typed unresolved outcomes. No I/O, no clock, no async executor, no model.\n",
+    "title": "Decision contract and pure core"
+  },
+  "shardHash": "207172965d29551a4f2ec56bffc2ad6b789487f776e9622a1ff6e5ede70770cb",
+  "specVersion": "1.8.0"
+}

@@ -1,0 +1,33 @@
+{
+  "record": {
+    "created": "2026-09-23",
+    "id": "000-bootstrap",
+    "implementation": "n-a",
+    "origin": {
+      "retroactive": true
+    },
+    "sectionDigests": {
+      "000-bootstrap-spec-system": "5a889b12cd7e28df2310252f7f37159483b320961405fcacde6f78929cade94c",
+      "1-the-authoring-derived-boundary": "772909940515f387ab8482a8a862ffd5cd351c3e90ad2f9564962e0bc40a383e",
+      "2-the-typed-authority-graph": "4f2574354e9911250140bd1a320e346911346ee171e4a4840d02da756f020833"
+    },
+    "sectionHeadings": [
+      "000: Bootstrap spec system",
+      "1. The authoring / derived boundary",
+      "2. The typed authority graph"
+    ],
+    "specPath": "specs/000-bootstrap/spec.md",
+    "status": "approved",
+    "summary": "Foundational contract: authored truth lives only in markdown (+ YAML frontmatter); machine-consumable truth is compiler-emitted JSON only; every artifact is a deterministic function of (config, file contents); a typed authority graph governs who-owns-what.\n",
+    "title": "Bootstrap spec system",
+    "unamendable": [
+      "markdown-truth-boundary",
+      "json-truth-boundary",
+      "determinism-requirement",
+      "typed-authority-graph",
+      "refusal-rule"
+    ]
+  },
+  "shardHash": "ed928c1e21a499e5c1582b20780acbcc183a86ccaa52cb5153a92bf1182b827c",
+  "specVersion": "1.8.0"
+}
