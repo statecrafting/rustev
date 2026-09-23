@@ -1,0 +1,131 @@
+# spec-spine.toml governs this repository. Every key is optional; an
+# absent file behaves as the defaults for a single-Cargo-workspace repo.
+# Keys differing from the scaffold's defaults: [meta] required_version,
+# [index] extra_hashed_inputs and resolver_exclusions (docs/decisions C-04a).
+# `spec-spine config show` prints the effective configuration, including
+# the built-in bypass floor this file cannot see.
+
+[meta]
+# Pin the spec-spine version this repository is governed by. A binary
+# that does not satisfy it refuses to run. A pin is not only about
+# features: the coupling gate's built-in bypass floor is compiled into
+# the binary, so two versions can judge the same diff differently.
+# Cargo semantics: a bare version is a caret range, `=` is exact.
+# Pinned to 0.24.0 on 2026-09-23 at adoption. `=` is deliberate: a release
+# is adopted by review, not by resolution. `make tools` installs this exact
+# version into .tooling/bin, so a binary elsewhere on PATH cannot answer here.
+required_version = "=0.24.0"
+
+[manifest]
+# Drives the Cargo `[package.metadata.spec-spine].spec` and package.json `"spec-spine".spec` reads.
+metadata_namespace = "spec-spine"
+
+[domains]
+# L-002: warn on a spec with no `domain` once this list is non-empty.
+# Empty means the taxonomy is disabled, not that every spec is unclassified.
+allowed = []
+
+[kind]
+# L-003, symmetric with [domains].
+allowed = []
+
+[layout]
+# Where authored truth lives.
+specs_dir     = "specs"
+# Where the compiler and indexer write. See .gitignore for whether the
+# shard trees belong in version control.
+derived_dir   = ".statecraft/derived"
+standards_dir = "standards/spec"
+schemas_dir   = "standards/schemas"
+# An ungoverned root for a tool's own working files (spec 036): excluded
+# from every content hash, and bypassed by the coupling gate. L-006 if a
+# spec claims a unit inside it. Empty means no such root is declared.
+state_dir     = ".statecraft/state"
+# The workspace manifest the Rust package discovery starts from.
+cargo_workspace = "Cargo.toml"
+# Files probed for npm workspace globs.
+npm_workspaces = ["package.json", "pnpm-workspace.yaml"]
+# Packages outside any workspace, named one by one.
+# standalone_rust_workspaces = ["tools/thing"]
+# standalone_npm_packages    = ["npm"]
+
+[index]
+# Extra files folded into the global-inputs hash, so a change to one
+# stales every shard.
+#
+# WATCH THE GLOB FORM. `dir/**` matches DIRECTORIES and therefore no
+# files; you want `dir/**/*`, which is what the default below has.
+# The bare form is not an error and not empty: it parses, it prints
+# back through `config show`, and it matches nothing at all. It was
+# the shipped default until spec 058, and spec 050 found the same
+# form in spec-spine's own config before that. If you narrow or
+# extend this list, keep the trailing `/*`:
+#
+#   extra_hashed_inputs = ["standards/spec/**/*", ".github/workflows/**/*"]
+extra_hashed_inputs = [
+  "standards/**/*",
+  ".github/workflows/**/*",
+  "docs/**/*",
+  "README.md",
+  "AGENTS.md",
+  "Makefile",
+  ".gitignore",
+]
+# Directories the symbol resolver and the coverage walk skip.
+resolver_exclusions = ["target", "node_modules", ".statecraft/derived", "dist", "build", ".next", ".tooling"]
+# Named path sets `index check --slice <name>` can gate on their own.
+# [index.slices]
+# api = ["crates/*/src/lib.rs"]
+
+[branding]
+# Recorded in every emitted artifact's `build` block.
+compiler_id = "spec-spine"
+indexer_id  = "spec-spine"
+
+[coupling]
+# The PR-body waiver keyword (the reason follows the colon). A waiver is
+# a human instrument: it needs explicit human approval, and an agent
+# never writes one on its own authority.
+waiver_keyword = "Spec-Drift-Waiver:"
+# ADDITIVE to the built-in generic floor; it cannot remove an entry.
+# `spec-spine config show` prints the merged list the gate matches on.
+bypass_prefixes = []
+# C-002: refuse a changed source file that no spec specifically claims.
+# Off to start: a corpus turns this on once its coverage debt is retired.
+# `spec-spine index coverage` reports where you stand.
+require_ownership = false
+# Clear a diff whose every non-bypassed path is a dependency-only
+# manifest edit. Off to start; turn it on if a bot opens bump PRs, which
+# cannot add a waiver line to their own body.
+auto_waive_dependency_only = false
+
+[lint]
+# L-007: refuse a `depends_on` entry that does not name a lower ordinal.
+# Off to start: a corpus that files by domain rather than by date holds
+# a coherent position this would spam.
+require_ordinal_monotonic_depends_on = false
+# L-008 suppression: claimed paths deliberately in no content hash.
+# `index check` still reports the count, so an exception stays explicit.
+# unwitnessed_allowed = ["crates/**/*.rs"]
+
+[coverage]
+# Paths the ownership ratchet governs whatever their extension and
+# wherever they sit: they join `index coverage` and C-002. Empty to
+# start; set it once every file it names has an owning spec. Globs as in
+# extra_hashed_inputs, trap included: `dir/**` matches no files, use
+# `dir/**/*`. A bypassed or resolver-excluded path stays out.
+# governed_scope = ["AGENTS.md", "scripts/*"]
+# Carved back out of governed_scope only (generated or vendored files).
+# governed_scope_exclusions = []
+
+# [provenance.uri_schemes]
+# Named URI prefixes a `references` provenance value may use. The
+# header is commented too: an empty table here would OVERRIDE the
+# built-in schemes rather than add to them.
+# knowledge        = "knowledge://"
+# code-fingerprint = "fingerprint://"
+
+[frontmatter]
+# Keys this corpus recognizes beyond the grammar, so the unknown-key
+# lint stays quiet about them. They still land in `extraFrontmatter`.
+# extra_known_keys = ["owner", "risk"]

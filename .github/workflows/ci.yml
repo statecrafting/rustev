@@ -1,0 +1,39 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  governance:
+    name: gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - name: Cache the pinned spec-spine
+        uses: actions/cache@v4
+        with:
+          path: .tooling
+          key: spec-spine-${{ runner.os }}-${{ hashFiles('spec-spine.toml') }}
+      - name: Install the pinned spec-spine
+        run: test -x .tooling/bin/spec-spine && .tooling/bin/spec-spine --version || make tools
+      - name: Gate (read-only)
+        run: make gate
+      - name: Coupling
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          printf '%s\n' "$PR_BODY" > "$RUNNER_TEMP/pr-body.md"
+          .tooling/bin/spec-spine couple --base "origin/${{ github.base_ref }}" --pr-body "$RUNNER_TEMP/pr-body.md"
+      - name: Code
+        run: make code

@@ -1,0 +1,104 @@
+{
+  "version": 2,
+  "pins": {
+    "product": "0.0.0",
+    "spec_spine": "0.24.0",
+    "adapters": {}
+  },
+  "entries": [
+    {
+      "path": ".statecraft/AGENTS.md",
+      "class": "managed",
+      "source": {
+        "kind": "template",
+        "identity": "statecraft-governance"
+      },
+      "digest": "2b41647b3dd483c8151846804a985b5d691c49b4418af34d8355830f917fc324",
+      "bytes": 1624,
+      "written_at": "2026-09-23T16:56:12Z"
+    },
+    {
+      "path": "spec-spine.toml",
+      "class": "managed",
+      "source": {
+        "kind": "template",
+        "identity": "spec-spine-core@0.23.0"
+      },
+      "digest": "5b2ab9fb51984725c910fc3016b77a692bcd534048af9ddab5af6f016e9b019b",
+      "bytes": 5280,
+      "written_at": "2026-09-23T16:56:12Z"
+    },
+    {
+      "path": "specs/000-bootstrap/spec.md",
+      "class": "managed",
+      "source": {
+        "kind": "template",
+        "identity": "spec-spine-core@0.23.0"
+      },
+      "digest": "2316c27b52a2b5690cc03e30ada930fec1eceec56c95e0e5e5d0bc59696fa8a3",
+      "bytes": 1538,
+      "written_at": "2026-09-23T16:56:12Z"
+    },
+    {
+      "path": "standards/spec/constitution.md",
+      "class": "managed",
+      "source": {
+        "kind": "template",
+        "identity": "spec-spine-core@0.23.0"
+      },
+      "digest": "168024cbc145b5c217228fc7f82d167ec7330ccf2486062fbe4e209fda1e4970",
+      "bytes": 3675,
+      "written_at": "2026-09-23T16:56:12Z"
+    },
+    {
+      "path": "standards/spec/contract.md",
+      "class": "managed",
+      "source": {
+        "kind": "template",
+        "identity": "spec-spine-core@0.23.0"
+      },
+      "digest": "483dc81218c08798fb56adc8a7a809927759291da50a145f1735c3f849380782",
+      "bytes": 2682,
+      "written_at": "2026-09-23T16:56:12Z"
+    },
+    {
+      "path": "standards/spec/templates/constitution-template.md",
+      "class": "managed",
+      "source": {
+        "kind": "template",
+        "identity": "spec-spine-core@0.23.0"
+      },
+      "digest": "882ffc058fc35cee7b588a4efafca2ca6d7b8086c21f16c7dc44580d92fce2c6",
+      "bytes": 821,
+      "written_at": "2026-09-23T16:56:12Z"
+    },
+    {
+      "path": "standards/spec/templates/spec-template.md",
+      "class": "managed",
+      "source": {
+        "kind": "template",
+        "identity": "spec-spine-core@0.23.0"
+      },
+      "digest": "f03da87b8a8b5e929f51753ef4d0ff4a2b969ef799125ca124d2eeeb280c8a02",
+      "bytes": 952,
+      "written_at": "2026-09-23T16:56:12Z"
+    }
+  ],
+  "modifications": [
+    {
+      "path": "AGENTS.md",
+      "kind": "import-bridge",
+      "line": "@.statecraft/AGENTS.md",
+      "digest_after": "16df9d2b12d44949e7b35b4d2589cc8f58c4516e6deb3b6e201c5e17c66ce70a",
+      "written_at": "2026-09-23T16:56:12Z"
+    }
+  ],
+  "project": {
+    "requirements": {},
+    "overrides": {},
+    "shared_approval_required": [],
+    "enrollment": {
+      "kind": "solo"
+    }
+  }
+}

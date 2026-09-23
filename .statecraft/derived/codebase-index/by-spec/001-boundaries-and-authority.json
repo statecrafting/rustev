@@ -1,0 +1,54 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "000-bootstrap"
+    ],
+    "implementingPaths": [
+      {
+        "path": "docs/design/001-decision-engine-architecture.md",
+        "source": "spec-edge"
+      },
+      {
+        "path": "standards/spec/constitution.md",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "docs/design/001-decision-engine-architecture.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "standards/spec/constitution.md",
+            "span": {
+              "endLine": 67,
+              "startLine": 57
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "anchor": "vi-onward-the-principles-of-the-system-you-are-specifying",
+          "file": "standards/spec/constitution.md",
+          "kind": "section"
+        }
+      }
+    ],
+    "specId": "001-boundaries-and-authority",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "f3507ed85f611cc8e950bc4207fbac8f51703737298786ac37899a7d4fd4f243"
+}
