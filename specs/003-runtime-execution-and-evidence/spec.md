@@ -2,7 +2,7 @@
 id: "003-runtime-execution-and-evidence"
 title: "Runtime execution and evidence emission"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-09-23"
 summary: >
   Increment 2: `rustev-runtime` drives the pure core's staged evaluation
@@ -191,9 +191,9 @@ the pure core computes from the same validated step values.
    finds the queue full is rejected at once as `overloaded`. A queued
    submission whose deadline passes before admission is rejected as
    `queue_deadline`; one whose caller cancels while queued is rejected as
-   `cancelled`. A decision id outside 3.9.2's bounds, or a snapshot the core
-   refuses to start (spec 002, `StartError`), is rejected as
-   `invalid_request`. A rejection is a typed result, never a timeout, and a
+   `cancelled`. A decision id outside 3.9.2's bounds or already running, or a
+   snapshot the core refuses to start (spec 002, `StartError`), is rejected
+   as `invalid_request`. A rejection is a typed result, never a timeout, and a
    rejected decision has no judgment, no run record and spends nothing.
 2. Within a decision at most `max_parallel_requests` requests are in
    progress; the rest wait in a local queue bounded by the plan's
@@ -204,15 +204,19 @@ the pure core computes from the same validated step values.
    runs on the caller's task, and its requests are polled by that task. The
    only spawned task is the single evidence delivery worker of 3.9.3. The
    number of waiting futures is therefore bounded by the admission bounds
-   times the per-decision bounds.
+   times the per-decision bounds. The runtime waits on its own child of the
+   caller's cancellation signal, so a long-lived caller signal holds nothing
+   of a decision after it ends.
 4. Admission and backend permits are released when their holder finishes,
    fails, is cancelled or is dropped, and when a backend adapter panics
    while polled: a panic inside `infer` is contained at the attempt, classed
    `adapter_fault`, and its cost is unknown (3.5.4). A panic inside the
    core is a defect and is not contained.
-5. Dropping a decision's future is not cancellation: it releases every
-   permit and reservation guard it holds, but no run record is built or
-   delivered, and the runtime counts it as `abandoned` in memory.
+5. Dropping a decision's future, queued or admitted, is not cancellation: it
+   releases every permit it holds and settles each dispatched attempt's
+   reservation as an unknown charge (liability, never a refund), but no run
+   record is built or delivered, and the runtime counts it as `abandoned` in
+   memory.
 
 ### 3.5 Cost budgets
 
@@ -242,14 +246,17 @@ the pure core computes from the same validated step values.
      observed spend, even when it exceeds the reservation; an observed charge
      above a `bounded` reservation is recorded as a bound violation;
    - `estimated{units}`: the reservation is released and `units` is added to
-     estimated spend;
+     estimated spend; an estimate above a `bounded` reservation is also a
+     bound violation;
    - `unknown`, and every attempt the runtime stopped waiting for (deadline,
      timeout, cancellation without a confirmed stop, panic): the reservation
      is kept as outstanding liability and is never refunded because the local
      future ended.
 5. **Reconciliation.** A later observed charge for an attempt id moves its
    liability to observed spend on a ledger the host still holds (the shared
-   ledger); the delivered run record is never rewritten.
+   ledger); the delivered run record is never rewritten. The shared ledger
+   keeps one entry per unreconciled unknown charge; its lifetime and growth
+   are the host's to manage.
 6. **Labels.** The run record reports the mode, the limit, observed spend,
    estimated spend, outstanding liability and whether the final cost is known.
    Only `hard` with no unknown liability and no bound violation is reported
@@ -307,8 +314,11 @@ the pure core computes from the same validated step values.
    remote work or charges.
 4. A cancelled decision finishes no judgment. The caller receives the
    `cancelled` termination and the run record, which keeps every attempt and
-   every retained liability. Outputs that completed before cancellation are
-   recorded in their attempts and are not supplied.
+   every retained liability. An output that completed before the runtime
+   observed the cancellation (3.3.4) is recorded as its request's result, but
+   no judgment is finished from it. An adapter that answers the propagated
+   signal with a `cancelled` report is recorded as a cancellation with its
+   acknowledgement, not as an adapter failure.
 
 ### 3.8 Judgment equivalence
 
@@ -334,9 +344,12 @@ the pure core computes from the same validated step values.
    `finish` returned.
 2. **Identities.** The decision id is supplied by the caller, must be
    non-empty and at most 256 bytes, and is the delivery key. An attempt id is
-   `<decision id>/<step>/<instance joined by ','>/<n>`, with `n` counting
-   attempts of that request from 1 across targets; it is passed to the
-   adapter as its idempotency key. Both are independent of timing.
+   `<decision id>/<step>/<instance ids joined by ','>/<n>`, each component
+   with `%`, `/` and `,` percent-escaped so components cannot run together,
+   and `n` counting attempts of that request from 1 across targets; it is
+   passed to the adapter as its idempotency key. Both are independent of
+   timing, and attempt ids are unique among running decisions because a
+   running decision id cannot be submitted again (3.4.1).
 3. **Bounds.** A record holds at most the plan's requests and
    `max_attempts_per_decision` attempts (or one attempt per request without
    an execution policy); every free-text detail the runtime writes, including
@@ -486,7 +499,7 @@ cargo test -p rustev-runtime --locked
 # 3.11: partial adoption and dependency rules.
 cargo run -p rustev-boundaries --locked --quiet
 cargo build -p rustev-core --locked
-sh -c 't=$(cargo tree -p rustev-runtime -e normal --prefix none --locked) || exit 1; if printf "%s\n" "$t" | sed "s/ .*//" | grep -E "^rustev-" | grep -qvxE "rustev-(contract|core|runtime)"; then exit 1; fi'
+sh -c 't=$(cargo tree -p rustev-runtime -e normal --prefix none --locked) || exit 1; if printf "%s\n" "$t" | sed "s/ .*//" | grep -E "^rustev-" | grep -vxE "rustev-(contract|core|runtime)" | grep -q .; then exit 1; fi'
 cargo clippy -p rustev-runtime --all-targets --locked -- -D warnings
 cargo fmt -p rustev-runtime --check
 # Negative control: seeded defects must each be detected.
@@ -495,7 +508,8 @@ sh crates/rustev-runtime/mutation/seeds.sh
 
 ## Implementation record
 
-- Contract amendment (3.1, 3.2), landed separately before the runtime:
+- Contract amendment (3.1, 3.2), landed separately before the runtime
+  (PR #9):
   `rustev.plan/2` with `execution`; `rustev.execution/1` with
   `ExecutionPolicyId`; `rustev.run/1` and the cost and cancellation
   vocabulary; `compile_with` and category 12 in `rustev-core`, validated in
@@ -513,6 +527,47 @@ sh crates/rustev-runtime/mutation/seeds.sh
   Tests:
   `crates/rustev-core/tests/execution.rs` and two document tests in
   `crates/rustev-contract/tests/documents.rs`.
+
+- Runtime (3.3 to 3.12): `crates/rustev-runtime/`. `Runtime::builder` takes
+  a `Clock`, an `EvidenceSink` and `RuntimeConfig`, registers backends with
+  their own concurrency limits and optionally a shared `Ledger`;
+  `Runtime::prepare` checks a compiled plan against the registered
+  descriptors and cost models; `Runtime::decide` runs one decision on the
+  caller's task. Tests under `crates/rustev-runtime/tests/`, on
+  `ManualClock` and the scripted fixtures of 3.12, which include spec 002's
+  own fixture module by path so the reference plans have one source.
+- Independent review of concurrency, cancellation, accounting and evidence
+  found two high, four medium and five low issues, each fixed with a
+  regression test: a panic while an adapter or sink builds its future was
+  not contained (and could stop the delivery worker); an abandoned
+  decision's dispatched reservations were neither settled nor liability; an
+  estimate above a hard bound was labeled within the cap; slow cost
+  disclosure could carry dispatch past the deadline; a long-lived caller
+  signal accumulated wakers; duplicate running decision ids collided in
+  attempt ids and ledger entries; a queued decision dropped was not counted;
+  a panicking cost disclosure ignored a declared `adapter_fault` fallback;
+  and core refusals of runtime supplies were silently mislabeled (now a
+  loud defect). The review's remaining note, that a permit freed between
+  the immediate try and the queue check can still yield `overloaded` when
+  `max_queued` is 0, is accepted: admission is exact at each check, not
+  across them.
+- Also fixed during testing: an adapter answering the propagated
+  cancellation in the same poll was recorded as an adapter fault and
+  supplied; attempt id components are now percent-escaped (3.9.2).
+- Negative control: `crates/rustev-runtime/mutation/seeds.py` seeds 18
+  defects (ledger limit ignored, unknown charges refunded, dispatch after
+  the deadline, unbounded queue, undeclared retries, non-trigger fallback,
+  expiry winning a same-poll race, invalid output accepted, permits leaked,
+  remote stop claimed without acknowledgement, failed delivery reported as
+  acknowledged, drops not counted, policy left out of plan identity, and the
+  five review regressions); each must compile and be detected. Its first
+  run found one survivor: the waker test never made a decision wait on the
+  caller's signal; the test now does. A seed that makes a test wait forever
+  counts as detected after a timeout, and tests await decisions through a
+  bounded helper so a hang fails instead of waiting.
+- The partial-adoption check in Verification avoids `grep -q` with `-v`,
+  which BSD grep answers wrongly; the check was run against a tree listing
+  with and without an extra `rustev-` crate.
 
 ## Decision history
 
@@ -534,3 +589,5 @@ Made by the agent within A-03; open to the owner's review.
 | E-12 | One extra poll after raising cancellation, then stop waiting; no grace period. | A cooperative adapter can acknowledge without the runtime extending past `D`. |
 | E-13 | The runtime never retries a delivery; sinks deduplicate by decision id. | A retry after an uncertain timeout is the duplicate hazard; the caller decides. |
 | E-14 | `invalid_output` can trigger fallback but never retry. | A deterministic backend repeats an invalid output; another backend may not. |
+| E-15 | A running decision id is refused, not assumed unique. | Attempt ids are idempotency keys and ledger keys; a precondition the runtime cannot see is not a guarantee. |
+| E-16 | Seeded defects run on a copy of the tree, one at a time, and must compile. | A seed that silently does nothing, or that fails to compile, proves nothing about the tests. |

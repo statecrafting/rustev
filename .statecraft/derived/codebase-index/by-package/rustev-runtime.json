@@ -1,0 +1,11 @@
+{
+  "package": {
+    "kind": "rust-lib",
+    "name": "rustev-runtime",
+    "path": "crates/rustev-runtime",
+    "specRef": "003-runtime-execution-and-evidence",
+    "version": "0.1.0"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "14582a87423195d396fcb90d1997188b5b13fc87c9fe8f339e805c6200801815"
+}

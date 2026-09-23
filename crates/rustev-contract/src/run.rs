@@ -91,7 +91,8 @@ pub enum RequestResult {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AttemptRecord {
-    /// `<decision id>/<step>/<instance joined by ','>/<n>`.
+    /// `<decision id>/<step>/<instance ids joined by ','>/<n>`, each
+    /// component with `%`, `/` and `,` percent-escaped.
     pub attempt_id: String,
     pub target: u32,
     pub backend_id: String,

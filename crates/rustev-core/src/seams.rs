@@ -206,6 +206,13 @@ impl CancelSignal {
         Poll::Pending
     }
 
+    /// Wakers and live children registered on this signal, for diagnostics:
+    /// a signal shared across many waiters must not accumulate them.
+    pub fn registered(&self) -> usize {
+        let s = lock(&self.0.state);
+        s.wakers.len() + s.children.iter().filter(|w| w.strong_count() > 0).count()
+    }
+
     /// Resolves once raised.
     pub fn raised(&self) -> impl Future<Output = ()> + Send + '_ {
         std::future::poll_fn(move |cx| self.poll_raised(cx))
