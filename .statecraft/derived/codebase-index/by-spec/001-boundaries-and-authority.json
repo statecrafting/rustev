@@ -9,6 +9,11 @@
       },
       {
         "code": "W-001",
+        "message": "spec '001-boundaries-and-authority' file unit 'Cargo.lock' does not exist",
+        "path": "Cargo.lock"
+      },
+      {
+        "code": "W-001",
         "message": "spec '001-boundaries-and-authority' directory unit 'tools/rustev-boundaries/' is not a directory",
         "path": "tools/rustev-boundaries/"
       }
@@ -40,6 +45,15 @@
         "unit": {
           "kind": "directory",
           "path": "tools/rustev-boundaries/"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
         }
       },
       {
@@ -82,7 +96,7 @@
           {
             "file": "standards/spec/constitution.md",
             "span": {
-              "endLine": 120,
+              "endLine": 126,
               "startLine": 57
             }
           }
@@ -100,5 +114,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "dc36ffd9d2c6d0933cbc27227b6f498c342df91df139dc3a69ef8fc38a73f51d"
+  "shardHash": "a6d990459aef782e2eeb4acf330d58428280cddc0f8ba2bc87f3e331914aa127"
 }

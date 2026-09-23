@@ -16,6 +16,7 @@ establishes:
   - "docs/design/001-decision-engine-architecture.md"
   - { kind: section, file: "standards/spec/constitution.md", anchor: "vi-onward-the-principles-of-the-system-you-are-specifying" }
   - "Cargo.toml"
+  - "Cargo.lock"
   - "Makefile"
   - { kind: directory, path: "tools/rustev-boundaries/" }
 depends_on:
@@ -39,8 +40,11 @@ remembered.
 
 - The constitution section `VI onward`, whose principles are section 3.6.
 - The design document it normalizes.
-- The workspace manifest `Cargo.toml`, the `Makefile`, and the boundary check
-  `tools/rustev-boundaries/` (a `publish = false` workspace member).
+- The workspace manifest `Cargo.toml` and its lockfile `Cargo.lock`, the
+  `Makefile`, and the boundary check `tools/rustev-boundaries/` (a
+  `publish = false` workspace member). A spec that adds a crate directory
+  extends `Cargo.toml` and `Makefile` with an `extends` edge and claims its
+  own directory.
 
 ## 3. Behavior
 
@@ -62,9 +66,9 @@ usable without any of the other ecosystem projects.
 ### 3.2 Proposals, never grants
 
 1. A Rustev output is a proposal or an unresolved outcome. No Rustev crate
-   defines, constructs or returns a value that an action executor accepts as
-   authorization, and no Rustev crate defines a `Permitted`, `Grant` or
-   equivalent authorization type.
+   defines an authorization type (`Permitted`, `Grant` or an equivalent) or
+   presents any output as authorization. What an application's executor
+   accepts is the application's decision (4 below).
 2. Before any effect, the application validates the requested action, resource,
    parameters, principal, scope and current revision against its own authority
    policy. Rustev supplies none of these as trusted facts.
@@ -76,9 +80,10 @@ usable without any of the other ecosystem projects.
    authority function's signature is a design restriction on Rustev-supplied
    interfaces. It does not prove that a model-derived value was not copied
    into another input the application treats as a trusted fact. Rustev's
-   mitigation is provenance (3.3): every input and output carries its
-   derivation, so an application can refuse model-derived values as authority
-   inputs. Enforcing that refusal is the application's obligation.
+   mitigation is provenance: every input carries a provenance class and every
+   step value and judgment a derivation class (3.3), so an application can
+   refuse model-derived values as authority inputs. Enforcing that refusal is
+   the application's obligation.
 5. An optional executor interface, if ever supplied, is generic over an
    authorization type the application owns (`ActionExecutor<A, Auth>`), and
    Rustev never constructs an `Auth`. It is not part of increment 1.
@@ -119,7 +124,9 @@ usable without any of the other ecosystem projects.
 ### 3.5 The boundary check
 
 `tools/rustev-boundaries` reads `cargo metadata` for the workspace and exits
-non-zero naming each violation of 3.4. `make boundaries` runs it and `make
+non-zero naming each violation of 3.4.1, 3.4.2, 3.4.4 and 3.4.5. Rule 3.4.3
+(contracts kept apart from network code) is not visible in dependency metadata
+beyond 3.4.2 and is held in review. `make boundaries` runs it and `make
 code` includes it. Its rules are unit-tested against synthetic metadata,
 including one violating case per rule.
 

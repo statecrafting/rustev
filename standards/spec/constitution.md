@@ -68,7 +68,8 @@ application validates the requested action, resource, parameters, principal,
 scope and current revision before any effect. Model output cannot create or
 broaden permissions. Keeping judgments out of authority signatures is a design
 restriction, not a proof that model-derived values cannot be laundered into
-other inputs; provenance (X) is what lets an application refuse them.
+other inputs; provenance and derivation classes (X) are what let an
+application refuse them.
 
 ### VII. Values carry their semantics
 
@@ -89,9 +90,11 @@ meets is refused, or uses a fallback the definition declares.
 
 ### X. Every decision is identified, attributed and evidenced
 
-Definitions, plans, artifacts, calibrations, snapshots and datasets are
-content-identified. Every value carries its derivation class (exact-derived,
-model-derived, mixed-derived) and its lineage. A decision is evidence that the
+Definitions, plans, calibrations and snapshots are content-identified;
+artifact and dataset identities are supplied by their producers and recorded.
+Every input carries a provenance class; every step value and judgment carries
+a derivation class (exact-derived, model-derived, mixed-derived) and its
+lineage. A decision is evidence that the
 system produced it, never independent evidence that the preference or fact it
 was computed from is true.
 
@@ -114,7 +117,10 @@ Byte determinism is promised for canonical compilation (definitions, plans and
 their identities) and for explicitly defined exact computation. Backend
 numerical repeatability is a measured, per-artifact tolerance. Runtime
 observations (latency, cost, scheduling) are recorded, not reproduced.
-Principle IV governs this corpus's artifacts, not Rustev's runtime outputs.
+Whether principle IV and the bootstrap's `determinism-requirement` anchor
+reach Rustev's runtime outputs is open item O-01 in
+`docs/decisions/00-founding-decisions.md`; this principle is written under
+the reading recommended there, pending the owner's confirmation.
 
 ---
 

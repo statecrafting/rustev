@@ -20,6 +20,10 @@
       },
       {
         "kind": "file",
+        "path": "Cargo.lock"
+      },
+      {
+        "kind": "file",
         "path": "Makefile"
       },
       {
@@ -30,17 +34,17 @@
     "id": "001-boundaries-and-authority",
     "implementation": "pending",
     "sectionDigests": {
-      "001-ecosystem-boundaries-proposals-versus-authority-and-product-principles": "f176cc03779fe8c3459e81508da92c0f0bd8fe9e184966f71362add949d91fee",
+      "001-ecosystem-boundaries-proposals-versus-authority-and-product-principles": "994a40b07fd725bc9f06996ad966bc8e24621d66574e2c1508d27bfac42f1497",
       "1-purpose": "23d9fbfd79c7d53855467fa3936d5b3587d0827055ec39dc204addca739a071f",
-      "2-territory": "a4f7ecbece83f408eb5204f2e61a02a05fe3072fdb3414514f682a21ae132b6b",
+      "2-territory": "c8fb9fc390f4f7db79a2536c4cd94d241f241b4371746f469de3660691b69b0e",
       "3-1-responsibilities": "9239843abb6815deae05a2316acdf2bccb66d4c1a40ba6272b5163b0714aaa28",
-      "3-2-proposals-never-grants": "6a65beac1bf7663b6811683215a33503522c3ca1338412cedf0e18c9ba53d158",
+      "3-2-proposals-never-grants": "0690af826268cca8203d351c2016d923be5f0ff16c486e0509ea90404857917e",
       "3-3-provenance-of-rustev-outputs": "c45e4590ac64b361da4e3f576766ba47e202f6f2dff1a79893cce94d6a51ed93",
       "3-4-dependency-layout": "971deb4627fd92b91a8375bb5456c785141164740483eaaef08d9fc23b1aa850",
-      "3-5-the-boundary-check": "f42f503865cde88cc87e4cb79cd8eb033baaff48c445aa136559cce1aa6da5c7",
+      "3-5-the-boundary-check": "9e2264564294e8c4eca832c1a24b5c287c4a0c317b2c8c1b8788bccf7af00844",
       "3-6-product-principles-constitution-vi-onward": "bc2135a9d35c7e2e2609c0ef1bfe7deca4f9a66541e092c22412a31abd78d803",
       "3-7-partial-adoption-obligations": "abe2f7fea7ebb816f17d55e7b158431c1f26f0c80dc7652b08fe34b5e7dbc70e",
-      "3-behavior": "42d168f6d02ad17474b5a1b294ca60c5d0d95caee29875627e38c4b8a79c0829",
+      "3-behavior": "61d4721bd924417a6f1b32e74492a4270630e52f989cd02c49f5c58102e7c1e1",
       "4-out-of-scope": "30a6983b336dcd6d618d6c7c0e79c40ca2f613a405388db45671aea9b51e4b46",
       "5-observable-negative-cases": "ed4f8a5dc1222abdb7b175f801fe1fff4affd9f10758ff1aeee33d3194125af3",
       "acceptance": "01b1f205ba5c804722e80949c3c7bd0c666c7b608608a4503c3ed7adfc2c6de2",
@@ -70,6 +74,6 @@
     "summary": "What Rustev owns and refuses to own within the ecosystem (spec-spine, Aicortex, Rahi, statecraft-cli, applications), the rule that Rustev produces proposals and never grants, the provenance classes of Rustev outputs, the dependency layout that keeps contracts transport-neutral and the core free of integrations, and the product principles that are the constitution's principles VI onward. Owns the workspace manifest, the Makefile and the boundary check that enforces the dependency rules.\n",
     "title": "Ecosystem boundaries, proposals versus authority, and product principles"
   },
-  "shardHash": "9da997c7993c3583209d527d9d3dd4fe1eeebb432c1b83ba88ca7650f1cbff51",
+  "shardHash": "b78f193b5b819439708f776f4e796cf32030ede275125a291aded557809ce4fe",
   "specVersion": "1.8.0"
 }
