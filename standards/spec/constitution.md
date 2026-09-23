@@ -56,12 +56,65 @@ blessed: it is what a later spec is written against.
 
 ## VI onward: the principles of the system you are specifying
 
-Principles I through V govern the corpus and come from spec-spine. Number your
-own from VI. They govern the system your corpus describes, and they bind every
-spec equally. Keep them few. Freeze the ones you could not recover from by
-naming their anchors in the bootstrap spec's `unamendable` list.
+Principles I through V govern the corpus and come from spec-spine. Principles
+VI onward govern Rustev, the system this corpus describes, and bind every spec
+equally. They are claimed by spec `001-boundaries-and-authority`. None is
+frozen in the bootstrap's `unamendable` list.
 
-Replace this section with your first principle.
+### VI. Proposals, never grants
+
+Rustev produces proposals and unresolved outcomes, never authorization. The
+application validates the requested action, resource, parameters, principal,
+scope and current revision before any effect. Model output cannot create or
+broaden permissions. Keeping judgments out of authority signatures is a design
+restriction, not a proof that model-derived values cannot be laundered into
+other inputs; provenance (X) is what lets an application refuse them.
+
+### VII. Values carry their semantics
+
+Scores, distributions, calibrated probabilities, selected labels, ordinal
+levels and rank positions are distinct kinds that never convert silently. A
+conversion is an explicit, identified function or it does not exist.
+
+### VIII. Unresolved is an answer
+
+Missing, stale, conflicting or invalid evidence, invalid backend output and
+exhausted budgets produce a typed unresolved outcome, never a default. A
+selection policy handles each unresolved outcome it can meet explicitly.
+
+### IX. Capabilities are disclosed, not assumed
+
+A backend states what it returns. A plan whose requirement no bound backend
+meets is refused, or uses a fallback the definition declares.
+
+### X. Every decision is identified, attributed and evidenced
+
+Definitions, plans, artifacts, calibrations, snapshots and datasets are
+content-identified. Every value carries its derivation class (exact-derived,
+model-derived, mixed-derived) and its lineage. A decision is evidence that the
+system produced it, never independent evidence that the preference or fact it
+was computed from is true.
+
+### XI. Measured, not asserted
+
+Quality, calibration and latency claims name the dataset, split, artifact and
+conditions that measured them; an absent measurement is unknown. Applying a
+calibration artifact establishes which transformation was applied and to what
+it is bound, not that the output is calibrated on current data.
+
+### XII. Partial adoption
+
+Each major part is usable without the others and replaceable behind its seam.
+Rustev is usable without Aicortex, Rahi, statecraft-cli or spec-spine at run
+time.
+
+### XIII. Determinism is scoped
+
+Byte determinism is promised for canonical compilation (definitions, plans and
+their identities) and for explicitly defined exact computation. Backend
+numerical repeatability is a measured, per-artifact tolerance. Runtime
+observations (latency, cost, scheduling) are recorded, not reproduced.
+Principle IV governs this corpus's artifacts, not Rustev's runtime outputs.
 
 ---
 

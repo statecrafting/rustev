@@ -1,9 +1,28 @@
 {
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '001-boundaries-and-authority' file unit 'Cargo.toml' does not exist",
+        "path": "Cargo.toml"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '001-boundaries-and-authority' directory unit 'tools/rustev-boundaries/' is not a directory",
+        "path": "tools/rustev-boundaries/"
+      }
+    ]
+  },
   "mapping": {
     "dependsOn": [
       "000-bootstrap"
     ],
     "implementingPaths": [
+      {
+        "path": "Makefile",
+        "source": "spec-edge"
+      },
       {
         "path": "docs/design/001-decision-engine-architecture.md",
         "source": "spec-edge"
@@ -14,6 +33,37 @@
       }
     ],
     "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-boundaries/"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Makefile"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      },
       {
         "locations": [
           {
@@ -32,7 +82,7 @@
           {
             "file": "standards/spec/constitution.md",
             "span": {
-              "endLine": 67,
+              "endLine": 120,
               "startLine": 57
             }
           }
@@ -47,8 +97,8 @@
       }
     ],
     "specId": "001-boundaries-and-authority",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "f3507ed85f611cc8e950bc4207fbac8f51703737298786ac37899a7d4fd4f243"
+  "shardHash": "dc36ffd9d2c6d0933cbc27227b6f498c342df91df139dc3a69ef8fc38a73f51d"
 }
