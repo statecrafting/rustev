@@ -17,6 +17,11 @@ summary: >
 establishes:
   - { kind: directory, path: "crates/rustev-contract/" }
   - { kind: directory, path: "crates/rustev-core/" }
+extends:
+  # Adds the crates/ member glob and workspace dependencies.
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.toml" }, nature: additive }
+  # Adds 002 to the specs `make verify` runs.
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
 depends_on:
   - "000-bootstrap"
   - "001-boundaries-and-authority"
@@ -43,7 +48,7 @@ outputs, before any runtime or model exists.
 - `crates/rustev-core/`: validation, value kinds, the operator registry,
   compiler, calibration application, staged evaluation, selection policy, the
   typed builder and the seam traits. Depends on `rustev-contract`, `serde`,
-  `serde_json` and `sha2` only.
+  `serde_json` and `sha2` only. Neither crate has dev-dependencies.
 - Tests, golden documents and synthetic fixtures live under each crate's
   `tests/` directory and are owned with it. Every synthetic fixture says so in
   its name or content (R-04); none is evidence of semantic quality.
@@ -73,7 +78,10 @@ outputs, before any runtime or model exists.
    count, raw number bytes, and whether fractional numbers are allowed. The
    scan allocates only its container stack (bounded by depth) and per-object
    key sets (bounded by the input length). Typed deserialization runs only on
-   accepted input, so its allocations are bounded by the accepted size.
+   accepted input, so its allocations are bounded by a function of the
+   accepted limits (a small multiple of the accepted size), not by anything
+   the input can choose beyond them. Every scalar, array and object counts as
+   one value; object keys do not.
 3. Duplicate object keys are refused by the scan, compared after decoding
    escapes. Unknown fields are refused by every document type.
 4. Reading bytes from a transport, and bounding that buffer, belongs to the
@@ -87,13 +95,26 @@ outputs, before any runtime or model exists.
 | `SNAPSHOT_V1` | 4 MiB | 32 | 256 KiB | 10 000 | 500 000 | 40 | no |
 | `DESCRIPTOR_V1` | 256 KiB | 16 | 4 KiB | 1 024 | 20 000 | 40 | no |
 | `BACKEND_OUTPUT_V1` | 1 MiB | 8 | 4 KiB | 4 096 | 50 000 | 40 | yes |
+| `PLAN_V1` | 2 MiB | 32 | 64 KiB | 4 096 | 200 000 | 40 | no |
+| `RECORD_V1` | 4 MiB | 32 | 256 KiB | 10 000 | 500 000 | 40 | yes |
+
+   Definitions use `DEFINITION_V1`; snapshots `SNAPSHOT_V1`; backend
+   descriptors and calibration artifacts `DESCRIPTOR_V1`; backend outputs
+   `BACKEND_OUTPUT_V1`; plans `PLAN_V1`; judgments, evidence records and
+   evaluation reports `RECORD_V1`.
 
 ### 3.3 Canonical form and identities
 
 1. Canonical bytes of a document: its serde value with object keys sorted by
    byte order, no insignificant whitespace, `serde_json` string escaping, and
    no fractional or exponent numbers (identity-bearing documents carry
-   decimals as strings). Array order is significant and preserved.
+   decimals as strings). Array order is significant and preserved. Every
+   field of every identity-bearing type is always written: there are no
+   omitted or `null` fields; absence is an explicit variant. Enums are
+   externally tagged with `snake_case` names unless the contract type states
+   otherwise. The serde definitions in `rustev-contract` at schema version 1
+   are the normative encoding; a change that alters canonical bytes is a new
+   schema version, and the golden documents pin it.
 2. An identity is `sha256:` followed by 64 lowercase hex digits of
    SHA-256 over `tag || 0x00 || canonical bytes`, where `tag` is the schema
    string of the identified document. Identified documents: definition
@@ -104,8 +125,10 @@ outputs, before any runtime or model exists.
 4. The plan document embeds the canonical definition, the definition id,
    every bound backend's id, artifact and `DescriptorId`, every calibration's
    id and binding, every operator id and version, the exact-registry version
-   `rustev.exact/1`, the limits, the topological step order, derivation
-   classes, notices, and the compiler identity `rustev-core/<crate version>`.
+   `rustev.exact/1`, every field of the definition's limits, the topological
+   step order, each step's static derivation class (3.12), notices as
+   `{kind, step, reason}`, and the compiler identity
+   `rustev-core/<crate version>`.
    `PlanId` is the identity of that document.
 
 ### 3.4 Numbers and time
@@ -130,10 +153,12 @@ outputs, before any runtime or model exists.
 5. A mass, score or logit is an `f64` and must be finite. A decimal compared
    with an `f64` is first converted to the nearest `f64`.
 6. Exact computation, for byte determinism (principle XIII), means: decimal,
-   integer, timestamp and text operations above, and `f64` addition and
-   multiplication performed in a fixed, declared order. It excludes `exp` and
-   `ln`, which the logit normalization and temperature calibration use; those
-   are backend-output transformations with numerical, not byte, repeatability.
+   integer, timestamp and text operations above; conversion of a decimal to
+   the nearest `f64`; and IEEE 754 `f64` addition, subtraction,
+   multiplication and division (each correctly rounded) performed in a fixed,
+   declared order with no fused operations. It excludes `exp` and `ln`, which
+   logit normalization and temperature calibration use; those are
+   backend-output transformations with numerical, not byte, repeatability.
 
 ### 3.5 Value kinds
 
@@ -156,7 +181,8 @@ outputs, before any runtime or model exists.
    `stale_evidence{fields}`, `invalid_input{fields, detail}`,
    `abstained{rule}`, `backend_unavailable{detail}`,
    `invalid_backend_output{detail}`, `budget_exhausted{resource}`,
-   `deadline_exceeded`, `conflict{facts}`, `unsupported{capability}`.
+   `deadline_exceeded`, `conflict{facts}`, `unsupported{capability}`. Field and fact lists are
+   sorted and deduplicated.
 
 ### 3.6 Calibration
 
@@ -184,10 +210,11 @@ outputs, before any runtime or model exists.
    field is required). Values are decoded strictly: no coercion, no default.
 3. A snapshot is a list of entries `{field, value, provenance, as_of_ms,
    source}`. For each declared input, at evaluation time `now`:
-   - entries whose values differ (canonical comparison) make the field
-     `conflict{field}`;
-   - an entry with `as_of_ms > now` makes the field `invalid_input` (future
-     timestamp; no skew allowance in increment 1);
+   - entries with an accepted provenance class whose values differ
+     (canonical comparison) make the field `conflict{facts: [field]}`;
+     entries with a non-accepted class are ignored;
+   - an accepted entry with `as_of_ms > now` makes the field
+     `invalid_input` (future timestamp; no skew allowance in increment 1);
    - no entry with an accepted provenance class makes it
      `missing_evidence{field}`;
    - a value failing its type makes it `invalid_input`;
@@ -253,27 +280,32 @@ candidate id ascending.
 | `ordinal_distribution` | `distribution`, `logits` | rubric |
 | `scores` | `scores`, `logits` | rank |
 
-4. Compilation phases: parse and bound; resolve operators and calibrations;
-   type-check every reference and edge; build the step graph and order it
-   topologically (ties by declaration order); bind backends (an explicit
-   binding makes that backend the only candidate; otherwise the satisfying
-   descriptors in `backend_id` byte order, first wins); check budgets; check
-   the policy; emit.
-5. Refusals are typed and name the step and requirement:
+4. Compilation phases, in order: (a) parse and bound; (b) structure: ids,
+   references, literals, versions, limits; (c) resolve operators and
+   calibrations; (d) graph: order steps topologically (ties by declaration
+   order); (e) types: every reference and edge; (f) bind backends (an
+   explicit binding makes that backend the only candidate; otherwise the
+   satisfying descriptors in `backend_id` byte order, first wins), fallbacks
+   and calibration artifacts; (g) budget; (h) policy; (i) emit. Compilation
+   stops at the first refusal: the earliest phase wins, and within a phase the
+   first step in declaration order, then the first policy item in declaration
+   order.
+5. Refusals are typed, name the step or policy item and the requirement, and
+   belong to exactly one phase:
 
-| Category | Refused when |
-|---|---|
-| 1 `parse` | a bound, duplicate key, unknown field, syntax or schema failure |
-| 2 `unknown_operator` | an operator name or version not in `rustev.exact/1` |
-| 3 `kind_mismatch` | a reference or edge carries a type or value kind its consumer does not accept, including a label feeding a mass |
-| 4 `cycle` | the step graph has a cycle; the error lists its steps |
-| 5 `no_capable_backend` | no candidate satisfies a semantic step and the fallback is `none`; the error lists each candidate's shortfall (operation, output kind, option count, input limit, determinism, artifact pin) |
-| 6 `uncalibrated_threshold` | a probability threshold reads a non-calibrated kind without a declared `uncalibrated_threshold` reason |
-| 7 `budget` | worst-case semantic requests exceed `max_semantic_requests` without `truncate_visible`, or a projection's worst-case bytes exceed `max_projection_bytes` |
-| 8 `unhandled_unresolved` | the policy reads a value whose possible unresolved reasons are not all handled |
-| 9 `invalid_fallback` | a fallback kind its consumers cannot accept, or that no candidate satisfies either |
-| 10 `calibration_binding` | a calibration is missing, or its artifact, task, question, options or method do not match the bound step |
-| 11 `invalid_definition` | an unknown reference, duplicate id, invalid literal, version or limit, or a policy whose last rule is not `always` |
+| Category | Phase | Refused when |
+|---|---|---|
+| 1 `parse` | a | a bound, syntax, duplicate key, unknown field, unknown schema, or a JSON value of the wrong shape |
+| 11 `invalid_definition` | b | an unknown reference, duplicate id, a well-formed but invalid literal, version or limit, or a policy whose last rule is not `always` |
+| 2 `unknown_operator` | c | an operator name or version not in `rustev.exact/1` |
+| 10 `calibration_binding` | c, f | a `calibrated_probability` step names no calibration, or a named one is not supplied, or its task, question, options or method differ from the step (c); or its artifact differs from the bound backend's (f) |
+| 4 `cycle` | d | the step graph has a cycle; the error lists its steps |
+| 3 `kind_mismatch` | e, h | a reference, edge or policy condition reads a type or value kind its consumer does not accept, including a label where mass is required |
+| 5 `no_capable_backend` | f | no candidate satisfies a semantic step and the fallback is `none`; the error lists each candidate's shortfall (operation, output kind, option count, input limit, determinism, artifact pin) |
+| 9 `invalid_fallback` | f | a fallback kind its consumers cannot accept, or that no candidate satisfies either |
+| 7 `budget` | g | worst-case semantic requests exceed `max_semantic_requests` without `truncate_visible`, or a projection's worst-case bytes exceed `max_projection_bytes` |
+| 6 `uncalibrated_threshold` | h | a probability threshold reads a `distribution` without a declared `uncalibrated_threshold` reason (after the kind check) |
+| 8 `unhandled_unresolved` | h | the policy reads a value whose possible unresolved reasons are not all handled, applies `not` to a value handled `as_unmet`, or its last rule reads such a value |
 
 6. A declared fallback that is taken at compile time is recorded in the plan
    binding and as a notice. `unsupported` makes the step always
@@ -325,11 +357,20 @@ candidate id ascending.
 
 ### 3.12 Derivation and lineage
 
-Every step value and the judgment carry a derivation class (spec `001` 3.3)
-and lineage (inputs and steps read). An exact step is `exact-derived` when
-every input it reads, directly or through steps, has no `model-derived`
-provenance, and `mixed-derived` otherwise; a semantic step is
-`model-derived`; the judgment's class combines the values the policy read.
+1. Every step value and the judgment carry a derivation class (spec `001`
+   3.3) and lineage: the input fields and steps read, directly or
+   transitively, sorted.
+2. A semantic step value is `model-derived`. An input's class is
+   `model-derived` when its accepted entry's provenance is `model-derived`,
+   otherwise `exact-derived`. A value computed exactly (an exact step, or the
+   policy producing the judgment) from a set of read values is
+   `exact-derived` when every read value is `exact-derived` or nothing is
+   read, and `mixed-derived` otherwise.
+3. The plan records each step's static class, computed from the declared
+   accepted provenance classes as the worst case (any accepted
+   `model-derived` class counts as model-derived). The runtime class is
+   computed from the snapshot actually supplied and is never less derived
+   than it reads.
 
 ### 3.13 Reference plans
 
@@ -379,8 +420,8 @@ backend. Specs `003` to `006`.
   descriptor is added.
 - Ties in `top_label`, `top_k` and `weighted_rank` resolve as specified.
 - Both reference plans evaluate end to end on supplied semantic values.
-- `make code` and `make boundaries` pass; the value-kind types have
-  compile-fail tests for conversion.
+- `make code` (build, test, clippy, fmt, boundaries) passes; the value-kind
+  types have compile-fail doctests for conversion.
 
 ## Verification
 
@@ -393,11 +434,14 @@ cargo test -p rustev-core --locked
 # 3.1: dependency rules for both crates.
 cargo run -p rustev-boundaries --locked --quiet
 cargo clippy -p rustev-contract -p rustev-core --all-targets --locked -- -D warnings
+cargo fmt -p rustev-contract -p rustev-core --check
 ```
 
 ## Engineering choices
 
-Recorded under owner decision A-02; none reopens R-01 to R-06.
+Made by the implementing agent after the owner's approval (A-02), to settle
+details the approved draft left open. They are not owner decisions and are
+open to the owner's review; none reopens R-01 to R-06.
 
 | Id | Choice | Reason |
 |---|---|---|
@@ -415,4 +459,7 @@ Recorded under owner decision A-02; none reopens R-01 to R-06.
   `docs/decisions/00-founding-decisions.md`): enforceable parse bounds with
   transport buffering owned separately; calibration as identity and binding
   with one explicit method; determinism scoped; explicit acceptance and
-  verification. The concrete rules above settle details the draft left open.
+  verification. The concrete rules in section 3 and the engineering choices
+  were then written by the implementing agent within those corrections; they
+  are reviewable in the change that introduced them and are not the owner's
+  decisions.
