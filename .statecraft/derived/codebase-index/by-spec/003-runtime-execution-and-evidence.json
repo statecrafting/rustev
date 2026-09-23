@@ -1,0 +1,34 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '003-runtime-execution-and-evidence' directory unit 'crates/rustev-runtime/' is not a directory",
+        "path": "crates/rustev-runtime/"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-decision-contract-and-pure-core"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-runtime/"
+        }
+      }
+    ],
+    "specId": "003-runtime-execution-and-evidence",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "3f286cf7211d030267f8b8883a4219a82416a6bbd10aa76dcf3a329c263c7bff"
+}
