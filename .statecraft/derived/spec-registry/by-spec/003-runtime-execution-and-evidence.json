@@ -1,5 +1,8 @@
 {
   "record": {
+    "amends": [
+      "002-decision-contract-and-pure-core"
+    ],
     "created": "2026-09-23",
     "dependsOn": [
       "001-boundaries-and-authority",
@@ -11,29 +14,103 @@
         "path": "crates/rustev-runtime/"
       }
     ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-contract/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-core/"
+        }
+      }
+    ],
     "id": "003-runtime-execution-and-evidence",
     "implementation": "pending",
     "sectionDigests": {
-      "003-runtime-execution-and-evidence-emission": "a926cafdce43406c27fbae1b473a085f2b08e021f4105916fc882fe14f7cd40b",
-      "1-purpose": "70fc7400891020f23428774aae989e0eeebee2575ee55ba093dbb365c595ebc7",
-      "2-territory": "971e39877252113d89073ac48f3cc4da2b735232138712d2c814a162c53f3c80",
-      "3-behavior-to-be-made-concrete-before-approval": "fd9b484a42a2440061c2c25296973ca9328cfa23aa454ccd1118854cb6e202d3",
-      "4-out-of-scope": "ace1f563160697d262b60c7822b58673b03eb3f01a900685bc84b6e752197016",
-      "acceptance-draft": "62557bfdd95f10d3541efb805107051428d987916f3b1af09438d5c044380cf7"
+      "003-runtime-execution-and-evidence-emission": "37b0240a4a3edbca2b051dfc20bcac5c67f7ba0b403ab1762f8c502581a1fee2",
+      "1-purpose": "dfd31f066b5e596d296043dda73157b8e22b957f2090ed652189f4e03326c5b8",
+      "2-territory": "e01a590b847d0a25ca9cb02f4882a34c43aa451c8607295c047266cd1a85332b",
+      "3-1-relation-to-spec-002-and-compatibility": "15095131169d08e3e6470c77f78b36c132aae0ac34c2e815d889e2a96caca204",
+      "3-10-deferred-optimization-contract": "e4075287e014ada10c21f3961d374a183d54d2f4a18b975522718244af5ccdda",
+      "3-11-partial-adoption": "71430f7c30464ea43357fc3446149b17fde84cde1f4f07ae7641287c7f9ad990",
+      "3-12-test-fixtures": "639a15108abf988ace3e34372c729a7bc8ba2c4fbf93c9e9af11689f29c28aa6",
+      "3-2-contract-amendments-to-spec-002": "79ed65540e26816d85777820e98e6c57ca8e15416c7496e8adb2e653f6050cf3",
+      "3-3-time": "c816a9f5a10763239c964205f9b07c412ea41eb03c8c97eed2bae49649011ef7",
+      "3-4-admission-and-concurrency": "3e4b915918084699ef9c84d8b51b4b1d3c1d4e9027a737b6e159ee5729aa002b",
+      "3-5-cost-budgets": "25476f1f1d763b1e0ec37894c36322ddd2814ae4053860cf7e5a38cb583455aa",
+      "3-6-retries-and-runtime-fallback": "d5b9224dc90137edf381845b12ac3cc24ac1909fd36e3fef75de144260e5d2d8",
+      "3-7-cancellation": "5b9797c7bfa121c3b02be0d0c2e302e767c8e288ba405c16f40595bb8c11e7b1",
+      "3-8-judgment-equivalence": "62d6f9c8cc3e79a71674b7891f87175f8e65cf5895534850d5e1b6061fa06bc0",
+      "3-9-evidence": "fe9bea18ae6ddd0b212da242fae19d3c213d7adabd92a428422a59a527f48df2",
+      "3-behavior": "d58ecf5193f6c0fdce9eaedc059c92052d963d9697f76175f733fc101f2e85df",
+      "4-out-of-scope": "3a24c8cacecbea17adff82dde1cc1854d5f08569af0640d641f794433be1377f",
+      "5-observable-negative-cases": "32add3db5c0df095d5480a5e007eca0bf12a07aafbaccfffc7aff6a789b79647",
+      "acceptance": "8d937cc0d6127da1b16df87ec03bac056628e9369743cede203ef3228f9358ba",
+      "decision-history": "0c17f66256b6e7e0498627e2e2b7ecad32f058766ac2d6e8a710a4a1249c5555",
+      "engineering-choices": "98619abbd1dcc263e0e8c113e65a362127ef8bcd3cc5022e440d6112674680ad",
+      "verification": "eb750b21ce5d1131856cedd2579647224dc45968b318132d60dc8ea7b875888c"
     },
     "sectionHeadings": [
       "003: Runtime execution and evidence emission",
       "1. Purpose",
       "2. Territory",
-      "3. Behavior (to be made concrete before approval)",
+      "3. Behavior",
+      "3.1 Relation to spec 002 and compatibility",
+      "3.2 Contract amendments to spec 002",
+      "3.3 Time",
+      "3.4 Admission and concurrency",
+      "3.5 Cost budgets",
+      "3.6 Retries and runtime fallback",
+      "3.7 Cancellation",
+      "3.8 Judgment equivalence",
+      "3.9 Evidence",
+      "3.10 Deferred optimization contract",
+      "3.11 Partial adoption",
+      "3.12 Test fixtures",
       "4. Out of scope",
-      "Acceptance (draft)"
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Decision history",
+      "Engineering choices"
     ],
     "specPath": "specs/003-runtime-execution-and-evidence/spec.md",
-    "status": "draft",
-    "summary": "Increment 2: `rustev-runtime` drives the pure core's staged evaluation against real seams on Tokio (R-03): deadlines, admission, budget reservation, bounded retries and declared runtime fallbacks, batching and duplicate suppression, caches keyed by artifact and projection, truncation, cancellation honesty, and evidence emission under a declared sink policy.\n",
+    "status": "approved",
+    "summary": "Increment 2: `rustev-runtime` drives the pure core's staged evaluation through backend seams on Tokio (R-03) under explicit bounds: injectable monotonic time and one end-to-end deadline, bounded admission and concurrency, cost budgets reserved before dispatch with honest settlement, bounded retries and runtime fallback declared in an identified execution policy that is part of plan identity, cancellation that never claims more than the backend acknowledged, and evidence delivery under a declared sink policy. Amends spec 002: plan schema 2, the execution-policy and run-record documents, a pre-supply output check, and the backend and sink seams. Batching, duplicate suppression and caches are deferred by name.\n",
     "title": "Runtime execution and evidence emission"
   },
-  "shardHash": "3daed7ca0acb64acb68f264a7001015b2d81e2811270c644ee4fc269fdc0f32a",
+  "shardHash": "81b94ee35296d0fe9c649917131c7228d1098e14fdd7398a6896bc653b46ec9a",
   "specVersion": "1.8.0"
 }

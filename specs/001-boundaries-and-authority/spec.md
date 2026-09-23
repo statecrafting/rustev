@@ -208,3 +208,6 @@ sh -c 'for d in crates tools; do [ -d "$d" ] || continue; if grep -rnE "(struct|
   proposals with a stated limitation, derivation classes, dependency layout
   with network implementations under `integrations/`, ownership of workspace
   machinery). Recorded in `docs/decisions/00-founding-decisions.md` as A-01.
+- 2026-09-23: the owner closed O-01 (R-07). Principle XIII's closing
+  sentence, in the constitution section this spec claims, now records that
+  reading instead of the pending question. No principle changed.

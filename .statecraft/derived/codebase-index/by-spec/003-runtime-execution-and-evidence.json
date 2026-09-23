@@ -10,11 +10,35 @@
     ]
   },
   "mapping": {
+    "amends": [
+      "002-decision-contract-and-pure-core"
+    ],
     "dependsOn": [
       "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "Cargo.lock",
+        "source": "spec-edge"
+      },
+      {
+        "path": "Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "Makefile",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-contract/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-core/",
+        "source": "spec-edge"
+      }
+    ],
     "resolvedUnits": [
       {
         "locations": [],
@@ -24,11 +48,76 @@
           "kind": "directory",
           "path": "crates/rustev-runtime/"
         }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-contract/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-contract/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-core/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-core/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.lock"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Makefile"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
       }
     ],
     "specId": "003-runtime-execution-and-evidence",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "3f286cf7211d030267f8b8883a4219a82416a6bbd10aa76dcf3a329c263c7bff"
+  "shardHash": "ca8ad12cbacbaab4bba35a6d6305a1dfa05ebdb6ea7c13dcb3c1b02d6d4b9bcc"
 }
