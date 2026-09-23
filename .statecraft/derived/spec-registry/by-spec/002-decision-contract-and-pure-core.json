@@ -15,21 +15,50 @@
         "path": "crates/rustev-core/"
       }
     ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      }
+    ],
     "id": "002-decision-contract-and-pure-core",
+    "implementation": "pending",
     "sectionDigests": {
-      "002-decision-contract-and-pure-core": "8373bf23594eacbed3a495335533391199c75a2d08d1f14ad3e7952066c1c9dc",
-      "1-purpose": "ddfb60a02b2c319124f86f30089ae1777b75c3108b1600b0dbe74b891134bb3c",
-      "2-territory": "ccd795b2982abb21b2aab939caaebbd743fa72e57f5aecea18f6aa3edd85196c",
-      "3-1-purity": "05bea0ea091b4889581903b11173e74498e2579ec7497eec623563dcf5435d18",
-      "3-2-value-kinds": "5bba597bed1345a9763fb09bd9e7633e78b9b26a8230205513126482504b7a54",
-      "3-3-validation": "a70f31bf9f393382ce0a8bac626bc256fb6ee3afc7e4157feef555636dd8736c",
-      "3-4-exact-operators": "293ddf8a61daaaaa1e33a048f334371e7c579922be7d0f93362a5d8b97d8e9d3",
-      "3-5-definitions-and-compilation": "b0a48bf58841c70a1fa454dcbe667dcd92e1d4532f0728263ceda0284d5992ea",
-      "3-6-selection-policy": "12ea761e6d28360ab9d7a0c60a74901013826e4040561693dca260f766e121d4",
-      "3-7-fixtures": "a7df3f0b4c8c21112b99b3eff9b556ed548da04144bdacf22ec6a592a82f4866",
-      "3-behavior": "5cab3007c9c38dc83ad27bb937a7b637f3d37b5dc9af94aad057453123e411f1",
-      "4-out-of-scope": "51994b2a9d6bb97f1eb20d62d2ed5d8259e54f72ff573c4822e47bb6b3d80fac",
-      "5-observable-negative-cases": "91f6e3e18a7b3673fdaef13b330f76efa4ee1fa6a0efd7fbfda333ddabe814c0"
+      "002-decision-contract-and-pure-core": "0bf00afd671fcb2776679cc333bf6ce9b295296a610e572cce1788d3c22cb12a",
+      "1-purpose": "efd6bb9c309da706ab17fe0263a710e07f25af759e95d4fdbf81da098b975dfd",
+      "2-territory": "e229a2080dae05d3467052ac12d03e255c0064138cdf2df4b9f7e8c000d08be3",
+      "3-1-purity": "1172db9f90fbb5bfeda4e0a12c246f621d7643a405fc11e43468de87bcc67939",
+      "3-10-staged-evaluation": "1248e9073ecc824c9e50584fd3d92b9732f2fc223228d705fff5c0e76d0e02b3",
+      "3-11-selection-policy": "bd4bf1090d2ae32d617c23cf32af227b9a8f6710f4caf8b859dbcf0d7375f00b",
+      "3-12-derivation-and-lineage": "2a7a8c593f7fed1ed56e8c402640bd2a87ee66c7d7a3f825a0be6c91f4ab74a5",
+      "3-13-reference-plans": "a74f68907dc74ed70f3d562d1d5f8528297b0c548ab8d45df1c998e57f41bd52",
+      "3-2-documents-and-bounded-parsing": "b654550583a443d2f25591529a203fcdb6f06464dcb1c40c684b4f6255c4f5d7",
+      "3-3-canonical-form-and-identities": "0d5d16ee6c067a4ea530faf8428a8d9e3ae82dda9f0890cded1672b81ad859e6",
+      "3-4-numbers-and-time": "1885bb681edca722672d65192e4814b58633a62fb7edbfd99fbbfa1f8a58b851",
+      "3-5-value-kinds": "a3964f7d82974a92795f185f64908aecc7548cb45040d977b9fea6c40dc9695f",
+      "3-6-calibration": "240baa4b99a10cd72f8228522d795f62978f425080a0919a35d63e0a14ca5649",
+      "3-7-inputs-provenance-and-freshness": "00c9d823c13dc7d4338e803841bd0d992b1a543753ba89ec46babb0199cfc8ab",
+      "3-8-exact-operators": "38784c70d9ee71e5b23b90574ce26e9663e33099fc54c8e6586b1b26c0c987ec",
+      "3-9-definitions-and-compilation": "848230e92e377720f97456da9d256ea73c7263ea0017f70a536fca4dee4c78a8",
+      "3-behavior": "5f22050d9340b7b5a430c3b12f0716a766b3d2b12ceaa8b5938a3b552a7d4cea",
+      "4-out-of-scope": "c81f733e15396d9d21494f9350333a3a25a42aba9d8b2be3bf9fbb57c8e13cd5",
+      "5-observable-negative-cases": "938c88fb31fa7948543f607992d27120d411697e3983139927cadf4aab36c79a",
+      "acceptance": "17d006ce0597943c7e053483738b1f04376a944ef29cde6f3068bda644284251",
+      "decision-history": "8626eecc35c69482618395c51843d8c12f85fe851372ed39f6b4432e897d6a9d",
+      "engineering-choices": "ad4c7add3dff980a4b0fdca87ae8e9396362b87b0f2a5e89fd1a242847d3d9b1",
+      "verification": "a381b4b3cb4aeb5468a033e82d000b4f78ed6e8fd9b30a3ffd8c06f402e19d3d"
     },
     "sectionHeadings": [
       "002: Decision contract and pure core",
@@ -37,20 +66,30 @@
       "2. Territory",
       "3. Behavior",
       "3.1 Purity",
-      "3.2 Value kinds",
-      "3.3 Validation",
-      "3.4 Exact operators",
-      "3.5 Definitions and compilation",
-      "3.6 Selection policy",
-      "3.7 Fixtures",
+      "3.2 Documents and bounded parsing",
+      "3.3 Canonical form and identities",
+      "3.4 Numbers and time",
+      "3.5 Value kinds",
+      "3.6 Calibration",
+      "3.7 Inputs, provenance and freshness",
+      "3.8 Exact operators",
+      "3.9 Definitions and compilation",
+      "3.10 Staged evaluation",
+      "3.11 Selection policy",
+      "3.12 Derivation and lineage",
+      "3.13 Reference plans",
       "4. Out of scope",
-      "5. Observable negative cases"
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Engineering choices",
+      "Decision history"
     ],
     "specPath": "specs/002-decision-contract-and-pure-core/spec.md",
-    "status": "draft",
-    "summary": "Increment 1: the versioned wire contract (`rustev-contract`) and the pure core (`rustev-core`). Value kinds and their conversion rules, identities, bounded input validation with provenance and freshness, the exact operator registry, decision definitions, the plan compiler with capability matching and explicit refusal, selection policy evaluation, and typed unresolved outcomes. No I/O, no clock, no async executor, no model.\n",
+    "status": "approved",
+    "summary": "Increment 1: the versioned wire contract (`rustev-contract`) and the pure core (`rustev-core`). Bounded parsing, canonical form and identities, value kinds without silent conversion, fixed-point decimals and millisecond time, input validation with provenance, freshness and conflict, a closed versioned exact-operator registry, decision definitions entered through a typed builder or canonical JSON, the plan compiler with capability matching, declared fallbacks and typed refusals, calibration binding, deterministic selection policy with explicit unresolved handling, and derivation classes with lineage. No I/O, no clock, no async executor, no model.\n",
     "title": "Decision contract and pure core"
   },
-  "shardHash": "207172965d29551a4f2ec56bffc2ad6b789487f776e9622a1ff6e5ede70770cb",
+  "shardHash": "49d7878b85828d13a9be497ab9e1579104975e30541930cf53ad1f93ec00d875",
   "specVersion": "1.8.0"
 }

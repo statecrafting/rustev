@@ -11,6 +11,11 @@
         "code": "W-001",
         "message": "spec '002-decision-contract-and-pure-core' directory unit 'crates/rustev-core/' is not a directory",
         "path": "crates/rustev-core/"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '002-decision-contract-and-pure-core' file unit 'Cargo.toml' does not exist",
+        "path": "Cargo.toml"
       }
     ]
   },
@@ -19,7 +24,12 @@
       "000-bootstrap",
       "001-boundaries-and-authority"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "Makefile",
+        "source": "spec-edge"
+      }
+    ],
     "resolvedUnits": [
       {
         "locations": [],
@@ -38,11 +48,33 @@
           "kind": "directory",
           "path": "crates/rustev-core/"
         }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Makefile"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
       }
     ],
     "specId": "002-decision-contract-and-pure-core",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "31c289b93e789944163bc490dd93f4a7887ebea35fcc7ea43c6adb8107213b8f"
+  "shardHash": "c9f97ed05d49504ffdfd915f80a1d42cbe07c318b4b5b812b31633703258ce52"
 }
