@@ -13,7 +13,8 @@
     "dependsOn": [
       "002-decision-contract-and-pure-core",
       "003-runtime-execution-and-evidence",
-      "004-evaluation-and-replay"
+      "004-evaluation-and-replay",
+      "005-reference-backends"
     ],
     "implementingPaths": [],
     "resolvedUnits": [
@@ -31,5 +32,5 @@
     "specStatus": "draft"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "fb840c8682743ae77599555afe1596590d397b742cbd42d67ae9a2920cb9d216"
+  "shardHash": "829baf60791fd51523eac8681e03fa79d5c29544833da7d2350216d2e9ae5745"
 }

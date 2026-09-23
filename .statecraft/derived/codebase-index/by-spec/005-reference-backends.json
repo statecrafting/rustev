@@ -11,7 +11,8 @@
   },
   "mapping": {
     "dependsOn": [
-      "002-decision-contract-and-pure-core"
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence"
     ],
     "implementingPaths": [],
     "resolvedUnits": [
@@ -29,5 +30,5 @@
     "specStatus": "draft"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "4a243003310ba82dcb81b79f31ea633ba29e5ef605d700b18b29fe7084e586c1"
+  "shardHash": "081c977dd376cb2b28a762464afdf8e946517c7e2bd1491efa2624475338a098"
 }
