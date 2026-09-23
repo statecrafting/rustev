@@ -1,0 +1,38 @@
+{
+  "record": {
+    "created": "2026-09-23",
+    "dependsOn": [
+      "002-decision-contract-and-pure-core"
+    ],
+    "establishes": [
+      {
+        "kind": "directory",
+        "path": "backends/rustev-backend-rules/"
+      }
+    ],
+    "id": "005-reference-backends",
+    "implementation": "pending",
+    "sectionDigests": {
+      "005-reference-backends": "2994fe80b119d8d7b5f222e597428aeb668477b740336dd02e83001fc8d25b1c",
+      "1-purpose": "2e6448579c0ce5a4f19347897e6dad6f275d822f2254c50bcbfa71b2897e9df5",
+      "2-territory": "54d25645b152fe5c51845539be0e7d0cd39b0a5204423c957d462f15808c05fd",
+      "3-behavior-to-be-made-concrete-before-approval": "eeba04ef209ad34ddcb19b350bd4780deaec6aa9c2a71868fc5fab3ae9164a2f",
+      "4-out-of-scope": "f45381b6e6bdd48a914ba802480812554d2586a9708a9861f0b9fc76b6759c86",
+      "acceptance-draft": "cdb29b21a5762aa9eece4bc6374a6c1169c7d4aac68e0a434504880bfb85e255"
+    },
+    "sectionHeadings": [
+      "005: Reference backends",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior (to be made concrete before approval)",
+      "4. Out of scope",
+      "Acceptance (draft)"
+    ],
+    "specPath": "specs/005-reference-backends/spec.md",
+    "status": "draft",
+    "summary": "Increment 2: `rustev-backend-rules`, a deterministic backend (rules, lookup tables, linear heads over exact features) used as reference and test double; and the first semantic backend candidate, frozen embeddings plus a task-specific linear head (R-01), with ONNX Runtime through `ort` preferred only after a bounded compatibility, licensing, operator, linking, packaging and resource check.\n",
+    "title": "Reference backends"
+  },
+  "shardHash": "e26b5bad79a343bd30acd90a71027c66568c4c5618a9247ef07fee2d039ea756",
+  "specVersion": "1.8.0"
+}

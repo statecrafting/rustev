@@ -1,0 +1,35 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '006-cli-surface' directory unit 'crates/rustev-cli/' is not a directory",
+        "path": "crates/rustev-cli/"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-cli/"
+        }
+      }
+    ],
+    "specId": "006-cli-surface",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "01959e046e7d88b4ac56c784c9e773efd4e52decfb1d6ed7ec43183a4a662223"
+}

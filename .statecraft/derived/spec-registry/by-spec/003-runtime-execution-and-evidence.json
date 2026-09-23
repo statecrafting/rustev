@@ -1,0 +1,39 @@
+{
+  "record": {
+    "created": "2026-09-23",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-decision-contract-and-pure-core"
+    ],
+    "establishes": [
+      {
+        "kind": "directory",
+        "path": "crates/rustev-runtime/"
+      }
+    ],
+    "id": "003-runtime-execution-and-evidence",
+    "implementation": "pending",
+    "sectionDigests": {
+      "003-runtime-execution-and-evidence-emission": "a926cafdce43406c27fbae1b473a085f2b08e021f4105916fc882fe14f7cd40b",
+      "1-purpose": "70fc7400891020f23428774aae989e0eeebee2575ee55ba093dbb365c595ebc7",
+      "2-territory": "971e39877252113d89073ac48f3cc4da2b735232138712d2c814a162c53f3c80",
+      "3-behavior-to-be-made-concrete-before-approval": "fd9b484a42a2440061c2c25296973ca9328cfa23aa454ccd1118854cb6e202d3",
+      "4-out-of-scope": "ace1f563160697d262b60c7822b58673b03eb3f01a900685bc84b6e752197016",
+      "acceptance-draft": "62557bfdd95f10d3541efb805107051428d987916f3b1af09438d5c044380cf7"
+    },
+    "sectionHeadings": [
+      "003: Runtime execution and evidence emission",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior (to be made concrete before approval)",
+      "4. Out of scope",
+      "Acceptance (draft)"
+    ],
+    "specPath": "specs/003-runtime-execution-and-evidence/spec.md",
+    "status": "draft",
+    "summary": "Increment 2: `rustev-runtime` drives the pure core's staged evaluation against real seams on Tokio (R-03): deadlines, admission, budget reservation, bounded retries and declared runtime fallbacks, batching and duplicate suppression, caches keyed by artifact and projection, truncation, cancellation honesty, and evidence emission under a declared sink policy.\n",
+    "title": "Runtime execution and evidence emission"
+  },
+  "shardHash": "3daed7ca0acb64acb68f264a7001015b2d81e2811270c644ee4fc269fdc0f32a",
+  "specVersion": "1.8.0"
+}

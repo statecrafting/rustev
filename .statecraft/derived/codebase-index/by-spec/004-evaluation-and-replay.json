@@ -1,0 +1,34 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '004-evaluation-and-replay' directory unit 'crates/rustev-eval/' is not a directory",
+        "path": "crates/rustev-eval/"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-eval/"
+        }
+      }
+    ],
+    "specId": "004-evaluation-and-replay",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "4c39c9132443539b38272b269206954b83737d83a774ad6a9fb231e1c14ce109"
+}
