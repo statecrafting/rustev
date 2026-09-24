@@ -16,8 +16,9 @@ summary: >
   recorded, never treated as calibrated. `rank` is not declared. No Jev
   wire-compatible surface is exposed. Paid inference for smoke and
   qualification is authorized by R-27 (zero data retention, synthetic and
-  independently labeled data only, a default cap of USD 25 per month);
-  production requires a pinned model version (R-28). Draft: claims no code.
+  independently labeled data only); testing is capped at USD 5 in total and
+  production at USD 25 per month (R-29), and production requires a pinned
+  model version (R-28). Draft: claims no code.
 extends:
   # Adds the integration crate's manifest and dependencies to the workspace.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.toml" }, nature: additive }
@@ -60,7 +61,7 @@ obligations:
     anchor: "3-3-questions-and-the-descriptor"
   - id: "R-2"
     kind: requirement
-    text: "Live calls and paid inference happen only within R-27: smoke and qualification of this spec, key read from the owner's file at runtime and never copied, zero data retention requested, synthetic or independently labeled data only, within the monthly cap; no quality claim precedes the R-04 dataset."
+    text: "Live calls and paid inference happen only within R-27: smoke and qualification of this spec, key read from the owner's file at runtime and never copied, zero data retention requested, synthetic or independently labeled data only, within R-29's USD 5 total testing cap, enforced as a hard stop before dispatch; no quality claim precedes the R-04 dataset."
     anchor: "3-8-qualification-plan"
   - id: "I-6"
     kind: invariant
@@ -79,7 +80,8 @@ Draft: a proposal, not a claim about code. Ordinal: the next free one;
 `011` is taken. Rationale: owner decision R-26 (Rustev is the decision
 engine of the travel-memory product, with Jev through the Vercel AI Gateway
 as a remote backend), R-27 (paid inference for smoke and qualification),
-R-28 (the owner's answers to this draft's questions), R-04, R-05, R-10 and
+R-28 (the owner's answers to this draft's questions), R-29 (spend caps),
+R-04, R-05, R-10 and
 R-23 in `docs/decisions/00-founding-decisions.md`; design section 1.2 ("a
 compatibility adapter may be written later as an ordinary integration");
 discussion `002` for background only. Facts about the provider are C-09 in
@@ -287,11 +289,15 @@ id locally. Exchange records are digest-only by default under R-19.
 Three stages. Stages 2 and 3 are authorized by R-27 within its scope: the
 Gateway transport, zero data retention and the provider allowlist on every
 request, the key read at runtime from the owner's file, only synthetic or
-independently labeled data, and a spend cap of USD 25 per calendar month
-(an agent-selected default the owner may change) held by a shared cost
-ledger in the harness (spec 003, 3.5.2) with a Gateway dashboard budget as
-the backstop, because this adapter's charges are estimates, not bounds.
-No stage runs as part of drafting or approving this spec.
+independently labeled data. Spend caps are the owner's (R-29): USD 5 in
+total for all testing (smoke, qualification and evaluation runs together)
+and USD 25 per calendar month for production use. Each cap is held by a
+shared cost ledger that persists across runs (spec 003, 3.5.2), and the
+adapter's accounting stops before dispatch any attempt whose reservation
+would take the ledger over its cap: a hard stop, recorded as
+`budget_exhausted{cost}`. Because this adapter's per-call amounts are
+estimates, not bounds, a Gateway dashboard budget set to the same caps is
+the backstop. No stage runs as part of drafting or approving this spec.
 
 1. **Mechanics (no network, no spend).** Recorded Gateway responses are
    replayed through a local HTTP test server: every mapping in 3.4, every
@@ -353,8 +359,8 @@ real user data before a separate privacy decision.
   counter shows zero calls to any external host.
 - The boundary check passes; no crate outside `integrations/` names the
   provider.
-- Stages 2 and 3 run only within R-27 and are recorded, with their spend,
-  in this spec's implementation record.
+- Stages 2 and 3 run only within R-27 and R-29 and are recorded, with their
+  spend against the testing cap, in this spec's implementation record.
 
 ## Verification
 
@@ -385,12 +391,12 @@ Decided by the owner on 2026-09-24:
    synthetic-provenance set that may go to the provider under zero data
    retention (R-28).
 6. Batching: off by default until qualified (R-28, 3.5).
+7. Spend caps: USD 5 total for testing, USD 25 per month for production,
+   hard stop in the adapter's accounting plus a Gateway budget (R-29).
 
 ## Open questions
 
 1. The default projection input limit, pending the smoke stage's
    measurement of bytes per token.
-2. Whether the spend cap should change from the agent-selected default of
-   USD 25 per month (R-27).
-3. The Gateway's per-answer field names (3.4), to be fixed from the smoke
+2. The Gateway's per-answer field names (3.4), to be fixed from the smoke
    stage's recorded responses.

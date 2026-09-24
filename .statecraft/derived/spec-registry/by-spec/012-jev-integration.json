@@ -76,7 +76,7 @@
         "anchor": "3-8-qualification-plan",
         "id": "R-2",
         "kind": "requirement",
-        "text": "Live calls and paid inference happen only within R-27: smoke and qualification of this spec, key read from the owner's file at runtime and never copied, zero data retention requested, synthetic or independently labeled data only, within the monthly cap; no quality claim precedes the R-04 dataset."
+        "text": "Live calls and paid inference happen only within R-27: smoke and qualification of this spec, key read from the owner's file at runtime and never copied, zero data retention requested, synthetic or independently labeled data only, within R-29's USD 5 total testing cap, enforced as a hard stop before dispatch; no quality claim precedes the R-04 dataset."
       },
       {
         "anchor": "3-2-transports",
@@ -115,7 +115,7 @@
       }
     ],
     "sectionDigests": {
-      "012-jev-integration-remote-decision-backend": "54831fe3720f95eada692025af89ff926330cce476fd804999c363ebaa37d64a",
+      "012-jev-integration-remote-decision-backend": "ffdd58caeed24714ac852e30f6b5dee5ebe7f532b3e9721b39a024a48beb704a",
       "1-purpose": "1084471762749dfa367cabbbae66a59a75b9464e3075c6224307063a2379367e",
       "2-territory": "91b9d4e85ec7de1aa1824c34061710bad02bc16755c51cfebc4b2d3b67951b60",
       "3-1-position-and-names": "f781a5b3d5f3c0a325fe3b61ece93af60f5ef0cc47046a431c464eb8629e6b55",
@@ -125,13 +125,13 @@
       "3-5-many-questions-one-state": "c4aa1c1b0f8a34ccb476862d43b08f7126b27d8f03731e0ce36a5491d67c721a",
       "3-6-identity-routing-and-cost": "bd6ae164e4da76356bd06bd22be268e0746ea05dc98d760ce7fe595cfa72aaac",
       "3-7-privacy-options": "2363978f4671dc4156c3f772cdd926c587ffa4af897eb4e6504d0ced2f5e2f4d",
-      "3-8-qualification-plan": "7f4c4edf59ab306de72eaddc766bf9c2081658f1e598935bcebd636edcfd1261",
-      "3-behavior": "0d70e71253bc3b0fcc11159f1ac4acfa15ba0c4ad48c3cd86fe28934834875f9",
+      "3-8-qualification-plan": "d00d14c5762c5a30f06765a8be38c3f9a00bb8c87bd714178733bd6d78c82c18",
+      "3-behavior": "06cb53bbe16af2569096b27b12c29a56f4b71bf27c88f36189943200bd3145c5",
       "4-out-of-scope": "0a4ecc92d13399c9e0cbd0c4941b1624147f2468a2bf72cb4e34fb49a7639aaf",
       "5-observable-negative-cases": "85a19045a4ef5a2639ca857608d9f1f3b212060778354743099421cced0238eb",
-      "acceptance-planned": "fdfaf0415ac4b145d5a365ce1c62ec8b6b00f116b18983646f14ae473303dbb1",
-      "open-questions": "fb0bad7d4406cc5f803cb4a9fd3ff064c9a587b4ab4089eb63ca06d322d402e4",
-      "resolved-questions": "a98cd2dc48cd289fc44f92c794475941364579f09bf1969dd9903651198ebeeb",
+      "acceptance-planned": "b29dded4d19e93740c02520d81120863431aa2e94d86d3305fb6fd177b39c937",
+      "open-questions": "7c71a507c3b59a1c2cb4cea73b9075572003b621d375886946017ba288e89f27",
+      "resolved-questions": "5a0a533f069a76ca1292496b93ea6a643c818e3d8be4d188c7a34b6212cd3403",
       "verification": "906d31c5ff2dc11f39920e8b430f401a5f00d549e471ca3d53542eb6fbe2bed3"
     },
     "sectionHeadings": [
@@ -156,9 +156,9 @@
     ],
     "specPath": "specs/012-jev-integration/spec.md",
     "status": "draft",
-    "summary": "A remote decision backend under `integrations/` that answers Rustev's `proposition`, `classify` and `rubric` steps by calling TypeSafe's Jev model, through the Vercel AI Gateway by default or TypeSafe's own API as an alternative transport, as an ordinary integration. It conforms to Part A of spec 009: explicit served identity (unknown on the Gateway), one total budget, unconfirmed cancellation once sent, closed error codes, estimated cost, requested privacy options, and exchange records. Many Rustev questions over one state go in one request. Provider confidence is recorded, never treated as calibrated. `rank` is not declared. No Jev wire-compatible surface is exposed. Paid inference for smoke and qualification is authorized by R-27 (zero data retention, synthetic and independently labeled data only, a default cap of USD 25 per month); production requires a pinned model version (R-28). Draft: claims no code.\n",
+    "summary": "A remote decision backend under `integrations/` that answers Rustev's `proposition`, `classify` and `rubric` steps by calling TypeSafe's Jev model, through the Vercel AI Gateway by default or TypeSafe's own API as an alternative transport, as an ordinary integration. It conforms to Part A of spec 009: explicit served identity (unknown on the Gateway), one total budget, unconfirmed cancellation once sent, closed error codes, estimated cost, requested privacy options, and exchange records. Many Rustev questions over one state go in one request. Provider confidence is recorded, never treated as calibrated. `rank` is not declared. No Jev wire-compatible surface is exposed. Paid inference for smoke and qualification is authorized by R-27 (zero data retention, synthetic and independently labeled data only); testing is capped at USD 5 in total and production at USD 25 per month (R-29), and production requires a pinned model version (R-28). Draft: claims no code.\n",
     "title": "Jev integration (remote decision backend)"
   },
-  "shardHash": "124d2130c981d0cff0984b622209a0d8989fdfc5d6b5bb1ccf0d099c143262a4",
+  "shardHash": "9d110fb7cfea483597c33bf16a8a1fae7f7fd09035b5f7c5009b8943839e601e",
   "specVersion": "1.8.0"
 }
