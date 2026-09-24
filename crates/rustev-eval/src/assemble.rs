@@ -17,13 +17,13 @@ use rustev_contract::ids::ContentDigest;
 use rustev_contract::limits::REPLAY_V1;
 use rustev_contract::plan::Plan;
 use rustev_contract::replay::{
-    BundleError, Capture, CaptureStatus, CapturedValue, ItemLocation, MAX_RESOLVED_BYTES,
-    ReplayBundle, SupplyEntry,
+    BundleError, Capture, CaptureStatus, CapturedValue, ItemLocation, MAX_BUNDLE_ITEMS,
+    MAX_RESOLVED_BYTES, ReplayBundle, SupplyEntry,
 };
 use rustev_contract::retention::{
     DEFAULT_METADATA_LIFETIME_MS, MAX_BUNDLE_LIFETIME_MS, Retention, RetentionItem,
 };
-use rustev_contract::run::{CoreEvidence, RunRecord};
+use rustev_contract::run::{CoreEvidence, RunRecord, Termination};
 use rustev_contract::scope::Scope;
 use rustev_contract::snapshot::Snapshot;
 use rustev_contract::time::{DurationMs, Timestamp};
@@ -152,6 +152,9 @@ pub fn assemble(
         return binding("run record plan id");
     }
     if let CoreEvidence::Recorded(e) = &run.core {
+        if e.plan_id != plan_id || e.judgment.plan_id != plan_id {
+            return binding("evidence plan id");
+        }
         if e.snapshot_id != snapshot_id {
             return binding("snapshot id");
         }
@@ -169,11 +172,25 @@ pub fn assemble(
         if &c.scope != input.scope {
             return binding("capture scope");
         }
+        let max = input
+            .plan
+            .definition
+            .limits
+            .max_semantic_requests
+            .min(MAX_BUNDLE_ITEMS as u64);
+        if c.supplies.len() as u64 > max {
+            return binding("capture entries beyond the plan's request bound");
+        }
+        if c.status == CaptureStatus::Complete && run.termination != Termination::Judged {
+            return binding("a complete capture of a run without a judgment");
+        }
     }
     Compiled::load_checked(input.plan, input.descriptors, input.calibrations)
         .map_err(|e: LoadError| AssemblyError::Plan(e.to_string()))?;
 
-    let mut embedded = 0usize;
+    // Every byte replay would resolve, embedded or external, counts.
+    let mut resolved = 0usize;
+    let mut not_utf8 = None;
     let mut item = |location: ItemLocation,
                     document_schema: &str,
                     bytes: Vec<u8>,
@@ -187,19 +204,24 @@ pub fn assemble(
                 expires_at_ms: expires,
             },
             Content::Embedded => {
-                embedded += bytes.len();
+                resolved += bytes.len();
                 Retention::Retained {
-                    // Record canonical bytes are UTF-8 JSON.
-                    bytes: String::from_utf8(bytes).unwrap_or_default(),
+                    bytes: String::from_utf8(bytes).unwrap_or_else(|_| {
+                        not_utf8 = Some(location);
+                        String::new()
+                    }),
                     digest: digest.clone(),
                     expires_at_ms: expires,
                 }
             }
-            Content::External(store) => Retention::External {
-                reference: store(location, &bytes),
-                digest: digest.clone(),
-                expires_at_ms: expires,
-            },
+            Content::External(store) => {
+                resolved += bytes.len();
+                Retention::External {
+                    reference: store(location, &bytes),
+                    digest: digest.clone(),
+                    expires_at_ms: expires,
+                }
+            }
         };
         RetentionItem {
             document_schema: document_schema.into(),
@@ -262,9 +284,12 @@ pub fn assemble(
             value,
         });
     }
-    if embedded > MAX_RESOLVED_BYTES {
+    if let Some(location) = not_utf8 {
+        return Err(AssemblyError::NotCanonical { location });
+    }
+    if resolved > MAX_RESOLVED_BYTES {
         return Err(AssemblyError::TooLarge {
-            bytes: embedded,
+            bytes: resolved,
             limit: MAX_RESOLVED_BYTES,
         });
     }

@@ -33,8 +33,8 @@ fn assert_reproduces(r: &Retained, probes: &[&Arc<Probe>]) -> rustev_eval::repla
     let out = reproduced(replay(&embedded(r)));
     let after: Vec<usize> = probes.iter().map(|p| p.calls()).collect();
     assert_eq!(before, after, "replay called a backend");
-    assert_eq!(out.judgment.record_canonical().unwrap(), expected(r));
-    assert_eq!(out.run, r.run, "historical observations are copied");
+    assert_eq!(out.judgment().record_canonical().unwrap(), expected(r));
+    assert_eq!(out.run(), &r.run, "historical observations are copied");
     out
 }
 
@@ -52,7 +52,7 @@ async fn support_routing_reproduces_offline_without_inference() {
     assert_eq!(p.calls(), 3);
     assert_eq!(r.capture.status, CaptureStatus::Complete);
     let out = assert_reproduces(&r, &[&p]);
-    assert_eq!(out.supplies.len(), 3);
+    assert_eq!(out.supplies().len(), 3);
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -84,7 +84,7 @@ async fn a_decision_with_no_semantic_request_reproduces() {
     assert!(r.capture.supplies.is_empty());
     assert!(r.run.requests.is_empty());
     let out = assert_reproduces(&r, &[&p]);
-    assert!(out.supplies.is_empty());
+    assert!(out.supplies().is_empty());
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -240,7 +240,7 @@ async fn a_fallback_output_reproduces_under_the_fallback_identity() {
         .unwrap();
     assert_eq!(topic.target, 1);
     let out = assert_reproduces(&r, &[&primary, &replica]);
-    let t = out.supplies.iter().find(|s| s.step == "topic").unwrap();
+    let t = out.supplies().iter().find(|s| s.step == "topic").unwrap();
     assert!(matches!(t.value, RetainedValue::Output { .. }));
     assert_eq!(t.target, 1);
 }
@@ -284,7 +284,7 @@ async fn pre_dispatch_failures_reproduce_as_retained_runtime_reasons() {
     }
     let out = assert_reproduces(&r, &[&p]);
     assert_eq!(
-        out.supplies
+        out.supplies()
             .iter()
             .filter(|s| matches!(s.value, RetainedValue::Reason(_)))
             .count(),

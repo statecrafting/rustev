@@ -95,7 +95,7 @@ async fn a_calibration_or_policy_only_change_reuses_raw_outputs() {
         rustev_contract::Identified::id(&cal2).unwrap(),
     );
     let c = candidate(&def, &[descriptor(&b)], &[cal2]);
-    assert_ne!(c.id, b.case.judgment.plan_id);
+    assert_ne!(c.id, b.case.judgment().plan_id);
     let out = compare(&b.case, &c).unwrap();
     assert_eq!(out.reused, 3);
     // Policy: drop the billing-priority rule.

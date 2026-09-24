@@ -228,3 +228,113 @@ async fn a_bundle_beyond_the_replay_bounds_is_refused_with_its_size() {
     // Digest-only keeps the same bundle small enough.
     assert!(assemble(&i, &RetentionChoice::default()).is_ok());
 }
+
+fn many(r: &Retained, n: usize, id: impl Fn(usize) -> String) -> Vec<BackendDescriptor> {
+    let mut ds = r.fixture.descriptors.clone();
+    ds.extend((0..n).map(|i| {
+        let mut d = r.fixture.descriptors[0].clone();
+        d.backend_id = id(i);
+        d
+    }));
+    ds
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn external_bytes_count_against_the_case_cap_at_assembly() {
+    let r = base().await;
+    let big = |i: usize| {
+        let mut d: BackendDescriptor = r.fixture.descriptors[0].clone();
+        d.backend_id = format!("zz-unreferenced-{i:04}-{}", "x".repeat(4000));
+        d.operations = vec![d.operations[0].clone(); 1000];
+        d
+    };
+    let one = big(0).record_canonical().unwrap().len();
+    let mut descriptors = r.fixture.descriptors.clone();
+    descriptors.extend((0..MAX_RESOLVED_BYTES / one + 2).map(big));
+    let mut i = input(&r);
+    i.descriptors = &descriptors;
+    let refs = |loc: ItemLocation, _: &[u8]| format!("ref:{loc}");
+    assert!(matches!(
+        assemble(
+            &i,
+            &RetentionChoice {
+                content: Content::External(&refs),
+                ..RetentionChoice::default()
+            },
+        ),
+        Err(AssemblyError::TooLarge { .. })
+    ));
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn the_escaped_bundle_size_is_checked_not_only_the_raw_bytes() {
+    let r = base().await;
+    // Quote-heavy identifiers: raw document bytes stay under 16 MiB, but
+    // embedding escapes every quote again.
+    let quotes = "\"".repeat(3000);
+    let descriptors = many(&r, 1500, |i| format!("zz-{i:04}{quotes}"));
+    let raw: usize = descriptors
+        .iter()
+        .map(|d| d.record_canonical().unwrap().len())
+        .sum();
+    assert!(raw < MAX_RESOLVED_BYTES, "{raw}");
+    let mut i = input(&r);
+    i.descriptors = &descriptors;
+    match assemble(
+        &i,
+        &RetentionChoice {
+            content: Content::Embedded,
+            ..RetentionChoice::default()
+        },
+    ) {
+        Err(AssemblyError::TooLarge { bytes, limit }) => {
+            assert_eq!(limit, rustev_contract::limits::REPLAY_V1.max_bytes);
+            assert!(bytes > limit);
+        }
+        other => panic!("{:?}", other.map(|_| ())),
+    }
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn a_capture_must_fit_its_plan_and_its_run() {
+    let r = base().await;
+    // A complete capture of a run that produced no judgment.
+    let mut run = r.run.clone();
+    run.termination = rustev_contract::run::Termination::Cancelled;
+    let mut i = input(&r);
+    i.run = &run;
+    assert!(matches!(
+        assemble(&i, &RetentionChoice::default()),
+        Err(AssemblyError::Binding { .. })
+    ));
+    // More entries than the plan can issue.
+    let mut cap = r.capture.clone();
+    let extra = cap.supplies[0].clone();
+    let limit = r
+        .fixture
+        .compiled
+        .plan
+        .definition
+        .limits
+        .max_semantic_requests as usize;
+    while cap.supplies.len() <= limit {
+        cap.supplies.push(extra.clone());
+    }
+    let mut i = input(&r);
+    i.capture = Some(&cap);
+    assert!(matches!(
+        assemble(&i, &RetentionChoice::default()),
+        Err(AssemblyError::Binding { .. })
+    ));
+    // Evidence naming another plan.
+    let mut run = r.run.clone();
+    if let rustev_contract::run::CoreEvidence::Recorded(e) = &mut run.core {
+        e.judgment.plan_id = rustev_contract::ids::PlanId::parse(&id('4')).unwrap();
+    }
+    let mut i = input(&r);
+    i.run = &run;
+    assert!(matches!(
+        assemble(&i, &RetentionChoice::default()),
+        Err(AssemblyError::Binding { .. })
+    ));
+}

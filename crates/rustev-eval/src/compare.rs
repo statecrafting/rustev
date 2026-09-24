@@ -31,6 +31,9 @@ pub enum CandidateIncomparable {
     HistoricalRuntimeFailure { step: String, instance: Vec<String> },
     /// Retained outputs with this identity disagree.
     AmbiguousOutput { step: String, instance: Vec<String> },
+    /// The candidate's core refuses the reused output; no failure is
+    /// substituted for it.
+    OutputRefused { step: String, instance: Vec<String> },
 }
 
 impl CandidateIncomparable {
@@ -40,6 +43,7 @@ impl CandidateIncomparable {
             CandidateIncomparable::RequestMismatch { .. } => "request-mismatch",
             CandidateIncomparable::HistoricalRuntimeFailure { .. } => "historical-runtime-failure",
             CandidateIncomparable::AmbiguousOutput { .. } => "ambiguous-output",
+            CandidateIncomparable::OutputRefused { .. } => "output-refused",
         }
     }
 }
@@ -98,7 +102,11 @@ pub fn compare(case: &Reproduced, candidate: &Compiled) -> Result<Compared, Cand
             if !agree(retained.into_iter().flatten()) {
                 return Err(CandidateIncomparable::AmbiguousOutput { step, instance });
             }
-            // The core validates the rebound raw output as the candidate's.
+            // The core validates the rebound raw output as the candidate's;
+            // a refusal is never turned into a supplied failure.
+            if !matches!(ev.check_output(&step, &instance, first), Ok(Ok(()))) {
+                return Err(CandidateIncomparable::OutputRefused { step, instance });
+            }
             ev.supply(&step, &instance, Supplied::Output((*first).clone()))
                 .map_err(|_| CandidateIncomparable::RequestMismatch {
                     step: step.clone(),

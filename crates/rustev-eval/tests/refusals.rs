@@ -545,3 +545,139 @@ fn scope_equality_includes_the_mode() {
     let b: Scope = principal("t", "r", "p");
     assert_ne!(a, b);
 }
+
+#[tokio::test(flavor = "current_thread")]
+async fn each_output_binding_is_checked_on_its_own() {
+    let r = base().await;
+    // Output artifact and run attempt both rewritten: only the plan-bound
+    // target artifact refuses it.
+    let mut b = embedded(&r);
+    let mut out =
+        rustev_contract::output::BackendOutputDoc::parse(&bytes(&b.supplies[0].value)).unwrap();
+    out.artifact = artifact('e');
+    reembed(&mut b.supplies[0].value, &out.record_canonical().unwrap());
+    let step = b.supplies[0].step.clone();
+    rewrite_run(&mut b, |run| {
+        for q in run.requests.iter_mut().filter(|q| q.step == step) {
+            q.attempts
+                .iter_mut()
+                .for_each(|a| a.artifact = artifact('e'));
+        }
+    });
+    assert_eq!(
+        inconsistency(replay(&b)),
+        (ItemLocation::Supply(0), Inconsistency::OutputBinding)
+    );
+    // Only the run attempt's artifact differs from the output's.
+    let mut b = embedded(&r);
+    let step = b.supplies[0].step.clone();
+    rewrite_run(&mut b, |run| {
+        for q in run.requests.iter_mut().filter(|q| q.step == step) {
+            q.attempts
+                .iter_mut()
+                .for_each(|a| a.artifact = artifact('e'));
+        }
+    });
+    assert_eq!(
+        inconsistency(replay(&b)),
+        (ItemLocation::Supply(0), Inconsistency::OutputBinding)
+    );
+    // An output document naming another instance.
+    let mut b = embedded(&r);
+    let mut out =
+        rustev_contract::output::BackendOutputDoc::parse(&bytes(&b.supplies[1].value)).unwrap();
+    out.instance = vec!["elsewhere".into()];
+    reembed(&mut b.supplies[1].value, &out.record_canonical().unwrap());
+    assert_eq!(
+        inconsistency(replay(&b)),
+        (ItemLocation::Supply(1), Inconsistency::OutputBinding)
+    );
+    // An output of the wrong kind: refused, never diverged.
+    let mut b = embedded(&r);
+    let mut out =
+        rustev_contract::output::BackendOutputDoc::parse(&bytes(&b.supplies[2].value)).unwrap();
+    out.output = rustev_contract::output::RawOutput::Label("calm".into());
+    reembed(&mut b.supplies[2].value, &out.record_canonical().unwrap());
+    assert_eq!(
+        inconsistency(replay(&b)),
+        (ItemLocation::Supply(2), Inconsistency::OutputRefused)
+    );
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn a_retained_reason_must_be_the_recorded_one() {
+    use rustev_contract::judgment::Unresolved;
+    use rustev_contract::run::RequestResult;
+    let r = base().await;
+    let mut b = embedded(&r);
+    let step = b.supplies[0].step.clone();
+    rewrite_run(&mut b, |run| {
+        for q in run.requests.iter_mut().filter(|q| q.step == step) {
+            q.result = RequestResult::Failed(Unresolved::BackendUnavailable {
+                detail: "down".into(),
+            });
+        }
+    });
+    b.supplies[0].value.document_schema = schema::RUNTIME_REASON.into();
+    let reason =
+        rustev_contract::reason::RuntimeReasonDoc::new(Unresolved::DeadlineExceeded).unwrap();
+    reembed(
+        &mut b.supplies[0].value,
+        &reason.record_canonical().unwrap(),
+    );
+    assert_eq!(
+        inconsistency(replay(&b)),
+        (ItemLocation::Supply(0), Inconsistency::Value)
+    );
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn evidence_snapshot_and_termination_are_checked_separately() {
+    let r = base().await;
+    let mut b = embedded(&r);
+    rewrite_run(&mut b, |run| {
+        if let CoreEvidence::Recorded(e) = &mut run.core {
+            e.snapshot_id = rustev_contract::ids::SnapshotId::parse(&id('3')).unwrap();
+        }
+    });
+    assert_eq!(
+        inconsistency(replay(&b)),
+        (ItemLocation::Run, Inconsistency::SnapshotId)
+    );
+    // Evidence kept, but the run says it was cancelled.
+    let mut b = embedded(&r);
+    rewrite_run(&mut b, |run| run.termination = Termination::Cancelled);
+    assert_eq!(incomparable(replay(&b)), Incomparable::NoExpectedJudgment);
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn the_resolved_byte_budget_is_per_case_not_per_item() {
+    let r = base().await;
+    let mut kept: BTreeMap<String, Vec<u8>> = BTreeMap::new();
+    let cell = Mutex::new(&mut kept);
+    let refs = |loc: ItemLocation, b: &[u8]| {
+        let k = format!("ref:{loc}");
+        cell.lock().unwrap().insert(k.clone(), b.to_vec());
+        k
+    };
+    let b = bundle_with(&r, Content::External(&refs));
+    drop(cell);
+    let s = Store::default();
+    let plan = kept["ref:plan"].clone();
+    let rest = rustev_contract::replay::MAX_RESOLVED_BYTES - plan.len();
+    s.items
+        .lock()
+        .unwrap()
+        .insert("ref:plan".into(), Resolution::Bytes(plan));
+    // Under 16 MiB on its own, over it together with the plan.
+    s.items.lock().unwrap().insert(
+        "ref:descriptors[0]".into(),
+        Resolution::Bytes(vec![b' '; rest + 1]),
+    );
+    assert!(matches!(
+        incomparable(reproduce(&b, &s, &config_for(&b.scope))),
+        Incomparable::Oversized {
+            location: ItemLocation::Descriptor(0)
+        }
+    ));
+}

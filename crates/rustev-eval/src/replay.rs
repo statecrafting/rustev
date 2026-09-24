@@ -8,6 +8,12 @@
 //! judgment bytes equal the retained run record's; a valid, complete replay
 //! with other bytes is `diverged`; anything else is `incomparable` with a
 //! typed reason and location. No backend is called: there is none here.
+//!
+//! Nothing digests the bundle's own scope field: relabeling is caught
+//! because every supply's request identity is recomputed under the claimed
+//! scope. A bundle with no supplies has no identity to contradict a
+//! relabeled scope; a bundle is evidence of what the host retained, never
+//! an attestation (spec 004, 3.1.1).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -80,6 +86,12 @@ pub enum Inconsistency {
     },
     /// The requests were not listed in the recorded order.
     RequestOrder,
+    /// The core refused to start on the retained snapshot.
+    StartRefused,
+    /// The core could not finish once every entry was supplied.
+    FinishRefused,
+    /// A judgment has no record canonical form.
+    NoRecordForm,
 }
 
 /// Why a case cannot be reproduced or compared.
@@ -172,17 +184,46 @@ pub struct RetainedSupply {
 }
 
 /// A case whose judgment reproduced byte for byte, with what candidate
-/// comparison needs. Historical timing, attempts and cost stay in `run`:
-/// copied observations, never remeasured.
+/// comparison needs. Historical timing, attempts and cost stay in the run
+/// record: copied observations, never remeasured. Only [`reproduce`]
+/// constructs one, so a candidate is only ever compared on a reproduced
+/// case (spec 004, 3.4.4).
 #[derive(Debug, Clone)]
 pub struct Reproduced {
-    pub decision_id: String,
-    pub scope: Scope,
-    pub snapshot: Snapshot,
-    pub evaluation_time: Timestamp,
-    pub judgment: Judgment,
-    pub run: RunRecord,
-    pub supplies: Vec<RetainedSupply>,
+    pub(crate) decision_id: String,
+    pub(crate) scope: Scope,
+    pub(crate) snapshot: Snapshot,
+    pub(crate) evaluation_time: Timestamp,
+    pub(crate) judgment: Judgment,
+    pub(crate) run: RunRecord,
+    pub(crate) supplies: Vec<RetainedSupply>,
+}
+
+impl Reproduced {
+    pub fn decision_id(&self) -> &str {
+        &self.decision_id
+    }
+    pub fn scope(&self) -> &Scope {
+        &self.scope
+    }
+    pub fn snapshot(&self) -> &Snapshot {
+        &self.snapshot
+    }
+    pub fn evaluation_time(&self) -> Timestamp {
+        self.evaluation_time
+    }
+    /// The reproduced judgment, byte-equal to the retained one.
+    pub fn judgment(&self) -> &Judgment {
+        &self.judgment
+    }
+    /// The retained run record: historical observations.
+    pub fn run(&self) -> &RunRecord {
+        &self.run
+    }
+    /// The checked supply entries, in supply order.
+    pub fn supplies(&self) -> &[RetainedSupply] {
+        &self.supplies
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -412,7 +453,7 @@ fn reproduce_inner(
         })?;
     // 4. The pure core, fed in actual supply order.
     let mut ev = Evaluation::start(&compiled, &r.snapshot, bundle.evaluation_time_ms)
-        .map_err(|_| inconsistent(ItemLocation::Snapshot, Inconsistency::SnapshotId))?;
+        .map_err(|_| inconsistent(ItemLocation::Snapshot, Inconsistency::StartRefused))?;
     let by_key: BTreeMap<(&str, &[String]), usize> = run
         .requests
         .iter()
@@ -437,6 +478,8 @@ fn reproduce_inner(
         };
         if from.target != entry.target
             || from.attempt.map(|a| a.attempt_id.as_str()) != entry.attempt_id.as_deref()
+            || matches!(q.result, RequestResult::Output { .. })
+                && from.attempt.map(|a| a.target) != Some(entry.target)
         {
             return bad(Inconsistency::Origin);
         }
@@ -512,11 +555,13 @@ fn reproduce_inner(
     // 5. The verdict.
     let (judgment, _) = ev
         .finish(&bundle.decision_id)
-        .map_err(|_| inconsistent(ItemLocation::Bundle, Inconsistency::NotPending))?;
+        .map_err(|_| inconsistent(ItemLocation::Bundle, Inconsistency::FinishRefused))?;
     let expected = &evidence.judgment;
     let same = match (judgment.record_canonical(), expected.record_canonical()) {
         (Ok(a), Ok(b)) => a == b,
-        _ => false,
+        _ => {
+            return Err(inconsistent(ItemLocation::Run, Inconsistency::NoRecordForm));
+        }
     };
     if !same {
         return Ok(ReplayOutcome::Diverged {
