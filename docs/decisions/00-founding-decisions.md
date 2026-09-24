@@ -54,7 +54,8 @@ Recorded here as the owner's decisions, not the agent's.
 ### Delegated replay decisions of 2026-09-23
 
 The owner asked to keep pressure on delivery and stated: "I approve optimal
-decisions that push us onwards". In the context of the four replay questions, this authorizes choosing and recording
+decisions that push us onwards". In the context of the four replay questions,
+this authorizes choosing and recording
 the next bounded replay work order. The choices below are the agent's
 selections under that delegation, not quotations of choices individually
 made by the owner. They do not claim a mathematically optimal design.
@@ -66,6 +67,17 @@ made by the owner. They do not claim a mathematically optimal design.
 | R-21 | Request identity includes both tenant and effective principal-scope handles. The host supplies opaque non-secret handles, rotating the scope handle when permissions change. Equality isolates retained evidence; it never grants access. This deliberately forgoes cross-principal reuse even within a tenant. |
 | R-22 | Runtime handoff is opt-in bounded capture returned separately with the normal result, including sink-delivery failure. Existing APIs and run-record bytes stay compatible. No callback, persistence or sink payload enlargement. Capture overflow is explicit incompleteness, never a reason to alter the decision. |
 | R-23 | Delivery authority for the bounded spec 004 work order: record these decisions and A-05; deliver its contract amendments separately before implementation under R-16; implement and verify the approved replay/evaluation increment; make scoped commits, pushes and PRs; remediate review/CI findings and merge verified changes. Spec 006 and 011 approval/implementation, live inference, releases, publication, deployment, paid services, real-user data, sibling repositories, managed-environment repair, protection changes, waivers and recurring monitors remain outside this authority. |
+
+### Owner refinement during replay review, 2026-09-23
+
+The owner explicitly requested tenant-only and principal-scope isolation as
+configurable alternatives while the approval PR was still under review.
+This refines R-21 before implementation; its original selection above is
+preserved as history.
+
+| Id | Decision |
+|---|---|
+| R-24 | Replace R-21's fixed principal requirement with two mutually exclusive scope modes: `tenant_only{tenant, context_revision}` and `principal{tenant, context_revision, principal_scope}`. Principal scope remains the default; tenant-only is an explicit host choice that permits cross-principal reuse only within a tenant and revision, where computation is principal-independent and each reader is authorized by the host. Mode and all scope fields enter request identity. Mode changes never relabel existing evidence; omitted principal data never downgrades isolation. This configuration affects replay equivalence, not backend call authorization. Spec 004's pending implementation and acceptance cover both modes within A-05 and R-23. |
 
 ## Approvals
 

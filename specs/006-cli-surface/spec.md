@@ -53,7 +53,11 @@ without writing Rust, using only files and the pinned library.
    approved spec 004 (implementation pending). Replay is offline from an
    explicitly scoped replay bundle, including retained plan dependencies
    and the expected judgment in its run record; it never installs or calls
-   a backend. The caller supplies scope and current time. Live re-execution
+   a backend. The caller supplies scope and current time, selecting
+   principal isolation by default or tenant-only explicitly under spec 004
+   3.1. Both include tenant and context revision; principal mode also
+   requires principal scope. Missing principal data never weakens isolation.
+   Live re-execution
    is deferred. Capture and content retention for `run` are explicit opt-ins,
    with expiry, erasure and bounded file buffering owned by the host/CLI.
    Report output includes the evaluator configuration and detail companion;

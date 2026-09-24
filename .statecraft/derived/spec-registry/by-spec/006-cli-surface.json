@@ -16,10 +16,10 @@
     "id": "006-cli-surface",
     "implementation": "pending",
     "sectionDigests": {
-      "006-cli-surface": "69ae2867115aa4704ecb4c36172cd7aa15209e30669427ae3c264651909d7419",
+      "006-cli-surface": "0531cfb76ebd66e600bbd3c4798c1bc85a2274c72f92fdb54e07c9edbf993714",
       "1-purpose": "efa6849c78b10d39c954a1a681df2c5ff8b9e181111433a7a01260cd4d2b4c7e",
       "2-territory": "32ca40a82d9e4c63d91d54cf682bae44d53fed45d1eff494eb1278bde0db3eb3",
-      "3-behavior-to-be-made-concrete-before-approval": "cb7a2a63635e6ffaec6be3ac6618772fa249fe2e5f87d152d5f23bc92dcbc9f8",
+      "3-behavior-to-be-made-concrete-before-approval": "d2deb197fce0023727f35ff759a1f6680b979d2fc5d85381a75c87ced93bb226",
       "4-out-of-scope": "0a8604d7d5563d1a160ad95e110e095e464b9b5626adf4d52b3e8a20eb2cf6ac",
       "acceptance-draft": "67759cba17f487a7603fb871dfd01d37e951542320c70e620d09167185928598"
     },
@@ -36,6 +36,6 @@
     "summary": "Increment 2: `rustev`, a command-line surface over the library: plan check, show and compile against descriptor, calibration and execution-policy files; run with a declared backend configuration through `rustev-runtime`; offline replay, eval and calibrate through `rustev-eval` over retained bundles and named datasets. No hosting, no HTTP.\n",
     "title": "CLI surface"
   },
-  "shardHash": "6df677f814a97613eae2064c927eecfa42a5d5538cb17a7db5e6e547b8eefa9d",
+  "shardHash": "4af92690c00c954bd94ecbab2b1700ce9b4dbf5d0d5e7d9196280bde0bb4bc72",
   "specVersion": "1.8.0"
 }

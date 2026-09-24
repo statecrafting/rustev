@@ -6,7 +6,7 @@ implementation: pending
 created: "2026-09-23"
 summary: >
   Increment 2: offline reproduction from bounded, host-retained replay
-  bundles; tenant-and-principal-scoped request equivalence for candidate
+  bundles; configurable tenant-only or principal-scoped equivalence for candidate
   comparison; explicit availability, coverage and abstention; named dataset
   splits and temperature fitting. Amends 002 with replay and request
   documents and typed loading diagnostics, and 003 with opt-in bounded
@@ -34,7 +34,9 @@ depends_on:
 
 Approved work order, not implemented. The owner delegated the four replay
 choices and approved forward progress on 2026-09-23; R-19 to R-23 and A-05
-record the scope and the agent's selected defaults. This amendment is
+record the scope and the agent's selected defaults. The owner then requested
+both isolation modes as a configurable choice (R-24), incorporated in this
+same approval change before implementation. This amendment is
 reviewed and delivered separately before implementation (R-16). The text of
 approved specs 002 and 003 remains their historical contract.
 
@@ -74,25 +76,46 @@ contract, core and runtime additions in section 5 and workspace wiring.
    refused. These are engineering defaults, not legal retention advice.
    Extending the hard cap requires an amendment. Copying a bundle does not
    reset creation or expiry.
-3. Every request identity includes a non-empty opaque tenant handle and
-   a non-empty opaque principal-scope handle, each at most 256 bytes. The
-   latter identifies the effective authorization context, including its
-   revision when permissions change. The host supplies stable, non-secret
-   handles and must rotate them when scope changes. Raw credentials never
-   belong in a bundle. Rustev checks equality, not authorization; the host
-   must authorize access before resolving bytes.
-4. Replay requires the caller's scope to equal the bundle's scope before
-   resolving any item. A different tenant or principal yields
-   `incomparable{scope-mismatch}`. Cross-scope comparison is not supported.
+3. Isolation is a mutually exclusive, host-configured choice per capture
+   and bundle, represented by a tagged scope value:
+   - `tenant_only{tenant, context_revision}` permits reuse across principals
+     within that tenant and revision;
+   - `principal{tenant, context_revision, principal_scope}` additionally
+     requires the same effective principal scope. This is the configuration
+     default; a missing principal handle is an error, never an automatic
+     downgrade to tenant-only.
+   Every handle/revision is non-empty, opaque, non-secret and at most 256
+   bytes. Serialized documents always state the mode and all its fields;
+   omitted modes, unknown modes or fields from both variants are refused.
+   The host increments/rotates context revision when shared visibility or
+   output-affecting authorization context changes, and rotates principal
+   scope when principal-specific permissions change. Raw credentials never
+   belong in a bundle.
+4. Tenant-only is an explicit host assertion that the reusable computation
+   is independent of principal-specific permissions and hidden backend
+   context, and that the host authorizes each reader to access the retained
+   snapshot and outputs. It does not make the bundle tenant-public. If that
+   assertion does not hold, the host must select principal scope or disable
+   reuse. Rustev cannot establish principal independence from a digest.
+   The mode scopes reuse, not the authorization context passed to live
+   backends: selecting tenant-only never strips `principal_handle` from
+   `CallContext` or grants access.
+5. Replay requires the caller's trusted scope configuration to equal the
+   bundle's scope before resolving any item. Comparison includes the mode,
+   tenant and context revision, plus principal scope in principal mode.
+   Any difference yields `incomparable{scope-mismatch}`. Tenant-only never
+   crosses tenants. A principal-scoped capture cannot be relabeled or
+   downgraded to tenant-only, nor reused in the other direction. Selecting
+   a new mode requires a new capture; no automatic migration is provided.
    No empty handle or omitted scope implies a public/shared namespace.
-5. Retention modes are `retained{bytes, digest, expires_at_ms}`,
+6. Retention modes are `retained{bytes, digest, expires_at_ms}`,
    `external{reference, digest, expires_at_ms}` and
    `digest_only{digest, expires_at_ms}`. Embedded bytes use a JSON UTF-8
    string containing the canonical document. External references are opaque
    strings, not instructions to fetch a URL; the host resolves them.
    Every item states its expected document schema and identity where one
    exists. Digests use the existing schema-tagged canonical digest rule.
-6. Availability is exactly `available`, `missing`, `expired`, `erased`,
+7. Availability is exactly `available`, `missing`, `expired`, `erased`,
    `corrupt`, `inaccessible` or `mismatched`. At `now_ms >= expires_at_ms`,
    report expired without resolving bytes. For an unexpired external item,
    the resolver returns bounded bytes, missing, erased or inaccessible;
@@ -102,7 +125,7 @@ contract, core and runtime additions in section 5 and workspace wiring.
    is corrupt. Only available items can contribute to reproduction.
    When expiry and erasure overlap, expiry takes precedence at replay; an
    erasure reported before expiry remains a distinct outcome.
-7. Embedded bytes may themselves outlive erasure in a copied bundle. The
+8. Embedded bytes may themselves outlive erasure in a copied bundle. The
    host must remove every retained copy, including backups, or use external
    storage that enforces erasure. Rustev cannot discover removed consent
    from bytes alone. This limit is stated wherever replayability is claimed.
@@ -188,7 +211,8 @@ allocation; the library checks the supplied slices again.
 ### 3.4 Request identity and candidate comparison
 
 1. `rustev.request/1` has a `RequestId` using the existing tagged canonical
-   digest rule. Its content is scope, actual backend id, artifact,
+   digest rule. Its content is the full tagged scope (including mode and
+   context revision), actual backend id, artifact,
    descriptor identity, exact canonical projection bytes, bound output kind,
    required value kind and normalization. Input-limit handling is covered
    by the descriptor identity, which commits to `input_limit.max_bytes` and
@@ -255,7 +279,7 @@ allocation; the library checks the supplied slices again.
    accompanied by this document and a bounded `rustev.eval-detail/1`
    document in eval, under the same limits, binding report digest, dataset,
    split and configuration, with numerator, denominator, exclusion counts
-   and per-case outcome/reason. A standalone envelope never proves these
+   and per-case scope, outcome and reason. A standalone envelope never proves these
    denominators or definitions. All counts reconcile to the named cohort.
 4. Coverage is comparable cases / all cases, reported first. Historical
    comparison requires reproduction; divergence is reported and excluded
@@ -339,10 +363,13 @@ by this work order.
 3. **Spec 003, runtime:** add an opt-in `decide_with_capture` path returning
    the normal decide result plus a separate capture outcome, also when sink
    delivery fails. A rejected decision returns `not-admitted` capture with
-   no entries; it cannot become a replay bundle. Existing `decide`, `Decided`, `DecisionRequest` and
-   `RuntimeConfig` retain their API and wire behavior. Capture configuration
+   no entries; it cannot become a replay bundle. Existing `decide`,
+   `Decided`, `DecisionRequest` and `RuntimeConfig` retain their API and
+   wire behavior. Capture configuration
    supplies the scope and a positive byte limit no greater than 16 MiB;
-   the principal-scope handle is separate from secret-bearing call context.
+   all scope handles are separate from secret-bearing call context. Mode
+   selection is explicit as in 3.1; a missing principal never selects the
+   tenant-only variant.
    Capture records only successfully supplied values in actual supply order,
    with actual target/attempt references and request identity. It is a
    bounded in-memory handoff, not persistent retention or a callback.
@@ -381,10 +408,16 @@ Required executable acceptance before completion:
   inference. Include zero-request, dependent-request, out-of-order completion,
   nondeterministic-output, retry, fallback and pre-dispatch failure cases.
 - Every availability reason, exact expiry boundary, invalid lifetime,
-  external byte cap, embedded parse bound, wrong scope, changed permission
-  revision, missing descriptor/calibration, compiler change, same-compiler
+  external byte cap, embedded parse bound, wrong scope, changed context or
+  permission revision, missing descriptor/calibration, compiler change, same-compiler
   plan corruption, wrong attempt/target, duplicate/extra/missing supply,
   cancellation and absent expected judgment has a failing fixture.
+- Isolation matrix: tenant-only permits otherwise identical requests from
+  different principals in the same tenant/revision, but refuses another
+  tenant or revision. Principal mode additionally refuses another principal
+  scope. Both directions of mode mismatch, absent mode/handle, mixed-variant
+  fields and attempts to downgrade an existing capture are refused before
+  resolution. Tenant-only leaves the live call's principal context unchanged.
 - Changing artifact, descriptor, question, options, projection, scope or
   normalization prevents reuse. A policy/calibration-only change can reuse
   raw outputs. Historical failures, conflicting duplicate outputs and a
@@ -431,3 +464,7 @@ sh crates/rustev-eval/mutation/seeds.sh
   retained expected judgment, actual fallback identity, successful supply
   order, cancellation, candidate runtime-failure reuse and calibration
   split lineage. These were gaps in the draft, not delivered features.
+- 2026-09-23: during review of this approval change, the owner requested
+  configurable tenant-only and principal-scope isolation (R-24). Both modes,
+  principal-mode default, explicit context revisions, mode-separated
+  identities and the acceptance matrix are specified before implementation.
