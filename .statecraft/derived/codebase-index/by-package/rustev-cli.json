@@ -1,0 +1,11 @@
+{
+  "package": {
+    "kind": "rust-lib-bin",
+    "name": "rustev-cli",
+    "path": "crates/rustev-cli",
+    "specRef": "006-cli-surface",
+    "version": "0.1.0"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "407f48f4b779c1afd9f58556ab85fef06d4fa731040facba0646572c8bddce29"
+}

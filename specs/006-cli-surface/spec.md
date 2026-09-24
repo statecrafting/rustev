@@ -2,7 +2,7 @@
 id: "006-cli-surface"
 title: "CLI surface"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-23"
 summary: >
   Increment 2: `rustev`, a command-line host over the library. Plan check,
@@ -31,7 +31,8 @@ depends_on:
 
 # 006: CLI surface
 
-Approved; implementation pending. The owner approved making this spec
+Approved and implemented; the implementation record states what was
+delivered and what was found. The owner approved making this spec
 concrete and delivering it through verified merge within the scope below
 (R-25 and A-06 in `docs/decisions/00-founding-decisions.md`). The concrete
 rules were written by the agent within that scope; its engineering choices
@@ -453,8 +454,20 @@ back, calibrates or judges on its own.
 
 ## Verification
 
-Declared when the implementation is complete; until then `make verify`
-does not run this spec.
+The delivered implementation's acceptance, run by `make verify`.
+
+```verify:cli
+# 3.1 to 3.10: grammar, bounded I/O, plan, run, capture, replay, eval,
+# gate, calibrate and the task adapter, end to end through the binary.
+cargo test -p rustev-cli --locked
+cargo run -p rustev-boundaries --locked --quiet
+# 2: no HTTP stack, ecosystem crate or argument-parsing crate.
+sh -c 't=$(cargo tree -p rustev-cli -e normal --prefix none --locked) || exit 1; if printf "%s\n" "$t" | sed "s/ .*//" | grep -xE "hyper|reqwest|axum|actix-web|warp|tonic|ureq|isahc|surf|h2|http|clap|aicortex.*|rahi.*|statecraft.*" | grep -q .; then exit 1; fi'
+cargo clippy -p rustev-cli --all-targets --locked -- -D warnings
+cargo fmt -p rustev-cli --check
+# Negative control: seeded defects must each be detected.
+sh crates/rustev-cli/mutation/seeds.sh
+```
 
 ## Implementation record
 
@@ -468,6 +481,81 @@ does not run this spec.
   adapter change a gate could miss, and bundle files the library cannot
   report per case. Each is resolved in the text above (3.2, 3.3, 3.5 to
   3.10, E-31); no library change is needed.
+- 2026-09-24: increment 1 of 3, the host skeleton and `plan` (3.1 to
+  3.4). New crate `crates/rustev-cli/` with binary `rustev` and a library
+  entry `execute` that tests drive in process: the hand-parsed argument
+  grammar with per-command flag tables (usage errors before any read),
+  bounded reads (regular files only, checked before and after opening,
+  at most the document's limit plus one byte, a 256 MiB per-command
+  budget and file-count caps), outputs published by a synced temporary
+  file and a hard link that never overwrites, one sorted JSON object per
+  command, and `plan check`, `compile` and `show` with typed refusals,
+  malformed dependency files as category 1 naming the file, and load
+  diagnostics. Golden stdout covers both reference plans and one refusal
+  per category 1 to 12; the reference definitions are emitted at test time
+  from the core's builders and the rules backend's fixtures (R-02). Not
+  yet delivered: `run`, capture and bundles, `replay`, `eval`, `gate`,
+  `calibrate`, the task adapter and the seed harness.
+- 2026-09-24: increment 2 of 3, `run`, capture, bundles and `replay`
+  (3.5 to 3.7). `run` checks every flag before admission (capture,
+  scope, retention and lifetime included), then refuses existing outputs,
+  duplicate backend ids, load diagnostics, `check_plan` mismatches and
+  malformed snapshots before any decision; it runs one decision on Tokio's
+  multi-thread runtime with one worker, with the first interrupt raising
+  the cancel signal and a second exiting with 130; the file sink publishes
+  the record canonical run record within its first poll and acknowledges an
+  identical existing record. With capture, the bundle is assembled after
+  the decision under the chosen retention; external items go to the
+  content-addressed store before the bundle is published. Post-decision
+  failures keep the decision fields and follow the precedence of 3.2.
+  `replay` reproduces a bundle under the flags' trusted scope with the
+  store resolver (64 hex digits only, regular files that are not symbolic
+  links, one byte past the budget reported as oversized). Tests run both
+  reference plans to delivered records (goldens normalize only elapsed
+  times and the receipt), a cancelled record through the in-process entry,
+  a rejection with no record, evidence not delivered into an unwritable
+  directory, every retention mode through `replay` (embedded and external
+  reproduce byte for byte; digest-only is `missing`), removed, altered,
+  linked and expired store items, a reference outside the store, and the
+  isolation matrix in both modes.
+- 2026-09-24: increment 3 of 3, the task adapter, `eval`, `gate` and
+  `calibrate` (3.8 to 3.10); implementation complete and 006 added to
+  `make verify`. `rustev.task-adapter/1` is validated and implements the
+  library's task adapter (label shapes, label rules, parameter rules with
+  `enum`, `text`, `integer` and `first_ranked` selection, maps and
+  `otherwise`). `eval` checks the manifest with the adapter's label check,
+  refuses unmappable or case-colliding case ids, reads each split case's
+  bundle (absent is left to the library as `bundle-missing`; unparsable
+  stops the command), evaluates as baseline or against a candidate loaded
+  with `load_checked`, and writes report, detail, configuration and
+  adapter all or none. `gate` is `unknown` when the two sides' adapter
+  documents differ or the gate is undeclared. `calibrate fit` samples only
+  target-0 outputs of the binding's artifact from reproduced
+  calibration-split cases, reports the rest by reason, and writes the
+  artifact and its fit record all or none; `qualify` maps the library's
+  verdict. Tests evaluate both reference tasks through declarative
+  adapters, as baseline and with candidates, gates that pass, fail (a
+  labeled-coverage minimum) and stay unknown (every case escalated, an
+  unmeasured candidate latency, an undeclared gate, a changed adapter, the
+  wrong roles), and a fit on the support topic step with qualification
+  qualified, refused on the fitting split and unknown without a record.
+  An independent review of increment 1 found no behavioral defect beyond
+  `--help` accepted as a flag value, a following flag taken as a missing
+  value, and file-count caps checked after the first read (all fixed), and
+  that its tests missed 11 of 17 seeded defects (budget off by one, FIFO
+  and handle checks, no-clobber publishing, pre-work output check,
+  recompile refusal category, count cap, dependency I/O mapping); each
+  now has a test. The seed harness (`crates/rustev-cli/mutation/seeds.sh`)
+  seeds 23 compiling defects across scope flag handling, byte caps,
+  no-clobber, exit-code mapping, store confinement, adapter correctness
+  and sink acknowledgement; every one is detected. Its first full run left
+  one survivor (a fallback's output fitted as the primary's), now caught by
+  a test that fits a step every case served from a declared fallback.
+  Limits: the regular-file check before opening and the check on the
+  handle leave a window in which a path swapped for a FIFO can block the
+  open; the adapter's rules are bound to a report only through the
+  adapter file written beside it; synthetic datasets establish mechanics
+  only (R-04).
 
 ## Decision history
 

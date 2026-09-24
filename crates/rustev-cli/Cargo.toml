@@ -1,0 +1,32 @@
+[package]
+name = "rustev-cli"
+version = "0.1.0"
+description = "Rustev's command-line host: plan check, compile and show; rules-backed runs with bounded capture; offline replay, evaluation, gates and calibration fitting."
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[package.metadata.spec-spine]
+spec = "006-cli-surface"
+
+[[bin]]
+name = "rustev"
+path = "src/main.rs"
+
+# The library crates, the rules backend and Tokio; no HTTP stack, no
+# ecosystem crate and no argument-parsing crate (spec 006, 2).
+[dependencies]
+rustev-contract = { path = "../rustev-contract" }
+rustev-core = { path = "../rustev-core" }
+rustev-runtime = { path = "../rustev-runtime" }
+rustev-eval = { path = "../rustev-eval" }
+rustev-backend-rules = { path = "../../backends/rustev-backend-rules" }
+serde.workspace = true
+serde_json = { workspace = true, features = ["raw_value"] }
+sha2.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "time", "sync", "signal"] }
+
+[lints]
+workspace = true

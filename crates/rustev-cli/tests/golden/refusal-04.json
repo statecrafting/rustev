@@ -1,0 +1,1 @@
+{"category":4,"category_name":"cycle","command":"plan check","detail":"the step graph has a cycle among a, b","shortfalls":[],"status":"refused","subject":"step:a"}
