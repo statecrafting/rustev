@@ -36,6 +36,21 @@ design's section 18. Recorded here as the owner's decisions, not the agent's.
 | R-10 | Compile-time capability fallback and runtime failure fallback are different policies. Runtime retries and fallback are explicitly declared, validated and included in plan identity, and are never inferred from whichever backend happens to be installed. |
 | R-11 | Delivery authority for spec `003`: the bounded contract changes it needs, its implementation, tests and documentation, local commits, scoped pushes and pull requests, remediation of review and CI findings, and merge after verification. It does not extend to approving specs `004` to `006`. |
 
+### Owner decisions of 2026-09-23, increment 2 continued
+
+Decided by the owner on 2026-09-23 in their brief for the rules backend.
+Recorded here as the owner's decisions, not the agent's.
+
+| Id | Decision |
+|---|---|
+| R-12 | Sequencing: the rules-backend portion of spec `005` is implemented before spec `004`, because the backend supplies execution fixtures for evaluation and CLI work. This is an explicit, single exception to ordinal build order; it does not authorize any other reordering. |
+| R-13 | Spec `005` is narrowed to the deterministic rules backend. The semantic-backend work (R-01's frozen embeddings plus a linear head, the bounded `ort` check, numerical tolerance) moves to spec `011-semantic-backend`, a draft allocated at the next free ordinal after the design roadmap's `007` to `010`. R-01's direction and rationale are unchanged; no spec carrying unfinished semantic-backend obligations is marked complete. |
+| R-14 | C-08 item (1) is resolved: the requirement that selection-policy control parameters (proposal parameters, thresholds, weights and every other policy control) are exact values or literals, never semantic values, is retained (spec `002`, 3.11.4). Semantic results remain usable as decision inputs according to their value kinds; they cannot silently redefine a threshold, weight or other policy control. Relaxing this is a reviewed amendment, not an implementation detail. |
+| R-15 | C-08 item (2) is resolved: per-operation fixed-point rounding is retained, including the composed `round(div(a, b), s)` and `fx` (each step half-even at 10^-9, then half-even to `s`). Representative boundary examples are documented with spec `002` and kept as regression tests. Final-only rounding would be a separately versioned arithmetic contract (a new operator or registry version, E-06), never an edit. |
+| R-16 | C-08 item (3) is preserved, not rewritten: normative text of approved spec `002` (sections 3.8, 3.10, 3.11) was edited in its implementing change, as its implementation record lists. From now on a substantive change to approved behavior is proposed and reviewed before implementation, through an `amends` edge in a separately reviewable change (as spec `003` did), never by editing approved text while implementing it. |
+| R-17 | No semantic inference in this increment: no `ort` dependency, model download, training, paid inference or semantic quality qualification. R-01 stands for spec `011`. |
+| R-18 | Delivery authority for the rules backend: the narrowed spec `005` and any bounded prerequisite contract change it needs, its implementation, verification, review fixes and documentation, scoped commits, pushes, pull requests and merge after checks pass, and updating later drafts to match delivered interfaces while they stay drafts. It does not extend to approving specs `004`, `006` or `011`, implementing them, releases, publication, deployments, paid services, real-user data, sibling repositories, managed-environment repair, branch protection or waivers. |
+
 ## Approvals
 
 | Id | Act | Date |
@@ -43,6 +58,7 @@ design's section 18. Recorded here as the owner's decisions, not the agent's.
 | A-01 | The owner approved spec `001` with bounded corrections: proposals never grants, with the signature-restriction limitation stated; no Rustev-owned authorization type; derivation classes with lineage; network implementations under `integrations/`; ownership of workspace machinery; constitution principles VI onward under the existing `VI onward` heading. | 2026-09-23 |
 | A-02 | The owner approved spec `002` with bounded corrections: enforceable parse bounds with transport buffering owned separately; calibration as identity and binding, with one explicit initial method and fitting deferred; determinism scoped to canonical compilation and defined exact computation; explicit acceptance and executable verification. Its lifecycle fields are recorded in the change that makes it concrete. | 2026-09-23 |
 | A-03 | The owner approved spec `003` within the bounded requirements of their runtime brief: time, admission and concurrency, budgets, retries and fallback, cancellation, evidence and judgment equivalence as stated there, with the optimization deferral of R-08 and executable acceptance. The concrete rules were then written by the agent within those bounds and are reviewable in the change that recorded this approval. | 2026-09-23 |
+| A-04 | The owner approved spec `005` within the narrowed rules-backend scope of R-13 and the requirements of their brief (a bounded, versioned rules program; disclosure of exactly what is returned; authored interpretations for logits; program and configuration bound to artifact and descriptor identity; explicit setup; defined cost units; bounded work; honest cancellation; provenance as the existing contract defines it; executable acceptance). The approval was given in advance of the concrete contract and is recorded in the change that makes the contract concrete. It does not approve specs `004`, `006` or `011`. | 2026-09-23 |
 
 No approval authorizes ratifying any other spec.
 

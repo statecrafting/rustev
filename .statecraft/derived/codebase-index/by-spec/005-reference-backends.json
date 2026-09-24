@@ -11,10 +11,24 @@
   },
   "mapping": {
     "dependsOn": [
+      "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core",
       "003-runtime-execution-and-evidence"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "Cargo.lock",
+        "source": "spec-edge"
+      },
+      {
+        "path": "Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "Makefile",
+        "source": "spec-edge"
+      }
+    ],
     "resolvedUnits": [
       {
         "locations": [],
@@ -24,11 +38,50 @@
           "kind": "directory",
           "path": "backends/rustev-backend-rules/"
         }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.lock"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Makefile"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
       }
     ],
     "specId": "005-reference-backends",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "081c977dd376cb2b28a762464afdf8e946517c7e2bd1491efa2624475338a098"
+  "shardHash": "4e4e5e33d2f77410bdcf03c0288605989dac9f3f23ef6f767dcd62745a5ccb99"
 }

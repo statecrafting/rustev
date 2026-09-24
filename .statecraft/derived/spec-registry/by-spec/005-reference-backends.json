@@ -2,6 +2,7 @@
   "record": {
     "created": "2026-09-23",
     "dependsOn": [
+      "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core",
       "003-runtime-execution-and-evidence"
     ],
@@ -11,29 +12,95 @@
         "path": "backends/rustev-backend-rules/"
       }
     ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      }
+    ],
     "id": "005-reference-backends",
     "implementation": "pending",
     "sectionDigests": {
-      "005-reference-backends": "17cf6389f548086377aff385ac572a4f5faee6256dd18306cb98ae090ec21261",
-      "1-purpose": "9046ea37cd9d4fbdc15f6e5c50347a7e410cce9d9231248798c19898e09bc7d4",
-      "2-territory": "c73b3483fdc110282c2a0b05948ac96f5cf4694eb009ffa67166c7f9cf8ab726",
-      "3-behavior-to-be-made-concrete-before-approval": "d93fd82edb5fd6c815651247348f5cf172f20242372254d934bda8e43dfd956e",
-      "4-out-of-scope": "f45381b6e6bdd48a914ba802480812554d2586a9708a9861f0b9fc76b6759c86",
-      "acceptance-draft": "2f41303225aa81132d20e11c8d987d13b8ed29af5805a1ac5b6bba08bcee0af2"
+      "005-deterministic-rules-backend": "2a24d584069e60c621731cfbd4615d09c7edc6c752bba4ecb8e2f457cbbdf5aa",
+      "1-purpose": "8a10dc63a855787396e38a7b59b3f00ab8eaa8eb64081e27d7feb2fd0926c249",
+      "2-territory": "455cf037b0000dafdbc216f998eb256263a4a82c136ae25656efea8b7716e6ea",
+      "3-1-scope": "9c83521a6e32243d456373b8589403b6488c67b7004db9f50f64c469b4a0b484",
+      "3-10-identity": "cec4d8962287ccc763c3b2c702c7c329d7b9c06188ee496fa18b39d66224a64f",
+      "3-11-setup-responsibilities": "246f44ee1b511309768f9220f730d79bf18fa168f3526593227cfbdebe6bb880",
+      "3-12-cost": "118db17d1b4a61ad44851eedd8ed35302cdb56df20da9538716cf60a4aa40f3f",
+      "3-13-cancellation": "7b4e40e0ad000a16a3366fc76bed57353f01f459d41744954cf30ae9399545a5",
+      "3-14-provenance": "0a8bfb74a167d2a81f35f6244722d427e79a98b31122ae8f988acad5019fc1ef",
+      "3-15-dependencies-and-partial-adoption": "cf5bf560e0e3eb11e2e3606aea4ea8108a74d086cbe5dd9404efa30ee5b74b18",
+      "3-16-reference-programs": "6e3ad4ec887fad3eba035c26ea4424e2fc2cc51e5a6e278396f5c745baf919ef",
+      "3-2-the-rules-program-rustev-rules-1": "0a550d130b1752832ac9a939bb8c31a7c7c8c34ee2e8de247a2b399dfef1b757",
+      "3-3-validation-and-limits": "d88f9057d33242082e9244dbb3a8340d1dcfce5fd04ef5e1e5b33b08e5ae2bc2",
+      "3-4-field-access-and-validation": "d80954ca090ae7e2b894ef5eee4491329bc77fde731f2af23b45a866a3fadb39",
+      "3-5-choosing-the-task": "872f51b1f228a05809f81630ad0c5fe2e1b3e8b0936b43a6c9f808c00193017b",
+      "3-6-numbers": "a1cf7a7001381cae3cb6abe413c1a0776fa454bd8b5ff7643d3b33c1df39824a",
+      "3-7-evaluation": "62a5b9153a72202d063296da1ad5a46ae8293d8aa4808d014aed0e339362e5b9",
+      "3-8-interpretation": "0bf504217dffee5ffe219875aa254722b0ef93df7ac1aac1a6dc5ddd881ecc7c",
+      "3-9-disclosure-the-derived-descriptor": "fe60336625d85c32f2e9e1d903d0f5faeb4f361bdf791b50428f6fe674abfe6b",
+      "3-behavior": "9d13c674350ef732f2c307be1cedd1baaa368bf4e318843252cdcd33fce47ab8",
+      "4-out-of-scope": "f5cb5511a94803765faa5f71bc8551926bf2c5b6948990ce3940b77d1cbe671e",
+      "5-observable-negative-cases": "fe6780d28db2526b525c6f91bdf2d8e69e7fe55c7dcaf84b27703d3b27f208e0",
+      "acceptance": "b1ae93f0cb786f695f1fb247c1b0128abb56d12e10d829f56407fd62fd7c5b15",
+      "decision-history": "2239d51bc7f71b50084638d97137596bddc6a3c11f0409551f8f15d5a67526d3",
+      "engineering-choices": "1d25777abedf26617896cdf21e1e4eb2f209e1bcbe238d3e0aaafd031dd6c5a7",
+      "verification": "4a3e9662ac3e62bebfce96590bfd90b863221382bf9376d790520ac4383fb28e"
     },
     "sectionHeadings": [
-      "005: Reference backends",
+      "005: Deterministic rules backend",
       "1. Purpose",
       "2. Territory",
-      "3. Behavior (to be made concrete before approval)",
+      "3. Behavior",
+      "3.1 Scope",
+      "3.2 The rules program, `rustev.rules/1`",
+      "3.3 Validation and limits",
+      "3.4 Field access and validation",
+      "3.5 Choosing the task",
+      "3.6 Numbers",
+      "3.7 Evaluation",
+      "3.8 Interpretation",
+      "3.9 Disclosure: the derived descriptor",
+      "3.10 Identity",
+      "3.11 Setup responsibilities",
+      "3.12 Cost",
+      "3.13 Cancellation",
+      "3.14 Provenance",
+      "3.15 Dependencies and partial adoption",
+      "3.16 Reference programs",
       "4. Out of scope",
-      "Acceptance (draft)"
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Decision history",
+      "Engineering choices"
     ],
     "specPath": "specs/005-reference-backends/spec.md",
-    "status": "draft",
-    "summary": "Increment 2: `rustev-backend-rules`, a deterministic backend (rules, lookup tables, linear heads over exact features) implementing the backend seam as amended by spec 003, used as a reference and in spec 004 and 006; and the first semantic backend candidate, frozen embeddings plus a task-specific linear head (R-01), with ONNX Runtime through `ort` preferred only after a bounded compatibility, licensing, operator, linking, packaging and resource check.\n",
-    "title": "Reference backends"
+    "status": "approved",
+    "summary": "Increment 2: `rustev-backend-rules`, a deterministic, in-process backend that implements the backend seam of spec 003 by evaluating a bounded, versioned rules program (`rustev.rules/1`): typed field access into the canonical projection, ordered rules with explicit precedence and no-match behavior, constant, linear and lookup contributions to authored logits in exact fixed-point arithmetic, and a descriptor derived from the program so the program's digest is the artifact identity plans bind. Metered logical cost units, bounded work, local cancellation observed at declared points. Narrowed by owner decision R-13; the semantic backend is spec 011.\n",
+    "title": "Deterministic rules backend"
   },
-  "shardHash": "66b93c7ebe372e12a5eb6a1173bfce8e4169d7799c62e37d0ce2f65b048535df",
+  "shardHash": "ab77b439630aef4069447553922e267db0e7ea8d20f14932249c15a3880b620b",
   "specVersion": "1.8.0"
 }
