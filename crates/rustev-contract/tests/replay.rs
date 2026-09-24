@@ -514,3 +514,135 @@ fn scope_handles_are_bounded_in_bytes_and_modes_stated_once() {
     assert_ne!(long, text);
     assert!(RequestDoc::parse(long.as_bytes()).is_err());
 }
+mod supplied_from {
+    use rustev_contract::execution::FailureClass;
+    use rustev_contract::ids::ArtifactId;
+    use rustev_contract::judgment::Unresolved;
+    use rustev_contract::run::{
+        AttemptCost, AttemptEnd, AttemptRecord, Cancellation, Charge, CostBound, RemoteState,
+        RequestRecord, RequestResult, Transition,
+    };
+
+    fn attempt(n: u32, target: u32) -> AttemptRecord {
+        AttemptRecord {
+            attempt_id: format!("d/s//{n}"),
+            target,
+            backend_id: "b".into(),
+            artifact: ArtifactId::parse(&super::digest('a')).unwrap(),
+            dispatched_ms: 0,
+            ended_ms: 0,
+            end: AttemptEnd::Failed {
+                class: FailureClass::Transient,
+                detail: String::new(),
+            },
+            cancellation: Cancellation::NotRequested,
+            remote: RemoteState::Finished,
+            cost: AttemptCost {
+                bound: CostBound::Unknown,
+                reserved: 0,
+                charge: Charge::Unknown,
+            },
+        }
+    }
+
+    fn rec(
+        result: RequestResult,
+        attempts: Vec<AttemptRecord>,
+        transitions: Vec<Transition>,
+    ) -> RequestRecord {
+        RequestRecord {
+            step: "s".into(),
+            instance: vec![],
+            result,
+            attempts,
+            transitions,
+        }
+    }
+
+    fn of(r: &RequestRecord) -> (u32, Option<String>) {
+        let f = r.supplied_from().unwrap();
+        (f.target, f.attempt.map(|a| a.attempt_id.clone()))
+    }
+
+    const FAILED: RequestResult = RequestResult::Failed(Unresolved::DeadlineExceeded);
+
+    fn stop(after: u32) -> Transition {
+        Transition::Stop {
+            after,
+            reason: "x".into(),
+        }
+    }
+
+    fn fallback(after: u32, to: u32) -> Transition {
+        Transition::Fallback {
+            after,
+            class: FailureClass::Permanent,
+            to,
+        }
+    }
+
+    #[test]
+    fn outputs_come_from_their_target_and_last_attempt() {
+        let r = rec(
+            RequestResult::Output { target: 1 },
+            vec![attempt(1, 0), attempt(2, 1)],
+            vec![fallback(1, 1)],
+        );
+        assert_eq!(of(&r), (1, Some("d/s//2".into())));
+    }
+
+    #[test]
+    fn a_failure_after_its_last_attempt_names_it() {
+        let r = rec(FAILED, vec![attempt(1, 0)], vec![stop(1)]);
+        assert_eq!(of(&r), (0, Some("d/s//1".into())));
+        let r = rec(
+            FAILED,
+            vec![attempt(1, 0), attempt(2, 0)],
+            vec![
+                Transition::Retry {
+                    after: 1,
+                    class: FailureClass::Transient,
+                    delay_ms: 0,
+                },
+                stop(2),
+            ],
+        );
+        assert_eq!(of(&r), (0, Some("d/s//2".into())));
+    }
+
+    #[test]
+    fn a_failure_without_a_producing_attempt_keeps_its_current_target() {
+        // Nothing dispatched.
+        assert_eq!(of(&rec(FAILED, vec![], vec![stop(0)])), (0, None));
+        // Fell back, then stopped before dispatching on target 1.
+        let r = rec(FAILED, vec![attempt(1, 0)], vec![fallback(1, 1), stop(1)]);
+        assert_eq!(of(&r), (1, None));
+        // Retry declared, then stopped before the retry dispatched.
+        let r = rec(
+            FAILED,
+            vec![attempt(1, 0)],
+            vec![
+                Transition::Retry {
+                    after: 1,
+                    class: FailureClass::Transient,
+                    delay_ms: 5,
+                },
+                stop(1),
+            ],
+        );
+        assert_eq!(of(&r), (0, None));
+        // A panicking disclosure falls back with no attempt at all.
+        let r = rec(FAILED, vec![], vec![fallback(0, 1), stop(0)]);
+        assert_eq!(of(&r), (1, None));
+    }
+
+    #[test]
+    fn nothing_supplied_has_no_origin() {
+        let r = rec(
+            RequestResult::NotSupplied,
+            vec![attempt(1, 0)],
+            vec![stop(1)],
+        );
+        assert!(r.supplied_from().is_none());
+    }
+}

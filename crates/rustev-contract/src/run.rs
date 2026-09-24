@@ -77,6 +77,51 @@ pub struct RequestRecord {
     pub transitions: Vec<Transition>,
 }
 
+/// Where a supplied value came from (spec 004, 3.2).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SuppliedFrom<'r> {
+    /// The producing target of an output; for a failure, the `to` of the
+    /// last `fallback` transition, else 0.
+    pub target: u32,
+    /// The producing attempt: an output's last attempt; a failure's last
+    /// attempt only when no `retry` or `fallback` transition has an `after`
+    /// equal to its ordinal.
+    pub attempt: Option<&'r AttemptRecord>,
+}
+
+impl RequestRecord {
+    /// Where this request's supplied value came from; `None` when nothing was
+    /// supplied. The one derivation runtime capture and replay both use.
+    pub fn supplied_from(&self) -> Option<SuppliedFrom<'_>> {
+        match &self.result {
+            RequestResult::NotSupplied => None,
+            RequestResult::Output { target } => Some(SuppliedFrom {
+                target: *target,
+                attempt: self.attempts.last(),
+            }),
+            RequestResult::Failed(_) => {
+                let target = self
+                    .transitions
+                    .iter()
+                    .rev()
+                    .find_map(|t| match t {
+                        Transition::Fallback { to, .. } => Some(*to),
+                        _ => None,
+                    })
+                    .unwrap_or(0);
+                let n = self.attempts.len() as u32;
+                let moved_on = self.transitions.iter().any(|t| {
+                    matches!(t, Transition::Retry { after, .. } | Transition::Fallback { after, .. } if *after == n)
+                });
+                Some(SuppliedFrom {
+                    target,
+                    attempt: if moved_on { None } else { self.attempts.last() },
+                })
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum RequestResult {

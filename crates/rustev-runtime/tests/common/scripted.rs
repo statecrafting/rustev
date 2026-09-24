@@ -71,6 +71,8 @@ pub struct Scripted {
     pub before_bound: Mutex<Option<Box<dyn Fn() + Send + Sync>>>,
     answer: Box<AnswerFn>,
     events: Mutex<Vec<Event>>,
+    /// The principal handle each dispatched attempt was called with.
+    principals: Mutex<Vec<Vec<u8>>>,
     gates: Mutex<BTreeMap<String, oneshot::Sender<Answer>>>,
 }
 
@@ -87,6 +89,7 @@ impl Scripted {
             before_bound: Mutex::new(None),
             answer: Box::new(answer),
             events: Mutex::new(vec![]),
+            principals: Mutex::new(vec![]),
             gates: Mutex::new(BTreeMap::new()),
         })
     }
@@ -100,6 +103,10 @@ impl Scripted {
     pub fn with_on_cancel(self: Arc<Self>, on: OnCancel) -> Arc<Self> {
         *self.on_cancel.lock().unwrap() = on;
         self
+    }
+
+    pub fn principals(&self) -> Vec<Vec<u8>> {
+        self.principals.lock().unwrap().clone()
     }
 
     pub fn events(&self) -> Vec<Event> {
@@ -186,6 +193,10 @@ impl DecisionBackend for Handle {
         let projection: Json = serde_json::from_slice(call.projection).unwrap_or(Json::Null);
         let signal = call.cancel.clone();
         s.push(Event::Dispatched(id.clone()));
+        s.principals
+            .lock()
+            .unwrap()
+            .push(call.cx.principal_handle.clone());
         let answer = (s.answer)(&Call {
             attempt_id: id.clone(),
             n,

@@ -572,3 +572,18 @@ sh crates/rustev-eval/mutation/seeds.sh
   declared plan and snapshot identities and of supplies under a disabled
   or limit-exceeded capture, and to an exact (not lossy) projection
   string. The plan's own request bound is checked at replay.
+- 2026-09-23: increment 2 of 4, runtime capture (5.3, 5.4, 5.7).
+  `Runtime::decide_with_capture` takes a `CaptureConfig` (scope, byte
+  limit in 1..=16 MiB, refused before admission) and returns the normal
+  result beside a `CaptureOutcome`: `not_admitted` for a rejected
+  decision, else a `Capture` that is `complete`, `cancelled` (keeping the
+  values supplied before cancellation) or `limit_exceeded` (every payload
+  discarded, also past 4096 entries). Each entry is recorded right before
+  its `supply`, in actual supply order, with the core's request identity
+  for the actual target, the producing attempt and the value document.
+  `RequestRecord::supplied_from` (contract) is the one derivation of
+  target and producing attempt that capture and replay share. `decide`
+  delegates to the same path with capture off; its API, records and sink
+  traffic are unchanged, and capture data never reaches the sink. The
+  scripted test backend now records the principal handle it is called
+  with, to show tenant-only capture leaves it unchanged.

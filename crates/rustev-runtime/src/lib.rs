@@ -12,6 +12,7 @@
 //! the queued sink policies (spec 003, 3.4.3).
 #![forbid(unsafe_code)]
 
+mod capture;
 pub mod clock;
 mod driver;
 pub mod ledger;
@@ -28,6 +29,7 @@ use rustev_contract::execution::{
 use rustev_contract::ids::ArtifactId;
 use rustev_contract::judgment::Judgment;
 use rustev_contract::plan::{PlanExecution, PlanStepDetail};
+use rustev_contract::replay::Capture;
 use rustev_contract::run::{
     CoreEvidence, CostMode, CostModel, RecordedExecution, RunRecord, Termination, Timing,
 };
@@ -39,6 +41,7 @@ use rustev_core::evaluate::Evaluation;
 use rustev_core::seams::{CancelSignal, DecisionBackend, EvidenceSink};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore, mpsc, oneshot};
 
+pub use capture::{CaptureConfig, CaptureConfigError, MAX_CAPTURE_BYTES};
 pub use clock::{Clock, Instant, ManualClock, TokioClock};
 pub use ledger::Ledger;
 pub use sink::{DeliveryFailure, DeliveryTicket, SinkPolicy, SinkStats};
@@ -132,6 +135,23 @@ pub struct Decided {
     pub completion: Completion,
     pub record: Arc<RunRecord>,
     pub delivery: Delivery,
+}
+
+/// What [`Runtime::decide_with_capture`] captured (spec 004, 5.3).
+#[derive(Debug, Clone, PartialEq)]
+pub enum CaptureOutcome {
+    /// The decision was rejected: nothing ran, and there is nothing to
+    /// retain or replay.
+    NotAdmitted,
+    Captured(Capture),
+}
+
+/// The normal decide result, and beside it the capture, also when evidence
+/// delivery failed.
+#[derive(Debug)]
+pub struct CapturedDecision {
+    pub result: Result<Decided, DecideError>,
+    pub capture: CaptureOutcome,
 }
 
 /// Live counts, for operators and tests. In memory only.
@@ -487,6 +507,41 @@ impl Runtime {
         req: DecisionRequest,
         cancel: &CancelSignal,
     ) -> Result<Decided, DecideError> {
+        self.run(plan, req, cancel, None).await
+    }
+
+    /// [`Runtime::decide`] with opt-in bounded capture of every supplied
+    /// value (spec 004, 5.3). An invalid configuration is refused before
+    /// admission. Dropping the future returns nothing, as for `decide`.
+    pub async fn decide_with_capture(
+        &self,
+        plan: &PreparedPlan,
+        req: DecisionRequest,
+        cancel: &CancelSignal,
+        capture: &CaptureConfig,
+    ) -> Result<CapturedDecision, CaptureConfigError> {
+        capture.check()?;
+        let decision_id = req.decision_id.clone();
+        let mut capturing = capture::Capturing::new(capture);
+        let result = self.run(plan, req, cancel, Some(&mut capturing)).await;
+        let capture = match &result {
+            Err(DecideError::Rejected(_)) => CaptureOutcome::NotAdmitted,
+            Ok(Decided { record, .. }) | Err(DecideError::EvidenceNotDelivered { record, .. }) => {
+                CaptureOutcome::Captured(
+                    capturing.finish(&decision_id, record.termination == Termination::Cancelled),
+                )
+            }
+        };
+        Ok(CapturedDecision { result, capture })
+    }
+
+    async fn run(
+        &self,
+        plan: &PreparedPlan,
+        req: DecisionRequest,
+        cancel: &CancelSignal,
+        capture: Option<&mut capture::Capturing<'_>>,
+    ) -> Result<Decided, DecideError> {
         let i = &*self.inner;
         // The runtime waits on its own child of the caller's signal, so a
         // long-lived caller signal holds no waker of this decision after it
@@ -555,7 +610,7 @@ impl Runtime {
                 principal: &req.principal_handle,
                 ev: &ev,
             };
-            driver::run_requests(&cx).await
+            driver::run_requests(&cx, capture).await
         };
         let ev = ev.into_inner().unwrap_or_else(|e| e.into_inner());
         let (completion, core) = if cancelled {
