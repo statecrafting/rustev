@@ -483,6 +483,28 @@ does not run this spec.
   from the core's builders and the rules backend's fixtures (R-02). Not
   yet delivered: `run`, capture and bundles, `replay`, `eval`, `gate`,
   `calibrate`, the task adapter and the seed harness.
+- 2026-09-24: increment 2 of 3, `run`, capture, bundles and `replay`
+  (3.5 to 3.7). `run` checks every flag before admission (capture,
+  scope, retention and lifetime included), then refuses existing outputs,
+  duplicate backend ids, load diagnostics, `check_plan` mismatches and
+  malformed snapshots before any decision; it runs one decision on Tokio's
+  multi-thread runtime with one worker, with the first interrupt raising
+  the cancel signal and a second exiting with 130; the file sink publishes
+  the record canonical run record within its first poll and acknowledges an
+  identical existing record. With capture, the bundle is assembled after
+  the decision under the chosen retention; external items go to the
+  content-addressed store before the bundle is published. Post-decision
+  failures keep the decision fields and follow the precedence of 3.2.
+  `replay` reproduces a bundle under the flags' trusted scope with the
+  store resolver (64 hex digits only, regular files that are not symbolic
+  links, one byte past the budget reported as oversized). Tests run both
+  reference plans to delivered records (goldens normalize only elapsed
+  times and the receipt), a cancelled record through the in-process entry,
+  a rejection with no record, evidence not delivered into an unwritable
+  directory, every retention mode through `replay` (embedded and external
+  reproduce byte for byte; digest-only is `missing`), removed, altered,
+  linked and expired store items, a reference outside the store, and the
+  isolation matrix in both modes.
 
 ## Decision history
 

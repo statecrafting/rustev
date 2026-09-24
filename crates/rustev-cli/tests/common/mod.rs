@@ -184,3 +184,112 @@ pub fn reference_inputs(s: &Scratch) {
 pub fn cli_golden(name: &str, bytes: &[u8]) {
     golden(name, bytes)
 }
+
+/// The support-routing snapshot the rules backend routes to billing.
+pub fn support_snapshot_default() -> rustev_contract::snapshot::Snapshot {
+    support_snapshot("pro", &[2, 5], 0)
+}
+
+pub fn lodging_snapshot_default() -> rustev_contract::snapshot::Snapshot {
+    lodging_snapshot(
+        true,
+        vec![
+            candidate("c-1", "120", "USD", 2, true),
+            candidate("c-2", "90", "EUR", 4, false),
+            candidate("c-3", "250", "USD", 2, true),
+        ],
+        vec![
+            claim("k-1", "verified", "preference", NOW + DAY),
+            claim("k-2", "stated", "preference", NOW + DAY),
+        ],
+    )
+}
+
+pub const NOW_ARG: &str = "1790164800000";
+/// Host wall-clock time for bundle creation and replay; unrelated to domain
+/// time.
+pub const WALL: i64 = 1_800_000_000_000;
+
+/// Everything `run` needs for both tasks, compiled through the CLI:
+/// `support.plan.json`, `lodging.plan.json` and the snapshots.
+pub fn run_inputs(s: &Scratch) {
+    reference_inputs(s);
+    s.rustev(&[
+        "plan",
+        "compile",
+        "--definition",
+        "support.definition.json",
+        "--rules",
+        "support.rules.json",
+        "--calibration",
+        "topic.calibration.json",
+        "--out",
+        "support.plan.json",
+    ])
+    .expect(0, "compiled");
+    s.rustev(&[
+        "plan",
+        "compile",
+        "--definition",
+        "lodging.definition.json",
+        "--rules",
+        "lodging.rules.json",
+        "--out",
+        "lodging.plan.json",
+    ])
+    .expect(0, "compiled");
+    s.write(
+        "support.snapshot.json",
+        &canonical(&support_snapshot_default()),
+    );
+    s.write(
+        "lodging.snapshot.json",
+        &canonical(&lodging_snapshot_default()),
+    );
+}
+
+/// The `run` arguments of one task, before any optional flag.
+pub fn run_args(task: &str, decision: &str, record: &str) -> Vec<String> {
+    let mut v: Vec<String> = [
+        "run",
+        "--plan",
+        &format!("{task}.plan.json"),
+        "--rules",
+        &format!("{task}.rules.json"),
+        "--snapshot",
+        &format!("{task}.snapshot.json"),
+        "--evaluation-time",
+        NOW_ARG,
+        "--decision-id",
+        decision,
+        "--record-out",
+        record,
+    ]
+    .iter()
+    .map(|x| x.to_string())
+    .collect();
+    if task == "support" {
+        v.extend(["--calibration".into(), "topic.calibration.json".into()]);
+    }
+    v
+}
+
+impl Scratch {
+    pub fn rustev_owned(&self, args: &[String]) -> Ran {
+        let a: Vec<&str> = args.iter().map(String::as_str).collect();
+        self.rustev(&a)
+    }
+}
+
+/// Zero the runtime's elapsed-time fields of a run record's JSON, the only
+/// fields a golden normalizes (with the digests computed over them).
+pub fn normalize_timing(record: &mut Json) {
+    record["timing"]["elapsed_ms"] = 0.into();
+    record["timing"]["queued_ms"] = 0.into();
+    for r in record["requests"].as_array_mut().into_iter().flatten() {
+        for a in r["attempts"].as_array_mut().into_iter().flatten() {
+            a["dispatched_ms"] = 0.into();
+            a["ended_ms"] = 0.into();
+        }
+    }
+}

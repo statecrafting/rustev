@@ -10,9 +10,13 @@
 
 pub mod args;
 mod deps;
+mod host;
 pub mod io;
 pub mod out;
 mod plan;
+mod replay;
+mod run;
+mod sink;
 
 use rustev_core::seams::CancelSignal;
 
@@ -67,8 +71,10 @@ fn usage_exit(u: args::Usage) -> Exit {
     }
 }
 
-fn dispatch(p: &Parsed, _cx: &Context) -> Result<Done, args::Usage> {
+fn dispatch(p: &Parsed, cx: &Context) -> Result<Done, args::Usage> {
     let r = match p.spec.path {
+        ["run"] => run::run(p, cx)?,
+        ["replay"] => replay::replay(p)?,
         ["plan", "check"] => plan::check(p),
         ["plan", "compile"] => plan::compile_cmd(p),
         ["plan", "show"] => plan::show(p),
