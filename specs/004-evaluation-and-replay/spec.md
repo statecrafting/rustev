@@ -621,4 +621,16 @@ sh crates/rustev-eval/mutation/seeds.sh
   once exact steps settle. The dependent-request case is therefore
   lodging's requests fanned out from computed exact steps (`shortlist`,
   `active_claims`); replay still re-derives the core's listing order after
-  every supply and checks it against the run record.
+  every supply and checks it against the run record. An independent
+  review found no path to a false `reproduced` or comparison, but four
+  robustness gaps, now fixed: a `Reproduced` case could be built by hand
+  (its fields are now private, so only `reproduce` makes one); a judgment
+  without a record form read as `diverged` (now incomparable); comparison
+  could let the core record an invalid reused output as a failure (now
+  `output-refused`, never a substituted failure); and assembly counted
+  only embedded bytes against the case cap (external bytes now count,
+  with the evidence plan, the plan's request bound and a complete
+  capture's termination also bound). Of 42 seeded defects the tests
+  missed 9; each now has a test and all 42 are detected. A bundle with no
+  supplies has no request identity to contradict a relabeled scope; this
+  is stated, since a bundle is not an attestation.

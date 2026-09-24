@@ -681,3 +681,58 @@ async fn the_resolved_byte_budget_is_per_case_not_per_item() {
         }
     ));
 }
+
+#[tokio::test(flavor = "current_thread")]
+async fn a_failure_entry_keeps_the_target_the_run_stopped_on() {
+    use rustev_contract::judgment::Unresolved;
+    use rustev_contract::run::RequestResult;
+    let r = base().await;
+    let failed = |target: u32| {
+        let mut b = embedded(&r);
+        let step = b.supplies[0].step.clone();
+        rewrite_run(&mut b, |run| {
+            for q in run.requests.iter_mut().filter(|q| q.step == step) {
+                q.result = RequestResult::Failed(Unresolved::DeadlineExceeded);
+            }
+        });
+        b.supplies[0].value.document_schema = schema::RUNTIME_REASON.into();
+        let reason =
+            rustev_contract::reason::RuntimeReasonDoc::new(Unresolved::DeadlineExceeded).unwrap();
+        reembed(
+            &mut b.supplies[0].value,
+            &reason.record_canonical().unwrap(),
+        );
+        b.supplies[0].target = target;
+        b
+    };
+    assert_eq!(
+        inconsistency(replay(&failed(1))),
+        (ItemLocation::Supply(0), Inconsistency::Origin)
+    );
+    // Negative control: the recorded target passes the origin check (the
+    // altered result then diverges from the retained judgment).
+    assert!(matches!(replay(&failed(0)), ReplayOutcome::Diverged { .. }));
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn bytes_are_checked_against_the_role_they_are_read_for() {
+    let r = base().await;
+    let b = embedded(&r);
+    // A valid plan's bytes declared, and digested, as a snapshot: intact,
+    // parseable as a plan, yet not what this item claims to be.
+    let mut item = b.snapshot.clone();
+    item.identity = None;
+    let plan = bytes(&b.plan);
+    reembed(&mut item, &plan);
+    let got = rustev_eval::resolve::check_bytes::<rustev_contract::plan::Plan>(&item, &plan);
+    assert_eq!(
+        got,
+        Err(rustev_eval::resolve::ItemFailure::Unavailable(
+            Availability::Mismatched
+        ))
+    );
+    // Negative control: declared as a plan, the same bytes are a plan.
+    assert!(
+        rustev_eval::resolve::check_bytes::<rustev_contract::plan::Plan>(&b.plan, &plan).is_ok()
+    );
+}
