@@ -51,3 +51,35 @@ impl EvidenceSink for FileSink {
         Box::pin(async move { result })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn record() -> RunRecord {
+        // A delivered run record, as a golden keeps it.
+        RunRecord::parse(include_bytes!("../tests/golden/support.record.json").trim_ascii_end())
+            .unwrap()
+    }
+
+    #[test]
+    fn an_identical_existing_record_is_acknowledged_and_anything_else_refused() {
+        let d = std::env::temp_dir().join(format!("rustev-cli-sink-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        let path = d.join("r.json").to_string_lossy().into_owned();
+        let sink = FileSink { path: path.clone() };
+        let r = record();
+        let receipt = sink.publish(&r).unwrap();
+        assert_eq!(receipt, format!("file:{}", r.record_digest().unwrap()));
+        assert_eq!(std::fs::read(&path).unwrap(), r.record_canonical().unwrap());
+        // The same record again: acknowledged, not rewritten.
+        assert_eq!(sink.publish(&r).unwrap(), receipt);
+        // Another record at that path: refused, the file untouched.
+        let mut other = r.clone();
+        other.decision_id = "another".into();
+        assert!(sink.publish(&other).is_err());
+        assert_eq!(std::fs::read(&path).unwrap(), r.record_canonical().unwrap());
+        let _ = std::fs::remove_dir_all(&d);
+    }
+}

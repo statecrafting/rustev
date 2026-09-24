@@ -368,3 +368,37 @@ fn run_usage_is_checked_before_admission() {
     a[i] = "x".repeat(257);
     assert_eq!(s.rustev_owned(&a).code, 2);
 }
+
+#[test]
+fn too_many_rules_files_are_refused_before_any_read() {
+    let s = Scratch::new("run-count");
+    let mut a = run_args("support", "d", "r.json");
+    for _ in 0..64 {
+        a.extend(["--rules".into(), "absent.rules.json".into()]);
+    }
+    let j = s.rustev_owned(&a).expect(3, "io_error");
+    assert_eq!(j["path"], "--rules");
+    assert!(j["detail"].as_str().unwrap().contains("65 files"), "{j}");
+}
+
+#[test]
+fn a_bundle_failure_after_the_decision_keeps_the_decision_fields() {
+    let s = Scratch::new("run-bundle-fail");
+    run_inputs(&s);
+    let mut a = run_args("support", "b-1", "b.record.json");
+    a.extend(
+        [
+            "--capture-bytes", "1048576", "--bundle-out", "missing-dir/b.json", "--now-ms",
+            "1800000000000", "--tenant", "t", "--context-revision", "r", "--principal-scope", "p",
+            "--retain", "embedded",
+        ]
+        .iter()
+        .map(|x| x.to_string()),
+    );
+    let j = s.rustev_owned(&a).expect(3, "io_error");
+    assert_eq!(j["completion"], "judged");
+    assert_eq!(j["record"], "b.record.json");
+    assert!(j.get("judgment").is_some());
+    assert_eq!(j["bundle_error"]["path"], "missing-dir/b.json");
+    assert!(s.exists("b.record.json"));
+}

@@ -162,3 +162,57 @@ pub fn create(path: &str, bytes: &[u8]) -> Result<(), IoFail> {
 pub fn join(dir: &str, name: &str) -> String {
     Path::new(dir).join(name).to_string_lossy().into_owned()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn scratch(name: &str) -> std::path::PathBuf {
+        let d = std::env::temp_dir().join(format!("rustev-cli-io-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    #[test]
+    fn the_aggregate_budget_admits_exactly_its_cap() {
+        let d = scratch("budget");
+        let f = d.join("f").to_string_lossy().into_owned();
+        std::fs::write(&f, [b'x'; 10]).unwrap();
+        let exact = Reads::with_cap(20);
+        assert_eq!(exact.read(&f, 100).unwrap().len(), 10);
+        assert_eq!(exact.read(&f, 100).unwrap().len(), 10);
+        assert_eq!(exact.remaining(), 0);
+        let short = Reads::with_cap(19);
+        short.read(&f, 100).unwrap();
+        let e = short.read(&f, 100).unwrap_err();
+        assert!(e.detail.contains("budget"), "{e:?}");
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn a_file_is_read_to_at_most_its_limit_plus_one_byte() {
+        let d = scratch("limit");
+        let f = d.join("f").to_string_lossy().into_owned();
+        std::fs::write(&f, [b'x'; 10]).unwrap();
+        let r = Reads::default();
+        assert_eq!(r.read(&f, 10).unwrap().len(), 10);
+        assert_eq!(r.read(&f, 9).unwrap().len(), 10);
+        assert_eq!(r.read(&f, 5).unwrap().len(), 6);
+        assert_eq!(r.remaining(), MAX_TOTAL_BYTES - 26);
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn create_never_overwrites_and_leaves_no_temporary_file() {
+        let d = scratch("create");
+        let f = d.join("out").to_string_lossy().into_owned();
+        create(&f, b"first").unwrap();
+        let e = create(&f, b"second").unwrap_err();
+        assert!(e.detail.contains("already exists"), "{e:?}");
+        assert_eq!(std::fs::read(&f).unwrap(), b"first");
+        assert_eq!(std::fs::read_dir(&d).unwrap().count(), 1);
+        assert!(ensure_absent(&f).is_err());
+        let _ = std::fs::remove_dir_all(&d);
+    }
+}

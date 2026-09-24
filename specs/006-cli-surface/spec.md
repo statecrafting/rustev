@@ -453,8 +453,20 @@ back, calibrates or judges on its own.
 
 ## Verification
 
-Declared when the implementation is complete; until then `make verify`
-does not run this spec.
+The delivered implementation's acceptance, run by `make verify`.
+
+```verify:cli
+# 3.1 to 3.10: grammar, bounded I/O, plan, run, capture, replay, eval,
+# gate, calibrate and the task adapter, end to end through the binary.
+cargo test -p rustev-cli --locked
+cargo run -p rustev-boundaries --locked --quiet
+# 2: no HTTP stack, ecosystem crate or argument-parsing crate.
+sh -c 't=$(cargo tree -p rustev-cli -e normal --prefix none --locked) || exit 1; if printf "%s\n" "$t" | sed "s/ .*//" | grep -xE "hyper|reqwest|axum|actix-web|warp|tonic|ureq|isahc|surf|h2|http|clap|aicortex.*|rahi.*|statecraft.*" | grep -q .; then exit 1; fi'
+cargo clippy -p rustev-cli --all-targets --locked -- -D warnings
+cargo fmt -p rustev-cli --check
+# Negative control: seeded defects must each be detected.
+sh crates/rustev-cli/mutation/seeds.sh
+```
 
 ## Implementation record
 
