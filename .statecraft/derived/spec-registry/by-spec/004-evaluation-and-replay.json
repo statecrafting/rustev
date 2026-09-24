@@ -3,7 +3,8 @@
     "created": "2026-09-23",
     "dependsOn": [
       "002-decision-contract-and-pure-core",
-      "003-runtime-execution-and-evidence"
+      "003-runtime-execution-and-evidence",
+      "005-reference-backends"
     ],
     "establishes": [
       {
@@ -14,26 +15,48 @@
     "id": "004-evaluation-and-replay",
     "implementation": "pending",
     "sectionDigests": {
-      "004-evaluation-and-replay": "c527b75ed4c0f9f12b8bb73e0ac6da20d1191ab7d06d96114a5853b669d5eff3",
-      "1-purpose": "2720718c19fe86121254b250f54005a150c681be0f564a917e6d7f07ca0ed131",
-      "2-territory": "e98c2c680a8a3461bbe45cf299151a072625079e6779695d9135b0917de02b17",
-      "3-behavior-to-be-made-concrete-before-approval": "146256b04cc6632f77ad0a00bf9a341caa1734933e2225f0ca4b6ff8b7d68299",
-      "4-out-of-scope": "1a961660da5313a0aeac4bc82299ed671efb8f7e7c56b318f25fce608bc82aa4",
-      "acceptance-draft": "20dc56a3747d1cbdc5fe26d749aae4fd010239063006ee12e48f5ec52ece2d38"
+      "004-evaluation-and-replay": "f4dcff1862b60b86a8426395aeb16745d961b01efc2a81f753845ee11c70bcd3",
+      "1-purpose": "0a071a792169decc11725f5e9aaac837f24fec0f3ae37c1f283442232e1569f4",
+      "2-territory": "ac83ccd0a16415c07d743b35766c3ff872679f7e86e50426bbf2320b69df18e3",
+      "3-1-what-exists-after-specs-003-and-005": "dd89d1c191ad9acea3b5ae93e437b9c00e381ba013beafddcf64ea869c4c02a6",
+      "3-2-the-replay-bundle-rustev-replay-1": "88a4dd3c181f1e3e4e55bd046163274f4f382eae0910aecc3495ecc9ca70babe",
+      "3-3-retention-and-availability": "ab8930cf6dbf0a9186c0e382c758b2b5610d38d36c0450655a30898c7e24e85a",
+      "3-4-historical-reproduction-offline": "af08df2fe32aed91304d4e461ac0cacc78752f6e06c312e06e998447e8cffd36",
+      "3-5-candidate-comparison": "8139af32d7034df1b6d93e83da5b260293c022cd4e0c6f6087f208b7bb95540c",
+      "3-6-live-re-execution": "de8b9b91e4d3598cda7a1014f3c22e3297cee1d895d9568f58ead76c2bb8ddb0",
+      "3-7-datasets-and-provenance-gate-r-04": "69d6a3c312bfff3e48d233d175d1102ac6ebfdd87298c5534057c2a888cbe73b",
+      "3-8-metrics": "269d216847e5d271daf9c96d148b5357628c87c61a384ceeb912cd1bcd199494",
+      "3-9-calibration-fitting": "8b1fcd463352377f4d1058bedcf29bc279e0c437cdeab1b571a2e53d7bed21c0",
+      "3-behavior-to-be-made-concrete-before-approval": "51ce05ab3802f995c0e01a474a57d796504216d15d797f5bf77040179f01d5fc",
+      "4-out-of-scope": "22666b705a8c8ca12a49f9fe728e07d847f95937e85386871027ec46b54ee620",
+      "5-required-amendments-proposed-not-made-by-this-draft": "75cc4f62484963442a3dbddc0c52720f78c1d77615f2b357bd120427fbf8dc06",
+      "6-decisions-still-required-from-the-owner": "7d5ada9be24be5ab0afc48cff79472135f0fdd6fc8d3085250d1a8695536b3ae",
+      "acceptance-draft": "13a21e10cb73f7dab017251babe5fee92689db310cd69600f0f9d13597223324"
     },
     "sectionHeadings": [
       "004: Evaluation and replay",
       "1. Purpose",
       "2. Territory",
       "3. Behavior (to be made concrete before approval)",
+      "3.1 What exists after specs 003 and 005",
+      "3.2 The replay bundle, `rustev.replay/1`",
+      "3.3 Retention and availability",
+      "3.4 Historical reproduction (offline)",
+      "3.5 Candidate comparison",
+      "3.6 Live re-execution",
+      "3.7 Datasets and provenance gate (R-04)",
+      "3.8 Metrics",
+      "3.9 Calibration fitting",
       "4. Out of scope",
+      "5. Required amendments (proposed; not made by this draft)",
+      "6. Decisions still required from the owner",
       "Acceptance (draft)"
     ],
     "specPath": "specs/004-evaluation-and-replay/spec.md",
     "status": "draft",
-    "summary": "Increment 2: `rustev-eval` replays plans over retained snapshots and backend outputs, compares baseline and candidate per case and subgroup, computes metrics including calibration and coverage against error among accepted decisions, fits calibration artifacts on a named split, and emits the versioned report envelope from `rustev-contract` (R-06). Reads `rustev.run/1` records for latency and cost with their certainty labels. Quality claims require real, independently labeled data (R-04).\n",
+    "summary": "Increment 2: `rustev-eval` reproduces judgments offline from a separate, versioned replay bundle (`rustev.replay/1`) that references the plan, the snapshot and every supplied backend output or runtime reason under an explicit, bounded retention mode; compares a candidate plan only on requests that are semantically equivalent; keeps live re-execution apart as new observations; computes metrics with explicit denominators, abstention handling and comparable-case coverage; fits calibration on a named split; and emits the versioned report envelope from `rustev-contract` (R-06). Quality claims require real, independently labeled data (R-04).\n",
     "title": "Evaluation and replay"
   },
-  "shardHash": "6f141f81c3a4655b53926181c4e81b34bc6a1ac00ae8830f4394bc30faa24b96",
+  "shardHash": "939388cff09d56451d66d0b77e7eee2c7ee7175b3856a70357ec8b0729ab9abe",
   "specVersion": "1.8.0"
 }
