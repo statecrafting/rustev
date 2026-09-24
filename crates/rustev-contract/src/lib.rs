@@ -25,7 +25,12 @@ pub mod judgment;
 pub mod limits;
 pub mod output;
 pub mod plan;
+pub mod reason;
+pub mod replay;
+pub mod request;
+pub mod retention;
 pub mod run;
+pub mod scope;
 pub mod snapshot;
 pub mod time;
 
@@ -34,7 +39,8 @@ pub use document::{Document, DocumentError, Identified};
 pub use time::{DurationMs, Timestamp};
 
 /// Schema strings of every document (spec 002, 3.2.1, as amended by spec 003,
-/// 3.2: plans are at version 2; execution policies and run records are new).
+/// 3.2: plans are at version 2; execution policies and run records are new;
+/// and by spec 004, 5.1: replay, request and runtime-reason documents).
 pub mod schema {
     pub const DEFINITION: &str = "rustev.definition/1";
     pub const PLAN: &str = "rustev.plan/2";
@@ -49,4 +55,9 @@ pub mod schema {
     pub const RUN: &str = "rustev.run/1";
     /// The exact-operator registry version a plan was compiled against.
     pub const EXACT_REGISTRY: &str = "rustev.exact/1";
+    /// Replay bundles, request identities and retained runtime reasons
+    /// (spec 004, 3.2 and 3.4).
+    pub const REPLAY: &str = "rustev.replay/1";
+    pub const REQUEST: &str = "rustev.request/1";
+    pub const RUNTIME_REASON: &str = "rustev.runtime-reason/1";
 }

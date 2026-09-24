@@ -2,7 +2,7 @@
 id: "004-evaluation-and-replay"
 title: "Evaluation and replay"
 status: approved
-implementation: pending
+implementation: in-progress
 created: "2026-09-23"
 summary: >
   Increment 2: offline reproduction from bounded, host-retained replay
@@ -32,7 +32,8 @@ depends_on:
 
 # 004: Evaluation and replay
 
-Approved work order, not implemented. The owner delegated the four replay
+Approved work order, in progress: the implementation record states what is
+delivered. The owner delegated the four replay
 choices and approved forward progress on 2026-09-23; R-19 to R-23 and A-05
 record the scope and the agent's selected defaults. The owner then requested
 both isolation modes as a configurable choice (R-24), incorporated in this
@@ -544,3 +545,30 @@ sh crates/rustev-eval/mutation/seeds.sh
   differently from Rust's `core::fmt`), identity-bearing eval documents
   uncovered, and the failure-target rule wrong; all are fixed here. No
   code yet.
+- 2026-09-23: increment 1 of 4, contract and core (5.1, 5.2, 5.6).
+  `rustev-contract` gains `scope` (tagged `tenant_only`/`principal` with
+  bounded handles and no default mode), `retention` (items, modes,
+  availability, the 7-day default and 30-day cap), `request`
+  (`rustev.request/1`, `RequestId`, `REQUEST_V1`), `reason`
+  (`rustev.runtime-reason/1`, the four runtime reasons only) and `replay`
+  (`rustev.replay/1` with structural and lifetime checks under
+  `REPLAY_V1`, and the in-memory `Capture` handoff type), plus
+  `ContentDigest`, `Document::record_canonical`/`record_digest` and the
+  record canonical form with Rustev's own binary64 writer. The workspace
+  enables `serde_json/float_roundtrip`; every existing test passes
+  unchanged, and `Cargo.lock` does not change. `rustev-core` gains
+  `Evaluation::request_document` (primary or bound fallback target of a
+  pending request) and `Compiled::load_checked` with `LoadError`
+  (`compiler-changed` with both identities, missing descriptor or
+  calibration, `plan-mismatch` with the recompile refusal if any); `load`
+  now delegates to the same recompile-and-compare function and keeps its
+  refusal. Not yet delivered: runtime capture, replay, comparison,
+  datasets, metrics, fitting, reports and the seed harness. An
+  independent review found no correctness defect but seeded 15 compiling
+  defects of which the tests missed 8 (duplicate keys ignoring instance,
+  missing supply and calibration caps, role schemas, a `Some(NaN)`
+  fixpoint, handle length in characters, hard-coded normalization); each
+  now has a test and all 15 are detected. It also led to bundle checks of
+  declared plan and snapshot identities and of supplies under a disabled
+  or limit-exceeded capture, and to an exact (not lossy) projection
+  string. The plan's own request bound is checked at replay.

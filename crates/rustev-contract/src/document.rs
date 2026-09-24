@@ -7,7 +7,8 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 use crate::bounded::{ParseError, ParseLimits, parse_bounded};
-use crate::canonical::{CanonicalError, canonical_bytes, tagged_digest};
+use crate::canonical::{CanonicalError, canonical_bytes, record_canonical_bytes, tagged_digest};
+use crate::ids::ContentDigest;
 
 /// A Rustev document with a schema string and a limit set.
 pub trait Document: Serialize + DeserializeOwned {
@@ -33,6 +34,27 @@ pub trait Document: Serialize + DeserializeOwned {
     /// The canonical bytes (spec 002, 3.3.1).
     fn canonical(&self) -> Result<Vec<u8>, CanonicalError> {
         canonical_bytes(self)
+    }
+
+    /// The record canonical bytes (spec 004, 5.6): the canonical bytes, with
+    /// finite fractional numbers written in shortest round-trip form.
+    fn record_canonical(&self) -> Result<Vec<u8>, CanonicalError>
+    where
+        Self: PartialEq,
+    {
+        record_canonical_bytes(self)
+    }
+
+    /// `sha256(SCHEMA || 0x00 || record canonical bytes)` (spec 004, 3.1.6).
+    /// Equal to the identity of an identified document.
+    fn record_digest(&self) -> Result<ContentDigest, CanonicalError>
+    where
+        Self: PartialEq,
+    {
+        Ok(ContentDigest::from_digest(tagged_digest(
+            Self::SCHEMA,
+            &self.record_canonical()?,
+        )))
     }
 }
 
