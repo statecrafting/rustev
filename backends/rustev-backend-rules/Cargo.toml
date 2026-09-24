@@ -1,0 +1,26 @@
+[package]
+name = "rustev-backend-rules"
+version = "0.1.0"
+description = "Rustev's deterministic rules backend: an identified, bounded rules program answering semantic requests with authored logits."
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[package.metadata.spec-spine]
+spec = "005-reference-backends"
+
+[dependencies]
+rustev-contract = { path = "../../crates/rustev-contract" }
+rustev-core = { path = "../../crates/rustev-core" }
+serde.workspace = true
+serde_json.workspace = true
+
+# The runtime and Tokio are for integration tests only (spec 005, 3.15).
+[dev-dependencies]
+rustev-runtime = { path = "../../crates/rustev-runtime" }
+tokio = { workspace = true, features = ["sync", "time", "rt", "macros"] }
+
+[lints]
+workspace = true

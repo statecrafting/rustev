@@ -1,14 +1,4 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '005-reference-backends' directory unit 'backends/rustev-backend-rules/' is not a directory",
-        "path": "backends/rustev-backend-rules/"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "001-boundaries-and-authority",
@@ -27,11 +17,23 @@
       {
         "path": "Makefile",
         "source": "spec-edge"
+      },
+      {
+        "path": "backends/rustev-backend-rules",
+        "source": "manifest-metadata"
+      },
+      {
+        "path": "backends/rustev-backend-rules/",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "backends/rustev-backend-rules/"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -83,5 +85,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "4e4e5e33d2f77410bdcf03c0288605989dac9f3f23ef6f767dcd62745a5ccb99"
+  "shardHash": "56aaa216cbbde47eace5c4e07cf570b94ed8f46730fe429eb07cae51d8152eec"
 }
