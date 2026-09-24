@@ -42,7 +42,8 @@ without writing Rust, using only files and the pinned library.
    `rustev.plan/2` document and its `PlanId`. Exit codes distinguish
    refusal from I/O failure.
 2. `rustev run`: evaluates one snapshot through `rustev-runtime` with a
-   declared backend configuration (spec 005's backends only; no network),
+   declared backend configuration (spec 005's rules backend, loaded from a
+   `rustev.rules/1` program file and checked with `check_plan`; no network),
    an explicit evaluation time, `TokioClock`, a `RuntimeConfig` (admission
    bounds, parallelism, sink policy) and a file sink that writes the
    `rustev.run/1` record. Prints the judgment, or the typed rejection, or
