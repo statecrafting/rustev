@@ -65,7 +65,9 @@ pub fn canonical_value_bytes(value: &Value) -> Result<Vec<u8>, CanonicalError> {
     Ok(out)
 }
 
-/// The record canonical bytes of a typed document (spec 004, 5.6). Refused
+/// The record canonical bytes of a typed document (spec 004, 5.6); the
+/// form is defined for typed documents only, never for an untyped JSON
+/// value, whose numbers lose the binary64 distinction. Refused
 /// unless they parse back to an equal document whose record canonical bytes
 /// are the same bytes: a non-finite number, which serializes as `null`,
 /// never gets a form.

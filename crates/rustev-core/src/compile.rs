@@ -195,7 +195,10 @@ impl Compiled {
     /// compiler or exact-operator registry, a binding dependency not
     /// supplied, or a plan that does not recompile identically under this
     /// compiler. It shares `load`'s recompile and equality check; there is
-    /// no recompile-and-accept fallback.
+    /// no recompile-and-accept fallback. The dependency list is read from
+    /// the plan document itself, so a caller verifies the document's digest
+    /// or identity first: a tampered plan naming a bogus descriptor reports
+    /// that descriptor missing, not a mismatch.
     pub fn load_checked(
         plan: &Plan,
         descriptors: &[BackendDescriptor],

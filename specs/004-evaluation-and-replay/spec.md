@@ -563,4 +563,12 @@ sh crates/rustev-eval/mutation/seeds.sh
   calibration, `plan-mismatch` with the recompile refusal if any); `load`
   now delegates to the same recompile-and-compare function and keeps its
   refusal. Not yet delivered: runtime capture, replay, comparison,
-  datasets, metrics, fitting, reports and the seed harness.
+  datasets, metrics, fitting, reports and the seed harness. An
+  independent review found no correctness defect but seeded 15 compiling
+  defects of which the tests missed 8 (duplicate keys ignoring instance,
+  missing supply and calibration caps, role schemas, a `Some(NaN)`
+  fixpoint, handle length in characters, hard-coded normalization); each
+  now has a test and all 15 are detected. It also led to bundle checks of
+  declared plan and snapshot identities and of supplies under a disabled
+  or limit-exceeded capture, and to an exact (not lossy) projection
+  string. The plan's own request bound is checked at replay.

@@ -93,6 +93,9 @@ pub enum RequestIdentityError {
     /// The target is neither the primary (0) nor a fallback the plan binds
     /// for this step.
     UnknownTarget { step: String, target: u32 },
+    /// The projection is not UTF-8. Canonical JSON always is, so this is a
+    /// defect, reported rather than repaired.
+    ProjectionNotUtf8 { step: String },
 }
 
 impl fmt::Display for RequestIdentityError {
@@ -103,6 +106,9 @@ impl fmt::Display for RequestIdentityError {
             }
             RequestIdentityError::UnknownTarget { step, target } => {
                 write!(f, "step {step} binds no target {target}")
+            }
+            RequestIdentityError::ProjectionNotUtf8 { step } => {
+                write!(f, "the projection of {step} is not UTF-8")
             }
         }
     }
@@ -403,8 +409,9 @@ impl<'c> Evaluation<'c> {
             backend_id: backend_id.clone(),
             artifact: artifact.clone(),
             descriptor: descriptor.clone(),
-            // Canonical JSON is UTF-8 by construction.
-            projection: String::from_utf8_lossy(&req.projection).into_owned(),
+            // The exact bytes, never a lossy repair.
+            projection: String::from_utf8(req.projection.clone())
+                .map_err(|_| RequestIdentityError::ProjectionNotUtf8 { step: step.into() })?,
             output: b.output,
             requires: b.requires,
             normalization: b.normalization,

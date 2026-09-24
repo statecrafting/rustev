@@ -344,3 +344,21 @@ fn a_same_compiler_plan_that_does_not_recompile_is_plan_mismatch() {
     ));
     assert!(Compiled::load(&p, &d, &k).is_err());
 }
+
+#[test]
+fn the_bound_kinds_and_normalization_of_each_step_enter_the_document() {
+    let c = with_fallback("1.5");
+    let ev = start(&c);
+    let scope = tenant("t", "r");
+    let frustration = ev.request_document("frustration", &[], 0, &scope).unwrap();
+    assert_eq!(frustration.requires, RequiredKind::OrdinalDistribution);
+    assert_eq!(frustration.normalization, Normalization::Softmax1);
+    let deadline = ev
+        .request_document("explicit_deadline", &[], 0, &scope)
+        .unwrap();
+    assert_eq!(deadline.requires, RequiredKind::Distribution);
+    assert_eq!(deadline.normalization, Normalization::Softmax1);
+    // Negative control: the calibrated step is not normalized by the core.
+    let topic = ev.request_document("topic", &[], 0, &scope).unwrap();
+    assert_eq!(topic.normalization, Normalization::None);
+}

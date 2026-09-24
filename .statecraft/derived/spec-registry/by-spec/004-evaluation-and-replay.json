@@ -69,7 +69,7 @@
     "id": "004-evaluation-and-replay",
     "implementation": "in-progress",
     "sectionDigests": {
-      "004-evaluation-and-replay": "bd117a43fc0ae704662ca7c8d227d32dac35a9d27d21469da2d45b44b171114a",
+      "004-evaluation-and-replay": "9ff5774152e55ae5a5675d06fb45e53e07255df891644ae9c9faaab3b4d1f3dd",
       "1-purpose": "178329d16b30401fc67c5b1119f034124706ffbdd940efb5d0ce8c603c690ef9",
       "2-territory": "b78a594ab2b0c36224832d3dc67d8ca53b1dd8cf6c0ce7b36b73bdd3892f17e9",
       "3-1-storage-scope-and-retention": "c7e5104ce7b5d1062adeba542dfb5d4b582a900958627e0f2508b77eda8a908c",
@@ -82,7 +82,7 @@
       "4-out-of-scope": "26fc6dd2fc8b3ee70111fdbf4b57d0cf0700b56c24fdb87c22a5831f62e09876",
       "5-amendments-and-compatibility": "d0db5a94fcad29deafc8d1bae4e3ce5c73c85b83abb74407cefe0329849ea269",
       "6-delivery-sequence-and-acceptance": "58f45eb05689e25e0d5978c64f831c978b72071e2329282af53d23d7feb90b62",
-      "implementation-record": "2b956f15fec93669779b51c7bf11ad24e90281d6d2e27f259696193fdc9b8029",
+      "implementation-record": "fb20f811a87dd3e0cfced8b2a976222c06ecac485694bf0c20965d7d2e8c2684",
       "verification": "fa2418cd1dd9968dc006804fb872545e1fe67dc3ca656169a26a5e350af3ea7f"
     },
     "sectionHeadings": [
@@ -107,6 +107,6 @@
     "summary": "Increment 2: offline reproduction from bounded, host-retained replay bundles; configurable tenant-only or principal-scoped equivalence for candidate comparison; explicit availability, coverage and abstention; named dataset splits and temperature fitting. Amends 002 with replay and request documents and typed loading diagnostics, and 003 with opt-in bounded capture of supplied values. Live re-execution is deferred. Synthetic fixtures establish mechanics only, never empirical quality.\n",
     "title": "Evaluation and replay"
   },
-  "shardHash": "ef0a250f2c50cb3eed2f51ca0c2295c460d41aff42bf1d09954ae8e8319eb4a7",
+  "shardHash": "f94d89afc631839c9416c88562317ea7508602f4a5c7b2efb1511ab26b08746d",
   "specVersion": "1.8.0"
 }

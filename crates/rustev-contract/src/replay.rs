@@ -152,6 +152,13 @@ pub enum BundleError {
     Role {
         location: ItemLocation,
     },
+    /// The plan or snapshot item declares an identity other than the
+    /// bundle's `plan_id` or `snapshot_id`.
+    Identity {
+        location: ItemLocation,
+    },
+    /// A disabled or limit-exceeded capture carries supplies.
+    SuppliesWithoutCapture,
 }
 
 impl fmt::Display for BundleError {
@@ -173,6 +180,15 @@ impl fmt::Display for BundleError {
             }
             BundleError::Role { location } => {
                 write!(f, "{location} declares a schema its role does not allow")
+            }
+            BundleError::Identity { location } => {
+                write!(
+                    f,
+                    "{location} declares an identity the bundle does not name"
+                )
+            }
+            BundleError::SuppliesWithoutCapture => {
+                f.write_str("a disabled or limit-exceeded capture has no supplies")
             }
         }
     }
@@ -209,7 +225,9 @@ impl ReplayBundle {
 
     /// Structural checks that need no resolved bytes: schema, decision id,
     /// lifetimes under the hard cap and an optional tighter host cap, item
-    /// counts, item roles, and the supply sequence. Applies to a typed
+    /// counts (at most 4096 each; the plan's own request bound is checked at
+    /// replay, once the plan is resolved), item roles, declared plan and
+    /// snapshot identities, and the supply sequence. Applies to a typed
     /// bundle as well as a parsed one.
     pub fn check(&self, host_cap_ms: Option<u64>) -> Result<(), BundleError> {
         if self.schema != schema::REPLAY {
@@ -261,6 +279,25 @@ impl ReplayBundle {
             if !allowed.contains(&item.document_schema.as_str()) {
                 return Err(BundleError::Role { location });
             }
+        }
+        for (location, item, id) in [
+            (ItemLocation::Plan, &self.plan, self.plan_id.as_str()),
+            (
+                ItemLocation::Snapshot,
+                &self.snapshot,
+                self.snapshot_id.as_str(),
+            ),
+        ] {
+            if item.identity.as_ref().is_some_and(|d| d.as_str() != id) {
+                return Err(BundleError::Identity { location });
+            }
+        }
+        if matches!(
+            self.capture,
+            CaptureStatus::Disabled | CaptureStatus::LimitExceeded
+        ) && !self.supplies.is_empty()
+        {
+            return Err(BundleError::SuppliesWithoutCapture);
         }
         let mut keys = BTreeSet::new();
         for (i, s) in self.supplies.iter().enumerate() {

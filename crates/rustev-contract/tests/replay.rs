@@ -381,3 +381,136 @@ fn retention_modes_are_tagged_and_closed() {
         .is_err()
     );
 }
+
+#[test]
+fn bundle_entries_are_unique_by_step_and_instance_together() {
+    let mut b = bundle();
+    b.supplies[1].step = "a".into();
+    b.supplies[1].instance = vec!["i".into()];
+    b.check(None).unwrap();
+    b.supplies[0].instance = vec!["i".into()];
+    assert_eq!(
+        b.check(None),
+        Err(BundleError::DuplicateSupply { index: 1 })
+    );
+}
+
+#[test]
+fn every_item_count_is_capped_at_4096() {
+    let mut b = bundle();
+    b.calibrations = vec![item(schema::CALIBRATION, CREATED + DAY); MAX_BUNDLE_ITEMS + 1];
+    assert!(matches!(
+        b.check(None),
+        Err(BundleError::TooMany {
+            what: "calibrations",
+            ..
+        })
+    ));
+    let mut b = bundle();
+    b.supplies = (0..MAX_BUNDLE_ITEMS as u64 + 1)
+        .map(|i| supply(i, &format!("s{i}")))
+        .collect();
+    assert!(matches!(
+        b.check(None),
+        Err(BundleError::TooMany {
+            what: "supplies",
+            ..
+        })
+    ));
+    b.supplies.pop();
+    b.check(None).unwrap();
+}
+
+#[test]
+fn every_role_accepts_only_its_own_schema() {
+    for (location, wrong) in [
+        (ItemLocation::Plan, schema::DEFINITION),
+        (ItemLocation::Snapshot, schema::RUN),
+        (ItemLocation::Run, schema::JUDGMENT),
+        (ItemLocation::Run, schema::EVIDENCE),
+        (ItemLocation::Calibration(0), schema::BACKEND),
+    ] {
+        let mut b = bundle();
+        b.calibrations = vec![item(schema::CALIBRATION, CREATED + DAY)];
+        let slot = match location {
+            ItemLocation::Plan => &mut b.plan,
+            ItemLocation::Snapshot => &mut b.snapshot,
+            ItemLocation::Run => &mut b.run,
+            ItemLocation::Calibration(_) => &mut b.calibrations[0],
+            _ => unreachable!(),
+        };
+        slot.document_schema = wrong.into();
+        assert_eq!(
+            b.check(None),
+            Err(BundleError::Role { location }),
+            "{wrong}"
+        );
+    }
+}
+
+#[test]
+fn declared_plan_and_snapshot_identities_must_be_the_bundle_s() {
+    let mut b = bundle();
+    b.plan.identity = Some(ContentDigest::parse(b.plan_id.as_str()).unwrap());
+    b.snapshot.identity = Some(ContentDigest::parse(b.snapshot_id.as_str()).unwrap());
+    b.check(None).unwrap();
+    b.plan.identity = Some(ContentDigest::parse(&digest('9')).unwrap());
+    assert_eq!(
+        b.check(None),
+        Err(BundleError::Identity {
+            location: ItemLocation::Plan
+        })
+    );
+    let mut b = bundle();
+    b.snapshot.identity = Some(ContentDigest::parse(&digest('9')).unwrap());
+    assert_eq!(
+        b.check(None),
+        Err(BundleError::Identity {
+            location: ItemLocation::Snapshot
+        })
+    );
+}
+
+#[test]
+fn only_complete_or_cancelled_captures_carry_supplies() {
+    for (status, ok) in [
+        (CaptureStatus::Complete, true),
+        (CaptureStatus::Cancelled, true),
+        (CaptureStatus::Abandoned, true),
+        (CaptureStatus::Disabled, false),
+        (CaptureStatus::LimitExceeded, false),
+    ] {
+        let mut b = bundle();
+        b.capture = status;
+        assert_eq!(b.check(None).is_ok(), ok, "{status:?}");
+        b.supplies.clear();
+        b.check(None).unwrap();
+    }
+}
+
+#[test]
+fn a_non_finite_optional_number_has_no_record_form() {
+    // `serde_json` writes `Some(NaN)` as `null`, which parses back as `None`.
+    assert!(record_canonical_bytes(&Some(f64::NAN)).is_err());
+    assert!(record_canonical_bytes(&Some(1.5)).is_ok());
+}
+
+#[test]
+fn scope_handles_are_bounded_in_bytes_and_modes_stated_once() {
+    let wide = "é".repeat(129); // 258 bytes, 129 characters
+    assert!(Handle::new(wide.clone()).is_err());
+    assert!(Handle::new("é".repeat(128)).is_ok());
+    let r = request();
+    let text = String::from_utf8(r.canonical().unwrap()).unwrap();
+    // A repeated `mode` key is refused by the bounded parser.
+    let dup = text.replacen(
+        r#""mode":"principal","#,
+        r#""mode":"principal","mode":"principal","#,
+        1,
+    );
+    assert_ne!(dup, text);
+    assert!(RequestDoc::parse(dup.as_bytes()).is_err());
+    let long = text.replacen(r#""tenant":"tenant""#, &format!(r#""tenant":"{wide}""#), 1);
+    assert_ne!(long, text);
+    assert!(RequestDoc::parse(long.as_bytes()).is_err());
+}
