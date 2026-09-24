@@ -114,7 +114,9 @@ contract, core and runtime additions in section 5 and workspace wiring.
    string containing the canonical document. External references are opaque
    strings, not instructions to fetch a URL; the host resolves them.
    Every item states its expected document schema and identity where one
-   exists. Digests use the existing schema-tagged canonical digest rule.
+   exists. Digests use the existing schema-tagged canonical digest rule,
+   over the record canonical form of 5.6 for documents whose limit set
+   permits fractional numbers. Embedded bytes must be exactly that form.
 7. Availability is exactly `available`, `missing`, `expired`, `erased`,
    `corrupt`, `inaccessible` or `mismatched`. At `now_ms >= expires_at_ms`,
    report expired without resolving bytes. For an unexpired external item,
@@ -145,11 +147,18 @@ One bundle describes one admitted decision and includes:
 - capture status: complete, disabled, limit-exceeded, cancelled or
   abandoned. Only complete can be reproduced;
 - one entry per value successfully supplied to the core: step, instance,
-  request identity document, supply sequence number, optional producing
+  `RequestId`, supply sequence number, optional producing
   attempt id and optional target index, and a retention item holding the
   output document or a `rustev.runtime-reason/1` document containing
   `schema` and `reason` (one of the four existing runtime reasons). The
   reason document uses `RECORD_V1`; no other unresolved kind is accepted.
+
+The entry records the `RequestId`, not the request document: the document
+contains the projection, which is snapshot content that `digest_only`
+retention must not embed. Replay recomputes the document from the retained
+plan and snapshot (3.3.3) and compares identities. An output entry's
+identity is computed for its producing target; a failure's for the target of
+its last attempt, or the primary target when nothing was dispatched.
 
 A no-dispatch budget/deadline failure has no producing attempt. An output
 names the actual producing target, including fallback, and its artifact
@@ -193,9 +202,10 @@ allocation; the library checks the supplied slices again.
    supply the retained raw output or runtime reason. Fallback raw outputs
    use `supply` after these checks, not `supply_doc`, whose existing artifact
    check expects the primary binding. Finish with the original decision id.
-4. `reproduced` means canonical judgment bytes equal those in the retained
-   run record. A valid, complete replay with different bytes is `diverged`.
-   An unavailable input or failed precondition is `incomparable{reason}`.
+4. `reproduced` means record-canonical (5.6) judgment bytes equal those
+   in the retained run record. A valid, complete replay with different
+   bytes is `diverged`. An unavailable input or failed precondition is
+   `incomparable{reason}`.
    A cancelled/abandoned execution has no expected judgment and is
    incomparable, even if a prefix of its supplied values was captured.
 5. Zero backend calls occur. A nondeterministic backend is replayable when
@@ -386,7 +396,22 @@ by this work order.
    choices. It does not obtain them from an output digest. Returning a
    capture is not a promise that a serializable bundle fits the size cap;
    assembly checks escaped document sizes and returns a typed bound error.
-6. Wire schemas `definition/1`, `plan/2`, `run/1`, `backend-output/1`,
+6. **Record canonical form (spec 002, 3.3).** Backend outputs, run records,
+   judgments and reports may contain fractional numbers, which the existing
+   canonical form refuses. Their canonical bytes are the existing form
+   except that a finite non-integer number is written as the shortest
+   decimal that round-trips to the same binary64 value, in the notation of
+   the pinned `serde_json` (`ryu`) writer, exponent included where it uses
+   one. A value whose canonical bytes do not parse back to an equal typed
+   document (a non-finite number, which JSON cannot carry) has no record
+   canonical form and is refused, never written as `null`. Documents with
+   no fractional numbers, including every identity-bearing one, have
+   exactly their existing canonical bytes. A later change of that
+   notation is a new form, pinned by known-answer tests.
+7. **Capture accounting (spec 003).** Captured bytes are the sum of the
+   record-canonical lengths of every captured value document and request
+   document; that sum is what the configured byte limit bounds.
+8. Wire schemas `definition/1`, `plan/2`, `run/1`, `backend-output/1`,
    `calibration/1` and `eval-report/1` are unchanged. The existing plan and
    definition goldens must remain byte-identical. Any later need to change
    them is another reviewed amendment before implementation.
@@ -468,3 +493,11 @@ sh crates/rustev-eval/mutation/seeds.sh
   configurable tenant-only and principal-scope isolation (R-24). Both modes,
   principal-mode default, explicit context revisions, mode-separated
   identities and the acceptance matrix are specified before implementation.
+- 2026-09-23: amended before implementation, in a separate reviewed change
+  (R-16). Designing the contract against current source showed three gaps:
+  backend outputs, run records and judgments carry binary64 numbers the
+  existing canonical form refuses, so their digests and "canonical
+  judgment bytes" were undefined (5.6); a supply entry holding the full
+  request document would embed projection content under `digest_only`
+  retention (3.2); and a failed supply's identity target was unstated
+  (3.2). Capture accounting is also made explicit (5.7). No code yet.
