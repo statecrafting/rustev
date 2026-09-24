@@ -26,6 +26,7 @@ use rustev_core::seams::{
     AdapterFailure, AttemptCall, AttemptReport, CallContext, CancelAck, CancelSignal,
 };
 
+use crate::capture::Capturing;
 use crate::clock::Instant;
 use crate::ledger::{Ledger, Refused};
 use crate::wait::{CatchUnwind, Raced, cut, poll_once, race};
@@ -135,9 +136,13 @@ pub(crate) struct RequestOutcome {
 type Driving<'a> = Pin<Box<dyn Future<Output = RequestOutcome> + Send + 'a>>;
 
 /// Run every request the core lists until none is pending, supplying each
-/// result as it arrives. Returns the request records in the order the core
-/// listed them, and whether the caller's cancellation left any unsupplied.
-pub(crate) async fn run_requests(cx: &DecisionCtx<'_, '_>) -> (Vec<RequestRecord>, bool) {
+/// result as it arrives, and capturing it first when a capture is given.
+/// Returns the request records in the order the core listed them, and
+/// whether the caller's cancellation left any unsupplied.
+pub(crate) async fn run_requests(
+    cx: &DecisionCtx<'_, '_>,
+    mut capture: Option<&mut Capturing<'_>>,
+) -> (Vec<RequestRecord>, bool) {
     let mut seen: BTreeMap<(String, Vec<String>), usize> = BTreeMap::new();
     let mut records: Vec<Option<RequestRecord>> = Vec::new();
     let mut waiting: VecDeque<SemanticRequest> = VecDeque::new();
@@ -171,11 +176,14 @@ pub(crate) async fn run_requests(cx: &DecisionCtx<'_, '_>) -> (Vec<RequestRecord
         drop(active.swap_remove(idx));
         match out.supplied {
             Some(s) => {
+                let mut ev = cx.ev();
+                if let Some(c) = capture.as_deref_mut() {
+                    c.record(&ev, cx.plan, &out.record, &s);
+                }
                 // The request is pending until this call, and the runtime
                 // supplies only outputs and the four runtime reasons; a
                 // refusal is a defect, not a runtime condition.
-                cx.ev()
-                    .supply(&out.step, &out.instance, s)
+                ev.supply(&out.step, &out.instance, s)
                     .expect("the core accepts what the runtime supplies");
             }
             None => cancelled = true,
