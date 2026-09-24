@@ -20,15 +20,18 @@ selection policy). The first runtime slice is implemented in
 `rustev-runtime`: bounded admission and concurrency, one end-to-end deadline
 on an injectable clock, cost budgets reserved before dispatch, declared
 retries and runtime fallback that are part of the plan's identity, honest
-cancellation, and run records delivered under a declared sink policy. It is
-verified against scripted test backends only. There is no production
-backend, CLI or model yet, and no quality or calibration claim: the
-reference plans run on synthetic fixtures. Batching, duplicate suppression
-and caches are deferred. Nothing is released.
+cancellation, and run records delivered under a declared sink policy.
+`rustev-backend-rules` is a deterministic rules backend: authored,
+identified rules programs, not a model. `rustev-eval` reproduces retained
+decisions offline from bounded replay bundles, compares candidate plans,
+and produces evaluation reports, regression gates and temperature fits.
+There is no CLI or model backend yet, and no quality or calibration claim:
+every dataset and report is synthetic. Batching, duplicate suppression and
+caches are deferred. Nothing is released.
 
 - Design (proposed): [docs/design/001-decision-engine-architecture.md](docs/design/001-decision-engine-architecture.md)
 - Decisions: [docs/decisions/00-founding-decisions.md](docs/decisions/00-founding-decisions.md)
-- Specs: `001` boundaries and authority, `002` decision contract and pure core, `003` runtime execution and evidence (approved and complete); `004` to `006` are drafts.
+- Specs: `001` boundaries and authority, `002` decision contract and pure core, `003` runtime execution and evidence, `004` evaluation and replay, `005` rules backend (approved and complete); `006` CLI (approved, implementation pending); `011` semantic backend (draft).
 
 ## Governance
 
