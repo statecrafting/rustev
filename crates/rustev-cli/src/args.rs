@@ -210,24 +210,36 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Usage> {
     if argv.is_empty() {
         return usage("no command; run `rustev help`");
     }
-    if argv.iter().any(|a| a == "--help") || argv[0] == "help" {
+    if argv[0] == "help" || argv[0] == "--help" {
         return Ok(Invocation::Help);
     }
-    let spec = COMMANDS
+    let Some(spec) = COMMANDS
         .iter()
         .filter(|c| c.path.len() <= argv.len() && c.path.iter().zip(argv).all(|(p, a)| p == a))
         .max_by_key(|c| c.path.len())
-        .ok_or_else(|| Usage(format!("unknown command {:?}", argv[0])))?;
+    else {
+        // `rustev plan --help`: help where a subcommand was expected.
+        if argv.get(1).is_some_and(|a| a == "--help") {
+            return Ok(Invocation::Help);
+        }
+        return usage(format!("unknown command {:?}", argv[0]));
+    };
     let mut values: BTreeMap<&'static str, Vec<String>> = BTreeMap::new();
     let mut rest = argv[spec.path.len()..].iter();
     while let Some(arg) = rest.next() {
         let Some(name) = arg.strip_prefix("--") else {
             return usage(format!("unexpected argument {arg:?}"));
         };
+        // Help only where a flag name is expected, never as a value.
+        if name == "help" {
+            return Ok(Invocation::Help);
+        }
         let Some(&(flag, arity)) = spec.flags.iter().find(|(f, _)| *f == name) else {
             return usage(format!("{} takes no flag --{name}", spec.path.join(" ")));
         };
-        let Some(value) = rest.next() else {
+        // A value never starts with `--`: that is the next flag, and the
+        // value is missing.
+        let Some(value) = rest.next().filter(|v| !v.starts_with("--")) else {
             return usage(format!("--{flag} needs a value"));
         };
         let slot = values.entry(flag).or_default();

@@ -53,6 +53,27 @@ fn usage_errors_are_found_before_any_file_is_read() {
         &["gate", "--baseline", "a", "--candidate", "b"],
         "--gate is required",
     );
+    // The next flag is never taken as a missing value.
+    usage(
+        &["plan", "check", "--definition", "--rules", "r"],
+        "--definition needs a value",
+    );
+}
+
+#[test]
+fn help_is_only_where_a_flag_name_is_expected() {
+    // As a value, `--help` is refused as a missing value, never help.
+    usage(
+        &["plan", "compile", "--definition", "d", "--out", "--help"],
+        "--out needs a value",
+    );
+    for args in [
+        &["plan", "--help"][..],
+        &["--help"][..],
+        &["run", "--help"][..],
+    ] {
+        assert_eq!(run(args).code, 0, "{args:?}");
+    }
 }
 
 #[test]

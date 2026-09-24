@@ -417,3 +417,134 @@ fn unreadable_inputs_are_io_errors_naming_the_path() {
     ));
     assert_eq!(r.expect(3, "io_error")["path"], "no-dir/p.json");
 }
+
+#[test]
+fn missing_dependency_files_are_io_errors_naming_them() {
+    let s = Scratch::new("plan-dep-io");
+    reference_inputs(&s);
+    for (flag, file) in [
+        ("--rules", "absent.rules.json"),
+        ("--calibration", "absent.cal.json"),
+        ("--descriptor", "absent.d.json"),
+    ] {
+        let r = s.rustev(&[
+            "plan",
+            "check",
+            "--definition",
+            "support.definition.json",
+            flag,
+            file,
+        ]);
+        assert_eq!(r.expect(3, "io_error")["path"], file);
+    }
+}
+
+#[test]
+fn an_existing_output_is_refused_before_any_work() {
+    let s = Scratch::new("plan-clobber");
+    s.write("junk.definition.json", b"{");
+    s.write("taken.json", b"keep");
+    // The output check comes first: io_error, not the parse refusal.
+    let r = s.rustev(&[
+        "plan",
+        "compile",
+        "--definition",
+        "junk.definition.json",
+        "--out",
+        "taken.json",
+    ]);
+    r.expect(3, "io_error");
+    assert_eq!(s.read("taken.json"), b"keep");
+}
+
+#[test]
+fn file_count_caps_admit_exactly_their_bound() {
+    let s = Scratch::new("plan-counts");
+    reference_inputs(&s);
+    let mut a = vec![
+        "plan",
+        "check",
+        "--definition",
+        "support.definition.json",
+        "--calibration",
+        "topic.calibration.json",
+    ];
+    for _ in 0..64 {
+        a.extend(["--rules", "support.rules.json"]);
+    }
+    // 64 programs are read (and compile, as 64 copies of one backend).
+    assert_ne!(s.rustev(&a).code, 3);
+    a.extend(["--rules", "support.rules.json"]);
+    assert_eq!(s.rustev(&a).expect(3, "io_error")["path"], "--rules");
+}
+
+#[test]
+fn a_plan_whose_definition_no_longer_compiles_names_the_refusal() {
+    let s = Scratch::new("plan-recompile");
+    reference_inputs(&s);
+    s.rustev(&with(
+        &[
+            "plan",
+            "compile",
+            "--definition",
+            "support.definition.json",
+            "--out",
+            "p.json",
+        ],
+        &SUPPORT_DEPS,
+    ))
+    .expect(0, "compiled");
+    let mut plan = Plan::parse(&s.read("p.json")).unwrap();
+    if let StepBody::Exact(x) = &mut plan.definition.steps[1].body {
+        x.version = 2;
+    }
+    s.write("bad.json", &plan.canonical().unwrap());
+    let r = s.rustev(&with(
+        &["plan", "show", "--plan", "bad.json"],
+        &SUPPORT_DEPS,
+    ));
+    let j = r.expect(5, "refused");
+    assert_eq!(j["load_error"], "plan_mismatch");
+    assert_eq!(j["refusal"]["category"], 2, "{j}");
+}
+
+#[cfg(unix)]
+#[test]
+fn a_fifo_is_refused_without_blocking() {
+    let s = Scratch::new("plan-fifo");
+    let made = std::process::Command::new("mkfifo")
+        .arg(s.path("fifo"))
+        .status()
+        .unwrap();
+    assert!(made.success());
+    let mut child = std::process::Command::new(env!("CARGO_BIN_EXE_rustev"))
+        .args(["plan", "check", "--definition", "fifo"])
+        .current_dir(&s.0)
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    // A blocked open is the defect: fail after a bound, never hang. The
+    // bound is generous because a new binary can wait on the OS scan.
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
+    let status = loop {
+        if let Some(st) = child.try_wait().unwrap() {
+            break st;
+        }
+        if std::time::Instant::now() > deadline {
+            let _ = child.kill();
+            let _ = child.wait();
+            panic!("reading a FIFO blocked");
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    };
+    assert_eq!(status.code(), Some(3));
+    let mut out = String::new();
+    use std::io::Read;
+    child
+        .stdout
+        .take()
+        .unwrap()
+        .read_to_string(&mut out)
+        .unwrap();
+    assert!(out.contains("regular file"), "{out}");
+}

@@ -388,9 +388,20 @@ fn a_bundle_failure_after_the_decision_keeps_the_decision_fields() {
     let mut a = run_args("support", "b-1", "b.record.json");
     a.extend(
         [
-            "--capture-bytes", "1048576", "--bundle-out", "missing-dir/b.json", "--now-ms",
-            "1800000000000", "--tenant", "t", "--context-revision", "r", "--principal-scope", "p",
-            "--retain", "embedded",
+            "--capture-bytes",
+            "1048576",
+            "--bundle-out",
+            "missing-dir/b.json",
+            "--now-ms",
+            "1800000000000",
+            "--tenant",
+            "t",
+            "--context-revision",
+            "r",
+            "--principal-scope",
+            "p",
+            "--retain",
+            "embedded",
         ]
         .iter()
         .map(|x| x.to_string()),

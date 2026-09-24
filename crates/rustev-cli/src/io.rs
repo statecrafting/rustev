@@ -33,6 +33,7 @@ fn fail<T>(path: &str, detail: impl Into<String>) -> Result<T, IoFail> {
 
 /// The per-command read budget.
 pub struct Reads {
+    cap: usize,
     remaining: Cell<usize>,
 }
 
@@ -45,6 +46,7 @@ impl Default for Reads {
 impl Reads {
     pub fn with_cap(cap: usize) -> Self {
         Reads {
+            cap,
             remaining: Cell::new(cap),
         }
     }
@@ -93,7 +95,10 @@ impl Reads {
         if bytes.len() > remaining {
             return fail(
                 path,
-                format!("the command's read budget of {MAX_TOTAL_BYTES} bytes is exhausted"),
+                format!(
+                    "the command's read budget of {} bytes is exhausted",
+                    self.cap
+                ),
             );
         }
         self.remaining.set(remaining - bytes.len());

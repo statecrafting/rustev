@@ -183,6 +183,46 @@ SEEDS = [
         '.map(|d| format!("file:{d}0"))',
         CLI,
     ),
+    (
+        "no-clobber",
+        "compile skips the output pre-check",
+        S + "plan.rs",
+        "    io::ensure_absent(out).map_err(|e| Done::io(command, e))?;\n",
+        "",
+        CLI,
+    ),
+    (
+        "no-clobber",
+        "the temporary file is left behind",
+        S + "io.rs",
+        "    let _ = std::fs::remove_file(&temp);\n    match linked {",
+        "    match linked {",
+        CLI,
+    ),
+    (
+        "byte caps",
+        "a FIFO is opened before the regular-file check",
+        S + "io.rs",
+        "        // Checked before opening, so a FIFO never blocks, and again on the\n        // handle.\n        match std::fs::metadata(path) {\n            Ok(m) if m.is_file() => {}",
+        "        // Checked before opening, so a FIFO never blocks, and again on the\n        // handle.\n        match std::fs::metadata(path) {\n            Ok(_) => {}",
+        CLI,
+    ),
+    (
+        "exit-code mapping",
+        "a missing dependency file is an input error",
+        S + "plan.rs",
+        "DepFail::Io(e) => Done::io(command, e),",
+        "DepFail::Io(e) => Done::invalid(command, &e.path, e.detail),",
+        CLI,
+    ),
+    (
+        "exit-code mapping",
+        "a recompile refusal names the wrong category",
+        S + "plan.rs",
+        '"category": r.category as u8,',
+        '"category": r.category as u8 + 1,',
+        CLI,
+    ),
 ]
 
 

@@ -57,19 +57,21 @@ fn parse<T: Document>(reads: &Reads, kind: &str, path: &str) -> Result<T, DepFai
     })
 }
 
-/// Read every dependency flag of `p`. Counts are checked before any read.
+/// The file-count caps (spec 006, 3.3.2), checked before a command reads
+/// its first file.
+pub fn check_counts(p: &Parsed) -> Result<(), IoFail> {
+    let check = |flag: &str, max: usize| match count(flag, p.many(flag).len(), max) {
+        Err(DepFail::Io(e)) => Err(e),
+        _ => Ok(()),
+    };
+    check("descriptor", MAX_DESCRIPTOR_FILES)?;
+    check("rules", MAX_RULES_FILES)?;
+    check("calibration", MAX_CALIBRATION_FILES)
+}
+
+/// Read every dependency flag of `p`.
 pub fn load(p: &Parsed, reads: &Reads) -> Result<Deps, DepFail> {
-    count(
-        "descriptor",
-        p.many("descriptor").len(),
-        MAX_DESCRIPTOR_FILES,
-    )?;
-    count("rules", p.many("rules").len(), MAX_RULES_FILES)?;
-    count(
-        "calibration",
-        p.many("calibration").len(),
-        MAX_CALIBRATION_FILES,
-    )?;
+    check_counts(p).map_err(DepFail::Io)?;
     let mut deps = Deps::default();
     for path in p.many("descriptor") {
         deps.descriptors.push(parse(reads, "descriptor", path)?);

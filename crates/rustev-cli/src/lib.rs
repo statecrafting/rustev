@@ -75,6 +75,9 @@ fn usage_exit(u: args::Usage) -> Exit {
 }
 
 fn dispatch(p: &Parsed, cx: &Context) -> Result<Done, args::Usage> {
+    if let Err(e) = deps::check_counts(p) {
+        return Ok(Done::io(&p.name(), e));
+    }
     let r = match p.spec.path {
         ["run"] => run::run(p, cx)?,
         ["replay"] => replay::replay(p)?,
