@@ -2,7 +2,7 @@
 id: "005-reference-backends"
 title: "Deterministic rules backend"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-23"
 summary: >
   Increment 2: `rustev-backend-rules`, a deterministic, in-process backend
@@ -408,6 +408,93 @@ cargo fmt -p rustev-backend-rules --check
 # Negative control: seeded defects must each be detected.
 sh backends/rustev-backend-rules/mutation/seeds.sh
 ```
+
+## Implementation record
+
+- `backends/rustev-backend-rules/`: `RulesProgram` (the document,
+  `program.rs`), validation into a checked form, the evaluator (`eval.rs`),
+  `check_plan` (`check.rs`) and the `DecisionBackend` implementation
+  (`lib.rs`). Production dependencies: `rustev-contract`, `rustev-core`,
+  `serde`, `serde_json`. `rustev-runtime` and Tokio are dev-dependencies of
+  the integration tests only. No contract, core or runtime unit changed.
+- Synthetic reference programs `tests/fixtures/support-routing.rules.json`
+  (3 units per call) and `tests/fixtures/lodging.rules.json` (2 units per
+  call). Through the runtime, support routing is judged
+  `route_ticket{queue: billing-priority, priority: high}` under a hard cap of
+  exactly 9 units (3 requests), and lodging ranks three candidates using
+  10 requests and 20 units under a hard cap of 32. These establish software
+  behavior only (R-04).
+- Tests: `tests/program.rs` (every validation rule and limit, at and one
+  past), `tests/evaluate.rs` (semantics, fields, numbers, ties,
+  repeatability, standalone `infer` with no executor),
+  `tests/identity.rs` (identity, calibration refusal, `check_plan`
+  including fallback targets), `tests/runtime.rs` (both reference plans,
+  exact nonzero and zero cost, a budget one unit short, descriptor refusal,
+  cancellation observed by the backend and recorded `stopped` with its
+  charge, an altered output refused by the core, provenance), and
+  `src/tests.rs` (cancellation points through a deterministic observation
+  hook).
+- Independent review of the rules semantics, identities, numbers and
+  cancellation and cost disclosures found no high-severity defect. It
+  found that 9 of 11 mutations it seeded survived the tests then present:
+  identity was not tested for field `ref`, field `type` or `on_missing`;
+  `le`, `gt`, `not` and `any` were never evaluated at a boundary;
+  `check_plan` fallback targets and a `null` record were untested. Each
+  gap now has a regression test, and each of those mutations is a seed of
+  the negative control. Also fixed: the projection parse had a 40-byte
+  number cap that 3.5 does not state (now bounded by the byte limit only, as
+  3.5 says), and `check_plan` could list a step twice.
+- Negative control: `mutation/seeds.py` seeds 21 defects (identity ignoring
+  the program, a field reference or `on_missing` left out of the identity,
+  charge or bound misreported, cancellation never observed, a stop claimed
+  for a failure, distributions advertised, `stop` or no-match `fail`
+  ignored, mismatched options accepted, an unchecked integer field,
+  saturating overflow, truncating `linear`, duplicate lookup keys accepted,
+  unbounded condition depth, `check_plan` ignoring options or fallback
+  targets, and `le`, `not` and `any` miscomputed). Each must compile and be
+  detected; a timeout counts as inconclusive, never as detected.
+
+### Clarifications of the approved text
+
+Found in review and recorded here rather than edited into the approved
+sections above (R-16). None changes behavior.
+
+1. 3.6.1 and the overflow row of section 5: `linear` uses
+   `Decimal::checked_mul`, which refuses when the exact `i128` intermediate
+   overflows (spec 002, 3.4.2). A product therefore fails once its
+   magnitude exceeds about 1.7 * 10^20, well inside the unit range of about
+   1.7 * 10^29 that sums may reach. It fails; it never saturates.
+2. 3.2 and 3.3: the program is parsed under `DESCRIPTOR_V1`, so a program
+   within every per-item limit of 3.3 can still be refused by that set's
+   256 KiB total or its 4 KiB escaped-string cap (for example 32 tasks of
+   128 rules, or a 4 096-byte question containing a quote).
+3. 3.13.1: between `before parsing` and `after field validation` the backend
+   does the bounded parse, task choice and field reads; between later points
+   it does at most one rule.
+4. 3.4.1: a field `ref` of `input:<name>/<member>` reads a member of the
+   projected `input:<name>` record. A plan that projects the record-field
+   reference `input:<name>/<member>` itself does not match it, and
+   `check_plan` reports `not_projected`.
+5. 3.3, `lookup`: keys on `bool` and `integer` fields are not checked for
+   canonical form; a key such as `TRUE` or `07` is accepted and never
+   matches. `equals` does check its value. Refusing such keys would change
+   approved behavior, so it is left to a reviewed amendment.
+6. Acceptance, provenance: evidence records carry each semantic step's
+   derivation class (`model-derived`); lineage is carried by the judgment,
+   which lists the inputs the rules read (for support routing,
+   `ticket.message`) and the rules steps.
+
+### Limitations
+
+- Outputs are authored heuristics. Nothing here measures quality,
+  calibration or semantic accuracy, and the synthetic calibration used for
+  `topic` in tests is unfitted.
+- `check_plan` is the host's call; the runtime does not make it.
+- Evaluation is synchronous within one poll: the runtime's deadline and
+  attempt timeout cannot interrupt it; its work is bounded by the program
+  and projection limits, which are not a CPU-time guarantee.
+- The interpretation reaches readers through the program, not the
+  descriptor or run record.
 
 ## Decision history
 

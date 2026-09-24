@@ -39,9 +39,9 @@
       }
     ],
     "id": "005-reference-backends",
-    "implementation": "pending",
+    "implementation": "complete",
     "sectionDigests": {
-      "005-deterministic-rules-backend": "2a24d584069e60c621731cfbd4615d09c7edc6c752bba4ecb8e2f457cbbdf5aa",
+      "005-deterministic-rules-backend": "61ff0c38fd0510d17e413430db293ba591c892ce60523f72e654d37c2b9fa127",
       "1-purpose": "8a10dc63a855787396e38a7b59b3f00ab8eaa8eb64081e27d7feb2fd0926c249",
       "2-territory": "455cf037b0000dafdbc216f998eb256263a4a82c136ae25656efea8b7716e6ea",
       "3-1-scope": "9c83521a6e32243d456373b8589403b6488c67b7004db9f50f64c469b4a0b484",
@@ -64,8 +64,11 @@
       "4-out-of-scope": "f5cb5511a94803765faa5f71bc8551926bf2c5b6948990ce3940b77d1cbe671e",
       "5-observable-negative-cases": "fe6780d28db2526b525c6f91bdf2d8e69e7fe55c7dcaf84b27703d3b27f208e0",
       "acceptance": "b1ae93f0cb786f695f1fb247c1b0128abb56d12e10d829f56407fd62fd7c5b15",
+      "clarifications-of-the-approved-text": "30ab5574da78f59372adec7a53cdece5858d90f6f74eb33f7772e198a2a80e09",
       "decision-history": "2239d51bc7f71b50084638d97137596bddc6a3c11f0409551f8f15d5a67526d3",
       "engineering-choices": "1d25777abedf26617896cdf21e1e4eb2f209e1bcbe238d3e0aaafd031dd6c5a7",
+      "implementation-record": "523a40575886b2d238bd6fc3454170229a256d697ff75df82a20fa1ca21b05c9",
+      "limitations": "e7081e53241664619dd0f4582bd008354fba424833308e442fdfcae2f47a195e",
       "verification": "4a3e9662ac3e62bebfce96590bfd90b863221382bf9376d790520ac4383fb28e"
     },
     "sectionHeadings": [
@@ -93,6 +96,9 @@
       "5. Observable negative cases",
       "Acceptance",
       "Verification",
+      "Implementation record",
+      "Clarifications of the approved text",
+      "Limitations",
       "Decision history",
       "Engineering choices"
     ],
@@ -101,6 +107,6 @@
     "summary": "Increment 2: `rustev-backend-rules`, a deterministic, in-process backend that implements the backend seam of spec 003 by evaluating a bounded, versioned rules program (`rustev.rules/1`): typed field access into the canonical projection, ordered rules with explicit precedence and no-match behavior, constant, linear and lookup contributions to authored logits in exact fixed-point arithmetic, and a descriptor derived from the program so the program's digest is the artifact identity plans bind. Metered logical cost units, bounded work, local cancellation observed at declared points. Narrowed by owner decision R-13; the semantic backend is spec 011.\n",
     "title": "Deterministic rules backend"
   },
-  "shardHash": "ab77b439630aef4069447553922e267db0e7ea8d20f14932249c15a3880b620b",
+  "shardHash": "22cde5cf6cecab6efdde06fdfc0d20f1b222d98bac702be240eeaa63643909f1",
   "specVersion": "1.8.0"
 }

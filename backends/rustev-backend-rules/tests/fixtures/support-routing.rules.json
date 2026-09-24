@@ -1,0 +1,50 @@
+{
+  "schema": "rustev.rules/1",
+  "backend_id": "synthetic-rules-support",
+  "limits": { "max_projection_bytes": 65536 },
+  "cost": { "units_per_call": 3 },
+  "tasks": [
+    {
+      "operation": "classify",
+      "task": "support.topic",
+      "question": "Which area does this support ticket concern?",
+      "options": ["billing", "integration_defect", "account_access", "other"],
+      "interpretation": "SYNTHETIC keyword heuristic. Logits are authored preferences: 4 for the first matching keyword group in rule order, 1 for other when nothing matches. They are not probabilities, and a keyword match is not evidence of what the ticket concerns.",
+      "fields": [ { "name": "message", "ref": "input:ticket.message", "type": "text" } ],
+      "base": { "other": "1" },
+      "rules": [
+        { "name": "billing", "when": { "contains_any": { "field": "message", "terms": ["charged", "refund", "invoice", "payment", "card", "billing"] } }, "then": [ { "add": { "billing": "4" } } ], "stop": true },
+        { "name": "integration", "when": { "contains_any": { "field": "message", "terms": ["api", "webhook", "integration", "sdk", "error code"] } }, "then": [ { "add": { "integration_defect": "4" } } ], "stop": true },
+        { "name": "access", "when": { "contains_any": { "field": "message", "terms": ["password", "login", "log in", "locked out", "2fa", "sign in"] } }, "then": [ { "add": { "account_access": "4" } } ], "stop": true }
+      ],
+      "on_no_match": "base"
+    },
+    {
+      "operation": "rubric",
+      "task": "support.frustration",
+      "question": "How frustrated is the customer?",
+      "options": ["calm", "frustrated", "very_angry"],
+      "interpretation": "SYNTHETIC keyword heuristic over three ordered levels. Logits are authored preferences, not probabilities; they say nothing measured about the customer.",
+      "fields": [ { "name": "message", "ref": "input:ticket.message", "type": "text" } ],
+      "base": { "calm": "1" },
+      "rules": [
+        { "name": "angry", "when": { "contains_any": { "field": "message", "terms": ["unacceptable", "furious", "ridiculous", "!!"] } }, "then": [ { "add": { "very_angry": "3" } } ], "stop": true },
+        { "name": "repeated", "when": { "contains_any": { "field": "message", "terms": ["twice", "again", "still", "already"] } }, "then": [ { "add": { "frustrated": "2" } } ], "stop": false }
+      ],
+      "on_no_match": "base"
+    },
+    {
+      "operation": "proposition",
+      "task": "support.deadline",
+      "question": "The customer states a time limit.",
+      "options": ["false", "true"],
+      "interpretation": "SYNTHETIC phrase heuristic. Logits are authored preferences for whether a time-limit phrase occurs, not probabilities.",
+      "fields": [ { "name": "message", "ref": "input:ticket.message", "type": "text" } ],
+      "base": { "false": "1" },
+      "rules": [
+        { "name": "time_limit", "when": { "contains_any": { "field": "message", "terms": ["by friday", "by monday", "by tomorrow", "deadline", "asap", "urgent", "today"] } }, "then": [ { "add": { "true": "3" } } ], "stop": true }
+      ],
+      "on_no_match": "base"
+    }
+  ]
+}
