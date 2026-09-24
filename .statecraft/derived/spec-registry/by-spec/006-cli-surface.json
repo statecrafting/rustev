@@ -13,29 +13,77 @@
         "path": "crates/rustev-cli/"
       }
     ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      }
+    ],
     "id": "006-cli-surface",
     "implementation": "pending",
     "sectionDigests": {
-      "006-cli-surface": "0531cfb76ebd66e600bbd3c4798c1bc85a2274c72f92fdb54e07c9edbf993714",
-      "1-purpose": "efa6849c78b10d39c954a1a681df2c5ff8b9e181111433a7a01260cd4d2b4c7e",
-      "2-territory": "32ca40a82d9e4c63d91d54cf682bae44d53fed45d1eff494eb1278bde0db3eb3",
-      "3-behavior-to-be-made-concrete-before-approval": "d2deb197fce0023727f35ff759a1f6680b979d2fc5d85381a75c87ced93bb226",
-      "4-out-of-scope": "0a8604d7d5563d1a160ad95e110e095e464b9b5626adf4d52b3e8a20eb2cf6ac",
-      "acceptance-draft": "67759cba17f487a7603fb871dfd01d37e951542320c70e620d09167185928598"
+      "006-cli-surface": "32d1c799a3ea5a9f80ad8aa472023c9b0a36e23080900f5a43f5fdae491b6810",
+      "1-purpose": "4e2e2f237b2a801fa00173df8cfad9bc84473b9b0606fbb2bcf9d0270d91a3bc",
+      "2-territory": "f5ac06c8c6256fe69899f58a2a9cbb5fb89be74ae63329ae37e60df13b5a0196",
+      "3-1-invocation-and-output": "77ec067e5f8d7401376d1e6fa39749fca0529abcfb520a7723c6e969d1eb19dc",
+      "3-10-rustev-calibrate-fit-qualify": "a92aee40bc48ee54a3318f56b5b8ea4156dd8b33c7dc981f728f961c9bfba43c",
+      "3-2-exit-codes": "8ccc8248db826d45a8ee9f7ff2e6c46d7855f1a44aac11bfca38aa6b4686cc52",
+      "3-3-bounded-file-access": "85dc3817dc67df92f5df20495a7b7988453cbbb3f7e2dcf00250fbc6658a46bd",
+      "3-4-rustev-plan-check-compile-show": "ff7907fa8ad513195a947781f84e974313d9aad4d28a47cb89e2d3d59d4f6902",
+      "3-5-rustev-run": "0eb67166c74825601ca050466d5ca367e665789b7dfe7ed6f71d611d1d59adba",
+      "3-6-capture-and-bundles-on-run": "e60691f1b9bdf1ed27fe0b9bf240a9a902fcf307d1f3a182519e21e255efbea5",
+      "3-7-rustev-replay": "82c0b2fada9d0c0f6ee287c5475d3eac19b9c3c6c069bf8eab6885ff04179c9f",
+      "3-8-task-adapters-rustev-task-adapter-1": "4800f35d8772df3e141cfe3e35a15e665ebf33d6ec41f07603f62e9ad0a3020b",
+      "3-9-rustev-eval-and-rustev-gate": "3273185fed88868b190c70eeb64be03f8d16afd304ad0843a363dbaa79c24d1f",
+      "3-behavior": "42fa3e04cbe3e36a6cd4150493980f02af8a9dfc54e9ccf1bdc638303729ec7d",
+      "4-out-of-scope": "db2f4d386a67cb47783a41679ff0d4bb48e72eefd5f90220045677df4f2a0419",
+      "5-observable-negative-cases": "c499cf2367d807b7259140dd611eeef78b0fd4eddac9bada3d0574071ef5527b",
+      "acceptance": "0cf3c6ea2e628178d04f3d37f491dcf1f4624d1b30f3c8b31198a65e09e65974",
+      "decision-history": "db88927e5d5328c82e7d03af5721b40e0d0279bc9484b5db9a55cec60700e644",
+      "engineering-choices": "6c6a374ed12f63cf5785a2c6b726b5777c5bad7112886bf030f374551a4675b6",
+      "implementation-record": "90fbed48cb0883077c3d591719094d6d717b780e297a09222e4b438e6edc2349",
+      "verification": "00ba9bd41fd588e1a2d9add3fd19fa7e4df83e5d67b5fd90f221f646ccb8a75e"
     },
     "sectionHeadings": [
       "006: CLI surface",
       "1. Purpose",
       "2. Territory",
-      "3. Behavior (to be made concrete before approval)",
+      "3. Behavior",
+      "3.1 Invocation and output",
+      "3.2 Exit codes",
+      "3.3 Bounded file access",
+      "3.4 `rustev plan check | compile | show`",
+      "3.5 `rustev run`",
+      "3.6 Capture and bundles on `run`",
+      "3.7 `rustev replay`",
+      "3.8 Task adapters, `rustev.task-adapter/1`",
+      "3.9 `rustev eval` and `rustev gate`",
+      "3.10 `rustev calibrate fit | qualify`",
       "4. Out of scope",
-      "Acceptance (draft)"
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Implementation record",
+      "Decision history",
+      "Engineering choices"
     ],
     "specPath": "specs/006-cli-surface/spec.md",
-    "status": "draft",
-    "summary": "Increment 2: `rustev`, a command-line surface over the library: plan check, show and compile against descriptor, calibration and execution-policy files; run with a declared backend configuration through `rustev-runtime`; offline replay, eval and calibrate through `rustev-eval` over retained bundles and named datasets. No hosting, no HTTP.\n",
+    "status": "approved",
+    "summary": "Increment 2: `rustev`, a command-line host over the library. Plan check, compile and show against descriptor, rules-program, calibration and execution-policy files; run one snapshot through `rustev-runtime` on rules-program backends with a file evidence sink and optional bounded capture into a replay bundle; offline replay under an explicitly supplied trusted scope; evaluation reports with their detail and configuration companions, regression gates, and temperature fitting with its lineage record, through `rustev-eval`. Bounded file access, stable JSON output and distinct exit codes. No network, no hosting, no live inference beyond the deterministic rules backend.\n",
     "title": "CLI surface"
   },
-  "shardHash": "4af92690c00c954bd94ecbab2b1700ce9b4dbf5d0d5e7d9196280bde0bb4bc72",
+  "shardHash": "8907468496cae0b428be5696e60126a15d8890e6d283c356f6d11a7d7f768408",
   "specVersion": "1.8.0"
 }

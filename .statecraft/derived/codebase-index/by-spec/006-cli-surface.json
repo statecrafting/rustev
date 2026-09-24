@@ -16,7 +16,16 @@
       "004-evaluation-and-replay",
       "005-reference-backends"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "Cargo.lock",
+        "source": "spec-edge"
+      },
+      {
+        "path": "Makefile",
+        "source": "spec-edge"
+      }
+    ],
     "resolvedUnits": [
       {
         "locations": [],
@@ -26,11 +35,37 @@
           "kind": "directory",
           "path": "crates/rustev-cli/"
         }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.lock"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Makefile"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
       }
     ],
     "specId": "006-cli-surface",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "12f6eeb953677e6d869f719f0e1bc00575f3ed4e394c0c9e7367263746c06a1f"
+  "shardHash": "a9f3a258149e9fc282a47bc6c1f219ebad916b777e6b90e8adef3ed2902f7d33"
 }

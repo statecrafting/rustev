@@ -79,6 +79,16 @@ preserved as history.
 |---|---|
 | R-24 | Replace R-21's fixed principal requirement with two mutually exclusive scope modes: `tenant_only{tenant, context_revision}` and `principal{tenant, context_revision, principal_scope}`. Principal scope remains the default; tenant-only is an explicit host choice that permits cross-principal reuse only within a tenant and revision, where computation is principal-independent and each reader is authorized by the host. Mode and all scope fields enter request identity. Mode changes never relabel existing evidence; omitted principal data never downgrades isolation. This configuration affects replay equivalence, not backend call authorization. Spec 004's pending implementation and acceptance cover both modes within A-05 and R-23. |
 
+### Owner decision of 2026-09-24, the CLI
+
+Decided by the owner on 2026-09-24, choosing the recommended option when
+asked whether to make spec `006` concrete and deliver it. Recorded here as
+the owner's decision, not the agent's.
+
+| Id | Decision |
+|---|---|
+| R-25 | Spec `006` (CLI) is made concrete and delivered through verified merge within this scope: plan checking, compilation and inspection; rules-backed execution with optional bounded capture; offline replay with both isolation modes and an explicitly supplied trusted scope; evaluation and calibration with their companion records; bounded file access, clear exit codes and end-to-end tests for both reference tasks. Delivery authority: record this decision and A-06, deliver the concrete spec before code, implement and verify it in reviewed increments, make scoped commits, pushes and pull requests, remediate review and CI findings, and merge verified changes. Spec `011` stays a deferred draft until that workflow is usable. Outside this authority: spec `011` approval or implementation, live or model inference, network access, releases, publication, deployment, paid services, real-user data, sibling repositories, managed-environment repair, branch-protection changes, waivers and recurring monitors. |
+
 ## Approvals
 
 | Id | Act | Date |
@@ -88,6 +98,7 @@ preserved as history.
 | A-03 | The owner approved spec `003` within the bounded requirements of their runtime brief: time, admission and concurrency, budgets, retries and fallback, cancellation, evidence and judgment equivalence as stated there, with the optimization deferral of R-08 and executable acceptance. The concrete rules were then written by the agent within those bounds and are reviewable in the change that recorded this approval. | 2026-09-23 |
 | A-04 | The owner approved spec `005` within the narrowed rules-backend scope of R-13 and the requirements of their brief (a bounded, versioned rules program; disclosure of exactly what is returned; authored interpretations for logits; program and configuration bound to artifact and descriptor identity; explicit setup; defined cost units; bounded work; honest cancellation; provenance as the existing contract defines it; executable acceptance). The approval was given in advance of the concrete contract and is recorded in the change that makes the contract concrete. It does not approve specs `004`, `006` or `011`. | 2026-09-23 |
 | A-05 | The owner delegated resolution of the four replay choices and approved forward progress in that context. Recorded as approval of spec `004` within R-19 to R-23: bounded host-owned retention, scoped request equivalence, opt-in runtime capture, offline reproduction/comparison, explicit evaluation denominators and split-aware temperature fitting, with the bounded prerequisite amendments to specs `002` and `003`. Concrete engineering rules are authored by the agent in the separate approval change before code. Implementation remains pending; specs `006` and `011` remain unapproved. | 2026-09-23 |
+| A-06 | The owner approved spec `006` within R-25, in advance of its concrete contract. The concrete rules are written by the agent and recorded in the change that makes the contract concrete, with its engineering choices listed as its own. Implementation is pending; spec `011` remains unapproved. | 2026-09-24 |
 
 No approval authorizes ratifying any other spec.
 
