@@ -637,6 +637,16 @@ mod supplied_from {
     }
 
     #[test]
+    fn the_last_of_several_fallbacks_is_the_target() {
+        let r = rec(
+            FAILED,
+            vec![attempt(1, 0), attempt(2, 1)],
+            vec![fallback(1, 1), fallback(2, 2), stop(2)],
+        );
+        assert_eq!(of(&r), (2, None));
+    }
+
+    #[test]
     fn nothing_supplied_has_no_origin() {
         let r = rec(
             RequestResult::NotSupplied,

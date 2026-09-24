@@ -71,7 +71,8 @@ impl CaptureConfig {
     }
 }
 
-/// A capture in progress.
+/// A capture in progress. `bytes` counts up to and including the entry
+/// that overflowed a cap; nothing is counted after a discard.
 pub(crate) struct Capturing<'a> {
     config: &'a CaptureConfig,
     bytes: u64,
@@ -101,17 +102,27 @@ impl<'a> Capturing<'a> {
         if self.exceeded {
             return;
         }
-        match self.entry(ev, plan, record, supplied) {
-            Some((entry, bytes)) => {
-                self.bytes = self.bytes.saturating_add(bytes);
-                if self.bytes > self.config.max_bytes || self.supplies.len() >= MAX_BUNDLE_ITEMS {
-                    self.discard();
-                } else {
-                    self.supplies.push(entry);
-                }
-            }
-            // A value that cannot be retained cannot be within any limit.
-            None => self.discard(),
+        let entry = self.entry(ev, plan, record, supplied);
+        self.push(entry);
+    }
+
+    /// Keep an entry within both caps, or discard every payload. An entry
+    /// that could not be built is a value that cannot be retained, so it
+    /// cannot be within any limit: the capture is never `complete` without
+    /// it.
+    fn push(&mut self, entry: Option<(CapturedSupply, u64)>) {
+        if self.exceeded {
+            return;
+        }
+        let Some((entry, bytes)) = entry else {
+            self.discard();
+            return;
+        };
+        self.bytes = self.bytes.saturating_add(bytes);
+        if self.bytes > self.config.max_bytes || self.supplies.len() >= MAX_BUNDLE_ITEMS {
+            self.discard();
+        } else {
+            self.supplies.push(entry);
         }
     }
 
@@ -193,5 +204,107 @@ impl<'a> Capturing<'a> {
             supplies: self.supplies,
             bytes: self.bytes,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rustev_contract::ids::RequestId;
+    use rustev_contract::scope::Handle;
+
+    fn config(max_bytes: u64) -> CaptureConfig {
+        CaptureConfig {
+            scope: Scope::tenant_only(Handle::new("t").unwrap(), Handle::new("r").unwrap()),
+            max_bytes,
+        }
+    }
+
+    fn entry(i: u64) -> Option<(CapturedSupply, u64)> {
+        let reason =
+            RuntimeReasonDoc::new(rustev_contract::judgment::Unresolved::DeadlineExceeded).unwrap();
+        Some((
+            CapturedSupply {
+                sequence: i,
+                step: format!("s{i}"),
+                instance: vec![],
+                request: RequestId::parse(&format!("sha256:{}", "a".repeat(64))).unwrap(),
+                attempt_id: None,
+                target: 0,
+                value: CapturedValue::Reason(reason),
+            },
+            10,
+        ))
+    }
+
+    #[test]
+    fn config_bounds_are_inclusive() {
+        assert_eq!(config(0).check(), Err(CaptureConfigError::ZeroLimit));
+        assert!(config(1).check().is_ok());
+        assert!(config(MAX_CAPTURE_BYTES).check().is_ok());
+        assert!(config(MAX_CAPTURE_BYTES + 1).check().is_err());
+    }
+
+    #[test]
+    fn an_entry_that_cannot_be_built_discards_everything() {
+        let c = config(1_000);
+        let mut cap = Capturing::new(&c);
+        cap.push(entry(0));
+        cap.push(None);
+        cap.push(entry(2));
+        let done = cap.finish("d", false);
+        assert_eq!(done.status, CaptureStatus::LimitExceeded);
+        assert!(done.supplies.is_empty());
+    }
+
+    #[test]
+    fn overflowing_after_a_kept_entry_discards_it_too() {
+        let c = config(15);
+        let mut cap = Capturing::new(&c);
+        cap.push(entry(0));
+        assert_eq!(cap.supplies.len(), 1);
+        cap.push(entry(1));
+        let done = cap.finish("d", false);
+        assert_eq!(done.status, CaptureStatus::LimitExceeded);
+        assert!(done.supplies.is_empty());
+        assert_eq!(done.bytes, 20);
+        // Negative control: exactly at the limit is complete.
+        let c = config(20);
+        let mut cap = Capturing::new(&c);
+        cap.push(entry(0));
+        cap.push(entry(1));
+        assert_eq!(cap.finish("d", false).status, CaptureStatus::Complete);
+    }
+
+    #[test]
+    fn at_most_4096_entries_are_kept() {
+        let c = config(MAX_CAPTURE_BYTES);
+        let mut cap = Capturing::new(&c);
+        for i in 0..MAX_BUNDLE_ITEMS as u64 {
+            cap.push(entry(i));
+        }
+        assert_eq!(cap.supplies.len(), MAX_BUNDLE_ITEMS);
+        assert!(!cap.exceeded);
+        cap.push(entry(MAX_BUNDLE_ITEMS as u64));
+        let done = cap.finish("d", false);
+        assert_eq!(done.status, CaptureStatus::LimitExceeded);
+        assert!(done.supplies.is_empty());
+    }
+
+    #[test]
+    fn a_cap_overrun_outranks_cancellation() {
+        let c = config(5);
+        let mut cap = Capturing::new(&c);
+        cap.push(entry(0));
+        let done = cap.finish("d", true);
+        assert_eq!(done.status, CaptureStatus::LimitExceeded);
+        assert!(done.supplies.is_empty());
+        // Negative control: a cancelled capture within its cap keeps entries.
+        let c = config(100);
+        let mut cap = Capturing::new(&c);
+        cap.push(entry(0));
+        let done = cap.finish("d", true);
+        assert_eq!(done.status, CaptureStatus::Cancelled);
+        assert_eq!(done.supplies.len(), 1);
     }
 }

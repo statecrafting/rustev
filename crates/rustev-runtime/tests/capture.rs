@@ -227,6 +227,114 @@ async fn a_fallback_output_names_its_target_and_producer_identity() {
 }
 
 #[tokio::test(flavor = "current_thread")]
+async fn a_fallback_output_names_the_fallback_artifact() {
+    let head = Scripted::new(linear_head(), |c| {
+        if c.task() == "support.frustration" {
+            Answer::Fail(
+                AdapterFailure::Permanent,
+                "down".into(),
+                rustev_contract::run::Charge::Observed { units: 1 },
+            )
+        } else {
+            ok(c.task(), 1)
+        }
+    });
+    let other = answering(other_head());
+    let policy = execution(
+        CostPolicy::Unlimited,
+        vec![step_exec(
+            "frustration",
+            1,
+            &[],
+            Delay::None,
+            &["synthetic-other-head"],
+            &[F::Permanent],
+        )],
+    );
+    let rig = common::rig(config(1, 0, 1), &[(head, 4), (other, 4)]);
+    let plan = Arc::new(rig.rt.prepare(support_compiled(Some(&policy))).unwrap());
+    let c = finished(start_capture(
+        &rig,
+        &plan,
+        request("d1"),
+        &CancelSignal::new(),
+        principal(),
+    ))
+    .await;
+    let e = captured(&c)
+        .supplies
+        .iter()
+        .find(|e| e.step == "frustration")
+        .unwrap();
+    assert_eq!(e.target, 1);
+    let CapturedValue::Output(o) = &e.value else {
+        panic!("output")
+    };
+    assert_eq!(o.artifact, artifact('c'), "the producer, not the primary");
+    replay_matches(&plan, captured(&c), c.result.as_ref().unwrap());
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn a_cap_hit_after_kept_entries_or_during_cancellation_keeps_nothing() {
+    // The first entry fits, the second overflows.
+    let rig = common::rig(config(1, 0, 1), &[(answering(linear_head()), 4)]);
+    let plan = Arc::new(rig.rt.prepare(support_compiled(None)).unwrap());
+    let full = finished(start_capture(
+        &rig,
+        &plan,
+        request("d1"),
+        &CancelSignal::new(),
+        principal(),
+    ))
+    .await;
+    let first = &captured(&full).supplies[0];
+    let CapturedValue::Output(o) = &first.value else {
+        panic!("output")
+    };
+    let one = (o.record_canonical().unwrap().len() + first.request.as_str().len()) as u64;
+    let rig = common::rig(config(1, 0, 1), &[(answering(linear_head()), 4)]);
+    let plan = Arc::new(rig.rt.prepare(support_compiled(None)).unwrap());
+    let c = finished(start_capture(
+        &rig,
+        &plan,
+        request("d1"),
+        &CancelSignal::new(),
+        CaptureConfig {
+            max_bytes: one + 1,
+            ..principal()
+        },
+    ))
+    .await;
+    assert_eq!(captured(&c).status, CaptureStatus::LimitExceeded);
+    assert!(captured(&c).supplies.is_empty());
+    // Cancelled after overflowing: still limit_exceeded, still empty.
+    let head = gate_all(linear_head()).with_on_cancel(OnCancel::Stop(
+        rustev_contract::run::Charge::Observed { units: 0 },
+    ));
+    let rig = common::rig(config(1, 0, 3), &[(head.clone(), 4)]);
+    let plan = Arc::new(rig.rt.prepare(support_compiled(None)).unwrap());
+    let cancel = CancelSignal::new();
+    let run = start_capture(
+        &rig,
+        &plan,
+        request("d1"),
+        &cancel,
+        CaptureConfig {
+            max_bytes: 1,
+            ..principal()
+        },
+    );
+    until(|| head.gated().len() == 3).await;
+    assert!(head.release("d1/topic//1", ok("support.topic", 1)));
+    settle().await;
+    cancel.raise();
+    let c = finished(run).await;
+    assert_eq!(c.result.as_ref().unwrap().completion, Completion::Cancelled);
+    assert_eq!(captured(&c).status, CaptureStatus::LimitExceeded);
+    assert!(captured(&c).supplies.is_empty());
+}
+
+#[tokio::test(flavor = "current_thread")]
 async fn a_retried_output_names_the_attempt_that_produced_it() {
     let head = Scripted::new(linear_head(), |c| {
         if c.task() == "support.topic" && c.n == 1 {

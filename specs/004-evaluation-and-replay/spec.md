@@ -586,4 +586,10 @@ sh crates/rustev-eval/mutation/seeds.sh
   delegates to the same path with capture off; its API, records and sink
   traffic are unchanged, and capture data never reaches the sink. The
   scripted test backend now records the principal handle it is called
-  with, to show tenant-only capture leaves it unchanged.
+  with, to show tenant-only capture leaves it unchanged. An independent
+  review found no production defect; of 13 seeded defects the tests
+  missed 5 (entry cap off by one, cancellation masking an overrun, an
+  unbuildable entry skipped instead of discarding, the first rather than
+  last fallback, a fallback output's artifact taken from the primary, and
+  a discard that kept entries). Each now has a test and all 13 are
+  detected.
