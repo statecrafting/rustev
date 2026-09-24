@@ -1,0 +1,29 @@
+[package]
+name = "rustev-eval"
+version = "0.1.0"
+description = "Rustev's offline evaluation: bounded replay bundles, historical reproduction, candidate comparison, datasets, metrics and calibration fitting."
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[package.metadata.spec-spine]
+spec = "004-evaluation-and-replay"
+
+# Contract and core only: no runtime, backend, HTTP stack, clock or
+# filesystem (spec 004, 2). A test checks this list.
+[dependencies]
+rustev-contract = { path = "../rustev-contract" }
+rustev-core = { path = "../rustev-core" }
+serde.workspace = true
+serde_json.workspace = true
+
+# The runtime, the rules backend and Tokio produce fixtures in tests only.
+[dev-dependencies]
+rustev-runtime = { path = "../rustev-runtime" }
+rustev-backend-rules = { path = "../../backends/rustev-backend-rules" }
+tokio = { workspace = true, features = ["sync", "time", "rt", "macros"] }
+
+[lints]
+workspace = true

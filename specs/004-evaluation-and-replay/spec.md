@@ -588,8 +588,49 @@ sh crates/rustev-eval/mutation/seeds.sh
   scripted test backend now records the principal handle it is called
   with, to show tenant-only capture leaves it unchanged. An independent
   review found no production defect; of 13 seeded defects the tests
-  missed 5 (entry cap off by one, cancellation masking an overrun, an
+  missed 6 (entry cap off by one, cancellation masking an overrun, an
   unbuildable entry skipped instead of discarding, the first rather than
   last fallback, a fallback output's artifact taken from the primary, and
   a discard that kept entries). Each now has a test and all 13 are
   detected.
+- 2026-09-23: increment 3 of 4, offline reproduction and comparison
+  (3.1, 3.2, 3.3, 3.4, 5.5). New crate `crates/rustev-eval/` with normal
+  dependencies on contract and core only (a test pins the list):
+  `resolve` (host `Resolver`, availability at a caller-supplied time with
+  expiry before resolution, the 16 MiB per-case budget, panics as
+  `inaccessible`, digest then parse then record-canonical fixpoint then
+  identity), `assemble` (digest-only and seven days by default, explicit
+  embedded or external bytes expiring with the bundle, every binding and
+  the escaped size checked), `replay::reproduce` (scope before any
+  resolution, bundle and capture checks, every cross-reference with a
+  typed location, `Compiled::load_checked`, supply in actual order with
+  identity, origin and value checks, listing order against the run
+  record, record-canonical judgment equality) and `compare::compare`
+  (reuse only under equal request identity for the candidate's primary,
+  agreement of artifact plus raw output across duplicates, historical
+  failures and mismatches incomparable). Both reference tasks run through
+  the rules backend under runtime capture and reproduce byte-identical
+  judgments with a backend-call counter unchanged, including zero-request,
+  out-of-order, nondeterministic, retry, fallback and pre-dispatch failure
+  cases; failing fixtures cover every availability reason and each
+  precondition listed in section 6; the isolation matrix and the reuse
+  rules have their own tests. Limit found: under approved spec 002 no
+  semantic request can depend on another semantic output (the compiler
+  refuses projecting a semantic step or a ranking summary, and only
+  `weighted_rank` reads semantic values), so every request is pending
+  once exact steps settle. The dependent-request case is therefore
+  lodging's requests fanned out from computed exact steps (`shortlist`,
+  `active_claims`); replay still re-derives the core's listing order after
+  every supply and checks it against the run record. An independent
+  review found no path to a false `reproduced` or comparison, but four
+  robustness gaps, now fixed: a `Reproduced` case could be built by hand
+  (its fields are now private, so only `reproduce` makes one); a judgment
+  without a record form read as `diverged` (now incomparable); comparison
+  could let the core record an invalid reused output as a failure (now
+  `output-refused`, never a substituted failure); and assembly counted
+  only embedded bytes against the case cap (external bytes now count,
+  with the evidence plan, the plan's request bound and a complete
+  capture's termination also bound). Of 42 seeded defects the tests
+  missed 9; each now has a test and all 42 are detected. A bundle with no
+  supplies has no request identity to contradict a relabeled scope; this
+  is stated, since a bundle is not an attestation.

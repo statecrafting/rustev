@@ -1,0 +1,11 @@
+{
+  "package": {
+    "kind": "rust-lib",
+    "name": "rustev-eval",
+    "path": "crates/rustev-eval",
+    "specRef": "004-evaluation-and-replay",
+    "version": "0.1.0"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "26d8e8e8c34b4259cef6c1b67f45e5d078aa46c05d7b7a551ce1223fa0c5a270"
+}
