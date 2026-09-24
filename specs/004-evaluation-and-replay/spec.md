@@ -163,8 +163,8 @@ is the target the request was on when it stopped: the `to` of its last
 `fallback` transition, else the primary (0), including when nothing was
 dispatched there. The identity is computed for that target. A failure's
 producing attempt is its last attempt only when no `retry` or `fallback`
-transition follows that attempt; otherwise, and when nothing was
-dispatched, it has none.
+transition has an `after` equal to that attempt's ordinal; otherwise, and
+when nothing was dispatched, it has none.
 
 A no-dispatch budget/deadline failure has no producing attempt. An output
 names the actual producing target, including fallback, and its artifact
@@ -415,19 +415,25 @@ by this work order.
    - digits: the shortest decimal digit string that parses back to the
      same binary64 value; among several, the one nearest the exact value;
      an exact tie takes the larger magnitude (Rust's `core::fmt` shortest
-     mode);
+     mode). Rustev owns this writer: `serde_json`'s own float output does
+     not conform, since it breaks such ties to even
+     (`1658206780088562.25` is `1658206780088562.3` here, `...2.2` there);
    - layout, for decimal exponent `e` of the first significant digit:
      `-5 <= e < 16` is plain notation with at least one fractional digit
      (`3.0`, `0.00001`, `1000000000000000.0`); otherwise scientific,
-     `d[.ddd]e+N` or `d[.ddd]e-N` (`1e+16`, `1e-6`, `1.5e-7`); zero is
-     `0.0` or `-0.0` by its sign bit;
+     `d[.ddd]e+N` or `d[.ddd]e-N`, `N` without leading zeros and the sign
+     always written (`1e+16`, `1e-6`, `1.5e-7`); zero is `0.0` or `-0.0`
+     by its sign bit;
    - a non-finite value has no form and is refused, never written as
      `null`; the bytes must parse to an equal document whose record
      canonical bytes are the same bytes (a fixpoint).
    Parsing is correctly rounded: the workspace enables `serde_json`'s
    `float_roundtrip`, whose default best-effort parsing does not return
    the written value for a large share of binary64 values. So a retained
-   output parses to exactly the value that was supplied. Identity-bearing
+   output parses to exactly the value that was supplied. This intentionally
+   amends how approved specs 002 (`supply_doc`, document parsing) and 003
+   (the runtime) read supplied numbers: a value the best-effort parser
+   misread by a unit in the last place now reads as written. Identity-bearing
    documents, including the eval-owned `dataset/1`, `evaluator-config/1`
    and `calibration-fit/1`, carry no binary64 numbers: fractional values
    there are Decimal strings (spec 002, 3.3.1), and their identities use
