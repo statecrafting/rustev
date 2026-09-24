@@ -137,6 +137,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustev-eval"
+version = "0.1.0"
+dependencies = [
+ "rustev-backend-rules",
+ "rustev-contract",
+ "rustev-core",
+ "rustev-runtime",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "rustev-runtime"
 version = "0.1.0"
 dependencies = [
