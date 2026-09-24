@@ -1,0 +1,34 @@
+{
+  "record": {
+    "created": "2026-09-23",
+    "dependsOn": [
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "005-reference-backends"
+    ],
+    "id": "011-semantic-backend",
+    "implementation": "deferred",
+    "sectionDigests": {
+      "011-first-semantic-backend-deferred": "bf36e814aacd6ea633546f025665be403312b90e3cacb97a1b016316e1e52c73",
+      "1-purpose": "1fdf7cc5cbaafbe52d8544cd8da64dd85218cec36d037cb1befe0335f4a88442",
+      "2-territory": "9dd16f6fd760ba30a6ade71ec9bcb60f3ea0faeeca820f8f30aac68c4a282e68",
+      "3-behavior-carried-from-spec-005-s-draft-to-be-made-concrete": "697322fd7a57b7be145d622cffe14b437682da2bec4aaf8ea9e4952b106b3dd1",
+      "4-out-of-scope": "9ba648d7a5033aa4586fbb602642b812d086adbfbe35399ad6fa80e27df1a323",
+      "acceptance-draft": "c163b97e80a2ffa4e17ce152b6a9759589d9cafec5aee4b6d23e1af121198b21"
+    },
+    "sectionHeadings": [
+      "011: First semantic backend (deferred)",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior (carried from spec 005's draft; to be made concrete)",
+      "4. Out of scope",
+      "Acceptance (draft)"
+    ],
+    "specPath": "specs/011-semantic-backend/spec.md",
+    "status": "draft",
+    "summary": "Deferred roadmap item split out of spec 005 by owner decision R-13: the first semantic backend candidate of R-01, frozen embeddings plus a task-specific linear head, with ONNX Runtime through `ort` preferred only after a bounded compatibility, licensing, operator, linking, packaging and resource check. Claims no code and adds no dependency until that check is recorded and this spec is made concrete and approved.\n",
+    "title": "First semantic backend (deferred)"
+  },
+  "shardHash": "0383baa6a20e78f2faa7efcd0e64e05cecae23f97b9484aa2eb32ffe9b828623",
+  "specVersion": "1.8.0"
+}

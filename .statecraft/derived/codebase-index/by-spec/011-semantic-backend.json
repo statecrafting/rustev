@@ -1,0 +1,14 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "005-reference-backends"
+    ],
+    "implementingPaths": [],
+    "specId": "011-semantic-backend",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "3c523d1cabe79d2b91ab26557689d466b22a092044eb5caa7ea2601e8e90e55d"
+}
