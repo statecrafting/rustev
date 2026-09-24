@@ -8,8 +8,11 @@
 //! and output, so tests drive the same code the binary does.
 #![forbid(unsafe_code)]
 
+mod adapter;
 pub mod args;
+mod calibrate;
 mod deps;
+mod eval;
 mod host;
 pub mod io;
 pub mod out;
@@ -75,6 +78,10 @@ fn dispatch(p: &Parsed, cx: &Context) -> Result<Done, args::Usage> {
     let r = match p.spec.path {
         ["run"] => run::run(p, cx)?,
         ["replay"] => replay::replay(p)?,
+        ["eval"] => eval::eval(p)?,
+        ["gate"] => eval::gate(p)?,
+        ["calibrate", "fit"] => calibrate::fit(p)?,
+        ["calibrate", "qualify"] => calibrate::qualify_cmd(p)?,
         ["plan", "check"] => plan::check(p),
         ["plan", "compile"] => plan::compile_cmd(p),
         ["plan", "show"] => plan::show(p),
