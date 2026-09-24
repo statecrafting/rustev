@@ -69,20 +69,20 @@
     "id": "004-evaluation-and-replay",
     "implementation": "pending",
     "sectionDigests": {
-      "004-evaluation-and-replay": "5948c997a9787c9a20f3d76e2b8b6c055036f3ce02e65e313509af7fb01c932c",
+      "004-evaluation-and-replay": "a16902a44551f5b25d98bfb54bf6eb55e026c9352102de3c87b48997da82d5fc",
       "1-purpose": "178329d16b30401fc67c5b1119f034124706ffbdd940efb5d0ce8c603c690ef9",
       "2-territory": "b78a594ab2b0c36224832d3dc67d8ca53b1dd8cf6c0ce7b36b73bdd3892f17e9",
-      "3-1-storage-scope-and-retention": "a26efcfe504e0bc20b40802db540cf834808b1524d1c512b13b6a4843c97715e",
-      "3-2-replay-bundle-rustev-replay-1": "4cfde43b256d17b8fa7952c6f8d5bce8af5ae7cfd47b04a931ae713ef3dea3ad",
+      "3-1-storage-scope-and-retention": "c7e5104ce7b5d1062adeba542dfb5d4b582a900958627e0f2508b77eda8a908c",
+      "3-2-replay-bundle-rustev-replay-1": "446cc0a2091ff9aa92378c7224bbc33a5c68cca4327e489afcacea4d720e0b04",
       "3-3-historical-reproduction": "27065604d10c287bb2c5489a0dce61bb17ec202e2f4c4b5465fadbe78b17bbce",
-      "3-4-request-identity-and-candidate-comparison": "a0f5ee27cca73155c901688c92cbc283e64441a60b8f862004170976dd6dc368",
+      "3-4-request-identity-and-candidate-comparison": "17c2cd1f385a67048221410388f111eb8de9a47e514522e35d2f3e1a7fe5d2a2",
       "3-5-datasets-metrics-and-regression-gates": "077531f9591a9718ba32ca6bacfd587cee139ee846d6ef858001834d5e437bbf",
       "3-6-calibration-fitting": "df40f74c8b447aa2bbf1ea1b89a3c24eded34c78b198aeb7c292a0ce0bbbea6f",
-      "3-behavior": "b87f5d7250998d4465084d0c2d3c9a6617023a0c0c1d9bc56eddeefe747bf272",
+      "3-behavior": "cf3aa4457661a5c17dce15bae7f3e6c7acc5d7e6346cd4b5b0c723978a0b8dbf",
       "4-out-of-scope": "26fc6dd2fc8b3ee70111fdbf4b57d0cf0700b56c24fdb87c22a5831f62e09876",
-      "5-amendments-and-compatibility": "b907160ef09655e0486c2a0b821de86fbfd97f8c85507ef56b440e3dcf730db9",
+      "5-amendments-and-compatibility": "174633a856c1935e84e39f5d4cfefb47db48ce82c4f2768aa2f4573ec42e3912",
       "6-delivery-sequence-and-acceptance": "58f45eb05689e25e0d5978c64f831c978b72071e2329282af53d23d7feb90b62",
-      "implementation-record": "7f0e3751b00210e6eacc6ae09859daa3e25a919c54eb0ceb4102eb888e9faf72",
+      "implementation-record": "42bf606ec63d83a90e42984bd695bae8b6de3e996f7c203f71b03ae2bc268138",
       "verification": "fa2418cd1dd9968dc006804fb872545e1fe67dc3ca656169a26a5e350af3ea7f"
     },
     "sectionHeadings": [
@@ -107,6 +107,6 @@
     "summary": "Increment 2: offline reproduction from bounded, host-retained replay bundles; configurable tenant-only or principal-scoped equivalence for candidate comparison; explicit availability, coverage and abstention; named dataset splits and temperature fitting. Amends 002 with replay and request documents and typed loading diagnostics, and 003 with opt-in bounded capture of supplied values. Live re-execution is deferred. Synthetic fixtures establish mechanics only, never empirical quality.\n",
     "title": "Evaluation and replay"
   },
-  "shardHash": "b036975a9fa7686cf051cd83488516c2bcf48089ee73a1741cf36e0e90d28a04",
+  "shardHash": "4862e57aff76a2ea951d5a761cdd9a63b2f54c43a3107b72b005e21f610a9835",
   "specVersion": "1.8.0"
 }
