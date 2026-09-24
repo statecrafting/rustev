@@ -11,5 +11,11 @@
 
 pub mod assemble;
 pub mod compare;
+pub mod config;
+pub mod dataset;
+mod doc;
+pub mod fit;
+pub mod metrics;
 pub mod replay;
+pub mod report;
 pub mod resolve;

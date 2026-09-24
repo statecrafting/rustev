@@ -192,6 +192,8 @@ pub struct RetainedSupply {
 pub struct Reproduced {
     pub(crate) decision_id: String,
     pub(crate) scope: Scope,
+    pub(crate) plan: Plan,
+    pub(crate) calibrations: Vec<CalibrationArtifact>,
     pub(crate) snapshot: Snapshot,
     pub(crate) evaluation_time: Timestamp,
     pub(crate) judgment: Judgment,
@@ -205,6 +207,13 @@ impl Reproduced {
     }
     pub fn scope(&self) -> &Scope {
         &self.scope
+    }
+    /// The retained plan and its calibrations, as loaded.
+    pub fn plan(&self) -> &Plan {
+        &self.plan
+    }
+    pub fn calibrations(&self) -> &[CalibrationArtifact] {
+        &self.calibrations
     }
     pub fn snapshot(&self) -> &Snapshot {
         &self.snapshot
@@ -572,6 +581,8 @@ fn reproduce_inner(
     Ok(ReplayOutcome::Reproduced(Box::new(Reproduced {
         decision_id: bundle.decision_id.clone(),
         scope: bundle.scope.clone(),
+        plan: r.plan.clone(),
+        calibrations: r.calibrations.clone(),
         snapshot: r.snapshot,
         evaluation_time: bundle.evaluation_time_ms,
         judgment,

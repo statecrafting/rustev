@@ -56,6 +56,8 @@ pub struct Compared {
     pub candidate: Judgment,
     /// Requests the candidate issued, each served by a reused output.
     pub reused: usize,
+    /// What was supplied to the candidate, by step and instance.
+    pub supplied: Vec<(String, Vec<String>, RawOutput)>,
 }
 
 /// Run `candidate` over the reproduced `case`, reusing retained outputs by
@@ -72,6 +74,7 @@ pub fn compare(case: &Reproduced, candidate: &Compiled) -> Result<Compared, Cand
             }
         })?;
     let mut reused = 0;
+    let mut supplied = vec![];
     loop {
         let pending = ev.pending();
         if pending.is_empty() {
@@ -113,6 +116,7 @@ pub fn compare(case: &Reproduced, candidate: &Compiled) -> Result<Compared, Cand
                     instance: instance.clone(),
                 })?;
             reused += 1;
+            supplied.push((step, instance, (*first).clone()));
         }
     }
     let (candidate, _) = ev
@@ -122,6 +126,7 @@ pub fn compare(case: &Reproduced, candidate: &Compiled) -> Result<Compared, Cand
         historical: case.judgment.clone(),
         candidate,
         reused,
+        supplied,
     })
 }
 

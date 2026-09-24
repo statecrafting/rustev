@@ -2,7 +2,7 @@
 id: "004-evaluation-and-replay"
 title: "Evaluation and replay"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-09-23"
 summary: >
   Increment 2: offline reproduction from bounded, host-retained replay
@@ -32,8 +32,8 @@ depends_on:
 
 # 004: Evaluation and replay
 
-Approved work order, in progress: the implementation record states what is
-delivered. The owner delegated the four replay
+Approved and implemented; the implementation record states what was
+delivered and what was found. The owner delegated the four replay
 choices and approved forward progress on 2026-09-23; R-19 to R-23 and A-05
 record the scope and the agent's selected defaults. The owner then requested
 both isolation modes as a configurable choice (R-24), incorporated in this
@@ -499,18 +499,23 @@ Required executable acceptance before completion:
 
 ## Verification
 
-These commands are the future implementation acceptance, not a claim that
-an eval crate exists. They must fail until that work is delivered. Do not
-add 004 to the aggregate completed-spec acceptance list prematurely.
+The delivered implementation's acceptance, run by `make verify`.
 
 ```verify:cli
+# 5.1, 5.2, 5.6: contract documents, record form, identity, plan loading.
 cargo test -p rustev-contract --locked
 cargo test -p rustev-core --locked
+# 5.3, 5.4, 5.7: capture.
 cargo test -p rustev-runtime --locked
+# 3.1 to 3.6: replay, comparison, isolation, reports, gates and fitting.
 cargo test -p rustev-eval --locked
 cargo run -p rustev-boundaries --locked --quiet
+# 2: eval's normal tree is contract and core only, and it does no I/O.
+sh -c 't=$(cargo tree -p rustev-eval -e normal --prefix none --locked) || exit 1; if printf "%s\n" "$t" | sed "s/ .*//" | grep -E "^(rustev-|tokio$)" | grep -vxE "rustev-(contract|core|eval)" | grep -q .; then exit 1; fi'
+sh -c 'if grep -rnE "std::(fs|net|env|process|thread|time)|tokio|SystemTime|Instant" crates/rustev-eval/src; then exit 1; fi'
 cargo clippy -p rustev-eval --all-targets --locked -- -D warnings
 cargo fmt --all --check
+# Negative control: seeded defects must each be detected.
 sh crates/rustev-eval/mutation/seeds.sh
 ```
 
@@ -634,3 +639,53 @@ sh crates/rustev-eval/mutation/seeds.sh
   missed 9; each now has a test and all 42 are detected. A bundle with no
   supplies has no request identity to contradict a relabeled scope; this
   is stated, since a bundle is not an attestation.
+- 2026-09-23: increment 4 of 4, datasets, metrics, gates, fitting and the
+  reference reports (3.5, 3.6); implementation complete and 004 added to
+  `make verify`. `rustev-eval` gains `dataset` (`rustev.dataset/1`, a
+  content-derived `DatasetId`, unique cases, a source or snapshot repeated
+  across splits refused as leakage, real provenance needing all four
+  fields, label shape checked by the named adapter), `config`
+  (`rustev.evaluator-config/1` whose digest is the `EvaluatorConfigId`:
+  adapter, label interpretation, agreement payloads, the scored step,
+  subgroup and bin boundaries, latency quantiles, cost unit
+  comparability, metric formulas, gate thresholds and the temperature
+  grid, all Decimal strings), `metrics` (the task adapter trait, outcome
+  categories with escalations and unresolved outcomes as abstentions,
+  probability vectors only through the core's own normalization and
+  calibration, log loss with an explicit infinite-loss diagnostic, Brier,
+  half-open reliability bins, nearest-rank quantiles, and observed,
+  estimated and unknown cost kept apart unless units are declared
+  comparable), `report` (`evaluate` over one split, the existing
+  `rustev.eval-report/1` envelope, the `rustev.eval-detail/1` document
+  bound to the report's record digest with every count and per-case
+  scope, outcome and reason, reconciliation before a report is returned,
+  and gates that are unknown on unbound, undeclared, incompatible or
+  unmeasured inputs and fail below minimum coverage) and `fit` (grid
+  search with the core's `temperature/1`, ties to the smaller
+  temperature, the `rustev.calibration-fit/1` lineage record, and
+  qualification that refuses the fitting split or any shared case,
+  source or snapshot). Engineering choices: a gate states metric,
+  direction, tolerance and minimum coverages in the configuration, and
+  its baseline and candidate cohorts are the ones their reports name,
+  since a configuration cannot name its own identity; a candidate
+  report's latency and cost are unknown, because the candidate was not
+  executed and the retained observations are the baseline's; labeled
+  coverage for gates is labeled proposals over proposals. Both reference
+  tasks have synthetic baseline reports in the tests; the numbers
+  establish mechanics only. The seed harness
+  (`crates/rustev-eval/mutation/seeds.sh`) seeds defects in scope
+  isolation, expiry, output equivalence, fallback identity, capture
+  completeness, denominator accounting and split leakage; every one is
+  detected, and the harness fails if a required category loses its
+  seeds. An independent review found the gates weakest: a gate could not
+  name a suffixed series (such as `latency_ms/p0.5`), did not check which
+  report was the baseline, compared cohorts over different comparable
+  cases, trusted detail counts it did not reconcile, and failed rather
+  than stayed unknown on a zero-denominator coverage; outcome change
+  compared payloads outside the agreement key; fitting accepted leaking
+  manifests and duplicate samples and could record a silent zero loss.
+  All are fixed: gates now require the two roles, identical comparable
+  cases, reconciled details bound to their report and configuration, and
+  exact integer coverage minimums, and a queue time beyond the elapsed
+  time is unknown latency. Of 34 seeded defects the tests missed 15;
+  each now has a test and all are detected.
