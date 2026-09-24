@@ -143,6 +143,7 @@ dependencies = [
 name = "rustev-cli"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "rustev-backend-rules",
  "rustev-contract",
  "rustev-core",

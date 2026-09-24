@@ -1,7 +1,6 @@
 //! `rustev replay` (spec 006, 3.7) and the content-addressed store resolver
 //! shared with `eval` and `calibrate fit`.
 
-use std::fs::File;
 use std::io::{ErrorKind, Read};
 
 use rustev_contract::Document;
@@ -39,7 +38,9 @@ impl Resolver for Store {
             Err(e) if e.kind() == ErrorKind::NotFound => return Resolution::Missing,
             Err(_) => return Resolution::Inaccessible,
         }
-        let Ok(file) = File::open(&path) else {
+        // Opened without blocking and without following a link swapped in
+        // since the check above (spec 006, 3.3.1 and 3.7).
+        let Ok(file) = crate::io::open_input(&path, true) else {
             return Resolution::Inaccessible;
         };
         if !file.metadata().is_ok_and(|m| m.is_file()) {

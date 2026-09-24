@@ -74,7 +74,7 @@ impl Reads {
             Err(e) if e.kind() == ErrorKind::NotFound => return Ok(None),
             Err(e) => return fail(path, e.to_string()),
         }
-        let file = match File::open(path) {
+        let file = match open_input(Path::new(path), false) {
             Ok(f) => f,
             Err(e) if e.kind() == ErrorKind::NotFound => return Ok(None),
             Err(e) => return fail(path, e.to_string()),
@@ -104,6 +104,28 @@ impl Reads {
         self.remaining.set(remaining - bytes.len());
         Ok(Some(bytes))
     }
+}
+
+/// Open a file for reading without blocking (spec 006, 3.3.1): a path
+/// swapped for a FIFO or device after the caller's regular-file check
+/// opens at once instead of waiting for a writer, and the caller's check
+/// on the handle refuses it. With `no_follow`, a final symbolic link is
+/// refused rather than followed. On other platforms this is a plain open.
+pub fn open_input(path: &Path, no_follow: bool) -> std::io::Result<File> {
+    let mut options = OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        let mut flags = libc::O_NONBLOCK;
+        if no_follow {
+            flags |= libc::O_NOFOLLOW;
+        }
+        options.custom_flags(flags);
+    }
+    #[cfg(not(unix))]
+    let _ = no_follow;
+    options.open(path)
 }
 
 fn missing(path: &str) -> IoFail {
