@@ -7,9 +7,9 @@ created: "2026-09-23"
 summary: >
   Increment 2: `rustev`, a command-line surface over the library: plan check,
   show and compile against descriptor, calibration and execution-policy
-  files; run and replay with a declared backend configuration through
-  `rustev-runtime`; eval and calibrate over named datasets. No hosting, no
-  HTTP.
+  files; run with a declared backend configuration through `rustev-runtime`;
+  offline replay, eval and calibrate through `rustev-eval` over retained
+  bundles and named datasets. No hosting, no HTTP.
 establishes:
   - { kind: directory, path: "crates/rustev-cli/" }
 depends_on:
@@ -50,7 +50,14 @@ without writing Rust, using only files and the pinned library.
    `evidence_not_delivered` with the record path. Exit codes distinguish
    judged, cancelled, rejected, evidence not delivered and I/O failure.
 3. `rustev replay`, `rustev eval` and `rustev calibrate`: thin surfaces over
-   spec 004.
+   approved spec 004 (implementation pending). Replay is offline from an
+   explicitly scoped replay bundle, including retained plan dependencies
+   and the expected judgment in its run record; it never installs or calls
+   a backend. The caller supplies scope and current time. Live re-execution
+   is deferred. Capture and content retention for `run` are explicit opt-ins,
+   with expiry, erasure and bounded file buffering owned by the host/CLI.
+   Report output includes the evaluator configuration and detail companion;
+   calibration output includes the fit-lineage companion.
 4. File reads are bounded by the same limit sets as the contract; the CLI
    owns transport buffering for files (spec 002, 3.2.4). Run records are
    read under `RECORD_V1`.

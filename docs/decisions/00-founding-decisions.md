@@ -51,6 +51,22 @@ Recorded here as the owner's decisions, not the agent's.
 | R-17 | No semantic inference in this increment: no `ort` dependency, model download, training, paid inference or semantic quality qualification. R-01 stands for spec `011`. |
 | R-18 | Delivery authority for the rules backend: the narrowed spec `005` and any bounded prerequisite contract change it needs, its implementation, verification, review fixes and documentation, scoped commits, pushes, pull requests and merge after checks pass, and updating later drafts to match delivered interfaces while they stay drafts. It does not extend to approving specs `004`, `006` or `011`, implementing them, releases, publication, deployments, paid services, real-user data, sibling repositories, managed-environment repair, branch protection or waivers. |
 
+### Delegated replay decisions of 2026-09-23
+
+The owner asked to keep pressure on delivery and stated: "I approve optimal
+decisions that push us onwards". In the context of the four replay questions, this authorizes choosing and recording
+the next bounded replay work order. The choices below are the agent's
+selections under that delegation, not quotations of choices individually
+made by the owner. They do not claim a mathematically optimal design.
+
+| Id | Decision |
+|---|---|
+| R-19 | Host-owned replay storage, access control, expiry and erasure. Default capture is off and content retention is digest-only. Bundle metadata defaults to seven days, with a hard maximum lifetime of 30 days; embedded and external bytes require explicit retention and cannot outlive the bundle. The host may tighten the cap. These engineering defaults bound exposure and storage without creating a Rustev storage service. They do not establish legal suitability or prove deletion of copies. |
+| R-20 | Live re-execution is deferred to a later spec. Spec 004 delivers offline historical reproduction and candidate comparison from retained raw outputs. This keeps fresh observations and provider execution outside reproduction and keeps eval's normal dependencies limited to contract and core. |
+| R-21 | Request identity includes both tenant and effective principal-scope handles. The host supplies opaque non-secret handles, rotating the scope handle when permissions change. Equality isolates retained evidence; it never grants access. This deliberately forgoes cross-principal reuse even within a tenant. |
+| R-22 | Runtime handoff is opt-in bounded capture returned separately with the normal result, including sink-delivery failure. Existing APIs and run-record bytes stay compatible. No callback, persistence or sink payload enlargement. Capture overflow is explicit incompleteness, never a reason to alter the decision. |
+| R-23 | Delivery authority for the bounded spec 004 work order: record these decisions and A-05; deliver its contract amendments separately before implementation under R-16; implement and verify the approved replay/evaluation increment; make scoped commits, pushes and PRs; remediate review/CI findings and merge verified changes. Spec 006 and 011 approval/implementation, live inference, releases, publication, deployment, paid services, real-user data, sibling repositories, managed-environment repair, protection changes, waivers and recurring monitors remain outside this authority. |
+
 ## Approvals
 
 | Id | Act | Date |
@@ -59,6 +75,7 @@ Recorded here as the owner's decisions, not the agent's.
 | A-02 | The owner approved spec `002` with bounded corrections: enforceable parse bounds with transport buffering owned separately; calibration as identity and binding, with one explicit initial method and fitting deferred; determinism scoped to canonical compilation and defined exact computation; explicit acceptance and executable verification. Its lifecycle fields are recorded in the change that makes it concrete. | 2026-09-23 |
 | A-03 | The owner approved spec `003` within the bounded requirements of their runtime brief: time, admission and concurrency, budgets, retries and fallback, cancellation, evidence and judgment equivalence as stated there, with the optimization deferral of R-08 and executable acceptance. The concrete rules were then written by the agent within those bounds and are reviewable in the change that recorded this approval. | 2026-09-23 |
 | A-04 | The owner approved spec `005` within the narrowed rules-backend scope of R-13 and the requirements of their brief (a bounded, versioned rules program; disclosure of exactly what is returned; authored interpretations for logits; program and configuration bound to artifact and descriptor identity; explicit setup; defined cost units; bounded work; honest cancellation; provenance as the existing contract defines it; executable acceptance). The approval was given in advance of the concrete contract and is recorded in the change that makes the contract concrete. It does not approve specs `004`, `006` or `011`. | 2026-09-23 |
+| A-05 | The owner delegated resolution of the four replay choices and approved forward progress in that context. Recorded as approval of spec `004` within R-19 to R-23: bounded host-owned retention, scoped request equivalence, opt-in runtime capture, offline reproduction/comparison, explicit evaluation denominators and split-aware temperature fitting, with the bounded prerequisite amendments to specs `002` and `003`. Concrete engineering rules are authored by the agent in the separate approval change before code. Implementation remains pending; specs `006` and `011` remain unapproved. | 2026-09-23 |
 
 No approval authorizes ratifying any other spec.
 

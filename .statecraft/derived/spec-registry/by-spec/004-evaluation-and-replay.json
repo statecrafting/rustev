@@ -1,5 +1,9 @@
 {
   "record": {
+    "amends": [
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence"
+    ],
     "created": "2026-09-23",
     "dependsOn": [
       "002-decision-contract-and-pure-core",
@@ -12,51 +16,97 @@
         "path": "crates/rustev-eval/"
       }
     ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-contract/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-core/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "003-runtime-execution-and-evidence",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-runtime/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      }
+    ],
     "id": "004-evaluation-and-replay",
     "implementation": "pending",
     "sectionDigests": {
-      "004-evaluation-and-replay": "f4dcff1862b60b86a8426395aeb16745d961b01efc2a81f753845ee11c70bcd3",
-      "1-purpose": "0a071a792169decc11725f5e9aaac837f24fec0f3ae37c1f283442232e1569f4",
-      "2-territory": "ac83ccd0a16415c07d743b35766c3ff872679f7e86e50426bbf2320b69df18e3",
-      "3-1-what-exists-after-specs-003-and-005": "dd89d1c191ad9acea3b5ae93e437b9c00e381ba013beafddcf64ea869c4c02a6",
-      "3-2-the-replay-bundle-rustev-replay-1": "88a4dd3c181f1e3e4e55bd046163274f4f382eae0910aecc3495ecc9ca70babe",
-      "3-3-retention-and-availability": "ab8930cf6dbf0a9186c0e382c758b2b5610d38d36c0450655a30898c7e24e85a",
-      "3-4-historical-reproduction-offline": "af08df2fe32aed91304d4e461ac0cacc78752f6e06c312e06e998447e8cffd36",
-      "3-5-candidate-comparison": "8139af32d7034df1b6d93e83da5b260293c022cd4e0c6f6087f208b7bb95540c",
-      "3-6-live-re-execution": "de8b9b91e4d3598cda7a1014f3c22e3297cee1d895d9568f58ead76c2bb8ddb0",
-      "3-7-datasets-and-provenance-gate-r-04": "69d6a3c312bfff3e48d233d175d1102ac6ebfdd87298c5534057c2a888cbe73b",
-      "3-8-metrics": "269d216847e5d271daf9c96d148b5357628c87c61a384ceeb912cd1bcd199494",
-      "3-9-calibration-fitting": "8b1fcd463352377f4d1058bedcf29bc279e0c437cdeab1b571a2e53d7bed21c0",
-      "3-behavior-to-be-made-concrete-before-approval": "51ce05ab3802f995c0e01a474a57d796504216d15d797f5bf77040179f01d5fc",
-      "4-out-of-scope": "22666b705a8c8ca12a49f9fe728e07d847f95937e85386871027ec46b54ee620",
-      "5-required-amendments-proposed-not-made-by-this-draft": "75cc4f62484963442a3dbddc0c52720f78c1d77615f2b357bd120427fbf8dc06",
-      "6-decisions-still-required-from-the-owner": "7d5ada9be24be5ab0afc48cff79472135f0fdd6fc8d3085250d1a8695536b3ae",
-      "acceptance-draft": "13a21e10cb73f7dab017251babe5fee92689db310cd69600f0f9d13597223324"
+      "004-evaluation-and-replay": "9d4ac40c8f9a1a3dc3b5e3965a6cbce098df9d66ac49e2c8a8f51fce76b42149",
+      "1-purpose": "178329d16b30401fc67c5b1119f034124706ffbdd940efb5d0ce8c603c690ef9",
+      "2-territory": "b78a594ab2b0c36224832d3dc67d8ca53b1dd8cf6c0ce7b36b73bdd3892f17e9",
+      "3-1-storage-scope-and-retention": "e2376413a29bd3f1c6daca29f1ebcdc67d01e7f4fe5a92939e6d42c063c12463",
+      "3-2-replay-bundle-rustev-replay-1": "d7b9ab16184bc9d335d6d9f18ad80aaf6e6373cd64a5ebc06ebe72bcae3ef037",
+      "3-3-historical-reproduction": "0a4e4fb6459694052cd6044354f1cdf33a152cc710f83412f376945f455265a1",
+      "3-4-request-identity-and-candidate-comparison": "ab95b395b3fdaf70a716de912dafc530ebdea9ce6a21e20d9484de87f417fcc1",
+      "3-5-datasets-metrics-and-regression-gates": "6f19aa1454ca686ae5de5fedb0fdf504360bf18330ddc3430320037de4f4d18a",
+      "3-6-calibration-fitting": "df40f74c8b447aa2bbf1ea1b89a3c24eded34c78b198aeb7c292a0ce0bbbea6f",
+      "3-behavior": "04fcc7bd7fca7d5ac0a5c747a38b7f42be351f78994c6d0e68f17f76078a7236",
+      "4-out-of-scope": "26fc6dd2fc8b3ee70111fdbf4b57d0cf0700b56c24fdb87c22a5831f62e09876",
+      "5-amendments-and-compatibility": "58804c74cf9f26bd7386e6cd69f32efed06875afbfa3c110afe1b17242287043",
+      "6-delivery-sequence-and-acceptance": "b0e7cd0ddfd5ac1622d361c8da6d9869f5259082a40797d27fe3ac70141f7065",
+      "implementation-record": "e44a4e3478e03c05ee77d1530c15bd9d9f52ddb0f368e45b0807b99de6ded26e",
+      "verification": "fa2418cd1dd9968dc006804fb872545e1fe67dc3ca656169a26a5e350af3ea7f"
     },
     "sectionHeadings": [
       "004: Evaluation and replay",
       "1. Purpose",
       "2. Territory",
-      "3. Behavior (to be made concrete before approval)",
-      "3.1 What exists after specs 003 and 005",
-      "3.2 The replay bundle, `rustev.replay/1`",
-      "3.3 Retention and availability",
-      "3.4 Historical reproduction (offline)",
-      "3.5 Candidate comparison",
-      "3.6 Live re-execution",
-      "3.7 Datasets and provenance gate (R-04)",
-      "3.8 Metrics",
-      "3.9 Calibration fitting",
+      "3. Behavior",
+      "3.1 Storage, scope and retention",
+      "3.2 Replay bundle, `rustev.replay/1`",
+      "3.3 Historical reproduction",
+      "3.4 Request identity and candidate comparison",
+      "3.5 Datasets, metrics and regression gates",
+      "3.6 Calibration fitting",
       "4. Out of scope",
-      "5. Required amendments (proposed; not made by this draft)",
-      "6. Decisions still required from the owner",
-      "Acceptance (draft)"
+      "5. Amendments and compatibility",
+      "6. Delivery sequence and acceptance",
+      "Verification",
+      "Implementation record"
     ],
     "specPath": "specs/004-evaluation-and-replay/spec.md",
-    "status": "draft",
-    "summary": "Increment 2: `rustev-eval` reproduces judgments offline from a separate, versioned replay bundle (`rustev.replay/1`) that references the plan, the snapshot and every supplied backend output or runtime reason under an explicit, bounded retention mode; compares a candidate plan only on requests that are semantically equivalent; keeps live re-execution apart as new observations; computes metrics with explicit denominators, abstention handling and comparable-case coverage; fits calibration on a named split; and emits the versioned report envelope from `rustev-contract` (R-06). Quality claims require real, independently labeled data (R-04).\n",
+    "status": "approved",
+    "summary": "Increment 2: offline reproduction from bounded, host-retained replay bundles; tenant-and-principal-scoped request equivalence for candidate comparison; explicit availability, coverage and abstention; named dataset splits and temperature fitting. Amends 002 with replay and request documents and typed loading diagnostics, and 003 with opt-in bounded capture of supplied values. Live re-execution is deferred. Synthetic fixtures establish mechanics only, never empirical quality.\n",
     "title": "Evaluation and replay"
   },
-  "shardHash": "939388cff09d56451d66d0b77e7eee2c7ee7175b3856a70357ec8b0729ab9abe",
+  "shardHash": "de6f4dd5b8c202761443422e6ae55b31c09d35adcb64dc1068b5ddbffc19a81b",
   "specVersion": "1.8.0"
 }
