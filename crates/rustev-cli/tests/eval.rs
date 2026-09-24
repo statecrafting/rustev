@@ -679,3 +679,147 @@ fn fitting_uses_the_calibration_split_and_qualification_needs_lineage() {
     q("calibration", true).expect(11, "refused_qualification");
     q("final_test", false).expect(12, "unknown");
 }
+
+#[test]
+fn a_fallback_output_is_never_fitted_as_the_primarys() {
+    use rustev_contract::execution::{CostPolicy, Delay, FailureClass};
+    let s = Scratch::new("calibrate-fallback");
+    reference_inputs(&s);
+    // A primary whose topic task always fails, and the original program
+    // under another backend id as its declared runtime fallback.
+    let mut primary: Json =
+        serde_json::from_slice(&rules_fixture("support-routing.rules.json")).unwrap();
+    for t in primary["tasks"].as_array_mut().unwrap() {
+        if t["task"] == "support.frustration" {
+            t["rules"] = json!([]);
+            t["on_no_match"] = json!("fail");
+        }
+    }
+    let mut fallback: Json =
+        serde_json::from_slice(&rules_fixture("support-routing.rules.json")).unwrap();
+    fallback["backend_id"] = json!("synthetic-rules-fallback");
+    let primary = serde_json::to_vec(&primary).unwrap();
+    let fallback = serde_json::to_vec(&fallback).unwrap();
+    s.write("primary.rules.json", &primary);
+    s.write("fallback.rules.json", &fallback);
+    let p = rustev_backend_rules::RulesBackend::from_bytes(&primary).unwrap();
+    let cal = rules_calibration(p.artifact(), "1.5");
+    s.write("fb.calibration.json", &canonical(&cal));
+    let mut def = support_routing_builder(&cal).build().unwrap();
+    for st in &mut def.steps {
+        if let rustev_contract::definition::StepBody::Semantic(d) = &mut st.body {
+            d.backend.binding = rustev_contract::definition::BindingChoice::Backend(
+                "synthetic-rules-support".into(),
+            );
+        }
+    }
+    s.write("fb.definition.json", &canonical(&def));
+    let policy = execution(
+        CostPolicy::Unlimited,
+        vec![step_exec(
+            "frustration",
+            1,
+            &[],
+            Delay::None,
+            &["synthetic-rules-fallback"],
+            &[FailureClass::Permanent],
+        )],
+    );
+    s.write("fb.execution.json", &canonical(&policy));
+    let r = s.rustev(&[
+        "plan",
+        "compile",
+        "--definition",
+        "fb.definition.json",
+        "--rules",
+        "primary.rules.json",
+        "--rules",
+        "fallback.rules.json",
+        "--calibration",
+        "fb.calibration.json",
+        "--execution",
+        "fb.execution.json",
+        "--out",
+        "fb.plan.json",
+    ]);
+    r.expect(0, "compiled");
+    let cases: Vec<Case> = support_cases()
+        .into_iter()
+        .filter(|c| c.split == Split::Calibration)
+        // Labels of the fitted step's options.
+        .map(|c| Case {
+            label: Some("calm"),
+            ..c
+        })
+        .collect();
+    std::fs::create_dir_all(s.path("bundles")).unwrap();
+    for c in &cases {
+        let snap = format!("snap-{}.json", c.id);
+        s.write(&snap, &canonical(&c.snapshot));
+        let mut a: Vec<String> = [
+            "run",
+            "--plan",
+            "fb.plan.json",
+            "--rules",
+            "primary.rules.json",
+            "--rules",
+            "fallback.rules.json",
+            "--calibration",
+            "fb.calibration.json",
+            "--snapshot",
+            &snap,
+            "--evaluation-time",
+            NOW_ARG,
+            "--decision-id",
+            c.id,
+            "--record-out",
+            &format!("{}.record.json", c.id),
+            "--capture-bytes",
+            "16777216",
+            "--bundle-out",
+            &format!("bundles/{}.json", c.id),
+            "--now-ms",
+            "1800000000000",
+            "--retain",
+            "embedded",
+        ]
+        .iter()
+        .map(|x| x.to_string())
+        .collect();
+        a.extend(scope());
+        assert_eq!(s.rustev_owned(&a).code, 0, "{}", c.id);
+    }
+    s.write(
+        "fb.dataset.json",
+        &canonical(&manifest("fallback synthetic", "support-routing", &cases)),
+    );
+    s.write(
+        "fb.config.json",
+        &canonical(&config("support-routing", &[], None)),
+    );
+    std::fs::create_dir(s.path("fit")).unwrap();
+    let mut a: Vec<String> = [
+        "calibrate",
+        "fit",
+        "--dataset",
+        "fb.dataset.json",
+        "--config",
+        "fb.config.json",
+        "--step",
+        "frustration",
+        "--bundles",
+        "bundles",
+        "--now-ms",
+        LATER,
+        "--out",
+        "fit",
+    ]
+    .iter()
+    .map(|x| x.to_string())
+    .collect();
+    a.extend(scope());
+    // Every frustration output came from the fallback: nothing to fit.
+    let j = s.rustev_owned(&a).expect(4, "invalid_input");
+    assert!(j["detail"].as_str().unwrap().contains("Empty"), "{j}");
+    assert!(!s.exists("fit/calibration.json"));
+}

@@ -25,13 +25,16 @@ cancellation, and run records delivered under a declared sink policy.
 identified rules programs, not a model. `rustev-eval` reproduces retained
 decisions offline from bounded replay bundles, compares candidate plans,
 and produces evaluation reports, regression gates and temperature fits.
-There is no CLI or model backend yet, and no quality or calibration claim:
-every dataset and report is synthetic. Batching, duplicate suppression and
+`rustev` (`crates/rustev-cli`) does all of this from files: plan check,
+compile and show; rules-backed runs with bounded capture into replay
+bundles; offline replay; evaluation reports, gates and temperature fits.
+There is no model backend yet, and no quality or calibration claim: every
+dataset and report is synthetic. Batching, duplicate suppression and
 caches are deferred. Nothing is released.
 
 - Design (proposed): [docs/design/001-decision-engine-architecture.md](docs/design/001-decision-engine-architecture.md)
 - Decisions: [docs/decisions/00-founding-decisions.md](docs/decisions/00-founding-decisions.md)
-- Specs: `001` boundaries and authority, `002` decision contract and pure core, `003` runtime execution and evidence, `004` evaluation and replay, `005` rules backend (approved and complete); `006` CLI (approved, implementation pending); `011` semantic backend (draft).
+- Specs: `001` boundaries and authority, `002` decision contract and pure core, `003` runtime execution and evidence, `004` evaluation and replay, `005` rules backend, `006` CLI (approved and complete); `011` semantic backend (draft).
 
 ## Governance
 

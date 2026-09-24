@@ -2,7 +2,7 @@
 id: "006-cli-surface"
 title: "CLI surface"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-09-23"
 summary: >
   Increment 2: `rustev`, a command-line host over the library. Plan check,
@@ -31,7 +31,8 @@ depends_on:
 
 # 006: CLI surface
 
-Approved; implementation in progress. The owner approved making this spec
+Approved and implemented; the implementation record states what was
+delivered and what was found. The owner approved making this spec
 concrete and delivering it through verified merge within the scope below
 (R-25 and A-06 in `docs/decisions/00-founding-decisions.md`). The concrete
 rules were written by the agent within that scope; its engineering choices
@@ -517,6 +518,44 @@ sh crates/rustev-cli/mutation/seeds.sh
   reproduce byte for byte; digest-only is `missing`), removed, altered,
   linked and expired store items, a reference outside the store, and the
   isolation matrix in both modes.
+- 2026-09-24: increment 3 of 3, the task adapter, `eval`, `gate` and
+  `calibrate` (3.8 to 3.10); implementation complete and 006 added to
+  `make verify`. `rustev.task-adapter/1` is validated and implements the
+  library's task adapter (label shapes, label rules, parameter rules with
+  `enum`, `text`, `integer` and `first_ranked` selection, maps and
+  `otherwise`). `eval` checks the manifest with the adapter's label check,
+  refuses unmappable or case-colliding case ids, reads each split case's
+  bundle (absent is left to the library as `bundle-missing`; unparsable
+  stops the command), evaluates as baseline or against a candidate loaded
+  with `load_checked`, and writes report, detail, configuration and
+  adapter all or none. `gate` is `unknown` when the two sides' adapter
+  documents differ or the gate is undeclared. `calibrate fit` samples only
+  target-0 outputs of the binding's artifact from reproduced
+  calibration-split cases, reports the rest by reason, and writes the
+  artifact and its fit record all or none; `qualify` maps the library's
+  verdict. Tests evaluate both reference tasks through declarative
+  adapters, as baseline and with candidates, gates that pass, fail (a
+  labeled-coverage minimum) and stay unknown (every case escalated, an
+  unmeasured candidate latency, an undeclared gate, a changed adapter, the
+  wrong roles), and a fit on the support topic step with qualification
+  qualified, refused on the fitting split and unknown without a record.
+  An independent review of increment 1 found no behavioral defect beyond
+  `--help` accepted as a flag value, a following flag taken as a missing
+  value, and file-count caps checked after the first read (all fixed), and
+  that its tests missed 11 of 17 seeded defects (budget off by one, FIFO
+  and handle checks, no-clobber publishing, pre-work output check,
+  recompile refusal category, count cap, dependency I/O mapping); each
+  now has a test. The seed harness (`crates/rustev-cli/mutation/seeds.sh`)
+  seeds 23 compiling defects across scope flag handling, byte caps,
+  no-clobber, exit-code mapping, store confinement, adapter correctness
+  and sink acknowledgement; every one is detected. Its first full run left
+  one survivor (a fallback's output fitted as the primary's), now caught by
+  a test that fits a step every case served from a declared fallback.
+  Limits: the regular-file check before opening and the check on the
+  handle leave a window in which a path swapped for a FIFO can block the
+  open; the adapter's rules are bound to a report only through the
+  adapter file written beside it; synthetic datasets establish mechanics
+  only (R-04).
 
 ## Decision history
 
