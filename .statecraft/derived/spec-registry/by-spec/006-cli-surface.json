@@ -32,27 +32,27 @@
       }
     ],
     "id": "006-cli-surface",
-    "implementation": "complete",
+    "implementation": "in-progress",
     "sectionDigests": {
-      "006-cli-surface": "67b2978dcd23b8a78fdcbf638f7eb89f9f04b317735d622bdcfb07dd17399143",
+      "006-cli-surface": "6d4829b3b927a88bfe22c28f4a7d43d8f0db7700d9c6632bc252cbd511841bfb",
       "1-purpose": "4e2e2f237b2a801fa00173df8cfad9bc84473b9b0606fbb2bcf9d0270d91a3bc",
-      "2-territory": "f2550de1e11215e4f9d4335ee31ca10a35fa6f0b4ec2e2915025010222f9f16a",
+      "2-territory": "ee3b1cab96531588fb2efc6d6a7b67db773b6749d4e9b4106a7b164f0213b910",
       "3-1-invocation-and-output": "a4493237889bb81be796ff380faec13dbf8dfd484ca6479dacb10d7b4f42f959",
       "3-10-rustev-calibrate-fit-qualify": "c5d6c4ee3b4c0bcd176c7041a641be9037899cdedde29802275d3aa7837dc6cb",
       "3-2-exit-codes": "290a6d78b103c15950cec8655cd75def4c760c92f4c650862f5882c7c0614006",
-      "3-3-bounded-file-access": "e0b22b9bff1bd614953c61f34e6338dba2bf06cc946b92678e4bab58228eb981",
+      "3-3-bounded-file-access": "d616fb3531182bff4f9025f134aefcad673eff2150d90796f8c11133573d6d29",
       "3-4-rustev-plan-check-compile-show": "ff7907fa8ad513195a947781f84e974313d9aad4d28a47cb89e2d3d59d4f6902",
       "3-5-rustev-run": "c3357d83ab8dfe8e0b819a86f01be8cf0ab740d293745c795a1f4e1e7152802c",
       "3-6-capture-and-bundles-on-run": "059a8009658c855d300d4962ea27d40b1bd2a5a4e0ed963e37cd5cd0efb82547",
       "3-7-rustev-replay": "9e804a5df3d09a92ed5b00ab1728c4b896a99702c00a95f5aa653a0a29187371",
       "3-8-task-adapters-rustev-task-adapter-1": "0df3cde64be3cc40b4236621b0a722ecb2f34db1da5381aa4e2950946e573c91",
       "3-9-rustev-eval-and-rustev-gate": "9a50f528ff7d7e4cebba3623d6b3d5cb754e925cdc0bcdace6f2e2a1c7fa31fb",
-      "3-behavior": "cc475c6de779f1cefbdaa93e205afc8774c050764159b9c88cc144f8b79a59ae",
+      "3-behavior": "7446918483200cb0765be37ff7926f972be8d57c8625d5882144fcfaa9dfc777",
       "4-out-of-scope": "db2f4d386a67cb47783a41679ff0d4bb48e72eefd5f90220045677df4f2a0419",
       "5-observable-negative-cases": "147b6cff44bc90d50b4376aac2bd93ae00d5820895e5a1c26ce27ba163c6c615",
       "acceptance": "ccc038c7907c755e015473a8d9aa6e09adff7c3477ef57dd99ea7bfded0c9e50",
-      "decision-history": "db88927e5d5328c82e7d03af5721b40e0d0279bc9484b5db9a55cec60700e644",
-      "engineering-choices": "061631a354a04025f470996b66f8aeaaf5d6e634a2e8adcd2b7469daf0147184",
+      "decision-history": "303ad270260dd9e6decd8555255783cb5b83e2046e6c17d77768aecba51c445e",
+      "engineering-choices": "8cf9cfb4ea7df7447c0a94c60dad880d6b432984977046f0703c70c6343a0625",
       "implementation-record": "442a842212718a9849528e4ee99f182bbf912e4484592a7983cd399c579381b1",
       "verification": "8a26cd5de979bcae91f5dc431f30058c5c5754e4c6909a618892cf285d2733df"
     },
@@ -84,6 +84,6 @@
     "summary": "Increment 2: `rustev`, a command-line host over the library. Plan check, compile and show against descriptor, rules-program, calibration and execution-policy files; run one snapshot through `rustev-runtime` on rules-program backends with a file evidence sink and optional bounded capture into a replay bundle; offline replay under an explicitly supplied trusted scope; evaluation reports with their detail and configuration companions, regression gates, and temperature fitting with its lineage record, through `rustev-eval`. Bounded file access, stable JSON output and distinct exit codes. No network, no hosting, no live inference beyond the deterministic rules backend.\n",
     "title": "CLI surface"
   },
-  "shardHash": "750fb1e7f3a55539b1142109865506fa4c460820c47828dd85c342833c2608db",
+  "shardHash": "3e8155c90ff4791588404b41d4df56cc3d76d0388fb89bdc327e1f5fb067f0ff",
   "specVersion": "1.8.0"
 }

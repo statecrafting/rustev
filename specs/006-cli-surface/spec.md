@@ -2,7 +2,7 @@
 id: "006-cli-surface"
 title: "CLI surface"
 status: approved
-implementation: complete
+implementation: in-progress
 created: "2026-09-23"
 summary: >
   Increment 2: `rustev`, a command-line host over the library. Plan check,
@@ -52,8 +52,9 @@ in the library crates; the CLI adds none.
 target holding the command implementations so tests can drive them in
 process. Normal dependencies: `rustev-contract`, `rustev-core`,
 `rustev-runtime`, `rustev-eval`, `rustev-backend-rules`, `serde`,
-`serde_json` (with `raw_value`), `sha2` and `tokio` (`rt-multi-thread`,
-`time`, `sync`, `signal`). No HTTP stack, no ecosystem crate, no argument-parsing crate:
+`serde_json` (with `raw_value`), `sha2`, `tokio` (`rt-multi-thread`,
+`time`, `sync`, `signal`) and, on Unix targets only, `libc` (for the
+open flag of 3.3.1). No HTTP stack, no ecosystem crate, no argument-parsing crate:
 the argument grammar of 3.1 is small and parsed by hand. Additive edits to
 spec 001's `Cargo.lock` and, at completion, `Makefile`. No change to any
 unit owned by specs 002 to 005: if one proves necessary it is a separate,
@@ -126,9 +127,11 @@ fields); then `cancelled`; then `judged`.
 
 ### 3.3 Bounded file access
 
-1. Every input file is read by requiring a regular file before opening it
-   (so a FIFO never blocks) and again on the opened handle, then reading
-   at most its document's limit plus one byte: definitions under
+1. Every input file and store item is read by requiring a regular file
+   before opening it, opening it without blocking (`O_NONBLOCK` on Unix),
+   and requiring a regular file again on the opened handle, so a FIFO or
+   device never blocks, even one swapped in between the first check and
+   the open. It is then read up to its document's limit plus one byte: definitions under
    `DEFINITION_V1`; descriptors, calibrations, rules programs, execution
    policies and task adapters under `DESCRIPTOR_V1`; plans under `PLAN_V1`;
    snapshots under `SNAPSHOT_V1`; run records and evaluation reports under
@@ -564,6 +567,12 @@ sh crates/rustev-cli/mutation/seeds.sh
 - 2026-09-24: the owner approved making this spec concrete and delivering
   it through verified merge within the scope of R-25 (A-06). Spec 011
   stays a draft.
+- 2026-09-24: 3.3.1 now requires the open itself not to block, closing the
+  window the implementation record listed as a limit (a path swapped for a
+  FIFO between the regular-file check and the open). Section 2 adds `libc`
+  on Unix for the flag. Delivered as remediation within R-25's bounded
+  file access; the promise that a FIFO never blocks is unchanged, and the
+  implementation returns to complete when its change merges.
 
 ## Engineering choices
 
@@ -579,3 +588,4 @@ Made by the agent within A-06; open to the owner's review.
 | E-29 | A declarative, CLI-owned task adapter document. | Evaluation needs an adapter, and a package author should not need Rust to define correctness. |
 | E-30 | Run uses only rules-program backends, one admitted decision, no queue, `fail_decision` delivery. | The only production backend without inference; a CLI run has one decision and must know whether its evidence was delivered. |
 | E-31 | A bundle file that exists but does not parse stops `eval` and `calibrate fit`. | The library's evaluation takes parsed bundles only; stopping is honest where counting the case as missing would not be. Reporting it per case would be an amendment to spec 004. |
+| E-32 | `O_NONBLOCK` through `libc` rather than per-platform constants. | The flag's value differs by operating system and architecture; `libc` is already in the lockfile through Tokio. |
