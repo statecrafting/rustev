@@ -155,7 +155,7 @@ async fn external_outcomes_are_never_available_by_default() {
         k
     };
     let b = bundle_with(&r, Content::External(&refs));
-    drop(cell);
+    let _ = cell.into_inner();
     let full = || {
         let s = Store::default();
         for (k, v) in &kept {
@@ -661,7 +661,7 @@ async fn the_resolved_byte_budget_is_per_case_not_per_item() {
         k
     };
     let b = bundle_with(&r, Content::External(&refs));
-    drop(cell);
+    let _ = cell.into_inner();
     let s = Store::default();
     let plan = kept["ref:plan"].clone();
     let rest = rustev_contract::replay::MAX_RESOLVED_BYTES - plan.len();
