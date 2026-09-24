@@ -2,7 +2,7 @@
 id: "006-cli-surface"
 title: "CLI surface"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-09-23"
 summary: >
   Increment 2: `rustev`, a command-line host over the library. Plan check,
@@ -559,6 +559,18 @@ sh crates/rustev-cli/mutation/seeds.sh
   open; the adapter's rules are bound to a report only through the
   adapter file written beside it; synthetic datasets establish mechanics
   only (R-04).
+- 2026-09-24: 3.3.1's non-blocking open delivered. Input files and store
+  items are opened with `O_NONBLOCK`, and store items also with
+  `O_NOFOLLOW`, so neither a FIFO nor a symbolic link swapped in after the
+  first check blocks the open or opens a file outside the store (3.7,
+  section 5). The limit above on a swapped FIFO no longer applies. Tests
+  open a FIFO and a link directly, as a swapped path would be. The seed
+  harness now seeds 25 defects, and every one is detected: two new seeds
+  each remove one flag, and the two seeds that removed only the check
+  before the open (which the flags now back, so removing it alone is no
+  longer observable) now remove the check and the flag together. The
+  store resolver's choice of the no-follow open is not seeded by itself:
+  no test can swap a path at the instant between check and open.
 
 ## Decision history
 

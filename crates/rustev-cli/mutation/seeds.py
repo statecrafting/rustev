@@ -32,7 +32,8 @@ REQUIRED = [
 # Generous: a new test binary can wait on the OS before it starts.
 TEST_TIMEOUT_S = 1800
 
-# (category, name, file, old, new, packages)
+# (category, name, file, old, new, packages); `old` and `new` may be equal-
+# length lists, for a defect that must remove more than one layer at once.
 SEEDS = [
     (
         "scope flag handling",
@@ -129,10 +130,12 @@ SEEDS = [
     ),
     (
         "store confinement",
-        "a symbolic link in the store is followed",
+        # The check alone is now backed by the no-follow open (3.3.1), so
+        # removing only one of them is not observable.
+        "a symbolic link in the store passes the check and is followed",
         S + "replay.rs",
-        "Ok(m) if m.file_type().is_file() => {}",
-        "Ok(_) => {}",
+        ["Ok(m) if m.file_type().is_file() => {}", "open_input(&path, true)"],
+        ["Ok(_) => {}", "open_input(&path, false)"],
         CLI,
     ),
     (
@@ -201,10 +204,30 @@ SEEDS = [
     ),
     (
         "byte caps",
-        "a FIFO is opened before the regular-file check",
+        # The check alone is now backed by the non-blocking open (3.3.1).
+        "a FIFO passes the check before opening and the open blocks",
         S + "io.rs",
-        "        // Checked before opening, so a FIFO never blocks, and again on the\n        // handle.\n        match std::fs::metadata(path) {\n            Ok(m) if m.is_file() => {}",
-        "        // Checked before opening, so a FIFO never blocks, and again on the\n        // handle.\n        match std::fs::metadata(path) {\n            Ok(_) => {}",
+        [
+            "        match std::fs::metadata(path) {\n            Ok(m) if m.is_file() => {}",
+            "let mut flags = libc::O_NONBLOCK;",
+        ],
+        ["        match std::fs::metadata(path) {\n            Ok(_) => {}", "let mut flags = 0;"],
+        CLI,
+    ),
+    (
+        "byte caps",
+        "a FIFO swapped in after the check blocks the open",
+        S + "io.rs",
+        "let mut flags = libc::O_NONBLOCK;",
+        "let mut flags = 0;",
+        CLI,
+    ),
+    (
+        "store confinement",
+        "a symbolic link swapped into the store is followed",
+        S + "io.rs",
+        "            flags |= libc::O_NOFOLLOW;\n",
+        "",
         CLI,
     ),
     (
@@ -261,11 +284,16 @@ def main():
             base = ["cargo", "test", "--locked", "-q"] + [a for p in packages for a in ("-p", p)]
             f = os.path.join(src, path)
             original = open(f, encoding="utf-8").read()
-            if original.count(old) != 1:
-                failures.append(f"{label}: anchor found {original.count(old)} times in {path}")
+            pairs = list(zip(old, new)) if isinstance(old, list) else [(old, new)]
+            bad = [o for o, _ in pairs if original.count(o) != 1]
+            if bad:
+                failures.append(f"{label}: an anchor is not found exactly once in {path}")
                 print(f"BROKEN   {label}: anchor", flush=True)
                 continue
-            open(f, "w", encoding="utf-8").write(original.replace(old, new))
+            seeded = original
+            for o, n in pairs:
+                seeded = seeded.replace(o, n)
+            open(f, "w", encoding="utf-8").write(seeded)
             try:
                 if run(base + ["--no-run"], src, env) != 0:
                     failures.append(f"{label}: the seeded tree does not compile")
