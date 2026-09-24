@@ -14,9 +14,10 @@ summary: >
   estimated cost, requested privacy options, and exchange records. Many
   Rustev questions over one state go in one request. Provider confidence is
   recorded, never treated as calibrated. `rank` is not declared. No Jev
-  wire-compatible surface is exposed. Paid inference and quality
-  qualification wait for an owner decision (O-02) and independently
-  labeled data (R-04). Draft: claims no code.
+  wire-compatible surface is exposed. Paid inference for smoke and
+  qualification is authorized by R-27 (zero data retention, synthetic and
+  independently labeled data only, a default cap of USD 25 per month);
+  production requires a pinned model version (R-28). Draft: claims no code.
 extends:
   # Adds the integration crate's manifest and dependencies to the workspace.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.toml" }, nature: additive }
@@ -59,8 +60,16 @@ obligations:
     anchor: "3-3-questions-and-the-descriptor"
   - id: "R-2"
     kind: requirement
-    text: "No live call, paid inference or quality claim before the owner decides O-02 and a dataset meeting R-04 is recorded; until then only recorded, labeled-synthetic fixtures are used."
+    text: "Live calls and paid inference happen only within R-27: smoke and qualification of this spec, key read from the owner's file at runtime and never copied, zero data retention requested, synthetic or independently labeled data only, within the monthly cap; no quality claim precedes the R-04 dataset."
     anchor: "3-8-qualification-plan"
+  - id: "I-6"
+    kind: invariant
+    text: "The Gateway API key is never copied into a repository, log, fixture, exchange record or other evidence."
+    anchor: "3-2-transports"
+  - id: "R-3"
+    kind: requirement
+    text: "Production binds only a transport with a pinned, verified model version: the direct TypeSafe API with a pin, or the Gateway once its pinning is verified and recorded; `served: unknown` is for development only."
+    anchor: "3-6-identity-routing-and-cost"
 ---
 
 # 012: Jev integration (remote decision backend)
@@ -69,8 +78,9 @@ Draft: a proposal, not a claim about code. Ordinal: the next free one;
 `010` stays reserved for the roadmap's general integrations increment and
 `011` is taken. Rationale: owner decision R-26 (Rustev is the decision
 engine of the travel-memory product, with Jev through the Vercel AI Gateway
-as a remote backend), R-04, R-05, R-10, R-17, R-23 and open decision O-02 in
-`docs/decisions/00-founding-decisions.md`; design section 1.2 ("a
+as a remote backend), R-27 (paid inference for smoke and qualification),
+R-28 (the owner's answers to this draft's questions), R-04, R-05, R-10 and
+R-23 in `docs/decisions/00-founding-decisions.md`; design section 1.2 ("a
 compatibility adapter may be written later as an ordinary integration");
 discussion `002` for background only. Facts about the provider are C-09 in
 the decisions record, verified from Vercel's documentation on 2026-09-24;
@@ -111,8 +121,9 @@ registers it with the runtime.
    provider metadata goes to exchange records (spec 009, 3.9).
 3. Content sent to the provider is exactly the step's projection and
    question material (3.3). Hosts decide which inputs a plan projects;
-   travel-memory plans must not project data the owner has not cleared for
-   disclosure to the provider (O-02).
+   under R-27 only the travel-memory synthetic fixture corpus and
+   independently labeled evaluation data may reach the provider; real user
+   mail may not until a separate privacy decision.
 
 ### 3.2 Transports
 
@@ -128,7 +139,11 @@ therefore in its artifact identity:
 The Gateway's OpenAI-, Anthropic- and Cohere-compatible endpoints do not
 support Jev (C-09) and are not transports. The credential is read by the
 host and passed to the adapter at construction; it is never logged, never
-in the binding identity and never in an exchange record. Switching
+in the binding identity and never in an exchange record. For development and
+qualification (R-27) the harness reads `AI_GATEWAY_API_KEY` at runtime from
+`/Users/bart/.config/statecrafting/infra/vercel/.env`; the key is never
+copied into a repository, log, fixture or evidence, and recorded fixtures
+keep no request headers. For production, see 3.6.2. Switching
 transport, or falling back from one to another, is a runtime fallback
 between two adapter instances declared in the plan's execution policy, so
 it is in plan identity (R-10) and never happens inside an adapter.
@@ -215,8 +230,10 @@ candidates does not batch across candidates, because each candidate's
 instance differs; it batches the questions asked about the same candidate.
 Answers do not share hidden context across questions, as the provider
 documents, but Rustev does not rely on that claim: each answer is validated
-on its own. Batching stays disabled until spec 009's open question 1 is
-decided; unbatched, each attempt is one request.
+on its own. Batching is off by default (R-28); it is enabled for this
+adapter only after stage 3 of 3.8 shows batched and unbatched answers
+agree within the qualification's stated bounds. Unbatched, each attempt is
+one request.
 
 ### 3.6 Identity, routing and cost
 
@@ -232,7 +249,10 @@ decided; unbatched, each attempt is one request.
    `generation_id`. On the direct transport with a pin, the response's model
    field is recorded as `reported`, and a value other than the pin is
    `identity_mismatch`. Whether the Gateway honors a version pin is
-   unverified (open question 4).
+   unverified. `served: unknown` is acceptable for development and
+   qualification only; production binds the direct transport with a pinned
+   version unless Gateway pinning is verified and recorded in the decisions
+   record (R-28).
 3. **Consequence for claims.** With `served: unknown`, a change of model
    version behind the Gateway cannot be detected per call. Every evaluation
    report, calibration artifact and qualification record for this adapter
@@ -264,21 +284,29 @@ id locally. Exchange records are digest-only by default under R-19.
 
 ### 3.8 Qualification plan
 
-Three stages. Only the first may run before the owner decides O-02.
+Three stages. Stages 2 and 3 are authorized by R-27 within its scope: the
+Gateway transport, zero data retention and the provider allowlist on every
+request, the key read at runtime from the owner's file, only synthetic or
+independently labeled data, and a spend cap of USD 25 per calendar month
+(an agent-selected default the owner may change) held by a shared cost
+ledger in the harness (spec 003, 3.5.2) with a Gateway dashboard budget as
+the backstop, because this adapter's charges are estimates, not bounds.
+No stage runs as part of drafting or approving this spec.
 
 1. **Mechanics (no network, no spend).** Recorded Gateway responses are
    replayed through a local HTTP test server: every mapping in 3.4, every
    spec 009 error code, batching with a cancelled member, late responses,
    cost paths, served identity `unknown`, and both reference plans through
    the runtime with capture and offline replay (spec 004). Recorded responses
-   come only from calls the owner has authorized, or are hand-written and
-   labeled synthetic (R-04, R-09). They establish mechanics only.
-2. **Smoke (after O-02).** A bounded number of live calls under an
+   come only from calls made under R-27, or are hand-written and labeled
+   synthetic (R-04, R-09). They establish mechanics only.
+2. **Smoke (under R-27).** A bounded number of live calls under an
    owner-set spend cap, confirming the unverified shapes of 3.4 and 3.2 and
    recording them as fixtures. No quality statement.
-3. **Qualification (after O-02 and R-04).** On a dataset recorded under
-   R-04 (licensed for disclosure to the provider, provenance, labeling
-   method, splits, limitations), per task: accuracy or macro-F1, log loss,
+3. **Qualification (under R-27 and R-28).** On the independently labeled,
+   synthetic-provenance evaluation set travel-memory supplies (R-28), with
+   its provenance, labeling method, splits and limitations recorded under
+   R-04 before use, per task: accuracy or macro-F1, log loss,
    Brier score and binned calibration error with every denominator,
    coverage against error for the plan's thresholds, and the same metrics
    by slice, including arithmetic, counting, date comparison, multi-hop and
@@ -286,7 +314,10 @@ Three stages. Only the first may run before the owner decides O-02.
    rules backend is the comparison baseline in the same spec 004 report.
    A temperature calibration may be fitted on a calibration split and
    qualified on a separate one (spec 004, 3.6). Provider confidence is
-   reported as a provider statistic only. The report states 3.6.3.
+   reported as a provider statistic only. The report states 3.6.3, and that
+   the content is of synthetic provenance, so it is not evidence about real
+   user data (R-04, R-28). It also compares batched with unbatched answers
+   (3.5).
 4. **Plan authoring guidance** that follows from the documented weaknesses
    and holds regardless of qualification: counting, arithmetic and date
    comparison are exact steps (spec 002, 3.8), never questions; multi-hop
@@ -298,7 +329,8 @@ Three stages. Only the first may run before the owner decides O-02.
 A Jev wire-compatible API or server (R-05, design section 19). The
 travel-memory application's plans and data. Training, fine-tuning or
 distillation. Streaming. Any claim of quality, calibration or equivalence
-with other backends before stage 3. Paid inference before O-02.
+with other backends before stage 3. Paid inference outside R-27, and any
+real user data before a separate privacy decision.
 
 ## 5. Observable negative cases
 
@@ -321,8 +353,8 @@ with other backends before stage 3. Paid inference before O-02.
   counter shows zero calls to any external host.
 - The boundary check passes; no crate outside `integrations/` names the
   provider.
-- Stages 2 and 3 are recorded only after O-02 is decided, in the decisions
-  record and this spec's implementation record.
+- Stages 2 and 3 run only within R-27 and are recorded, with their spend,
+  in this spec's implementation record.
 
 ## Verification
 
@@ -339,24 +371,26 @@ cargo run -p rustev-boundaries --locked --quiet
 cargo clippy -p rustev-jev --all-targets --locked -- -D warnings
 ```
 
+## Resolved questions
+
+Decided by the owner on 2026-09-24:
+
+1. Paid inference (former O-02): authorized for smoke and qualification
+   within R-27's scope.
+2. Rank: composed in plans; no native or adapter-composed operation (R-28).
+3. Option descriptions: stay in the adapter binding for now (R-28).
+4. Pinning: `served: unknown` is for development only; production uses the
+   direct API with a pin unless Gateway pinning is verified (R-28, 3.6.2).
+5. Dataset: travel-memory supplies an independently labeled,
+   synthetic-provenance set that may go to the provider under zero data
+   retention (R-28).
+6. Batching: off by default until qualified (R-28, 3.5).
+
 ## Open questions
 
-1. **O-02, paid inference (owner).** Authorize paid Jev inference through
-   the Gateway: spend cap, which environments and keys, and which data may
-   be sent to Vercel and TypeSafe. Gates stages 2 and 3 of 3.8 and any
-   production use; it does not gate this draft.
-2. **Rank.** Keep `rank` undeclared and compose it in plans (recommended),
-   or specify a separately identified composed operation, for example a
-   `choice` over candidates yielding a distribution that is explicitly not a
-   ranking score?
-3. **Option descriptions.** Keep them in the adapter binding (identity-bound,
-   outside the definition), or propose an amendment to spec 002 so a
-   definition carries option descriptions for every backend?
-4. **Version pinning on the Gateway.** Unverified. If the Gateway cannot pin
-   a version, is `served: unknown` acceptable for travel-memory production,
-   or should production use the direct transport with a pin?
-5. **Dataset.** Which R-04 dataset for travel-memory's tasks, and is it
-   licensed for disclosure to the provider?
-6. **Batching.** Depends on spec 009's open question 1.
-7. **Input limit.** The default projection limit, pending the smoke stage's
+1. The default projection input limit, pending the smoke stage's
    measurement of bytes per token.
+2. Whether the spend cap should change from the agent-selected default of
+   USD 25 per month (R-27).
+3. The Gateway's per-answer field names (3.4), to be fixed from the smoke
+   stage's recorded responses.

@@ -93,7 +93,8 @@ This spec **amends no approved spec**. Everything here is expressible through
 the seams and records spec 003 already approved (`DecisionBackend`,
 `AttemptCall`, `AttemptReport`, `AdapterFailure`, `CancelAck`, `Charge`,
 `RemoteState`). Where that vocabulary is too narrow, section 5 names the gap
-and says what an amendment would change; none is proposed in this change.
+and says what an amendment would change; the one the owner chose to pursue
+is a separate amendment of spec 003, proposed as draft spec 013 in its own change.
 
 ## 1. Purpose
 
@@ -381,8 +382,10 @@ Serde types in `rustev-contract`, parsed under declared limits, with
    of the same decision whose projections share byte-identical `values` and
    `instance` members (the state), differing only in `operation`, `task`,
    `question`, `options` and `candidates`. This is the batching increment
-   R-08 deferred, scoped to one decision and one remote adapter, and it
-   satisfies spec 003 3.10 for that scope:
+   R-08 deferred, scoped to one decision and one remote adapter (accepted
+   as such by R-28), and it satisfies spec 003 3.10 for that scope. It is
+   off by default, and an adapter enables it only after the batched path is
+   qualified for that adapter:
    - equivalence: items are never merged or deduplicated; each keeps its own
      attempt id, projection and output (spec 003, 3.10.1);
    - waiters: each item keeps its own cancellation; cancelling one sends a
@@ -392,7 +395,9 @@ Serde types in `rustev-contract`, parsed under declared limits, with
      response in attempt-id order, with integer shares summing exactly to
      the rounded-up total; a member that stopped waiting reports `unknown`,
      so its reservation stays liability until the host reconciles it from
-     the exchange record (spec 003, 3.10.2);
+     the exchange record (spec 003, 3.10.2). Liability can therefore exceed
+     the true unattributed remainder until reconciled; it is never below
+     it (accepted by R-28);
    - isolation: one decision only, so one ledger and one authorized scope;
    - evidence: the exchange record lists every member (spec 003, 3.10.4).
    The adapter may hold a dispatched attempt for a declared coalescing
@@ -424,19 +429,21 @@ authority).
 
 ## 5. Limits of the approved vocabulary
 
-Recorded so they are not hidden; no amendment is proposed here (R-16).
+Recorded so they are not hidden. This spec amends nothing; the gap in 1 is
+proposed as a separately reviewable amendment (R-16, R-28).
 
 1. **Remote state on failure.** Spec 003 derives `possibly_continuing` from
    cancellation only. A `transport_interrupted` failure, where request bytes
    were sent and no response came, is recorded as `finished` although remote
    work may continue. The unknown charge keeps the reservation as liability,
-   so cost stays honest; the remote-state field does not. Correcting it
-   needs an `amends` change to spec 003 (a remote-state hint on the attempt
-   report).
+   so cost stays honest; the remote-state field does not. Draft spec 013
+   proposes the correction as an `amends` change to spec 003 (R-28). Until
+   it is approved and delivered, this limitation holds.
 2. **Structured remote evidence in the run record.** The code travels in
    the failure detail and everything else in the exchange record (3.9). A
    typed member of `rustev.run/1` would need a new run schema through an
-   `amends` change to specs 003 and 004.
+   `amends` change to specs 003 and 004. R-28 keeps the separate sink now
+   and defers `rustev.run/2` to a later change.
 3. **Runtime-planned batching.** 3.10.4 batches inside the adapter with a
    coalescing window. A runtime that hands the adapter every sibling at once
    (no window) needs a batch-aware seam, which is an `amends` change to
@@ -488,15 +495,20 @@ sh -c 'if grep -rniE "jev|typesafe|vercel|openai|anthropic" crates/rustev-contra
 cargo clippy -p rustev-remote-http --all-targets --locked -- -D warnings
 ```
 
+## Resolved questions
+
+Decided by the owner on 2026-09-24 (R-28):
+
+1. Adapter-scoped batching (3.10.4) is the R-08 optimization step for
+   remote adapters, off by default until qualified.
+2. The batched cost attribution (shares to members that received the
+   response, liability for the rest until reconciled) is accepted.
+3. The remote-state gap (5.1) goes to a separate amendment of spec 003,
+   draft spec 013.
+4. Exchange records go to a separate host sink now (3.9); a `rustev.run/2`
+   member is a later change (5.2).
+
 ## Open questions
 
-1. Accept adapter-scoped batching (3.10.4) as the R-08 optimization
-   increment for remote adapters, or keep batching deferred until a
-   runtime-planned design (5.3) is specified?
-2. Should the attribution rule for a batched charge (shares to the members
-   that received the response, liability for the rest) be accepted, given
-   that it can hold liability above the true remainder until reconciled?
-3. Pursue the spec 003 amendment of 5.1 (remote state on failed attempts)
-   before implementation, or accept the documented limitation?
-4. Exchange records in a separate host sink (3.9) versus a typed member of
-   a future `rustev.run/2` (5.2)?
+1. The default coalescing window and `max_items` for batching, to be set
+   from qualification measurements.

@@ -122,11 +122,11 @@
       }
     ],
     "sectionDigests": {
-      "009-remote-adapter-protocol": "eaafd81feb4bcdfd219b347aa2283a278eab2d02775f3989d585fa61b29322da",
+      "009-remote-adapter-protocol": "769126a44b2f6734149c91473707a9ad6f1b686b61f3b39af5356d0b24ac9a1d",
       "1-purpose": "825492dea422d2ff179a33669639eb9593e9c78f0c2bba0415b305d89808a695",
       "2-territory": "ce99aa55077d5a9469f3d29b147858465ccc7a4de8fbef5b39555097c45fc0bb",
       "3-1-authority-and-provenance": "ed94499ca9b4687dcf509ff71a84e04e2613cb6c6b804a9d96cf22c70743022c",
-      "3-10-the-rustev-remote-1-documents": "f4aabce3d5332a4444427245500249de6993cb61d18a0dd985e42292c6df80d1",
+      "3-10-the-rustev-remote-1-documents": "1e4233ca4346825e8162acdd30fab8f3b995ee137e1687a8bcec54a7ba2633b5",
       "3-11-http-binding": "f89bd2c8367d706cb350aa61a1a819c94a30a103013cd3f5a13cd181f404da47",
       "3-2-capability-description-and-negotiation": "1aef3748aa9e0e25b9e80fa8badb8a54624de03205995e848225e55fa803b257",
       "3-3-attempt-identity-and-idempotency": "fcd66e143aa348f1c64c08dd7eb2b5dd51c40d4775bcfaafbd30d036f85672d3",
@@ -136,12 +136,13 @@
       "3-7-model-and-served-identity": "8bd763356721271561156a685ba43b2e32965328eae516d91446eb54696c85ef",
       "3-8-cost-and-privacy": "28f1ade8823b560b6d053bd7f68cfc90558102088826743dc5bf55e1bea27f57",
       "3-9-exchange-records-and-replay": "bd689328c829ce1bbfa5751c7e453d0f2bd8f3996428f87ea3d28487bdea642e",
-      "3-behavior": "29d90a0130f861e3bdc596c0d1b44ebc21a9f305e362348c8ad6266162fe85dd",
+      "3-behavior": "9e37370b1de0b4d49813427eb80cf2c2e29e8c25328c6cfe68d96299c79ea103",
       "4-out-of-scope": "83f3a338eb85023a092ef9ac91db865cb644f9e883b46d231bfe1cc753d9d9be",
-      "5-limits-of-the-approved-vocabulary": "47cd40875d820bcecfb2d19840ecd7639f792837cc5cde72d4a62ab9281e03f0",
+      "5-limits-of-the-approved-vocabulary": "a1ee0d380f44f2e248ebc3ec81f425e57133de1c10c1362568894086ae9d71ba",
       "6-observable-negative-cases": "a2b6ae6780ed18edb3e5032d873f2991e6c19a12a72daf3ee06ba08589231591",
       "acceptance-planned": "c21d9815de7e218cd8bd7c6e7aa67ef64e26fc5b9541bfbd7535b61f424131fb",
-      "open-questions": "5866ef11440ed244f52472a5db70c1ffab360d33f06ef425de50105408dc8589",
+      "open-questions": "34bc4dcdd87331f7eec9d27a83bab2d45f91eea314614433daa89dbce5e4beaa",
+      "resolved-questions": "bc4ca95b62fdd0726d35b5281c100b97736d13e7b831a699ca73227bd45027b6",
       "verification": "aeec6a5d5a73fd4f2f0d7935efb1a4d54b206c8d5e29f88ce27a8425152ec06d"
     },
     "sectionHeadings": [
@@ -165,6 +166,7 @@
       "6. Observable negative cases",
       "Acceptance (planned)",
       "Verification",
+      "Resolved questions",
       "Open questions"
     ],
     "specPath": "specs/009-remote-adapter-protocol/spec.md",
@@ -172,6 +174,6 @@
     "summary": "Increment 3 (design roadmap 17.1, ordinal 009): what every decision backend reached across a network must guarantee, and a versioned, transport-neutral protocol (`rustev.remote/1`) for backends served by another process. Covers capability description and negotiation at setup, attempt identity and idempotency, one total time budget per attempt, cancellation that never claims more than the remote side confirmed, validation of responses into `RawOutput` without inventing mass, a closed error taxonomy mapped onto spec 003's failure classes, explicit served-model identity (unknown is a value, never an omission), cost reporting, retained exchange records for audit and replay, and privacy options passed through and recorded. Protocol messages live in `rustev-contract`; every network implementation lives under `integrations/`. Amends no approved behavior. Draft: claims no code.\n",
     "title": "Remote adapter protocol"
   },
-  "shardHash": "2b04275c51548598e8657788d9eea1678e9d277c461f2b3ea1fd54b0a4a2064f",
+  "shardHash": "a152edb5468acb707f7a8d74838e5355f8a529b38087d492ad772d63c9c66268",
   "specVersion": "1.8.0"
 }
