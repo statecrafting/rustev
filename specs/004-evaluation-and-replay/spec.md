@@ -1,22 +1,29 @@
 ---
 id: "004-evaluation-and-replay"
 title: "Evaluation and replay"
-status: draft
+status: approved
 implementation: pending
 created: "2026-09-23"
 summary: >
-  Increment 2: `rustev-eval` reproduces judgments offline from a separate,
-  versioned replay bundle (`rustev.replay/1`) that references the plan, the
-  snapshot and every supplied backend output or runtime reason under an
-  explicit, bounded retention mode; compares a candidate plan only on
-  requests that are semantically equivalent; keeps live re-execution apart
-  as new observations; computes metrics with explicit denominators,
-  abstention handling and comparable-case coverage; fits calibration on a
-  named split; and emits the versioned report envelope from
-  `rustev-contract` (R-06). Quality claims require real, independently
-  labeled data (R-04).
+  Increment 2: offline reproduction from bounded, host-retained replay
+  bundles; configurable tenant-only or principal-scoped equivalence for candidate
+  comparison; explicit availability, coverage and abstention; named dataset
+  splits and temperature fitting. Amends 002 with replay and request
+  documents and typed loading diagnostics, and 003 with opt-in bounded
+  capture of supplied values. Live re-execution is deferred. Synthetic
+  fixtures establish mechanics only, never empirical quality.
 establishes:
   - { kind: directory, path: "crates/rustev-eval/" }
+amends:
+  - "002-decision-contract-and-pure-core"
+  - "003-runtime-execution-and-evidence"
+extends:
+  - { spec: "002-decision-contract-and-pure-core", unit: { kind: directory, path: "crates/rustev-contract/" }, nature: amending }
+  - { spec: "002-decision-contract-and-pure-core", unit: { kind: directory, path: "crates/rustev-core/" }, nature: amending }
+  - { spec: "003-runtime-execution-and-evidence", unit: { kind: directory, path: "crates/rustev-runtime/" }, nature: amending }
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.toml" }, nature: additive }
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.lock" }, nature: additive }
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
 depends_on:
   - "002-decision-contract-and-pure-core"
   - "003-runtime-execution-and-evidence"
@@ -25,237 +32,439 @@ depends_on:
 
 # 004: Evaluation and replay
 
-Draft. A proposal, not a claim about code. Rationale: design section 11;
-owner decisions R-04 and R-06. Refined after specs 003 and 005 were
-delivered, against their actual interfaces, following the owner's replay
-direction of 2026-09-23 (recorded with R-12 to R-18). Section 5 lists the
-contract and runtime amendments this spec would need; none is made here.
+Approved work order, not implemented. The owner delegated the four replay
+choices and approved forward progress on 2026-09-23; R-19 to R-23 and A-05
+record the scope and the agent's selected defaults. The owner then requested
+both isolation modes as a configurable choice (R-24), incorporated in this
+same approval change before implementation. This amendment is
+reviewed and delivered separately before implementation (R-16). The text of
+approved specs 002 and 003 remains their historical contract.
 
 ## 1. Purpose
 
-Make every quality, calibration and latency statement a measured, named
-result; make an absent measurement `unknown`; and make "this judgment can be
-reproduced" a checked claim about retained inputs, never an inference from a
-digest.
+Make reproduction a checked statement about available retained inputs.
+Compare candidate decisions only where evidence permits it. Report coverage,
+abstention and missing measurements explicitly. A digest proves integrity
+relative to expected bytes, never truth, authorization or producer identity.
 
 ## 2. Territory
 
-`crates/rustev-eval/`. The report envelope stays in `rustev-contract`
-(R-06); the replay bundle document would join it (5.1). Metrics, datasets,
-replay execution and fitting live here. Depends on `rustev-contract` and
-`rustev-core`; on `rustev-runtime` only for live re-execution (3.6), which
-may be split out if the dependency is unwanted.
+`crates/rustev-eval/` owns replay execution, datasets, metrics, fitting and
+regression gates. Normal dependencies are contract and core only, with no
+runtime, backend, HTTP stack, clock or filesystem access. Host resolution is
+a synchronous, fallible byte-provider interface supplied by the caller;
+the library itself performs no storage or network operation. Tests may use
+runtime and the rules backend. The amendment edges above authorize only the
+contract, core and runtime additions in section 5 and workspace wiring.
 
-## 3. Behavior (to be made concrete before approval)
+## 3. Behavior
 
-### 3.1 What exists after specs 003 and 005
+### 3.1 Storage, scope and retention
 
-1. A `rustev.run/1` record carries the core's `EvidenceRecord`, the
-   `PlanId`, the execution-policy identity, attempts, timing and cost. It
-   carries the `SnapshotId` but not the snapshot, and each request's result
-   as `output{target}` or a runtime reason, but not the output. A run record
-   alone therefore cannot reproduce a judgment, and this spec does not
-   change that: run records stay observational records with the retention
-   obligations spec 003 gives them (none beyond delivery).
-2. The core reproduces a judgment from a plan, a snapshot, an evaluation
-   time and the sequence of supplied values (`Evaluation::supply`, spec 003
-   3.8). The runtime does not currently hand the supplied outputs to its
-   caller (5.3).
-3. Spec 005's rules backend is `bitwise` deterministic and in-process, so it
-   supplies execution fixtures whose live re-execution is exactly
-   comparable. It is a software fixture, not a quality baseline.
+1. The host owns storage, access checks, expiry, erasure and transport
+   buffering. Rustev validates declarations and availability at a caller-
+   supplied `now_ms`. It neither schedules deletion nor claims deletion
+   occurred. A bundle is evidence of what the host retained, not an
+   attestation of a producer or an authorization token.
+2. Default capture is off and default content retention is `digest_only`.
+   A newly assembled bundle defaults to a seven-day metadata lifetime.
+   Keeping bytes, including via an external reference, requires an explicit
+   retention choice. Every mode has an expiry; the maximum bundle lifetime
+   is 30 days from `created_at_ms`, and the host may enforce a shorter cap.
+   Each item's expiry is no later than the bundle's. An expiry must be
+   strictly after creation; arithmetic overflow or exceeding the cap is
+   refused. These are engineering defaults, not legal retention advice.
+   Extending the hard cap requires an amendment. Copying a bundle does not
+   reset creation or expiry.
+3. Isolation is a mutually exclusive, host-configured choice per capture
+   and bundle, represented by a tagged scope value:
+   - `tenant_only{tenant, context_revision}` permits reuse across principals
+     within that tenant and revision;
+   - `principal{tenant, context_revision, principal_scope}` additionally
+     requires the same effective principal scope. This is the configuration
+     default; a missing principal handle is an error, never an automatic
+     downgrade to tenant-only.
+   Every handle/revision is non-empty, opaque, non-secret and at most 256
+   bytes. Serialized documents always state the mode and all its fields;
+   omitted modes, unknown modes or fields from both variants are refused.
+   The host increments/rotates context revision when shared visibility or
+   output-affecting authorization context changes, and rotates principal
+   scope when principal-specific permissions change. Raw credentials never
+   belong in a bundle.
+4. Tenant-only is an explicit host assertion that the reusable computation
+   is independent of principal-specific permissions and hidden backend
+   context, and that the host authorizes each reader to access the retained
+   snapshot and outputs. It does not make the bundle tenant-public. If that
+   assertion does not hold, the host must select principal scope or disable
+   reuse. Rustev cannot establish principal independence from a digest.
+   The mode scopes reuse, not the authorization context passed to live
+   backends: selecting tenant-only never strips `principal_handle` from
+   `CallContext` or grants access.
+5. Replay requires the caller's trusted scope configuration to equal the
+   bundle's scope before resolving any item. Comparison includes the mode,
+   tenant and context revision, plus principal scope in principal mode.
+   Any difference yields `incomparable{scope-mismatch}`. Tenant-only never
+   crosses tenants. A principal-scoped capture cannot be relabeled or
+   downgraded to tenant-only, nor reused in the other direction. Selecting
+   a new mode requires a new capture; no automatic migration is provided.
+   No empty handle or omitted scope implies a public/shared namespace.
+6. Retention modes are `retained{bytes, digest, expires_at_ms}`,
+   `external{reference, digest, expires_at_ms}` and
+   `digest_only{digest, expires_at_ms}`. Embedded bytes use a JSON UTF-8
+   string containing the canonical document. External references are opaque
+   strings, not instructions to fetch a URL; the host resolves them.
+   Every item states its expected document schema and identity where one
+   exists. Digests use the existing schema-tagged canonical digest rule.
+7. Availability is exactly `available`, `missing`, `expired`, `erased`,
+   `corrupt`, `inaccessible` or `mismatched`. At `now_ms >= expires_at_ms`,
+   report expired without resolving bytes. For an unexpired external item,
+   the resolver returns bounded bytes, missing, erased or inaccessible;
+   panics/errors must not become missing or available. Digest-only is
+   missing. A digest mismatch is corrupt; intact bytes with a wrong schema,
+   identity, cross-reference or semantic role are mismatched. Invalid JSON
+   is corrupt. Only available items can contribute to reproduction.
+   When expiry and erasure overlap, expiry takes precedence at replay; an
+   erasure reported before expiry remains a distinct outcome.
+8. Embedded bytes may themselves outlive erasure in a copied bundle. The
+   host must remove every retained copy, including backups, or use external
+   storage that enforces erasure. Rustev cannot discover removed consent
+   from bytes alone. This limit is stated wherever replayability is claimed.
 
-### 3.2 The replay bundle, `rustev.replay/1`
+### 3.2 Replay bundle, `rustev.replay/1`
 
-A separate, versioned document per decision, written by the host from what
-it retained, never derived from the run record alone:
+One bundle describes one admitted decision and includes:
 
-- `decision_id`, `plan_id`, and the plan: embedded canonical bytes, or a
-  reference with its digest;
-- `evaluation_time_ms`;
-- the snapshot: `snapshot_id` and one retention item (3.3);
-- per request, in the order the core listed them: `step`, `instance`, the
-  request identity (3.5), and exactly one supplied value, either a
-  `rustev.backend-output/1` document or a runtime reason of spec 002
-  3.10.1, each as a retention item; plus the run record's attempt id that
-  produced it, as a cross-reference;
-- the run record's `decision_id` and a digest of the delivered record, as a
-  cross-reference only.
+- schema, decision id, scope, creation and expiry times, evaluation time;
+- `PlanId` and retained plan document; all descriptors and calibration
+  artifacts needed to recompile that plan, with their identities and
+  retention items (the compiler currently needs these separately);
+- `SnapshotId` and the snapshot retention item;
+- the delivered `rustev.run/1` record as a retention item, including its
+  digest. Its core evidence contains the expected judgment. A digest alone
+  is insufficient to obtain the expected judgment or historical costs;
+- capture status: complete, disabled, limit-exceeded, cancelled or
+  abandoned. Only complete can be reproduced;
+- one entry per value successfully supplied to the core: step, instance,
+  request identity document, supply sequence number, optional producing
+  attempt id and optional target index, and a retention item holding the
+  output document or a `rustev.runtime-reason/1` document containing
+  `schema` and `reason` (one of the four existing runtime reasons). The
+  reason document uses `RECORD_V1`; no other unresolved kind is accepted.
 
-A bundle is bounded by the plan's `max_semantic_requests` and parsed under a
-named limit set. It is not identified evidence of provenance: it says what
-the host retained.
+A no-dispatch budget/deadline failure has no producing attempt. An output
+names the actual producing target, including fallback, and its artifact
+and descriptor. A reason is a historical runtime observation, not a backend
+output. `not_supplied` is never encoded as a supplied failure.
 
-### 3.3 Retention and availability
+Supply sequence is the actual successful `Evaluation::supply` order,
+contiguous from zero. Run-record request order remains the order the core
+listed requests; concurrent completion order can differ. Entries are unique
+by step and instance. Reproduction checks both orders against their
+respective roles, never assumes they are interchangeable.
 
-1. Each retention item declares one mode:
-   - `retained{digest, expires_at_ms}`: the bytes are held with the bundle
-     (or its store) until the stated expiry;
-   - `external{reference, digest}`: the bytes are held elsewhere and
-     resolved on demand;
-   - `digest_only{digest}`: only the digest was kept.
-   Retention is explicit and bounded: a bundle states its expiry, and no
-   mode is unlimited by default. `digest_only` never establishes
-   replayability.
-2. At replay, each item resolves to exactly one availability:
-   `available`, `missing` (never retained, or `digest_only`), `expired`,
-   `erased` (removed on request before expiry), `corrupt` (bytes whose
-   digest differs from the recorded one), `inaccessible` (the resolver
-   failed or refused), or `mismatched` (intact bytes that belong to another
-   plan, snapshot, request or decision). The seven are distinct and are
-   reported as such; none is ever read as a pass.
-3. A digest establishes integrity relative to the expected bytes. It does
-   not establish who produced them or that they are true; the bundle's
-   cross-references to the run record are what connect them to an
-   execution, and those are only as trustworthy as the host's storage.
-4. Erasure and expiry remove replay availability. A case whose snapshot or
-   any supplied value is `erased` or `expired` becomes `incomparable` with
-   that reason; it is counted in coverage (3.8) and excluded from every
-   quality numerator and denominator, never scored as agreement.
+The bundle has at most `min(plan.max_semantic_requests, 4096)` supplies,
+at most 4096 descriptors and at most 4096 calibrations. The `REPLAY_V1`
+parse set is 16 MiB total, depth 48, 8 MiB per string, 10,000 members per
+collection, 1,000,000 values, 40 bytes per number, fractional numbers
+allowed. All nested documents are also checked against their own existing
+limits before typed construction. Total resolved bytes, including external
+items, are capped at 16 MiB per case. Bounds apply to typed constructors as
+well as parsing. Oversized cases are explicitly incomparable, never
+truncated into a successful replay. The host bounds external reads before
+allocation; the library checks the supplied slices again.
 
-### 3.4 Historical reproduction (offline)
+### 3.3 Historical reproduction
 
-1. Reproduction re-runs the pure core only: it loads the plan
-   (`Compiled::load`, which recompiles and requires byte-identical plan
-   bytes), starts an evaluation over the retained snapshot at the recorded
-   evaluation time, supplies each retained value through
-   `Evaluation::supply` in the recorded order, and finishes. It makes no
-   backend or model call.
-2. The result is `reproduced` when the judgment's canonical bytes equal the
-   recorded judgment's, `diverged` otherwise (a defect to investigate), or
-   `incomparable{reason}` when any input is not `available`, or when the
-   plan cannot be loaded under this build of the core
-   (`compiler-changed`).
-3. A nondeterministic backend does not prevent reproduction: its actual
-   outputs are retained, and reproduction replays them. Determinism
-   matters only for live re-execution (3.6).
-4. Reproduction does not remeasure anything: latency, attempts and spend
-   stay the historical observations in the run record, with their labels
-   (observed, estimated, unknown liability never summed as spend).
+1. Validate scope, capture completeness, lifetimes, resource bounds,
+   integrity and cross-references before evaluation. Load every required
+   document under its own limits. Match decision, plan, snapshot, evaluation
+   time, request entries, results and producing attempts to the retained
+   run record. Missing, duplicate, extra or inconsistent entries are
+   incomparable with a typed reason and item location.
+2. Load the plan using retained descriptors and calibrations. A changed
+   compiler or exact-operator registry is `compiler-changed`, carrying
+   recorded/current identities. A same-compiler plan that does not
+   recompile identically is `plan-mismatch`, not compiler-changed.
+   Missing dependencies keep their availability reasons, not a generic
+   compiler error. There is no automatic recompile-and-accept fallback.
+3. Start the pure core with the retained snapshot and recorded evaluation
+   time. For every supply, find the pending request, recompute its identity,
+   validate the actual target against the plan and attempt record, then
+   supply the retained raw output or runtime reason. Fallback raw outputs
+   use `supply` after these checks, not `supply_doc`, whose existing artifact
+   check expects the primary binding. Finish with the original decision id.
+4. `reproduced` means canonical judgment bytes equal those in the retained
+   run record. A valid, complete replay with different bytes is `diverged`.
+   An unavailable input or failed precondition is `incomparable{reason}`.
+   A cancelled/abandoned execution has no expected judgment and is
+   incomparable, even if a prefix of its supplied values was captured.
+5. Zero backend calls occur. A nondeterministic backend is replayable when
+   its actual outputs are retained. Historical latency, queueing, attempts
+   and costs are copied as observations; they are never remeasured or
+   inferred from replay duration. Estimated units and unknown liability
+   remain distinct from observed units, and logical units are not money.
+6. Integrity and equality establish reproduction under this core build and
+   platform. No new cross-platform floating-point guarantee is made. A
+   numerical difference remains divergence, never silently accepted under
+   a tolerance intended for live inference.
 
-### 3.5 Candidate comparison
+### 3.4 Request identity and candidate comparison
 
-1. A candidate plan (different definition, bindings, calibration or
-   execution policy) is evaluated over the same retained snapshot and
-   evaluation time. A retained value is reused for a candidate request
-   only when the two requests are semantically equivalent.
-2. Request identity covers every output-affecting input (spec 003
-   3.10.1): backend artifact and descriptor, operation, task, question,
-   options or levels, candidates, the canonical projection bytes, input
-   limit handling, and, for values read after normalization, the output
-   kind and normalization. A calibration applied by the core after the
-   backend is not part of the request; it is applied again by the
-   candidate. Step ids and instance keys alone are never equivalence.
-3. A candidate request with no equivalent retained request is
-   `incomparable{request-mismatch}` for that request, and the case is
-   incomparable unless the candidate policy handles that step's absence
-   explicitly; a changed model, question, option list, preprocessing or
-   projection never reuses the old output as evidence of the new behavior.
+1. `rustev.request/1` has a `RequestId` using the existing tagged canonical
+   digest rule. Its content is the full tagged scope (including mode and
+   context revision), actual backend id, artifact,
+   descriptor identity, exact canonical projection bytes, bound output kind,
+   required value kind and normalization. Input-limit handling is covered
+   by the descriptor identity, which commits to `input_limit.max_bytes` and
+   `input_limit.on_excess`; it is not guessed from a digest. Projection
+   bytes already include operation, task, question, ordered options,
+   candidates, instance bindings and projected values. No textual
+   normalization or reordered option equivalence is inferred.
+2. Core computes this document for a pending request and a validated target
+   index. The target must be the primary or an explicit fallback bound by
+   that plan. It refuses unknown requests, targets and invalid scope.
+   Runtime and eval use this one function. `REQUEST_V1` uses `REPLAY_V1`
+   bounds, tightened to 4 MiB total; projection bytes still obey the plan's
+   bound. The containing bundle's aggregate bound also applies.
+3. Decision id, step id, plan id, timing, retry count and core-applied
+   calibration are excluded. They do not identify a backend computation.
+   Instance content inside the projection is included. This permits
+   calibration/policy comparison while preventing accidental reuse based
+   solely on a step name. Scope is an isolation key, never an authority
+   grant. Context-sensitive providers must declare every other output-
+   affecting configuration in artifact/descriptor identity; hidden provider
+   context invalidates reuse eligibility.
+4. Candidate comparison first requires a reproduced historical case.
+   Compile/load the candidate against explicitly supplied descriptors and
+   calibration artifacts, using the same snapshot, time and scope. Only
+   retained raw successful outputs are reusable, and only for a candidate's
+   primary request with exactly equal request identity. An old fallback
+   output may serve a new primary only if that actual producer identity is
+   equal. Candidate fallback execution is not simulated offline.
+5. Historical runtime failures are never reused to predict a candidate's
+   failure. A candidate request without an equivalent successful output
+   makes the case incomparable with `request-mismatch` or
+   `historical-runtime-failure`, even if the candidate policy could handle
+   an invented absence. No substitute failure is supplied. A candidate that
+   legitimately issues no such request is unaffected.
+6. If several retained entries share one request identity, they are usable
+   only if their canonical raw outputs agree. Otherwise the candidate case
+   is incomparable with `ambiguous-output`; choosing an arbitrary output
+   from a nondeterministic backend is forbidden. Candidate use rebinds only
+   the destination step/instance, then the core validates the raw output.
+7. Candidate outcome change is reported separately from historical
+   divergence. A changed `PlanId` alone does not prevent comparison, and
+   equality of entire judgments (which include plan identity) is not the
+   candidate agreement metric. The task adapter compares explicitly named
+   proposal payloads or outcome categories; this definition is recorded in
+   the evaluator configuration.
 
-### 3.6 Live re-execution
+### 3.5 Datasets, metrics and regression gates
 
-Open whether it belongs in this spec (default: a separately feature-gated
-module). If included, it runs the candidate through `rustev-runtime` against
-installed backends, produces new run records and new observations, and is
-reported apart from reproduction. Its results are never labeled
-`reproduced`. Against a `bitwise` backend (spec 005) outputs are compared
-exactly; against a `tolerance` backend within its declared, measured
-tolerance; otherwise `incomparable{nondeterministic-backend}`.
+1. The eval crate defines a bounded `rustev.dataset/1` manifest using
+   `REPLAY_V1`, with a content-derived `DatasetId`, provenance (R-04),
+   unique case ids, source/snapshot identities, labels or explicit missing
+   labels, subgroup membership and disjoint training, model-selection,
+   calibration and final-test membership. Repeated source/snapshot identity
+   across splits is refused. Label shape is checked by a named task adapter.
+   Semantic duplicates the manifest cannot identify remain a stated limit.
+2. Reports use the existing `rustev.eval-report/1` envelope (R-06).
+   Synthetic provenance always prevents empirical quality claims. Real
+   provenance requires source, license, labeling method and limitations;
+   a declared real dataset is not independently verified by Rustev.
+3. A versioned `rustev.evaluator-config/1` document in eval, also under
+   `REPLAY_V1`, identifies task adapter/version, label interpretation,
+   metric formulas, subgroup/bin boundaries, exclusions and gate thresholds.
+   Its canonical digest is the report's `EvaluatorConfigId`. Reports are
+   accompanied by this document and a bounded `rustev.eval-detail/1`
+   document in eval, under the same limits, binding report digest, dataset,
+   split and configuration, with numerator, denominator, exclusion counts
+   and per-case scope, outcome and reason. A standalone envelope never proves these
+   denominators or definitions. All counts reconcile to the named cohort.
+4. Coverage is comparable cases / all cases, reported first. Historical
+   comparison requires reproduction; divergence is reported and excluded
+   from candidate quality. Acceptance coverage is proposals / comparable
+   cases. Escalations, missing-evidence and unresolved outcomes are
+   abstentions in that denominator. Incomparable cases are excluded from
+   quality and counted by reason. Cancellation never becomes agreement.
+5. Error among accepted is wrong labeled proposals / labeled proposals,
+   alongside acceptance coverage and labeled-proposal coverage. Unlabeled
+   proposals are counted and excluded, never treated as correct. Zero
+   denominators yield unknown. Task adapters explicitly define correctness.
+6. On labeled, comparable probability vectors: mean log loss is
+   `-sum(ln(p[label])) / n` (a zero true-class probability yields an explicit
+   infinite-loss diagnostic and unknown finite metric, never clipping);
+   multiclass Brier is `sum_case sum_class (p-y)^2 / n`. Scores, labels,
+   ranks and unresolved values never silently become probabilities.
+   Reliability reports bin counts, mean confidence and empirical accuracy
+   for top-label confidence, by declared subgroup. Bins are half-open except
+   the final bin includes 1. Empty bins are unknown. Use the core's same
+   validation/calibration math; duplicating a different softmax is forbidden.
+7. Latency uses retained run records, with queueing separate and a named
+   cohort. Quantiles use nearest rank (`ceil(q*n)`, one-based). Observed,
+   estimated and unknown cost are separate series, with no mixed total
+   presented as observed spend. Unit comparability must be declared by the
+   evaluator; different backend units cannot be added without it.
+8. A gate states metric, direction, absolute tolerance, minimum comparable
+   and labeled coverage, and baseline/candidate dataset, split and config.
+   Missing, nonfinite or incompatible measurements yield unknown, never
+   pass; below-minimum coverage fails the coverage gate. Gates never grant
+   authority to an executor.
 
-### 3.7 Datasets and provenance gate (R-04)
+### 3.6 Calibration fitting
 
-1. Datasets are identified by `DatasetId` and split into training, model
-   selection, calibration and final test. A report names its split; a split
-   used to fit is never a holdout afterwards.
-2. A report over synthetic data says so in its envelope and makes no
-   quality claim. Before semantic quality qualification, an appropriately
-   licensed public dataset or an independently human-labeled dataset is
-   recorded with provenance, license, labeling method, splits and
-   limitations. Generated examples are never independent evidence of
-   semantic quality, and spec 005's rules programs are software fixtures.
-
-### 3.8 Metrics
-
-Every metric states its definition, numerator, denominator and the cases it
-excludes. Per case the outcome is one of: proposal, escalation,
-`missing_evidence_from`, unresolved (each reason), or incomparable (each
-reason).
-
-1. **Coverage of comparison**: comparable cases over all cases, with
-   incomparable counts by reason. Always reported first.
-2. **Acceptance coverage**: proposals over comparable cases. Escalations
-   and unresolved outcomes are abstentions, counted in the denominator and
-   never in the numerator.
-3. **Error among accepted**: wrong proposals over proposals, against
-   labels; the central product measure, always shown with acceptance
-   coverage (the coverage-error pair), never alone.
-4. **Log loss, Brier, reliability by subgroup**: over steps that produced a
-   distribution or calibrated probability and have a label; steps that were
-   unresolved are counted as missing, not as a probability.
-5. **Missing cases**: a case without a label is counted and excluded from
-   labeled metrics, never imputed.
-6. **Latency and cost** come from run records only, with queueing reported
-   separately and cost labels preserved; replay adds none.
-7. A regression gate declares tolerances; a missing measurement is
-   `unknown`, never a pass.
-
-### 3.9 Calibration fitting
-
-Fits `temperature/1` on the calibration split and emits a
-`rustev.calibration/1` artifact bound to artifact, task, question and
-dataset. The artifact records the fit; whether it is calibrated is measured
-again on a different split. A fitted calibration is refused as evidence on
-the split that fitted it.
+1. Fit `temperature/1` on the calibration split only, against valid labeled
+   logits or distributions using the core's defined transformation. Refuse
+   empty data, nonfinite inputs, zero support for a true label that no
+   temperature can repair, and inconsistent artifact/task/question/options.
+2. The caller supplies a non-empty, strictly increasing list of at most
+   4096 candidate Decimal temperatures in `(0, 1000]`. Evaluate mean log
+   loss at each; choose the lowest loss, ties choosing the smaller
+   temperature. This bounded grid search claims only the best evaluated
+   candidate, not a globally optimal fit. The grid and all fit counts are
+   recorded in the evaluator configuration and fit record.
+3. Emit the existing `rustev.calibration/1` artifact and an eval-owned
+   `rustev.calibration-fit/1` companion document under `REPLAY_V1`, binding
+   artifact id, dataset id, split, source/case identities, configuration and
+   fit result. The existing calibration schema has no split field; never
+   pretend its dataset id alone proves disjoint evaluation.
+4. Qualification requires the companion record and a different, disjoint
+   split with no fit-source overlap. Missing lineage yields unknown;
+   overlap or reuse of the fitting split is refused. Applying an artifact
+   in core is still possible under the existing contract, but does not by
+   itself establish calibration quality. Synthetic fitting tests establish
+   mechanics only.
 
 ## 4. Out of scope
 
-Training models (R-01, R-17), paid inference, dataset acquisition, model
-benchmarking, any dataset without recorded provenance and license, and
-changing run records' retention obligations.
+Live re-execution is deferred to a future spec, including bitwise/tolerance
+backend comparison and new runtime observations. This work adds no live
+inference command, model dependency, training, paid service, dataset
+acquisition, persistent store, deletion scheduler, authorization service or
+new run-record retention obligation. CLI and semantic-backend specs 006 and
+011 remain drafts. No release, publication, deployment, branch-protection
+change, waiver, sibling-repository edit or background monitor is authorized
+by this work order.
 
-## 5. Required amendments (proposed; not made by this draft)
+## 5. Amendments and compatibility
 
-Each would be a separately reviewable change with an `amends` edge, made
-before implementation (R-16).
+1. **Spec 002, contract:** add the replay/request/runtime-reason documents, typed
+   retention/availability vocabulary and request identity above. Existing
+   documents and their canonical bytes stay unchanged; no existing schema
+   gains a field silently. Eval-owned dataset/detail/config/fit documents
+   compose the existing report and calibration envelopes.
+2. **Spec 002, core:** add the pending-request identity function in 3.4 and
+   an additive typed loading diagnostic distinguishing compiler/registry
+   mismatch, missing binding dependencies and invalid/recompiled plan
+   mismatch. Keep `Compiled::load` behavior and refusal API compatible;
+   the new entry point must share its actual recompile/equality logic.
+   Neither an error string match nor a version difference inferred from
+   arbitrary corruption is an adequate diagnostic.
+3. **Spec 003, runtime:** add an opt-in `decide_with_capture` path returning
+   the normal decide result plus a separate capture outcome, also when sink
+   delivery fails. A rejected decision returns `not-admitted` capture with
+   no entries; it cannot become a replay bundle. Existing `decide`,
+   `Decided`, `DecisionRequest` and `RuntimeConfig` retain their API and
+   wire behavior. Capture configuration
+   supplies the scope and a positive byte limit no greater than 16 MiB;
+   all scope handles are separate from secret-bearing call context. Mode
+   selection is explicit as in 3.1; a missing principal never selects the
+   tenant-only variant.
+   Capture records only successfully supplied values in actual supply order,
+   with actual target/attempt references and request identity. It is a
+   bounded in-memory handoff, not persistent retention or a callback.
+4. Capture refuses invalid configuration before admission. If capture
+   exceeds its byte/request cap, discard captured payloads and return
+   `limit-exceeded`; decision execution and sink policy still complete
+   normally. Never report a partial capture as complete. Cancellation is
+   explicit; dropping the future returns nothing and provides no durable
+   capture guarantee. Existing accounting and abandonment rules still hold.
+   Failed delivery does not become acknowledged because capture succeeded.
+   No capture data is sent to the evidence sink by default.
+5. Assembly takes caller-retained plan dependencies, snapshot, run record
+   and capture, validates all bindings, and applies explicit retention
+   choices. It does not obtain them from an output digest. Returning a
+   capture is not a promise that a serializable bundle fits the size cap;
+   assembly checks escaped document sizes and returns a typed bound error.
+6. Wire schemas `definition/1`, `plan/2`, `run/1`, `backend-output/1`,
+   `calibration/1` and `eval-report/1` are unchanged. The existing plan and
+   definition goldens must remain byte-identical. Any later need to change
+   them is another reviewed amendment before implementation.
 
-1. **Contract (spec 002's crate, as amended by 003):** the
-   `rustev.replay/1` bundle document and its limit set; a retention item and
-   availability vocabulary; a request-identity document or digest function
-   (`rustev.request/1`) so that equivalence is computed one way.
-2. **Core:** a function returning each pending request's identity from the
-   plan binding and projection (3.5.2), so eval and runtime cannot disagree
-   on equivalence.
-3. **Runtime (spec 003):** a way for the host to retain what was supplied,
-   without enlarging the run record: either `Decided` gains the supplied
-   values per request, or a separate retention seam receives them. The
-   runtime would still retain nothing itself.
-4. **Plan loading:** confirm that `Compiled::load` under a different
-   `rustev-core` version is reported as `compiler-changed` rather than a
-   load error the caller must interpret.
+## 6. Delivery sequence and acceptance
 
-## 6. Decisions still required from the owner
+Deliver this approval and amendment before code. Then implement in bounded
+changes: contract/core diagnostics and identities; runtime capture; offline
+reproduction and comparison; metrics/fitting and both reference reports.
+Each implementation change edits this spec's implementation record, keeps
+its lifecycle honest and passes gate, code, declared acceptance and coupling
+on the exact reviewed head before merge. Only the final accepted increment
+sets `implementation: complete` and adds 004 to `make verify`.
 
-1. Where bundles live and who enforces expiry and erasure (the host, with
-   Rustev only describing and checking), and the default and maximum
-   retention bounds.
-2. Whether live re-execution is part of this spec or a later one.
-3. Whether request identity includes the authorized scope (principal
-   handle or tenant), as spec 003 3.10.1 requires for sharing, so a
-   retained value from one tenant can never serve another's candidate.
-4. Which of the two shapes in 5.3 the runtime takes.
+Required executable acceptance before completion:
 
-## Acceptance (draft)
+- Both reference tasks produce synthetic runtime fixtures and reproduce
+  byte-identical judgments offline, with a backend-call counter proving no
+  inference. Include zero-request, dependent-request, out-of-order completion,
+  nondeterministic-output, retry, fallback and pre-dispatch failure cases.
+- Every availability reason, exact expiry boundary, invalid lifetime,
+  external byte cap, embedded parse bound, wrong scope, changed context or
+  permission revision, missing descriptor/calibration, compiler change, same-compiler
+  plan corruption, wrong attempt/target, duplicate/extra/missing supply,
+  cancellation and absent expected judgment has a failing fixture.
+- Isolation matrix: tenant-only permits otherwise identical requests from
+  different principals in the same tenant/revision, but refuses another
+  tenant or revision. Principal mode additionally refuses another principal
+  scope. Both directions of mode mismatch, absent mode/handle, mixed-variant
+  fields and attempts to downgrade an existing capture are refused before
+  resolution. Tenant-only leaves the live call's principal context unchanged.
+- Changing artifact, descriptor, question, options, projection, scope or
+  normalization prevents reuse. A policy/calibration-only change can reuse
+  raw outputs. Historical failures, conflicting duplicate outputs and a
+  fallback mistaken for the primary never qualify as comparable.
+- Capture-off preserves the existing API tests. Capture-on preserves the
+  judgment and accounting, including sink failure and cancellation. Cap
+  exhaustion reports incomplete capture without altering decision results.
+- Both baseline reports name synthetic provenance, configuration and all
+  denominators. Count reconciliation includes abstentions, missing labels,
+  divergence and each incomparable reason. Zero denominators, zero true-
+  class probability, wrong kinds, empty bins, mixed cost units and unknown
+  gate inputs never pass by default.
+- Temperature fitting picks the expected grid winner on a hand-computable
+  fixture, emits bound lineage and rejects same-split/source qualification.
+- Negative controls seed at least one compiling defect in scope isolation,
+  expiry, output equivalence, fallback identity, capture completeness,
+  denominator accounting and split leakage. Every defect must be detected.
+  The bounded seed harness belongs under `crates/rustev-eval/`.
+- Normal dependency trees keep eval independent of runtime/backends and
+  keep contract/core free of runtime, I/O and network dependencies.
 
-- A retained run reproduces its judgment byte for byte with no backend
-  call; a run with a `digest_only`, expired, erased, corrupt, inaccessible
-  or mismatched input is `incomparable` with that distinct reason and is
-  never counted as agreement.
-- A candidate plan with a changed question, option list, projection or
-  artifact does not reuse the old output; an unchanged request does.
-- Live re-execution, if included, is reported apart from reproduction.
-- A synthetic baseline report exists for each reference task, labeled
-  synthetic, with no quality claim; it states comparable-case coverage and
-  every denominator.
-- A fitted calibration is refused as evidence on the split that fitted it.
-- A report never presents estimated or unknown cost as observed, and never
-  reports replay time as inference latency.
+## Verification
+
+These commands are the future implementation acceptance, not a claim that
+an eval crate exists. They must fail until that work is delivered. Do not
+add 004 to the aggregate completed-spec acceptance list prematurely.
+
+```verify:cli
+cargo test -p rustev-contract --locked
+cargo test -p rustev-core --locked
+cargo test -p rustev-runtime --locked
+cargo test -p rustev-eval --locked
+cargo run -p rustev-boundaries --locked --quiet
+cargo clippy -p rustev-eval --all-targets --locked -- -D warnings
+cargo fmt --all --check
+sh crates/rustev-eval/mutation/seeds.sh
+```
+
+## Implementation record
+
+- 2026-09-23: approved contract and amendments only. No replay, capture,
+  metrics or fitting implementation is claimed. Review against current
+  source found and addressed missing plan-loading dependencies, missing
+  retained expected judgment, actual fallback identity, successful supply
+  order, cancellation, candidate runtime-failure reuse and calibration
+  split lineage. These were gaps in the draft, not delivered features.
+- 2026-09-23: during review of this approval change, the owner requested
+  configurable tenant-only and principal-scope isolation (R-24). Both modes,
+  principal-mode default, explicit context revisions, mode-separated
+  identities and the acceptance matrix are specified before implementation.

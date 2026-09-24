@@ -10,12 +10,41 @@
     ]
   },
   "mapping": {
+    "amends": [
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence"
+    ],
     "dependsOn": [
       "002-decision-contract-and-pure-core",
       "003-runtime-execution-and-evidence",
       "005-reference-backends"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "Cargo.lock",
+        "source": "spec-edge"
+      },
+      {
+        "path": "Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "Makefile",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-contract/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-core/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-runtime/",
+        "source": "spec-edge"
+      }
+    ],
     "resolvedUnits": [
       {
         "locations": [],
@@ -25,11 +54,89 @@
           "kind": "directory",
           "path": "crates/rustev-eval/"
         }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-contract/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-contract/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-core/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-core/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-runtime/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-runtime/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.lock"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Makefile"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
       }
     ],
     "specId": "004-evaluation-and-replay",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "8aa9085a28c72453ebdb76d33c094296fc422e6eb2c8fd15c870c1f695da8b4d"
+  "shardHash": "937d56e6269103e7861dd147f9bba9012db83617ba7de078c01a7e264288cf07"
 }
