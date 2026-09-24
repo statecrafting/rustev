@@ -1,0 +1,1 @@
+{"category":6,"category_name":"uncalibrated_threshold","command":"plan check","detail":"a probability threshold reads the uncalibrated distribution \"explicit_deadline\" without uncalibrated_threshold","shortfalls":[],"status":"refused","subject":"policy:adjustment:urgency"}

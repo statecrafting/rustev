@@ -1,0 +1,1 @@
+{"category":9,"category_name":"invalid_fallback","command":"plan check","detail":"consumers cannot accept the fallback kind: a probability threshold cannot read selected_label","shortfalls":[],"status":"refused","subject":"step:explicit_deadline"}

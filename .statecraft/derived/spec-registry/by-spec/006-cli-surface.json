@@ -32,9 +32,9 @@
       }
     ],
     "id": "006-cli-surface",
-    "implementation": "pending",
+    "implementation": "in-progress",
     "sectionDigests": {
-      "006-cli-surface": "13a769823c8fbf7169eccc15cbd3a4998a74e401cb27129a22996f3813cba1c4",
+      "006-cli-surface": "3c3c0bf09ac9f32ae9c3426798f994fa8cc365e12e148db554c4a2606068ba1d",
       "1-purpose": "4e2e2f237b2a801fa00173df8cfad9bc84473b9b0606fbb2bcf9d0270d91a3bc",
       "2-territory": "f2550de1e11215e4f9d4335ee31ca10a35fa6f0b4ec2e2915025010222f9f16a",
       "3-1-invocation-and-output": "a4493237889bb81be796ff380faec13dbf8dfd484ca6479dacb10d7b4f42f959",
@@ -53,7 +53,7 @@
       "acceptance": "ccc038c7907c755e015473a8d9aa6e09adff7c3477ef57dd99ea7bfded0c9e50",
       "decision-history": "db88927e5d5328c82e7d03af5721b40e0d0279bc9484b5db9a55cec60700e644",
       "engineering-choices": "061631a354a04025f470996b66f8aeaaf5d6e634a2e8adcd2b7469daf0147184",
-      "implementation-record": "7fb33c3dd05ce9738350555602b3f07d69cdea9902159099eb28e0045e928777",
+      "implementation-record": "1fdc329f566e0130d2e39142a50d826a77cdca0ab3bcd1331ecae80f03aa3d03",
       "verification": "00ba9bd41fd588e1a2d9add3fd19fa7e4df83e5d67b5fd90f221f646ccb8a75e"
     },
     "sectionHeadings": [
@@ -84,6 +84,6 @@
     "summary": "Increment 2: `rustev`, a command-line host over the library. Plan check, compile and show against descriptor, rules-program, calibration and execution-policy files; run one snapshot through `rustev-runtime` on rules-program backends with a file evidence sink and optional bounded capture into a replay bundle; offline replay under an explicitly supplied trusted scope; evaluation reports with their detail and configuration companions, regression gates, and temperature fitting with its lineage record, through `rustev-eval`. Bounded file access, stable JSON output and distinct exit codes. No network, no hosting, no live inference beyond the deterministic rules backend.\n",
     "title": "CLI surface"
   },
-  "shardHash": "0a7c1b44f0e35d9724a5ccd4607778d500e80f2982358b77c3bb1e972beffc34",
+  "shardHash": "37d90060262e7ea4c58e273dbcc35ab7066e3debcdbc4cb5b2867abca7f31747",
   "specVersion": "1.8.0"
 }

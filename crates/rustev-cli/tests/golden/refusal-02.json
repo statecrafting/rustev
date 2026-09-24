@@ -1,0 +1,1 @@
+{"category":2,"category_name":"unknown_operator","command":"plan check","detail":"count_where@2 is not in rustev.exact/1","shortfalls":[],"status":"refused","subject":"step:failed_payments_30d"}

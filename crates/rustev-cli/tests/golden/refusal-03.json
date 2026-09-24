@@ -1,0 +1,1 @@
+{"category":3,"category_name":"kind_mismatch","command":"plan check","detail":"input:ticket.message is text, not a list","shortfalls":[],"status":"refused","subject":"step:failed_payments_30d"}

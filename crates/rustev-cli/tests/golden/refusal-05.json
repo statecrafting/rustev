@@ -1,0 +1,1 @@
+{"category":5,"category_name":"no_capable_backend","command":"plan check","detail":"bound backend \"nope\" was not supplied","shortfalls":[{"backend_id":"nope","reasons":[{"kind":"unknown_backend"}]}],"status":"refused","subject":"step:frustration"}

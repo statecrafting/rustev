@@ -2,7 +2,7 @@
 id: "006-cli-surface"
 title: "CLI surface"
 status: approved
-implementation: pending
+implementation: in-progress
 created: "2026-09-23"
 summary: >
   Increment 2: `rustev`, a command-line host over the library. Plan check,
@@ -31,7 +31,7 @@ depends_on:
 
 # 006: CLI surface
 
-Approved; implementation pending. The owner approved making this spec
+Approved; implementation in progress. The owner approved making this spec
 concrete and delivering it through verified merge within the scope below
 (R-25 and A-06 in `docs/decisions/00-founding-decisions.md`). The concrete
 rules were written by the agent within that scope; its engineering choices
@@ -468,6 +468,21 @@ does not run this spec.
   adapter change a gate could miss, and bundle files the library cannot
   report per case. Each is resolved in the text above (3.2, 3.3, 3.5 to
   3.10, E-31); no library change is needed.
+- 2026-09-24: increment 1 of 3, the host skeleton and `plan` (3.1 to
+  3.4). New crate `crates/rustev-cli/` with binary `rustev` and a library
+  entry `execute` that tests drive in process: the hand-parsed argument
+  grammar with per-command flag tables (usage errors before any read),
+  bounded reads (regular files only, checked before and after opening,
+  at most the document's limit plus one byte, a 256 MiB per-command
+  budget and file-count caps), outputs published by a synced temporary
+  file and a hard link that never overwrites, one sorted JSON object per
+  command, and `plan check`, `compile` and `show` with typed refusals,
+  malformed dependency files as category 1 naming the file, and load
+  diagnostics. Golden stdout covers both reference plans and one refusal
+  per category 1 to 12; the reference definitions are emitted at test time
+  from the core's builders and the rules backend's fixtures (R-02). Not
+  yet delivered: `run`, capture and bundles, `replay`, `eval`, `gate`,
+  `calibrate`, the task adapter and the seed harness.
 
 ## Decision history
 

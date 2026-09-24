@@ -1,0 +1,1 @@
+{"category":8,"category_name":"unhandled_unresolved","command":"plan check","detail":"step:frustration can be unresolved with missing_evidence, invalid_input, backend_unavailable, invalid_backend_output, budget_exhausted, deadline_exceeded, conflict and no handler covers it","shortfalls":[],"status":"refused","subject":"policy:adjustment:urgency"}

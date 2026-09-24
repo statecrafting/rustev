@@ -1,0 +1,1 @@
+{"category":7,"category_name":"budget","command":"plan check","detail":"worst-case 3 semantic requests exceed max_semantic_requests 2 without truncate_visible","shortfalls":[],"status":"refused","subject":"limits"}

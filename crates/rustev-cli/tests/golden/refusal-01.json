@@ -1,0 +1,1 @@
+{"category":1,"category_name":"parse","command":"plan check","detail":"bounds: duplicate key \"name\" at byte 761","shortfalls":[],"status":"refused","subject":"definition"}
