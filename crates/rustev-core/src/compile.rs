@@ -20,7 +20,7 @@ use rustev_contract::definition::{
 };
 use rustev_contract::descriptor::{BackendDescriptor, InputExcess, OutputKind};
 use rustev_contract::execution::ExecutionPolicy;
-use rustev_contract::ids::{CalibrationId, PlanId};
+use rustev_contract::ids::{CalibrationId, DescriptorId, PlanId};
 use rustev_contract::judgment::{Derivation, Notice, NoticeKind};
 use rustev_contract::plan::{
     BoundCalibration, Normalization, Plan, PlanExecution, PlanStep, PlanStepDetail, SemanticBinding,
@@ -180,20 +180,155 @@ impl Compiled {
         descriptors: &[BackendDescriptor],
         calibrations: &[CalibrationArtifact],
     ) -> Result<Compiled, Refusal> {
-        let execution = match &plan.execution {
-            PlanExecution::None => None,
-            PlanExecution::Declared(d) => Some(&d.policy),
-        };
-        let c = compile_inner(&plan.definition, descriptors, calibrations, execution)?;
-        if plan.canonical().ok() != Some(c.canonical()) {
-            return refuse(
-                Category::Parse,
-                "plan",
-                "the plan document does not match its recompiled definition",
+        recompile(plan, descriptors, calibrations).map_err(|e| match e {
+            Recompiled::Refused(r) => r,
+            Recompiled::Differs => Refusal {
+                category: Category::Parse,
+                subject: "plan".into(),
+                detail: "the plan document does not match its recompiled definition".into(),
+                shortfalls: vec![],
+            },
+        })
+    }
+
+    /// [`Compiled::load`] with a typed diagnostic (spec 004, 5.2): a changed
+    /// compiler or exact-operator registry, a binding dependency not
+    /// supplied, or a plan that does not recompile identically under this
+    /// compiler. It shares `load`'s recompile and equality check; there is
+    /// no recompile-and-accept fallback.
+    pub fn load_checked(
+        plan: &Plan,
+        descriptors: &[BackendDescriptor],
+        calibrations: &[CalibrationArtifact],
+    ) -> Result<Compiled, LoadError> {
+        if plan.compiler != COMPILER || plan.registry != schema::EXACT_REGISTRY {
+            return Err(LoadError::CompilerChanged {
+                recorded_compiler: plan.compiler.clone(),
+                current_compiler: COMPILER,
+                recorded_registry: plan.registry.clone(),
+                current_registry: schema::EXACT_REGISTRY,
+            });
+        }
+        let have_d: BTreeSet<DescriptorId> =
+            descriptors.iter().filter_map(|d| d.id().ok()).collect();
+        let have_c: BTreeSet<CalibrationId> =
+            calibrations.iter().filter_map(|c| c.id().ok()).collect();
+        let mut needed: Vec<(String, &DescriptorId)> = vec![];
+        for step in &plan.steps {
+            if let PlanStepDetail::Semantic(b) = &step.detail {
+                needed.push((b.backend_id.clone(), &b.descriptor));
+                if let BoundCalibration::Bound { id, .. } = &b.calibration {
+                    if !have_c.contains(id) {
+                        return Err(LoadError::MissingCalibration {
+                            step: step.id.clone(),
+                            calibration: id.clone(),
+                        });
+                    }
+                }
+            }
+        }
+        if let PlanExecution::Declared(d) = &plan.execution {
+            needed.extend(
+                d.fallbacks
+                    .iter()
+                    .map(|f| (f.backend_id.clone(), &f.descriptor)),
             );
         }
-        Ok(c)
+        for (backend_id, descriptor) in needed {
+            if !have_d.contains(descriptor) {
+                return Err(LoadError::MissingDescriptor {
+                    backend_id,
+                    descriptor: descriptor.clone(),
+                });
+            }
+        }
+        recompile(plan, descriptors, calibrations).map_err(|e| LoadError::PlanMismatch {
+            refusal: match e {
+                Recompiled::Refused(r) => Some(r),
+                Recompiled::Differs => None,
+            },
+        })
     }
+}
+
+/// Why [`Compiled::load_checked`] refused a plan (spec 004, 3.3.2).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LoadError {
+    /// The plan was compiled by another compiler or registry version.
+    CompilerChanged {
+        recorded_compiler: String,
+        current_compiler: &'static str,
+        recorded_registry: String,
+        current_registry: &'static str,
+    },
+    /// A binding names a descriptor that was not supplied.
+    MissingDescriptor {
+        backend_id: String,
+        descriptor: DescriptorId,
+    },
+    /// A step binds a calibration artifact that was not supplied.
+    MissingCalibration {
+        step: String,
+        calibration: CalibrationId,
+    },
+    /// Same compiler, yet the plan does not recompile to identical bytes:
+    /// refused on recompilation, or recompiled differently.
+    PlanMismatch { refusal: Option<Refusal> },
+}
+
+impl fmt::Display for LoadError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LoadError::CompilerChanged {
+                recorded_compiler,
+                current_compiler,
+                recorded_registry,
+                current_registry,
+            } => write!(
+                f,
+                "compiler changed: recorded {recorded_compiler} ({recorded_registry}), \
+                 current {current_compiler} ({current_registry})"
+            ),
+            LoadError::MissingDescriptor {
+                backend_id,
+                descriptor,
+            } => write!(f, "descriptor {descriptor} of {backend_id} not supplied"),
+            LoadError::MissingCalibration { step, calibration } => {
+                write!(f, "calibration {calibration} of step {step} not supplied")
+            }
+            LoadError::PlanMismatch { refusal: Some(r) } => {
+                write!(f, "plan does not recompile: {r}")
+            }
+            LoadError::PlanMismatch { refusal: None } => {
+                f.write_str("plan does not match its recompiled definition")
+            }
+        }
+    }
+}
+
+impl std::error::Error for LoadError {}
+
+enum Recompiled {
+    Refused(Refusal),
+    Differs,
+}
+
+/// The one recompile-and-compare both loaders use.
+fn recompile(
+    plan: &Plan,
+    descriptors: &[BackendDescriptor],
+    calibrations: &[CalibrationArtifact],
+) -> Result<Compiled, Recompiled> {
+    let execution = match &plan.execution {
+        PlanExecution::None => None,
+        PlanExecution::Declared(d) => Some(&d.policy),
+    };
+    let c = compile_inner(&plan.definition, descriptors, calibrations, execution)
+        .map_err(Recompiled::Refused)?;
+    if plan.canonical().ok() != Some(c.canonical()) {
+        return Err(Recompiled::Differs);
+    }
+    Ok(c)
 }
 
 /// Parse a definition document and compile it.

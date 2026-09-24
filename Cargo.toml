@@ -13,7 +13,9 @@ repository = "https://github.com/statecrafting/rustev"
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# `float_roundtrip`: parsing is correctly rounded, so a retained output parses
+# to exactly the value that was supplied (spec 004, 5.6).
+serde_json = { version = "1", features = ["float_roundtrip"] }
 sha2 = { version = "0.10", default-features = false }
 # The runtime's executor (R-03); never a dependency of rustev-contract or
 # rustev-core (spec 001, 3.4.1). Added by spec 003.

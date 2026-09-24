@@ -23,5 +23,5 @@ pub mod seams;
 pub mod sem;
 pub mod value;
 
-pub use compile::{Category, Compiled, Refusal, compile, compile_bytes, compile_with};
-pub use evaluate::{Evaluation, SemanticRequest, Supplied};
+pub use compile::{Category, Compiled, LoadError, Refusal, compile, compile_bytes, compile_with};
+pub use evaluate::{Evaluation, RequestIdentityError, SemanticRequest, Supplied};

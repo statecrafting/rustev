@@ -20,7 +20,9 @@ use rustev_contract::evidence::{
 use rustev_contract::ids::SnapshotId;
 use rustev_contract::judgment::{Derivation, Judgment, Lineage, Notice, NoticeKind, Unresolved};
 use rustev_contract::output::{BackendOutputDoc, RawOutput};
-use rustev_contract::plan::PlanStepDetail;
+use rustev_contract::plan::{PlanExecution, PlanStepDetail};
+use rustev_contract::request::RequestDoc;
+use rustev_contract::scope::Scope as ReplayScope;
 use rustev_contract::snapshot::{Entry, Snapshot};
 use rustev_contract::time::Timestamp;
 use rustev_contract::{Identified, schema};
@@ -82,6 +84,31 @@ impl fmt::Display for SupplyError {
 }
 
 impl std::error::Error for SupplyError {}
+
+/// Why a request identity was not computed (spec 004, 3.4.2).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RequestIdentityError {
+    /// No such request is pending.
+    NotPending { step: String, instance: Vec<String> },
+    /// The target is neither the primary (0) nor a fallback the plan binds
+    /// for this step.
+    UnknownTarget { step: String, target: u32 },
+}
+
+impl fmt::Display for RequestIdentityError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RequestIdentityError::NotPending { step, instance } => {
+                write!(f, "no pending request {step}{instance:?}")
+            }
+            RequestIdentityError::UnknownTarget { step, target } => {
+                write!(f, "step {step} binds no target {target}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for RequestIdentityError {}
 
 /// `finish` was called while requests are pending.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -325,6 +352,63 @@ impl<'c> Evaluation<'c> {
                 .then_with(|| a.instance.cmp(&b.instance))
         });
         v
+    }
+
+    /// The request identity document of a pending request for one of its
+    /// targets (spec 004, 3.4): 0 is the bound backend, `n` the plan's `n`th
+    /// fallback for the step. The one function runtime capture and eval
+    /// replay both use; a scope is valid by construction.
+    pub fn request_document(
+        &self,
+        step: &str,
+        instance: &[String],
+        target: u32,
+        scope: &ReplayScope,
+    ) -> Result<RequestDoc, RequestIdentityError> {
+        let not_pending = || RequestIdentityError::NotPending {
+            step: step.into(),
+            instance: instance.to_vec(),
+        };
+        let req = self
+            .pending
+            .get(&(step.to_string(), instance.to_vec()))
+            .ok_or_else(not_pending)?;
+        let plan = &self.compiled.plan;
+        let Some(PlanStepDetail::Semantic(b)) =
+            plan.steps.iter().find(|s| s.id == step).map(|s| &s.detail)
+        else {
+            // A pending request always belongs to a bound semantic step.
+            return Err(not_pending());
+        };
+        let unknown = || RequestIdentityError::UnknownTarget {
+            step: step.into(),
+            target,
+        };
+        let (backend_id, artifact, descriptor) = if target == 0 {
+            (&b.backend_id, &b.artifact, &b.descriptor)
+        } else {
+            let PlanExecution::Declared(d) = &plan.execution else {
+                return Err(unknown());
+            };
+            let f = d
+                .fallbacks
+                .iter()
+                .find(|f| f.step == step && f.target == target)
+                .ok_or_else(unknown)?;
+            (&f.backend_id, &f.artifact, &f.descriptor)
+        };
+        Ok(RequestDoc {
+            schema: schema::REQUEST.into(),
+            scope: scope.clone(),
+            backend_id: backend_id.clone(),
+            artifact: artifact.clone(),
+            descriptor: descriptor.clone(),
+            // Canonical JSON is UTF-8 by construction.
+            projection: String::from_utf8_lossy(&req.projection).into_owned(),
+            output: b.output,
+            requires: b.requires,
+            normalization: b.normalization,
+        })
     }
 
     /// Supply a backend output document; its artifact must be the bound one.

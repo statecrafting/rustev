@@ -71,3 +71,21 @@ pub const RECORD_V1: ParseLimits = ParseLimits {
     max_number_bytes: 40,
     allow_fractional_numbers: true,
 };
+
+/// Replay bundles and eval-owned documents (spec 004, 3.2 and 3.5).
+pub const REPLAY_V1: ParseLimits = ParseLimits {
+    max_bytes: 16 * MIB,
+    max_depth: 48,
+    max_string_bytes: 8 * MIB,
+    max_collection_len: 10_000,
+    max_total_values: 1_000_000,
+    max_number_bytes: 40,
+    allow_fractional_numbers: true,
+};
+
+/// Request identity documents: `REPLAY_V1` tightened to 4 MiB (spec 004,
+/// 3.4.2). The projection inside still obeys the plan's own bound.
+pub const REQUEST_V1: ParseLimits = ParseLimits {
+    max_bytes: 4 * MIB,
+    ..REPLAY_V1
+};

@@ -1,6 +1,7 @@
 //! Identities (spec 002, 3.3.2 and 3.3.3): `sha256:` and 64 lowercase hex
-//! digits. Computed identities come from [`crate::Identified::id`]; supplied
-//! ones (`ArtifactId`, `DatasetId`, `EvaluatorConfigId`) are validated only.
+//! digits. Computed identities come from [`crate::Identified::id`] (and
+//! content digests from [`crate::Document::record_digest`]); supplied ones
+//! (`ArtifactId`, `DatasetId`, `EvaluatorConfigId`) are validated only.
 
 use std::fmt;
 
@@ -106,6 +107,17 @@ identity!(
 identity!(
     /// Identity of a canonical execution policy (spec 003, 3.2.2).
     ExecutionPolicyId
+);
+identity!(
+    /// Identity of a canonical request document, `rustev.request/1`
+    /// (spec 004, 3.4.1).
+    RequestId
+);
+identity!(
+    /// The schema-tagged digest of a retained document's record canonical
+    /// bytes (spec 004, 3.1.6 and 5.6). It proves integrity relative to
+    /// expected bytes, never truth, authorization or producer identity.
+    ContentDigest
 );
 identity!(
     /// A backend artifact (model, tokenizer, preprocessing, truncation,
