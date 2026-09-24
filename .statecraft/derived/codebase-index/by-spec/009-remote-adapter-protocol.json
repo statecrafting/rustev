@@ -1,7 +1,10 @@
 {
   "mapping": {
     "dependsOn": [
-      "000-bootstrap"
+      "001-boundaries-and-authority",
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay"
     ],
     "implementingPaths": [
       {
@@ -17,19 +20,7 @@
         "source": "spec-edge"
       },
       {
-        "path": "docs/design/001-decision-engine-architecture.md",
-        "source": "spec-edge"
-      },
-      {
-        "path": "standards/spec/constitution.md",
-        "source": "spec-edge"
-      },
-      {
-        "path": "tools/rustev-boundaries",
-        "source": "manifest-metadata"
-      },
-      {
-        "path": "tools/rustev-boundaries/",
+        "path": "crates/rustev-contract/",
         "source": "spec-edge"
       }
     ],
@@ -37,14 +28,14 @@
       {
         "locations": [
           {
-            "file": "tools/rustev-boundaries/"
+            "file": "crates/rustev-contract/"
           }
         ],
         "ownership": true,
-        "sourceField": "establishes",
+        "sourceField": "extends",
         "unit": {
           "kind": "directory",
-          "path": "tools/rustev-boundaries/"
+          "path": "crates/rustev-contract/"
         }
       },
       {
@@ -54,7 +45,7 @@
           }
         ],
         "ownership": true,
-        "sourceField": "establishes",
+        "sourceField": "extends",
         "unit": {
           "kind": "file",
           "path": "Cargo.lock"
@@ -67,7 +58,7 @@
           }
         ],
         "ownership": true,
-        "sourceField": "establishes",
+        "sourceField": "extends",
         "unit": {
           "kind": "file",
           "path": "Cargo.toml"
@@ -80,7 +71,7 @@
           }
         ],
         "ownership": true,
-        "sourceField": "establishes",
+        "sourceField": "extends",
         "unit": {
           "kind": "file",
           "path": "Makefile"
@@ -89,38 +80,33 @@
       {
         "locations": [
           {
-            "file": "docs/design/001-decision-engine-architecture.md"
+            "file": "docs/decisions/00-founding-decisions.md"
           }
         ],
-        "ownership": true,
-        "sourceField": "establishes",
+        "ownership": false,
+        "sourceField": "references",
         "unit": {
           "kind": "file",
-          "path": "docs/design/001-decision-engine-architecture.md"
+          "path": "docs/decisions/00-founding-decisions.md"
         }
       },
       {
         "locations": [
           {
-            "file": "standards/spec/constitution.md",
-            "span": {
-              "endLine": 127,
-              "startLine": 57
-            }
+            "file": "docs/design/001-decision-engine-architecture.md"
           }
         ],
-        "ownership": true,
-        "sourceField": "establishes",
+        "ownership": false,
+        "sourceField": "references",
         "unit": {
-          "anchor": "vi-onward-the-principles-of-the-system-you-are-specifying",
-          "file": "standards/spec/constitution.md",
-          "kind": "section"
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
         }
       }
     ],
-    "specId": "001-boundaries-and-authority",
-    "specStatus": "approved"
+    "specId": "009-remote-adapter-protocol",
+    "specStatus": "draft"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "54062d53e5171500bc5a3a6b29b0708887cde0e77eec9bd9b06c3441acd7a449"
+  "shardHash": "74c8afdd9a3615b9ddb857d327eeb178c7d72e87eb0114a429ab4c34529b75c9"
 }

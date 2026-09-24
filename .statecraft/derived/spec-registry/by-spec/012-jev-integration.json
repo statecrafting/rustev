@@ -1,0 +1,150 @@
+{
+  "record": {
+    "created": "2026-09-24",
+    "dependsOn": [
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay",
+      "009-remote-adapter-protocol"
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      }
+    ],
+    "id": "012-jev-integration",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-1-position-and-names",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "The Jev adapter grants no authority: its outputs are model-derived raw outputs or classified failures, and nothing Jev returns changes a plan, policy, retry, fallback or budget."
+      },
+      {
+        "anchor": "3-4-answers-into-rawoutput",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "Provider-reported confidence, argmax and interpolated score are recorded as provider-reported and are never supplied to the core or labeled calibrated."
+      },
+      {
+        "anchor": "3-6-identity-routing-and-cost",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "On the Gateway transport the served model identity is recorded as `unknown`; the requested model id or a routing slug is never recorded as the served identity."
+      },
+      {
+        "anchor": "3-2-transports",
+        "id": "I-4",
+        "kind": "invariant",
+        "text": "The adapter sends each attempt at most once, never retries or switches transport, model or provider on its own; any alternative is a separate adapter instance named as a runtime fallback target in the plan's execution policy."
+      },
+      {
+        "anchor": "3-1-position-and-names",
+        "id": "I-5",
+        "kind": "invariant",
+        "text": "Rustev exposes no Jev wire-compatible endpoint, and no crate outside `integrations/` names Jev, TypeSafe or Vercel."
+      },
+      {
+        "anchor": "3-3-questions-and-the-descriptor",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "The descriptor declares `proposition` (2 options), `classify` (up to 255 options) and `rubric` (up to 10 levels) with output `distribution`, determinism `unspecified`, and no `rank`."
+      },
+      {
+        "anchor": "3-8-qualification-plan",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "No live call, paid inference or quality claim before the owner decides O-02 and a dataset meeting R-04 is recorded; until then only recorded, labeled-synthetic fixtures are used."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/discussions/002-user-jev-assessment-and-architecture.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "012-jev-integration-remote-decision-backend": "db601d03c2b11b3e96ef6c2aa8af0f73840275efea0d67ce74346f41017ee545",
+      "1-purpose": "1084471762749dfa367cabbbae66a59a75b9464e3075c6224307063a2379367e",
+      "2-territory": "91b9d4e85ec7de1aa1824c34061710bad02bc16755c51cfebc4b2d3b67951b60",
+      "3-1-position-and-names": "4cae696d5c3104f79aa0dee3690fdec80e1e7afe6efb35bae09a588d8faa5111",
+      "3-2-transports": "a114e8dc6f7bf2f3e05b3e5c58d1f47bfd2aae09dcfc1c004ed36877e934a5d5",
+      "3-3-questions-and-the-descriptor": "d49d81889abf2683ae2c1189c88de4ade07f7bbfb8ec5844ac982fca2ca5e18b",
+      "3-4-answers-into-rawoutput": "80c8d613e046cb4ff0977dd1bb3f3afd539fd42c6fe830188f4a598090489123",
+      "3-5-many-questions-one-state": "5aed8aa1261f6b172873f2a31a853a644618f58f9349c76b7b14082f8d220e31",
+      "3-6-identity-routing-and-cost": "e3e4bf874de2d5c39b06e556101e8f65681de237dd061d11eab21373fc934ddc",
+      "3-7-privacy-options": "2363978f4671dc4156c3f772cdd926c587ffa4af897eb4e6504d0ced2f5e2f4d",
+      "3-8-qualification-plan": "4dddfde078debbe486937ce7c999d93f2fc977224314e2acdd9f7559685e887a",
+      "3-behavior": "2fc93b5ba3e75d779347061debdc6721b960d35a9279336f1fee665656d13dc1",
+      "4-out-of-scope": "d3981e16925562a93b1776cbf8be6a89482ab28363757c931e37d4799b0761a2",
+      "5-observable-negative-cases": "85a19045a4ef5a2639ca857608d9f1f3b212060778354743099421cced0238eb",
+      "acceptance-planned": "b32ef7d2a09a82f9a1d206c4a8d5fd67c31aa2ad9b4f0011d78cdecb6bda49b0",
+      "open-questions": "df0e8e504f8a481306fc66434592a8729ce9ac827ead1ff1d6e4d5a745d17e22",
+      "verification": "906d31c5ff2dc11f39920e8b430f401a5f00d549e471ca3d53542eb6fbe2bed3"
+    },
+    "sectionHeadings": [
+      "012: Jev integration (remote decision backend)",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 Position and names",
+      "3.2 Transports",
+      "3.3 Questions and the descriptor",
+      "3.4 Answers into RawOutput",
+      "3.5 Many questions, one state",
+      "3.6 Identity, routing and cost",
+      "3.7 Privacy options",
+      "3.8 Qualification plan",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance (planned)",
+      "Verification",
+      "Open questions"
+    ],
+    "specPath": "specs/012-jev-integration/spec.md",
+    "status": "draft",
+    "summary": "A remote decision backend under `integrations/` that answers Rustev's `proposition`, `classify` and `rubric` steps by calling TypeSafe's Jev model, through the Vercel AI Gateway by default or TypeSafe's own API as an alternative transport, as an ordinary integration. It conforms to Part A of spec 009: explicit served identity (unknown on the Gateway), one total budget, unconfirmed cancellation once sent, closed error codes, estimated cost, requested privacy options, and exchange records. Many Rustev questions over one state go in one request. Provider confidence is recorded, never treated as calibrated. `rank` is not declared. No Jev wire-compatible surface is exposed. Paid inference and quality qualification wait for an owner decision (O-02) and independently labeled data (R-04). Draft: claims no code.\n",
+    "title": "Jev integration (remote decision backend)"
+  },
+  "shardHash": "a0de85d90a5ec9629a560607e73d3a3cf86e2aa3c6e60e4ab56ab6b11edd5d1e",
+  "specVersion": "1.8.0"
+}

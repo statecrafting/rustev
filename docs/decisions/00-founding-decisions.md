@@ -89,6 +89,16 @@ the owner's decision, not the agent's.
 |---|---|
 | R-25 | Spec `006` (CLI) is made concrete and delivered through verified merge within this scope: plan checking, compilation and inspection; rules-backed execution with optional bounded capture; offline replay with both isolation modes and an explicitly supplied trusted scope; evaluation and calibration with their companion records; bounded file access, clear exit codes and end-to-end tests for both reference tasks. Delivery authority: record this decision and A-06, deliver the concrete spec before code, implement and verify it in reviewed increments, make scoped commits, pushes and pull requests, remediate review and CI findings, and merge verified changes. Spec `011` stays a deferred draft until that workflow is usable. Outside this authority: spec `011` approval or implementation, live or model inference, network access, releases, publication, deployment, paid services, real-user data, sibling repositories, managed-environment repair, branch-protection changes, waivers and recurring monitors. |
 
+### Owner decision of 2026-09-24, a remote backend
+
+Decided by the owner on 2026-09-24, as stated in the work order that
+drafted specs `009` and `012`. Recorded here as the owner's decision, not
+the agent's.
+
+| Id | Decision |
+|---|---|
+| R-26 | Rustev becomes the decision engine of a new product, travel-memory, with TypeSafe's Jev, reached through the Vercel AI Gateway, as a remote backend. Specs `009` (remote adapter protocol, the roadmap's reserved ordinal) and `012` (the Jev integration, the next free ordinal) are drafted for it. D-06, R-04, R-05, R-10, R-16, R-17 and R-23 stand: the integration is an ordinary adapter under `integrations/`, Rustev claims no Jev compatibility and exposes no Jev wire surface, and no quality claim precedes real labeled data. This decision authorizes drafting only; it does not authorize paid inference (O-02), approval or implementation of either spec, or live calls. |
+
 ## Approvals
 
 | Id | Act | Date |
@@ -104,7 +114,11 @@ No approval authorizes ratifying any other spec.
 
 ## Open
 
-None. O-01 was closed by the owner as R-07.
+| Id | Question | Gates |
+|---|---|---|
+| O-02 | Paid inference for Jev through the Vercel AI Gateway (or TypeSafe's API): is it authorized, under what spend cap, with which keys and environments, and which data may be sent to the provider? Not yet decided by the owner. | Spec `012` stages 2 and 3 of its qualification plan (live smoke calls, quality qualification) and any production use. It does not gate drafting specs `009` or `012`. |
+
+O-01 was closed by the owner as R-07.
 
 ## Closed
 
@@ -125,3 +139,4 @@ None. O-01 was closed by the owner as R-07.
 | C-06 | Aicortex and Rahi were not assessed beyond their README summaries, which describe Aicortex as specified and largely `pending` and Rahi as a 0.2.0 candidate. Nothing here claims their readiness. No Rustev component depends on or waits for either. | their READMEs, 2026-09-21 |
 | C-07 | The scaffolded bootstrap lists five `unamendable` anchors (`markdown-truth-boundary`, `json-truth-boundary`, `determinism-requirement`, `typed-authority-graph`, `refusal-rule`). None is a heading slug in its body, and three have no body text at all; spec-spine's lint does not check them. A dogfood finding for the scaffold. | `specs/000-bootstrap/spec.md`; `make gate` |
 | C-08 | Review of spec `002`'s implementation record against its approved text (`git diff 75462ff 96a794c -- specs/002-*`), made before spec `003` consumed it. No contradiction with an approved requirement was found. Clarifications: record-field references `input:<name>/<field>` give the approved `record` type an address; arithmetic faults in `count_where@1`, `member_of@1` and `compare@1` follow approved 3.4.2 (no saturation, no wrapping) where the approved operator table said "none"; `supply` accepting only the four runtime reasons is required for approved 3.11.2's static coverage to be sound; exact output-kind matching is the literal reading of "output kind as bound". For the owner's attention: (1) "policy parameters are exact values, never semantic values" narrows approved 3.11.4 beyond what A-02 stated; it refuses rather than permits, so it is safe, and relaxing it later is additive; (2) `div` rounds at 10^-9 and `round` rescales, so `round(div(a, b), s)` and `fx` round more than once; this follows approved 3.4.2, differs from a single rounding at `s`, and a change would be a new operator version (E-06); (3) approved normative text in sections 3.8, 3.10 and 3.11 was edited in the implementing change, with the edits listed in its implementation record. | the diff above; `crates/rustev-core/src/expr.rs` |
+| C-09 | Vercel AI Gateway serves TypeSafe's Jev as model `typesafe-ai/jev` at `POST https://ai-gateway.vercel.sh/v1/evaluate` with `Authorization: Bearer <AI_GATEWAY_API_KEY>` and body `{model, state, questions}`: `state` is a string, object or array; `questions` maps a key to `{type, instructions, criteria}` with `type` one of `boolean`, `choice`, `score`; several questions are answered against one state in one request. The response is `{model, answers, usage{inputTokens, outputTokens}, providerMetadata.gateway{routing{originalModelId, resolvedProvider, canonicalSlug, finalProvider}, cost, generationId}}` and exposes no resolved model version. Provider options `providerOptions.gateway{zeroDataRetention: true, only: ["typesafe-ai"]}` are accepted. A TypeSafe-compatible base exists under `/typesafe`; Jev is not available through the Gateway's OpenAI-, Anthropic- or Cohere-compatible endpoints. TypeSafe's own API documents version pinning (`jev-1.13.0`), up to 255 choice options and 2 to 10 score levels, and Jev 1.13 weaknesses in arithmetic, counting, date comparison, multi-hop reasoning and adversarial content. Unverified: Gateway version pinning, and the Gateway's per-answer field names. | Vercel AI Gateway documentation, read 2026-09-24 as relayed in the work order; TypeSafe's API documentation for the direct-API items |
