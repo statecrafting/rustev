@@ -510,6 +510,23 @@ rather than made silently, and the text above now states them:
   key sorting, unobservable without `serde_json/preserve_order`) is now
   covered by a direct test of the sort.
 
+- Rounding boundary examples (owner decision R-15; added after delivery,
+  describing behavior unchanged since increment 1). Rounding is per
+  operation: `div` and `mul` round half-even at 10^-9, and `round` and `fx`
+  then rescale half-even. Near a tie at the target scale this differs from
+  rounding the exact value once, and the per-operation result is the
+  contract:
+
+  | Expression | Exact value | Per operation (contract) | Single rounding (not offered) |
+  |---|---|---|---|
+  | `round(div(0.044999999, 3), 2)` | 0.014999999666... | `div` gives 0.015, then 0.02 | 0.01 |
+  | `fx(0.5, EUR, USD)` at EUR 1, USD 0.029999999, scale 2 | 0.0149999995 | `mul` gives 0.015 (tie on odd 9), then 0.02 | 0.01 |
+  | `fx(0.044999999, EUR, USD)` at EUR 3, USD 1, scale 2 | 0.014999999666... | `div` gives 0.015, then 0.02 | 0.01 |
+
+  `crates/rustev-core/tests/rounding.rs` keeps these, with neighbours on
+  either side of each boundary, as regression tests. A seeded change of
+  `div` to truncation fails both tests.
+
 Evidence: `spec-spine verify 002` runs the block above; the goldens for both
 reference plans are under `crates/rustev-core/tests/golden/`.
 
@@ -523,3 +540,10 @@ reference plans are under `crates/rustev-core/tests/golden/`.
   were then written by the implementing agent within those corrections; they
   are reviewable in the change that introduced them and are not the owner's
   decisions.
+- 2026-09-23: the owner resolved the three C-08 items of
+  `docs/decisions/00-founding-decisions.md`: policy control parameters stay
+  exact (R-14); per-operation rounding is retained, with the boundary
+  examples above kept as regression tests (R-15); and the edits to approved
+  text in the implementing change are preserved as recorded, with later
+  changes to approved behavior going through a reviewed amendment first
+  (R-16). No normative text of this spec changed.
