@@ -341,6 +341,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustev-jev"
+version = "0.1.0"
+dependencies = [
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "rustev-contract",
+ "rustev-core",
+ "rustev-eval",
+ "rustev-runtime",
+ "rustls",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tokio",
+ "tokio-rustls",
+ "webpki-roots",
+]
+
+[[package]]
 name = "rustev-remote-http"
 version = "0.1.0"
 dependencies = [

@@ -18,9 +18,30 @@
       {
         "path": "Makefile",
         "source": "spec-edge"
+      },
+      {
+        "path": "integrations/rustev-jev",
+        "source": "manifest-metadata"
+      },
+      {
+        "path": "integrations/rustev-jev/",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "integrations/rustev-jev/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-jev/"
+        }
+      },
       {
         "locations": [
           {
@@ -104,5 +125,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "10e383971b514fc0a031ebace4c6670e6115330288f34f73b0fe40393c056d94"
+  "shardHash": "7e0ba863ef899b3311f06607b8ddadfd99dfdd021b454e60764690097463ad3e"
 }

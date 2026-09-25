@@ -1,0 +1,85 @@
+{
+ "recorded_at": "2026-09-25T01:55:00.169450Z",
+ "provenance": "synthetic fixture, live Gateway call under R-27 (and R-30 for calls without zeroDataRetention)",
+ "request_body": {
+  "model": "typesafe-ai/jev",
+  "state": {
+   "values": {
+    "message": "SYNTHETIC FIXTURE. Your booking is confirmed. Flight AC 123 from Toronto (YYZ) to Lisbon (LIS), departing 2027-03-14 18:05, arriving 2027-03-15 06:40. Confirmation code QX7P2L. Passenger: Test Traveler."
+   },
+   "instance": null
+  },
+  "questions": {
+   "q0": {
+    "type": "boolean",
+    "instructions": "Does the message confirm a flight booking?",
+    "criteria": {
+     "false": "false",
+     "true": "true"
+    }
+   },
+   "q1": {
+    "type": "choice",
+    "instructions": "What kind of travel item does the message describe?",
+    "criteria": {
+     "flight": "flight",
+     "hotel": "hotel",
+     "car_rental": "car_rental",
+     "other": "other"
+    }
+   },
+   "q2": {
+    "type": "score",
+    "instructions": "How complete is the itinerary information in the message?",
+    "criteria": [
+     "low",
+     "medium",
+     "high"
+    ]
+   }
+  },
+  "providerOptions": {
+   "gateway": {
+    "zeroDataRetention": true,
+    "only": [
+     "typesafe-ai"
+    ]
+   }
+  }
+ },
+ "status": 403,
+ "response_body": {
+  "error": {
+   "message": "Zero Data Retention (ZDR) is only available for Pro and Enterprise plans. Current plan: hobby. Please upgrade your plan at https://vercel.com/d?to=%2F%5Bteam%5D%2F%7E%2Fsettings%2Fbilling to access this feature.",
+   "type": "permission_denied",
+   "param": {
+    "error": "Zero Data Retention (ZDR) is only available for Pro and Enterprise plans. Current plan: hobby. Please upgrade your plan at https://vercel.com/d?to=%2F%5Bteam%5D%2F%7E%2Fsettings%2Fbilling to access this feature.",
+    "type": "permission_denied",
+    "statusCode": 403,
+    "name": "ZdrUnauthorizedError",
+    "message": "Zero Data Retention (ZDR) is only available for Pro and Enterprise plans. Current plan: hobby. Please upgrade your plan at https://vercel.com/d?to=%2F%5Bteam%5D%2F%7E%2Fsettings%2Fbilling to access this feature."
+   }
+  },
+  "providerMetadata": {
+   "gateway": {
+    "routing": {
+     "originalModelId": "typesafe-ai/jev",
+     "resolvedProvider": "typesafe-ai",
+     "fallbacksAvailable": [],
+     "canonicalSlug": "typesafe-ai/jev",
+     "modelAttemptCount": 1,
+     "modelAttempts": [
+      {
+       "canonicalSlug": "typesafe-ai/jev",
+       "success": false,
+       "providerAttemptCount": 0,
+       "providerAttempts": []
+      }
+     ],
+     "totalProviderAttemptCount": 0
+    },
+    "generationId": "gen_01M3B4BSN0J6X8PRT9XD4GF882"
+   }
+  }
+ }
+}

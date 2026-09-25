@@ -1,0 +1,47 @@
+{
+ "recorded_at": "2026-09-25T02:02:47.280259Z",
+ "provenance": "synthetic fixture, live Gateway call under R-27 (and R-30 for calls without zeroDataRetention)",
+ "request_body": {
+  "model": "typesafe-ai/jev",
+  "providerOptions": {
+   "gateway": {
+    "only": [
+     "typesafe-ai"
+    ]
+   }
+  },
+  "state": {
+   "values": {
+    "x": "SYNTHETIC FIXTURE"
+   },
+   "instance": null
+  },
+  "questions": {
+   "q0": {
+    "type": "score",
+    "instructions": "How much?",
+    "criteria": [
+     "0",
+     "1",
+     "2",
+     "3",
+     "4",
+     "5",
+     "6",
+     "7",
+     "8",
+     "9",
+     "10"
+    ]
+   }
+  }
+ },
+ "status": 400,
+ "response_body": {
+  "error": {
+   "message": "questions.q0.criteria: Too big: expected array to have <=10 items",
+   "param": null,
+   "type": "invalid_request_error"
+  }
+ }
+}

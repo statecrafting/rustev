@@ -1,0 +1,83 @@
+{
+ "recorded_at": "2026-09-25T02:02:46.768107Z",
+ "provenance": "synthetic fixture, live Gateway call under R-27 (and R-30 for calls without zeroDataRetention)",
+ "request_body": {
+  "model": "typesafe-ai/jev",
+  "providerOptions": {
+   "gateway": {
+    "only": [
+     "typesafe-ai"
+    ]
+   }
+  },
+  "state": {
+   "values": {
+    "message": "SYNTHETIC FIXTURE line 0: Hotel Aurora Lisboa reservation HX1000, check-in 2027-03-01, room type double, rate EUR 90.00 per night, guest Test Traveler 0.\nSYNTHETIC FIXTURE line 1: Hotel Aurora Lisboa reservation HX1001, check-in 2027-03-02, room type double, rate EUR 91.00 per night, guest Test Traveler 1.\nSYNTHETIC FIXTURE line 2: Hotel Aurora Lisboa reservation HX1002, check-in 2027-03-03, room type double, rate EUR 92.00 per night, guest Test Traveler 2.\nSYNTHETIC FIXTURE line 3: Hotel Aurora Lisboa reservation HX1003, check-in 2027-03-04, room type double, rate EUR 93.00 per night, guest Test Traveler 3.\nSYNTHETIC FIXTURE line 4: Hotel Aurora Lisboa reservation HX1004, check-in 2027-03-05, room type double, rate EUR 94.00 per night, guest Test Traveler 4.\nSYNTHETIC FIXTURE line 5: Hotel Aurora Lisboa reservation HX1005, check-in 2027-03-06, room type double, rate EUR 95.00 per night, guest Test Traveler 5.\nSYNTHETIC FIXTURE line 6: Hotel Aurora Lisboa reservation HX1006, check-in 2027-03-07, room type double, rate EUR 96.00 per night, guest Test Traveler 6.\nSYNTHETIC FIXTURE line 7: Hotel Aurora Lisboa reservation HX1007, check-in 2027-03-08, room type double, rate EUR 97.00 per night, guest Test Traveler 7.\nSYNTHETIC FIXTURE line 8: Hotel Aurora Lisboa reservation HX1008, check-in 2027-03-09, room type double, rate EUR 98.00 per night, guest Test Traveler 8.\nSYNTHETIC FIXTURE line 9: Hotel Aurora Lisboa reservation HX1009, check-in 2027-03-10, room type double, rate EUR 99.00 per night, guest Test Traveler 9.\nSYNTHETIC FIXTURE line 10: Hotel Aurora Lisboa reservation HX1010, check-in 2027-03-11, room type double, rate EUR 100.00 per night, guest Test Traveler 10.\nSYNTHETIC FIXTURE line 11: Hotel Aurora Lisboa reservation HX1011, check-in 2027-03-12, room type double, rate EUR 101.00 per night, guest Test Traveler 11.\nSYNTHETIC FIXTURE line 12: Hotel Aurora Lisboa reservation HX1012, check-in 2027-03-13, room type double, rate EUR 102.00 per night, guest Test Traveler 12.\nSYNTHETIC FIXTURE line 13: Hotel Aurora Lisboa reservation HX1013, check-in 2027-03-14, room type double, rate EUR 103.00 per night, guest Test Traveler 13.\nSYNTHETIC FIXTURE line 14: Hotel Aurora Lisboa reservation HX1014, check-in 2027-03-15, room type double, rate EUR 104.00 per night, guest Test Traveler 14.\nSYNTHETIC FIXTURE line 15: Hotel Aurora Lisboa reservation HX1015, check-in 2027-03-16, room type double, rate EUR 105.00 per night, guest Test Traveler 15.\nSYNTHETIC FIXTURE line 16: Hotel Aurora Lisboa reservation HX1016, check-in 2027-03-17, room type double, rate EUR 106.00 per night, guest Test Traveler 16.\nSYNTHETIC FIXTURE line 17: Hotel Aurora Lisboa reservation HX1017, check-in 2027-03-18, room type double, rate EUR 107.00 per night, guest Test Traveler 17.\nSYNTHETIC FIXTURE line 18: Hotel Aurora Lisboa reservation HX1018, check-in 2027-03-19, room type double, rate EUR 108.00 per night, guest Test Traveler 18.\nSYNTHETIC FIXTURE line 19: Hotel Aurora Lisboa reservation HX1019, check-in 2027-03-20, room type double, rate EUR 109.00 per night, guest Test Traveler 19.\nSYNTHETIC FIXTURE line 20: Hotel Aurora Lisboa reservation HX1020, check-in 2027-03-21, room type double, rate EUR 110.00 per night, guest Test Traveler 20.\nSYNTHETIC FIXTURE line 21: Hotel Aurora Lisboa reservation HX1021, check-in 2027-03-22, room type double, rate EUR 111.00 per night, guest Test Traveler 21.\nSYNTHETIC FIXTURE line 22: Hotel Aurora Lisboa reservation HX1022, check-in 2027-03-23, room type double, rate EUR 112.00 per night, guest Test Traveler 22.\nSYNTHETIC FIXTURE line 23: Hotel Aurora Lisboa reservation HX1023, check-in 2027-03-24, room type double, rate EUR 113.00 per night, guest Test Traveler 23.\nSYNTHETIC FIXTURE line 24: Hotel Aurora Lisboa reservation HX1024, check-in 2027-03-25, room type double, rate EUR 114.00 per night, guest Test Traveler 24.\nSYNTHETIC FIXTURE line 25: Hotel Aurora Lisboa reservation HX1025, check-in 2027-03-26, room type double, rate EUR 115.00 per night, guest Test Traveler 25.\nSYNTHETIC FIXTURE line 26: Hotel Aurora Lisboa reservation HX1026, check-in 2027-03-27, room type double, rate EUR 116.00 per night, guest Test Traveler 26.\nSYNTHETIC FIXTURE line 27: Hotel Aurora Lisboa reservation HX1027, check-in 2027-03-01, room type double, rate EUR 117.00 per night, guest Test Traveler 27.\nSYNTHETIC FIXTURE line 28: Hotel Aurora Lisboa reservation HX1028, check-in 2027-03-02, room type double, rate EUR 118.00 per night, guest Test Traveler 28.\nSYNTHETIC FIXTURE line 29: Hotel Aurora Lisboa reservation HX1029, check-in 2027-03-03, room type double, rate EUR 119.00 per night, guest Test Traveler 29.\nSYNTHETIC FIXTURE line 30: Hotel Aurora Lisboa reservation HX1030, check-in 2027-03-04, room type double, rate EUR 120.00 per night, guest Test Traveler 30.\nSYNTHETIC FIXTURE line 31: Hotel Aurora Lisboa reservation HX1031, check-in 2027-03-05, room type double, rate EUR 121.00 per night, guest Test Traveler 31.\nSYNTHETIC FIXTURE line 32: Hotel Aurora Lisboa reservation HX1032, check-in 2027-03-06, room type double, rate EUR 122.00 per night, guest Test Traveler 32.\nSYNTHETIC FIXTURE line 33: Hotel Aurora Lisboa reservation HX1033, check-in 2027-03-07, room type double, rate EUR 123.00 per night, guest Test Traveler 33.\nSYNTHETIC FIXTURE line 34: Hotel Aurora Lisboa reservation HX1034, check-in 2027-03-08, room type double, rate EUR 124.00 per night, guest Test Traveler 34.\nSYNTHETIC FIXTURE line 35: Hotel Aurora Lisboa reservation HX1035, check-in 2027-03-09, room type double, rate EUR 125.00 per night, guest Test Traveler 35.\nSYNTHETIC FIXTURE line 36: Hotel Aurora Lisboa reservation HX1036, check-in 2027-03-10, room type double, rate EUR 126.00 per night, guest Test Traveler 36.\nSYNTHETIC FIXTURE line 37: Hotel Aurora Lisboa reservation HX1037, check-in 2027-03-11, room type double, rate EUR 127.00 per night, guest Test Traveler 37.\nSYNTHETIC FIXTURE line 38: Hotel Aurora Lisboa reservation HX1038, check-in 2027-03-12, room type double, rate EUR 128.00 per night, guest Test Traveler 38.\nSYNTHETIC FIXTURE line 39: Hotel Aurora Lisboa reservation HX1039, check-in 2027-03-13, room type double, rate EUR 129.00 per night, guest Test Traveler 39."
+   },
+   "instance": null
+  },
+  "questions": {
+   "q0": {
+    "type": "boolean",
+    "instructions": "Does the message describe a hotel reservation?",
+    "criteria": {
+     "false": "false",
+     "true": "true"
+    }
+   }
+  }
+ },
+ "status": 200,
+ "response_body": {
+  "model": "typesafe-ai/jev",
+  "answers": {
+   "q0": {
+    "type": "boolean",
+    "probability": 0.98
+   }
+  },
+  "usage": {
+   "inputTokens": 2680,
+   "outputTokens": 21
+  },
+  "providerMetadata": {
+   "typesafe": {
+    "confidence": {}
+   },
+   "gateway": {
+    "routing": {
+     "originalModelId": "typesafe-ai/jev",
+     "resolvedProvider": "typesafe-ai",
+     "fallbacksAvailable": [],
+     "planningReasoning": "Provider set restricted to: typesafe-ai. System credentials planned for: typesafe-ai. Total execution order: typesafe-ai(system)",
+     "canonicalSlug": "typesafe-ai/jev",
+     "finalProvider": "typesafe-ai",
+     "modelAttemptCount": 1,
+     "modelAttempts": [
+      {
+       "canonicalSlug": "typesafe-ai/jev",
+       "success": true,
+       "providerAttemptCount": 1,
+       "providerAttempts": [
+        {
+         "provider": "typesafe-ai",
+         "credentialType": "system",
+         "success": true,
+         "startTime": 1790301767021,
+         "endTime": 1790301767223,
+         "statusCode": 200
+        }
+       ]
+      }
+     ],
+     "totalProviderAttemptCount": 1
+    },
+    "cost": "0",
+    "marketCost": "0.00011256",
+    "surchargeCost": "0",
+    "gatewayCost": "0",
+    "generationId": "gen_01M3B4T19ZGJ7ZEZW15CBRN5S3"
+   }
+  }
+ }
+}

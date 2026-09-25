@@ -1,0 +1,41 @@
+[package]
+name = "rustev-jev"
+version = "0.1.0"
+description = "A remote decision backend answering Rustev's proposition, classify and rubric steps with a hosted closed-set evaluation model, under spec 009's remote adapter obligations."
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[package.metadata.spec-spine]
+spec = "012-jev-integration"
+
+# Spec 009's Part A machinery is compiled in from its source files (see
+# src/lib.rs), not taken as a Cargo dependency: spec 001 3.4.4 forbids any
+# crate depending on a crate under integrations/. Its dependencies are
+# therefore repeated here.
+[dependencies]
+rustev-contract = { path = "../../crates/rustev-contract" }
+rustev-core = { path = "../../crates/rustev-core" }
+rustev-runtime = { path = "../../crates/rustev-runtime" }
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tokio = { workspace = true, features = ["net", "time", "rt", "sync", "macros", "io-util"] }
+hyper = { workspace = true, features = ["client", "http1"] }
+hyper-util = { workspace = true, features = ["tokio"] }
+http-body-util.workspace = true
+rustls.workspace = true
+tokio-rustls.workspace = true
+webpki-roots.workspace = true
+
+# The eval crate and a multi-threaded Tokio are for the tests and the smoke
+# harness only; hyper's server side serves the loopback fake Gateway.
+[dev-dependencies]
+rustev-eval = { path = "../../crates/rustev-eval" }
+hyper = { workspace = true, features = ["client", "server", "http1"] }
+tokio = { workspace = true, features = ["net", "time", "rt", "rt-multi-thread", "sync", "macros", "io-util", "test-util"] }
+
+[lints]
+workspace = true

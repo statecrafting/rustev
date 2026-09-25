@@ -2,7 +2,7 @@
 id: "012-jev-integration"
 title: "Jev integration (remote decision backend)"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-24"
 summary: >
   A remote decision backend under `integrations/` that answers Rustev's
@@ -18,7 +18,9 @@ summary: >
   qualification is authorized by R-27 (zero data retention, synthetic and
   independently labeled data only); testing is capped at USD 5 in total and
   production at USD 25 per month (R-29), and production requires a pinned
-  model version (R-28). Approved (A-09); implementation pending.
+  model version (R-28). Approved (A-09); implemented.
+establishes:
+  - { kind: directory, path: "integrations/rustev-jev/" }
 extends:
   # Adds the integration crate's manifest and dependencies to the workspace.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.toml" }, nature: additive }
@@ -75,7 +77,7 @@ obligations:
 
 # 012: Jev integration (remote decision backend)
 
-Approved (A-09, 2026-09-24), not implemented. Ordinal: the next free one;
+Approved (A-09, 2026-09-24) and implemented. Ordinal: the next free one;
 `010` stays reserved for the roadmap's general integrations increment and
 `011` is taken. Rationale: owner decision R-26 (Rustev is the decision
 engine of the travel-memory product, with Jev through the Vercel AI Gateway
@@ -370,7 +372,7 @@ real user data before a separate privacy decision.
 | Cancellation after the request was written | Ack `unconfirmed`, charge `unknown`, `possibly_continuing`. |
 | A plan under a `hard` cost policy reaches this adapter | Refused when prepared (spec 003, 3.5.3). |
 
-## Acceptance (planned)
+## Acceptance
 
 - Stage 1 of 3.8 passes with no network access beyond loopback, and a
   counter shows zero calls to any external host.
@@ -379,9 +381,64 @@ real user data before a separate privacy decision.
 - Stages 2 and 3 run only within R-27 and R-29 and are recorded, with their
   spend against the testing cap, in this spec's implementation record.
 
+## Implementation record
+
+Delivered 2026-09-25 on spec 009's Part A machinery and spec 013's remote
+end.
+
+- `integrations/rustev-jev/`: `binding` (the `rustev.jev-binding/1`
+  document and its digest as artifact identity; transports `gateway`,
+  `gateway_typesafe_base` and `direct` with a pin; provider options refused
+  at construction unless `only` is exactly `["typesafe-ai"]`; the option
+  description table, request limits with the 49,152-byte default, batching
+  off by default; `CostConfig` with the C-10 price table, 2 bytes per token
+  and nano-USD units), `mapping` (3.3 and 3.4: `q<i>` keys, criteria shapes
+  of C-11, `boolean` probability reshaped losslessly, `choice` keys as
+  received, `score` keyed by index or `malformed_response`, provider extras
+  kept in the exchange record only), `adapter` (`JevBackend`, the
+  `DecisionBackend`: descriptor of R-1, `check_plan`, one send per attempt,
+  served `unknown` on the Gateway and `identity_mismatch` on a pinned direct
+  transport, shared-state batching when enabled, exchange records to the
+  host sink), `spend` (the persistent `SpendJournal`: one file per budget,
+  an exclusive lock, a reservation before dispatch refused over the cap,
+  settlement to observed, estimated or liability, testing never resets and
+  production resets each UTC month) and `net` (a count of exchanges by
+  destination). Spec 009's Part A sources are compiled in by path, since
+  spec 001 3.4.4 forbids depending on a crate under `integrations/`.
+- Stage 1 (no network): `cargo test -p rustev-jev --locked`, against a
+  loopback fake Gateway, the recorded calls of C-11 and labeled synthetic
+  fixtures: every 3.4 mapping, every spec 009 error code the Gateway can
+  produce, cancellation before and after sending, one total budget, cost
+  paths, privacy options, the credential only in the bearer header,
+  batching with a cancelled member and late answers, both reference plans
+  through `rustev-runtime` with capture and offline replay making no
+  Gateway call (`tests/runtime.rs`), and the spend journal
+  (`tests/spend.rs`: an attempt over the cap is refused unsent in the
+  adapter, and through a runtime whose shared ledger is seeded from the
+  journal it ends `budget_exhausted{cost}` before reaching the adapter;
+  persistence, liability on reopen, reconciliation, one writer, a torn or
+  corrupt line, and both periods). The adapter's own refusal is a backstop
+  reported as `remote:capability` with the refusal text; a host that wants
+  the runtime's `budget_exhausted{cost}` seeds its shared ledger with
+  `SpendJournal::shared_runtime_ledger`. Tests that exercise the transport
+  assert that only loopback was contacted.
+- Stage 2 (smoke, R-27, R-29, R-30): `examples/smoke.rs`, run by hand with
+  `RUSTEV_JEV_LIVE=1`, the key read at runtime and never written, every
+  attempt reserved against a persistent testing journal. On 2026-09-25 four
+  calls on SYNTHETIC fixtures (two `boolean`, one `choice`, one `score`)
+  all mapped as 3.4 says, routed to `typesafe-ai`, served `unknown`;
+  Gateway `cost` was `0` on each (charged USD 0), `marketCost` totalled USD
+  0.00006702 for 1,596 input tokens. The public price after the promotion,
+  read 2026-09-25 from the Gateway's model list, is USD 0.000000042 per
+  input token and 0 per output token, the default table's. Testing spend to
+  date, with the five calls of C-11: USD 0 of the USD 5 cap.
+- Stage 3 waits on travel-memory's independently labeled set (R-28, tm spec
+  012); batching stays off until it shows batched and unbatched answers
+  agree.
+
 ## Verification
 
-Planned; not run until this spec is implemented and added to `make verify`.
+Run by `make verify` (012 is in `VERIFIED_SPECS`).
 
 ```verify:cli
 # 3.2 to 3.7 and stage 1 of 3.8: mapping, errors, batching, cost, identity,

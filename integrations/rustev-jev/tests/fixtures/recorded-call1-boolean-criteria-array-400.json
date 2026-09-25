@@ -1,0 +1,85 @@
+{
+ "recorded_at": "2026-09-25T01:54:50.413499Z",
+ "provenance": "synthetic fixture, live Gateway call under R-27 (and R-30 for calls without zeroDataRetention)",
+ "request_body": {
+  "model": "typesafe-ai/jev",
+  "state": {
+   "values": {
+    "message": "SYNTHETIC FIXTURE. Your booking is confirmed. Flight AC 123 from Toronto (YYZ) to Lisbon (LIS), departing 2027-03-14 18:05, arriving 2027-03-15 06:40. Confirmation code QX7P2L. Passenger: Test Traveler."
+   },
+   "instance": null
+  },
+  "questions": {
+   "q0": {
+    "type": "boolean",
+    "instructions": "Does the message confirm a flight booking?",
+    "criteria": [
+     {
+      "name": "false",
+      "description": "false"
+     },
+     {
+      "name": "true",
+      "description": "true"
+     }
+    ]
+   },
+   "q1": {
+    "type": "choice",
+    "instructions": "What kind of travel item does the message describe?",
+    "criteria": [
+     {
+      "name": "flight",
+      "description": "flight"
+     },
+     {
+      "name": "hotel",
+      "description": "hotel"
+     },
+     {
+      "name": "car_rental",
+      "description": "car_rental"
+     },
+     {
+      "name": "other",
+      "description": "other"
+     }
+    ]
+   },
+   "q2": {
+    "type": "score",
+    "instructions": "How complete is the itinerary information in the message?",
+    "criteria": [
+     {
+      "name": "low",
+      "description": "low"
+     },
+     {
+      "name": "medium",
+      "description": "medium"
+     },
+     {
+      "name": "high",
+      "description": "high"
+     }
+    ]
+   }
+  },
+  "providerOptions": {
+   "gateway": {
+    "zeroDataRetention": true,
+    "only": [
+     "typesafe-ai"
+    ]
+   }
+  }
+ },
+ "status": 400,
+ "response_body": {
+  "error": {
+   "message": "questions.q0.criteria: Invalid input: expected object, received array",
+   "param": null,
+   "type": "invalid_request_error"
+  }
+ }
+}

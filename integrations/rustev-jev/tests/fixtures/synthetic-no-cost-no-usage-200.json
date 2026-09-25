@@ -1,0 +1,19 @@
+{
+ "recorded_at": null,
+ "provenance": "SYNTHETIC: hand-written for spec 012 stage 1 (3.8.1); not a recorded call and not evidence of the provider's behavior",
+ "status": 200,
+ "response_body": {
+  "model": "typesafe-ai/jev",
+  "answers": {
+   "q0": {
+    "type": "boolean",
+    "probability": 0.25
+   }
+  },
+  "providerMetadata": {
+   "typesafe": {
+    "confidence": {}
+   }
+  }
+ }
+}
