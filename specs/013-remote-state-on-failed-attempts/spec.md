@@ -1,7 +1,7 @@
 ---
 id: "013-remote-state-on-failed-attempts"
 title: "Remote state on attempts that end without a stop (amends 003)"
-status: draft
+status: approved
 implementation: pending
 created: "2026-09-24"
 summary: >
@@ -13,7 +13,7 @@ summary: >
   field to the attempt report through which an adapter states that remote
   work may continue, and one derivation rule in the runtime. The
   `rustev.run/1` schema and every existing record's bytes are unchanged.
-  Draft: claims no code.
+  Approved (A-07); implementation pending.
 amends:
   - "003-runtime-execution-and-evidence"
 extends:
@@ -43,8 +43,9 @@ obligations:
 
 # 013: Remote state on attempts that end without a stop (amends 003)
 
-Draft. An amendment proposal, reviewable on its own before any code, as
-R-16 requires for a substantive change to approved behavior. The owner
+Approved (A-07, 2026-09-24), not implemented. An amendment, reviewed and
+approved on its own before any code, as R-16 requires for a substantive
+change to approved behavior. The owner
 chose it over accepting the limitation (R-28, item 4). Spec 003's approved
 text is not edited; this spec records the change.
 
@@ -129,7 +130,7 @@ change to cancellation acknowledgements.
 
 ## Verification
 
-Planned; not run until this amendment is approved and delivered.
+Planned; not run until this amendment is delivered.
 
 ```verify:cli
 cargo test -p rustev-core --locked

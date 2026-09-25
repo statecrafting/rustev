@@ -93,8 +93,8 @@
       }
     ],
     "specId": "013-remote-state-on-failed-attempts",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "f2f77a051a1b97da114069532fbe65248ca6f5d55d29a44fcf380275a47fa756"
+  "shardHash": "6312eca9e9b3999470a116e4ee0c368cd1e68ea6f6b677e25f5f704fa6121325"
 }

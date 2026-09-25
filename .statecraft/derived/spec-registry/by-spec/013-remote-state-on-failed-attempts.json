@@ -68,7 +68,7 @@
       }
     ],
     "sectionDigests": {
-      "013-remote-state-on-attempts-that-end-without-a-stop-amends-003": "dedd35255da9f93f128892f09c1547c9504db0c6b7b11e113efcc1b01891f303",
+      "013-remote-state-on-attempts-that-end-without-a-stop-amends-003": "aab5e9d2f7f9a23399333429f91e2af65ae0b8b899efb08cb3b1216aa9cd4d19",
       "1-purpose": "054d23e01905baacbfc642b68a01118142f4fe5e8b69f2168b2f485ac6c2a328",
       "2-territory": "aa682f5b3a9b7e276b89512894e8ee6ee2d3dfaf15b2c775c435ffbd2c3cef59",
       "3-1-the-attempt-report": "aaa985e8ce68b05268f4b0befda1bd2bfece8ab480980a70e72512ec357fe58d",
@@ -78,7 +78,7 @@
       "4-out-of-scope": "8171fdec67211a083b2a5510cc988235816ad34adb0b968b4769b6459cf9ee2e",
       "5-observable-negative-cases": "3db4090261b6a7967a7390931ce36c3329eb1f2e25517599f5762da5c1e1a1f2",
       "acceptance-planned": "351a5bc0e029e6f3358a3e9fc65714bc0fc25f802a45c7d41f6e42e2004d889b",
-      "verification": "cf120d4b3dd1088c3b2df950d46b13b398190c8b2abd377db1a6f0edba4904f4"
+      "verification": "24a113e9f03a85f1af25642be42583cf7c14fbc7d40e6b1508749cc3613a99a8"
     },
     "sectionHeadings": [
       "013: Remote state on attempts that end without a stop (amends 003)",
@@ -94,10 +94,10 @@
       "Verification"
     ],
     "specPath": "specs/013-remote-state-on-failed-attempts/spec.md",
-    "status": "draft",
-    "summary": "A separately reviewable amendment of approved spec 003 (R-16), chosen by the owner in R-28 for the gap spec 009 5.1 records: the runtime derives `possibly_continuing` only from cancellation, so an attempt whose request left the process and whose connection then failed is recorded as `finished` although remote work and charges may continue. This adds one field to the attempt report through which an adapter states that remote work may continue, and one derivation rule in the runtime. The `rustev.run/1` schema and every existing record's bytes are unchanged. Draft: claims no code.\n",
+    "status": "approved",
+    "summary": "A separately reviewable amendment of approved spec 003 (R-16), chosen by the owner in R-28 for the gap spec 009 5.1 records: the runtime derives `possibly_continuing` only from cancellation, so an attempt whose request left the process and whose connection then failed is recorded as `finished` although remote work and charges may continue. This adds one field to the attempt report through which an adapter states that remote work may continue, and one derivation rule in the runtime. The `rustev.run/1` schema and every existing record's bytes are unchanged. Approved (A-07); implementation pending.\n",
     "title": "Remote state on attempts that end without a stop (amends 003)"
   },
-  "shardHash": "0f12d00c00d3d918d93435ee33bfdda7d579ef4a3612ea64294f283c9b0c4518",
+  "shardHash": "7f0677a10e2f204af23ecea4e1490f46f45ca1628e2431560c87410b3e369e26",
   "specVersion": "1.8.0"
 }
