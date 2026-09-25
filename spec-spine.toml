@@ -11,10 +11,10 @@
 # features: the coupling gate's built-in bypass floor is compiled into
 # the binary, so two versions can judge the same diff differently.
 # Cargo semantics: a bare version is a caret range, `=` is exact.
-# Pinned to 0.24.0 on 2026-09-23 at adoption. `=` is deliberate: a release
+# Pinned to 0.24.0 on 2026-09-23 at adoption; moved to 0.26.0 on 2026-09-25. `=` is deliberate: a release
 # is adopted by review, not by resolution. `make tools` installs this exact
 # version into .tooling/bin, so a binary elsewhere on PATH cannot answer here.
-required_version = "=0.24.0"
+required_version = "=0.26.0"
 
 [manifest]
 # Drives the Cargo `[package.metadata.spec-spine].spec` and package.json `"spec-spine".spec` reads.
