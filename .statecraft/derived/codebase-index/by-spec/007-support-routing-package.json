@@ -1,0 +1,64 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '007-support-routing-package' directory unit 'packages/rustev-pkg-support-routing/' is not a directory",
+        "path": "packages/rustev-pkg-support-routing/"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-decision-contract-and-pure-core",
+      "004-evaluation-and-replay",
+      "005-reference-backends",
+      "006-cli-surface",
+      "012-jev-integration"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "packages/rustev-pkg-support-routing/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/decisions/00-founding-decisions.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/001-decision-engine-architecture.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      }
+    ],
+    "specId": "007-support-routing-package",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "d2f8a1d4d85e7a812b81cb8e5fca9596dd77ac1116c7f17263836ce56e53bc24"
+}

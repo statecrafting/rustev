@@ -1,0 +1,31 @@
+{
+  "mapping": {
+    "amends": [
+      "004-evaluation-and-replay"
+    ],
+    "dependsOn": [
+      "004-evaluation-and-replay",
+      "006-cli-surface"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "docs/decisions/00-founding-decisions.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "specId": "015-per-case-bundle-failures",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "ffc631acb0eec582b8e272085aa2fcdbcf7775286c155988f4147441d8b69d6f"
+}
