@@ -28,6 +28,7 @@ REQUIRED = [
     "scope flag handling",
     "sink acknowledgement",
     "store confinement",
+    "unusable bundles",
 ]
 # Generous: a new test binary can wait on the OS before it starts.
 TEST_TIMEOUT_S = 1800
@@ -35,6 +36,38 @@ TEST_TIMEOUT_S = 1800
 # (category, name, file, old, new, packages); `old` and `new` may be equal-
 # length lists, for a defect that must remove more than one layer at once.
 SEEDS = [
+    (
+        "unusable bundles",
+        "a corrupt bundle is treated as absent (spec 015)",
+        S + "eval.rs",
+        "Err(e) => LoadFailure::new(BundleLoad::Corrupt, &e.to_string()).into(),",
+        "Err(_) => continue,",
+        CLI,
+    ),
+    (
+        "unusable bundles",
+        "an unreadable bundle stops the command (spec 015)",
+        S + "eval.rs",
+        "Err(ReadFail::File(e)) => LoadFailure::new(BundleLoad::Inaccessible, &e.detail).into(),",
+        "Err(ReadFail::File(e)) => return Err(Done::io(command, e)),",
+        CLI,
+    ),
+    (
+        "unusable bundles",
+        "an oversized bundle is reported as corrupt (spec 015)",
+        S + "eval.rs",
+        "                BundleLoad::Oversized,",
+        "                BundleLoad::Corrupt,",
+        CLI,
+    ),
+    (
+        "unusable bundles",
+        "fitting skips an unusable bundle as missing (spec 015)",
+        S + "calibrate.rs",
+        "bump(&mut skipped, f.kind.code());",
+        'bump(&mut skipped, "bundle-missing");',
+        CLI,
+    ),
     (
         "scope flag handling",
         "a principal scope is accepted in tenant-only mode",

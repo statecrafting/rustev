@@ -583,26 +583,23 @@ fn eval_input_errors_stop_the_command() {
         "o",
     ));
     r.expect(4, "invalid_input");
-    // A bundle file that does not parse stops the command; it is never
-    // counted as missing.
-    s.write("bundles/s-2.json", b"{");
-    let r = s.rustev_owned(&eval_args(
-        "support.dataset.json",
-        "final_test",
-        "support.config.json",
-        "support.adapter.json",
-        "o",
-    ));
-    assert_eq!(r.expect(4, "invalid_input")["input"], "bundles/s-2.json");
     // Nothing was written by any failed run.
     assert_eq!(std::fs::read_dir(s.path("o")).unwrap().count(), 0);
 }
 
 #[test]
-fn an_absent_bundle_is_counted_as_missing_not_fatal() {
-    let s = Scratch::new("eval-absent");
+fn an_unusable_bundle_is_reported_per_case_not_fatal() {
+    let s = Scratch::new("eval-unusable");
     support_setup(&s);
+    // Absent, truncated, one byte past the document limit, a directory.
     std::fs::remove_file(s.path("bundles/s-3.json")).unwrap();
+    s.write("bundles/s-2.json", b"{");
+    s.write(
+        "bundles/s-4.json",
+        &vec![b' '; rustev_contract::limits::REPLAY_V1.max_bytes + 1],
+    );
+    std::fs::remove_file(s.path("bundles/s-5.json")).unwrap();
+    std::fs::create_dir(s.path("bundles/s-5.json")).unwrap();
     std::fs::create_dir(s.path("o")).unwrap();
     s.rustev_owned(&eval_args(
         "support.dataset.json",
@@ -613,8 +610,23 @@ fn an_absent_bundle_is_counted_as_missing_not_fatal() {
     ))
     .expect(0, "reported");
     let d = detail(&s, "o");
-    let c = d.cases.iter().find(|c| c.case == "s-3").unwrap();
-    assert_eq!(c.reason.as_deref(), Some("bundle-missing"), "{c:?}");
+    d.reconcile().unwrap();
+    for (id, reason) in [
+        ("s-2", "bundle-corrupt"),
+        ("s-3", "bundle-missing"),
+        ("s-4", "bundle-oversized"),
+        ("s-5", "bundle-inaccessible"),
+    ] {
+        let c = d.cases.iter().find(|c| c.case == id).unwrap();
+        assert_eq!(c.outcome, "incomparable", "{c:?}");
+        assert_eq!(c.reason.as_deref(), Some(reason), "{c:?}");
+        assert_eq!(c.scope, None, "{c:?}");
+    }
+    // Inside the coverage denominator; s-1 is still evaluated.
+    let cov = d.count("coverage").unwrap();
+    assert_eq!((cov.numerator, cov.denominator), (1, 5));
+    let s1 = d.cases.iter().find(|c| c.case == "s-1").unwrap();
+    assert_ne!(s1.outcome, "incomparable", "{s1:?}");
 }
 
 #[test]
@@ -642,6 +654,18 @@ fn fitting_uses_the_calibration_split_and_qualification_needs_lineage() {
     .map(|x| x.to_string())
     .collect();
     a.extend(scope());
+    // A corrupt calibration bundle is skipped by reason; the fit uses the
+    // rest (spec 015, 3.2.3).
+    let kept = s.read("bundles/s-7.json");
+    s.write("bundles/s-7.json", b"[]");
+    std::fs::create_dir(s.path("fit-corrupt")).unwrap();
+    let mut c = a.clone();
+    let at = c.iter().position(|x| x == "--out").unwrap() + 1;
+    c[at] = "fit-corrupt".into();
+    let j = s.rustev_owned(&c).expect(0, "fitted");
+    assert_eq!(j["fitted"], 2, "{j}");
+    assert_eq!(j["skipped"]["bundle-corrupt"], 1, "{j}");
+    s.write("bundles/s-7.json", &kept);
     let j = s.rustev_owned(&a).expect(0, "fitted");
     assert_eq!(j["fitted"], 3, "{j}");
     let fit = rustev_eval::fit::CalibrationFit::parse(&s.read("fit/calibration-fit.json")).unwrap();

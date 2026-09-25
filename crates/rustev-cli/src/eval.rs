@@ -9,6 +9,7 @@ use rustev_contract::canonical::record_canonical_bytes;
 use rustev_contract::eval_report::{EvalReport, Split};
 use rustev_contract::limits::{DESCRIPTOR_V1, RECORD_V1, REPLAY_V1};
 use rustev_contract::replay::ReplayBundle;
+use rustev_eval::bundle::{BundleInput, BundleLoad, LoadFailure};
 use rustev_eval::config::EvaluatorConfig;
 use rustev_eval::dataset::{DatasetCase, DatasetManifest};
 use rustev_eval::metrics::TaskAdapter;
@@ -19,10 +20,10 @@ use rustev_eval::report::{
 use crate::adapter::TaskAdapterDoc;
 use crate::args::{Parsed, Usage, usage};
 use crate::deps;
-use crate::io::{self, IoFail, Reads};
+use crate::io::{self, IoFail, ReadFail, Reads};
 use crate::out::{Done, Out, Res, code};
 use crate::plan::{dep_failed, load_plan, read_plan};
-use crate::replay::{read_bundle, replay_config, resolver};
+use crate::replay::{replay_config, resolver};
 
 pub fn split(p: &Parsed) -> Result<Split, Usage> {
     match p.req("split") {
@@ -83,21 +84,36 @@ pub fn check_case_ids<'a>(
     Ok(())
 }
 
-/// The bundles of `cases` from `dir`: absent files are left out for the
-/// library to judge; a file that exists but cannot be read or parsed stops
-/// the command.
+/// The bundles of `cases` from `dir` (spec 015, 3.3): absent files are left
+/// out for the library to judge (`bundle-missing`); a file that exists but
+/// cannot be read, is past the document limit or does not parse is
+/// supplied as that case's load failure, and the command continues. Only
+/// an exhausted read budget stops it, because that depends on read order
+/// rather than on the bundle.
 pub fn read_bundles<'a>(
     command: &str,
     reads: &Reads,
     dir: &str,
     cases: impl Iterator<Item = &'a DatasetCase>,
-) -> Result<BTreeMap<String, ReplayBundle>, Done> {
+) -> Result<BTreeMap<String, BundleInput>, Done> {
     let mut bundles = BTreeMap::new();
     for c in cases {
         let path = io::join(dir, &format!("{}.json", c.id));
-        if let Some(b) = read_bundle(command, reads, &path)? {
-            bundles.insert(c.id.clone(), b);
-        }
+        let input = match reads.read_classified(&path, REPLAY_V1.max_bytes.saturating_add(1)) {
+            Ok(None) => continue,
+            Err(ReadFail::Budget(e)) => return Err(Done::io(command, e)),
+            Err(ReadFail::File(e)) => LoadFailure::new(BundleLoad::Inaccessible, &e.detail).into(),
+            Ok(Some(bytes)) if bytes.len() > REPLAY_V1.max_bytes => LoadFailure::new(
+                BundleLoad::Oversized,
+                &format!("more than {} bytes", REPLAY_V1.max_bytes),
+            )
+            .into(),
+            Ok(Some(bytes)) => match ReplayBundle::parse(&bytes) {
+                Ok(b) => b.into(),
+                Err(e) => LoadFailure::new(BundleLoad::Corrupt, &e.to_string()).into(),
+            },
+        };
+        bundles.insert(c.id.clone(), input);
     }
     Ok(bundles)
 }

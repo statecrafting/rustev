@@ -10,6 +10,7 @@
 #![forbid(unsafe_code)]
 
 pub mod assemble;
+pub mod bundle;
 pub mod compare;
 pub mod config;
 pub mod dataset;

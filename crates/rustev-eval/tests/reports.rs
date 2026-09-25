@@ -18,6 +18,7 @@ use rustev_contract::run::CoreEvidence;
 use rustev_contract::snapshot::Snapshot;
 use rustev_contract::{Document, Identified, schema};
 use rustev_eval::assemble::{AssemblyInput, Content, RetentionChoice, assemble};
+use rustev_eval::bundle::{BundleInput, BundleLoad, LoadFailure};
 use rustev_eval::config::{Agreement, Direction, EvaluatorConfig, Gate, MetricFormula};
 use rustev_eval::dataset::{AdapterRef, DatasetCase, DatasetManifest, Label};
 use rustev_eval::metrics::TaskAdapter;
@@ -459,7 +460,7 @@ fn run(s: &SupportRun, candidate: Option<rustev_eval::report::Candidate<'_>>) ->
         split: Split::FinalTest,
         config: &s.config,
         adapter: &Support,
-        bundles: &s.bundles,
+        bundles: &inputs_of(&s.bundles),
         resolver: &NoExternal,
         replay: &config_for(&scope()),
         candidate,
@@ -666,7 +667,7 @@ async fn a_candidate_report_and_its_gates() {
         split: Split::Calibration,
         config: &s.config,
         adapter: &Support,
-        bundles: &s.bundles,
+        bundles: &inputs_of(&s.bundles),
         resolver: &NoExternal,
         replay: &config_for(&scope()),
         candidate: Some(rustev_eval::report::Candidate {
@@ -742,7 +743,7 @@ async fn the_lodging_baseline_report_counts_missing_evidence_as_abstention() {
         split: Split::FinalTest,
         config: &config,
         adapter: &Lodging,
-        bundles: &bundles,
+        bundles: &inputs_of(&bundles),
         resolver: &NoExternal,
         replay: &config_for(&scope()),
         candidate: None,
@@ -783,7 +784,7 @@ async fn configurations_and_datasets_are_checked_before_evaluation() {
             split: Split::FinalTest,
             config: &bad,
             adapter: &Support,
-            bundles: &s.bundles,
+            bundles: &inputs_of(&s.bundles),
             resolver: &NoExternal,
             replay: &config_for(&scope()),
             candidate: None,
@@ -799,7 +800,7 @@ async fn configurations_and_datasets_are_checked_before_evaluation() {
         split: Split::FinalTest,
         config: &sparse,
         adapter: &Support,
-        bundles: &s.bundles,
+        bundles: &inputs_of(&s.bundles),
         resolver: &NoExternal,
         replay: &config_for(&scope()),
         candidate: None,
@@ -928,7 +929,7 @@ async fn gates_hold_their_roles_boundaries_and_cohorts() {
             split: Split::FinalTest,
             config: c,
             adapter: &Support,
-            bundles: &s.bundles,
+            bundles: &inputs_of(&s.bundles),
             resolver: &NoExternal,
             replay: &config_for(&scope()),
             candidate: cand.then_some(rustev_eval::report::Candidate {
@@ -996,7 +997,7 @@ async fn a_zero_denominator_coverage_is_unknown_to_a_gate() {
             split: Split::FinalTest,
             config: &s.config,
             adapter: &Support,
-            bundles: &s.bundles,
+            bundles: &inputs_of(&s.bundles),
             resolver: &NoExternal,
             replay: &config_for(&scope()),
             candidate: cand.then_some(rustev_eval::report::Candidate {
@@ -1026,7 +1027,7 @@ async fn complete_needs_every_case_and_every_metric() {
             split: Split::FinalTest,
             config: c,
             adapter: &Support,
-            bundles: &s.bundles,
+            bundles: &inputs_of(&s.bundles),
             resolver: &NoExternal,
             replay: &config_for(&scope()),
             candidate: None,
@@ -1078,7 +1079,7 @@ async fn outcome_changes_count_agreement_keys_only() {
             split: Split::FinalTest,
             config,
             adapter: &Support,
-            bundles: &s.bundles,
+            bundles: &inputs_of(&s.bundles),
             resolver: &NoExternal,
             replay: &config_for(&scope()),
             candidate: Some(rustev_eval::report::Candidate {
@@ -1159,7 +1160,7 @@ async fn latency_excludes_queueing_and_mixed_plans_are_refused() {
         split: Split::FinalTest,
         config: &s.config,
         adapter: &Support,
-        bundles: &timed,
+        bundles: &inputs_of(&timed),
         resolver: &NoExternal,
         replay: &config_for(&scope()),
         candidate: None,
@@ -1188,7 +1189,7 @@ async fn latency_excludes_queueing_and_mixed_plans_are_refused() {
         split: Split::FinalTest,
         config: &s.config,
         adapter: &Support,
-        bundles: &mixed,
+        bundles: &inputs_of(&mixed),
         resolver: &NoExternal,
         replay: &config_for(&scope()),
         candidate: None,
@@ -1280,7 +1281,7 @@ async fn coverage_minimums_bind_both_cohorts_and_their_own_series() {
                 split: Split::FinalTest,
                 config: &c,
                 adapter: &Support,
-                bundles: &s.bundles,
+                bundles: &inputs_of(&s.bundles),
                 resolver: &NoExternal,
                 replay: &config_for(&scope()),
                 candidate: cand.then_some(rustev_eval::report::Candidate {
@@ -1326,5 +1327,190 @@ async fn coverage_minimums_bind_both_cohorts_and_their_own_series() {
     assert!(matches!(
         evaluate_gate(&g, &b, &c),
         GateResult::Fail { reason } if reason.contains("labeled coverage")
+    ));
+}
+
+/// Parsed bundles as the evaluation's inputs (spec 015).
+fn inputs_of(b: &BTreeMap<String, ReplayBundle>) -> BTreeMap<String, BundleInput> {
+    b.iter()
+        .map(|(k, v)| (k.clone(), v.clone().into()))
+        .collect()
+}
+
+/// The support run's bundles with some cases replaced by load failures.
+fn with_failures(s: &SupportRun, fail: &[(&str, BundleLoad)]) -> BTreeMap<String, BundleInput> {
+    let mut m = inputs_of(&s.bundles);
+    for (id, kind) in fail {
+        assert!(m.contains_key(*id), "{id} has a bundle to replace");
+        m.insert(id.to_string(), LoadFailure::new(*kind, "a note").into());
+    }
+    m
+}
+
+fn case_detail<'a>(d: &'a EvalDetail, id: &str) -> &'a rustev_eval::report::CaseDetail {
+    d.cases.iter().find(|c| c.case == id).unwrap()
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn an_unusable_bundle_is_incomparable_for_its_case_only() {
+    let s = support_run().await;
+    let bundles = with_failures(
+        &s,
+        &[
+            ("s-02", BundleLoad::Corrupt),
+            ("s-03", BundleLoad::Oversized),
+            ("s-04", BundleLoad::Inaccessible),
+        ],
+    );
+    let e = evaluate(&Inputs {
+        manifest: &s.manifest,
+        split: Split::FinalTest,
+        config: &s.config,
+        adapter: &Support,
+        bundles: &bundles,
+        resolver: &NoExternal,
+        replay: &config_for(&scope()),
+        candidate: None,
+    })
+    .unwrap();
+    let d = &e.detail;
+    d.reconcile().unwrap();
+    // Inside the coverage denominator, counted under its own reason, beside
+    // the reasons the unchanged cases already had.
+    let (num, den, why) = count(d, "coverage");
+    assert_eq!((num, den), (3, 10));
+    assert_eq!(
+        why,
+        BTreeMap::from([
+            ("diverged".to_string(), 1),
+            ("incomparable:bundle-corrupt".to_string(), 1),
+            ("incomparable:bundle-inaccessible".to_string(), 1),
+            ("incomparable:bundle-missing".to_string(), 1),
+            ("incomparable:bundle-oversized".to_string(), 1),
+            ("incomparable:expired".to_string(), 1),
+            ("incomparable:missing".to_string(), 1),
+        ])
+    );
+    for (id, code) in [
+        ("s-02", "bundle-corrupt"),
+        ("s-03", "bundle-oversized"),
+        ("s-04", "bundle-inaccessible"),
+    ] {
+        let c = case_detail(d, id);
+        assert_eq!(c.outcome, "incomparable");
+        assert_eq!(c.reason.as_deref(), Some(code));
+        assert_eq!(c.scope, None, "no scope from unusable bytes");
+    }
+    // Excluded from every quality metric: only comparable cases are scored.
+    assert_eq!(count(d, "acceptance_coverage").1, 3);
+    assert_eq!(count(d, "probability_scored").1, 3);
+    // The other cases are evaluated as before.
+    assert_eq!(
+        case_detail(d, "s-01").outcome,
+        case_detail(&run(&s, None).detail, "s-01").outcome
+    );
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn a_candidate_over_an_unusable_bundle_is_incomparable() {
+    let s = support_run().await;
+    let base = run(&s, None);
+    let (sharp, cals) = candidate_with("0.5", &s.probe);
+    let bundles = with_failures(&s, &[("s-02", BundleLoad::Corrupt)]);
+    let cand = evaluate(&Inputs {
+        manifest: &s.manifest,
+        split: Split::FinalTest,
+        config: &s.config,
+        adapter: &Support,
+        bundles: &bundles,
+        resolver: &NoExternal,
+        replay: &config_for(&scope()),
+        candidate: Some(rustev_eval::report::Candidate {
+            plan: &sharp,
+            calibrations: &cals,
+        }),
+    })
+    .unwrap();
+    cand.detail.reconcile().unwrap();
+    let c = case_detail(&cand.detail, "s-02");
+    assert_eq!(c.outcome, "incomparable");
+    assert_eq!(c.reason.as_deref(), Some("bundle-corrupt"));
+    // Never reused, never agreement: out of the outcome-change cohort.
+    assert_eq!(count(&cand.detail, "candidate_outcome_change").1, 5);
+    assert_eq!(
+        count(&cand.detail, "coverage").0,
+        count(&base.detail, "coverage").0 - 1
+    );
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn unusable_bundles_fail_the_coverage_gate_and_never_pass_it() {
+    let s = support_run().await;
+    let (sharp, cals) = candidate_with("0.5", &s.probe);
+    let loaded: Vec<String> = s
+        .manifest
+        .split(Split::FinalTest)
+        .map(|c| c.id.clone())
+        .filter(|id| s.bundles.contains_key(id))
+        .collect();
+    let replay = config_for(&scope());
+    let with = |keep: Option<&str>| {
+        let fail: Vec<(&str, BundleLoad)> = loaded
+            .iter()
+            .filter(|id| Some(id.as_str()) != keep)
+            .map(|id| (id.as_str(), BundleLoad::Corrupt))
+            .collect();
+        with_failures(&s, &fail)
+    };
+    let eval = |bundles: &BTreeMap<String, BundleInput>, candidate| {
+        evaluate(&Inputs {
+            manifest: &s.manifest,
+            split: Split::FinalTest,
+            config: &s.config,
+            adapter: &Support,
+            bundles,
+            resolver: &NoExternal,
+            replay: &replay,
+            candidate,
+        })
+    };
+    let cand_of = || {
+        Some(rustev_eval::report::Candidate {
+            plan: &sharp,
+            calibrations: &cals,
+        })
+    };
+    // Both sides read the same damaged bundles: one usable case of ten is
+    // below the gate's minimum comparable coverage.
+    let one = with(Some("s-01"));
+    let base = eval(&one, None).unwrap();
+    let cand = eval(&one, cand_of()).unwrap();
+    assert_eq!(count(&cand.detail, "coverage").0, 1);
+    let g = s.config.gates.iter().find(|g| g.name == "error").unwrap();
+    assert!(matches!(
+        evaluate_gate(g, &base, &cand),
+        GateResult::Fail { reason } if reason.contains("comparable coverage")
+    ));
+    // Every bundle of the split unusable: quality metrics are unknown and
+    // the gate fails on coverage.
+    let none = with(None);
+    let base = eval(&none, None).unwrap();
+    let cand = eval(&none, cand_of()).unwrap();
+    assert_eq!(count(&cand.detail, "coverage").0, 0);
+    unknown_metric(&cand, "error_among_accepted");
+    unknown_metric(&base, "error_among_accepted");
+    assert!(matches!(
+        evaluate_gate(g, &base, &cand),
+        GateResult::Fail { reason } if reason.contains("comparable coverage")
+    ));
+    // A baseline names its plan from a usable bundle; with none at all it
+    // refuses, as it does when every bundle is absent, and reports nothing.
+    let only_split: BTreeMap<String, BundleInput> = none
+        .into_iter()
+        .filter(|(id, _)| loaded.contains(id))
+        .collect();
+    assert!(matches!(
+        eval(&only_split, None),
+        Err(rustev_eval::report::EvalError::EmptySplit)
     ));
 }

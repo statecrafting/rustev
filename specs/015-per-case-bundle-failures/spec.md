@@ -2,10 +2,10 @@
 id: "015-per-case-bundle-failures"
 title: "Per-case reporting of unusable replay bundles (amends 004)"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-25"
 summary: >
-  A proposed amendment of approved spec 004 (R-16). Evaluation takes
+  An amendment of approved spec 004 (R-16). Evaluation takes
   parsed replay bundles only, so a retained bundle whose bytes cannot be
   read, exceed their limit or do not parse cannot be reported as one
   incomparable case: a host must either stop the whole evaluation (the
@@ -13,9 +13,18 @@ summary: >
   then reports as `bundle-missing`, misstating corruption as absence.
   This amendment lets the caller supply a typed bundle-load failure per case,
   reported as incomparable with its own reason, counted in coverage and
-  excluded from quality. Approved (A-11, 2026-09-25); implementation pending.
+  excluded from quality. Approved (A-11, 2026-09-25) and implemented.
 amends:
   - "004-evaluation-and-replay"
+extends:
+  # The evaluation inputs take a parsed bundle or a load failure per case
+  # (spec 004, 3.3.1 and 3.5.4).
+  - { spec: "004-evaluation-and-replay", unit: { kind: directory, path: "crates/rustev-eval/" }, nature: amending }
+  # `eval` and `calibrate fit` report an unusable bundle per case (spec 006
+  # E-31 superseded).
+  - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: amending }
+  # Adds 015 to `make verify`.
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
 depends_on:
   - "004-evaluation-and-replay"
   - "006-cli-surface"
@@ -26,7 +35,7 @@ references:
 # 015: Per-case reporting of unusable replay bundles (amends 004)
 
 Approved (A-11, 2026-09-25) as its own reviewable change before any code
-(R-16); implementation is pending. Drafted on 2026-09-25 under the
+(R-16), and implemented; see the implementation record. Drafted on 2026-09-25 under the
 owner decision of 2026-09-24 to draft the spec 004 amendments once 012 was
 merged, and to stop for approval. Spec 004's approved text is not edited;
 this spec records the change.
@@ -148,3 +157,52 @@ text is kept as the record of what was asked.
 - Q-2: whether to add an optional expected bundle digest per case to the
   dataset manifest now. Recommendation: not in this amendment; it changes
   `rustev.dataset/1` and deserves its own change.
+
+## Implementation record
+
+- `crates/rustev-eval/src/bundle.rs`: `BundleInput` (a parsed bundle or a
+  `LoadFailure`), `BundleLoad` (`Inaccessible`, `Oversized`, `Corrupt`,
+  with their `bundle-*` codes) and the operator note, cut to 256 bytes at a
+  character boundary and never written to a report.
+- `crates/rustev-eval/src/report.rs`: `Inputs::bundles` maps case ids to
+  `BundleInput`. A failure is `incomparable` with its code and no scope; the
+  baseline's plan id is taken from a usable bundle only.
+- `crates/rustev-cli/src/io.rs`: `Reads::read_classified` tells a failure of
+  the file from an exhausted command budget. `crates/rustev-cli/src/eval.rs`
+  `read_bundles` supplies a failure per case (open or read error or a
+  non-regular file: inaccessible; past the limit: oversized; parse or schema
+  refusal: corrupt) and stops only on the budget (3.3.2);
+  `crates/rustev-cli/src/calibrate.rs` skips such a case by its reason. The
+  standalone `replay` command still refuses an unusable bundle: it evaluates
+  no cases.
+- Spec 006's test that expected `eval` to stop on an unparsable bundle
+  (`eval_input_errors_stop_the_command`) lost that case; the per-case
+  outcome is `an_unusable_bundle_is_reported_per_case_not_fatal`.
+- Section 5, by row: truncated, oversized, directory and absent bundles
+  through the CLI (`crates/rustev-cli/tests/eval.rs`) and the library
+  (`an_unusable_bundle_is_incomparable_for_its_case_only`); a candidate over
+  a corrupt bundle (`a_candidate_over_an_unusable_bundle_is_incomparable`);
+  `calibrate fit` with a corrupt calibration bundle
+  (`fitting_uses_the_calibration_split_and_qualification_needs_lineage`);
+  every bundle of the split corrupt
+  (`unusable_bundles_fail_the_coverage_gate_and_never_pass_it`).
+- Clarification of the last row: a baseline report names its plan from a
+  usable bundle in the inputs. With a usable bundle outside the split, the
+  report is produced, its quality metrics are unknown and the coverage gate
+  fails. With no usable bundle at all, `evaluate` refuses (`EmptySplit`), as
+  it already did when every bundle is absent, so no report exists and no
+  gate can pass.
+- Seeds, `unusable bundles` in both harnesses (run by the verification of
+  specs 004 and 006): a failure reported as `bundle-missing`, dropped from
+  the coverage denominator, or counted as comparable; in the CLI, a corrupt
+  bundle treated as absent, an unreadable bundle stopping the command, an
+  oversized bundle reported as corrupt, and fitting skipping a failure as
+  missing.
+
+## Verification
+
+```verify:cli
+cargo test -p rustev-eval --locked
+cargo test -p rustev-cli --locked
+cargo clippy -p rustev-eval -p rustev-cli --all-targets --locked -- -D warnings
+```
