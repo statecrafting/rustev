@@ -30,12 +30,37 @@ REQUIRED = [
     "output equivalence",
     "scope isolation",
     "split leakage",
+    "unusable bundles",
 ]
 # Generous: a new test binary can wait on the OS before it starts.
 TEST_TIMEOUT_S = 1800
 
 # (category, name, file, old, new, packages)
 SEEDS = [
+    (
+        "unusable bundles",
+        "a load failure is reported as bundle-missing (spec 015)",
+        E + "report.rs",
+        "Some(BundleInput::Failed(f)) => return incomparable(None, f.kind.code()),",
+        'Some(BundleInput::Failed(_)) => return incomparable(None, "bundle-missing"),',
+        EVAL,
+    ),
+    (
+        "unusable bundles",
+        "an unusable bundle leaves the coverage denominator (spec 015)",
+        E + "report.rs",
+        "let results: Vec<CaseResult<'_>> = cases.iter().map(|c| evaluate_case(inputs, c)).collect();",
+        "let results: Vec<CaseResult<'_>> = cases.iter().map(|c| evaluate_case(inputs, c)).filter(|r| !matches!(&r.status, Status::Incomparable(c) if c.starts_with(\"bundle-\") && c != \"bundle-missing\")).collect();",
+        EVAL,
+    ),
+    (
+        "unusable bundles",
+        "an unusable bundle is counted as comparable (spec 015)",
+        E + "report.rs",
+        "            Status::Incomparable(code) => {\n",
+        "            Status::Incomparable(code) => {\n                if code.starts_with(\"bundle-c\") {\n                    comparable += 1;\n                }\n",
+        EVAL,
+    ),
     (
         "scope isolation",
         "only the tenant is compared",

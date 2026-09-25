@@ -31,6 +31,17 @@ fn fail<T>(path: &str, detail: impl Into<String>) -> Result<T, IoFail> {
     })
 }
 
+/// A classified read failure: the file's own, or the command budget's.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ReadFail {
+    File(IoFail),
+    Budget(IoFail),
+}
+
+fn file_fail<T>(path: &str, detail: impl Into<String>) -> Result<T, ReadFail> {
+    fail(path, detail).map_err(ReadFail::File)
+}
+
 /// The per-command read budget.
 pub struct Reads {
     cap: usize,
@@ -66,23 +77,32 @@ impl Reads {
     /// a file that does not exist (for store items and bundles, whose
     /// absence the library judges).
     pub fn read_bounded(&self, path: &str, max: usize) -> Result<Option<Vec<u8>>, IoFail> {
+        self.read_classified(path, max).map_err(|e| match e {
+            ReadFail::File(f) | ReadFail::Budget(f) => f,
+        })
+    }
+
+    /// Like [`Reads::read_bounded`], telling a failure of the file from an
+    /// exhausted command budget, which depends on read order rather than on
+    /// the file (spec 015, 3.3.2).
+    pub fn read_classified(&self, path: &str, max: usize) -> Result<Option<Vec<u8>>, ReadFail> {
         // Checked before opening, so a FIFO never blocks, and again on the
         // handle.
         match std::fs::metadata(path) {
             Ok(m) if m.is_file() => {}
-            Ok(_) => return fail(path, "not a regular file"),
+            Ok(_) => return file_fail(path, "not a regular file"),
             Err(e) if e.kind() == ErrorKind::NotFound => return Ok(None),
-            Err(e) => return fail(path, e.to_string()),
+            Err(e) => return file_fail(path, e.to_string()),
         }
         let file = match open_input(Path::new(path), false) {
             Ok(f) => f,
             Err(e) if e.kind() == ErrorKind::NotFound => return Ok(None),
-            Err(e) => return fail(path, e.to_string()),
+            Err(e) => return file_fail(path, e.to_string()),
         };
         match file.metadata() {
             Ok(m) if m.is_file() => {}
-            Ok(_) => return fail(path, "not a regular file"),
-            Err(e) => return fail(path, e.to_string()),
+            Ok(_) => return file_fail(path, "not a regular file"),
+            Err(e) => return file_fail(path, e.to_string()),
         }
         let remaining = self.remaining.get();
         // One byte past the budget tells an exhausted budget from a file
@@ -90,16 +110,16 @@ impl Reads {
         let take = max.min(remaining.saturating_add(1));
         let mut bytes = Vec::new();
         if let Err(e) = file.take(take as u64).read_to_end(&mut bytes) {
-            return fail(path, e.to_string());
+            return file_fail(path, e.to_string());
         }
         if bytes.len() > remaining {
-            return fail(
-                path,
-                format!(
+            return Err(ReadFail::Budget(IoFail {
+                path: path.into(),
+                detail: format!(
                     "the command's read budget of {} bytes is exhausted",
                     self.cap
                 ),
-            );
+            }));
         }
         self.remaining.set(remaining - bytes.len());
         Ok(Some(bytes))

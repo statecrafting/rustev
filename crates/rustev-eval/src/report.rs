@@ -20,13 +20,13 @@ use rustev_contract::ids::{
 };
 use rustev_contract::limits::REPLAY_V1;
 use rustev_contract::plan::{BoundCalibration, Plan, PlanExecution, PlanStepDetail};
-use rustev_contract::replay::ReplayBundle;
 use rustev_contract::run::RunRecord;
 use rustev_contract::scope::Scope;
 use rustev_contract::{Document, Identified, schema};
 use rustev_core::Compiled;
 use serde::{Deserialize, Serialize};
 
+use crate::bundle::BundleInput;
 use crate::compare::compare;
 use crate::config::{ConfigError, Direction, EvaluatorConfig, Gate};
 use crate::dataset::{DatasetCase, DatasetError, DatasetManifest};
@@ -110,8 +110,9 @@ pub struct Inputs<'a> {
     pub split: Split,
     pub config: &'a EvaluatorConfig,
     pub adapter: &'a dyn TaskAdapter,
-    /// By case id.
-    pub bundles: &'a BTreeMap<String, ReplayBundle>,
+    /// By case id: a parsed bundle or the load failure the host observed
+    /// (spec 015). A case with no entry is `bundle-missing`.
+    pub bundles: &'a BTreeMap<String, BundleInput>,
     pub resolver: &'a dyn Resolver,
     pub replay: &'a ReplayConfig,
     /// A candidate plan to compare; none for a baseline report.
@@ -157,8 +158,11 @@ fn evaluate_case<'a>(inputs: &Inputs<'_>, case: &'a DatasetCase) -> CaseResult<'
         scope,
         status: Status::Incomparable(code.into()),
     };
-    let Some(bundle) = inputs.bundles.get(&case.id) else {
-        return incomparable(None, "bundle-missing");
+    let bundle = match inputs.bundles.get(&case.id) {
+        None => return incomparable(None, "bundle-missing"),
+        // No scope: the bytes that would carry it are unusable.
+        Some(BundleInput::Failed(f)) => return incomparable(None, f.kind.code()),
+        Some(BundleInput::Loaded(b)) => b,
     };
     let scope = Some(bundle.scope.clone());
     if bundle.snapshot_id != case.snapshot {
@@ -542,8 +546,10 @@ pub fn evaluate(inputs: &Inputs<'_>) -> Result<Evaluated, EvalError> {
         (None, None) => inputs
             .bundles
             .values()
-            .map(|b| b.plan_id.clone())
-            .next()
+            .find_map(|b| match b {
+                BundleInput::Loaded(b) => Some(b.plan_id.clone()),
+                BundleInput::Failed(_) => None,
+            })
             .ok_or(EvalError::EmptySplit)?,
     };
     let (artifacts, calibrations) = match (inputs.candidate, plan_doc) {

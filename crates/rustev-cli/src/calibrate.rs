@@ -9,6 +9,7 @@ use rustev_contract::eval_report::Split;
 use rustev_contract::limits::{DESCRIPTOR_V1, REPLAY_V1};
 use rustev_contract::output::RawOutput;
 use rustev_contract::plan::{Plan, PlanStepDetail};
+use rustev_eval::bundle::BundleInput;
 use rustev_eval::config::EvaluatorConfig;
 use rustev_eval::dataset::DatasetManifest;
 use rustev_eval::fit::{CalibrationFit, FitTarget, Qualification, fit_temperature, qualify};
@@ -84,9 +85,16 @@ pub fn fit(p: &Parsed) -> Result<Res, Usage> {
         let mut samples: Vec<(String, RawOutput)> = vec![];
         let mut plan: Option<Plan> = None;
         for case in manifest.split(Split::Calibration) {
-            let Some(bundle) = bundles.get(&case.id) else {
-                bump(&mut skipped, "bundle-missing");
-                continue;
+            let bundle = match bundles.get(&case.id) {
+                None => {
+                    bump(&mut skipped, "bundle-missing");
+                    continue;
+                }
+                Some(BundleInput::Failed(f)) => {
+                    bump(&mut skipped, f.kind.code());
+                    continue;
+                }
+                Some(BundleInput::Loaded(b)) => b,
             };
             let r = match reproduce(bundle, resolver.as_ref(), &replay) {
                 ReplayOutcome::Reproduced(r) => r,
