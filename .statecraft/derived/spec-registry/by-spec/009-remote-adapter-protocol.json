@@ -122,9 +122,9 @@
       }
     ],
     "sectionDigests": {
-      "009-remote-adapter-protocol": "769126a44b2f6734149c91473707a9ad6f1b686b61f3b39af5356d0b24ac9a1d",
+      "009-remote-adapter-protocol": "61f87f5fba95350710e0f41517904a3fd97c8e91e3bb88c5764af43711b5c7f2",
       "1-purpose": "825492dea422d2ff179a33669639eb9593e9c78f0c2bba0415b305d89808a695",
-      "2-territory": "ce99aa55077d5a9469f3d29b147858465ccc7a4de8fbef5b39555097c45fc0bb",
+      "2-territory": "d1823b8847e5bef5248e78eb0838e102601e53f05de9546fb3aa999f11959b83",
       "3-1-authority-and-provenance": "ed94499ca9b4687dcf509ff71a84e04e2613cb6c6b804a9d96cf22c70743022c",
       "3-10-the-rustev-remote-1-documents": "1e4233ca4346825e8162acdd30fab8f3b995ee137e1687a8bcec54a7ba2633b5",
       "3-11-http-binding": "f89bd2c8367d706cb350aa61a1a819c94a30a103013cd3f5a13cd181f404da47",
@@ -138,12 +138,12 @@
       "3-9-exchange-records-and-replay": "bd689328c829ce1bbfa5751c7e453d0f2bd8f3996428f87ea3d28487bdea642e",
       "3-behavior": "9e37370b1de0b4d49813427eb80cf2c2e29e8c25328c6cfe68d96299c79ea103",
       "4-out-of-scope": "83f3a338eb85023a092ef9ac91db865cb644f9e883b46d231bfe1cc753d9d9be",
-      "5-limits-of-the-approved-vocabulary": "a1ee0d380f44f2e248ebc3ec81f425e57133de1c10c1362568894086ae9d71ba",
+      "5-limits-of-the-approved-vocabulary": "08b8000f9c321d423db7b29bf6070f41a2c72974c317aa2510479236b940a63b",
       "6-observable-negative-cases": "a2b6ae6780ed18edb3e5032d873f2991e6c19a12a72daf3ee06ba08589231591",
       "acceptance-planned": "c21d9815de7e218cd8bd7c6e7aa67ef64e26fc5b9541bfbd7535b61f424131fb",
       "open-questions": "34bc4dcdd87331f7eec9d27a83bab2d45f91eea314614433daa89dbce5e4beaa",
-      "resolved-questions": "bc4ca95b62fdd0726d35b5281c100b97736d13e7b831a699ca73227bd45027b6",
-      "verification": "aeec6a5d5a73fd4f2f0d7935efb1a4d54b206c8d5e29f88ce27a8425152ec06d"
+      "resolved-questions": "bdc7f2907257114427dd8c3fb737b0e71eedd34f2a42afb11909936894608b9f",
+      "verification": "d5be5945ea1d37570208826f459b1a8dfd5fbdf2896c4142dfab5e3af603b7e8"
     },
     "sectionHeadings": [
       "009: Remote adapter protocol",
@@ -170,10 +170,10 @@
       "Open questions"
     ],
     "specPath": "specs/009-remote-adapter-protocol/spec.md",
-    "status": "draft",
-    "summary": "Increment 3 (design roadmap 17.1, ordinal 009): what every decision backend reached across a network must guarantee, and a versioned, transport-neutral protocol (`rustev.remote/1`) for backends served by another process. Covers capability description and negotiation at setup, attempt identity and idempotency, one total time budget per attempt, cancellation that never claims more than the remote side confirmed, validation of responses into `RawOutput` without inventing mass, a closed error taxonomy mapped onto spec 003's failure classes, explicit served-model identity (unknown is a value, never an omission), cost reporting, retained exchange records for audit and replay, and privacy options passed through and recorded. Protocol messages live in `rustev-contract`; every network implementation lives under `integrations/`. Amends no approved behavior. Draft: claims no code.\n",
+    "status": "approved",
+    "summary": "Increment 3 (design roadmap 17.1, ordinal 009): what every decision backend reached across a network must guarantee, and a versioned, transport-neutral protocol (`rustev.remote/1`) for backends served by another process. Covers capability description and negotiation at setup, attempt identity and idempotency, one total time budget per attempt, cancellation that never claims more than the remote side confirmed, validation of responses into `RawOutput` without inventing mass, a closed error taxonomy mapped onto spec 003's failure classes, explicit served-model identity (unknown is a value, never an omission), cost reporting, retained exchange records for audit and replay, and privacy options passed through and recorded. Protocol messages live in `rustev-contract`; every network implementation lives under `integrations/`. Amends no approved behavior. Approved (A-08); implementation pending.\n",
     "title": "Remote adapter protocol"
   },
-  "shardHash": "a152edb5468acb707f7a8d74838e5355f8a529b38087d492ad772d63c9c66268",
+  "shardHash": "7187d973b59c56af9b2aafd11fe1757a30bb7916ed2bee59dcd84c9865333a74",
   "specVersion": "1.8.0"
 }

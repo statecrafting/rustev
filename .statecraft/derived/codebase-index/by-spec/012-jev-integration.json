@@ -101,8 +101,8 @@
       }
     ],
     "specId": "012-jev-integration",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "1485d619efc181545136c19b2d54d7c13dba411767c006b12c0f19c8dbae20a9"
+  "shardHash": "a73efec414574d20ae7a8989394e0995513dfd000333b1a51a7faeb084bf905d"
 }

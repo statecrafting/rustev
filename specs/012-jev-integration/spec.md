@@ -1,7 +1,7 @@
 ---
 id: "012-jev-integration"
 title: "Jev integration (remote decision backend)"
-status: draft
+status: approved
 implementation: pending
 created: "2026-09-24"
 summary: >
@@ -18,7 +18,7 @@ summary: >
   qualification is authorized by R-27 (zero data retention, synthetic and
   independently labeled data only); testing is capped at USD 5 in total and
   production at USD 25 per month (R-29), and production requires a pinned
-  model version (R-28). Draft: claims no code.
+  model version (R-28). Approved (A-09); implementation pending.
 extends:
   # Adds the integration crate's manifest and dependencies to the workspace.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.toml" }, nature: additive }
@@ -75,7 +75,7 @@ obligations:
 
 # 012: Jev integration (remote decision backend)
 
-Draft: a proposal, not a claim about code. Ordinal: the next free one;
+Approved (A-09, 2026-09-24), not implemented. Ordinal: the next free one;
 `010` stays reserved for the roadmap's general integrations increment and
 `011` is taken. Rationale: owner decision R-26 (Rustev is the decision
 engine of the travel-memory product, with Jev through the Vercel AI Gateway
@@ -88,7 +88,7 @@ discussion `002` for background only. Facts about the provider are C-09 in
 the decisions record, verified from Vercel's documentation on 2026-09-24;
 anything not in C-09 is marked unverified here.
 
-This spec **amends no approved spec**. It needs spec 009 (draft) for the
+This spec **amends no approved spec**. It needs spec 009 for the
 remote adapter obligations and for shared-state batching.
 
 ## 1. Purpose
@@ -102,7 +102,7 @@ working adapter with no quality claim.
 
 ## 2. Territory
 
-Nothing is claimed while this spec is a draft. When made concrete it claims
+Nothing is claimed until the implementing change. Then it claims
 `integrations/rustev-jev/`: a `DecisionBackend` implementation, its binding
 document `rustev.jev-binding/1`, the mapping of 3.3 and 3.4, and recorded
 test fixtures. It depends on `rustev-contract`, `rustev-core`, spec 009's
@@ -164,8 +164,10 @@ it is in plan identity (R-10) and never happens inside an adapter.
    The descriptor declares these three operations with output
    `distribution`, `max_options` 2, 255 and 10, determinism `unspecified`,
    and an input limit in canonical projection bytes with `on_excess:
-   refuse`, set conservatively below the model's context (the default is an
-   open question for qualification). Plans require `distribution`,
+   refuse`, set conservatively below the model's 32,000-token context
+   (C-10): 49,152 bytes by default, which is about 20,500 tokens at the
+   2.4 bytes per token observed in C-11 and leaves room for question
+   material and variance in the ratio. The binding may lower it. Plans require `distribution`,
    `ordinal_distribution` or, with a calibration bound to this adapter's
    artifact, `calibrated_probability` (spec 002, 3.9.3).
 2. **Rank is not native** and is not synthesized. The descriptor omits
@@ -181,9 +183,12 @@ it is in plan identity (R-10) and never happens inside an adapter.
 4. **Question.** Each Rustev request becomes one entry of `questions`,
    keyed `q0`, `q1` and so on in item order (never by step name, which may
    carry meaning the host does not want to disclose). `instructions` is the
-   step's `question`. `criteria` lists the step's options or levels in
-   declared order; each carries a description from the binding's option
-   description table when one is given, otherwise the option label itself.
+   step's `question`. `criteria` has the shape the Gateway accepts (C-11):
+   for `boolean` the object `{"false": d, "true": d}`, for `choice` an object
+   from each label, in declared order, to its description, and for `score`
+   an array of level descriptions from low to high. Each description comes
+   from the binding's option description table when one is given, otherwise
+   it is the option label itself.
    The table and the mapping version are in the artifact identity (spec 009,
    3.2.3), so changing a description changes the `PlanId` of dependent
    plans.
@@ -195,24 +200,25 @@ it is in plan identity (R-10) and never happens inside an adapter.
 
 ### 3.4 Answers into RawOutput
 
-Spec 009 3.5 applies. The answer shapes below come from the direct API
-documentation summarized in discussion `002`; the Gateway's per-answer
-field names are **unverified** and are fixed from recorded Gateway
-responses before implementation. If they differ, only the mapping changes,
-under a new mapping version.
+Spec 009 3.5 applies. The Gateway's answer shapes were observed in C-11
+(`answers.<key>` with `type` and the fields below); a change of shape
+changes only the mapping, under a new mapping version. An answer whose
+`type` differs from the question's is `malformed_response`.
 
-1. `boolean`: the probability `p` that the proposition is true becomes
+1. `boolean`: the field `probability`, the probability `p` that the
+   proposition is true, becomes
    `{"false": 1 - p, "true": p}`, the lossless reshaping of spec 009 3.5.4.
-2. `choice`: the per-option probabilities become the distribution, keyed by
+2. `choice`: the per-option `probabilities` become the distribution, keyed by
    the labels sent as criteria. Keys are not added, removed or renamed; a
    missing or extra key reaches the core's validation as received.
-3. `score`: the per-level probabilities, keyed by level index `0` to `k-1`,
+3. `score`: the per-level `probabilities`, keyed by level index `0` to `k-1`,
    become the distribution keyed by the rubric's level at that index. Keys
    that are not exactly `0` to `k-1` are `malformed_response`. The
    interpolated `score` (the expectation) is not supplied; the core computes
    its own expectation from the distribution (spec 002, 3.5.4).
-4. **Provider extras.** The argmax `choice`, any `confidence`, the
-   interpolated `score` and any legend are kept in the exchange record as
+4. **Provider extras.** The argmax `choice`, any `confidence` (per answer
+   or in `providerMetadata.typesafe.confidence`), the interpolated `score`
+   and any legend are kept in the exchange record as
    provider-reported. `confidence` is a transform of the distribution's peak
    (discussion `002`), not a probability of being correct, and it is never
    supplied, compared to a threshold, or called calibrated. A calibrated
@@ -265,10 +271,15 @@ one request.
    ratio and the declared price table; a `hard` cost policy therefore refuses
    plans that reach this adapter (spec 003, 3.5.3), and travel-memory plans
    use `estimated`. The charge is `observed` from
-   `providerMetadata.gateway.cost` when present (converted by the declared
-   unit rate, rounded up), else `estimated` from `usage.inputTokens` and
-   `usage.outputTokens`, else `unknown`. Reported cost and usage are kept
-   verbatim in the exchange record.
+   `providerMetadata.gateway.cost`, a decimal USD string (C-11), when present
+   (converted by the declared unit rate, rounded up), else `estimated` from
+   `usage.inputTokens` and `usage.outputTokens`, else `unknown`. Reported
+   cost, `marketCost` and usage are kept verbatim in the exchange record.
+   The default price table is the public one of C-10: USD 0.042 per 1M
+   input tokens and no output price; the default estimation ratio is 2
+   bytes per token, below the observed 2.4, so estimates err high. The
+   default unit is one nano-USD (USD 10^-9), so the caps of R-29 are
+   5,000,000,000 and 25,000,000,000 units.
 5. **Cancellation.** No cancel operation is documented. Before any request
    byte is sent a cancellation acknowledges `stopped` with `observed{0}`;
    after that it is `unconfirmed` with an `unknown` charge, and the run
@@ -279,7 +290,13 @@ one request.
 The binding sets, by default, the Gateway provider options
 `zeroDataRetention: true` and `only: ["typesafe-ai"]` (C-09). They are sent
 on every request and recorded as requested; the adapter does not claim that
-retention or routing was honored. Because they can change routing, they are
+retention or routing was honored. `only` is mandatory and must be exactly
+`["typesafe-ai"]`: the other listed provider keeps data (C-10), so a
+binding that omits or widens it is refused at construction and no request
+is sent. `zeroDataRetention` may be set `false` only as an explicit binding
+choice under R-30 (the Gateway refuses it on the Hobby plan, C-11), for
+synthetic and independently labeled synthetic-provenance data only; the
+choice is in the artifact identity. Because they can change routing, they are
 in the artifact identity. The attempt id and decision id are not sent
 (spec 009, 3.3.3); the exchange record joins `generationId` to the attempt
 id locally. Exchange records are digest-only by default under R-19.
@@ -364,8 +381,7 @@ real user data before a separate privacy decision.
 
 ## Verification
 
-Planned; not run until this spec is made concrete, approved and added to
-`make verify`.
+Planned; not run until this spec is implemented and added to `make verify`.
 
 ```verify:cli
 # 3.2 to 3.7 and stage 1 of 3.8: mapping, errors, batching, cost, identity,
@@ -394,9 +410,13 @@ Decided by the owner on 2026-09-24:
 7. Spend caps: USD 5 total for testing, USD 25 per month for production,
    hard stop in the adapter's accounting plus a Gateway budget (R-29).
 
+8. Zero data retention: the Gateway flag may be omitted for synthetic data
+   while the team is on the Hobby plan; the provider allowlist stays (R-30).
+
+Settled from the recorded calls of C-11 before approval: the default
+projection input limit (3.3.1), the request `criteria` shapes (3.3.4), the
+Gateway's per-answer field names (3.4) and the cost fields (3.6.4).
+
 ## Open questions
 
-1. The default projection input limit, pending the smoke stage's
-   measurement of bytes per token.
-2. The Gateway's per-answer field names (3.4), to be fixed from the smoke
-   stage's recorded responses.
+None.

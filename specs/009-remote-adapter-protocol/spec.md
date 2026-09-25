@@ -1,7 +1,7 @@
 ---
 id: "009-remote-adapter-protocol"
 title: "Remote adapter protocol"
-status: draft
+status: approved
 implementation: pending
 created: "2026-09-24"
 summary: >
@@ -16,7 +16,8 @@ summary: >
   never an omission), cost reporting, retained exchange records for audit and
   replay, and privacy options passed through and recorded. Protocol messages
   live in `rustev-contract`; every network implementation lives under
-  `integrations/`. Amends no approved behavior. Draft: claims no code.
+  `integrations/`. Amends no approved behavior. Approved (A-08);
+  implementation pending.
 extends:
   # The protocol documents are a new, additive module of the contract crate
   # (spec 001, 3.4.3: remote protocol messages live in rustev-contract).
@@ -80,7 +81,7 @@ obligations:
 
 # 009: Remote adapter protocol
 
-Draft: a proposal, not a claim about code. The ordinal is the one design
+Approved (A-08, 2026-09-24), not implemented. The ordinal is the one design
 roadmap 17.1 reserves for this subject. Rationale: design sections 8, 9, 15
 and 17 (not contract); founding decision D-06 (traits plus a versioned
 protocol for remote adapters); owner decisions R-05, R-08, R-10, R-16, R-19,
@@ -94,7 +95,7 @@ the seams and records spec 003 already approved (`DecisionBackend`,
 `AttemptCall`, `AttemptReport`, `AdapterFailure`, `CancelAck`, `Charge`,
 `RemoteState`). Where that vocabulary is too narrow, section 5 names the gap
 and says what an amendment would change; the one the owner chose to pursue
-is a separate amendment of spec 003, proposed as draft spec 013 in its own change.
+is a separate amendment of spec 003, proposed as spec 013 in its own change.
 
 ## 1. Purpose
 
@@ -108,8 +109,7 @@ of them explicit instead of assumed.
 
 ## 2. Territory
 
-Nothing is claimed while this spec is a draft. When it is made concrete it
-claims:
+Nothing is claimed until the implementing change. Then this spec claims:
 
 - `crates/rustev-contract/src/remote.rs` (an additive module of spec 002's
   crate, 3.10): the `rustev.remote/1` documents and their parse limits.
@@ -436,7 +436,7 @@ proposed as a separately reviewable amendment (R-16, R-28).
    cancellation only. A `transport_interrupted` failure, where request bytes
    were sent and no response came, is recorded as `finished` although remote
    work may continue. The unknown charge keeps the reservation as liability,
-   so cost stays honest; the remote-state field does not. Draft spec 013
+   so cost stays honest; the remote-state field does not. Spec 013
    proposes the correction as an `amends` change to spec 003 (R-28). Until
    it is approved and delivered, this limitation holds.
 2. **Structured remote evidence in the run record.** The code travels in
@@ -481,8 +481,7 @@ proposed as a separately reviewable amendment (R-16, R-28).
 
 ## Verification
 
-Planned; not run until this spec is made concrete, approved and added to
-`make verify`.
+Planned; not run until this spec is implemented and added to `make verify`.
 
 ```verify:cli
 # 3.10: protocol documents, limits and canonical bytes.
@@ -504,7 +503,7 @@ Decided by the owner on 2026-09-24 (R-28):
 2. The batched cost attribution (shares to members that received the
    response, liability for the rest until reconciled) is accepted.
 3. The remote-state gap (5.1) goes to a separate amendment of spec 003,
-   draft spec 013.
+   spec 013 (A-07).
 4. Exchange records go to a separate host sink now (3.9); a `rustev.run/2`
    member is a later change (5.2).
 
