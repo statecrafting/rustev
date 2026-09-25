@@ -55,7 +55,7 @@ fn manifest() -> DatasetManifest {
 fn config(grid: &[&str]) -> EvaluatorConfig {
     EvaluatorConfig {
         schema: rustev_eval::config::EVALUATOR_CONFIG.into(),
-        adapter: manifest().adapter,
+        adapter: rustev_eval::config::ConfigAdapter::v1(manifest().adapter),
         label_interpretation: "SYNTHETIC".into(),
         agreement: Agreement { params: vec![] },
         probability_step: None,

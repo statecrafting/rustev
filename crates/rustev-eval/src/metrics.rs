@@ -15,12 +15,16 @@ use rustev_contract::run::{Charge, RunRecord};
 use rustev_core::calibrate::{self, BindingCheck, CalibrationInput};
 use rustev_core::kinds::Distribution;
 
-use crate::config::Agreement;
+use crate::config::{AdapterRules, Agreement};
 use crate::dataset::AdapterRef;
 
 /// How a task reads its judgments and labels.
 pub trait TaskAdapter {
     fn adapter(&self) -> AdapterRef;
+    /// What determines this adapter's label check and correctness (spec
+    /// 014, 3.1). No default: every adapter states whether its rules are
+    /// bound to a document or opaque.
+    fn rules(&self) -> AdapterRules;
     /// Refuse a label of the wrong shape.
     fn check_label(&self, label: &str) -> Result<(), String>;
     /// Whether a proposal is correct for a label. The adapter defines

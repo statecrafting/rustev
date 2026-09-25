@@ -31,12 +31,37 @@ REQUIRED = [
     "scope isolation",
     "split leakage",
     "unusable bundles",
+    "adapter rules",
 ]
 # Generous: a new test binary can wait on the OS before it starts.
 TEST_TIMEOUT_S = 1800
 
 # (category, name, file, old, new, packages)
 SEEDS = [
+    (
+        "adapter rules",
+        "the rules digest is left out of the configuration identity (spec 014)",
+        E + "config.rs",
+        '#[serde(default, skip_serializing_if = "Option::is_none")]\n    pub rules',
+        "#[serde(default, skip_serializing)]\n    pub rules",
+        EVAL,
+    ),
+    (
+        "adapter rules",
+        "the adapter-mismatch check ignores the rules (spec 014)",
+        E + "report.rs",
+        ".is_some_and(|r| *r != inputs.adapter.rules())",
+        ".is_some_and(|_| false)",
+        EVAL,
+    ),
+    (
+        "adapter rules",
+        "a gate passes over one side's unbound rules (spec 014)",
+        E + "report.rs",
+        "        baseline.config.bound_rules(),\n        candidate.config.bound_rules(),\n    ) {",
+        "        baseline.config.bound_rules().or(candidate.config.bound_rules()),\n        candidate.config.bound_rules().or(baseline.config.bound_rules()),\n    ) {",
+        EVAL,
+    ),
     (
         "unusable bundles",
         "a load failure is reported as bundle-missing (spec 015)",

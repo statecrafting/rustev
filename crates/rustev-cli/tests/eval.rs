@@ -10,7 +10,9 @@ use rustev_contract::Document;
 use rustev_contract::Identified;
 use rustev_contract::eval_report::{DatasetProvenance, Split};
 use rustev_contract::snapshot::Snapshot;
-use rustev_eval::config::{Agreement, Direction, EvaluatorConfig, Gate, MetricFormula};
+use rustev_eval::config::{
+    AdapterRules, Agreement, ConfigAdapter, Direction, EvaluatorConfig, Gate, MetricFormula,
+};
 use rustev_eval::dataset::{AdapterRef, DatasetCase, DatasetManifest, Label};
 use rustev_eval::report::EvalDetail;
 use serde_json::{Value as Json, json};
@@ -173,6 +175,21 @@ fn formulas() -> Vec<MetricFormula> {
     .collect()
 }
 
+/// The rules digest the CLI binds for an adapter document (spec 014,
+/// 3.1.4): over its canonical bytes, tagged with its schema.
+fn adapter_rules(doc: &str) -> AdapterRules {
+    let a: Json = serde_json::from_str(doc).unwrap();
+    let bytes = rustev_contract::canonical::canonical_value_bytes(&a).unwrap();
+    AdapterRules::Bound(
+        rustev_contract::ids::ContentDigest::parse(&rustev_contract::canonical::tagged_digest(
+            "rustev.task-adapter/1",
+            &bytes,
+        ))
+        .unwrap(),
+    )
+}
+
+/// A version 2 configuration binding the named adapter document's rules.
 fn config(adapter: &str, params: &[&str], probability_step: Option<&str>) -> EvaluatorConfig {
     let gate = |name: &str, metric: &str, direction, tol: &str| Gate {
         name: name.into(),
@@ -189,12 +206,20 @@ fn config(adapter: &str, params: &[&str], probability_step: Option<&str>) -> Eva
         "0.1",
     );
     fully_labeled.min_labeled_coverage = dec("1");
+    let doc = match adapter {
+        "support-routing" => SUPPORT_ADAPTER,
+        "lodging" => LODGING_ADAPTER,
+        other => panic!("no adapter document for {other}"),
+    };
     EvaluatorConfig {
-        schema: rustev_eval::config::EVALUATOR_CONFIG.into(),
-        adapter: AdapterRef {
-            name: adapter.into(),
-            version: "1".into(),
-        },
+        schema: rustev_eval::config::EVALUATOR_CONFIG_V2.into(),
+        adapter: ConfigAdapter::v2(
+            AdapterRef {
+                name: adapter.into(),
+                version: "1".into(),
+            },
+            adapter_rules(doc),
+        ),
         label_interpretation: "SYNTHETIC authored label".into(),
         agreement: Agreement {
             params: params.iter().map(|s| s.to_string()).collect(),
@@ -396,14 +421,8 @@ fn gates_pass_fail_and_stay_unknown() {
         "base",
     ))
     .expect(0, "reported");
-    let candidate = |plan: &str, cal: &str, out: &str, adapter: &str| {
-        let mut a = eval_args(
-            "support.dataset.json",
-            "final_test",
-            "support.config.json",
-            adapter,
-            out,
-        );
+    let candidate_with = |plan: &str, cal: &str, out: &str, adapter: &str, config: &str| {
+        let mut a = eval_args("support.dataset.json", "final_test", config, adapter, out);
         a.extend(
             [
                 "--candidate-plan",
@@ -417,6 +436,9 @@ fn gates_pass_fail_and_stay_unknown() {
             .map(|x| x.to_string()),
         );
         s.rustev_owned(&a).expect(0, "reported")
+    };
+    let candidate = |plan: &str, cal: &str, out: &str, adapter: &str| {
+        candidate_with(plan, cal, out, adapter, "support.config.json")
     };
     // The same plan as a candidate, and a much hotter calibration that
     // flattens the topic distribution into escalations.
@@ -435,12 +457,44 @@ fn gates_pass_fail_and_stay_unknown() {
         "\"billing-priority\":\"other\"",
     );
     s.write("other.adapter.json", other.as_bytes());
-    candidate(
+    // The support configuration binds the original rules: refused before
+    // any case (spec 014, 3.2.2).
+    let mut a = eval_args(
+        "support.dataset.json",
+        "final_test",
+        "support.config.json",
+        "other.adapter.json",
+        "refused",
+    );
+    a.extend(
+        [
+            "--candidate-plan",
+            "support.plan.json",
+            "--rules",
+            "support.rules.json",
+        ]
+        .iter()
+        .map(|x| x.to_string()),
+    );
+    let r = s.rustev_owned(&a).expect(4, "invalid_input");
+    assert!(r["detail"].to_string().contains("adapter rules"), "{r}");
+    let mut other_cfg = config("support-routing", &["queue"], Some("topic"));
+    other_cfg.adapter.rules = Some(adapter_rules(&other));
+    s.write("other.config.json", &canonical(&other_cfg));
+    candidate_with(
         "support.plan.json",
         "topic.calibration.json",
         "other-adapter",
         "other.adapter.json",
+        "other.config.json",
     );
+    // A rule change alone changes the configuration's identity.
+    let id = |dir: &str| {
+        rustev_contract::eval_report::EvalReport::parse(&s.read(&format!("{dir}/report.json")))
+            .unwrap()
+            .evaluator_config
+    };
+    assert_ne!(id("other-adapter"), id("same"));
 
     let gate = |cand: &str, name: &str| {
         s.rustev(&[

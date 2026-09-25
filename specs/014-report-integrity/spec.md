@@ -2,10 +2,10 @@
 id: "014-report-integrity"
 title: "Task adapter rules bound into evaluation identity (amends 004)"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-25"
 summary: >
-  A proposed amendment of approved spec 004 (R-16). The evaluator
+  An amendment of approved spec 004 (R-16). The evaluator
   configuration names its task adapter only by name and version, so the
   configuration identity a report carries does not change when the
   adapter's correctness rules change under the same version, and a gate
@@ -14,9 +14,18 @@ summary: >
   each report and comparing bytes. This amendment binds a digest of the
   adapter's rules into a new evaluator configuration version, so the
   report identity itself covers correctness, and makes a gate unknown
-  whenever either side's rules are unbound. Approved (A-10, 2026-09-25); implementation pending.
+  whenever either side's rules are unbound. Approved (A-10, 2026-09-25) and implemented.
 amends:
   - "004-evaluation-and-replay"
+extends:
+  # The configuration document, the task adapter trait, report
+  # construction and gates (spec 004, 3.5.3, 3.5.5 and 3.5.8).
+  - { spec: "004-evaluation-and-replay", unit: { kind: directory, path: "crates/rustev-eval/" }, nature: amending }
+  # The declarative adapter states its rules digest; `eval` refuses a
+  # configuration binding other rules (spec 006, 3.8).
+  - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: amending }
+  # Adds 014 to `make verify`.
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
 depends_on:
   - "004-evaluation-and-replay"
   - "006-cli-surface"
@@ -27,7 +36,7 @@ references:
 # 014: Task adapter rules bound into evaluation identity (amends 004)
 
 Approved (A-10, 2026-09-25) as its own reviewable change before any code
-(R-16); implementation is pending. Drafted on 2026-09-25 under the
+(R-16), and implemented; see the implementation record. Drafted on 2026-09-25 under the
 owner decision of 2026-09-24 to draft the spec 004 amendments once 012 was
 merged, and to stop for approval. Spec 004's approved text is not edited;
 this spec records the change, as 013 does for 003.
@@ -160,3 +169,49 @@ text is kept as the record of what was asked.
   library adapter should be forced to author a rules document.
   Recommendation: keep `opaque`; forcing a document on Rust adapters
   would invite a digest of something other than the rules.
+
+## Implementation record
+
+- `crates/rustev-eval/src/config.rs`: `EVALUATOR_CONFIG_V2`;
+  `ConfigAdapter { name, version, rules }`, whose `rules` is absent in
+  version 1 and required in version 2 (`check` refuses either mismatch);
+  `AdapterRules::{Bound(ContentDigest), Opaque}`, serialized as
+  `{"bound": <digest>}` or `"opaque"`; `bound_rules` is `Some` only for a
+  version 2 `bound` configuration. `Document` and `Identified` are
+  implemented by hand so either version parses and the identity is tagged
+  with the document's own schema: a version 1 configuration keeps its bytes
+  (no `rules` member) and its identity.
+- `TaskAdapter::rules`, required, with no default
+  (`crates/rustev-eval/src/metrics.rs`).
+- `evaluate` refuses (`EvalError::Adapter`) a configuration whose name,
+  version or, in version 2, rules differ from the adapter's
+  (`crates/rustev-eval/src/report.rs`).
+- `evaluate_gate` adds one precondition, checked before the configuration
+  equality so that a rule change is named: unknown when either side's rules
+  are unbound (naming the side) or the digests differ.
+- `crates/rustev-cli/src/adapter.rs`: the declarative adapter is `bound`,
+  with the digest tagged `rustev.task-adapter/1` over its canonical bytes,
+  the bytes `eval` writes as `adapter.json`. `eval` refuses a version 2
+  configuration binding other rules (`invalid_input`); `gate` keeps its
+  byte comparison (spec 006, 3.8.3). The CLI reads whichever version it is
+  given; its tests now write version 2 configurations.
+- Section 5, by row: `gates_need_bound_equal_adapter_rules`
+  (`crates/rustev-eval/tests/reports.rs`: opaque on either side, a rule
+  change naming the rules, the adapter-mismatch refusal, version 1 bytes,
+  identity and an unknown gate); `gates_pass_fail_and_stay_unknown`
+  (`crates/rustev-cli/tests/eval.rs`: a changed adapter rule under an
+  unchanged name and version is refused under the original configuration,
+  and under its own configuration yields another `EvaluatorConfigId` and
+  an unknown gate). Existing eval tests changed only mechanically (the
+  trait method; version 2 test configurations; `fit.rs` keeps version 1).
+- Seeds (`adapter rules`, eval harness, run by spec 004's verification):
+  the rules left out of the configuration identity, ignored by the
+  adapter-mismatch check, and a gate passing over one side's unbound rules.
+
+## Verification
+
+```verify:cli
+cargo test -p rustev-eval --locked
+cargo test -p rustev-cli --locked
+cargo clippy -p rustev-eval -p rustev-cli --all-targets --locked -- -D warnings
+```

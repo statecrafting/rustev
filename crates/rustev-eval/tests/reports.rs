@@ -19,7 +19,9 @@ use rustev_contract::snapshot::Snapshot;
 use rustev_contract::{Document, Identified, schema};
 use rustev_eval::assemble::{AssemblyInput, Content, RetentionChoice, assemble};
 use rustev_eval::bundle::{BundleInput, BundleLoad, LoadFailure};
-use rustev_eval::config::{Agreement, Direction, EvaluatorConfig, Gate, MetricFormula};
+use rustev_eval::config::{
+    AdapterRules, Agreement, ConfigAdapter, Direction, EvaluatorConfig, Gate, MetricFormula,
+};
 use rustev_eval::dataset::{AdapterRef, DatasetCase, DatasetManifest, Label};
 use rustev_eval::metrics::TaskAdapter;
 use rustev_eval::report::{EvalDetail, Evaluated, GateResult, Inputs, evaluate, evaluate_gate};
@@ -34,6 +36,10 @@ impl TaskAdapter for Support {
             name: "support-routing".into(),
             version: "1".into(),
         }
+    }
+    /// Bound to a stand-in digest: the test's rules document.
+    fn rules(&self) -> AdapterRules {
+        AdapterRules::Bound(rules_digest("support-routing rules 1"))
     }
     fn check_label(&self, label: &str) -> Result<(), String> {
         if TOPICS.contains(&label) {
@@ -64,6 +70,9 @@ impl TaskAdapter for Lodging {
             name: "lodging".into(),
             version: "1".into(),
         }
+    }
+    fn rules(&self) -> AdapterRules {
+        AdapterRules::Bound(rules_digest("lodging rules 1"))
     }
     fn check_label(&self, label: &str) -> Result<(), String> {
         if label == "none" || label.starts_with("c-") {
@@ -134,10 +143,23 @@ fn gate(name: &str, metric: &str, direction: Direction, tol: &str, min_c: &str) 
     }
 }
 
-fn config(adapter: AdapterRef, params: &[&str], probability_step: Option<&str>) -> EvaluatorConfig {
+fn rules_digest(text: &str) -> rustev_contract::ids::ContentDigest {
+    rustev_contract::ids::ContentDigest::parse(&rustev_contract::canonical::tagged_digest(
+        "test-rules",
+        text.as_bytes(),
+    ))
+    .unwrap()
+}
+
+/// A version 2 configuration binding `adapter`'s rules.
+fn config(
+    adapter: &dyn TaskAdapter,
+    params: &[&str],
+    probability_step: Option<&str>,
+) -> EvaluatorConfig {
     EvaluatorConfig {
-        schema: rustev_eval::config::EVALUATOR_CONFIG.into(),
-        adapter,
+        schema: rustev_eval::config::EVALUATOR_CONFIG_V2.into(),
+        adapter: ConfigAdapter::v2(adapter.adapter(), adapter.rules()),
         label_interpretation: "SYNTHETIC authored label".into(),
         agreement: Agreement {
             params: params.iter().map(|s| s.to_string()).collect(),
@@ -448,7 +470,7 @@ async fn support_run() -> SupportRun {
     .await;
     SupportRun {
         manifest: manifest("support-routing synthetic", Support.adapter(), &cases),
-        config: config(Support.adapter(), &["queue"], Some("topic")),
+        config: config(&Support, &["queue"], Some("topic")),
         bundles,
         probe,
     }
@@ -737,7 +759,7 @@ async fn the_lodging_baseline_report_counts_missing_evidence_as_abstention() {
     let p = probe.clone();
     let bundles = bundles(&probe, || lodging_fixture(&p, &unlimited()), &cases).await;
     let manifest = manifest("lodging synthetic", Lodging.adapter(), &cases);
-    let config = config(Lodging.adapter(), &["ranking"], None);
+    let config = config(&Lodging, &["ranking"], None);
     let e = evaluate(&Inputs {
         manifest: &manifest,
         split: Split::FinalTest,
@@ -1223,7 +1245,7 @@ async fn a_swapped_case_outcome_fails_reconciliation() {
 
 #[test]
 fn every_configuration_refusal_is_its_own_case() {
-    let base = config(Support.adapter(), &["queue"], Some("topic"));
+    let base = config(&Support, &["queue"], Some("topic"));
     base.check().unwrap();
     let refused = |f: &dyn Fn(&mut EvaluatorConfig)| {
         let mut c = base.clone();
@@ -1513,4 +1535,132 @@ async fn unusable_bundles_fail_the_coverage_gate_and_never_pass_it() {
         eval(&only_split, None),
         Err(rustev_eval::report::EvalError::EmptySplit)
     ));
+}
+
+/// An adapter with Support's rules that states them as opaque.
+struct OpaqueSupport;
+
+impl TaskAdapter for OpaqueSupport {
+    fn adapter(&self) -> AdapterRef {
+        Support.adapter()
+    }
+    fn rules(&self) -> AdapterRules {
+        AdapterRules::Opaque
+    }
+    fn check_label(&self, label: &str) -> Result<(), String> {
+        Support.check_label(label)
+    }
+    fn correct(&self, action: &str, params: &BTreeMap<String, OutValue>, label: &str) -> bool {
+        Support.correct(action, params, label)
+    }
+}
+
+fn eval_with(
+    s: &SupportRun,
+    config: &EvaluatorConfig,
+    adapter: &dyn TaskAdapter,
+    candidate: Option<rustev_eval::report::Candidate<'_>>,
+) -> Result<Evaluated, rustev_eval::report::EvalError> {
+    evaluate(&Inputs {
+        manifest: &s.manifest,
+        split: Split::FinalTest,
+        config,
+        adapter,
+        bundles: &inputs_of(&s.bundles),
+        resolver: &NoExternal,
+        replay: &config_for(&scope()),
+        candidate,
+    })
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn gates_need_bound_equal_adapter_rules() {
+    let s = support_run().await;
+    let (sharp, cals) = candidate_with("0.5", &s.probe);
+    let cand_of = || {
+        Some(rustev_eval::report::Candidate {
+            plan: &sharp,
+            calibrations: &cals,
+        })
+    };
+    let g = s.config.gates.iter().find(|g| g.name == "error").unwrap();
+    let pair = |config: &EvaluatorConfig, adapter: &dyn TaskAdapter| {
+        (
+            eval_with(&s, config, adapter, None).unwrap(),
+            eval_with(&s, config, adapter, cand_of()).unwrap(),
+        )
+    };
+    let (base, cand) = pair(&s.config, &Support);
+    assert_eq!(evaluate_gate(g, &base, &cand), GateResult::Pass);
+
+    // Opaque rules: reports are produced, the gate is unknown.
+    let mut opaque = s.config.clone();
+    opaque.adapter.rules = Some(AdapterRules::Opaque);
+    let (ob, oc) = pair(&opaque, &OpaqueSupport);
+    assert!(matches!(
+        evaluate_gate(g, &ob, &oc),
+        GateResult::Unknown { reason } if reason.contains("baseline's task adapter rules are unbound")
+    ));
+    assert!(matches!(
+        evaluate_gate(g, &base, &oc),
+        GateResult::Unknown { reason } if reason.contains("candidate's task adapter rules are unbound")
+    ));
+
+    // A rule change alone changes the identity, and the gate names it.
+    let mut changed = s.config.clone();
+    changed.adapter.rules = Some(AdapterRules::Bound(rules_digest("support-routing rules 2")));
+    assert_ne!(changed.id().unwrap(), s.config.id().unwrap());
+    struct Changed;
+    impl TaskAdapter for Changed {
+        fn adapter(&self) -> AdapterRef {
+            Support.adapter()
+        }
+        fn rules(&self) -> AdapterRules {
+            AdapterRules::Bound(rules_digest("support-routing rules 2"))
+        }
+        fn check_label(&self, label: &str) -> Result<(), String> {
+            Support.check_label(label)
+        }
+        fn correct(&self, action: &str, params: &BTreeMap<String, OutValue>, label: &str) -> bool {
+            Support.correct(action, params, label)
+        }
+    }
+    let cc = eval_with(&s, &changed, &Changed, cand_of()).unwrap();
+    assert!(matches!(
+        evaluate_gate(g, &base, &cc),
+        GateResult::Unknown { reason } if reason.contains("rules differ")
+    ));
+
+    // A configuration binding other rules than the adapter's is refused
+    // before any case.
+    assert!(matches!(
+        eval_with(&s, &changed, &Support, None),
+        Err(rustev_eval::report::EvalError::Adapter)
+    ));
+
+    // Version 1: evaluable as supplied, identity unchanged, gate unknown.
+    let mut v1 = s.config.clone();
+    v1.schema = rustev_eval::config::EVALUATOR_CONFIG.into();
+    v1.adapter.rules = None;
+    let bytes = v1.canonical().unwrap();
+    assert!(!String::from_utf8_lossy(&bytes).contains("rules"));
+    assert_eq!(
+        v1.id().unwrap().to_string(),
+        rustev_contract::canonical::tagged_digest(rustev_eval::config::EVALUATOR_CONFIG, &bytes)
+    );
+    assert_eq!(EvaluatorConfig::parse(&bytes).unwrap(), v1);
+    let (vb, vc) = pair(&v1, &Support);
+    assert_eq!(vb.config.canonical().unwrap(), bytes);
+    assert_eq!(vb.report.evaluator_config, v1.id().unwrap());
+    assert!(matches!(
+        evaluate_gate(g, &vb, &vc),
+        GateResult::Unknown { reason } if reason.contains("unbound")
+    ));
+    // A version 1 document naming rules, or a version 2 without, is refused.
+    let mut bad = v1.clone();
+    bad.adapter.rules = Some(Support.rules());
+    assert!(bad.check().is_err());
+    let mut bad = s.config.clone();
+    bad.adapter.rules = None;
+    assert!(bad.check().is_err());
 }
