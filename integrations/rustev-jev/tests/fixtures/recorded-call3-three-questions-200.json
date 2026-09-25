@@ -1,0 +1,126 @@
+{
+ "recorded_at": "2026-09-25T02:02:33.925902Z",
+ "provenance": "synthetic fixture, live Gateway call under R-27 (and R-30 for calls without zeroDataRetention)",
+ "request_body": {
+  "model": "typesafe-ai/jev",
+  "state": {
+   "values": {
+    "message": "SYNTHETIC FIXTURE. Your booking is confirmed. Flight AC 123 from Toronto (YYZ) to Lisbon (LIS), departing 2027-03-14 18:05, arriving 2027-03-15 06:40. Confirmation code QX7P2L. Passenger: Test Traveler."
+   },
+   "instance": null
+  },
+  "questions": {
+   "q0": {
+    "type": "boolean",
+    "instructions": "Does the message confirm a flight booking?",
+    "criteria": {
+     "false": "false",
+     "true": "true"
+    }
+   },
+   "q1": {
+    "type": "choice",
+    "instructions": "What kind of travel item does the message describe?",
+    "criteria": {
+     "flight": "flight",
+     "hotel": "hotel",
+     "car_rental": "car_rental",
+     "other": "other"
+    }
+   },
+   "q2": {
+    "type": "score",
+    "instructions": "How complete is the itinerary information in the message?",
+    "criteria": [
+     "low",
+     "medium",
+     "high"
+    ]
+   }
+  },
+  "providerOptions": {
+   "gateway": {
+    "only": [
+     "typesafe-ai"
+    ]
+   }
+  }
+ },
+ "status": 200,
+ "response_body": {
+  "model": "typesafe-ai/jev",
+  "answers": {
+   "q0": {
+    "type": "boolean",
+    "probability": 0.95
+   },
+   "q1": {
+    "type": "choice",
+    "choice": "flight",
+    "probabilities": {
+     "hotel": 0,
+     "flight": 1,
+     "car_rental": 0,
+     "other": 0
+    },
+    "confidence": 1
+   },
+   "q2": {
+    "type": "score",
+    "score": 1.89,
+    "probabilities": {
+     "0": 0,
+     "1": 0.1,
+     "2": 0.9
+    },
+    "confidence": 0.83
+   }
+  },
+  "usage": {
+   "inputTokens": 516,
+   "outputTokens": 81
+  },
+  "providerMetadata": {
+   "typesafe": {
+    "confidence": {
+     "q1": 1,
+     "q2": 0.83
+    }
+   },
+   "gateway": {
+    "routing": {
+     "originalModelId": "typesafe-ai/jev",
+     "resolvedProvider": "typesafe-ai",
+     "fallbacksAvailable": [],
+     "planningReasoning": "Provider set restricted to: typesafe-ai. System credentials planned for: typesafe-ai. Total execution order: typesafe-ai(system)",
+     "canonicalSlug": "typesafe-ai/jev",
+     "finalProvider": "typesafe-ai",
+     "modelAttemptCount": 1,
+     "modelAttempts": [
+      {
+       "canonicalSlug": "typesafe-ai/jev",
+       "success": true,
+       "providerAttemptCount": 1,
+       "providerAttempts": [
+        {
+         "provider": "typesafe-ai",
+         "credentialType": "system",
+         "success": true,
+         "startTime": 1790301754419,
+         "endTime": 1790301754529,
+         "statusCode": 200
+        }
+       ]
+      }
+     ],
+     "totalProviderAttemptCount": 1
+    },
+    "cost": "0",
+    "marketCost": "0.000021672",
+    "surchargeCost": "0",
+    "gatewayCost": "0",
+    "generationId": "gen_01M3B4SMTPG5KN8FYWDG2C9XPM"
+   }
+  }
+ }
+}

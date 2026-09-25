@@ -1,0 +1,38 @@
+{
+ "recorded_at": null,
+ "provenance": "SYNTHETIC: hand-written for spec 012 stage 1 (3.8.1); not a recorded call and not evidence of the provider's behavior",
+ "status": 200,
+ "response_body": {
+  "model": "typesafe-ai/jev",
+  "answers": {
+   "q0": {
+    "type": "boolean",
+    "probability": 0.5
+   },
+   "q7": {
+    "type": "boolean",
+    "probability": 0.5
+   }
+  },
+  "providerMetadata": {
+   "gateway": {
+    "routing": {
+     "originalModelId": "typesafe-ai/jev",
+     "resolvedProvider": "typesafe-ai",
+     "canonicalSlug": "typesafe-ai/jev",
+     "finalProvider": "typesafe-ai"
+    },
+    "marketCost": "0.0000042",
+    "generationId": "gen_SYNTHETIC_0001",
+    "cost": "0.000000105"
+   },
+   "typesafe": {
+    "confidence": {}
+   }
+  },
+  "usage": {
+   "inputTokens": 2500,
+   "outputTokens": 20
+  }
+ }
+}

@@ -1,0 +1,11 @@
+{
+  "package": {
+    "kind": "rust-lib",
+    "name": "rustev-jev",
+    "path": "integrations/rustev-jev",
+    "specRef": "012-jev-integration",
+    "version": "0.1.0"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "3861d0f6ddd5fc2e75705bc5d0e6253f4eadbff7f871611e13790035e07a1f59"
+}
