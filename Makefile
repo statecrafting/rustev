@@ -14,9 +14,9 @@ SPEC_SPINE_VERSION := $(shell sed -n 's/^required_version = "=\(.*\)"/\1/p' spec
 SPEC_SPINE_LOCAL := .tooling/bin/spec-spine
 SPEC_SPINE ?= $(if $(wildcard $(SPEC_SPINE_LOCAL)),$(SPEC_SPINE_LOCAL),spec-spine)
 
-CRATE_MANIFESTS := $(wildcard crates/*/Cargo.toml backends/*/Cargo.toml tools/*/Cargo.toml)
+CRATE_MANIFESTS := $(wildcard crates/*/Cargo.toml backends/*/Cargo.toml tools/*/Cargo.toml integrations/*/Cargo.toml)
 SKIP_NOTE := no crate exists yet, so cargo has nothing to judge
-VERIFIED_SPECS := 001 002 003 004 005 006 013
+VERIFIED_SPECS := 001 002 003 004 005 006 009 013
 
 .PHONY: tools gate refresh code build test clippy fmt boundaries verify
 

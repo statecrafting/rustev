@@ -89,3 +89,28 @@ pub const REQUEST_V1: ParseLimits = ParseLimits {
     max_bytes: 4 * MIB,
     ..REPLAY_V1
 };
+
+/// The `rustev.remote/1` documents (spec 009, 3.10): descriptors inside a
+/// describe answer, projections as strings, outputs as JSON numbers. A
+/// transport also bounds what it reads by the negotiated maximum.
+pub const REMOTE_V1: ParseLimits = ParseLimits {
+    max_bytes: 4 * MIB,
+    max_depth: 16,
+    max_string_bytes: MIB,
+    max_collection_len: 4096,
+    max_total_values: 100_000,
+    max_number_bytes: 40,
+    allow_fractional_numbers: true,
+};
+
+/// Exchange records, `rustev.remote-exchange/1` (spec 009, 3.9.1): a fixed
+/// maximum size, with free text cut to 256 bytes before escaping.
+pub const EXCHANGE_V1: ParseLimits = ParseLimits {
+    max_bytes: 512 * KIB,
+    max_depth: 8,
+    max_string_bytes: 2 * KIB,
+    max_collection_len: 64,
+    max_total_values: 4096,
+    max_number_bytes: 40,
+    allow_fractional_numbers: false,
+};

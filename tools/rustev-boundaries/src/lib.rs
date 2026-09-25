@@ -25,6 +25,10 @@ pub const HTTP_STACKS: &[&str] = &[
     "surf",
     "h2",
     "http",
+    // The pieces of the hyper stack the remote binding uses (spec 009, 3.11).
+    "hyper-util",
+    "http-body",
+    "http-body-util",
 ];
 /// Async runtime executors `rustev-contract` and `rustev-core` may not reach.
 pub const EXECUTORS: &[&str] = &[
@@ -426,6 +430,84 @@ mod tests {
         assert!(
             matches!(&check(&m)[..], [Violation::ForbiddenFamily { dependency, .. }] if dependency == "reqwest")
         );
+    }
+
+    /// The remote binding of spec 009 as it is laid out: an HTTP stack and
+    /// Tokio under `integrations/`, depending on the contract and core.
+    const REMOTE_HTTP: Member<'static> = (
+        "rustev-remote-http",
+        "integrations/rustev-remote-http",
+        &[
+            ("rustev-contract", None, Some("crates/rustev-contract")),
+            ("rustev-core", None, Some("crates/rustev-core")),
+            ("hyper", None, None),
+            ("hyper-util", None, None),
+            ("http-body-util", None, None),
+            ("tokio", None, None),
+            ("tokio-rustls", None, None),
+        ],
+    );
+
+    #[test]
+    fn the_remote_binding_under_integrations_passes() {
+        let m = meta(
+            &[CONTRACT, CORE, REMOTE_HTTP],
+            &[
+                "serde",
+                "hyper",
+                "hyper-util",
+                "http-body-util",
+                "tokio",
+                "tokio-rustls",
+            ],
+            &[
+                ("rustev-core", "rustev-contract", None),
+                ("rustev-remote-http", "rustev-core", None),
+                ("rustev-remote-http", "hyper", None),
+                ("rustev-remote-http", "tokio", None),
+            ],
+        );
+        assert_eq!(check(&m), vec![]);
+    }
+
+    #[test]
+    fn a_crate_outside_integrations_on_the_remote_binding_or_its_stack_fails() {
+        // Spec 009, section 6: depending on the HTTP binding fails, and so
+        // does reaching for the pieces of its stack directly.
+        for (dep, path) in [
+            (
+                "rustev-remote-http",
+                Some("integrations/rustev-remote-http"),
+            ),
+            ("hyper-util", None),
+            ("http-body-util", None),
+        ] {
+            let deps: &[Dep<'_>] = &[(dep, None, path)];
+            let m = meta(
+                &[
+                    CONTRACT,
+                    CORE,
+                    REMOTE_HTTP,
+                    ("rustev-cli", "crates/rustev-cli", deps),
+                ],
+                &[
+                    "serde",
+                    "hyper",
+                    "hyper-util",
+                    "http-body-util",
+                    "tokio",
+                    "tokio-rustls",
+                ],
+                &[],
+            );
+            let v = check(&m);
+            assert!(
+                v.iter().any(|x| matches!(x,
+                    Violation::DependsOnIntegration { krate, .. }
+                    | Violation::ForbiddenFamily { krate, .. } if krate == "rustev-cli")),
+                "{dep}: {v:?}"
+            );
+        }
     }
 
     #[test]

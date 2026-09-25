@@ -22,9 +22,34 @@
       {
         "path": "crates/rustev-contract/",
         "source": "spec-edge"
+      },
+      {
+        "path": "integrations/rustev-remote-http",
+        "source": "manifest-metadata"
+      },
+      {
+        "path": "integrations/rustev-remote-http/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "tools/rustev-boundaries/",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "integrations/rustev-remote-http/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-remote-http/"
+        }
+      },
       {
         "locations": [
           {
@@ -36,6 +61,19 @@
         "unit": {
           "kind": "directory",
           "path": "crates/rustev-contract/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "tools/rustev-boundaries/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-boundaries/"
         }
       },
       {
@@ -108,5 +146,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "0ed7ce6219604ef686d13384b7a6a7a1a31cc165232588e0dc12e26b4e1b488f"
+  "shardHash": "5068492c3c88fb9140cb8ce221ffee95b980c0c5fc7e3d286f430becbd93d7bf"
 }
