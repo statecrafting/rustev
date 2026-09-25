@@ -34,7 +34,9 @@ REQUIRED = [
 TEST_TIMEOUT_S = 1800
 
 # (category, name, file, old, new, packages); `old` and `new` may be equal-
-# length lists, for a defect that must remove more than one layer at once.
+# length lists, for a defect that must remove more than one layer at once,
+# and `file` then a list of the same length when the layers live in
+# different files.
 SEEDS = [
     (
         "unusable bundles",
@@ -190,9 +192,17 @@ SEEDS = [
     (
         "adapter correctness",
         "a gate ignores a changed adapter",
-        S + "eval.rs",
-        "let result = if badapter != cadapter {",
-        "let result = if badapter.is_empty() && cadapter.is_empty() {",
+        # Two layers since spec 014: the CLI's byte comparison and the
+        # library's rules precondition; removing one alone is equivalent.
+        [S + "eval.rs", "crates/rustev-eval/src/report.rs"],
+        [
+            "let result = if badapter != cadapter {",
+            '        (Some(x), Some(y)) if x != y => {\n            return unknown("the task adapter rules differ");\n        }\n',
+        ],
+        [
+            "let result = if badapter.is_empty() && cadapter.is_empty() {",
+            "",
+        ],
         CLI,
     ),
     (
@@ -315,18 +325,26 @@ def main():
         for category, name, path, old, new, packages in chosen:
             label = f"{category}: {name}"
             base = ["cargo", "test", "--locked", "-q"] + [a for p in packages for a in ("-p", p)]
-            f = os.path.join(src, path)
-            original = open(f, encoding="utf-8").read()
-            pairs = list(zip(old, new)) if isinstance(old, list) else [(old, new)]
-            bad = [o for o, _ in pairs if original.count(o) != 1]
+            # A multi-hunk seed may name one path per hunk, for a defect
+            # whose layers live in different files.
+            if isinstance(old, list):
+                paths = path if isinstance(path, list) else [path] * len(old)
+                hunks = list(zip(paths, old, new))
+            else:
+                hunks = [(path, old, new)]
+            originals = {}
+            for p in dict.fromkeys(h[0] for h in hunks):
+                originals[p] = open(os.path.join(src, p), encoding="utf-8").read()
+            bad = [p for p, o, _ in hunks if originals[p].count(o) != 1]
             if bad:
-                failures.append(f"{label}: an anchor is not found exactly once in {path}")
+                failures.append(f"{label}: an anchor is not found exactly once in {bad[0]}")
                 print(f"BROKEN   {label}: anchor", flush=True)
                 continue
-            seeded = original
-            for o, n in pairs:
-                seeded = seeded.replace(o, n)
-            open(f, "w", encoding="utf-8").write(seeded)
+            seeded = dict(originals)
+            for p, o, n in hunks:
+                seeded[p] = seeded[p].replace(o, n)
+            for p, text in seeded.items():
+                open(os.path.join(src, p), "w", encoding="utf-8").write(text)
             try:
                 if run(base + ["--no-run"], src, env) != 0:
                     failures.append(f"{label}: the seeded tree does not compile")
@@ -342,7 +360,8 @@ def main():
                 else:
                     print(f"DETECTED {label}", flush=True)
             finally:
-                open(f, "w", encoding="utf-8").write(original)
+                for p, text in originals.items():
+                    open(os.path.join(src, p), "w", encoding="utf-8").write(text)
     finally:
         shutil.rmtree(work, ignore_errors=True)
     full = not sys.argv[1:]

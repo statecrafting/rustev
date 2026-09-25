@@ -167,11 +167,23 @@ pub fn eval(p: &Parsed) -> Result<Res, Usage> {
         adapter
             .check()
             .map_err(|e| Done::invalid(command, adapter_path, e))?;
-        if config.adapter != adapter.adapter() {
+        if config.adapter.reference() != adapter.adapter() {
             return Err(Done::invalid(
                 command,
                 adapter_path,
                 "the configuration names another adapter",
+            ));
+        }
+        if config
+            .adapter
+            .rules
+            .as_ref()
+            .is_some_and(|r| *r != adapter.rules())
+        {
+            return Err(Done::invalid(
+                command,
+                adapter_path,
+                "the configuration binds other adapter rules",
             ));
         }
         manifest

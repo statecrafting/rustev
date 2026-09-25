@@ -6,8 +6,11 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use rustev_contract::Document;
 use rustev_contract::bounded::ParseLimits;
+use rustev_contract::canonical::tagged_digest;
+use rustev_contract::ids::ContentDigest;
 use rustev_contract::judgment::OutValue;
 use rustev_contract::limits::DESCRIPTOR_V1;
+use rustev_eval::config::AdapterRules;
 use rustev_eval::dataset::AdapterRef;
 use rustev_eval::metrics::TaskAdapter;
 use serde::{Deserialize, Serialize};
@@ -160,6 +163,19 @@ impl TaskAdapter for TaskAdapterDoc {
             name: self.name.clone(),
             version: self.version.clone(),
         }
+    }
+
+    /// Always bound: the document is the whole definition (spec 014,
+    /// 3.1.4), and the digest is over the canonical bytes `eval` writes as
+    /// `adapter.json`.
+    fn rules(&self) -> AdapterRules {
+        let bytes = self
+            .canonical()
+            .expect("a checked adapter document has a canonical form");
+        AdapterRules::Bound(
+            ContentDigest::parse(&tagged_digest(TASK_ADAPTER, &bytes))
+                .expect("a tagged digest is a content digest"),
+        )
     }
 
     fn check_label(&self, label: &str) -> Result<(), String> {

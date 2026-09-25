@@ -279,13 +279,20 @@ fn quantile_name(q: rustev_contract::decimal::Decimal) -> String {
 pub fn evaluate(inputs: &Inputs<'_>) -> Result<Evaluated, EvalError> {
     let config = inputs.config;
     config.check().map_err(EvalError::Config)?;
-    if config.adapter != inputs.adapter.adapter() {
+    // Name and version always; in version 2 the rules too (spec 014, 3.2.2).
+    if config.adapter.reference() != inputs.adapter.adapter()
+        || config
+            .adapter
+            .rules
+            .as_ref()
+            .is_some_and(|r| *r != inputs.adapter.rules())
+    {
         return Err(EvalError::Adapter);
     }
     let adapter = inputs.adapter;
     inputs
         .manifest
-        .check(&config.adapter, |l| adapter.check_label(l))
+        .check(&config.adapter.reference(), |l| adapter.check_label(l))
         .map_err(EvalError::Dataset)?;
     let cases: Vec<&DatasetCase> = inputs.manifest.split(inputs.split).collect();
     if cases.is_empty() {
@@ -719,6 +726,18 @@ pub fn evaluate_gate(gate: &Gate, baseline: &Evaluated, candidate: &Evaluated) -
     let (b, c) = (&baseline.report, &candidate.report);
     if b.dataset.id != c.dataset.id || b.dataset.split != c.dataset.split {
         return unknown("the cohorts are different datasets or splits");
+    }
+    // Both sides' correctness rules bound and equal (spec 014, 3.3).
+    match (
+        baseline.config.bound_rules(),
+        candidate.config.bound_rules(),
+    ) {
+        (None, _) => return unknown("the baseline's task adapter rules are unbound"),
+        (_, None) => return unknown("the candidate's task adapter rules are unbound"),
+        (Some(x), Some(y)) if x != y => {
+            return unknown("the task adapter rules differ");
+        }
+        _ => {}
     }
     if b.evaluator_config != c.evaluator_config {
         return unknown("the cohorts use different evaluator configurations");
