@@ -1,0 +1,36 @@
+[package]
+name = "rustev-remote-http"
+version = "0.1.0"
+description = "Rustev's remote adapter machinery and the rustev.remote/1 HTTP binding: a client implementing the backend seam and a server hosting any backend."
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[package.metadata.spec-spine]
+spec = "009-remote-adapter-protocol"
+
+[dependencies]
+rustev-contract = { path = "../../crates/rustev-contract" }
+rustev-core = { path = "../../crates/rustev-core" }
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tokio = { workspace = true, features = ["net", "time", "rt", "sync", "macros", "io-util"] }
+hyper = { workspace = true, features = ["client", "server", "http1"] }
+hyper-util = { workspace = true, features = ["tokio"] }
+http-body-util.workspace = true
+rustls.workspace = true
+tokio-rustls.workspace = true
+webpki-roots.workspace = true
+
+# The runtime, eval and the rules backend are for the conformance suite only.
+[dev-dependencies]
+rustev-runtime = { path = "../../crates/rustev-runtime" }
+rustev-eval = { path = "../../crates/rustev-eval" }
+rustev-backend-rules = { path = "../../backends/rustev-backend-rules" }
+tokio = { workspace = true, features = ["net", "time", "rt", "rt-multi-thread", "sync", "macros", "io-util", "test-util"] }
+
+[lints]
+workspace = true

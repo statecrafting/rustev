@@ -2,7 +2,7 @@
 id: "009-remote-adapter-protocol"
 title: "Remote adapter protocol"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-24"
 summary: >
   Increment 3 (design roadmap 17.1, ordinal 009): what every decision backend
@@ -17,7 +17,9 @@ summary: >
   replay, and privacy options passed through and recorded. Protocol messages
   live in `rustev-contract`; every network implementation lives under
   `integrations/`. Amends no approved behavior. Approved (A-08);
-  implementation pending.
+  implemented.
+establishes:
+  - { kind: directory, path: "integrations/rustev-remote-http/" }
 extends:
   # The protocol documents are a new, additive module of the contract crate
   # (spec 001, 3.4.3: remote protocol messages live in rustev-contract).
@@ -28,6 +30,9 @@ extends:
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.lock" }, nature: additive }
   # Adds integration manifests to the code targets and 009 to `make verify`.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  # Names the hyper stack's remaining pieces (hyper-util, http-body,
+  # http-body-util) as HTTP families and tests the binding's layout.
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "tools/rustev-boundaries/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "002-decision-contract-and-pure-core"
@@ -81,7 +86,7 @@ obligations:
 
 # 009: Remote adapter protocol
 
-Approved (A-08, 2026-09-24), not implemented. The ordinal is the one design
+Approved (A-08, 2026-09-24) and implemented. The ordinal is the one design
 roadmap 17.1 reserves for this subject. Rationale: design sections 8, 9, 15
 and 17 (not contract); founding decision D-06 (traits plus a versioned
 protocol for remote adapters); owner decisions R-05, R-08, R-10, R-16, R-19,
@@ -464,7 +469,7 @@ proposed as a separately reviewable amendment (R-16, R-28).
 | A transport timeout configured longer than the remaining budget | Refused at construction. |
 | A crate outside `integrations/` depends on the HTTP binding | The boundary check fails (spec 001, 3.5). |
 
-## Acceptance (planned)
+## Acceptance
 
 - The protocol documents round-trip through their canonical bytes, refuse
   unknown fields and schemas, and enforce their parse limits.
@@ -479,9 +484,106 @@ proposed as a separately reviewable amendment (R-16, R-28).
 - The boundary check passes with the new crate; `rustev-contract` and
   `rustev-core` gain no HTTP or async dependency.
 
+## Implementation record
+
+Delivered 2026-09-24 on top of spec 013 (so 5.1 no longer holds: a remote
+adapter reports `RemoteEnd::PossiblyContinuing`, and the runtime records it).
+
+- `crates/rustev-contract/src/remote.rs` (an additive module; the crate
+  stays spec 002's): the `rustev.remote-describe/1`, `rustev.remote-infer/1`
+  and `rustev.remote-cancel/1` documents with `RemoteTerms` (cost,
+  `refusals_charged`, cancellation support, served-identity terms, batching,
+  request and response maxima, idempotency window, privacy options), the
+  closed `RemoteCode` set, and the `rustev.remote-exchange/1` record with
+  `bounded()` (every string cut to 256 bytes, members to 32, route to 8,
+  each map to 16) and `parse_checked`. New limit sets `REMOTE_V1` and
+  `EXCHANGE_V1` (512 KiB, which the worst case with every byte escaped fits);
+  schema strings in `schema`. On the wire a document is its record
+  canonical bytes, equal to its canonical bytes when it has no fractional
+  number. Seven tests (`cargo test -p rustev-contract --locked remote`).
+- `integrations/rustev-remote-http/`, Part A (public, for spec 012):
+  `taxonomy` (code to class, default charge, `remote:<code>` detail within
+  256 bytes, HTTP status classification, the spec 013 remote end,
+  `RemoteFailure`), `budget` (one `Budget` per attempt, phase limits clamped
+  to it, told budget minus margin, `check_transport_timeout`), `cancel`
+  (`cancel_outcome`, `cancelled_report`), `wire` (`SentTracker`, a one-way
+  state machine that lets an attempt win "no request byte ever left" without
+  a race, and `TrackedIo`), `http` (`Endpoint`, `HttpTransport`: one HTTP/1.1
+  connection per exchange over hyper 1 and Tokio, TLS through rustls with
+  `ring` and the webpki roots, required except for loopback; bounded body
+  reading; no redirect, no retry; `Secret` never prints), `identity`
+  (`AdapterBinding` whose digest is the adapter's artifact,
+  `served_identity`), `cost` (`UnitRate`, amounts and remote units converted
+  and rounded up, `PriceTable` estimates, `attribute` for integer shares) and
+  `exchange` (`ExchangeSink` injected at construction with `offer` for
+  reconciliation, `Exchanges` counting sink failures and panics, digest-only
+  unless retention is on).
+- Part B: `client::RemoteClient` (negotiation at construction, the remote
+  descriptor re-bound to the binding artifact, one submission per attempt id
+  enforced locally, output kind checked against the descriptor, echo checks,
+  late responses recorded and offered, adapter-scoped batching behind
+  `BatchConfig`, `map_retained` for the offline mapping check of 3.9.4) and
+  `server::RemoteServer` (hosts any `DecisionBackend`, idempotency window
+  with `in_progress` and `attempt_id_conflict`, told budget enforced by
+  raising the hosted attempt's signal, cancel endpoint, `503` beyond
+  `max_in_flight`, plain HTTP refused off loopback unless TLS is given).
+  Hyper, hyper-util, http-body-util, rustls, tokio-rustls and webpki-roots
+  are workspace dependencies used only here; `rustev-boundaries` now also
+  names hyper-util, http-body and http-body-util as HTTP families.
+- Tests (`cargo test -p rustev-remote-http --locked`, 66): 25 unit tests of
+  Part A; `tests/conformance.rs` (29: every row of 3.6 over loopback
+  against scripted backends and a canned responder, each section 6 row that
+  ends at the adapter, negotiation, privacy, identity, idempotency, sink
+  failure, late responses, reconciliation offers, retained bytes re-mapped
+  byte for byte); `tests/batching.rs` (6: off by default, one exchange with
+  shares 2, 1, 1 of 4 units, a cancelled member reporting `unknown` with the
+  rest carrying the charge and the member offered 0, a member withdrawn
+  before sending, all members leaving with late shares offered, no sharing
+  across state or decisions); `tests/runtime.rs` (6: both reference plans
+  over loopback judge as the in-process rules backend under the same hard
+  caps; captured bundles replay with zero hosted calls; best-effort cancel
+  and an interrupted transport recorded `possibly_continuing`; an answer
+  missing an option recorded `invalid_output` by the core). Two boundary
+  tests. All fixtures SYNTHETIC; only 127.0.0.1 is contacted.
+
+Engineering choices made by the implementing agent, not by the owner:
+
+- The runtime polls a cancelled attempt once (spec 003, 3.7), so the client
+  answers the signal at once: `stopped` only when nothing was sent, else
+  `unconfirmed` and `unknown`; a cancel is sent in the background and a
+  confirmed final charge becomes a reconciliation offer. Waiting for the
+  confirmation (and so reporting `stopped` with it) is opt-in
+  (`await_cancel_confirmation`), only for a member alone in its exchange.
+- A reconciliation offer is made once per member, when the exchange ends: a
+  late response's share when no member received it; zero for a member that
+  left when the receivers were attributed the whole observed charge; a
+  confirmed cancel charge only when no response came back.
+- The transport timeout is checked against the setup budget at
+  construction, and every phase limit is also clamped to the attempt's
+  budget. After the budget runs out the client waits up to
+  `expiry_grace_ms` for the runtime's signal before answering as cancelled.
+- The server maps a hosted `permanent` failure to `malformed_request`,
+  `transient` to `remote_error` and `overloaded` to `overloaded`, keeping a
+  `remote:<code>` prefix of the same class when the hosted detail has one.
+  The hosted backend never sees a principal (3.1.3).
+- An answer naming an attempt that was not asked makes every member
+  `malformed_response`. An `in_progress` answer is `remote_error` with
+  charge `unknown`, possibly continuing. A name offered under `unknown`
+  disclosure is kept as the provider extra `served_identity_claim`.
+- The coalescing window starts with the first member and is bounded by its
+  budget; later members with shorter budgets leave on their own signals.
+
+Deferred: per-phase timeouts (one transport timeout covers the exchange);
+HTTP keep-alive and connection reuse; sending the principal handle to a
+host-operated endpoint (3.1.3 permits it only when enabled; no option is
+offered yet); the qualification that would turn batching on (open question
+1). The limitation of 3.7 for `reported` and `unknown` disclosure is for
+spec 004 reports and qualification records to state; nothing here reports
+results.
+
 ## Verification
 
-Planned; not run until this spec is implemented and added to `make verify`.
+Run by `make verify` (009 is in `VERIFIED_SPECS`).
 
 ```verify:cli
 # 3.10: protocol documents, limits and canonical bytes.

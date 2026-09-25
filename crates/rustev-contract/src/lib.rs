@@ -26,6 +26,7 @@ pub mod limits;
 pub mod output;
 pub mod plan;
 pub mod reason;
+pub mod remote;
 pub mod replay;
 pub mod request;
 pub mod retention;
@@ -40,7 +41,8 @@ pub use time::{DurationMs, Timestamp};
 
 /// Schema strings of every document (spec 002, 3.2.1, as amended by spec 003,
 /// 3.2: plans are at version 2; execution policies and run records are new;
-/// and by spec 004, 5.1: replay, request and runtime-reason documents).
+/// by spec 004, 5.1: replay, request and runtime-reason documents; and by
+/// spec 009, 3.10: the remote protocol documents).
 pub mod schema {
     pub const DEFINITION: &str = "rustev.definition/1";
     pub const PLAN: &str = "rustev.plan/2";
@@ -60,4 +62,10 @@ pub mod schema {
     pub const REPLAY: &str = "rustev.replay/1";
     pub const REQUEST: &str = "rustev.request/1";
     pub const RUNTIME_REASON: &str = "rustev.runtime-reason/1";
+    /// The `rustev.remote/1` protocol documents and the exchange record
+    /// (spec 009, 3.9 and 3.10).
+    pub const REMOTE_DESCRIBE: &str = "rustev.remote-describe/1";
+    pub const REMOTE_INFER: &str = "rustev.remote-infer/1";
+    pub const REMOTE_CANCEL: &str = "rustev.remote-cancel/1";
+    pub const REMOTE_EXCHANGE: &str = "rustev.remote-exchange/1";
 }

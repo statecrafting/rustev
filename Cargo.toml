@@ -3,7 +3,7 @@
 # manifest (an `extends` edge) and claims the directory itself.
 [workspace]
 resolver = "3"
-members = ["crates/*", "backends/*", "tools/*"]
+members = ["crates/*", "backends/*", "tools/*", "integrations/*"]
 
 [workspace.package]
 edition = "2024"
@@ -20,6 +20,15 @@ sha2 = { version = "0.10", default-features = false }
 # The runtime's executor (R-03); never a dependency of rustev-contract or
 # rustev-core (spec 001, 3.4.1). Added by spec 003.
 tokio = { version = "1.53", default-features = false }
+# The HTTP stack and TLS of the remote adapter binding (spec 009, 3.11).
+# Only crates under `integrations/` may depend on these (spec 001, 3.4.2);
+# `make boundaries` refuses them anywhere else.
+hyper = { version = "1.9", default-features = false }
+hyper-util = { version = "0.1.17", default-features = false }
+http-body-util = { version = "0.1", default-features = false }
+rustls = { version = "0.23.35", default-features = false, features = ["ring", "std", "tls12"] }
+tokio-rustls = { version = "0.26.4", default-features = false, features = ["ring", "tls12"] }
+webpki-roots = { version = "1.0.5", default-features = false }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
