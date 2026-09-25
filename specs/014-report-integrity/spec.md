@@ -1,7 +1,7 @@
 ---
 id: "014-report-integrity"
 title: "Task adapter rules bound into evaluation identity (amends 004)"
-status: draft
+status: approved
 implementation: pending
 created: "2026-09-25"
 summary: >
@@ -11,10 +11,10 @@ summary: >
   adapter's correctness rules change under the same version, and a gate
   can compare two reports that judged correctness differently. Spec 006
   closes this for the CLI alone, by writing the adapter document beside
-  each report and comparing bytes. This draft binds a digest of the
+  each report and comparing bytes. This amendment binds a digest of the
   adapter's rules into a new evaluator configuration version, so the
   report identity itself covers correctness, and makes a gate unknown
-  whenever either side's rules are unbound. Proposal only; claims no code.
+  whenever either side's rules are unbound. Approved (A-10, 2026-09-25); implementation pending.
 amends:
   - "004-evaluation-and-replay"
 depends_on:
@@ -26,10 +26,11 @@ references:
 
 # 014: Task adapter rules bound into evaluation identity (amends 004)
 
-Draft: a proposal, not a claim about code. Drafted on 2026-09-25 under the
+Approved (A-10, 2026-09-25) as its own reviewable change before any code
+(R-16); implementation is pending. Drafted on 2026-09-25 under the
 owner decision of 2026-09-24 to draft the spec 004 amendments once 012 was
 merged, and to stop for approval. Spec 004's approved text is not edited;
-if approved, this spec records the change, as 013 does for 003.
+this spec records the change, as 013 does for 003.
 
 ## 1. Purpose
 
@@ -145,6 +146,10 @@ correctness is computed; migrating stored version 1 configurations.
   and the version 1 gate expectations changed as 3.4 states.
 
 ## Open questions
+
+Owner decision of 2026-09-25 (R-31), answering Q-1 and Q-2: "Specs 014, 015 and 007 are APPROVED, accepting the recommendation written in each draft for every open question".
+Each question below is therefore settled as its recommendation states; the
+text is kept as the record of what was asked.
 
 - Q-1: making gates over version 1 reports `unknown` is the safe reading
   of spec 004's "incompatible measurements yield unknown". The

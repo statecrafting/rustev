@@ -1,7 +1,7 @@
 ---
 id: "015-per-case-bundle-failures"
 title: "Per-case reporting of unusable replay bundles (amends 004)"
-status: draft
+status: approved
 implementation: pending
 created: "2026-09-25"
 summary: >
@@ -11,9 +11,9 @@ summary: >
   incomparable case: a host must either stop the whole evaluation (the
   CLI's choice, spec 006 E-31) or leave the case out, which the library
   then reports as `bundle-missing`, misstating corruption as absence.
-  This draft lets the caller supply a typed bundle-load failure per case,
+  This amendment lets the caller supply a typed bundle-load failure per case,
   reported as incomparable with its own reason, counted in coverage and
-  excluded from quality. Proposal only; claims no code.
+  excluded from quality. Approved (A-11, 2026-09-25); implementation pending.
 amends:
   - "004-evaluation-and-replay"
 depends_on:
@@ -25,10 +25,11 @@ references:
 
 # 015: Per-case reporting of unusable replay bundles (amends 004)
 
-Draft: a proposal, not a claim about code. Drafted on 2026-09-25 under the
+Approved (A-11, 2026-09-25) as its own reviewable change before any code
+(R-16); implementation is pending. Drafted on 2026-09-25 under the
 owner decision of 2026-09-24 to draft the spec 004 amendments once 012 was
 merged, and to stop for approval. Spec 004's approved text is not edited;
-if approved, this spec records the change.
+this spec records the change.
 
 ## 1. Purpose
 
@@ -135,6 +136,10 @@ errors; storage, retention or deletion.
   quality metric; each must be detected.
 
 ## Open questions
+
+Owner decision of 2026-09-25 (R-31), answering Q-1 and Q-2: "Specs 014, 015 and 007 are APPROVED, accepting the recommendation written in each draft for every open question".
+Each question below is therefore settled as its recommendation states; the
+text is kept as the record of what was asked.
 
 - Q-1: whether `inaccessible` should instead keep stopping the CLI, since
   an I/O error may be transient rather than a property of the bundle.

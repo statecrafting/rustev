@@ -20,7 +20,7 @@
       }
     ],
     "sectionDigests": {
-      "014-task-adapter-rules-bound-into-evaluation-identity-amends-004": "e603281f013520efb8aadb277f4551295dc461aa8015aa9bd0e001b411aad24a",
+      "014-task-adapter-rules-bound-into-evaluation-identity-amends-004": "2d7731b5a57223c6e8a6c58baf87ed0b52dcd724bc02494b06f86a01cb8515ae",
       "1-purpose": "e849f5107f7f2fe569982121230bd9894a01cb1777ce6436d766dd1b41e5ab4a",
       "2-territory": "404145f31d5a4dd3df9b6afe5c9406def40a349e4c8b37505cf8f16c620ea5cc",
       "3-1-the-adapter-s-rules-identity": "9d6249b127edab95f6328a24e1bb7eebef3711d94771e15d2e80d769c9b9ab97",
@@ -31,7 +31,7 @@
       "4-out-of-scope": "adeb871d1161193e726383b69ed531dd3083dc653719cae4e921880be3299e0e",
       "5-observable-negative-cases": "6289857c3f2720a7a7afa5315c43f5c8e436ef858b41d1983a14e0ca429c96db",
       "acceptance": "5005e55cb508277045181be39410483f00cb143d5744c807b780f4de16a44177",
-      "open-questions": "cbd7c6fe29a599dea185f0e1286a586d56c135b701e8ec0262fb65ac62aac8c0"
+      "open-questions": "5fe50d9191e79696431eb5128551073791e8ad306c5d71e649f0696451ea9b38"
     },
     "sectionHeadings": [
       "014: Task adapter rules bound into evaluation identity (amends 004)",
@@ -48,10 +48,10 @@
       "Open questions"
     ],
     "specPath": "specs/014-report-integrity/spec.md",
-    "status": "draft",
-    "summary": "A proposed amendment of approved spec 004 (R-16). The evaluator configuration names its task adapter only by name and version, so the configuration identity a report carries does not change when the adapter's correctness rules change under the same version, and a gate can compare two reports that judged correctness differently. Spec 006 closes this for the CLI alone, by writing the adapter document beside each report and comparing bytes. This draft binds a digest of the adapter's rules into a new evaluator configuration version, so the report identity itself covers correctness, and makes a gate unknown whenever either side's rules are unbound. Proposal only; claims no code.\n",
+    "status": "approved",
+    "summary": "A proposed amendment of approved spec 004 (R-16). The evaluator configuration names its task adapter only by name and version, so the configuration identity a report carries does not change when the adapter's correctness rules change under the same version, and a gate can compare two reports that judged correctness differently. Spec 006 closes this for the CLI alone, by writing the adapter document beside each report and comparing bytes. This amendment binds a digest of the adapter's rules into a new evaluator configuration version, so the report identity itself covers correctness, and makes a gate unknown whenever either side's rules are unbound. Approved (A-10, 2026-09-25); implementation pending.\n",
     "title": "Task adapter rules bound into evaluation identity (amends 004)"
   },
-  "shardHash": "c8d9dcd6f7cb6240f1bc77699a18d44b2f90a0eaba2b07d529336a7daf647b62",
+  "shardHash": "0b0543ad0c7651d3bd8bc324b9d8c698fee826c431629d119958a3521bc35669",
   "specVersion": "1.8.0"
 }

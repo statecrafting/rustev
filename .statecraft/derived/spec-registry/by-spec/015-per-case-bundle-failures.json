@@ -20,7 +20,7 @@
       }
     ],
     "sectionDigests": {
-      "015-per-case-reporting-of-unusable-replay-bundles-amends-004": "c65c237f085a26f1ef3d8a7184fbc62326ddd7c945ed398cd0c3f5c52aa32660",
+      "015-per-case-reporting-of-unusable-replay-bundles-amends-004": "702992652b79040b2f78bd3431111a839c36281b95af349298d67a551cb64188",
       "1-purpose": "84131b051b48f80f538fc75ebc1a4e093d855b61d8314337532d9526bca5f8a4",
       "2-territory": "ddbf4cc767e5ac1030b019e610584a6435cdd17c68cc56e7a528bd5572f4098f",
       "3-1-bundle-inputs": "60aaf6c12672f439385472c439a9246296b3bd7f23eedabe601c0c1ecfeafd90",
@@ -31,7 +31,7 @@
       "4-out-of-scope": "59de8b1bb0ff3c1500cf0c636a50b8498bfd03e6c70be47ea53a81f1dc17883a",
       "5-observable-negative-cases": "ac19f29c91ad047b3b4b6db360af2e4d016b12ccb5957d9a5995064e21d57931",
       "acceptance": "f9c14a347e69b552e12654db1cff8460eb22e7d7c89f765cb1e32a95306869c0",
-      "open-questions": "d3c20de2864977493413f0bdbecfe42836e860347134e3a5af1db9e30f479864"
+      "open-questions": "9edeff026d6805493f3fec35aa26993fa779091baf67f4cd8ca6e40d412d0b8f"
     },
     "sectionHeadings": [
       "015: Per-case reporting of unusable replay bundles (amends 004)",
@@ -48,10 +48,10 @@
       "Open questions"
     ],
     "specPath": "specs/015-per-case-bundle-failures/spec.md",
-    "status": "draft",
-    "summary": "A proposed amendment of approved spec 004 (R-16). Evaluation takes parsed replay bundles only, so a retained bundle whose bytes cannot be read, exceed their limit or do not parse cannot be reported as one incomparable case: a host must either stop the whole evaluation (the CLI's choice, spec 006 E-31) or leave the case out, which the library then reports as `bundle-missing`, misstating corruption as absence. This draft lets the caller supply a typed bundle-load failure per case, reported as incomparable with its own reason, counted in coverage and excluded from quality. Proposal only; claims no code.\n",
+    "status": "approved",
+    "summary": "A proposed amendment of approved spec 004 (R-16). Evaluation takes parsed replay bundles only, so a retained bundle whose bytes cannot be read, exceed their limit or do not parse cannot be reported as one incomparable case: a host must either stop the whole evaluation (the CLI's choice, spec 006 E-31) or leave the case out, which the library then reports as `bundle-missing`, misstating corruption as absence. This amendment lets the caller supply a typed bundle-load failure per case, reported as incomparable with its own reason, counted in coverage and excluded from quality. Approved (A-11, 2026-09-25); implementation pending.\n",
     "title": "Per-case reporting of unusable replay bundles (amends 004)"
   },
-  "shardHash": "cadef536139e4b07edc615325722bb9c420264c446c18b1b06627190af20e771",
+  "shardHash": "bdc56c2c0dcfeb3c852bf805ad6fc388766a92b76a833211063df1b69b645bc2",
   "specVersion": "1.8.0"
 }
