@@ -1,7 +1,7 @@
 ---
 id: "007-support-routing-package"
 title: "Reference package: support routing"
-status: draft
+status: approved
 implementation: pending
 created: "2026-09-25"
 summary: >
@@ -13,10 +13,9 @@ summary: >
   `rustev-core`. It demonstrates that a domain is a package and not a core
   change, and that swapping the semantic backend (the rules backend's
   synthetic head against the Jev integration, spec 012) produces comparable
-  reports with no change in any authority path. Proposal only; claims no
-  code.
+  reports with no change in any authority path. Approved (A-12, 2026-09-25); implementation pending.
 establishes:
-  # Created on delivery; a draft claims no code (see section 2).
+  # Created on delivery (see section 2).
   - { kind: directory, path: "packages/rustev-pkg-support-routing/" }
 depends_on:
   - "001-boundaries-and-authority"
@@ -32,7 +31,8 @@ references:
 
 # 007: Reference package: support routing
 
-Draft: a proposal, not a claim about code. Drafted on 2026-09-25 under the
+Approved (A-12, 2026-09-25) as its own reviewable change before any code
+(R-16); implementation is pending. Drafted on 2026-09-25 under the
 owner decision of 2026-09-24 to draft package 007 once 012 was merged, and
 to stop for approval. Rationale: design sections 15, 16.1 and 17
 (increment 3); owner decisions R-02 (typed builder and canonical JSON),
@@ -104,7 +104,7 @@ amendment first (R-16); increment 3's gate records that it was needed.
 1. A `rustev.task-adapter/1` document (spec 006, 3.8) defining a correct
    route: the queue label equals the proposed queue; priority is a separate
    labeled field with its own rule. It is bound by content digest where
-   spec 014, if approved, requires it.
+   spec 014 (approved) requires it.
 2. A `rustev.evaluator-config/1` document (version 2 if spec 014 is
    approved first) naming that adapter, agreement on queue and priority,
    `topic` as the probability step, reliability bins, subgroups by
@@ -167,6 +167,10 @@ package to crates.io; `rank`, which Jev does not declare.
   increment 3's "no core change" is checked by the diff.
 
 ## Open questions
+
+Owner decision of 2026-09-25 (R-31), answering Q-1 to Q-4: "Specs 014, 015 and 007 are APPROVED, accepting the recommendation written in each draft for every open question".
+Each question below is therefore settled as its recommendation states; the
+text is kept as the record of what was asked.
 
 - Q-1: the `topic` threshold needs a calibrated probability. Jev returns a
   provider distribution that spec 012 never labels calibrated. With no

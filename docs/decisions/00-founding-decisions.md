@@ -120,6 +120,15 @@ Decided by the owner on 2026-09-24. Recorded here as the owner's decisions.
 |---|---|
 | R-30 | The Vercel team is on the Hobby plan, and the Gateway refuses `zeroDataRetention: true` with HTTP 403 `ZdrUnauthorizedError` ("Zero Data Retention (ZDR) is only available for Pro and Enterprise plans", C-11). Asked whether to upgrade, stop at recorded fixtures, or drop the flag, the owner chose: "Drop gateway ZDR flag". Scope: spec `012` smoke and qualification requests carrying only the travel-memory synthetic fixture corpus and independently labeled synthetic-provenance data may omit `zeroDataRetention`; `only: ["typesafe-ai"]` stays mandatory on every request, so no request can route to a provider without zero data retention (C-10). This amends R-27's "every request sets zeroDataRetention" for that data only. The binding default stays `zeroDataRetention: true`; omitting it is an explicit binding choice and part of the artifact identity. Real user data still needs a separate privacy decision, and production still needs a pinned transport (R-28). |
 
+### Owner decisions of 2026-09-25, the spec 004 amendments and package 007
+
+Decided by the owner on 2026-09-25 PM, through the travel-memory rustev work
+order. Recorded here as the owner's decisions.
+
+| Id | Decision |
+|---|---|
+| R-31 | Owner's words: "Specs 014, 015 and 007 are APPROVED, accepting the recommendation written in each draft for every open question". Answers, each the draft's recommendation: spec `014` Q-1, gates over `rustev.evaluator-config/1` reports are `unknown`; Q-2, `AdapterRules::opaque` is kept. Spec `015` Q-1, an inaccessible bundle is reported per case (`bundle-inaccessible`) and does not stop the CLI; Q-2, no expected bundle digest in `rustev.dataset/1` in this amendment. Spec `007` Q-1, the Jev binding declares `uncalibrated_threshold` with a margin rule rather than a synthetic temperature fit; Q-2, the dataset labels both queue and priority, priority as its own agreement payload; Q-3, spec `002`'s reference-plan tests keep their own copy and the package's test asserts byte equality with the core goldens; Q-4, package documents are files under `packages/rustev-pkg-support-routing/data/`, embedded with `include_bytes!`. Build order: `015`, then `014`, then `007`, one spec per pull request. |
+
 ## Approvals
 
 | Id | Act | Date |
@@ -133,6 +142,9 @@ Decided by the owner on 2026-09-24. Recorded here as the owner's decisions.
 | A-07 | The owner approved spec `013` (amends `003`: an adapter may report that remote work possibly continues) by issuing the travel-memory rustev work order of 2026-09-24 ("I agree with all recommendations"), as its own reviewable change before code (R-16). Implementation is pending. | 2026-09-24 |
 | A-08 | The owner approved spec `009` (remote adapter protocol `rustev.remote/1` and `integrations/rustev-remote-http`) by the same work order. Implementation is pending. | 2026-09-24 |
 | A-09 | The owner approved spec `012` (Jev integration) by the same work order, within R-27 to R-30, with the Gateway shapes observed in C-11 folded into it before approval. Live calls are limited to smoke and qualification within the USD 5 testing cap; production deployment and releases are not approved. Implementation is pending. | 2026-09-24 |
+| A-10 | The owner approved spec `014` (amends `004`: the task adapter's rules digest bound into `rustev.evaluator-config/2`) with R-31's answers, as its own reviewable change before code (R-16). Implementation is pending. | 2026-09-25 |
+| A-11 | The owner approved spec `015` (amends `004`: per-case reporting of unusable replay bundles; supersedes spec `006` E-31) with R-31's answers, by the same act. Implementation is pending. | 2026-09-25 |
+| A-12 | The owner approved spec `007` (package `packages/rustev-pkg-support-routing`, depending on contract and core only) with R-31's answers, by the same act. Implementation is pending. | 2026-09-25 |
 
 No approval authorizes ratifying any other spec.
 

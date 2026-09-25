@@ -24,8 +24,8 @@
       }
     ],
     "specId": "015-per-case-bundle-failures",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "ffc631acb0eec582b8e272085aa2fcdbcf7775286c155988f4147441d8b69d6f"
+  "shardHash": "9321e09debd53fc4b69a4ae0dcdc0230bcecf9a7e4696d475fdeaf200ab4515f"
 }
