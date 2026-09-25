@@ -1,0 +1,58 @@
+{
+  "record": {
+    "amends": [
+      "007-support-routing-package"
+    ],
+    "created": "2026-09-25",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-decision-contract-and-pure-core",
+      "004-evaluation-and-replay",
+      "005-reference-backends",
+      "007-support-routing-package",
+      "012-jev-integration"
+    ],
+    "id": "016-support-routing-swap-threshold",
+    "implementation": "pending",
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "016-declared-uncalibrated-threshold-in-support-routing-swap-test-amends-007": "ebf5700967ba227a01d796f3ec3ab35eb434109a0f2e0080dc6452287b57ae5d",
+      "1-purpose": "b199f302df0bb5f157b5a12c1b92cb8bb19329b0a3947f00dc70f63ea70a84d0",
+      "2-territory": "11b2fd70d262179fb0ec9c6e794da6ddb93940de67480aacf8ef5ffd62cffd4f",
+      "3-1-selection-policy-comparison-across-bindings": "fa56d92031368cc3a5f5a9185e9cd93e9c15e4cad0fd6b65d82b468bdc5a5d50",
+      "3-2-amendment-of-spec-007-normative-text": "f12553719898e9e0ae09741bf2e1f61d378ce0364a66a1f023591fe8193c4bbe",
+      "3-behavior": "aef6a1803eaa188b08354410eff54d0f212852dc6c8837c3958677054476e7bf",
+      "4-observable-negative-cases": "8fd922d99b0632871789cd7cea7a4bddf18099ed8a769ae2417c51783016b46a"
+    },
+    "sectionHeadings": [
+      "016: Declared uncalibrated threshold in support-routing swap test (amends 007)",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 Selection policy comparison across bindings",
+      "3.2 Amendment of spec 007 normative text",
+      "4. Observable negative cases"
+    ],
+    "specPath": "specs/016-support-routing-swap-threshold/spec.md",
+    "status": "draft",
+    "summary": "A proposed amendment of approved spec 007 (R-16). Spec 007 3.4.3 and section 5 require the backend swap test to assert identical compiled plans' policy sections across the rules backend and Jev backend. Under owner decision R-31 (approving Q-1), Jev returns an uncalibrated distribution and declares `uncalibrated_threshold` on `topic`'s `top_mass_below` condition with a margin rule. The reference definition keeps `uncalibrated_threshold: not_declared` to match the golden document byte-for-byte (3.1.3). Because `uncalibrated_threshold` is part of the condition inside the policy section, the compiled plans' policy sections cannot be strictly identical under equality. This amendment amends 3.4.3 and section 5 so that the swap test asserts identical policy rules, conditions, thresholds, adjustments and output declarations, accounting for Jev's declared uncalibrated threshold on `topic`.\n",
+    "title": "Declared uncalibrated threshold in support-routing swap test (amends 007)"
+  },
+  "shardHash": "e58b894aa93f7742b1bf65dbc55c74d47cee0795f17b7a38a6869f2305d4b00c",
+  "specVersion": "1.8.0"
+}
