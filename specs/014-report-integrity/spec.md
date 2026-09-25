@@ -207,6 +207,11 @@ text is kept as the record of what was asked.
 - Seeds (`adapter rules`, eval harness, run by spec 004's verification):
   the rules left out of the configuration identity, ignored by the
   adapter-mismatch check, and a gate passing over one side's unbound rules.
+  Spec 006's CLI seed "a gate ignores a changed adapter" removed only the
+  CLI's byte comparison and survived once the library's precondition caught
+  the same defect (an equivalent mutant); it now removes both layers, and
+  the CLI harness accepts a multi-hunk seed whose hunks name different
+  files.
 
 ## Verification
 
