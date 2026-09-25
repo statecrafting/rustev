@@ -1,36 +1,27 @@
 {
   "mapping": {
+    "amends": [
+      "003-runtime-execution-and-evidence"
+    ],
     "dependsOn": [
-      "000-bootstrap",
-      "001-boundaries-and-authority"
+      "003-runtime-execution-and-evidence",
+      "009-remote-adapter-protocol"
     ],
     "implementingPaths": [
       {
-        "path": "Cargo.lock",
+        "path": "backends/rustev-backend-rules/",
         "source": "spec-edge"
-      },
-      {
-        "path": "Cargo.toml",
-        "source": "spec-edge"
-      },
-      {
-        "path": "Makefile",
-        "source": "spec-edge"
-      },
-      {
-        "path": "crates/rustev-contract",
-        "source": "manifest-metadata"
-      },
-      {
-        "path": "crates/rustev-contract/",
-        "source": "spec-edge"
-      },
-      {
-        "path": "crates/rustev-core",
-        "source": "manifest-metadata"
       },
       {
         "path": "crates/rustev-core/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-eval/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-runtime/",
         "source": "spec-edge"
       }
     ],
@@ -38,14 +29,14 @@
       {
         "locations": [
           {
-            "file": "crates/rustev-contract/"
+            "file": "backends/rustev-backend-rules/"
           }
         ],
         "ownership": true,
-        "sourceField": "establishes",
+        "sourceField": "extends",
         "unit": {
           "kind": "directory",
-          "path": "crates/rustev-contract/"
+          "path": "backends/rustev-backend-rules/"
         }
       },
       {
@@ -55,7 +46,7 @@
           }
         ],
         "ownership": true,
-        "sourceField": "establishes",
+        "sourceField": "extends",
         "unit": {
           "kind": "directory",
           "path": "crates/rustev-core/"
@@ -64,46 +55,46 @@
       {
         "locations": [
           {
-            "file": "Cargo.lock"
+            "file": "crates/rustev-eval/"
           }
         ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
-          "kind": "file",
-          "path": "Cargo.lock"
+          "kind": "directory",
+          "path": "crates/rustev-eval/"
         }
       },
       {
         "locations": [
           {
-            "file": "Cargo.toml"
+            "file": "crates/rustev-runtime/"
           }
         ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
-          "kind": "file",
-          "path": "Cargo.toml"
+          "kind": "directory",
+          "path": "crates/rustev-runtime/"
         }
       },
       {
         "locations": [
           {
-            "file": "Makefile"
+            "file": "docs/decisions/00-founding-decisions.md"
           }
         ],
-        "ownership": true,
-        "sourceField": "extends",
+        "ownership": false,
+        "sourceField": "references",
         "unit": {
           "kind": "file",
-          "path": "Makefile"
+          "path": "docs/decisions/00-founding-decisions.md"
         }
       }
     ],
-    "specId": "002-decision-contract-and-pure-core",
+    "specId": "013-remote-state-on-failed-attempts",
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "66fd759f46b9519cdfc9e3b299e9ff9d932b1022ad72de76e634a65fdae54bf1"
+  "shardHash": "6312eca9e9b3999470a116e4ee0c368cd1e68ea6f6b677e25f5f704fa6121325"
 }

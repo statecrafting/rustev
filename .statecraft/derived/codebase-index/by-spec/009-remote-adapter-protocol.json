@@ -1,8 +1,10 @@
 {
   "mapping": {
     "dependsOn": [
-      "000-bootstrap",
-      "001-boundaries-and-authority"
+      "001-boundaries-and-authority",
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay"
     ],
     "implementingPaths": [
       {
@@ -18,19 +20,7 @@
         "source": "spec-edge"
       },
       {
-        "path": "crates/rustev-contract",
-        "source": "manifest-metadata"
-      },
-      {
         "path": "crates/rustev-contract/",
-        "source": "spec-edge"
-      },
-      {
-        "path": "crates/rustev-core",
-        "source": "manifest-metadata"
-      },
-      {
-        "path": "crates/rustev-core/",
         "source": "spec-edge"
       }
     ],
@@ -42,23 +32,10 @@
           }
         ],
         "ownership": true,
-        "sourceField": "establishes",
+        "sourceField": "extends",
         "unit": {
           "kind": "directory",
           "path": "crates/rustev-contract/"
-        }
-      },
-      {
-        "locations": [
-          {
-            "file": "crates/rustev-core/"
-          }
-        ],
-        "ownership": true,
-        "sourceField": "establishes",
-        "unit": {
-          "kind": "directory",
-          "path": "crates/rustev-core/"
         }
       },
       {
@@ -99,11 +76,37 @@
           "kind": "file",
           "path": "Makefile"
         }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/decisions/00-founding-decisions.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/001-decision-engine-architecture.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
       }
     ],
-    "specId": "002-decision-contract-and-pure-core",
+    "specId": "009-remote-adapter-protocol",
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "66fd759f46b9519cdfc9e3b299e9ff9d932b1022ad72de76e634a65fdae54bf1"
+  "shardHash": "4774a030e4872c07a3b606bfa3a02ba40e5c3d2d3789d133c9ee5cfd7d429802"
 }
