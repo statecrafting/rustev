@@ -245,6 +245,8 @@ pub enum Canned {
     Reply(u16, Vec<(&'static str, String)>, Vec<u8>),
     /// Close the connection without a response.
     HangUp,
+    /// Never answer.
+    Hang,
 }
 
 pub struct CannedServer {
@@ -292,6 +294,10 @@ pub async fn canned(f: impl Fn(&str, &[u8]) -> Canned + Send + Sync + 'static) -
                         h.fetch_add(1, Ordering::SeqCst);
                         match f(&path, &body) {
                             Canned::HangUp => Err("SYNTHETIC hang-up".to_string()),
+                            Canned::Hang => {
+                                std::future::pending::<()>().await;
+                                Err("never".to_string())
+                            }
                             Canned::Reply(status, headers, body) => {
                                 let mut r = Response::new(Full::new(Bytes::from(body)));
                                 *r.status_mut() = hyper::StatusCode::from_u16(status).unwrap();

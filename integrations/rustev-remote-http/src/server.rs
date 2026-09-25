@@ -43,7 +43,7 @@ use tokio::time::Instant;
 
 use crate::cost::sum_charges;
 use crate::http::Secret;
-use crate::taxonomy::{code_of_detail, failure_class};
+use crate::taxonomy::{code_of_detail, failure_class, is_local_only};
 use crate::wire::digest_bytes;
 
 /// Paths of the three documents (3.11).
@@ -271,6 +271,15 @@ where
         .await;
 }
 
+/// Byte equality whose time depends on the lengths only, not on where the
+/// first difference is: a credential is not guessable byte by byte.
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
+}
+
 fn reply(status: StatusCode, body: Vec<u8>) -> Response<Full<Bytes>> {
     let mut r = Response::new(Full::new(Bytes::from(body)));
     *r.status_mut() = status;
@@ -298,7 +307,7 @@ async fn handle(state: Arc<State>, req: Request<Incoming>) -> Response<Full<Byte
         let ok = req
             .headers()
             .get(AUTHORIZATION)
-            .is_some_and(|v| v.as_bytes() == expected.as_bytes());
+            .is_some_and(|v| constant_time_eq(v.as_bytes(), expected.as_bytes()));
         if !ok {
             return refuse(StatusCode::UNAUTHORIZED, "credentials refused");
         }
@@ -681,12 +690,7 @@ fn spawn_attempt(
                 hit.load(Ordering::SeqCst),
                 requested.load(Ordering::SeqCst),
             ),
-            None => Recorded {
-                result: failure(RemoteCode::RemoteDeadline, "the budget ran out"),
-                charge: Charge::Unknown,
-                ack: CancelAck::Unconfirmed,
-                remote: RemoteEnd::PossiblyContinuing,
-            },
+            None => unconfirmed_deadline(),
         }
     });
     tokio::spawn(async move {
@@ -708,14 +712,34 @@ fn spawn_attempt(
     });
 }
 
+/// The told budget ran out and the hosted backend did not confirm a stop:
+/// its work may go on, so this is not `remote_deadline` (which says the
+/// remote side stopped) but `remote_error` with charge `unknown`, which a
+/// client records as possibly continuing (spec 013).
+fn unconfirmed_deadline() -> Recorded {
+    Recorded {
+        result: failure(
+            RemoteCode::RemoteError,
+            "the budget ran out and the hosted backend did not confirm a stop",
+        ),
+        charge: Charge::Unknown,
+        ack: CancelAck::Unconfirmed,
+        remote: RemoteEnd::PossiblyContinuing,
+    }
+}
+
 /// The hosted report, one to one: output, or the failure's own code when
-/// its detail carries one of the same class, else the class's code.
+/// its detail carries one of the same class, else the class's code. Codes
+/// only a client can observe (`transport_*`) are never sent on: a hosted
+/// backend's own transport failure is a `remote_error` here.
 fn map_report(r: AttemptReport, deadline_hit: bool, cancel_requested: bool) -> Recorded {
     let result = match r.result {
         Ok(o) => ItemResult::Output(o),
-        Err((AdapterFailure::Cancelled, d)) if deadline_hit => {
+        // `remote_deadline` only for a stop the hosted backend confirmed.
+        Err((AdapterFailure::Cancelled, d)) if deadline_hit && r.cancel == CancelAck::Stopped => {
             failure(RemoteCode::RemoteDeadline, &d)
         }
+        Err((AdapterFailure::Cancelled, _)) if deadline_hit => return unconfirmed_deadline(),
         Err((AdapterFailure::Cancelled, d)) if cancel_requested => {
             failure(RemoteCode::Cancelled, &d)
         }
@@ -724,7 +748,7 @@ fn map_report(r: AttemptReport, deadline_hit: bool, cancel_requested: bool) -> R
             &format!("reported cancelled without a request: {d}"),
         ),
         Err((class, d)) => match code_of_detail(&d) {
-            Some(c) if failure_class(c) == class => {
+            Some(c) if failure_class(c) == class && !is_local_only(c) => {
                 let rest = d
                     .strip_prefix(&format!("remote:{}", c.as_str()))
                     .unwrap_or("")
@@ -801,4 +825,82 @@ async fn cancel(state: &Arc<State>, body: &[u8]) -> Result<Vec<u8>, Refusal> {
     }
     .record_canonical()
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bearer_comparison_is_exact_and_length_checked() {
+        assert!(constant_time_eq(b"Bearer abc", b"Bearer abc"));
+        assert!(!constant_time_eq(b"Bearer abc", b"Bearer abd"));
+        assert!(!constant_time_eq(b"Bearer abc", b"Bearer ab"));
+        assert!(!constant_time_eq(b"", b"x"));
+        assert!(constant_time_eq(b"", b""));
+    }
+
+    fn cancelled(ack: CancelAck, charge: Charge) -> AttemptReport {
+        AttemptReport {
+            result: Err((AdapterFailure::Cancelled, "SYNTHETIC".into())),
+            charge,
+            cancel: ack,
+            remote: RemoteEnd::Finished,
+        }
+    }
+
+    #[test]
+    fn remote_deadline_only_for_a_confirmed_stop() {
+        let stopped = map_report(
+            cancelled(CancelAck::Stopped, Charge::Observed { units: 1 }),
+            true,
+            false,
+        );
+        assert!(matches!(
+            stopped.result,
+            ItemResult::Failure {
+                code: RemoteCode::RemoteDeadline,
+                ..
+            }
+        ));
+        assert_eq!(stopped.charge, Charge::Observed { units: 1 });
+        let unconfirmed = map_report(
+            cancelled(CancelAck::Unconfirmed, Charge::Observed { units: 1 }),
+            true,
+            false,
+        );
+        assert!(matches!(
+            unconfirmed.result,
+            ItemResult::Failure {
+                code: RemoteCode::RemoteError,
+                ..
+            }
+        ));
+        assert_eq!(unconfirmed.charge, Charge::Unknown);
+    }
+
+    #[test]
+    fn a_hosted_transport_code_is_never_sent_on() {
+        let r = map_report(
+            AttemptReport {
+                result: Err((
+                    AdapterFailure::Transient,
+                    "remote:transport_unsent: SYNTHETIC".into(),
+                )),
+                charge: Charge::Observed { units: 3 },
+                cancel: CancelAck::NotRequested,
+                remote: RemoteEnd::Finished,
+            },
+            false,
+            false,
+        );
+        assert!(matches!(
+            r.result,
+            ItemResult::Failure {
+                code: RemoteCode::RemoteError,
+                ..
+            }
+        ));
+        assert_eq!(r.charge, Charge::Observed { units: 3 });
+    }
 }

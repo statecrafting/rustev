@@ -97,13 +97,30 @@ pub const fn classify_status(status: u16) -> Option<RemoteCode> {
     }
 }
 
+/// Codes only the adapter itself can observe. A remote party that sends one
+/// is not trusted with it (it could zero a reported charge); adapters refuse
+/// such an answer as `malformed_response`.
+pub const fn is_local_only(code: RemoteCode) -> bool {
+    matches!(
+        code,
+        RemoteCode::TransportUnsent | RemoteCode::TransportInterrupted
+    )
+}
+
 /// Whether remote work may outlive a failure reported of the adapter's own
-/// accord (spec 013, 3.1): exactly when request bytes left the process, no
-/// complete answer arrived, and so the charge is `unknown`.
+/// accord (spec 013, 3.1): when request bytes left the process, the charge
+/// is `unknown` because nothing established a final one, and the code is
+/// one where no confirmed end arrived. That covers a transport interrupted
+/// after sending and an unparseable answer, and also `remote_deadline` and
+/// `remote_error` without a charge: the remote side gave up or failed
+/// without confirming that its work and charges stopped.
 pub fn remote_end(code: RemoteCode, sent: bool, charge: Charge) -> RemoteEnd {
     let no_complete_answer = matches!(
         code,
-        RemoteCode::TransportInterrupted | RemoteCode::MalformedResponse
+        RemoteCode::TransportInterrupted
+            | RemoteCode::MalformedResponse
+            | RemoteCode::RemoteDeadline
+            | RemoteCode::RemoteError
     );
     if sent && no_complete_answer && charge == Charge::Unknown {
         RemoteEnd::PossiblyContinuing
@@ -279,9 +296,23 @@ mod tests {
             remote_end(RemoteCode::TransportInterrupted, false, u),
             RemoteEnd::Finished
         );
+        // A remote failure without a final charge does not establish a stop.
+        assert_eq!(remote_end(RemoteCode::RemoteError, true, u), pc);
+        assert_eq!(remote_end(RemoteCode::RemoteDeadline, true, u), pc);
         assert_eq!(
-            remote_end(RemoteCode::RemoteError, true, u),
+            remote_end(
+                RemoteCode::RemoteDeadline,
+                true,
+                Charge::Observed { units: 1 }
+            ),
             RemoteEnd::Finished
         );
+        assert_eq!(
+            remote_end(RemoteCode::Overloaded, true, u),
+            RemoteEnd::Finished
+        );
+        assert!(is_local_only(RemoteCode::TransportUnsent));
+        assert!(is_local_only(RemoteCode::TransportInterrupted));
+        assert!(!is_local_only(RemoteCode::RemoteError));
     }
 }

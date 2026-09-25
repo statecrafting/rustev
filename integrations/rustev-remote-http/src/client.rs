@@ -18,7 +18,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use rustev_contract::canonical::canonical_value_bytes;
-use rustev_contract::definition::Operation;
+use rustev_contract::definition::{Determinism, Operation};
 use rustev_contract::descriptor::{BackendDescriptor, OutputKind};
 use rustev_contract::ids::{ArtifactId, DescriptorId};
 use rustev_contract::limits::REMOTE_V1;
@@ -47,7 +47,7 @@ use crate::exchange::{
 use crate::http::{Endpoint, EndpointError, HttpReply, HttpTransport, Secret, TransportError};
 use crate::identity::{AdapterBinding, served_identity};
 use crate::server::{CANCEL_PATH, DESCRIBE_PATH, INFER_PATH};
-use crate::taxonomy::{RemoteFailure, classify_status};
+use crate::taxonomy::{RemoteFailure, classify_status, is_local_only};
 use crate::wire::{SentTracker, digest_bytes};
 
 /// The version of the identity mapping this client applies: answers are
@@ -100,9 +100,6 @@ pub struct ClientConfig {
     /// runtime polls a cancelled attempt once, so with this on it records
     /// the answer as not observed; off by default.
     pub await_cancel_confirmation: bool,
-    /// After the budget runs out, how long to wait for the runtime's signal
-    /// before answering as cancelled anyway.
-    pub expiry_grace_ms: u64,
     /// The budget of a cancel exchange sent after the attempt answered.
     pub cancel_budget_ms: u64,
 }
@@ -127,7 +124,6 @@ impl ClientConfig {
             batching: None,
             retain_bytes: false,
             await_cancel_confirmation: false,
-            expiry_grace_ms: 1_000,
             cancel_budget_ms: 1_000,
         }
     }
@@ -389,8 +385,11 @@ impl RemoteClient {
         }
         .artifact()
         .map_err(|e| SetupError::Identity(e.to_string()))?;
+        // A remote adapter cannot prove any determinism across a network
+        // and a remote side it does not control (3.2.2).
         let descriptor = BackendDescriptor {
             artifact: binding.clone(),
+            determinism: Determinism::Unspecified,
             ..remote.descriptor.clone()
         };
         let max_items = match (config.batching, remote.terms.batching) {
@@ -571,32 +570,43 @@ async fn attempt(
     };
     let ex = join(&inner, key, trace_id, member);
 
-    let grace = Duration::from_millis(inner.config.expiry_grace_ms);
+    // One total budget (3.4.1): when it runs out the runtime raises the
+    // signal at the same moment, and the attempt answers as for
+    // cancellation (3.4.2) without waiting past it.
     tokio::select! {
         biased;
         _ = signal.raised() => {}
-        r = &mut rx => return r.unwrap_or_else(|_| lost()),
-        _ = budget.expiry() => {
-            // The runtime raises the signal when the budget runs out; wait
-            // for it (or the result) briefly, then answer as cancelled.
-            tokio::select! {
-                biased;
-                _ = signal.raised() => {}
-                r = &mut rx => return r.unwrap_or_else(|_| lost()),
-                _ = tokio::time::sleep(grace) => {}
-            }
-        }
+        r = &mut rx => return r.unwrap_or_else(|_| lost(ex.sent.may_have_sent())),
+        _ = budget.expiry() => {}
     }
     cancel_member(&inner, &ex, &attempt_id, rx, budget).await
 }
 
-fn lost() -> AttemptReport {
+/// Whether a member leaving its exchange must assume its request bytes left
+/// (or will leave). An aborted tracker means none ever will, whoever else
+/// waits; with others waiting the request goes out with this item in it;
+/// alone, the member wins the abort only if no write began (3.4.3).
+fn bytes_may_leave(sent: &SentTracker, others_waiting: bool) -> bool {
+    if sent.is_aborted() {
+        false
+    } else if others_waiting {
+        true
+    } else {
+        !sent.try_abort()
+    }
+}
+
+/// The exchange ended without an answer for this member (its task failed).
+/// If request bytes may have left, the remote work may go on and its charge
+/// is unknown; otherwise nothing was sent and nothing charged.
+fn lost(sent: bool) -> AttemptReport {
+    let reported = (!sent).then_some(Charge::Observed { units: 0 });
     RemoteFailure::new(
         RemoteCode::RemoteError,
         "the exchange ended without an answer",
-        None,
+        reported,
         true,
-        true,
+        sent,
     )
     .report()
 }
@@ -673,12 +683,14 @@ async fn cancel_member(
             .iter()
             .any(|m| m.attempt_id != attempt_id && m.status == Status::Waiting);
         let Some(m) = st.members.iter_mut().find(|m| m.attempt_id == attempt_id) else {
-            return lost();
+            return lost(ex.sent.may_have_sent());
         };
         if m.status == Status::Delivered {
             // The result was ready first; it wins (spec 003, 3.3.4).
             drop(st);
-            return rx.try_recv().unwrap_or_else(|_| lost());
+            return rx
+                .try_recv()
+                .unwrap_or_else(|_| lost(ex.sent.may_have_sent()));
         }
         match phase {
             Phase::Collecting => {
@@ -694,7 +706,7 @@ async fn cancel_member(
                 m.status = Status::Abandoned;
                 m.tx = None;
                 // Only a lone member can stop the whole exchange from sending.
-                sent = others_waiting || !ex.sent.try_abort();
+                sent = bytes_may_leave(&ex.sent, others_waiting);
                 if !sent {
                     m.settled = true;
                 }
@@ -728,7 +740,7 @@ async fn cancel_member(
         let late = {
             let mut st = lock(&ex.state);
             let Some(m) = st.members.iter_mut().find(|m| m.attempt_id == attempt_id) else {
-                return lost();
+                return lost(ex.sent.may_have_sent());
             };
             m.awaiting = false;
             let parked = m.late_share.take();
@@ -917,18 +929,26 @@ async fn run_exchange(
             .collect()
     };
     let mut reply_body: Option<Vec<u8>> = None;
-    let determined: Option<Vec<Determined>> = if told == 0 || body.is_empty() {
+    // Members whose own budget still runs are answered promptly when the
+    // exchange (bounded by the earliest member budget) cannot finish; the
+    // members whose budget ran out answer their own signals.
+    let mut live_only = false;
+    let determined: Vec<Determined> = if told == 0 || body.is_empty() {
         // No time to give the remote side, or nothing to send: send nothing.
-        // Members answer their signals as unsent.
         ex.sent.try_abort();
-        None
+        live_only = true;
+        all(
+            RemoteCode::TransportUnsent,
+            "no budget left to give the remote side",
+            None,
+        )
     } else if body.len() as u64 > terms.max_request_bytes {
         ex.sent.try_abort();
-        Some(all(
+        all(
             RemoteCode::Capability,
             "request exceeds the negotiated size",
             None,
-        ))
+        )
     } else {
         let max = (terms.max_response_bytes as usize).min(REMOTE_V1.max_bytes);
         let r = inner
@@ -936,11 +956,10 @@ async fn run_exchange(
             .post(INFER_PATH, body.clone(), max, &budget, &ex.sent)
             .await;
         match r {
-            // The budget ran out: the members answer their own signals.
-            Err(TransportError::Expired { .. }) if budget.expired() => None,
             Err(e) => {
+                live_only = matches!(e, TransportError::Expired { .. }) && budget.expired();
                 let (code, detail) = transport_code(&e);
-                Some(all(code, &detail, None))
+                all(code, &detail, None)
             }
             Ok(HttpReply {
                 status,
@@ -957,15 +976,15 @@ async fn run_exchange(
                         if let Some(r) = &retry_after {
                             d.push_str(&format!("; retry-after {r} (recorded, not waited)"));
                         }
-                        Some(all(code, &d, None))
+                        all(code, &d, None)
                     }
-                    None => Some(read_response(&inner, &request, &kinds, &body, &mut record)),
+                    None => read_response(&inner, &request, &kinds, &body, &mut record),
                 }
             }
         }
     };
     record.bytes_sent = ex.sent.may_have_sent();
-    finish(&inner, &ex, determined, record, body, reply_body);
+    finish(&inner, &ex, determined, live_only, record, body, reply_body);
 }
 
 /// Validate a 2xx body into per-member results (3.5).
@@ -1094,6 +1113,12 @@ fn read_response(
                         declared
                     ),
                 )),
+                // Only the adapter observes its transport; a remote party
+                // sending such a code is not trusted to zero a charge.
+                ItemResult::Failure { code, .. } if is_local_only(*code) => Err((
+                    RemoteCode::MalformedResponse,
+                    format!("the adapter-only code `{}` in an answer", code.as_str()),
+                )),
                 ItemResult::Failure { code, detail } => Err((*code, detail.clone())),
                 ItemResult::InProgress => {
                     d.in_progress = true;
@@ -1110,7 +1135,8 @@ fn read_response(
 fn finish(
     inner: &Inner,
     ex: &Exchange,
-    determined: Option<Vec<Determined>>,
+    det: Vec<Determined>,
+    live_only: bool,
     mut record: rustev_contract::remote::ExchangeRecord,
     request: Vec<u8>,
     response: Option<Vec<u8>>,
@@ -1137,121 +1163,101 @@ fn finish(
                 }
             }
         }
-        let received: Vec<bool> = st
-            .members
-            .iter()
-            .map(|m| m.status == Status::Waiting)
-            .collect();
+        // With `live_only`, a member whose own budget ran out is left to
+        // answer its signal; the others are answered now.
+        let receives =
+            |m: &Member| m.status == Status::Waiting && !(live_only && m.budget.expired());
+        let received: Vec<bool> = st.members.iter().map(receives).collect();
         let any_received = received.iter().any(|r| *r);
         let mut members = vec![];
-        match determined {
-            None => {
-                // Nothing came back in time: the members answer their own
-                // signals.
-                for m in &st.members {
-                    members.push(ExchangeMember {
-                        attempt_id: m.attempt_id.clone(),
-                        outcome: MemberOutcome::Failure {
-                            code: RemoteCode::Cancelled,
-                            detail: "no answer within the budget".into(),
-                        },
-                        charge: if sent {
-                            Charge::Unknown
-                        } else {
-                            Charge::Observed { units: 0 }
-                        },
-                    });
-                }
-            }
-            Some(det) => {
-                let reported = det.first().and_then(|d| d.share);
-                // Shares go to the members that receive the response; with
-                // none, the whole charge is offered to those that left.
-                let shares = match reported {
-                    Some(total) if any_received => attribute(total, &received),
-                    Some(total) => attribute(total, &vec![true; received.len()]),
-                    None => vec![Charge::Unknown; received.len()],
-                };
-                record.late = !any_received && response.is_some();
-                for ((m, d), share) in st.members.iter_mut().zip(det).zip(shares) {
-                    let waiting = m.status == Status::Waiting;
-                    let report = match &d.outcome {
-                        Ok(o) => AttemptReport {
-                            result: Ok(o.clone()),
-                            charge: share,
-                            cancel: CancelAck::NotRequested,
-                            remote: RemoteEnd::Finished,
-                        },
-                        // A remote cancel this member never asked for.
-                        Err((RemoteCode::Cancelled, detail)) => RemoteFailure::new(
-                            RemoteCode::RemoteError,
-                            format!("cancelled at the remote side without a request: {detail}"),
-                            d.share.map(|_| share),
+        {
+            let reported = det.first().and_then(|d| d.share);
+            // Shares go to the members that receive the response; with
+            // none, the whole charge is offered to those that left.
+            let shares = match reported {
+                Some(total) if any_received => attribute(total, &received),
+                Some(total) => attribute(total, &vec![true; received.len()]),
+                None => vec![Charge::Unknown; received.len()],
+            };
+            record.late = !any_received && response.is_some();
+            for ((m, d), share) in st.members.iter_mut().zip(det).zip(shares) {
+                let waiting = receives(m);
+                let report = match &d.outcome {
+                    Ok(o) => AttemptReport {
+                        result: Ok(o.clone()),
+                        charge: share,
+                        cancel: CancelAck::NotRequested,
+                        remote: RemoteEnd::Finished,
+                    },
+                    // A remote cancel this member never asked for.
+                    Err((RemoteCode::Cancelled, detail)) => RemoteFailure::new(
+                        RemoteCode::RemoteError,
+                        format!("cancelled at the remote side without a request: {detail}"),
+                        d.share.map(|_| share),
+                        terms.refusals_charged,
+                        sent,
+                    )
+                    .report(),
+                    Err((code, detail)) => {
+                        let reported = d.share.map(|_| share);
+                        let mut f = RemoteFailure::new(
+                            *code,
+                            detail.clone(),
+                            reported,
                             terms.refusals_charged,
                             sent,
-                        )
-                        .report(),
-                        Err((code, detail)) => {
-                            let reported = d.share.map(|_| share);
-                            let mut f = RemoteFailure::new(
-                                *code,
-                                detail.clone(),
-                                reported,
-                                terms.refusals_charged,
-                                sent,
-                            );
-                            if d.in_progress {
-                                f.charge = Charge::Unknown;
-                                f.remote = RemoteEnd::PossiblyContinuing;
-                            }
-                            f.report()
+                        );
+                        if d.in_progress {
+                            f.charge = Charge::Unknown;
+                            f.remote = RemoteEnd::PossiblyContinuing;
+                        }
+                        f.report()
+                    }
+                };
+                members.push(ExchangeMember {
+                    attempt_id: m.attempt_id.clone(),
+                    outcome: match &d.outcome {
+                        Ok(o) => MemberOutcome::Output {
+                            digest: output_digest(o).unwrap_or_default(),
+                        },
+                        Err((code, detail)) => MemberOutcome::Failure {
+                            code: *code,
+                            detail: detail.clone(),
+                        },
+                    },
+                    charge: if waiting || record.late {
+                        report.charge
+                    } else {
+                        Charge::Unknown
+                    },
+                });
+                if waiting {
+                    m.status = Status::Delivered;
+                    m.settled = true;
+                    if let Some(tx) = m.tx.take() {
+                        let _ = tx.send(report);
+                    }
+                } else if m.status == Status::Abandoned && !m.settled && response.is_some() {
+                    // A charge learned after the member stopped waiting
+                    // is offered, never supplied (3.4.4, 3.10.4).
+                    let offered = if any_received {
+                        // Fully attributed to the receivers.
+                        matches!(reported, Some(Charge::Observed { .. })).then_some(0)
+                    } else {
+                        match share {
+                            Charge::Observed { units } => Some(units),
+                            _ => None,
                         }
                     };
-                    members.push(ExchangeMember {
-                        attempt_id: m.attempt_id.clone(),
-                        outcome: match &d.outcome {
-                            Ok(o) => MemberOutcome::Output {
-                                digest: output_digest(o).unwrap_or_default(),
-                            },
-                            Err((code, detail)) => MemberOutcome::Failure {
-                                code: *code,
-                                detail: detail.clone(),
-                            },
-                        },
-                        charge: if waiting || record.late {
-                            report.charge
-                        } else {
-                            Charge::Unknown
-                        },
-                    });
-                    if waiting {
-                        m.status = Status::Delivered;
+                    if m.awaiting {
+                        m.late_share = offered;
+                    } else if let Some(units) = offered {
                         m.settled = true;
-                        if let Some(tx) = m.tx.take() {
-                            let _ = tx.send(report);
-                        }
-                    } else if m.status == Status::Abandoned && !m.settled && response.is_some() {
-                        // A charge learned after the member stopped waiting
-                        // is offered, never supplied (3.4.4, 3.10.4).
-                        let offered = if any_received {
-                            // Fully attributed to the receivers.
-                            matches!(reported, Some(Charge::Observed { .. })).then_some(0)
-                        } else {
-                            match share {
-                                Charge::Observed { units } => Some(units),
-                                _ => None,
-                            }
-                        };
-                        if m.awaiting {
-                            m.late_share = offered;
-                        } else if let Some(units) = offered {
-                            m.settled = true;
-                            offers.push(ReconciliationOffer {
-                                attempt_id: m.attempt_id.clone(),
-                                observed_units: units,
-                                binding: inner.binding.clone(),
-                            });
-                        }
+                        offers.push(ReconciliationOffer {
+                            attempt_id: m.attempt_id.clone(),
+                            observed_units: units,
+                            binding: inner.binding.clone(),
+                        });
                     }
                 }
             }
@@ -1282,5 +1288,39 @@ pub fn map_retained(body: &[u8], attempt_id: &str, declared: OutputKind) -> Opti
     match &one.result {
         ItemResult::Output(o) if output_kind_of(o) == declared => Some(o.clone()),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_aborted_exchange_never_counts_as_sent_even_with_siblings() {
+        let t = SentTracker::new();
+        assert!(t.try_abort());
+        assert!(!bytes_may_leave(&t, true));
+        assert!(!bytes_may_leave(&t, false));
+        let idle = SentTracker::new();
+        assert!(bytes_may_leave(&idle, true), "siblings will send it");
+        let alone = SentTracker::new();
+        assert!(!bytes_may_leave(&alone, false), "a lone member aborts");
+        let writing = SentTracker::new();
+        assert!(writing.begin_write());
+        assert!(bytes_may_leave(&writing, false));
+    }
+
+    #[test]
+    fn a_lost_answer_after_sending_is_possibly_continuing() {
+        let r = lost(true);
+        assert_eq!(
+            (r.charge, r.remote),
+            (Charge::Unknown, RemoteEnd::PossiblyContinuing)
+        );
+        let r = lost(false);
+        assert_eq!(
+            (r.charge, r.remote),
+            (Charge::Observed { units: 0 }, RemoteEnd::Finished)
+        );
     }
 }

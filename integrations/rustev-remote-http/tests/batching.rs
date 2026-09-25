@@ -323,3 +323,74 @@ async fn different_state_or_decisions_never_share_an_exchange() {
     let recs = sink.until_records(3).await;
     assert!(recs.iter().all(|r| r.members.len() == 1), "{recs:?}");
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_member_with_budget_left_is_answered_when_the_exchange_budget_ends() {
+    // The exchange is bounded by its earliest member budget. When that runs
+    // out, a member whose own budget still runs is answered at once, not
+    // left waiting for its own budget.
+    let server = ServerConfig {
+        cancellation: CancelSupport::None,
+        ..batching_server()
+    };
+    let s = scripted_head(|_| Answer::Gate);
+    let (_srv, _h, c, _sink) = rig(
+        server,
+        Some(BatchConfig {
+            window_ms: 2_000,
+            max_items: 2,
+        }),
+        &s,
+    )
+    .await;
+    let reqs = siblings();
+    let (long_c, long_id, long_p) = (c.clone(), reqs[0].0.clone(), reqs[0].1.clone());
+    let long = tokio::spawn(async move {
+        call_traced(
+            &long_c,
+            &long_id,
+            &long_p,
+            30_000,
+            &CancelSignal::new(),
+            "d-7",
+        )
+        .await
+    });
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    let (short_c, short_id, short_p) = (c.clone(), reqs[1].0.clone(), reqs[1].1.clone());
+    let short = tokio::spawn(async move {
+        call_traced(
+            &short_c,
+            &short_id,
+            &short_p,
+            700,
+            &CancelSignal::new(),
+            "d-7",
+        )
+        .await
+    });
+    wait_until(|| s.gated().len() == 2).await;
+    let gated_at = std::time::Instant::now();
+    let r_short = short.await.unwrap();
+    assert_eq!(
+        code_of_detail(&r_short.result.clone().unwrap_err().1),
+        Some(RemoteCode::Cancelled)
+    );
+    let r_long = long.await.unwrap();
+    assert!(
+        gated_at.elapsed() < Duration::from_secs(5),
+        "the member with budget left waited {:?}",
+        gated_at.elapsed()
+    );
+    assert_eq!(
+        code_of_detail(&r_long.result.clone().unwrap_err().1),
+        Some(RemoteCode::TransportInterrupted)
+    );
+    assert_eq!(
+        (r_long.charge, r_long.remote),
+        (
+            Charge::Unknown,
+            rustev_core::seams::RemoteEnd::PossiblyContinuing
+        )
+    );
+}

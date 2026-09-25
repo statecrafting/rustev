@@ -10,6 +10,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use common::*;
+use rustev_contract::definition::Determinism;
 use rustev_contract::output::RawOutput;
 use rustev_contract::remote::{
     Attribution, CancelSupport, Disclosure, MemberOutcome, RemoteCode, ServedTerms,
@@ -277,11 +278,14 @@ async fn statuses_map_to_the_taxonomy() {
         let (c, _) = connect(client_config(&srv.url(), &d.backend_id)).await;
         let r = call(&c, "s/1", &topic_projection(), 5_000, &CancelSignal::new()).await;
         failed(&r, code, class);
-        assert_eq!(
-            (r.charge, r.remote),
-            (charge, RemoteEnd::Finished),
-            "{status}"
-        );
+        // A 5xx with no charge does not establish that the remote work
+        // stopped (spec 013): possibly continuing.
+        let end = if code == C::RemoteError {
+            RemoteEnd::PossiblyContinuing
+        } else {
+            RemoteEnd::Finished
+        };
+        assert_eq!((r.charge, r.remote), (charge, end), "{status}");
         // A redirect is never followed.
         assert_eq!(srv.hits.load(std::sync::atomic::Ordering::SeqCst), 2);
     }
@@ -888,25 +892,40 @@ async fn a_sink_failure_never_changes_the_result_and_is_counted() {
     wait_until(|| c.exchange_stats().failed == 1).await;
 }
 
+/// A canned remote side that never answers and records the budget it was
+/// told and when the request arrived.
+async fn silent_remote() -> (CannedServer, Arc<std::sync::Mutex<Option<(u64, Instant)>>>) {
+    let seen = Arc::new(std::sync::Mutex::new(None));
+    let s2 = seen.clone();
+    let d = linear_head();
+    let srv = canned_backend(d, terms(), move |req| {
+        let v: serde_json::Value = serde_json::from_slice(req).unwrap();
+        *s2.lock().unwrap() = Some((v["budget_ms"].as_u64().unwrap(), Instant::now()));
+        Canned::Hang
+    })
+    .await;
+    (srv, seen)
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn the_budget_bounds_the_wait_and_the_remote_side_is_told_less() {
-    // A remote side that never answers: the attempt ends at its budget
-    // (plus the grace for a signal that never comes, standalone).
-    let s = scripted_head(|_| Answer::Gate);
-    let (_server, h) = serve(
-        ServerConfig {
-            cancellation: CancelSupport::None,
-            ..ServerConfig::default()
-        },
-        vec![Hosted::new(Arc::new(Handle(s.clone())))],
-    )
-    .await;
-    let mut cfg = client_config(&h.url(), "synthetic-linear-head");
-    cfg.expiry_grace_ms = 100;
+    let (srv, seen) = silent_remote().await;
+    let mut cfg = client_config(&srv.url(), "synthetic-linear-head");
+    cfg.transit_margin_ms = 150;
     let (c, _) = connect(cfg).await;
-    let t = Instant::now();
-    let r = call(&c, "b/1", &topic_projection(), 400, &CancelSignal::new()).await;
-    assert!(t.elapsed() < Duration::from_secs(10));
+    let r = call(&c, "b/1", &topic_projection(), 600, &CancelSignal::new()).await;
+    let ended = Instant::now();
+    let (told, arrived) = seen.lock().unwrap().expect("the request arrived");
+    // Told the remaining budget minus the transit margin: at most 450 ms,
+    // and no more than a little dispatch time less.
+    assert!((350..=450).contains(&told), "told {told} ms");
+    // Measured from the request's arrival, so a slow process start does
+    // not count: the wait ends with the budget, never past it.
+    assert!(
+        ended.duration_since(arrived) <= Duration::from_millis(600 + 150),
+        "waited {:?} after the request arrived",
+        ended.duration_since(arrived)
+    );
     failed(&r, RemoteCode::Cancelled, AdapterFailure::Cancelled);
     assert_eq!(
         (r.cancel, r.charge),
@@ -915,16 +934,111 @@ async fn the_budget_bounds_the_wait_and_the_remote_side_is_told_less() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn an_unanswered_standalone_signal_before_sending_is_stopped() {
-    // The attempt has no time to give the remote side after the transit
-    // margin, so nothing is sent, and its expiry answers `stopped`.
+async fn an_attempt_never_outlives_its_budget() {
+    // One total budget (3.4.1): no grace after it, with the default
+    // configuration, even when no runtime raises the signal.
+    let (srv, _) = silent_remote().await;
+    let (c, _) = connect(client_config(&srv.url(), "synthetic-linear-head")).await;
+    let t = Instant::now();
+    let r = call(&c, "b/2", &topic_projection(), 400, &CancelSignal::new()).await;
+    assert!(
+        t.elapsed() < Duration::from_millis(400 + 250),
+        "took {:?}",
+        t.elapsed()
+    );
+    failed(&r, RemoteCode::Cancelled, AdapterFailure::Cancelled);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn no_budget_left_after_the_margin_is_answered_unsent_and_free() {
+    // Nothing can be given to the remote side after the transit margin:
+    // nothing is sent, and the attempt is answered at once, charged zero.
     let (s, _server, h) = topic_server(ServerConfig::default(), |c| ok(c.task(), 1)).await;
     let mut cfg = client_config(&h.url(), "synthetic-linear-head");
     cfg.transit_margin_ms = 5_000;
-    cfg.expiry_grace_ms = 50;
     let (c, _) = connect(cfg).await;
-    let r = call(&c, "z/1", &topic_projection(), 200, &CancelSignal::new()).await;
-    failed(&r, RemoteCode::Cancelled, AdapterFailure::Cancelled);
-    assert_eq!((r.cancel, r.charge), (CancelAck::Stopped, O0));
+    let t = Instant::now();
+    let r = call(&c, "z/1", &topic_projection(), 2_000, &CancelSignal::new()).await;
+    assert!(
+        t.elapsed() < Duration::from_millis(1_000),
+        "{:?}",
+        t.elapsed()
+    );
+    failed(&r, RemoteCode::TransportUnsent, AdapterFailure::Transient);
+    assert_eq!((r.charge, r.remote), (O0, RemoteEnd::Finished));
     assert!(s.dispatched().is_empty());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_remote_transport_code_never_zeroes_a_reported_charge() {
+    // Finding: a remote party sending `transport_unsent` for an item must
+    // not erase the charge it reported; the answer is malformed.
+    let d = linear_head();
+    let srv = canned_backend(d.clone(), terms(), move |req| {
+        let mut v = infer_answer(
+            req,
+            &linear_head(),
+            json!({"failure": {"code": "transport_unsent", "detail": "SYNTHETIC"}}),
+        );
+        v["charge"] = json!({"observed": {"units": 5}});
+        ok_json(&v)
+    })
+    .await;
+    let (c, _) = connect(client_config(&srv.url(), &d.backend_id)).await;
+    let r = call(&c, "tu/1", &topic_projection(), 2_000, &CancelSignal::new()).await;
+    let detail = failed(&r, RemoteCode::MalformedResponse, AdapterFailure::Permanent);
+    assert!(detail.contains("transport_unsent"), "{detail}");
+    assert_eq!(r.charge, Charge::Observed { units: 5 }, "as reported");
+    // A hosted backend's own transport failure reaches the client as a
+    // remote error with its charge, never as a transport code.
+    let (_s, _server, h) = topic_server(ServerConfig::default(), |_| {
+        Answer::Fail(
+            AdapterFailure::Transient,
+            "remote:transport_unsent: SYNTHETIC".into(),
+            Charge::Observed { units: 3 },
+        )
+    })
+    .await;
+    let (c, _) = connect(client_config(&h.url(), "synthetic-linear-head")).await;
+    let r = call(&c, "tu/2", &topic_projection(), 2_000, &CancelSignal::new()).await;
+    failed(&r, RemoteCode::RemoteError, AdapterFailure::Transient);
+    assert_eq!(r.charge, Charge::Observed { units: 3 });
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_unconfirmed_remote_stop_at_the_budget_is_possibly_continuing() {
+    // The told budget runs out and the hosted backend does not confirm a
+    // stop (it ignores the signal, or answers unconfirmed): its work may go
+    // on, so the attempt is not `remote_deadline` and not `finished`.
+    for on in [OnCancel::Ignore, OnCancel::Unconfirmed] {
+        let s = scripted_head(|_| Answer::Gate).with_on_cancel(on);
+        let config = ServerConfig {
+            cancel_wait_ms: 100,
+            ..ServerConfig::default()
+        };
+        let (_server, h) = serve(config, vec![Hosted::new(Arc::new(Handle(s.clone())))]).await;
+        let mut cfg = client_config(&h.url(), "synthetic-linear-head");
+        cfg.transit_margin_ms = 1_500;
+        let (c, _) = connect(cfg).await;
+        let r = call(&c, "ud/1", &topic_projection(), 3_000, &CancelSignal::new()).await;
+        failed(&r, RemoteCode::RemoteError, AdapterFailure::Transient);
+        assert_eq!(
+            (r.charge, r.remote),
+            (Charge::Unknown, RemoteEnd::PossiblyContinuing),
+            "{on:?}"
+        );
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn the_adapter_declares_unspecified_determinism() {
+    // 3.2.2: a remote adapter cannot prove what the remote side declares.
+    let (_s, _server, h) = topic_server(ServerConfig::default(), |c| ok(c.task(), 1)).await;
+    let (c, _) = connect(client_config(&h.url(), "synthetic-linear-head")).await;
+    assert_ne!(linear_head().determinism, Determinism::Unspecified);
+    assert_eq!(c.descriptor().determinism, Determinism::Unspecified);
+    assert_eq!(
+        c.remote_descriptor().0.determinism,
+        linear_head().determinism
+    );
 }

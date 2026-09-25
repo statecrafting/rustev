@@ -530,8 +530,8 @@ adapter reports `RemoteEnd::PossiblyContinuing`, and the runtime records it).
   Hyper, hyper-util, http-body-util, rustls, tokio-rustls and webpki-roots
   are workspace dependencies used only here; `rustev-boundaries` now also
   names hyper-util, http-body and http-body-util as HTTP families.
-- Tests (`cargo test -p rustev-remote-http --locked`, 66): 25 unit tests of
-  Part A; `tests/conformance.rs` (29: every row of 3.6 over loopback
+- Tests (`cargo test -p rustev-remote-http --locked`, 76 after the review
+  fixes below): 30 unit tests; `tests/conformance.rs` (33: every row of 3.6 over loopback
   against scripted backends and a canned responder, each section 6 row that
   ends at the adapter, negotiation, privacy, identity, idempotency, sink
   failure, late responses, reconciliation offers, retained bytes re-mapped
@@ -539,7 +539,8 @@ adapter reports `RemoteEnd::PossiblyContinuing`, and the runtime records it).
   shares 2, 1, 1 of 4 units, a cancelled member reporting `unknown` with the
   rest carrying the charge and the member offered 0, a member withdrawn
   before sending, all members leaving with late shares offered, no sharing
-  across state or decisions); `tests/runtime.rs` (6: both reference plans
+  across state or decisions, and one added by the review fixes);
+  `tests/runtime.rs` (6: both reference plans
   over loopback judge as the in-process rules backend under the same hard
   caps; captured bundles replay with zero hosted calls; best-effort cancel
   and an interrupted transport recorded `possibly_continuing`; an answer
@@ -560,18 +561,41 @@ Engineering choices made by the implementing agent, not by the owner:
   confirmed cancel charge only when no response came back.
 - The transport timeout is checked against the setup budget at
   construction, and every phase limit is also clamped to the attempt's
-  budget. After the budget runs out the client waits up to
-  `expiry_grace_ms` for the runtime's signal before answering as cancelled.
+  budget. When the budget runs out the attempt answers as for cancellation
+  at once; it never waits past the budget for the runtime's signal.
 - The server maps a hosted `permanent` failure to `malformed_request`,
   `transient` to `remote_error` and `overloaded` to `overloaded`, keeping a
   `remote:<code>` prefix of the same class when the hosted detail has one.
   The hosted backend never sees a principal (3.1.3).
+- `remote_error` and `remote_deadline` with charge `unknown` after the
+  request was sent are recorded possibly continuing, like
+  `transport_interrupted` and an unparseable answer (spec 013, 3.1): the
+  remote side failed or gave up without confirming a stop. The server sends
+  `remote_deadline` only when the hosted backend acknowledged `stopped`;
+  otherwise `remote_error` with charge `unknown`.
+- The codes only an adapter observes (`transport_unsent`,
+  `transport_interrupted`) are never trusted from a remote party: in an
+  answer they make the item `malformed_response` with the reported charge,
+  and the server sends a hosted backend's own transport failure as
+  `remote_error`.
+- A remote adapter's descriptor declares determinism `unspecified`, whatever
+  the remote side declares (3.2.2).
 - An answer naming an attempt that was not asked makes every member
   `malformed_response`. An `in_progress` answer is `remote_error` with
   charge `unknown`, possibly continuing. A name offered under `unknown`
   disclosure is kept as the provider extra `served_identity_claim`.
 - The coalescing window starts with the first member and is bounded by its
-  budget; later members with shorter budgets leave on their own signals.
+  budget. An exchange is bounded by its earliest member budget; when it runs
+  out (or leaves nothing to tell the remote side), members whose own budget
+  still runs are answered at once `transport_interrupted` or
+  `transport_unsent`, and the others answer their own signals.
+
+Review fixes (2026-09-24, after independent review): the items above on
+local-only codes, `remote_deadline`, determinism, the batch budget and the
+budget without grace (the former `expiry_grace_ms` option is removed); an
+answer lost to a failed exchange task after sending is possibly continuing
+with charge `unknown`; and the server compares bearer credentials in time
+that depends on their lengths only.
 
 Deferred: per-phase timeouts (one transport timeout covers the exchange);
 HTTP keep-alive and connection reuse; sending the principal handle to a

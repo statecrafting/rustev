@@ -62,6 +62,11 @@ impl SentTracker {
         }
     }
 
+    /// True once [`Self::try_abort`] won: no request byte ever left.
+    pub fn is_aborted(&self) -> bool {
+        self.0.state.load(Ordering::SeqCst) == ABORTED
+    }
+
     /// True once a write began: request bytes may have left the process.
     /// Conservative: a write that began counts even if it failed.
     pub fn may_have_sent(&self) -> bool {
@@ -185,6 +190,7 @@ mod tests {
         assert!(!t.may_have_sent());
         assert!(t.try_abort());
         assert!(t.try_abort(), "idempotent");
+        assert!(t.is_aborted());
         assert!(!t.begin_write());
         assert!(!t.may_have_sent());
     }
