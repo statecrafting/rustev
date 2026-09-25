@@ -1,0 +1,31 @@
+{
+  "mapping": {
+    "amends": [
+      "004-evaluation-and-replay"
+    ],
+    "dependsOn": [
+      "004-evaluation-and-replay",
+      "006-cli-surface"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "docs/decisions/00-founding-decisions.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "specId": "014-report-integrity",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "276eced9a302c73b77c6be7df49debd4d0b5eafc5574f3d12f9841758a2d0357"
+}

@@ -1,0 +1,71 @@
+{
+  "record": {
+    "created": "2026-09-25",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-decision-contract-and-pure-core",
+      "004-evaluation-and-replay",
+      "005-reference-backends",
+      "006-cli-surface",
+      "012-jev-integration"
+    ],
+    "establishes": [
+      {
+        "kind": "directory",
+        "path": "packages/rustev-pkg-support-routing/"
+      }
+    ],
+    "id": "007-support-routing-package",
+    "implementation": "pending",
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "007-reference-package-support-routing": "2bef4611c1a719149ceb1f2ddb819e1b6489d8831fc566bfda0c753b3fa2cabc",
+      "1-purpose": "bb9fe0060a0c8d1c401bde6242a12d38fc2ecea1d488d04522f3ea639af366df",
+      "2-territory": "9175439862c2a9d263da66053f0f775651627690cb7416e02a66db1bc78ad162",
+      "3-1-the-definition": "fefe26334a50dede19766cf9721a45447c9da6da64085c6733a56d9c651c5407",
+      "3-2-evaluation-material": "4611a5f44f4dae38910068f6a18b20b40342c8498ff46f9ee76ea35759bc3478",
+      "3-3-dependencies": "9f0c2ca3e3abedb6bb2249149bfae8e19bf33f6c3c3873f3355de6c7136072e0",
+      "3-4-the-backend-swap": "2a882f01a0fb2c2ec958d58504be67e9d884b07fe4359c8270c17d3d64423c35",
+      "3-behavior": "237795a6a75a0514265faf29431d27e8595a733f7a7fa32495a69ea37e489d59",
+      "4-out-of-scope": "6e1b9637c29fd1a13b5de0af93f0a31b521b335625c8d59584dcb232151ddda0",
+      "5-observable-negative-cases": "346db68e4288b710fe3794b32a7bf6e387bee773203513ca185966084c8b7989",
+      "acceptance": "f5050086d28f484922334bdd4e9f29cc9fdc22864252b9417ba065d9aaa29ce8",
+      "open-questions": "b459218c5906ade4ffda8f4fd5d981600610e9c115d4af1d96ffa7aaead07f03"
+    },
+    "sectionHeadings": [
+      "007: Reference package: support routing",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 The definition",
+      "3.2 Evaluation material",
+      "3.3 Dependencies",
+      "3.4 The backend swap",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Open questions"
+    ],
+    "specPath": "specs/007-support-routing-package/spec.md",
+    "status": "draft",
+    "summary": "The first domain package of increment 3 (design section 16.1, roadmap ordinal 007): `packages/rustev-pkg-support-routing`, a library that publishes the support-routing decision definition, its golden canonical documents, a declarative task adapter and evaluator configuration, and a synthetic labeled dataset, depending only on `rustev-contract` and `rustev-core`. It demonstrates that a domain is a package and not a core change, and that swapping the semantic backend (the rules backend's synthetic head against the Jev integration, spec 012) produces comparable reports with no change in any authority path. Proposal only; claims no code.\n",
+    "title": "Reference package: support routing"
+  },
+  "shardHash": "4dc0c597d997542975838316022e06fcecc7c4617c0a2fe38779799c962d5dcc",
+  "specVersion": "1.8.0"
+}

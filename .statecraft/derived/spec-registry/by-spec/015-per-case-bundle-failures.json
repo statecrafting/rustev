@@ -1,0 +1,57 @@
+{
+  "record": {
+    "amends": [
+      "004-evaluation-and-replay"
+    ],
+    "created": "2026-09-25",
+    "dependsOn": [
+      "004-evaluation-and-replay",
+      "006-cli-surface"
+    ],
+    "id": "015-per-case-bundle-failures",
+    "implementation": "pending",
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "015-per-case-reporting-of-unusable-replay-bundles-amends-004": "c65c237f085a26f1ef3d8a7184fbc62326ddd7c945ed398cd0c3f5c52aa32660",
+      "1-purpose": "84131b051b48f80f538fc75ebc1a4e093d855b61d8314337532d9526bca5f8a4",
+      "2-territory": "ddbf4cc767e5ac1030b019e610584a6435cdd17c68cc56e7a528bd5572f4098f",
+      "3-1-bundle-inputs": "60aaf6c12672f439385472c439a9246296b3bd7f23eedabe601c0c1ecfeafd90",
+      "3-2-reporting": "32ee8f2cd763ae47fd54a60361297c7c80a07cefdd44b1fad87dd32fd2050293",
+      "3-3-the-cli": "8e0d68f1c632a049542ad4465ada680160065bea5c8df084b498f6d3bf8802de",
+      "3-4-compatibility": "37afe92ec35b45bdb2ea1ba43cddc7d57f40d230a03630ccd93b1bd25ab5e49b",
+      "3-behavior": "9e0d7b7beb9571dc2784b5ce3ea32dc05cdc7b28cc73c1f5d74f9b4a7c9b5834",
+      "4-out-of-scope": "59de8b1bb0ff3c1500cf0c636a50b8498bfd03e6c70be47ea53a81f1dc17883a",
+      "5-observable-negative-cases": "ac19f29c91ad047b3b4b6db360af2e4d016b12ccb5957d9a5995064e21d57931",
+      "acceptance": "f9c14a347e69b552e12654db1cff8460eb22e7d7c89f765cb1e32a95306869c0",
+      "open-questions": "d3c20de2864977493413f0bdbecfe42836e860347134e3a5af1db9e30f479864"
+    },
+    "sectionHeadings": [
+      "015: Per-case reporting of unusable replay bundles (amends 004)",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 Bundle inputs",
+      "3.2 Reporting",
+      "3.3 The CLI",
+      "3.4 Compatibility",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Open questions"
+    ],
+    "specPath": "specs/015-per-case-bundle-failures/spec.md",
+    "status": "draft",
+    "summary": "A proposed amendment of approved spec 004 (R-16). Evaluation takes parsed replay bundles only, so a retained bundle whose bytes cannot be read, exceed their limit or do not parse cannot be reported as one incomparable case: a host must either stop the whole evaluation (the CLI's choice, spec 006 E-31) or leave the case out, which the library then reports as `bundle-missing`, misstating corruption as absence. This draft lets the caller supply a typed bundle-load failure per case, reported as incomparable with its own reason, counted in coverage and excluded from quality. Proposal only; claims no code.\n",
+    "title": "Per-case reporting of unusable replay bundles (amends 004)"
+  },
+  "shardHash": "cadef536139e4b07edc615325722bb9c420264c446c18b1b06627190af20e771",
+  "specVersion": "1.8.0"
+}
