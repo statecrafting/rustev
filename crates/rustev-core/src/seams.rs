@@ -80,12 +80,27 @@ pub enum CancelAck {
     Unconfirmed,
 }
 
+/// Whether remote work may outlive a report the adapter returned of its own
+/// accord (spec 013, 3.1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RemoteEnd {
+    /// The remote work, if any, is over as far as the adapter can establish.
+    /// Every in-process backend reports this.
+    Finished,
+    /// Request bytes left the process and nothing establishes that the remote
+    /// side stopped.
+    PossiblyContinuing,
+}
+
 /// What one attempt produced, what it cost and how cancellation went.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AttemptReport {
     pub result: Result<RawOutput, (AdapterFailure, String)>,
     pub charge: Charge,
     pub cancel: CancelAck,
+    /// Read only for a report returned of the adapter's own accord; the
+    /// cancellation path decides from `cancel` (spec 013, 3.2).
+    pub remote: RemoteEnd,
 }
 
 /// Answers semantic requests. States its capabilities and its cost; never

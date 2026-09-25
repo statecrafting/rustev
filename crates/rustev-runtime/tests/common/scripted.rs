@@ -12,7 +12,8 @@ use rustev_contract::descriptor::BackendDescriptor;
 use rustev_contract::output::RawOutput;
 use rustev_contract::run::{Charge, CostBound, CostModel, RunRecord};
 use rustev_core::seams::{
-    AdapterFailure, AttemptCall, AttemptReport, BoxFuture, CancelAck, DecisionBackend, EvidenceSink,
+    AdapterFailure, AttemptCall, AttemptReport, BoxFuture, CancelAck, DecisionBackend,
+    EvidenceSink, RemoteEnd,
 };
 use serde_json::Value as Json;
 use tokio::sync::oneshot;
@@ -67,6 +68,8 @@ pub struct Scripted {
     pub cost_model: Mutex<CostModel>,
     pub bound: Mutex<CostBound>,
     pub on_cancel: Mutex<OnCancel>,
+    /// The remote end every report states (spec 013, 3.1).
+    pub remote: Mutex<RemoteEnd>,
     /// Runs inside `cost_bound`, before it answers.
     pub before_bound: Mutex<Option<Box<dyn Fn() + Send + Sync>>>,
     answer: Box<AnswerFn>,
@@ -86,6 +89,7 @@ impl Scripted {
             cost_model: Mutex::new(CostModel::Bounded),
             bound: Mutex::new(CostBound::Bounded { max_units: 1 }),
             on_cancel: Mutex::new(OnCancel::Ignore),
+            remote: Mutex::new(RemoteEnd::Finished),
             before_bound: Mutex::new(None),
             answer: Box::new(answer),
             events: Mutex::new(vec![]),
@@ -97,6 +101,11 @@ impl Scripted {
     pub fn with_cost(self: Arc<Self>, model: CostModel, bound: CostBound) -> Arc<Self> {
         *self.cost_model.lock().unwrap() = model;
         *self.bound.lock().unwrap() = bound;
+        self
+    }
+
+    pub fn with_remote(self: Arc<Self>, remote: RemoteEnd) -> Arc<Self> {
+        *self.remote.lock().unwrap() = remote;
         self
     }
 
@@ -141,11 +150,16 @@ impl Scripted {
     }
 }
 
-fn report(result: Result<RawOutput, (AdapterFailure, String)>, charge: Charge) -> AttemptReport {
+fn report(
+    result: Result<RawOutput, (AdapterFailure, String)>,
+    charge: Charge,
+    remote: RemoteEnd,
+) -> AttemptReport {
     AttemptReport {
         result,
         charge,
         cancel: CancelAck::NotRequested,
+        remote,
     }
 }
 
@@ -236,6 +250,7 @@ impl DecisionBackend for Handle {
                                         result: Err((AdapterFailure::Cancelled, "stopped".into())),
                                         charge,
                                         cancel: CancelAck::Stopped,
+                                        remote: *s.remote.lock().unwrap(),
                                     };
                                 }
                                 OnCancel::Unconfirmed => {
@@ -248,6 +263,7 @@ impl DecisionBackend for Handle {
                                         )),
                                         charge: Charge::Unknown,
                                         cancel: CancelAck::Unconfirmed,
+                                        remote: *s.remote.lock().unwrap(),
                                     };
                                 }
                                 OnCancel::Ignore => std::future::pending::<Answer>().await,
@@ -258,8 +274,8 @@ impl DecisionBackend for Handle {
                 a => a,
             };
             let r = match answer {
-                Answer::Output(o, c) => report(Ok(o), c),
-                Answer::Fail(f, d, c) => report(Err((f, d)), c),
+                Answer::Output(o, c) => report(Ok(o), c, *s.remote.lock().unwrap()),
+                Answer::Fail(f, d, c) => report(Err((f, d)), c, *s.remote.lock().unwrap()),
                 Answer::Panic => panic!("scripted adapter panic"),
                 Answer::Gate => std::future::pending::<AttemptReport>().await,
             };

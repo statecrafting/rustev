@@ -28,7 +28,7 @@ use rustev_contract::snapshot::Snapshot;
 use rustev_contract::time::Timestamp;
 use rustev_core::seams::{
     AdapterFailure, AttemptCall, AttemptReport, BoxFuture, CancelAck, CancelSignal,
-    DecisionBackend, EvidenceSink,
+    DecisionBackend, EvidenceSink, RemoteEnd,
 };
 use rustev_core::{Compiled, compile_with};
 use rustev_eval::assemble::{AssemblyInput, Content, RetentionChoice, assemble};
@@ -207,6 +207,7 @@ impl DecisionBackend for ProbeHandle {
                 result: Err((f, "SYNTHETIC failure".into())),
                 charge: Charge::Observed { units: 1 },
                 cancel: CancelAck::NotRequested,
+                remote: RemoteEnd::Finished,
             };
             match behavior {
                 Behavior::Fail(f) => return fail(f),

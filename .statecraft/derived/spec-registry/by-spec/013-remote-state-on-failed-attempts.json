@@ -40,10 +40,18 @@
           "kind": "directory",
           "path": "crates/rustev-eval/"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
       }
     ],
     "id": "013-remote-state-on-failed-attempts",
-    "implementation": "pending",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-2-runtime-derivation",
@@ -68,7 +76,7 @@
       }
     ],
     "sectionDigests": {
-      "013-remote-state-on-attempts-that-end-without-a-stop-amends-003": "aab5e9d2f7f9a23399333429f91e2af65ae0b8b899efb08cb3b1216aa9cd4d19",
+      "013-remote-state-on-attempts-that-end-without-a-stop-amends-003": "77c52914fc1a16a2d6900abc7cde0f3b4027d882f2cc34b90b6ad48e4b192e22",
       "1-purpose": "054d23e01905baacbfc642b68a01118142f4fe5e8b69f2168b2f485ac6c2a328",
       "2-territory": "aa682f5b3a9b7e276b89512894e8ee6ee2d3dfaf15b2c775c435ffbd2c3cef59",
       "3-1-the-attempt-report": "aaa985e8ce68b05268f4b0befda1bd2bfece8ab480980a70e72512ec357fe58d",
@@ -77,8 +85,9 @@
       "3-behavior": "711f588821a6ed204a0b7080503da1dea7ac58e4e3b401c27ce175c920ec3927",
       "4-out-of-scope": "8171fdec67211a083b2a5510cc988235816ad34adb0b968b4769b6459cf9ee2e",
       "5-observable-negative-cases": "3db4090261b6a7967a7390931ce36c3329eb1f2e25517599f5762da5c1e1a1f2",
-      "acceptance-planned": "351a5bc0e029e6f3358a3e9fc65714bc0fc25f802a45c7d41f6e42e2004d889b",
-      "verification": "24a113e9f03a85f1af25642be42583cf7c14fbc7d40e6b1508749cc3613a99a8"
+      "acceptance": "7c61c3f0b0b4195302442d5cd7d7243dcd0f72b89ee4d8b8726ff0e87f9010d8",
+      "implementation-record": "cd32e9e1a0e1c662938c17b468ff7bee299a61a2a6860a14ffd7b2ac398e502e",
+      "verification": "ab07cdb0ba2a19ba7b0e1327c8b30defdadd95120e64f2515e7db8670a73b42c"
     },
     "sectionHeadings": [
       "013: Remote state on attempts that end without a stop (amends 003)",
@@ -90,14 +99,15 @@
       "3.3 Compatibility",
       "4. Out of scope",
       "5. Observable negative cases",
-      "Acceptance (planned)",
+      "Acceptance",
+      "Implementation record",
       "Verification"
     ],
     "specPath": "specs/013-remote-state-on-failed-attempts/spec.md",
     "status": "approved",
-    "summary": "A separately reviewable amendment of approved spec 003 (R-16), chosen by the owner in R-28 for the gap spec 009 5.1 records: the runtime derives `possibly_continuing` only from cancellation, so an attempt whose request left the process and whose connection then failed is recorded as `finished` although remote work and charges may continue. This adds one field to the attempt report through which an adapter states that remote work may continue, and one derivation rule in the runtime. The `rustev.run/1` schema and every existing record's bytes are unchanged. Approved (A-07); implementation pending.\n",
+    "summary": "A separately reviewable amendment of approved spec 003 (R-16), chosen by the owner in R-28 for the gap spec 009 5.1 records: the runtime derives `possibly_continuing` only from cancellation, so an attempt whose request left the process and whose connection then failed is recorded as `finished` although remote work and charges may continue. This adds one field to the attempt report through which an adapter states that remote work may continue, and one derivation rule in the runtime. The `rustev.run/1` schema and every existing record's bytes are unchanged. Approved (A-07) and implemented.\n",
     "title": "Remote state on attempts that end without a stop (amends 003)"
   },
-  "shardHash": "7f0677a10e2f204af23ecea4e1490f46f45ca1628e2431560c87410b3e369e26",
+  "shardHash": "495f0a2f06e2f06d59d846709708027e60e70c8399838b8d209eed45e5e9958c",
   "specVersion": "1.8.0"
 }
