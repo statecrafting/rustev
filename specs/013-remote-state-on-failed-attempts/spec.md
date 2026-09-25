@@ -2,7 +2,7 @@
 id: "013-remote-state-on-failed-attempts"
 title: "Remote state on attempts that end without a stop (amends 003)"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-24"
 summary: >
   A separately reviewable amendment of approved spec 003 (R-16), chosen by
@@ -13,7 +13,7 @@ summary: >
   field to the attempt report through which an adapter states that remote
   work may continue, and one derivation rule in the runtime. The
   `rustev.run/1` schema and every existing record's bytes are unchanged.
-  Approved (A-07); implementation pending.
+  Approved (A-07) and implemented.
 amends:
   - "003-runtime-execution-and-evidence"
 extends:
@@ -25,6 +25,8 @@ extends:
   # value that keeps their behavior; no behavior of theirs changes.
   - { spec: "005-reference-backends", unit: { kind: directory, path: "backends/rustev-backend-rules/" }, nature: additive }
   - { spec: "004-evaluation-and-replay", unit: { kind: directory, path: "crates/rustev-eval/" }, nature: additive }
+  # Adds 013 to `make verify`.
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
 depends_on:
   - "003-runtime-execution-and-evidence"
   - "009-remote-adapter-protocol"
@@ -43,7 +45,8 @@ obligations:
 
 # 013: Remote state on attempts that end without a stop (amends 003)
 
-Approved (A-07, 2026-09-24), not implemented. An amendment, reviewed and
+Approved (A-07, 2026-09-24) and implemented; see the implementation
+record. An amendment, reviewed and
 approved on its own before any code, as R-16 requires for a substantive
 change to approved behavior. The owner
 chose it over accepting the limitation (R-28, item 4). Spec 003's approved
@@ -122,15 +125,31 @@ change to cancellation acknowledgements.
 | The rules backend runs both reference plans | Run records byte-identical to those before the amendment. |
 | A report with `remote: PossiblyContinuing` arrives after the runtime raised the signal | Derived from `CancelAck` exactly as before. |
 
-## Acceptance (planned)
+## Acceptance
 
 - Runtime tests cover each row of section 5 with scripted backends.
 - The existing runtime, eval, rules-backend and CLI suites pass, and a
   recorded golden run record for each reference plan is byte-identical.
 
-## Verification
+## Implementation record
 
-Planned; not run until this amendment is delivered.
+- `RemoteEnd` and `AttemptReport::remote` in `crates/rustev-core/src/seams.rs`.
+- `crates/rustev-runtime/src/driver.rs`: a report returned of the adapter's
+  own accord with `PossiblyContinuing`, while the attempt's signal is not
+  raised, is recorded `possibly_continuing` with charge `unknown`. A report
+  that raced a raised signal keeps the approved derivation (`Finished`, the
+  reported charge); an adapter-cancelled report is derived from `CancelAck`.
+- Every existing constructor (rules backend, runtime and eval scripted
+  backends) sets `Finished`. The scripted runtime backend gained
+  `with_remote` for the tests.
+- Section 5, one test per row: `crates/rustev-runtime/tests/remote_state.rs`
+  (liability kept and reconcilable; `Finished` unchanged; the cancellation
+  path decides by acknowledgement). Byte identity: the existing CLI goldens
+  for both reference plans (`crates/rustev-cli/tests/`) and every existing
+  runtime, eval and rules-backend test pass unchanged apart from
+  constructing the field.
+
+## Verification
 
 ```verify:cli
 cargo test -p rustev-core --locked

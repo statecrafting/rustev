@@ -23,7 +23,7 @@ use rustev_contract::run::{
 use rustev_contract::time::DurationMs;
 use rustev_core::evaluate::{Evaluation, SemanticRequest, Supplied};
 use rustev_core::seams::{
-    AdapterFailure, AttemptCall, AttemptReport, CallContext, CancelAck, CancelSignal,
+    AdapterFailure, AttemptCall, AttemptReport, CallContext, CancelAck, CancelSignal, RemoteEnd,
 };
 
 use crate::capture::Capturing;
@@ -596,13 +596,16 @@ async fn attempt(
             } else {
                 Cancellation::NotRequested
             };
-            return (
-                ended,
-                cancellation,
-                RemoteState::Finished,
-                report.charge,
-                dispatched_ms,
-            );
+            // An adapter that says its request may still be running is
+            // recorded so, and its charge stays liability (spec 013, 3.2).
+            // A completion that raced a raised signal is derived as before.
+            let (remote, charge) = match report.remote {
+                RemoteEnd::PossiblyContinuing if !signal.is_raised() => {
+                    (RemoteState::PossiblyContinuing, Charge::Unknown)
+                }
+                _ => (RemoteState::Finished, report.charge),
+            };
+            return (ended, cancellation, remote, charge, dispatched_ms);
         }
         Raced::Done(Err(panic)) => {
             return (

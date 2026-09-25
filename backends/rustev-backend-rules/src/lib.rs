@@ -32,7 +32,8 @@ use rustev_contract::ids::ArtifactId;
 use rustev_contract::run::{Charge, CostBound, CostModel};
 use rustev_contract::schema;
 use rustev_core::seams::{
-    AdapterFailure, AttemptCall, AttemptReport, BoxFuture, CancelAck, CancelSignal, DecisionBackend,
+    AdapterFailure, AttemptCall, AttemptReport, BoxFuture, CancelAck, CancelSignal,
+    DecisionBackend, RemoteEnd,
 };
 
 pub use check::{PlanMismatch, PlanMismatchKind};
@@ -175,11 +176,13 @@ impl DecisionBackend for RulesBackend {
                     result: Ok(output),
                     charge,
                     cancel: CancelAck::NotRequested,
+                    remote: RemoteEnd::Finished,
                 },
                 Evaluated::Failed(detail) => AttemptReport {
                     result: Err((AdapterFailure::Permanent, detail)),
                     charge,
                     cancel: CancelAck::NotRequested,
+                    remote: RemoteEnd::Finished,
                 },
                 // A local evaluation that observed the signal has stopped;
                 // there is no remote work (3.13.2).
@@ -187,6 +190,7 @@ impl DecisionBackend for RulesBackend {
                     result: Err((AdapterFailure::Cancelled, format!("cancelled {point}"))),
                     charge,
                     cancel: CancelAck::Stopped,
+                    remote: RemoteEnd::Finished,
                 },
             }
         })

@@ -9,6 +9,10 @@
     ],
     "implementingPaths": [
       {
+        "path": "Makefile",
+        "source": "spec-edge"
+      },
+      {
         "path": "backends/rustev-backend-rules/",
         "source": "spec-edge"
       },
@@ -81,6 +85,19 @@
       {
         "locations": [
           {
+            "file": "Makefile"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "docs/decisions/00-founding-decisions.md"
           }
         ],
@@ -96,5 +113,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "6312eca9e9b3999470a116e4ee0c368cd1e68ea6f6b677e25f5f704fa6121325"
+  "shardHash": "9e10a3ff5b1b9239b7e43484834a1efde06f8a68efd7846afef2a091abe55835"
 }
