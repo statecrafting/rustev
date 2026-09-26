@@ -630,16 +630,20 @@ were comparable:
 
 **Cost** (testing journal, nano-USD units).
 
-- The journal has 293 reservations and 293 settlements: 80 observed and 213
-  unknown. Attempt ids record 131 attempts numbered above one across Stage 3;
-  the calibration run made 34 attempts for 28 decisions, including 6 retry
+- Stage 3 has 287 reservations and 287 settlements: 22 batched and 265
+  unbatched. With 6 earlier smoke and probe attempts, the whole testing journal
+  has 293 reservations and 293 settlements: 80 observed and 213 unknown.
+  Attempt ids record 131 attempts numbered above one across Stage 3; the
+  calibration run made 34 attempts for 28 decisions, including 6 retry
   attempts for one decision.
 - Observed Gateway charges: 1,421,364 units (USD 0.001421364). The calibration
   run added 971,292 units. Retained exchange bodies report USD 0.001983828 in
   `marketCost`; the journal, rather than that provider statistic, governs the
   cap.
-- Maximum liability held for unknown charges: 11,039,490 units
-  (USD 0.011039490). The calibration retries added 347,214 units.
+- Maximum Stage 3 liability held for unknown charges: 11,020,128 units
+  (USD 0.011020128). The calibration retries added 347,214 units to the prior
+  10,672,914. The earlier ZDR probe adds 19,362 units, making the whole-journal
+  maximum unresolved liability 11,039,490 units (USD 0.011039490).
 - Pessimistic cap consumption is observed plus maximum unresolved liability,
   USD 0.012460854. USD 4.987539146 remains under the USD 5 testing cap (R-29).
 - The raw exchange bodies of the 11 relevance decisions were lost when the
