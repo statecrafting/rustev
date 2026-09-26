@@ -347,9 +347,12 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-util",
+ "rustev-backend-rules",
+ "rustev-cli",
  "rustev-contract",
  "rustev-core",
  "rustev-eval",
+ "rustev-pkg-support-routing",
  "rustev-runtime",
  "rustls",
  "serde",
@@ -358,6 +361,20 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "webpki-roots",
+]
+
+[[package]]
+name = "rustev-pkg-support-routing"
+version = "0.1.0"
+dependencies = [
+ "rustev-backend-rules",
+ "rustev-cli",
+ "rustev-contract",
+ "rustev-core",
+ "rustev-eval",
+ "rustev-runtime",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]

@@ -1,0 +1,11 @@
+{
+  "package": {
+    "kind": "rust-lib",
+    "name": "rustev-pkg-support-routing",
+    "path": "packages/rustev-pkg-support-routing",
+    "specRef": "007-support-routing-package",
+    "version": "0.1.0"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "e81ab4748eb97997da89002e6f6bc9ce8a3cdb3dc98ce02507fd4d5ee2a06715"
+}

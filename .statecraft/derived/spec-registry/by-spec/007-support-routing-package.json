@@ -15,8 +15,50 @@
         "path": "packages/rustev-pkg-support-routing/"
       }
     ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-boundaries/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "012-jev-integration",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-jev/"
+        }
+      }
+    ],
     "id": "007-support-routing-package",
-    "implementation": "pending",
+    "implementation": "complete",
     "references": [
       {
         "role": "context",
@@ -34,7 +76,7 @@
       }
     ],
     "sectionDigests": {
-      "007-reference-package-support-routing": "fd89fc932a7ac300a45bdaa57f95f191cde2c3740aeeb8e679ce66e96b3ba058",
+      "007-reference-package-support-routing": "8dbeb6135d3a55da23977469ae44f0c2f46de9763390f8fea39cf07ff8e5b4e7",
       "1-purpose": "bb9fe0060a0c8d1c401bde6242a12d38fc2ecea1d488d04522f3ea639af366df",
       "2-territory": "9175439862c2a9d263da66053f0f775651627690cb7416e02a66db1bc78ad162",
       "3-1-the-definition": "fefe26334a50dede19766cf9721a45447c9da6da64085c6733a56d9c651c5407",
@@ -45,7 +87,9 @@
       "4-out-of-scope": "6e1b9637c29fd1a13b5de0af93f0a31b521b335625c8d59584dcb232151ddda0",
       "5-observable-negative-cases": "346db68e4288b710fe3794b32a7bf6e387bee773203513ca185966084c8b7989",
       "acceptance": "f5050086d28f484922334bdd4e9f29cc9fdc22864252b9417ba065d9aaa29ce8",
-      "open-questions": "e6f49167f3a6f80f4555568db1c5f5f8241c94e9e20c914ea7f983f336053fd9"
+      "implementation-record": "1de0a22e8f690e677cff32beaa557dac5f78422780f8bd0e9c3172d8bd2337f1",
+      "open-questions": "e6f49167f3a6f80f4555568db1c5f5f8241c94e9e20c914ea7f983f336053fd9",
+      "verification": "bb497c5e482367b12f8f9e86edb8b39f8b4f6c674db199c54f8c0f8d7cffd71a"
     },
     "sectionHeadings": [
       "007: Reference package: support routing",
@@ -59,13 +103,15 @@
       "4. Out of scope",
       "5. Observable negative cases",
       "Acceptance",
+      "Implementation record",
+      "Verification",
       "Open questions"
     ],
     "specPath": "specs/007-support-routing-package/spec.md",
     "status": "approved",
-    "summary": "The first domain package of increment 3 (design section 16.1, roadmap ordinal 007): `packages/rustev-pkg-support-routing`, a library that publishes the support-routing decision definition, its golden canonical documents, a declarative task adapter and evaluator configuration, and a synthetic labeled dataset, depending only on `rustev-contract` and `rustev-core`. It demonstrates that a domain is a package and not a core change, and that swapping the semantic backend (the rules backend's synthetic head against the Jev integration, spec 012) produces comparable reports with no change in any authority path. Approved (A-12, 2026-09-25); implementation pending.\n",
+    "summary": "The first domain package of increment 3 (design section 16.1, roadmap ordinal 007): `packages/rustev-pkg-support-routing`, a library that publishes the support-routing decision definition, its golden canonical documents, a declarative task adapter and evaluator configuration, and a synthetic labeled dataset, depending only on `rustev-contract` and `rustev-core`. It demonstrates that a domain is a package and not a core change, and that swapping the semantic backend (the rules backend's synthetic head against the Jev integration, spec 012) produces comparable reports with no change in any authority path. Approved (A-12, 2026-09-25) and amended by 016 (A-13, 2026-09-26); implemented.\n",
     "title": "Reference package: support routing"
   },
-  "shardHash": "d24690863f14d7400a3ad69553a1beec3e1e6726e63b284e2d9350a8c5b8cb3f",
+  "shardHash": "5ec05ad800b8f34c286ff4139b254a0b60def3c9b5d5dd0057c1f0015c00dc14",
   "specVersion": "1.8.0"
 }
