@@ -1,0 +1,30 @@
+# The dependency rules of spec 001 section 3.4 (`make boundaries`), a
+# reusable workflow that ci-gate calls and requires (ci.extra_required_jobs).
+# Not rendered by the setup profile: owned by spec 001.
+name: boundaries
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  boundaries:
+    name: boundaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Cache cargo registry, git and target
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: boundaries-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: |
+            boundaries-${{ runner.os }}-
+      - name: Dependency boundaries
+        run: make boundaries

@@ -48,6 +48,7 @@ target
 # decision made on your behalf. To choose the second, add:
 #
 #   .statecraft/derived/
+# The repository-local spec-spine the setup profile installs.
 # <<< statecraft managed ignores <<<
 
 # macOS Finder metadata.
