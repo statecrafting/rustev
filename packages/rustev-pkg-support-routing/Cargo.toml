@@ -1,0 +1,29 @@
+[package]
+name = "rustev-pkg-support-routing"
+version = "0.1.0"
+description = "Rustev reference package: the support-routing decision definition, its evaluation material and a SYNTHETIC dataset."
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[package.metadata.spec-spine]
+spec = "007-support-routing-package"
+
+# Contract and core only (spec 007 3.3.1); `make boundaries` enforces it.
+[dependencies]
+rustev-contract = { path = "../../crates/rustev-contract" }
+rustev-core = { path = "../../crates/rustev-core" }
+
+# The runtime, a backend, eval and the CLI run the package's own tests only.
+[dev-dependencies]
+rustev-runtime = { path = "../../crates/rustev-runtime" }
+rustev-eval = { path = "../../crates/rustev-eval" }
+rustev-cli = { path = "../../crates/rustev-cli" }
+rustev-backend-rules = { path = "../../backends/rustev-backend-rules" }
+serde_json.workspace = true
+tokio = { workspace = true, features = ["rt", "macros", "sync", "time"] }
+
+[lints]
+workspace = true

@@ -30,10 +30,16 @@ rustls.workspace = true
 tokio-rustls.workspace = true
 webpki-roots.workspace = true
 
-# The eval crate and a multi-threaded Tokio are for the tests and the smoke
-# harness only; hyper's server side serves the loopback fake Gateway.
+# The eval crate, the support-routing swap crates and a multi-threaded Tokio
+# are for the tests and the smoke harness only; hyper's server side serves
+# the loopback fake Gateway.
 [dev-dependencies]
 rustev-eval = { path = "../../crates/rustev-eval" }
+# The support-routing backend swap (spec 016 3.3): the package, spec 005's
+# rules program as the other backend, and the CLI that evaluates bundles.
+rustev-pkg-support-routing = { path = "../../packages/rustev-pkg-support-routing" }
+rustev-backend-rules = { path = "../../backends/rustev-backend-rules" }
+rustev-cli = { path = "../../crates/rustev-cli" }
 hyper = { workspace = true, features = ["client", "server", "http1"] }
 tokio = { workspace = true, features = ["net", "time", "rt", "rt-multi-thread", "sync", "macros", "io-util", "test-util"] }
 

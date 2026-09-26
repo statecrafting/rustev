@@ -3,7 +3,7 @@
 # manifest (an `extends` edge) and claims the directory itself.
 [workspace]
 resolver = "3"
-members = ["crates/*", "backends/*", "tools/*", "integrations/*"]
+members = ["crates/*", "backends/*", "tools/*", "integrations/*", "packages/*"]
 
 [workspace.package]
 edition = "2024"

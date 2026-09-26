@@ -1,4 +1,5 @@
-//! The workspace dependency rules of spec 001, section 3.4, checked over the
+//! The workspace dependency rules of spec 001, section 3.4, and the package
+//! rule of spec 007, section 3.3.1, checked over the
 //! output of `cargo metadata --format-version 1`.
 //!
 //! The forbidden families are a conservative denylist matched by package name
@@ -41,6 +42,9 @@ pub const EXECUTORS: &[&str] = &[
 
 /// The crates whose whole normal and build dependency graph is checked.
 pub const PURE_CRATES: &[&str] = &["rustev-contract", "rustev-core"];
+/// The only normal or build dependencies a crate under `packages/` may have
+/// (design section 15; spec 007, 3.3.1).
+pub const PACKAGE_DEPENDENCIES: &[&str] = &["rustev-contract", "rustev-core"];
 
 /// The subset of `cargo metadata` output this check reads.
 #[derive(Debug, Deserialize)]
@@ -100,6 +104,10 @@ pub enum Violation {
     /// 3.4.5: `rustev-contract` depends on a workspace crate, or `rustev-core`
     /// on one other than `rustev-contract`.
     WorkspaceEdge { krate: String, dependency: String },
+    /// Spec 007 3.3.1 (design section 15): a crate under `packages/` has a
+    /// normal or build dependency other than `rustev-contract` and
+    /// `rustev-core`.
+    PackageDependency { krate: String, dependency: String },
 }
 
 impl fmt::Display for Violation {
@@ -121,6 +129,10 @@ impl fmt::Display for Violation {
             Violation::WorkspaceEdge { krate, dependency } => write!(
                 f,
                 "001 3.4.5: `{krate}` may not depend on the workspace crate `{dependency}`"
+            ),
+            Violation::PackageDependency { krate, dependency } => write!(
+                f,
+                "007 3.3.1 package rule: `{krate}` is a package and may depend only on rustev-contract and rustev-core, not `{dependency}`"
             ),
         }
     }
@@ -156,6 +168,10 @@ fn under_integrations(rel: &str) -> bool {
     rel == "integrations" || rel.starts_with("integrations/")
 }
 
+fn under_packages(rel: &str) -> bool {
+    rel.starts_with("packages/")
+}
+
 /// Every violation of spec 001 3.4, sorted.
 pub fn check(meta: &Metadata) -> Vec<Violation> {
     let mut out = BTreeSet::new();
@@ -176,6 +192,7 @@ pub fn check(meta: &Metadata) -> Vec<Violation> {
     for pkg in &members {
         let rel = relative_dir(&meta.workspace_root, &pkg.manifest_path);
         let in_integrations = under_integrations(&rel);
+        let in_packages = under_packages(&rel);
         for dep in &pkg.dependencies {
             let dep_under_integrations = dep
                 .path
@@ -200,6 +217,12 @@ pub fn check(meta: &Metadata) -> Vec<Violation> {
                 });
             }
             let is_dev = dep.kind.as_deref() == Some("dev");
+            if in_packages && !is_dev && !PACKAGE_DEPENDENCIES.contains(&dep.name.as_str()) {
+                out.insert(Violation::PackageDependency {
+                    krate: pkg.name.clone(),
+                    dependency: dep.name.clone(),
+                });
+            }
             if member_names.contains(dep.name.as_str()) && !is_dev {
                 let allowed = match pkg.name.as_str() {
                     "rustev-contract" => false,
@@ -230,10 +253,11 @@ pub fn check(meta: &Metadata) -> Vec<Violation> {
                 (n.id.as_str(), deps)
             })
             .collect();
-        for pkg in members
-            .iter()
-            .filter(|p| PURE_CRATES.contains(&p.name.as_str()))
-        {
+        // Packages are as pure as the core (spec 007, 3.3.2).
+        for pkg in members.iter().filter(|p| {
+            PURE_CRATES.contains(&p.name.as_str())
+                || under_packages(&relative_dir(&meta.workspace_root, &p.manifest_path))
+        }) {
             if let Some(path) = forbidden_path(&graph, &by_id, &pkg.id) {
                 out.insert(Violation::ForbiddenTransitive {
                     krate: pkg.name.clone(),
@@ -629,6 +653,94 @@ mod tests {
                 dependency: "rustev-runtime".into()
             }]
         );
+    }
+
+    const PACKAGE: &str = "packages/rustev-pkg-x";
+
+    #[test]
+    fn a_package_on_contract_and_core_with_dev_only_extras_passes() {
+        let m = meta(
+            &[
+                CONTRACT,
+                CORE,
+                ("rustev-runtime", "crates/rustev-runtime", &[]),
+                (
+                    "rustev-pkg-x",
+                    PACKAGE,
+                    &[
+                        ("rustev-contract", None, Some("crates/rustev-contract")),
+                        ("rustev-core", None, Some("crates/rustev-core")),
+                        ("rustev-runtime", Some("dev"), Some("crates/rustev-runtime")),
+                        ("tokio", Some("dev"), None),
+                    ],
+                ),
+            ],
+            &["serde", "tokio"],
+            &[
+                ("rustev-core", "rustev-contract", None),
+                ("rustev-pkg-x", "rustev-core", None),
+                ("rustev-pkg-x", "tokio", Some("dev")),
+            ],
+        );
+        assert_eq!(check(&m), vec![]);
+    }
+
+    #[test]
+    fn a_package_with_a_normal_dependency_on_the_runtime_fails_naming_the_rule() {
+        for kind in [None, Some("build")] {
+            let deps: &[Dep<'_>] = &[
+                ("rustev-contract", None, Some("crates/rustev-contract")),
+                ("rustev-runtime", kind, Some("crates/rustev-runtime")),
+            ];
+            let m = meta(
+                &[
+                    CONTRACT,
+                    ("rustev-runtime", "crates/rustev-runtime", &[]),
+                    ("rustev-pkg-x", PACKAGE, deps),
+                ],
+                &["serde"],
+                &[],
+            );
+            let v = check(&m);
+            assert_eq!(
+                v,
+                vec![Violation::PackageDependency {
+                    krate: "rustev-pkg-x".into(),
+                    dependency: "rustev-runtime".into()
+                }],
+                "{kind:?}"
+            );
+            assert!(v[0].to_string().contains("007 3.3.1 package rule"));
+        }
+    }
+
+    #[test]
+    fn a_package_reaching_an_executor_through_its_graph_fails() {
+        let m = meta(
+            &[
+                CONTRACT,
+                (
+                    "rustev-pkg-x",
+                    PACKAGE,
+                    &[("rustev-contract", None, Some("crates/rustev-contract"))],
+                ),
+            ],
+            &["serde", "helper", "tokio"],
+            &[
+                ("rustev-pkg-x", "rustev-contract", None),
+                ("rustev-contract", "helper", None),
+                ("helper", "tokio", None),
+            ],
+        );
+        assert!(check(&m).contains(&Violation::ForbiddenTransitive {
+            krate: "rustev-pkg-x".into(),
+            path: vec![
+                "rustev-pkg-x".into(),
+                "rustev-contract".into(),
+                "helper".into(),
+                "tokio".into()
+            ],
+        }));
     }
 
     #[test]

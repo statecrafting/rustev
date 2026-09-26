@@ -1,14 +1,4 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '007-support-routing-package' directory unit 'packages/rustev-pkg-support-routing/' is not a directory",
-        "path": "packages/rustev-pkg-support-routing/"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "001-boundaries-and-authority",
@@ -18,15 +8,113 @@
       "006-cli-surface",
       "012-jev-integration"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "Cargo.lock",
+        "source": "spec-edge"
+      },
+      {
+        "path": "Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "Makefile",
+        "source": "spec-edge"
+      },
+      {
+        "path": "integrations/rustev-jev/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "packages/rustev-pkg-support-routing",
+        "source": "manifest-metadata"
+      },
+      {
+        "path": "packages/rustev-pkg-support-routing/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "tools/rustev-boundaries/",
+        "source": "spec-edge"
+      }
+    ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "packages/rustev-pkg-support-routing/"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
           "kind": "directory",
           "path": "packages/rustev-pkg-support-routing/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "integrations/rustev-jev/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-jev/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "tools/rustev-boundaries/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-boundaries/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.lock"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Makefile"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
         }
       },
       {
@@ -60,5 +148,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "2f38d5e4e728318f71f6abc8a03dfd904158c64d1fd83bbe07c9fd5db0d41fc2"
+  "shardHash": "7313b05a290f58b4097f465c31bf2b5d501d7c0cde5fc43647e85467bdc07428"
 }

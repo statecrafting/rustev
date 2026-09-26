@@ -1,0 +1,1 @@
+{"labels":{"prefixes":[],"values":["normal","high","urgent"]},"name":"support-routing.priority","rules":[{"action":"route_ticket","map":{"high":"high","normal":"normal","urgent":"urgent"},"otherwise":null,"param":"priority","select":"enum"}],"schema":"rustev.task-adapter/1","version":"1"}

@@ -1,0 +1,1702 @@
+{
+ "recorded_at": null,
+ "provenance": "SYNTHETIC: hand-written Gateway responses for the support-routing backend swap (spec 007 3.4, spec 016), in the shape of the recorded calls of C-11, one per case and question type (choice: topic, score: frustration, boolean: explicit_deadline); not recorded calls and not evidence of the provider's behavior",
+ "cases": [
+  {
+   "case": "sr-t01",
+   "message": "SYNTHETIC: I was charged twice for my subscription and need a refund by Friday.",
+   "responses": {
+    "choice": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "choice",
+       "choice": "billing",
+       "probabilities": {
+        "billing": 0.93,
+        "integration_defect": 0.023333,
+        "account_access": 0.023333,
+        "other": 0.023334
+       },
+       "confidence": 0.93
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    },
+    "score": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "score",
+       "score": 1.0,
+       "probabilities": {
+        "0": 0.2,
+        "1": 0.6,
+        "2": 0.2
+       },
+       "confidence": 0.6
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    },
+    "boolean": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "boolean",
+       "probability": 0.9
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    }
+   }
+  },
+  {
+   "case": "sr-t02",
+   "message": "SYNTHETIC: Our webhook deliveries fail with error code 502 since your last release.",
+   "responses": {
+    "choice": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "choice",
+       "choice": "integration_defect",
+       "probabilities": {
+        "billing": 0.033333,
+        "integration_defect": 0.9,
+        "account_access": 0.033333,
+        "other": 0.033334
+       },
+       "confidence": 0.9
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    },
+    "score": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "score",
+       "score": 0.35,
+       "probabilities": {
+        "0": 0.7,
+        "1": 0.25,
+        "2": 0.05
+       },
+       "confidence": 0.7
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    },
+    "boolean": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "boolean",
+       "probability": 0.05
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    }
+   }
+  },
+  {
+   "case": "sr-t03",
+   "message": "SYNTHETIC: I am locked out after resetting my password and the 2FA code never arrives.",
+   "responses": {
+    "choice": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "choice",
+       "choice": "account_access",
+       "probabilities": {
+        "billing": 0.04,
+        "integration_defect": 0.04,
+        "account_access": 0.88,
+        "other": 0.04
+       },
+       "confidence": 0.88
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    },
+    "score": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "score",
+       "score": 0.8,
+       "probabilities": {
+        "0": 0.3,
+        "1": 0.6,
+        "2": 0.1
+       },
+       "confidence": 0.6
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    },
+    "boolean": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "boolean",
+       "probability": 0.1
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    }
+   }
+  },
+  {
+   "case": "sr-t04",
+   "message": "SYNTHETIC: Do you offer a discount for nonprofit organizations?",
+   "responses": {
+    "choice": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "choice",
+       "choice": "other",
+       "probabilities": {
+        "billing": 0.066667,
+        "integration_defect": 0.066667,
+        "account_access": 0.066666,
+        "other": 0.8
+       },
+       "confidence": 0.8
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    },
+    "score": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "score",
+       "score": 0.12,
+       "probabilities": {
+        "0": 0.9,
+        "1": 0.08,
+        "2": 0.02
+       },
+       "confidence": 0.9
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    },
+    "boolean": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "boolean",
+       "probability": 0.03
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    }
+   }
+  },
+  {
+   "case": "sr-m01",
+   "message": "SYNTHETIC: The invoice for last month lists the wrong billing address.",
+   "responses": {
+    "choice": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "choice",
+       "choice": "billing",
+       "probabilities": {
+        "billing": 0.85,
+        "integration_defect": 0.05,
+        "account_access": 0.05,
+        "other": 0.05
+       },
+       "confidence": 0.85
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    },
+    "score": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "score",
+       "score": 0.25,
+       "probabilities": {
+        "0": 0.8,
+        "1": 0.15,
+        "2": 0.05
+       },
+       "confidence": 0.8
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    },
+    "boolean": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "boolean",
+       "probability": 0.05
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    }
+   }
+  },
+  {
+   "case": "sr-m02",
+   "message": "SYNTHETIC: This is ridiculous, the API returns an error code for every request again!!",
+   "responses": {
+    "choice": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "choice",
+       "choice": "integration_defect",
+       "probabilities": {
+        "billing": 0.033333,
+        "integration_defect": 0.9,
+        "account_access": 0.033333,
+        "other": 0.033334
+       },
+       "confidence": 0.9
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    },
+    "score": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "score",
+       "score": 1.65,
+       "probabilities": {
+        "0": 0.05,
+        "1": 0.25,
+        "2": 0.7
+       },
+       "confidence": 0.7
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    },
+    "boolean": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "boolean",
+       "probability": 0.1
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    }
+   }
+  },
+  {
+   "case": "sr-m03",
+   "message": "SYNTHETIC: I cannot log in on my new phone.",
+   "responses": {
+    "choice": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "choice",
+       "choice": "account_access",
+       "probabilities": {
+        "billing": 0.06,
+        "integration_defect": 0.06,
+        "account_access": 0.82,
+        "other": 0.06
+       },
+       "confidence": 0.82
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    },
+    "score": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "score",
+       "score": 0.35,
+       "probabilities": {
+        "0": 0.7,
+        "1": 0.25,
+        "2": 0.05
+       },
+       "confidence": 0.7
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    },
+    "boolean": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "boolean",
+       "probability": 0.05
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    }
+   }
+  },
+  {
+   "case": "sr-m04",
+   "message": "SYNTHETIC: Where can I download a copy of your security whitepaper?",
+   "responses": {
+    "choice": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "choice",
+       "choice": "other",
+       "probabilities": {
+        "billing": 0.083333,
+        "integration_defect": 0.083333,
+        "account_access": 0.083334,
+        "other": 0.75
+       },
+       "confidence": 0.75
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    },
+    "score": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "score",
+       "score": 0.12,
+       "probabilities": {
+        "0": 0.9,
+        "1": 0.08,
+        "2": 0.02
+       },
+       "confidence": 0.9
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    },
+    "boolean": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "boolean",
+       "probability": 0.02
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    }
+   }
+  },
+  {
+   "case": "sr-c01",
+   "message": "SYNTHETIC: My card payment failed but the charge still shows on my statement.",
+   "responses": {
+    "choice": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "choice",
+       "choice": "billing",
+       "probabilities": {
+        "billing": 0.9,
+        "integration_defect": 0.033333,
+        "account_access": 0.033333,
+        "other": 0.033334
+       },
+       "confidence": 0.9
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    },
+    "score": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "score",
+       "score": 0.7,
+       "probabilities": {
+        "0": 0.4,
+        "1": 0.5,
+        "2": 0.1
+       },
+       "confidence": 0.5
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    },
+    "boolean": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "boolean",
+       "probability": 0.05
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    }
+   }
+  },
+  {
+   "case": "sr-c02",
+   "message": "SYNTHETIC: The SDK integration drops events now and then; we need a fix by Monday.",
+   "responses": {
+    "choice": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "choice",
+       "choice": "integration_defect",
+       "probabilities": {
+        "billing": 0.046667,
+        "integration_defect": 0.86,
+        "account_access": 0.046667,
+        "other": 0.046666
+       },
+       "confidence": 0.86
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    },
+    "score": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "score",
+       "score": 0.8,
+       "probabilities": {
+        "0": 0.3,
+        "1": 0.6,
+        "2": 0.1
+       },
+       "confidence": 0.6
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    },
+    "boolean": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "boolean",
+       "probability": 0.92
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    }
+   }
+  },
+  {
+   "case": "sr-c03",
+   "message": "SYNTHETIC: Please remove my old login email from the account.",
+   "responses": {
+    "choice": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "choice",
+       "choice": "account_access",
+       "probabilities": {
+        "billing": 0.1,
+        "integration_defect": 0.1,
+        "account_access": 0.7,
+        "other": 0.1
+       },
+       "confidence": 0.7
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    },
+    "score": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "score",
+       "score": 0.2,
+       "probabilities": {
+        "0": 0.85,
+        "1": 0.1,
+        "2": 0.05
+       },
+       "confidence": 0.85
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    },
+    "boolean": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "boolean",
+       "probability": 0.02
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    }
+   }
+  },
+  {
+   "case": "sr-c04",
+   "message": "SYNTHETIC: Can I change the language of the dashboard?",
+   "responses": {
+    "choice": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "choice",
+       "choice": "other",
+       "probabilities": {
+        "billing": 0.093333,
+        "integration_defect": 0.093333,
+        "account_access": 0.093334,
+        "other": 0.72
+       },
+       "confidence": 0.72
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    },
+    "score": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "score",
+       "score": 0.12,
+       "probabilities": {
+        "0": 0.9,
+        "1": 0.08,
+        "2": 0.02
+       },
+       "confidence": 0.9
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    },
+    "boolean": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "boolean",
+       "probability": 0.02
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    }
+   }
+  },
+  {
+   "case": "sr-f01",
+   "message": "SYNTHETIC: You charged my card again after I cancelled. Unacceptable.",
+   "responses": {
+    "choice": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "choice",
+       "choice": "billing",
+       "probabilities": {
+        "billing": 0.94,
+        "integration_defect": 0.02,
+        "account_access": 0.02,
+        "other": 0.02
+       },
+       "confidence": 0.94
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    },
+    "score": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "score",
+       "score": 1.6,
+       "probabilities": {
+        "0": 0.05,
+        "1": 0.3,
+        "2": 0.65
+       },
+       "confidence": 0.65
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    },
+    "boolean": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "boolean",
+       "probability": 0.1
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    }
+   }
+  },
+  {
+   "case": "sr-f02",
+   "message": "SYNTHETIC: The integration with our CRM stopped syncing contacts.",
+   "responses": {
+    "choice": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "choice",
+       "choice": "integration_defect",
+       "probabilities": {
+        "billing": 0.066667,
+        "integration_defect": 0.8,
+        "account_access": 0.066667,
+        "other": 0.066666
+       },
+       "confidence": 0.8
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    },
+    "score": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "score",
+       "score": 0.45,
+       "probabilities": {
+        "0": 0.6,
+        "1": 0.35,
+        "2": 0.05
+       },
+       "confidence": 0.6
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    },
+    "boolean": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "boolean",
+       "probability": 0.05
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    }
+   }
+  },
+  {
+   "case": "sr-f03",
+   "message": "SYNTHETIC: I keep getting a sign in loop and cannot reach my workspace; fix it by tomorrow.",
+   "responses": {
+    "choice": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "choice",
+       "choice": "account_access",
+       "probabilities": {
+        "billing": 0.053333,
+        "integration_defect": 0.053333,
+        "account_access": 0.84,
+        "other": 0.053334
+       },
+       "confidence": 0.84
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    },
+    "score": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "score",
+       "score": 1.2,
+       "probabilities": {
+        "0": 0.1,
+        "1": 0.6,
+        "2": 0.3
+       },
+       "confidence": 0.6
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    },
+    "boolean": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "boolean",
+       "probability": 0.9
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    }
+   }
+  },
+  {
+   "case": "sr-f04",
+   "message": "SYNTHETIC: How do I export all my projects as a zip file?",
+   "responses": {
+    "choice": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "choice",
+       "choice": "other",
+       "probabilities": {
+        "billing": 0.166667,
+        "integration_defect": 0.166667,
+        "account_access": 0.166666,
+        "other": 0.5
+       },
+       "confidence": 0.5
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    },
+    "score": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "score",
+       "score": 0.12,
+       "probabilities": {
+        "0": 0.9,
+        "1": 0.08,
+        "2": 0.02
+       },
+       "confidence": 0.9
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    },
+    "boolean": {
+     "model": "typesafe-ai/jev",
+     "answers": {
+      "q0": {
+       "type": "boolean",
+       "probability": 0.02
+      }
+     },
+     "usage": {
+      "inputTokens": 100,
+      "outputTokens": 0
+     },
+     "providerMetadata": {
+      "gateway": {
+       "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+       },
+       "cost": "0",
+       "marketCost": "0.0000042",
+       "generationId": "gen_SYNTHETIC"
+      },
+      "typesafe": {
+       "confidence": {}
+      }
+     }
+    }
+   }
+  }
+ ]
+}

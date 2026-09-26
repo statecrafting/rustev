@@ -2,7 +2,7 @@
 id: "007-support-routing-package"
 title: "Reference package: support routing"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-25"
 summary: >
   The first domain package of increment 3 (design section 16.1, roadmap
@@ -13,10 +13,21 @@ summary: >
   `rustev-core`. It demonstrates that a domain is a package and not a core
   change, and that swapping the semantic backend (the rules backend's
   synthetic head against the Jev integration, spec 012) produces comparable
-  reports with no change in any authority path. Approved (A-12, 2026-09-25); implementation pending.
+  reports with no change in any authority path. Approved (A-12, 2026-09-25)
+  and amended by 016 (A-13, 2026-09-26); implemented.
 establishes:
   # Created on delivery (see section 2).
   - { kind: directory, path: "packages/rustev-pkg-support-routing/" }
+extends:
+  # The `packages/*` member glob and the package's lockfile entries.
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.toml" }, nature: additive }
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.lock" }, nature: additive }
+  # Adds 007 to `make verify`.
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  # The package rule of 3.3 in `make boundaries`.
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "tools/rustev-boundaries/" }, nature: additive }
+  # The backend swap test and its dev-dependencies (spec 016, 3.3).
+  - { spec: "012-jev-integration", unit: { kind: directory, path: "integrations/rustev-jev/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "002-decision-contract-and-pure-core"
@@ -32,7 +43,8 @@ references:
 # 007: Reference package: support routing
 
 Approved (A-12, 2026-09-25) as its own reviewable change before any code
-(R-16); implementation is pending. Drafted on 2026-09-25 under the
+(R-16) and amended by spec 016 (A-13, 2026-09-26: the swap test's policy
+comparison, its location and the priority set); implemented. Drafted on 2026-09-25 under the
 owner decision of 2026-09-24 to draft package 007 once 012 was merged, and
 to stop for approval. Rationale: design sections 15, 16.1 and 17
 (increment 3); owner decisions R-02 (typed builder and canonical JSON),
@@ -165,6 +177,80 @@ package to crates.io; `rank`, which Jev does not declare.
   seeded normal dependency on the runtime.
 - No file under `crates/` other than spec 002's test moves (Q-3) changes;
   increment 3's "no core change" is checked by the diff.
+
+## Implementation record
+
+Delivered 2026-09-26 with spec 016's amendment.
+
+- `packages/rustev-pkg-support-routing/src/lib.rs`: `builder(&Params)` and
+  `definition(&Params)`, the definition of 16.1 moved out of spec 002's test
+  helper and parameterized by `TopicCalibration` (`Calibrated(id)`, or
+  `Uncalibrated { reason }`, which asks `topic` for a distribution and
+  declares `uncalibrated_threshold` on the `ambiguous` rule; R-31 Q-1) and
+  the three thresholds; `Params::reference()` names the SYNTHETIC reference
+  calibration. Normal dependencies are `rustev-contract` and `rustev-core`
+  only; no I/O, clock or async runtime.
+- `data/` (Q-4), embedded with `include_bytes!`: the reference definition
+  (byte-identical to `crates/rustev-core/tests/golden/support-routing.definition.json`,
+  which stays spec 002's, Q-3), the SYNTHETIC reference `topic`
+  calibration, and two evaluation sets over the same sixteen invented
+  tickets, snapshots and splits (spec 016 3.4): `queue.*` and `priority.*`,
+  each a `rustev.task-adapter/1` document, a `rustev.evaluator-config/2`
+  bound to that adapter's rules digest (spec 014) with `topic` as the
+  probability step, tier subgroups and an `error` gate, and a
+  `rustev.dataset/1` manifest with SYNTHETIC provenance and four tickets in
+  each of the training, model-selection, calibration and final-test splits,
+  one source per ticket; one snapshot document per case. Every file is
+  emitted by `tests/common/mod.rs` (`RUSTEV_BLESS=1` rewrites them) and
+  checked against it.
+- `tools/rustev-boundaries`: the package rule (`PackageDependency`): a crate
+  under `packages/` has no normal or build dependency other than contract
+  and core, and its normal graph is checked for executors and forbidden
+  families as the pure crates' is. A seeded normal dependency of the package
+  on `rustev-runtime` failed `make boundaries` naming the rule (and the
+  Tokio path it brings); unit tests cover a normal, a build and a
+  transitive case and a passing dev-only one.
+- Section 5, by row: the runtime seed above; `documents.rs` (golden byte
+  equality, one representation, a changed threshold changes the bytes,
+  both datasets synthetic with one split membership); `behavior.rs` (stale
+  payments are `Unresolved` stale evidence, never a route, with the
+  at-the-limit control; a flat or unavailable `topic` escalates as
+  `ambiguous-topic`; a report over the dataset through `rustev eval`
+  carries synthetic provenance; a priority-only change moves the priority
+  report and not the queue report, spec 016's row); the swap row in
+  `integrations/rustev-jev/tests/support_routing_swap.rs` (spec 016 3.3):
+  all sixteen cases through the runtime with spec 005's SYNTHETIC rules
+  program and with the Jev adapter answering from hand-written SYNTHETIC
+  Gateway responses on loopback (`synthetic-support-routing-answers.json`,
+  labeled synthetic as spec 012 3.8.1 allows; no live call), captured,
+  evaluated by `rustev eval` with both sets on every split under one
+  dataset, configuration and adapter digest, and the `error` gate's verdict
+  recorded; the policy sections are equal after setting `topic`'s
+  declaration, and differ without it, and the output declarations are
+  equal (spec 016 3.1); a Jev plan without the declaration is refused with
+  `C::UncalibratedThreshold`.
+- Row "stale payments" reads `Unresolved` missing evidence; the core reports
+  a field past its maximum age as `stale_evidence` (spec 002), which is
+  what the test asserts: an unresolved outcome, never a default route.
+- The gate between the two reports is `unknown` ("the baseline and
+  candidate roles do not hold"): both are baseline reports, and spec 004's
+  candidate mode cannot replay another backend's requests. 3.4.2 records the
+  verdict; it is not a quality statement.
+- No file under `crates/` changed; increment 3's "no core change" holds.
+
+## Verification
+
+Run by `make verify` (007 is in `VERIFIED_SPECS`).
+
+```verify:cli
+cargo test -p rustev-pkg-support-routing --locked
+# The backend swap (3.4, spec 016): loopback only, no live call.
+cargo test -p rustev-jev --test support_routing_swap --locked
+# The package rule (3.3.1) and the workspace passing it.
+cargo test -p rustev-boundaries --locked
+cargo run -p rustev-boundaries --locked --quiet
+cargo clippy -p rustev-pkg-support-routing --all-targets --locked -- -D warnings
+```
 
 ## Open questions
 
