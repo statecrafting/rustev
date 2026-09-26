@@ -32,7 +32,7 @@
       }
     ],
     "sectionDigests": {
-      "016-declared-uncalibrated-threshold-in-support-routing-swap-test-amends-007": "91abb64377ca88b82fc927d208c27b2fe4bcee32a55b3d7594c8ecbcaab485c0",
+      "016-declared-uncalibrated-threshold-in-support-routing-swap-test-amends-007": "d329c6590e70e8d431e0ed59d5613325698c7e83978aa33de64f3bb5512952ab",
       "1-purpose": "b199f302df0bb5f157b5a12c1b92cb8bb19329b0a3947f00dc70f63ea70a84d0",
       "2-territory": "9801811208417596dc205c532228087a4d4ddce05e70fc504ee8747c94fa641d",
       "3-1-selection-policy-comparison-across-bindings": "fa56d92031368cc3a5f5a9185e9cd93e9c15e4cad0fd6b65d82b468bdc5a5d50",
@@ -41,7 +41,7 @@
       "3-4-priority-as-a-separately-labeled-field": "c35e8106be2d29998e4335f9f8cfc51ac524be5f412e18ba25feb4f3081ecef1",
       "3-behavior": "ee0cb8e9040ffad9426f6e447e5edd668f5419b2bcc5520951183762951f61ba",
       "4-observable-negative-cases": "5767c49467abcd00ec23b649bff389290fb09f8af8237f4abdb68b218d938510",
-      "open-questions": "01cee65858d84321379f6deb9170fd5c8be5f2bc11ae61ed840785affec48293"
+      "open-questions": "74ec3464fd6fcb665db99424515e2500f1193b365538b4c35a11ace1fc760f3a"
     },
     "sectionHeadings": [
       "016: Declared uncalibrated threshold in support-routing swap test (amends 007)",
@@ -56,10 +56,10 @@
       "Open questions"
     ],
     "specPath": "specs/016-support-routing-swap-threshold/spec.md",
-    "status": "draft",
-    "summary": "A proposed amendment of approved spec 007 (R-16). Spec 007 3.4.3 and section 5 require the backend swap test to assert identical compiled plans' policy sections across the rules backend and Jev backend. Under owner decision R-31 (approving Q-1), Jev returns an uncalibrated distribution and declares `uncalibrated_threshold` on `topic`'s `top_mass_below` condition with a margin rule. The reference definition keeps `uncalibrated_threshold: not_declared` to match the golden document byte-for-byte (3.1.3). Because `uncalibrated_threshold` is part of the condition inside the policy section, the compiled plans' policy sections cannot be strictly identical under equality. This amendment amends 3.4.3 and section 5 so that the swap test asserts identical policy rules, conditions, thresholds, adjustments and output declarations, accounting for Jev's declared uncalibrated threshold on `topic`. It also resolves two further conflicts found while preparing 007's delivery: where the swap test can live given spec 001 3.4.4, and how priority can be a separately labeled field given the declarative task adapter's one-label-per-case shape (spec 006, 3.8).\n",
+    "status": "approved",
+    "summary": "A proposed amendment of approved spec 007 (R-16). Spec 007 3.4.3 and section 5 require the backend swap test to assert identical compiled plans' policy sections across the rules backend and Jev backend. Under owner decision R-31 (approving Q-1), Jev returns an uncalibrated distribution and declares `uncalibrated_threshold` on `topic`'s `top_mass_below` condition with a margin rule. The reference definition keeps `uncalibrated_threshold: not_declared` to match the golden document byte-for-byte (3.1.3). Because `uncalibrated_threshold` is part of the condition inside the policy section, the compiled plans' policy sections cannot be strictly identical under equality. This amendment amends 3.4.3 and section 5 so that the swap test asserts identical policy rules, conditions, thresholds, adjustments and output declarations, accounting for Jev's declared uncalibrated threshold on `topic`. It also resolves two further conflicts found while preparing 007's delivery: where the swap test can live given spec 001 3.4.4, and how priority can be a separately labeled field given the declarative task adapter's one-label-per-case shape (spec 006, 3.8). Approved (A-13, 2026-09-26) with both open questions settled as recommended (R-33); implementation pending, delivered with spec 007.\n",
     "title": "Declared uncalibrated threshold in support-routing swap test (amends 007)"
   },
-  "shardHash": "a7d436387c730c2d8cbcd081fe0e317eb19f6d9f20a5f73d5747d641eb57c4c7",
+  "shardHash": "3d42d1eed10588e7383749fc9389edaa88ed29995e7c8f7e61fd73f076189633",
   "specVersion": "1.8.0"
 }

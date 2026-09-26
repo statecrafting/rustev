@@ -128,6 +128,7 @@ order. Recorded here as the owner's decisions.
 | Id | Decision |
 |---|---|
 | R-31 | Owner's words: "Specs 014, 015 and 007 are APPROVED, accepting the recommendation written in each draft for every open question". Answers, each the draft's recommendation: spec `014` Q-1, gates over `rustev.evaluator-config/1` reports are `unknown`; Q-2, `AdapterRules::opaque` is kept. Spec `015` Q-1, an inaccessible bundle is reported per case (`bundle-inaccessible`) and does not stop the CLI; Q-2, no expected bundle digest in `rustev.dataset/1` in this amendment. Spec `007` Q-1, the Jev binding declares `uncalibrated_threshold` with a margin rule rather than a synthetic temperature fit; Q-2, the dataset labels both queue and priority, priority as its own agreement payload; Q-3, spec `002`'s reference-plan tests keep their own copy and the package's test asserts byte equality with the core goldens; Q-4, package documents are files under `packages/rustev-pkg-support-routing/data/`, embedded with `include_bytes!`. Build order: `015`, then `014`, then `007`, one spec per pull request. |
+| R-33 | Owner's words, 2026-09-26: "Proceed with ratifying the amendment 016". Spec `016` (amends `007`) is approved as drafted, and its open questions are settled as the draft recommends, following R-31's precedent: Q-1, the backend swap test lives in `integrations/rustev-jev/tests/` with the package as a dev-dependency of `rustev-jev`, spec `001` 3.4.4 stays absolute, and spec `007` 3.3.1's allowance for integrations as package dev-dependencies is withdrawn; Q-2, the package ships two evaluation sets over the same cases and snapshots, `support-routing.queue` and `support-routing.priority`, each with its own version 2 evaluator configuration. `016` is implemented together with `007`. |
 
 ## Approvals
 
@@ -145,6 +146,7 @@ order. Recorded here as the owner's decisions.
 | A-10 | The owner approved spec `014` (amends `004`: the task adapter's rules digest bound into `rustev.evaluator-config/2`) with R-31's answers, as its own reviewable change before code (R-16). Implementation is pending. | 2026-09-25 |
 | A-11 | The owner approved spec `015` (amends `004`: per-case reporting of unusable replay bundles; supersedes spec `006` E-31) with R-31's answers, by the same act. Implementation is pending. | 2026-09-25 |
 | A-12 | The owner approved spec `007` (package `packages/rustev-pkg-support-routing`, depending on contract and core only) with R-31's answers, by the same act. Implementation is pending. | 2026-09-25 |
+| A-13 | The owner approved spec `016` (amends `007`: the swap test compares policy sections modulo Jev's declared `uncalibrated_threshold` on `topic`, lives in `rustev-jev`'s tests, and priority is a second evaluation set) with R-33's answers, as its own reviewable change before code (R-16). Implementation is pending, with `007`. | 2026-09-26 |
 
 No approval authorizes ratifying any other spec.
 
