@@ -216,7 +216,8 @@ Delivered 2026-09-26 with spec 016's amendment.
   payments are `Unresolved` stale evidence, never a route, with the
   at-the-limit control; a flat or unavailable `topic` escalates as
   `ambiguous-topic`; a report over the dataset through `rustev eval`
-  carries synthetic provenance); the swap row in
+  carries synthetic provenance; a priority-only change moves the priority
+  report and not the queue report, spec 016's row); the swap row in
   `integrations/rustev-jev/tests/support_routing_swap.rs` (spec 016 3.3):
   all sixteen cases through the runtime with spec 005's SYNTHETIC rules
   program and with the Jev adapter answering from hand-written SYNTHETIC

@@ -159,3 +159,51 @@ async fn a_report_over_the_synthetic_dataset_carries_synthetic_provenance() {
         assert_eq!(run::measured(&report, "coverage").unwrap(), (4, 1.0));
     }
 }
+
+/// Spec 016 section 4: a priority change with an unchanged queue moves the
+/// priority report's error and leaves the queue report's alone.
+#[tokio::test(flavor = "current_thread")]
+async fn a_priority_change_moves_only_the_priority_report() {
+    let tmp = env!("CARGO_TARGET_TMPDIR");
+    let mut dirs = vec![];
+    for (name, expectation) in [("reference", "1.5"), ("eager", "0.1")] {
+        let b = rules_backend();
+        let cal = calibration_for(b.artifact());
+        let mut params = pkg::Params::with_topic(pkg::TopicCalibration::Calibrated(
+            rustev_contract::Identified::id(&cal).unwrap(),
+        ));
+        params.frustration_expectation = dec(expectation);
+        let def = pkg::definition(&params).unwrap();
+        let c = compile(&def, &[b.descriptor().clone()], std::slice::from_ref(&cal)).unwrap();
+        let dir = run::fresh_dir(tmp, &format!("pkg-support-routing/priority-{name}"));
+        run::run_cases(Arc::new(b), &c, &[cal], &dir).await;
+        dirs.push(dir);
+    }
+    let errors = std::thread::spawn(move || {
+        let mut out = vec![];
+        for set in [pkg::QUEUE, pkg::PRIORITY] {
+            let mut per_run = vec![];
+            for (i, dir) in dirs.iter().enumerate() {
+                let mut e = vec![];
+                for split in ["training", "model_selection", "calibration", "final_test"] {
+                    let o = run::fresh_dir(
+                        tmp,
+                        &format!("pkg-support-routing/priority-eval-{}-{i}-{split}", set.name),
+                    );
+                    let (code, r) = run::eval(set, split, dir, &o);
+                    assert_eq!(code, 0, "{r}");
+                    e.push(run::measured(&r, "error_among_accepted"));
+                }
+                per_run.push(e);
+            }
+            out.push((set.name, per_run));
+        }
+        out
+    })
+    .join()
+    .unwrap();
+    let (_, queue) = &errors[0];
+    let (_, priority) = &errors[1];
+    assert_eq!(queue[0], queue[1], "the queue report moved");
+    assert_ne!(priority[0], priority[1], "the priority report did not move");
+}

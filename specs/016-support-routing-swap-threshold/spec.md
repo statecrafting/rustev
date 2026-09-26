@@ -2,7 +2,7 @@
 id: "016-support-routing-swap-threshold"
 title: "Declared uncalibrated threshold in support-routing swap test (amends 007)"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-25"
 summary: >
   A proposed amendment of approved spec 007 (R-16). Spec 007 3.4.3 and
@@ -23,7 +23,7 @@ summary: >
   separately labeled field given the declarative task adapter's
   one-label-per-case shape (spec 006, 3.8). Approved (A-13, 2026-09-26)
   with both open questions settled as recommended (R-33); implementation
-  pending, delivered with spec 007.
+  complete, delivered with spec 007.
 amends:
   - "007-support-routing-package"
 depends_on:
@@ -42,8 +42,8 @@ references:
 # 016: Declared uncalibrated threshold in support-routing swap test (amends 007)
 
 Approved amendment of spec 007 (A-13, 2026-09-26) as its own reviewable
-change before any code (R-16); implementation is pending and is delivered
-with spec 007. Drafted on 2026-09-25. Spec 007's approved text is not
+change before any code (R-16); implemented with spec 007 (see 007's
+implementation record). Drafted on 2026-09-25. Spec 007's approved text is not
 edited; this spec records the change, as 013 does for 003.
 
 ## 1. Purpose
@@ -173,6 +173,28 @@ Spec 007 section 5 (negative cases row 6) is amended as follows:
 | Jev does not declare `uncalibrated_threshold` on `topic` | Compiler refuses with `C::UncalibratedThreshold`. |
 | The package gains any dependency (normal or dev) on a crate under `integrations/` | `make boundaries` fails (spec 001 3.4.4). |
 | A priority change with an unchanged queue | The priority report's error changes; the queue report's does not. |
+
+## Implementation record
+
+Delivered 2026-09-26 with spec 007.
+
+- 3.1 and 3.2: `integrations/rustev-jev/tests/support_routing_swap.rs`
+  compares the rules plan's and the Jev plan's policy sections: equal once
+  `topic`'s threshold declaration is set to the other side's, unequal
+  without it, and equal output declarations. A Jev plan whose `topic`
+  threshold is not declared is refused with `C::UncalibratedThreshold`.
+- 3.3 (Q-1): the swap test is a test of `rustev-jev`, which takes the
+  package, the rules backend and the CLI as dev-dependencies; the package
+  has no dependency of any kind on a crate under `integrations/`, and
+  `make boundaries` passes.
+- 3.4 (Q-2): the package ships `support-routing.queue` and
+  `support-routing.priority` evaluation sets over the same cases, snapshots
+  and splits; both are evaluated in the swap test on every split.
+- Negative case "a priority change with an unchanged queue":
+  `a_priority_change_moves_only_the_priority_report` in the package's
+  `tests/behavior.rs` lowers the frustration threshold, which changes
+  priorities and no queue; the priority report's error moves and the queue
+  report's does not.
 
 ## Open questions
 
