@@ -2,10 +2,48 @@
   "version": 2,
   "pins": {
     "product": "0.0.0",
-    "spec_spine": "0.24.0",
-    "adapters": {}
+    "spec_spine": "0.26.0",
+    "adapters": {},
+    "producer": {
+      "name": "spec-spine-core",
+      "version": "0.25.0",
+      "checksum": "d96d89fb5e00a1c88f3f3eef47ab7091c7af8bfb6467856bc0d30edd9f143b2c"
+    }
   },
   "entries": [
+    {
+      "path": ".github/CODEOWNERS",
+      "class": "managed",
+      "source": {
+        "kind": "template",
+        "identity": "statecraft-setup:github-actions-rust@7"
+      },
+      "digest": "aca969a6cdfb0803404e225885b575e51ba0a77ffac05beb63bb5cf2c5ac26a7",
+      "bytes": 624,
+      "written_at": "2026-09-25T16:51:09Z"
+    },
+    {
+      "path": ".github/workflows/statecraft-ai-review.yml",
+      "class": "managed",
+      "source": {
+        "kind": "template",
+        "identity": "statecraft-setup:github-actions-rust@7"
+      },
+      "digest": "4fa41adee52551c51fccd9d2d5d4be176e433b8bfcb554c9ec91df39e27a80d3",
+      "bytes": 3035,
+      "written_at": "2026-09-25T16:49:55Z"
+    },
+    {
+      "path": ".github/workflows/statecraft-ci.yml",
+      "class": "managed",
+      "source": {
+        "kind": "template",
+        "identity": "statecraft-setup:github-actions-rust@7"
+      },
+      "digest": "6803fc6c308aeacc6e28d62e833afa7abf6ac5fd09c9cc8e45288b065c3d923e",
+      "bytes": 14926,
+      "written_at": "2026-09-25T16:51:09Z"
+    },
     {
       "path": ".statecraft/AGENTS.md",
       "class": "managed",
@@ -18,15 +56,70 @@
       "written_at": "2026-09-23T16:56:12Z"
     },
     {
-      "path": "spec-spine.toml",
+      "path": ".statecraft/setup/github-actions-rust.json",
       "class": "managed",
       "source": {
         "kind": "template",
-        "identity": "spec-spine-core@0.23.0"
+        "identity": "statecraft-setup:github-actions-rust@7"
       },
-      "digest": "5b2ab9fb51984725c910fc3016b77a692bcd534048af9ddab5af6f016e9b019b",
-      "bytes": 5280,
-      "written_at": "2026-09-23T16:56:12Z"
+      "digest": "2264523ce41c95db34e932bb70ba6b54cfa7477c5233c49fde47efb12ec26f59",
+      "bytes": 9274,
+      "written_at": "2026-09-25T16:51:09Z"
+    },
+    {
+      "path": "scripts/statecraft/ai-review.sh",
+      "class": "managed",
+      "source": {
+        "kind": "template",
+        "identity": "statecraft-setup:github-actions-rust@7"
+      },
+      "digest": "d6f966ea51d6a32639adf79ec461ef90c48f08109b617dff6d1e4bb32d86a6a4",
+      "bytes": 12572,
+      "written_at": "2026-09-25T16:49:55Z"
+    },
+    {
+      "path": "scripts/statecraft/ci-gate.sh",
+      "class": "managed",
+      "source": {
+        "kind": "template",
+        "identity": "statecraft-setup:github-actions-rust@7"
+      },
+      "digest": "b5547b56f0f46524f12b2ef108a56e0e39971f4e7fdd0bcbd68a28d3b084f083",
+      "bytes": 14011,
+      "written_at": "2026-09-25T16:49:55Z"
+    },
+    {
+      "path": "scripts/statecraft/gate.sh",
+      "class": "managed",
+      "source": {
+        "kind": "template",
+        "identity": "statecraft-setup:github-actions-rust@7"
+      },
+      "digest": "8245d61879a3b6cc809fd9518cb86c1471d4420fe1f15ebef81b5e042002a3da",
+      "bytes": 18018,
+      "written_at": "2026-09-25T16:51:09Z"
+    },
+    {
+      "path": "scripts/statecraft/install-spec-spine.sh",
+      "class": "managed",
+      "source": {
+        "kind": "template",
+        "identity": "statecraft-setup:github-actions-rust@7"
+      },
+      "digest": "34875ae336cc68cb73fedfd68d0b2ed30b090e1055b5ddf084200cb30daf0455",
+      "bytes": 2056,
+      "written_at": "2026-09-25T16:49:55Z"
+    },
+    {
+      "path": "spec-spine.toml",
+      "class": "adopted",
+      "source": {
+        "kind": "template",
+        "identity": "statecraft-governance"
+      },
+      "digest": "834f804e84c68f20622e30c62aaf0f4609ceae66bce694b41aef2a32bde5e7ad",
+      "bytes": 6015,
+      "written_at": "2026-09-25T16:49:55Z"
     },
     {
       "path": "specs/000-bootstrap/spec.md",
@@ -55,33 +148,33 @@
       "class": "managed",
       "source": {
         "kind": "template",
-        "identity": "spec-spine-core@0.23.0"
+        "identity": "spec-spine-core@0.25.0"
       },
       "digest": "483dc81218c08798fb56adc8a7a809927759291da50a145f1735c3f849380782",
       "bytes": 2682,
-      "written_at": "2026-09-23T16:56:12Z"
+      "written_at": "2026-09-25T16:49:55Z"
     },
     {
       "path": "standards/spec/templates/constitution-template.md",
       "class": "managed",
       "source": {
         "kind": "template",
-        "identity": "spec-spine-core@0.23.0"
+        "identity": "spec-spine-core@0.25.0"
       },
       "digest": "882ffc058fc35cee7b588a4efafca2ca6d7b8086c21f16c7dc44580d92fce2c6",
       "bytes": 821,
-      "written_at": "2026-09-23T16:56:12Z"
+      "written_at": "2026-09-25T16:49:55Z"
     },
     {
       "path": "standards/spec/templates/spec-template.md",
       "class": "managed",
       "source": {
         "kind": "template",
-        "identity": "spec-spine-core@0.23.0"
+        "identity": "spec-spine-core@0.25.0"
       },
       "digest": "f03da87b8a8b5e929f51753ef4d0ff4a2b969ef799125ca124d2eeeb280c8a02",
       "bytes": 952,
-      "written_at": "2026-09-23T16:56:12Z"
+      "written_at": "2026-09-25T16:49:55Z"
     }
   ],
   "modifications": [
@@ -99,6 +192,47 @@
     "shared_approval_required": [],
     "enrollment": {
       "kind": "solo"
+    },
+    "setup": {
+      "profile": "github-actions-rust",
+      "revision": 7,
+      "identity": "8ea41428995187dbd49555e5cddec56dd80beeda5f0f2213216d47b511f79f65",
+      "parameters": {
+        "ci.extra_required_jobs": [
+          {
+            "job": "boundaries",
+            "workflow": ".github/workflows/boundaries.yml"
+          },
+          {
+            "job": "verify",
+            "workflow": ".github/workflows/verify.yml"
+          }
+        ],
+        "governance.authored_content": "scripts/check-authored-content.sh",
+        "governance.authored_content_text": true,
+        "governance.enforce_coverage": true,
+        "governance.gate_each_commit": true,
+        "governance.require_signed_commits": true,
+        "review.code_owners": [
+          "@bartekus"
+        ]
+      }
     }
-  }
+  },
+  "transfers": [
+    {
+      "id": "9d42d4192817da71793743d403027e7bfc600c74c401d475f3cd0929c0cd4288",
+      "path": "spec-spine.toml",
+      "from": "managed",
+      "to": "user",
+      "digest": "834f804e84c68f20622e30c62aaf0f4609ceae66bce694b41aef2a32bde5e7ad",
+      "bytes": 6015,
+      "producer": "spec-spine-core@0.25.0",
+      "operator": "agent-rustev",
+      "operator_provenance": "operator-supplied",
+      "reason": "spec-spine.toml is authored by this repository (exact pin, index and coverage settings under spec 001); release it from template management so upgrades never rewrite it",
+      "at": "2026-09-25T16:49:43Z",
+      "manifest_before": "face97285eb0d5f4564fdbbc8934732a19d22b6b48fa2c0693b411c1d7f98c6d"
+    }
+  ]
 }

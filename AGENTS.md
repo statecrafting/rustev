@@ -44,3 +44,17 @@ Normative text: spec `001` and constitution principles VI onward.
 `make code` runs build, test, clippy (`-D warnings`), fmt and the boundary
 check across the workspace. `spec-spine verify <id>` runs a spec's declared
 acceptance.
+
+## Continuous integration
+
+CI is the Statecraft setup profile `github-actions-rust` (revision 7): one
+required check, `ci-gate`, over governance, code, the AI review and the
+declared extra jobs `boundaries` and `verify`
+(`.github/workflows/boundaries.yml`, `.github/workflows/verify.yml`, owned by
+spec 001). The managed files (`.github/workflows/statecraft-*.yml`,
+`scripts/statecraft/*`, `.statecraft/setup/*`, `.github/CODEOWNERS`) change
+only by editing `project.setup.parameters` in `.statecraft/environment.json`
+and re-rendering with `statecraft-cli init plan|apply`, never by hand. Any
+change under `.github/workflows/` or `scripts/statecraft/`, and to
+`scripts/check-authored-content.sh`, needs the owner's approval of the
+`statecraft-review-exception` Environment once.
