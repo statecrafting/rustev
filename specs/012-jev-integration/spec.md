@@ -432,9 +432,179 @@ end.
   read 2026-09-25 from the Gateway's model list, is USD 0.000000042 per
   input token and 0 per output token, the default table's. Testing spend to
   date, with the five calls of C-11: USD 0 of the USD 5 cap.
-- Stage 3 waits on travel-memory's independently labeled set (R-28, tm spec
-  012); batching stays off until it shows batched and unbatched answers
-  agree.
+- Stage 3 (qualification, R-27, R-28, R-29, R-30, R-32), recorded below.
+  Batching stays off: the batched and unbatched answers agreed on this
+  subset (see "Batched against unbatched"), but 11 messages do not qualify
+  batching for production. That decision stays with the owner (R-28).
+
+### Stage 3 qualification record (2026-09-26)
+
+**Set.** travel-memory's synthetic-provenance qualification set
+(`evaluation/qualification/`, tm spec 012, R-28). Primary identifiers are
+the tree `178d6432d3c60bfe8da8f3be0258d3cb17850f96` and the manifest digest
+`sha256:6eda107b4ac26323bef6253340aaef8c86cfad881a62212aa941c9608eb78626`,
+read at tm commit `c609ce0ded69e41ee2ecc9e4c11ba98239c02188`. That commit
+may change when tm's history is rewritten; the tree and digest do not. The
+set was verified file by file against its manifest before use. Its
+provenance, labeling method, splits and limitations are tm's (R-04). No
+fixture text or label is in this repository. The raw records (bundles,
+exchanges, reports, the spend journal) stay outside it, under
+travel-memory's `handoffs/rustev/qualification-20260925/`. Each case's
+snapshot id was computed from its input as `rustev.snapshot/1` before the
+dataset id was computed. Task adapters are `tm.relevance`, `tm.message_kind`
+and `tm.preference_scope` (one enum rule each).
+
+**Scope run.** The whole-run projection was 73 requests and USD 0.0036
+(USD 0.0072 with a 2x margin), from the Gateway price read at
+2026-09-25T23:06Z (input USD 0.000000042 per token, output 0). That was
+within the cap. The upstream then admitted about one request per 300 s and
+answered HTTP 429 otherwise (C-13). The run was therefore cut to a
+documented subset, the `final_test` split:
+
+- 11 relevance and 11 message_kind cases, one request per question;
+- the same 11 messages batched, with relevance and message_kind as two
+  questions on one state;
+- 0 preference_scope cases, because the set has none in `final_test`.
+
+The calibration split was not run live, so no temperature was fitted. Every
+request used the Gateway transport with `only: ["typesafe-ai"]` and without
+`zeroDataRetention` (R-30, R-32). Every attempt was reserved against the
+persistent testing journal. Decisions were paced 300 s apart, with retries
+60 s apart on `overloaded` and `transient`. The plans used an `estimated`
+cost policy.
+
+- Binding identities: unbatched
+  `sha256:87093d26ecf3b77c32ceae65fa3aea12f312a0c066c90964d3f14bfbee8a12e0`,
+  batched
+  `sha256:63efde86dc526f8e9fb16767d796c51fdf1555186255f579c9db59d46ac894f6`.
+- Calls measured, all 2026-09-26 UTC: relevance 01:59 to 02:49; message_kind
+  02:57 to 03:47; batched 03:57 to 04:47.
+- Served identity: `unknown` (3.6.3). A model version change behind the
+  Gateway during these windows would not have been visible.
+- Routing: every answered request resolved and finished on `typesafe-ai`.
+- Content: of synthetic provenance, so none of this is evidence about real
+  user data (R-04, R-28).
+
+**Plans.** One per task: a `classify` step, then escalation below 0.5 top
+mass, declared `uncalibrated_threshold` (the distribution is provider-made,
+I-2), then a proposal with the top label. The spec 005 baseline is an
+authored keyword rules program, written from the answer spaces alone and
+never tuned on the set. It ran over the same snapshots with the same plans.
+
+**Spec 004 reports.** Each backend has its own baseline report. For a given
+task, both reports share the dataset, split, evaluator configuration
+(version 2, rules bound, spec 014) and task adapter:
+
+| Task | Dataset | Config |
+|---|---|---|
+| relevance | `sha256:9a12944c3adaa638c292d518faf4b247d4ee6083e3fdc8d05217405b9bf080e1` | `sha256:a034ffbc2777293e21a6c59cda6f3eaf5179ba4fb6e1d113caccda12f1790434` |
+| message_kind | `sha256:7d9e9197e4d3d8ca17a3bd49896783ec855446727de8d2ebb8669b6cba3551db` | `sha256:4d5e6d2b474dc05027dff3547a5d1f44ab2f76205b1bb72c501d550831e12b57` |
+
+3.8 item 3 asks for the rules baseline "in the same spec 004 report". This
+record does not meet that literally. Spec 004's candidate mode reuses only
+outputs of an identical request, so evaluating the rules plan as a
+candidate of the Jev bundles makes every case `incomparable
+{request-mismatch}`. `gate` also refuses two baseline reports ("the
+baseline and candidate roles do not hold"). The comparison below is
+therefore side by side over identical dataset, split, configuration and
+adapter identities. A single cross-backend report would need a spec 004
+amendment, and none is proposed here.
+
+`final_test` (n = cases; labeled n in parentheses where it differs):
+
+| Metric | relevance, Jev | relevance, rules | message_kind, Jev | message_kind, rules |
+|---|---|---|---|---|
+| cases | 11 | 11 | 11 (10 labeled) | 11 (10 labeled) |
+| coverage (usable bundles) | 1.0 | 1.0 | 1.0 | 1.0 |
+| acceptance coverage (proposals) | 11/11 | 11/11 | 11/11 | 9/11 |
+| accuracy, top label over labeled | 11/11 | 8/11 | 7/10 | 7/10 |
+| macro-F1 over gold classes | 1.00 | 0.61 | 0.87 | 0.83 |
+| error among accepted (spec 004) | 0/11 | 3/11 | 3/10 | 3/8 |
+| mean log loss (spec 004) | 0.0103 (n 11) | 0.750 (n 11) | unknown: p(gold) = 0 on one case | 1.290 (n 10) |
+| log loss, p clamped at 1e-6 | 0.0103 | 0.750 | 2.001 (n 10) | 1.290 |
+| Brier (spec 004) | 0.0012 (n 11) | 0.458 (n 11) | 0.544 (n 10) | 0.585 (n 10) |
+
+Binned reliability, from spec 004's bins [0, 0.2, 0.4, 0.6, 0.8, 1]; each
+entry is cases, mean top mass and accuracy. Empty bins are unknown.
+
+| Run | Bin 0.4 to 0.6 | Bin 0.6 to 0.8 | Bin 0.8 to 1 |
+|---|---|---|---|
+| relevance, Jev | none | none | 11, 0.990, 1.00 |
+| relevance, rules | 1, 0.576, 1.00 | none | 10, 0.844, 0.70 |
+| message_kind, Jev | none | 1, 0.700, 1.00 | 9, 0.953, 0.67 |
+| message_kind, rules | none | 8, 0.674, 0.63 | none |
+
+The rules backend's message_kind also has 2 cases in bin 0.2 to 0.4 (mean
+0.254, accuracy 1.00).
+
+Coverage against error over labeled answered cases, as accepted/wrong at
+top-mass thresholds 0, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95 and 0.99. The plans'
+own threshold is 0.5.
+
+| Run | 0 | 0.5 | 0.6 | 0.7 | 0.8 | 0.9 | 0.95 | 0.99 |
+|---|---|---|---|---|---|---|---|---|
+| relevance, Jev | 11/0 | 11/0 | 11/0 | 11/0 | 11/0 | 11/0 | 10/0 | 9/0 |
+| relevance, rules | 11/3 | 11/3 | 10/3 | 10/3 | 10/3 | 0/0 | 0/0 | 0/0 |
+| message_kind, Jev | 10/3 | 10/3 | 10/3 | 10/3 | 9/3 | 7/2 | 7/2 | 5/1 |
+| message_kind, rules | 10/3 | 8/3 | 8/3 | 0/0 | 0/0 | 0/0 | 0/0 | 0/0 |
+
+By slice, as correct/n over labeled cases. Slices overlap, and the slice
+tags are single-annotator.
+
+| Slice | relevance, Jev | relevance, rules | message_kind, Jev | message_kind, rules |
+|---|---|---|---|---|
+| adversarial | 1/1 | 1/1 | 1/1 | 0/1 |
+| counting | 2/2 | 2/2 | 1/2 | 1/2 |
+| date comparison | 7/7 | 7/7 | 4/6 | 5/6 |
+| multi-hop | 6/6 | 5/6 | 3/5 | 3/5 |
+| arithmetic | no case | no case | no case | no case |
+| certainty clear | 10/10 | 7/10 | 6/9 | 7/9 |
+| certainty borderline | 1/1 | 1/1 | 1/1 | 0/1 |
+
+Provider confidence, as a provider statistic only (I-2): the mean was 0.885
+over 11 unbatched message_kind answers and 0.926 over 22 batched answers.
+
+**Batched against unbatched** (3.5). All 22 pairs (11 messages, 2 questions)
+were comparable:
+
+- the top label agreed on 22/22;
+- total variation between the two distributions was at most 0.080, with a
+  mean of 0.0077.
+
+**Cost** (testing journal, nano-USD units).
+
+- Stage 3 settled 253 attempts. The unbatched runs, including three
+  earlier attempts cut short by HTTP 429 (their bundles are kept apart and
+  are not in the reports), account for 231: 26 answered with an observed
+  charge of 0 and 205 answered HTTP 429 with an unknown charge. The batched
+  run accounts for 22, one per question over 11 requests, all answered: 20
+  with an observed charge above 0 and 2 with an observed charge of 0.
+- Observed charges: 450,072 units (USD 0.00045), all on the batched run.
+  Every unbatched answer, the last at 03:47 UTC, reported Gateway `cost`
+  "0"; charging began within the batched run's window.
+- Liability held for the unknown charges: 10,672,914 units (USD 0.0107).
+- Testing total to date, with smoke and probes: observed USD 0.00045 plus
+  liability USD 0.0107 of the USD 5 cap (R-29).
+- The raw exchange bodies of the 11 relevance decisions were lost when the
+  host process was killed after they finished. Their bundles, run records
+  and journal entries are kept. The runner now writes exchanges per case.
+
+**Limitations.**
+
+- The label mapping is under owner review: spam maps to marketing and
+  non-travel to other; fixtures 10 and 22 are missing for message_kind
+  (hence 10 labeled of 11); preference_scope has no `final_test` case;
+  arithmetic has no `final_test` case; the slice tags are
+  single-annotator.
+- The samples are 10 to 11 cases per task, so no interval is claimed and
+  none of these numbers is a production quality claim.
+- The calibration split was not run.
+- The served version is unknown (3.6.3).
+- Zero data retention was not requested (R-30, R-32).
+
+**Owner fact (2026-09-25).** The owner set the Vercel AI Gateway dashboard
+budget to USD 5, equal to the testing cap (R-29), as the external backstop
+of 3.8 (recorded in R-32).
 
 ## Verification
 
