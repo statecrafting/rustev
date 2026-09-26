@@ -42,8 +42,8 @@
       }
     ],
     "specId": "016-support-routing-swap-threshold",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "d16fce47d165aab59688f65459533a5294a6bf820acc560a958a6e816a48bc61"
+  "shardHash": "16070aac59de03a3924ad7090b2801c3afabca16669b9c64cb8e98d7d8ba95dd"
 }

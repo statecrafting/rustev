@@ -1,7 +1,7 @@
 ---
 id: "016-support-routing-swap-threshold"
 title: "Declared uncalibrated threshold in support-routing swap test (amends 007)"
-status: draft
+status: approved
 implementation: pending
 created: "2026-09-25"
 summary: >
@@ -21,7 +21,9 @@ summary: >
   two further conflicts found while preparing 007's delivery: where the
   swap test can live given spec 001 3.4.4, and how priority can be a
   separately labeled field given the declarative task adapter's
-  one-label-per-case shape (spec 006, 3.8).
+  one-label-per-case shape (spec 006, 3.8). Approved (A-13, 2026-09-26)
+  with both open questions settled as recommended (R-33); implementation
+  pending, delivered with spec 007.
 amends:
   - "007-support-routing-package"
 depends_on:
@@ -39,9 +41,10 @@ references:
 
 # 016: Declared uncalibrated threshold in support-routing swap test (amends 007)
 
-Proposed amendment of approved spec 007 (R-16); drafted on 2026-09-25.
-Spec 007's approved text is not edited; this spec records the proposed
-change.
+Approved amendment of spec 007 (A-13, 2026-09-26) as its own reviewable
+change before any code (R-16); implementation is pending and is delivered
+with spec 007. Drafted on 2026-09-25. Spec 007's approved text is not
+edited; this spec records the change, as 013 does for 003.
 
 ## 1. Purpose
 
@@ -175,6 +178,13 @@ Spec 007 section 5 (negative cases row 6) is amended as follows:
 
 Found on 2026-09-25 (night) while preparing 007's delivery; the owner
 decides them with the rest of this amendment.
+
+Owner decision of 2026-09-26 (R-33): "Proceed with ratifying the amendment
+016". Following R-31's precedent, each question below is settled as its
+recommendation states: Q-1, the swap test moves to
+`integrations/rustev-jev/tests/` and spec 001 3.4.4 is unchanged; Q-2, two
+evaluation sets, queue and priority. The text is kept as the record of what
+was asked.
 
 - Q-1: move the swap test to `integrations/rustev-jev/tests/` (3.3), or
   amend spec 001 3.4.4 to allow dev-dependencies on integrations?
