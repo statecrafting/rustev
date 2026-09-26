@@ -443,9 +443,12 @@ end.
 (`evaluation/qualification/`, tm spec 012, R-28). Primary identifiers are
 the tree `178d6432d3c60bfe8da8f3be0258d3cb17850f96` and the manifest digest
 `sha256:6eda107b4ac26323bef6253340aaef8c86cfad881a62212aa941c9608eb78626`,
-read at tm commit `c609ce0ded69e41ee2ecc9e4c11ba98239c02188`. That commit
-may change when tm's history is rewritten; the tree and digest do not. The
-set was verified file by file against its manifest before use. Its
+read at rewritten tm commit
+`7e08ce1cb82a1b38633d2d7a3fc7a45af5fefdc6`. The paid bundles retain the
+pre-rewrite execution context
+`c609ce0ded69e41ee2ecc9e4c11ba98239c02188`; both commits have the exact
+tree above. The set was verified file by file against its manifest before
+use. Its
 provenance, labeling method, splits and limitations are tm's (R-04). No
 fixture text or label is in this repository. The raw records (bundles,
 exchanges, reports, the spend journal) stay outside it, under
@@ -464,21 +467,25 @@ documented subset, the `final_test` split:
 - 11 relevance and 11 message_kind cases, one request per question;
 - the same 11 messages batched, with relevance and message_kind as two
   questions on one state;
-- 0 preference_scope cases, because the set has none in `final_test`.
+- 0 preference_scope cases, because the set has none in `final_test`;
+- the complete `calibration` split: 12 relevance, 12 message_kind and 4
+  preference_scope cases, one request per question.
 
-The calibration split was not run live, so no temperature was fitted. Every
-request used the Gateway transport with `only: ["typesafe-ai"]` and without
-`zeroDataRetention` (R-30, R-32). Every attempt was reserved against the
-persistent testing journal. Decisions were paced 300 s apart, with retries
-60 s apart on `overloaded` and `transient`. The plans used an `estimated`
-cost policy.
+Every request used the Gateway transport with `only: ["typesafe-ai"]` and
+without `zeroDataRetention` (R-30, R-32). Every attempt was reserved against
+the persistent testing journal. Decisions were paced 300 s apart, with
+retries 60 s apart on `overloaded` and `transient`. The plans used an
+`estimated` cost policy. Before calibration dispatch, the price was read at
+2026-09-26T04:57:29Z: input USD 0.000000042 per token and output 0. The 28
+request projection was USD 0.0012 before margin, well inside the remaining
+cap even with the journal's maximum unresolved liability.
 
 - Binding identities: unbatched
   `sha256:87093d26ecf3b77c32ceae65fa3aea12f312a0c066c90964d3f14bfbee8a12e0`,
   batched
   `sha256:63efde86dc526f8e9fb16767d796c51fdf1555186255f579c9db59d46ac894f6`.
 - Calls measured, all 2026-09-26 UTC: relevance 01:59 to 02:49; message_kind
-  02:57 to 03:47; batched 03:57 to 04:47.
+  02:57 to 03:47; batched 03:57 to 04:47; calibration 04:58 to 07:20.
 - Served identity: `unknown` (3.6.3). A model version change behind the
   Gateway during these windows would not have been visible.
 - Routing: every answered request resolved and finished on `typesafe-ai`.
@@ -497,8 +504,9 @@ task, both reports share the dataset, split, evaluator configuration
 
 | Task | Dataset | Config |
 |---|---|---|
-| relevance | `sha256:9a12944c3adaa638c292d518faf4b247d4ee6083e3fdc8d05217405b9bf080e1` | `sha256:a034ffbc2777293e21a6c59cda6f3eaf5179ba4fb6e1d113caccda12f1790434` |
-| message_kind | `sha256:7d9e9197e4d3d8ca17a3bd49896783ec855446727de8d2ebb8669b6cba3551db` | `sha256:4d5e6d2b474dc05027dff3547a5d1f44ab2f76205b1bb72c501d550831e12b57` |
+| relevance | `sha256:bac1d773d4cface9056d724385fc12d7372bd1302e132abe6b1a5716b47ee0e4` | `sha256:a034ffbc2777293e21a6c59cda6f3eaf5179ba4fb6e1d113caccda12f1790434` |
+| message_kind | `sha256:9e9d16f34de261e59dfb17ce0ec413537f8ac553a48dc9942d4d58c49cdece9d` | `sha256:4d5e6d2b474dc05027dff3547a5d1f44ab2f76205b1bb72c501d550831e12b57` |
+| preference_scope | `sha256:6b118e97c9f7de7b6ab7fc539029bc766dd52f4777d83695fea297115bd205df` | `sha256:17b9a8dc7dbb65855608f5f9baaea5bc108330db396f79732fba250601bcc6a6` |
 
 3.8 item 3 asks for the rules baseline "in the same spec 004 report". This
 record does not meet that literally. Spec 004's candidate mode reuses only
@@ -523,6 +531,30 @@ amendment, and none is proposed here.
 | mean log loss (spec 004) | 0.0103 (n 11) | 0.750 (n 11) | unknown: p(gold) = 0 on one case | 1.290 (n 10) |
 | log loss, p clamped at 1e-6 | 0.0103 | 0.750 | 2.001 (n 10) | 1.290 |
 | Brier (spec 004) | 0.0012 (n 11) | 0.458 (n 11) | 0.544 (n 10) | 0.585 (n 10) |
+
+`calibration` results, with the same identities and rules baseline. Accuracy
+and macro-F1 use labeled answered cases; ECE is the weighted absolute error
+over the configured reliability bins.
+
+| Task and backend | Answered/labeled | Accuracy | Macro-F1 | Log loss | Brier | ECE |
+|---|---:|---:|---:|---:|---:|---:|
+| relevance, Jev | 12/12 | 11/12 | 0.911 | 0.0946 | 0.0540 | 0.0667 |
+| relevance, rules | 12/12 | 7/12 | 0.368 | 1.003 | 0.647 | 0.260 |
+| message_kind, Jev | 10/11 | 7/10 | 0.786 | 0.592 | 0.422 | 0.187 |
+| message_kind, rules | 11/11 | 3/11 | 0.286 | 2.118 | 0.940 | 0.325 |
+| preference_scope, Jev | 4/4 | 2/4 | 0.583 | unknown: p(gold) = 0 on one case | 0.787 | 0.365 |
+| preference_scope, rules | 4/4 | 0/4 | 0.000 | 2.241 | 1.102 | 0.498 |
+
+Temperature fitting used the `calibration` split only. Relevance fitted 12
+cases at temperature 0.5 (fit log loss 0.075065914), artifact
+`sha256:f3f0742074b47a316b01ba20bc14df9b19176617202adc689ec092351e9e9ba3`.
+Message_kind fitted 10 cases at temperature 3 (fit log loss 0.435860749),
+excluded two with no sample, and produced artifact
+`sha256:8ba3ad36c0ae2d5c074711aca0267fb8c47572083d7a9d48a2d3e29647815b30`.
+Both artifacts passed the spec 004 disjoint-final-test lineage check. The
+preference_scope fit emitted no artifact: case `preference_scope.12.p4` had
+zero support for its gold class, and there is no preference_scope final-test
+split against which to qualify one.
 
 Binned reliability, from spec 004's bins [0, 0.2, 0.4, 0.6, 0.8, 1]; each
 entry is cases, mean top mass and accuracy. Empty bins are unknown.
@@ -561,8 +593,33 @@ tags are single-annotator.
 | certainty clear | 10/10 | 7/10 | 6/9 | 7/9 |
 | certainty borderline | 1/1 | 1/1 | 1/1 | 0/1 |
 
+Calibration coverage against error for Jev, with the same thresholds as the
+final-test table:
+
+| Task | 0 | 0.5 | 0.6 | 0.7 | 0.8 | 0.9 | 0.95 | 0.99 |
+|---|---|---|---|---|---|---|---|---|
+| relevance | 12/1 | 12/1 | 11/0 | 11/0 | 11/0 | 10/0 | 10/0 | 7/0 |
+| message_kind | 10/3 | 10/3 | 10/3 | 9/2 | 7/2 | 5/0 | 5/0 | 5/0 |
+| preference_scope | 4/2 | 4/2 | 3/1 | 3/1 | 2/1 | 1/1 | 0/0 | 0/0 |
+
+Required calibration slices, again as correct/n over labeled answered cases:
+
+| Slice | relevance, Jev/rules | message_kind, Jev/rules | preference_scope, Jev/rules |
+|---|---|---|---|
+| adversarial | 1/1, 1/1 | no labeled answer | n/a |
+| arithmetic | 1/1, 1/1 | 0/1, 0/1 | n/a |
+| counting | 1/1, 1/1 | 1/1, 0/1 | n/a |
+| date comparison | 4/4, 4/4 | 3/4, 2/4 | n/a |
+| hostile markup | 0/1, 0/1 | 0/1, 0/1 | n/a |
+| multi-hop | 4/4, 4/4 | 3/4, 1/4 | n/a |
+| certainty clear | 9/9, 6/9 | 6/8, 2/8 | 2/4, 0/4 |
+| certainty borderline | 2/3, 1/3 | 1/2, 1/3 | n/a |
+| hardness hard | n/a | n/a | 2/2, 0/2 |
+| hardness soft | n/a | n/a | 0/2, 0/2 |
+
 Provider confidence, as a provider statistic only (I-2): the mean was 0.885
-over 11 unbatched message_kind answers and 0.926 over 22 batched answers.
+over 11 unbatched final-test message_kind answers, 0.926 over 22 batched
+answers, and 0.853 over the 27 answered calibration attempts.
 
 **Batched against unbatched** (3.5). All 22 pairs (11 messages, 2 questions)
 were comparable:
@@ -573,21 +630,33 @@ were comparable:
 
 **Cost** (testing journal, nano-USD units).
 
-- Stage 3 settled 253 attempts. The unbatched runs, including three
-  earlier attempts cut short by HTTP 429 (their bundles are kept apart and
-  are not in the reports), account for 231: 26 answered with an observed
-  charge of 0 and 205 answered HTTP 429 with an unknown charge. The batched
-  run accounts for 22, one per question over 11 requests, all answered: 20
-  with an observed charge above 0 and 2 with an observed charge of 0.
-- Observed charges: 450,072 units (USD 0.00045), all on the batched run.
-  Every unbatched answer, the last at 03:47 UTC, reported Gateway `cost`
-  "0"; charging began within the batched run's window.
-- Liability held for the unknown charges: 10,672,914 units (USD 0.0107).
-- Testing total to date, with smoke and probes: observed USD 0.00045 plus
-  liability USD 0.0107 of the USD 5 cap (R-29).
+- Stage 3 has 287 reservations and 287 settlements: 22 batched and 265
+  unbatched. With 6 earlier smoke and probe attempts, the whole testing journal
+  has 293 reservations and 293 settlements: 80 observed and 213 unknown.
+  Attempt ids record 131 attempts numbered above one across Stage 3; the
+  calibration run made 34 attempts for 28 decisions, including 6 retry
+  attempts for one decision.
+- Observed Gateway charges: 1,421,364 units (USD 0.001421364). The calibration
+  run added 971,292 units. Retained exchange bodies report USD 0.001983828 in
+  `marketCost`; the journal, rather than that provider statistic, governs the
+  cap.
+- Maximum Stage 3 liability held for unknown charges: 11,020,128 units
+  (USD 0.011020128). The calibration retries added 347,214 units to the prior
+  10,672,914. The earlier ZDR probe adds 19,362 units, making the whole-journal
+  maximum unresolved liability 11,039,490 units (USD 0.011039490).
+- Pessimistic cap consumption is observed plus maximum unresolved liability,
+  USD 0.012460854. USD 4.987539146 remains under the USD 5 testing cap (R-29).
 - The raw exchange bodies of the 11 relevance decisions were lost when the
   host process was killed after they finished. Their bundles, run records
   and journal entries are kept. The runner now writes exchanges per case.
+
+The calibration run retained 34 exchanges: 27 HTTP 200, five HTTP 429, one
+HTTP 503 and one HTTP 520. One message_kind decision exhausted seven attempts
+and escalated unresolved. A different HTTP-200 answer summed to 0.99, outside
+the core's 0.000001 distribution tolerance, and was retained as
+`invalid_backend_output`, never normalized. Every retained request kept the
+TypeSafe-only allowlist; every answered route finished on TypeSafe, and every
+served identity remained unknown.
 
 **Limitations.**
 
@@ -596,11 +665,18 @@ were comparable:
   (hence 10 labeled of 11); preference_scope has no `final_test` case;
   arithmetic has no `final_test` case; the slice tags are
   single-annotator.
-- The samples are 10 to 11 cases per task, so no interval is claimed and
-  none of these numbers is a production quality claim.
-- The calibration split was not run.
+- The samples are 4 to 12 cases per task and split, so no interval is claimed
+  and none of these numbers is a production quality claim.
+- Preference_scope has only four calibration cases, zero final-test cases and
+  no fitted artifact because one gold class had zero provider support.
 - The served version is unknown (3.6.3).
 - Zero data retention was not requested (R-30, R-32).
+
+Canonical aggregate reports, calibration records and their digest manifest
+are retained outside Git under
+`travel-memory/handoffs/rustev/qualification-20260925/`; raw bundles,
+exchange bodies and the spend journal remain there as well. Only this
+governed aggregate is committed.
 
 **Owner fact (2026-09-25).** The owner set the Vercel AI Gateway dashboard
 budget to USD 5, equal to the testing cap (R-29), as the external backstop
