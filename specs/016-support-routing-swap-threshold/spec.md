@@ -17,7 +17,11 @@ summary: >
   cannot be strictly identical under equality. This amendment amends 3.4.3
   and section 5 so that the swap test asserts identical policy rules,
   conditions, thresholds, adjustments and output declarations, accounting
-  for Jev's declared uncalibrated threshold on `topic`.
+  for Jev's declared uncalibrated threshold on `topic`. It also resolves
+  two further conflicts found while preparing 007's delivery: where the
+  swap test can live given spec 001 3.4.4, and how priority can be a
+  separately labeled field given the declarative task adapter's
+  one-label-per-case shape (spec 006, 3.8).
 amends:
   - "007-support-routing-package"
 depends_on:
@@ -25,6 +29,7 @@ depends_on:
   - "002-decision-contract-and-pure-core"
   - "004-evaluation-and-replay"
   - "005-reference-backends"
+  - "006-cli-surface"
   - "007-support-routing-package"
   - "012-jev-integration"
 references:
@@ -78,6 +83,12 @@ When approved:
 - `packages/rustev-pkg-support-routing/tests/swap.rs`: the backend swap test
   asserts equality of the policy sections modulo the declared uncalibrated
   threshold on `topic`, and asserts identical output declarations.
+- `integrations/rustev-jev/tests/support_routing_swap.rs` instead, if Q-1
+  below is accepted (3.3): the Jev crate gains a dev-dependency on the
+  package.
+- `packages/rustev-pkg-support-routing/data/`: a second task adapter,
+  evaluator configuration and dataset manifest for priority, if Q-2 below
+  is accepted (3.4).
 
 No contract, core, runtime, eval or backend behavior changes.
 
@@ -114,6 +125,41 @@ Spec 007 section 5 (negative cases row 6) is amended as follows:
 - Expected: "Two comparable reports; identical policy rules, thresholds and
   output declarations with Jev's declared uncalibrated threshold notice."
 
+### 3.3 Where the swap test lives
+
+1. Spec 007 3.3.1 lets integrations appear as dev-dependencies of the
+   package, but spec 001 3.4.4 says "No crate depends on a crate under
+   `integrations/`", with no exception for dev-dependencies, and
+   `make boundaries` enforces it for every dependency kind. A package test
+   that replays recorded Jev exchanges needs `rustev-jev`, so it cannot be
+   a package test.
+2. Proposed: the swap test is a test of `integrations/rustev-jev`, which
+   takes the package as a dev-dependency (an integration may depend on a
+   package; nothing forbids that direction). The package's own normal and
+   dev-dependencies never include a crate under `integrations/`. Spec 007
+   3.3.1's allowance for integrations as package dev-dependencies is
+   withdrawn; spec 001 is unchanged.
+
+### 3.4 Priority as a separately labeled field
+
+1. Spec 007 3.2.1 asks for one `rustev.task-adapter/1` document in which
+   the queue label equals the proposed queue and priority is "a separate
+   labeled field with its own rule". The declarative adapter (spec 006,
+   3.8) selects the first rule whose action matches and compares one mapped
+   parameter with the case's single label; a `rustev.dataset/1` case has
+   one label. One document cannot judge queue and priority separately, and
+   the package cannot ship a library adapter, because `TaskAdapter` lives
+   in `rustev-eval`, which is not a normal dependency of a package (007
+   3.3.1).
+2. Proposed: the package ships two evaluation sets over the same cases and
+   snapshots: `support-routing.queue` (adapter rule on `queue`, dataset
+   labeled with queues) and `support-routing.priority` (adapter rule on
+   `priority`, dataset labeled with priorities), each with its own version
+   2 evaluator configuration bound to its adapter's rules digest (spec
+   014). A frustration or deadline change then shows up in the priority
+   report while the queue report is unaffected, which is Q-2's intent. Both
+   datasets keep SYNTHETIC provenance and identical split membership.
+
 ## 4. Observable negative cases
 
 | Case | Expected |
@@ -122,3 +168,18 @@ Spec 007 section 5 (negative cases row 6) is amended as follows:
 | A threshold value differs between the rules plan and the Jev plan | The swap test fails. |
 | An output declaration differs between the rules plan and the Jev plan | The swap test fails. |
 | Jev does not declare `uncalibrated_threshold` on `topic` | Compiler refuses with `C::UncalibratedThreshold`. |
+| The package gains any dependency (normal or dev) on a crate under `integrations/` | `make boundaries` fails (spec 001 3.4.4). |
+| A priority change with an unchanged queue | The priority report's error changes; the queue report's does not. |
+
+## Open questions
+
+Found on 2026-09-25 (night) while preparing 007's delivery; the owner
+decides them with the rest of this amendment.
+
+- Q-1: move the swap test to `integrations/rustev-jev/tests/` (3.3), or
+  amend spec 001 3.4.4 to allow dev-dependencies on integrations?
+  Recommendation: move the test; 001's rule stays absolute and simple to
+  check.
+- Q-2: two evaluation sets, queue and priority (3.4), or evaluate the queue
+  only and drop priority labels? Recommendation: two sets, which keeps
+  R-31's answer to 007 Q-2 (label both).

@@ -8,6 +8,7 @@
       "002-decision-contract-and-pure-core",
       "004-evaluation-and-replay",
       "005-reference-backends",
+      "006-cli-surface",
       "007-support-routing-package",
       "012-jev-integration"
     ],
@@ -44,5 +45,5 @@
     "specStatus": "draft"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "f578905f981a34ef4baf06968660a6d57876bdf16316073cb053159cf99bc8ac"
+  "shardHash": "d16fce47d165aab59688f65459533a5294a6bf820acc560a958a6e816a48bc61"
 }
