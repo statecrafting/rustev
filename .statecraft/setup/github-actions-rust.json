@@ -1,0 +1,238 @@
+{
+  "authority_rule": {
+    "compared": "the candidate's own changes, base...head",
+    "exception_environment": "statecraft-review-exception",
+    "read_at_the_base": [
+      "gate.sh",
+      "install-spec-spine.sh",
+      "ci-gate.sh",
+      "ai-review.sh",
+      "the declared authored-content script"
+    ],
+    "requires": "the owner exception approved for the run; in the merge queue, for the run recorded for the entry's pull request",
+    "set": [
+      "every path in files",
+      ".statecraft/setup/github-actions-rust.json",
+      "scripts/statecraft/*",
+      "the declared governance.authored_content script"
+    ]
+  },
+  "commands": {
+    "code": [
+      [
+        "cargo",
+        "build",
+        "--workspace",
+        "--locked"
+      ],
+      [
+        "cargo",
+        "test",
+        "--workspace",
+        "--locked"
+      ],
+      [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ]
+    ],
+    "governance": [
+      [
+        ".tooling/bin/spec-spine",
+        "check",
+        "--fail-on-warn"
+      ],
+      [
+        ".tooling/bin/spec-spine",
+        "lint",
+        "--fail-on-warn"
+      ],
+      [
+        ".tooling/bin/spec-spine",
+        "index",
+        "coverage",
+        "--fail-on-untraced"
+      ],
+      [
+        ".tooling/bin/spec-spine",
+        "index",
+        "check",
+        "--fail-on-unresolved"
+      ],
+      [
+        "scripts/check-authored-content.sh"
+      ]
+    ]
+  },
+  "files": [
+    {
+      "digest": "6803fc6c308aeacc6e28d62e833afa7abf6ac5fd09c9cc8e45288b065c3d923e",
+      "path": ".github/workflows/statecraft-ci.yml",
+      "role": "workflow"
+    },
+    {
+      "digest": "4fa41adee52551c51fccd9d2d5d4be176e433b8bfcb554c9ec91df39e27a80d3",
+      "path": ".github/workflows/statecraft-ai-review.yml",
+      "role": "workflow"
+    },
+    {
+      "digest": "34875ae336cc68cb73fedfd68d0b2ed30b090e1055b5ddf084200cb30daf0455",
+      "path": "scripts/statecraft/install-spec-spine.sh",
+      "role": "script"
+    },
+    {
+      "digest": "8245d61879a3b6cc809fd9518cb86c1471d4420fe1f15ebef81b5e042002a3da",
+      "path": "scripts/statecraft/gate.sh",
+      "role": "script"
+    },
+    {
+      "digest": "b5547b56f0f46524f12b2ef108a56e0e39971f4e7fdd0bcbd68a28d3b084f083",
+      "path": "scripts/statecraft/ci-gate.sh",
+      "role": "script"
+    },
+    {
+      "digest": "d6f966ea51d6a32639adf79ec461ef90c48f08109b617dff6d1e4bb32d86a6a4",
+      "path": "scripts/statecraft/ai-review.sh",
+      "role": "script"
+    },
+    {
+      "digest": "aca969a6cdfb0803404e225885b575e51ba0a77ffac05beb63bb5cf2c5ac26a7",
+      "path": ".github/CODEOWNERS",
+      "role": "codeowners"
+    }
+  ],
+  "id": "github-actions-rust",
+  "identity": "8ea41428995187dbd49555e5cddec56dd80beeda5f0f2213216d47b511f79f65",
+  "jobs": {
+    "ai-review": {
+      "merge_group": "recorded-review",
+      "optional": false,
+      "pull_request": "required-review",
+      "push": "inapplicable",
+      "required": true
+    },
+    "boundaries": {
+      "declared": "ci.extra_required_jobs",
+      "merge_group": "required",
+      "optional": false,
+      "pull_request": "required",
+      "push": "required",
+      "required": true,
+      "workflow": ".github/workflows/boundaries.yml"
+    },
+    "code": {
+      "merge_group": "required",
+      "optional": false,
+      "pull_request": "required",
+      "push": "required",
+      "required": true
+    },
+    "governance": {
+      "merge_group": "required",
+      "optional": false,
+      "pull_request": "required",
+      "push": "required",
+      "required": true
+    },
+    "review-exception": {
+      "merge_group": "inapplicable",
+      "optional": false,
+      "pull_request": "owner-exception",
+      "push": "inapplicable",
+      "required": true
+    },
+    "verify": {
+      "declared": "ci.extra_required_jobs",
+      "merge_group": "required",
+      "optional": false,
+      "pull_request": "required",
+      "push": "required",
+      "required": true,
+      "workflow": ".github/workflows/verify.yml"
+    }
+  },
+  "parameters": {
+    "authored_content": "scripts/check-authored-content.sh",
+    "authored_content_text": true,
+    "code_owners": [
+      "@bartekus"
+    ],
+    "default_branch": "main",
+    "diff_cap": 2000,
+    "enforce_coverage": true,
+    "exclude": [
+      ".statecraft/derived"
+    ],
+    "extra_required_jobs": [
+      {
+        "job": "boundaries",
+        "workflow": ".github/workflows/boundaries.yml"
+      },
+      {
+        "job": "verify",
+        "workflow": ".github/workflows/verify.yml"
+      }
+    ],
+    "gate_each_commit": true,
+    "release_branch_pattern": "release/*",
+    "require_default_base": true,
+    "require_signed_commits": true
+  },
+  "prerequisites": {
+    "local": [
+      "an exact spec-spine pin",
+      "rust-toolchain.toml",
+      "Cargo.lock",
+      "a git work tree"
+    ]
+  },
+  "remote": [
+    "Settings, Actions: Actions enabled; the workflow token read-only by default",
+    "the secret CLAUDE_CODE_OAUTH_TOKEN set by the operator (gh secret set CLAUDE_CODE_OAUTH_TOKEN); its value is never in a log, a file or a message",
+    "branch protection on the default branch: require the status check ci-gate from GitHub Actions (app id 15368), and branches up to date",
+    "branch protection on the default branch: required approvals 0, and require code-owner review, so ci-gate with the AI review approves ordinary changes and a change to the profile's files needs a review its author cannot give (S-3, R2-2)",
+    "the Environment statecraft-review-exception with the owner as a required reviewer, for owner exceptions: a release candidate whose review was skipped (S-1), a pull request whose review returned findings (R2-1), and a pull request that changes the authority set (revision 5)",
+    "a merge queue, if the default branch requires one: upgrade to revision 3 first, or merge the upgrade while no queue is required, because ci-gate reads its policy at the base and revision 2 states no merge_group rule; a queue entry is judged by the review recorded for its pull request, never by a second review (revision 3)",
+    "a new refusal (revision 4): a pull request whose base is not the default branch fails governance, because a stacked pull request merges into another branch and is never judged against the default branch; open each branch off the default branch, or set governance.require_default_base to false",
+    "revision 5: a candidate never judges itself with its own gate. gate.sh, install-spec-spine.sh and the declared authored-content script run as they exist at the base, and a pull request that changes the authority set (the rendered workflows, scripts/statecraft/*, the policy, the declared authored-content script) blocks ci-gate until the owner approves the Environment statecraft-review-exception for that run. Every re-render of the profile, and every change to a file of the authority set, therefore needs the owner's approval once",
+    "the upgrade from revision 4 to 5 is one pull request judged by the base's revision-4 ci-gate, which reports the authority change and does not block it, so the owner's approval of that pull request is procedural: approve it before merging (revision 5)",
+    "revision 6: every file under .github/workflows/ is in the authority set, rendered or not, so adding, changing or removing any workflow needs the owner's approval once; a workflow the profile does not render could otherwise report a check named ci-gate",
+    "revision 7: every rendered script exits in one family contract, 0 ok, 1 finding, 2 refused, 3 usage, 4 failed; a missing spec-spine or a missing declared authored-content script now refuses with 2, a usage error is 3, and a command that broke is 4. A job the project must keep required is declared in ci.extra_required_jobs as a reusable workflow under .github/workflows/ (on: workflow_call); ci-gate needs it and blocks on failed, cancelled and skipped exactly as for its own jobs",
+    "a repository that already runs these checks by hand keeps them by setting governance.enforce_coverage (index coverage --fail-on-untraced), governance.authored_content (the script's path; absent or not executable refuses), governance.authored_content_text (the title, the body and every commit message), governance.gate_each_commit (each commit's tree passes the gate and cargo fmt) and governance.require_signed_commits (each commit verified as signed by GitHub) (revision 4)"
+  ],
+  "review": {
+    "credential": "CLAUDE_CODE_OAUTH_TOKEN",
+    "findings_rule": {
+      "exception_environment": "statecraft-review-exception",
+      "requires": "a no-findings review, or an owner exception approved for the run"
+    },
+    "never_an_approval": true,
+    "release_branch_pattern": "release/*",
+    "release_candidate_rule": {
+      "exception_environment": "statecraft-review-exception",
+      "requires": "a review (findings or no-findings), or an owner exception"
+    },
+    "skip_classes": [
+      "draft",
+      "fork",
+      "dependabot",
+      "oversized",
+      "transient"
+    ],
+    "tool": "claude-code",
+    "tool_version": "2.1.116"
+  },
+  "revision": 7
+}
