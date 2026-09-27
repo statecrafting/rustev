@@ -1,0 +1,172 @@
+{
+  "record": {
+    "amends": [
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay",
+      "009-remote-adapter-protocol",
+      "012-jev-integration"
+    ],
+    "created": "2026-09-27",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay",
+      "009-remote-adapter-protocol",
+      "012-jev-integration",
+      "013-remote-state-on-failed-attempts",
+      "017-general-runtime-optimization"
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-contract/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "003-runtime-execution-and-evidence",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-core/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "003-runtime-execution-and-evidence",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-runtime/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "004-evaluation-and-replay",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-eval/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "009-remote-adapter-protocol",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-remote-http/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "012-jev-integration",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-jev/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      }
+    ],
+    "id": "020-remote-protocol-refinements",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-4-phase-specific-time-ceilings",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "Every transport phase ceiling consumes the one remaining attempt budget; no phase, retry, pooled connection or batch grants more time, cost, authority or work than the identified plan permits."
+      },
+      {
+        "anchor": "3-5-bounded-connection-reuse",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "A pooled connection is reusable only within one complete transport isolation key and never carries credentials or principal context across a key boundary."
+      },
+      {
+        "anchor": "3-6-host-endpoint-principal-reference",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "A principal reference is optional host-supplied routing context for a host-operated endpoint, never a credential, grant, policy input, provider field or authorization."
+      },
+      {
+        "anchor": "3-2-rustev-run-2",
+        "id": "I-4",
+        "kind": "invariant",
+        "text": "A run record references remote evidence without embedding secrets or unbounded exchange bodies, and unavailable referenced evidence is explicit rather than reconstructed."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/backlog.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "020-remote-protocol-and-evidence-refinements": "835235e9c68294f1eb4972172184aec558be653dd2e4e699e2518da127c3a156",
+      "1-purpose": "cd00ba5a53f35045c907ea3cdce177cdbe5bba971cc946ff103e28240b4ea6a3",
+      "2-territory-versions-and-compatibility": "e8777389583e391c67215692e80100ddbd042bcdf01c5cfad4eae256f3b21e55",
+      "3-1-identified-configuration": "76ad82b56d06cece13b93933d00a40f990b7bb4a6dfca9f6537eafe05980d22d",
+      "3-2-rustev-run-2": "5cd6835b4e7ab342567b552c50c2ae308fda3f345ca353a3b973699ad8e65c71",
+      "3-3-runtime-planned-remote-batches": "58e50d7ba2cb7b44deb5f9c0b8b3c983d062b2f45e618a97fe9df2ae6338fb12",
+      "3-4-phase-specific-time-ceilings": "e61a21844831e2ab2c3e23234ef371c2539c43c14e13e519a58c1b4f87ef747e",
+      "3-5-bounded-connection-reuse": "625f53ee7413b2bc5673385d3a85ae61869126982c6ef17899794ec6f4dd46b3",
+      "3-6-host-endpoint-principal-reference": "fa4f131532ee4a6e06b04beceb0d8e9258061a5210adc698cd1be8a184267efa",
+      "3-7-migration-and-failure-discipline": "fb0b54ae4a5413cd34f0375480ffa9e9666b9f166a3d4ad710ec5824388cdba3",
+      "3-behavior": "01710c6fabcc6450648d4a6ee8725bfe9188919dd89a557dde9c4f884288fe4d",
+      "4-out-of-scope": "620527646aedf8f66febeff70113353edd3b9bfa11695cd1aac31356dda533d3",
+      "5-observable-negative-cases": "e2d118fdbdb851ec7dc9826622c706e5dc0e3477c2314bface45ea0ecbd5d8be",
+      "acceptance": "002f4a8729da09ff90bdb359ed264064012a06ca1a8fbfc1b628a4ccee601069",
+      "questions-settled-by-r-34": "bd7de3ca783fc231f3b1df0a823cde967a0cba761da40838ac22967fe2cb8290",
+      "verification": "ed9f4152bdac839f7ef1f32607f799de71a162233d4a970c1d57f99c10c3b656"
+    },
+    "sectionHeadings": [
+      "020: Remote protocol and evidence refinements",
+      "1. Purpose",
+      "2. Territory, versions, and compatibility",
+      "3. Behavior",
+      "3.1 Identified configuration",
+      "3.2 `rustev.run/2`",
+      "3.3 Runtime-planned remote batches",
+      "3.4 Phase-specific time ceilings",
+      "3.5 Bounded connection reuse",
+      "3.6 Host-endpoint principal reference",
+      "3.7 Migration and failure discipline",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Questions settled by R-34"
+    ],
+    "specPath": "specs/020-remote-protocol-refinements/spec.md",
+    "status": "approved",
+    "summary": "A separately reviewable refinement of the approved runtime and remote contracts: `rustev.run/2` references bounded remote exchange evidence, the runtime may dispatch an explicitly compatible general batch, transport phases receive identified ceilings inside one total attempt budget, connection reuse is bounded and isolation-keyed, and a host-operated endpoint may receive an opt-in opaque principal reference. All features default off or preserve version 1 behavior. Approval authorizes implementation only: no migration, qualification, deployment, live call, spend, or publication is authorized or claimed.\n",
+    "title": "Remote protocol and evidence refinements"
+  },
+  "shardHash": "a7adefc2eb12c750800903fd419665458ca73b831ca9e2e1ab0b88d1eaf05013",
+  "specVersion": "1.8.0"
+}

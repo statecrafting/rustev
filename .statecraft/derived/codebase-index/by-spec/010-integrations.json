@@ -4,7 +4,8 @@
       "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core",
       "003-runtime-execution-and-evidence",
-      "004-evaluation-and-replay"
+      "004-evaluation-and-replay",
+      "009-remote-adapter-protocol"
     ],
     "implementingPaths": [
       {
@@ -20,47 +21,36 @@
         "source": "spec-edge"
       },
       {
-        "path": "crates/rustev-contract/",
-        "source": "spec-edge"
-      },
-      {
-        "path": "integrations/rustev-remote-http",
-        "source": "manifest-metadata"
-      },
-      {
-        "path": "integrations/rustev-remote-http/",
-        "source": "spec-edge"
-      },
-      {
         "path": "tools/rustev-boundaries/",
         "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
       {
-        "locations": [
-          {
-            "file": "integrations/rustev-remote-http/"
-          }
-        ],
+        "locations": [],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
           "kind": "directory",
-          "path": "integrations/rustev-remote-http/"
+          "path": "integrations/rustev-aicortex/"
         }
       },
       {
-        "locations": [
-          {
-            "file": "crates/rustev-contract/"
-          }
-        ],
+        "locations": [],
         "ownership": true,
-        "sourceField": "extends",
+        "sourceField": "establishes",
         "unit": {
           "kind": "directory",
-          "path": "crates/rustev-contract/"
+          "path": "integrations/rustev-rahi/"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-serve/"
         }
       },
       {
@@ -142,9 +132,9 @@
         }
       }
     ],
-    "specId": "009-remote-adapter-protocol",
+    "specId": "010-integrations",
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "e26f778bf12d9fff03d10b8811cbb31059da019696baee7699404a73ba81ffe1"
+  "shardHash": "f2d7710dc243c011da204de2a18f7e5daf775952a5fb313c59e72473fae6605a"
 }

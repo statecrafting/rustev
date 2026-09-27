@@ -1,0 +1,146 @@
+{
+  "record": {
+    "amends": [
+      "003-runtime-execution-and-evidence"
+    ],
+    "created": "2026-09-26",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay",
+      "009-remote-adapter-protocol",
+      "012-jev-integration"
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-contract/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-core/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "003-runtime-execution-and-evidence",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-runtime/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "004-evaluation-and-replay",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-eval/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      }
+    ],
+    "id": "017-general-runtime-optimization",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-1-equivalence-and-plan-identity",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "For the same plan, snapshot, evaluation time and validated backend values, optimization produces the same judgment and core evidence as independent execution; it changes only runtime observations explicitly recorded by this spec."
+      },
+      {
+        "anchor": "3-2-complete-request-equivalence",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "No batch, shared call or cache entry crosses an authorized scope, tenant, principal, artifact, question, preprocessing, policy or other output-affecting identity boundary."
+      },
+      {
+        "anchor": "3-7-invalidation-erasure-and-races",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "Correction, revocation or erasure invalidates every affected cache entry and in-flight result; a result arriving after invalidation is neither stored nor served to a later request."
+      },
+      {
+        "anchor": "3-5-budgets-cost-and-liability",
+        "id": "I-4",
+        "kind": "invariant",
+        "text": "One external attempt has one charge owner and one liability record; sharing never duplicates, hides, refunds or reallocates an unknown charge by inference."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "017-general-runtime-batching-duplicate-suppression-and-caches": "f62fbb40bc3be12ab447b9b63fa84705dd7170e542068fc38e2af552913462fe",
+      "1-purpose": "b5e739a4b82aa29c0e1a158be58f066b65b7a8cee6b17196aa510c8280874ba0",
+      "2-territory-and-compatibility": "8c1f6063cdb67f186b9fac657dd155c28e4cb9a6841295326c8bc7960aaf871d",
+      "3-1-equivalence-and-plan-identity": "401e0e6353dcde90eebb31fa56d75c4609a03a983019f8e2d1f9676fca668dee",
+      "3-2-complete-request-equivalence": "f01b6f944339738f35c811c9e436621e2b2c653e0a8a0fb6a37f9e95fa748741",
+      "3-3-runtime-planned-batching": "3b4eaab7de5f70d1c8b450904e1f98c457028491e5efa161fc1d12a20ffeafcd",
+      "3-4-concurrent-duplicate-suppression": "293ce8259f0fbbf1000c5d98cabd434d655e0616dd3fde786ec472c1752501db",
+      "3-5-budgets-cost-and-liability": "602788bf3e81e19f9a49c8351baf0ed6e7069c33d5afeb142d4472455498bf22",
+      "3-6-memory-and-persistent-caches": "3fc932c3bf56ca65f074b2bf01bc6b9cf8fdd228c435ac928e3e30c3b670c609",
+      "3-7-invalidation-erasure-and-races": "e207f2f2f7a0405751f5d1bc03d3b890d67838469d86e2efb4e8cda00ad95212",
+      "3-8-evidence-replay-and-evaluation": "66218d25001f8f6e5d8b21707632a33ce809d72e526c9deaaf95cd778f071066",
+      "3-behavior": "909ab621ae93a7a637d63c1502103a8788e9e975475ae4bdf495f86621d08cb9",
+      "4-out-of-scope": "9c6ab559e148b9891b711e686cb97f72bee471bb78d75bbd8cfde7254d0f5631",
+      "5-observable-negative-cases": "cd755b10d0b26de73ac803a1ed55069f4107af0a1123ba8fae3089004851a1fb",
+      "acceptance": "f8bbd8433dda76d0956e8d90d29bcf492cee7840d1e8b2ab18c0dd6be183f771",
+      "questions-settled-by-r-34": "a1f023a6869315fc1d4b530ff4974050af709adc83fcd70cb29f01fbf4768d26",
+      "verification": "83cf4dae905c0f20b6b9632718c588554531f227834e8a159068d9bb95969dbd"
+    },
+    "sectionHeadings": [
+      "017: General runtime batching, duplicate suppression, and caches",
+      "1. Purpose",
+      "2. Territory and compatibility",
+      "3. Behavior",
+      "3.1 Equivalence and plan identity",
+      "3.2 Complete request equivalence",
+      "3.3 Runtime-planned batching",
+      "3.4 Concurrent duplicate suppression",
+      "3.5 Budgets, cost and liability",
+      "3.6 Memory and persistent caches",
+      "3.7 Invalidation, erasure and races",
+      "3.8 Evidence, replay and evaluation",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Questions settled by R-34"
+    ],
+    "specPath": "specs/017-general-runtime-optimization/spec.md",
+    "status": "approved",
+    "summary": "A separately reviewable amendment to runtime execution for general runtime-planned batching, concurrent duplicate suppression, bounded memory caches, and opt-in persistent caches. Optimized execution must be judgment equivalent to independent uncached execution, isolate authorized scopes, preserve each waiter's deadline and cancellation, attribute one charge and every liability exactly once, invalidate on correction, revocation and erasure, and record every shared-call or cache effect. Existing adapter-scoped batching remains a special case, not evidence that this general contract is implemented or qualified.\n",
+    "title": "General runtime batching, duplicate suppression, and caches"
+  },
+  "shardHash": "1d5a07050f95c6da5a9eebf67e3835dd5e40183171212ea1465f1f55450f3f63",
+  "specVersion": "1.8.0"
+}

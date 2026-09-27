@@ -1,5 +1,9 @@
 {
   "mapping": {
+    "amends": [
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay"
+    ],
     "dependsOn": [
       "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core",
@@ -7,14 +11,6 @@
       "004-evaluation-and-replay"
     ],
     "implementingPaths": [
-      {
-        "path": "Cargo.lock",
-        "source": "spec-edge"
-      },
-      {
-        "path": "Cargo.toml",
-        "source": "spec-edge"
-      },
       {
         "path": "Makefile",
         "source": "spec-edge"
@@ -24,32 +20,15 @@
         "source": "spec-edge"
       },
       {
-        "path": "integrations/rustev-remote-http",
-        "source": "manifest-metadata"
-      },
-      {
-        "path": "integrations/rustev-remote-http/",
+        "path": "crates/rustev-eval/",
         "source": "spec-edge"
       },
       {
-        "path": "tools/rustev-boundaries/",
+        "path": "crates/rustev-runtime/",
         "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
-      {
-        "locations": [
-          {
-            "file": "integrations/rustev-remote-http/"
-          }
-        ],
-        "ownership": true,
-        "sourceField": "establishes",
-        "unit": {
-          "kind": "directory",
-          "path": "integrations/rustev-remote-http/"
-        }
-      },
       {
         "locations": [
           {
@@ -66,40 +45,27 @@
       {
         "locations": [
           {
-            "file": "tools/rustev-boundaries/"
+            "file": "crates/rustev-eval/"
           }
         ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
           "kind": "directory",
-          "path": "tools/rustev-boundaries/"
+          "path": "crates/rustev-eval/"
         }
       },
       {
         "locations": [
           {
-            "file": "Cargo.lock"
+            "file": "crates/rustev-runtime/"
           }
         ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
-          "kind": "file",
-          "path": "Cargo.lock"
-        }
-      },
-      {
-        "locations": [
-          {
-            "file": "Cargo.toml"
-          }
-        ],
-        "ownership": true,
-        "sourceField": "extends",
-        "unit": {
-          "kind": "file",
-          "path": "Cargo.toml"
+          "kind": "directory",
+          "path": "crates/rustev-runtime/"
         }
       },
       {
@@ -142,9 +108,9 @@
         }
       }
     ],
-    "specId": "009-remote-adapter-protocol",
+    "specId": "018-live-re-execution",
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "e26f778bf12d9fff03d10b8811cbb31059da019696baee7699404a73ba81ffe1"
+  "shardHash": "1c44ae681cedaaec01809b7a4c960d20dedd7e030c8e6f0bdeef054899295145"
 }
