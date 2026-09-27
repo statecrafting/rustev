@@ -1,0 +1,145 @@
+{
+  "record": {
+    "amends": [
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay"
+    ],
+    "created": "2026-09-26",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay",
+      "005-reference-backends"
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-contract/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-core/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "003-runtime-execution-and-evidence",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-runtime/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "004-evaluation-and-replay",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-eval/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      }
+    ],
+    "id": "019-dynamic-questions",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-1-separate-class-and-api",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "A dynamic question is a separate request and outcome class; it cannot mutate a registered plan, satisfy a pending plan request, or enter a plan evaluation without a later explicit, separately governed snapshot input."
+      },
+      {
+        "anchor": "3-3-data-only-and-injection-resistant",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "Question, labels, levels, and context are bounded structured data, never instructions to Rustev, a tool invocation, an authorization, or a source of new capability."
+      },
+      {
+        "anchor": "3-4-dynamic-capability-disclosure",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "A backend answers a dynamic question only when it separately declares the exact dynamic operation, output kind, bounds, artifact identity, and data-handling posture; ordinary registered-plan capability is insufficient."
+      },
+      {
+        "anchor": "3-5-execution-budgets-and-abstention",
+        "id": "I-4",
+        "kind": "invariant",
+        "text": "Every dynamic request has one attempt under a hard declared cost cap and deadline; unknown exposure, missing capability, invalid output, ambiguity, or insufficient support yields refusal or abstention, never a default label."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "019-dynamic-questions-as-a-narrow-evaluated-class": "473c9d5ba959b270f1b47ecd85eed210d0aaa23c2bf1d6c6f03a1f8e24f29106",
+      "1-purpose": "a876c2dd0828605e3821cefa4147b773412f9825962f17eeea6db78d0a8cd48d",
+      "2-territory-and-compatibility": "c37b59d7ebdfefc8d73dd0fee8a019c53dda44fef86a56804eb3f1f0bf41cd80",
+      "3-1-separate-class-and-api": "b84ce761bd48bfb8d61ca5956af61ffcf56dde566e4c6d39c0b729c74ebf103d",
+      "3-2-request-shape-and-bounds": "26825e21e885494682711aa4796366bb703921b788f915914ec8b47144f1606a",
+      "3-3-data-only-and-injection-resistant": "9048310fba6461db5d862e8696b30f51e2e630d379fe44b2e17b083799a43fc2",
+      "3-4-dynamic-capability-disclosure": "15735aa7f88604fc83f52b73ec170357400b169423225e7fb2f756df2586e17b",
+      "3-5-execution-budgets-and-abstention": "b6ef517a564f9cb4dfa570856f1937426e030e64c2120d02e5b35a5ceee79c48",
+      "3-6-outcome-lineage-and-evidence": "c0c22a06d0b0565ab50dd551c540a44c7c9ca20352048c470688f2268d438309",
+      "3-7-replay-and-dedicated-evaluation": "5b8fc2c941ab11f22d74f696efc934aa92c1c5b9fba68542b9e5b10a7908ee10",
+      "3-behavior": "448ad350ef7862fc41a9aa48fb407c6e6581b5de1a08bc61f260294e9dd1c64e",
+      "4-out-of-scope": "2a03b831b04fff0f6cd2b653d0a9362c8408bc54f11e25ff1ae898e08566c9cc",
+      "5-observable-negative-cases": "decf882d48535846a132a9111436e1e8768cbebf6b15875291b4d02b60e5b818",
+      "acceptance": "eb03d3a7ff6817ba0444c647c058bbca9a70f1fcea53f045502cca077799dff1",
+      "questions-settled-by-r-34": "be45bb809983f9fe2365f5e759916e429b2875ab600e14eca511b68a27f18ace",
+      "verification": "44ba84b339f67300913b7576c1ae843e3cd0fe3b801022fad3ecb55a6163d44a"
+    },
+    "sectionHeadings": [
+      "019: Dynamic questions as a narrow evaluated class",
+      "1. Purpose",
+      "2. Territory and compatibility",
+      "3. Behavior",
+      "3.1 Separate class and API",
+      "3.2 Request shape and bounds",
+      "3.3 Data-only and injection-resistant",
+      "3.4 Dynamic capability disclosure",
+      "3.5 Execution, budgets, and abstention",
+      "3.6 Outcome, lineage, and evidence",
+      "3.7 Replay and dedicated evaluation",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Questions settled by R-34"
+    ],
+    "specPath": "specs/019-dynamic-questions/spec.md",
+    "status": "approved",
+    "summary": "A separate, explicitly invoked class for one bounded proposition, classification, or rubric question over caller-selected context. Dynamic questions use a dedicated backend capability, structured data-only inputs, fixed request-time labels or levels, one attempt, hard cost and time limits, explicit abstention, model-derived lineage, and class-specific evaluation. They do not alter a registered plan, supply a value into a running plan, create calibration or probability by implication, invoke tools, or grant authority.\n",
+    "title": "Dynamic questions as a narrow evaluated class"
+  },
+  "shardHash": "a78857a867a0ff76aee0a972b5b62eca6cbc1e7370b4b7f61b46ccc3adfff439",
+  "specVersion": "1.8.0"
+}

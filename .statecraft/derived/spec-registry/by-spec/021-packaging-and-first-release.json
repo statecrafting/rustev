@@ -1,0 +1,206 @@
+{
+  "record": {
+    "amends": [
+      "006-cli-surface",
+      "007-support-routing-package"
+    ],
+    "created": "2026-09-27",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay",
+      "005-reference-backends",
+      "006-cli-surface",
+      "007-support-routing-package",
+      "009-remote-adapter-protocol"
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rustev-contract/Cargo.toml"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rustev-core/Cargo.toml"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "003-runtime-execution-and-evidence",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rustev-runtime/Cargo.toml"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "004-evaluation-and-replay",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rustev-eval/Cargo.toml"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "005-reference-backends",
+        "unit": {
+          "kind": "file",
+          "path": "backends/rustev-backend-rules/Cargo.toml"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "006-cli-surface",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rustev-cli/Cargo.toml"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "007-support-routing-package",
+        "unit": {
+          "kind": "file",
+          "path": "packages/rustev-pkg-support-routing/Cargo.toml"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "009-remote-adapter-protocol",
+        "unit": {
+          "kind": "file",
+          "path": "integrations/rustev-remote-http/Cargo.toml"
+        }
+      }
+    ],
+    "id": "021-packaging-and-first-release",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-1-lifecycle-and-authority",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "A passing package check, a signed candidate, an approved release spec, an uploaded crate, a visible registry version and a qualified fresh consumer are distinct states and none is reported as another."
+      },
+      {
+        "anchor": "3-4-manifests-and-dependency-closure",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "Every published Rustev dependency resolves from the public registry at an exact family version; no released package or qualification uses a path, Git, patch, alternate registry or unpublished workspace crate."
+      },
+      {
+        "anchor": "3-8-signed-release-identity-and-artifacts",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "A release identity is one exact commit, signed tag, artifact manifest and immutable registry checksum set; an ambiguous or partial publication is never rerun as though nothing happened."
+      },
+      {
+        "anchor": "3-9-publication-procedure-and-failure",
+        "id": "I-4",
+        "kind": "invariant",
+        "text": "Publication requires a fresh explicit owner instruction naming the version, exact candidate commit, registry and package set after all candidate evidence passes."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "README.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "LICENSE"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/backlog.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "021-packaging-and-first-public-release": "3a00c212eb40d99861a85821c3e97b110324758da9fad9085973f31afcb10dee",
+      "1-purpose": "06117bd1d659705227fb77273ed1f536626be5f1c2d876bab4dafcc2508e6b0d",
+      "2-first-release-scope": "9f6956ecfcb382633ecc39fbd98c6426d77e53c16b92b539239ad0f02a03ee38",
+      "3-1-lifecycle-and-authority": "b641fd2242e1d0d5cbe9c3aee40c8b79d901a9464843d1424cadb54c4c5f86de",
+      "3-10-fresh-registry-only-consumer-qualification": "dbc8cd5474befba9c36dfc2b0b7c6404c70251086eee1875d7204cfe9d44eef7",
+      "3-2-version-policy": "63b0f058db61aa83eaa09972e3c3aeec4024b49ad6cb7c6a5e30c1add063ca62",
+      "3-3-public-metadata-and-features": "494d0f65e5333c35d5ecb2176009aa68029e43aaab06a8db9f899874d6a1a90a",
+      "3-4-manifests-and-dependency-closure": "1bd47eb6048f3c0535818d18816f46ae18d9e990461a384224c25f074a4d1291",
+      "3-5-registry-contents": "ef7feb1223579fc6bf37a5b555250851f72b8d7d59278a453b17fdfe98cdd55e",
+      "3-6-dependency-license-and-advisory-audit": "074359466440773f4a48541ddf2dbc9b3c00b02d6a2928040e7b6c9aa3e5d175",
+      "3-7-reproducible-package-verification": "cf4bd113cb42ff8160d9a831de1bf985724b9c34dabbd6203d2ddcd525b97d52",
+      "3-8-signed-release-identity-and-artifacts": "e2661906cbd764a99b349a844e72bce7250b83a4d25343533415c68ec2bad453",
+      "3-9-publication-procedure-and-failure": "4dd25f4641ccaaa68bf1ee91b2e4032dcae5acb8149cc211a9b012f72b978886",
+      "3-contract": "fd2a3c4613cd80129cb0f46bc819533eff3e28759624ea5f8bbb0fa5e2697233",
+      "4-observable-negative-cases": "2a6c8bba48ed4102c220ab54c57c63d551cd1b3c907731a6b68f9e18c1735d96",
+      "acceptance": "3fb6e446eb21f0958276d7c92ec302874efd13434dc99b9734f897319414bcdf",
+      "questions-settled-by-r-34": "98ecbd74b36f3a6ab92bf9755eac98ab8825bc2a494d3947da9a75d58984fe09",
+      "verification": "9f16fc7fb6df9503918bae4433d72118078ee5b2abe6c1c7bb3645bbb3efb0e5"
+    },
+    "sectionHeadings": [
+      "021: Packaging and first public release",
+      "1. Purpose",
+      "2. First-release scope",
+      "3. Contract",
+      "3.1 Lifecycle and authority",
+      "3.2 Version policy",
+      "3.3 Public metadata and features",
+      "3.4 Manifests and dependency closure",
+      "3.5 Registry contents",
+      "3.6 Dependency, license, and advisory audit",
+      "3.7 Reproducible package verification",
+      "3.8 Signed release identity and artifacts",
+      "3.9 Publication procedure and failure",
+      "3.10 Fresh registry-only consumer qualification",
+      "4. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Questions settled by R-34"
+    ],
+    "specPath": "specs/021-packaging-and-first-release/spec.md",
+    "status": "approved",
+    "summary": "Defines the intended first public Rustev crate family, its lockstep pre-1.0 version policy, registry contents and features, internal dependency pins, license and dependency audit, reproducible package checks, signed release identity, publication journal, and fresh registry-only consumer proof. Candidate construction, owner publication authorization, registry upload, public availability, and consumer qualification are distinct lifecycle states. Approval authorizes candidate implementation only: no crate is publishable yet and no release, tag, upload, name reservation, or availability claim is authorized or made.\n",
+    "title": "Packaging and first public release"
+  },
+  "shardHash": "63511b09b9532d69017a5e580b5c9bf1ff9610ef6124a57471daa60a54b4cb45",
+  "specVersion": "1.8.0"
+}

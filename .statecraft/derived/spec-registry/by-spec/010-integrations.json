@@ -1,0 +1,155 @@
+{
+  "record": {
+    "created": "2026-09-26",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay",
+      "009-remote-adapter-protocol"
+    ],
+    "establishes": [
+      {
+        "kind": "directory",
+        "path": "integrations/rustev-aicortex/",
+        "planned": true
+      },
+      {
+        "kind": "directory",
+        "path": "integrations/rustev-rahi/",
+        "planned": true
+      },
+      {
+        "kind": "directory",
+        "path": "integrations/rustev-serve/",
+        "planned": true
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-boundaries/"
+        }
+      }
+    ],
+    "id": "010-integrations",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-1-common-boundary",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "No integration output is authorization: Aicortex context remains attributed input, Rahi receipts establish only their declared acceptance or durability, and a serving response is only a Rustev judgment, unresolved outcome, or failure."
+      },
+      {
+        "anchor": "3-2-dependencies-and-partial-adoption",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "Each integration is independently optional and removable; contract, core, runtime, evaluation, backends and packages build without all three, and no crate depends on an integration crate."
+      },
+      {
+        "anchor": "3-3-identity-provenance-and-failure",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "Every external object, request, response, receipt and failure used by an integration retains its producer identity or an explicit unknown; an adapter never substitutes a requested identity for an observed identity."
+      },
+      {
+        "anchor": "3-2-dependencies-and-partial-adoption",
+        "id": "I-4",
+        "kind": "invariant",
+        "text": "Aicortex, Rahi, HTTP and async dependencies remain under integrations; rustev-contract and rustev-core gain no async runtime, HTTP or ecosystem dependency."
+      },
+      {
+        "anchor": "3-4-binding-records-before-implementation",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "Before an integration is implemented, an owner-reviewed binding record identifies the exact external contract, immutable dependency versions, compatibility range, failure mapping, security and privacy posture, resource limits, and retained qualification evidence."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "010-optional-ecosystem-integrations-and-serving-boundary": "3c9b4b9baf8fcc117d4972211f3c0a0f7a4e06f6c806cfbe940292e46da9a227",
+      "1-purpose": "5b155272c9232bbb80ccff1a1334c284013fb24fbe85f5eab0c95bf12449009d",
+      "2-territory-and-lifecycle": "953e4c745db493347f82ad3ad784b538b13b232b50618f845859d40cc8334bec",
+      "3-1-common-boundary": "f979610cbae4f4c7a6f816a45d02a70ec9e7defb29f2ba1e1549ea117bdb70e9",
+      "3-2-dependencies-and-partial-adoption": "7918d289c17f92d2c8175822338929c49d5388aa06f4e2cdf485e5d646e0e3a2",
+      "3-3-identity-provenance-and-failure": "15e85f9e6fec9addc1be63f2d1a26302a1cbc2510c9a32ba0b3005b65e8912c0",
+      "3-4-binding-records-before-implementation": "cc4ec1c96924fadb086c1f52ab43173a8aab90bd467c62f7502654ba74165f4e",
+      "3-5-aicortex-adapter": "38de7f8a7a5db244c74f1a372ba77fbf8720faaa915e190687f478a286a5ffc1",
+      "3-6-rahi-adapter": "f00c78a146e92dbfd859c389c0adc8a98c7046a5431af8998726712759afa6b3",
+      "3-7-serving-adapter": "4c079c0f5ba2ce689f659cd620b2ea682fc4600e232ee3fae171e77c4ff35150",
+      "3-behavior": "b886e6806c04c5b3c8782e647c3f1de1c9de0834aaa88112506f20155491068f",
+      "4-out-of-scope": "b94e4a2b9662c2fc0a7005589a9ff148f8747130beed017a00a136b59fee03fa",
+      "5-observable-negative-cases": "9ef636e4c5b27c2b053cf0bfa8b87ac0d1309ec34bafa3c8fd819ae03bcf080e",
+      "acceptance": "1b5fefd7df62ecb032adf6c62c2bc47fd0afffa28a4d1cf192ebf1c0683f1f2f",
+      "questions-settled-by-r-34": "9d03855a73f4458247f4366929cd07b18955edcc20205ff81cc1c6b6780d9ce9",
+      "verification": "617097493a2efddbe91eae5435dbbf78cf162d251a49b8ca5054110edc70d230"
+    },
+    "sectionHeadings": [
+      "010: Optional ecosystem integrations and serving boundary",
+      "1. Purpose",
+      "2. Territory and lifecycle",
+      "3. Behavior",
+      "3.1 Common boundary",
+      "3.2 Dependencies and partial adoption",
+      "3.3 Identity, provenance and failure",
+      "3.4 Binding records before implementation",
+      "3.5 Aicortex adapter",
+      "3.6 Rahi adapter",
+      "3.7 Serving adapter",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Questions settled by R-34"
+    ],
+    "specPath": "specs/010-integrations/spec.md",
+    "status": "approved",
+    "summary": "A shared boundary contract for three independently optional integration crates: `rustev-aicortex` adapts attributed context and observation proposals, `rustev-rahi` adapts evidence delivery and optional operational hosting, and `rustev-serve` exposes bounded registered-plan execution over an application-operated service boundary. Every integration preserves explicit identity, provenance, failure and unresolved effects; none grants authority, owns domain judgment, or makes Rustev depend on an ecosystem service. Concrete external API bindings and readiness claims require later evidence before implementation.\n",
+    "title": "Optional ecosystem integrations and serving boundary"
+  },
+  "shardHash": "7a34c85683ebdf14d661ee7c9a0e8a28cfc55cac05814d553f295ce72db4e7ff",
+  "specVersion": "1.8.0"
+}
