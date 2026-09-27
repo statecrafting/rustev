@@ -1,0 +1,126 @@
+{
+  "record": {
+    "created": "2026-09-26",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay",
+      "005-reference-backends",
+      "006-cli-surface",
+      "007-support-routing-package",
+      "012-jev-integration",
+      "014-report-integrity"
+    ],
+    "establishes": [
+      {
+        "kind": "directory",
+        "path": "packages/rustev-pkg-lodging/"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "012-jev-integration",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-jev/"
+        }
+      }
+    ],
+    "id": "008-reference-package-lodging",
+    "implementation": "complete",
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "008-reference-package-lodging-recommendation": "42ab64f6f5ec9b1dd12d9d010267d1a3eb4f507eeabff05053886e4ce0a6f592",
+      "1-purpose": "83cd8b2c86615681829e4e0ee4e41cb91c84bea8006a9e7f1b5042e711cec49a",
+      "2-territory-and-dependencies": "c344f671aa0219d8355b08fc61bd143e5e6d5f24069274b38125b2afaa88264b",
+      "3-1-definition-and-inputs": "68cd2149d24d04e0b6bfc2e6725703f48fbd8c761fb7109d6ae46c28a25d25db",
+      "3-2-exact-eligibility-and-shortlist": "97567ca35e109a99d231155addd3c0a66c175841b165d6e129aeff06c8a973be",
+      "3-3-trusted-context-and-semantic-work": "6e70d0d88bdac2160a1c26aa465ed8bc253efbac2fdab2986bfff9c248c8d74f",
+      "3-4-ranking-output-and-abstention": "4a22bd79cc2865079d450c31fcbb065ddb65affb443a3cb09041b97a74917aeb",
+      "3-5-identity-and-repeatability": "40d5a4487d24b22d9424ae990155bbf57e66b3378102ac942e363a95bf52d9ef",
+      "3-package-contract": "3979bb6c27af64bd8cd8618d0de42f325032dfd6aba1653ccccdfc8c3f82d03a",
+      "4-1-synthetic-mechanics-set": "243395d5d648e8084c42044f0f5addd267e25fcc3349832676c9f37f951fccfb",
+      "4-2-quality-evidence-is-separate": "57c02bff2ae241c2a4ac8c26f731b365babdf5f13d019fcf9c41161bd2e3c2ff",
+      "4-3-backend-swap": "794a174f2bc0bf28af923b2dd4ef1352e4742cbdbcab2a203b9a3257edd07198",
+      "4-4-partial-adoption": "2a86e5ed2a03450908f6fda51aa68fc660310e1218d396ba40fd389af32262de",
+      "4-evaluation-and-evidence": "73ce81a87a188446bcd7e5def19163ed5e93023f521f35d42fa39c6a371660a2",
+      "5-privacy-isolation-and-resources": "3c9d138f0c435438900828ee6376debfb2ba4931eb47bb294c5f0ed2bafd3354",
+      "6-non-goals": "3a1b65c1cb500355906a9a5f154234ab8b80adcd27e8dbf479553ca09251ddd1",
+      "7-observable-negative-cases": "7852cb832ccb95ed014dd5537ef31f9e1b71f1c55e3266969e7f7aae8952930c",
+      "acceptance": "2537793f981837d63f45224c9a13094a26837c46252105db5d74365c9ef2d7ba",
+      "implementation-record": "253728f8ed56460532dcae32c7ba4b04871933baa4ffc13cb4bb3097c2e5168a",
+      "open-owner-questions": "2c2e0e44f4bd28aae0618071e2ff6108293e83d560cc295cb156edac04ae375d",
+      "verification": "361e32bc264b1b8098e24ec01d3e7fb1aa537030d589f60b73a0c2e68d6169b1"
+    },
+    "sectionHeadings": [
+      "008: Reference package: lodging recommendation",
+      "1. Purpose",
+      "2. Territory and dependencies",
+      "3. Package contract",
+      "3.1 Definition and inputs",
+      "3.2 Exact eligibility and shortlist",
+      "3.3 Trusted context and semantic work",
+      "3.4 Ranking, output, and abstention",
+      "3.5 Identity and repeatability",
+      "4. Evaluation and evidence",
+      "4.1 Synthetic mechanics set",
+      "4.2 Quality evidence is separate",
+      "4.3 Backend swap",
+      "4.4 Partial adoption",
+      "5. Privacy, isolation, and resources",
+      "6. Non-goals",
+      "7. Observable negative cases",
+      "Acceptance",
+      "Implementation record",
+      "Verification",
+      "Open owner questions"
+    ],
+    "specPath": "specs/008-reference-package-lodging/spec.md",
+    "status": "approved",
+    "summary": "The second reference domain package reserved by the architecture roadmap: `packages/rustev-pkg-lodging`, containing a bounded lodging-recommendation definition, canonical documents, synthetic mechanics fixtures, and evaluation material. The package preserves exact eligibility, explicit trust treatment, bounded semantic fan-out, abstention, lineage, offline replay, partial adoption, and backend-swap comparison without claiming semantic quality, external readiness, or authority to book lodging.\n",
+    "title": "Reference package: lodging recommendation"
+  },
+  "shardHash": "b204168e5eee7aeed0d188cd30de250df07f7765df83f3cab8e4e3a27469afa5",
+  "specVersion": "1.8.0"
+}

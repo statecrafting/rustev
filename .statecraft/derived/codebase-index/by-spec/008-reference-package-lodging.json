@@ -1,11 +1,15 @@
 {
   "mapping": {
-    "amends": [
-      "002-decision-contract-and-pure-core"
-    ],
     "dependsOn": [
       "001-boundaries-and-authority",
-      "002-decision-contract-and-pure-core"
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay",
+      "005-reference-backends",
+      "006-cli-surface",
+      "007-support-routing-package",
+      "012-jev-integration",
+      "014-report-integrity"
     ],
     "implementingPaths": [
       {
@@ -21,19 +25,15 @@
         "source": "spec-edge"
       },
       {
-        "path": "crates/rustev-contract/",
+        "path": "integrations/rustev-jev/",
         "source": "spec-edge"
       },
       {
-        "path": "crates/rustev-core/",
-        "source": "spec-edge"
-      },
-      {
-        "path": "crates/rustev-runtime",
+        "path": "packages/rustev-pkg-lodging",
         "source": "manifest-metadata"
       },
       {
-        "path": "crates/rustev-runtime/",
+        "path": "packages/rustev-pkg-lodging/",
         "source": "spec-edge"
       }
     ],
@@ -41,40 +41,27 @@
       {
         "locations": [
           {
-            "file": "crates/rustev-runtime/"
+            "file": "packages/rustev-pkg-lodging/"
           }
         ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
           "kind": "directory",
-          "path": "crates/rustev-runtime/"
+          "path": "packages/rustev-pkg-lodging/"
         }
       },
       {
         "locations": [
           {
-            "file": "crates/rustev-contract/"
+            "file": "integrations/rustev-jev/"
           }
         ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
           "kind": "directory",
-          "path": "crates/rustev-contract/"
-        }
-      },
-      {
-        "locations": [
-          {
-            "file": "crates/rustev-core/"
-          }
-        ],
-        "ownership": true,
-        "sourceField": "extends",
-        "unit": {
-          "kind": "directory",
-          "path": "crates/rustev-core/"
+          "path": "integrations/rustev-jev/"
         }
       },
       {
@@ -115,11 +102,37 @@
           "kind": "file",
           "path": "Makefile"
         }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/decisions/00-founding-decisions.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/001-decision-engine-architecture.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
       }
     ],
-    "specId": "003-runtime-execution-and-evidence",
+    "specId": "008-reference-package-lodging",
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "0fb18d68cf2346d87b92e43a66d0fe233333217022afd1790df8c3c6bddddf1c"
+  "shardHash": "22a7af588b301e32cea6e9b37eb335be0b74267359a74bc1839f45d30fd7ba94"
 }

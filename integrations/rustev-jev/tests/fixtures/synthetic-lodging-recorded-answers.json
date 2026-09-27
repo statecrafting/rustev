@@ -1,0 +1,88 @@
+{
+  "recorded_at": null,
+  "provenance": "SYNTHETIC: authored recorded-response fixture for the spec 008 mechanics-only backend swap",
+  "responses": {
+    "boolean": {
+      "answers": {
+        "q0": {
+          "probability": 0.8,
+          "type": "boolean"
+        }
+      },
+      "metadata": {
+        "gateway": {
+          "cost": "0.0000042",
+          "generationId": "gen_SYNTHETIC_lodging_boolean",
+          "marketCost": "0.0000042",
+          "routing": {
+            "canonicalSlug": "typesafe-ai/jev",
+            "finalProvider": "typesafe-ai",
+            "originalModelId": "typesafe-ai/jev",
+            "resolvedProvider": "typesafe-ai"
+          }
+        },
+        "typesafe": {
+          "confidence": {}
+        }
+      }
+    },
+    "choice": {
+      "answers": {
+        "q0": {
+          "probabilities": {
+            "business": 0.7,
+            "family": 0.1,
+            "leisure": 0.1,
+            "other": 0.1
+          },
+          "type": "choice"
+        }
+      },
+      "metadata": {
+        "gateway": {
+          "cost": "0.0000042",
+          "generationId": "gen_SYNTHETIC_lodging_choice",
+          "marketCost": "0.0000042",
+          "routing": {
+            "canonicalSlug": "typesafe-ai/jev",
+            "finalProvider": "typesafe-ai",
+            "originalModelId": "typesafe-ai/jev",
+            "resolvedProvider": "typesafe-ai"
+          }
+        },
+        "typesafe": {
+          "confidence": {}
+        }
+      }
+    },
+    "score": {
+      "answers": {
+        "q0": {
+          "probabilities": {
+            "0": 0.1,
+            "1": 0.1,
+            "2": 0.2,
+            "3": 0.6
+          },
+          "type": "score"
+        }
+      },
+      "metadata": {
+        "gateway": {
+          "cost": "0.0000042",
+          "generationId": "gen_SYNTHETIC_lodging_score",
+          "marketCost": "0.0000042",
+          "routing": {
+            "canonicalSlug": "typesafe-ai/jev",
+            "finalProvider": "typesafe-ai",
+            "originalModelId": "typesafe-ai/jev",
+            "resolvedProvider": "typesafe-ai"
+          }
+        },
+        "typesafe": {
+          "confidence": {}
+        }
+      }
+    }
+  }
+}
