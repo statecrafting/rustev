@@ -38,6 +38,7 @@ rustev-eval = { path = "../../crates/rustev-eval" }
 # The support-routing backend swap (spec 016 3.3): the package, spec 005's
 # rules program as the other backend, and the CLI that evaluates bundles.
 rustev-pkg-support-routing = { path = "../../packages/rustev-pkg-support-routing" }
+rustev-pkg-lodging = { path = "../../packages/rustev-pkg-lodging" }
 rustev-backend-rules = { path = "../../backends/rustev-backend-rules" }
 rustev-cli = { path = "../../crates/rustev-cli" }
 hyper = { workspace = true, features = ["client", "server", "http1"] }

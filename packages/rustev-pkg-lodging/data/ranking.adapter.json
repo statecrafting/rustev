@@ -1,0 +1,1 @@
+{"labels":{"prefixes":["c-"],"values":["none"]},"name":"lodging-recommendation.ranking","rules":[{"action":"present_ranked_lodging","map":{},"otherwise":null,"param":"ranking","select":"first_ranked"},{"action":"no_eligible_lodging","label":"none"}],"schema":"rustev.task-adapter/1","version":"1"}

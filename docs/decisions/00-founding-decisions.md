@@ -131,6 +131,15 @@ order. Recorded here as the owner's decisions.
 | R-32 | Asked on 2026-09-25 (night), after the Gateway refused `zeroDataRetention: true` on the Hobby plan again (C-13), whether stage 3 of spec `012` 3.8 could dispatch without it, the owner chose: "Run under R-30 (omit ZDR)". Stage 3 on travel-memory's synthetic-provenance qualification set therefore omits `zeroDataRetention` and keeps `only: ["typesafe-ai"]` on every request, within R-30's scope; the work order's "ZDR on every request" and travel-memory 006 3.5 assumed the flag would be accepted. Owner fact, 2026-09-25: the Vercel AI Gateway dashboard budget is set to USD 5, equal to the testing cap (R-29), as the external backstop. |
 | R-33 | Owner's words, 2026-09-26: "Proceed with ratifying the amendment 016". Spec `016` (amends `007`) is approved as drafted, and its open questions are settled as the draft recommends, following R-31's precedent: Q-1, the backend swap test lives in `integrations/rustev-jev/tests/` with the package as a dev-dependency of `rustev-jev`, spec `001` 3.4.4 stays absolute, and spec `007` 3.3.1's allowance for integrations as package dev-dependencies is withdrawn; Q-2, the package ships two evaluation sets over the same cases and snapshots, `support-routing.queue` and `support-routing.priority`, each with its own version 2 evaluator configuration. `016` is implemented together with `007`. |
 
+### Owner decision of 2026-09-26, backlog contracts
+
+Decided by the owner on 2026-09-26 after reviewing the completed backlog
+drafting handoff. Recorded here as the owner's decision.
+
+| Id | Decision |
+|---|---|
+| R-34 | Owner's words: "I approve and ratify specs 008, 010, 017, 018, 019, 020, and 021 as drafted, accept their recommendations, and authorize their implementation as separate reviewable PRs. Publication, release, deployment, live provider activity, spend, and approval of spec 010 binding records remain separate owner acts." Each draft question is settled as its recommendation states. Implementation order begins with 008. Spec 010 implementation may proceed only after the owner separately approves each concrete binding record required by its section 3.4. Spec 021 approval authorizes candidate implementation and qualification, not publication, tagging, release, credentials, name reservation, or an availability claim. |
+
 ## Approvals
 
 | Id | Act | Date |
@@ -148,6 +157,7 @@ order. Recorded here as the owner's decisions.
 | A-11 | The owner approved spec `015` (amends `004`: per-case reporting of unusable replay bundles; supersedes spec `006` E-31) with R-31's answers, by the same act. Implementation is pending. | 2026-09-25 |
 | A-12 | The owner approved spec `007` (package `packages/rustev-pkg-support-routing`, depending on contract and core only) with R-31's answers, by the same act. Implementation is pending. | 2026-09-25 |
 | A-13 | The owner approved spec `016` (amends `007`: the swap test compares policy sections modulo Jev's declared `uncalibrated_threshold` on `topic`, lives in `rustev-jev`'s tests, and priority is a second evaluation set) with R-33's answers, as its own reviewable change before code (R-16). Implementation is pending, with `007`. | 2026-09-26 |
+| A-14 | The owner approved spec `008` (lodging reference package) as drafted with R-34's answers. Implementation is pending. | 2026-09-26 |
 
 No approval authorizes ratifying any other spec.
 
