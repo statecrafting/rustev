@@ -13,15 +13,7 @@
     ],
     "implementingPaths": [
       {
-        "path": "Cargo.lock",
-        "source": "spec-edge"
-      },
-      {
         "path": "Makefile",
-        "source": "spec-edge"
-      },
-      {
-        "path": "crates/rustev-cli/src/run.rs",
         "source": "spec-edge"
       },
       {
@@ -97,19 +89,6 @@
       {
         "locations": [
           {
-            "file": "Cargo.lock"
-          }
-        ],
-        "ownership": true,
-        "sourceField": "extends",
-        "unit": {
-          "kind": "file",
-          "path": "Cargo.lock"
-        }
-      },
-      {
-        "locations": [
-          {
             "file": "Makefile"
           }
         ],
@@ -118,23 +97,6 @@
         "unit": {
           "kind": "file",
           "path": "Makefile"
-        }
-      },
-      {
-        "locations": [
-          {
-            "file": "crates/rustev-cli/src/run.rs",
-            "span": {
-              "endLine": 181,
-              "startLine": 167
-            }
-          }
-        ],
-        "ownership": true,
-        "sourceField": "extends",
-        "unit": {
-          "id": "rustev_cli::run::prepare_json",
-          "kind": "symbol"
         }
       },
       {
@@ -168,5 +130,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "89f5caaa31c3d09d8b6189f4489832ed083dc9dcd5b6ec73f82fb2260939f75d"
+  "shardHash": "8a05ae89317ba82eac455b0cdcef5423438f21f7b5b0c1e68f4e4aeb1dbe23a8"
 }

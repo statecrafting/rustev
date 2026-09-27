@@ -180,7 +180,10 @@ impl<'a> Capturing<'a> {
                 step: record.step.clone(),
                 instance: record.instance.clone(),
                 request,
-                attempt_id: from.attempt.map(|a| a.attempt_id.clone()),
+                attempt_id: from
+                    .attempt
+                    .map(|a| a.attempt_id.clone())
+                    .or_else(|| from.reused_from.map(str::to_string)),
                 target: from.target,
                 value,
             },

@@ -17,7 +17,6 @@ pub mod clock;
 mod driver;
 pub mod ledger;
 mod optimization;
-mod persistent;
 mod sink;
 mod wait;
 
@@ -47,10 +46,10 @@ use tokio::sync::{OwnedSemaphorePermit, Semaphore, mpsc, oneshot};
 pub use capture::{CaptureConfig, CaptureConfigError, MAX_CAPTURE_BYTES};
 pub use clock::{Clock, Instant, ManualClock, TokioClock};
 pub use ledger::Ledger;
-pub use optimization::{InvalidationCause, InvalidationResult, InvalidationSelector};
-pub use persistent::PersistentCacheStore;
+pub use optimization::InvalidationResult;
 pub use sink::{DeliveryFailure, DeliveryTicket, SinkPolicy, SinkStats};
 
+use crate::optimization::InvalidationSelector;
 use crate::sink::{Job, Stats};
 use crate::wait::{Raced, race};
 
@@ -79,16 +78,12 @@ pub enum PrepareError {
     /// The plan binds a backend id that is not registered.
     MissingBackend(String),
     /// The registered backend's descriptor is not the one the plan bound.
-    DescriptorMismatch {
-        backend_id: String,
-    },
+    DescriptorMismatch { backend_id: String },
     /// A hard budget, and a reachable backend without enforceable bounds.
     HardBudgetUnenforceable {
         backend_id: String,
         model: CostModel,
     },
-    MissingPersistentStore,
-    PersistentStoreContractMismatch,
 }
 
 /// Why a decision was not admitted (spec 003, 3.4.1). Nothing was dispatched
@@ -192,7 +187,6 @@ pub(crate) struct Inner {
     pub queue: Option<mpsc::Sender<Job>>,
     pub stats: Arc<Stats>,
     pub shared: Option<Arc<Ledger>>,
-    persistent: Option<Arc<dyn PersistentCacheStore>>,
     optimizer: optimization::Optimizer,
     admission: Arc<Semaphore>,
     queued: AtomicUsize,
@@ -213,7 +207,6 @@ pub struct RuntimeBuilder {
     config: RuntimeConfig,
     backends: Vec<(Arc<dyn DecisionBackend>, usize)>,
     shared: Option<Arc<Ledger>>,
-    persistent: Option<Arc<dyn PersistentCacheStore>>,
 }
 
 impl RuntimeBuilder {
@@ -226,13 +219,6 @@ impl RuntimeBuilder {
     /// A ledger shared by every decision, reserved after each decision's own.
     pub fn shared_ledger(mut self, ledger: Arc<Ledger>) -> Self {
         self.shared = Some(ledger);
-        self
-    }
-
-    /// Supply the persistent cache implementation asserted by an enabled
-    /// optimization policy. Merely registering a store does not enable it.
-    pub fn persistent_cache(mut self, store: Arc<dyn PersistentCacheStore>) -> Self {
-        self.persistent = Some(store);
         self
     }
 
@@ -298,7 +284,6 @@ impl RuntimeBuilder {
                 queue,
                 stats,
                 shared: self.shared,
-                persistent: self.persistent,
                 optimizer: optimization::Optimizer::default(),
                 admission: Arc::new(Semaphore::new(c.max_in_flight)),
                 queued: AtomicUsize::new(0),
@@ -394,7 +379,6 @@ impl Runtime {
             config,
             backends: vec![],
             shared: None,
-            persistent: None,
         }
     }
 
@@ -430,19 +414,6 @@ impl Runtime {
             .map(|p| p.cost)
             .unwrap_or(CostPolicy::Unlimited);
         let optimization = policy.as_ref().and_then(|p| p.optimization.clone());
-        if let Some(persistent) = optimization
-            .as_ref()
-            .and_then(|optimization| optimization.persistent_cache.as_ref())
-        {
-            let store = self
-                .inner
-                .persistent
-                .as_ref()
-                .ok_or(PrepareError::MissingPersistentStore)?;
-            if store.contract() != &persistent.contract {
-                return Err(PrepareError::PersistentStoreContractMismatch);
-            }
-        }
         let target = |backend_id: &str, descriptor: &rustev_contract::ids::DescriptorId| {
             let r = self
                 .inner
@@ -514,70 +485,35 @@ impl Runtime {
         })
     }
 
-    /// Invalidate every reusable result in this plan's namespace. Generation
-    /// advances before entries are removed, so a racing result cannot return.
-    pub async fn invalidate_plan(
-        &self,
-        plan: &PreparedPlan,
-        cause: InvalidationCause,
-    ) -> Option<InvalidationResult> {
+    /// Invalidate every reusable result in this plan's namespace, for any
+    /// correction, revocation, erasure, artifact withdrawal or policy
+    /// change the host observed. The generation advances before entries are
+    /// removed, so a result captured earlier is never stored or served.
+    pub fn invalidate_plan(&self, plan: &PreparedPlan) -> Option<InvalidationResult> {
         let namespace = plan.optimization_namespace()?;
-        let selector = InvalidationSelector::Namespace {
-            namespace: namespace.clone(),
-        };
-        Some(self.invalidate(plan, selector, namespace, cause).await)
+        Some(
+            self.inner
+                .optimizer
+                .invalidate(&InvalidationSelector::Namespace { namespace }),
+        )
     }
 
-    /// Invalidate reusable results for one opaque authorized scope.
-    pub async fn invalidate_scope(
+    /// Invalidate reusable results for one opaque authorized scope, as for
+    /// an erasure or a scope revocation.
+    pub fn invalidate_scope(
         &self,
         plan: &PreparedPlan,
         principal_handle: &[u8],
-        cause: InvalidationCause,
     ) -> Option<InvalidationResult> {
         let namespace = plan.optimization_namespace()?;
-        let scope_id = optimization::scope_id(principal_handle);
-        let selector = InvalidationSelector::Scope {
-            namespace: namespace.clone(),
-            scope_id,
-        };
-        Some(self.invalidate(plan, selector, namespace, cause).await)
-    }
-
-    async fn invalidate(
-        &self,
-        plan: &PreparedPlan,
-        selector: InvalidationSelector,
-        namespace: String,
-        cause: InvalidationCause,
-    ) -> InvalidationResult {
-        let policy = plan
-            .optimization
-            .as_ref()
-            .expect("invalidation requires optimization policy");
-        let mut result = self
-            .inner
-            .optimizer
-            .invalidate(&selector, cause, &policy.invalidation);
-        if policy.persistent_cache.is_some()
-            && let Some(store) = self.inner.persistent.as_ref()
-            && let Err(detail) = store.invalidate(&selector).await
-        {
-            let detail = format!("persistent invalidation failed: {detail}");
+        Some(
             self.inner
                 .optimizer
-                .mark_unavailable(&namespace, detail.clone());
-            result.namespace_available = false;
-            result.diagnostic = Some(detail);
-        }
-        result
-    }
-
-    /// Restore an optimization namespace after the host has completed and
-    /// verified reconciliation of a failed persistent invalidation.
-    pub fn reconcile_optimization_namespace(&self, plan: &PreparedPlan) -> bool {
-        plan.optimization_namespace()
-            .is_some_and(|namespace| self.inner.optimizer.reconcile(&namespace))
+                .invalidate(&InvalidationSelector::Scope {
+                    namespace,
+                    scope_id: optimization::scope_id(principal_handle),
+                }),
+        )
     }
 
     async fn admit(
@@ -717,7 +653,7 @@ impl Runtime {
                 plan,
                 deadline,
                 submitted,
-                cancel: cancel.clone(),
+                cancel,
                 ledger: &ledger,
                 decision_id: &req.decision_id,
                 principal: &req.principal_handle,

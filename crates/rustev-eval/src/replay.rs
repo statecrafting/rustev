@@ -485,10 +485,20 @@ fn reproduce_inner(
         let Some(from) = q.supplied_from() else {
             return bad(Inconsistency::NotInRun);
         };
+        // An output reused from a cache entry names the earlier attempt that
+        // produced it; the record itself made no attempt (spec 017, 3.8).
+        let origin = from
+            .attempt
+            .map(|a| a.attempt_id.as_str())
+            .or(from.reused_from);
+        let output_target = from
+            .attempt
+            .map(|a| a.target)
+            .or(from.reused_from.map(|_| from.target));
         if from.target != entry.target
-            || from.attempt.map(|a| a.attempt_id.as_str()) != entry.attempt_id.as_deref()
+            || origin != entry.attempt_id.as_deref()
             || matches!(q.result, RequestResult::Output { .. })
-                && from.attempt.map(|a| a.target) != Some(entry.target)
+                && output_target != Some(entry.target)
         {
             return bad(Inconsistency::Origin);
         }
@@ -509,7 +519,7 @@ fn reproduce_inner(
                 if o.step != entry.step
                     || o.instance != entry.instance
                     || bound.as_ref() != Some(&o.artifact)
-                    || from.attempt.map(|a| &a.artifact) != Some(&o.artifact)
+                    || from.attempt.is_some_and(|a| a.artifact != o.artifact)
                 {
                     return bad(Inconsistency::OutputBinding);
                 }

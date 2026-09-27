@@ -2,7 +2,7 @@
 id: "017-general-runtime-optimization"
 title: "General runtime batching, duplicate suppression, and caches"
 status: approved
-implementation: complete
+implementation: in-progress
 created: "2026-09-26"
 summary: >
   A separately reviewable amendment to runtime execution for general
@@ -13,7 +13,7 @@ summary: >
   every liability exactly once, invalidate on correction, revocation and
   erasure, and record every shared-call or cache effect. Existing
   adapter-scoped batching remains a special case, not evidence that this
-  general contract is qualified. Approved (A-16) and implemented.
+  general contract is implemented or qualified.
 amends:
   - "003-runtime-execution-and-evidence"
 extends:
@@ -21,8 +21,6 @@ extends:
   - { spec: "002-decision-contract-and-pure-core", unit: { kind: directory, path: "crates/rustev-core/" }, nature: amending }
   - { spec: "003-runtime-execution-and-evidence", unit: { kind: directory, path: "crates/rustev-runtime/" }, nature: amending }
   - { spec: "004-evaluation-and-replay", unit: { kind: directory, path: "crates/rustev-eval/" }, nature: additive }
-  - { spec: "006-cli-surface", unit: { kind: symbol, id: "rustev_cli::run::prepare_json" }, nature: additive }
-  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.lock" }, nature: additive }
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
@@ -56,9 +54,9 @@ obligations:
 # 017: General runtime batching, duplicate suppression, and caches
 
 Approved (A-16, 2026-09-26) as its own reviewable change before any code
-(R-16), and implemented; see the implementation record. Approval and
-implementation make no latency, throughput, cost, durability, cache-safety,
-qualification, adoption, or production claim.
+(R-16). Implementation is in progress in increments; see the implementation
+record. Approval makes no latency, throughput,
+cost, durability, cache-safety, or production claim.
 
 ## 1. Purpose
 
@@ -209,10 +207,10 @@ is unknown.
 
 ## 4. Out of scope
 
-Adapter-scoped batching changes; distributed caches; cross-scope sharing;
-approximate or semantic cache keys; caching judgments or authorizations;
-changing backend capabilities; provider qualification; production enablement;
-performance or cost claims.
+Adapter-scoped batching changes; distributed caches;
+cross-scope sharing; approximate or semantic cache keys; caching judgments or
+authorizations; changing backend capabilities; provider qualification;
+production enablement; performance or cost claims.
 
 ## 5. Observable negative cases
 
@@ -255,67 +253,98 @@ cargo test -p rustev-runtime --test optimization_benchmark --locked -- --ignored
 
 ## Implementation record
 
-- `rustev-contract` adds the identified optimization policy and bounded
-  evidence vocabulary. The optimization member is optional and omitted when
-  disabled. `an_execution_policy_parses_round_trips_and_is_identified` pins
-  the exact pre-017 canonical bytes as a negative control.
-- `rustev-core` carries the policy into the plan and exposes neutral general
-  batch calls. Core remains free of I/O, clocks, async runtimes and cache
-  state. The runtime validates every reused or batched `RawOutput` through the
-  same core seam used for independent output.
-- `rustev-runtime` implements general same-decision batching, concurrent
-  duplicate suppression, bounded FIFO memory caching and an opt-in host store.
-  The complete key binds the plan, optimization and schema versions, complete
-  authorized-scope handle, installed artifact and descriptor, step, instance
-  and canonical projection. Digest hits compare retained canonical material.
-- Every batch member is admitted and reserved before dispatch. Known charges
-  use even integer allocation with the remainder assigned by member index.
-  Unknown batch exposure has one owner for the full reservation and one linked
-  liability value on every member. Requests with retry, timeout, fallback or
-  multiple targets bypass batching so their approved independent semantics
-  remain exact.
-- Shared calls preserve each waiter's deadline, cancellation and evidence.
-  Work continues while a waiter remains; the final departure raises the
-  worker signal. The charge owner returns after cancellation is processed into
-  its record and does not wait for a backend that ignores cancellation.
-- Memory admission enforces entry, count, total-byte and per-scope-byte bounds
-  before reuse and records deterministic eviction count and bytes. Persistent
-  entries carry schema, complete key material, scope, generation, creation and
-  expiry inputs, validated output, source lineage and an integrity digest.
-  Host contract mismatch is a preparation refusal; corrupt, old-schema,
-  stale, colliding or request-invalid entries are diagnostic misses.
-- Correction, revocation and erasure advance a namespace generation before
-  removal. Erasure and scope revocation stop affected calls. Correction may
-  finish existing waiters only when the identified policy permits it. A late
-  result from an earlier generation cannot be stored. Failed host-store
-  invalidation quarantines the namespace until explicit reconciliation.
-- `rustev-eval::optimization` reports cold and warm p50, p95 and p99 latency,
-  throughput, hit and join rates, failures, unknown liability, cache bytes,
-  evictions, invalidation lag, erasure completion and judgment equivalence.
-  Measurements the caller does not supply remain `unknown`; evaluation never
-  consults a live store.
-- Section 5 is covered in `crates/rustev-runtime/tests/optimization.rs` and the
-  internal optimizer tests: scope-key separation, independent waiter
-  cancellation, final-waiter cancellation, erasure and correction races,
-  old persistent schema, omitted batch members, exact remainder allocation,
-  collision handling, restart reuse, persistent corruption, byte bounds and
-  single-owner unknown liability. The disabled-byte check is in
-  `crates/rustev-contract/tests/documents.rs`.
-- Differential tests compare cold and memory-hit execution and independent and
-  batched dispatch for identical judgments and core evidence. Existing runtime
-  failure, cancellation, deadline and fallback suites remain the independent
-  controls; optimization-specific tests exercise those paths without changing
-  their core result. Existing specs 009 and 012 batching tests are unchanged
-  special-case coverage only, not qualification of this implementation.
+Settled question 1 lets the mechanisms land as separately reviewed
+increments under this contract. Increment 1 implements runtime-planned
+batching (3.3) and the bounded memory cache (3.6, memory part) with its
+invalidation (3.7), their evidence (3.8) and evaluation support. Concurrent
+duplicate suppression (3.4) and persistent caching (3.6, persistent part) are
+increment 2 and are not implemented: the policy has no member for them, so no
+plan can enable them. Increment 2 must settle how a shared call outlives an
+owner that cancels while spec 003's rule that the runtime spawns no task per
+request still holds.
+
+- `rustev-contract` adds the identified optimization policy (key schema and
+  namespace versions, admission, expiry basis, batch and memory-cache
+  bounds) and the per-request `OptimizationRecord`, including every
+  diagnostic up to a bound. Both members are optional and omitted when
+  disabled; `an_execution_policy_parses_round_trips_and_is_identified` pins
+  the exact pre-017 policy bytes and
+  `disabled_optimization_adds_nothing_to_the_record` the record bytes.
+  `SuppliedFrom::reused_from` names the source attempt of a cached output.
+- `rustev-core` validates the policy: every bound positive, at least one
+  mechanism, a batch of at least two members, and memory bounds that some
+  entry can satisfy (`max_entry_bytes <= max_scope_bytes <= max_bytes`).
+  `incomplete_or_unsatisfiable_optimization_policies_are_refused` has one row
+  per refusal; `plan_identity_follows_the_optimization_policy` shows the
+  policy is part of `PlanId`. Core stays free of I/O, clocks and cache state.
+- The complete memory-cache key binds the plan, key-schema, namespace and
+  runtime versions, the complete authorized-scope handle, the bound target's
+  artifact and descriptor, the step, the instance and the canonical
+  projection. A digest hit is compared with retained key material; a
+  mismatch is a collision, refused or run independently as the policy says.
+- Cache state is kept per plan namespace. Total-byte and count bounds evict
+  that namespace's oldest entry; the per-scope bound evicts only the
+  inserting scope's oldest entry, so one tenant's traffic never evicts
+  another's and one plan's bounds never evict another plan's entries.
+  Admission preconditions are checked before anything is evicted.
+- Only a validated output of target 0 is cached, because the key names
+  target 0; a fallback's output is supplied but never cached. A hit is
+  revalidated by the core, records its entry, source attempt, age and
+  generation, makes no attempt and has zero new charge.
+- `Runtime::invalidate_plan` and `invalidate_scope` advance the namespace
+  generation before removing entries. A request captures the generation
+  before it runs; a result from an earlier generation is supplied to its own
+  request but is never stored, so it is never served later. The memory cache
+  dies with the process, so its generation state needs no durability.
+- A general batch forms only among requests of one decision's admission
+  wave whose steps allow one attempt, no timeout and no fallback, on a
+  backend that declares compatible batch semantics, within every hard
+  bound. Batch members count against `max_parallel_requests` until their
+  batch ends, and no queue delay is taken because nothing can join.
+- Each member is admitted and reserved, rechecked for deadline and
+  cancellation after the permit wait, and concluded through the same code as
+  an independent attempt: the same failure classes, `Unresolved` details,
+  transitions, cancellation answers and remote states. A panic or top-level
+  failure is attributed to every member. A missing or duplicate member
+  response is that member's invalid output only.
+- The charge owner (member 0) holds and settles the summed reservation
+  against the batch total, so a share above one member's own bound is not a
+  bound violation. A known charge is split evenly, remainder to the lowest
+  indices, summing exactly. An unknown charge stays `Unknown` on every
+  member, and every member links the one liability.
+- Capture records a cache hit's source attempt as its origin, and replay
+  accepts it; `a_run_served_from_the_memory_cache_reproduces_offline`
+  captures a warm run and reproduces it without a backend.
+- `rustev-eval::optimization` reports cold and warm p50, p95 and p99
+  latency, throughput, hit and batch rates, failures and unknown liability,
+  plus cache bytes, evictions, invalidation lag, erasure completion and
+  judgment equivalence when the host supplies them. Anything unmeasured, and
+  any metric over zero runs, is `unknown`.
+- Section 5 rows in scope are covered in
+  `crates/rustev-runtime/tests/optimization.rs`: different authorized
+  scopes share nothing (`memory_cache_hits_expire_and_never_cross_scope`;
+  a batch never spans decisions, so never scopes), a result arriving after
+  erasure (`a_result_arriving_after_erasure_is_neither_stored_nor_served`),
+  an omitted member (`a_missing_batch_member_fails_only_that_member`), the
+  allocation remainder (`general_batch_is_one_dispatch_with_exact_member_evidence_and_allocation`
+  and the driver's unit test) and disabled optimization. The waiter rows and
+  the persistent-schema row belong to increment 2.
+- Differential tests compare batched with independent execution for
+  outputs, invalid output, permanent and transient failure, an unrequested
+  cancel answer, deadline and cancellation after send, and warm with cold
+  memory-cache execution; `an_output_from_a_fallback_target_is_not_cached`
+  covers fallback. Adversarial coverage: cross-scope keys, collisions,
+  cross-scope and cross-plan eviction, the invalidation race, and unknown
+  charge. Existing specs 009 and 012 batching tests are unchanged and are
+  special-case coverage only.
 - `crates/rustev-runtime/tests/optimization_benchmark.rs` is an ignored local
-  synthetic measurement with no performance assertion. On 2026-09-27, an
-  Apple M1 Max, Darwin arm64, Rust 1.98.1 debug test run over 100 cases reported
-  cold p50/p95/p99 837/1049/1163 microseconds and 1136.53 runs per second;
-  warm p50/p95/p99 601/737/767 microseconds and 1594.04 runs per second. It
-  observed 303 backend member dispatches: 300 cold plus three warm-seed
-  dispatches, and no further dispatch on 100 warm runs. These local synthetic
-  measurements are not qualification, an acceptance threshold or a production
-  performance claim.
+  synthetic measurement of the memory cache with no performance assertion.
+  On 2026-09-27, an Apple M1 Max, Darwin arm64, Rust 1.98.1 debug test run
+  over 100 cases reported cold p50/p95/p99 909/1230/1391 microseconds and
+  1043.30 runs per second, and warm 603/726/833 microseconds and 1584.78 runs
+  per second, with 303 backend dispatches (300 cold, 3 to seed the warm
+  entry, none warm). These numbers are not qualification, an acceptance
+  threshold or a performance claim.
 
 ## Questions settled by R-34
 

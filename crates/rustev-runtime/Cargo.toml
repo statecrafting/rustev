@@ -14,11 +14,10 @@ spec = "003-runtime-execution-and-evidence"
 [dependencies]
 rustev-contract = { path = "../rustev-contract" }
 rustev-core = { path = "../rustev-core" }
-serde.workspace = true
-serde_json.workspace = true
 tokio = { workspace = true, features = ["sync", "time", "rt"] }
 
 [dev-dependencies]
+serde_json.workspace = true
 tokio = { workspace = true, features = ["sync", "time", "rt", "macros"] }
 
 [lints]

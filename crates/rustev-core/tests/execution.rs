@@ -574,3 +574,163 @@ fn exponential_delays_double_and_cap() {
         60_000
     );
 }
+
+fn optimized() -> ExecutionPolicy {
+    use rustev_contract::optimization::*;
+    let mut policy = execution(CostPolicy::Unlimited, vec![]);
+    policy.optimization = Some(OptimizationPolicy {
+        key_schema_version: 1,
+        cache_namespace_version: 1,
+        admission: OptimizationAdmission::Refuse,
+        expiry: ExpiryBasis::InjectedRuntimeTime,
+        batch: Some(BatchPolicy {
+            max_members: 4,
+            max_canonical_bytes: 4_096,
+            max_members_per_scope: 4,
+            max_queue_delay_ms: 0,
+            max_backend_work: 4,
+            allocation: BatchChargeAllocation::EvenRemainderByMemberIndex,
+        }),
+        memory_cache: Some(MemoryCachePolicy {
+            max_bytes: 8_192,
+            max_entries: 8,
+            max_entry_bytes: 1_024,
+            max_scope_bytes: 4_096,
+            ttl_ms: 1_000,
+            eviction: EvictionOrder::Fifo,
+        }),
+    });
+    policy
+}
+
+/// Spec 017, 3.1: one row per refusal reason, each against the accepted
+/// neighbour it was derived from.
+#[test]
+fn incomplete_or_unsatisfiable_optimization_policies_are_refused() {
+    use rustev_contract::optimization::OptimizationPolicy;
+    accepted(&optimized());
+    type Edit = fn(&mut OptimizationPolicy);
+    let batch = "batch bounds must be positive";
+    let memory = "memory cache bounds must be positive";
+    let rows: [(&str, Edit, &str); 15] = [
+        (
+            "key schema",
+            |p| p.key_schema_version = 0,
+            "key_schema_version",
+        ),
+        (
+            "namespace",
+            |p| p.cache_namespace_version = 0,
+            "cache_namespace_version",
+        ),
+        (
+            "no mechanism",
+            |p| {
+                p.batch = None;
+                p.memory_cache = None;
+            },
+            "at least one optimization mechanism",
+        ),
+        (
+            "one member",
+            |p| p.batch.as_mut().unwrap().max_members = 1,
+            batch,
+        ),
+        (
+            "zero bytes",
+            |p| p.batch.as_mut().unwrap().max_canonical_bytes = 0,
+            batch,
+        ),
+        (
+            "zero per scope",
+            |p| p.batch.as_mut().unwrap().max_members_per_scope = 0,
+            batch,
+        ),
+        (
+            "scope above members",
+            |p| p.batch.as_mut().unwrap().max_members_per_scope = 5,
+            batch,
+        ),
+        (
+            "zero work",
+            |p| p.batch.as_mut().unwrap().max_backend_work = 0,
+            batch,
+        ),
+        (
+            "zero total",
+            |p| p.memory_cache.as_mut().unwrap().max_bytes = 0,
+            memory,
+        ),
+        (
+            "zero entries",
+            |p| p.memory_cache.as_mut().unwrap().max_entries = 0,
+            memory,
+        ),
+        (
+            "zero entry",
+            |p| p.memory_cache.as_mut().unwrap().max_entry_bytes = 0,
+            memory,
+        ),
+        (
+            "zero scope",
+            |p| p.memory_cache.as_mut().unwrap().max_scope_bytes = 0,
+            memory,
+        ),
+        (
+            "zero ttl",
+            |p| p.memory_cache.as_mut().unwrap().ttl_ms = 0,
+            memory,
+        ),
+        (
+            "entry above scope",
+            |p| p.memory_cache.as_mut().unwrap().max_entry_bytes = 4_097,
+            memory,
+        ),
+        (
+            "scope above total",
+            |p| p.memory_cache.as_mut().unwrap().max_scope_bytes = 8_193,
+            memory,
+        ),
+    ];
+    for (row, edit, needle) in rows {
+        let mut policy = optimized();
+        edit(policy.optimization.as_mut().unwrap());
+        let r = refused(&policy, needle);
+        assert_eq!(r.subject, "execution.optimization", "{row}");
+    }
+    // Each mechanism alone is a complete policy.
+    for keep_batch in [true, false] {
+        let mut policy = optimized();
+        let o = policy.optimization.as_mut().unwrap();
+        if keep_batch {
+            o.memory_cache = None;
+        } else {
+            o.batch = None;
+        }
+        accepted(&policy);
+    }
+}
+
+/// Spec 017, 2: enabling or changing the optimization member changes
+/// `PlanId`; nothing else in the policy differs between these plans.
+#[test]
+fn plan_identity_follows_the_optimization_policy() {
+    let without = accepted(&execution(CostPolicy::Unlimited, vec![]));
+    let with_policy = accepted(&optimized());
+    let mut longer_ttl = optimized();
+    longer_ttl
+        .optimization
+        .as_mut()
+        .unwrap()
+        .memory_cache
+        .as_mut()
+        .unwrap()
+        .ttl_ms = 2_000;
+    let longer_ttl = accepted(&longer_ttl);
+    assert_ne!(without.id, with_policy.id);
+    assert_ne!(with_policy.id, longer_ttl.id);
+    assert_eq!(
+        with_policy.canonical(),
+        accepted(&with_policy.execution_policy()).canonical()
+    );
+}

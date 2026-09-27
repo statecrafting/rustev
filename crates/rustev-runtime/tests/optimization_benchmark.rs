@@ -10,8 +10,7 @@ use std::time::Instant;
 use common::*;
 use rustev_contract::execution::CostPolicy;
 use rustev_contract::optimization::{
-    EvictionOrder, ExpiryBasis, InvalidationContract, MemoryCachePolicy, OptimizationAdmission,
-    OptimizationPolicy,
+    EvictionOrder, ExpiryBasis, MemoryCachePolicy, OptimizationAdmission, OptimizationPolicy,
 };
 use rustev_core::seams::CancelSignal;
 use rustev_runtime::Completion;
@@ -25,12 +24,7 @@ fn policy() -> rustev_contract::execution::ExecutionPolicy {
         cache_namespace_version: 1,
         admission: OptimizationAdmission::Refuse,
         expiry: ExpiryBasis::InjectedRuntimeTime,
-        invalidation: InvalidationContract {
-            finish_existing_waiters: false,
-            max_tombstones: 512,
-        },
         batch: None,
-        shared_calls: None,
         memory_cache: Some(MemoryCachePolicy {
             max_bytes: 10_000_000,
             max_entries: 512,
@@ -39,7 +33,6 @@ fn policy() -> rustev_contract::execution::ExecutionPolicy {
             ttl_ms: 60_000,
             eviction: EvictionOrder::Fifo,
         }),
-        persistent_cache: None,
     });
     policy
 }

@@ -99,6 +99,10 @@ fn phase_metrics(name: &str, runs: &[RunRecord], window_ms: Option<u64>) -> Vec<
         }
     }
     match window_ms.filter(|window| *window > 0) {
+        _ if runs.is_empty() => metrics.push(unknown(
+            format!("{name}/throughput_per_second"),
+            "zero runs",
+        )),
         Some(window) => metrics.push(measured(
             format!("{name}/throughput_per_second"),
             runs.len() as f64 * 1_000.0 / window as f64,
@@ -111,7 +115,7 @@ fn phase_metrics(name: &str, runs: &[RunRecord], window_ms: Option<u64>) -> Vec<
     }
     if denominator == 0 {
         metrics.push(unknown(format!("{name}/hit_rate"), "zero requests"));
-        metrics.push(unknown(format!("{name}/join_rate"), "zero requests"));
+        metrics.push(unknown(format!("{name}/batch_rate"), "zero requests"));
         metrics.push(unknown(format!("{name}/failures"), "zero requests"));
     } else {
         metrics.push(measured(
@@ -120,8 +124,8 @@ fn phase_metrics(name: &str, runs: &[RunRecord], window_ms: Option<u64>) -> Vec<
             denominator,
         ));
         metrics.push(measured(
-            format!("{name}/join_rate"),
-            rate(OptimizationOutcome::Joined),
+            format!("{name}/batch_rate"),
+            rate(OptimizationOutcome::Batched),
             denominator,
         ));
         metrics.push(measured(
@@ -133,11 +137,19 @@ fn phase_metrics(name: &str, runs: &[RunRecord], window_ms: Option<u64>) -> Vec<
             denominator,
         ));
     }
-    metrics.push(measured(
-        format!("{name}/unknown_liability_units"),
-        runs.iter().map(|run| run.cost.liability).sum::<u64>() as f64,
-        runs.len() as u64,
-    ));
+    // A zero over no runs would read as a measured zero.
+    if runs.is_empty() {
+        metrics.push(unknown(
+            format!("{name}/unknown_liability_units"),
+            "zero runs",
+        ));
+    } else {
+        metrics.push(measured(
+            format!("{name}/unknown_liability_units"),
+            runs.iter().map(|run| run.cost.liability).sum::<u64>() as f64,
+            runs.len() as u64,
+        ));
+    }
     metrics
 }
 
@@ -205,10 +217,47 @@ mod tests {
             "invalidation_lag_ms/p0.95",
             "erasure_completion_ms/p0.99",
             "judgment_equivalence_rate",
+            "cold/unknown_liability_units",
+            "warm/unknown_liability_units",
+            "cold/hit_rate",
+            "warm/batch_rate",
         ] {
             assert!(metrics.iter().any(|metric| {
                 metric.name == name && matches!(metric.value, MetricValue::Unknown { .. })
             }));
         }
+    }
+
+    #[test]
+    fn an_empty_cohort_with_a_window_is_still_unknown() {
+        let metrics = optimization_metrics(&OptimizationEvaluation {
+            cold: &[],
+            warm: &[],
+            cold_window_ms: Some(1_000),
+            warm_window_ms: Some(1_000),
+            external: ExternalMeasurements::default(),
+        });
+        for metric in &metrics {
+            assert!(
+                !matches!(metric.value, MetricValue::Measured { n: 0, .. }),
+                "{} is a measured value over n=0",
+                metric.name
+            );
+        }
+    }
+
+    #[test]
+    fn quantile_is_nearest_rank() {
+        assert_eq!(quantile(&[], 50), None);
+        assert_eq!(quantile(&[7], 50), Some(7));
+        assert_eq!(quantile(&[7], 99), Some(7));
+        let hundred = (1..=100).rev().collect::<Vec<u64>>();
+        assert_eq!(quantile(&hundred, 50), Some(50));
+        assert_eq!(quantile(&hundred, 95), Some(95));
+        // p99 of 100 values is exactly rank 99, not rank 100.
+        assert_eq!(quantile(&hundred, 99), Some(99));
+        // One past an exact boundary rounds the rank up.
+        let hundred_one = (1..=101).collect::<Vec<u64>>();
+        assert_eq!(quantile(&hundred_one, 99), Some(100));
     }
 }

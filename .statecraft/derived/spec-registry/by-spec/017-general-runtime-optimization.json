@@ -47,22 +47,6 @@
       },
       {
         "nature": "additive",
-        "spec": "006-cli-surface",
-        "unit": {
-          "id": "rustev_cli::run::prepare_json",
-          "kind": "symbol"
-        }
-      },
-      {
-        "nature": "additive",
-        "spec": "001-boundaries-and-authority",
-        "unit": {
-          "kind": "file",
-          "path": "Cargo.lock"
-        }
-      },
-      {
-        "nature": "additive",
         "spec": "001-boundaries-and-authority",
         "unit": {
           "kind": "file",
@@ -71,7 +55,7 @@
       }
     ],
     "id": "017-general-runtime-optimization",
-    "implementation": "complete",
+    "implementation": "in-progress",
     "obligations": [
       {
         "anchor": "3-1-equivalence-and-plan-identity",
@@ -115,7 +99,7 @@
       }
     ],
     "sectionDigests": {
-      "017-general-runtime-batching-duplicate-suppression-and-caches": "18cd2eddfa22bbecc90076b8c326f30a0c93c244f35620d072bb96a90d921ce4",
+      "017-general-runtime-batching-duplicate-suppression-and-caches": "6f6e544dd1247087798d80183976748f6b93b4d0288f886ec756df4bb1929ef1",
       "1-purpose": "b5e739a4b82aa29c0e1a158be58f066b65b7a8cee6b17196aa510c8280874ba0",
       "2-territory-and-compatibility": "8c1f6063cdb67f186b9fac657dd155c28e4cb9a6841295326c8bc7960aaf871d",
       "3-1-equivalence-and-plan-identity": "401e0e6353dcde90eebb31fa56d75c4609a03a983019f8e2d1f9676fca668dee",
@@ -127,10 +111,10 @@
       "3-7-invalidation-erasure-and-races": "e207f2f2f7a0405751f5d1bc03d3b890d67838469d86e2efb4e8cda00ad95212",
       "3-8-evidence-replay-and-evaluation": "66218d25001f8f6e5d8b21707632a33ce809d72e526c9deaaf95cd778f071066",
       "3-behavior": "909ab621ae93a7a637d63c1502103a8788e9e975475ae4bdf495f86621d08cb9",
-      "4-out-of-scope": "967e8f5ff269a415bd6f81bea2413f667f537e96596ed949297442239437d155",
+      "4-out-of-scope": "1cb166d70775b184fad8dab354ba37dc8b0f11d555627cf6a123da335e78101d",
       "5-observable-negative-cases": "cd755b10d0b26de73ac803a1ed55069f4107af0a1123ba8fae3089004851a1fb",
       "acceptance": "f8bbd8433dda76d0956e8d90d29bcf492cee7840d1e8b2ab18c0dd6be183f771",
-      "implementation-record": "01050e1f928491c1b1c64bbd8930012fd589ce84f829570167a17d5c3d9d256d",
+      "implementation-record": "4d0f7a5547a8f93f2caa3e5110e62c82225705dce312c303da0413fb698739da",
       "questions-settled-by-r-34": "a1f023a6869315fc1d4b530ff4974050af709adc83fcd70cb29f01fbf4768d26",
       "verification": "9aff687915df45df565033e821b8696a357bae9f08d6e1248e5c2c02cc13a9b4"
     },
@@ -156,9 +140,9 @@
     ],
     "specPath": "specs/017-general-runtime-optimization/spec.md",
     "status": "approved",
-    "summary": "A separately reviewable amendment to runtime execution for general runtime-planned batching, concurrent duplicate suppression, bounded memory caches, and opt-in persistent caches. Optimized execution must be judgment equivalent to independent uncached execution, isolate authorized scopes, preserve each waiter's deadline and cancellation, attribute one charge and every liability exactly once, invalidate on correction, revocation and erasure, and record every shared-call or cache effect. Existing adapter-scoped batching remains a special case, not evidence that this general contract is qualified. Approved (A-16) and implemented.\n",
+    "summary": "A separately reviewable amendment to runtime execution for general runtime-planned batching, concurrent duplicate suppression, bounded memory caches, and opt-in persistent caches. Optimized execution must be judgment equivalent to independent uncached execution, isolate authorized scopes, preserve each waiter's deadline and cancellation, attribute one charge and every liability exactly once, invalidate on correction, revocation and erasure, and record every shared-call or cache effect. Existing adapter-scoped batching remains a special case, not evidence that this general contract is implemented or qualified.\n",
     "title": "General runtime batching, duplicate suppression, and caches"
   },
-  "shardHash": "a3f6404c7bf26e23245788f399f4363e6105e54956cec2713384ad4760883ea2",
+  "shardHash": "c843e43f4bfbbf0d9096ed279f95f68d55cb9959b58f3690b4cbb6f2f9b0b634",
   "specVersion": "1.8.0"
 }

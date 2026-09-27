@@ -1,59 +1,45 @@
-//! Deterministic runtime optimization acceptance coverage (spec 017).
+//! Deterministic runtime optimization acceptance coverage (spec 017):
+//! general batching and the bounded memory cache, each compared with
+//! independent execution of the same requests. No wall-clock sleeps: the
+//! clock is manual and progress comes only from polling.
 
 mod common;
 
-use std::collections::BTreeMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use common::*;
-use rustev_contract::canonical::{record_canonical_bytes, tagged_digest};
-use rustev_contract::execution::{CostPolicy, Delay, FailureClass};
+use rustev_contract::Document;
+use rustev_contract::execution::{CostPolicy, Delay, ExecutionPolicy, FailureClass as F};
+use rustev_contract::judgment::Unresolved;
 use rustev_contract::optimization::{
-    BatchChargeAllocation, BatchPolicy, ChargeAllocation, EvictionOrder, ExpiryBasis,
-    InvalidationContract, MemoryCachePolicy, OptimizationAdmission, OptimizationMechanism,
-    OptimizationOutcome, OptimizationPolicy, PersistentCachePolicy, PersistentStoreContract,
-    SharedCallPolicy, StoreFailurePolicy,
+    BatchChargeAllocation, BatchPolicy, EvictionOrder, ExpiryBasis, MemoryCachePolicy,
+    OptimizationAdmission, OptimizationMechanism, OptimizationOutcome, OptimizationPolicy,
 };
-use rustev_contract::run::Charge;
-use rustev_core::seams::{AdapterFailure, BoxFuture, CancelSignal};
-use rustev_runtime::{
-    Completion, InvalidationSelector, Ledger, ManualClock, PersistentCacheStore, Runtime,
+use rustev_contract::run::{
+    AttemptEnd, CancelAnswer, Cancellation, Charge, CostBound, RemoteState, RequestRecord,
+    RequestResult,
 };
+use rustev_core::seams::{AdapterFailure, CancelSignal};
+use rustev_runtime::{Completion, Decided};
 
-fn shared_policy() -> rustev_contract::execution::ExecutionPolicy {
+const REPLICA: &str = "synthetic-linear-head-replica";
+
+fn optimized(batch: Option<BatchPolicy>, memory: Option<MemoryCachePolicy>) -> ExecutionPolicy {
     let mut policy = execution(CostPolicy::Hard { max_units: 100 }, vec![]);
     policy.optimization = Some(OptimizationPolicy {
         key_schema_version: 1,
         cache_namespace_version: 1,
         admission: OptimizationAdmission::Refuse,
         expiry: ExpiryBasis::InjectedRuntimeTime,
-        invalidation: InvalidationContract {
-            finish_existing_waiters: false,
-            max_tombstones: 8,
-        },
-        batch: None,
-        shared_calls: Some(SharedCallPolicy {
-            max_waiters: 4,
-            allocation: ChargeAllocation::OwnerPays,
-        }),
-        memory_cache: None,
-        persistent_cache: None,
+        batch,
+        memory_cache: memory,
     });
     policy
 }
 
-fn batch_policy(max_members: u32) -> rustev_contract::execution::ExecutionPolicy {
-    let mut policy = execution(CostPolicy::Hard { max_units: 100 }, vec![]);
-    policy.optimization = Some(OptimizationPolicy {
-        key_schema_version: 1,
-        cache_namespace_version: 1,
-        admission: OptimizationAdmission::Refuse,
-        expiry: ExpiryBasis::InjectedRuntimeTime,
-        invalidation: InvalidationContract {
-            finish_existing_waiters: false,
-            max_tombstones: 8,
-        },
-        batch: Some(BatchPolicy {
+fn batch_policy(max_members: u32) -> ExecutionPolicy {
+    optimized(
+        Some(BatchPolicy {
             max_members,
             max_canonical_bytes: 100_000,
             max_members_per_scope: max_members,
@@ -61,11 +47,107 @@ fn batch_policy(max_members: u32) -> rustev_contract::execution::ExecutionPolicy
             max_backend_work: max_members as u64,
             allocation: BatchChargeAllocation::EvenRemainderByMemberIndex,
         }),
-        shared_calls: None,
-        memory_cache: None,
-        persistent_cache: None,
-    });
-    policy
+        None,
+    )
+}
+
+fn memory(ttl_ms: u64, max_entries: u64, max_entry_bytes: u64) -> MemoryCachePolicy {
+    MemoryCachePolicy {
+        max_bytes: 100_000,
+        max_entries,
+        max_entry_bytes,
+        max_scope_bytes: 100_000,
+        ttl_ms,
+        eviction: EvictionOrder::Fifo,
+    }
+}
+
+fn memory_policy(ttl_ms: u64, max_entries: u64, max_entry_bytes: u64) -> ExecutionPolicy {
+    optimized(None, Some(memory(ttl_ms, max_entries, max_entry_bytes)))
+}
+
+fn observation(r: &RequestRecord) -> &rustev_contract::optimization::OptimizationRecord {
+    r.optimization.as_ref().expect("an optimization record")
+}
+
+fn step<'d>(d: &'d Decided, step: &str) -> &'d RequestRecord {
+    d.record
+        .requests
+        .iter()
+        .find(|r| r.step == step)
+        .unwrap_or_else(|| panic!("no {step} record"))
+}
+
+/// Everything independent execution determines about a request, without
+/// runtime observations (timing, optimization) that spec 017 lets differ.
+#[track_caller]
+fn assert_same_requests(independent: &Decided, optimized: &Decided) {
+    assert_eq!(
+        independent.record.requests.len(),
+        optimized.record.requests.len()
+    );
+    for a in &independent.record.requests {
+        let b = step(optimized, &a.step);
+        assert_eq!(a.result, b.result, "{} result", a.step);
+        assert_eq!(a.transitions, b.transitions, "{} transitions", a.step);
+        assert_eq!(a.attempts.len(), b.attempts.len(), "{} attempts", a.step);
+        for (x, y) in a.attempts.iter().zip(&b.attempts) {
+            assert_eq!(x.attempt_id, y.attempt_id);
+            assert_eq!(x.target, y.target);
+            assert_eq!(x.end, y.end, "{} end", a.step);
+            assert_eq!(x.cancellation, y.cancellation, "{} cancellation", a.step);
+            assert_eq!(x.remote, y.remote, "{} remote", a.step);
+            assert_eq!(x.cost.bound, y.cost.bound);
+            assert_eq!(x.cost.reserved, y.cost.reserved);
+        }
+    }
+}
+
+/// The same decision run independently (batch-capable backend, but one
+/// request per admission wave, so no batch forms) and batched.
+async fn independent_and_batched(
+    backend: impl Fn() -> Arc<Scripted>,
+    id: &str,
+) -> (Decided, Decided, Arc<Scripted>) {
+    let policy = batch_policy(3);
+    let solo = backend();
+    let solo_rig = rig(config(1, 0, 1), &[(solo.clone(), 3)]);
+    let plan = solo_rig
+        .rt
+        .prepare(support_compiled(Some(&policy)))
+        .unwrap();
+    let independent = solo_rig
+        .rt
+        .decide(&plan, request(id), &CancelSignal::new())
+        .await
+        .unwrap();
+    assert!(
+        !solo
+            .events()
+            .iter()
+            .any(|e| matches!(e, Event::BatchDispatched(..))),
+        "the control run formed no batch"
+    );
+    let batched_backend = backend();
+    let batch_rig = rig(config(1, 0, 3), &[(batched_backend.clone(), 3)]);
+    let plan = batch_rig
+        .rt
+        .prepare(support_compiled(Some(&policy)))
+        .unwrap();
+    let batched = batch_rig
+        .rt
+        .decide(&plan, request(id), &CancelSignal::new())
+        .await
+        .unwrap();
+    (independent, batched, batched_backend)
+}
+
+fn batch_count(backend: &Scripted) -> usize {
+    backend
+        .events()
+        .iter()
+        .filter(|e| matches!(e, Event::BatchDispatched(..)))
+        .count()
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -87,48 +169,100 @@ async fn general_batch_is_one_dispatch_with_exact_member_evidence_and_allocation
         .unwrap();
 
     assert!(matches!(decided.completion, Completion::Judged(_)));
-    let batch_events = backend
-        .events()
-        .into_iter()
-        .filter(|event| matches!(event, Event::BatchDispatched(_, _)))
-        .count();
-    assert_eq!(batch_events, 1);
+    assert_eq!(batch_count(&backend), 1);
     assert_eq!(decided.record.cost.observed, 4);
-    let mut batch_ids = decided
-        .record
-        .requests
-        .iter()
-        .map(|record| {
-            let observation = record.optimization.as_ref().unwrap();
-            assert_eq!(observation.mechanism, OptimizationMechanism::Batch);
-            assert_eq!(observation.outcome, OptimizationOutcome::Owner);
-            assert_eq!(record.attempts.len(), 1);
-            observation.batch_id.clone().unwrap()
-        })
-        .collect::<Vec<_>>();
-    batch_ids.sort();
+    let mut batch_ids = vec![];
+    for (index, record) in decided.record.requests.iter().enumerate() {
+        let o = observation(record);
+        assert_eq!(o.mechanism, OptimizationMechanism::Batch);
+        assert_eq!(o.outcome, OptimizationOutcome::Batched);
+        assert_eq!(o.batch_member, Some(index as u32));
+        assert_eq!(record.attempts.len(), 1);
+        assert_eq!(
+            o.source_attempt_id.as_deref(),
+            Some(record.attempts[0].attempt_id.as_str())
+        );
+        batch_ids.push(o.batch_id.clone().unwrap());
+    }
     batch_ids.dedup();
     assert_eq!(batch_ids.len(), 1);
-    let allocations = decided
+    // Even shares with the remainder to the lowest index, summing exactly to
+    // the observed charge, in the observation and in the attempt.
+    let shares = decided
         .record
         .requests
         .iter()
-        .map(|record| record.optimization.as_ref().unwrap().allocated_charge_units)
+        .map(|r| {
+            (
+                observation(r).allocated_charge_units,
+                r.attempts[0].cost.charge,
+            )
+        })
         .collect::<Vec<_>>();
-    assert_eq!(allocations, vec![2, 1, 1]);
     assert_eq!(
-        decided
-            .record
-            .requests
-            .iter()
-            .filter(|record| record.optimization.as_ref().unwrap().charge_owner)
-            .count(),
-        1
+        shares,
+        vec![
+            (2, Charge::Observed { units: 2 }),
+            (1, Charge::Observed { units: 1 }),
+            (1, Charge::Observed { units: 1 }),
+        ]
     );
+    let owners = decided
+        .record
+        .requests
+        .iter()
+        .filter(|r| observation(r).charge_owner)
+        .count();
+    assert_eq!(owners, 1);
 }
 
+/// Spec 017, 3.5: the batch total is settled once against the summed
+/// reservation. An even share above one member's own bound is allocation
+/// evidence, not a bound violation; a total above the sum still is one.
 #[tokio::test(flavor = "current_thread")]
-async fn unknown_batch_charge_has_one_owner_for_the_full_exposure() {
+async fn batch_settles_its_total_against_the_summed_reservation() {
+    for (topic_units, violations) in [(2, 0), (4, 1)] {
+        let backend = Scripted::new(linear_head(), move |call| {
+            ok(
+                call.task(),
+                if call.task() == "support.topic" {
+                    topic_units
+                } else {
+                    1
+                },
+            )
+        })
+        .with_batch()
+        .with_task_bound("support.topic", CostBound::Bounded { max_units: 1 })
+        .with_task_bound("support.frustration", CostBound::Bounded { max_units: 3 })
+        .with_task_bound("support.deadline", CostBound::Bounded { max_units: 1 });
+        let rig = rig(config(1, 0, 3), &[(backend.clone(), 1)]);
+        let plan = rig
+            .rt
+            .prepare(support_compiled(Some(&batch_policy(3))))
+            .unwrap();
+        let decided = rig
+            .rt
+            .decide(&plan, request("uneven-bounds"), &CancelSignal::new())
+            .await
+            .unwrap();
+        assert_eq!(batch_count(&backend), 1);
+        let cost = &decided.record.cost;
+        assert_eq!(cost.observed, topic_units + 2);
+        assert_eq!(cost.bound_violations, violations, "total {}", cost.observed);
+        assert_eq!(cost.within_guaranteed_cap, violations == 0);
+        let first = &decided.record.requests[0];
+        assert_eq!(first.attempts[0].cost.reserved, 1);
+        if violations == 0 {
+            assert_eq!(first.attempts[0].cost.charge, Charge::Observed { units: 2 });
+        }
+    }
+}
+
+/// Spec 017, 3.5 and I-4: an unknown batch charge stays unknown on every
+/// member; one owner holds the one liability, which every member links.
+#[tokio::test(flavor = "current_thread")]
+async fn unknown_batch_charge_has_one_owner_and_stays_unknown_on_every_member() {
     let backend = Scripted::new(linear_head(), |call| {
         Answer::Output(support_output(call.task()), Charge::Unknown)
     })
@@ -148,349 +282,311 @@ async fn unknown_batch_charge_has_one_owner_for_the_full_exposure() {
         .await
         .unwrap();
 
+    let requests = &decided.record.requests;
     assert_eq!(decided.record.cost.liability, 3);
     assert_eq!(
-        decided
-            .record
-            .requests
+        requests
             .iter()
-            .filter(|record| matches!(record.attempts[0].cost.charge, Charge::Unknown))
-            .count(),
-        1
-    );
-    assert_eq!(
-        decided
-            .record
-            .requests
-            .iter()
-            .filter(|record| record.optimization.as_ref().unwrap().charge_owner)
-            .count(),
-        1
+            .map(|r| r.attempts[0].cost.reserved)
+            .sum::<u64>(),
+        decided.record.cost.liability
     );
     assert!(
-        decided.record.requests.iter().all(|record| {
-            record
-                .optimization
-                .as_ref()
-                .is_some_and(|observation| observation.shared_liability_units == 3)
-        }),
-        "records: {:#?}",
-        decided.record.requests
+        requests
+            .iter()
+            .all(|r| r.attempts[0].cost.charge == Charge::Unknown),
+        "no member claims an observed zero: {requests:#?}"
     );
+    assert_eq!(
+        requests
+            .iter()
+            .filter(|r| observation(r).charge_owner)
+            .count(),
+        1
+    );
+    assert!(requests.iter().all(|r| {
+        let o = observation(r);
+        o.shared_liability_units == 3 && o.allocated_charge_units == 0
+    }));
 }
 
 #[tokio::test(flavor = "current_thread")]
 async fn batching_is_judgment_and_core_equivalent_to_independent_dispatch() {
-    let policy = batch_policy(3);
-    let independent_backend = answering(linear_head()).with_batch();
-    let independent_rig = rig(config(1, 0, 1), &[(independent_backend.clone(), 1)]);
-    let independent_plan = independent_rig
-        .rt
-        .prepare(support_compiled(Some(&policy)))
-        .unwrap();
-    let independent = independent_rig
-        .rt
-        .decide(
-            &independent_plan,
-            request("batch-differential"),
-            &CancelSignal::new(),
-        )
-        .await
-        .unwrap();
-
-    let batch_backend = answering(linear_head()).with_batch();
-    let batch_rig = rig(config(1, 0, 3), &[(batch_backend.clone(), 1)]);
-    let batch_plan = batch_rig
-        .rt
-        .prepare(support_compiled(Some(&policy)))
-        .unwrap();
-    let batched = batch_rig
-        .rt
-        .decide(
-            &batch_plan,
-            request("batch-differential"),
-            &CancelSignal::new(),
-        )
-        .await
-        .unwrap();
-
+    let (independent, batched, backend) = independent_and_batched(
+        || answering(linear_head()).with_batch(),
+        "batch-differential",
+    )
+    .await;
     assert_eq!(independent.completion, batched.completion);
     assert_eq!(independent.record.core, batched.record.core);
-    assert_eq!(independent_backend.dispatched().len(), 3);
-    assert_eq!(batch_backend.dispatched().len(), 3);
-    assert!(batch_backend.events().iter().any(|event| matches!(
+    assert_same_requests(&independent, &batched);
+    assert!(backend.events().iter().any(|event| matches!(
         event,
         Event::BatchDispatched(_, members) if members.len() == 3
     )));
 }
 
+/// Differential across member failures: a batch member ends exactly as its
+/// independent execution does, detail strings included (I-1).
 #[tokio::test(flavor = "current_thread")]
-async fn missing_batch_member_fails_only_that_member() {
-    let backend = answering(linear_head()).with_batch_omitting("support.frustration");
-    let rig = rig(config(1, 0, 3), &[(backend, 1)]);
+async fn a_failing_batch_member_ends_as_its_independent_execution_does() {
+    type Script = fn(&Call) -> Answer;
+    let cases: [(&str, Script); 4] = [
+        ("invalid-output", |c| {
+            if c.task() == "support.frustration" {
+                // Topic labels are not frustration levels.
+                ok("support.topic", 1)
+            } else {
+                ok(c.task(), 1)
+            }
+        }),
+        ("permanent", |c| {
+            if c.task() == "support.frustration" {
+                Answer::Fail(
+                    AdapterFailure::Permanent,
+                    "no".into(),
+                    Charge::Observed { units: 1 },
+                )
+            } else {
+                ok(c.task(), 1)
+            }
+        }),
+        ("transient", |c| {
+            if c.task() == "support.frustration" {
+                Answer::Fail(
+                    AdapterFailure::Transient,
+                    "later".into(),
+                    Charge::Observed { units: 1 },
+                )
+            } else {
+                ok(c.task(), 1)
+            }
+        }),
+        ("unrequested-cancel", |c| {
+            if c.task() == "support.frustration" {
+                Answer::Fail(
+                    AdapterFailure::Cancelled,
+                    "gone".into(),
+                    Charge::Observed { units: 1 },
+                )
+            } else {
+                ok(c.task(), 1)
+            }
+        }),
+    ];
+    for (name, script) in cases {
+        let (independent, batched, backend) =
+            independent_and_batched(|| Scripted::new(linear_head(), script).with_batch(), name)
+                .await;
+        assert_eq!(batch_count(&backend), 1, "{name}");
+        assert_eq!(independent.completion, batched.completion, "{name}");
+        assert_eq!(independent.record.core, batched.record.core, "{name}");
+        assert_same_requests(&independent, &batched);
+        assert!(
+            matches!(
+                step(&batched, "frustration").result,
+                RequestResult::Failed(_)
+            ),
+            "{name}"
+        );
+    }
+}
+
+/// A panic is backend-wide: it is attributed to every dispatched member,
+/// with the independent path's failure class and detail (spec 017, 3.3).
+#[tokio::test(flavor = "current_thread")]
+async fn a_batch_panic_is_an_adapter_fault_for_every_member() {
+    let backend = Scripted::new(linear_head(), |c| {
+        if c.task() == "support.frustration" {
+            Answer::Panic
+        } else {
+            ok(c.task(), 1)
+        }
+    })
+    .with_batch();
+    let rig = rig(config(1, 0, 3), &[(backend.clone(), 1)]);
     let plan = rig
         .rt
         .prepare(support_compiled(Some(&batch_policy(3))))
         .unwrap();
     let decided = rig
         .rt
-        .decide(
-            &plan,
-            request("general-batch-missing"),
-            &CancelSignal::new(),
-        )
+        .decide(&plan, request("batch-panic"), &CancelSignal::new())
         .await
         .unwrap();
-    let missing = decided
-        .record
-        .requests
-        .iter()
-        .find(|record| record.step == "frustration")
-        .unwrap();
-    assert!(matches!(
-        missing.attempts[0].end,
-        rustev_contract::run::AttemptEnd::Failed {
-            class: rustev_contract::execution::FailureClass::InvalidOutput,
-            ..
-        }
-    ));
-    assert!(
-        decided
-            .record
-            .requests
-            .iter()
-            .filter(|record| matches!(
-                record.result,
-                rustev_contract::run::RequestResult::Output { .. }
-            ))
-            .count()
-            >= 1
-    );
+    let detail = "adapter panicked: scripted adapter panic";
+    for r in &decided.record.requests {
+        assert_eq!(
+            r.attempts[0].end,
+            AttemptEnd::Failed {
+                class: F::AdapterFault,
+                detail: detail.into(),
+            }
+        );
+        assert_eq!(
+            r.result,
+            RequestResult::Failed(Unresolved::BackendUnavailable {
+                detail: format!("adapter_fault: {detail}"),
+            })
+        );
+        assert_eq!(r.attempts[0].remote, RemoteState::PossiblyContinuing);
+        assert_eq!(r.attempts[0].cost.charge, Charge::Unknown);
+    }
+    assert_eq!(decided.record.cost.liability, 3);
 }
 
+/// Spec 017, section 5: a batch that omits one member's response fails
+/// only that member as invalid output; its siblings keep their own results.
 #[tokio::test(flavor = "current_thread")]
-async fn batch_members_keep_the_decision_deadline_after_send() {
+async fn a_missing_batch_member_fails_only_that_member() {
+    let (independent, batched, _) = independent_and_batched(
+        || answering(linear_head()).with_batch_omitting("support.frustration"),
+        "general-batch-missing",
+    )
+    .await;
+    let missing = step(&batched, "frustration");
+    let detail = "missing batch member response";
+    assert_eq!(
+        missing.attempts[0].end,
+        AttemptEnd::Failed {
+            class: F::InvalidOutput,
+            detail: detail.into(),
+        }
+    );
+    assert_eq!(
+        missing.result,
+        RequestResult::Failed(Unresolved::InvalidBackendOutput {
+            detail: detail.into()
+        })
+    );
+    for sibling in ["topic", "explicit_deadline"] {
+        let (a, b) = (step(&independent, sibling), step(&batched, sibling));
+        assert_eq!(b.result, RequestResult::Output { target: 0 });
+        assert_eq!(a.result, b.result);
+        assert_eq!(a.attempts[0].end, b.attempts[0].end);
+    }
+}
+
+/// Deadline and cancellation after send: each member keeps the outcome,
+/// cancellation answer, remote state and liability of its independent
+/// execution.
+#[tokio::test(flavor = "current_thread")]
+async fn batch_members_end_after_send_as_independent_attempts_do() {
+    for cancel_instead in [false, true] {
+        let mut decided_pair = vec![];
+        for batched in [false, true] {
+            let backend = gate_all(linear_head())
+                .with_batch()
+                .with_on_cancel(OnCancel::Stop(Charge::Observed { units: 1 }));
+            // The control run has no batch policy, so all three requests
+            // are sent independently and at once.
+            let rig = rig(config(1, 0, 3), &[(backend.clone(), 3)]);
+            let policy = if batched {
+                batch_policy(3)
+            } else {
+                execution(CostPolicy::Hard { max_units: 100 }, vec![])
+            };
+            let plan = Arc::new(rig.rt.prepare(support_compiled(Some(&policy))).unwrap());
+            let mut req = request("after-send");
+            req.deadline_ms = Some(100);
+            let cancel = CancelSignal::new();
+            let running = start_req(&rig, &plan, req, &cancel);
+            until(|| backend.gated().len() == 3).await;
+            assert_eq!(batch_count(&backend), usize::from(batched));
+            if cancel_instead {
+                cancel.raise();
+            } else {
+                rig.clock.advance(100);
+            }
+            decided_pair.push(decided(done(running).await));
+        }
+        let (independent, batched) = (&decided_pair[0], &decided_pair[1]);
+        assert_same_requests(independent, batched);
+        assert_eq!(independent.record.cost, batched.record.cost);
+        for r in &batched.record.requests {
+            let a = &r.attempts[0];
+            if cancel_instead {
+                assert_eq!(r.result, RequestResult::NotSupplied);
+                assert_eq!(a.end, AttemptEnd::Cancelled);
+            } else {
+                assert_eq!(
+                    r.result,
+                    RequestResult::Failed(Unresolved::DeadlineExceeded)
+                );
+                assert_eq!(a.end, AttemptEnd::Deadline);
+            }
+            assert_eq!(
+                a.cancellation,
+                Cancellation::Requested {
+                    answer: CancelAnswer::Stopped
+                }
+            );
+            assert_eq!(a.remote, RemoteState::Stopped);
+            assert_eq!(a.cost.charge, Charge::Observed { units: 1 });
+        }
+    }
+}
+
+/// Spec 017, 3.4: batch members count against `max_parallel_requests` for
+/// as long as their batch runs.
+#[tokio::test(flavor = "current_thread")]
+async fn batch_members_count_against_the_parallel_request_bound() {
     let backend = gate_all(linear_head()).with_batch();
-    let rig = rig(config(1, 0, 3), &[(backend.clone(), 1)]);
+    let rig = rig(config(1, 0, 2), &[(backend.clone(), 3)]);
     let plan = Arc::new(
         rig.rt
             .prepare(support_compiled(Some(&batch_policy(3))))
             .unwrap(),
     );
-    let mut req = request("general-batch-deadline");
-    req.deadline_ms = Some(100);
-    let running = start_req(&rig, &plan, req, &CancelSignal::new());
-    until(|| {
-        backend
-            .events()
-            .iter()
-            .any(|event| matches!(event, Event::BatchDispatched(_, _)))
-    })
-    .await;
-    rig.clock.advance(100);
-
+    let running = start(&rig, &plan, "parallel-bound", &CancelSignal::new());
+    until(|| backend.gated().len() == 2).await;
+    settle().await;
+    assert_eq!(backend.dispatched().len(), 2, "the third request waits");
+    assert_eq!(batch_count(&backend), 1);
+    assert_eq!(release_all(&backend), 2);
+    until(|| backend.gated().len() == 1).await;
+    assert_eq!(release_all(&backend), 1);
     let decided = decided(done(running).await);
-    assert!(decided.record.requests.iter().all(|record| {
-        matches!(
-            record.result,
-            rustev_contract::run::RequestResult::Failed(
-                rustev_contract::judgment::Unresolved::DeadlineExceeded
-            )
-        ) && matches!(
-            record.attempts[0].end,
-            rustev_contract::run::AttemptEnd::Deadline
-        )
-    }));
-    assert_eq!(decided.record.cost.liability, 3);
-    assert_eq!(
-        backend
-            .events()
-            .iter()
-            .filter(|event| matches!(event, Event::CancelSeen(_)))
-            .count(),
-        3
+    assert!(matches!(decided.completion, Completion::Judged(_)));
+    assert_eq!(backend.dispatched().len(), 3);
+}
+
+/// A member cancelled while its batch waits for a backend permit is removed
+/// without dispatch and its reservation is released.
+#[tokio::test(flavor = "current_thread")]
+async fn batch_members_cancelled_before_send_are_never_dispatched() {
+    let backend = gate_all(linear_head()).with_batch();
+    let rig = rig(config(2, 0, 3), &[(backend.clone(), 1)]);
+    // An unoptimized decision holds the backend's only permit.
+    let holder = Arc::new(rig.rt.prepare(support_compiled(None)).unwrap());
+    let held = start(&rig, &holder, "holder", &CancelSignal::new());
+    until(|| backend.gated().len() == 1).await;
+    let plan = Arc::new(
+        rig.rt
+            .prepare(support_compiled(Some(&batch_policy(3))))
+            .unwrap(),
     );
-}
-
-fn store_contract() -> PersistentStoreContract {
-    PersistentStoreContract {
-        schema: "rustev.persistent-cache-entry/1".into(),
-        namespace: "identified".into(),
-        durability: "test-process".into(),
-        encryption: "test-none".into(),
-        atomicity: "atomic-entry".into(),
-        conflict: "replace".into(),
-        expiry: "rustev-validated".into(),
-        invalidation: "selector".into(),
-        erasure: "selector".into(),
+    let cancel = CancelSignal::new();
+    let waiting = start(&rig, &plan, "waiting", &cancel);
+    settle().await;
+    cancel.raise();
+    let decided = decided(done(waiting).await);
+    assert!(matches!(decided.completion, Completion::Cancelled));
+    assert_eq!(batch_count(&backend), 0);
+    for r in &decided.record.requests {
+        assert!(r.attempts.is_empty());
+        assert_eq!(r.result, RequestResult::NotSupplied);
     }
-}
-
-fn persistent_policy(
-    on_failure: StoreFailurePolicy,
-) -> rustev_contract::execution::ExecutionPolicy {
-    let mut policy = execution(CostPolicy::Hard { max_units: 100 }, vec![]);
-    policy.optimization = Some(OptimizationPolicy {
-        key_schema_version: 1,
-        cache_namespace_version: 1,
-        admission: OptimizationAdmission::Refuse,
-        expiry: ExpiryBasis::InjectedRuntimeTime,
-        invalidation: InvalidationContract {
-            finish_existing_waiters: false,
-            max_tombstones: 8,
-        },
-        batch: None,
-        shared_calls: None,
-        memory_cache: None,
-        persistent_cache: Some(PersistentCachePolicy {
-            contract: store_contract(),
-            max_entry_bytes: 16_384,
-            ttl_ms: 100,
-            on_failure,
-        }),
-    });
-    policy
-}
-
-fn memory_policy(
-    ttl_ms: u64,
-    max_entries: u64,
-    max_entry_bytes: u64,
-) -> rustev_contract::execution::ExecutionPolicy {
-    let mut policy = execution(CostPolicy::Hard { max_units: 100 }, vec![]);
-    policy.optimization = Some(OptimizationPolicy {
-        key_schema_version: 1,
-        cache_namespace_version: 1,
-        admission: OptimizationAdmission::Refuse,
-        expiry: ExpiryBasis::InjectedRuntimeTime,
-        invalidation: InvalidationContract {
-            finish_existing_waiters: false,
-            max_tombstones: 8,
-        },
-        batch: None,
-        shared_calls: None,
-        memory_cache: Some(MemoryCachePolicy {
-            max_bytes: 100_000,
-            max_entries,
-            max_entry_bytes,
-            max_scope_bytes: 100_000,
-            ttl_ms,
-            eviction: EvictionOrder::Fifo,
-        }),
-        persistent_cache: None,
-    });
-    policy
-}
-
-struct TestStore {
-    values: Mutex<BTreeMap<(String, String), Vec<u8>>>,
-    fail: Mutex<bool>,
-    fail_put_only: Mutex<bool>,
-    contract: PersistentStoreContract,
-}
-
-impl TestStore {
-    fn new() -> Arc<Self> {
-        Arc::new(Self {
-            values: Mutex::new(BTreeMap::new()),
-            fail: Mutex::new(false),
-            fail_put_only: Mutex::new(false),
-            contract: store_contract(),
-        })
+    assert_eq!(decided.record.cost.observed, 0);
+    assert_eq!(decided.record.cost.liability, 0);
+    while release_all(&backend) > 0 {
+        settle().await;
     }
+    decided_ok(done(held).await);
 }
 
-impl PersistentCacheStore for TestStore {
-    fn contract(&self) -> &PersistentStoreContract {
-        &self.contract
-    }
-
-    fn get<'a>(
-        &'a self,
-        namespace: &'a str,
-        key_id: &'a str,
-    ) -> BoxFuture<'a, Result<Option<Vec<u8>>, String>> {
-        Box::pin(async move {
-            if *self.fail.lock().unwrap() {
-                return Err("test store unavailable".into());
-            }
-            Ok(self
-                .values
-                .lock()
-                .unwrap()
-                .get(&(namespace.into(), key_id.into()))
-                .cloned())
-        })
-    }
-
-    fn put<'a>(
-        &'a self,
-        namespace: &'a str,
-        key_id: &'a str,
-        value: &'a [u8],
-    ) -> BoxFuture<'a, Result<(), String>> {
-        Box::pin(async move {
-            if *self.fail.lock().unwrap() || *self.fail_put_only.lock().unwrap() {
-                return Err("test store unavailable".into());
-            }
-            self.values
-                .lock()
-                .unwrap()
-                .insert((namespace.into(), key_id.into()), value.into());
-            Ok(())
-        })
-    }
-
-    fn invalidate<'a>(
-        &'a self,
-        selector: &'a InvalidationSelector,
-    ) -> BoxFuture<'a, Result<(), String>> {
-        Box::pin(async move {
-            if *self.fail.lock().unwrap() {
-                return Err("test store unavailable".into());
-            }
-            self.values.lock().unwrap().retain(
-                |(entry_namespace, entry_key), bytes| match selector {
-                    InvalidationSelector::Namespace { namespace } => entry_namespace != namespace,
-                    InvalidationSelector::Key { namespace, key_id } => {
-                        entry_namespace != namespace || entry_key != key_id
-                    }
-                    InvalidationSelector::Scope {
-                        namespace,
-                        scope_id,
-                    } => {
-                        if entry_namespace != namespace {
-                            return true;
-                        }
-                        let value: serde_json::Value = serde_json::from_slice(bytes).unwrap();
-                        value["payload"]["scope_id"].as_str() != Some(scope_id.as_str())
-                    }
-                },
-            );
-            Ok(())
-        })
-    }
-}
-
-fn rewrite_persistent_value(bytes: &[u8], change: impl FnOnce(&mut serde_json::Value)) -> Vec<u8> {
-    let mut envelope: serde_json::Value = serde_json::from_slice(bytes).unwrap();
-    change(&mut envelope["payload"]);
-    let payload = record_canonical_bytes(&envelope["payload"]).unwrap();
-    envelope["integrity"] = serde_json::Value::String(tagged_digest(
-        "rustev.persistent-cache-integrity/1",
-        &payload,
-    ));
-    record_canonical_bytes(&envelope).unwrap()
-}
-
-fn persistent_runtime(store: Arc<TestStore>, backend: Arc<Scripted>) -> Runtime {
-    let clock = ManualClock::new();
-    let sink = ScriptedSink::new(SinkAnswer::Ack);
-    Runtime::builder(Arc::new(clock), Arc::new(SinkHandle(sink)), config(2, 0, 3))
-        .backend(Arc::new(Handle(backend)), 3)
-        .persistent_cache(store)
-        .build()
-        .unwrap()
+fn decided_ok(r: Result<Decided, rustev_runtime::DecideError>) {
+    assert!(matches!(decided(r).completion, Completion::Judged(_)));
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -514,19 +610,26 @@ async fn memory_cache_hits_expire_and_never_cross_scope() {
         .unwrap();
     assert_eq!(backend.dispatched().len(), 3);
     assert!(warm.record.requests.iter().all(|record| {
-        record.optimization.as_ref().is_some_and(|observation| {
-            observation.mechanism == OptimizationMechanism::MemoryCache
-                && observation.outcome == OptimizationOutcome::Hit
-        })
+        let o = observation(record);
+        o.mechanism == OptimizationMechanism::MemoryCache && o.outcome == OptimizationOutcome::Hit
     }));
 
+    // Section 5: equal inputs under another authorized scope share nothing.
     let mut other_scope = request("memory-other-scope");
     other_scope.principal_handle = b"tenant-b".to_vec();
-    rig.rt
+    let other = rig
+        .rt
         .decide(&plan, other_scope, &CancelSignal::new())
         .await
         .unwrap();
     assert_eq!(backend.dispatched().len(), 6);
+    assert!(
+        other
+            .record
+            .requests
+            .iter()
+            .all(|r| observation(r).outcome == OptimizationOutcome::Miss)
+    );
 
     rig.clock.advance(100);
     rig.rt
@@ -549,6 +652,7 @@ async fn memory_hits_are_judgment_and_core_equivalent_to_cold_execution() {
         .decide(&plan, request("memory-differential"), &CancelSignal::new())
         .await
         .unwrap();
+    rig.clock.advance(7);
     let warm = rig
         .rt
         .decide(&plan, request("memory-differential"), &CancelSignal::new())
@@ -558,46 +662,46 @@ async fn memory_hits_are_judgment_and_core_equivalent_to_cold_execution() {
     assert_eq!(cold.completion, warm.completion);
     assert_eq!(cold.record.core, warm.record.core);
     assert_eq!(backend.dispatched().len(), 3);
-    assert!(warm.record.requests.iter().all(|record| {
-        record
-            .optimization
-            .as_ref()
-            .is_some_and(|observation| observation.outcome == OptimizationOutcome::Hit)
-    }));
+    for hit in &warm.record.requests {
+        let source = step(&cold, &hit.step);
+        let (o, s) = (observation(hit), observation(source));
+        assert_eq!(o.outcome, OptimizationOutcome::Hit);
+        assert_eq!(hit.result, source.result);
+        assert!(hit.attempts.is_empty(), "a hit makes no attempt");
+        assert_eq!(
+            o.source_attempt_id.as_deref(),
+            Some(source.attempts[0].attempt_id.as_str())
+        );
+        assert_eq!(o.entry_id, s.entry_id);
+        assert_eq!(o.age_ms, 7);
+        assert_eq!((o.allocated_charge_units, o.charge_owner), (0, false));
+    }
+    assert_eq!(warm.record.cost.observed, 0, "a hit has no new charge");
 }
 
 #[tokio::test(flavor = "current_thread")]
 async fn memory_entry_and_count_bounds_refuse_admission_without_reuse() {
-    let mut total_bound = memory_policy(100, 8, 16_384);
-    let total_memory = total_bound
-        .optimization
-        .as_mut()
-        .unwrap()
-        .memory_cache
-        .as_mut()
-        .unwrap();
-    total_memory.max_bytes = 2_048;
-    total_memory.max_entry_bytes = 2_048;
-    total_memory.max_scope_bytes = 2_048;
-    let mut scope_bound = memory_policy(100, 8, 16_384);
-    let scope_memory = scope_bound
-        .optimization
-        .as_mut()
-        .unwrap()
-        .memory_cache
-        .as_mut()
-        .unwrap();
-    scope_memory.max_scope_bytes = 2_048;
-    scope_memory.max_entry_bytes = 2_048;
-    for (policy, expected_dispatches) in [
-        (memory_policy(100, 8, 1), 6),
-        (total_bound, 4),
-        (scope_bound, 4),
-        (memory_policy(100, 2, 16_384), 4),
+    let mut scope_bound = memory(100, 8, 2_048);
+    scope_bound.max_scope_bytes = 2_048;
+    let mut total_bound = scope_bound.clone();
+    total_bound.max_bytes = 2_048;
+    for (name, policy, expected_dispatches, diagnostic) in [
+        (
+            "entry",
+            memory(100, 8, 1),
+            6,
+            "memory cache entry exceeds max_entry_bytes",
+        ),
+        ("total", total_bound, 4, "evicting"),
+        ("scope", scope_bound, 4, "evicting"),
+        ("count", memory(100, 2, 16_384), 4, "evicting 1 entries"),
     ] {
         let backend = answering(linear_head());
         let rig = rig(config(2, 0, 3), &[(backend.clone(), 3)]);
-        let plan = rig.rt.prepare(support_compiled(Some(&policy))).unwrap();
+        let plan = rig
+            .rt
+            .prepare(support_compiled(Some(&optimized(None, Some(policy)))))
+            .unwrap();
         let cold = rig
             .rt
             .decide(&plan, request("memory-bounds-cold"), &CancelSignal::new())
@@ -607,717 +711,184 @@ async fn memory_entry_and_count_bounds_refuse_admission_without_reuse() {
             .decide(&plan, request("memory-bounds-warm"), &CancelSignal::new())
             .await
             .unwrap();
-        assert_eq!(backend.dispatched().len(), expected_dispatches);
-        if policy
-            .optimization
-            .as_ref()
-            .unwrap()
-            .memory_cache
-            .as_ref()
-            .unwrap()
-            .max_entries
-            == 2
-        {
-            assert!(cold.record.requests.iter().any(|record| {
-                record
-                    .optimization
-                    .as_ref()
-                    .and_then(|observation| observation.diagnostic.as_deref())
-                    .is_some_and(|diagnostic| diagnostic.contains("evicting 1 entries"))
-            }));
-        }
-    }
-}
-
-#[tokio::test(flavor = "current_thread")]
-async fn persistent_entries_survive_runtime_restart_without_a_second_dispatch() {
-    let store = TestStore::new();
-    let first_backend = answering(linear_head());
-    let compiled = support_compiled(Some(&persistent_policy(
-        StoreFailurePolicy::ContinueWithoutCache,
-    )));
-    let first_runtime = persistent_runtime(store.clone(), first_backend.clone());
-    let first_plan = first_runtime.prepare(compiled.clone()).unwrap();
-    let first = first_runtime
-        .decide(
-            &first_plan,
-            request("persistent-cold"),
-            &CancelSignal::new(),
-        )
-        .await
-        .unwrap();
-    assert!(matches!(first.completion, Completion::Judged(_)));
-    assert_eq!(first_backend.dispatched().len(), 3);
-    assert_eq!(store.values.lock().unwrap().len(), 3);
-
-    let second_backend = answering(linear_head());
-    let second_runtime = persistent_runtime(store, second_backend.clone());
-    let second_plan = second_runtime.prepare(compiled).unwrap();
-    let second = second_runtime
-        .decide(
-            &second_plan,
-            request("persistent-warm"),
-            &CancelSignal::new(),
-        )
-        .await
-        .unwrap();
-    assert!(matches!(second.completion, Completion::Judged(_)));
-    assert!(second_backend.dispatched().is_empty());
-    assert!(second.record.requests.iter().all(|record| {
-        record.attempts.is_empty()
-            && record.optimization.as_ref().is_some_and(|observation| {
-                observation.mechanism
-                    == rustev_contract::optimization::OptimizationMechanism::PersistentCache
-                    && observation.outcome
-                        == rustev_contract::optimization::OptimizationOutcome::Hit
-                    && !observation.charge_owner
-            })
-    }));
-}
-
-#[tokio::test(flavor = "current_thread")]
-async fn persistent_store_read_failure_obeys_the_declared_policy() {
-    for (failure_policy, expected_dispatches) in [
-        (StoreFailurePolicy::FailClosed, 0),
-        (StoreFailurePolicy::ContinueWithoutCache, 3),
-    ] {
-        let store = TestStore::new();
-        *store.fail.lock().unwrap() = true;
-        let backend = answering(linear_head());
-        let runtime = persistent_runtime(store, backend.clone());
-        let plan = runtime
-            .prepare(support_compiled(Some(&persistent_policy(failure_policy))))
-            .unwrap();
-        let decided = runtime
-            .decide(
-                &plan,
-                request("persistent-store-failure"),
-                &CancelSignal::new(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(backend.dispatched().len(), expected_dispatches);
+        assert_eq!(backend.dispatched().len(), expected_dispatches, "{name}");
         assert!(
-            decided.record.requests.iter().all(|record| {
-                record
-                    .optimization
-                    .as_ref()
-                    .and_then(|observation| observation.diagnostic.as_ref())
-                    .is_some_and(|diagnostic| diagnostic.contains("persistent cache"))
+            cold.record.requests.iter().any(|r| {
+                observation(r)
+                    .diagnostics
+                    .iter()
+                    .any(|d| d.contains(diagnostic))
             }),
-            "records: {:#?}",
-            decided.record.requests
+            "{name}: {:#?}",
+            cold.record.requests
         );
     }
 }
 
+/// Spec 017, 3.1: a fallback's output is never cached under the bound
+/// target's identity, so a later request still tries the primary.
 #[tokio::test(flavor = "current_thread")]
-async fn corrupt_persistent_bytes_are_a_diagnostic_miss_through_the_public_store() {
-    let store = TestStore::new();
-    let cold_backend = answering(linear_head());
-    let compiled = support_compiled(Some(&persistent_policy(
-        StoreFailurePolicy::ContinueWithoutCache,
-    )));
-    let cold_runtime = persistent_runtime(store.clone(), cold_backend);
-    let cold_plan = cold_runtime.prepare(compiled.clone()).unwrap();
-    cold_runtime
-        .decide(&cold_plan, request("corrupt-cold"), &CancelSignal::new())
-        .await
-        .unwrap();
-    let first_key = store.values.lock().unwrap().keys().next().cloned().unwrap();
-    store
-        .values
-        .lock()
-        .unwrap()
-        .insert(first_key, b"not-json".to_vec());
-
-    let backend = answering(linear_head());
-    let runtime = persistent_runtime(store, backend.clone());
-    let plan = runtime.prepare(compiled).unwrap();
-    let decided = runtime
-        .decide(&plan, request("corrupt-warm"), &CancelSignal::new())
-        .await
-        .unwrap();
-    assert_eq!(backend.dispatched().len(), 1);
-    assert!(decided.record.requests.iter().any(|record| {
-        record
-            .optimization
-            .as_ref()
-            .and_then(|observation| observation.diagnostic.as_deref())
-            .is_some_and(|diagnostic| diagnostic.contains("corrupt"))
-    }));
-}
-
-#[tokio::test(flavor = "current_thread")]
-async fn valid_integrity_old_schema_is_a_diagnostic_runtime_miss() {
-    let store = TestStore::new();
-    let compiled = support_compiled(Some(&persistent_policy(
-        StoreFailurePolicy::ContinueWithoutCache,
-    )));
-    let cold_runtime = persistent_runtime(store.clone(), answering(linear_head()));
-    let cold_plan = cold_runtime.prepare(compiled.clone()).unwrap();
-    cold_runtime
-        .decide(&cold_plan, request("old-schema-cold"), &CancelSignal::new())
-        .await
-        .unwrap();
-    let key = store.values.lock().unwrap().keys().next().cloned().unwrap();
-    let old = store.values.lock().unwrap()[&key].clone();
-    let rewritten = rewrite_persistent_value(&old, |payload| {
-        payload["key_schema_version"] = serde_json::json!(999);
-    });
-    store.values.lock().unwrap().insert(key, rewritten);
-
-    let backend = answering(linear_head());
-    let runtime = persistent_runtime(store, backend.clone());
-    let plan = runtime.prepare(compiled).unwrap();
-    let decided = runtime
-        .decide(&plan, request("old-schema-warm"), &CancelSignal::new())
-        .await
-        .unwrap();
-    assert_eq!(backend.dispatched().len(), 1);
-    assert!(decided.record.requests.iter().any(|record| {
-        record
-            .optimization
-            .as_ref()
-            .and_then(|observation| observation.diagnostic.as_deref())
-            .is_some_and(|diagnostic| diagnostic.contains("schema"))
-    }));
-}
-
-#[tokio::test(flavor = "current_thread")]
-async fn valid_persistent_output_is_revalidated_for_its_request() {
-    let store = TestStore::new();
-    let compiled = support_compiled(Some(&persistent_policy(
-        StoreFailurePolicy::ContinueWithoutCache,
-    )));
-    let cold_runtime = persistent_runtime(store.clone(), answering(linear_head()));
-    let cold_plan = cold_runtime.prepare(compiled.clone()).unwrap();
-    cold_runtime
-        .decide(
-            &cold_plan,
-            request("persistent-validation-cold"),
-            &CancelSignal::new(),
-        )
-        .await
-        .unwrap();
-    let entries = store
-        .values
-        .lock()
-        .unwrap()
-        .iter()
-        .map(|(key, value)| (key.clone(), value.clone()))
-        .collect::<Vec<_>>();
-    let donor: serde_json::Value = serde_json::from_slice(&entries[0].1).unwrap();
-    let donor_output = donor["payload"]["output"].clone();
-    let rewritten = rewrite_persistent_value(&entries[1].1, |payload| {
-        payload["output"] = donor_output;
-    });
-    store
-        .values
-        .lock()
-        .unwrap()
-        .insert(entries[1].0.clone(), rewritten);
-
-    let backend = answering(linear_head());
-    let runtime = persistent_runtime(store, backend.clone());
-    let plan = runtime.prepare(compiled).unwrap();
-    let decided = runtime
-        .decide(
-            &plan,
-            request("persistent-validation-warm"),
-            &CancelSignal::new(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(backend.dispatched().len(), 1);
-    assert!(decided.record.requests.iter().any(|record| {
-        record
-            .optimization
-            .as_ref()
-            .and_then(|observation| observation.diagnostic.as_deref())
-            .is_some_and(|diagnostic| diagnostic.contains("validation"))
-    }));
-}
-
-#[tokio::test(flavor = "current_thread")]
-async fn persistent_write_fail_closed_keeps_attempt_and_charge_evidence() {
-    let store = TestStore::new();
-    *store.fail_put_only.lock().unwrap() = true;
-    let backend = answering(linear_head());
-    let runtime = persistent_runtime(store, backend.clone());
-    let plan = runtime
-        .prepare(support_compiled(Some(&persistent_policy(
-            StoreFailurePolicy::FailClosed,
-        ))))
-        .unwrap();
-    let decided = runtime
-        .decide(
-            &plan,
-            request("persistent-write-fail-closed"),
-            &CancelSignal::new(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(backend.dispatched().len(), 3);
-    assert_eq!(decided.record.cost.observed, 3);
-    assert!(decided.record.requests.iter().all(|record| {
-        record.attempts.len() == 1
-            && matches!(
-                record.result,
-                rustev_contract::run::RequestResult::Failed(_)
-            )
-            && record
-                .optimization
-                .as_ref()
-                .and_then(|observation| observation.diagnostic.as_deref())
-                .is_some_and(|diagnostic| diagnostic.contains("write failed"))
-    }));
-}
-
-#[test]
-fn persistent_store_contract_mismatch_is_refused_at_preparation() {
-    let backend = answering(linear_head());
-    let clock = ManualClock::new();
-    let sink = ScriptedSink::new(SinkAnswer::Ack);
-    let mut different = store_contract();
-    different.atomicity = "different".into();
-    let mismatched = Arc::new(TestStore {
-        values: Mutex::new(BTreeMap::new()),
-        fail: Mutex::new(false),
-        fail_put_only: Mutex::new(false),
-        contract: different,
-    });
-    let runtime = Runtime::builder(Arc::new(clock), Arc::new(SinkHandle(sink)), config(2, 0, 3))
-        .backend(Arc::new(Handle(backend)), 3)
-        .persistent_cache(mismatched)
-        .build()
-        .unwrap();
-    assert!(matches!(
-        runtime.prepare(support_compiled(Some(&persistent_policy(
-            StoreFailurePolicy::ContinueWithoutCache
-        )))),
-        Err(rustev_runtime::PrepareError::PersistentStoreContractMismatch)
-    ));
-}
-
-#[tokio::test(flavor = "current_thread")]
-async fn scope_invalidation_is_exact_in_store_and_namespace_generation_is_conservative() {
-    let store = TestStore::new();
-    let backend = answering(linear_head());
-    let runtime = persistent_runtime(store.clone(), backend.clone());
-    let plan = runtime
-        .prepare(support_compiled(Some(&persistent_policy(
-            StoreFailurePolicy::ContinueWithoutCache,
-        ))))
-        .unwrap();
-    runtime
-        .decide(&plan, request("scope-a-cold"), &CancelSignal::new())
-        .await
-        .unwrap();
-    let mut scope_b = request("scope-b-cold");
-    scope_b.principal_handle = b"tenant-b".to_vec();
-    runtime
-        .decide(&plan, scope_b, &CancelSignal::new())
-        .await
-        .unwrap();
-    assert_eq!(store.values.lock().unwrap().len(), 6);
-
-    let result = runtime
-        .invalidate_scope(
-            &plan,
-            b"tenant-a",
-            rustev_runtime::InvalidationCause::Erasure,
-        )
-        .await
-        .unwrap();
-    // The public result reports removals from the in-process cache. The host
-    // store applies the same selector independently below.
-    assert_eq!(result.removed_entries, 0);
-    assert_eq!(store.values.lock().unwrap().len(), 3);
-
-    runtime
-        .decide(&plan, request("scope-a-after"), &CancelSignal::new())
-        .await
-        .unwrap();
-    let mut scope_b = request("scope-b-after");
-    scope_b.principal_handle = b"tenant-b".to_vec();
-    runtime
-        .decide(&plan, scope_b, &CancelSignal::new())
-        .await
-        .unwrap();
-    assert_eq!(backend.dispatched().len(), 12);
-}
-
-#[tokio::test(flavor = "current_thread")]
-async fn failed_persistent_invalidation_quarantines_until_explicit_reconciliation() {
-    let store = TestStore::new();
-    let backend = answering(linear_head());
-    let runtime = persistent_runtime(store.clone(), backend.clone());
-    let plan = runtime
-        .prepare(support_compiled(Some(&persistent_policy(
-            StoreFailurePolicy::ContinueWithoutCache,
-        ))))
-        .unwrap();
-    runtime
-        .decide(&plan, request("before-invalidation"), &CancelSignal::new())
-        .await
-        .unwrap();
-    assert_eq!(backend.dispatched().len(), 3);
-
-    *store.fail.lock().unwrap() = true;
-    let invalidated = runtime
-        .invalidate_plan(&plan, rustev_runtime::InvalidationCause::Correction)
-        .await
-        .unwrap();
-    assert_eq!(invalidated.generation, 1);
-    assert!(!invalidated.namespace_available);
-    assert!(invalidated.diagnostic.is_some());
-
-    let quarantined = runtime
-        .decide(&plan, request("while-quarantined"), &CancelSignal::new())
-        .await
-        .unwrap();
-    assert_eq!(backend.dispatched().len(), 3);
-    assert!(quarantined.record.requests.iter().all(|record| {
-        record
-            .optimization
-            .as_ref()
-            .and_then(|observation| observation.diagnostic.as_ref())
-            .is_some_and(|diagnostic| diagnostic.contains("namespace unavailable"))
-    }));
-
-    *store.fail.lock().unwrap() = false;
-    assert!(runtime.reconcile_optimization_namespace(&plan));
-    let after = runtime
-        .decide(&plan, request("after-reconciliation"), &CancelSignal::new())
-        .await
-        .unwrap();
-    assert!(matches!(after.completion, Completion::Judged(_)));
-    assert_eq!(backend.dispatched().len(), 6);
-}
-
-#[tokio::test(flavor = "current_thread")]
-async fn owner_cancellation_does_not_cancel_work_for_a_remaining_waiter() {
-    let backend =
-        gate_all(linear_head()).with_on_cancel(OnCancel::Stop(Charge::Observed { units: 1 }));
-    let rig = rig(config(2, 0, 3), &[(backend.clone(), 3)]);
-    let plan = Arc::new(
-        rig.rt
-            .prepare(support_compiled(Some(&shared_policy())))
-            .unwrap(),
-    );
-    let owner_cancel = CancelSignal::new();
-    let joiner_cancel = CancelSignal::new();
-    let owner = start(&rig, &plan, "owner", &owner_cancel);
-    until(|| backend.gated().len() == 3).await;
-    let joiner = start(&rig, &plan, "joiner", &joiner_cancel);
-    settle().await;
-    assert_eq!(backend.dispatched().len(), 3, "the joiner reuses all calls");
-
-    owner_cancel.raise();
-    settle().await;
-    assert!(
-        backend
-            .events()
-            .iter()
-            .all(|event| !matches!(event, Event::CancelSeen(_))),
-        "one waiter leaving must not cancel shared work"
-    );
-    assert_eq!(release_all(&backend), 3);
-
-    let owner = decided(done(owner).await);
-    let joiner = decided(done(joiner).await);
-    assert_eq!(owner.completion, Completion::Cancelled);
-    assert!(matches!(joiner.completion, Completion::Judged(_)));
-    assert_eq!(backend.dispatched().len(), 3);
-    assert!(owner.record.requests.iter().all(|record| {
-        record
-            .optimization
-            .as_ref()
-            .is_some_and(|observation| observation.charge_owner)
-    }));
-    assert!(joiner.record.requests.iter().all(|record| {
-        record.optimization.as_ref().is_some_and(|observation| {
-            !observation.charge_owner && observation.allocated_charge_units == 0
-        })
-    }));
-}
-
-#[tokio::test(flavor = "current_thread")]
-async fn all_waiters_leaving_requests_cancellation_and_keeps_the_owner_charge() {
-    let backend =
-        gate_all(linear_head()).with_on_cancel(OnCancel::Stop(Charge::Observed { units: 1 }));
-    let rig = rig(config(2, 0, 3), &[(backend.clone(), 3)]);
-    let plan = Arc::new(
-        rig.rt
-            .prepare(support_compiled(Some(&shared_policy())))
-            .unwrap(),
-    );
-    let owner_cancel = CancelSignal::new();
-    let joiner_cancel = CancelSignal::new();
-    let owner = start(&rig, &plan, "owner-all-leave", &owner_cancel);
-    until(|| backend.gated().len() == 3).await;
-    let joiner = start(&rig, &plan, "joiner-all-leave", &joiner_cancel);
-    settle().await;
-
-    owner_cancel.raise();
-    settle().await;
-    assert_eq!(
-        backend
-            .events()
-            .iter()
-            .filter(|event| matches!(event, Event::CancelSeen(_)))
-            .count(),
-        0
-    );
-    joiner_cancel.raise();
-    until(|| {
-        backend
-            .events()
-            .iter()
-            .filter(|event| matches!(event, Event::CancelSeen(_)))
-            .count()
-            == 3
-    })
-    .await;
-
-    let owner = decided(done(owner).await);
-    let joiner = decided(done(joiner).await);
-    assert_eq!(owner.completion, Completion::Cancelled);
-    assert_eq!(joiner.completion, Completion::Cancelled);
-    assert_eq!(owner.record.cost.observed, 3);
-    assert_eq!(joiner.record.cost.observed, 0);
-    assert!(owner.record.requests.iter().all(|record| {
-        record.attempts.len() == 1
-            && record
-                .optimization
-                .as_ref()
-                .is_some_and(|observation| observation.charge_owner)
-    }));
-}
-
-#[tokio::test(flavor = "current_thread")]
-async fn charge_owner_returns_after_cancellation_is_processed_not_backend_completion() {
-    let backend = gate_all(linear_head()).with_on_cancel(OnCancel::Ignore);
-    let rig = rig(config(1, 0, 3), &[(backend.clone(), 3)]);
-    let plan = Arc::new(
-        rig.rt
-            .prepare(support_compiled(Some(&shared_policy())))
-            .unwrap(),
-    );
-    let cancel = CancelSignal::new();
-    let owner = start(&rig, &plan, "owner-cancel-latency", &cancel);
-    until(|| backend.gated().len() == 3).await;
-    cancel.raise();
-
-    let owner = decided(done(owner).await);
-    assert_eq!(owner.completion, Completion::Cancelled);
-    assert_eq!(owner.record.cost.liability, 3);
-    assert_eq!(
-        backend
-            .events()
-            .iter()
-            .filter(|event| matches!(event, Event::CancelSeen(_)))
-            .count(),
-        3
-    );
-    assert!(owner.record.requests.iter().all(|record| {
-        record.attempts.len() == 1
-            && record
-                .optimization
-                .as_ref()
-                .is_some_and(|observation| observation.charge_owner)
-    }));
-}
-
-#[tokio::test(flavor = "current_thread")]
-async fn shared_waiters_keep_independent_deadlines() {
-    let backend = gate_all(linear_head());
-    let rig = rig(config(2, 0, 3), &[(backend.clone(), 3)]);
-    let plan = Arc::new(
-        rig.rt
-            .prepare(support_compiled(Some(&shared_policy())))
-            .unwrap(),
-    );
-    let owner = start(&rig, &plan, "shared-deadline-owner", &CancelSignal::new());
-    until(|| backend.gated().len() == 3).await;
-    let mut req = request("shared-deadline-joiner");
-    req.deadline_ms = Some(100);
-    let joiner = start_req(&rig, &plan, req, &CancelSignal::new());
-    settle().await;
-    rig.clock.advance(100);
-    let joiner = decided(done(joiner).await);
-    assert!(joiner.record.requests.iter().all(|record| matches!(
-        record.result,
-        rustev_contract::run::RequestResult::Failed(
-            rustev_contract::judgment::Unresolved::DeadlineExceeded
-        )
-    )));
-    assert!(
-        backend
-            .events()
-            .iter()
-            .all(|event| !matches!(event, Event::CancelSeen(_)))
-    );
-
-    assert_eq!(release_all(&backend), 3);
-    assert!(matches!(
-        decided(done(owner).await).completion,
-        Completion::Judged(_)
-    ));
-}
-
-#[tokio::test(flavor = "current_thread")]
-async fn shared_waiter_and_hard_budget_bounds_refuse_without_extra_dispatch() {
-    for use_shared_budget in [false, true] {
-        let backend = gate_all(linear_head());
-        let mut policy = shared_policy();
-        if !use_shared_budget {
-            policy
-                .optimization
-                .as_mut()
-                .unwrap()
-                .shared_calls
-                .as_mut()
-                .unwrap()
-                .max_waiters = 1;
-        }
-        let shared =
-            use_shared_budget.then(|| Arc::new(Ledger::new(CostPolicy::Hard { max_units: 3 })));
-        let rig = rig_with(
-            config(2, 0, 3),
-            &[(backend.clone(), 3)],
-            SinkAnswer::Ack,
-            shared,
-        );
-        let plan = Arc::new(rig.rt.prepare(support_compiled(Some(&policy))).unwrap());
-        let owner_cancel = CancelSignal::new();
-        let owner = start(&rig, &plan, "shared-bound-owner", &owner_cancel);
-        until(|| backend.gated().len() == 3).await;
-        let joiner = decided(
-            done(start(
-                &rig,
-                &plan,
-                "shared-bound-joiner",
-                &CancelSignal::new(),
-            ))
-            .await,
-        );
-        assert_eq!(backend.dispatched().len(), 3);
-        assert!(joiner.record.requests.iter().all(|record| {
-            record
-                .optimization
-                .as_ref()
-                .is_some_and(|observation| observation.outcome == OptimizationOutcome::Refused)
-        }));
-        owner_cancel.raise();
-        let _ = done(owner).await;
-    }
-}
-
-#[tokio::test(flavor = "current_thread")]
-async fn shared_worker_obeys_backend_concurrency_and_fallback_once() {
-    let primary = gate_all(linear_head());
-    let fallback = answering(linear_head_replica());
-    let steps = ["topic", "frustration", "explicit_deadline"]
-        .into_iter()
-        .map(|step| {
-            step_exec(
-                step,
-                1,
-                &[],
-                Delay::None,
-                &["synthetic-linear-head-replica"],
-                &[FailureClass::Transient],
-            )
-        })
-        .collect();
-    let mut policy = execution(CostPolicy::Hard { max_units: 100 }, steps);
-    policy.optimization = shared_policy().optimization;
-    let rig = rig(
-        config(2, 0, 3),
-        &[(primary.clone(), 1), (fallback.clone(), 3)],
-    );
-    let plan = Arc::new(rig.rt.prepare(support_compiled(Some(&policy))).unwrap());
-    let owner = start(&rig, &plan, "shared-fallback-owner", &CancelSignal::new());
-    until(|| primary.gated().len() == 1).await;
-    let joiner = start(&rig, &plan, "shared-fallback-joiner", &CancelSignal::new());
-    settle().await;
-    assert_eq!(
-        primary.dispatched().len(),
-        1,
-        "backend concurrency remains one"
-    );
-    for _ in 0..3 {
-        let id = primary.gated().into_iter().next().unwrap();
-        assert!(primary.release(
-            &id,
+async fn an_output_from_a_fallback_target_is_not_cached() {
+    let failed_once = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let flag = failed_once.clone();
+    let head = Scripted::new(linear_head(), move |c| {
+        if c.task() == "support.topic" && !flag.swap(true, std::sync::atomic::Ordering::SeqCst) {
             Answer::Fail(
-                AdapterFailure::Transient,
-                "synthetic transient".into(),
-                Charge::Observed { units: 1 },
-            ),
-        ));
-        settle().await;
-    }
-    let owner = decided(done(owner).await);
-    let joiner = decided(done(joiner).await);
-    assert!(matches!(owner.completion, Completion::Judged(_)));
-    assert!(matches!(joiner.completion, Completion::Judged(_)));
-    assert_eq!(primary.dispatched().len(), 3);
-    assert_eq!(fallback.dispatched().len(), 3);
+                AdapterFailure::Permanent,
+                "outage".into(),
+                Charge::Observed { units: 0 },
+            )
+        } else {
+            ok(c.task(), 1)
+        }
+    });
+    let replica = answering(linear_head_replica());
+    let rig = rig(config(2, 0, 3), &[(head.clone(), 3), (replica.clone(), 3)]);
+    let mut policy = memory_policy(1_000, 8, 16_384);
+    policy.steps = vec![step_exec(
+        "topic",
+        1,
+        &[],
+        Delay::None,
+        &[REPLICA],
+        &[F::Permanent],
+    )];
+    let plan = rig.rt.prepare(support_compiled(Some(&policy))).unwrap();
+    let first = rig
+        .rt
+        .decide(&plan, request("fallback-cold"), &CancelSignal::new())
+        .await
+        .unwrap();
+    let topic = step(&first, "topic");
+    assert_eq!(topic.result, RequestResult::Output { target: 1 });
     assert!(
-        owner
-            .record
-            .requests
+        observation(topic)
+            .diagnostics
             .iter()
-            .all(|record| record.attempts.len() == 2)
+            .any(|d| d.contains("fallback target"))
     );
-    assert!(
-        joiner
-            .record
-            .requests
-            .iter()
-            .all(|record| record.attempts.is_empty())
+    assert_eq!(observation(topic).entry_id, None);
+
+    let second = rig
+        .rt
+        .decide(&plan, request("fallback-warm"), &CancelSignal::new())
+        .await
+        .unwrap();
+    let topic = step(&second, "topic");
+    assert_eq!(topic.result, RequestResult::Output { target: 0 });
+    assert_eq!(observation(topic).outcome, OptimizationOutcome::Miss);
+    assert_eq!(replica.dispatched().len(), 1, "the primary answered");
+    // The other steps came from the primary the first time, so they hit.
+    assert_eq!(
+        observation(step(&second, "frustration")).outcome,
+        OptimizationOutcome::Hit
     );
 }
 
 #[tokio::test(flavor = "current_thread")]
-async fn unknown_charge_is_owned_once_and_linked_from_joiners() {
+async fn invalidation_advances_the_generation_and_removes_entries() {
+    let backend = answering(linear_head());
+    let rig = rig(config(2, 0, 3), &[(backend.clone(), 3)]);
+    let plan = rig
+        .rt
+        .prepare(support_compiled(Some(&memory_policy(1_000, 8, 16_384))))
+        .unwrap();
+    rig.rt
+        .decide(&plan, request("cold"), &CancelSignal::new())
+        .await
+        .unwrap();
+    let result = rig.rt.invalidate_plan(&plan).unwrap();
+    assert_eq!((result.generation, result.removed_entries), (1, 3));
+    let after = rig
+        .rt
+        .decide(&plan, request("after"), &CancelSignal::new())
+        .await
+        .unwrap();
+    assert_eq!(backend.dispatched().len(), 6);
+    assert!(
+        after
+            .record
+            .requests
+            .iter()
+            .all(|r| observation(r).invalidation_generation == 1)
+    );
+    // Another scope's invalidation leaves this scope's entries in place only
+    // until the namespace-wide generation retires them.
+    let result = rig.rt.invalidate_scope(&plan, b"tenant-b").unwrap();
+    assert_eq!((result.generation, result.removed_entries), (2, 0));
+    // An unoptimized plan has nothing to invalidate.
+    let plain = rig.rt.prepare(support_compiled(None)).unwrap();
+    assert_eq!(rig.rt.invalidate_plan(&plain), None);
+}
+
+/// Spec 017, section 5 and I-3: a result that arrives after an erasure
+/// invalidation is supplied to its own request but never stored or served
+/// to a later one.
+#[tokio::test(flavor = "current_thread")]
+async fn a_result_arriving_after_erasure_is_neither_stored_nor_served() {
     let backend = gate_all(linear_head());
     let rig = rig(config(2, 0, 3), &[(backend.clone(), 3)]);
     let plan = Arc::new(
         rig.rt
-            .prepare(support_compiled(Some(&shared_policy())))
+            .prepare(support_compiled(Some(&memory_policy(1_000, 8, 16_384))))
             .unwrap(),
     );
-    let owner = start(&rig, &plan, "owner-unknown", &CancelSignal::new());
+    let running = start(&rig, &plan, "in-flight", &CancelSignal::new());
     until(|| backend.gated().len() == 3).await;
-    let joiner = start(&rig, &plan, "joiner-unknown", &CancelSignal::new());
-    settle().await;
-    for attempt_id in backend.gated() {
-        assert!(backend.release(
-            &attempt_id,
-            Answer::Output(support_output(task_of(&attempt_id)), Charge::Unknown)
-        ));
+    let erased = rig.rt.invalidate_scope(&plan, b"tenant-a").unwrap();
+    assert_eq!(erased.generation, 1);
+    assert_eq!(release_all(&backend), 3);
+    let late = decided(done(running).await);
+    assert!(matches!(late.completion, Completion::Judged(_)));
+    for r in &late.record.requests {
+        let o = observation(r);
+        assert_eq!(o.invalidation_generation, 0);
+        assert_eq!(o.entry_id, None);
+        assert!(
+            o.diagnostics
+                .iter()
+                .any(|d| d.contains("earlier generation"))
+        );
     }
 
-    let owner = decided(done(owner).await);
-    let joiner = decided(done(joiner).await);
-    assert_eq!(owner.record.cost.liability, 3);
-    assert_eq!(joiner.record.cost.liability, 0);
-    assert!(owner.record.requests.iter().all(|record| {
-        record.optimization.as_ref().is_some_and(|observation| {
-            observation.charge_owner
-                && observation.allocated_charge_units == 0
-                && observation.shared_liability_units == 1
-        })
-    }));
-    assert!(joiner.record.requests.iter().all(|record| {
-        record.optimization.as_ref().is_some_and(|observation| {
-            !observation.charge_owner
-                && observation.allocated_charge_units == 0
-                && observation.shared_liability_units == 1
-        })
-    }));
+    let later = start(&rig, &plan, "later", &CancelSignal::new());
+    until(|| backend.gated().len() == 3).await;
+    assert_eq!(
+        backend.dispatched().len(),
+        6,
+        "nothing was served from cache"
+    );
+    release_all(&backend);
+    let later = decided(done(later).await);
+    assert!(
+        later
+            .record
+            .requests
+            .iter()
+            .all(|r| observation(r).outcome == OptimizationOutcome::Miss)
+    );
+}
+
+/// Spec 017, section 5: with optimization disabled, records carry no
+/// optimization member at all.
+#[tokio::test(flavor = "current_thread")]
+async fn disabled_optimization_adds_nothing_to_the_record() {
+    let backend = answering(linear_head()).with_batch();
+    let rig = rig(config(2, 0, 3), &[(backend.clone(), 3)]);
+    let plan = rig.rt.prepare(support_compiled(None)).unwrap();
+    let decided = rig
+        .rt
+        .decide(&plan, request("disabled"), &CancelSignal::new())
+        .await
+        .unwrap();
+    assert_eq!(batch_count(&backend), 0, "a capable backend is not batched");
+    assert!(
+        decided
+            .record
+            .requests
+            .iter()
+            .all(|r| r.optimization.is_none())
+    );
+    let bytes = decided.record.record_canonical().unwrap();
+    assert!(!String::from_utf8(bytes).unwrap().contains("optimization"));
 }
