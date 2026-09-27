@@ -13,6 +13,7 @@ use crate::execution::FailureClass;
 use crate::ids::{ArtifactId, ExecutionPolicyId, PlanId};
 use crate::judgment::Unresolved;
 use crate::limits::RECORD_V1;
+use crate::optimization::OptimizationRecord;
 use crate::schema;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -75,6 +76,9 @@ pub struct RequestRecord {
     pub result: RequestResult,
     pub attempts: Vec<AttemptRecord>,
     pub transitions: Vec<Transition>,
+    /// Absent for unoptimized execution, preserving existing record bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub optimization: Option<OptimizationRecord>,
 }
 
 /// Where a supplied value came from (spec 004, 3.2).

@@ -103,6 +103,50 @@ pub struct AttemptReport {
     pub remote: RemoteEnd,
 }
 
+/// A backend's explicit declaration that one projection may participate in a
+/// general runtime batch. Equal compatibility identifiers mean the backend
+/// promises compatible semantics. Work units are backend-defined and are
+/// used only against the plan's hard `max_backend_work` bound.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BatchCapability {
+    pub compatibility: String,
+    pub work_units: u64,
+}
+
+/// One owned member of a general runtime batch.
+#[derive(Debug, Clone)]
+pub struct BatchMemberCall {
+    pub projection: Vec<u8>,
+    pub attempt_id: String,
+    pub cancel: CancelSignal,
+    pub cx: CallContext,
+}
+
+/// One general batch dispatch. Member order is stable and evidence-visible.
+pub struct BatchAttemptCall {
+    pub batch_id: String,
+    pub cancel: CancelSignal,
+    pub members: Vec<BatchMemberCall>,
+}
+
+/// A member result is keyed by attempt id. Duplicate, unknown, or missing ids
+/// are malformed for the affected member and never fill another member.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BatchMemberReport {
+    pub attempt_id: String,
+    pub result: Result<RawOutput, (AdapterFailure, String)>,
+}
+
+/// One backend-wide batch report. A top-level failure is attributed to every
+/// dispatched member. The batch charge is allocated by the plan policy.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BatchAttemptReport {
+    pub result: Result<Vec<BatchMemberReport>, (AdapterFailure, String)>,
+    pub charge: Charge,
+    pub cancel: CancelAck,
+    pub remote: RemoteEnd,
+}
+
 /// Answers semantic requests. States its capabilities and its cost; never
 /// manufactures a distribution or a calibration claim.
 pub trait DecisionBackend: Send + Sync {
@@ -113,6 +157,27 @@ pub trait DecisionBackend: Send + Sync {
     /// `bounded`; fractional costs are rounded up.
     fn cost_bound(&self, projection: &[u8]) -> CostBound;
     fn infer<'a>(&'a self, call: AttemptCall<'a>) -> BoxFuture<'a, AttemptReport>;
+
+    /// Opt-in general batch declaration. `None` preserves unbatched behavior.
+    fn batch_capability(&self, _projection: &[u8]) -> Option<BatchCapability> {
+        None
+    }
+
+    /// Dispatch a declared-compatible batch. The default is unreachable for
+    /// a backend that keeps the default `batch_capability` implementation.
+    fn infer_batch<'a>(&'a self, _call: BatchAttemptCall) -> BoxFuture<'a, BatchAttemptReport> {
+        Box::pin(async {
+            BatchAttemptReport {
+                result: Err((
+                    AdapterFailure::Permanent,
+                    "backend did not implement declared batch semantics".into(),
+                )),
+                charge: Charge::Unknown,
+                cancel: CancelAck::NotRequested,
+                remote: RemoteEnd::PossiblyContinuing,
+            }
+        })
+    }
 }
 
 /// A task adapter producing an evaluation report envelope (R-06).

@@ -419,6 +419,7 @@ version = "0.1.0"
 dependencies = [
  "rustev-contract",
  "rustev-core",
+ "serde",
  "serde_json",
  "tokio",
 ]

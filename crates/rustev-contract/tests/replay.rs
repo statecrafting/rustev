@@ -556,6 +556,7 @@ mod supplied_from {
             result,
             attempts,
             transitions,
+            optimization: None,
         }
     }
 

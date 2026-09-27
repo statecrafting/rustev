@@ -173,6 +173,10 @@ fn prepare_json(e: &PrepareError) -> serde_json::Value {
         PrepareError::HardBudgetUnenforceable { backend_id, model } => json!({
             "kind": "hard_budget_unenforceable", "backend_id": backend_id, "model": model,
         }),
+        PrepareError::MissingPersistentStore => json!({"kind": "missing_persistent_store"}),
+        PrepareError::PersistentStoreContractMismatch => {
+            json!({"kind": "persistent_store_contract_mismatch"})
+        }
     }
 }
 

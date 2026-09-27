@@ -12,8 +12,9 @@ use rustev_contract::descriptor::BackendDescriptor;
 use rustev_contract::output::RawOutput;
 use rustev_contract::run::{Charge, CostBound, CostModel, RunRecord};
 use rustev_core::seams::{
-    AdapterFailure, AttemptCall, AttemptReport, BoxFuture, CancelAck, DecisionBackend,
-    EvidenceSink, RemoteEnd,
+    AdapterFailure, AttemptCall, AttemptReport, BatchAttemptCall, BatchAttemptReport,
+    BatchCapability, BatchMemberReport, BoxFuture, CancelAck, DecisionBackend, EvidenceSink,
+    RemoteEnd,
 };
 use serde_json::Value as Json;
 use tokio::sync::oneshot;
@@ -42,6 +43,7 @@ pub enum OnCancel {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
     Dispatched(String),
+    BatchDispatched(String, Vec<String>),
     Finished(String),
     CancelSeen(String),
     Dropped(String),
@@ -77,6 +79,8 @@ pub struct Scripted {
     /// The principal handle each dispatched attempt was called with.
     principals: Mutex<Vec<Vec<u8>>>,
     gates: Mutex<BTreeMap<String, oneshot::Sender<Answer>>>,
+    batch_enabled: Mutex<bool>,
+    batch_omit_task: Mutex<Option<String>>,
 }
 
 impl Scripted {
@@ -95,6 +99,8 @@ impl Scripted {
             events: Mutex::new(vec![]),
             principals: Mutex::new(vec![]),
             gates: Mutex::new(BTreeMap::new()),
+            batch_enabled: Mutex::new(false),
+            batch_omit_task: Mutex::new(None),
         })
     }
 
@@ -114,6 +120,17 @@ impl Scripted {
         self
     }
 
+    pub fn with_batch(self: Arc<Self>) -> Arc<Self> {
+        *self.batch_enabled.lock().unwrap() = true;
+        self
+    }
+
+    pub fn with_batch_omitting(self: Arc<Self>, task: &str) -> Arc<Self> {
+        *self.batch_enabled.lock().unwrap() = true;
+        *self.batch_omit_task.lock().unwrap() = Some(task.into());
+        self
+    }
+
     pub fn principals(&self) -> Vec<Vec<u8>> {
         self.principals.lock().unwrap().clone()
     }
@@ -125,9 +142,10 @@ impl Scripted {
     pub fn dispatched(&self) -> Vec<String> {
         self.events()
             .into_iter()
-            .filter_map(|e| match e {
-                Event::Dispatched(a) => Some(a),
-                _ => None,
+            .flat_map(|e| match e {
+                Event::Dispatched(a) => vec![a],
+                Event::BatchDispatched(_, members) => members,
+                _ => vec![],
             })
             .collect()
     }
@@ -282,6 +300,91 @@ impl DecisionBackend for Handle {
             watch.armed = false;
             s.push(Event::Finished(id));
             r
+        })
+    }
+
+    fn batch_capability(&self, _projection: &[u8]) -> Option<BatchCapability> {
+        if *self.0.batch_enabled.lock().unwrap() {
+            Some(BatchCapability {
+                compatibility: "scripted-general-batch/1".into(),
+                work_units: 1,
+            })
+        } else {
+            None
+        }
+    }
+
+    fn infer_batch<'a>(&'a self, call: BatchAttemptCall) -> BoxFuture<'a, BatchAttemptReport> {
+        let s = self.0.clone();
+        Box::pin(async move {
+            let ids = call
+                .members
+                .iter()
+                .map(|member| member.attempt_id.clone())
+                .collect::<Vec<_>>();
+            s.push(Event::BatchDispatched(call.batch_id, ids));
+            let mut reports = Vec::new();
+            let mut observed = 0_u64;
+            let mut estimated = 0_u64;
+            let mut unknown = false;
+            for member in call.members {
+                s.principals
+                    .lock()
+                    .unwrap()
+                    .push(member.cx.principal_handle.clone());
+                let projection: Json =
+                    serde_json::from_slice(&member.projection).unwrap_or(Json::Null);
+                let task = projection["task"].as_str().unwrap_or_default().to_string();
+                let n = member
+                    .attempt_id
+                    .rsplit('/')
+                    .next()
+                    .and_then(|value| value.parse().ok())
+                    .unwrap_or(0);
+                let answer = (s.answer)(&Call {
+                    attempt_id: member.attempt_id.clone(),
+                    n,
+                    projection,
+                });
+                if s.batch_omit_task.lock().unwrap().as_deref() == Some(task.as_str()) {
+                    continue;
+                }
+                let (result, charge) = match answer {
+                    Answer::Output(output, charge) => (Ok(output), charge),
+                    Answer::Fail(failure, detail, charge) => (Err((failure, detail)), charge),
+                    Answer::Gate => {
+                        std::future::poll_fn(|cx| member.cancel.poll_raised(cx)).await;
+                        s.push(Event::CancelSeen(member.attempt_id.clone()));
+                        (
+                            Err((AdapterFailure::Cancelled, "batch member stopped".into())),
+                            Charge::Unknown,
+                        )
+                    }
+                    Answer::Panic => panic!("scripted batch panic"),
+                };
+                match charge {
+                    Charge::Observed { units } => observed = observed.saturating_add(units),
+                    Charge::Estimated { units } => estimated = estimated.saturating_add(units),
+                    Charge::Unknown => unknown = true,
+                }
+                reports.push(BatchMemberReport {
+                    attempt_id: member.attempt_id,
+                    result,
+                });
+            }
+            let charge = if unknown || (observed > 0 && estimated > 0) {
+                Charge::Unknown
+            } else if estimated > 0 {
+                Charge::Estimated { units: estimated }
+            } else {
+                Charge::Observed { units: observed }
+            };
+            BatchAttemptReport {
+                result: Ok(reports),
+                charge,
+                cancel: CancelAck::NotRequested,
+                remote: *s.remote.lock().unwrap(),
+            }
         })
     }
 }
