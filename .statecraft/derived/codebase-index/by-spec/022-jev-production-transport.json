@@ -1,0 +1,47 @@
+{
+  "mapping": {
+    "amends": [
+      "012-jev-integration"
+    ],
+    "dependsOn": [
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay",
+      "009-remote-adapter-protocol",
+      "012-jev-integration",
+      "013-remote-state-on-failed-attempts"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "docs/backlog.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/backlog.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/decisions/00-founding-decisions.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "specId": "022-jev-production-transport",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "930378c9f4b8b86af3f504f9b49e0d2fff575763def82c31729fc2419ab1c32f"
+}

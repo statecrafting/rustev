@@ -1,0 +1,82 @@
+{
+  "record": {
+    "created": "2026-09-27",
+    "dependsOn": [
+      "004-evaluation-and-replay",
+      "009-remote-adapter-protocol",
+      "012-jev-integration"
+    ],
+    "id": "025-wire-witness-replay-input",
+    "implementation": "deferred",
+    "obligations": [
+      {
+        "anchor": "3-2-joining-a-witness-record",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "A witness record is joined to a Rustev attempt only by an exact match of request byte digests to exactly one exchange record; any other outcome is recorded as unjoined, never guessed."
+      },
+      {
+        "anchor": "3-3-corroboration-not-substitution",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "Witness evidence never overwrites a Rustev field: requested and served identity, usage and cost from the witness are recorded beside Rustev's as corroborating or conflicting testimony."
+      },
+      {
+        "anchor": "3-5-what-is-not-imported",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "Captured traffic that no Rustev attempt produced never becomes a decision, replay bundle or evaluation case, and no imported record grants authority."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/backlog.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "025-wire-witness-exchanges-as-remote-exchange-and-replay-evidence-deferred": "b89e2ac3922d38aebe2aa90d963193365d66560bdb2380679e086a242282bc4c",
+      "1-purpose": "42fe89db463b55435161956ca49d2810fd6eaa48112df93a26829f43b76ce62c",
+      "2-territory": "a95ef004e21f594fce65500474437bd37b70dc2a1b148d51419462cb3383a92f",
+      "3-1-inputs": "56d2f69298b6dbff19b50d8986c79a5435f0d3abf666df0dc9d2b795a74890e7",
+      "3-2-joining-a-witness-record": "aee340af706fdbe892e0be331a6b3be3d36259230b3ee4d2029c7df05d6b068d",
+      "3-3-corroboration-not-substitution": "4cfb7410b783fbcb05a43bdc1808de8398acd9f9a04b4f351eb72ad8a7deb5f4",
+      "3-4-retained-bytes-and-the-mapping-check": "f89f1fac686a0e1a829fdfaa508d39edaeaed30edfa1c7c1d7538858d13b0d15",
+      "3-5-what-is-not-imported": "37a0f46431be09e6dff86b817fe26c71bf375fdfa9aa68e50bbd8ed10402e62b",
+      "3-behavior-to-be-made-concrete": "ac0ab2663d1bb12eb1ec1ea64f046e42c96f878f3dbb6cbf9664099f25cd1a59",
+      "4-out-of-scope": "a68ac0081dda043e0dedd8c3bd7c0411460e98c2722b766c0bdb749c38b757b1",
+      "5-observable-negative-cases": "0b80e96c2fd032f339e32a5411fee19ba60d6b1f45efe5c3b0d01f29664e743d",
+      "6-open-questions": "d013621da89971a9d852928af0afe4b8b5afb62f650c22ce21b84201a73d015e"
+    },
+    "sectionHeadings": [
+      "025: Wire-witness exchanges as remote-exchange and replay evidence (deferred)",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior (to be made concrete)",
+      "3.1 Inputs",
+      "3.2 Joining a witness record",
+      "3.3 Corroboration, not substitution",
+      "3.4 Retained bytes and the mapping check",
+      "3.5 What is not imported",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "6. Open questions"
+    ],
+    "specPath": "specs/025-wire-witness-replay-input/spec.md",
+    "status": "draft",
+    "summary": "Reserves backlog item RUSTEV-013: how a redacted, attempt-bound `wire-witness.exchange/1` record, captured by an independent witness and admitted by its host, may corroborate a Rustev `rustev.remote-exchange/1` record and supply retained response bytes for spec 009's offline mapping check, while preserving requested versus served identity, explicit unknowns, the stricter retention, privacy and cost provenance, and host-owned authorization. Captured traffic that no Rustev attempt produced is never a Rustev decision or replay case. Draft and deferred: depends on wire-witness's exchange record being implemented and on a Rustev remote backend that a witness can observe.\n",
+    "title": "Wire-witness exchanges as remote-exchange and replay evidence (deferred)"
+  },
+  "shardHash": "ca21e291b4d13a1fc135cb79c1970da4a62a04aeb7517d534ebe6f1cbe1ec443",
+  "specVersion": "1.8.0"
+}

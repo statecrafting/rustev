@@ -1,0 +1,79 @@
+{
+  "record": {
+    "created": "2026-09-27",
+    "dependsOn": [
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay",
+      "005-reference-backends",
+      "011-semantic-backend"
+    ],
+    "id": "024-second-local-semantic-backend",
+    "implementation": "deferred",
+    "obligations": [
+      {
+        "anchor": "3-3-swap-evidence",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "Swapping this backend for another changes no plan authority path and requires no change to rustev-contract or rustev-core unless separately approved."
+      },
+      {
+        "anchor": "3-1-entry-criteria",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "Work under this spec starts only when spec 011 is implementation-complete and a retained comparison report names a need the first backend does not meet."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/backlog.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "024-second-local-semantic-backend-deferred": "4cbf4ea1c97d42bc732a1f6ec7cddcef1211cffaf5f3ec4fce59442755b89229",
+      "1-purpose": "532a67ce4689946577a65e8a94005597a262d5df4a5fc2673bc1b08d140e72e8",
+      "2-territory": "18023ace8229d6d02028ad9b72511a61e945e9b82f1a5d60686c050e62e64700",
+      "3-1-entry-criteria": "0c58a1e1e6cf2e5437dc9d4f3f9f8e57a6767553f0fc7118dc19364039a4ebde",
+      "3-2-obligations-carried-from-spec-011": "1993431164f5f947291e3c93dbd45905177d3fbe253ed88b6e5312974cc4d613",
+      "3-3-swap-evidence": "e6a700c325f617fb5c0b52cb63d702f813141beb78a9f2a998bce77aa28bb5b0",
+      "3-behavior-to-be-made-concrete": "f87cba29769a590c8cc0ed45abeaed0967d9e7d1dfbb98650c1b3119f7028195",
+      "4-out-of-scope": "dfb1aabf15f05989ad63ed89ae21f4e18ccf714e3e42d264a40b893b98a0cbef",
+      "acceptance-draft": "33e911dee804c904faad56d276f30140802d9c092f35a6b6f140a2573d028371"
+    },
+    "sectionHeadings": [
+      "024: Second local semantic backend (deferred)",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior (to be made concrete)",
+      "3.1 Entry criteria",
+      "3.2 Obligations carried from spec 011",
+      "3.3 Swap evidence",
+      "4. Out of scope",
+      "Acceptance (draft)"
+    ],
+    "specPath": "specs/024-second-local-semantic-backend/spec.md",
+    "status": "draft",
+    "summary": "Reserves backlog item RUSTEV-012 and the architecture's increment 3 \"second semantic backend\": a second local, offline `DecisionBackend` added only after the first local backend (spec 011) is complete and comparable evaluation reports show a concrete need it would answer. It declares its actual capabilities, artifact identity, resource use and numerical behavior, and must be swappable with spec 011's backend and the Jev adapter without any authority-path or core contract change. Claims no code, names no model, and adds no dependency.\n",
+    "title": "Second local semantic backend (deferred)"
+  },
+  "shardHash": "fb20bf1ffe290c7de6857fa75f4ed62d806e2fe49ce81b570fb26572916d3f39",
+  "specVersion": "1.8.0"
+}

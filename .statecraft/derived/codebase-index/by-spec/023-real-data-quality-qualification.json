@@ -1,0 +1,45 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "004-evaluation-and-replay",
+      "005-reference-backends",
+      "007-support-routing-package",
+      "008-reference-package-lodging",
+      "012-jev-integration",
+      "014-report-integrity"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "docs/backlog.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/backlog.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/decisions/00-founding-decisions.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "specId": "023-real-data-quality-qualification",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "0eeea3fc6f74c6c5cccb25c2d78d85c309fdb628bf28193f25fe7eb7a8913881"
+}

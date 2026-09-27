@@ -1,0 +1,105 @@
+{
+  "record": {
+    "amends": [
+      "012-jev-integration"
+    ],
+    "created": "2026-09-27",
+    "dependsOn": [
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay",
+      "009-remote-adapter-protocol",
+      "012-jev-integration",
+      "013-remote-state-on-failed-attempts"
+    ],
+    "id": "022-jev-production-transport",
+    "implementation": "deferred",
+    "obligations": [
+      {
+        "anchor": "3-1-production-eligibility",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "A binding is production-eligible only when its transport pins a model version and the pin is verified per answered exchange; a binding whose served identity can be `unknown` is refused for production at construction."
+      },
+      {
+        "anchor": "3-2-direct-transport-with-a-pin",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "An answered exchange whose observed served identity differs from the pin, or cannot be observed on a transport that promised it, is `identity_mismatch` and never supplies an output."
+      },
+      {
+        "anchor": "3-6-evidence-and-requalification",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "Evaluation, calibration and qualification evidence produced under one binding identity is never reported as evidence for another; a change of transport, pin or mapping requires requalification."
+      },
+      {
+        "anchor": "3-3-gateway-pinning-as-an-alternative",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "Gateway pinning is accepted only after a recorded fact shows the Gateway both honors a requested version and reports the served version per response; documentation alone is not sufficient."
+      },
+      {
+        "anchor": "3-4-transport-facts-of-a-production-binding",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "A production binding records its transport facts (endpoint, API version, TLS policy, timeouts inside the one attempt budget, connection behavior, privacy terms and cost source) and a reconciliation procedure between the spend journal and the provider's billing record."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/backlog.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "022-production-transport-and-served-identity-for-the-jev-adapter-amends-012": "91b75133e26d10c00682c32686a2d7121b75ff9513ae9b7e7dfcce84a02a9819",
+      "1-purpose": "70685a3a8f2e016c3a9760e89eae9aa998656191292f5b263ff26808718464e3",
+      "2-territory": "4a45c86e472a6db4261c0e696c9dc2bfa1bae8537cea3019838eb88ef89b9ac9",
+      "3-1-production-eligibility": "5bbe7c4185d15c476faa590abf8439f6d499f73705640f322f9e0a4a76c3697d",
+      "3-2-direct-transport-with-a-pin": "09534cfc1c46aaa9d24040c81c1c15fc033547cdc754ffe2af79d434c2438cea",
+      "3-3-gateway-pinning-as-an-alternative": "16808079d4375a740410778d0f2bfb76e75e40eb94e2a759800c0c5c899dd461",
+      "3-4-transport-facts-of-a-production-binding": "c2426f450d95cb86401fdb9aa3151d7db269682f0d60aa02b2708f5cfa2ef652",
+      "3-5-cost-reconciliation": "f7431b8147b49cd03178d2b2c13c785bab2423ac5a4e69fdff1cd001814abf7b",
+      "3-6-evidence-and-requalification": "4269aff4e6befd01c4ca4b1052ee7a52f42283e45f804df1dfb557664f463fca",
+      "3-7-qualification-stages": "27dde8a339e5c72a460314d729cf516bc3ce1e5a9f4831f108b4014135642a3c",
+      "3-behavior": "12120ed0474b43c45929ba078dece9a2f7fdfeb50712f75a8d8fc7f169d70488",
+      "4-out-of-scope": "faec5ae3c40f8d5a9c745c348c9220a55d9e7664134a1e287c82c2111276cc6d",
+      "5-observable-negative-cases": "5b99adb770ee25dd51d6cc1b4ede93768054d4733c8844340056c7001bd524d1",
+      "acceptance-draft": "10d8e008a8b4c45eec64cf62d3bd1a4505c5e6051b37140b6ef4b9a9e82a03a5",
+      "open-questions": "2f726c287eb4bbc3ce8f23208689bbfffe30e0720c0426325c9be2dfe9736064"
+    },
+    "sectionHeadings": [
+      "022: Production transport and served identity for the Jev adapter (amends 012)",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 Production eligibility",
+      "3.2 Direct transport with a pin",
+      "3.3 Gateway pinning as an alternative",
+      "3.4 Transport facts of a production binding",
+      "3.5 Cost reconciliation",
+      "3.6 Evidence and requalification",
+      "3.7 Qualification stages",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance (draft)",
+      "Open questions"
+    ],
+    "specPath": "specs/022-jev-production-transport/spec.md",
+    "status": "draft",
+    "summary": "The separately reviewable spec 012 amendment that backlog item RUSTEV-010 and spec 012 R-3 require before production use: a Jev binding is production-eligible only when its transport pins a model version and every answered exchange proves the served identity against that pin. Defines the qualification of TypeSafe's direct API with a pinned version, the evidence under which Gateway pinning could be accepted instead, and the transport, TLS, timeout, connection, privacy and cost-reconciliation facts a production binding records. Development evidence with `served: unknown` is never relabeled as production evidence. Draft and deferred: blocked on owner decisions and external evidence; it authorizes no live call, spend, credential use or deployment.\n",
+    "title": "Production transport and served identity for the Jev adapter (amends 012)"
+  },
+  "shardHash": "75512704c6e0dd71139c7f545cbdefc61f8e77d064ee1e2e9041d687d553c72f",
+  "specVersion": "1.8.0"
+}
