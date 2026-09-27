@@ -16,7 +16,8 @@ use rustev_contract::ids::ArtifactId;
 use rustev_contract::judgment::Judgment;
 use rustev_contract::remote::CancelSupport;
 use rustev_contract::run::{
-    AttemptEnd, CancelAnswer, Cancellation, Charge, CoreEvidence, RemoteState, RunRecord,
+    AttemptEnd, CancelAnswer, Cancellation, Charge, CoreEvidence, RemoteState, RequestResult,
+    RunRecord,
 };
 use rustev_contract::scope::Scope;
 use rustev_contract::snapshot::Snapshot;
@@ -47,13 +48,17 @@ impl EvidenceSink for KeepRef {
 }
 
 fn runtime(backend: Arc<dyn DecisionBackend>) -> Runtime {
+    runtime_with(backend, 4)
+}
+
+fn runtime_with(backend: Arc<dyn DecisionBackend>, max_parallel_requests: usize) -> Runtime {
     Runtime::builder(
         Arc::new(ManualClock::new()),
         Arc::new(KeepRef(Arc::new(Keep::default()))),
         RuntimeConfig {
             max_in_flight: 4,
             max_queued: 4,
-            max_parallel_requests: 4,
+            max_parallel_requests,
             sink: SinkPolicy::FailDecision { timeout_ms: 1_000 },
         },
     )
@@ -343,7 +348,11 @@ async fn best_effort_cancel_after_writing_is_recorded_possibly_continuing() {
         )
         .await
     });
-    wait_until(|| !s.gated().is_empty()).await;
+    // Every request must be written (held at the gate) before the signal:
+    // this row is "raised after the request was written", and a request not
+    // yet written would correctly answer `stopped` (spec 009, section 6).
+    const REQUESTS: usize = 3; // semantic requests in the support-routing plan
+    wait_until(|| s.gated().len() == REQUESTS).await;
     cancel.raise();
     let d = tokio::time::timeout(LONG, t)
         .await
@@ -357,7 +366,11 @@ async fn best_effort_cancel_after_writing_is_recorded_possibly_continuing() {
         .iter()
         .flat_map(|r| r.attempts.iter())
         .collect();
-    assert!(!attempts.is_empty());
+    assert_eq!(
+        attempts.len(),
+        REQUESTS,
+        "every request was written before the signal"
+    );
     for a in attempts {
         assert_eq!(a.end, AttemptEnd::Cancelled);
         assert_eq!(
@@ -373,6 +386,66 @@ async fn best_effort_cancel_after_writing_is_recorded_possibly_continuing() {
         d.record.cost.liability > 0,
         "reservations kept as liability"
     );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn cancel_with_one_request_written_leaves_the_rest_undispatched() {
+    // One request at a time: the first is written and held at the gate, the
+    // other two wait in the runtime. The signal ends the written one
+    // unconfirmed; the waiting ones are never dispatched, so they carry no
+    // attempt and no charge (spec 009, section 6).
+    let s = scripted_head(|_| Answer::Gate);
+    let config = ServerConfig {
+        cancellation: CancelSupport::BestEffort,
+        ..ServerConfig::default()
+    };
+    let (_h, c) = scripted_over_loopback(config, &s).await;
+    let rt = Arc::new(runtime_with(Arc::new(c.clone()), 1));
+    let (plan, _) = support_plan(&c, &unlimited());
+    let plan = Arc::new(rt.prepare(plan).unwrap());
+    let cancel = CancelSignal::new();
+    let (rt2, plan2, cancel2) = (rt.clone(), plan.clone(), cancel.clone());
+    let t = tokio::spawn(async move {
+        rt2.decide(
+            &plan2,
+            request("k-1", support_snapshot("pro", &[2, 5], 0)),
+            &cancel2,
+        )
+        .await
+    });
+    wait_until(|| s.gated().len() == 1).await;
+    cancel.raise();
+    let d = tokio::time::timeout(LONG, t)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    assert_eq!(d.completion, Completion::Cancelled);
+    assert_eq!(
+        s.dispatched().len(),
+        1,
+        "no request dispatched after the signal"
+    );
+    let (written, unsent): (Vec<_>, Vec<_>) = d
+        .record
+        .requests
+        .iter()
+        .partition(|r| !r.attempts.is_empty());
+    assert_eq!((written.len(), unsent.len()), (1, 2));
+    let a = &written[0].attempts[..];
+    assert_eq!(a.len(), 1);
+    assert_eq!(a[0].end, AttemptEnd::Cancelled);
+    assert_eq!(
+        a[0].cancellation,
+        Cancellation::Requested {
+            answer: CancelAnswer::Unconfirmed
+        }
+    );
+    assert_eq!(a[0].remote, RemoteState::PossiblyContinuing);
+    assert_eq!(a[0].cost.charge, Charge::Unknown);
+    for r in unsent {
+        assert_eq!(r.result, RequestResult::NotSupplied);
+    }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

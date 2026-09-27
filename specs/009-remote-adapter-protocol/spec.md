@@ -605,6 +605,13 @@ offered yet); the qualification that would turn batching on (open question
 spec 004 reports and qualification records to state; nothing here reports
 results.
 
+Test fix (2026-09-27): the runtime test of a best-effort cancel raised
+after writing now waits until all three support-routing requests are held
+at the gate. It had raised the signal once one was held, and a request not
+yet written correctly answers `stopped` (section 6), so it failed about
+1 run in 40. A sibling test runs one request at a time: the written request
+ends unconfirmed and the waiting ones are never dispatched.
+
 ## Verification
 
 Run by `make verify` (009 is in `VERIFIED_SPECS`).
