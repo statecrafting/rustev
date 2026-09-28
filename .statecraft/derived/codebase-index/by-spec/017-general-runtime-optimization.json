@@ -1,40 +1,35 @@
 {
   "mapping": {
+    "amends": [
+      "003-runtime-execution-and-evidence"
+    ],
     "dependsOn": [
       "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
       "004-evaluation-and-replay",
-      "005-reference-backends",
-      "006-cli-surface",
+      "009-remote-adapter-protocol",
       "012-jev-integration"
     ],
     "implementingPaths": [
-      {
-        "path": "Cargo.lock",
-        "source": "spec-edge"
-      },
-      {
-        "path": "Cargo.toml",
-        "source": "spec-edge"
-      },
       {
         "path": "Makefile",
         "source": "spec-edge"
       },
       {
-        "path": "integrations/rustev-jev/",
+        "path": "crates/rustev-contract/",
         "source": "spec-edge"
       },
       {
-        "path": "packages/rustev-pkg-support-routing",
-        "source": "manifest-metadata"
-      },
-      {
-        "path": "packages/rustev-pkg-support-routing/",
+        "path": "crates/rustev-core/",
         "source": "spec-edge"
       },
       {
-        "path": "tools/rustev-boundaries/",
+        "path": "crates/rustev-eval/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-runtime/",
         "source": "spec-edge"
       }
     ],
@@ -42,66 +37,53 @@
       {
         "locations": [
           {
-            "file": "packages/rustev-pkg-support-routing/"
-          }
-        ],
-        "ownership": true,
-        "sourceField": "establishes",
-        "unit": {
-          "kind": "directory",
-          "path": "packages/rustev-pkg-support-routing/"
-        }
-      },
-      {
-        "locations": [
-          {
-            "file": "integrations/rustev-jev/"
+            "file": "crates/rustev-contract/"
           }
         ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
           "kind": "directory",
-          "path": "integrations/rustev-jev/"
+          "path": "crates/rustev-contract/"
         }
       },
       {
         "locations": [
           {
-            "file": "tools/rustev-boundaries/"
+            "file": "crates/rustev-core/"
           }
         ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
           "kind": "directory",
-          "path": "tools/rustev-boundaries/"
+          "path": "crates/rustev-core/"
         }
       },
       {
         "locations": [
           {
-            "file": "Cargo.lock"
+            "file": "crates/rustev-eval/"
           }
         ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
-          "kind": "file",
-          "path": "Cargo.lock"
+          "kind": "directory",
+          "path": "crates/rustev-eval/"
         }
       },
       {
         "locations": [
           {
-            "file": "Cargo.toml"
+            "file": "crates/rustev-runtime/"
           }
         ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
-          "kind": "file",
-          "path": "Cargo.toml"
+          "kind": "directory",
+          "path": "crates/rustev-runtime/"
         }
       },
       {
@@ -144,9 +126,9 @@
         }
       }
     ],
-    "specId": "007-support-routing-package",
+    "specId": "017-general-runtime-optimization",
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "236b5c6188f97056c1276a85bbc0712ac7e8296a9a21d881260d345c31d26a2c"
+  "shardHash": "8a05ae89317ba82eac455b0cdcef5423438f21f7b5b0c1e68f4e4aeb1dbe23a8"
 }

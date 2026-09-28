@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::ids::ExecutionPolicyId;
 use crate::limits::DESCRIPTOR_V1;
+use crate::optimization::OptimizationPolicy;
 use crate::schema;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -18,6 +19,10 @@ pub struct ExecutionPolicy {
     /// retry and fallback.
     pub max_attempts_per_decision: u64,
     pub cost: CostPolicy,
+    /// Optional reusable-work policy (spec 017). Its absence preserves the
+    /// version 1 policy bytes and unoptimized behavior.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub optimization: Option<OptimizationPolicy>,
     /// At most one entry per semantic step; an unlisted step gets one
     /// attempt, no timeout and no fallback.
     pub steps: Vec<StepExecution>,

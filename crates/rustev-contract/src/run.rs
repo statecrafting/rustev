@@ -13,6 +13,7 @@ use crate::execution::FailureClass;
 use crate::ids::{ArtifactId, ExecutionPolicyId, PlanId};
 use crate::judgment::Unresolved;
 use crate::limits::RECORD_V1;
+use crate::optimization::{OptimizationOutcome, OptimizationRecord};
 use crate::schema;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -75,6 +76,9 @@ pub struct RequestRecord {
     pub result: RequestResult,
     pub attempts: Vec<AttemptRecord>,
     pub transitions: Vec<Transition>,
+    /// Absent for unoptimized execution, preserving existing record bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub optimization: Option<OptimizationRecord>,
 }
 
 /// Where a supplied value came from (spec 004, 3.2).
@@ -87,6 +91,10 @@ pub struct SuppliedFrom<'r> {
     /// attempt only when no `retry` or `fallback` transition has an `after`
     /// equal to its ordinal.
     pub attempt: Option<&'r AttemptRecord>,
+    /// For an output reused from a cache entry (spec 017, 3.8): the attempt
+    /// of an earlier decision that produced it. Set only when the record has
+    /// no attempt of its own and its optimization record names a hit.
+    pub reused_from: Option<&'r str>,
 }
 
 impl RequestRecord {
@@ -98,6 +106,11 @@ impl RequestRecord {
             RequestResult::Output { target } => Some(SuppliedFrom {
                 target: *target,
                 attempt: self.attempts.last(),
+                reused_from: self
+                    .optimization
+                    .as_ref()
+                    .filter(|o| self.attempts.is_empty() && o.outcome == OptimizationOutcome::Hit)
+                    .and_then(|o| o.source_attempt_id.as_deref()),
             }),
             RequestResult::Failed(_) => {
                 let target = self
@@ -116,6 +129,7 @@ impl RequestRecord {
                 Some(SuppliedFrom {
                     target,
                     attempt: if moved_on { None } else { self.attempts.last() },
+                    reused_from: None,
                 })
             }
         }

@@ -12,6 +12,7 @@ use rustev_contract::execution::{
     AttemptTimeout, CostPolicy, Delay, ExecutionPolicy, MAX_ATTEMPTS_PER_TARGET, MAX_DELAY_MS,
     MAX_FALLBACKS,
 };
+use rustev_contract::optimization::OptimizationPolicy;
 use rustev_contract::plan::{
     BoundCalibration, DeclaredExecution, FallbackBinding, PlanExecution, PlanStepDetail,
 };
@@ -30,6 +31,48 @@ fn refuse<T>(subject: impl Into<String>, detail: impl Into<String>) -> Result<T,
 
 fn unique<T: Ord>(items: &[T]) -> bool {
     items.iter().collect::<BTreeSet<_>>().len() == items.len()
+}
+
+fn validate_optimization(policy: &OptimizationPolicy) -> Result<(), Refusal> {
+    let subject = "execution.optimization";
+    if policy.key_schema_version == 0 {
+        return refuse(subject, "key_schema_version must be positive");
+    }
+    if policy.cache_namespace_version == 0 {
+        return refuse(subject, "cache_namespace_version must be positive");
+    }
+    if policy.batch.is_none() && policy.memory_cache.is_none() {
+        return refuse(subject, "at least one optimization mechanism is enabled");
+    }
+    if let Some(p) = &policy.batch
+        && (p.max_members < 2
+            || p.max_canonical_bytes == 0
+            || p.max_members_per_scope == 0
+            || p.max_members_per_scope > p.max_members
+            || p.max_backend_work == 0)
+    {
+        return refuse(
+            subject,
+            "batch bounds must be positive and internally consistent",
+        );
+    }
+    // A bound that no entry can satisfy is an incomplete policy, not a
+    // cache (spec 017, 3.1).
+    if let Some(p) = &policy.memory_cache
+        && (p.max_bytes == 0
+            || p.max_entries == 0
+            || p.max_entry_bytes == 0
+            || p.max_scope_bytes == 0
+            || p.ttl_ms == 0
+            || p.max_entry_bytes > p.max_scope_bytes
+            || p.max_scope_bytes > p.max_bytes)
+    {
+        return refuse(
+            subject,
+            "memory cache bounds must be positive and internally consistent",
+        );
+    }
+    Ok(())
 }
 
 pub(crate) fn validate(
@@ -52,6 +95,9 @@ pub(crate) fn validate(
             return refuse("execution", "a cost budget of 0 units admits nothing");
         }
         _ => {}
+    }
+    if let Some(optimization) = &policy.optimization {
+        validate_optimization(optimization)?;
     }
 
     let mut seen = BTreeSet::new();

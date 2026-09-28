@@ -158,6 +158,12 @@ drafting handoff. Recorded here as the owner's decision.
 | A-12 | The owner approved spec `007` (package `packages/rustev-pkg-support-routing`, depending on contract and core only) with R-31's answers, by the same act. Implementation is pending. | 2026-09-25 |
 | A-13 | The owner approved spec `016` (amends `007`: the swap test compares policy sections modulo Jev's declared `uncalibrated_threshold` on `topic`, lives in `rustev-jev`'s tests, and priority is a second evaluation set) with R-33's answers, as its own reviewable change before code (R-16). Implementation is pending, with `007`. | 2026-09-26 |
 | A-14 | The owner approved spec `008` (lodging reference package) as drafted with R-34's answers. Implementation is pending. | 2026-09-26 |
+| A-15 | The owner approved spec `010` (optional Aicortex, Rahi, and serving integrations) as drafted with R-34's answers. Implementation and each binding record remain subject to the separate owner-review boundary in R-34. | 2026-09-26 |
+| A-16 | The owner approved spec `017` (general runtime optimization) as drafted with R-34's answers. Implementation is pending. | 2026-09-26 |
+| A-17 | The owner approved spec `018` (live re-execution) as drafted with R-34's answers. Implementation is pending; no live activity or spend is authorized. | 2026-09-26 |
+| A-18 | The owner approved spec `019` (bounded dynamic questions) as drafted with R-34's answers. Implementation is pending; no live inference or spend is authorized. | 2026-09-26 |
+| A-19 | The owner approved spec `020` (remote protocol refinements) as drafted with R-34's answers. Implementation is pending; no migration, live qualification, deployment, or spend is authorized. | 2026-09-26 |
+| A-20 | The owner approved spec `021` (packaging and first release) as drafted with R-34's answers. Candidate implementation is pending; publication and release remain separate owner acts. | 2026-09-26 |
 
 No approval authorizes ratifying any other spec.
 

@@ -16,6 +16,7 @@ mod capture;
 pub mod clock;
 mod driver;
 pub mod ledger;
+mod optimization;
 mod sink;
 mod wait;
 
@@ -28,6 +29,7 @@ use rustev_contract::execution::{
 };
 use rustev_contract::ids::ArtifactId;
 use rustev_contract::judgment::Judgment;
+use rustev_contract::optimization::OptimizationPolicy;
 use rustev_contract::plan::{PlanExecution, PlanStepDetail};
 use rustev_contract::replay::Capture;
 use rustev_contract::run::{
@@ -44,8 +46,10 @@ use tokio::sync::{OwnedSemaphorePermit, Semaphore, mpsc, oneshot};
 pub use capture::{CaptureConfig, CaptureConfigError, MAX_CAPTURE_BYTES};
 pub use clock::{Clock, Instant, ManualClock, TokioClock};
 pub use ledger::Ledger;
+pub use optimization::InvalidationResult;
 pub use sink::{DeliveryFailure, DeliveryTicket, SinkPolicy, SinkStats};
 
+use crate::optimization::InvalidationSelector;
 use crate::sink::{Job, Stats};
 use crate::wait::{Raced, race};
 
@@ -113,7 +117,9 @@ pub struct DecisionRequest {
     pub evaluation_time: Timestamp,
     /// Can only tighten the plan's `deadline_ms`.
     pub deadline_ms: Option<u64>,
-    /// Opaque; passed through to backends.
+    /// Opaque complete authorized-scope handle, including any tenant and
+    /// principal isolation the host requires; passed through to backends and
+    /// included in every reusable-work key.
     pub principal_handle: Vec<u8>,
 }
 
@@ -181,6 +187,7 @@ pub(crate) struct Inner {
     pub queue: Option<mpsc::Sender<Job>>,
     pub stats: Arc<Stats>,
     pub shared: Option<Arc<Ledger>>,
+    optimizer: optimization::Optimizer,
     admission: Arc<Semaphore>,
     queued: AtomicUsize,
     rejected: AtomicU64,
@@ -277,6 +284,7 @@ impl RuntimeBuilder {
                 queue,
                 stats,
                 shared: self.shared,
+                optimizer: optimization::Optimizer::default(),
                 admission: Arc::new(Semaphore::new(c.max_in_flight)),
                 queued: AtomicUsize::new(0),
                 rejected: AtomicU64::new(0),
@@ -308,11 +316,19 @@ pub struct PreparedPlan {
     pub(crate) steps: BTreeMap<String, StepRuntime>,
     pub(crate) cost: CostPolicy,
     execution: RecordedExecution,
+    pub(crate) optimization: Option<OptimizationPolicy>,
 }
 
 impl PreparedPlan {
     pub fn compiled(&self) -> &Compiled {
         &self.compiled
+    }
+
+    /// Identified cache namespace for host invalidation and audit.
+    pub fn optimization_namespace(&self) -> Option<String> {
+        self.optimization
+            .as_ref()
+            .map(|policy| optimization::namespace(&self.compiled.id, policy))
     }
 }
 
@@ -397,6 +413,7 @@ impl Runtime {
             .as_ref()
             .map(|p| p.cost)
             .unwrap_or(CostPolicy::Unlimited);
+        let optimization = policy.as_ref().and_then(|p| p.optimization.clone());
         let target = |backend_id: &str, descriptor: &rustev_contract::ids::DescriptorId| {
             let r = self
                 .inner
@@ -464,7 +481,39 @@ impl Runtime {
             steps,
             cost,
             execution,
+            optimization,
         })
+    }
+
+    /// Invalidate every reusable result in this plan's namespace, for any
+    /// correction, revocation, erasure, artifact withdrawal or policy
+    /// change the host observed. The generation advances before entries are
+    /// removed, so a result captured earlier is never stored or served.
+    pub fn invalidate_plan(&self, plan: &PreparedPlan) -> Option<InvalidationResult> {
+        let namespace = plan.optimization_namespace()?;
+        Some(
+            self.inner
+                .optimizer
+                .invalidate(&InvalidationSelector::Namespace { namespace }),
+        )
+    }
+
+    /// Invalidate reusable results for one opaque authorized scope, as for
+    /// an erasure or a scope revocation.
+    pub fn invalidate_scope(
+        &self,
+        plan: &PreparedPlan,
+        principal_handle: &[u8],
+    ) -> Option<InvalidationResult> {
+        let namespace = plan.optimization_namespace()?;
+        Some(
+            self.inner
+                .optimizer
+                .invalidate(&InvalidationSelector::Scope {
+                    namespace,
+                    scope_id: optimization::scope_id(principal_handle),
+                }),
+        )
     }
 
     async fn admit(

@@ -12,8 +12,9 @@ use rustev_contract::descriptor::BackendDescriptor;
 use rustev_contract::output::RawOutput;
 use rustev_contract::run::{Charge, CostBound, CostModel, RunRecord};
 use rustev_core::seams::{
-    AdapterFailure, AttemptCall, AttemptReport, BoxFuture, CancelAck, DecisionBackend,
-    EvidenceSink, RemoteEnd,
+    AdapterFailure, AttemptCall, AttemptReport, BatchAttemptCall, BatchAttemptReport,
+    BatchCapability, BatchMemberReport, BoxFuture, CancelAck, DecisionBackend, EvidenceSink,
+    RemoteEnd,
 };
 use serde_json::Value as Json;
 use tokio::sync::oneshot;
@@ -42,6 +43,7 @@ pub enum OnCancel {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
     Dispatched(String),
+    BatchDispatched(String, Vec<String>),
     Finished(String),
     CancelSeen(String),
     Dropped(String),
@@ -77,6 +79,10 @@ pub struct Scripted {
     /// The principal handle each dispatched attempt was called with.
     principals: Mutex<Vec<Vec<u8>>>,
     gates: Mutex<BTreeMap<String, oneshot::Sender<Answer>>>,
+    batch_enabled: Mutex<bool>,
+    batch_omit_task: Mutex<Option<String>>,
+    /// Per-task cost bounds that override `bound`.
+    task_bounds: Mutex<BTreeMap<String, CostBound>>,
 }
 
 impl Scripted {
@@ -95,6 +101,9 @@ impl Scripted {
             events: Mutex::new(vec![]),
             principals: Mutex::new(vec![]),
             gates: Mutex::new(BTreeMap::new()),
+            batch_enabled: Mutex::new(false),
+            batch_omit_task: Mutex::new(None),
+            task_bounds: Mutex::new(BTreeMap::new()),
         })
     }
 
@@ -114,6 +123,22 @@ impl Scripted {
         self
     }
 
+    pub fn with_batch(self: Arc<Self>) -> Arc<Self> {
+        *self.batch_enabled.lock().unwrap() = true;
+        self
+    }
+
+    pub fn with_batch_omitting(self: Arc<Self>, task: &str) -> Arc<Self> {
+        *self.batch_enabled.lock().unwrap() = true;
+        *self.batch_omit_task.lock().unwrap() = Some(task.into());
+        self
+    }
+
+    pub fn with_task_bound(self: Arc<Self>, task: &str, bound: CostBound) -> Arc<Self> {
+        self.task_bounds.lock().unwrap().insert(task.into(), bound);
+        self
+    }
+
     pub fn principals(&self) -> Vec<Vec<u8>> {
         self.principals.lock().unwrap().clone()
     }
@@ -125,9 +150,10 @@ impl Scripted {
     pub fn dispatched(&self) -> Vec<String> {
         self.events()
             .into_iter()
-            .filter_map(|e| match e {
-                Event::Dispatched(a) => Some(a),
-                _ => None,
+            .flat_map(|e| match e {
+                Event::Dispatched(a) => vec![a],
+                Event::BatchDispatched(_, members) => members,
+                _ => vec![],
             })
             .collect()
     }
@@ -189,9 +215,16 @@ impl DecisionBackend for Handle {
         *self.0.cost_model.lock().unwrap()
     }
 
-    fn cost_bound(&self, _projection: &[u8]) -> CostBound {
+    fn cost_bound(&self, projection: &[u8]) -> CostBound {
         if let Some(f) = &*self.0.before_bound.lock().unwrap() {
             f();
+        }
+        let task = serde_json::from_slice::<Json>(projection).unwrap_or(Json::Null)["task"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string();
+        if let Some(bound) = self.0.task_bounds.lock().unwrap().get(&task) {
+            return *bound;
         }
         *self.0.bound.lock().unwrap()
     }
@@ -199,91 +232,199 @@ impl DecisionBackend for Handle {
     fn infer<'a>(&'a self, call: AttemptCall<'a>) -> BoxFuture<'a, AttemptReport> {
         let s = self.0.clone();
         let id = call.attempt_id.to_string();
+        s.push(Event::Dispatched(id.clone()));
+        let answer = s.call(&id, call.projection, &call.cx.principal_handle);
+        answer_future(s, id, call.cancel.clone(), answer)
+    }
+
+    fn batch_capability(&self, _projection: &[u8]) -> Option<BatchCapability> {
+        let enabled = *self.0.batch_enabled.lock().unwrap();
+        enabled.then(|| BatchCapability {
+            compatibility: "scripted-general-batch/1".into(),
+            work_units: 1,
+        })
+    }
+
+    /// Each member behaves exactly as the same answer would in `infer`,
+    /// including gates and cancellation; the batch report combines them.
+    fn infer_batch<'a>(&'a self, call: BatchAttemptCall) -> BoxFuture<'a, BatchAttemptReport> {
+        let s = self.0.clone();
+        let ids = call
+            .members
+            .iter()
+            .map(|member| member.attempt_id.clone())
+            .collect::<Vec<_>>();
+        s.push(Event::BatchDispatched(call.batch_id, ids));
+        let omit = s.batch_omit_task.lock().unwrap().clone();
+        let mut members = Vec::new();
+        for member in call.members {
+            let task =
+                serde_json::from_slice::<Json>(&member.projection).unwrap_or(Json::Null)["task"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string();
+            let answer = s.call(
+                &member.attempt_id,
+                &member.projection,
+                &member.cx.principal_handle,
+            );
+            members.push((
+                member.attempt_id.clone(),
+                omit.as_deref() == Some(task.as_str()),
+                answer_future(s.clone(), member.attempt_id, member.cancel, answer),
+            ));
+        }
+        Box::pin(async move {
+            let mut done: Vec<Option<AttemptReport>> = vec![None; members.len()];
+            std::future::poll_fn(|cx| {
+                for (i, (_, _, f)) in members.iter_mut().enumerate() {
+                    if done[i].is_none()
+                        && let Poll::Ready(r) = f.as_mut().poll(cx)
+                    {
+                        done[i] = Some(r);
+                    }
+                }
+                if done.iter().all(Option::is_some) {
+                    Poll::Ready(())
+                } else {
+                    Poll::Pending
+                }
+            })
+            .await;
+            let mut reports = Vec::new();
+            let mut known = 0_u64;
+            let mut estimated = false;
+            let mut unknown = false;
+            let mut acks = Vec::new();
+            for ((id, omitted, _), r) in members.into_iter().zip(done) {
+                let r = r.expect("every member finished");
+                match r.charge {
+                    Charge::Observed { units } => known += units,
+                    Charge::Estimated { units } => {
+                        known += units;
+                        estimated = true;
+                    }
+                    Charge::Unknown => unknown = true,
+                }
+                acks.push(r.cancel);
+                if !omitted {
+                    reports.push(BatchMemberReport {
+                        attempt_id: id,
+                        result: r.result,
+                    });
+                }
+            }
+            let cancel = if acks.contains(&CancelAck::Unconfirmed) {
+                CancelAck::Unconfirmed
+            } else if acks.contains(&CancelAck::Stopped) {
+                CancelAck::Stopped
+            } else {
+                CancelAck::NotRequested
+            };
+            BatchAttemptReport {
+                result: Ok(reports),
+                charge: match (unknown, estimated) {
+                    (true, _) => Charge::Unknown,
+                    (false, true) => Charge::Estimated { units: known },
+                    (false, false) => Charge::Observed { units: known },
+                },
+                cancel,
+                remote: *s.remote.lock().unwrap(),
+            }
+        })
+    }
+}
+
+impl Scripted {
+    fn call(&self, id: &str, projection: &[u8], principal: &[u8]) -> Answer {
         let n = id
             .rsplit('/')
             .next()
             .and_then(|x| x.parse().ok())
             .unwrap_or(0);
-        let projection: Json = serde_json::from_slice(call.projection).unwrap_or(Json::Null);
-        let signal = call.cancel.clone();
-        s.push(Event::Dispatched(id.clone()));
-        s.principals
-            .lock()
-            .unwrap()
-            .push(call.cx.principal_handle.clone());
-        let answer = (s.answer)(&Call {
-            attempt_id: id.clone(),
+        let projection: Json = serde_json::from_slice(projection).unwrap_or(Json::Null);
+        self.principals.lock().unwrap().push(principal.to_vec());
+        (self.answer)(&Call {
+            attempt_id: id.to_string(),
             n,
             projection,
-        });
-        Box::pin(async move {
-            let mut watch = DropWatch {
-                backend: s.clone(),
-                id: id.clone(),
-                armed: true,
-            };
-            let answer = match answer {
-                Answer::Gate => {
-                    let (tx, mut rx) = oneshot::channel();
-                    s.gates.lock().unwrap().insert(id.clone(), tx);
-                    let released = std::future::poll_fn(|cx| {
-                        if let Poll::Ready(r) = Pin::new(&mut rx).poll(cx) {
-                            return Poll::Ready(r.ok());
-                        }
-                        if signal.poll_raised(cx).is_ready() {
-                            return Poll::Ready(None);
-                        }
-                        Poll::Pending
-                    })
-                    .await;
-                    match released {
-                        Some(a) => a,
-                        None => {
-                            s.gates.lock().unwrap().remove(&id);
-                            s.push(Event::CancelSeen(id.clone()));
-                            let on = *s.on_cancel.lock().unwrap();
-                            match on {
-                                OnCancel::Stop(charge) => {
-                                    watch.armed = false;
-                                    s.push(Event::Finished(id.clone()));
-                                    return AttemptReport {
-                                        result: Err((AdapterFailure::Cancelled, "stopped".into())),
-                                        charge,
-                                        cancel: CancelAck::Stopped,
-                                        remote: *s.remote.lock().unwrap(),
-                                    };
-                                }
-                                OnCancel::Unconfirmed => {
-                                    watch.armed = false;
-                                    s.push(Event::Finished(id.clone()));
-                                    return AttemptReport {
-                                        result: Err((
-                                            AdapterFailure::Cancelled,
-                                            "stopped waiting".into(),
-                                        )),
-                                        charge: Charge::Unknown,
-                                        cancel: CancelAck::Unconfirmed,
-                                        remote: *s.remote.lock().unwrap(),
-                                    };
-                                }
-                                OnCancel::Ignore => std::future::pending::<Answer>().await,
+        })
+    }
+}
+
+fn answer_future(
+    s: Arc<Scripted>,
+    id: String,
+    signal: rustev_core::seams::CancelSignal,
+    answer: Answer,
+) -> BoxFuture<'static, AttemptReport> {
+    Box::pin(async move {
+        let mut watch = DropWatch {
+            backend: s.clone(),
+            id: id.clone(),
+            armed: true,
+        };
+        let answer = match answer {
+            Answer::Gate => {
+                let (tx, mut rx) = oneshot::channel();
+                s.gates.lock().unwrap().insert(id.clone(), tx);
+                let released = std::future::poll_fn(|cx| {
+                    if let Poll::Ready(r) = Pin::new(&mut rx).poll(cx) {
+                        return Poll::Ready(r.ok());
+                    }
+                    if signal.poll_raised(cx).is_ready() {
+                        return Poll::Ready(None);
+                    }
+                    Poll::Pending
+                })
+                .await;
+                match released {
+                    Some(a) => a,
+                    None => {
+                        s.gates.lock().unwrap().remove(&id);
+                        s.push(Event::CancelSeen(id.clone()));
+                        let on = *s.on_cancel.lock().unwrap();
+                        match on {
+                            OnCancel::Stop(charge) => {
+                                watch.armed = false;
+                                s.push(Event::Finished(id.clone()));
+                                return AttemptReport {
+                                    result: Err((AdapterFailure::Cancelled, "stopped".into())),
+                                    charge,
+                                    cancel: CancelAck::Stopped,
+                                    remote: *s.remote.lock().unwrap(),
+                                };
                             }
+                            OnCancel::Unconfirmed => {
+                                watch.armed = false;
+                                s.push(Event::Finished(id.clone()));
+                                return AttemptReport {
+                                    result: Err((
+                                        AdapterFailure::Cancelled,
+                                        "stopped waiting".into(),
+                                    )),
+                                    charge: Charge::Unknown,
+                                    cancel: CancelAck::Unconfirmed,
+                                    remote: *s.remote.lock().unwrap(),
+                                };
+                            }
+                            OnCancel::Ignore => std::future::pending::<Answer>().await,
                         }
                     }
                 }
-                a => a,
-            };
-            let r = match answer {
-                Answer::Output(o, c) => report(Ok(o), c, *s.remote.lock().unwrap()),
-                Answer::Fail(f, d, c) => report(Err((f, d)), c, *s.remote.lock().unwrap()),
-                Answer::Panic => panic!("scripted adapter panic"),
-                Answer::Gate => std::future::pending::<AttemptReport>().await,
-            };
-            watch.armed = false;
-            s.push(Event::Finished(id));
-            r
-        })
-    }
+            }
+            a => a,
+        };
+        let r = match answer {
+            Answer::Output(o, c) => report(Ok(o), c, *s.remote.lock().unwrap()),
+            Answer::Fail(f, d, c) => report(Err((f, d)), c, *s.remote.lock().unwrap()),
+            Answer::Panic => panic!("scripted adapter panic"),
+            Answer::Gate => std::future::pending::<AttemptReport>().await,
+        };
+        watch.armed = false;
+        s.push(Event::Finished(id));
+        r
+    })
 }
 
 /// What a scripted sink does with a record.

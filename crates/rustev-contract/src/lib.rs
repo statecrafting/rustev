@@ -23,6 +23,7 @@ pub mod execution;
 pub mod ids;
 pub mod judgment;
 pub mod limits;
+pub mod optimization;
 pub mod output;
 pub mod plan;
 pub mod reason;

@@ -144,6 +144,7 @@ pub fn execution(cost: CostPolicy, steps: Vec<StepExecution>) -> ExecutionPolicy
         schema: schema::EXECUTION.into(),
         max_attempts_per_decision: 1_000,
         cost,
+        optimization: None,
         steps,
     }
 }

@@ -218,7 +218,13 @@ fn an_execution_policy_parses_round_trips_and_is_identified() {
     use rustev_contract::execution::{CostPolicy, ExecutionPolicy};
     let p = ExecutionPolicy::parse(POLICY.as_bytes()).unwrap();
     assert_eq!(p.cost, CostPolicy::Hard { max_units: 100 });
+    assert!(p.optimization.is_none());
     let c = p.canonical().unwrap();
+    assert_eq!(
+        c,
+        br#"{"cost":{"hard":{"max_units":100}},"max_attempts_per_decision":6,"schema":"rustev.execution/1","steps":[{"attempt_timeout":{"ms":250},"fallback":{"backends":["b"],"on":["permanent","invalid_output"]},"retry":{"delay":{"exponential":{"initial_ms":10,"max_ms":40}},"max_attempts":3,"on":["transient","timed_out"]},"step":"topic"}]}"#
+    );
+    assert!(!String::from_utf8_lossy(&c).contains("optimization"));
     assert_eq!(ExecutionPolicy::parse(&c).unwrap(), p);
     assert!(p.id().unwrap().as_str().starts_with("sha256:"));
     let unknown = POLICY.replace("\"cost\"", "\"jitter\":1,\"cost\"");
