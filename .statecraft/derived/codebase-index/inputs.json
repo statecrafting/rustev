@@ -4,10 +4,10 @@
       "contentHash": "dc2a885b01ebb2e6cbb7bdd397a286cb621ca6e58075b732e88ce3ad6110809f"
     },
     ".github/workflows/statecraft-ai-review.yml": {
-      "contentHash": "9f00644582115ee46103cd954bbe1575feb83323ff058fcbf12f4a2fc9dca40c"
+      "contentHash": "cd73dc1e84948114345d9b50c517d7172053d66e49eaa8c6872ccb11fc0bf57a"
     },
     ".github/workflows/statecraft-ci.yml": {
-      "contentHash": "3b86389c14f3b72af551fdb4e80e1c42b700f066fb5b07f000eb4c7e057ceb07"
+      "contentHash": "f65c866123c039d2c82d522228e2033859bd604e4b913a1c6dbc83b1249f7d51"
     },
     ".github/workflows/verify.yml": {
       "contentHash": "dae84684a05021e54a8596a83c96d469d1c2895b0b6a87dfd9a84c7170247396"
