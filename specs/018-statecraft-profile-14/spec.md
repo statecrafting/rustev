@@ -2,7 +2,7 @@
 id: "018-statecraft-profile-14"
 title: "Adopt Statecraft profile revision 14 with the ordinary Rust code gate"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-02"
 summary: >
   Authorizes the narrow migration from Statecraft github-actions-rust
@@ -70,5 +70,24 @@ and resolver exclusion remain alongside `.bin` during this transition.
 
 Owner consent is the explicit approval of Statecraft proposal 032 and the
 continuing revision 14 fleet rollout on 2026-10-02. This spec grants only that
-scoped migration. `implementation: pending` is deliberate: adoption is not
-claimed until the separate managed-profile migration lands.
+scoped migration. The ratification PR left implementation pending. The separate migration
+candidate records the scoped implementation and must pass its declared local
+and hosted acceptance before merge.
+
+## 6. Implementation record
+
+The migration candidate uses Statecraft producer commit
+`b7e44d7187c9720c5252c897eb3c717d3c2409ca`, qualified by its normal PR and
+merge-group checks. The frozen renderer SHA-256 is
+`916d9c4044a8420cf400103a2373e6a10f1be65881dacfa816b944f574a01d98`.
+The rendered profile is revision 14 with identity
+`9eb589951883f6a94ad174678b50a683982915ac463e0782cfc0efbab8c960c9`.
+
+The reviewed setup plan identity is
+`ee2635bd4368a3f9ad7ac7467a6483e4d9ab0bc43e296547a30155554da4942c`.
+It retains the recorded setup parameters, ordinary Rust code gate and
+required specialized jobs. The exact spec-spine pin remains `=0.28.0`, and
+the reviewer CLI remains 2.1.116. Local governance passed for the rendered
+candidate; its signed commit and regenerated lifecycle shards are checked
+again before submission. Actual hosted checks, AI review, scoped owner
+Environment approval and any required merge group must pass before landing.
