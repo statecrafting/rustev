@@ -1,6 +1,6 @@
 # The check surface for this repository.
 #
-#   make tools    install the pinned spec-spine into .tooling/bin
+#   make tools    install the pinned spec-spine into .bin
 #   make gate     read-only: judge the corpus (meaningful with no code at all)
 #   make refresh  writing: recompute the committed shard trees
 #   make code     build, test, clippy, fmt and the boundary check
@@ -11,7 +11,7 @@
 #
 # The pin is authored once, in spec-spine.toml; nothing here repeats it.
 SPEC_SPINE_VERSION := $(shell sed -n 's/^required_version = "=\(.*\)"/\1/p' spec-spine.toml)
-SPEC_SPINE_LOCAL := .tooling/bin/spec-spine
+SPEC_SPINE_LOCAL := .bin/spec-spine
 SPEC_SPINE ?= $(if $(wildcard $(SPEC_SPINE_LOCAL)),$(SPEC_SPINE_LOCAL),spec-spine)
 
 CRATE_MANIFESTS := $(wildcard crates/*/Cargo.toml backends/*/Cargo.toml tools/*/Cargo.toml integrations/*/Cargo.toml)
@@ -22,7 +22,7 @@ VERIFIED_SPECS := 001 002 003 004 005 006 007 008 009 012 013 014 015 017
 
 tools:
 	@test -n "$(SPEC_SPINE_VERSION)" || { echo "no required_version in spec-spine.toml"; exit 3; }
-	cargo install spec-spine-cli --version $(SPEC_SPINE_VERSION) --locked --root .tooling
+	sh scripts/statecraft/install-spec-spine.sh
 	$(SPEC_SPINE_LOCAL) --version
 
 ## Read-only. A gate that writes repairs what it is meant to judge.

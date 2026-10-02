@@ -1,12 +1,15 @@
-# Rendered by Statecraft from profile github-actions-rust revision 7
-# (identity 8ea41428995187dbd49555e5cddec56dd80beeda5f0f2213216d47b511f79f65). A managed file and a member of this
+# Rendered by Statecraft from profile github-actions-rust revision 13
+# (identity 6167a12e110b30ec27d37909344c7de0178ba477d5ad1ab91a0053430a89e17b). A managed file and a member of this
 # repository's authority set. Called by statecraft-ci.yml only; it declares
-# the one credential it needs by name and is never given `secrets: inherit`.
+# the two credentials it may use by name (revision 8: the API key when set,
+# else the OAuth token) and is never given `secrets: inherit`.
 name: statecraft-ai-review
 
 on:
   workflow_call:
     secrets:
+      ANTHROPIC_API_KEY:
+        required: false
       CLAUDE_CODE_OAUTH_TOKEN:
         required: false
     outputs:
@@ -41,6 +44,7 @@ jobs:
       - name: Review
         id: review
         env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           GH_TOKEN: ${{ github.token }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -51,13 +55,22 @@ jobs:
           HEAD_REF: ${{ github.head_ref }}
           ACTOR: ${{ github.actor }}
           IS_DRAFT: ${{ github.event.pull_request.draft }}
-          DIFF_CAP: '2000'
+          DIFF_CAP: '20000'
+          CONTEXT_TOKENS: '200000'
+          MAX_CALLS: '4'
+          DELETION_CAP: '20000'
           EXCLUDE: '.statecraft/derived'
           RELEASE_PATTERN: 'release/*'
           CLAUDE_CLI_VERSION: '2.1.116'
-          PROFILE_IDENTITY: '8ea41428995187dbd49555e5cddec56dd80beeda5f0f2213216d47b511f79f65'
+          PROFILE_IDENTITY: '6167a12e110b30ec27d37909344c7de0178ba477d5ad1ab91a0053430a89e17b'
         run: |
           script="${RUNNER_TEMP}/statecraft-ai-review.sh"
+          # Revision 12: only a readable base without the script is the
+          # adoption; an unreadable base stops before the candidate is read.
+          if ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            echo "cannot read the base commit ${BASE_SHA}; ai-review.sh is never taken from the candidate in its place" >&2
+            exit 2
+          fi
           if git show "${BASE_SHA}:scripts/statecraft/ai-review.sh" > "$script" 2>/dev/null; then
             echo "ai-review.sh: read at the base ${BASE_SHA}"
           else

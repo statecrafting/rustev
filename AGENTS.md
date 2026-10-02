@@ -12,7 +12,7 @@ capability contracts, and explicit abstention. Start with
 ## Governance
 
 - spec-spine is pinned in `spec-spine.toml` (`required_version`). Install it
-  with `make tools`; it lands in `.tooling/bin` and the Makefile prefers it.
+  with `make tools`; it lands in `.bin` and the Makefile prefers it.
   A different version on `PATH` proves nothing.
 - `make gate` is read-only and must pass before every commit. `make refresh`
   regenerates `.statecraft/derived/`; commit the shards with the spec edit that
@@ -47,7 +47,7 @@ acceptance.
 
 ## Continuous integration
 
-CI is the Statecraft setup profile `github-actions-rust` (revision 7): one
+CI is the Statecraft setup profile `github-actions-rust` (revision 13): one
 required check, `ci-gate`, over governance, code, the AI review and the
 declared extra jobs `boundaries` and `verify`
 (`.github/workflows/boundaries.yml`, `.github/workflows/verify.yml`, owned by
