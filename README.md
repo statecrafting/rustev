@@ -42,7 +42,7 @@ Governed by [spec-spine](https://github.com/statecrafting/spec-spine), pinned
 in `spec-spine.toml`, and initialized with statecraft-cli.
 
 ```sh
-make tools   # install the pinned spec-spine into .tooling/bin
+make tools   # install the pinned spec-spine into .bin
 make gate    # read-only corpus gate, including ownership coverage
 make code    # build, test, clippy, fmt, boundary check
 make verify  # run each approved spec's declared acceptance

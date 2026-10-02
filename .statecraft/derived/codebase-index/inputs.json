@@ -1,0 +1,89 @@
+{
+  "inputs": {
+    ".github/workflows/boundaries.yml": {
+      "contentHash": "dc2a885b01ebb2e6cbb7bdd397a286cb621ca6e58075b732e88ce3ad6110809f"
+    },
+    ".github/workflows/statecraft-ai-review.yml": {
+      "contentHash": "9f00644582115ee46103cd954bbe1575feb83323ff058fcbf12f4a2fc9dca40c"
+    },
+    ".github/workflows/statecraft-ci.yml": {
+      "contentHash": "3b86389c14f3b72af551fdb4e80e1c42b700f066fb5b07f000eb4c7e057ceb07"
+    },
+    ".github/workflows/verify.yml": {
+      "contentHash": "10dfcf5b406d525dc7ec289e8209822d2aa27c42924bc4424b9d593464121134"
+    },
+    ".gitignore": {
+      "contentHash": "85b353d66046fda041cb48203b3c5fa67f5625c7cdc24245f2da2e86caaf5b70"
+    },
+    "AGENTS.md": {
+      "contentHash": "fa9e6d70b10a4782d04eacf5bd2c3b6b952749ddbdb753b69b0b0982cc7645ad"
+    },
+    "Cargo.toml": {
+      "contentHash": "3885ad11e92fadf94ce39934391feaec4fd51df49817114b93df953eb7db5f05"
+    },
+    "Makefile": {
+      "contentHash": "50e7217dbb6a6184400f384e30f0f6d953ba4340a37c118115e48515efeb6741"
+    },
+    "README.md": {
+      "contentHash": "b8255d9212d69c7eead697614900be64dad920de104744ae773d2ec85034197a"
+    },
+    "docs/backlog.md": {
+      "contentHash": "200783a40557fc5d507c95f54adb9aefd6fd97ab53820cc3f95ed1dc371f3c9b"
+    },
+    "docs/decisions/00-founding-decisions.md": {
+      "contentHash": "a80e1efe3292ebff617a3af16c76cec9d40d8040ba6d2c45ad3888be7d53e79d"
+    },
+    "docs/design/001-decision-engine-architecture.md": {
+      "contentHash": "cd178bbd394d2c40a711b946fbc45b393da94699bee53e32dddddbfe17de584c"
+    },
+    "docs/design/discussions/001-user-context-and-instructions.md": {
+      "contentHash": "99f8729db254d4540c2cbf3ae5c6dd6ed7b55b107207121c646ad41d7b663145"
+    },
+    "docs/design/discussions/002-user-jev-assessment-and-architecture.md": {
+      "contentHash": "477c98d9d692628d89b2ef57dd24d6c26f1d98a6f9819d8c107e35cacd70100f"
+    },
+    "docs/design/discussions/003-assistant-research-update.md": {
+      "contentHash": "ca063e92f079ab16379450a66d470715819621babca9e0ca2e9ac589224fed65"
+    },
+    "docs/design/discussions/004-assistant-architecture-update.md": {
+      "contentHash": "a01f70147a9eb790d3a7d6f21e06614057bc8df62eb0361bb285d1b8a8f9e108"
+    },
+    "docs/design/discussions/005-assistant-architecture-evaluation.md": {
+      "contentHash": "60d0cb954a54e0319dd366ae73261bd1d60279a7f7a98683efba0b82a04b3914"
+    },
+    "docs/design/discussions/006-user-environment-context.md": {
+      "contentHash": "34fb5f5b7975137839a38543bab98f7eb2c17c608e44d1208afe02b10d379b69"
+    },
+    "docs/design/discussions/007-user-repository-request.md": {
+      "contentHash": "28e324dba7f4d06f5d414b24881bb3ea96080478101856e7a8cfbc3677be5f1d"
+    },
+    "docs/design/discussions/008-assistant-archive-update.md": {
+      "contentHash": "9b8159343484498ba9a1c25778a849e12a411283dac21c49b863019beb6355b2"
+    },
+    "docs/design/discussions/009-assistant-archive-update.md": {
+      "contentHash": "8b990fa83f5e02643c8af04f80329e38f841af57e2c142de04973d476d373df4"
+    },
+    "docs/design/discussions/010-assistant-completion.md": {
+      "contentHash": "171cd07cb88c5762ae1f407fdff9925e3cf07fcfdd83ca46c698ab11e03297e7"
+    },
+    "docs/design/discussions/README.md": {
+      "contentHash": "c7df0ab376e0e837439039e52f433c68b312bea5ed89bfdd1e39a421b6ec2969"
+    },
+    "spec-spine.toml": {
+      "contentHash": "288594479386b867c8f08bd13ced19144a4f72c8ca9f15d77ce25413e60edf22"
+    },
+    "standards/spec/constitution.md": {
+      "contentHash": "010d2e3af85bb45a1208b6dc521803e99bccd7a2f1b00d08c5f5c9aacf0bd766"
+    },
+    "standards/spec/contract.md": {
+      "contentHash": "ba588fc0a3659e9560a76b25c335ba92efebea44bc2121e2eee5cad8b3dfa83c"
+    },
+    "standards/spec/templates/constitution-template.md": {
+      "contentHash": "9422c45aeea54a1765b9da797f6c7e958dd2e7d4e74a7e3b788f3ec281a97900"
+    },
+    "standards/spec/templates/spec-template.md": {
+      "contentHash": "ff016dd58ed2e6e59fed062a49961c76496b37a7a60d1f321af75b76574eef4f"
+    }
+  },
+  "schemaVersion": "1.2.0"
+}

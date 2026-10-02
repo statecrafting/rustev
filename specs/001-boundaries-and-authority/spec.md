@@ -211,3 +211,11 @@ sh -c 'for d in crates tools; do [ -d "$d" ] || continue; if grep -rnE "(struct|
 - 2026-09-23: the owner closed O-01 (R-07). Principle XIII's closing
   sentence, in the constitution section this spec claims, now records that
   reading instead of the pending question. No principle changed.
+
+## Profile upgrade record (2026-10-02)
+
+The Statecraft github-actions-rust profile moves to revision 13 before the
+spec-spine pin moves to 0.28.0. This bridge keeps the exact 0.26.0 pin while
+CI adopts the regular-file commit walk and repository-local `.bin` installer.
+Existing required reusable jobs remain declared in the profile parameters.
+Local installation derives the version from `spec-spine.toml`.
