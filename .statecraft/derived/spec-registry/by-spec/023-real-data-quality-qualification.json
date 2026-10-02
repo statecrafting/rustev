@@ -1,0 +1,93 @@
+{
+  "record": {
+    "created": "2026-09-27",
+    "dependsOn": [
+      "004-evaluation-and-replay",
+      "005-reference-backends",
+      "007-support-routing-package",
+      "008-reference-package-lodging",
+      "012-jev-integration",
+      "014-report-integrity"
+    ],
+    "id": "023-real-data-quality-qualification",
+    "implementation": "deferred",
+    "obligations": [
+      {
+        "anchor": "3-1-dataset-admission",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "No quality, calibration or usefulness claim cites a dataset that lacks an admission record, and synthetic or generated examples are never reported as independent evidence of semantic quality."
+      },
+      {
+        "anchor": "3-3-freezing-before-the-final-test",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "The evaluator configuration, gates and baselines are frozen and digested before any final-test case is evaluated; a change after that point starts a new qualification with a new final-test split."
+      },
+      {
+        "anchor": "3-5-claim-scoping",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "Every claim names the dataset id, split, evaluator configuration id, binding identity, call dates and population, and states the limits that bound it; a claim beyond them is rejected."
+      },
+      {
+        "anchor": "3-4-measurement",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "Every candidate is reported against the exact and rules baselines on the same dataset, split and configuration, with coverage and abstention reported before accuracy."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/backlog.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "023-semantic-quality-and-calibration-qualification-on-real-labeled-data": "13228e70a092b15deb5dbfbc7736addf876f24a09c57da91de3b9dd19a653af5",
+      "1-purpose": "44895a98ccce1b665b031d2706b09fd118cd3c1d577b104733cc98af4e871a89",
+      "2-territory": "2cc9d6629c1229238e4fbd37196aad7c898b069aadc837a41d991f7d9ac31723",
+      "3-1-dataset-admission": "f399c778f451b60eb9df1c36beb6f050e779e5490bfe416473eba96408da08c5",
+      "3-2-contamination-and-exposure": "85bab3193ad96ccf2a0ce49d76b9ab4c34ca61eb02f868e72ed4fdb4b525615b",
+      "3-3-freezing-before-the-final-test": "50a03fd8726992eb8d8455dcc3b8a5fd7e2183cc6558644893e044c022097beb",
+      "3-4-measurement": "f8b4be503b9c7f7bc7a8bd458dd0355a1ac2014d413d9faaef1dbc6da56f87ea",
+      "3-5-claim-scoping": "1c3debcfce6fc376acfafa82c2bcfbc706b18bde8f3245023ef16e3274e821ac",
+      "3-behavior": "9da27beabd29cd8c22edb5f0037c7cff30db9909c2909e5a078480dd822627ee",
+      "4-out-of-scope": "a2e63ea33044be2f45cc993f72dfea1da4ee7a00368c23b0c1a16e0daa048ed4",
+      "5-observable-negative-cases": "468762d84d8ab58cbfaad154a56b0b8e831948710b7892731ea388083428193a",
+      "6-open-questions": "f92cc823ad2971556a24b794a262bfceb77cde940404f121396ba2d006b86364",
+      "acceptance-draft": "9ac2e30302376d6906374fddeab9ef086b22a99b015f6d03e5a16e46902e78f9"
+    },
+    "sectionHeadings": [
+      "023: Semantic quality and calibration qualification on real labeled data",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 Dataset admission",
+      "3.2 Contamination and exposure",
+      "3.3 Freezing before the final test",
+      "3.4 Measurement",
+      "3.5 Claim scoping",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance (draft)",
+      "6. Open questions"
+    ],
+    "specPath": "specs/023-real-data-quality-qualification/spec.md",
+    "status": "draft",
+    "summary": "The governed path from \"mechanics only\" to a scoped empirical quality claim that backlog item RUSTEV-011 and owner decision R-04 require: how an appropriately licensed public dataset or an independently human-labeled dataset is admitted, with provenance, license, privacy basis, labeling method, annotator independence, splits and limitations recorded; how the evaluator configuration is frozen before the final-test split is read; how quality, calibration, abstention and regression are measured against exact and rules baselines under spec 004; and how every resulting claim is scoped to the evaluated population, task and binding identity. Draft and deferred: no dataset is identified yet, and no real data, live call or spend is authorized.\n",
+    "title": "Semantic quality and calibration qualification on real labeled data"
+  },
+  "shardHash": "9c21a449dede7d08ac1e4b867d639356395c04b0f0dcc26cee7ebd4fb347600a",
+  "specVersion": "1.8.0"
+}
