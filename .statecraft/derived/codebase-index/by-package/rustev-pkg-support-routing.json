@@ -6,6 +6,6 @@
     "specRef": "007-support-routing-package",
     "version": "0.1.0"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "810b3de74cdfcffe56648f3d8aa12c6e07e9f56668e2f61491ea83bc1c6a7be8"
+  "schemaVersion": "1.2.0",
+  "shardHash": "46f90a5596a0374c50ccceb28ad2c6c6c78e8a5cfb43dee1504336ce47c322af"
 }

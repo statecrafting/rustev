@@ -219,3 +219,10 @@ spec-spine pin moves to 0.28.0. This bridge keeps the exact 0.26.0 pin while
 CI adopts the regular-file commit walk and repository-local `.bin` installer.
 Existing required reusable jobs remain declared in the profile parameters.
 Local installation derives the version from `spec-spine.toml`.
+
+## Engine upgrade record (2026-10-02)
+
+After the revision 13 bridge, the repository exact pin moves to spec-spine
+0.28.0. The registry and index are regenerated with the pinned engine,
+including the committed codebase-index input manifest. The CI profile and
+required reusable jobs remain revision 13.

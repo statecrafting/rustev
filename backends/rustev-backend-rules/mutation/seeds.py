@@ -186,7 +186,7 @@ def main():
     work = tempfile.mkdtemp(prefix="rustev-rules-seeds-")
     env = dict(os.environ, CARGO_TARGET_DIR=os.path.join(work, "target"))
     src = os.path.join(work, "src")
-    ignore = shutil.ignore_patterns("target", ".git", ".tooling", ".statecraft")
+    ignore = shutil.ignore_patterns("target", ".git", ".tooling", ".bin", ".statecraft")
     shutil.copytree(ROOT, src, ignore=ignore)
     failures = []
     chosen = [x for x in SEEDS if not sys.argv[1:] or any(a in x[0] for a in sys.argv[1:])]

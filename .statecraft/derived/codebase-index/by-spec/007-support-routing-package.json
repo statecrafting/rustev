@@ -147,6 +147,6 @@
     "specId": "007-support-routing-package",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "1b9478d9e3e1e475a001c2da57822c8b0f5da5764dff27e50bcb7d91705a3386"
+  "schemaVersion": "1.2.0",
+  "shardHash": "0d50c32bd3579abab5f587c46c0009bbb13ee26555f8f573250d73471d370faa"
 }

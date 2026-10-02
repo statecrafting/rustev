@@ -84,6 +84,6 @@
     "specId": "005-reference-backends",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "9b32a02d41f001831d8642ac7c478df199f6377d1450b754ce00f89c7a8f73c4"
+  "schemaVersion": "1.2.0",
+  "shardHash": "fd374c2ae9c3935648c9c68360331aac14087a74977e165c55013c00d5aaa51c"
 }

@@ -139,6 +139,6 @@
     "specId": "004-evaluation-and-replay",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "9e1106e98000c418760fcaaef57be18b210459aac2922fd406c11cebda9b8e08"
+  "schemaVersion": "1.2.0",
+  "shardHash": "7ef7e7883a85b3356c0a75db269e1413a5d99c508afe605bec1c1cbc9e7a0412"
 }

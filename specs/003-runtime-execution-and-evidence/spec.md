@@ -591,3 +591,9 @@ Made by the agent within A-03; open to the owner's review.
 | E-14 | `invalid_output` can trigger fallback but never retry. | A deterministic backend repeats an invalid output; another backend may not. |
 | E-15 | A running decision id is refused, not assumed unique. | Attempt ids are idempotency keys and ledger keys; a precondition the runtime cannot see is not a guarantee. |
 | E-16 | Seeded defects run on a copy of the tree, one at a time, and must compile. | A seed that silently does nothing, or that fails to compile, proves nothing about the tests. |
+
+## Tooling compatibility record (2026-10-02)
+
+Mutation seed copies exclude the managed `.bin` engine directory introduced
+by Statecraft profile revision 13. The earlier `.tooling` exclusion remains
+for existing clones. Seed source, tests, and mutation outcomes are unchanged.

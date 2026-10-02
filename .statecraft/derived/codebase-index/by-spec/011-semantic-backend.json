@@ -9,6 +9,6 @@
     "specId": "011-semantic-backend",
     "specStatus": "draft"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "129419db834953adead6ac5008b0da366b62ad01c391e4cef9229f6b15be0787"
+  "schemaVersion": "1.2.0",
+  "shardHash": "0383baa6a20e78f2faa7efcd0e64e05cecae23f97b9484aa2eb32ffe9b828623"
 }

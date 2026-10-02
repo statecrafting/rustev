@@ -6,6 +6,6 @@
     "specRef": "004-evaluation-and-replay",
     "version": "0.1.0"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "4a68e553ce3dc8fd266e38acbc38ba2f2d27beedb34f2481da8123fac51d5e42"
+  "schemaVersion": "1.2.0",
+  "shardHash": "e11deaaf24ccac78d7d13dc873d0f12a4cb039df08a764bc60918e43f0048871"
 }
