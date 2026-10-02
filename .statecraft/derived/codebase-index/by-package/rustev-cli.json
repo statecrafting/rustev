@@ -6,6 +6,6 @@
     "specRef": "006-cli-surface",
     "version": "0.1.0"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "6f731e4d090c0c7ea3384982032eb047a87cfabb49f879bd5768acce8f4f9e2d"
+  "schemaVersion": "1.2.0",
+  "shardHash": "96eebf268f083eb48c647f57159d492607cd93b3a9d3f2b5b8eabc16eea57518"
 }

@@ -6,6 +6,6 @@
     "specRef": "012-jev-integration",
     "version": "0.1.0"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "90c4e2f069f9f606007fa7b56146e5fef0fb44717bed55aba14d3900dcbdbb95"
+  "schemaVersion": "1.2.0",
+  "shardHash": "aa9e9d95460f528cc01270fa0fb5887ba80fde6fe589dd56a9bc534145436bb9"
 }

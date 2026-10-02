@@ -6,6 +6,6 @@
     "specRef": "002-decision-contract-and-pure-core",
     "version": "0.1.0"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "498f808b0966a2f1ff26bc5189098a7cb3f804441dd8115ac59b580d2c35d3c1"
+  "schemaVersion": "1.2.0",
+  "shardHash": "35fd4f1e3f5bde276bd535ff090f0d698aae56d1f7c11bae459b10384579e551"
 }

@@ -6,6 +6,6 @@
     "specRef": "009-remote-adapter-protocol",
     "version": "0.1.0"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "22c4194df4539b3284beca4e13327ee8faf0af981ea94bcb33a50fb7ac4d319e"
+  "schemaVersion": "1.2.0",
+  "shardHash": "ebdc87f9fc3ea6739e72fdc305e16c146620bd591ce92320fcec9910c89a6597"
 }

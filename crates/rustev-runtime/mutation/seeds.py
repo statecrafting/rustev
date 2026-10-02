@@ -199,7 +199,7 @@ def main():
     work = tempfile.mkdtemp(prefix="rustev-seeds-")
     env = dict(os.environ, CARGO_TARGET_DIR=os.path.join(work, "target"))
     src = os.path.join(work, "src")
-    ignore = shutil.ignore_patterns("target", ".git", ".tooling", ".statecraft")
+    ignore = shutil.ignore_patterns("target", ".git", ".tooling", ".bin", ".statecraft")
     # One snapshot of the tree; each seed is applied to it and then undone,
     # so only the seeded crate rebuilds.
     shutil.copytree(ROOT, src, ignore=ignore)

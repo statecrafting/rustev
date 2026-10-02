@@ -63,5 +63,5 @@
     "title": "Declared uncalibrated threshold in support-routing swap test (amends 007)"
   },
   "shardHash": "715e8e99fffe363ca90d98d6408e85daa7e058308886fabff513861192c457a3",
-  "specVersion": "1.8.0"
+  "specVersion": "1.9.0"
 }

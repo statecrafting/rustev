@@ -689,3 +689,9 @@ sh crates/rustev-eval/mutation/seeds.sh
   exact integer coverage minimums, and a queue time beyond the elapsed
   time is unknown latency. Of 34 seeded defects the tests missed 15;
   each now has a test and all are detected.
+
+## Tooling compatibility record (2026-10-02)
+
+Mutation seed copies exclude the managed `.bin` engine directory introduced
+by Statecraft profile revision 13. The earlier `.tooling` exclusion remains
+for existing clones. Seed source, tests, and mutation outcomes are unchanged.

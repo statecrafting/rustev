@@ -601,3 +601,9 @@ Made by the agent within A-06; open to the owner's review.
 | E-30 | Run uses only rules-program backends, one admitted decision, no queue, `fail_decision` delivery. | The only production backend without inference; a CLI run has one decision and must know whether its evidence was delivered. |
 | E-31 | A bundle file that exists but does not parse stops `eval` and `calibrate fit`. | The library's evaluation takes parsed bundles only; stopping is honest where counting the case as missing would not be. Reporting it per case would be an amendment to spec 004. |
 | E-32 | `O_NONBLOCK` through `libc` rather than per-platform constants. | The flag's value differs by operating system and architecture; `libc` is already in the lockfile through Tokio. |
+
+## Tooling compatibility record (2026-10-02)
+
+Mutation seed copies exclude the managed `.bin` engine directory introduced
+by Statecraft profile revision 13. The earlier `.tooling` exclusion remains
+for existing clones. Seed source, tests, and mutation outcomes are unchanged.

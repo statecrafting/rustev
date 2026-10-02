@@ -6,6 +6,6 @@
     "specRef": "008-reference-package-lodging",
     "version": "0.1.0"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "5c520f9dacd011273fa749766db9c1fd054646e71cc82ed0bddab02d94e1ecc4"
+  "schemaVersion": "1.2.0",
+  "shardHash": "c1ef8c402759a08cdcb4cbc47fa5ba1ef749b501d0fd98aabca0250f7051b8c2"
 }

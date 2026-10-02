@@ -133,6 +133,6 @@
     "specId": "008-reference-package-lodging",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "cbbeec2fae6599a32a213a8c8e55da55934764cdb011fbaf624f98ddce98a769"
+  "schemaVersion": "1.2.0",
+  "shardHash": "b204168e5eee7aeed0d188cd30de250df07f7765df83f3cab8e4e3a27469afa5"
 }

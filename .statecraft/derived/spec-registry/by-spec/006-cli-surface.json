@@ -34,7 +34,7 @@
     "id": "006-cli-surface",
     "implementation": "complete",
     "sectionDigests": {
-      "006-cli-surface": "5a839f9fdcbe79ad2b0e27cd84acd0d2beca76254dc0f711c59dd39c459b10ff",
+      "006-cli-surface": "a489faf0e6a02d95d6d57bd4e49f629ef42a7a586e4d7b68c5bd0f14292732ed",
       "1-purpose": "4e2e2f237b2a801fa00173df8cfad9bc84473b9b0606fbb2bcf9d0270d91a3bc",
       "2-territory": "ee3b1cab96531588fb2efc6d6a7b67db773b6749d4e9b4106a7b164f0213b910",
       "3-1-invocation-and-output": "a4493237889bb81be796ff380faec13dbf8dfd484ca6479dacb10d7b4f42f959",
@@ -52,8 +52,9 @@
       "5-observable-negative-cases": "147b6cff44bc90d50b4376aac2bd93ae00d5820895e5a1c26ce27ba163c6c615",
       "acceptance": "ccc038c7907c755e015473a8d9aa6e09adff7c3477ef57dd99ea7bfded0c9e50",
       "decision-history": "303ad270260dd9e6decd8555255783cb5b83e2046e6c17d77768aecba51c445e",
-      "engineering-choices": "8cf9cfb4ea7df7447c0a94c60dad880d6b432984977046f0703c70c6343a0625",
+      "engineering-choices": "dc8108b84dc3fbaa8d5ff56c1b148b3a62864fffc727e3c78579f07ba1a29d42",
       "implementation-record": "2ba4f184fc021b8188c92d76c8e0985f2a889a842fdb1b2e31f0327e8e2addf7",
+      "tooling-compatibility-record-2026-10-02": "6097592f811a58419c0fcef912f35089a0ab6b1f2bfa1f9d50933db57633e498",
       "verification": "8a26cd5de979bcae91f5dc431f30058c5c5754e4c6909a618892cf285d2733df"
     },
     "sectionHeadings": [
@@ -77,13 +78,14 @@
       "Verification",
       "Implementation record",
       "Decision history",
-      "Engineering choices"
+      "Engineering choices",
+      "Tooling compatibility record (2026-10-02)"
     ],
     "specPath": "specs/006-cli-surface/spec.md",
     "status": "approved",
     "summary": "Increment 2: `rustev`, a command-line host over the library. Plan check, compile and show against descriptor, rules-program, calibration and execution-policy files; run one snapshot through `rustev-runtime` on rules-program backends with a file evidence sink and optional bounded capture into a replay bundle; offline replay under an explicitly supplied trusted scope; evaluation reports with their detail and configuration companions, regression gates, and temperature fitting with its lineage record, through `rustev-eval`. Bounded file access, stable JSON output and distinct exit codes. No network, no hosting, no live inference beyond the deterministic rules backend.\n",
     "title": "CLI surface"
   },
-  "shardHash": "dbb8fcfc1e0e2d296cda0d20ae60325fb0ce384667144b0a00b7f2e789639b17",
-  "specVersion": "1.8.0"
+  "shardHash": "dc345a2e01d81fe8dee48979a0237172a450b0f43a13904f4610ffc04918873b",
+  "specVersion": "1.9.0"
 }

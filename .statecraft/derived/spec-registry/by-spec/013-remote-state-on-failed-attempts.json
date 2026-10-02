@@ -109,5 +109,5 @@
     "title": "Remote state on attempts that end without a stop (amends 003)"
   },
   "shardHash": "495f0a2f06e2f06d59d846709708027e60e70c8399838b8d209eed45e5e9958c",
-  "specVersion": "1.8.0"
+  "specVersion": "1.9.0"
 }

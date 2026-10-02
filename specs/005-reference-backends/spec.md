@@ -519,3 +519,9 @@ Made by the agent within A-04; open to the owner's review.
 | E-21 | A flat charge per polled call, including cancelled calls. | Reservation equals charge, so accounting is exact; charging a stopped call errs toward liability, not refund. |
 | E-22 | Synchronous evaluation with cancellation checks, no yielding. | Bounded work and no executor dependency; the limitation (3.13.4) is stated rather than hidden. |
 | E-23 | `check_plan` is a backend function the host calls, not a runtime hook. | No contract or runtime change; the runtime's descriptor check already refuses the identity mismatch. |
+
+## Tooling compatibility record (2026-10-02)
+
+Mutation seed copies exclude the managed `.bin` engine directory introduced
+by Statecraft profile revision 13. The earlier `.tooling` exclusion remains
+for existing clones. Seed source, tests, and mutation outcomes are unchanged.

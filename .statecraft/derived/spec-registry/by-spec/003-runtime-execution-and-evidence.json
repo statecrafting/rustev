@@ -59,7 +59,7 @@
     "id": "003-runtime-execution-and-evidence",
     "implementation": "complete",
     "sectionDigests": {
-      "003-runtime-execution-and-evidence-emission": "965b9eb66e3fafa388452c283b35a48f6175bc0166e6637888977e60ae6e7456",
+      "003-runtime-execution-and-evidence-emission": "0db894a95927555f15a4ba7237b89f684388568106e7e982caaff6360ffa93b1",
       "1-purpose": "dfd31f066b5e596d296043dda73157b8e22b957f2090ed652189f4e03326c5b8",
       "2-territory": "e01a590b847d0a25ca9cb02f4882a34c43aa451c8607295c047266cd1a85332b",
       "3-1-relation-to-spec-002-and-compatibility": "15095131169d08e3e6470c77f78b36c132aae0ac34c2e815d889e2a96caca204",
@@ -79,8 +79,9 @@
       "5-observable-negative-cases": "32add3db5c0df095d5480a5e007eca0bf12a07aafbaccfffc7aff6a789b79647",
       "acceptance": "8d937cc0d6127da1b16df87ec03bac056628e9369743cede203ef3228f9358ba",
       "decision-history": "0c17f66256b6e7e0498627e2e2b7ecad32f058766ac2d6e8a710a4a1249c5555",
-      "engineering-choices": "3e20bc8f86c152577655facc7ffa57a9e65ddc1a89ac01d3dea41cdec8339379",
+      "engineering-choices": "362aa18080183b13141dd3a5a4b76862cd129eca0caa311cae657de9baa7f79f",
       "implementation-record": "4860839b2b076e22d946544fbb53c4352e80010e2d0dc10e4515b8ecb8ebc23f",
+      "tooling-compatibility-record-2026-10-02": "2553fae3bea5e01f360bca52e9d09c491e693b9a9c8d835cc47be0612cb7aae0",
       "verification": "65f74a55c970783d227f0552a3649ed4b047384c09bcb0135b5683ad66afeae2"
     },
     "sectionHeadings": [
@@ -106,13 +107,14 @@
       "Verification",
       "Implementation record",
       "Decision history",
-      "Engineering choices"
+      "Engineering choices",
+      "Tooling compatibility record (2026-10-02)"
     ],
     "specPath": "specs/003-runtime-execution-and-evidence/spec.md",
     "status": "approved",
     "summary": "Increment 2: `rustev-runtime` drives the pure core's staged evaluation through backend seams on Tokio (R-03) under explicit bounds: injectable monotonic time and one end-to-end deadline, bounded admission and concurrency, cost budgets reserved before dispatch with honest settlement, bounded retries and runtime fallback declared in an identified execution policy that is part of plan identity, cancellation that never claims more than the backend acknowledged, and evidence delivery under a declared sink policy. Amends spec 002: plan schema 2, the execution-policy and run-record documents, a pre-supply output check, and the backend and sink seams. Batching, duplicate suppression and caches are deferred by name.\n",
     "title": "Runtime execution and evidence emission"
   },
-  "shardHash": "bac1c9d27f0c03dbda90b41c09224e5c5d794364a8830a82b9886300cc17a5c9",
-  "specVersion": "1.8.0"
+  "shardHash": "f5dfdfb36c9564faca856567f701919daeb0883b0a035ada3dd2aea40df951be",
+  "specVersion": "1.9.0"
 }

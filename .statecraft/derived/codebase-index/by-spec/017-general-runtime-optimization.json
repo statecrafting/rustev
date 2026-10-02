@@ -129,6 +129,6 @@
     "specId": "017-general-runtime-optimization",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "0fafa34c1b9650fc88ea6d54febba82e69f30854b9c2ef175df0d0d322f407a6"
+  "schemaVersion": "1.2.0",
+  "shardHash": "c843e43f4bfbbf0d9096ed279f95f68d55cb9959b58f3690b4cbb6f2f9b0b634"
 }

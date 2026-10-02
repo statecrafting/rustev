@@ -6,6 +6,6 @@
     "specRef": "005-reference-backends",
     "version": "0.1.0"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "4a9db9ff9ca24fe59240df910038118f15201aca4889a9b37b19adf876f3c3a7"
+  "schemaVersion": "1.2.0",
+  "shardHash": "baadf2801ed2010ec9c3d18292353353da9bb9052d14a76f23a2223fdcdc6487"
 }

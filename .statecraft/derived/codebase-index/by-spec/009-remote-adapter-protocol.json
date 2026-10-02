@@ -145,6 +145,6 @@
     "specId": "009-remote-adapter-protocol",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "7d01a647134922a3f4c934a465aa439438bff2f6900a32a118c8d9b91699f9ac"
+  "schemaVersion": "1.2.0",
+  "shardHash": "95f07ca9f776ec9c957551ac40cb6928375585c9843cc56779d77fce02c46e9e"
 }
