@@ -47,7 +47,7 @@ acceptance.
 
 ## Continuous integration
 
-CI is the Statecraft setup profile `github-actions-rust` (revision 13): one
+CI is the Statecraft setup profile `github-actions-rust` (revision 14): one
 required check, `ci-gate`, over governance, code, the AI review and the
 declared extra jobs `boundaries` and `verify`
 (`.github/workflows/boundaries.yml`, `.github/workflows/verify.yml`, owned by
