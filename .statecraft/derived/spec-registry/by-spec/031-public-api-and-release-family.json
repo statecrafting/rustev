@@ -1,0 +1,298 @@
+{
+  "record": {
+    "amends": [
+      "001-boundaries-and-authority",
+      "008-reference-package-lodging",
+      "010-integrations",
+      "021-packaging-and-first-release"
+    ],
+    "created": "2026-10-16",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay",
+      "005-reference-backends",
+      "006-cli-surface",
+      "007-support-routing-package",
+      "008-reference-package-lodging",
+      "009-remote-adapter-protocol",
+      "010-integrations",
+      "011-semantic-backend",
+      "012-jev-integration",
+      "021-packaging-and-first-release",
+      "022-jev-production-transport"
+    ],
+    "establishes": [
+      {
+        "kind": "directory",
+        "path": "integrations/rustev/",
+        "planned": true
+      },
+      {
+        "kind": "directory",
+        "path": "tools/rustev-release/",
+        "planned": true
+      }
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-boundaries/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rustev-contract/Cargo.toml"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rustev-core/Cargo.toml"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "003-runtime-execution-and-evidence",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rustev-runtime/Cargo.toml"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "004-evaluation-and-replay",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rustev-eval/Cargo.toml"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "005-reference-backends",
+        "unit": {
+          "kind": "file",
+          "path": "backends/rustev-backend-rules/Cargo.toml"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "006-cli-surface",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rustev-cli/Cargo.toml"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "007-support-routing-package",
+        "unit": {
+          "kind": "file",
+          "path": "packages/rustev-pkg-support-routing/Cargo.toml"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "008-reference-package-lodging",
+        "unit": {
+          "kind": "file",
+          "path": "packages/rustev-pkg-lodging/Cargo.toml"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "009-remote-adapter-protocol",
+        "unit": {
+          "kind": "file",
+          "path": "integrations/rustev-remote-http/Cargo.toml"
+        }
+      }
+    ],
+    "id": "031-public-api-and-release-family",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-2-the-facade-crate-rustev",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "The facade `rustev` defines no type, trait, conversion or authorization of its own; it only re-exports member crates, has no default features, and with no features enabled its normal dependency graph is `rustev-contract` and `rustev-core` alone."
+      },
+      {
+        "anchor": "3-3-boundary-amendment-for-the-facade",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "Only the facade may depend on a crate under `integrations/`, only as an optional dependency enabled by one named facade feature, and no workspace crate depends on the facade."
+      },
+      {
+        "anchor": "3-4-feature-map-and-staged-features",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "A facade feature exists in a release only when its crate is a member of that release's publish set; a feature whose crate is not released is absent, never a stub."
+      },
+      {
+        "anchor": "3-7-plan-identity-stability",
+        "id": "I-4",
+        "kind": "invariant",
+        "text": "A plan identity that changes for an unchanged definition and bound plan inputs is a breaking release; a release states whether any plan identity changed, and plans that use no new construct keep byte-identical PlanIds, proven by goldens."
+      },
+      {
+        "anchor": "3-9-supply-chain",
+        "id": "I-5",
+        "kind": "invariant",
+        "text": "Every pre-publication check of spec 021 is kept for every crate, and every new artifact kind adds its own reproducibility, signature, provenance, SBOM and fresh-consumer checks before it may be published."
+      },
+      {
+        "anchor": "3-11-publication-authority",
+        "id": "I-6",
+        "kind": "invariant",
+        "text": "Publication remains the owner's act: the first release is authorized only conditionally by the quoted 2026-10-16 work order after every pre-publication check passes; any other release, repair version or yank needs a fresh owner instruction."
+      },
+      {
+        "anchor": "3-5-partial-adoption-subsets",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "Each documented partial-adoption subset is a CI job that builds a fresh consumer of the facade with exactly that feature set and proves that the omitted crates are absent from its graph."
+      },
+      {
+        "anchor": "3-6-compatibility-policy",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "A superseded document or protocol version stays readable for at least two subsequent minor releases or twelve months after its successor ships, whichever is longer, and the release notes state the end date."
+      },
+      {
+        "anchor": "3-8-api-compatibility-checks",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "`cargo semver-checks` runs in CI against the previous released family version, and a breaking change without the matching version increment fails."
+      },
+      {
+        "anchor": "3-10-changelog-from-implementation-records",
+        "id": "R-4",
+        "kind": "requirement",
+        "text": "The changelog of a release is generated deterministically from the governed corpus through spec-spine queries and the implementing commits, never written freehand."
+      },
+      {
+        "anchor": "3-12-ci-and-release-workflows",
+        "id": "R-5",
+        "kind": "requirement",
+        "text": "Release and CI workflows are added only through the owner-approved `statecraft-review-exception` path; managed files change only through `.statecraft/environment.json` parameters and `statecraft-cli init plan|apply`."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "rust-toolchain.toml"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "031-public-api-facade-compatibility-policy-and-release-family-amends-021": "e39a41f99cf7dbb408f03b715d8b6e4958679ccb761dc60bc99c3b08e165947c",
+      "1-purpose": "53645ebab7cc475ba8fc536cdce04fddf0d0569614ce5f6bbc533989bffb8d61",
+      "2-1-current-state-observed-2026-10-16": "a1a51aac02a5730ea5c747f68e58ad678b70c55c2145338cdabd173aa38a24ab",
+      "2-2-what-changes": "5d90fff50199ede2dcf9ab7a4e4373b3a53495aaabd045cf1bec9dd718e7d456",
+      "2-3-what-does-not-change": "ae2d6980343419aff7b934f3276a489681b610340727904331717b26d69048c1",
+      "2-territory": "7fc19d8bbf16e849bb0aae7e26f5ad4a610e32043771e0dde7b4387cb26f8d0b",
+      "3-1-release-family-and-layer-order": "f56138790302ff440fcd920f2e45aff8d962c0a19954a6fe22ad68417cee077d",
+      "3-10-changelog-from-implementation-records": "a14875d247a0cac9915b5aba76e4df7063407c2f8a68b2b718d44c3953806b80",
+      "3-11-publication-authority": "cf7649d84b04b7a57cd7a748234c830c3c0e5b90159441f988a00b8551554020",
+      "3-12-ci-and-release-workflows": "893abf000ae6b131c69a9834478aca24cf6f166dd48f319c1ddc2310a75441f2",
+      "3-13-binding-principles-of-76": "f70f8aee59e4571e2220e4fab855e19d6ab1884e36328989b7a0ca6658f3c47c",
+      "3-2-the-facade-crate-rustev": "504861f13430d3e337f90b8e9ad269dc3a5365d72548c907810d2b276d25bd38",
+      "3-3-boundary-amendment-for-the-facade": "bf11bcdbc7ce3081e3769bc863c8539626765d3e0e172facae1ecf4a57c4cc37",
+      "3-4-feature-map-and-staged-features": "688777e41b432fcf12ef72f859a0ccb4e749f6d1b5cfa13ab97f9c2ec49c3b46",
+      "3-5-partial-adoption-subsets": "3194e750334fbebc56d6969fb24b42566b59a50112354bf8d6a2f969dbcafe43",
+      "3-6-compatibility-policy": "3216991a263ae3ad4523244d86cb768bd9c396e6febee3b6fab471421264fc2e",
+      "3-7-plan-identity-stability": "7fe38dc86e298ad55cbded8ca88679b0c786a9d25227c2d0ac6546965eb496ae",
+      "3-8-api-compatibility-checks": "de3e91c6c4a662ffb47f09fd1e171d0707807033ee917fa7260436d1c1ffd70b",
+      "3-9-supply-chain": "262a414f0e9c7d45e4aef686f6d8df075f2421ae7031063730ec007af5844c21",
+      "3-behavior": "6f1553dce748d0b5f6b61c259bb616f374fd6b396504fc9a6889fb98478e44bb",
+      "4-out-of-scope": "7c0063bbd37428a2102f50e351db1c3477afd93cc9a838b598d59768abebe10b",
+      "5-observable-negative-cases": "3b087c351903622ff440c3ddd139f3f991cc0ecc6ef0dd616e533ce932657060",
+      "acceptance": "5248842f5b83e47172353e94ec868d3d34afeb2b4d9e0b205ce1fbe7f280a4c6",
+      "decisions-at-approval": "2528f31a1a63416de80bfc31f78caf08d3b487baf2e3a70d834909cd9c978001",
+      "verification": "170a9fee422adb915e1ae9092ac37fb6111a95a946616dc45ab0c1136bc66fda"
+    },
+    "sectionHeadings": [
+      "031: Public API facade, compatibility policy and release family (amends 021)",
+      "1. Purpose",
+      "2. Territory",
+      "2.1 Current state (observed 2026-10-16)",
+      "2.2 What changes",
+      "2.3 What does not change",
+      "3. Behavior",
+      "3.1 Release family and layer order",
+      "3.2 The facade crate `rustev`",
+      "3.3 Boundary amendment for the facade",
+      "3.4 Feature map and staged features",
+      "3.5 Partial-adoption subsets",
+      "3.6 Compatibility policy",
+      "3.7 Plan identity stability",
+      "3.8 API compatibility checks",
+      "3.9 Supply chain",
+      "3.10 Changelog from implementation records",
+      "3.11 Publication authority",
+      "3.12 CI and release workflows",
+      "3.13 Binding principles of #76",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Decisions at approval"
+    ],
+    "specPath": "specs/031-public-api-and-release-family/spec.md",
+    "status": "approved",
+    "summary": "Amends spec 021 so the first public release becomes a release family: the existing eight crates plus `rustev-pkg-lodging`, a facade crate `rustev` with no default features and one optional feature per adoptable slice, further integration crates as each lands, native and WebAssembly npm packages, a multi-arch service container image and prebuilt CLI binaries. Fixes one compatibility policy for every public surface (Rust API, documents, protocols, npm packages, service API, PlanId, MSRV), a supply chain of CycloneDX SBOMs, `cargo deny`, reproducible package checks, signed tags, signed artifacts with stated SLSA build provenance and npm provenance, a changelog generated from the governed corpus, and `cargo semver-checks` against the previous release. Narrowly amends spec 001 3.4.4, spec 010 I-2 and spec 008 for the facade and lodging. Approved (A-27) under R-39. Approval authorizes implementation and candidate evidence; publication of the first release is authorized only by the conditional owner act quoted in section 3.11, and no other release, yank, repair version, workflow change without the owner's environment approval, or availability claim is authorized.\n",
+    "title": "Public API facade, compatibility policy and release family (amends 021)"
+  },
+  "shardHash": "268752373c25442d39dfb4f3b9d726960389da0a4776fa00e2e41d5807fb51fb",
+  "specVersion": "1.9.0"
+}
