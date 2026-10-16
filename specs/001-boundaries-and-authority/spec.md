@@ -211,6 +211,9 @@ sh -c 'for d in crates tools; do [ -d "$d" ] || continue; if grep -rnE "(struct|
 - 2026-09-23: the owner closed O-01 (R-07). Principle XIII's closing
   sentence, in the constitution section this spec claims, now records that
   reading instead of the pending question. No principle changed.
+- 2026-10-16: R-35. The design document this spec owns refers to the
+  downstream host generically ("the host application"). Editorial only; no
+  principle, boundary or check changed.
 
 ## Profile upgrade record (2026-10-02)
 
