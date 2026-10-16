@@ -1,0 +1,212 @@
+{
+  "record": {
+    "amends": [
+      "001-boundaries-and-authority"
+    ],
+    "created": "2026-10-16",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay",
+      "009-remote-adapter-protocol",
+      "012-jev-integration",
+      "013-remote-state-on-failed-attempts",
+      "020-remote-protocol-refinements",
+      "023-real-data-quality-qualification"
+    ],
+    "establishes": [
+      {
+        "kind": "directory",
+        "path": "integrations/rustev-bedrock/",
+        "planned": true
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-boundaries/"
+        }
+      }
+    ],
+    "id": "030-bedrock-backend",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-1-position-authority-and-provenance",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "The Bedrock backend never grants authority: nothing Bedrock returns is authorization, an input fact, a policy parameter, or anything other than a raw output or a classified failure, and every supplied value is model-derived."
+      },
+      {
+        "anchor": "3-2-the-binding-document",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "Every member of `rustev.bedrock-binding/1` is always present and enters the artifact identity; a change of wire, region, model, profile kind, destination set, residency policy, parameters, structured output mode, price table or any reserved member is a different backend."
+      },
+      {
+        "anchor": "3-3-residency-and-inference-profiles",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "A binding whose declared destination regions or profile kind fall outside its residency policy, or whose model id prefix disagrees with its declared profile kind, is refused at construction; no descriptor exists for it, so no plan compiles against it."
+      },
+      {
+        "anchor": "3-4-model-policy",
+        "id": "I-4",
+        "kind": "invariant",
+        "text": "Rustev ships no default allowlist: a backend is constructed only with a host-supplied `ModelPolicy`, a binding is admitted only when an allow rule matches and no deny rule matches, and every refusal names the rule or the absence of a match."
+      },
+      {
+        "anchor": "3-5-credentials-signing-and-transport",
+        "id": "I-5",
+        "kind": "invariant",
+        "text": "Without the `aws-config` feature the crate reads no environment variable, profile file or instance metadata; credentials come only from the host's credential provider and never enter identity, logs or exchange records."
+      },
+      {
+        "anchor": "3-7-operations-and-output-kinds",
+        "id": "I-6",
+        "kind": "invariant",
+        "text": "A distribution or logits output is supplied only from token log-probabilities the wire returns for every declared option; a self-reported confidence, an argmax or a free-text score is recorded as provider-reported and never supplied or converted into mass."
+      },
+      {
+        "anchor": "3-8-served-identity",
+        "id": "I-7",
+        "kind": "invariant",
+        "text": "Served identity is explicit: the requested model is never copied into the served field, an echo of the requested id is not a served identity, and the processing region is recorded as unknown unless the response states it."
+      },
+      {
+        "anchor": "3-9-cost-and-spend",
+        "id": "I-8",
+        "kind": "invariant",
+        "text": "Missing usage yields an `unknown` charge, never zero; usage times the bound price table is an `estimated` charge; and every live call is reserved against the persistent testing journal under R-29 before any request byte is sent."
+      },
+      {
+        "anchor": "3-10-failure-taxonomy",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "Every Bedrock failure maps to exactly one code of spec 009's closed taxonomy, with the Bedrock error type retained in the detail."
+      },
+      {
+        "anchor": "3-11-reachability-probe",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "The reachability probe makes several calls under the live flag and the spend journal, and reports reachable only when every call succeeds."
+      },
+      {
+        "anchor": "3-12-operations-added-by-later-specs",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "Later specs add `rank`, `generate`, `extract`, Guardrails screening, log-probability outputs and spec 020 policies only by admitting new values of members reserved here; a new member is `rustev.bedrock-binding/2`, and version 1 documents keep their digests."
+      },
+      {
+        "anchor": "3-13-boundary-check-extension",
+        "id": "R-4",
+        "kind": "requirement",
+        "text": "The boundary check names the cloud SDK family and refuses it outside `integrations/` and anywhere in the graph of `rustev-contract` and `rustev-core`."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "030-hosted-model-platform-backend-aws-bedrock": "d4fd2c087b1601589a42d4e0c2b60233590236089272606ab66582d4abcc41ca",
+      "1-purpose": "c8803f461f533a8c51de7505c7fdc8318afacf16f61e71ad6926686529d8e9b6",
+      "2-territory": "5e34925b0ff05fffd186fdf11d173e08c3f855b37a0e27e51cf52683d46f442c",
+      "3-1-position-authority-and-provenance": "665f12655de73b292d7c48e4b1b5c874c14a4d45b63b1c5d9f9b4e6506c4f020",
+      "3-10-failure-taxonomy": "25a759835d30100c423332abecf92c510dc0af0612cbb25a685489560244c3f3",
+      "3-11-reachability-probe": "a00d5f74528a5882fb2f4db81c6e00a9ac69bca188b71d769ac13ed49ee03b56",
+      "3-12-operations-added-by-later-specs": "a7edfa2cb724b1762936c6dfdf306b74ea02e6463b1c1a59d57638282bc7b9d2",
+      "3-13-boundary-check-extension": "e2490f2a6f39f499670d205c8853ae9f64db0677b8bd640866c7f7f429f0af89",
+      "3-14-exchange-records-replay-and-live-smoke": "d8d1ed41ae0db5ae77d8d0feedcfab13b1b87c3aa80f55df552acc6703aed6ee",
+      "3-15-how-the-binding-principles-are-kept": "536e0e3b2f6c68f59f54a55a6120f118e719c2a192cf437ca750fe4a38246b1f",
+      "3-2-the-binding-document": "e71e3f0758a5485230b2af78ac1c946545645ec4ee4eb91300911431828011bf",
+      "3-3-residency-and-inference-profiles": "90381d26d751d7c95c35389380fba4198c7519c4fd613e2f4bf7a679e2e7353f",
+      "3-4-model-policy": "239819304fbdb673b24f9147cbfc9b08c0b2163c1061346d21306101e945b322",
+      "3-5-credentials-signing-and-transport": "e4f4721e104de62fe5b1a632652d95daa810ca4ebf5d3aaa9d0c3b6abb78d74d",
+      "3-6-the-converse-and-responses-wires": "cbba4da8249aa2efe76175e9cf67f289c3a616bda4a1515f05efd146fb97fd0b",
+      "3-7-operations-and-output-kinds": "8350ae9979247695dcb8e933949fa8faf5f2eb4d0905d215963a59bea65148e8",
+      "3-8-served-identity": "831edb85cad6d64d02726454a0bd29600b81a00f60ecf247f47e7f2c9b4acee8",
+      "3-9-cost-and-spend": "19a902fa6bf01c7cb55c04c52401364ef740c521b3b2f4221066908c99fbb4ae",
+      "3-behavior": "b0fd9e7e67640492cb85a735ad58814eace0ea53247cbb705839bf08ad6fe222",
+      "4-out-of-scope": "bef76b97313b51fdc47f31c8d3da95ead0499f4cc66cdff2b2925bf7974229de",
+      "5-observable-negative-cases": "4624d3c60116e909673f245b229fe6bcbfeeb57653716ba3794ac5c6ee0b55d3",
+      "acceptance": "2380fef499558d98adbbf011b97ef78fe6edabd218668dedb0c453ac4b1f96e5",
+      "decisions-at-approval": "3f7cf9bf7573b20c050abe01faca21294f95b5ffcf50068c3319858806c371fb",
+      "facts-relied-on": "3d991387232049fac357bbc0b12eddb16a39dd34d682f58554f39f8d8cb4e1f7",
+      "verification": "c64cf25085085002be6cbcdd3ad441584947868f180e32b7a669f890a7be2661"
+    },
+    "sectionHeadings": [
+      "030: Hosted model platform backend: AWS Bedrock",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 Position, authority and provenance",
+      "3.2 The binding document",
+      "3.3 Residency and inference profiles",
+      "3.4 Model policy",
+      "3.5 Credentials, signing and transport",
+      "3.6 The Converse and Responses wires",
+      "3.7 Operations and output kinds",
+      "3.8 Served identity",
+      "3.9 Cost and spend",
+      "3.10 Failure taxonomy",
+      "3.11 Reachability probe",
+      "3.12 Operations added by later specs",
+      "3.13 Boundary check extension",
+      "3.14 Exchange records, replay and live smoke",
+      "3.15 How the binding principles are kept",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Facts relied on",
+      "Acceptance",
+      "Verification",
+      "Decisions at approval"
+    ],
+    "specPath": "specs/030-bedrock-backend/spec.md",
+    "status": "approved",
+    "summary": "A remote decision backend under `integrations/rustev-bedrock/` for Amazon Bedrock over two wires on the `bedrock-runtime` endpoint, Converse and the OpenAI-compatible Responses API, signed with SigV4 over Rustev's existing hyper and rustls stack. A versioned binding document puts wire, region, model or inference profile, declared destination regions, residency policy, parameters, structured output mode, price table and reserved members for later operations into the artifact identity. A host-supplied `ModelPolicy` (deny wins, no default allowlist) is evaluated at bind time and again at runtime start. Wave 1 serves `classify`, `proposition` and `rubric` as `Label` outputs, because neither wire documents token log-probabilities; `rank`, `generate`, `extract` and Guardrails screening are added by their own specs into members reserved here. Amends spec 001 only by adding a cloud SDK dependency family to the boundary check. Approved (A-26) under the 2026-10-16 delivery work order; implementation is pending. The work order authorizes paid Bedrock smoke and probe calls on synthetic or spec 023 admitted data within R-29's USD 5 total testing cap across all providers; the owner supplies AWS credentials, whose absence blocks only the live stage. Approval makes no quality, residency-compliance or production claim.\n",
+    "title": "Hosted model platform backend: AWS Bedrock"
+  },
+  "shardHash": "4497579390504fd3a1689783b14354cadeb68ce23b428c2a3e43e9acbd565aef",
+  "specVersion": "1.9.0"
+}
