@@ -1,0 +1,138 @@
+{
+  "record": {
+    "amends": [
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay"
+    ],
+    "created": "2026-09-26",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay",
+      "017-general-runtime-optimization"
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-contract/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "003-runtime-execution-and-evidence",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-runtime/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "004-evaluation-and-replay",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-eval/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      }
+    ],
+    "id": "026-live-re-execution",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-1-separate-live-entry-point",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "Offline reproduction and candidate comparison remain unable to dispatch a backend; only the explicit live re-execution entry point may request fresh external work."
+      },
+      {
+        "anchor": "3-2-new-decision-and-snapshot",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "Every live re-execution has a new decision id, a newly constructed identified snapshot, a fresh evaluation time, fresh admission and budgets, and new runtime observations; it never mutates or relabels a historical record."
+      },
+      {
+        "anchor": "3-3-host-authorization-at-dispatch",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "Before each external dispatch, the host independently authorizes the exact scope, backend target, artifact, operation, maximum exposure, and remaining time; missing, expired, mismatched, or refused authorization prevents dispatch."
+      },
+      {
+        "anchor": "3-6-evidence-cost-and-external-effects",
+        "id": "I-4",
+        "kind": "invariant",
+        "text": "Every attempted external effect, cancellation answer, observed or unknown charge, delivery result, retained reference, and comparison limitation is attributable to the new decision and cannot be concealed by the historical source."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "026-live-re-execution-with-fresh-observations": "30bae3c127cf8cd6b7edd7e958623ee1f2ca471a0a87c6fe955d695528504330",
+      "1-purpose": "363d9d4481444224b11d0843994b667f3a52c728d959b383eed10745030cdf1a",
+      "2-territory-and-compatibility": "ca360b26f97bfa542e91971bc98cd7328cbb6ecfb49f94da9f6ae88e4bce76c7",
+      "3-1-separate-live-entry-point": "a2710c973a30ebe1445eaf1a077934fdeaba52cbe7fe8660f11c788da4038b70",
+      "3-2-new-decision-and-snapshot": "d31426ed30d077cb6bd2578fa557ac7d3a20c21aa4fed540f3943ef818b95999",
+      "3-3-host-authorization-at-dispatch": "acabd6a49724c3492bdf28766526d763f2c79ab30642f8bc1933c0f08e074100",
+      "3-4-fresh-dispatch-budgets-and-time": "f12778720b5a1df7a2bdd061123d55c55438fb1902b4f9b7604b850c254e535f",
+      "3-5-cancellation-and-possibly-continuing-work": "a5f165f6129dfc212dbf049c6d3872de2d3dda6676afe5d21aa37cfbf994d51a",
+      "3-6-evidence-cost-and-external-effects": "2c2cb51c400d405f49b14795d14149e6a4080497d58d11f5d8fc059ffa3ec6d9",
+      "3-7-retention-and-erasure": "b100ac33e655a1d9d7da14328944f6f9f97d5ce6beb63cf270164e733465200f",
+      "3-8-divergence-and-comparison": "71e30cb364791ee9961e91d6421bc5824a3d635163f668d97cc06ebb791b814e",
+      "3-behavior": "88b507e69674b65ea0ced99e98be28cdda035569c94625646b3525c956f70b8a",
+      "4-out-of-scope": "6d9084026d70abe36e9d8053fdae36ae48034935869b70e69237e8118b6b82e9",
+      "5-observable-negative-cases": "5283e337677ed1b62c98afabbdd6e3397613af6a5b8e8531c8a02a8cfd8c846e",
+      "acceptance": "92aba7dea59e0261c10a3f60baedcd83d3f114050ec08cb8728f2ac521182c9a",
+      "questions-settled-by-r-34": "0520fb5dca7894ad50df926b17aa85d20d025ee640c3ee00e39333f35fce3f79",
+      "verification": "269429cf8b03e852550e698389e35a6ba359955003dd7f95b1acfeb3fed0e1fb"
+    },
+    "sectionHeadings": [
+      "026: Live re-execution with fresh observations",
+      "1. Purpose",
+      "2. Territory and compatibility",
+      "3. Behavior",
+      "3.1 Separate live entry point",
+      "3.2 New decision and snapshot",
+      "3.3 Host authorization at dispatch",
+      "3.4 Fresh dispatch, budgets, and time",
+      "3.5 Cancellation and possibly continuing work",
+      "3.6 Evidence, cost, and external effects",
+      "3.7 Retention and erasure",
+      "3.8 Divergence and comparison",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Questions settled by R-34"
+    ],
+    "specPath": "specs/026-live-re-execution/spec.md",
+    "status": "approved",
+    "summary": "A separately invoked live re-execution path that creates a new decision from a newly identified snapshot, obtains fresh host authorization for every dispatch, applies new deadlines and budgets, and records new backend, cancellation, cost, retention, and delivery observations. It may compare the new proposal with a retained historical proposal, but never reuses a historical decision identity, supplies retained backend outputs as fresh, rewrites a replay bundle, or lets offline replay contact a backend.\n",
+    "title": "Live re-execution with fresh observations"
+  },
+  "shardHash": "3c32523f18664ea1050b240c7393845b06b2ed9b10a0f6e4af065b60212f5e8a",
+  "specVersion": "1.9.0"
+}
