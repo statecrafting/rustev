@@ -1,0 +1,228 @@
+{
+  "record": {
+    "created": "2026-10-16",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay",
+      "005-reference-backends",
+      "006-cli-surface",
+      "021-packaging-and-first-release"
+    ],
+    "establishes": [
+      {
+        "kind": "directory",
+        "path": "integrations/rustev-node/",
+        "planned": true
+      },
+      {
+        "kind": "directory",
+        "path": "integrations/rustev-wasm/",
+        "planned": true
+      },
+      {
+        "kind": "directory",
+        "path": "crates/rustev-surface/",
+        "planned": true
+      },
+      {
+        "kind": "directory",
+        "path": "tools/rustev-conformance/",
+        "planned": true
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-contract/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-core/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "004-evaluation-and-replay",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-eval/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "006-cli-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-cli/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-boundaries/"
+        }
+      }
+    ],
+    "id": "027-node-and-wasm-bindings",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-15-binding-principles",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "No binding output is authorization: a binding returns proposals, unresolved outcomes, refusals and evidence only, defines no permission type, and passes the principal handle through as opaque bytes."
+      },
+      {
+        "anchor": "3-6-host-implemented-seams",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "Rust never waits synchronously on JavaScript: every host-implemented seam call is asynchronous through a bounded queue with a typed refusal when full, carries its remaining deadline and cancellation, discards and counts a late resolution, and maps a JavaScript exception or rejection to the seam's typed failure without a panic crossing the boundary."
+      },
+      {
+        "anchor": "3-4-errors-and-unresolved-results",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "An unresolved outcome, including one caused by an exhausted deadline or budget during a decision, is a value in the result and never an exception; an exception means that no decision ran or that evidence delivery failed, exactly as the Rust API reports it."
+      },
+      {
+        "anchor": "3-14-dependency-boundaries",
+        "id": "I-4",
+        "kind": "invariant",
+        "text": "Node-API and wasm-bindgen dependency families occur only under integrations; contract, core and the shared surface crate never reach them, an executor or an HTTP stack; and the WebAssembly crate's normal dependency graph contains no runtime, executor, HTTP stack, randomness source or Node-API crate."
+      },
+      {
+        "anchor": "3-12-shared-conformance-suite",
+        "id": "I-5",
+        "kind": "invariant",
+        "text": "Every host surface runs the one shared conformance suite, and a surface's output for a case equals the case's expected bytes under only the comparison the case declares."
+      },
+      {
+        "anchor": "3-2-typed-boundary-and-generated-types",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "TypeScript document types are generated from JSON Schema emitted by rustev-contract, are identical in both packages, and a drift check fails when committed schema or types differ from regenerated output."
+      },
+      {
+        "anchor": "3-10-webassembly-build",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "The WebAssembly module stays within the declared compressed size and instantiation budgets, measured in CI as section 3.10 defines; exceeding a budget fails the build, and raising one is an amendment of this spec."
+      },
+      {
+        "anchor": "3-13-packaging",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "The native package ships prebuilt binaries for the declared platform matrix with a pinned Node-API version and no install-time download, and each target loads and passes a smoke test in CI."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "027-node-api-binding-and-webassembly-build": "b9b1af813092ead14c064f9438485779f542feb4f8ea4af80e7fcfea31fa10c7",
+      "1-purpose": "8248211a41b85b51d1bfae9bc8fdbc1c3e326401ca9a926d748c532ffe36120d",
+      "2-territory": "01c60a7d58cbc5c98a9af18fab1fc80ce6caa06e9bd86e299bd7fd0a54c7cf33",
+      "3-1-surfaces-and-crates": "2edf806df6ee8344f0f4a1ded63a0cae7c800f18fd15075656c0519f104a72bc",
+      "3-10-webassembly-build": "8133550a4405b30d8ea2d70ff8a74956a9b373d9ee5e651577c9babc417eb30f",
+      "3-11-floating-point-and-cross-target-determinism": "77e286f6ac628c496f53d1b3cf56d98facfac62296f30e864ccedd900f1929fe",
+      "3-12-shared-conformance-suite": "b5b76001341dbbd89e72b209756055b911d274a8b834ac4af70d81585ae34c0c",
+      "3-13-packaging": "30ad04263028e5a596044b2f195b5116e468014777474fd635e39ed64ed4a00b",
+      "3-14-dependency-boundaries": "a10d70b4ed69c30432537d5776ae96b3b80ae5e9a0b71aa23b0778af4751ff86",
+      "3-15-binding-principles": "e625525d3596218ae2fd16cf8c2b190b666468d7d0d068abbd2f39e9a8fc67fe",
+      "3-2-typed-boundary-and-generated-types": "02e0123c671a8c3cb5c65fffa9e5da3f846c29ea240c4f5e4f24bf2751cfff90",
+      "3-3-engine-lifecycle-and-the-typescript-api": "a1040377eae30104a6641e6a161b63e1c51ade97de2052905f02720182e3d34e",
+      "3-4-errors-and-unresolved-results": "1dfc2692592992847e97127bf6bc9407717fe67200c5bb0393ea20b9956a23e1",
+      "3-5-async-execution-and-cancellation": "22c7548e35d4706de8d961cc57223ccf91aab90ef87a8f5ce5604a6feeaff5b8",
+      "3-6-host-implemented-seams": "6d71a5cff64502e1a3d1fd68b8e5cf933d5bc3c0559834c184d63330545e59a9",
+      "3-7-seams-available-today-and-seams-that-join-later": "e6e9fcc264e5d7e6342e1c132000db826cef69d4a1c46e4c2e3fe0707e15b9dd",
+      "3-8-trace-context": "d002a5fe4b634384100b257c5282270cb4857ab0e8467369705ba59e51279e6a",
+      "3-9-memory-shutdown-and-observability": "d43098aed896056d07e32839e17ffd8f89843fa0320f8f1bd4a7fbb00f77d654",
+      "3-behavior": "3a89d3807583f921f415108f198f6612952293f2d7412ca836c8deb87bb1f92d",
+      "4-out-of-scope": "c08d31aad7ebde696420dabb7655112dd3cc51d01b992eb146df8db754533908",
+      "5-observable-negative-cases": "ee56c10e4a806e990283b1ac16005970128ba627473abc36bef812ee50a4d971",
+      "acceptance": "ede76f03d4516dab9362c7e567698c16b1ac066490b717b68e0adf3fa27a6482",
+      "decisions-at-approval": "19951ed3bcdf1fb4be7400ba6a13c8772ae82231ec28253c8e7c7e07bdfbb42f",
+      "verification": "15ba26e91a61b950a8ee96466526720b0b48615044f44c02ea802da23df21d73"
+    },
+    "sectionHeadings": [
+      "027: Node-API binding and WebAssembly build",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 Surfaces and crates",
+      "3.2 Typed boundary and generated types",
+      "3.3 Engine lifecycle and the TypeScript API",
+      "3.4 Errors and unresolved results",
+      "3.5 Async execution and cancellation",
+      "3.6 Host implemented seams",
+      "3.7 Seams available today and seams that join later",
+      "3.8 Trace context",
+      "3.9 Memory, shutdown and observability",
+      "3.10 WebAssembly build",
+      "3.11 Floating point and cross-target determinism",
+      "3.12 Shared conformance suite",
+      "3.13 Packaging",
+      "3.14 Dependency boundaries",
+      "3.15 Binding principles",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Decisions at approval"
+    ],
+    "specPath": "specs/027-node-and-wasm-bindings/spec.md",
+    "status": "approved",
+    "summary": "Approved (A-23). Two host surfaces over the existing engine: `rustev-node`, a napi-rs Node-API binding through which a TypeScript service compiles plans, runs decisions, replays and evaluates in-process and implements Rustev's seams in TypeScript as explicit composition (R-38); and `rustev-wasm`, a wasm-bindgen build of the pure crates for browsers, edge runtimes and tooling. Documents cross as the contract's canonical JSON, TypeScript types are generated from JSON Schema emitted by `rustev-contract`, command rendering moves into one pure crate shared by every surface, and every surface (CLI, native binding, WebAssembly, later HTTP and gRPC) runs one shared conformance suite. Approval does not authorize npm or crates.io publication, name reservation, a release, a live provider call, spend, or a claim that cross-target floating point agrees beyond what the parity suite measures.\n",
+    "title": "Node-API binding and WebAssembly build"
+  },
+  "shardHash": "616e80ef41b59ca7d8c3c151d6b0eb533fc8f5f07adb8b048a12015c826d1eb0",
+  "specVersion": "1.9.0"
+}
