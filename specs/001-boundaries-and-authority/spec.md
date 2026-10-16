@@ -214,6 +214,11 @@ sh -c 'for d in crates tools; do [ -d "$d" ] || continue; if grep -rnE "(struct|
 - 2026-10-16: R-35. The design document this spec owns refers to the
   downstream host generically ("the host application"). Editorial only; no
   principle, boundary or check changed.
+- 2026-10-16: RUSTEV-004. `README.md`, the design document this spec claims
+  and `docs/backlog.md` were reconciled with the governed specs and tracking
+  issue #76: status notes added to the design, backlog states point at their
+  owning specs or #76 children. Editorial only; no principle, boundary or
+  check changed.
 
 ## Profile upgrade record (2026-10-02)
 
