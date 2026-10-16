@@ -90,7 +90,7 @@ Approved (A-08, 2026-09-24) and implemented. The ordinal is the one design
 roadmap 17.1 reserves for this subject. Rationale: design sections 8, 9, 15
 and 17 (not contract); founding decision D-06 (traits plus a versioned
 protocol for remote adapters); owner decisions R-05, R-08, R-10, R-16, R-19,
-R-20; and R-26 (Rustev as the decision engine of the travel-memory product,
+R-20; and R-26 (Rustev as the decision engine of a host application,
 with a remote backend), all in `docs/decisions/00-founding-decisions.md`.
 The first consumer is spec 012 (the Jev integration), which conforms to Part
 A of this spec while speaking its provider's own wire format.

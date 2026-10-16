@@ -115,7 +115,7 @@ semantic judgment is required. This design commits to that center.
 - **Aicortex and Rahi were not assessed beyond their README summaries**,
   and nothing here claims their readiness. Rustev integrations target their
   published contracts only, and nothing in Rustev's core may wait on either.
-- **The traveler application is referenced but not present** in this
+- **The host application is referenced but not present** in this
   workspace. It is treated as an external consumer whose needs inform the
   lodging reference plan, not as a source of requirements.
 

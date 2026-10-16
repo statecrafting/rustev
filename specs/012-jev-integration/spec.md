@@ -80,7 +80,7 @@ obligations:
 Approved (A-09, 2026-09-24) and implemented. Ordinal: the next free one;
 `010` stays reserved for the roadmap's general integrations increment and
 `011` is taken. Rationale: owner decision R-26 (Rustev is the decision
-engine of the travel-memory product, with Jev through the Vercel AI Gateway
+engine of a host application, with Jev through the Vercel AI Gateway
 as a remote backend), R-27 (paid inference for smoke and qualification),
 R-28 (the owner's answers to this draft's questions), R-29 (spend caps),
 R-04, R-05, R-10 and
@@ -109,7 +109,7 @@ Nothing is claimed until the implementing change. Then it claims
 document `rustev.jev-binding/1`, the mapping of 3.3 and 3.4, and recorded
 test fixtures. It depends on `rustev-contract`, `rustev-core`, spec 009's
 adapter machinery, an HTTP client and Tokio. No crate depends on it; the
-host (for example the travel-memory application) constructs it and
+host application constructs it and
 registers it with the runtime.
 
 ## 3. Behavior
@@ -125,7 +125,7 @@ registers it with the runtime.
    provider metadata goes to exchange records (spec 009, 3.9).
 3. Content sent to the provider is exactly the step's projection and
    question material (3.3). Hosts decide which inputs a plan projects;
-   under R-27 only the travel-memory synthetic fixture corpus and
+   under R-27 only the host application's synthetic fixture corpus and
    independently labeled evaluation data may reach the provider; real user
    mail may not until a separate privacy decision.
 
@@ -271,7 +271,7 @@ one request.
 4. **Cost.** `cost_model` is `estimated`; `cost_bound` is an estimate from
    projection and question bytes under the binding's declared bytes-per-token
    ratio and the declared price table; a `hard` cost policy therefore refuses
-   plans that reach this adapter (spec 003, 3.5.3), and travel-memory plans
+   plans that reach this adapter (spec 003, 3.5.3), and the host application's plans
    use `estimated`. The charge is `observed` from
    `providerMetadata.gateway.cost`, a decimal USD string (C-11), when present
    (converted by the declared unit rate, rounded up), else `estimated` from
@@ -329,7 +329,7 @@ the backstop. No stage runs as part of drafting or approving this spec.
    owner-set spend cap, confirming the unverified shapes of 3.4 and 3.2 and
    recording them as fixtures. No quality statement.
 3. **Qualification (under R-27 and R-28).** On the independently labeled,
-   synthetic-provenance evaluation set travel-memory supplies (R-28), with
+   synthetic-provenance evaluation set the host application supplies (R-28), with
    its provenance, labeling method, splits and limitations recorded under
    R-04 before use, per task: accuracy or macro-F1, log loss,
    Brier score and binned calibration error with every denominator,
@@ -352,7 +352,7 @@ the backstop. No stage runs as part of drafting or approving this spec.
 ## 4. Out of scope
 
 A Jev wire-compatible API or server (R-05, design section 19). The
-travel-memory application's plans and data. Training, fine-tuning or
+host application's plans and data. Training, fine-tuning or
 distillation. Streaming. Any claim of quality, calibration or equivalence
 with other backends before stage 3. Paid inference outside R-27, and any
 real user data before a separate privacy decision.
@@ -439,20 +439,20 @@ end.
 
 ### Stage 3 qualification record (2026-09-26)
 
-**Set.** travel-memory's synthetic-provenance qualification set
-(`evaluation/qualification/`, tm spec 012, R-28). Primary identifiers are
+**Set.** The host application's synthetic-provenance qualification set
+(R-28). Primary identifiers are
 the tree `178d6432d3c60bfe8da8f3be0258d3cb17850f96` and the manifest digest
 `sha256:6eda107b4ac26323bef6253340aaef8c86cfad881a62212aa941c9608eb78626`,
-read at rewritten tm commit
+read at the host repository's rewritten commit
 `7e08ce1cb82a1b38633d2d7a3fc7a45af5fefdc6`. The paid bundles retain the
 pre-rewrite execution context
 `c609ce0ded69e41ee2ecc9e4c11ba98239c02188`; both commits have the exact
 tree above. The set was verified file by file against its manifest before
 use. Its
-provenance, labeling method, splits and limitations are tm's (R-04). No
+provenance, labeling method, splits and limitations are the host application's (R-04). No
 fixture text or label is in this repository. The raw records (bundles,
 exchanges, reports, the spend journal) stay outside it, under
-travel-memory's `handoffs/rustev/qualification-20260925/`. Each case's
+the host application's retained evidence store. Each case's
 snapshot id was computed from its input as `rustev.snapshot/1` before the
 dataset id was computed. Task adapters are `tm.relevance`, `tm.message_kind`
 and `tm.preference_scope` (one enum rule each).
@@ -673,8 +673,7 @@ served identity remained unknown.
 - Zero data retention was not requested (R-30, R-32).
 
 Canonical aggregate reports, calibration records and their digest manifest
-are retained outside Git under
-`travel-memory/handoffs/rustev/qualification-20260925/`; raw bundles,
+are retained outside Git in the host application's evidence store; raw bundles,
 exchange bodies and the spend journal remain there as well. Only this
 governed aggregate is committed.
 
@@ -706,7 +705,7 @@ Decided by the owner on 2026-09-24:
 3. Option descriptions: stay in the adapter binding for now (R-28).
 4. Pinning: `served: unknown` is for development only; production uses the
    direct API with a pin unless Gateway pinning is verified (R-28, 3.6.2).
-5. Dataset: travel-memory supplies an independently labeled,
+5. Dataset: the host application supplies an independently labeled,
    synthetic-provenance set that may go to the provider under zero data
    retention (R-28).
 6. Batching: off by default until qualified (R-28, 3.5).
