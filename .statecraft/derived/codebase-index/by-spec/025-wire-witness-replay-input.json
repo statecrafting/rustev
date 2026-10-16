@@ -1,0 +1,43 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "004-evaluation-and-replay",
+      "009-remote-adapter-protocol",
+      "012-jev-integration",
+      "023-real-data-quality-qualification"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "docs/backlog.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/backlog.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/decisions/00-founding-decisions.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "specId": "025-wire-witness-replay-input",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.2.0",
+  "shardHash": "10fe2407153569084f2a1fe23107f4e0e4d4133e30decbae34a386d3d081527c"
+}

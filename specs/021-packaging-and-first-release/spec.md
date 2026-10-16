@@ -3,7 +3,7 @@ id: "021-packaging-and-first-release"
 title: "Packaging and first public release"
 status: approved
 implementation: pending
-created: "2026-09-27"
+created: "2026-09-26"
 summary: >
   Defines the intended first public Rustev crate family, its lockstep pre-1.0
   version policy, registry contents and features, internal dependency pins,

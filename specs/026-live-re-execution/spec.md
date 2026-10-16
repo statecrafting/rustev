@@ -25,6 +25,7 @@ depends_on:
   - "002-decision-contract-and-pure-core"
   - "003-runtime-execution-and-evidence"
   - "004-evaluation-and-replay"
+  - "013-remote-state-on-failed-attempts"
   - "017-general-runtime-optimization"
 references:
   - { unit: { kind: file, path: "docs/design/001-decision-engine-architecture.md" }, role: context }

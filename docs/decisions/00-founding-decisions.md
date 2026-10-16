@@ -148,6 +148,24 @@ Decided by the owner on 2026-10-16. Recorded here as the owner's decision.
 |---|---|
 | R-35 | Rustev's public record names no downstream host application. Earlier references in this record, in specs `009` and `012`, in the design and in test comments are generalized to "the host application". The change is editorial: no behavior, identifier, digest or approval changes, and task adapter ids recorded in spec `012` stay as recorded because they are bound into evaluation identities. |
 
+### Owner decisions of 2026-10-16, tracking issue #76
+
+The owner approved the direction of tracking issue #76, including its owner
+decisions OD-1 to OD-7, in the 2026-10-16 delivery work order. Owner's words:
+"I approve the direction of issue #76, including owner decisions OD-1 to
+OD-7 as written there. Record them in `docs/decisions/00-founding-decisions.md`
+as owner decisions (next free R numbers), quoting this work order, in the
+change that lands the first spec depending on each." The same work order
+ratifies in advance every spec and amendment that implements a child issue
+of #76 faithfully and completely, and reserves to the owner anything that
+relaxes a principle #76 lists as binding. Each decision below is recorded by
+the change that lands the first spec depending on it.
+
+| Id | Decision |
+|---|---|
+| R-36 | OD-1 of #76: drafts `011`, `022` and `023` are ratified, and spec `017` increment 2 is completed. Amends R-17 for spec `011`. Why: a local backend, a production transport, real-data quality and the remaining runtime optimizations are prerequisites for production embedding. Recorded with the ratification of `022` and `023` (A-21, A-22); spec `011` is ratified by its own change. |
+| R-37 | OD-7 of #76: R-04 stands. Synthetic fixtures prove mechanics; quality claims need real labeled data admitted under spec `023`, which hosts keep outside this repository. Amends nothing. |
+
 ## Approvals
 
 | Id | Act | Date |
@@ -172,6 +190,8 @@ Decided by the owner on 2026-10-16. Recorded here as the owner's decision.
 | A-18 | The owner approved spec `019` (bounded dynamic questions) as drafted with R-34's answers. Implementation is pending; no live inference or spend is authorized. | 2026-09-26 |
 | A-19 | The owner approved spec `020` (remote protocol refinements) as drafted with R-34's answers. Implementation is pending; no migration, live qualification, deployment, or spend is authorized. | 2026-09-26 |
 | A-20 | The owner approved spec `021` (packaging and first release) as drafted with R-34's answers. Candidate implementation is pending; publication and release remain separate owner acts. | 2026-09-26 |
+| A-21 | The owner ratified spec `022` (production transport and served identity for the Jev adapter, amends `012`) under R-36, with the additions of #76 child C3 and its open questions settled as written in the spec, by the 2026-10-16 delivery work order ("I ratify, in advance, every spec and spec amendment that implements a child issue faithfully and completely ... ratification of drafts 011, 022 and 023 with the decisions recorded in #68, #69 and #76"). Implementation is pending; live stages stay inside R-29's testing cap. | 2026-10-16 |
+| A-22 | The owner ratified spec `023` (semantic quality and calibration qualification on real labeled data) under R-36 and R-37, with its open questions settled as written in the spec, by the same work order. Implementation is pending; no dataset is admitted by this act. | 2026-10-16 |
 
 No approval authorizes ratifying any other spec.
 
@@ -205,3 +225,4 @@ None. O-01 was closed by the owner as R-07, O-02 as R-27.
 | C-12 | spec-spine 0.26.0 is released (`spec-spine-cli` on crates.io); the pin moved from `=0.24.0` to `=0.26.0` on 2026-09-25 with the derived shards refreshed by that binary and the corpus accepted without a change. `.statecraft/environment.json` still records the scaffolded `spec-spine.toml` hash and a `pins.spec_spine` observed from `PATH`; the CI profile adoption records both through `statecraft-cli`. | `cargo search spec-spine-cli`; `make gate` with `.tooling/bin/spec-spine` 0.26.0 |
 | C-13 | Gateway observations for `typesafe-ai/jev`, 2026-09-25 23:00 UTC to 2026-09-26: the public model list prices input at USD 0.000000042 per token and output at 0 (unchanged from C-10) and reports `zdr: none`; the per-model endpoint list names only DigitalOcean (`has_zdr: false`), yet every routed request resolved and finished on `typesafe-ai` (`planningReasoning`: "Provider set restricted to: typesafe-ai"). A request with `zeroDataRetention: true` got HTTP 403 `ZdrUnauthorizedError` ("only available for Pro and Enterprise plans. Current plan: hobby") with no provider attempt. The upstream answered HTTP 429 `rate_limit_exceeded` ("experiencing high demand") to all but about one request per 300 s, over more than two hours. A later run paced at 300 s still had one decision exhaust seven attempts: five HTTP 429, one HTTP 503 and one HTTP 520. Early answered requests had `cost` "0" with `marketCost` at the listed price; later answered requests charged the listed `marketCost`. | the stage 3 probe and run records (outside the repository), spec `012` implementation record |
 | C-14 | Specs `010`, `018`, `019`, `020` and `021`, approved on 2026-09-26 (A-15, A-17 to A-20), had approval records on `main` but no spec text there: their texts stayed on the unmerged branch of pull request #44, and ordinal `018` was then given to `018-statecraft-profile-14` (2026-10-02). Their texts landed on 2026-10-04 exactly as approved, except that the live re-execution spec approved as `018` under A-17 is `026-live-re-execution`; only its `id` and title heading changed, and `017-general-runtime-optimization` was added to its `depends_on` because its section 3.4 already defers to spec `017` (as spec `020` declares). Spec `020`'s `extends` entry for `crates/rustev-core/` was corrected from spec `003` to spec `002`, the directory's owner, which is what every other spec's entry for that directory already names. No requirement text changed. A-17 refers to that spec. Spec `017` on `main` is the text implemented by pull request #46 and is unaffected. No approval was given or changed by this reconciliation. | `git diff origin/main origin/spec/backlog-draft-specs -- specs/` |
+| C-15 | The AI review of #54 found three metadata inconsistencies in the specs C-14 landed, corrected after #54 merged and without changing any requirement text or approval: spec `026` section 3.5 defers to spec `013` ("Cancellation follows specs 003 and 013") but its `depends_on` omitted `013`, now declared; specs `020` and `021` had `created: "2026-09-27"` although both were approved on 2026-09-26 (A-19, A-20), now `2026-09-26` like specs `010`, `019` and `026`. | the AI review comment on #54 at head `0a126c4`; `git diff` of this change |
