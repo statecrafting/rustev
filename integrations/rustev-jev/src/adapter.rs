@@ -987,6 +987,9 @@ fn finish(
     let refusals_charged = inner.cost.refusals_charged;
     let sent = record.bytes_sent;
     let mut offers: Vec<(ReconciliationOffer, Option<u64>)> = vec![];
+    // Reports are sent after the record reaches the sink, so a caller that
+    // has its result can already find the exchange recorded.
+    let mut reports = vec![];
     {
         let mut st = lock(&ex.state);
         // With `live_only`, a member whose own budget ran out is left to
@@ -1045,7 +1048,7 @@ fn finish(
                 m.settled = true;
                 settle(inner, m, report.charge);
                 if let Some(tx) = m.tx.take() {
-                    let _ = tx.send(report);
+                    reports.push((tx, report));
                 }
             } else if m.status == Status::Abandoned && !m.settled && response.is_some() {
                 // A charge learned after the member stopped waiting is
@@ -1082,4 +1085,7 @@ fn finish(
     }
     let retained = RetainedBytes { request, response };
     inner.exchanges.deliver(record, Some(retained));
+    for (tx, report) in reports {
+        let _ = tx.send(report);
+    }
 }

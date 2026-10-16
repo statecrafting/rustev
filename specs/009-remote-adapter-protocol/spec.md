@@ -612,6 +612,12 @@ yet written correctly answers `stopped` (section 6), so it failed about
 1 run in 40. A sibling test runs one request at a time: the written request
 ends unconfirmed and the waiting ones are never dispatched.
 
+Ordering fix (2026-10-16): the client now delivers an exchange's record to
+the host sink before it answers the exchange's members. It answered them
+first, so a caller holding its result could find the sink still empty. The
+spec 012 adapter had the same order and failed a stage 1 test that way; no
+requirement changes.
+
 ## Verification
 
 Run by `make verify` (009 is in `VERIFIED_SPECS`).
