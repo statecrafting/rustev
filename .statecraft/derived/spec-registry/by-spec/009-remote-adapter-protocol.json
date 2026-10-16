@@ -136,7 +136,7 @@
       }
     ],
     "sectionDigests": {
-      "009-remote-adapter-protocol": "8ce4ad7be0f2d914b91aa27347f4f7612bf62af4ba7dc9a0b1a64c3b53ba3074",
+      "009-remote-adapter-protocol": "1e0862e6755eb1d2807819fe231a6582a97c92da75084cb1ed9c1b4d3c7e8c70",
       "1-purpose": "825492dea422d2ff179a33669639eb9593e9c78f0c2bba0415b305d89808a695",
       "2-territory": "d1823b8847e5bef5248e78eb0838e102601e53f05de9546fb3aa999f11959b83",
       "3-1-authority-and-provenance": "ed94499ca9b4687dcf509ff71a84e04e2613cb6c6b804a9d96cf22c70743022c",
@@ -190,6 +190,6 @@
     "summary": "Increment 3 (design roadmap 17.1, ordinal 009): what every decision backend reached across a network must guarantee, and a versioned, transport-neutral protocol (`rustev.remote/1`) for backends served by another process. Covers capability description and negotiation at setup, attempt identity and idempotency, one total time budget per attempt, cancellation that never claims more than the remote side confirmed, validation of responses into `RawOutput` without inventing mass, a closed error taxonomy mapped onto spec 003's failure classes, explicit served-model identity (unknown is a value, never an omission), cost reporting, retained exchange records for audit and replay, and privacy options passed through and recorded. Protocol messages live in `rustev-contract`; every network implementation lives under `integrations/`. Amends no approved behavior. Approved (A-08); implemented.\n",
     "title": "Remote adapter protocol"
   },
-  "shardHash": "95f07ca9f776ec9c957551ac40cb6928375585c9843cc56779d77fce02c46e9e",
+  "shardHash": "6257d10f074672a06f480fe1b912619d21e2e88d8b9cf9707a3b65a136d924b5",
   "specVersion": "1.9.0"
 }

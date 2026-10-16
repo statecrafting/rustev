@@ -31,10 +31,10 @@
       "contentHash": "200783a40557fc5d507c95f54adb9aefd6fd97ab53820cc3f95ed1dc371f3c9b"
     },
     "docs/decisions/00-founding-decisions.md": {
-      "contentHash": "a80e1efe3292ebff617a3af16c76cec9d40d8040ba6d2c45ad3888be7d53e79d"
+      "contentHash": "dba1bf04b2c6cf52493f7c1e5b3f77eaa9a8a6af856c0aefa44bd71c72ccd5b8"
     },
     "docs/design/001-decision-engine-architecture.md": {
-      "contentHash": "cd178bbd394d2c40a711b946fbc45b393da94699bee53e32dddddbfe17de584c"
+      "contentHash": "41f06661331267ace5a8ced7545638edda5d1697917a789b066f67ce95946807"
     },
     "docs/design/discussions/001-user-context-and-instructions.md": {
       "contentHash": "99f8729db254d4540c2cbf3ae5c6dd6ed7b55b107207121c646ad41d7b663145"

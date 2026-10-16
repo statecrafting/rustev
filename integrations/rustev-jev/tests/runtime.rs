@@ -61,7 +61,7 @@ fn runtime(backend: Arc<dyn DecisionBackend>) -> Runtime {
     .unwrap()
 }
 
-/// The policy travel-memory plans use with this adapter (3.6.4).
+/// The policy the host application's plans use with this adapter (3.6.4).
 fn estimated() -> ExecutionPolicy {
     execution(
         CostPolicy::Estimated {
