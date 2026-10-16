@@ -1,0 +1,140 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay",
+      "009-remote-adapter-protocol"
+    ],
+    "implementingPaths": [
+      {
+        "path": "Cargo.lock",
+        "source": "spec-edge"
+      },
+      {
+        "path": "Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "Makefile",
+        "source": "spec-edge"
+      },
+      {
+        "path": "tools/rustev-boundaries/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-aicortex/"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-rahi/"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-serve/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "tools/rustev-boundaries/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-boundaries/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.lock"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Makefile"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/decisions/00-founding-decisions.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/001-decision-engine-architecture.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      }
+    ],
+    "specId": "010-integrations",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.2.0",
+  "shardHash": "7a34c85683ebdf14d661ee7c9a0e8a28cfc55cac05814d553f295ce72db4e7ff"
+}
