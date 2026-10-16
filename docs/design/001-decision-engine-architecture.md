@@ -6,6 +6,13 @@ Not normative. The normative contract is the spec corpus under `specs/`, and
 nothing here binds code except through an `approved` spec. The discussion
 archive under `discussions/` is rationale, not contract.
 
+Reconciled with the governed specs on 2026-10-16 (backlog item RUSTEV-004):
+status notes below say what is implemented, approved but pending, or still a
+proposal; the specs remain the authority on each. The proposed architecture
+itself is unchanged. The current roadmap is tracking issue
+[#76](https://github.com/statecrafting/rustev/issues/76), which describes
+planned work, not current behavior.
+
 This document answers the first architectural deliverable named in the
 ecosystem brief: a Rustev design covering its boundaries, its extension
 contracts and two reference decision plans, followed by a bounded
@@ -180,6 +187,9 @@ ecosystem projects.
 
 Each row is a test obligation for increment 3 or 4: a build of that subset,
 with no path dependency on the omitted crates.
+
+Status: the first two rows' crates exist. `rustev-serve` and `rustev-rahi`
+are owned by spec `010`, approved with implementation pending.
 
 ## 4. Vocabulary
 
@@ -459,6 +469,17 @@ Validation, idempotency and outcome recording are the executor's obligations.
 - **Cancellation honesty**: the evidence record states when a cancelled
   remote call may still have run or been charged, as the backend declared.
 
+Status of batching, duplicate suppression and caches. Two mechanisms exist
+and are distinct. Adapter-scoped shared-state batching (spec `009` 3.10.4,
+used by spec `012`) is implemented for remote adapters and off by default
+until qualified (R-28). General runtime optimization is spec `017`:
+increment 1 (runtime-planned batching, the bounded memory cache and its
+invalidation, opt-in per plan) is implemented; increment 2 (concurrent
+duplicate suppression and persistent caches) is not, and no plan can enable
+it. The cache key spec `017` binds is more specific than the sketch above: plan,
+key-schema, namespace and runtime versions, the authorized-scope handle, the
+bound target, the step, the instance and the canonical projection.
+
 Owner decision R-03: contract and core are executor-independent; the first
 runtime uses Tokio, behind explicit time, cancellation and scheduling
 boundaries where useful. No general executor abstraction is built and no
@@ -477,6 +498,11 @@ Replay re-runs a plan, or a candidate plan, over recorded snapshots and
 reports each case as `comparable`, or `incomparable` with a reason:
 `inputs-erased`, `inputs-expired`, `artifact-unavailable`,
 `nondeterministic-backend`.
+
+Status: spec `004` implements offline historical reproduction and candidate
+comparison from retained replay bundles. Live re-execution with fresh
+observations is a separate spec, `026`, approved with implementation pending
+(R-20).
 
 Candidate for the hash-linked evidence log in the Rahi-hosted option:
 `attest-ledger` or Rahi's ledger, behind the evidence sink seam.
@@ -606,6 +632,16 @@ rustev/
   fixtures/                        synthetic datasets, golden definitions and plans, replay cases.
 ```
 
+Status against this sketch (2026-10-16). Present: the five `crates/` other
+than `rustev-act`, `backends/rustev-backend-rules`, both reference packages,
+`integrations/rustev-remote-http`, `integrations/rustev-jev` (the remote
+decision backend of spec `012`, not in the original sketch) and
+`tools/rustev-boundaries`. The CLI also has `gate` and `calibrate qualify`.
+Not present: `rustev-act` (research item RUSTEV-018), a semantic backend
+under `backends/` (spec `011`, draft), and `rustev-aicortex`, `rustev-rahi`
+and `rustev-serve` (spec `010`, pending). There is no top-level `fixtures/`;
+synthetic data and goldens live with the crate or package that owns them.
+
 Dependency rules, enforced by a workspace test over `cargo metadata`:
 
 - `contract` <- `core` <- `runtime` <- `eval`, `cli`.
@@ -726,26 +762,56 @@ proposition calibration where labels exist.
 | 3. Two domain packages | `rustev-pkg-support-routing`, `rustev-pkg-lodging`, second semantic backend or remote adapter (network side under `integrations/`) | No core change was needed for the second package; a backend swap produces a comparable report and no change in any authority path; partial adoption builds (3.3) pass |
 | 4. Ecosystem integrations | `rustev-aicortex`, `rustev-rahi`, `rustev-serve`, spec-spine contract references, statecraft acceptance of a plan change | Standalone library build still passes with no integration crate |
 
+Status (2026-10-16): increment 1 is complete (spec `002`). Increment 2 is
+complete except its semantic backend: specs `003` to `006` are complete, and
+the first local semantic backend (spec `011`) is a draft. Increment 3 is
+complete through its remote-adapter option: specs `007`, `008`, `009` and
+`012` are complete, and the second package needed no core change. Increment
+4 is approved and pending (spec `010`). No baseline report rests on real
+labeled data; that is spec `023`, approved and pending.
+
 Behind later evidence gates, by name: custom model training, distributed
 execution, dynamic plugin loading, sandboxed extensions, arbitrary-question
 intelligence, a Jev-compatible HTTP surface.
 
 ### 17.1 Spec roadmap
 
-Ordinals are build order. Only `001` and `002` are filed now, as drafts.
+Ordinals are build order. The table below was the original roadmap; the
+status column is as of 2026-10-16 and the spec corpus is authoritative.
 
-| Spec | Subject | Increment |
+| Spec | Subject | Increment | Status |
+|---|---|---|---|
+| 001 | Ecosystem boundaries, judgment versus authority, product principles | all | approved, complete |
+| 002 | Decision contract and pure core (`rustev-contract`, `rustev-core`) | 1 | approved, complete |
+| 003 | Runtime execution and evidence emission | 2 | approved, complete |
+| 004 | Evaluation and replay | 2 | approved, complete |
+| 005 | Reference backends (the deterministic rules backend) | 2 | approved, complete |
+| 006 | CLI surface | 2 | approved, complete |
+| 007 | Reference package: support routing | 3 | approved, complete |
+| 008 | Reference package: lodging recommendation | 3 | approved, complete |
+| 009 | Remote adapter protocol | 3 | approved, complete |
+| 010 | Integrations | 4 | approved, pending |
+
+Specs added since:
+
+| Spec | Subject | Status |
 |---|---|---|
-| 001 | Ecosystem boundaries, judgment versus authority, product principles | all |
-| 002 | Decision contract and pure core (`rustev-contract`, `rustev-core`) | 1 |
-| 003 | Runtime execution and evidence emission | 2 |
-| 004 | Evaluation and replay | 2 |
-| 005 | Reference backends | 2 |
-| 006 | CLI surface | 2 |
-| 007 | Reference package: support routing | 3 |
-| 008 | Reference package: lodging recommendation | 3 |
-| 009 | Remote adapter protocol | 3 |
-| 010 | Integrations | 4 |
+| 011 | First local semantic backend | draft, deferred |
+| 012 | Jev integration (remote decision backend) | approved, complete |
+| 013 | Remote state on failed attempts (amends 003) | approved, complete |
+| 014 | Report integrity (amends 004) | approved, complete |
+| 015 | Per-case bundle failures (amends 004) | approved, complete |
+| 016 | Support-routing swap threshold (amends 007) | approved, complete |
+| 017 | General runtime optimization | approved, in progress (increment 1 implemented) |
+| 018 | Statecraft profile revision 14 | approved, complete |
+| 019 | Dynamic questions | approved, pending |
+| 020 | Remote protocol and evidence refinements | approved, pending |
+| 021 | Packaging and first public release | approved, pending |
+| 022 | Jev production transport (amends 012) | approved, pending |
+| 023 | Real labeled data quality qualification | approved, pending |
+| 024 | Second local semantic backend | draft, deferred |
+| 025 | Wire-witness replay input | draft, deferred |
+| 026 | Live re-execution | approved, pending |
 
 ## 18. Owner decisions
 
@@ -765,3 +831,8 @@ Custom model training and distillation pipelines. Distributed execution.
 Dynamic plugin loading, sandboxed extension runtime, plugin marketplace.
 Dynamic arbitrary questions beyond a narrow, separately evaluated class.
 Replicated storage. A Jev wire-compatible API. Publication to crates.io.
+
+Since this list was written, dynamic questions as a narrow class (spec `019`)
+and packaging and a first release (spec `021`) have approved specs; neither
+is implemented, and spec `021` approval authorizes no publication. The rest
+remain deferred, as `docs/backlog.md` records.

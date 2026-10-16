@@ -4,12 +4,23 @@ This file is the canonical inventory of unfinished Rustev product work. It
 contains only tasks. Completed implementation and historical evidence stay in
 their owning specs, decision records, reports, and retained evidence stores.
 
+The current roadmap is tracking issue
+[#76](https://github.com/statecrafting/rustev/issues/76). Its child issues
+(#56 to #75) supersede or carry several items below. An item that is done,
+now owned by an approved spec, or carried by a #76 child keeps its entry
+with a State line that points there; the owning spec and the issue are
+authoritative. Reconciled on 2026-10-16 (RUSTEV-004).
+
 ## Immediate sequence
 
 ### RUSTEV-001: Decide spec 011
 
 - Type: feature contract and owner decision.
-- State: owner review required.
+- State: owner direction recorded, ratification pending. R-36 (OD-1 of #76)
+  directs that draft spec `011` be ratified by its own change; tracked by
+  [#69](https://github.com/statecrafting/rustev/issues/69), which also
+  records the decisions for the section 7 selections. Spec `011` is still
+  `draft` until that change lands.
 - Input: clean signed draft commit
   `303446c7cdf8a4b40124920ffe112705a27ad26f` on
   `spec/011-semantic-backend-readiness`.
@@ -25,7 +36,8 @@ their owning specs, decision records, reports, and retained evidence stores.
 ### RUSTEV-002: Produce the local-backend feasibility record
 
 - Type: feature feasibility and supply-chain qualification.
-- State: blocked on RUSTEV-001 approval and owner selections.
+- State: blocked on RUSTEV-001 (spec `011` ratification); carried by
+  [#69](https://github.com/statecrafting/rustev/issues/69).
 - Task: evaluate the selected immutable checkpoint, tokenizer,
   preprocessing, ONNX export and operators, pinned `ort` and ONNX Runtime,
   platform and linking matrix, packaging, offline acquisition, licenses,
@@ -53,7 +65,8 @@ their owning specs, decision records, reports, and retained evidence stores.
 ### RUSTEV-003: Implement the first local semantic backend
 
 - Type: feature.
-- State: blocked on approved spec 011 and accepted RUSTEV-002 evidence.
+- State: blocked on approved spec 011 and accepted RUSTEV-002 evidence;
+  carried by [#69](https://github.com/statecrafting/rustev/issues/69).
 - Task: add `backends/rustev-backend-embed-linear` as an ordinary
   `DecisionBackend` using frozen embeddings and an externally produced,
   identified task-specific linear head.
@@ -76,7 +89,9 @@ their owning specs, decision records, reports, and retained evidence stores.
 ### RUSTEV-004: Reconcile stale public documentation
 
 - Type: fix.
-- State: ready as a separate governed documentation unit.
+- State: done by the change that reconciled `README.md`, the design document
+  and this file with the governed specs and #76 (2026-10-16), recorded in
+  spec `001`'s decision history.
 - Task: update `README.md` and
   `docs/design/001-decision-engine-architecture.md` to reflect the implemented
   generalized engine, completed specs 007 and 009 and 012 through 016,
@@ -94,7 +109,10 @@ their owning specs, decision records, reports, and retained evidence stores.
 ### RUSTEV-005: Qualify adapter-scoped batching
 
 - Type: enhancement and external qualification.
-- State: implemented but disabled by default; evidence required before use.
+- State: implemented but disabled by default (R-28); evidence required
+  before use. Carried by
+  [#75](https://github.com/statecrafting/rustev/issues/75) (F1, item 5) under
+  spec `017`.
 - Task: qualify specs 009 and 012 shared-state same-decision batching for the
   intended adapter, including batch bounds, member attribution, partial-member
   liability, cancellation, deadlines, cost settlement, and failure behavior.
@@ -107,7 +125,9 @@ their owning specs, decision records, reports, and retained evidence stores.
 ### RUSTEV-006: Specify general runtime optimization
 
 - Type: enhancement contract.
-- State: intentionally deferred; no owning spec exists.
+- State: done. Spec `017` (general runtime batching, duplicate suppression,
+  and caches) is approved (A-16, R-34); the decision-result cache that #75
+  proposes is a further amendment of `017`.
 - Task: draft one separately reviewable spec covering runtime-planned batching,
   cross-request duplicate suppression, reusable inference caches, and
   persistent caches. Treat adapter-scoped batching as an existing special case.
@@ -120,7 +140,10 @@ their owning specs, decision records, reports, and retained evidence stores.
 ### RUSTEV-007: Implement general runtime optimization
 
 - Type: enhancement.
-- State: blocked on RUSTEV-006.
+- State: in progress under spec `017`. Increment 1 (runtime-planned
+  batching, bounded memory cache and invalidation) is implemented; increment
+  2 (concurrent duplicate suppression, persistent caches) and the benchmarks
+  are carried by [#75](https://github.com/statecrafting/rustev/issues/75).
 - Task: implement only the ratified batching, duplicate-suppression, and cache
   contract, preserving bounded admission, deterministic core semantics,
   request isolation, explicit unresolved outcomes, and honest evidence.
@@ -130,7 +153,10 @@ their owning specs, decision records, reports, and retained evidence stores.
 ### RUSTEV-008: Add live re-execution
 
 - Type: feature.
-- State: intentionally deferred by R-20; no owning spec exists.
+- State: owned by spec `026` (live re-execution), approved (A-17), with
+  implementation pending; superseded by
+  [#74](https://github.com/statecrafting/rustev/issues/74) (E3), which
+  implements `026` and extends it to dataset scale.
 - Task: specify and implement fresh re-execution separately from spec 004's
   offline historical reproduction. Define authorization inputs, new
   observations, backend dispatch, cost, retention, divergence, cancellation,
@@ -141,7 +167,9 @@ their owning specs, decision records, reports, and retained evidence stores.
 ### RUSTEV-009: Add dynamic questions as a narrow class
 
 - Type: feature.
-- State: intentionally deferred by D-05; no owning spec exists.
+- State: owned by spec `019` (dynamic questions as a narrow evaluated
+  class), approved (A-18), with implementation pending. #76 lists it as a
+  basis for future multi-turn work, not as a child issue.
 - Task: define dynamic questions as a separately evaluated class with narrower
   claims, bounded labels and context, capability disclosure, abstention,
   injection-resistant data handling, cost limits, and dedicated evaluation.
@@ -153,7 +181,10 @@ their owning specs, decision records, reports, and retained evidence stores.
 ### RUSTEV-010: Qualify a production remote transport and served identity
 
 - Type: fix and production qualification.
-- State: dependent on owner decision and external evidence.
+- State: owned by spec `022` (amends `012`), approved (A-21), with
+  implementation pending; superseded by
+  [#68](https://github.com/statecrafting/rustev/issues/68) (C3). Live
+  stages still need external evidence within R-29's testing cap.
 - Task: qualify TypeSafe's direct API with a pinned version, or prove and record
   equivalent Gateway pinning. Bind request and response shapes, transport,
   endpoint, served model identity, privacy posture, retries, timeouts, TLS,
@@ -166,7 +197,9 @@ their owning specs, decision records, reports, and retained evidence stores.
 ### RUSTEV-011: Produce real labeled quality and calibration evidence
 
 - Type: quality enhancement and external qualification.
-- State: dependent on external evidence.
+- State: owned by spec `023`, approved (A-22, R-36, R-37), with
+  implementation pending; still dependent on external evidence, since no
+  dataset is admitted yet. Scheduled in wave 4 of #76.
 - Task: identify an appropriately licensed public dataset or independently
   human-labeled dataset, record provenance, labeling method, splits and
   limitations, bind the dataset and evaluator configuration, then measure
@@ -179,7 +212,8 @@ their owning specs, decision records, reports, and retained evidence stores.
 ### RUSTEV-012: Add a second local semantic backend
 
 - Type: feature.
-- State: intentionally deferred; no owning spec exists.
+- State: intentionally deferred; reserved by draft spec `024` (deferred,
+  not offered as work). #76 lists it as later, not as a child issue.
 - Task: add a second local backend only after the first backend and evaluation
   path expose a concrete comparative need. Declare actual capabilities,
   artifact identity, resource use, numerical behavior, and swap evidence.
@@ -189,7 +223,8 @@ their owning specs, decision records, reports, and retained evidence stores.
 ### RUSTEV-013: Admit wire-witness exchanges as replay-corpus input
 
 - Type: integration enhancement.
-- State: deferred; no Rustev change is currently required.
+- State: deferred; reserved by draft spec `025` (deferred). #76 lists it
+  as later, not as a child issue.
 - Depends on: wire-witness exchange normalization and Rustev semantic backend
   availability.
 - Task: define how redacted, attempt-bound wire-witness exchange records map to
@@ -205,8 +240,9 @@ their owning specs, decision records, reports, and retained evidence stores.
 ### RUSTEV-014: Deliver the lodging reference package
 
 - Type: feature.
-- State: intentionally deferred and unsupported by current authority.
-- Proposed owner: new spec 008.
+- State: done. Spec `008` is approved (A-14) and implementation-complete;
+  `packages/rustev-pkg-lodging` exists. Real-quality evidence for the
+  package remains spec `023`'s concern (RUSTEV-011).
 - Task: implement `rustev-pkg-lodging` with bounded candidate fan-out,
   deterministic eligibility, trusted-context handling, semantic budgets,
   explicit abstention, plan identities, synthetic mechanics fixtures, and
@@ -217,8 +253,10 @@ their owning specs, decision records, reports, and retained evidence stores.
 ### RUSTEV-015: Deliver optional ecosystem integrations and hosting
 
 - Type: feature.
-- State: intentionally deferred and unsupported by current authority.
-- Proposed owner: new spec 010.
+- State: owned by spec `010`, approved (A-15), with implementation pending;
+  each concrete binding record still needs separate owner approval (R-34).
+  The service part is carried by
+  [#57](https://github.com/statecrafting/rustev/issues/57) (A2).
 - Task: specify and implement only evidenced needs for `rustev-aicortex`,
   `rustev-rahi`, and `rustev-serve` under `integrations/`.
 - Required boundaries: Aicortex supplies attributed context and receives only
@@ -231,7 +269,9 @@ their owning specs, decision records, reports, and retained evidence stores.
 ### RUSTEV-016: Refine the remote protocol and transport
 
 - Type: enhancement.
-- State: intentionally deferred; no owning spec exists.
+- State: owned by spec `020` (remote protocol and evidence refinements),
+  approved (A-19), with implementation pending. #76 children A2, C1 and F1
+  depend on it.
 - Task: evaluate and separately specify `rustev.run/2` structured remote
   evidence, runtime-planned batch dispatch, per-phase timeouts, connection
   reuse, and a principal option for host-operated remote endpoints.
@@ -241,7 +281,11 @@ their owning specs, decision records, reports, and retained evidence stores.
 ### RUSTEV-017: Define packaging and publish the first release
 
 - Type: release feature.
-- State: unsupported by current authority; no release spec exists.
+- State: owned by spec `021`, approved (A-20), with candidate
+  implementation pending; approval authorizes no publication, tag or
+  release. Its extension to the facade crate, new integrations, npm packages
+  and the service image is carried by
+  [#58](https://github.com/statecrafting/rustev/issues/58) (A3, OD-6).
 - Task: define crate boundaries and publishability, version policy, registry
   contents, feature policy, dependency and license audit, reproducible package
   checks, signed tag and release artifacts, release notes, and registry-only
@@ -286,7 +330,11 @@ their owning specs, decision records, reports, and retained evidence stores.
 ### RUSTEV-021: Evaluate extension mechanisms without dynamic plugin loading
 
 - Type: research.
-- State: not schedulable under D-06 without an explicit amendment.
+- State: not schedulable under D-06 without an explicit amendment. Related:
+  OD-5 of #76 would clarify D-06 so that seams implemented in a host language
+  through a Node binding, or across a remote protocol, count as explicit
+  composition rather than dynamic plugin loading. OD-5 is not yet recorded
+  in the decisions record and does not resolve this item.
 - Task: if static Rust traits and versioned remote adapters prove insufficient,
   produce evidence and compare sandboxed extensions against current explicit
   composition. Do not introduce dynamic plugin loading or a marketplace by
