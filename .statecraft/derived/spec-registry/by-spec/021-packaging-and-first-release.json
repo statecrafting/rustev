@@ -4,7 +4,7 @@
       "006-cli-surface",
       "007-support-routing-package"
     ],
-    "created": "2026-09-27",
+    "created": "2026-09-26",
     "dependsOn": [
       "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core",
@@ -201,6 +201,6 @@
     "summary": "Defines the intended first public Rustev crate family, its lockstep pre-1.0 version policy, registry contents and features, internal dependency pins, license and dependency audit, reproducible package checks, signed release identity, publication journal, and fresh registry-only consumer proof. Candidate construction, owner publication authorization, registry upload, public availability, and consumer qualification are distinct lifecycle states. Approval authorizes candidate implementation only: no crate is publishable yet and no release, tag, upload, name reservation, or availability claim is authorized or made.\n",
     "title": "Packaging and first public release"
   },
-  "shardHash": "63511b09b9532d69017a5e580b5c9bf1ff9610ef6124a57471daa60a54b4cb45",
+  "shardHash": "f916a3da8f7113315a10447eee28765f92572e5cb0518b79fbe5654d717f6657",
   "specVersion": "1.9.0"
 }

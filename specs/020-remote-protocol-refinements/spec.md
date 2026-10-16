@@ -3,7 +3,7 @@ id: "020-remote-protocol-refinements"
 title: "Remote protocol and evidence refinements"
 status: approved
 implementation: pending
-created: "2026-09-27"
+created: "2026-09-26"
 summary: >
   A separately reviewable refinement of the approved runtime and remote
   contracts: `rustev.run/2` references bounded remote exchange evidence,

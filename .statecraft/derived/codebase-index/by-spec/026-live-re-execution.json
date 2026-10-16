@@ -9,6 +9,7 @@
       "002-decision-contract-and-pure-core",
       "003-runtime-execution-and-evidence",
       "004-evaluation-and-replay",
+      "013-remote-state-on-failed-attempts",
       "017-general-runtime-optimization"
     ],
     "implementingPaths": [
@@ -113,5 +114,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "3c32523f18664ea1050b240c7393845b06b2ed9b10a0f6e4af065b60212f5e8a"
+  "shardHash": "02e0067fd07fbfc8ec3b3d28f87a6a81336e1fd96bf9d2528881c25414314dfc"
 }

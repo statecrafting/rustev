@@ -6,7 +6,7 @@
       "009-remote-adapter-protocol",
       "012-jev-integration"
     ],
-    "created": "2026-09-27",
+    "created": "2026-09-26",
     "dependsOn": [
       "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core",
@@ -167,6 +167,6 @@
     "summary": "A separately reviewable refinement of the approved runtime and remote contracts: `rustev.run/2` references bounded remote exchange evidence, the runtime may dispatch an explicitly compatible general batch, transport phases receive identified ceilings inside one total attempt budget, connection reuse is bounded and isolation-keyed, and a host-operated endpoint may receive an opt-in opaque principal reference. All features default off or preserve version 1 behavior. Approval authorizes implementation only: no migration, qualification, deployment, live call, spend, or publication is authorized or claimed.\n",
     "title": "Remote protocol and evidence refinements"
   },
-  "shardHash": "a11a6f98eb7325cf6fe3c10d159e0652c3c994967f4e1f461380f37e9885bc9a",
+  "shardHash": "06c55563e9f71c9974bb1b5e841e285940c278977791020770a6ed66dcd9c647",
   "specVersion": "1.9.0"
 }

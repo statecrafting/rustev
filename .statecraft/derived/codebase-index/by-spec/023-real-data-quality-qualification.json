@@ -1,0 +1,63 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "004-evaluation-and-replay",
+      "005-reference-backends",
+      "007-support-routing-package",
+      "008-reference-package-lodging",
+      "012-jev-integration",
+      "014-report-integrity"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/rustev-eval/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-eval/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-eval/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/backlog.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/backlog.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/decisions/00-founding-decisions.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "specId": "023-real-data-quality-qualification",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.2.0",
+  "shardHash": "ff640d693e4c34103196e6c39430c859514f6b622f0371d2f4080d9d6cb367e8"
+}
