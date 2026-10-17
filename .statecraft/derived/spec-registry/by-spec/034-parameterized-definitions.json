@@ -1,0 +1,186 @@
+{
+  "record": {
+    "amends": [
+      "002-decision-contract-and-pure-core",
+      "006-cli-surface"
+    ],
+    "created": "2026-10-17",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay",
+      "006-cli-surface",
+      "029-evaluation-repeatability",
+      "031-public-api-and-release-family",
+      "032-evidence-quality",
+      "033-provenance-rules-and-actionable-outcomes"
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-contract/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-core/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "004-evaluation-and-replay",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-eval/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "006-cli-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-cli/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      }
+    ],
+    "id": "034-parameterized-definitions",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-16-compatibility",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "A `rustev.definition/1` compiled without a profile and without a variant yields a `rustev.plan/2` byte-identical to today's, with the same `PlanId`, and every existing CLI output for it keeps its bytes."
+      },
+      {
+        "anchor": "3-10-plan-version-3-and-identity",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "An instantiated `rustev.plan/3` records the exact template document and its identity, the variant, the identity of every profile in the resolved chain and every resolved parameter value with its source, so its `PlanId` never depends on a version range, a pin or which other definitions were supplied."
+      },
+      {
+        "anchor": "3-7-overlay-resolution",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "A profile that sets a `fixed` parameter, sets a `bounded` parameter outside its bounds, sets an undeclared parameter or sets an ill-typed value is refused with the parameter named; no plan is produced."
+      },
+      {
+        "anchor": "3-5-profiles",
+        "id": "I-4",
+        "kind": "invariant",
+        "text": "A profile carries values for declared parameters only: it cannot add or remove an input, step, operator, expression, handler, rule, adjustment or action name, and no parameter value is interpreted as code, an expression or a reference."
+      },
+      {
+        "anchor": "3-15-library-surface",
+        "id": "I-5",
+        "kind": "invariant",
+        "text": "Rustev never selects a profile or variant from a principal, tenant handle, scope or request content; the host names both for every compilation."
+      },
+      {
+        "anchor": "3-6-definition-version-binding",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "A profile's definition range resolves to the highest supplied definition version that satisfies it, or to the host's pin when the pin satisfies it; an unsatisfiable range or a pin outside the range is refused, listing the supplied versions."
+      },
+      {
+        "anchor": "3-12-plan-diff",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "`rustev.plan-diff/1` is a deterministic function of the two plan documents, and `rustev plan diff` output is golden-tested."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "034-parameterized-definitions-variants-and-tenant-profiles-amends-002-and-006": "2f6c64d27b881b92b76b4a7c0f87e0aaab3251d3159558689eec54b821d5ff16",
+      "1-purpose": "1c3a052dbd44ba981a61697cb87182d71dd6bb7eaca6c4362a742ec4646e758c",
+      "2-1-binding-principles-of-76": "2725fc5219e46e9bd5aff780d154d73d4013331b6e54de815042b3342c0fa7c6",
+      "2-territory": "98e384c797512d8ba38bf9dd4e4261c2612256bbfd819d13c1279d5d184cc092",
+      "3-1-definition-version-2": "12f9933fa2b67fb00d8bc2a72332bca3ce4584d6a6f737b728f51f295187d021",
+      "3-10-plan-version-3-and-identity": "28241a18f27646ffa8900372357e82c477901bdb02b532d5d088165652be1756",
+      "3-11-loading-replay-and-evaluation": "5ca9fa94d5d268fe35ab1921485dd5fffa0f676d9899b388bb9655f791fa04dd",
+      "3-12-plan-diff": "b81b988188af328ef0aa469d6f63397b674255d5aef9f1d77ecd3508036a167e",
+      "3-13-profile-check": "00a209ed4bce68f50b480cb708fd59750328700f460d67b09b2f8bc5705ed2b7",
+      "3-14-cli-surface-amends-spec-006": "eac42a216a6070f3588e029aa4b62c57248e66154f8eb2741b933b43d217586c",
+      "3-15-library-surface": "8d54f59633f1fff3f4166e2f5d2b7548e1f4263480ad8e5096e229182f968832",
+      "3-16-compatibility": "7c2acc99198806ef12b57c5d35c3add92cba72bffd940046c889cd860ebd5c47",
+      "3-2-parameter-declarations": "d7feac1ceb9b32889366f4209cfe343861b95bf671e223f6a61770b03aad566c",
+      "3-3-parameter-references": "0e7e7c7856fb97500e42c174a52c5abd92ded1d4c41583dea190d8af2799fa3c",
+      "3-4-variants-and-optional-items": "f8cb5aa13d9e5e621d883f914e3c70cbc259c720b51cd17e8ea6c118e9af32cb",
+      "3-5-profiles": "890e6eff4b4b65057ac179fd707126b9bcd709318045e2b9c02b60ed431c7d25",
+      "3-6-definition-version-binding": "596742570fc75fa72015823ed971fe00f06098ea0891befc26967135a5c7398a",
+      "3-7-overlay-resolution": "c6d49b52bcc7e8d91f53272e765e59c007df437149d9e2870921d82f0badcf0a",
+      "3-8-instantiation": "f16577e35f5cca8be25f6dd54a05e9b1ded01b8ae0b612fdc7448e029b9e080c",
+      "3-9-instantiation-refusals": "e21c4ee55e0556796c77f688100d0bd0fdb55b0b6b8c1f50af61349761b51602",
+      "3-behavior": "02a6524a4a04a820c68654edd2c5a8ca531981c602363002d53413d6afdfd504",
+      "4-out-of-scope": "9313a789633ecb148640e5fa4fcacdb5816197f4dc3975c96f2807b76f7198d5",
+      "5-observable-negative-cases": "989f9393d2ebb460fba9dfed121bce550c1e6267d51e7e9d68ae1e406c78995f",
+      "acceptance": "c43b86e8b2312d28bbaff2c36e31a17f73e5c8d96d0c67716b9d4a21bfcfef5e",
+      "decisions-at-approval": "62d87ad3999a43fc2673a960637bd611882e7240fd634eefd5c15450c2705789",
+      "verification": "6e61bbb2da8f0e1230017b5ef77eee5017c5c64738e47dd456866f21530b6a26"
+    },
+    "sectionHeadings": [
+      "034: Parameterized definitions, variants and tenant profiles (amends 002 and 006)",
+      "1. Purpose",
+      "2. Territory",
+      "2.1 Binding principles of #76",
+      "3. Behavior",
+      "3.1 Definition version 2",
+      "3.2 Parameter declarations",
+      "3.3 Parameter references",
+      "3.4 Variants and optional items",
+      "3.5 Profiles",
+      "3.6 Definition version binding",
+      "3.7 Overlay resolution",
+      "3.8 Instantiation",
+      "3.9 Instantiation refusals",
+      "3.10 Plan version 3 and identity",
+      "3.11 Loading, replay and evaluation",
+      "3.12 Plan diff",
+      "3.13 Profile check",
+      "3.14 CLI surface (amends spec 006)",
+      "3.15 Library surface",
+      "3.16 Compatibility",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Decisions at approval"
+    ],
+    "specPath": "specs/034-parameterized-definitions/spec.md",
+    "status": "approved",
+    "summary": "An amendment of approved specs 002 and 006 (R-16), for #76 child B4. A definition may declare, as optional members this spec adds to the #76 track version `rustev.definition/2` (introduced by spec 032), typed, bounded parameters with lock levels (`fixed`, `bounded`, `free`), reference them from a closed set of literal positions, declare named variants and scope inputs, steps, handlers, rules and adjustments to them. A versioned profile document (`rustev.profile/1`) binds parameter values, may extend one other profile, and names its definition by a version range. Instantiation, a pure phase before compilation, resolves the range against the supplied definitions, resolves the overlay chain, checks every lock and bound, substitutes values and prunes the variant, yielding a definition without parameterization that the compiler compiles into a `rustev.plan/3` (the #76 track version, introduced by spec 032, to which this spec adds the optional member `instantiation`) whose `PlanId` binds the template, the variant, the profile chain and every resolved value. Adds `rustev plan diff` (`rustev.plan-diff/1`) and `rustev profile check`. A `rustev.definition/1` compiled without a profile still yields a byte-identical `rustev.plan/2` and `PlanId`. Approved (A-31); implementation is pending.\n",
+    "title": "Parameterized definitions, variants and tenant profiles (amends 002 and 006)"
+  },
+  "shardHash": "7bf740ffabd2f8a52dbd8a091728151b7e1f9a04f6a5f7a476ec43a7c58ef3c6",
+  "specVersion": "1.9.0"
+}
