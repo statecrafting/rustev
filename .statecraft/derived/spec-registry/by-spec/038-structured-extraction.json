@@ -1,0 +1,198 @@
+{
+  "record": {
+    "amends": [
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence"
+    ],
+    "created": "2026-10-17",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay",
+      "005-reference-backends",
+      "008-reference-package-lodging",
+      "032-evidence-quality",
+      "033-provenance-rules-and-actionable-outcomes",
+      "035-screening-seam"
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-contract/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-core/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "003-runtime-execution-and-evidence",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-runtime/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "008-reference-package-lodging",
+        "unit": {
+          "kind": "directory",
+          "path": "packages/rustev-pkg-lodging/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      }
+    ],
+    "id": "038-structured-extraction",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-14-compatibility-and-identity",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "Every rustev.definition/1 document compiles to the same rustev.plan/2 bytes and PlanId as before this spec, with the same judgment, evidence and refusals; snapshot 1 documents keep their bytes and SnapshotId."
+      },
+      {
+        "anchor": "3-4-field-validation-and-presence",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "An extracted field is either present with a value that satisfies its declared type, bounds and vocabulary exactly as received, or absent with a reason; no value is coerced, clamped, truncated, defaulted or repaired."
+      },
+      {
+        "anchor": "3-5-origin-derivation-and-lineage",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "A field filled by the model is model-derived; a field filled by the fallback extractor is exact-derived only when every source it read is exact-derived; acceptance never lowers a value's derivation class."
+      },
+      {
+        "anchor": "3-6-per-field-distributions-and-calibration",
+        "id": "I-4",
+        "kind": "invariant",
+        "text": "A per-field distribution exists only from log-probabilities the backend returned for every declared option, normalized by the core; a self-reported confidence is recorded as provider-reported and never becomes mass."
+      },
+      {
+        "anchor": "3-9-the-model-value-gate",
+        "id": "I-5",
+        "kind": "invariant",
+        "text": "In a version 2 definition, no exact operator, policy predicate, proposal parameter, acquisition request or other model step reads a model value except through a declared acceptance rule, and no selection-policy control reads one at all; the compiler refuses every other read with unaccepted_model_value."
+      },
+      {
+        "anchor": "3-7-the-fallback-extractor",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "The fallback extractor is a pure, bounded, identified program evaluated in rustev-core with identical results on every target, and its identity is part of the PlanId."
+      },
+      {
+        "anchor": "3-8-acceptance-steps",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "An accept_model_derived step declares its validation and its consequence on failure, applies them to every model-derived value it reads, passes caller and system values through unchanged, and emits a field_dropped notice with its computed action for every dropped value."
+      },
+      {
+        "anchor": "3-2-pattern-a-host-side-extraction",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "Snapshot producers are accepted only on model-derived entries and are recorded per input and in the lineage of every value that read the input."
+      },
+      {
+        "anchor": "3-13-needs-input-from-extraction",
+        "id": "R-4",
+        "kind": "requirement",
+        "text": "Questions of a needs_input outcome are always declared templates; an extraction may only select among a declared set, through an accept step, and never supplies question text."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "038-structured-extraction-step-and-the-model-derived-input-pattern-amends-002-and-003": "62612819866657fb999765908054ca8b6be08617a3afec1c6f70209c5c632415",
+      "1-purpose": "f5bea3af91f654f6ace04598cac68b35fa6213d44dddad298bdb83b2107e5f87",
+      "2-1-binding-principles-of-76": "9d34b4f885f3673c2e98cb8bea7a3e1406800235e405353348a03f298eae2915",
+      "2-territory": "673b44c1fef7bebeaa010589b4f3ee9393e9098528073edae4a27da548849ff6",
+      "3-1-terms": "fa7e8d0b3c42d6e5c921735efdde183960117df30598d07fceefc689fdb3bc5b",
+      "3-10-backend-capability-and-output": "abb47e1632fae1f0701235314878bd48011f256e79dc703010ce6128eca7be95",
+      "3-11-runtime-amends-spec-003": "2b0c0fe6126157c11e6a744da7dfacd514f7fc025450b14bc45bf18d93295bd9",
+      "3-12-evidence-and-judgment": "4a8294bffcf8e3de6b6b9ad6db2e6f2413761b7f21a8f6effb49db69c5dba701",
+      "3-13-needs-input-from-extraction": "fcb0b283bce966c911c56789a16b988e3a006a258fb58e9a976c70681e275827",
+      "3-14-compatibility-and-identity": "4115010602d10b9c25a5ec5124b0cb64a0d2aca42576fe13d60529df6589ca70",
+      "3-15-lodging-reference-example": "117f95c8187b1ebdea90971075389b43d97099c250f7a8cf63789afb6301eab6",
+      "3-16-alignment-with-sibling-76-specs": "91ae68b34f65df4bb02c27531629ddce6ea0de91a0dc18d1dea6c27090c84941",
+      "3-2-pattern-a-host-side-extraction": "a7ecac6f9b143f801950c568c50812f9c927ad8f4cf402ba3c45327b444a7bc9",
+      "3-3-the-extract-step": "9328606aedbae5f2ed38c22af09f33168f2d11bb5947cfbb2c34ccdf356c6f33",
+      "3-4-field-validation-and-presence": "5550ea39c6efd69aed5728775204d13052860280594b0fd98628093f41891b1e",
+      "3-5-origin-derivation-and-lineage": "e00153756aee6c5031372904b17f5adb37081cd1d00945e26477d84898cd8be3",
+      "3-6-per-field-distributions-and-calibration": "bbc6393a314ed5a6de5977543bfb61f4a5469c61cf4ec50412f99f44b4822b98",
+      "3-7-the-fallback-extractor": "31d0ef8ab4afe040b0d8bc7e831e04798e0b49d974a6c716726a8961bdc3351c",
+      "3-8-acceptance-steps": "8dc9bd83d74b8570b0316ce8fb71f2a863a28bfec09d55295f2997a01656ee7f",
+      "3-9-the-model-value-gate": "3dc9d565aed2c5c66881d0c25c7605b91b77b0460ad1fda6ba1a7ea4fd61732a",
+      "3-behavior": "a485ed7fe611cd0d74775c82d4e8e21e54c30b56bceb5e796f99668711238960",
+      "4-out-of-scope": "8edde98e7708201acb75755cd3ca697ae6cc7d0c7a886a15c36c06174d263310",
+      "5-observable-negative-cases": "511b07ab1a084d67c3c099a7f1b40be14531c5725a489789ef224da20400fb73",
+      "acceptance": "b26bfc4a750d486e82b809258c6b3d87009d6f564d6155c89eb7f89b06cdadaa",
+      "decisions-at-approval": "04ac59d3e0a018ab5f6f0d2dfba5b92a2d040ed8d1b5414c2168abf434c27f91",
+      "verification": "e8849d1648e28aa74f3b657b6bfd9ff49f0b62a7c51a29df7a4b41c9632d2491"
+    },
+    "sectionHeadings": [
+      "038: Structured extraction step and the model-derived input pattern (amends 002 and 003)",
+      "1. Purpose",
+      "2. Territory",
+      "2.1 Binding principles of #76",
+      "3. Behavior",
+      "3.1 Terms",
+      "3.2 Pattern A: host-side extraction",
+      "3.3 The extract step",
+      "3.4 Field validation and presence",
+      "3.5 Origin, derivation and lineage",
+      "3.6 Per-field distributions and calibration",
+      "3.7 The fallback extractor",
+      "3.8 Acceptance steps",
+      "3.9 The model-value gate",
+      "3.10 Backend capability and output",
+      "3.11 Runtime (amends spec 003)",
+      "3.12 Evidence and judgment",
+      "3.13 Needs input from extraction",
+      "3.14 Compatibility and identity",
+      "3.15 Lodging reference example",
+      "3.16 Alignment with sibling #76 specs",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Decisions at approval"
+    ],
+    "specPath": "specs/038-structured-extraction/spec.md",
+    "status": "approved",
+    "summary": "An amendment of approved specs 002 and 003 (R-16), for #76 child B6. Two supported ways to turn free text into typed decision inputs, both keeping extracted values model-derived. Pattern A: the host extracts and submits snapshot entries with provenance `model-derived` and an optional producer identity (artifact, template digest, production time), recorded in evidence and lineage. Pattern B: an `extract` step, a model step of spec 037's bounded envelope, asks a backend for a typed record against a declared schema and vocabularies under an identified prompt template; every field is validated and is present or absent with a reason, never coerced, clamped or truncated; each field carries its origin (`extracted`, `fallback`, `absent`) and derivation; a deterministic in-core fallback extractor (`rustev.extract-rules/1`) yields exact-derived fields; per-field distributions exist only from backend log-probabilities and are thresholded only under a bound calibration or a declared `uncalibrated_threshold`. In both patterns an exact operator, policy predicate, proposal parameter, acquisition request or other model step reads a model value only through a declared acceptance rule (an `accept_model_derived` step, or a spec 033 check covering `model-derived`); selection-policy controls never read one. Extraction can drive spec 033's `needs_input` outcome and propose which declared questions it asks. Adds to the shared #76 versions; every version 1 definition keeps its bytes, its plan and its `PlanId`. Approved (A-35); implementation is pending.\n",
+    "title": "Structured extraction step and the model-derived input pattern (amends 002 and 003)"
+  },
+  "shardHash": "e0e7eea5e9fe0520ae02080b8633ec24172bc08bd3e1970200f74f11eadda1e1",
+  "specVersion": "1.9.0"
+}
