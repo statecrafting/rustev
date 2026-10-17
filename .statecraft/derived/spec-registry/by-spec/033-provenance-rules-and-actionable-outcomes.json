@@ -1,0 +1,169 @@
+{
+  "record": {
+    "amends": [
+      "002-decision-contract-and-pure-core",
+      "006-cli-surface"
+    ],
+    "created": "2026-10-17",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "032-evidence-quality",
+      "006-cli-surface",
+      "027-node-and-wasm-bindings"
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-contract/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-core/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "003-runtime-execution-and-evidence",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-runtime/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "006-cli-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-cli/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      }
+    ],
+    "id": "033-provenance-rules-and-actionable-outcomes",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-12-compatibility",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "A definition that uses no construct of this spec compiles to the same plan bytes and PlanId as before this spec, and its decisions produce the same rustev.judgment/1, evidence and run record bytes; no existing refusal changes category or order."
+      },
+      {
+        "anchor": "3-5-actionable-outcomes",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "An outcome or notice is addressed to the caller only when every cause is an input whose provenance class the definition declares caller-controlled; no declaration, override or remediation can address the caller otherwise, and the compiler refuses any that would."
+      },
+      {
+        "anchor": "3-2-checks",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "A check over an input that accepts several provenance classes covers each accepted class with a branch or a default; otherwise the definition is refused naming the uncovered classes."
+      },
+      {
+        "anchor": "3-3-consequences",
+        "id": "I-4",
+        "kind": "invariant",
+        "text": "A dropped field is absent, read as missing_evidence by every dependent; no consequence substitutes a value, and no check result is a default."
+      },
+      {
+        "anchor": "3-7-the-needs-input-outcome",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "Every question of a needs_input outcome is a declared literal template, byte-identical to its declaration; no model output or input value enters a question's text."
+      },
+      {
+        "anchor": "3-6-remediations-and-transience",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "transient is computed from the fixed table of 3.6 and is true only for backend_unavailable, deadline_exceeded, and invalid_backend_output from a backend whose determinism is not bitwise."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "033-provenance-conditional-rules-and-actionable-outcomes-amends-002-and-006": "24a3f90d6f1cadef3e65d93876fd2594c76562d6b2c2ce192e5dce3e15d4866f",
+      "1-purpose": "3f29e160e1f528730995f1d3485e5d734becd4da175391f91e0519a65618231e",
+      "2-1-binding-principles-of-76": "dd20445f4d5dcab10d699ca800a441225bde9534a11dea3ad0b52decac3e7b47",
+      "2-territory": "170894fab17e2c9874ac3e54df628ecee26620b90061bfd126a77c4cc85b8bd3",
+      "3-1-documents-and-versions": "310ca8920f8b037b9751d861e07f41d251b1a0990ddd4f32d6943e5f8675d04d",
+      "3-10-host-status-guidance": "2b26d65d5c209854f6ae9ac8322f07c41af5745a8f6cad4b1490c167e7e1627f",
+      "3-11-cli-surface-amends-spec-006": "990e38e4afccb8b0d324c4a6d56c40bcefdb02bf4f02d2c8b34caf08be4dae22",
+      "3-12-compatibility": "7f287aeda1cdd9fbb09e55fccbac2822a49fd46a96e1be9a5b50d2ac2d2b9e75",
+      "3-2-checks": "e6cb87266ce0050ab153e080afe4144d6b31b9d33c698e6fe93ddde5cbfae775",
+      "3-3-consequences": "c40d8590df4e6d187bfb5eb4807899eff03016dd09691e07dd4c2b9a4db121be",
+      "3-4-check-evaluation": "721df377bbd2852a4deca7cc8c9d1969901d3d7ae4e755e96f2f9952fbc5aeaf",
+      "3-5-actionable-outcomes": "6c13c002d1d9127b41e1f77d2a8f6afbcc606a6a1acc2c7c6fc360aa1052aa0b",
+      "3-6-remediations-and-transience": "ad86c6acd1016ac780730a2cb3f309c7cd70f600f91160176286596c24fa3e4b",
+      "3-7-the-needs-input-outcome": "5d04148c519cf5799b5433aa2f97b3304a667da26d5eadb06c6e55d2f65ce2e7",
+      "3-8-compilation-the-actionability-phase": "ac95f24802d3caf053376a3e0dbfa11ca0062719d4aae2ded92e9354d6a96333",
+      "3-9-runtime-origin-adds-to-spec-003": "13c87c1daec67a000ae0725accbfded33d8e4001210f271cdc7ab0a0bdefa2c2",
+      "3-behavior": "68a4034c720799aa6e221ce6615be3af09d4cb0f318821d67aa4111efcf79370",
+      "4-out-of-scope": "2caf0b694989e0b18a4f4fb9dc201dec2b0f7cbd4308d80c7d91239ce350f00f",
+      "5-observable-negative-cases": "0c445bfb7674290de4d6391a17e2d869b04c6bba052464979d34ec5fc35ab113",
+      "acceptance": "b641889d14003c48eece9936b067885c16f6d569c44c637876c8c987a6ab7fe8",
+      "decisions-at-approval": "4b72d6b78048ffbfc966f689ced5a540635e9029fb9417d24c4d5d4adc102d65",
+      "verification": "4efc643d528d57e8b0a2c01bc3a7179dd16d653f9f394610184d93e40d5d2554"
+    },
+    "sectionHeadings": [
+      "033: Provenance-conditional rules and actionable outcomes (amends 002 and 006)",
+      "1. Purpose",
+      "2. Territory",
+      "2.1 Binding principles of #76",
+      "3. Behavior",
+      "3.1 Documents and versions",
+      "3.2 Checks",
+      "3.3 Consequences",
+      "3.4 Check evaluation",
+      "3.5 Actionable outcomes",
+      "3.6 Remediations and transience",
+      "3.7 The needs-input outcome",
+      "3.8 Compilation: the actionability phase",
+      "3.9 Runtime origin (adds to spec 003)",
+      "3.10 Host status guidance",
+      "3.11 CLI surface (amends spec 006)",
+      "3.12 Compatibility",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Decisions at approval"
+    ],
+    "specPath": "specs/033-provenance-rules-and-actionable-outcomes/spec.md",
+    "status": "approved",
+    "summary": "An amendment of approved specs 002 and 006, for #76 child B3. A definition may declare which provenance classes the caller controls, input checks whose consequence on failure depends on the provenance of the value tested (refuse, drop the field, relax a named constraint group, downgrade its grade, abstain, escalate, or continue with a notice), exhaustive over the classes the input accepts, and policy conditions over provenance. Every unresolved outcome, refusal and notice of such a plan carries who can act on it, a typed remediation, its causes with provenance, and whether retrying can succeed; who can act is computed from the causes, and an author may only move it away from the caller, never toward it. Adds the `needs_input` outcome with declared, literal questions and a continuation digest, and documents how hosts map outcomes to transport semantics. Adds to the #76 track versions `rustev.definition/2`, `rustev.plan/3` and `rustev.evidence/2`, and introduces `rustev.judgment/2`; plans using no construct of this spec keep their bytes and `PlanId`. Approved (A-30); implementation is pending.\n",
+    "title": "Provenance-conditional rules and actionable outcomes (amends 002 and 006)"
+  },
+  "shardHash": "7b7ec0ab1a02d6127e2f672e26adcfcd91b02e6aa49b76a838b15b8ce620b39b",
+  "specVersion": "1.9.0"
+}
