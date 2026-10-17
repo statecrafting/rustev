@@ -1,0 +1,201 @@
+{
+  "mapping": {
+    "amends": [
+      "026-live-re-execution",
+      "006-cli-surface"
+    ],
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay",
+      "006-cli-surface",
+      "012-jev-integration",
+      "013-remote-state-on-failed-attempts",
+      "014-report-integrity",
+      "015-per-case-bundle-failures",
+      "023-real-data-quality-qualification",
+      "026-live-re-execution",
+      "029-evaluation-repeatability"
+    ],
+    "implementingPaths": [
+      {
+        "path": "Cargo.lock",
+        "source": "spec-edge"
+      },
+      {
+        "path": "Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "Makefile",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-cli/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-contract/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-eval/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-runtime/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "integrations/rustev-jev/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-live/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-cli/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-cli/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-contract/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-contract/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-eval/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-eval/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-runtime/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-runtime/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "integrations/rustev-jev/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-jev/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.lock"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Makefile"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/decisions/00-founding-decisions.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/001-decision-engine-architecture.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      }
+    ],
+    "specId": "043-live-re-execution-at-scale",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.2.0",
+  "shardHash": "f9f0f66d01cb7be46d1bd488418e4b8e7be09f1458aba0468b1010cf74b2e8c3"
+}
