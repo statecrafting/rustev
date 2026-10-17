@@ -1144,6 +1144,9 @@ fn finish(
     let terms = &inner.remote.terms;
     let sent = record.bytes_sent;
     let mut offers = vec![];
+    // Reports are sent after the record reaches the sink, so a caller that
+    // has its result can already find the exchange recorded.
+    let mut reports = vec![];
     {
         let mut st = lock(&ex.state);
         st.finished = Some(response.is_some());
@@ -1235,7 +1238,7 @@ fn finish(
                     m.status = Status::Delivered;
                     m.settled = true;
                     if let Some(tx) = m.tx.take() {
-                        let _ = tx.send(report);
+                        reports.push((tx, report));
                     }
                 } else if m.status == Status::Abandoned && !m.settled && response.is_some() {
                     // A charge learned after the member stopped waiting
@@ -1269,6 +1272,9 @@ fn finish(
     }
     let retained = RetainedBytes { request, response };
     inner.exchanges.deliver(record, Some(retained));
+    for (tx, report) in reports {
+        let _ = tx.send(report);
+    }
 }
 
 /// Re-run this client's mapping offline over retained response bytes

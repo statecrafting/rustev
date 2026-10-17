@@ -681,6 +681,12 @@ governed aggregate is committed.
 budget to USD 5, equal to the testing cap (R-29), as the external backstop
 of 3.8 (recorded in R-32).
 
+**Ordering fix (2026-10-16).** The adapter now delivers an exchange's record
+to the host sink before it answers the exchange's members. It answered them
+first, so `capability_and_malformed_request_are_refused_unsent` in
+`tests/adapter.rs` intermittently found no record after its one valid call
+(seen in CI on 2026-09-27 and 2026-10-16). No requirement changes.
+
 ## Verification
 
 Run by `make verify` (012 is in `VERIFIED_SPECS`).
