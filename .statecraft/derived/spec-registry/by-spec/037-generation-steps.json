@@ -1,0 +1,199 @@
+{
+  "record": {
+    "amends": [
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay"
+    ],
+    "created": "2026-10-17",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay",
+      "017-general-runtime-optimization",
+      "030-bedrock-backend",
+      "032-evidence-quality",
+      "033-provenance-rules-and-actionable-outcomes",
+      "034-parameterized-definitions",
+      "035-screening-seam",
+      "036-mid-plan-acquisition"
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-contract/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-core/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "003-runtime-execution-and-evidence",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-runtime/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "004-evaluation-and-replay",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-eval/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      }
+    ],
+    "id": "037-generation-steps",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-18-compatibility-and-identity",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "A definition without a generate step is unaffected by this spec: a version 1 definition compiles to the same plan bytes and PlanId under the same compiler identity, and evaluates to the same judgment, evidence, run record, capture and report bytes, as before."
+      },
+      {
+        "anchor": "3-6-isolation-from-decisions",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "No value produced by a generate step is readable by an exact step, a semantic or model step, a policy condition, outcome, parameter or adjustment, an execution policy, an acquisition request, a template parameter or a backstop; every such reference is refused at compile time."
+      },
+      {
+        "anchor": "3-4-backstop-language",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "Every required generated field has a backstop that compiles, reads only exact-derived values, and renders within the field's bounds; its output is exact-derived."
+      },
+      {
+        "anchor": "3-10-per-field-origin-and-the-text-result",
+        "id": "I-4",
+        "kind": "invariant",
+        "text": "Per-field origin never changes the judgment: the judgment is final before the generation stage starts, a proposal whose text fell back is a successful proposal, and origin is never an Unresolved reason."
+      },
+      {
+        "anchor": "3-14-caching",
+        "id": "I-5",
+        "kind": "invariant",
+        "text": "A cached copy of generated output is served with its stored origin and with `served_from_cache` naming the original decision; a backstop or repaired field is never served as freshly generated."
+      },
+      {
+        "anchor": "3-9-ownership",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "An output carrying a member that is not a declared generated field is rejected as an invalid output, and a carried context field or judgment that differs from its source at final verification is restored and reported with an `ownership_restored` notice."
+      },
+      {
+        "anchor": "3-13-streaming",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "A streamed field is provisional; a streamed value that is not the field's final value is followed by exactly one `superseded` event, and the final result, evidence and cache entry equal those of the same run without streaming."
+      },
+      {
+        "anchor": "3-3-prompt-templates",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "A prompt template is an identified document embedded in the plan; any change to it changes `PlanId` and therefore every request identity and cache key derived from the plan."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "037-generation-steps-with-deterministic-backstops-and-per-field-origin-amends-002-003-and-004": "e2759b8cee5d9397e6120af06e04eb96ea9e8d53b437b5d6a767c4a3f427426c",
+      "1-purpose": "fd977d8728f79b78a4ff674b1c7b282b81d81e55d33fa1b6f5a0acaa74b0d67a",
+      "2-1-binding-principles-of-76": "3283c54be2cf3f6145c468f26d5137fd9f5fd27da33381f700c2da9b56c605ac",
+      "2-territory": "b187192acf63fcf1b853714f8ffcee7c92af61f0b3ef9d79f05a8ac4792f52ff",
+      "3-1-the-bounded-model-step-envelope": "97c96d03a8933098526d360eb8f881d66e9b773fabbd29986c1bce63b2d6b9d7",
+      "3-10-per-field-origin-and-the-text-result": "98851fae6037e73524952dee6c9b8e5b09a924727b5337a238c54e2eaceb97fc",
+      "3-11-screening-b7": "a69826769ccd848e37b306e2a3243f550b3b9cc8ca56065cb653c9d97afb7d79",
+      "3-12-runtime-the-generation-stage-amends-003": "5e6409ed215766cd00c173fc1cbca5e788e21da8b751a8e58608959b545ece9c",
+      "3-13-streaming": "a760a09463a32dcf22eab1aac7d28ea7cec332d8bce48141b979b02e5379bca4",
+      "3-14-caching": "1a53ec18cd7e1975295c02cb7908c5bf1124b404b8f8f9f494284e9e3cc268fe",
+      "3-15-evidence-capture-and-replay-amends-004": "7a727f2f571cc81ef0d803f79d00cfe36abfc60cf7e911e7da33465229098887",
+      "3-16-evaluation-metrics-amends-004": "1fbf2e21b600a66cd93a503e561cad94518a9fccca1cbdc4b54af07cf7ea624b",
+      "3-17-backend-capability": "090cdf3687fd7a4c9c606a01f6f0c4e4720b56f728eeee502c5d629880f60604",
+      "3-18-compatibility-and-identity": "f72cb5e3b3e40f62f9193ccdf83694d89042af3ce213697193f419af18bb2b8f",
+      "3-2-the-generate-step-declaration": "a5a99dd21257ccd7fc0c5b15af660dcba7cde4007cbfa3d18a98f88f3de36810",
+      "3-3-prompt-templates": "a4f31ed5b24f78ebb84e19ecd9db5a5dca39def674cc6bcbb33e065f2aa32a28",
+      "3-4-backstop-language": "787dfe8ec95322f64cbac3e51f23e93b2393e07f6b588b574d49fa53a771bd96",
+      "3-5-compilation": "bcdc5b244f504751e994360f22c321fed57388bfcfb1c7a040208eddeb97e667",
+      "3-6-isolation-from-decisions": "5f2818be8f7c657e68dcd06311dc3c8f96897bc6f345239e9e0aa86415c8dc71",
+      "3-7-requests-outputs-and-validation": "6f3c2819fcd274c253828c0a3a024ca5bda938aeed31a0ea050c1e49952b0510",
+      "3-8-repair": "fd3cc2ad5dc3bdd9fb799ccc58314c17b3df41e6679759ab719c05441badab5b",
+      "3-9-ownership": "0da2a8aa7071861820a06a2657ae59139ab83c19a0db29b9a2b0d25a95d2e74a",
+      "3-behavior": "4e80d62ec3fb1680c6c04df8e8ad3d610ad07c60bb4af28f74bba2be1a366db0",
+      "4-out-of-scope": "b1ef778f71ad0d4d7152e6407e1b3eac486bfb4fe99ac320f800ff099a18b375",
+      "5-observable-negative-cases": "07ade0bde8c2e802885d81bd91c32a2035bee945001b67f670d35e4f1d3c577c",
+      "acceptance": "3361e2e563272e5c97d80ed2e597210b619e9d6a04bbcd5751b809ca049423cb",
+      "decisions-at-approval": "87051abe667faddb7a55f289105a37bd7672d0a1af846e9ceef3fb488bffc08b",
+      "verification": "1070ea93ceb49441e319c81ebbbf1ae3e3b0efa6eb13b0ff5e91bfc7fddd824b"
+    },
+    "sectionHeadings": [
+      "037: Generation steps with deterministic backstops and per-field origin (amends 002, 003 and 004)",
+      "1. Purpose",
+      "2. Territory",
+      "2.1 Binding principles of #76",
+      "3. Behavior",
+      "3.1 The bounded model step envelope",
+      "3.2 The generate step declaration",
+      "3.3 Prompt templates",
+      "3.4 Backstop language",
+      "3.5 Compilation",
+      "3.6 Isolation from decisions",
+      "3.7 Requests, outputs and validation",
+      "3.8 Repair",
+      "3.9 Ownership",
+      "3.10 Per-field origin and the text result",
+      "3.11 Screening (B7)",
+      "3.12 Runtime: the generation stage (amends 003)",
+      "3.13 Streaming",
+      "3.14 Caching",
+      "3.15 Evidence, capture and replay (amends 004)",
+      "3.16 Evaluation metrics (amends 004)",
+      "3.17 Backend capability",
+      "3.18 Compatibility and identity",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Decisions at approval"
+    ],
+    "specPath": "specs/037-generation-steps/spec.md",
+    "status": "approved",
+    "summary": "An amendment of approved specs 002, 003 and 004 (R-16), for #76 child B5 (#63), under owner decisions R-41 (OD-2) and R-42 (OD-4). Defines the bounded model step envelope that later model steps reuse, and its first kind, `generate`: a declared, finite step that runs after selection and asks a backend for schema-bounded text fields per selected item, with a versioned prompt template bound into `PlanId`, a deterministic backstop for every required field written in a logic-less template language implemented in `rustev-core`, optional bounded repair, ownership checks, and per-field origin (`generated`, `repaired`, `backstop{reason}`) in the text result, the evidence, every capture and every cached copy. Generated text is model-derived and can never reach an exact operator, a policy control, an acquisition request or another model step. Generate steps add to the shared #76 versions `rustev.definition/2`, `rustev.plan/3` and `rustev.evidence/2`; plans without any #76 construct keep byte-identical identities and documents. Approved (A-34); implementation is pending; approval authorizes no live provider call, spend, release or real-user data.\n",
+    "title": "Generation steps with deterministic backstops and per-field origin (amends 002, 003 and 004)"
+  },
+  "shardHash": "ed9bb9cce67464fd695a5803b447e024f340b41cc638fb1479c74f79f1fc3212",
+  "specVersion": "1.9.0"
+}
