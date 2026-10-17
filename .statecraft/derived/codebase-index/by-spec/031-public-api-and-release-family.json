@@ -1,0 +1,312 @@
+{
+  "mapping": {
+    "amends": [
+      "001-boundaries-and-authority",
+      "008-reference-package-lodging",
+      "010-integrations",
+      "021-packaging-and-first-release"
+    ],
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay",
+      "005-reference-backends",
+      "006-cli-surface",
+      "007-support-routing-package",
+      "008-reference-package-lodging",
+      "009-remote-adapter-protocol",
+      "010-integrations",
+      "011-semantic-backend",
+      "012-jev-integration",
+      "021-packaging-and-first-release",
+      "022-jev-production-transport"
+    ],
+    "implementingPaths": [
+      {
+        "path": "Cargo.lock",
+        "source": "spec-edge"
+      },
+      {
+        "path": "Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "Makefile",
+        "source": "spec-edge"
+      },
+      {
+        "path": "backends/rustev-backend-rules/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-cli/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-contract/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-core/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-eval/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-runtime/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "integrations/rustev-remote-http/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "packages/rustev-pkg-lodging/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "packages/rustev-pkg-support-routing/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "tools/rustev-boundaries/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev/"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-release/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "tools/rustev-boundaries/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-boundaries/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.lock"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Makefile"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "backends/rustev-backend-rules/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "backends/rustev-backend-rules/Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-cli/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rustev-cli/Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-contract/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rustev-contract/Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-core/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rustev-core/Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-eval/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rustev-eval/Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-runtime/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rustev-runtime/Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "integrations/rustev-remote-http/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "integrations/rustev-remote-http/Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "packages/rustev-pkg-lodging/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "packages/rustev-pkg-lodging/Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "packages/rustev-pkg-support-routing/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "packages/rustev-pkg-support-routing/Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/decisions/00-founding-decisions.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/001-decision-engine-architecture.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "rust-toolchain.toml"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "rust-toolchain.toml"
+        }
+      }
+    ],
+    "specId": "031-public-api-and-release-family",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.2.0",
+  "shardHash": "268752373c25442d39dfb4f3b9d726960389da0a4776fa00e2e41d5807fb51fb"
+}

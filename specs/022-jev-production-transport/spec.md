@@ -157,7 +157,7 @@ A production binding records, and its artifact identity covers:
 | Retries | None inside the adapter; retries and fallback stay plan policy (R-10). |
 | Privacy | The provider's retention and training terms for the direct API, as a dated fact, and the request options that invoke them. |
 | Cost | The price table source and date, the unit rate, and whether a per-response charge is reported. |
-| Credential | The credential's custody class (host-injected at construction, never in identity or evidence); never its value. |
+| Credential | The credential's custody class: the host registers a credential callback at construction, and the key value is obtained only at dispatch through that callback (3.8.1). The value is never stored in the binding and never enters identity or evidence; the binding records only the custody class. |
 
 ### 3.5 Cost reconciliation
 

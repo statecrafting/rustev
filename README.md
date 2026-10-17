@@ -13,28 +13,61 @@ without any of them.
 
 ## Status
 
-Increment 1 is implemented: `rustev-contract` (versioned documents, bounded
-parsing, canonical identities) and `rustev-core` (value kinds, exact
-operators, the plan compiler with typed refusals, staged evaluation and
-selection policy). The first runtime slice is implemented in
-`rustev-runtime`: bounded admission and concurrency, one end-to-end deadline
-on an injectable clock, cost budgets reserved before dispatch, declared
-retries and runtime fallback that are part of the plan's identity, honest
-cancellation, and run records delivered under a declared sink policy.
-`rustev-backend-rules` is a deterministic rules backend: authored,
-identified rules programs, not a model. `rustev-eval` reproduces retained
-decisions offline from bounded replay bundles, compares candidate plans,
-and produces evaluation reports, regression gates and temperature fits.
-`rustev` (`crates/rustev-cli`) does all of this from files: plan check,
-compile and show; rules-backed runs with bounded capture into replay
-bundles; offline replay; evaluation reports, gates and temperature fits.
-There is no model backend yet, and no quality or calibration claim: every
-dataset and report is synthetic. Batching, duplicate suppression and
-caches are deferred. Nothing is released.
+Implemented, under approved and complete specs:
+
+- `rustev-contract` and `rustev-core` (`002`): versioned documents, bounded
+  parsing, canonical identities, value kinds, exact operators, the plan
+  compiler with typed refusals, staged evaluation and selection policy.
+- `rustev-runtime` (`003`, amended by `013`): bounded admission and
+  concurrency, one end-to-end deadline on an injectable clock, cost budgets
+  reserved before dispatch, declared retries and fallback that are part of
+  the plan's identity, honest cancellation, remote state on attempts that end
+  without a stop, and run records delivered under a declared sink policy.
+- `rustev-eval` (`004`, amended by `014` and `015`): offline reproduction of
+  retained decisions from bounded replay bundles, candidate comparison,
+  evaluation reports with task adapter rules bound into their identity,
+  per-case reporting of unusable bundles, regression gates and temperature
+  fits. Live re-execution is not implemented (spec `026`).
+- `rustev-backend-rules` (`005`): a deterministic rules backend; authored,
+  identified rules programs, not a model.
+- `rustev` (`crates/rustev-cli`, `006`): plan check, compile and show; run;
+  replay; eval; gate; calibrate fit and qualify.
+- `integrations/rustev-remote-http` (`009`): the versioned remote adapter
+  protocol over HTTP, client and server, including adapter-scoped
+  shared-state batching that is off by default until qualified.
+- `integrations/rustev-jev` (`012`): a remote decision backend over TypeSafe's
+  Jev through the Vercel AI Gateway. Its evidence is development evidence: the
+  Gateway reports the served model as unknown, and the production transport
+  (spec `022`) is approved but not implemented.
+- Reference packages `rustev-pkg-support-routing` (`007`, amended by `016`)
+  and `rustev-pkg-lodging` (`008`); neither amends a core crate.
+
+Runtime optimization (spec `017`) is in progress: increment 1 (runtime-planned
+batching and a bounded memory cache with invalidation, opt-in per plan) is
+implemented; increment 2 (concurrent duplicate suppression and persistent
+caches) is not. There is no local model backend (spec `011` is a draft), and
+no quality or calibration claim: datasets and reports are synthetic or of
+synthetic provenance, and real labeled data is admitted only under spec `023`
+(R-04, R-37). Nothing is released; every
+manifest is `0.1.0` with `publish = false` (spec `021` is approved, not
+implemented).
+
+Approved specs not yet implemented: `010` optional integrations and serving,
+`019` dynamic questions, `020` remote protocol refinements, `021` packaging
+and first release, `022` Jev production transport, `023` real labeled data
+qualification, `026` live re-execution. Drafts: `011` first local semantic
+backend, `024` second local semantic backend, `025` wire-witness replay input.
+`017` is approved and in progress. Every other spec (`000` to `009`, `012` to
+`016`, `018`) is approved and complete.
+
+The current roadmap is tracking issue
+[#76](https://github.com/statecrafting/rustev/issues/76); it describes planned
+work, not current behavior. Remaining unscheduled and research items are in
+[docs/backlog.md](docs/backlog.md).
 
 - Design (proposed): [docs/design/001-decision-engine-architecture.md](docs/design/001-decision-engine-architecture.md)
 - Decisions: [docs/decisions/00-founding-decisions.md](docs/decisions/00-founding-decisions.md)
-- Specs: `001` boundaries and authority, `002` decision contract and pure core, `003` runtime execution and evidence, `004` evaluation and replay, `005` rules backend, `006` CLI (approved and complete); `011` semantic backend (draft).
+- Specs: [`specs/`](specs/); `spec-spine registry list` shows each status.
 
 ## Governance
 
