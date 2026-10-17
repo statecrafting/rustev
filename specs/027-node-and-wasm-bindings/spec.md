@@ -1,0 +1,755 @@
+---
+id: "027-node-and-wasm-bindings"
+title: "Node-API binding and WebAssembly build"
+status: approved
+implementation: pending
+created: "2026-10-16"
+summary: >
+  Approved (A-23). Two host surfaces over the existing engine: `rustev-node`,
+  a napi-rs Node-API binding through which a TypeScript service compiles
+  plans, runs decisions, replays and evaluates in-process and implements
+  Rustev's seams in TypeScript as explicit composition (R-38); and
+  `rustev-wasm`, a wasm-bindgen build of the pure crates for browsers, edge
+  runtimes and tooling. Documents cross as the contract's canonical JSON,
+  TypeScript types are generated from JSON Schema emitted by
+  `rustev-contract`, command rendering moves into one pure crate shared by
+  every surface, and every surface (CLI, native binding, WebAssembly, later
+  HTTP and gRPC) runs one shared conformance suite. Approval does not
+  authorize npm or crates.io publication, name reservation, a release, a
+  live provider call, spend, or a claim that cross-target floating point
+  agrees beyond what the parity suite measures.
+extends:
+  - { spec: "002-decision-contract-and-pure-core", unit: { kind: directory, path: "crates/rustev-contract/" }, nature: additive }
+  - { spec: "002-decision-contract-and-pure-core", unit: { kind: directory, path: "crates/rustev-core/" }, nature: additive }
+  - { spec: "004-evaluation-and-replay", unit: { kind: directory, path: "crates/rustev-eval/" }, nature: additive }
+  - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: amending }
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.toml" }, nature: additive }
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.lock" }, nature: additive }
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "tools/rustev-boundaries/" }, nature: additive }
+establishes:
+  - { kind: directory, path: "integrations/rustev-node/", planned: true }
+  - { kind: directory, path: "integrations/rustev-wasm/", planned: true }
+  - { kind: directory, path: "crates/rustev-surface/", planned: true }
+  - { kind: directory, path: "tools/rustev-conformance/", planned: true }
+depends_on:
+  - "001-boundaries-and-authority"
+  - "002-decision-contract-and-pure-core"
+  - "003-runtime-execution-and-evidence"
+  - "004-evaluation-and-replay"
+  - "005-reference-backends"
+  - "006-cli-surface"
+  - "021-packaging-and-first-release"
+references:
+  - { unit: { kind: file, path: "docs/design/001-decision-engine-architecture.md" }, role: context }
+  - { unit: { kind: file, path: "docs/decisions/00-founding-decisions.md" }, role: context }
+obligations:
+  - id: "I-1"
+    kind: invariant
+    text: "No binding output is authorization: a binding returns proposals, unresolved outcomes, refusals and evidence only, defines no permission type, and passes the principal handle through as opaque bytes."
+    anchor: "3-15-binding-principles"
+  - id: "I-2"
+    kind: invariant
+    text: "Rust never waits synchronously on JavaScript: every host-implemented seam call is asynchronous through a bounded queue with a typed refusal when full, carries its remaining deadline and cancellation, discards and counts a late resolution, and maps a JavaScript exception or rejection to the seam's typed failure without a panic crossing the boundary."
+    anchor: "3-6-host-implemented-seams"
+  - id: "I-3"
+    kind: invariant
+    text: "An unresolved outcome, including one caused by an exhausted deadline or budget during a decision, is a value in the result and never an exception; an exception means that no decision ran or that evidence delivery failed, exactly as the Rust API reports it."
+    anchor: "3-4-errors-and-unresolved-results"
+  - id: "I-4"
+    kind: invariant
+    text: "Node-API and wasm-bindgen dependency families occur only under integrations; contract, core and the shared surface crate never reach them, an executor or an HTTP stack; and the WebAssembly crate's normal dependency graph contains no runtime, executor, HTTP stack, randomness source or Node-API crate."
+    anchor: "3-14-dependency-boundaries"
+  - id: "I-5"
+    kind: invariant
+    text: "Every host surface runs the one shared conformance suite, and a surface's output for a case equals the case's expected bytes under only the comparison the case declares."
+    anchor: "3-12-shared-conformance-suite"
+  - id: "R-1"
+    kind: requirement
+    text: "TypeScript document types are generated from JSON Schema emitted by rustev-contract, are identical in both packages, and a drift check fails when committed schema or types differ from regenerated output."
+    anchor: "3-2-typed-boundary-and-generated-types"
+  - id: "R-2"
+    kind: requirement
+    text: "The WebAssembly module stays within the declared compressed size and instantiation budgets, measured in CI as section 3.10 defines; exceeding a budget fails the build, and raising one is an amendment of this spec."
+    anchor: "3-10-webassembly-build"
+  - id: "R-3"
+    kind: requirement
+    text: "The native package ships prebuilt binaries for the declared platform matrix with a pinned Node-API version and no install-time download, and each target loads and passes a smoke test in CI."
+    anchor: "3-13-packaging"
+---
+
+# 027: Node-API binding and WebAssembly build
+
+Approved by the owner (A-23, 2026-10-16, under the 2026-10-16 delivery work
+order) as its own reviewable change before any code (R-16); implementation is
+pending. It implements #76 child A1 (#56) and rests on R-38 (OD-5 of #76).
+Approval does not authorize publication to npm or crates.io, reservation of a
+package name or scope, a release or tag (spec 021 and its amendment by #76
+child A3 govern those, and each remains a separate owner act), a live provider
+call, or spend. It makes no claim that floating-point results agree across
+targets beyond the inputs the parity suite actually runs (section 3.11).
+
+## 1. Purpose
+
+Today Rustev is reachable only from Rust and through the CLI. A web service
+written in TypeScript would have to spawn a process per decision, which is
+slow and loses cancellation, streaming evidence and host-implemented seams.
+This spec defines two surfaces over the same engine:
+
+- `rustev-node`, a Node-API binding built with napi-rs: compile plans, run
+  decisions, replay and evaluate in-process, and implement Rustev's seams in
+  TypeScript;
+- `rustev-wasm`, a WebAssembly build of the pure crates (contract, core,
+  evaluation) for browsers, edge runtimes and tooling that cannot load a
+  native module.
+
+It also defines what keeps the surfaces from drifting apart: one typed
+boundary, one pure command renderer, and one shared conformance suite that
+every surface runs.
+
+The whole A1 contract is defined here. Wave 1 of #76 implements it over
+today's surface (section 3.7); seams and commands that later specs add join
+the bindings through the same mechanism and the same suite without amending
+the guarantees of this spec.
+
+## 2. Territory
+
+New crates, each a workspace member through the existing directory globs:
+
+| Directory | Holds | Publishable to crates.io |
+|---|---|---|
+| `crates/rustev-surface/` | The pure command surface: bytes-in, bytes-out functions for `check`, `compile`, `show`, offline `replay`, `eval`, `gate`, `calibrate fit` and `calibrate qualify`, and the result envelope of `run`, rendered exactly as the CLI renders them today. Depends on `rustev-contract`, `rustev-core`, `rustev-eval`, `serde`, `serde_json` and `sha2` only. | Not by this spec (spec 021 and A3 decide) |
+| `integrations/rustev-node/` | The napi-rs binding (`cdylib`), its TypeScript API, generated and committed type declarations, and the npm package layout. | No (`publish = false`); shipped through npm |
+| `integrations/rustev-wasm/` | The wasm-bindgen build, its JavaScript glue, the same committed type declarations, and the npm package layout. | No (`publish = false`); shipped through npm |
+| `tools/rustev-conformance/` | The shared conformance suite: case manifest, fixtures, expected bytes, the Rust runner (CLI and Rust API) and the JavaScript runner (native and WebAssembly). `publish = false`. | No |
+
+Existing territory this spec changes:
+
+- `crates/rustev-contract/` (spec 002, additive): a pure, deterministic JSON
+  Schema emitter for every public document type, and the committed schemas
+  under `crates/rustev-contract/schema/`. No existing document, parse bound
+  or canonical byte changes. No new dependency is added unless it is pure,
+  performs no I/O, and passes the boundary check.
+- `crates/rustev-core/` and `crates/rustev-eval/` (specs 002 and 004,
+  additive): only `cfg` attributes needed to compile for `wasm32-unknown-unknown`,
+  with no new dependency and no behavior change on native targets. If none
+  is needed, these crates do not change.
+- `crates/rustev-cli/` (spec 006, amending its internal structure only): the
+  CLI calls `rustev-surface` for every rendering listed above instead of its
+  own copy. Spec 006's observable contract (grammar, exit codes, output
+  bytes, file handling) is unchanged; its existing goldens under
+  `crates/rustev-cli/tests/golden/` prove it, unchanged and without
+  re-blessing. No normative text of spec 006 changes.
+- `Cargo.toml`, `Cargo.lock` (spec 001, additive): workspace dependency
+  entries for napi-rs and wasm-bindgen, pinned to exact versions.
+- `Makefile` (spec 001, additive): targets `conformance` and `bindings`
+  (section 3.12) and the boundary families of section 3.14.
+- `tools/rustev-boundaries/` (spec 001, additive): the new integration-only
+  dependency families and graph rules of section 3.14.
+
+What does not change: plan compilation, `PlanId`s and every other content
+identity; the runtime's behavior and public Rust API; the remote protocol;
+run record, judgment, replay and report bytes; the CLI's contract. This spec
+adds no plan construct, so every plan keeps a byte-identical `PlanId`; the
+conformance suite asserts the `plan_id` of every golden on every surface
+(section 3.12), which is the golden that proves it.
+
+## 3. Behavior
+
+### 3.1 Surfaces and crates
+
+1. **One engine.** Both bindings call the same Rust code the CLI calls:
+   `rustev-surface` for pure commands, `rustev-runtime` for decisions (native
+   only). A binding renders no document of its own and re-serializes no
+   canonical document: judgments, run records, plans, bundles and reports
+   cross as the canonical bytes the contract produces.
+2. **Result shape.** Every command result exposes both the canonical bytes
+   (`raw: Uint8Array`, and for each produced artifact such as a plan, bundle
+   or report, its bytes) and a parsed view typed by the generated
+   declarations. The parsed view is derived from the bytes; a host that
+   needs evidence-grade bytes uses `raw`.
+3. **CLI-only presentation.** File paths the CLI prints (such as `out`) and
+   process exit codes are CLI presentation. A binding returns artifacts as
+   bytes instead. Section 3.12 lists exactly which fields a comparison may
+   exclude.
+
+### 3.2 Typed boundary and generated types
+
+1. **Canonical JSON in, bounded parse.** Every document a host passes (a
+   definition, profile, calibration, descriptor, snapshot, request, bundle,
+   dataset, configuration) crosses as UTF-8 canonical JSON bytes or a string,
+   and is parsed on the Rust side by the contract's existing bounded parser
+   with the document's existing `ParseLimits`. A JavaScript object argument
+   is serialized by the binding with `JSON.stringify` and then parsed the
+   same way; no JavaScript-side validation substitutes for the Rust parse.
+   Bounds are enforced before unbounded allocation on both 64-bit and
+   `wasm32` targets.
+2. **Schema emission.** `rustev-contract` gains a function that emits, for
+   every public document type and version, a JSON Schema (draft 2020-12)
+   document derived from the same type definitions the parser enforces,
+   including closed objects where the parser denies unknown fields, enums,
+   string formats of identifiers, and every bound a schema can express.
+   Emission is pure and deterministic: canonical JSON, sorted keys,
+   byte-identical across runs and targets. The schemas are committed under
+   `crates/rustev-contract/schema/`, and a contract test fails when emitted
+   bytes differ from the committed files. The schema is descriptive: the
+   bounded parser remains the only authority on validity.
+3. **Type generation.** One code generator, exact-pinned with a committed
+   lockfile and run offline from the committed schemas, produces the
+   document declarations (`rustev-documents.d.ts`). The hand-written API
+   declarations (`Engine`, `PlanHandle`, error classes, seam interfaces)
+   import them. Both packages commit byte-identical copies of the document
+   declarations, so code can switch between the native and WebAssembly
+   packages; napi-rs's generated glue declarations are committed too.
+4. **Drift check.** `make bindings` and CI regenerate schemas and
+   declarations and fail when any committed file differs, or when the two
+   packages' document declarations differ.
+5. **Kinds stay distinct.** Generated types keep every value kind distinct
+   (score, distribution, calibrated probability, label, ordinal level,
+   rank) as tagged shapes; the bindings provide no conversion between kinds
+   and no coercion of a missing value to a default.
+
+### 3.3 Engine lifecycle and the TypeScript API
+
+The native package exposes this API (names normative; option bags may gain
+optional fields by later specs):
+
+```ts
+const engine = await Engine.create({
+  runtime: RuntimeConfig,          // spec 003 bounds plus binding worker sizing
+  sink: EvidenceSink,              // required; no default sink
+  backends: BackendRegistration[], // registered set, each with descriptor and max concurrency
+  contextSource?: ContextSource,   // section 3.7; used when a request carries no snapshot
+  clock?: 'system' | ManualClock,  // 'system' is TokioClock
+});
+const plan = await engine.compile({ definition, profile?, backends: BackendBinding[], calibrations? });
+// plan: PlanHandle { planId, report, raw }
+const result = await plan.decide(request, {
+  signal?: AbortSignal, deadlineMs?, principalHandle?: Uint8Array,
+  traceparent?: string, capture?: CaptureConfig,
+});
+// result: { judgment, evidence, origin, notices, delivery, raw }
+const replay = await engine.replay(bundleBytes, { nowMs, resolve });
+const report = await engine.evaluate({ dataset, split, config, candidates, resolve });
+const gate = await engine.gate({ reports, gate });
+const fit = await engine.calibrateFit({ ... });
+const verdict = await engine.calibrateQualify({ ... });
+engine.check(definition); engine.show(planBytes);   // pure, may be synchronous
+engine.compileSync(...);                             // optional, documented as blocking
+engine.gauges(); engine.onGauges(cb, { everyMs });   // section 3.9
+await engine.shutdown({ drainMs });
+```
+
+1. **Registration and binding.** The runtime registers its backends when the
+   engine is created (spec 003 builds the runtime with its backends).
+   `compile`'s `backends` binds the definition's backend ids to registered
+   backends by id and descriptor. Preparing a plan whose binding names an
+   unregistered backend or a different descriptor is refused with spec 003's
+   `PrepareError`, mapped as section 3.4 states.
+2. **Native backends available today.** The reference rules backend of spec
+   005, constructed from its documents as bytes. Remote backends under
+   `integrations/` (`rustev-remote-http`, `rustev-jev`) are not linked into
+   the binding: spec 001's boundary rule forbids any crate depending on an
+   integration crate. A host reaches a remote backend through a
+   TypeScript-implemented `DecisionBackend` (section 3.6) or through a later
+   spec that changes that rule.
+3. **Result fields.** `judgment` is the judgment (or the cancelled
+   completion) with its notices; `evidence` is the run record; `delivery` is
+   the sink outcome (acknowledged with receipt, queued, or dropped with the
+   dropped count); `origin` is the judgment's derivation class and lineage
+   as the contract carries them; `notices` are the judgment's notices. No
+   field is computed by the binding beyond what the Rust result holds. Per
+   field origin (#76 child B5) joins `origin` when its spec lands.
+4. **Time.** Domain evaluation time is always an explicit request field.
+   `nowMs` for replay and evaluation is always an explicit argument. The
+   binding reads no clock except through the engine's configured `Clock`.
+5. **`Engine.create` refusals.** A zero bound or duplicate backend id is
+   refused with spec 003's `ConfigError`. A binding-level sizing value or a
+   host seam's queue capacity (3.6.2) outside its declared range is refused
+   by the binding as `ConfigRefused` with code `out_of_range`, naming the
+   field in `detail`. Every refusal happens before any thread is started.
+6. **Context source.** A request carries a snapshot or, when the engine was
+   created with a `contextSource`, may omit it; the binding then obtains the
+   snapshot as section 3.7 states. The binding refuses a request with
+   neither before admission, as `AdmissionRejected` (`invalid_request`);
+   nothing is defaulted.
+
+### 3.4 Errors and unresolved results
+
+1. **Typed errors.** Every refusal and failure the Rust API returns as an
+   error maps to an exported subclass of `RustevError` with a stable
+   `code` (snake case, never changed once released), a typed `detail`
+   payload parsed from canonical JSON, and no message the host must parse.
+   The mapping is exhaustive over today's Rust error types:
+
+   | Rust | Class | `code` |
+   |---|---|---|
+   | compile or check refusal (spec 002) | `CompileRefusal` | the refusal category name, such as `kind_mismatch` |
+   | document parse or bound failure | `InvalidDocument` | `invalid_document` |
+   | `ConfigError`; a binding sizing value or seam queue capacity out of range (3.3.5) | `ConfigRefused` | `zero_bound`, `duplicate_backend`, `out_of_range` |
+   | `PrepareError` | `PlanPrepareRefused` | `missing_backend`, `descriptor_mismatch`, `hard_budget_unenforceable` |
+   | `Rejection::Overloaded`, `Rejection::InvalidRequest` | `AdmissionRejected` | `overloaded`, `invalid_request` |
+   | `Rejection::QueueDeadline` | `DeadlineExceeded` | `queue_deadline` |
+   | `Rejection::Cancelled` | `CancelledBeforeAdmission` | `cancelled` |
+   | `DecideError::EvidenceNotDelivered` | `SinkFailure` | the delivery failure name; `detail` carries the run record bytes |
+   | `CaptureConfigError` | `CaptureConfigRefused` | its variant name |
+   | context source failure before a decision (3.7) | `ContextUnavailable` | `host_seam_failed`, `host_seam_queue_full`, `invalid_snapshot` |
+   | invalid `traceparent` (3.8) | `InvalidTraceContext` | `invalid_traceparent` |
+   | engine shut down | `EngineShutDown` | `engine_shut_down` |
+
+   `BudgetExhausted` is exported and reserved for a budget refusal the Rust
+   API returns as an error before any work. Today no such path exists
+   (enforceability is a prepare refusal; exhaustion during a decision is an
+   unresolved outcome), so it is never thrown, and a test proves that budget
+   exhaustion during a decision yields a value.
+2. **Unresolved is a value.** An unresolved outcome of any kind, including
+   deadline, budget, backend unavailable or invalid backend output during a
+   decision, is returned in `judgment` and never thrown. A `SinkFailure`
+   still carries the record, which is evidence and not a result to act on,
+   exactly as `DecideError::EvidenceNotDelivered` states.
+3. **No panic crosses the boundary.** Every exported function catches a
+   Rust panic and turns it into `InternalError` (`code: internal`); the
+   engine that observed it refuses further calls with `EngineShutDown`
+   after draining as section 3.9 states. A panic is a defect and a test
+   failure, never an expected path.
+4. The WebAssembly package uses the same classes and codes for every error
+   its commands can produce.
+
+### 3.5 Async execution and cancellation
+
+1. **One runtime per engine.** Each `Engine` owns one Tokio multi-thread
+   runtime sized by its configuration (worker threads 1 to 64, blocking
+   threads 1 to 512; values outside are refused). Every asynchronous call
+   returns a Promise resolved on the Node event loop.
+2. **No event-loop blocking.** The asynchronous calls run compilation,
+   evaluation, replay, gating and calibration on the engine's blocking
+   pool, never on the JavaScript thread. `compileSync` and the pure
+   synchronous calls are the only exceptions: they run on the calling
+   thread, are documented as blocking and are bounded by the same parse
+   limits.
+3. **Cancellation.** An `AbortSignal` maps to the decision's `CancelSignal`.
+   Aborting before admission yields `CancelledBeforeAdmission`; aborting
+   after admission is spec 003 cancellation, and the result reports the
+   backends' honest answers (`CancelAck`: not requested, stopped,
+   unconfirmed; `RemoteEnd`: finished, possibly continuing) exactly as the
+   Rust runtime records them. An already-aborted signal is treated as
+   aborting before admission. Dropping the Promise does not cancel; only
+   the signal does.
+4. `deadlineMs` can only tighten the plan's deadline, as spec 003 states for
+   `DecisionRequest.deadline_ms`.
+
+### 3.6 Host implemented seams
+
+TypeScript may implement a seam by passing an object that satisfies the
+seam's interface. The binding wraps it in a Rust implementation of the
+seam trait that calls JavaScript through a napi `ThreadsafeFunction`. These
+rules bind every host-implemented seam, today's and later ones:
+
+1. **Asynchronous only.** Rust never blocks a thread waiting on JavaScript.
+   Every seam method that the Rust trait declares synchronous is supplied as
+   declared data, not as a callback: a TypeScript `DecisionBackend` declares
+   its full `BackendDescriptor`, its `CostModel` and one `CostBound` that
+   applies to every projection, and supports no batch capability. A
+   projection-dependent cost bound or a batch-capable host backend needs a
+   later amendment.
+2. **Bounded queue per seam.** Each seam instance has a queue whose capacity
+   the host declares with the seam object (1 to 65,536; there is no
+   default); `Engine.create` refuses a capacity outside that range (3.3.5).
+   When the queue is full the call is not enqueued and returns a typed
+   refusal immediately: for a backend, an attempt failure `Overloaded` with
+   charge observed zero and remote end finished, so spec 003 retry and
+   fallback apply; for a sink, a delivery failure handled by the sink
+   policy; for a context source, `ContextUnavailable` with
+   `host_seam_queue_full`. Nothing buffers without bound on either side.
+3. **Inputs passed in.** Every call carries its remaining deadline in
+   milliseconds, its attempt or delivery identity, an `AbortSignal` linked
+   to the Rust `CancelSignal`, and, for a backend, the reserved cost bound
+   for that attempt. The host decides what to do with them; the runtime
+   enforces its own deadline regardless.
+4. **Late resolution.** A Promise that settles after the runtime has
+   finished the call (deadline, cancellation or shutdown) is discarded and
+   counted in the seam's `late_resolutions_discarded` statistic. Its value
+   never reaches a judgment or record.
+5. **Exceptions.** A thrown exception, a rejected Promise, or a value that
+   fails the bounded parse maps to the seam's typed failure. A host may
+   throw an exported `SeamFailure` carrying the failure class (`transient`,
+   `overloaded`, `permanent`), the charge it observed and the remote end it
+   knows. Anything else maps to `permanent` with charge `Unknown` and remote
+   end `PossiblyContinuing`, because the binding does not know what the
+   host's work did; it never assumes zero cost or stopped work.
+6. **Same contract as Rust.** A host backend's output is validated by the
+   same core path as any backend's; capability matching, identity, admission,
+   budgets, retries, fallback, deadlines and cancellation are the runtime's,
+   unchanged. Conformance proves it (section 3.12).
+7. **Explicit composition (R-38).** A host seam is an object the host passes
+   to `Engine.create` or `compile`. Nothing is discovered, loaded from a
+   path or registry, or resolved by name at run time; the binding loads no
+   code. This is explicit composition under D-06 as R-38 clarifies it.
+
+### 3.7 Seams available today and seams that join later
+
+Wave 1 implements the binding over today's surface:
+
+| Seam (Rust trait, `rustev-core`) | Host-implementable in wave 1 | Notes |
+|---|---|---|
+| `DecisionBackend` | yes | Section 3.6. |
+| `EvidenceSink` | yes | Delivery under the engine's spec 003 sink policy. |
+| `ContextSource` | yes | The runtime takes a snapshot in the request today. When a host passes a context source instead of a snapshot, the binding calls it once, before admission, with the plan's declared input fields, parses the result with the snapshot's bounded parser, and then decides. A failure is `ContextUnavailable` and no decision runs; nothing is defaulted. |
+
+These join the bindings when their owning specs land, through the same seam
+mechanism (section 3.6), the same error mapping (section 3.4) and the same
+conformance suite (section 3.12), without amending this spec's guarantees:
+`Screener` (#76 B7), `Generator` (B5), mid-plan acquisition through the
+context source (B1, which replaces the before-admission call with recorded
+in-plan acquisitions), `explain` (D2), and `profile check` and `plan diff`
+(B4). Each owning spec states its seam's or command's binding surface and
+adds its cases to the suite. Until then, no binding exposes a placeholder for
+them.
+
+### 3.8 Trace context
+
+`traceparent`, when given, must be a valid W3C Trace Context version `00`
+header (55 characters, lowercase hex, non-zero trace and parent ids);
+otherwise the call fails with `InvalidTraceContext` before admission. The
+binding keeps it for the decision and passes it to every host-implemented
+seam call of that decision as `traceparent`. It does not enter `CallContext`,
+the run record, the judgment, the remote protocol or any identity, so all
+bytes stay unchanged. #76 child D1 decides how spans join it.
+
+### 3.9 Memory, shutdown and observability
+
+1. **Lifetime.** A `PlanHandle` holds a reference-counted prepared plan. The
+   plan is released when the last JavaScript handle is garbage-collected
+   and no decision using it is in flight. An `Engine` is released the same
+   way after `shutdown`.
+2. **Shutdown.** `shutdown({ drainMs })` stops admission at once (new calls
+   fail with `EngineShutDown`), waits for in-flight decisions up to `drainMs`
+   (0 to 600,000), then raises cancellation on the rest, which end with
+   spec 003's honest cancellation evidence. Pending sink deliveries follow
+   the sink policy. The Promise resolves with counts of drained, cancelled
+   and late-discarded work.
+3. **Observability.** `engine.gauges()` returns a snapshot of the runtime's
+   `Gauges`, its `SinkStats` and every host seam's queue depth, refusals and
+   late discards. `onGauges(cb, { everyMs })` (100 to 3,600,000 ms) delivers
+   the same snapshot periodically through a bounded, drop-oldest queue of
+   capacity 1; it returns an unsubscribe function. Gauges are in-memory
+   operator views, not evidence.
+
+### 3.10 WebAssembly build
+
+1. **Scope.** Everything pure: `check`, `compile`, `show`, offline `replay`,
+   `eval`, `gate`, `calibrate fit` and `calibrate qualify`, all through
+   `rustev-surface`. No runtime, no backends, no acquisition, no sinks, no
+   decision execution. `plan diff` and `profile check` (B4) and `explain`
+   (D2) join when their specs land (section 3.7).
+2. **Build.** `wasm-bindgen` for `wasm32-unknown-unknown`, with the
+   `wasm-bindgen-cli` version equal to the `wasm-bindgen` crate version
+   (exact pins; `make bindings` refuses a mismatch), outputs for the `web`,
+   `bundler` and `nodejs` targets in one package as subpath exports, and the
+   document declarations of section 3.2. The module is optimized with a
+   pinned `wasm-opt` at `-Oz`.
+3. **No ambient capabilities.** The module imports only wasm-bindgen's
+   generated glue intrinsics; it has no WASI import, no `env` import, and no
+   import of time, randomness, network, storage or DOM. CI inspects the
+   import section against an allowlist and fails on anything else. Time is
+   an argument (`nowMs`, evaluation time). Bytes a replay or evaluation
+   needs are supplied by a synchronous host callback, as `rustev-eval`'s
+   resolver already defines; a callback that throws or returns invalid
+   bytes yields the same per-case outcome the CLI reports for unusable
+   bytes.
+4. **Size budget (declared, measured).** For the optimized
+   `rustev_wasm_bg.wasm`:
+   - gzip (level 9) compressed size at most 786,432 bytes (768 KiB): gated;
+   - uncompressed size at most 2,097,152 bytes (2 MiB): gated;
+   - Brotli (quality 11) size: recorded, not gated.
+5. **Instantiation budget (declared, measured).** Instantiation is the time
+   from module bytes in memory to the first successful call of an exported
+   `version()`, covering compile, instantiate and glue initialization:
+   - Node 22 on the GitHub-hosted `ubuntu-24.04` x64 standard runner: median
+     at most 50 ms over 21 runs, each in a fresh process, after 3 discarded
+     warm-up processes that warm only the file system and page cache, so
+     every measured run is a cold instantiation: gated;
+   - headless Chromium (exact-pinned through the test harness) on the same
+     runner class: median at most 100 ms under the same procedure: gated;
+   - p95 and the raw samples: recorded.
+6. **How CI measures.** The `bindings` job (section 3.12) builds the
+   release module, measures sizes with the pinned compressors, runs the
+   timing procedure, writes a measurement document (sizes, samples,
+   medians, runner image, Node and Chromium versions, commit), uploads it as
+   a job artifact, and fails when a gated value exceeds its budget. The
+   first measurement is recorded in this spec's implementation record. A
+   budget is lowered or raised only by amending this spec; a build never
+   adjusts it.
+
+### 3.11 Floating point and cross-target determinism
+
+1. **What is promised.** Principle XIII stands: byte determinism is promised
+   for canonical compilation and explicitly defined exact computation.
+   Plans, identities, canonical documents and exact operators use integer,
+   decimal-string and correctly rounded IEEE 754 basic operations, which
+   agree bit for bit on every target the bindings build for.
+2. **What can differ.** Some pure paths call transcendental functions:
+   today `exp` in core's distribution normalization, `ln` in core's
+   calibration, and `ln` in evaluation's log loss and temperature fitting.
+   On native targets these come from the platform's math library (glibc,
+   musl, Apple, Microsoft), and on `wasm32-unknown-unknown` from Rust's
+   bundled implementation. They are not required to be correctly rounded,
+   so results may differ in the last bit between targets, including between
+   two native targets, and a shortest round-trip serialization exposes that
+   difference.
+3. **What the parity suite proves.** That on each target CI runs (every
+   native matrix target of section 3.13 and WebAssembly in Node and
+   Chromium), every conformance case produces its expected bytes. In
+   addition, a differential corpus runs each transcendental call site
+   reachable from a pure command over a fixed, committed input set (at
+   least 100,000 inputs per call site, including subnormal, boundary and
+   large-magnitude values) on every target and compares bit patterns. NaN
+   payloads are out of scope because canonical JSON refuses non-finite
+   numbers.
+4. **What it does not prove.** Agreement for inputs outside the goldens and
+   the corpus, on targets CI does not run, or under future math library or
+   toolchain versions. The bindings make no such claim.
+5. **A divergence.** Any bit difference in a conformance case or the
+   corpus fails the parity job. The remedy, routing those functions through
+   one pure Rust implementation on every target, changes core and may
+   change existing goldens, so it is a separate amendment of spec 002 with
+   a golden migration; this spec does not authorize it silently. Until it
+   lands the affected surface is not released.
+6. Outputs never depend on hash iteration order, pointer width or
+   `usize` size; limits are checked in `u64` before conversion, and the
+   suite runs on `wasm32` to prove it.
+
+### 3.12 Shared conformance suite
+
+1. **Rule.** Every host surface runs the shared suite: the CLI, the native
+   binding and the WebAssembly package now; the HTTP and gRPC transports of
+   #76 child A2 when they land. A surface that does not run it does not
+   ship.
+2. **Location.** `tools/rustev-conformance/`:
+   - `cases/manifest.json`, a `rustev.conformance-manifest/1` document
+     listing each case: id, command, the surfaces it applies to, inputs (by
+     repository path and SHA-256), expected outputs (by path and SHA-256),
+     and its comparison;
+   - expected bytes: the existing CLI goldens are referenced in place under
+     `crates/rustev-cli/tests/golden/`, never copied; outputs no golden
+     covers today (evaluation and gate reports, calibration results,
+     WebAssembly-only artifacts) are generated by the CLI once, committed
+     under `tools/rustev-conformance/expected/`, and reviewed like any
+     golden;
+   - the Rust runner (a crate binary and test), which drives the CLI through
+     its library entry point and the Rust runtime API;
+   - the JavaScript runner, one harness with a native adapter and a
+     WebAssembly adapter (Node and Chromium).
+3. **Comparison.** A case's comparison is `bytes` (whole output identical)
+   unless it declares, exhaustively, (a) CLI-only presentation fields to
+   exclude (file paths, exit codes) and (b) observation fields to normalize
+   with exactly the normalization the CLI goldens already use for timing.
+   No other difference is tolerated. Every case asserts `plan_id`.
+4. **Coverage.** At least: every existing CLI golden for `check`,
+   `compile`, `show`, `run`, `replay` and the refusal goldens (native);
+   every pure command on WebAssembly; `eval` and `gate` on both packaged
+   reference tasks; runtime cases for admission, budget, retry, deadline
+   and cancellation expressed as data (a scripted backend script per
+   attempt: outcome, charge, manual-clock delay, cancel answer, remote end)
+   with expected run record bytes under `ManualClock`, each naming the
+   existing `crates/rustev-runtime/tests` test it mirrors. The Rust runner
+   executes runtime cases with Rust scripted seams; the native runner with
+   TypeScript scripted seams; both must produce the same expected bytes.
+   Host-seam cases add queue full, late resolution, exception mapping and
+   abort mapping.
+5. **Make and CI.** `make conformance` runs the Rust runner and needs no
+   Node toolchain. `make bindings` builds both packages and runs type drift
+   checks, the JavaScript runner (native and WebAssembly), the differential
+   corpus, the import allowlist and the WebAssembly budgets; it requires
+   Node 20 or later and refuses a tool version other than its exact pins.
+   CI runs both through a declared extra required job `bindings` in
+   `.github/workflows/bindings.yml`, owned by this spec in the way spec 001
+   owns `boundaries.yml`, declared in `project.setup.parameters` of
+   `.statecraft/environment.json` and rendered through
+   `statecraft-cli init plan|apply`. Adding it needs the owner's approval of
+   the `statecraft-review-exception` Environment; this spec does not make
+   that change, and its implementation is not complete, and no surface
+   ships, until that job runs as required.
+
+### 3.13 Packaging
+
+1. **Native matrix.** Prebuilt binaries for `linux-x64-gnu`,
+   `linux-x64-musl`, `linux-arm64-gnu`, `linux-arm64-musl`, `darwin-arm64`,
+   `darwin-x64` and `win32-x64` (`x86_64-pc-windows-msvc`), one platform
+   package each in napi-rs's optional-dependency layout. The binding pins
+   Node-API version 8 (the napi-rs `napi8` feature), which Node 20, 22 and
+   24 all provide; `engines.node` is `>=20`. Node 20, 22 and 24 are each
+   tested on linux-x64-gnu; every matrix target runs a smoke test (load,
+   compile a reference plan, decide with the rules backend, replay) on
+   Node 22, on a native runner where one exists and otherwise under a
+   recorded emulation (Alpine containers for musl, Rosetta 2 for
+   darwin-x64).
+2. **No install-time code.** No `postinstall` or other install script, no
+   download at install or load time. The loader selects the platform
+   package by `process.platform`, `process.arch` and the C library, and
+   fails with a typed error naming the missing platform package.
+3. **WebAssembly package.** One package with `web`, `bundler` and `nodejs`
+   subpath exports; it runs its smoke test in Node and in headless Chromium.
+4. **Publication.** Both packages are built as candidates under spec 021's
+   lifecycle as amended by #76 child A3 (OD-6), with provenance-signed npm
+   publication. Nothing is published, reserved or tagged by this spec.
+
+### 3.14 Dependency boundaries
+
+`tools/rustev-boundaries` gains:
+
+1. Integration-only families: Node-API (`napi`, `napi-derive`, `napi-sys`,
+   `napi-build`) and WebAssembly bindings (`wasm-bindgen`,
+   `wasm-bindgen-macro`, `wasm-bindgen-futures`, `js-sys`, `web-sys`). A
+   crate outside `integrations/` depending on one fails, as for HTTP stacks.
+2. The transitive purity check of `rustev-contract` and `rustev-core` also
+   refuses these families, and `rustev-surface` joins the checked set.
+3. `rustev-wasm`'s normal and build graph may not contain `rustev-runtime`,
+   an executor, an HTTP stack, a Node-API crate, `getrandom`, `web-sys` or
+   `wasm-bindgen-futures`.
+4. Unit tests for each rule, in the existing style, and `make boundaries`
+   passes on the workspace.
+
+The two binding crates keep spec 001's rule that no crate depends on an
+integration crate. Their hand-written code contains no `unsafe` block; if
+macro-generated glue requires it, the crate relaxes `unsafe_code` from
+`forbid` to `deny` with the reason at the attribute, and a test fails on any
+hand-written `unsafe`. `rustev-core` keeps `forbid(unsafe_code)`.
+
+### 3.15 Binding principles
+
+How this spec keeps each principle #76 lists as binding:
+
+- **Proposals, never grants.** Bindings return judgments, unresolved
+  outcomes, refusals and evidence. The generated and hand-written
+  declarations define no permission, grant or `Permitted` type.
+  `principalHandle` is opaque bytes passed to the runtime as spec 003's
+  `principal_handle`; the binding never interprets it.
+- **Derivation classes and lineage.** Every judgment and record crosses as
+  canonical bytes with its derivation classes and lineage; the parsed view
+  keeps them, and `origin` exposes them without recomputation.
+- **Unresolved, never a default; no silent kind conversion.** Section 3.4.2,
+  3.2.5, 3.6.5 (unknown charge, possibly continuing) and 3.7 (no defaulted
+  snapshot).
+- **Pure core.** Core and contract gain no I/O, clock, `unsafe` or async
+  runtime; only `wasm32` `cfg` attributes are allowed (section 2).
+- **New dependency classes only under integrations.** Section 3.14 extends
+  `make boundaries`.
+- **No dynamic plugin loading.** Section 3.6.7 and R-38.
+- **Rustev owns no identity, authority or knowledge store.** The bindings
+  hold no credentials, users, sessions or stored knowledge; evidence goes to
+  the host's sink and retention stays with the host.
+
+## 4. Out of scope
+
+HTTP and gRPC serving (#76 A2); the screening, generation, acquisition,
+explanation and profile seams and commands until their specs land; remote
+backends linked into the binding; projection-dependent host cost bounds and
+host batch backends; a Deno, Bun or React Native specific build (they may
+consume the WebAssembly package, untested); WASI targets; threads or SIMD in
+WebAssembly; publication, name or scope reservation, release; OpenTelemetry
+spans (#76 D1); any change to plan, identity or evidence bytes.
+
+## 5. Observable negative cases
+
+| Case | Expected |
+|---|---|
+| A host backend's queue is full | Attempt failure `overloaded`, charge observed zero, remote end finished; retry and fallback as the plan declares; queue depth never exceeds capacity. |
+| A host seam's declared queue capacity is 0 or above 65,536 | `ConfigRefused` (`out_of_range`) from `Engine.create`; no thread started. |
+| A host backend resolves after the deadline | The decision records the deadline outcome; the late value is discarded and counted. |
+| A host backend throws a plain `Error` | Attempt failure `permanent`, charge `Unknown`, remote end possibly continuing. |
+| A host backend returns output failing the bounded parse | Spec 003 invalid backend output; unresolved, not an exception. |
+| Budget is exhausted during a decision | Unresolved value in `judgment`; no exception. |
+| The deadline passes while queued for admission | `DeadlineExceeded` (`queue_deadline`); no record. |
+| `AbortSignal` aborted after dispatch, backend unconfirmed | Result records `unconfirmed` and possibly continuing work, as the Rust runtime does. |
+| The evidence sink rejects delivery under fail-decision policy | `SinkFailure` with the run record bytes in `detail`. |
+| The context source throws | `ContextUnavailable`; no decision runs; no snapshot is defaulted. |
+| `traceparent` is malformed | `InvalidTraceContext` before admission. |
+| A document exceeds its parse bound | `InvalidDocument` before unbounded allocation, on native and `wasm32`. |
+| The compiled WebAssembly module imports a clock, randomness or WASI function | The import allowlist check fails the build. |
+| The WebAssembly module exceeds its size or instantiation budget | The `bindings` job fails. |
+| A transcendental result differs in one bit between native and WebAssembly | The parity job fails; no release of that surface. |
+| A committed `.d.ts` differs from regenerated output | The drift check fails. |
+| A crate under `crates/` depends on `napi` or `wasm-bindgen` | `make boundaries` fails. |
+| No platform package for the host's platform | Typed load error naming the missing package; no download is attempted. |
+| A call after `shutdown` | `EngineShutDown`. |
+
+## Acceptance
+
+- Golden parity with the CLI for `check`, `compile`, `show`, `run`,
+  `replay` and `eval` (native) and for every pure command (WebAssembly),
+  through the shared conformance suite, with every case asserting `plan_id`.
+- The CLI's existing goldens pass unchanged after it calls `rustev-surface`.
+- Cancellation through `AbortSignal` produces the same `CancelAck` evidence
+  as the Rust runtime in scripted-backend tests.
+- A TypeScript-implemented backend, source and sink pass the runtime's
+  conformance cases (admission, budget, retry, deadline, cancel) with the
+  same expected bytes as the Rust runner.
+- A queue-full seam yields a typed refusal and never unbounded memory; a late
+  resolution is discarded and counted; exceptions map as section 3.6.5
+  states.
+- Every row of section 5 has a deterministic test without network access or
+  wall-clock sleeps (except the instantiation timing of 3.10).
+- Schema and type generation drift checks pass in CI for both packages.
+- The prebuilt native matrix builds and the smoke test runs on each target
+  in CI; Node 20, 22 and 24 run the native suite; the WebAssembly package
+  runs its smoke test in Node and in headless Chromium.
+- WebAssembly size and instantiation budgets and the import allowlist are
+  enforced in CI, and the measurement document is retained.
+- The differential floating-point corpus runs on every target and the
+  result is recorded.
+- `make boundaries` refuses the new families outside `integrations/` and
+  the forbidden graph of `rustev-wasm`, with unit tests.
+- `make code`, declared verification, and `make gate` pass.
+
+## Verification
+
+Pending with implementation. Approval of this spec satisfies no acceptance
+item. The implementation adds `verify:cli` entries for `make conformance`
+and `make boundaries` here, and records the first WebAssembly measurements
+and the CI jobs that ran the matrix.
+
+## Decisions at approval
+
+1. **npm package names and scope** (left to the implementer by #56; decided
+   by the implementer within this spec). Recommendation: native
+   `@statecrafting/rustev` with platform packages
+   `@statecrafting/rustev-<platform>` (for example
+   `@statecrafting/rustev-linux-x64-gnu`), and WebAssembly
+   `@statecrafting/rustev-wasm`. The scope matches the source organization,
+   keeps platform packages from being squatted, and ties npm provenance to
+   the repository. Observed on 2026-10-16 against `registry.npmjs.org`:
+   `@statecrafting/rustev`, `@statecrafting/rustev-node`,
+   `@statecrafting/rustev-wasm`, `@statecrafting/rustev-linux-x64-gnu`,
+   `@statecrafting/rustev-darwin-arm64`,
+   `@statecrafting/rustev-win32-x64-msvc`, `rustev`, `rustev-node`,
+   `rustev-wasm`, `@rustev/node` and `@rustev/wasm` all returned 404 (not
+   published); a registry search for scope `statecrafting` returned no
+   packages. Whether the `@statecrafting` organization exists on npm and who
+   controls it could not be determined anonymously. If the owner cannot
+   obtain the scope, the fallback is unscoped `rustev-node` and
+   `rustev-wasm`; names change no API. Obtaining the scope and reserving
+   names remain owner acts under spec 021.
+2. **WebAssembly budgets** (required by #56; decided by the implementer
+   within this spec): the declared values and procedure of section 3.10.
+   They are ceilings to be measured, not measurements.
+3. **Node versions and matrix** (settled by #56): Node 20, 22 and 24 and the
+   seven native targets. Observation: Node 20 reached upstream end of life
+   on 2026-04-30; it stays supported as #56 requires, and dropping it is an
+   amendment of this spec. Node-API version 8 is pinned because all three
+   provide it.
+4. **Where the conformance suite lives** (decided by the implementer within
+   this spec): `tools/rustev-conformance/`, with CLI goldens referenced in
+   place.
+5. **Shared rendering** (decided by the implementer within this spec): a
+   new pure crate `rustev-surface` rather than each surface re-rendering
+   CLI output, because #76 names drift between surfaces as a risk; the CLI
+   adopts it with byte-identical output.
+6. **Host seams use no synchronous callbacks** (decided by the implementer
+   within this spec): synchronous trait methods are declared data, which
+   rules out deadlock between the event loop and runtime threads.
+7. **Seam clarification** (settled by the work order): host-implemented
+   seams are explicit composition under D-06 (R-38, OD-5 of #76).
+8. **Floating point** (decided by the implementer within this spec):
+   section 3.11; a divergence is fixed by a separate spec 002 amendment, not
+   by tolerance.

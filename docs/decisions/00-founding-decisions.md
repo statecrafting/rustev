@@ -165,6 +165,7 @@ the change that lands the first spec depending on it.
 |---|---|
 | R-36 | OD-1 of #76: drafts `011`, `022` and `023` are to be ratified, and spec `017` increment 2 is to be completed (a direction, not a delivery; increment 2 is not yet implemented). Amends R-17 for spec `011`. Why: a local backend, a production transport, real-data quality and the remaining runtime optimizations are prerequisites for production embedding. Recorded with the ratification of `022` and `023` (A-21, A-22); spec `011` is ratified by its own change. |
 | R-37 | OD-7 of #76: R-04 stands. Synthetic fixtures prove mechanics; quality claims need real labeled data admitted under spec `023`, which hosts keep outside this repository. Amends nothing. |
+| R-38 | OD-5 of #76: seams implemented in a host language through the Node binding, or across a remote protocol, are explicit composition, not dynamic plugin loading. Amends D-06 (clarification). Why: the Node binding needs host-implemented sources, sinks, screeners, generators and backends. Recorded with spec `027`. |
 
 ## Approvals
 
@@ -192,6 +193,7 @@ the change that lands the first spec depending on it.
 | A-20 | The owner approved spec `021` (packaging and first release) as drafted with R-34's answers. Candidate implementation is pending; publication and release remain separate owner acts. | 2026-09-26 |
 | A-21 | The owner ratified spec `022` (production transport and served identity for the Jev adapter, amends `012`) under R-36, with the additions of #76 child C3 and its open questions settled as written in the spec, by the 2026-10-16 delivery work order ("I ratify, in advance, every spec and spec amendment that implements a child issue faithfully and completely ... ratification of drafts 011, 022 and 023 with the decisions recorded in #68, #69 and #76"). Implementation is pending; live stages stay inside R-29's testing cap. | 2026-10-16 |
 | A-22 | The owner ratified spec `023` (semantic quality and calibration qualification on real labeled data) under R-36 and R-37, with its open questions settled as written in the spec, by the same work order. Implementation is pending; no dataset is admitted by this act. | 2026-10-16 |
+| A-23 | The owner ratified spec `027` (Node-API binding and WebAssembly build) implementing #76 child A1 (#56), by the 2026-10-16 delivery work order ("I ratify, in advance, every spec and spec amendment that implements a child issue faithfully and completely"). Implementation is pending; no npm or crates.io publication, name or scope reservation, release, live provider call or spend is authorized, and no cross-target floating-point agreement is claimed beyond what the parity suite measures. | 2026-10-16 |
 
 No approval authorizes ratifying any other spec.
 
