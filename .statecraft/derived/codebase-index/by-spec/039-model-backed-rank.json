@@ -1,0 +1,178 @@
+{
+  "mapping": {
+    "amends": [
+      "002-decision-contract-and-pure-core",
+      "005-reference-backends"
+    ],
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay",
+      "005-reference-backends",
+      "009-remote-adapter-protocol",
+      "012-jev-integration",
+      "022-jev-production-transport",
+      "029-evaluation-repeatability",
+      "030-bedrock-backend",
+      "031-public-api-and-release-family",
+      "032-evidence-quality",
+      "036-mid-plan-acquisition",
+      "037-generation-steps",
+      "038-structured-extraction"
+    ],
+    "implementingPaths": [
+      {
+        "path": "Makefile",
+        "source": "spec-edge"
+      },
+      {
+        "path": "backends/rustev-backend-rules/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-cli/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-contract/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-core/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-eval/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-runtime/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "backends/rustev-backend-rules/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "backends/rustev-backend-rules/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-cli/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-cli/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-contract/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-contract/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-core/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-core/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-eval/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-eval/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-runtime/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-runtime/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Makefile"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/decisions/00-founding-decisions.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/001-decision-engine-architecture.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      }
+    ],
+    "specId": "039-model-backed-rank",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.2.0",
+  "shardHash": "c6400f116e32ce9a9c7561ece640d5868cc6f5b23f55dd995be00cb4e69e5574"
+}
