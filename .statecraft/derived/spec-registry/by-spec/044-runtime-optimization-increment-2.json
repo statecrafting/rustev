@@ -1,0 +1,247 @@
+{
+  "record": {
+    "amends": [
+      "017-general-runtime-optimization",
+      "003-runtime-execution-and-evidence",
+      "002-decision-contract-and-pure-core",
+      "009-remote-adapter-protocol",
+      "012-jev-integration",
+      "020-remote-protocol-refinements"
+    ],
+    "created": "2026-10-17",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay",
+      "009-remote-adapter-protocol",
+      "012-jev-integration",
+      "013-remote-state-on-failed-attempts",
+      "017-general-runtime-optimization",
+      "020-remote-protocol-refinements",
+      "022-jev-production-transport",
+      "023-real-data-quality-qualification",
+      "032-evidence-quality",
+      "027-node-and-wasm-bindings"
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-contract/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-core/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "003-runtime-execution-and-evidence",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-runtime/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "004-evaluation-and-replay",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-eval/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "009-remote-adapter-protocol",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-remote-http/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "012-jev-integration",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-jev/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      }
+    ],
+    "id": "044-runtime-optimization-increment-2",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-2-concurrent-duplicate-suppression",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "Duplicate suppression spawns no task: a shared attempt is polled only from the tasks of its waiters, progresses whenever any remaining waiter is polled, and a waiter that cancels, times out or is dropped returns or drops without waiting for the attempt while another waiter remains."
+      },
+      {
+        "anchor": "3-2-4-charge-reservation-and-liability",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "One shared attempt has exactly one charge owner at every instant and one settlement; a handoff moves ownership to a waiter that already holds the full reservation, and an unknown charge stays one liability on the final owner's record, linked by shared-call id from every waiter."
+      },
+      {
+        "anchor": "3-5-key-discipline",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "Every cache key, request-level or decision-level, memory or persistent, is derived by Rustev from the plan's compiled key schema and always contains the plan identity, the complete authorized scope, the profile identity or `none`, and the key-schema and namespace versions; no host API accepts a key, and a request that cannot supply a declared key dimension is never served from or admitted to a cache."
+      },
+      {
+        "anchor": "3-4-runtime-store-and-persistent-entries",
+        "id": "I-4",
+        "kind": "invariant",
+        "text": "A persistent entry is served only after its schema, complete key material, integrity digest, generations, expiry and output validation all check; anything else is a miss with a diagnostic, never a value, and a write commits only if the store's generations still equal those captured before the work began."
+      },
+      {
+        "anchor": "3-6-decision-result-cache",
+        "id": "I-5",
+        "kind": "invariant",
+        "text": "A decision served from the decision-result cache has its judgment recomputed by the core from the new request's snapshot and evaluation time; every request in the refresh closure of a declared volatile source is dispatched again; and a failed refresh never supplies a value outside its declared freshness."
+      },
+      {
+        "anchor": "3-7-per-item-isolation",
+        "id": "I-6",
+        "kind": "invariant",
+        "text": "A capability that declares `isolation: per_item` is never dispatched as part of any batch, runtime-planned or adapter-scoped, whatever the batching configuration."
+      },
+      {
+        "anchor": "3-10-compatibility",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "Plans, descriptors, run records and policies that use none of this spec's members keep byte-identical documents and identities, proved by the existing goldens."
+      },
+      {
+        "anchor": "3-8-adapter-scoped-batching-qualification",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "Adapter-scoped batching on a production binding is constructible only with a cited `rustev.batch-qualification/1` report whose verdict is `qualified`; enabling it remains the owner's act under R-28."
+      },
+      {
+        "anchor": "3-1-policy-members-and-plan-identity",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "This spec is not marked implemented while specs 036 and 037 are in the registry but absent from its `depends_on`, and its declared verification fails in that state."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/backlog.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "044-runtime-optimization-increment-2-amends-017-003-002-009-012-and-020": "ae208286f5fb2bdee140eee93f05e29bf3d23676b762806f1df9f08a9962ac7a",
+      "1-purpose": "ea80bf0f3f36a7db47061ac339b96e60d520ebbcc03c92a97ed01ffbc636bba3",
+      "2-1-binding-principles-of-76": "fa0b4f40e2c3a80864d8c109330c03767c14d25dbdc6379f5666ffd220addf77",
+      "2-territory": "2a093c3a54128a77e13bea2d629c0466fb04f4b38423d6beb54ed32e3d8df049",
+      "3-1-policy-members-and-plan-identity": "a1804ec2b439f9a4ce5af0f63e8de6ecd6c7e99e9c60e939a12864e461dc71f9",
+      "3-10-compatibility": "c4891b1960108b30bf4f9d959b0298877af994004c8416cc78a0acb3208c7d69",
+      "3-2-1-eligibility": "4d5843a33ed64a4bfe268e5155796abbf7ec637170841ecdcccb4fa654b3c6a5",
+      "3-2-2-the-shared-slot": "449b9be949e83a964599c9f15b9544b1f9a94d1309761028c350430f467a9450",
+      "3-2-3-leaving-handoff-and-the-last-waiter": "7f4dd0cbeb86e99b7f171f96bcbc2687c611330171d0ecc6f8084c0b9aff1789",
+      "3-2-4-charge-reservation-and-liability": "ed71f9dbb2ba276b81930663d7613dd82c55052b07c07130bcd2a4cfa319fc57",
+      "3-2-5-evidence": "4533f1e07e5360e33cf869fb2b791e3593a29ea83ce0e65767fcc57d3b852db3",
+      "3-2-concurrent-duplicate-suppression": "31495f79a52ccd5e809d85f209f8abb8cccb35a1898bdb70cdcf27f24d101dcb",
+      "3-3-tiers-and-lookup-order": "b0509ce59eba56e43b9580fd71209ea4766938d2cc043a5b5712eaebd3525b06",
+      "3-4-1-the-seam": "155548c62e09db809ad02a46cca6c7f5636b71f189727363cb3de4ac6316478c",
+      "3-4-2-store-failure-policy": "988d8039873c333bff368471fa097d8730357100eadd103d2deb31c89ab1d8ed",
+      "3-4-3-entry-document-and-checks": "d820e74d2c996754541097f18d2fa347189d0ad6bdaa67b6e3ec3ec0b10000bd",
+      "3-4-4-budgets": "6590961ddec2c871042229e10ffabc603030a92e3d7326ab7ec99e76f2e5af9d",
+      "3-4-runtime-store-and-persistent-entries": "fc87fe9bfda60c978885577e37c86a7a564e2464277375e7353cf50707c1786f",
+      "3-5-key-discipline": "29fb0b8a1e17f35022f529adba0f8279e93c569ca6cb292e91d499902036aec0",
+      "3-6-1-key": "b2904ef9326866baf04dff789075edaf4cfd5ca0d6d7bbfd6fde9d1d74f57ebb",
+      "3-6-2-volatile-sources-and-the-refresh-closure": "9e6d375fb0aefaf62d4d93de86b56edcf280160fbb328405dd5f96dedf59a653",
+      "3-6-3-lookup-and-serving": "289d0faf528dbc058346676f961a525657ae303b9016b9fd6f307b931af58155",
+      "3-6-4-admission": "1e9d2ad525c0a107c18e481ed63771855d0150affd719d38fe1d459e3f5ee8af",
+      "3-6-5-refresh-failure": "be47fbc06b7f2a62426c2e1b314f1b511ad3c07234d9538f05033d48c1b81e36",
+      "3-6-6-evidence-and-origins": "0c2de944b099735e216b2ec072f8e7fe41226cb927f7d7c45a78e08e8900d323",
+      "3-6-decision-result-cache": "67e21a6b72665dae68e345e1944441b80fd5c90b25c4f47aaa6b10867ef4609f",
+      "3-7-per-item-isolation": "fab344fbcdad6be313bb46c1d772aaace4df2a298fc3c4e760d8e8052f24a94c",
+      "3-8-adapter-scoped-batching-qualification": "bee071c6014446e25317db78048a6f032ef5ad920593027f617c8e35aa7a4adc",
+      "3-9-refusal-and-diagnostic-codes": "538dca23b2093c3e00e66817a81522c1ec6521d75a1db53973de3ae163028416",
+      "3-behavior": "03094d507ddba7711a73ba4ed84fabcdf29e0a896b5f642fbd93dfc38512d339",
+      "4-out-of-scope": "e61b9a31ae2244ab1ca8775ba2cc8bce6e1e01d5197af9531323c5883e294e33",
+      "5-observable-negative-cases": "978fc55483339e1c267b9dccc9a0af65ec6a6b6568ddf27485f3052d2ff9fb69",
+      "acceptance": "d1f7f78293841deea180e9d3c452cb9e97014e3733387ea312cf36151e0759a5",
+      "decisions-at-approval": "f63874f84705d10c83b06db9e9855e0a9c02fec91354be1ec0c0f97c94ae67a3",
+      "verification": "9c55517df2f5cfc4d14ea987c8ebe87026637eed98dfc4a9a2bf5b9e959e90cd"
+    },
+    "sectionHeadings": [
+      "044: Runtime optimization increment 2 (amends 017, 003, 002, 009, 012 and 020)",
+      "1. Purpose",
+      "2. Territory",
+      "2.1 Binding principles of #76",
+      "3. Behavior",
+      "3.1 Policy members and plan identity",
+      "3.2 Concurrent duplicate suppression",
+      "3.2.1 Eligibility",
+      "3.2.2 The shared slot",
+      "3.2.3 Leaving, handoff and the last waiter",
+      "3.2.4 Charge, reservation and liability",
+      "3.2.5 Evidence",
+      "3.3 Tiers and lookup order",
+      "3.4 Runtime store and persistent entries",
+      "3.4.1 The seam",
+      "3.4.2 Store failure policy",
+      "3.4.3 Entry document and checks",
+      "3.4.4 Budgets",
+      "3.5 Key discipline",
+      "3.6 Decision-result cache",
+      "3.6.1 Key",
+      "3.6.2 Volatile sources and the refresh closure",
+      "3.6.3 Lookup and serving",
+      "3.6.4 Admission",
+      "3.6.5 Refresh failure",
+      "3.6.6 Evidence and origins",
+      "3.7 Per-item isolation",
+      "3.8 Adapter-scoped batching qualification",
+      "3.9 Refusal and diagnostic codes",
+      "3.10 Compatibility",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Decisions at approval"
+    ],
+    "specPath": "specs/044-runtime-optimization-increment-2/spec.md",
+    "status": "approved",
+    "summary": "An amendment of approved spec 017 (and, through it, of spec 003's concurrency and cancellation rules) for #76 child F1, which also amends specs 002, 009, 012 and 020 where its members and batching rules reach them. Completes 017 increment 2 and adds a decision-result cache. Concurrent duplicate suppression keeps spec 003's rule that the runtime spawns no task per request: a shared attempt lives in a runtime-owned slot that is driven by whichever waiter is polled, a waiter that cancels returns at once and hands charge ownership to the oldest remaining waiter, and the last waiter to leave cancels the attempt under spec 003's existing rules. Persistent caches sit behind a host-implemented `RuntimeStore` seam with durable generations, conditional writes, byte budgets and integrity-checked `rustev.cache-entry/1` entries. The decision-result cache reuses a whole decision's semantic work under a compiler-derived key that always holds plan identity, the complete authorized scope, the profile and declared upstream-origin dimensions; on a hit the core recomputes the judgment and the runtime re-runs the compiler-derived dependency closure of every declared volatile source, with a declared policy when refresh fails that never serves stale evidence as a value. Capabilities may declare `isolation: per_item`, which every batching path honours, and adapter-scoped batching gains a qualification procedure and report (`rustev.batch-qualification/1`). Plans, descriptors and records that use none of this keep their bytes and identities. Approved (A-41); implementation is pending.\n",
+    "title": "Runtime optimization increment 2: duplicate suppression, persistent and decision-result caches, batching qualification (amends 017, 003, 002, 009, 012 and 020)"
+  },
+  "shardHash": "04b6a5b0cad4c64829d254cf359d1a5b132d73f6178de41b615205d53e2457e1",
+  "specVersion": "1.9.0"
+}
