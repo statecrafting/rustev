@@ -1,0 +1,159 @@
+{
+  "record": {
+    "amends": [
+      "004-evaluation-and-replay",
+      "006-cli-surface"
+    ],
+    "created": "2026-10-16",
+    "dependsOn": [
+      "002-decision-contract-and-pure-core",
+      "004-evaluation-and-replay",
+      "006-cli-surface",
+      "014-report-integrity",
+      "015-per-case-bundle-failures",
+      "026-live-re-execution"
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "004-evaluation-and-replay",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-eval/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "006-cli-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-cli/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      }
+    ],
+    "id": "029-evaluation-repeatability",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-15-compatibility",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "Without a repeat configuration, every existing evaluation, gate and CLI invocation produces byte-identical documents, stdout and exit codes, and no plan identity changes."
+      },
+      {
+        "anchor": "3-4-bootstrap-intervals",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "Bootstrap intervals and per-run seeds are fully determined by the declared configuration, the case measures and the seed, through the named generator and fixed arithmetic order, and are bit-identical across platforms for identical case measures."
+      },
+      {
+        "anchor": "3-5-noise-bands",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "A noise band derived from fewer than two independent runs is unknown, never zero, except for deterministic replay; an unknown band, statistic or measurement makes every clause that needs it unknown, never a pass."
+      },
+      {
+        "anchor": "3-7-split-roles-and-held-out-discipline",
+        "id": "I-4",
+        "kind": "invariant",
+        "text": "A held-out evaluation states its count only from a host-supplied ledger or an explicit new-ledger statement; a missing count is unknown, never zero, and Rustev keeps no store."
+      },
+      {
+        "anchor": "3-11-multi-candidate-comparison",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "Latency and cost observed by a historical run are never presented as a candidate's own; a selection clause over them for an offline candidate is unknown."
+      },
+      {
+        "anchor": "3-12-selection-gates",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "A selection gate yields per candidate exactly one of qualifies, rejected with its failing clause, or unknown with its clause, and the command's exit code is 0, 11 or 12 as section 3.14 states."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "029-evaluation-repeatability-baselines-diffs-and-selection-gates-amends-004-and-006": "3f062266d51612b43c135cf15db9807e5b8e0aa5e2c567210384a3ec58ad33a4",
+      "1-purpose": "d449fae2d1de8e8a8c41c542a297d8a49fb9545657b3f63561187af50711374c",
+      "2-1-binding-principles-of-76": "a110d5d3149238be1c887d7b7d9b3167396c9b1fa459117127ceef54afa71fda",
+      "2-territory": "11e099d675019e2d266ecf3db1769d4907561360a5ce0399b6843975b56b2516",
+      "3-1-repeat-sources-and-runs": "2cfb17bcea76d2ba74207c37d27b9cbc65b2a4e3ac53083f10dbab4643262b24",
+      "3-10-diffs": "411bc64d1c3924f79285f5d64e83a97e3b3d4aa6282828abcefee3ea92af6d40",
+      "3-11-multi-candidate-comparison": "c798d26177fa8624f59d3b1925e451deeb8d49d9d881b430a91616ef39fe762e",
+      "3-12-selection-gates": "e2e47b0e9d3719ab0b8adfef8bdcaaa9ea46763746dded0ba911022e0189b517",
+      "3-13-cli-surface-amends-spec-006": "9ac78406b4f2e1103ed6b48381bee77cb38921de99bfb4e93768acbea767837e",
+      "3-14-exit-codes": "c8b8bcab598ac50f31c769df71e354be2de061dbe3d370b056eda776ee6fb901",
+      "3-15-compatibility": "5372c0718b19f58a6160c30d9ce3e09159863bea4268c90c01f9466db8452427",
+      "3-2-per-case-measures": "4608e7cb8c8507aab87d68742b5fe6242f2e390c7175d989360e744cebf9aebe",
+      "3-3-repeat-configuration-and-statistics": "dc32125b3b67bc0641f86f2a5ab4ddee3d82ba3fbfad916235d2a62e4acf4090",
+      "3-4-bootstrap-intervals": "38166030e934e8e6b497228805f39abf8ba602811c92970f1ba0f84d68dffb72",
+      "3-5-noise-bands": "5abe3af6ebfa102c8cb84c0c0b816d5bfd80f1b0fa5f6f11ba22a860770eda95",
+      "3-6-slices": "7f23173ccc9c6f79429198c245a04b35e426e2bd70f8ec5b78ae6d96a1a29ac7",
+      "3-7-split-roles-and-held-out-discipline": "81ec61aadc06dadb958da085795d5c041800d61d7b57d86b43c7cae45a55d769",
+      "3-8-baselines": "129371affd722f146899691846b83215016cd140bc03b0d40986f5e1e9f421ed",
+      "3-9-reproducibility-check": "161be5c242cdbabcc9a1b31cc5ff47b46f48ea9a99bd663dd121f29357e3f4bf",
+      "3-behavior": "945584a1408d2652d577045fdd34ef93557d35d71e8050f3b8e222ff90362a4b",
+      "4-out-of-scope": "2389ec50e687562ad7db5feb10e828a5ab3253bb9a22d11c27869251987a2375",
+      "5-observable-negative-cases": "df67b3a9be6b92138b614495e64e251596c2bb618de6ed68f03e87ee7285d7e6",
+      "acceptance": "76283fa6de5f0f70a192e9ff1efd4d01ef0f109a306c55a0ae769e53ae761ac9",
+      "decisions-at-approval": "d0ac1a2e717a3997b1ef13e5ea47e1223510fbf8ed6dad6135d297703d49ccfb",
+      "verification": "9b72e8bd823b4724a77bc47812cb429c5db3a86e7ec68837c61e6fa7c500cd7f"
+    },
+    "sectionHeadings": [
+      "029: Evaluation repeatability, baselines, diffs and selection gates (amends 004 and 006)",
+      "1. Purpose",
+      "2. Territory",
+      "2.1 Binding principles of #76",
+      "3. Behavior",
+      "3.1 Repeat sources and runs",
+      "3.2 Per-case measures",
+      "3.3 Repeat configuration and statistics",
+      "3.4 Bootstrap intervals",
+      "3.5 Noise bands",
+      "3.6 Slices",
+      "3.7 Split roles and held-out discipline",
+      "3.8 Baselines",
+      "3.9 Reproducibility check",
+      "3.10 Diffs",
+      "3.11 Multi-candidate comparison",
+      "3.12 Selection gates",
+      "3.13 CLI surface (amends spec 006)",
+      "3.14 Exit codes",
+      "3.15 Compatibility",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Decisions at approval"
+    ],
+    "specPath": "specs/029-evaluation-repeatability/spec.md",
+    "status": "approved",
+    "summary": "An amendment of approved specs 004 and 006 (R-16), for #76 child E2. Evaluation runs each configuration N times from a declared repeat source (deterministic replay, captured historical run sets, or live runs once spec 026 is implemented), reports per metric and per slice the mean, standard deviation, minimum, maximum, a pooled estimate and a case-clustered percentile bootstrap interval computed with a named, versioned, seeded generator, and derives declared noise bands. Adds named baselines (`rustev.baseline/1`), a reproducibility check, diffs in JSON and Markdown, multi-candidate comparison, held-out accounting against a host-kept ledger file, and a declarative selection gate (`rustev.selection-gate/1`) with stated CI exit codes. Every existing document, gate and CLI output keeps its bytes. Answers spec 023's open question 3. Approved (A-25); approval authorizes no live run, provider call or spend, no quality claim, and no change to `rustev.eval-report/1` or any plan identity.\n",
+    "title": "Evaluation repeatability, baselines, diffs and selection gates (amends 004 and 006)"
+  },
+  "shardHash": "ad3f54d09bd81caa5af5eb93fa4316ffac8820f7e92f784d6cb08167da66b5a1",
+  "specVersion": "1.9.0"
+}
