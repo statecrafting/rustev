@@ -38,9 +38,10 @@ authoritative. Reconciled on 2026-10-16 (RUSTEV-004).
 - Type: feature feasibility and supply-chain qualification.
 - State: owned by spec `011` section 3.2 (the `rustev.embed-feasibility/1`
   record), approved (A-28); carried by
-  [#69](https://github.com/statecrafting/rustev/issues/69). Acquiring the
-  pinned checkpoint and running local inference for it awaits the owner's
-  confirmation (spec `011`, Decision 18).
+  [#69](https://github.com/statecrafting/rustev/issues/69). The owner
+  authorized acquiring the pinned checkpoint and an ONNX Runtime library
+  and running local CPU inference on synthetic texts for it (R-43; spec
+  `011`, Decision 18).
 - Task: evaluate the selected immutable checkpoint, tokenizer,
   preprocessing, ONNX export and operators, pinned `ort` and ONNX Runtime,
   platform and linking matrix, packaging, offline acquisition, licenses,
@@ -48,8 +49,9 @@ authoritative. Reconciled on 2026-10-16 (RUSTEV-004).
   thresholds.
 - Candidate to evaluate if retained by the owner:
   `sentence-transformers/all-MiniLM-L6-v2` at repository revision
-  `f5610b47471b118dafc55f4c387822dbfc8413ae`, with selected bytes bound by
-  SHA-256.
+  `1110a243fdf4706b3f48f1d95db1a4f5529b4d41` (moved by R-43 from
+  `f5610b47471b118dafc55f4c387822dbfc8413ae`; same weights and tokenizer,
+  plus a shipped `onnx/model.onnx`), with selected bytes bound by SHA-256.
 - Proposed initial posture: host-provisioned immutable artifacts, no
   redistributed checkpoint or runtime, verified absolute runtime path, Linux
   x86_64 CPU and macOS arm64 CPU qualified independently, and no first-run
