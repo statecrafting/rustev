@@ -45,8 +45,9 @@ Implemented, under approved and complete specs:
 Runtime optimization (spec `017`) is in progress: increment 1 (runtime-planned
 batching and a bounded memory cache with invalidation, opt-in per plan) is
 implemented; increment 2 (concurrent duplicate suppression and persistent
-caches) is not. There is no local model backend (spec `011` is a draft), and
-no quality or calibration claim: datasets and reports are synthetic or of
+caches) is not. There is no local model backend (spec `011` is approved,
+not implemented), and no quality or calibration claim: datasets and reports
+are synthetic or of
 synthetic provenance, and real labeled data is admitted only under spec `023`
 (R-04, R-37). Nothing is released; every
 manifest is `0.1.0` with `publish = false` (spec `021` is approved, not
@@ -55,8 +56,8 @@ implemented).
 Approved specs not yet implemented: `010` optional integrations and serving,
 `019` dynamic questions, `020` remote protocol refinements, `021` packaging
 and first release, `022` Jev production transport, `023` real labeled data
-qualification, `026` live re-execution. Drafts: `011` first local semantic
-backend, `024` second local semantic backend, `025` wire-witness replay input.
+qualification, `026` live re-execution, `011` first local semantic backend.
+Drafts: `024` second local semantic backend, `025` wire-witness replay input.
 `017` is approved and in progress. Every other spec (`000` to `009`, `012` to
 `016`, `018`) is approved and complete.
 

@@ -16,11 +16,11 @@ authoritative. Reconciled on 2026-10-16 (RUSTEV-004).
 ### RUSTEV-001: Decide spec 011
 
 - Type: feature contract and owner decision.
-- State: owner direction recorded, ratification pending. R-36 (OD-1 of #76)
-  directs that draft spec `011` be ratified by its own change; tracked by
-  [#69](https://github.com/statecrafting/rustev/issues/69), which also
-  records the decisions for the section 7 selections. Spec `011` is still
-  `draft` until that change lands.
+- State: done. Spec `011` is approved (A-28, under R-36), with the #69
+  selections in its section 3.3 and implementation pending; carried by
+  [#69](https://github.com/statecrafting/rustev/issues/69). The
+  ratification-readiness draft named below was not landed; its points are
+  covered by the approved text.
 - Input: clean signed draft commit
   `303446c7cdf8a4b40124920ffe112705a27ad26f` on
   `spec/011-semantic-backend-readiness`.
@@ -36,8 +36,11 @@ authoritative. Reconciled on 2026-10-16 (RUSTEV-004).
 ### RUSTEV-002: Produce the local-backend feasibility record
 
 - Type: feature feasibility and supply-chain qualification.
-- State: blocked on RUSTEV-001 (spec `011` ratification); carried by
-  [#69](https://github.com/statecrafting/rustev/issues/69).
+- State: owned by spec `011` section 3.2 (the `rustev.embed-feasibility/1`
+  record), approved (A-28); carried by
+  [#69](https://github.com/statecrafting/rustev/issues/69). Acquiring the
+  pinned checkpoint and running local inference for it awaits the owner's
+  confirmation (spec `011`, Decision 18).
 - Task: evaluate the selected immutable checkpoint, tokenizer,
   preprocessing, ONNX export and operators, pinned `ort` and ONNX Runtime,
   platform and linking matrix, packaging, offline acquisition, licenses,
@@ -65,8 +68,9 @@ authoritative. Reconciled on 2026-10-16 (RUSTEV-004).
 ### RUSTEV-003: Implement the first local semantic backend
 
 - Type: feature.
-- State: blocked on approved spec 011 and accepted RUSTEV-002 evidence;
-  carried by [#69](https://github.com/statecrafting/rustev/issues/69).
+- State: owned by spec `011`, approved (A-28), with implementation
+  pending and its inference dependencies gated on RUSTEV-002; carried by
+  [#69](https://github.com/statecrafting/rustev/issues/69).
 - Task: add `backends/rustev-backend-embed-linear` as an ordinary
   `DecisionBackend` using frozen embeddings and an externally produced,
   identified task-specific linear head.
