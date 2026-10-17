@@ -1,0 +1,211 @@
+{
+  "record": {
+    "amends": [
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "009-remote-adapter-protocol"
+    ],
+    "created": "2026-10-17",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "009-remote-adapter-protocol",
+      "017-general-runtime-optimization",
+      "020-remote-protocol-refinements",
+      "028-opentelemetry-evidence-sink",
+      "030-bedrock-backend",
+      "032-evidence-quality",
+      "033-provenance-rules-and-actionable-outcomes",
+      "034-parameterized-definitions"
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-contract/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-core/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "003-runtime-execution-and-evidence",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-runtime/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "009-remote-adapter-protocol",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-remote-http/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "004-evaluation-and-replay",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-eval/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "006-cli-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-cli/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      }
+    ],
+    "id": "035-screening-seam",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-8-withheld-values-in-projections",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "Under every consequence except a declared `fail_open`, no model step request carries screened text whose verdict is not `pass`: blocked or unavailable text is withheld by the marker of 3.8 or the request is not dispatched."
+      },
+      {
+        "anchor": "3-10-isolation-and-batching",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "A request to a screener whose capability declares `isolation: per_item` carries exactly one text value per call under every batching, coalescing and dispatch setting of specs 009, 017 and 020."
+      },
+      {
+        "anchor": "3-18-compatibility-and-identity",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "Definitions that use no #76 construct, descriptors without a `screen` profile, and plans compiled from them keep byte-identical canonical documents and identities, and their judgments, evidence and run records keep byte-identical bytes."
+      },
+      {
+        "anchor": "3-13-evidence",
+        "id": "I-4",
+        "kind": "invariant",
+        "text": "No screening evidence, notice, run record member or metric carries screened text; text is identified only by its tagged digest."
+      },
+      {
+        "anchor": "3-5-compilation",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "In a definition that declares screening, the compiler refuses with `unscreened_text` any model step whose projection can carry untrusted text not covered by a screening entry."
+      },
+      {
+        "anchor": "3-5-compilation",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "The compiler refuses `fail_open` on any field that accepts `user-supplied` or `authenticated-app-field`, whether or not the definition declares `caller_controlled`, or any other class the definition declares caller-controlled; and a screening refusal is addressed to the caller only when spec 033's computed party is `caller`."
+      },
+      {
+        "anchor": "3-7-screening-refusals",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "The first blocked value under a `refuse` entry makes the judgment spec 033's `refused` outcome at once, and no request not yet dispatched for that decision is dispatched afterwards."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "035-untrusted-text-screening-seam-amends-002-003-and-009": "d58b0353057853f3e7fe78d7eeb033256a55b05f99808a2bff81b127ea080fdc",
+      "1-purpose": "b55f92ecbb9ed3b5a29fc31d21c08319053a3ec820d01a5108e68659cb82860a",
+      "2-1-binding-principles-of-76": "9826edf89a9ccf289c81a45ebc975bf82443f7a8f9cffda17a2942c3403efc7d",
+      "2-territory": "32c0fe06608ad4ee2076ea56e8dbd695594a4e0b7e1b7c7a633748dad4e76d21",
+      "3-1-terms": "c1204da48c3c6cd260c7960d2736b1bb1d3dfe3b2a08977d31d25132a5d32366",
+      "3-10-isolation-and-batching": "23273fb56418a8a0674777a8ac0db98a0427d79b00394a259ab3b3f49955bbe5",
+      "3-11-verdict-cache": "21f2386c667c4a85623fc159b89c00dcc40f1f203dece19a7a6e5fe73c058eed",
+      "3-12-text-units-and-budgets": "9d2a71a8b4cb74bf901ec5b0e90d80a98474080821a5d25e962f122101687ee9",
+      "3-13-evidence": "3c513083b1f4b2efcf3954d8bef50d82e994908d0a7294dbda0f2cf36fd0d1a7",
+      "3-14-metrics": "db3cd4b51ac2b58fdf43a60eec0c274b51c26c8a7a1429e160785d62852b9ca3",
+      "3-15-remote-adapters-amends-009": "b6a6264feef088bc10f1cd063dc81a07d17a0817f38797a11e4ec9b9e6574584",
+      "3-16-alignment-with-spec-030-bedrock": "7653292a9a32731bd2fe4dafdf5387f782d38810b8e01e629d6499c32cc7feaf",
+      "3-17-relation-to-b3-b5-and-b6": "9c3cf5686fe0e8e285d5e92165cfb952b5548344909dadedf6e9d683458aa07f",
+      "3-18-compatibility-and-identity": "6a8b51987f4d16c94fa51f62a2e5bd902e2509b0e6b8125b730c972d9185cc1f",
+      "3-2-the-screen-profile-descriptor": "56663239ffd7bbf8bd1ccd7ab6e7a6beffcc11f5f4e2e6cc76b8ea1a14212963",
+      "3-3-the-screen-output-and-required-kind": "3c9c7321f7ac810e6093ef1c6e563fb2e7dcb9316765907e4962bde66bbfdbf7",
+      "3-4-screening-declarations": "f1cd65497b44fe7034d975402bfa4fe7035ed31853578d7db36e48509827aa31",
+      "3-5-compilation": "33e21e08c3c66696642a6fa38151b2a21d47b71bfd75375f4cb4c17c25c787fc",
+      "3-6-verdicts-and-consequences": "7e43dfdd829c59157cc9f8833f7a63504e5512b322f5c1b8517e364863e3462b",
+      "3-7-screening-refusals": "228d082242a43ba06aa96eca1862597fcd8a238c287de8c62f38b18b36d9b7cf",
+      "3-8-withheld-values-in-projections": "01b061de0d0f601f53868375774fa0720efa022609ef525cd14d529667969c58",
+      "3-9-unavailability": "f1bc12534ec786a813a26da865107f512d6b29d955c4bffcd020bba9e3297012",
+      "3-behavior": "cd057676713c54947a1c5e829c4e3614d34691d13869a7ff1d88083f08f27f51",
+      "4-out-of-scope": "83a33971511dd7a9d6bd9a1def89df007fd8f86837407a724194352f729cff8b",
+      "5-observable-negative-cases": "da2ac2ba728223a2e07ea5808bb6a942b86f7612d1b8f9c4e8fbf0f905b4c4ad",
+      "acceptance": "f47b9c395480eea127c60bdafe4d220c8c2984c10dbd6c09c72a9a9683cad19c",
+      "decisions-at-approval": "d4258072b38094ef047ded0a4a4398fd64c5a67d35ba2b20a0c9fd5717b2831e",
+      "facts-relied-on": "3612958c387a92b5f8bf5a04735a4e2740cb0a06c10ccbd7edfe4227f6dc29df",
+      "verification": "df328559770eb1e6e5c780723ae4a62420522f09302091be2f2a35b6e5f59ea2"
+    },
+    "sectionHeadings": [
+      "035: Untrusted-text screening seam (amends 002, 003 and 009)",
+      "1. Purpose",
+      "2. Territory",
+      "2.1 Binding principles of #76",
+      "3. Behavior",
+      "3.1 Terms",
+      "3.2 The screen profile (descriptor)",
+      "3.3 The screen output and required kind",
+      "3.4 Screening declarations",
+      "3.5 Compilation",
+      "3.6 Verdicts and consequences",
+      "3.7 Screening refusals",
+      "3.8 Withheld values in projections",
+      "3.9 Unavailability",
+      "3.10 Isolation and batching",
+      "3.11 Verdict cache",
+      "3.12 Text units and budgets",
+      "3.13 Evidence",
+      "3.14 Metrics",
+      "3.15 Remote adapters (amends 009)",
+      "3.16 Alignment with spec 030 (Bedrock)",
+      "3.17 Relation to B3, B5 and B6",
+      "3.18 Compatibility and identity",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Facts relied on",
+      "Decisions at approval"
+    ],
+    "specPath": "specs/035-screening-seam/spec.md",
+    "status": "approved",
+    "summary": "An amendment of approved specs 002, 003 and 009, for #76 child B7 (#65). A definition may declare a `screening` block that names untrusted text fields (caller text, third-party text, list item text), the screener backend that judges each one, a consequence on block (`refuse`, `drop_field`, `drop_text`, `drop_item`) and a consequence when the screener is unavailable (`fail_closed`, `skip_generation`, `fail_open`). The block compiles down to ordinary `proposition` steps, one text value per request, plus consequence rules evaluated before the selection policy; a screener is an ordinary backend that declares a `screen` profile (categories, maximum text bytes, text unit size) and uses the general per-capability `isolation: per_item` member this spec introduces. In a definition that declares screening, the compiler refuses a model step that reads unscreened untrusted text. A blocked value under `refuse` yields spec 033's `refused` outcome with its computed addressing. Adds a `screen_unavailable` unresolved reason, an explicit withheld marker in projections, per-value screening evidence with digests only, text-unit budgets, verdict caching through spec 017's cache, the reserved `rustev.screening` metric of spec 028, a per-item isolation rule for spec 009 remote adapters, and the mapping constraints for spec 030's reserved Bedrock screening values. New members go into the shared #76 track versions (`rustev.definition/2`, `rustev.plan/3`, `rustev.evidence/2`, `rustev.judgment/2`, `rustev.run/3`); definitions, descriptors and plans that use no #76 construct keep byte-identical identities. Approved (A-32); implementation is pending.\n",
+    "title": "Untrusted-text screening seam (amends 002, 003 and 009)"
+  },
+  "shardHash": "53fd1a6c151ea9521dc3002a909640cc4116640f8f35fa17580bb7142ac20f8b",
+  "specVersion": "1.9.0"
+}
