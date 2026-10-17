@@ -70,7 +70,7 @@
         "anchor": "3-5-identity",
         "id": "I-2",
         "kind": "invariant",
-        "text": "Every behavior-affecting input (checkpoint, export, tokenizer, preprocessing, truncation, pooling, precision, runtime version and settings, operators, heads, labels, text templates, limits, cost and tolerance) is in the `rustev.embed-linear/1` manifest, whose digest is the artifact identity; a mutable name, alias or path is never an identity."
+        "text": "Every behavior-affecting input (checkpoint, graph, tokenizer, preprocessing, truncation, pooling, precision, runtime version and settings, operators, heads, labels, text templates, limits, cost and tolerance) is in the `rustev.embed-linear/1` manifest, whose digest is the artifact identity; a mutable name, alias or path is never an identity."
       },
       {
         "anchor": "3-7-setup-and-refusals",
@@ -139,7 +139,7 @@
       }
     ],
     "sectionDigests": {
-      "011-local-semantic-backend-frozen-embeddings-and-a-linear-head": "3d19f79c781802e5aee62d2d061d4b8e1334ef58a554a8022475c9d14105ccd3",
+      "011-local-semantic-backend-frozen-embeddings-and-a-linear-head": "e54c5cefc79191a2fa7ab607b537dfaf5573dd84e8c6d220274fba861b9331f5",
       "1-purpose": "0d3569d95796599deb0bc6feaa4e062fd4a3dfe85a184f8086c973c56415a386",
       "2-1-binding-principles-of-76": "e104a153715a456e6f6b0969c1f41c2c25e36a50e4544767fe3bae305d52a565",
       "2-territory": "5d61b2c53484919461ca3b3927123f08cd4559d0494401ba1fc4091c220e5b6a",
@@ -154,21 +154,21 @@
       "3-17-optional-features-in-bindings-service-and-facade": "e2e1bc07ff599652b1f0ef1031632b972988eb18ac22448663fa47996a460ed4",
       "3-18-boundary-check-extension": "5b7f60b9bb89ca17d8c72660e0126a56ff1da676eccc26252ad43160bb1f3f90",
       "3-19-synthetic-encoder-and-test-bundles": "df206b7e1a82166169df3d8414b9fd23e6ea1e451bdc24305c0ecab0ca2fd738",
-      "3-2-the-feasibility-gate": "7b103c0ea33d52a8ebc0b77669e271db2077fa8d6b8d52e65913661f2cddf8ac",
+      "3-2-the-feasibility-gate": "b4a8ad9c018c55cfd77941cfbf3d074115cf2f5ef8d49cdb7ad55c4a060ca789",
       "3-20-compatibility": "db27c65d6a0dad446a86f8b806e0fa8ce21799853e28434185ee8fc713aed07a",
-      "3-3-selections": "21d5a188fce5a8b534ea6c359a19f21939d38756eb601783c91f5049744c41ed",
-      "3-4-the-bundle-and-manifest": "628504b1063be3aaecb081f9514b501a60f2bf9f7f6495e29e3584d9276cdde6",
-      "3-5-identity": "fea33fb9fb3168c9f11c634986cb60740a741463be16e14cd8cf85446ebc897f",
+      "3-3-selections": "21d08b72b9642bf0db2527fa17078e32db60e9779f0049ed3ba3c531b2f5efed",
+      "3-4-the-bundle-and-manifest": "78a9c19fe2177508ad3bd1bdad571c10898639da3d8aab9417686b262098c5b7",
+      "3-5-identity": "ee5155b723a500e1a5d3991eebfbe7e4d465e90fd8f195112515e71c149c79bc",
       "3-6-runtime-loading-and-platforms": "d27a1d06d24b664b5557e711110157d6ba87b93fb77b12790682fa3cafbb79db",
       "3-7-setup-and-refusals": "e87e74572996c777540143c4e961a2110003d2d3c67e4b417ca41d50d4ffc8ac",
       "3-8-text-tokenization-and-truncation": "32a1aada3820375c60416bf0c48a8d7f2ad81af8df943192ef3302d161fe6b40",
       "3-9-encoder-pooling-and-the-linear-head": "545e72eb34886b149137a05a3c9ed85f775c048f9f17604ef48b7ce3a96abd52",
-      "3-behavior": "df1fb6e45565e2c46d179384b594edec281f6bd3c7dc08572bc3a533456032d8",
+      "3-behavior": "1df9797d4c13bb04bb22e79068654ac39266f3b7680c1125cc2c1d187520d810",
       "4-out-of-scope": "f275e77d9523117145c5a97a08720da1a6e573b843faa17c855651043bf0a4c0",
       "5-observable-negative-cases": "fd47616f6359eb3c535ba15cc915968ed1a77533e3427fb70c70d44ab2163dd4",
       "acceptance": "849036fd83aeafe74e21f0db8b8da9f224f5ae90b0e71ed9d346697f08bf549d",
-      "decisions-at-approval": "7672da9f6a4ba1b991463d8dbedf0766d0cb36de979cbdf2f8c4c5772abfb65b",
-      "facts-relied-on": "2071d31e1dbd28adad2ea0f94b8c6f7f379b9fef1d159c082b72d95eceecab90",
+      "decisions-at-approval": "2fbadfeaa0d340fe0a2464cea9006893a256784d301218d5f0c1e597dd8ee8a7",
+      "facts-relied-on": "d58aa3f7f5589622c6dbb96230f847757925403b900085a5ce72d2b4132ca18a",
       "verification": "08de6a906e75445bb1f7290eaca32c56b3953ce1e46941f45cee6596cae40b46"
     },
     "sectionHeadings": [
@@ -206,9 +206,9 @@
     ],
     "specPath": "specs/011-semantic-backend/spec.md",
     "status": "approved",
-    "summary": "The first local model backend, `backends/rustev-backend-embed-linear/`: an ordinary `DecisionBackend` that embeds projected text with a frozen, host-provisioned sentence encoder run by ONNX Runtime through `ort`, and answers `classify`, `proposition` and `rubric` with logits from an externally produced, identified task-specific linear head. One canonical `rustev.embed-linear/1` manifest binds checkpoint, export, tokenizer, preprocessing, truncation, pooling, precision, runtime, heads, labels, cost and tolerance into the artifact identity. Implementation is gated by a staged feasibility record (`rustev.embed-feasibility/1`) that passes or refuses each selection of #69 against measured limits before any inference dependency lands. No network, no download, no training, no provider; repeatability is a declared tolerance, not bitwise. Optional `local-embed` features in the Node binding, the service and the facade, and an opt-in in-process embedding cache. Amends spec 001 only by adding a local inference runtime family and one placement rule to the boundary check. Ratified (A-28) under R-36, which amends R-17 for this spec; implementation is pending.\n",
+    "summary": "The first local model backend, `backends/rustev-backend-embed-linear/`: an ordinary `DecisionBackend` that embeds projected text with a frozen, host-provisioned sentence encoder run by ONNX Runtime through `ort`, and answers `classify`, `proposition` and `rubric` with logits from an externally produced, identified task-specific linear head. One canonical `rustev.embed-linear/1` manifest binds checkpoint, graph, tokenizer, preprocessing, truncation, pooling, precision, runtime, heads, labels, cost and tolerance into the artifact identity. Implementation is gated by a staged feasibility record (`rustev.embed-feasibility/1`) that passes or refuses each selection of #69 against measured limits before any inference dependency lands. No network, no download, no training, no provider; repeatability is a declared tolerance, not bitwise. Optional `local-embed` features in the Node binding, the service and the facade, and an opt-in in-process embedding cache. Amends spec 001 only by adding a local inference runtime family and one placement rule to the boundary check. Ratified (A-28) under R-36, which amends R-17 for this spec; R-43 authorizes the feasibility stages and pins the revision that ships an ONNX graph; implementation is pending.\n",
     "title": "Local semantic backend: frozen embeddings and a linear head"
   },
-  "shardHash": "e2d14526c21dc91ac9d6f15daf5395f21df5bdc7618491bc7f3eed40a4fe176d",
+  "shardHash": "dc08be503cbb8c74b5c5ab7dd93375e37b18017152771ee105adfd859ea6e4b3",
   "specVersion": "1.9.0"
 }

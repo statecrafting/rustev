@@ -10,7 +10,7 @@ summary: >
   host-provisioned sentence encoder run by ONNX Runtime through `ort`, and
   answers `classify`, `proposition` and `rubric` with logits from an
   externally produced, identified task-specific linear head. One canonical
-  `rustev.embed-linear/1` manifest binds checkpoint, export, tokenizer,
+  `rustev.embed-linear/1` manifest binds checkpoint, graph, tokenizer,
   preprocessing, truncation, pooling, precision, runtime, heads, labels,
   cost and tolerance into the artifact identity. Implementation is gated by
   a staged feasibility record (`rustev.embed-feasibility/1`) that passes or
@@ -21,7 +21,8 @@ summary: >
   and an opt-in in-process embedding cache. Amends spec 001 only by adding
   a local inference runtime family and one placement rule to the boundary
   check. Ratified (A-28) under R-36, which amends R-17 for this spec;
-  implementation is pending.
+  R-43 authorizes the feasibility stages and pins the revision that ships
+  an ONNX graph; implementation is pending.
 amends:
   - "001-boundaries-and-authority"
 establishes:
@@ -56,7 +57,7 @@ obligations:
     anchor: "3-1-position-authority-and-provenance"
   - id: "I-2"
     kind: invariant
-    text: "Every behavior-affecting input (checkpoint, export, tokenizer, preprocessing, truncation, pooling, precision, runtime version and settings, operators, heads, labels, text templates, limits, cost and tolerance) is in the `rustev.embed-linear/1` manifest, whose digest is the artifact identity; a mutable name, alias or path is never an identity."
+    text: "Every behavior-affecting input (checkpoint, graph, tokenizer, preprocessing, truncation, pooling, precision, runtime version and settings, operators, heads, labels, text templates, limits, cost and tolerance) is in the `rustev.embed-linear/1` manifest, whose digest is the artifact identity; a mutable name, alias or path is never an identity."
     anchor: "3-5-identity"
   - id: "I-3"
     kind: invariant
@@ -98,8 +99,11 @@ prohibition of an `ort` dependency and of semantic inference is lifted for
 spec 011 only, within this contract and its feasibility gate (3.2). R-01's
 direction stands and is made concrete here; R-13's split from spec 005 and
 R-25's condition (the spec 006 workflow is usable; spec 006 is complete)
-are both satisfied. Approval makes no quality, calibration, usefulness,
-release or publication claim.
+are both satisfied. R-43 (2026-10-17) authorizes acquisition and local
+inference for the feasibility record (Decision 18) and moves the pinned
+revision of #69's checkpoint to one that ships an ONNX graph (Decision 2).
+Approval makes no quality, calibration, usefulness, release or
+publication claim.
 
 ## 1. Purpose
 
@@ -228,15 +232,19 @@ construct, document consumed by the core or operator is added.
       and their SHA-256 are recorded; the license (model card metadata and
       the base model's) permits host-side use without redistribution by
       Rustev; the training data description is recorded.
-   2. *ONNX export and operators:* the revision ships no ONNX graph
-      (Fact 1), so the graph is exported outside Rustev by a recorded tool
-      chain (tool, versions, opset, recipe digest) from the pinned
-      revision, in an isolated environment. The record holds the graph's
-      SHA-256, its inputs and output signature, the operator set by domain
-      and opset, and reference token ids and pooled embeddings for the
-      fixture texts (3.2.4) from the reference implementation. A graph
-      that ONNX Runtime's CPU execution provider at the pinned version
-      cannot load, or whose operators need a custom library, refuses.
+   2. *ONNX graph and operators:* the pinned revision ships the graph
+      `onnx/model.onnx` (Fact 1), which is used as shipped and bound by
+      its SHA-256; nothing is exported or converted. The record holds the
+      graph's SHA-256 (equal to the one recorded in stage 1), its inputs
+      and output signature, the operator set by domain and opset, and
+      reference token ids and pooled embeddings for the fixture texts
+      (3.2.4) from the reference implementation (the same revision's
+      `pytorch_model.bin` through Sentence Transformers). The graph's
+      pooled embeddings must agree with the reference within the 3.3
+      bounds, or the stage refuses. A graph that ONNX Runtime's CPU
+      execution provider at the pinned version cannot load, or whose
+      operators need a custom library, refuses. A refusal is recovered
+      only through an amendment of this spec.
    3. *Linking per platform:* the exact `ort` and ONNX Runtime versions;
       the crate's resolved dependency graph (normal and build) with the
       chosen features, which passes `make boundaries` and contains no HTTP
@@ -257,23 +265,24 @@ construct, document consumed by the core or operator is added.
    dataset's texts, a generated set covering empty-after-trim refusal,
    Unicode (accents, CJK, emoji), punctuation runs and exactly
    `max_tokens` and `max_tokens + 1` tokens. No real-user data.
-5. **What this spec authorizes.** Approval authorizes the contract only.
-   Producing the record requires acquiring the pinned public checkpoint
-   files and an ONNX Runtime library and running local CPU inference on
-   synthetic texts; whether #69's "Ratify, qualify and implement" covers
-   that acquisition and local inference is an owner question (Decision
-   18). Nothing in this spec authorizes a provider call or spend, and no
-   checkpoint, graph, tokenizer, head or runtime byte is committed to the
-   repository except the synthetic test bundles of 3.19.
+5. **What this spec authorizes.** Under R-43, producing the record may
+   download the pinned public checkpoint files and an ONNX Runtime
+   library and run local CPU inference on the synthetic fixture texts of
+   3.2.4 (Decision 18). Nothing in this spec authorizes a provider call or
+   spend, real-user data, or publication or redistribution of any
+   downloaded byte, and no checkpoint, graph, tokenizer, head or runtime
+   byte is committed to the repository except the synthetic test bundles
+   of 3.19.
 
 ### 3.3 Selections
 
-These are #69's decisions, each subject to the measured pass or refusal of
-3.2.
+These are #69's decisions, with the revision moved by R-43 (Decision 2),
+each subject to the measured pass or refusal of 3.2.
 
 | Question | Selection |
 |---|---|
-| Checkpoint | `sentence-transformers/all-MiniLM-L6-v2` at revision `f5610b47471b118dafc55f4c387822dbfc8413ae`; selected files bound by SHA-256 |
+| Checkpoint | `sentence-transformers/all-MiniLM-L6-v2` at revision `1110a243fdf4706b3f48f1d95db1a4f5529b4d41` (R-43; #69 named `f5610b47471b118dafc55f4c387822dbfc8413ae`, whose weights, configuration and tokenizer are byte-identical, Fact 1); selected files bound by SHA-256 |
+| Graph | the revision's `onnx/model.onnx` (f32), used as shipped and bound by SHA-256; the revision's optimized (`model_O1` to `model_O4`), quantized and OpenVINO files are not selected |
 | Redistribution | none: the host provisions immutable artifacts verified by digest; no first-run download; Rustev publishes no checkpoint, graph, tokenizer, head or runtime |
 | Runtime | `ort` with ONNX Runtime, exact versions pinned in the record; dynamic loading from a verified absolute path |
 | Platforms | `linux-x86_64-gnu`, `linux-aarch64-gnu`, `macos-aarch64`, CPU only, each qualified independently |
@@ -284,7 +293,7 @@ These are #69's decisions, each subject to the measured pass or refusal of
 | Numerics | per logit, `abs(a - b) <= 0.00001` or `abs(a - b) <= 0.0001 * max(abs(a), abs(b))`; every output finite |
 | Decisions | no label, ordering or judgment change except where the deciding quantity lies within 0.001 of a threshold or tie |
 | Linear head | produced outside Rustev, identified by digest, with its training-data description recorded; Rustev never trains |
-| Order | checkpoint and license, export and operators, linking per platform, then performance |
+| Order | checkpoint and license, graph and operators, linking per platform, then performance |
 
 ### 3.4 The bundle and manifest
 
@@ -302,7 +311,7 @@ These are #69's decisions, each subject to the measured pass or refusal of
 | `schema` | `rustev.embed-linear/1` |
 | `backend_id` | 1 to 64 bytes of `[a-z0-9._-]` |
 | `checkpoint` | `{repository, revision (40 hex), files: [{name, sha256}], license, base_model}`; provenance, `synthetic` for test bundles |
-| `encoder` | `{kind: onnx or synthetic, graph: {file, bytes, sha256}, export: {tool, versions, opset, recipe_sha256}, inputs: [names], output, hidden_size, precision: f32}` |
+| `encoder` | `{kind: onnx or synthetic, graph: {file, bytes, sha256, source}, inputs: [names], output, hidden_size, precision: f32}`; `source` is the graph's path in the checkpoint revision (`onnx/model.onnx`), or `synthetic` |
 | `tokenizer` | `{file, bytes, sha256, implementation: "tokenizers@<exact version>", max_tokens, truncation: refuse or truncate_end}` |
 | `pooling` | `{mode: mean_masked, normalize: l2 or none}` |
 | `runtime` | `{onnxruntime: <exact version>, ort: <exact version>, execution_provider: cpu, graph_optimization: disabled, basic, extended or all, intra_op_threads, inter_op_threads, libraries: [{platform, sha256}]}` |
@@ -314,15 +323,16 @@ These are #69's decisions, each subject to the measured pass or refusal of
 3. Construction refuses an incomplete or inconsistent manifest (for
    example a head whose options are not unique, a proposition whose
    options are not exactly `["false", "true"]`, `intra_op_threads` of 0,
-   or `max_tokens` above the graph's position limit) and sends nothing to
-   the runtime.
+   `max_tokens` above the graph's position limit, or, for `kind: onnx`, a
+   graph whose `source` is not among `checkpoint.files` with the same
+   SHA-256) and sends nothing to the runtime.
 
 ### 3.5 Identity
 
 1. The artifact identity is the contract digest (spec 002 3.3.2) of the
    manifest's canonical bytes under `rustev.embed-linear/1`. Since the
    manifest names every file by SHA-256, the identity transitively covers
-   checkpoint provenance, graph, export, tokenizer, preprocessing,
+   checkpoint provenance, graph and its source, tokenizer, preprocessing,
    truncation, pooling, precision, runtime version and settings, the
    accepted runtime library per platform, operators (through the graph),
    head weights and biases, ordered labels, text templates,
@@ -727,13 +737,14 @@ claims (R-04, R-37); release and publication (spec 021, 031).
 
 ## Facts relied on
 
-Read on 2026-10-17 from the sources named, metadata only (no checkpoint
+Read on 2026-10-17 from the sources named, metadata only (file listings
+and Git and LFS object ids through the Hugging Face API; no checkpoint
 byte was downloaded); re-confirmed in stage 1.
 
 | # | Fact | Source |
 |---|---|---|
-| 1 | Revision `f5610b47471b118dafc55f4c387822dbfc8413ae` (last modified 2022-11-07) lists `config.json`, `modules.json`, `1_Pooling/config.json`, `sentence_bert_config.json`, `tokenizer.json`, `tokenizer_config.json`, `special_tokens_map.json`, `vocab.txt`, `pytorch_model.bin`, `tf_model.h5`, `rust_model.ot` and others, and no `onnx/` file; card license `apache-2.0`. | https://huggingface.co/api/models/sentence-transformers/all-MiniLM-L6-v2/revision/f5610b47471b118dafc55f4c387822dbfc8413ae |
-| 2 | At that revision: `max_seq_length` 256; mean token pooling over 384 dimensions; modules Transformer, Pooling, Normalize; a BERT model with 6 layers, 12 heads, hidden size 384, 512 positions, vocabulary 30 522, base `nreimers/MiniLM-L6-H384-uncased`. | the revision's `sentence_bert_config.json`, `1_Pooling/config.json`, `modules.json`, `config.json` |
+| 1 | Revision `1110a243fdf4706b3f48f1d95db1a4f5529b4d41` (head of `main`, last modified 2026-06-01; card license `apache-2.0`, base model `nreimers/MiniLM-L6-H384-uncased`) lists `onnx/model.onnx` (90 405 214 bytes, LFS SHA-256 `6fd5d72fe4589f189f8ebc006442dbb529bb7ce38f8082112682524616046452`), added on 2024-10-10 by Sentence Transformers' `push_to_hub` with an ONNX backend (discussion #83, by its maintainer). Its `pytorch_model.bin` (LFS SHA-256 `c3a85f238711653950f6a79ece63eb0ea93d76f6a6284be04019c53733baf256`), `tf_model.h5`, `rust_model.ot`, `config.json`, `modules.json`, `1_Pooling/config.json`, `sentence_bert_config.json`, `tokenizer.json`, `tokenizer_config.json`, `special_tokens_map.json` and `vocab.txt` have the same Git and LFS object ids as at #69's revision `f5610b47471b118dafc55f4c387822dbfc8413ae` (2022-11-07), which lists no `onnx/` file and is not an ancestor of `main` (it only adds a two-byte file `212`). | https://huggingface.co/api/models/sentence-transformers/all-MiniLM-L6-v2/tree/1110a243fdf4706b3f48f1d95db1a4f5529b4d41?recursive=true, the same for `f5610b47471b118dafc55f4c387822dbfc8413ae`, https://huggingface.co/api/models/sentence-transformers/all-MiniLM-L6-v2/commits/main, https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/discussions/83 |
+| 2 | At both revisions: `max_seq_length` 256; mean token pooling over 384 dimensions; modules Transformer, Pooling, Normalize; a BERT model with 6 layers, 12 heads, hidden size 384, 512 positions, vocabulary 30 522, base `nreimers/MiniLM-L6-H384-uncased`. | the revisions' identical `sentence_bert_config.json`, `1_Pooling/config.json`, `modules.json`, `config.json` |
 | 3 | `ort` (latest on docs.rs: 2.0.0-rc.14, for ONNX Runtime 1.31) has default features including `download-binaries` and `copy-dylibs`; `load-dynamic` enables `disable-linking` and `preload-dylibs` (`libloading`); `fetch-models` adds `ureq`. | https://docs.rs/crate/ort/latest/features |
 
 ## Acceptance
@@ -799,11 +810,13 @@ open and are decided by the implementer within this spec, as written.
 1. **Crate and schema names.** `backends/rustev-backend-embed-linear` and
    `rustev.embed-linear/1`, as RUSTEV-003 proposed; it is a backend, not an
    integration, because it uses none of the integration-only classes.
-2. **ONNX graph provenance.** The pinned revision has no ONNX file
-   (Fact 1); #69 keeps that revision, so the graph is exported outside
-   Rustev and bound by digest and recipe, like the head (3.2.2). Choosing a
-   later revision that ships a graph would change #69's selection and is
-   the owner's.
+2. **ONNX graph provenance (settled by R-43).** #69's revision has no ONNX
+   file; a later revision of the same model ships an official graph with
+   byte-identical weights, configuration and tokenizer (Fact 1). Under the
+   owner's direction (R-43) the pinned revision moves to it, and its
+   shipped `onnx/model.onnx` is bound by SHA-256 in place of an export made
+   outside Rustev (3.2.2). #69's model selection is unchanged; stage 2
+   still measures the graph against the reference implementation.
 3. **Numerical criterion.** #69's absolute and relative limits are combined
    as "either holds", the usual closeness test; requiring both would fail
    any logit near zero on rounding alone.
@@ -844,13 +857,14 @@ open and are decided by the implementer within this spec, as written.
 16. **Head arithmetic in f64** over exact f32 conversions in index order,
     so the head adds no platform variation beyond the embedding.
 17. **No batch capability** now; spec 017 governs adding one.
-18. **Acquisition and local inference for the feasibility record (needs
-    the owner).** #69 orders the backend qualified and implemented, which
-    requires a one-time acquisition of the pinned public checkpoint files,
-    an export, an ONNX Runtime library and local CPU inference on synthetic
-    texts. Neither #69 nor #76 authorizes a model or checkpoint download or
-    inference in those words, so this approval does not either: stage 1
-    to 4 work waits for the owner to confirm that #69 covers it (no spend
-    is involved). Everything that needs no real artifact (manifest,
+18. **Acquisition and local inference for the feasibility record (settled
+    by R-43).** The owner authorized it on 2026-10-17: "for spec 011 I
+    authorize downloading the pinned public checkpoint and an ONNX Runtime
+    library, and running local CPU inference on synthetic texts with no
+    spend". Feasibility stages 1 to 4 may download the pinned public
+    checkpoint files and an ONNX Runtime library and run local CPU
+    inference on synthetic texts (3.2.4). No spend, no provider call, no
+    real-user data, and no publication or redistribution of any
+    downloaded byte. Everything that needs no real artifact (manifest,
     verification, synthetic encoder, cache, bindings, boundaries) may
-    proceed.
+    proceed independently.
