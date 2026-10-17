@@ -1,0 +1,168 @@
+{
+  "record": {
+    "amends": [
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence"
+    ],
+    "created": "2026-10-17",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay",
+      "008-reference-package-lodging"
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-contract/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-core/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "003-runtime-execution-and-evidence",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-runtime/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "008-reference-package-lodging",
+        "unit": {
+          "kind": "directory",
+          "path": "packages/rustev-pkg-lodging/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      }
+    ],
+    "id": "032-evidence-quality",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-12-compatibility",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "Every rustev.definition/1 document compiles to the same rustev.plan/2 bytes and PlanId as before this spec, evaluates to the same judgment and rustev.evidence/1 bytes, and no existing refusal changes category or order."
+      },
+      {
+        "anchor": "3-2-evidence-grades-and-value-metadata",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "A value's grade is never higher than the minimum of its source ceiling, its definition cap, its snapshot claim and the grades of the graded values it was computed from, except through a corroboration step whose supporting checks read values of at least the upgraded grade."
+      },
+      {
+        "anchor": "3-4-presence-predicates",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "A map key, list item or record that fails its presence predicate is absent, and reading an absent value is missing_evidence; key existence alone is never presence."
+      },
+      {
+        "anchor": "3-6-typed-merge-merge-fields-1",
+        "id": "I-4",
+        "kind": "invariant",
+        "text": "merge_fields@1 never takes a base field the field's rule does not name; a field its rule cannot fill is absent, never a fallback value."
+      },
+      {
+        "anchor": "3-9-grade-compilation-phase",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "The compiler refuses a hard gate, or a grade requirement, that reads a value whose static grade ceiling is below the required grade, with category 13 grade_requirement, or category 14 uncorroborated_hint when the ceiling is hint and no corroboration step raises it."
+      },
+      {
+        "anchor": "3-8-conflict-policy",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "Every disagreement between accepted snapshot entries and every corroboration contradiction is resolved only by a declared rule and recorded in rustev.evidence/2 with each value's digest, source and grade."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "032-evidence-quality-grades-presence-predicates-typed-joins-corroboration-and-conflict-policy-amends-002-and-003": "24ec2f49dcde6b5e695699a5e43124d172f1404d2e9e3ccc3abed05a98e67d42",
+      "1-purpose": "9489dd5680e40807a9030a20b5efa1d04784d21af4aac6f95e6579586ee6d335",
+      "2-1-binding-principles-of-76": "988c95fb200be82cbbdf0eaf16fd4e26223ef97d46a17fab45b7b5bd6ebebde5",
+      "2-territory": "863e9577ad470309a0a5ad38c7da1b8c20086017fe7afc1db1313d4d2a056360",
+      "3-1-documents-and-versions": "40f918744737c2aa1d534a57436ce093b6d6f1eca6ad694b1917a45510a780a2",
+      "3-10-evidence-amends-spec-003-3-9": "b41abb4591af0a3a6d690c0894923902517b838d4789df49c1c91b72e05b806f",
+      "3-11-runtime-amends-spec-003": "362c65a3a22486c8573df8509644edda35c9f3791e8ad6affd2596ede10c6c77",
+      "3-12-compatibility": "957e28a4bf5102c7a13f80a0baf352fc62e8472d9d7ac64b0fc0a573a757846b",
+      "3-2-evidence-grades-and-value-metadata": "608b4240079f2ea9bb70dcd1fa542d1658fdec263172e1c63f763fd817cd34c9",
+      "3-3-sources-ceilings-and-claims": "69f91a562b3f1a0d22b9538906a3cbe220ddc1fded3d6b47351f6869ad79c58e",
+      "3-4-presence-predicates": "e90766e993e8b43d2e75142e72877650e3817cbee80d586dd9961c0457bdad50",
+      "3-5-typed-keyed-join-join-keyed-1": "960dbb2d3df556d3a832c0c91185fd9a3c3605bdb95e806cbc46a29b124c5e43",
+      "3-6-typed-merge-merge-fields-1": "fa8c0a2ae933fa3310994d20fcc5459dfc35b575b93bd72a60d53f0b5ffa7523",
+      "3-7-corroboration": "6d851c4ebbd1fb44af3280362016ae44faf09e2fd1ad1d822fff4ca5f8fa8a28",
+      "3-8-conflict-policy": "4dd28b5bdc52a2124718401b3a76f694c9ac2402909b810ecb286425c4a9ec75",
+      "3-9-grade-compilation-phase": "808c8acfd5ca4178806bba8098e0137b71a4d09a726a4b2e7fa4f2c6ffb7d522",
+      "3-behavior": "684cb98aeda65875ee00ba4918fa6d376d35c8b68a08c403c7d1456922ebf4b6",
+      "4-out-of-scope": "5824a53f7ecd30401c213431c33969f269ad12bd7ced02a80c76910ab7fe00e6",
+      "5-observable-negative-cases": "f1c3130a8e1ecc8f38f8d671b7c9a821f5576faa3650ce6e2fc5f1f3cd4f3d18",
+      "acceptance": "32d0512c9f78283fc5f0b47952280b7b37e93ade2a2f5e5fa296b9ef427185bb",
+      "decisions-at-approval": "9c71179052dc41f6923fe701c2485ed524f8838266d7050a8ce1bf1ec150fcab",
+      "verification": "72d9ce9d72381b934cb1e22e97d9cea27ca579d841781145106e83cec6fb512f"
+    },
+    "sectionHeadings": [
+      "032: Evidence quality: grades, presence predicates, typed joins, corroboration and conflict policy (amends 002 and 003)",
+      "1. Purpose",
+      "2. Territory",
+      "2.1 Binding principles of #76",
+      "3. Behavior",
+      "3.1 Documents and versions",
+      "3.2 Evidence grades and value metadata",
+      "3.3 Sources, ceilings and claims",
+      "3.4 Presence predicates",
+      "3.5 Typed keyed join: `join_keyed@1`",
+      "3.6 Typed merge: `merge_fields@1`",
+      "3.7 Corroboration",
+      "3.8 Conflict policy",
+      "3.9 Grade compilation phase",
+      "3.10 Evidence (amends spec 003, 3.9)",
+      "3.11 Runtime (amends spec 003)",
+      "3.12 Compatibility",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Decisions at approval"
+    ],
+    "specPath": "specs/032-evidence-quality/spec.md",
+    "status": "approved",
+    "summary": "An amendment of approved specs 002 and 003 (R-16), for #76 child B2. Adds an ordered evidence grade (`authoritative`, `cached`, `estimated`, `hint`) and value metadata (grade, provenance set, sources, oldest as-of) to every value of a plan that opts in, declared per field by a new context source descriptor (`rustev.source/1`) and lowered, never raised, by the definition; presence predicates so key existence is never presence; typed keyed joins (`join_keyed@1`) and per-field merges (`merge_fields@1`) with no implicit fallback; a corroboration step, the only way a grade rises; and a per-fact conflict policy that makes silent last-writer-wins impossible. Introduces the shared #76 track versions `rustev.definition/2`, `rustev.plan/3`, `rustev.snapshot/2`, `rustev.evidence/2`, `rustev.run/3` and the registry `rustev.exact/2`, to which later #76 specs add optional members; every version 1 definition keeps its bytes, its plan and its `PlanId`. Approved (A-29); implementation is pending.\n",
+    "title": "Evidence quality: grades, presence predicates, typed joins, corroboration and conflict policy (amends 002 and 003)"
+  },
+  "shardHash": "54ba6b6d7b10fa385ec28dec4171e59cbf358c6046e02317b2382890b6e9e776",
+  "specVersion": "1.9.0"
+}
