@@ -1,34 +1,214 @@
 {
   "record": {
+    "amends": [
+      "001-boundaries-and-authority"
+    ],
     "created": "2026-09-23",
     "dependsOn": [
+      "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core",
       "003-runtime-execution-and-evidence",
-      "005-reference-backends"
+      "004-evaluation-and-replay",
+      "005-reference-backends",
+      "007-support-routing-package",
+      "010-integrations",
+      "017-general-runtime-optimization",
+      "023-real-data-quality-qualification",
+      "027-node-and-wasm-bindings"
+    ],
+    "establishes": [
+      {
+        "kind": "directory",
+        "path": "backends/rustev-backend-embed-linear/",
+        "planned": true
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-boundaries/"
+        }
+      }
     ],
     "id": "011-semantic-backend",
-    "implementation": "deferred",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-1-position-authority-and-provenance",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "The backend never grants authority: it supplies logits or a classified failure only, every supplied value is model-derived, and no output, embedding, cache entry or setup result is authorization or an input fact."
+      },
+      {
+        "anchor": "3-5-identity",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "Every behavior-affecting input (checkpoint, export, tokenizer, preprocessing, truncation, pooling, precision, runtime version and settings, operators, heads, labels, text templates, limits, cost and tolerance) is in the `rustev.embed-linear/1` manifest, whose digest is the artifact identity; a mutable name, alias or path is never an identity."
+      },
+      {
+        "anchor": "3-7-setup-and-refusals",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "The crate performs no network access and no download at build, setup or inference; it reads only host-supplied absolute paths, verifies every byte it uses against the manifest before use, and refuses a missing, oversized or mismatched artifact with a typed code."
+      },
+      {
+        "anchor": "3-10-capabilities-and-the-descriptor",
+        "id": "I-4",
+        "kind": "invariant",
+        "text": "The descriptor declares exactly the operations and options of the bundled heads, output `logits` only and determinism `tolerance`; no `rank`, no label outside a head's trained options, no distribution or calibration claim."
+      },
+      {
+        "anchor": "3-12-deadlines-and-cancellation",
+        "id": "I-5",
+        "kind": "invariant",
+        "text": "Cancellation is acknowledged `stopped` only when the backend has established that the run ended; otherwise `unconfirmed`, and the worker slot stays occupied until the run ends."
+      },
+      {
+        "anchor": "3-13-numerical-repeatability",
+        "id": "I-6",
+        "kind": "invariant",
+        "text": "Repeatability is declared as a tolerance measured under recorded conditions; no bitwise or cross-platform claim is made beyond what the feasibility record measured."
+      },
+      {
+        "anchor": "3-2-the-feasibility-gate",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "No inference dependency enters the workspace until the feasibility record passes stages 1 to 3 for at least one platform; a platform is supported only when all four stages pass for it, and a refusal is recorded, never hidden."
+      },
+      {
+        "anchor": "3-14-embedding-cache",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "An embedding cache hit supplies exactly the bits a miss computed in the same process for the same artifact, principal handle and token sequence, never crosses a principal handle, and is refused on a platform without measured in-process bitwise repeatability."
+      },
+      {
+        "anchor": "3-18-boundary-check-extension",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "Builds of the Node binding, the service and the facade without `local-embed` contain no crate of the local inference runtime family, and the boundary check refuses that family outside the backend crate except through an optional dependency on it."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/backlog.md"
+        }
+      }
+    ],
     "sectionDigests": {
-      "011-first-semantic-backend-deferred": "bf36e814aacd6ea633546f025665be403312b90e3cacb97a1b016316e1e52c73",
-      "1-purpose": "1fdf7cc5cbaafbe52d8544cd8da64dd85218cec36d037cb1befe0335f4a88442",
-      "2-territory": "9dd16f6fd760ba30a6ade71ec9bcb60f3ea0faeeca820f8f30aac68c4a282e68",
-      "3-behavior-carried-from-spec-005-s-draft-to-be-made-concrete": "697322fd7a57b7be145d622cffe14b437682da2bec4aaf8ea9e4952b106b3dd1",
-      "4-out-of-scope": "9ba648d7a5033aa4586fbb602642b812d086adbfbe35399ad6fa80e27df1a323",
-      "acceptance-draft": "c163b97e80a2ffa4e17ce152b6a9759589d9cafec5aee4b6d23e1af121198b21"
+      "011-local-semantic-backend-frozen-embeddings-and-a-linear-head": "3d19f79c781802e5aee62d2d061d4b8e1334ef58a554a8022475c9d14105ccd3",
+      "1-purpose": "0d3569d95796599deb0bc6feaa4e062fd4a3dfe85a184f8086c973c56415a386",
+      "2-1-binding-principles-of-76": "e104a153715a456e6f6b0969c1f41c2c25e36a50e4544767fe3bae305d52a565",
+      "2-territory": "5d61b2c53484919461ca3b3927123f08cd4559d0494401ba1fc4091c220e5b6a",
+      "3-1-position-authority-and-provenance": "93a78c94e292578e3062e992d858da950f7d5c8d469e1933eccd113663cd89de",
+      "3-10-capabilities-and-the-descriptor": "9bd352526211bdcaee5af24f5b8d49f6bbe4630e0d55ed7c8d05309be34d2e4a",
+      "3-11-resources-workers-queue-memory-and-cost": "0a22bd20a6086792deeac7b74dcf5fbcb19037d2ffcf55171a26d992e0e9265b",
+      "3-12-deadlines-and-cancellation": "b7e2285072e884ba708089592b193b380a39e45cc94179f3d5dbe47b84bd1a18",
+      "3-13-numerical-repeatability": "dd9305b79cdcd77e0c2fadf78a9ec2c8837e5a1d686781ee91fdeefda76ad40f",
+      "3-14-embedding-cache": "1d9ed7b45beddba18f65b667e2e12dd3bb7a48c56b889d5263067c38555cacff",
+      "3-15-evidence-replay-and-evaluation": "abed7bf538b98c1573a408ca9efd239c0822062d6b7039c3d40daf91be5b7a88",
+      "3-16-relationship-to-remote-backends": "fc0f0634e5b3a10f8afa15087da604091b8384830e4c6893a59855023fc758d6",
+      "3-17-optional-features-in-bindings-service-and-facade": "e2e1bc07ff599652b1f0ef1031632b972988eb18ac22448663fa47996a460ed4",
+      "3-18-boundary-check-extension": "5b7f60b9bb89ca17d8c72660e0126a56ff1da676eccc26252ad43160bb1f3f90",
+      "3-19-synthetic-encoder-and-test-bundles": "df206b7e1a82166169df3d8414b9fd23e6ea1e451bdc24305c0ecab0ca2fd738",
+      "3-2-the-feasibility-gate": "7b103c0ea33d52a8ebc0b77669e271db2077fa8d6b8d52e65913661f2cddf8ac",
+      "3-20-compatibility": "db27c65d6a0dad446a86f8b806e0fa8ce21799853e28434185ee8fc713aed07a",
+      "3-3-selections": "21d5a188fce5a8b534ea6c359a19f21939d38756eb601783c91f5049744c41ed",
+      "3-4-the-bundle-and-manifest": "628504b1063be3aaecb081f9514b501a60f2bf9f7f6495e29e3584d9276cdde6",
+      "3-5-identity": "fea33fb9fb3168c9f11c634986cb60740a741463be16e14cd8cf85446ebc897f",
+      "3-6-runtime-loading-and-platforms": "d27a1d06d24b664b5557e711110157d6ba87b93fb77b12790682fa3cafbb79db",
+      "3-7-setup-and-refusals": "e87e74572996c777540143c4e961a2110003d2d3c67e4b417ca41d50d4ffc8ac",
+      "3-8-text-tokenization-and-truncation": "32a1aada3820375c60416bf0c48a8d7f2ad81af8df943192ef3302d161fe6b40",
+      "3-9-encoder-pooling-and-the-linear-head": "545e72eb34886b149137a05a3c9ed85f775c048f9f17604ef48b7ce3a96abd52",
+      "3-behavior": "df1fb6e45565e2c46d179384b594edec281f6bd3c7dc08572bc3a533456032d8",
+      "4-out-of-scope": "f275e77d9523117145c5a97a08720da1a6e573b843faa17c855651043bf0a4c0",
+      "5-observable-negative-cases": "fd47616f6359eb3c535ba15cc915968ed1a77533e3427fb70c70d44ab2163dd4",
+      "acceptance": "849036fd83aeafe74e21f0db8b8da9f224f5ae90b0e71ed9d346697f08bf549d",
+      "decisions-at-approval": "7672da9f6a4ba1b991463d8dbedf0766d0cb36de979cbdf2f8c4c5772abfb65b",
+      "facts-relied-on": "2071d31e1dbd28adad2ea0f94b8c6f7f379b9fef1d159c082b72d95eceecab90",
+      "verification": "08de6a906e75445bb1f7290eaca32c56b3953ce1e46941f45cee6596cae40b46"
     },
     "sectionHeadings": [
-      "011: First semantic backend (deferred)",
+      "011: Local semantic backend: frozen embeddings and a linear head",
       "1. Purpose",
       "2. Territory",
-      "3. Behavior (carried from spec 005's draft; to be made concrete)",
+      "2.1 Binding principles of #76",
+      "3. Behavior",
+      "3.1 Position, authority and provenance",
+      "3.2 The feasibility gate",
+      "3.3 Selections",
+      "3.4 The bundle and manifest",
+      "3.5 Identity",
+      "3.6 Runtime loading and platforms",
+      "3.7 Setup and refusals",
+      "3.8 Text, tokenization and truncation",
+      "3.9 Encoder, pooling and the linear head",
+      "3.10 Capabilities and the descriptor",
+      "3.11 Resources: workers, queue, memory and cost",
+      "3.12 Deadlines and cancellation",
+      "3.13 Numerical repeatability",
+      "3.14 Embedding cache",
+      "3.15 Evidence, replay and evaluation",
+      "3.16 Relationship to remote backends",
+      "3.17 Optional features in bindings, service and facade",
+      "3.18 Boundary check extension",
+      "3.19 Synthetic encoder and test bundles",
+      "3.20 Compatibility",
       "4. Out of scope",
-      "Acceptance (draft)"
+      "5. Observable negative cases",
+      "Facts relied on",
+      "Acceptance",
+      "Verification",
+      "Decisions at approval"
     ],
     "specPath": "specs/011-semantic-backend/spec.md",
-    "status": "draft",
-    "summary": "Deferred roadmap item split out of spec 005 by owner decision R-13: the first semantic backend candidate of R-01, frozen embeddings plus a task-specific linear head, with ONNX Runtime through `ort` preferred only after a bounded compatibility, licensing, operator, linking, packaging and resource check. Claims no code and adds no dependency until that check is recorded and this spec is made concrete and approved.\n",
-    "title": "First semantic backend (deferred)"
+    "status": "approved",
+    "summary": "The first local model backend, `backends/rustev-backend-embed-linear/`: an ordinary `DecisionBackend` that embeds projected text with a frozen, host-provisioned sentence encoder run by ONNX Runtime through `ort`, and answers `classify`, `proposition` and `rubric` with logits from an externally produced, identified task-specific linear head. One canonical `rustev.embed-linear/1` manifest binds checkpoint, export, tokenizer, preprocessing, truncation, pooling, precision, runtime, heads, labels, cost and tolerance into the artifact identity. Implementation is gated by a staged feasibility record (`rustev.embed-feasibility/1`) that passes or refuses each selection of #69 against measured limits before any inference dependency lands. No network, no download, no training, no provider; repeatability is a declared tolerance, not bitwise. Optional `local-embed` features in the Node binding, the service and the facade, and an opt-in in-process embedding cache. Amends spec 001 only by adding a local inference runtime family and one placement rule to the boundary check. Ratified (A-28) under R-36, which amends R-17 for this spec; implementation is pending.\n",
+    "title": "Local semantic backend: frozen embeddings and a linear head"
   },
-  "shardHash": "0383baa6a20e78f2faa7efcd0e64e05cecae23f97b9484aa2eb32ffe9b828623",
+  "shardHash": "e2d14526c21dc91ac9d6f15daf5395f21df5bdc7618491bc7f3eed40a4fe176d",
   "specVersion": "1.9.0"
 }
