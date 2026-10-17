@@ -1,0 +1,164 @@
+{
+  "record": {
+    "amends": [
+      "004-evaluation-and-replay",
+      "014-report-integrity",
+      "029-evaluation-repeatability"
+    ],
+    "created": "2026-10-17",
+    "dependsOn": [
+      "002-decision-contract-and-pure-core",
+      "004-evaluation-and-replay",
+      "006-cli-surface",
+      "014-report-integrity",
+      "015-per-case-bundle-failures",
+      "023-real-data-quality-qualification",
+      "027-node-and-wasm-bindings",
+      "029-evaluation-repeatability",
+      "032-evidence-quality",
+      "035-screening-seam",
+      "036-mid-plan-acquisition",
+      "037-generation-steps",
+      "038-structured-extraction",
+      "039-model-backed-rank"
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "004-evaluation-and-replay",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-eval/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "006-cli-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-cli/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      }
+    ],
+    "id": "041-ranking-and-rubric-metrics",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-13-compatibility",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "Without a version 3 evaluator configuration, every existing evaluation, gate, selection and CLI invocation produces byte-identical documents, stdout and exit codes, and no plan, dataset, configuration or adapter identity changes."
+      },
+      {
+        "anchor": "3-2-common-rules",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "An unjudged item, an unknown attribute, an absent gold record, a missing score and an unscored case are excluded from the metric's denominator and counted by reason; none is treated as non-relevant, failing, zero or correct."
+      },
+      {
+        "anchor": "3-8-model-judges",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "A metric produced by a model scorer is named under `model/`, reported after every deterministic metric, and never combined with a deterministic metric in any aggregate, pooled value, interval or ranking; a deterministic metric never carries the `model/` prefix."
+      },
+      {
+        "anchor": "3-11-per-case-measures-and-spec-029",
+        "id": "I-4",
+        "kind": "invariant",
+        "text": "Every new metric's per-case measure reproduces its report value bit for bit by spec 029's reconciliation, and every value is computed with integer arithmetic, IEEE 754 binary64 addition, multiplication and division in the stated order, and the committed discount table, so values are bit-identical on every target."
+      },
+      {
+        "anchor": "3-7-scorers-views-and-scores",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "Scores enter evaluation only as a `rustev.scores/1` document bound to the score views of the same evaluation; a views digest, case order or subject mismatch refuses the evaluation."
+      },
+      {
+        "anchor": "3-12-gates-and-selection",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "A gate or selection clause over a metric whose scorer is opaque, or whose adapter measures differ between sides, is unknown, never a pass."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "041-ranking-constraint-match-and-rubric-metrics-pluggable-scorers-amends-004-014-and-029": "89de8a47c1b285bcd806b922af927b781fcb87408ead1fa23a1c702e0c9210ed",
+      "1-purpose": "51e08a00cd8e097638290d693e2250388a20657c51c40a9cbbfc7a284c15fe6b",
+      "2-1-binding-principles-of-76": "4577bc59b9d80257a80e0a7e7fabaf4af2495ecd1bd37a24db0b490679cbaf36",
+      "2-territory": "d2c3e0ec2abeff33bb89120f239f84f16fed2f3806d4cc4a47dc58ed544df10c",
+      "3-1-documents-and-versions": "ff518f5ebf48ab08cd152c29c30c273f4bd715ffebc502b0c029fb083d26eb8a",
+      "3-10-cli-surface-adds-to-spec-006": "30a1d5ba6456eafe56f4d902b8818d41b58a2f2b8670a8d4d10470aca7f83e26",
+      "3-11-per-case-measures-and-spec-029": "30cebee8fad35063b07edc613ff62d24a31c95559129b6a926a0fcdee087cc6e",
+      "3-12-gates-and-selection": "7cdfa2f9558a2764de3e697f2b62a2751a14ca21a627fffe588056b2a06ff6a7",
+      "3-13-compatibility": "eabae886922633b9c594bf09b40252430a4cf797634ab343ef1c05fe8470f624",
+      "3-2-common-rules": "6d77680122511efbc104ce288e5830f003d546eafd16f1e51a443215fb858750",
+      "3-3-gold-records": "8ae67c26fe611495d044095275fe33bf33e204e096393adbff31ecb6baac7e43",
+      "3-4-adapter-measures-ranking-constraint-and-field-declarations": "0428701a195d899a266778bb44c167cbc8e43342069ec525d32ad024aab1fc7c",
+      "3-5-origin-and-evidence-quality-metrics": "e66ddb39886413219b70520355bea40eb744b6ae6827a959c00a8fb78eb4050e",
+      "3-6-scorers": "c48c3e41637c1343c993cb174160dc26a2a167368426ffbe40ad93e1f8bdd535",
+      "3-7-scorers-views-and-scores": "65caf41f8174f1772f1a081a5d9b2fa9c56631a721ebae083f244115d43f994b",
+      "3-8-model-judges": "784800bbbf3dabecb8aa8caf79e158af0b200a46ce1ba7e172bc19529ec30f4d",
+      "3-9-host-scorers-through-the-node-binding": "249969daa52b526f42c4210e9ba49e7da624615ca84710ca33d33ab4fe1489c3",
+      "3-behavior": "9b8494d02a3346b026f86e12f9af75e9cb8f622cf4b98a7cbbd60cb4d841fda2",
+      "4-out-of-scope": "5533901c6cb9a07f7a0265f6d0b6129c00450bf43061c59af827a40f141a2c74",
+      "5-observable-negative-cases": "cbb8b613b8740522d26156dba3477032ef7242915d01e71a9c7d4ca4654e13bc",
+      "acceptance": "db750e1fabffd0367dce0d09f43304fe9164a2fcb1b959fe30d5f86ff0eb7824",
+      "decisions-at-approval": "ed38f237ae942b3c0f7c28bece0f5bf1e5c629ba0d57999b8ba6d1c34d7f1e3e",
+      "verification": "4dcff6de6aef7005e943e23eb3a728b90365312b1d748a2833638a8a2fc975a5"
+    },
+    "sectionHeadings": [
+      "041: Ranking, constraint-match and rubric metrics; pluggable scorers (amends 004, 014 and 029)",
+      "1. Purpose",
+      "2. Territory",
+      "2.1 Binding principles of #76",
+      "3. Behavior",
+      "3.1 Documents and versions",
+      "3.2 Common rules",
+      "3.3 Gold records",
+      "3.4 Adapter measures: ranking, constraint and field declarations",
+      "3.5 Origin and evidence-quality metrics",
+      "3.6 Scorers",
+      "3.7 Scorers, views and scores",
+      "3.8 Model judges",
+      "3.9 Host scorers through the Node binding",
+      "3.10 CLI surface (adds to spec 006)",
+      "3.11 Per-case measures and spec 029",
+      "3.12 Gates and selection",
+      "3.13 Compatibility",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Decisions at approval"
+    ],
+    "specPath": "specs/041-ranking-and-rubric-metrics/spec.md",
+    "status": "approved",
+    "summary": "An amendment of approved specs 004, 014 and 029 (R-16), for #76 child E1. Under a new `rustev.evaluator-config/3`, evaluation adds ranking metrics (precision, recall, nDCG, MRR and hit at k over graded gold relevance, with unjudged items excluded and counted, and per-position backfill rate), declarative constraint-match metrics declared in a new `rustev.task-adapter/2` and bound into evaluation identity, origin and evidence-quality rates for the constructs of #76 B1, B2, B5, B6, B7 and C2 (specs 036, 032, 037, 038, 035 and 039), and rubric metrics from pluggable scorers. Scorers are composed at compile time (a Rust trait, or a TypeScript object through the Node binding under R-38); their scores travel as `rustev.scores/1` documents bound to `rustev.score-views/1`. Model judges are ordinary plans with a `rubric` step whose retained bundles eval reproduces; their metrics are model-derived, named under `model/` and never pooled with deterministic ones, with judge agreement statistics. Gold records arrive in a new `rustev.dataset/2`. Every new metric defines its per-case measure, so spec 029's repeat statistics, intervals, slices and selection gates apply. Existing documents, identities, plans and CLI outputs keep their bytes. Approved (A-38); approval authorizes no live run, provider call or spend, and no quality claim (R-37).\n",
+    "title": "Ranking, constraint-match and rubric metrics; pluggable scorers (amends 004, 014 and 029)"
+  },
+  "shardHash": "a3a1f549c65dd6e3e9920e4a42ab1ecdd338b058cc92b4db278326f8c67a9c4f",
+  "specVersion": "1.9.0"
+}
