@@ -2,7 +2,7 @@
 id: "017-general-runtime-optimization"
 title: "General runtime batching, duplicate suppression, and caches"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-09-26"
 summary: >
   A separately reviewable amendment to runtime execution for general
@@ -54,8 +54,8 @@ obligations:
 # 017: General runtime batching, duplicate suppression, and caches
 
 Approved (A-16, 2026-09-26) as its own reviewable change before any code
-(R-16). Implementation is in progress in increments; see the implementation
-record. Approval makes no latency, throughput,
+(R-16). Increment 1 is implemented; increment 2 is owned by spec 044, which
+amends this spec. See the implementation record. Approval makes no latency, throughput,
 cost, durability, cache-safety, or production claim.
 
 ## 1. Purpose
@@ -262,6 +262,15 @@ increment 2 and are not implemented: the policy has no member for them, so no
 plan can enable them. Increment 2 must settle how a shared call outlives an
 owner that cancels while spec 003's rule that the runtime spawns no task per
 request still holds.
+
+On 2026-10-18 the owner's standing instruction to clear blockers moved
+increment 2 out of this spec: spec 044 (approved, A-41) amends 017 and owns
+concurrent duplicate suppression (3.4), the persistent cache (3.6, persistent
+part), the waiter rows and the persistent-schema row of section 5, and the
+cancelling-owner question above. This spec is therefore complete for the
+increment 1 scope recorded here. Completion makes no claim about increment 2,
+and specs that need duplicate suppression or persistent caching depend on
+spec 044, not on this status.
 
 - `rustev-contract` adds the identified optimization policy (key schema and
   namespace versions, admission, expiry basis, batch and memory-cache

@@ -753,5 +753,7 @@ decided by the implementer within this spec, as written:
     codes in merge order at rebase, and the names never change.
 14. **Shared document versions.** This spec introduces and adds to none
     of the #76 track versions; it reads `rustev.replay/2` and accepts
-    `rustev.run/3` as spec 036 introduces them, and its own documents are
-    new names.
+    `rustev.run/3` as spec 032 introduces them (032 3.1.1: "This spec
+    introduces the document versions the #76 decision-model specs share",
+    listing `rustev.run/3`; spec 036 adds members to it under 032 3.1.2),
+    and its own documents are new names.
