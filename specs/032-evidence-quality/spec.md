@@ -2,7 +2,7 @@
 id: "032-evidence-quality"
 title: "Evidence quality: grades, presence predicates, typed joins, corroboration and conflict policy (amends 002 and 003)"
 status: approved
-implementation: pending
+implementation: in-progress
 created: "2026-10-17"
 summary: >
   An amendment of approved specs 002 and 003 (R-16), for #76 child B2.
@@ -19,7 +19,8 @@ summary: >
   `rustev.evidence/2`, `rustev.run/3` and the registry `rustev.exact/2`,
   to which later #76 specs add optional members; every version 1
   definition keeps its bytes, its plan and its `PlanId`. Approved (A-29);
-  implementation is pending.
+  implementation is in progress in increments (see the implementation
+  record).
 amends:
   - "002-decision-contract-and-pure-core"
   - "003-runtime-execution-and-evidence"
@@ -79,7 +80,7 @@ obligations:
 
 Approved by the owner (A-29, 2026-10-17, under the 2026-10-16 delivery work
 order) as its own reviewable change before any code (R-16); implementation
-is pending. This spec implements #76 child B2 (#60). The approved texts of
+is in progress in increments (see the implementation record). This spec implements #76 child B2 (#60). The approved texts of
 specs 002 and 003 are not edited; this spec records what changes, as 003
 does for 002. Spec 033 (#76 B3, provenance-conditional rules and actionable
 outcomes) builds on the grade and value metadata defined in 3.2.
@@ -665,6 +666,38 @@ quality claims from synthetic fixtures (R-04, R-37).
 ## Verification
 
 Pending with implementation. Approval satisfies no acceptance item.
+
+## Implementation record
+
+Delivered in increments, each its own pull request; nothing here claims an
+acceptance item before the increment that satisfies it.
+
+**Increment 1 (contract).** `rustev-contract` carries every document and
+member of 3.1: `rustev.definition/2`, `rustev.plan/3`, `rustev.snapshot/2`,
+`rustev.evidence/2` and `rustev.run/3` share their predecessor's wire shape
+(one Rust type per document); `versioned_document!` parses every listed
+version and tags the record digest and identity with the document's own
+schema, so every version 1 identity is unchanged. Members this spec adds are
+`Option`s omitted from canonical bytes when unused (3.1.2):
+`InputDecl.evidence` and `on_disagreement`, `TypeDecl::Record.present_when`,
+`Entry.grade`, `Plan.sources` and `grades`, and the evidence 2 members of
+`InputEvidence` and `StepEvidence`. New: `grade` (`Grade`, ordered weakest to
+strongest so `min` is the spec's order; `ValueGrade` with `ungraded` outside
+the order; `ValueMeta` and its combination; `PresentWhen`, `Presence`,
+`AbsentReason`; the value digest of 3.1.5), `source` (`rustev.source/1`,
+`SourceId`), the types `nullable` and `map`, the step kind `corroborate`,
+the predicate `member_ref`, the graded reference (written
+`{"graded": {"ref": ..., "require": {"min": ..., "max_age_ms": ...}}}`, the
+externally tagged form every expression uses), and the reason
+`insufficient_grade`. `rustev-core` refuses every such construct in a
+version 1 definition, category 11 `requires_definition_2` at the start of
+phase (b), while `join_keyed@1` and `merge_fields@1` stay unregistered in
+`rustev.exact/1` and are refused category 2 in phase (c)
+(`crates/rustev-core/tests/track_versions.rs`); a version 2 definition is
+still refused at phase (a) until increment 2 compiles plan 3. Unused
+optional members are absent from canonical bytes and each version parses
+(`crates/rustev-contract/tests/track_versions.rs`); every existing golden
+is unchanged.
 
 ## Decisions at approval
 

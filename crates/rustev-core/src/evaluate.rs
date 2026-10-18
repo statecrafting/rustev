@@ -991,6 +991,10 @@ impl<'c> Evaluation<'c> {
             .map(|(k, v)| InputEvidence {
                 field: k.clone(),
                 status: v.clone(),
+                meta: None,
+                presence: None,
+                entries: None,
+                resolution: None,
             })
             .collect();
         let mut steps = Vec::new();
@@ -1005,37 +1009,37 @@ impl<'c> Evaluation<'c> {
                 self.exact.get(id),
                 self.semantic.get(id),
             ) {
-                (StepInfo::Exact { ty, .. }, Some(r), _) => steps.push(StepEvidence {
-                    step: id.clone(),
-                    instance: vec![],
-                    status: match r {
+                (StepInfo::Exact { ty, .. }, Some(r), _) => steps.push(StepEvidence::new(
+                    id.clone(),
+                    vec![],
+                    match r {
                         Ok(_) => StepStatus::Resolved {
                             kind: ty.name(),
                             derivation,
                         },
                         Err(u) => StepStatus::Unresolved(u.clone()),
                     },
-                }),
+                )),
                 (StepInfo::Semantic { kind, .. }, _, Some(SemState::Instances { values, .. })) => {
                     for (k, v) in values {
-                        steps.push(StepEvidence {
-                            step: id.clone(),
-                            instance: k.clone(),
-                            status: match v {
+                        steps.push(StepEvidence::new(
+                            id.clone(),
+                            k.clone(),
+                            match v {
                                 Ok(_) => StepStatus::Resolved {
                                     kind: kind.name().into(),
                                     derivation,
                                 },
                                 Err(u) => StepStatus::Unresolved(u.clone()),
                             },
-                        });
+                        ));
                     }
                 }
-                (_, _, Some(SemState::Unresolved(u))) => steps.push(StepEvidence {
-                    step: id.clone(),
-                    instance: vec![],
-                    status: StepStatus::Unresolved(u.clone()),
-                }),
+                (_, _, Some(SemState::Unresolved(u))) => steps.push(StepEvidence::new(
+                    id.clone(),
+                    vec![],
+                    StepStatus::Unresolved(u.clone()),
+                )),
                 _ => {}
             }
         }

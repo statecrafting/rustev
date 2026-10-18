@@ -110,6 +110,7 @@ pub fn expr_refs(e: &Expr, out: &mut Vec<String>) {
             expr_refs(to, out);
             out.push(rates.clone());
         }
+        Expr::Graded { reference, .. } => out.push(reference.clone()),
     }
 }
 
@@ -123,6 +124,41 @@ pub fn predicate_refs(p: &Predicate, out: &mut Vec<String>) {
         Predicate::Not(p) => predicate_refs(p, out),
         Predicate::Member { value, .. } => expr_refs(value, out),
         Predicate::Present(r) => out.push(r.clone()),
+        Predicate::MemberRef { value, set } => {
+            expr_refs(value, out);
+            out.push(set.clone());
+        }
+    }
+}
+
+/// Whether an expression uses a construct of `rustev.exact/2` that a
+/// version 1 definition cannot carry (spec 032, 3.1.3).
+pub fn expr_uses_v2(e: &Expr) -> bool {
+    match e {
+        Expr::Graded { .. } => true,
+        Expr::Ref(_) | Expr::Lit(_) => false,
+        Expr::Add { left, right }
+        | Expr::Sub { left, right }
+        | Expr::Mul { left, right }
+        | Expr::Div { left, right } => expr_uses_v2(left) || expr_uses_v2(right),
+        Expr::Round { value, .. } | Expr::Len(value) | Expr::ToDecimal(value) => {
+            expr_uses_v2(value)
+        }
+        Expr::Fx {
+            amount, from, to, ..
+        } => expr_uses_v2(amount) || expr_uses_v2(from) || expr_uses_v2(to),
+    }
+}
+
+/// Whether a predicate uses a construct of `rustev.exact/2`.
+pub fn predicate_uses_v2(p: &Predicate) -> bool {
+    match p {
+        Predicate::MemberRef { .. } => true,
+        Predicate::Cmp { left, right, .. } => expr_uses_v2(left) || expr_uses_v2(right),
+        Predicate::All(ps) | Predicate::Any(ps) => ps.iter().any(predicate_uses_v2),
+        Predicate::Not(p) => predicate_uses_v2(p),
+        Predicate::Member { value, .. } => expr_uses_v2(value),
+        Predicate::Present(_) => false,
     }
 }
 
@@ -158,6 +194,10 @@ pub fn expr_structure(e: &Expr) -> Result<(), String> {
             expr_structure(to)
         }
         Expr::Len(v) | Expr::ToDecimal(v) => expr_structure(v),
+        Expr::Graded { reference, .. } => match Ref::parse(reference)? {
+            Ref::Input(..) | Ref::Step(_) | Ref::Item(_) => Ok(()),
+            _ => Err(format!("a grade requirement reads {reference:?}")),
+        },
     }
 }
 
@@ -179,6 +219,13 @@ pub fn predicate_structure(p: &Predicate) -> Result<(), String> {
             Ref::Input(_, p) if p.is_empty() => Ok(()),
             _ => Err(format!("present() takes an input reference, not {r:?}")),
         },
+        Predicate::MemberRef { value, set } => {
+            expr_structure(value)?;
+            match Ref::parse(set)? {
+                Ref::Input(..) | Ref::Step(_) => Ok(()),
+                _ => Err(format!("member_ref set {set:?} must be an input or step")),
+            }
+        }
     }
 }
 
@@ -309,6 +356,7 @@ pub fn type_expr(e: &Expr, env: &TyEnv<'_>) -> Result<Ty, String> {
             Ty::Integer => Ok(Ty::Decimal),
             t => Err(format!("to_decimal() of {}", t.name())),
         },
+        Expr::Graded { reference, .. } => ref_ty(reference, env),
     }
 }
 
@@ -372,6 +420,21 @@ pub fn type_predicate(p: &Predicate, env: &TyEnv<'_>) -> Result<(), String> {
             Ref::Input(n, p) if p.is_empty() && env.inputs.contains_key(&n) => Ok(()),
             _ => Err(format!("present() of unknown input {r:?}")),
         },
+        Predicate::MemberRef { value, set } => {
+            let t = type_expr(value, env)?;
+            let textual = matches!(t, Ty::Text { .. } | Ty::Enum(_));
+            match ref_ty(set, env)? {
+                Ty::List { item, .. } if textual && item.same_shape(&t) => Ok(()),
+                // A map's keys are its members, never its values (spec 032,
+                // 3.7.2).
+                Ty::Map { .. } if textual => Ok(()),
+                s => Err(format!(
+                    "member_ref of {} in {}: the set is a list of text or enum values, or a map",
+                    t.name(),
+                    s.name()
+                )),
+            }
+        }
     }
 }
 
@@ -573,6 +636,10 @@ pub fn eval_expr(e: &Expr, s: &Scope<'_>) -> Result<Value, Fault> {
             Value::Integer(i) => Ok(Value::Decimal(Decimal::from_i64(i))),
             _ => Err(Fault::Invalid("ill-typed to_decimal".into())),
         },
+        // The grade requirement is checked by the evaluator before the
+        // expression is evaluated (spec 032, 3.9.1); the value is the
+        // reference's own.
+        Expr::Graded { reference, .. } => eval_ref(reference, s),
     }
 }
 
@@ -628,6 +695,19 @@ pub fn eval_predicate(p: &Predicate, s: &Scope<'_>) -> Result<bool, Fault> {
         Predicate::Present(r) => Ok(r
             .strip_prefix("input:")
             .is_some_and(|n| s.present.contains(n))),
+        Predicate::MemberRef { value, set } => {
+            let v = match eval_expr(value, s)? {
+                Value::Text(x) | Value::Enum(x) => x,
+                _ => return Err(Fault::Invalid("member_ref of a non-text value".into())),
+            };
+            match eval_ref(set, s)? {
+                Value::List(items) => Ok(items
+                    .iter()
+                    .any(|i| matches!(i, Value::Text(x) | Value::Enum(x) if *x == v))),
+                Value::Map(m) => Ok(m.contains_key(&v)),
+                _ => Err(Fault::Invalid("member_ref of a non-set".into())),
+            }
+        }
     }
 }
 
@@ -719,6 +799,65 @@ mod tests {
             right: Box::new(Expr::Lit(L::Integer(1))),
         };
         assert_eq!(eval_expr(&ok, &s), Ok(Value::Integer(2)));
+    }
+
+    #[test]
+    fn member_ref_of_a_map_tests_its_keys() {
+        let map_ty = Ty::Map {
+            key_max: 8,
+            value: Box::new(Ty::Text { max_bytes: 8 }),
+            max: 4,
+        };
+        let tys = BTreeMap::from([
+            ("codes".to_string(), map_ty),
+            (
+                "tier".to_string(),
+                Ty::Enum(vec!["gold".into(), "eu".into()]),
+            ),
+            ("n".to_string(), Ty::Integer),
+        ]);
+        let step_tys = BTreeMap::new();
+        let env = TyEnv {
+            inputs: &tys,
+            steps: &step_tys,
+            item: None,
+        };
+        let member = |value: &str| Predicate::MemberRef {
+            value: Expr::Ref(value.into()),
+            set: "input:codes".into(),
+        };
+        assert!(type_predicate(&member("input:tier"), &env).is_ok());
+        assert!(
+            type_predicate(&member("input:n"), &env).is_err(),
+            "a non-text value"
+        );
+
+        let inputs = BTreeMap::from([
+            (
+                "codes".to_string(),
+                Value::Map(BTreeMap::from([(
+                    "eu".to_string(),
+                    Value::Text("gold".into()),
+                )])),
+            ),
+            ("tier".to_string(), Value::Enum("eu".into())),
+            ("other".to_string(), Value::Enum("gold".into())),
+        ]);
+        let steps = BTreeMap::new();
+        let present = BTreeSet::new();
+        let s = Scope {
+            now: Timestamp::from_ms(0).unwrap(),
+            inputs: &inputs,
+            steps: &steps,
+            present: &present,
+            item: None,
+        };
+        assert_eq!(eval_predicate(&member("input:tier"), &s), Ok(true));
+        assert_eq!(
+            eval_predicate(&member("input:other"), &s),
+            Ok(false),
+            "a map's values are not its members"
+        );
     }
 
     #[test]

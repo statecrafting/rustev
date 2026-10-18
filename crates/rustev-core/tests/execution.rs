@@ -70,7 +70,7 @@ fn a_plan_1_document_is_refused_by_the_parser() {
         .replace("rustev.plan/2", "rustev.plan/1");
     match Plan::parse(bytes.as_bytes()) {
         Err(DocumentError::Schema { expected, found }) => {
-            assert_eq!(expected, "rustev.plan/2");
+            assert_eq!(expected, "rustev.plan/2 or rustev.plan/3");
             assert_eq!(found, "rustev.plan/1");
         }
         other => panic!("expected a schema refusal, got {other:?}"),

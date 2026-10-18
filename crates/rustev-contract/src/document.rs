@@ -117,3 +117,115 @@ macro_rules! document {
 }
 
 pub(crate) use document;
+
+/// True when `expected` is exactly `schemas` joined with " or ". Evaluated
+/// at compile time by [`versioned_document!`], so a refusal's `expected`
+/// cannot drift from the schemas `parse` accepts.
+pub(crate) const fn lists_schemas(expected: &str, schemas: &[&str]) -> bool {
+    const SEP: &[u8] = b" or ";
+    let e = expected.as_bytes();
+    let mut at = 0;
+    let mut i = 0;
+    while i < schemas.len() {
+        if i > 0 {
+            let mut k = 0;
+            while k < SEP.len() {
+                if at >= e.len() || e[at] != SEP[k] {
+                    return false;
+                }
+                at += 1;
+                k += 1;
+            }
+        }
+        let s = schemas[i].as_bytes();
+        let mut k = 0;
+        while k < s.len() {
+            if at >= e.len() || e[at] != s[k] {
+                return false;
+            }
+            at += 1;
+            k += 1;
+        }
+        i += 1;
+    }
+    at == e.len()
+}
+
+/// Implements [`Document`] (and optionally [`Identified`]) for a type that
+/// carries one of several schema versions in one wire shape (spec 032,
+/// 3.1.1). `SCHEMA` names the first version, because the trait holds one
+/// constant; `parse` accepts every listed version (a refusal names them all,
+/// as `expected`), and the record digest and
+/// identity are tagged with the document's own schema, so a first-version
+/// identity is what it always was.
+macro_rules! versioned_document {
+    ($ty:ty, [$first:expr $(, $rest:expr)*], $expected:literal, $limits:expr) => {
+        const _: () = assert!(
+            $crate::document::lists_schemas($expected, &[$first $(, $rest)*]),
+            "`expected` must list the accepted schemas, joined with \" or \"",
+        );
+        impl $crate::Document for $ty {
+            const SCHEMA: &'static str = $first;
+            const LIMITS: $crate::bounded::ParseLimits = $limits;
+            fn schema(&self) -> &str {
+                &self.schema
+            }
+
+            fn parse(bytes: &[u8]) -> Result<Self, $crate::DocumentError> {
+                let doc: Self = $crate::bounded::parse_bounded(bytes, &Self::LIMITS)
+                    .map_err($crate::DocumentError::Parse)?;
+                if doc.schema != $first $(&& doc.schema != $rest)* {
+                    return Err($crate::DocumentError::Schema {
+                        expected: $expected,
+                        found: doc.schema.chars().take(80).collect(),
+                    });
+                }
+                Ok(doc)
+            }
+
+            fn record_digest(
+                &self,
+            ) -> Result<$crate::ids::ContentDigest, $crate::canonical::CanonicalError> {
+                Ok($crate::ids::ContentDigest::from_digest(
+                    $crate::canonical::tagged_digest(&self.schema, &self.record_canonical()?),
+                ))
+            }
+        }
+    };
+    ($ty:ty, [$first:expr $(, $rest:expr)*], $expected:literal, $limits:expr, $id:ty) => {
+        $crate::document::versioned_document!($ty, [$first $(, $rest)*], $expected, $limits);
+        impl $crate::Identified for $ty {
+            type Id = $id;
+            fn wrap(digest: String) -> $id {
+                <$id>::from_digest(digest)
+            }
+
+            fn id(&self) -> Result<$id, $crate::canonical::CanonicalError> {
+                Ok(Self::wrap($crate::canonical::tagged_digest(
+                    &self.schema,
+                    &$crate::Document::canonical(self)?,
+                )))
+            }
+        }
+    };
+}
+
+pub(crate) use versioned_document;
+
+#[cfg(test)]
+mod tests {
+    use super::lists_schemas;
+
+    #[test]
+    fn expected_must_list_every_schema_in_order() {
+        assert!(lists_schemas("a/1 or a/2", &["a/1", "a/2"]));
+        assert!(lists_schemas("a/1", &["a/1"]));
+        assert!(!lists_schemas("a/1 or a/3", &["a/1", "a/2"]), "renamed");
+        assert!(!lists_schemas("a/1", &["a/1", "a/2"]), "missing");
+        assert!(
+            !lists_schemas("a/1 or a/2 or a/3", &["a/1", "a/2"]),
+            "extra"
+        );
+        assert!(!lists_schemas("a/2 or a/1", &["a/1", "a/2"]), "order");
+    }
+}

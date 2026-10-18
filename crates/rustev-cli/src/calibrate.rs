@@ -49,7 +49,7 @@ fn target_parts(
         .find(|s| s.id == step)
         .and_then(|s| match &s.body {
             StepBody::Semantic(d) => Some(d),
-            StepBody::Exact(_) => None,
+            StepBody::Exact(_) | StepBody::Corroborate(_) => None,
         })?;
     Some((binding, decl.task.clone(), decl.options.clone()))
 }

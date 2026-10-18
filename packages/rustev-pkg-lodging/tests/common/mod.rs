@@ -71,6 +71,7 @@ pub fn entry(field: &str, value: Json, provenance: P, as_of: i64) -> Entry {
         provenance,
         as_of_ms: Timestamp::from_ms(as_of).unwrap(),
         source: "SYNTHETIC:rustev-pkg-lodging".into(),
+        grade: None,
     }
 }
 

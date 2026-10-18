@@ -60,6 +60,8 @@ impl DefinitionBuilder {
             ty,
             provenance: provenance.to_vec(),
             freshness,
+            evidence: None,
+            on_disagreement: None,
         });
         self
     }
@@ -164,6 +166,7 @@ pub mod ty {
                     ty: t.clone(),
                 })
                 .collect(),
+            present_when: None,
         }
     }
 }

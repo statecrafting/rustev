@@ -384,7 +384,9 @@ fn check_type_decl(t: &TypeDecl) -> Result<(), String> {
             }
         }
         TypeDecl::List { item, .. } => check_type_decl(item),
-        TypeDecl::Record { fields } => {
+        TypeDecl::Nullable { ty } => check_type_decl(ty),
+        TypeDecl::Map { value, .. } => check_type_decl(value),
+        TypeDecl::Record { fields, .. } => {
             let set: BTreeSet<_> = fields.iter().map(|f| &f.name).collect();
             if fields.is_empty()
                 || set.len() != fields.len()
@@ -600,7 +602,27 @@ fn compile_inner(
         }
     }
 
-    // (b) Structure. Supplied backend ids must be unique.
+    // (b) Structure. A version 1 definition carries no construct of spec
+    // 032 other than an operator outside `rustev.exact/1`, which phase (c)
+    // refuses as before (spec 032, 3.1.3).
+    // Only a version 1 definition is judged here; phase (a) admits nothing
+    // else until plan 3 compiles (increment 2).
+    let v1_construct = if def.schema == schema::DEFINITION {
+        first_v2_construct(def, &decoded)
+    } else {
+        None
+    };
+    if let Some((subject, construct)) = v1_construct {
+        return refuse(
+            C::InvalidDefinition,
+            subject,
+            format!(
+                "requires_definition_2: {construct} needs {}",
+                schema::DEFINITION_V2
+            ),
+        );
+    }
+    // Supplied backend ids must be unique.
     let mut backend_ids = BTreeSet::new();
     for d in descriptors {
         if !backend_ids.insert(d.backend_id.as_str()) {
@@ -658,7 +680,7 @@ fn compile_inner(
         .iter()
         .filter_map(|s| match &s.body {
             StepBody::Semantic(d) => Some((s.id.as_str(), &d.options)),
-            StepBody::Exact(_) => None,
+            StepBody::Exact(_) | StepBody::Corroborate(_) => None,
         })
         .collect();
     for (i, s) in def.steps.iter().enumerate() {
@@ -670,6 +692,8 @@ fn compile_inner(
             )?;
         }
         match &s.body {
+            // Refused above; plan 3 structure is checked separately.
+            StepBody::Corroborate(_) => {}
             StepBody::Exact(_) => {
                 if let Some(a) = decoded.get(&s.id) {
                     a.structure().or_else(|e| inv(subject.clone(), e))?;
@@ -896,6 +920,7 @@ fn compile_inner(
     for s in &def.steps {
         let subject = format!("step:{}", s.id);
         match &s.body {
+            StepBody::Corroborate(_) => {}
             StepBody::Exact(e) => {
                 if !ops::is_registered(&e.op, e.version) {
                     return refuse(
@@ -943,6 +968,7 @@ fn compile_inner(
     let mut deps: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for s in &def.steps {
         let mut refs: Vec<String> = match &s.body {
+            StepBody::Corroborate(c) => corroborate_refs(c),
             StepBody::Exact(_) => decoded[&s.id].refs(),
             StepBody::Semantic(d) => {
                 let mut v = Vec::new();
@@ -996,6 +1022,9 @@ fn compile_inner(
             shortfalls: vec![],
         };
         match &s.body {
+            StepBody::Corroborate(_) => {
+                unreachable!("a corroborate step is refused before typing outside plan 3")
+            }
             StepBody::Exact(_) => {
                 let args = decoded[id].clone();
                 let ty = args.type_check(&env).map_err(km)?;
@@ -1377,6 +1406,8 @@ fn compile_inner(
             .collect(),
         notices,
         execution: plan_execution,
+        sources: None,
+        grades: None,
     };
     let id = plan.id().map_err(|e| Refusal {
         category: C::Parse,
@@ -1395,6 +1426,90 @@ fn compile_inner(
             order,
         },
     })
+}
+
+/// The first construct of spec 032 in a version 1 definition, as `(subject,
+/// construct)`, judged inputs, then steps, then policy items, each in
+/// declaration order.
+fn first_v2_construct(
+    def: &Definition,
+    decoded: &BTreeMap<String, OpArgs>,
+) -> Option<(String, &'static str)> {
+    fn type_v2(t: &TypeDecl) -> Option<&'static str> {
+        match t {
+            TypeDecl::Nullable { .. } => Some("a nullable type"),
+            TypeDecl::Map { .. } => Some("a map type"),
+            TypeDecl::Record {
+                present_when: Some(_),
+                ..
+            } => Some("a presence predicate"),
+            TypeDecl::Record { fields, .. } => fields.iter().find_map(|f| type_v2(&f.ty)),
+            TypeDecl::List { item, .. } => type_v2(item),
+            _ => None,
+        }
+    }
+    fn cond_v2(c: &Cond) -> bool {
+        match c {
+            Cond::Exact(p) => crate::expr::predicate_uses_v2(p),
+            Cond::All(cs) | Cond::Any(cs) => cs.iter().any(cond_v2),
+            Cond::Not(c) => cond_v2(c),
+            _ => false,
+        }
+    }
+    for i in &def.inputs {
+        let subject = format!("input:{}", i.name);
+        if i.evidence.is_some() {
+            return Some((subject, "an evidence declaration"));
+        }
+        if i.on_disagreement.is_some() {
+            return Some((subject, "a disagreement rule"));
+        }
+        if let Some(c) = type_v2(&i.ty) {
+            return Some((subject, c));
+        }
+    }
+    for s in &def.steps {
+        let subject = format!("step:{}", s.id);
+        match &s.body {
+            StepBody::Corroborate(_) => return Some((subject, "a corroborate step")),
+            StepBody::Exact(_) => {
+                if decoded.get(&s.id).is_some_and(OpArgs::uses_v2) {
+                    return Some((subject, "a rustev.exact/2 predicate or graded reference"));
+                }
+            }
+            StepBody::Semantic(_) => {}
+        }
+    }
+    let policy = &def.policy;
+    for r in &policy.rules {
+        if cond_v2(&r.when) {
+            return Some((
+                format!("policy:rule:{}", r.id),
+                "a rustev.exact/2 predicate or graded reference",
+            ));
+        }
+    }
+    for a in &policy.adjustments {
+        if cond_v2(&a.when) {
+            return Some((
+                format!("policy:adjustment:{}", a.id),
+                "a rustev.exact/2 predicate or graded reference",
+            ));
+        }
+    }
+    None
+}
+
+/// The references a corroboration step reads: its claim and every check.
+fn corroborate_refs(c: &rustev_contract::definition::CorroborateDecl) -> Vec<String> {
+    let mut out = vec![c.claim.clone()];
+    for check in &c.by {
+        predicate_refs(&check.predicate, &mut out);
+    }
+    out.into_iter()
+        .filter(|r| r.starts_with("input:") || r.starts_with("step:"))
+        .map(|r| crate::expr::base_ref(&r))
+        .collect()
 }
 
 fn cond_structure(

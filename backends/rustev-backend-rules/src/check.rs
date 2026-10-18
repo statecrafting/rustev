@@ -108,7 +108,9 @@ fn fields(task: &CTask, decl: &SemanticDecl, plan: &Plan) -> Vec<PlanMismatchKin
         let ty = declared_type(&f.key, decl, plan).and_then(|t| match &f.member {
             None => Some(t),
             Some(m) => match t {
-                TypeDecl::Record { fields } => fields.iter().find(|x| &x.name == m).map(|x| &x.ty),
+                TypeDecl::Record { fields, .. } => {
+                    fields.iter().find(|x| &x.name == m).map(|x| &x.ty)
+                }
                 _ => None,
             },
         });

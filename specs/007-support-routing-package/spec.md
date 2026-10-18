@@ -277,3 +277,10 @@ text is kept as the record of what was asked.
 - Q-4: package documents embedded in the crate versus files under
   `packages/rustev-pkg-support-routing/data/`. Recommendation: files,
   embedded with `include_bytes!`, so the CLI can use them directly.
+
+## Contract compatibility record (2026-10-18)
+
+Spec 032's contract additions (a `present_when` member on record types, the
+`corroborate` step kind and the snapshot entry's optional `grade`) are not
+covered by this crate's exhaustive patterns and struct literals; the package test helper writes snapshot entries without a claim.
+Behavior, documents and tests of this spec are unchanged.

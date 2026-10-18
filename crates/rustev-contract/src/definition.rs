@@ -1,14 +1,19 @@
-//! Decision definitions, `rustev.definition/1` (spec 002, 3.7 to 3.11).
+//! Decision definitions, `rustev.definition/1` (spec 002, 3.7 to 3.11) and
+//! `rustev.definition/2` (spec 032, 3.1.1).
 //!
 //! These are the wire types. Their validation, typing and compilation live
 //! in `rustev-core`; the typed builder there produces these same values, so
 //! the builder and the JSON form enter one validated representation (R-02).
-//! Every field is required: absence is always an explicit variant.
+//! Every field is required: absence is always an explicit variant. The
+//! exception is spec 032's optional members, which version 1 never carries
+//! and which are omitted from canonical bytes when unused (spec 032, 3.1.2);
+//! the compiler refuses them in a version 1 definition.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::decimal::Decimal;
+use crate::grade::{Grade, PresentWhen};
 use crate::ids::{ArtifactId, CalibrationId, DefinitionId};
 use crate::limits::DEFINITION_V1;
 use crate::schema;
@@ -29,7 +34,13 @@ pub struct Definition {
     pub limits: LimitsDecl,
 }
 
-crate::document::document!(Definition, schema::DEFINITION, DEFINITION_V1, DefinitionId);
+crate::document::versioned_document!(
+    Definition,
+    [schema::DEFINITION, schema::DEFINITION_V2],
+    "rustev.definition/1 or rustev.definition/2",
+    DEFINITION_V1,
+    DefinitionId
+);
 
 /// One declared input field (spec 002, 3.7.1).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -41,6 +52,44 @@ pub struct InputDecl {
     /// The provenance classes this input accepts; non-empty.
     pub provenance: Vec<ProvenanceClass>,
     pub freshness: Freshness,
+    /// Version 2: the sources that grade this input (spec 032, 3.3.3);
+    /// an input without it is ungraded.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence: Option<EvidenceDecl>,
+    /// Version 2: how disagreeing entries are resolved (spec 032, 3.8);
+    /// omitted means `require_agreement`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub on_disagreement: Option<Disagreement>,
+}
+
+/// How an input is graded (spec 032, 3.3.3).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum EvidenceDecl {
+    Graded {
+        /// Non-empty, sorted, duplicate-free source names.
+        sources: Vec<String>,
+        /// Lower the ceiling of a path and its descendants; never raise.
+        caps: Vec<Cap>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Cap {
+    pub path: String,
+    pub max_grade: Grade,
+}
+
+/// The conflict policy of a graded input (spec 032, 3.8). There is no
+/// recency rule: entry order never chooses a value.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum Disagreement {
+    RequireAgreement,
+    Prefer { sources: Vec<String> },
+    TreatAsHint { sources: Vec<String> },
+    Abstain,
 }
 
 /// The closed set of provenance classes (spec 002, 3.7.1).
@@ -70,11 +119,35 @@ pub enum TypeDecl {
     Bool,
     Integer,
     Decimal,
-    Text { max_bytes: u64 },
+    Text {
+        max_bytes: u64,
+    },
     Timestamp,
-    Enum { options: Vec<String> },
-    List { item: Box<TypeDecl>, max_items: u64 },
-    Record { fields: Vec<FieldDecl> },
+    Enum {
+        options: Vec<String>,
+    },
+    List {
+        item: Box<TypeDecl>,
+        max_items: u64,
+    },
+    Record {
+        fields: Vec<FieldDecl>,
+        /// Version 2: when a decoded record is present (spec 032, 3.4.2).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        present_when: Option<PresentWhen>,
+    },
+    /// Version 2, record fields only: JSON `null` or a missing key, stored
+    /// as `null` (spec 032, 3.4.1).
+    Nullable {
+        #[serde(rename = "type")]
+        ty: Box<TypeDecl>,
+    },
+    /// Version 2: a JSON object with text keys (spec 032, 3.4.1).
+    Map {
+        key_max_bytes: u64,
+        value: Box<TypeDecl>,
+        max_entries: u64,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -98,6 +171,51 @@ pub struct StepDecl {
 pub enum StepBody {
     Exact(ExactDecl),
     Semantic(SemanticDecl),
+    /// Version 2: the only way a grade rises (spec 032, 3.7).
+    Corroborate(CorroborateDecl),
+}
+
+/// A corroboration step (spec 032, 3.7.1).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CorroborateDecl {
+    /// An input path or step value.
+    pub claim: String,
+    /// A grade above `hint`.
+    pub upgrade_to: Grade,
+    /// Non-empty.
+    pub by: Vec<Check>,
+    pub mode: CorroborationMode,
+    pub on_contradiction: OnContradiction,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Check {
+    pub predicate: Predicate,
+    pub on_false: OnFalse,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OnFalse {
+    Contradicts,
+    NoEvidence,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CorroborationMode {
+    All,
+    Any,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OnContradiction {
+    Conflict,
+    TreatAsHint,
+    Abstain,
 }
 
 /// An exact step: a registry operator, its version and its arguments. The
@@ -318,6 +436,28 @@ pub enum Expr {
     Len(Box<Expr>),
     /// Integer to decimal, the only numeric conversion.
     ToDecimal(Box<Expr>),
+    /// Registry `rustev.exact/2`: a reference with a grade requirement
+    /// (spec 032, 3.9.1).
+    Graded {
+        #[serde(rename = "ref")]
+        reference: String,
+        require: GradeRequirement,
+    },
+}
+
+/// What a graded read requires (spec 032, 3.9.1).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GradeRequirement {
+    pub min: Grade,
+    pub max_age_ms: AgeLimit,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum AgeLimit {
+    Ms(u64),
+    NotRequired,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -349,6 +489,12 @@ pub enum Predicate {
     },
     /// True when the named input resolved (`input:<name>`).
     Present(String),
+    /// Registry `rustev.exact/2`: true when the value is a member of the
+    /// list, or the keys of the map, `set` references (spec 032, 3.7.2).
+    MemberRef {
+        value: Expr,
+        set: String,
+    },
 }
 
 /// The selection policy (spec 002, 3.11).
@@ -391,10 +537,12 @@ pub enum ReasonKind {
     DeadlineExceeded,
     Conflict,
     Unsupported,
+    /// Present but below a required grade (spec 032, 3.9.4).
+    InsufficientGrade,
 }
 
 impl ReasonKind {
-    pub const ALL: [ReasonKind; 10] = [
+    pub const ALL: [ReasonKind; 11] = [
         ReasonKind::MissingEvidence,
         ReasonKind::StaleEvidence,
         ReasonKind::InvalidInput,
@@ -405,6 +553,7 @@ impl ReasonKind {
         ReasonKind::DeadlineExceeded,
         ReasonKind::Conflict,
         ReasonKind::Unsupported,
+        ReasonKind::InsufficientGrade,
     ];
 }
 

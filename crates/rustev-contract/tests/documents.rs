@@ -93,7 +93,9 @@ fn unknown_fields_are_refused_at_any_depth() {
 
 #[test]
 fn the_schema_string_is_checked() {
-    let doc = MINIMAL.replacen("rustev.definition/1", "rustev.definition/2", 1);
+    // Version 2 is a valid schema since spec 032 (tests/track_versions.rs);
+    // an unknown version is refused.
+    let doc = MINIMAL.replacen("rustev.definition/1", "rustev.definition/9", 1);
     assert!(matches!(
         Definition::parse(doc.as_bytes()),
         Err(DocumentError::Schema { .. })
