@@ -1,0 +1,110 @@
+{
+  "mapping": {
+    "amends": [
+      "004-evaluation-and-replay",
+      "014-report-integrity",
+      "029-evaluation-repeatability"
+    ],
+    "dependsOn": [
+      "002-decision-contract-and-pure-core",
+      "004-evaluation-and-replay",
+      "006-cli-surface",
+      "014-report-integrity",
+      "015-per-case-bundle-failures",
+      "023-real-data-quality-qualification",
+      "027-node-and-wasm-bindings",
+      "029-evaluation-repeatability",
+      "032-evidence-quality",
+      "035-screening-seam",
+      "036-mid-plan-acquisition",
+      "037-generation-steps",
+      "038-structured-extraction",
+      "039-model-backed-rank"
+    ],
+    "implementingPaths": [
+      {
+        "path": "Makefile",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-cli/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-eval/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-cli/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-cli/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-eval/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-eval/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Makefile"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/decisions/00-founding-decisions.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/001-decision-engine-architecture.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      }
+    ],
+    "specId": "041-ranking-and-rubric-metrics",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.2.0",
+  "shardHash": "a3a1f549c65dd6e3e9920e4a42ab1ecdd338b058cc92b4db278326f8c67a9c4f"
+}
