@@ -1,0 +1,227 @@
+{
+  "record": {
+    "amends": [
+      "010-integrations"
+    ],
+    "created": "2026-10-17",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay",
+      "009-remote-adapter-protocol",
+      "010-integrations",
+      "017-general-runtime-optimization",
+      "020-remote-protocol-refinements",
+      "027-node-and-wasm-bindings",
+      "028-opentelemetry-evidence-sink",
+      "029-evaluation-repeatability",
+      "031-public-api-and-release-family",
+      "032-evidence-quality",
+      "034-parameterized-definitions",
+      "036-mid-plan-acquisition"
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-contract/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "003-runtime-execution-and-evidence",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-runtime/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "009-remote-adapter-protocol",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-remote-http/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-boundaries/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      }
+    ],
+    "id": "042-decision-service-and-remote-seams",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "2-1-binding-principles-of-76",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "No service or callback output is authorization: a response, receipt, registration, verified signature or HTTP or gRPC success is only a judgment, unresolved outcome, refusal, integrity fact or evidence disposition, and the principal handle passes through as opaque bytes."
+      },
+      {
+        "anchor": "3-17-shared-conformance",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "For every conformance case, the HTTP/JSON and gRPC transports return byte-identical documents, and their judgments and delivered run records equal the CLI's and the bindings' bytes for the same case."
+      },
+      {
+        "anchor": "3-12-bounded-callback-seams",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "Every callback seam call goes through a bounded queue that refuses with a typed failure when full, carries its remaining deadline and cancellation, and discards and counts a late response; nothing buffers without bound."
+      },
+      {
+        "anchor": "3-14-graceful-shutdown",
+        "id": "I-4",
+        "kind": "invariant",
+        "text": "Shutdown loses no evidence silently: every admitted decision ends delivered, failed with the caller told, or dropped or unflushed and counted with its decision id in the shutdown report."
+      },
+      {
+        "anchor": "3-19-compatibility",
+        "id": "I-5",
+        "kind": "invariant",
+        "text": "This spec adds no plan construct: every plan and definition golden keeps its bytes and PlanId, and run record and judgment bytes are unchanged."
+      },
+      {
+        "anchor": "2-2-relation-to-spec-010-and-the-binding-record-gate",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "rustev-serve is not implemented until the owner approves its spec 010 section 3.4 binding record, which covers at least the rows of section 2.2."
+      },
+      {
+        "anchor": "3-3-plan-registration-and-signed-bundles",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "A plan bundle is registered only when its content recompiles to the PlanId in its path and compile report, and its signature satisfies the configured mode; a wrong key, tampered content or an unsigned bundle under a mode that forbids it is refused with its code."
+      },
+      {
+        "anchor": "3-5-admission-refusals-and-limits",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "Every refusal before a decision runs is a typed rustev.serve-refusal/1 with a code from section 3.5; Retry-After is sent only when the runtime states a retry time."
+      },
+      {
+        "anchor": "3-5-admission-refusals-and-limits",
+        "id": "R-4",
+        "kind": "requirement",
+        "text": "Request header and body byte limits are enforced before parsing; the document's bounded parser applies after."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "042-decision-service-sidecar-and-remote-context-and-sink-protocols-amends-010": "9110f64e9bc376ed6ed1f8157d6f8036824c7a901a4edec0111fbc1144439d73",
+      "1-purpose": "ff7983dfa100f7656f25eca5742c5a2871bed14513bce1a1b61748760a6b2840",
+      "2-1-binding-principles-of-76": "fb78e4bf06930e7788cf73a75e3943a4e9ebe77673de71b2eec54f5ce6127896",
+      "2-2-relation-to-spec-010-and-the-binding-record-gate": "686daeca68b7adec5084445de04ac9aa275c36c9fc1ca680756c6ba5a97c0059",
+      "2-territory": "a59a7ed3e4b3d0153468ae4aea3ee9ce659105a496b4bcc398ac6dcdbe50b45f",
+      "3-1-service-surfaces-and-listeners": "3d74fe3627f58811a712c7606f94cdc5529cacd3eb1d385de1f1995475b7ea7d",
+      "3-10-the-remote-context-protocol": "102d0a79ad1bc2da461b2dad483b6ae0fac3df4447cfc038ae61e1ff44d71f6e",
+      "3-11-the-remote-sink-protocol": "f8d376923164a362264db620b81b61ec1848898689c8d80f0a37cbbf181d0a80",
+      "3-12-bounded-callback-seams": "b53b6489bda525e0e8a6abf68c524dc49be0e4d001fbea0ece9d47255160ac12",
+      "3-13-health-readiness-and-metrics": "f05910adef7c1a415c399ed5772e3ae88ddffd2f7ddff212b668fa498db2664c",
+      "3-14-graceful-shutdown": "03afad90b565bd22f50444ecc601b14443115715876cad33e70cbc1fe0ae1357",
+      "3-15-configuration-and-service-identity": "5eb89677e2071c0ef966aed4c438c3a11a0d749c4dc70200d3420f926ad4128c",
+      "3-16-container-image-and-binary": "6b4335e4173236b7c166b8dce1c9edde659d1cb96a9159c8ba4910cc40370fd6",
+      "3-17-shared-conformance": "a151e0f1573bcb8eb7c3ddd3ac16e20997599bd69f6029fbda56fe137f3f142c",
+      "3-18-dependency-boundaries": "f49b788ab4d3781adf8a5a33ae166d57645b677b47f283d8d1a4de3989486085",
+      "3-19-compatibility": "d2a9463bd6484c5b97a67e5795f6b0d468ca3c68d2676df153446b82def634bb",
+      "3-2-caller-authentication-and-the-principal-handle": "fd04f4973f2a44075a9684483de1894d6fe70ea07ca2fa7bf1ea8565b6ca8cdc",
+      "3-3-plan-registration-and-signed-bundles": "683843cae38c99a8c285ce42a275955da2e4ea29fccc0e3c2824caf327d23667",
+      "3-4-running-decisions": "6074016cb99b417b966644a94e226dee5e0bc32d8d84b1bd2846362460c27f86",
+      "3-5-admission-refusals-and-limits": "4efc01ca2731d70e86bf585653e7e4bb81c17b48a0292537a7329843d36fe802",
+      "3-6-idempotency-lookup-and-cancellation": "52a3a8838ac3291088f63f7c6eae50161644b9898e6cc28adc2bffa2b99af60f",
+      "3-7-streaming": "4bb63244558e1c3a19118fe6123836a6d64f27e710229d3049f54aae1fc3e530",
+      "3-8-replay-evaluation-and-explanation": "558a1ac275edafa710ef40766e6d8c3cc659b3fcd590a9ebf85502b08b2634bf",
+      "3-9-the-grpc-transport": "42824be56a3bd655595daa90226bbfc3c9674f116bedab1e8647be92e1d7f411",
+      "3-behavior": "a0da701acbdaefbc7c1479099145c39265dd75e907c59c432eb5d1d41af26179",
+      "4-out-of-scope": "7d2fd43ef8fa068cfc83ca548c3fac36fe35089f12c6d9a30003ec4d56bee396",
+      "5-observable-negative-cases": "e2a66b42e6933ba5a01787a0b63dde9c606e11b3ab9a972c87d3271203502f11",
+      "acceptance": "cf6a6046487b594adf5d88d0cdb5e5fd8cc7e0b249ec1546afaff2f765667458",
+      "decisions-at-approval": "b2cc55ca8f777ed1ccf05f15c22b44845b99c34e7792a010e727b7dd1ff2fe04",
+      "verification": "0c2ab135adc6e4b5425b8cf6172efc51c588931a314d4678b3c1a9e49ea62c78"
+    },
+    "sectionHeadings": [
+      "042: Decision service sidecar and remote context and sink protocols (amends 010)",
+      "1. Purpose",
+      "2. Territory",
+      "2.1 Binding principles of #76",
+      "2.2 Relation to spec 010 and the binding-record gate",
+      "3. Behavior",
+      "3.1 Service surfaces and listeners",
+      "3.2 Caller authentication and the principal handle",
+      "3.3 Plan registration and signed bundles",
+      "3.4 Running decisions",
+      "3.5 Admission, refusals and limits",
+      "3.6 Idempotency, lookup and cancellation",
+      "3.7 Streaming",
+      "3.8 Replay, evaluation and explanation",
+      "3.9 The gRPC transport",
+      "3.10 The remote context protocol",
+      "3.11 The remote sink protocol",
+      "3.12 Bounded callback seams",
+      "3.13 Health, readiness and metrics",
+      "3.14 Graceful shutdown",
+      "3.15 Configuration and service identity",
+      "3.16 Container image and binary",
+      "3.17 Shared conformance",
+      "3.18 Dependency boundaries",
+      "3.19 Compatibility",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Decisions at approval"
+    ],
+    "specPath": "specs/042-decision-service-and-remote-seams/spec.md",
+    "status": "approved",
+    "summary": "An amendment of approved spec 010 (R-16), for #76 child A2 (#57). Makes the `rustev-serve` service API concrete as `rustev.serve/1`: plan registration by content identity from plain or signed plan bundles, decisions, cancellation, lookup, server-sent event streaming, offline replay, evaluation and explanation, health, readiness and OpenMetrics, served over HTTP/1.1 and HTTP/2 with JSON and over gRPC from one handler layer, on TCP and Unix domain socket listeners. Defines two new transport-neutral callback protocols with an HTTP binding, `rustev.remote-context/1` (describe, fetch, acquire, cancel and invalidation by push or poll) and `rustev.remote-sink/1` (describe and deliver with receipts), behind bounded queues with deadlines, cancellation and typed refusals when full. Adds no plan construct: every `PlanId`, run record and judgment byte is unchanged. Approved (A-39) under the 2026-10-16 delivery work order; implementation is pending, and `rustev-serve` implementation still waits for the owner's approval of its spec 010 section 3.4 binding record (R-34 in the founding decisions).\n",
+    "title": "Decision service sidecar and remote context and sink protocols (amends 010)"
+  },
+  "shardHash": "e1b69b53bf62fd77e79e25f245ce541be6c2d65e0e84d374f281864c56414d51",
+  "specVersion": "1.9.0"
+}
