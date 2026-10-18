@@ -1,0 +1,218 @@
+{
+  "record": {
+    "amends": [
+      "002-decision-contract-and-pure-core",
+      "005-reference-backends"
+    ],
+    "created": "2026-10-17",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay",
+      "005-reference-backends",
+      "009-remote-adapter-protocol",
+      "012-jev-integration",
+      "022-jev-production-transport",
+      "029-evaluation-repeatability",
+      "030-bedrock-backend",
+      "031-public-api-and-release-family",
+      "032-evidence-quality",
+      "036-mid-plan-acquisition",
+      "037-generation-steps",
+      "038-structured-extraction"
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-contract/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-core/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "005-reference-backends",
+        "unit": {
+          "kind": "directory",
+          "path": "backends/rustev-backend-rules/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "003-runtime-execution-and-evidence",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-runtime/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "004-evaluation-and-replay",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-eval/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "006-cli-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-cli/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      }
+    ],
+    "id": "039-model-backed-rank",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-9-the-model-ranking-value",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "A `ModelRanking` and a `Selection` are distinct value kinds with no conversion to or from scores, distributions, calibrated probabilities, labels or ordinal levels; no probability threshold, label condition, expectation or `weighted_rank@1` component reads them, and a ranking score is compared only with scores of the same ranking request."
+      },
+      {
+        "anchor": "3-10-the-select-step-and-deterministic-backfill",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "Every position of a selection carries its origin (`model` or `backfill`), its source position and its derivation class; a backfill position comes only from a declared ordering whose static class is exact-derived, never repeats a selected id, and never introduces an id outside the ranked candidate pool."
+      },
+      {
+        "anchor": "3-10-the-select-step-and-deterministic-backfill",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "A model ranking whose backend failed is never treated as an empty or partial ranking: `select` either fills every position from its backfill with a `fallback` notice (`backfill_all`) or is unresolved with the failure's reason (`propagate`), and evidence reasons (missing, stale, conflicting, invalid) always propagate."
+      },
+      {
+        "anchor": "3-7-pairwise-mode",
+        "id": "I-4",
+        "kind": "invariant",
+        "text": "A pairwise ranking issues its comparisons in the schedule's deterministic order, never more than `max_comparisons`, and the same answers yield the same order, win counts and cycle count on every run."
+      },
+      {
+        "anchor": "3-8-position-bias-controls",
+        "id": "I-5",
+        "kind": "invariant",
+        "text": "Position-bias controls are off unless declared; when declared, their kind, order count and seed enter the plan identity, and every presented order is a pure function of the seed, the step, the instance and the request index through `rustev.permute/1`."
+      },
+      {
+        "anchor": "3-18-compatibility",
+        "id": "I-6",
+        "kind": "invariant",
+        "text": "A definition that uses no construct of this spec, and a descriptor without a `ranking` member, keep byte-identical documents, `DescriptorId`s and `PlanId`s, proven by the existing goldens."
+      },
+      {
+        "anchor": "3-5-listwise-mode",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "Listwise answers drop unknown ids, ids outside the pool and duplicates with recorded reasons; a list shorter than the pool is a partial ranking, not an error."
+      },
+      {
+        "anchor": "3-14-rules-backend-pointwise-rank-amends-005",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "The rules backend answers pointwise `rank` tasks deterministically, so the same plan can be run with the rules backend and with a model backend with no change to the policy, the outcomes or any authority path."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "039-model-backed-rank-and-deterministic-backfill-amends-002-and-005": "47aea12e4019b158804388967c11bed3e7c25cbb411ca0fdd88beea816be0829",
+      "1-purpose": "62f7d816c0426136a873aa86f30c712d4acfed01b89c93ebeeb038255cc24387",
+      "2-1-binding-principles-of-76": "92d2ff04f1fc2ab5b1445dd912edae007e4ddb9636bdcd1ce28a83c7d9b04f6f",
+      "2-territory": "bc1d2b9c132cf6ae3da455c116e0dc3bbedf453ea20768604dffcb8bea34c988",
+      "3-1-documents-and-versions": "01e528a31f5ab1351dffb7c8c3b4f9a658f1cbf5745cd4032022c3be1b8428a9",
+      "3-10-the-select-step-and-deterministic-backfill": "378000a1ae043400d3e68d9a6c29dd657bf5e8b28d7a68975f062f5971e2d702",
+      "3-11-derivation-lineage-and-origin": "4631b8a1bd4c9c3276876bca9932986f35c6fe6b1f25d73dd57377274d110238",
+      "3-12-compilation-and-refusals": "b28721459bcace51ec2ba5ca398829123a0be2ca9ca68c5b076954470559f4d7",
+      "3-13-evidence-capture-and-replay": "19f8f45f63c167975e9af9bac69ec1014f0c0db169d0cf0a02ca0eb152130d76",
+      "3-14-rules-backend-pointwise-rank-amends-005": "5b0b829099a5a77166193b5928dc1d224f60efd40fb88a276854c17e763beed6",
+      "3-15-bedrock-rank-admitted-under-spec-030-3-12": "3e8b493bd9cc5c3606ba8da301ca300698424a3f480b722293fc23975164c43c",
+      "3-16-jev-and-composed-rankings-specs-012-022": "e21920232a2b02c5cda917d9d4e2468753e7d47a23e509fcee5b21bfe6dd3300",
+      "3-17-evaluation": "04859bda26540539d7870bc9f8e89562d16f3bad33bafa34d612ab55f5b18e26",
+      "3-18-compatibility": "0bf40f2b7426655fba95851890d47e6edaa7a1fbef9b08606db04e9a384e4994",
+      "3-2-the-rank-step": "f27ac253653aedd42e1cf8173b606b36d6c941b34e65468b6b5e1a9a807dc17e",
+      "3-3-the-descriptor-ranking-member": "7301a75616f6e8aff2046f7d07326d012e7e195a745c4afb3e25793541cc3d81",
+      "3-4-requests-and-projections": "ee2d5f5a3d9e48b1242798ad51c523171e432184330887d2509cb84f3abfa1d0",
+      "3-5-listwise-mode": "e78800c326ed830757e3ba11cb94ee0f8c7db4b419940c0fa264237b5133b4b3",
+      "3-6-pointwise-mode": "5b634545087870b3ec23a1a00c21902c1d2c3c0c9f9cf46017880231a9834a71",
+      "3-7-pairwise-mode": "77dd576a730dfda56987c57ed29d4b638950f0560b8df9782fe170cebd4a16ae",
+      "3-8-position-bias-controls": "20f5be6d86f40191681cf6af3623a51f3e70d45f642548e8bfff52cccbdb0e60",
+      "3-9-the-model-ranking-value": "3e96764a700676014e4c1e0630dd9c55b5750d584c688426af09120f81664baa",
+      "3-behavior": "f02cef6f93bb4c8325517a8fbf8761022a80bc32a9041c4bc51ad67238a56930",
+      "4-out-of-scope": "ee0f411dac3b20cd5b2d4627587a2444912e4ad5d9d92eb3df0fb2d96214602b",
+      "5-observable-negative-cases": "c561354840b91bdc404199554577534422e93ea0684383d81168517cdc6205cc",
+      "acceptance": "98058c814af4678d7f221c62d7a7ec6680e6a0b9cf4177bfacb4c8a18982de2b",
+      "decisions-at-approval": "4f4be317113055dcd51b758d2d77cba42f6a0a1d543d8d370df890f4c7293510",
+      "verification": "d0bc1aa52a4b4f52f73004c027e7ab3469e991281a84e1f3a6e8653717148f69"
+    },
+    "sectionHeadings": [
+      "039: Model-backed rank and deterministic backfill (amends 002 and 005)",
+      "1. Purpose",
+      "2. Territory",
+      "2.1 Binding principles of #76",
+      "3. Behavior",
+      "3.1 Documents and versions",
+      "3.2 The `rank` step",
+      "3.3 The descriptor `ranking` member",
+      "3.4 Requests and projections",
+      "3.5 Listwise mode",
+      "3.6 Pointwise mode",
+      "3.7 Pairwise mode",
+      "3.8 Position-bias controls",
+      "3.9 The model ranking value",
+      "3.10 The `select` step and deterministic backfill",
+      "3.11 Derivation, lineage and origin",
+      "3.12 Compilation and refusals",
+      "3.13 Evidence, capture and replay",
+      "3.14 Rules backend pointwise rank (amends 005)",
+      "3.15 Bedrock rank (admitted under spec 030 3.12)",
+      "3.16 Jev and composed rankings (specs 012, 022)",
+      "3.17 Evaluation",
+      "3.18 Compatibility",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Decisions at approval"
+    ],
+    "specPath": "specs/039-model-backed-rank/spec.md",
+    "status": "approved",
+    "summary": "An amendment of approved specs 002 and 005 (R-16), for #76 child C2. Adds a `rank` step kind with three declared modes (listwise, pointwise, pairwise) over a bounded candidate pool, a distinct `ModelRanking` value kind that records partial rankings, dropped ids with reasons, scores scoped to one ranking request and pairwise win counts, optional identity-bearing position-bias controls driven by a named seeded generator, and a `select` step that fills k positions from a model ranking and, when it is short or its backend failed, from a declared exact ordering, with per-position origin and derivation. Pairwise schedules are deterministic and bounded by `max_comparisons`; cycles are resolved by win count, then an exact tie-break, and counted. The constructs join the #76 track versions (`rustev.definition/2`, `rustev.plan/3`, `rustev.evidence/2`); the backend descriptor gains an optional `ranking` member. The rules backend (spec 005) answers pointwise `rank` for the swap test. Bedrock (spec 030) admits its reserved `rank` value under 030 3.12. Jev (specs 012 and 022) keeps R-28: rankings over Jev answers stay composed in plans and feed `select` unchanged. Plans that use none of this keep byte-identical identities. Approved (A-36); implementation is pending.\n",
+    "title": "Model-backed rank and deterministic backfill (amends 002 and 005)"
+  },
+  "shardHash": "c6400f116e32ce9a9c7561ece640d5868cc6f5b23f55dd995be00cb4e69e5574",
+  "specVersion": "1.9.0"
+}
