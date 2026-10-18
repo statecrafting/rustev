@@ -1,0 +1,184 @@
+{
+  "record": {
+    "amends": [
+      "004-evaluation-and-replay",
+      "006-cli-surface"
+    ],
+    "created": "2026-10-17",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay",
+      "006-cli-surface",
+      "009-remote-adapter-protocol",
+      "020-remote-protocol-refinements",
+      "027-node-and-wasm-bindings",
+      "028-opentelemetry-evidence-sink",
+      "029-evaluation-repeatability",
+      "031-public-api-and-release-family"
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-contract/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "004-evaluation-and-replay",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-eval/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "006-cli-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-cli/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      }
+    ],
+    "id": "040-decision-explanation",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-4-the-explainer",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "Explaining performs no re-execution: it starts no evaluation, compiles or recompiles no plan, supplies no value, constructs or calls no backend, calls no model, performs no I/O and reads no clock; the CLI and the bindings read files and resolve bundle items before the call."
+      },
+      {
+        "anchor": "3-5-facts-availability-derivation-and-lineage",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "Every available fact in an explanation is a copy of, or a comparison stated over, values at the evidence paths it cites, and every cited path resolves in the supplied inputs; a fact the inputs do not hold is not_available with a typed reason, never a default, an inference or a recomputed value."
+      },
+      {
+        "anchor": "3-5-facts-availability-derivation-and-lineage",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "Every fact carries the derivation class and lineage its source records, or an upper bound marked as such; a statement computed over cited values is exact-derived only when every compared value is exact-derived, and is never less derived than a value it reads."
+      },
+      {
+        "anchor": "3-13-redaction",
+        "id": "I-4",
+        "kind": "invariant",
+        "text": "Under a supplied redaction policy, no value whose effective action is other than allow appears in the explanation or its rendering, raw or transformed; it is not_available with reason redacted and the policy identity."
+      },
+      {
+        "anchor": "3-18-compatibility",
+        "id": "I-5",
+        "kind": "invariant",
+        "text": "No existing document, schema, canonical byte, plan identity, CLI output or exit code changes; every existing plan, definition, run, replay and CLI golden stays byte-identical."
+      },
+      {
+        "anchor": "3-11-diff",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "diff names as its first divergence the earliest difference in the fixed comparison order of 3.11, and for two replayed records that differ in one backend output names that step and instance with reason backend-output-changed."
+      },
+      {
+        "anchor": "3-15-library-surface-bindings-and-service",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "The same evidence, query and policy produce byte-identical explanation documents and renderings through the library, the CLI, the native binding and the WebAssembly package."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/001-decision-engine-architecture.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "040-decision-explanation-api-and-rustev-explain-amends-004-and-006": "d1e0ba29661fa5c371f582f1f247ef616303433477a172c569662ad17bfa9b5f",
+      "1-purpose": "3178f605b0a2932d4e581ad8c633ff1782db9a625c0ec69e558da03526bc927a",
+      "2-1-binding-principles-of-76": "d791f1707bdd26a13780bb9e6a82eac6b46b01e3bf62e34139e51e3db8520028",
+      "2-territory": "002d469df2936a3b3c93391c0b58d546b74da454c0a704766b79f1122b482ed3",
+      "3-1-evidence-sets": "f705bb5c62b6b28059cb5bde5ca0a3fd2bcf66f5d3104eef95597e9899624af1",
+      "3-10-models": "859f31968a98ab69b0801f61ec1288845d08c62b55ec749180e34740453e41d8",
+      "3-11-diff": "e7922ebe5879f4f5c4cfbb5dcc7a45d40f910ca0b2a8310fe73ccf1106125e66",
+      "3-12-facets-supplied-by-later-specs": "5b1ebeb93a56269d144fee2bfc744c9e63cf9301a7d471891b5a652f546ab060",
+      "3-13-redaction": "b85a6b01d8509a975e79d049a3c6f537ba96dd10ebc62d2a5c3b513c558d2410",
+      "3-14-markdown-rendering": "77d27dac19570d8041dc802529babfe16b7ac23af226be57c09fb276d176efa6",
+      "3-15-library-surface-bindings-and-service": "2d0d3db86bf98c3e5571a4ae341d60e8cb9ff594c31c5889f8a55cea7da44423",
+      "3-16-cli-surface-amends-spec-006": "73099acb319d79d96f07e1f538f82bd2690b8b9ce1cf5278de07ce78f6c5060b",
+      "3-17-exit-codes-and-refusal-codes": "0060e89bea08390ec33c7e0b62caa57e8032739e3b27aaa741c5862315293fc3",
+      "3-18-compatibility": "46165e56ee1d8f560997ad9602e9874b0174e32fffaaeea5b01df681603adaf8",
+      "3-2-evidence-paths": "d11ba201517cafa3e75f862c0d8eb55a7893487027d114165a78d760db277b9c",
+      "3-3-the-explanation-document-rustev-explanation-1": "c290c9bce83ceff5ee2f635e805d9e1ea1e7641c5c5288ff86eb54bc473b8e66",
+      "3-4-the-explainer": "30880a690096f223b3f46033b95217c964304862987e584926e2671966c4490a",
+      "3-5-facts-availability-derivation-and-lineage": "a7575b9bca4ab98cdcbf8c32c42692e45ae0aa9562384e6dc3f9748123a130ff",
+      "3-6-why-selected-item": "6d014bec8261bca0922a9aea4552be40bf1e6c2452ee5d9491498a10179a25a3",
+      "3-7-why-excluded-item-and-why-order-a-b": "c18b5696bfe7ecb974115bda56833733df8008ba17c788ac06360b9080baaa65",
+      "3-8-why-outcome": "306ab8a665538f4dbf4246e89adf81271cc3215d05cde7657c062cb9aec7f533",
+      "3-9-text-origin": "f901b7a19f560df67474f2dc5063d1ed4dbfb0774e3132744790ab86083826b1",
+      "3-behavior": "7ae524fd95f4ef7f37f7b57093b3a45cc221a9856b51ade3a86c74c6964dad9b",
+      "4-out-of-scope": "80bdea2dba45c2e2d43d2324aff0f0491722c3a4a297670dda9993a2769ea97f",
+      "5-observable-negative-cases": "89ffe506876b76ace911d2be8a91a4c132e39a6b67402537675607301b943687",
+      "acceptance": "6cbb2e96dca73ad5604a3aff61aefd165202fd96e73c84f94caafd296c4159e2",
+      "decisions-at-approval": "45be7962844cae50c61c6b87c8ce29d6931bcfc3ad10e1caba6929d2c257e494",
+      "verification": "060cc7e4a9cf858301d9e2879b406fcb6d29043c4eaafc1199ab616f8a9a5131"
+    },
+    "sectionHeadings": [
+      "040: Decision explanation API and `rustev explain` (amends 004 and 006)",
+      "1. Purpose",
+      "2. Territory",
+      "2.1 Binding principles of #76",
+      "3. Behavior",
+      "3.1 Evidence sets",
+      "3.2 Evidence paths",
+      "3.3 The explanation document, `rustev.explanation/1`",
+      "3.4 The explainer",
+      "3.5 Facts, availability, derivation and lineage",
+      "3.6 `why_selected(item)`",
+      "3.7 `why_excluded(item)` and `why_order(a, b)`",
+      "3.8 `why_outcome()`",
+      "3.9 `text_origin()`",
+      "3.10 `models()`",
+      "3.11 `diff()`",
+      "3.12 Facets supplied by later specs",
+      "3.13 Redaction",
+      "3.14 Markdown rendering",
+      "3.15 Library surface, bindings and service",
+      "3.16 CLI surface (amends spec 006)",
+      "3.17 Exit codes and refusal codes",
+      "3.18 Compatibility",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Decisions at approval"
+    ],
+    "specPath": "specs/040-decision-explanation/spec.md",
+    "status": "approved",
+    "summary": "An amendment of approved specs 004 and 006 (R-16), for #76 child D2. A pure function over recorded evidence (a delivered `rustev.run/1` record, or a `rustev.replay/1` bundle, with the plan document when supplied) answers seven structured questions: why an item was selected, why one was excluded, why one item precedes another, why the outcome is what it is, where text came from, which models answered at what cost, and where two decisions first diverge. Answers are written as a versioned `rustev.explanation/1` document in which every fact cites the evidence path it was copied from and carries the derivation class and lineage its source records; a fact the evidence does not hold, or holds only as a digest, or that a supplied redaction policy withholds, is `not_available` with a typed reason, never a guess. Nothing is re-executed, compiled or dispatched and no model is called. Adds a deterministic Markdown rendering, `rustev explain` in the CLI, and the binding surface for the Node and WebAssembly packages and the service. No existing document, identity or CLI output changes. Approved (A-37); implementation is pending.\n",
+    "title": "Decision explanation API and `rustev explain` (amends 004 and 006)"
+  },
+  "shardHash": "e79f159ae375e478fb98ba9903c3fcc92f81f34a806e3d4c526de80ae482fe29",
+  "specVersion": "1.9.0"
+}
