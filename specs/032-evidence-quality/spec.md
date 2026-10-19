@@ -35,6 +35,9 @@ extends:
   # Evidence 2 in the run record, and capture refusal for plan 3
   # decisions (spec 003, 3.9).
   - { spec: "003-runtime-execution-and-evidence", unit: { kind: directory, path: "crates/rustev-runtime/" }, nature: amending }
+  # The CLI's names for refusal categories 13 to 15 and its `plan show`
+  # rendering of a corroboration step (spec 006, 3.4).
+  - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: additive }
   # Synthetic evidence-quality fixtures and goldens beside, not inside,
   # the package's reference definition.
   - { spec: "008-reference-package-lodging", unit: { kind: directory, path: "packages/rustev-pkg-lodging/" }, nature: additive }
@@ -760,3 +763,14 @@ version 2 step and item field paths behind a `v2` flag on `TyEnv` and
 refuses every version 2 definition in phase (a), so none of it is reachable
 from `compile` until the change that admits plan 3; unit tests in
 `value.rs`, `ops.rs` and `expr.rs` cover it directly.
+
+**Increment 2, second change (structure and source binding).** In
+`crates/rustev-core/src/quality.rs`: phase (b) structure of a version 2
+definition (`use_definition_1`; `nullable` only as a record field; maps of
+1 to 10 000 entries; presence predicates over nullable fields of their
+record; field names usable in paths; graded-input and disagreement
+declarations; `reserved_reason`; corroboration structure; no explicit `hint`
+minimum in a hard gate) and phase (c) source binding (category 15). The
+refusal categories 13 to 15 exist from this change, with their CLI names.
+Unit tests in the module cover each refusal beside a passing neighbour; the
+compiler calls none of it until the change that admits plan 3.
