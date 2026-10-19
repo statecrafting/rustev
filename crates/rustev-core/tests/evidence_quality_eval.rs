@@ -380,6 +380,33 @@ fn a_nested_presence_predicate_records_its_canonical_tree() {
 }
 
 #[test]
+fn a_check_reading_below_upgrade_to_is_no_evidence() {
+    // The sub-area set is claimed only `cached` in the snapshot, below the
+    // `authoritative` the corroboration upgrades to: the check supports no
+    // upgrade, the claim stays `hint`, and the label cannot gate.
+    let mut v = base();
+    push_step(&mut v, corroborate("authoritative", "conflict"));
+    push_step(&mut v, is_centre());
+    let mut es = all_entries();
+    es[3] = claimed(subareas(), "cached");
+    let (_, ev) = run(&v, es);
+    let rec = step(&ev, "district_ok").corroboration.clone().unwrap();
+    assert_eq!(rec.checks[0].result, CheckResult::NoEvidence);
+    assert_eq!(
+        rec.checks[0].reason,
+        rustev_contract::evidence::CheckReason::BelowGrade {
+            read: "input:centre_subareas".into()
+        }
+    );
+    assert_eq!(rec.outcome, CorroborationOutcome::Uncorroborated);
+    assert_eq!(rec.grade_after, ValueGrade::Hint);
+    assert_eq!(
+        unresolved(step(&ev, "is_centre")),
+        &Unresolved::insufficient(["step:district_ok/kind".to_string()])
+    );
+}
+
+#[test]
 fn corroboration_outcomes() {
     // A label gates once corroborated by sub-area membership.
     let mut v = base();
