@@ -75,8 +75,9 @@ fn category_1_parse() {
             .category,
         Category::Parse
     );
-    // Wrong schema.
-    let schema = text.replacen("rustev.definition/1", "rustev.definition/2", 1);
+    // Wrong schema (version 2 is valid since spec 032; see
+    // tests/evidence_quality_compile.rs).
+    let schema = text.replacen("rustev.definition/1", "rustev.definition/9", 1);
     assert_eq!(
         compile_bytes(schema.as_bytes(), &descriptors(), &cal())
             .unwrap_err()

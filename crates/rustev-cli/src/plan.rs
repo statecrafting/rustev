@@ -240,6 +240,7 @@ fn step_json(step: &rustev_contract::plan::PlanStep) -> Value {
         PlanStepDetail::Unsupported { capability } => {
             json!({"kind": "unsupported", "capability": capability})
         }
+        PlanStepDetail::Corroborate => json!({"kind": "corroborate"}),
     };
     json!({"id": step.id, "derivation": step.derivation, "detail": detail})
 }

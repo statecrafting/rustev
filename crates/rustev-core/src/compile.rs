@@ -1,9 +1,10 @@
 //! The plan compiler (spec 002, 3.9).
 //!
 //! Phases run in order and stop at the first refusal: (a) parse and bound,
-//! (b) structure, (c) resolve operators and calibrations, (d) graph, (e)
-//! types, (f) bind backends, fallbacks and calibration artifacts, (g) budget,
-//! (h) policy, (i) emit. Within a phase, steps are judged in declaration
+//! (b) structure, (c) resolve operators, calibrations and sources, (d)
+//! graph, (e) types, (e2) grades (plan 3 only, spec 032 3.9), (f) bind
+//! backends, fallbacks and calibration artifacts, (g) budget, (h) policy,
+//! (i) emit. Within a phase, steps are judged in declaration
 //! order, then policy items in declaration order.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -23,14 +24,17 @@ use rustev_contract::execution::ExecutionPolicy;
 use rustev_contract::ids::{CalibrationId, DescriptorId, PlanId};
 use rustev_contract::judgment::{Derivation, Notice, NoticeKind};
 use rustev_contract::plan::{
-    BoundCalibration, Normalization, Plan, PlanExecution, PlanStep, PlanStepDetail, SemanticBinding,
+    BoundCalibration, Normalization, Plan, PlanExecution, PlanStep, PlanStepDetail,
+    SemanticBinding, StaticGrade,
 };
+use rustev_contract::source::SourceDescriptor;
 use rustev_contract::{Document, Identified, schema};
 use serde_json::json;
 
 use crate::calibrate;
 use crate::expr::{Ref, StepTy, TyEnv, predicate_refs, predicate_structure, type_predicate};
 use crate::ops::{self, OpArgs};
+use crate::quality;
 use crate::sem::SemKind;
 use crate::value::{Ty, Value};
 
@@ -150,6 +154,11 @@ pub(crate) enum StepInfo {
         binding: Option<Box<SemanticBinding>>,
         calibration: Option<(CalibrationArtifact, CalibrationId)>,
     },
+    /// Plan 3: a corroboration step; its value is the claim's.
+    Corroborate {
+        decl: Box<rustev_contract::definition::CorroborateDecl>,
+        ty: Ty,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -162,8 +171,14 @@ pub(crate) struct Info {
     /// argument order.
     pub deps: BTreeMap<String, Vec<String>>,
     pub order: Vec<String>,
-    /// A plan 3 (spec 032). Always false until plan 3 compiles.
+    /// A plan 3 (spec 032).
     pub v2: bool,
+    /// Plan 3: the bound sources and each graded input's grading.
+    #[allow(dead_code)] // read by plan 3 evaluation, spec 032 increment 3
+    pub bound: quality::Bound,
+    /// Plan 3: the static ceiling tree of every input and step.
+    #[allow(dead_code)] // read by plan 3 evaluation, spec 032 increment 3
+    pub trees: BTreeMap<String, quality::Ceil>,
 }
 
 /// A plan with everything evaluation needs.
@@ -190,7 +205,18 @@ impl Compiled {
         descriptors: &[BackendDescriptor],
         calibrations: &[CalibrationArtifact],
     ) -> Result<Compiled, Refusal> {
-        recompile(plan, descriptors, calibrations).map_err(|e| match e {
+        Self::load_with_sources(plan, descriptors, calibrations, &[])
+    }
+
+    /// [`Compiled::load`] with source descriptors, for a plan 3 that binds
+    /// sources (spec 032, 3.3.4).
+    pub fn load_with_sources(
+        plan: &Plan,
+        descriptors: &[BackendDescriptor],
+        calibrations: &[CalibrationArtifact],
+        sources: &[SourceDescriptor],
+    ) -> Result<Compiled, Refusal> {
+        recompile(plan, descriptors, calibrations, sources).map_err(|e| match e {
             Recompiled::Refused(r) => r,
             Recompiled::Differs => Refusal {
                 category: Category::Parse,
@@ -214,7 +240,23 @@ impl Compiled {
         descriptors: &[BackendDescriptor],
         calibrations: &[CalibrationArtifact],
     ) -> Result<Compiled, LoadError> {
-        if plan.compiler != COMPILER || plan.registry != schema::EXACT_REGISTRY {
+        Self::load_checked_with_sources(plan, descriptors, calibrations, &[])
+    }
+
+    /// [`Compiled::load_checked`] with source descriptors, for a plan 3
+    /// that binds sources (spec 032, 3.3.4); without them such a plan is a
+    /// mismatch carrying the category 15 refusal.
+    pub fn load_checked_with_sources(
+        plan: &Plan,
+        descriptors: &[BackendDescriptor],
+        calibrations: &[CalibrationArtifact],
+        sources: &[SourceDescriptor],
+    ) -> Result<Compiled, LoadError> {
+        // A plan 2 records `rustev.exact/1`; a plan 3 the lowest registry it
+        // needs (spec 032, 3.1.3).
+        let registry_known = plan.registry == schema::EXACT_REGISTRY
+            || (plan.schema == schema::PLAN_V3 && plan.registry == schema::EXACT_REGISTRY_V2);
+        if plan.compiler != COMPILER || !registry_known {
             return Err(LoadError::CompilerChanged {
                 recorded_compiler: plan.compiler.clone(),
                 current_compiler: COMPILER,
@@ -255,7 +297,7 @@ impl Compiled {
                 });
             }
         }
-        recompile(plan, descriptors, calibrations).map_err(|e| LoadError::PlanMismatch {
+        recompile(plan, descriptors, calibrations, sources).map_err(|e| LoadError::PlanMismatch {
             refusal: match e {
                 Recompiled::Refused(r) => Some(r),
                 Recompiled::Differs => None,
@@ -331,13 +373,20 @@ fn recompile(
     plan: &Plan,
     descriptors: &[BackendDescriptor],
     calibrations: &[CalibrationArtifact],
+    sources: &[SourceDescriptor],
 ) -> Result<Compiled, Recompiled> {
     let execution = match &plan.execution {
         PlanExecution::None => None,
         PlanExecution::Declared(d) => Some(&d.policy),
     };
-    let c = compile_inner(&plan.definition, descriptors, calibrations, execution)
-        .map_err(Recompiled::Refused)?;
+    let c = compile_inner(
+        &plan.definition,
+        descriptors,
+        calibrations,
+        sources,
+        execution,
+    )
+    .map_err(Recompiled::Refused)?;
     if plan.canonical().ok() != Some(c.canonical()) {
         return Err(Recompiled::Differs);
     }
@@ -543,7 +592,21 @@ pub fn compile(
     descriptors: &[BackendDescriptor],
     calibrations: &[CalibrationArtifact],
 ) -> Result<Compiled, Refusal> {
-    compile_inner(def, descriptors, calibrations, None)
+    compile_inner(def, descriptors, calibrations, &[], None)
+}
+
+/// Compile with context source descriptors beside backend descriptors and
+/// calibrations (spec 032, 3.3.4), and optionally an execution policy. A
+/// version 1 definition ignores supplied sources, as an unbound backend
+/// descriptor changes nothing.
+pub fn compile_with_sources(
+    def: &Definition,
+    descriptors: &[BackendDescriptor],
+    calibrations: &[CalibrationArtifact],
+    sources: &[SourceDescriptor],
+    execution: Option<&ExecutionPolicy>,
+) -> Result<Compiled, Refusal> {
+    compile_inner(def, descriptors, calibrations, sources, execution)
 }
 
 /// Compile with a runtime execution policy (spec 003, 3.2.3). The policy is
@@ -555,30 +618,39 @@ pub fn compile_with(
     calibrations: &[CalibrationArtifact],
     execution: &ExecutionPolicy,
 ) -> Result<Compiled, Refusal> {
-    compile_inner(def, descriptors, calibrations, Some(execution))
+    compile_inner(def, descriptors, calibrations, &[], Some(execution))
 }
 
 fn compile_inner(
     def: &Definition,
     descriptors: &[BackendDescriptor],
     calibrations: &[CalibrationArtifact],
+    sources: &[SourceDescriptor],
     execution: Option<&ExecutionPolicy>,
 ) -> Result<Compiled, Refusal> {
     use Category as C;
 
     // (a) Parse and bound: schema, and decoding of registered operators'
-    // arguments. Unknown operators are left to phase (c).
-    if def.schema != schema::DEFINITION {
+    // arguments. Unknown operators are left to phase (c). A version 2
+    // definition compiles only to plan 3 (spec 032, 3.1.3).
+    let v2 = def.schema == schema::DEFINITION_V2;
+    if def.schema != schema::DEFINITION && !v2 {
         return refuse(
             C::Parse,
             "definition",
-            format!("schema {:?} is not {}", def.schema, schema::DEFINITION),
+            format!(
+                "schema {:?} is neither {} nor {}",
+                def.schema,
+                schema::DEFINITION,
+                schema::DEFINITION_V2
+            ),
         );
     }
+    let decode = if v2 { ops::decode_v2 } else { ops::decode };
     let mut decoded: BTreeMap<String, OpArgs> = BTreeMap::new();
     for s in &def.steps {
         if let StepBody::Exact(e) = &s.body {
-            match ops::decode(&e.op, e.version, &e.args) {
+            match decode(&e.op, e.version, &e.args) {
                 Some(Ok(a)) => {
                     decoded.insert(s.id.clone(), a);
                 }
@@ -615,14 +687,9 @@ fn compile_inner(
     // (b) Structure. A version 1 definition carries no construct of spec
     // 032 other than an operator outside `rustev.exact/1`, which phase (c)
     // refuses as before (spec 032, 3.1.3).
-    // Only a version 1 definition is judged here; phase (a) admits nothing
-    // else until plan 3 compiles (increment 2).
-    let v1_construct = if def.schema == schema::DEFINITION {
-        first_v2_construct(def, &decoded)
-    } else {
-        None
-    };
-    if let Some((subject, construct)) = v1_construct {
+    if v2 {
+        quality::structure(def, &decoded)?;
+    } else if let Some((subject, construct)) = first_v2_construct(def, &decoded) {
         return refuse(
             C::InvalidDefinition,
             subject,
@@ -681,7 +748,11 @@ fn compile_inner(
     let known = |r: &str| -> Result<(), String> {
         match Ref::parse(r)? {
             Ref::Input(n, _) if !inputs.contains_key(&n) => Err(format!("unknown input {n:?}")),
-            Ref::Step(n) if !ids.contains(&n) => Err(format!("unknown step {n:?}")),
+            // A version 2 step reference may carry a field path.
+            Ref::Step(n) if v2 && !ids.contains(&crate::expr::split_step(&n).0) => {
+                Err(format!("unknown step {n:?}"))
+            }
+            Ref::Step(n) if !v2 && !ids.contains(&n) => Err(format!("unknown step {n:?}")),
             _ => Ok(()),
         }
     };
@@ -702,8 +773,16 @@ fn compile_inner(
             )?;
         }
         match &s.body {
-            // Refused above; plan 3 structure is checked separately.
-            StepBody::Corroborate(_) => {}
+            // Refused above outside plan 3, whose own structure is checked by
+            // `quality::structure`; here only the references are resolved.
+            StepBody::Corroborate(c) => {
+                let mut refs = vec![c.claim.clone()];
+                c.by.iter()
+                    .for_each(|k| predicate_refs(&k.predicate, &mut refs));
+                for r in refs {
+                    known(&r).or_else(|e| inv(subject.clone(), e))?;
+                }
+            }
             StepBody::Exact(_) => {
                 if let Some(a) = decoded.get(&s.id) {
                     a.structure().or_else(|e| inv(subject.clone(), e))?;
@@ -932,16 +1011,19 @@ fn compile_inner(
         match &s.body {
             StepBody::Corroborate(_) => {}
             StepBody::Exact(e) => {
-                if !ops::is_registered(&e.op, e.version) {
+                let (registered, registry) = if v2 {
+                    (
+                        ops::is_registered_v2(&e.op, e.version),
+                        schema::EXACT_REGISTRY_V2,
+                    )
+                } else {
+                    (ops::is_registered(&e.op, e.version), schema::EXACT_REGISTRY)
+                };
+                if !registered {
                     return refuse(
                         C::UnknownOperator,
                         subject,
-                        format!(
-                            "{}@{} is not in {}",
-                            e.op,
-                            e.version,
-                            schema::EXACT_REGISTRY
-                        ),
+                        format!("{}@{} is not in {registry}", e.op, e.version),
                     );
                 }
             }
@@ -974,6 +1056,14 @@ fn compile_inner(
         }
     }
 
+    // (c) continued: bind every source a graded input names (spec 032,
+    // 3.3.4). A version 1 definition binds none.
+    let bound = if v2 {
+        quality::bind_sources(def, sources)?
+    } else {
+        quality::Bound::default()
+    };
+
     // (d) Graph.
     let mut deps: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for s in &def.steps {
@@ -1000,6 +1090,10 @@ fn compile_inner(
                 v
             }
         };
+        if v2 {
+            // A version 2 step reference's dependency is the step itself.
+            refs = refs.iter().map(|r| base_ref_v2(r)).collect();
+        }
         let mut seen = BTreeSet::new();
         refs.retain(|r| seen.insert(r.clone()));
         deps.insert(s.id.clone(), refs);
@@ -1024,7 +1118,7 @@ fn compile_inner(
             inputs: &input_tys,
             steps: &step_tys,
             item: None,
-            v2: false,
+            v2,
         };
         let km = |e: String| Refusal {
             category: C::KindMismatch,
@@ -1033,11 +1127,47 @@ fn compile_inner(
             shortfalls: vec![],
         };
         match &s.body {
-            StepBody::Corroborate(_) => {
-                unreachable!("a corroborate step is refused before typing outside plan 3")
+            StepBody::Corroborate(c) => {
+                // The step's value is the claim (spec 032, 3.7.5).
+                let ty = crate::expr::ref_ty(&c.claim, &env).map_err(km)?;
+                for check in &c.by {
+                    type_predicate(&check.predicate, &env).map_err(km)?;
+                }
+                step_tys.insert(id.clone(), StepTy::Exact(ty.clone()));
+                infos.insert(
+                    id.clone(),
+                    StepInfo::Corroborate {
+                        decl: Box::new(c.clone()),
+                        ty,
+                    },
+                );
             }
             StepBody::Exact(_) => {
                 let args = decoded[id].clone();
+                if let OpArgs::MergeFields(m) = &args {
+                    // A per-item merge reads a join over its own base list.
+                    let overlay = m
+                        .overlay
+                        .strip_prefix("step:")
+                        .map(|s| crate::expr::split_step(s).0);
+                    if let Some(OpArgs::JoinKeyed(j)) =
+                        overlay.as_deref().and_then(|o| decoded.get(o))
+                    {
+                        if j.left != m.base {
+                            return refuse(
+                                C::InvalidDefinition,
+                                subject,
+                                format!(
+                                    "the overlay joins {}, not the base list {}",
+                                    j.left, m.base
+                                ),
+                            );
+                        }
+                    }
+                    if let Some(e) = args.merge_rule_error(&env) {
+                        return refuse(C::InvalidDefinition, subject, e);
+                    }
+                }
                 let ty = args.type_check(&env).map_err(km)?;
                 step_tys.insert(id.clone(), StepTy::Exact(ty.clone()));
                 infos.insert(id.clone(), StepInfo::Exact { args, ty });
@@ -1144,6 +1274,64 @@ fn compile_inner(
         }
     }
 
+    // (e2) Grades (spec 032, 3.9.3): the static ceiling of every input path
+    // and step value, then every requirement and hard gate, steps in
+    // declaration order, then policy items.
+    let mut trees: BTreeMap<String, quality::Ceil> = BTreeMap::new();
+    let mut grade_table: Vec<StaticGrade> = Vec::new();
+    if v2 {
+        for (name, (_, decl)) in &inputs {
+            trees.insert(
+                format!("input:{name}"),
+                quality::input_tree(&decl.ty, bound.inputs.get(name), None),
+            );
+        }
+        for id in &order {
+            let tree = match &infos[id] {
+                StepInfo::Exact { args, .. } => quality::step_tree(args, &trees),
+                StepInfo::Semantic { decl, .. } => quality::semantic_tree(decl, &trees),
+                StepInfo::Corroborate { decl, .. } => quality::corroborate_tree(decl, &trees),
+            };
+            trees.insert(format!("step:{id}"), tree);
+        }
+        for s in &def.steps {
+            let subject = format!("step:{}", s.id);
+            let found = match &infos[&s.id] {
+                StepInfo::Exact { args, .. } => quality::op_reads(args)
+                    .iter()
+                    .filter(|r| r.gate || r.require.is_some())
+                    .find_map(|r| quality::requirement_refusal(&subject, r, &trees)),
+                StepInfo::Corroborate { decl, .. } => {
+                    quality::corroborate_refusal(&subject, decl, &trees)
+                }
+                StepInfo::Semantic { .. } => None,
+            };
+            if let Some(r) = found {
+                return Err(r);
+            }
+        }
+        for (subject, c) in quality::policy_conds(def) {
+            let mut reads = Vec::new();
+            quality::cond_reads(c, &mut reads);
+            if let Some(r) = reads
+                .iter()
+                .find_map(|r| quality::requirement_refusal(&subject, r, &trees))
+            {
+                return Err(r);
+            }
+        }
+        if !bound.inputs.is_empty() {
+            for name in inputs.keys() {
+                let key = format!("input:{name}");
+                trees[&key].walk(&key, &mut grade_table);
+            }
+            for s in &def.steps {
+                let key = format!("step:{}", s.id);
+                trees[&key].walk(&key, &mut grade_table);
+            }
+        }
+    }
+
     // (f) Bind backends, fallbacks and calibration artifacts.
     let mut sorted: Vec<&BackendDescriptor> = descriptors.iter().collect();
     sorted.sort_by(|a, b| a.backend_id.as_bytes().cmp(b.backend_id.as_bytes()));
@@ -1153,18 +1341,22 @@ fn compile_inner(
     let mut bind_ctx: BTreeMap<String, (u64, u64)> = BTreeMap::new();
     for s in &def.steps {
         let subject = format!("step:{}", s.id);
-        let StepBody::Semantic(d) = &s.body else {
-            let StepBody::Exact(e) = &s.body else {
-                unreachable!()
-            };
-            details.insert(
-                s.id.clone(),
-                PlanStepDetail::Exact {
-                    op: e.op.clone(),
-                    version: e.version,
-                },
-            );
-            continue;
+        let d = match &s.body {
+            StepBody::Semantic(d) => d,
+            StepBody::Exact(e) => {
+                details.insert(
+                    s.id.clone(),
+                    PlanStepDetail::Exact {
+                        op: e.op.clone(),
+                        version: e.version,
+                    },
+                );
+                continue;
+            }
+            StepBody::Corroborate(_) => {
+                details.insert(s.id.clone(), PlanStepDetail::Corroborate);
+                continue;
+            }
         };
         let bound = projection_bounds[&s.id];
         let options_needed = match &d.candidates {
@@ -1387,12 +1579,30 @@ fn compile_inner(
         }
     }
 
+    // (g) continued: per-item and per-field evidence 2 records fit
+    // `RECORD_V1` (spec 032, 3.10.4).
+    if v2 {
+        if let Err(detail) = quality::evidence_bound(def, &infos) {
+            return refuse(C::Budget, "limits", format!("evidence-bound: {detail}"));
+        }
+    }
+
     // (h) Policy.
-    let reasons = possible_reasons(def, &inputs, &order, &infos, &details);
-    check_policy(def, &input_tys, &step_tys, &reasons, &mut notices)?;
+    let mut reasons = possible_reasons(def, &inputs, &order, &infos, &details);
+    if v2 {
+        extend_reasons_v2(def, &inputs, &order, &infos, &deps, &trees, &mut reasons);
+    }
+    check_policy(def, &input_tys, &step_tys, &reasons, &mut notices, v2)?;
 
     // (i) Emit.
-    let derivations = static_derivations(def, &inputs, &order, &deps);
+    let derivations = static_derivations(def, &inputs, &order, &deps, &infos);
+    // A plan records the lowest registry containing every operator,
+    // predicate and reference form it uses (spec 032, 3.1.3).
+    let registry = if v2 && uses_exact_v2(def, &decoded) {
+        schema::EXACT_REGISTRY_V2
+    } else {
+        schema::EXACT_REGISTRY
+    };
     let definition_id = def.id().map_err(|e| Refusal {
         category: C::Parse,
         subject: "definition".into(),
@@ -1400,9 +1610,9 @@ fn compile_inner(
         shortfalls: vec![],
     })?;
     let plan = Plan {
-        schema: schema::PLAN.into(),
+        schema: if v2 { schema::PLAN_V3 } else { schema::PLAN }.into(),
         compiler: COMPILER.into(),
-        registry: schema::EXACT_REGISTRY.into(),
+        registry: registry.into(),
         definition_id,
         definition: def.clone(),
         order: order.clone(),
@@ -1417,8 +1627,8 @@ fn compile_inner(
             .collect(),
         notices,
         execution: plan_execution,
-        sources: None,
-        grades: None,
+        sources: (!bound.sources.is_empty()).then(|| bound.sources.clone()),
+        grades: (!grade_table.is_empty()).then_some(grade_table),
     };
     let id = plan.id().map_err(|e| Refusal {
         category: C::Parse,
@@ -1435,9 +1645,161 @@ fn compile_inner(
             steps: infos,
             deps,
             order,
-            v2: false,
+            v2,
+            bound,
+            trees,
         },
     })
+}
+
+/// Whether a version 2 definition uses an operator, predicate or reference
+/// form only `rustev.exact/2` has.
+fn uses_exact_v2(def: &Definition, decoded: &BTreeMap<String, OpArgs>) -> bool {
+    decoded
+        .values()
+        .any(|a| matches!(a, OpArgs::JoinKeyed(_) | OpArgs::MergeFields(_)) || a.uses_v2())
+        || def.steps.iter().any(|s| match &s.body {
+            StepBody::Corroborate(c) => {
+                c.by.iter()
+                    .any(|k| crate::expr::predicate_uses_v2(&k.predicate))
+            }
+            _ => false,
+        })
+        || quality::policy_conds(def).any(|(_, c)| first_cond_v2(c))
+}
+
+fn first_cond_v2(c: &Cond) -> bool {
+    match c {
+        Cond::Exact(p) => crate::expr::predicate_uses_v2(p),
+        Cond::All(cs) | Cond::Any(cs) => cs.iter().any(first_cond_v2),
+        Cond::Not(c) => first_cond_v2(c),
+        _ => false,
+    }
+}
+
+fn base_ref_v2(r: &str) -> String {
+    crate::expr::base_ref_v2(r)
+}
+
+/// Whether values of a version 2 type can be absent or `null`.
+fn may_be_absent(t: &TypeDecl) -> bool {
+    match t {
+        TypeDecl::Nullable { .. } => true,
+        TypeDecl::Record {
+            present_when: Some(_),
+            ..
+        } => true,
+        TypeDecl::Record { fields, .. } => fields.iter().any(|f| may_be_absent(&f.ty)),
+        TypeDecl::List { item, .. } => may_be_absent(item),
+        TypeDecl::Map { value, .. } => may_be_absent(value),
+        _ => false,
+    }
+}
+
+/// The reasons spec 032 adds (3.4.4, 3.7.5, 3.8.1 and 3.9.4): reading an
+/// absent value is `missing_evidence`; a requirement or graded hard gate
+/// can be `insufficient_grade`; a corroboration can be `conflict` or
+/// `abstained`; `abstain` on disagreement is `abstained`.
+#[allow(clippy::too_many_arguments)]
+fn extend_reasons_v2(
+    def: &Definition,
+    inputs: &BTreeMap<String, (Ty, InputDecl)>,
+    order: &[String],
+    infos: &BTreeMap<String, StepInfo>,
+    deps: &BTreeMap<String, Vec<String>>,
+    trees: &BTreeMap<String, quality::Ceil>,
+    reasons: &mut BTreeMap<String, BTreeSet<ReasonKind>>,
+) {
+    use ReasonKind as K;
+    let graded_gate = |r: &quality::Read| {
+        r.require.is_some() || (r.gate && quality::read_ceiling(r, trees).own.graded().is_some())
+    };
+    let mut absent: BTreeSet<String> = BTreeSet::new();
+    for (name, (_, decl)) in inputs {
+        let key = format!("input:{name}");
+        if may_be_absent(&decl.ty) {
+            absent.insert(key.clone());
+        }
+        if matches!(
+            decl.on_disagreement,
+            Some(rustev_contract::definition::Disagreement::Abstain)
+        ) {
+            reasons.entry(key).or_default().insert(K::Abstained);
+        }
+    }
+    for id in order {
+        let key = format!("step:{id}");
+        let mut add: BTreeSet<ReasonKind> = BTreeSet::new();
+        match &infos[id] {
+            StepInfo::Exact { args, .. } => {
+                let reads = quality::op_reads(args);
+                let reads_absent = reads.iter().any(|r| absent.contains(&r.base));
+                match args {
+                    OpArgs::JoinKeyed(_) | OpArgs::MergeFields(_) => {
+                        absent.insert(key.clone());
+                    }
+                    // These exclude an absent item instead (3.4.4).
+                    OpArgs::FilterWithReasons(_) | OpArgs::TopK(_) | OpArgs::FieldPresence(_) => {}
+                    _ if reads_absent => {
+                        add.insert(K::MissingEvidence);
+                    }
+                    _ => {}
+                }
+                if reads.iter().any(graded_gate) {
+                    add.insert(K::InsufficientGrade);
+                }
+                if !matches!(args, OpArgs::FieldPresence(_)) {
+                    for d in &deps[id] {
+                        add.extend(reasons.get(d).cloned().unwrap_or_default());
+                    }
+                }
+            }
+            StepInfo::Corroborate { decl, .. } => {
+                let (claim, _) = quality::claim_path(decl);
+                if absent.contains(&claim) {
+                    absent.insert(key.clone());
+                }
+                add.extend(reasons.get(&claim).cloned().unwrap_or_default());
+                // A check reading an absent or unresolved value is
+                // `no_evidence`, and the claim then passes unchanged
+                // (spec 032, 3.7 items 3 and 5): a check's reads add no
+                // reason of their own to the step.
+                match decl.on_contradiction {
+                    rustev_contract::definition::OnContradiction::Conflict => {
+                        add.insert(K::Conflict);
+                    }
+                    rustev_contract::definition::OnContradiction::Abstain => {
+                        add.insert(K::Abstained);
+                    }
+                    rustev_contract::definition::OnContradiction::TreatAsHint => {}
+                }
+            }
+            StepInfo::Semantic { .. } => {
+                for d in &deps[id] {
+                    add.extend(reasons.get(d).cloned().unwrap_or_default());
+                }
+            }
+        }
+        reasons.entry(key).or_default().extend(add);
+    }
+    for (_, c) in quality::policy_conds(def) {
+        let mut reads = Vec::new();
+        quality::cond_reads(c, &mut reads);
+        for r in &reads {
+            if graded_gate(r) {
+                reasons
+                    .entry(r.base.clone())
+                    .or_default()
+                    .insert(K::InsufficientGrade);
+            }
+            if absent.contains(&r.base) {
+                reasons
+                    .entry(r.base.clone())
+                    .or_default()
+                    .insert(K::MissingEvidence);
+            }
+        }
+    }
 }
 
 /// The first construct of spec 032 in a version 1 definition, as `(subject,
@@ -1724,6 +2086,12 @@ fn possible_reasons(
             (_, PlanStepDetail::Unsupported { .. }) => {
                 r.insert(K::Unsupported);
             }
+            // An unresolved claim makes the step unresolved with the claim's
+            // reason (spec 032, 3.7.6); the rest is `extend_reasons_v2`.
+            (StepInfo::Corroborate { decl, .. }, _) => {
+                let (claim, _) = quality::claim_path(decl);
+                r.extend(out.get(&claim).cloned().unwrap_or_default());
+            }
             (StepInfo::Exact { args, .. }, _) => {
                 if let OpArgs::FieldPresence(fp) = args {
                     for i in &fp.inputs {
@@ -1794,13 +2162,21 @@ fn check_policy(
     step_tys: &BTreeMap<String, StepTy>,
     reasons: &BTreeMap<String, BTreeSet<ReasonKind>>,
     notices: &mut Vec<Notice>,
+    v2: bool,
 ) -> Result<(), Refusal> {
     use Category as C;
+    let base = |r: &str| {
+        if v2 {
+            crate::expr::base_ref_v2(r)
+        } else {
+            crate::expr::base_ref(r)
+        }
+    };
     let env = TyEnv {
         inputs: input_tys,
         steps: step_tys,
         item: None,
-        v2: false,
+        v2,
     };
     let policy = &def.policy;
 
@@ -1872,15 +2248,12 @@ fn check_policy(
         reads.extend(
             r.into_iter()
                 .filter(|(x, _)| x.starts_with("input:") || x.starts_with("step:"))
-                .map(|(x, neg)| (subject.clone(), crate::expr::base_ref(&x), neg)),
+                .map(|(x, neg)| (subject.clone(), base(&x), neg)),
         );
         if let Some(o) = outcome {
             let mut refs = Vec::new();
             outcome_refs(o, &mut refs);
-            reads.extend(
-                refs.into_iter()
-                    .map(|x| (subject.clone(), crate::expr::base_ref(&x), false)),
-            );
+            reads.extend(refs.into_iter().map(|x| (subject.clone(), base(&x), false)));
         }
     }
     for (subject, target, negated) in &reads {
@@ -1910,7 +2283,7 @@ fn check_policy(
         outcome_refs(&last.then, &mut refs);
         if let Some(r) = refs
             .iter()
-            .map(|r| crate::expr::base_ref(r))
+            .map(|r| base(r))
             .find(|r| unmet.contains(r.as_str()))
         {
             return refuse(
@@ -2027,6 +2400,7 @@ fn static_derivations(
     inputs: &BTreeMap<String, (Ty, InputDecl)>,
     order: &[String],
     deps: &BTreeMap<String, Vec<String>>,
+    infos: &BTreeMap<String, StepInfo>,
 ) -> BTreeMap<String, Derivation> {
     let semantic: BTreeSet<&str> = def
         .steps
@@ -2040,7 +2414,17 @@ fn static_derivations(
             out.insert(id.clone(), Derivation::ModelDerived);
             continue;
         }
-        let all_exact = deps[id].iter().all(|r| {
+        // Corroboration never changes a derivation class (spec 032, 2.1):
+        // the step's class is its claim's.
+        let claim_only;
+        let reads: &[String] = match infos.get(id) {
+            Some(StepInfo::Corroborate { decl, .. }) => {
+                claim_only = vec![quality::claim_path(decl).0];
+                &claim_only
+            }
+            _ => &deps[id],
+        };
+        let all_exact = reads.iter().all(|r| {
             if let Some(n) = r.strip_prefix("input:") {
                 !inputs
                     .get(n)

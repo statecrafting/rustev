@@ -788,3 +788,51 @@ read of a list node alone (`Mode::Node`) uses the node's own declaration,
 not its items' fields. Unit tests in the module cover ceilings, caps and
 the judgement; the compiler calls none of it until the change that admits
 plan 3.
+
+**Increment 2, fourth change (plan 3 compilation).** A `rustev.definition/2` compiles to
+`rustev.plan/3` through `compile_with_sources` (source descriptors beside
+backend descriptors and calibrations; `compile` and `compile_with` supply
+none) and loads with `Compiled::load_with_sources`. In
+`crates/rustev-core/src/quality.rs`:
+
+- Phase (b) adds `use_definition_1`, the version 2 types (`nullable` only
+  as a record field, maps of 1 to 10 000 entries, presence predicates
+  within 4 levels and 32 leaves over nullable fields of their record,
+  category 3 otherwise), graded-input and disagreement declarations
+  (`disagreement_on_ungraded`, `disagreement_sources`), `reserved_reason`,
+  corroboration structure, and the refusal of an explicit `hint` minimum in
+  a hard gate. Version 2 step ids hold no `/` and version 2 field names no
+  `/`, `.` or `*`, so `step:<id>/<field>` and `item:match/<field>` paths
+  are unambiguous; version 1 references are parsed exactly as before.
+- Phase (c) binds sources (category 15) and the registry `rustev.exact/2`
+  (`join_keyed@1`, `merge_fields@1`); version 1 still refuses both as
+  category 2.
+- Phase (e) types joins (a `joined` value whose per-item view is the
+  record `{id, match}`), merges (output fields are nullable, because a
+  merged field can be absent; a field of either side without a rule, or a
+  rule reading a side that lacks its field, is category 11; differing
+  types are category 3; a per-item merge's overlay must join the base list)
+  and corroboration (the step's type is the claim's).
+- Phase (e2) builds a static ceiling tree per input (each node's ceiling is
+  the highest over the input's sources of the minimum of declarations on
+  the node and its ancestors, capped) and per step, then judges every
+  requirement and graded hard-gate read (categories 13 and 14) and every
+  corroboration check. A read of the claim itself is not evidence for the
+  claim, so its grade is not compared with `upgrade_to`. An explicit
+  requirement on a statically ungraded value compiles and is
+  `insufficient_grade` at evaluation (section 5). A list read only for its
+  items' existence (`count_where`'s list, a filter's list) uses the list
+  node's own declaration, not its items' fields.
+- Phase (g) checks evidence 2's per-item and per-field records against
+  `RECORD_V1` (category 7, `evidence-bound`); phase (h) adds
+  `missing_evidence` for reads of values that can be absent,
+  `insufficient_grade` for requirements and graded hard gates (on the read
+  input or step for policy reads), `conflict` or `abstained` for
+  corroboration and `abstained` for `on_disagreement: abstain`.
+- Phase (i) emits plan 3 with `sources` (name order) and the `grades`
+  table when an input is graded, and the lowest registry the plan needs.
+
+`crates/rustev-core/tests/evidence_quality_compile.rs` covers each refusal
+with a passing neighbour, cap behaviour, `PlanId` sensitivity to a cap and
+insensitivity to an unbound descriptor, and plan 3 loading. Evaluating a
+plan 3 is refused at `Evaluation::start` until increment 3.

@@ -1,8 +1,7 @@
 //! Evidence quality at compile time (spec 032): the structure of version 2
-//! definitions (phase b), source binding (phase c, category 15) and static
-//! grade ceilings and the grade phase (e2, categories 13 and 14). The plan 3
-//! grade table and the evidence record bound follow with the change that
-//! admits plan 3.
+//! definitions (phase b), source binding (phase c, category 15), static
+//! grade ceilings and the grade phase (e2, categories 13 and 14), and the
+//! plan 3 grade table.
 //!
 //! A ceiling is the highest grade a value can have. It is computed from
 //! source descriptors, definition caps, propagation and corroboration only;
@@ -1253,6 +1252,129 @@ pub(crate) fn corroborate_refusal(
     None
 }
 
+/// Worst-case value-metadata nodes of a version 2 type: one per value,
+/// item, entry and field.
+fn meta_nodes(t: &TypeDecl) -> u64 {
+    match t {
+        TypeDecl::Nullable { ty } => meta_nodes(ty),
+        TypeDecl::Record { fields, .. } => fields
+            .iter()
+            .fold(1u64, |n, f| n.saturating_add(meta_nodes(&f.ty))),
+        TypeDecl::List { item, max_items } => {
+            1u64.saturating_add(max_items.saturating_mul(meta_nodes(item)))
+        }
+        TypeDecl::Map {
+            value, max_entries, ..
+        } => 1u64.saturating_add(max_entries.saturating_mul(meta_nodes(value))),
+        _ => 1,
+    }
+}
+
+/// Values one metadata node writes at most, beside its parts: grade,
+/// basis and its member, as-of, and the provenance and source sets.
+const VALUES_PER_META: u64 = 16;
+
+/// Phase (g) for plan 3 (spec 032, 3.10.4): the per-item and per-field
+/// records of evidence 2, bounded by declared list, map and record sizes,
+/// fit `RECORD_V1`.
+pub(crate) fn evidence_bound(
+    def: &Definition,
+    infos: &BTreeMap<String, crate::compile::StepInfo>,
+) -> Result<(), String> {
+    use rustev_contract::limits::RECORD_V1;
+    let collection = RECORD_V1.max_collection_len as u64;
+    fn widest(t: &TypeDecl) -> u64 {
+        match t {
+            TypeDecl::Nullable { ty } => widest(ty),
+            TypeDecl::Record { fields, .. } => fields
+                .iter()
+                .map(|f| widest(&f.ty))
+                .max()
+                .unwrap_or(0)
+                .max(fields.len() as u64),
+            TypeDecl::List { item, max_items } => (*max_items).max(widest(item)),
+            TypeDecl::Map {
+                value, max_entries, ..
+            } => (*max_entries).max(widest(value)),
+            _ => 0,
+        }
+    }
+    let mut nodes: u64 = 0;
+    for i in &def.inputs {
+        if widest(&i.ty) > collection {
+            return Err(format!(
+                "input:{} declares a collection over {collection} entries",
+                i.name
+            ));
+        }
+        nodes = nodes.saturating_add(meta_nodes(&i.ty));
+    }
+    for (id, info) in infos {
+        if let crate::compile::StepInfo::Exact { ty, .. }
+        | crate::compile::StepInfo::Corroborate { ty, .. } = info
+        {
+            if ty_widest(ty) > collection {
+                return Err(format!(
+                    "step:{id} produces a collection over {collection} entries"
+                ));
+            }
+        }
+        nodes = nodes.saturating_add(match info {
+            crate::compile::StepInfo::Exact { ty, .. }
+            | crate::compile::StepInfo::Corroborate { ty, .. } => ty_nodes(ty),
+            crate::compile::StepInfo::Semantic { .. } => 1,
+        });
+    }
+    let values = nodes.saturating_mul(VALUES_PER_META);
+    if values > RECORD_V1.max_total_values as u64 {
+        return Err(format!(
+            "worst-case value metadata of {nodes} nodes exceeds the record bound of {} values",
+            RECORD_V1.max_total_values
+        ));
+    }
+    Ok(())
+}
+
+/// The most entries any one collection of a step's type can hold.
+fn ty_widest(t: &crate::value::Ty) -> u64 {
+    use crate::value::Ty;
+    match t {
+        Ty::Nullable(t) | Ty::Maybe(t) => ty_widest(t),
+        Ty::Record(fields) => fields
+            .iter()
+            .map(|(_, t)| ty_widest(t))
+            .max()
+            .unwrap_or(0)
+            .max(fields.len() as u64),
+        Ty::List { item, max } => (*max).max(ty_widest(item)),
+        Ty::Map { value, max, .. } => (*max).max(ty_widest(value)),
+        Ty::Joined {
+            value,
+            max,
+            id_bytes,
+        } => (*max).max(ty_widest(&Ty::join_item(value, *id_bytes))),
+        _ => 0,
+    }
+}
+
+fn ty_nodes(t: &crate::value::Ty) -> u64 {
+    use crate::value::Ty;
+    match t {
+        Ty::Nullable(t) | Ty::Maybe(t) => ty_nodes(t),
+        Ty::Record(fields) => fields
+            .iter()
+            .fold(1u64, |n, (_, t)| n.saturating_add(ty_nodes(t))),
+        Ty::List { item, max } => 1u64.saturating_add(max.saturating_mul(ty_nodes(item))),
+        Ty::Map { value, max, .. } => 1u64.saturating_add(max.saturating_mul(ty_nodes(value))),
+        Ty::Joined {
+            value,
+            max,
+            id_bytes,
+        } => 1u64.saturating_add(max.saturating_mul(ty_nodes(&Ty::join_item(value, *id_bytes)))),
+        _ => 1,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1303,6 +1425,36 @@ mod tests {
         let e = r.expect_err("refused");
         assert_eq!(e.category, category, "{}", e.detail);
         assert!(e.detail.contains(detail), "{:?} lacks {detail:?}", e.detail);
+    }
+
+    #[test]
+    fn a_step_collection_is_measured_at_its_widest() {
+        use crate::value::Ty;
+        let list = |max, item| Ty::List {
+            item: Box::new(item),
+            max,
+        };
+        assert_eq!(ty_widest(&Ty::Bool), 0);
+        assert_eq!(ty_widest(&list(3, list(70, Ty::Bool))), 70);
+        let joined = Ty::Joined {
+            value: Box::new(Ty::Record([("a".to_string(), list(9, Ty::Bool))].into())),
+            max: 4,
+            id_bytes: 8,
+        };
+        assert_eq!(ty_widest(&joined), 9);
+        // A join's matched value is optional; its nodes still count.
+        let quote = Ty::Record(vec![
+            ("a".to_string(), Ty::Bool),
+            ("b".to_string(), Ty::Bool),
+        ]);
+        assert_eq!(ty_nodes(&Ty::Maybe(Box::new(quote.clone()))), 3);
+        let join = Ty::Joined {
+            value: Box::new(quote),
+            max: 20,
+            id_bytes: 8,
+        };
+        // Each item is {id, match: {a, b}}: 1 + 1 + 3 nodes.
+        assert_eq!(ty_nodes(&join), 1 + 20 * 5);
     }
 
     #[test]
