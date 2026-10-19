@@ -20,6 +20,7 @@ pub mod document;
 pub mod eval_report;
 pub mod evidence;
 pub mod execution;
+pub mod grade;
 pub mod ids;
 pub mod judgment;
 pub mod limits;
@@ -34,6 +35,7 @@ pub mod retention;
 pub mod run;
 pub mod scope;
 pub mod snapshot;
+pub mod source;
 pub mod time;
 
 pub use decimal::Decimal;
@@ -43,7 +45,8 @@ pub use time::{DurationMs, Timestamp};
 /// Schema strings of every document (spec 002, 3.2.1, as amended by spec 003,
 /// 3.2: plans are at version 2; execution policies and run records are new;
 /// by spec 004, 5.1: replay, request and runtime-reason documents; and by
-/// spec 009, 3.10: the remote protocol documents).
+/// spec 009, 3.10: the remote protocol documents; and by spec 032, 3.1.1:
+/// the #76 track versions and source descriptors).
 pub mod schema {
     pub const DEFINITION: &str = "rustev.definition/1";
     pub const PLAN: &str = "rustev.plan/2";
@@ -69,4 +72,15 @@ pub mod schema {
     pub const REMOTE_INFER: &str = "rustev.remote-infer/1";
     pub const REMOTE_CANCEL: &str = "rustev.remote-cancel/1";
     pub const REMOTE_EXCHANGE: &str = "rustev.remote-exchange/1";
+    /// The #76 track versions (spec 032, 3.1.1). Each is a superset of its
+    /// predecessor; later #76 specs add optional members to these versions
+    /// instead of defining further ones (3.1.2).
+    pub const DEFINITION_V2: &str = "rustev.definition/2";
+    pub const PLAN_V3: &str = "rustev.plan/3";
+    pub const SNAPSHOT_V2: &str = "rustev.snapshot/2";
+    pub const EVIDENCE_V2: &str = "rustev.evidence/2";
+    pub const RUN_V3: &str = "rustev.run/3";
+    pub const EXACT_REGISTRY_V2: &str = "rustev.exact/2";
+    /// Context source descriptors (spec 032, 3.3.1).
+    pub const SOURCE: &str = "rustev.source/1";
 }

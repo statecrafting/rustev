@@ -32,7 +32,14 @@ pub struct RunRecord {
     pub cost: CostSummary,
 }
 
-crate::document::document!(RunRecord, schema::RUN, RECORD_V1);
+// `rustev.run/3` is `rustev.run/1` with its core member holding
+// `rustev.evidence/2` (spec 032, 3.10.3).
+crate::document::versioned_document!(
+    RunRecord,
+    [schema::RUN, schema::RUN_V3],
+    "rustev.run/1 or rustev.run/3",
+    RECORD_V1
+);
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]

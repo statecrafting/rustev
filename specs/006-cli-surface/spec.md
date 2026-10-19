@@ -607,3 +607,10 @@ Made by the agent within A-06; open to the owner's review.
 Mutation seed copies exclude the managed `.bin` engine directory introduced
 by Statecraft profile revision 13. The earlier `.tooling` exclusion remains
 for existing clones. Seed source, tests, and mutation outcomes are unchanged.
+
+## Contract compatibility record (2026-10-18)
+
+Spec 032's contract additions (a `present_when` member on record types, the
+`corroborate` step kind and the snapshot entry's optional `grade`) are not
+covered by this crate's exhaustive patterns and struct literals; the CLI's calibration lookup and its plan test treat a corroborate step as not semantic.
+Behavior, documents and tests of this spec are unchanged.

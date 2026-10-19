@@ -32,7 +32,7 @@ fn semantic_mut<'a>(
 ) -> &'a mut rustev_contract::definition::SemanticDecl {
     match &mut def.steps.iter_mut().find(|s| s.id == id).unwrap().body {
         StepBody::Semantic(d) => d,
-        StepBody::Exact(_) => panic!("{id} is exact"),
+        StepBody::Exact(_) | StepBody::Corroborate(_) => panic!("{id} is not semantic"),
     }
 }
 

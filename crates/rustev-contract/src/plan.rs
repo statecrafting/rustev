@@ -1,5 +1,5 @@
 //! Compiled plans, `rustev.plan/2` (spec 002, 3.3.4, amended by spec 003,
-//! 3.2.1). A plan embeds its canonical definition, every binding that affects
+//! 3.2.1) and `rustev.plan/3` (spec 032, 3.1.1). A plan embeds its canonical definition, every binding that affects
 //! behavior and its execution policy, so its identity changes whenever
 //! behavior can.
 
@@ -9,8 +9,9 @@ use crate::calibration::CalibrationBinding;
 use crate::definition::{Definition, RequiredKind};
 use crate::descriptor::OutputKind;
 use crate::execution::ExecutionPolicy;
+use crate::grade::ValueGrade;
 use crate::ids::{
-    ArtifactId, CalibrationId, DefinitionId, DescriptorId, ExecutionPolicyId, PlanId,
+    ArtifactId, CalibrationId, DefinitionId, DescriptorId, ExecutionPolicyId, PlanId, SourceId,
 };
 use crate::judgment::{Derivation, Notice};
 use crate::limits::PLAN_V1;
@@ -22,7 +23,8 @@ pub struct Plan {
     pub schema: String,
     /// `rustev-core/<crate version>`.
     pub compiler: String,
-    /// `rustev.exact/1`.
+    /// `rustev.exact/1`, or for a plan 3 the lowest registry version
+    /// containing every operator, predicate and reference form it uses.
     pub registry: String,
     pub definition_id: DefinitionId,
     pub definition: Definition,
@@ -34,9 +36,39 @@ pub struct Plan {
     /// The runtime execution policy (spec 003, 3.2.1); `none` means one
     /// attempt per request on the bound backend, nothing else.
     pub execution: PlanExecution,
+    /// Plan 3: every bound source, in name order (spec 032, 3.3.4).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sources: Option<Vec<BoundSource>>,
+    /// Plan 3: the static grade table (spec 032, 3.9.3).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grades: Option<Vec<StaticGrade>>,
 }
 
-crate::document::document!(Plan, schema::PLAN, PLAN_V1, PlanId);
+crate::document::versioned_document!(
+    Plan,
+    [schema::PLAN, schema::PLAN_V3],
+    "rustev.plan/2 or rustev.plan/3",
+    PLAN_V1,
+    PlanId
+);
+
+/// A source descriptor bound at compile time.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BoundSource {
+    pub name: String,
+    pub version: String,
+    pub id: SourceId,
+}
+
+/// The highest grade an input path or step value can have.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StaticGrade {
+    /// `input:<name>`, `input:<name>/<path>` or `step:<id>`.
+    pub subject: String,
+    pub ceiling: ValueGrade,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]

@@ -290,6 +290,7 @@ fn has_fx_expr(e: &Expr) -> bool {
         | Expr::Mul { left, right }
         | Expr::Div { left, right } => has_fx_expr(left) || has_fx_expr(right),
         Expr::Round { value, .. } | Expr::Len(value) | Expr::ToDecimal(value) => has_fx_expr(value),
+        Expr::Graded { .. } => false,
     }
 }
 
@@ -298,7 +299,7 @@ fn has_fx_pred(p: &Predicate) -> bool {
         Predicate::Cmp { left, right, .. } => has_fx_expr(left) || has_fx_expr(right),
         Predicate::All(ps) | Predicate::Any(ps) => ps.iter().any(has_fx_pred),
         Predicate::Not(p) => has_fx_pred(p),
-        Predicate::Member { value, .. } => has_fx_expr(value),
+        Predicate::Member { value, .. } | Predicate::MemberRef { value, .. } => has_fx_expr(value),
         Predicate::Present(_) => false,
     }
 }
@@ -397,6 +398,26 @@ impl OpArgs {
             _ => out = self.refs(),
         }
         out
+    }
+
+    /// Whether the arguments use a predicate or reference form of
+    /// `rustev.exact/2` (spec 032, 3.1.3).
+    pub fn uses_v2(&self) -> bool {
+        use crate::expr::{expr_uses_v2, predicate_uses_v2};
+        match self {
+            OpArgs::CountWhere(a) => predicate_uses_v2(&a.predicate),
+            OpArgs::WindowFilter(a) => predicate_uses_v2(&a.predicate),
+            OpArgs::Extremum(_) | OpArgs::FieldPresence(_) | OpArgs::WeightedRank(_) => false,
+            OpArgs::TimestampDiff(a) => expr_uses_v2(&a.later) || expr_uses_v2(&a.earlier),
+            OpArgs::Compare(a) => predicate_uses_v2(&a.predicate),
+            OpArgs::Arith(a) => expr_uses_v2(&a.expr),
+            OpArgs::FxConvert(a) => {
+                expr_uses_v2(&a.amount) || expr_uses_v2(&a.from) || expr_uses_v2(&a.to)
+            }
+            OpArgs::MemberOf(a) => expr_uses_v2(&a.value),
+            OpArgs::FilterWithReasons(a) => a.rules.iter().any(|r| predicate_uses_v2(&r.predicate)),
+            OpArgs::TopK(a) => expr_uses_v2(&a.key),
+        }
     }
 
     /// Structural checks (compile phase b).

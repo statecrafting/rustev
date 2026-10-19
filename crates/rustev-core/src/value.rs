@@ -39,6 +39,13 @@ pub enum Ty {
     Ranking {
         max: u64,
     },
+    /// Version 2: text keys of at most `key_max` bytes, at most `max`
+    /// entries.
+    Map {
+        key_max: u64,
+        value: Box<Ty>,
+        max: u64,
+    },
 }
 
 impl Ty {
@@ -56,12 +63,24 @@ impl Ty {
                 item: Box::new(Ty::from_decl(item)),
                 max: *max_items,
             },
-            TypeDecl::Record { fields } => Ty::Record(
+            TypeDecl::Record { fields, .. } => Ty::Record(
                 fields
                     .iter()
                     .map(|f| (f.name.clone(), Ty::from_decl(&f.ty)))
                     .collect(),
             ),
+            // Version 2 types are refused in a version 1 definition before
+            // typing (spec 032, 3.1.3); plan 3 typing handles them itself.
+            TypeDecl::Nullable { ty } => Ty::Maybe(Box::new(Ty::from_decl(ty))),
+            TypeDecl::Map {
+                key_max_bytes,
+                value,
+                max_entries,
+            } => Ty::Map {
+                key_max: *key_max_bytes,
+                value: Box::new(Ty::from_decl(value)),
+                max: *max_entries,
+            },
         }
     }
 
@@ -73,6 +92,7 @@ impl Ty {
             (Ty::Enum(_), Ty::Enum(_)) => true,
             (Ty::Maybe(a), Ty::Maybe(b)) => a.same_shape(b),
             (Ty::List { item: a, .. }, Ty::List { item: b, .. }) => a.same_shape(b),
+            (Ty::Map { value: a, .. }, Ty::Map { value: b, .. }) => a.same_shape(b),
             (Ty::Record(a), Ty::Record(b)) => {
                 a.len() == b.len()
                     && a.iter()
@@ -98,6 +118,7 @@ impl Ty {
             Ty::Duration => "duration".into(),
             Ty::Maybe(t) => format!("maybe<{}>", t.name()),
             Ty::List { item, .. } => format!("list<{}>", item.name()),
+            Ty::Map { value, .. } => format!("map<{}>", value.name()),
             Ty::Record(_) => "record".into(),
             Ty::Filtered { .. } => "filtered".into(),
             Ty::Shortlist { .. } => "shortlist".into(),
@@ -131,6 +152,17 @@ impl Ty {
                 64u64.saturating_add(max.saturating_mul(text(*id_bytes).saturating_add(64)))
             }
             Ty::Ranking { max } => 64u64.saturating_add(max.saturating_mul(1024)),
+            Ty::Map {
+                key_max,
+                value,
+                max,
+            } => 2u64.saturating_add(
+                max.saturating_mul(
+                    text(*key_max)
+                        .saturating_add(2)
+                        .saturating_add(value.max_json_bytes()),
+                ),
+            ),
         }
     }
 
@@ -155,6 +187,7 @@ pub enum Value {
     Maybe(Option<Box<Value>>),
     List(Vec<Value>),
     Record(BTreeMap<String, Value>),
+    Map(BTreeMap<String, Value>),
     Filtered(Filtered),
     Shortlist(Shortlist),
     Ranking(Ranking),
@@ -206,6 +239,9 @@ impl Value {
             Value::Filtered(f) => OutValue::Filtered(f.clone()),
             Value::Shortlist(s) => OutValue::Shortlist(s.clone()),
             Value::Ranking(r) => OutValue::Ranking(r.clone()),
+            Value::Map(m) => {
+                OutValue::Record(m.iter().map(|(k, v)| (k.clone(), v.to_out())).collect())
+            }
         }
     }
 
@@ -228,6 +264,9 @@ impl Value {
             Value::Filtered(f) => serde_json::to_value(f).unwrap_or(Json::Null),
             Value::Shortlist(s) => serde_json::to_value(s).unwrap_or(Json::Null),
             Value::Ranking(_) => Json::Null,
+            Value::Map(m) => {
+                Json::Object(m.iter().map(|(k, v)| (k.clone(), v.to_json())).collect())
+            }
         }
     }
 
@@ -305,6 +344,29 @@ pub fn decode(ty: &Ty, json: &Json) -> Result<Value, String> {
                 .collect::<Result<Vec<_>, _>>()
                 .map(Value::List)
         }
+        (
+            Ty::Map {
+                key_max,
+                value,
+                max,
+            },
+            Json::Object(o),
+        ) => {
+            if o.len() as u64 > *max {
+                return Err(format!("map of {} entries exceeds {max}", o.len()));
+            }
+            let mut out = BTreeMap::new();
+            for (k, v) in o {
+                if k.len() as u64 > *key_max {
+                    return Err(format!("key of {} bytes exceeds {key_max}", k.len()));
+                }
+                out.insert(
+                    k.clone(),
+                    decode(value, v).map_err(|e| format!("[{k:?}]: {e}"))?,
+                );
+            }
+            Ok(Value::Map(out))
+        }
         (Ty::Record(fields), Json::Object(o)) => {
             if let Some(extra) = o.keys().find(|k| !fields.iter().any(|(n, _)| n == *k)) {
                 return Err(format!("undeclared field {extra:?}"));
@@ -329,6 +391,29 @@ pub fn decode(ty: &Ty, json: &Json) -> Result<Value, String> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn a_map_decodes_by_key_within_its_bounds() {
+        let map = Ty::from_decl(&TypeDecl::Map {
+            key_max_bytes: 4,
+            value: Box::new(TypeDecl::Integer),
+            max_entries: 2,
+        });
+        assert_eq!(
+            decode(&map, &json!({"a": 1, "b": 2})),
+            Ok(Value::Map(BTreeMap::from([
+                ("a".into(), Value::Integer(1)),
+                ("b".into(), Value::Integer(2)),
+            ])))
+        );
+        assert!(
+            decode(&map, &json!({"a": 1, "b": 2, "c": 3})).is_err(),
+            "entries"
+        );
+        assert!(decode(&map, &json!({"long_key": 1})).is_err(), "key bytes");
+        assert!(decode(&map, &json!({"a": "1"})).is_err(), "value type");
+        assert!(decode(&map, &json!([1])).is_err(), "not an object");
+    }
 
     #[test]
     fn decoding_is_strict() {

@@ -105,6 +105,11 @@ identity!(
     SnapshotId
 );
 identity!(
+    /// Identity of a canonical context source descriptor,
+    /// `rustev.source/1` (spec 032, 3.3.1).
+    SourceId
+);
+identity!(
     /// Identity of a canonical execution policy (spec 003, 3.2.2).
     ExecutionPolicyId
 );

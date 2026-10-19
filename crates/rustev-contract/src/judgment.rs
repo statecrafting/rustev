@@ -50,16 +50,39 @@ pub enum Outcome {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Unresolved {
-    MissingEvidence { fields: Vec<String> },
-    StaleEvidence { fields: Vec<String> },
-    InvalidInput { fields: Vec<String>, detail: String },
-    Abstained { rule: String },
-    BackendUnavailable { detail: String },
-    InvalidBackendOutput { detail: String },
-    BudgetExhausted { resource: String },
+    MissingEvidence {
+        fields: Vec<String>,
+    },
+    StaleEvidence {
+        fields: Vec<String>,
+    },
+    InvalidInput {
+        fields: Vec<String>,
+        detail: String,
+    },
+    Abstained {
+        rule: String,
+    },
+    BackendUnavailable {
+        detail: String,
+    },
+    InvalidBackendOutput {
+        detail: String,
+    },
+    BudgetExhausted {
+        resource: String,
+    },
     DeadlineExceeded,
-    Conflict { facts: Vec<String> },
-    Unsupported { capability: String },
+    Conflict {
+        facts: Vec<String>,
+    },
+    Unsupported {
+        capability: String,
+    },
+    /// A read whose value is below a required grade (spec 032, 3.9.4).
+    InsufficientGrade {
+        fields: Vec<String>,
+    },
 }
 
 impl Unresolved {
@@ -75,6 +98,7 @@ impl Unresolved {
             Unresolved::DeadlineExceeded => ReasonKind::DeadlineExceeded,
             Unresolved::Conflict { .. } => ReasonKind::Conflict,
             Unresolved::Unsupported { .. } => ReasonKind::Unsupported,
+            Unresolved::InsufficientGrade { .. } => ReasonKind::InsufficientGrade,
         }
     }
 
@@ -97,6 +121,13 @@ impl Unresolved {
         Unresolved::InvalidInput {
             fields: sorted(fields),
             detail: detail.into(),
+        }
+    }
+
+    /// `insufficient_grade` with sorted, deduplicated fields.
+    pub fn insufficient<I: IntoIterator<Item = String>>(fields: I) -> Self {
+        Unresolved::InsufficientGrade {
+            fields: sorted(fields),
         }
     }
 
@@ -136,6 +167,9 @@ impl fmt::Display for Unresolved {
             Unresolved::DeadlineExceeded => write!(f, "deadline_exceeded"),
             Unresolved::Conflict { facts } => write!(f, "conflict{{{}}}", facts.join(",")),
             Unresolved::Unsupported { capability } => write!(f, "unsupported{{{capability}}}"),
+            Unresolved::InsufficientGrade { fields } => {
+                write!(f, "insufficient_grade{{{}}}", fields.join(","))
+            }
         }
     }
 }
@@ -253,6 +287,7 @@ impl ReasonKind {
             ReasonKind::DeadlineExceeded => "deadline_exceeded",
             ReasonKind::Conflict => "conflict",
             ReasonKind::Unsupported => "unsupported",
+            ReasonKind::InsufficientGrade => "insufficient_grade",
         }
     }
 }
