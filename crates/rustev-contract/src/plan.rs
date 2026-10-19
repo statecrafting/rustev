@@ -121,6 +121,8 @@ pub enum PlanStepDetail {
     Unsupported {
         capability: String,
     },
+    /// Plan 3: a corroboration step (spec 032, 3.7).
+    Corroborate,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

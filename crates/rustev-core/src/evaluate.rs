@@ -269,6 +269,13 @@ impl<'c> Evaluation<'c> {
         if snapshot.schema != schema::SNAPSHOT {
             return Err(StartError::Schema(snapshot.schema.clone()));
         }
+        if compiled.info.v2 {
+            // Plan 3 evaluation is increment 3 of spec 032.
+            return Err(StartError::Schema(format!(
+                "{} evaluation is not implemented yet",
+                schema::PLAN_V3
+            )));
+        }
         let info = &compiled.info;
         for e in &snapshot.entries {
             if !info.inputs.contains_key(&e.field) {
@@ -734,6 +741,16 @@ impl<'c> Evaluation<'c> {
                         self.exact.insert(id.clone(), result);
                         self.derivation.insert(key.clone(), derivation);
                     }
+                    // Plan 3 evaluation is increment 3 of spec 032; `start`
+                    // refuses a plan 3 until then.
+                    StepInfo::Corroborate { .. } => {
+                        self.exact.insert(
+                            id.clone(),
+                            Err(Unresolved::Unsupported {
+                                capability: "corroborate evaluation".into(),
+                            }),
+                        );
+                    }
                     StepInfo::Semantic { .. } => {
                         self.derivation
                             .insert(key.clone(), Derivation::ModelDerived);
@@ -773,7 +790,7 @@ impl<'c> Evaluation<'c> {
                     k.clone(),
                     decl.for_each.iter().map(|f| f.bind.clone()).collect(),
                 )),
-                StepInfo::Exact { .. } => None,
+                StepInfo::Exact { .. } | StepInfo::Corroborate { .. } => None,
             })
             .collect();
         let cx = OpContext {

@@ -19,12 +19,13 @@ pub mod expr;
 pub mod kinds;
 pub mod ops;
 pub(crate) mod policy;
-// Wired into the compiler by the change that admits plan 3 (spec 032).
-#[allow(dead_code)]
 pub(crate) mod quality;
 pub mod seams;
 pub mod sem;
 pub mod value;
 
-pub use compile::{Category, Compiled, LoadError, Refusal, compile, compile_bytes, compile_with};
+pub use compile::{
+    Category, Compiled, LoadError, Refusal, compile, compile_bytes, compile_with,
+    compile_with_sources,
+};
 pub use evaluate::{Evaluation, RequestIdentityError, SemanticRequest, Supplied};
