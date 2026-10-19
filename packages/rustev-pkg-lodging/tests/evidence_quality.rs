@@ -376,6 +376,92 @@ fn goldens() -> Vec<(String, Vec<u8>)> {
     out
 }
 
+/// The smallest plan 3: one record input with a nullable field, no graded
+/// input and no source, so every optional member of spec 032 is unused.
+fn minimal_definition() -> Value {
+    json!({
+        "schema": "rustev.definition/2", "name": "eq-minimal", "version": "0.1.0",
+        "package": "synthetic",
+        "inputs": [{"name": "x", "type": {"record": {"fields": [
+            {"name": "a", "type": {"nullable": {"type": {"text": {"max_bytes": 8}}}}}]}},
+            "provenance": ["user-supplied"], "freshness": "not_required"}],
+        "steps": [], "policy": {"on_unresolved": [], "rules": [
+            {"id": "r", "when": "always", "then": {"escalate": {"reason": "x"}}}], "adjustments": []},
+        "limits": {"max_semantic_requests": 0, "on_excess": "refuse", "max_projection_bytes": 0,
+            "distribution_tolerance": "0.000001", "deadline_ms": 0}
+    })
+}
+
+fn minimal_snapshot() -> Snapshot {
+    snapshot(&json!({"schema": schema::SNAPSHOT_V2, "entries": [
+        entry("x", json!({"a": null}), "user-supplied", 0, "app")]}))
+}
+
+/// The canonical bytes of each version 2 document with its optional members
+/// unused (spec 032, 3.1.2): definition 2, plan 3, snapshot 2, evidence 2
+/// and run 3.
+async fn minimal_documents() -> Vec<(String, Vec<u8>)> {
+    let d = def(&minimal_definition());
+    let c = rustev_core::compile(&d, &[], &[]).unwrap();
+    let s = minimal_snapshot();
+    let (_, evidence) = evaluate(&c, &s);
+    let (rt, sink) = runtime(true);
+    let plan = rt.prepare(c.clone()).unwrap();
+    let req = DecisionRequest {
+        snapshot: s.clone(),
+        ..request()
+    };
+    rt.decide(&plan, req, &CancelSignal::default())
+        .await
+        .unwrap();
+    let run = sink.records.lock().unwrap()[0].canonical().unwrap();
+    vec![
+        ("minimal/definition.json".into(), d.canonical().unwrap()),
+        ("minimal/plan.json".into(), c.plan.canonical().unwrap()),
+        ("minimal/snapshot.json".into(), s.canonical().unwrap()),
+        ("minimal/evidence.json".into(), evidence),
+        ("minimal/run.json".into(), run),
+    ]
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn unused_optional_members_are_omitted_from_canonical_bytes() {
+    let docs = minimal_documents().await;
+    if std::env::var_os("RUSTEV_BLESS").is_some() {
+        for (path, bytes) in &docs {
+            let target = dir().join(path);
+            std::fs::create_dir_all(target.parent().unwrap()).unwrap();
+            std::fs::write(target, bytes).unwrap();
+        }
+        return;
+    }
+    for (path, bytes) in &docs {
+        let on_disk = std::fs::read(dir().join(path)).unwrap_or_else(|e| panic!("{path}: {e}"));
+        assert!(
+            on_disk == *bytes,
+            "tests/evidence_quality/{path} differs from its builder"
+        );
+        // No member that only a graded input, a source, a claim, a join, a
+        // merge or a corroboration needs.
+        let text = String::from_utf8(on_disk).unwrap();
+        let unused: &[&str] = match path.as_str() {
+            "minimal/definition.json" => &["\"evidence\"", "\"on_disagreement\""],
+            "minimal/plan.json" => &["\"sources\"", "\"grades\""],
+            "minimal/snapshot.json" => &["\"grade\""],
+            _ => &[
+                "\"entries\"",
+                "\"resolution\"",
+                "\"join\"",
+                "\"merge\"",
+                "\"corroboration\"",
+            ],
+        };
+        for member in unused {
+            assert!(!text.contains(member), "{path} carries {member}");
+        }
+    }
+}
+
 #[test]
 fn golden_fixtures_match_their_builders() {
     let goldens = goldens();

@@ -896,3 +896,16 @@ refused property. The same test runs a plan 3 decision through the runtime:
 the delivered record is `rustev.run/3` embedding the golden evidence 2, a
 sink accepting only `rustev.run/1` is refused `sink_version_unsupported`,
 and capture is refused `capture_unsupported` with nothing delivered.
+
+**Increment 4, second change (optional members and seeds).** Golden bytes
+under `packages/rustev-pkg-lodging/tests/evidence_quality/minimal/` hold a
+definition 2, plan 3, snapshot 2, evidence 2 and run 3 whose optional
+members of this spec are unused, and the test asserts each omits them.
+`crates/rustev-core/mutation/seeds.py` (run by `seeds.sh` on a temporary
+copy) seeds the seven defects of the Acceptance section: grade combination
+taking the maximum, a merge falling back to base under `overlay_only`, key
+existence counted as presence, a cap raising a ceiling, a corroboration
+ignoring check grades, `prefer` choosing the last entry and a requirement
+ignoring `max_age_ms`; each is detected. The corroboration seed is caught by
+`a_check_reading_below_upgrade_to_is_no_evidence`, which a snapshot claim
+below `upgrade_to` drives.
