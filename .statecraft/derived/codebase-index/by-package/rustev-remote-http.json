@@ -3,9 +3,8 @@
     "kind": "rust-lib",
     "name": "rustev-remote-http",
     "path": "integrations/rustev-remote-http",
-    "specRef": "009-remote-adapter-protocol",
-    "version": "0.1.0"
+    "specRef": "009-remote-adapter-protocol"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "ebdc87f9fc3ea6739e72fdc305e16c146620bd591ce92320fcec9910c89a6597"
+  "shardHash": "9af47224a6b5db8d7609c3c757191d8d084c06451e024125bc77f7db4ea09791"
 }

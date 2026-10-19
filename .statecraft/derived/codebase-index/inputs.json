@@ -19,13 +19,31 @@
       "contentHash": "9bdb73e6b5bf39970fe22c93aec881a762ecb1ddad85ca76a714ef6d59cd01c9"
     },
     "Cargo.toml": {
-      "contentHash": "3885ad11e92fadf94ce39934391feaec4fd51df49817114b93df953eb7db5f05"
+      "contentHash": "bc15d1d6bc8ffd8d805f45a2a31f6d10320337b2285807a5fa38706bf96b89fb"
     },
     "Makefile": {
       "contentHash": "f5b74b63788fec0a1856d570c00c610b91cb3fa978666c4f7cadf3ac06cb31ad"
     },
     "README.md": {
       "contentHash": "00357023c7a1ef133dcfda97631476dacd120980be8dc47004c55dc706932a2f"
+    },
+    "backends/rustev-backend-rules/LICENSE": {
+      "contentHash": "4c61361bb9199fac45f88e2eba0a7bc61d1a744e3b603315e5b84c8af846af87"
+    },
+    "crates/rustev-cli/LICENSE": {
+      "contentHash": "b80209b60da3ce21a6d37b26ab35ee5d0aa2537d34baee485f6599d8125eafb0"
+    },
+    "crates/rustev-contract/LICENSE": {
+      "contentHash": "6d62edd00bcd4372263e2cf7361ffeda05961cdf35f28543e424aba1fd16ada8"
+    },
+    "crates/rustev-core/LICENSE": {
+      "contentHash": "2ca485653675dfbfeee1d0c4b3b80fb92b2784b652ae41e83626650a9f3305ee"
+    },
+    "crates/rustev-eval/LICENSE": {
+      "contentHash": "64b3a80b501a616ac9b8f8eeaf80a20921a4901e935359e93a3f46c721b3de20"
+    },
+    "crates/rustev-runtime/LICENSE": {
+      "contentHash": "555c3777d1cf0db4a55bbd7a553f6301d4271644504d7f83b13d414186fd73c6"
     },
     "docs/backlog.md": {
       "contentHash": "7760f24163d3e76d164233ab32487cda20a859061f9488c17dec0e13044f2645"
@@ -69,8 +87,14 @@
     "docs/design/discussions/README.md": {
       "contentHash": "c7df0ab376e0e837439039e52f433c68b312bea5ed89bfdd1e39a421b6ec2969"
     },
+    "integrations/rustev-remote-http/LICENSE": {
+      "contentHash": "491bb1f843fe2e3b03b56199f2e1bcabaea41d2cd46e58f6c3cc7a9493dcaaa0"
+    },
+    "packages/rustev-pkg-support-routing/LICENSE": {
+      "contentHash": "85cbab11005a37eada09d774bcf825cdd527a5daccdd27353ccca5605f31763c"
+    },
     "spec-spine.toml": {
-      "contentHash": "0dd9213b9846b2dffc513970c75e0dbf56533dab741000f3115112646b55f538"
+      "contentHash": "32b20ee7844e76fcfe4e8151b014c17e04f8e0a0d3047f395ceef81b51ead68d"
     },
     "standards/spec/constitution.md": {
       "contentHash": "010d2e3af85bb45a1208b6dc521803e99bccd7a2f1b00d08c5f5c9aacf0bd766"

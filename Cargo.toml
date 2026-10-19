@@ -6,12 +6,26 @@ resolver = "3"
 members = ["crates/*", "backends/*", "tools/*", "integrations/*", "packages/*"]
 
 [workspace.package]
+# One lockstep family version for the eight first-release packages (spec 021,
+# 3.2); each internal dependency below names it exactly.
+version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
 license = "Apache-2.0"
 repository = "https://github.com/statecrafting/rustev"
+homepage = "https://github.com/statecrafting/rustev"
+readme = "README.md"
 
 [workspace.dependencies]
+# The first-release family (spec 021, 3.2): an exact `=X.Y.Z` version beside
+# the path, so a packaged manifest resolves from the registry by version alone.
+rustev-contract = { path = "crates/rustev-contract", version = "=0.1.0" }
+rustev-core = { path = "crates/rustev-core", version = "=0.1.0" }
+rustev-runtime = { path = "crates/rustev-runtime", version = "=0.1.0" }
+rustev-eval = { path = "crates/rustev-eval", version = "=0.1.0" }
+rustev-backend-rules = { path = "backends/rustev-backend-rules", version = "=0.1.0" }
+rustev-remote-http = { path = "integrations/rustev-remote-http", version = "=0.1.0" }
+rustev-cli = { path = "crates/rustev-cli", version = "=0.1.0" }
 serde = { version = "1", features = ["derive"] }
 # `float_roundtrip`: parsing is correctly rounded, so a retained output parses
 # to exactly the value that was supplied (spec 004, 5.6).

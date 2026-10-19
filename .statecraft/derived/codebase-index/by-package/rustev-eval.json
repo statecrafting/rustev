@@ -3,9 +3,8 @@
     "kind": "rust-lib",
     "name": "rustev-eval",
     "path": "crates/rustev-eval",
-    "specRef": "004-evaluation-and-replay",
-    "version": "0.1.0"
+    "specRef": "004-evaluation-and-replay"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "e11deaaf24ccac78d7d13dc873d0f12a4cb039df08a764bc60918e43f0048871"
+  "shardHash": "bc2175fa0c9cc8199dbd1b00e561a1967d7808e87a9894a8878a384e7e3ea31a"
 }

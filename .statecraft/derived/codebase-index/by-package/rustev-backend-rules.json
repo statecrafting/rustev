@@ -3,9 +3,8 @@
     "kind": "rust-lib",
     "name": "rustev-backend-rules",
     "path": "backends/rustev-backend-rules",
-    "specRef": "005-reference-backends",
-    "version": "0.1.0"
+    "specRef": "005-reference-backends"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "baadf2801ed2010ec9c3d18292353353da9bb9052d14a76f23a2223fdcdc6487"
+  "shardHash": "3685d3b5b930310102ab1d9d0297fb085fcf56cb395f1619ba04f14865a64d8a"
 }

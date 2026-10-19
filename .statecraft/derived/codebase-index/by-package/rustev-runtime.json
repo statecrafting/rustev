@@ -3,9 +3,8 @@
     "kind": "rust-lib",
     "name": "rustev-runtime",
     "path": "crates/rustev-runtime",
-    "specRef": "003-runtime-execution-and-evidence",
-    "version": "0.1.0"
+    "specRef": "003-runtime-execution-and-evidence"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "4703943a86d85375a8db195bb8cd30e7118c50581d8918fb3fe8696f9f8f4fc9"
+  "shardHash": "475942db19198b6d0bc74da3028835fe2d74bf4afe1e4c6a2cc12546ba355013"
 }

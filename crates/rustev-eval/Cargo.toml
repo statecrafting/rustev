@@ -1,12 +1,18 @@
 [package]
 name = "rustev-eval"
-version = "0.1.0"
+version.workspace = true
 description = "Rustev's offline evaluation: bounded replay bundles, historical reproduction, candidate comparison, datasets, metrics and calibration fitting."
-publish = false
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/rustev-eval"
+readme.workspace = true
+keywords = ["decision-engine", "evaluation", "replay", "calibration"]
+categories = ["development-tools::testing"]
+# Spec 021, 3.4: the intended public registry only.
+publish = ["crates-io"]
 
 [package.metadata.spec-spine]
 spec = "004-evaluation-and-replay"
@@ -14,15 +20,15 @@ spec = "004-evaluation-and-replay"
 # Contract and core only: no runtime, backend, HTTP stack, clock or
 # filesystem (spec 004, 2). A test checks this list.
 [dependencies]
-rustev-contract = { path = "../rustev-contract" }
-rustev-core = { path = "../rustev-core" }
+rustev-contract.workspace = true
+rustev-core.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 
 # The runtime, the rules backend and Tokio produce fixtures in tests only.
 [dev-dependencies]
-rustev-runtime = { path = "../rustev-runtime" }
-rustev-backend-rules = { path = "../../backends/rustev-backend-rules" }
+rustev-runtime.workspace = true
+rustev-backend-rules.workspace = true
 tokio = { workspace = true, features = ["sync", "time", "rt", "macros"] }
 
 [lints]

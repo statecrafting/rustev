@@ -1,19 +1,25 @@
 [package]
 name = "rustev-remote-http"
-version = "0.1.0"
+version.workspace = true
 description = "Rustev's remote adapter machinery and the rustev.remote/1 HTTP binding: a client implementing the backend seam and a server hosting any backend."
-publish = false
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/rustev-remote-http"
+readme.workspace = true
+keywords = ["decision-engine", "http", "protocol"]
+categories = ["network-programming"]
+# Spec 021, 3.4: the intended public registry only.
+publish = ["crates-io"]
 
 [package.metadata.spec-spine]
 spec = "009-remote-adapter-protocol"
 
 [dependencies]
-rustev-contract = { path = "../../crates/rustev-contract" }
-rustev-core = { path = "../../crates/rustev-core" }
+rustev-contract.workspace = true
+rustev-core.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
@@ -27,9 +33,9 @@ webpki-roots.workspace = true
 
 # The runtime, eval and the rules backend are for the conformance suite only.
 [dev-dependencies]
-rustev-runtime = { path = "../../crates/rustev-runtime" }
-rustev-eval = { path = "../../crates/rustev-eval" }
-rustev-backend-rules = { path = "../../backends/rustev-backend-rules" }
+rustev-runtime.workspace = true
+rustev-eval.workspace = true
+rustev-backend-rules.workspace = true
 tokio = { workspace = true, features = ["net", "time", "rt", "rt-multi-thread", "sync", "macros", "io-util", "test-util"] }
 
 [lints]

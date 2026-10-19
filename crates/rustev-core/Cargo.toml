@@ -1,18 +1,24 @@
 [package]
 name = "rustev-core"
-version = "0.1.0"
+version.workspace = true
 description = "Rustev's pure core: validation, value kinds, exact operators, compiler, calibration binding and selection policy."
-publish = false
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/rustev-core"
+readme.workspace = true
+keywords = ["decision-engine", "rules", "compiler"]
+categories = ["algorithms"]
+# Spec 021, 3.4: the intended public registry only.
+publish = ["crates-io"]
 
 [package.metadata.spec-spine]
 spec = "002-decision-contract-and-pure-core"
 
 [dependencies]
-rustev-contract = { path = "../rustev-contract" }
+rustev-contract.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 

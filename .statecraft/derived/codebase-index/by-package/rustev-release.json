@@ -1,0 +1,11 @@
+{
+  "package": {
+    "kind": "rust-lib-bin",
+    "name": "rustev-release",
+    "path": "tools/rustev-release",
+    "specRef": "031-public-api-and-release-family",
+    "version": "0.1.0"
+  },
+  "schemaVersion": "1.2.0",
+  "shardHash": "d69afe7cd7d9e12d3603908b4b40861b0205fc879701da362c1f000ff399fc38"
+}

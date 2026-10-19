@@ -32,7 +32,15 @@
         "source": "spec-edge"
       },
       {
+        "path": "backends/rustev-backend-rules/LICENSE",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rustev-cli/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-cli/LICENSE",
         "source": "spec-edge"
       },
       {
@@ -40,7 +48,15 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rustev-contract/LICENSE",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rustev-core/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-core/LICENSE",
         "source": "spec-edge"
       },
       {
@@ -48,7 +64,15 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rustev-eval/LICENSE",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rustev-runtime/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-runtime/LICENSE",
         "source": "spec-edge"
       },
       {
@@ -56,11 +80,36 @@
         "source": "spec-edge"
       },
       {
+        "path": "integrations/rustev-remote-http/LICENSE",
+        "source": "spec-edge"
+      },
+      {
         "path": "packages/rustev-pkg-support-routing/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "packages/rustev-pkg-support-routing/LICENSE",
+        "source": "spec-edge"
+      },
+      {
+        "path": "tools/rustev-release/",
         "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "tools/rustev-release/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-release/"
+        }
+      },
       {
         "locations": [
           {
@@ -116,6 +165,19 @@
       {
         "locations": [
           {
+            "file": "backends/rustev-backend-rules/LICENSE"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "backends/rustev-backend-rules/LICENSE"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rustev-cli/Cargo.toml"
           }
         ],
@@ -124,6 +186,19 @@
         "unit": {
           "kind": "file",
           "path": "crates/rustev-cli/Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-cli/LICENSE"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rustev-cli/LICENSE"
         }
       },
       {
@@ -142,6 +217,19 @@
       {
         "locations": [
           {
+            "file": "crates/rustev-contract/LICENSE"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rustev-contract/LICENSE"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rustev-core/Cargo.toml"
           }
         ],
@@ -150,6 +238,19 @@
         "unit": {
           "kind": "file",
           "path": "crates/rustev-core/Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-core/LICENSE"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rustev-core/LICENSE"
         }
       },
       {
@@ -168,6 +269,19 @@
       {
         "locations": [
           {
+            "file": "crates/rustev-eval/LICENSE"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rustev-eval/LICENSE"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rustev-runtime/Cargo.toml"
           }
         ],
@@ -176,6 +290,19 @@
         "unit": {
           "kind": "file",
           "path": "crates/rustev-runtime/Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-runtime/LICENSE"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/rustev-runtime/LICENSE"
         }
       },
       {
@@ -194,6 +321,19 @@
       {
         "locations": [
           {
+            "file": "integrations/rustev-remote-http/LICENSE"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "integrations/rustev-remote-http/LICENSE"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "packages/rustev-pkg-support-routing/Cargo.toml"
           }
         ],
@@ -202,6 +342,19 @@
         "unit": {
           "kind": "file",
           "path": "packages/rustev-pkg-support-routing/Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "packages/rustev-pkg-support-routing/LICENSE"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "packages/rustev-pkg-support-routing/LICENSE"
         }
       },
       {
@@ -248,5 +401,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "f916a3da8f7113315a10447eee28765f92572e5cb0518b79fbe5654d717f6657"
+  "shardHash": "e471ac7398c319278892eb31a1a9efcf6e55e8865c2653c76abe9ec97a7d6ad0"
 }

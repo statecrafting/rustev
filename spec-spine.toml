@@ -72,6 +72,8 @@ extra_hashed_inputs = [
   "Makefile",
   ".gitignore",
   "Cargo.toml",
+  # Each published package's link to the root LICENSE (spec 021, 3.3).
+  "*/*/LICENSE",
 ]
 # Directories the symbol resolver and the coverage walk skip.
 resolver_exclusions = ["target", "node_modules", ".statecraft/derived", "dist", "build", ".next", ".tooling", ".bin"]
