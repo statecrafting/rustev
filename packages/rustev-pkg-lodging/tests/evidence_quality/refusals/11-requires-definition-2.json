@@ -1,0 +1,115 @@
+{
+  "neighbour": {
+    "inputs": [
+      {
+        "freshness": "not_required",
+        "name": "x",
+        "provenance": [
+          "user-supplied"
+        ],
+        "type": {
+          "record": {
+            "fields": [
+              {
+                "name": "a",
+                "type": {
+                  "text": {
+                    "max_bytes": 8
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "limits": {
+      "deadline_ms": 0,
+      "distribution_tolerance": "0.000001",
+      "max_projection_bytes": 0,
+      "max_semantic_requests": 0,
+      "on_excess": "refuse"
+    },
+    "name": "plain",
+    "package": "p",
+    "policy": {
+      "adjustments": [],
+      "on_unresolved": [],
+      "rules": [
+        {
+          "id": "r",
+          "then": {
+            "escalate": {
+              "reason": "x"
+            }
+          },
+          "when": "always"
+        }
+      ]
+    },
+    "schema": "rustev.definition/1",
+    "steps": [],
+    "version": "0.1.0"
+  },
+  "refusal": {
+    "category": 11,
+    "detail": "requires_definition_2: a nullable type needs rustev.definition/2",
+    "subject": "input:x"
+  },
+  "refused": {
+    "inputs": [
+      {
+        "freshness": "not_required",
+        "name": "x",
+        "provenance": [
+          "user-supplied"
+        ],
+        "type": {
+          "record": {
+            "fields": [
+              {
+                "name": "a",
+                "type": {
+                  "nullable": {
+                    "type": {
+                      "text": {
+                        "max_bytes": 8
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "limits": {
+      "deadline_ms": 0,
+      "distribution_tolerance": "0.000001",
+      "max_projection_bytes": 0,
+      "max_semantic_requests": 0,
+      "on_excess": "refuse"
+    },
+    "name": "plain",
+    "package": "p",
+    "policy": {
+      "adjustments": [],
+      "on_unresolved": [],
+      "rules": [
+        {
+          "id": "r",
+          "then": {
+            "escalate": {
+              "reason": "x"
+            }
+          },
+          "when": "always"
+        }
+      ]
+    },
+    "schema": "rustev.definition/1",
+    "steps": [],
+    "version": "0.1.0"
+  }
+}

@@ -1,0 +1,1 @@
+{"facts":[{"grades":[{"max_grade":"cached","path":"","reliability":"reliable"}],"name":"hotels","provenance":"system-of-record"}],"name":"catalogue","schema":"rustev.source/1","version":"1.0.0"}
