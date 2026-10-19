@@ -837,6 +837,21 @@ with a passing neighbour, cap behaviour, `PlanId` sensitivity to a cap and
 insensitivity to an unbound descriptor, and plan 3 loading. Evaluating a
 plan 3 is refused at `Evaluation::start` until increment 3.
 
+**Increment 3, first change (evaluation grading).** In
+`crates/rustev-core/src/grading.rs`, the pure evaluation-time half of
+grades and presence: a graded input's admission by source, the conflict
+policy (3.8) and its value metadata tree; a read's metadata at a path,
+with `*` combining items or entries; a requirement judged against grade
+and age (3.9.1, `cached` and `estimated` aged, equal age fresh, the
+implicit `estimated` of a hard gate over a graded value); `join_keyed@1`
+(matched, `matched_absent`, unmatched with or without a readable key, a
+duplicate id refused); `merge_fields@1` per field and per item, with its
+presence predicate; a corroborated claim raised node by node and a
+contradicted one lowered to `hint`. In `ops.rs`, version 2 per-item
+operators exclude an absent or unmatched item with its reason, or read it
+as missing evidence (3.4.4). Unit tests in the module cover each function;
+nothing reaches it until the change that admits plan 3 evaluation.
+
 **Increment 3, second change (runtime).** 3.11 at the runtime:
 `EvidenceSink::accepts` names the run record schemas a sink accepts, by
 default `rustev.run/1` only; `Runtime::prepare` refuses a plan 3 on a sink
