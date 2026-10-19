@@ -114,3 +114,32 @@ async fn capture_refuses_a_plan_3_before_admission() {
     ));
     assert_eq!(sink.delivered.load(Ordering::SeqCst), 0, "no run record");
 }
+
+#[tokio::test(flavor = "current_thread")]
+async fn a_snapshot_2_for_a_plan_2_is_rejected_before_admission() {
+    let sink = Arc::new(Sink {
+        v3: false,
+        delivered: AtomicUsize::new(0),
+    });
+    let rt = runtime(sink.clone());
+    let plan = rt.prepare(plan(false)).unwrap();
+    let mut req = request("d1");
+    req.snapshot = <rustev_contract::snapshot::Snapshot as rustev_contract::Document>::parse(
+        json!({"schema": schema::SNAPSHOT_V2, "entries": []})
+            .to_string()
+            .as_bytes(),
+    )
+    .unwrap();
+    let r = rt.decide(&plan, req, &CancelSignal::default()).await;
+    assert!(
+        matches!(
+            r,
+            Err(rustev_runtime::DecideError::Rejected(
+                rustev_runtime::Rejection::InvalidRequest(ref d)
+            )) if d.contains("snapshot_version")
+        ),
+        "{:?}",
+        r.err()
+    );
+    assert_eq!(sink.delivered.load(Ordering::SeqCst), 0, "no run record");
+}

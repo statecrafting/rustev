@@ -1,0 +1,705 @@
+{
+  "neighbour": {
+    "inputs": [
+      {
+        "evidence": {
+          "graded": {
+            "caps": [],
+            "sources": [
+              "catalogue"
+            ]
+          }
+        },
+        "freshness": "not_required",
+        "name": "hotels",
+        "provenance": [
+          "system-of-record"
+        ],
+        "type": {
+          "list": {
+            "item": {
+              "record": {
+                "fields": [
+                  {
+                    "name": "id",
+                    "type": {
+                      "text": {
+                        "max_bytes": 16
+                      }
+                    }
+                  },
+                  {
+                    "name": "price",
+                    "type": "decimal"
+                  },
+                  {
+                    "name": "description",
+                    "type": {
+                      "text": {
+                        "max_bytes": 64
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "max_items": 20
+          }
+        }
+      },
+      {
+        "evidence": {
+          "graded": {
+            "caps": [],
+            "sources": [
+              "live-quote"
+            ]
+          }
+        },
+        "freshness": {
+          "max_age_ms": 600000
+        },
+        "name": "quotes",
+        "provenance": [
+          "third-party"
+        ],
+        "type": {
+          "map": {
+            "key_max_bytes": 16,
+            "max_entries": 20,
+            "value": {
+              "record": {
+                "fields": [
+                  {
+                    "name": "price",
+                    "type": {
+                      "nullable": {
+                        "type": "decimal"
+                      }
+                    }
+                  },
+                  {
+                    "name": "unit_price",
+                    "type": {
+                      "nullable": {
+                        "type": "decimal"
+                      }
+                    }
+                  }
+                ],
+                "present_when": {
+                  "any_non_null": [
+                    "price",
+                    "unit_price"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "evidence": {
+          "graded": {
+            "caps": [],
+            "sources": [
+              "geocoder"
+            ]
+          }
+        },
+        "freshness": "not_required",
+        "name": "district",
+        "provenance": [
+          "third-party"
+        ],
+        "type": {
+          "record": {
+            "fields": [
+              {
+                "name": "name",
+                "type": {
+                  "text": {
+                    "max_bytes": 32
+                  }
+                }
+              },
+              {
+                "name": "kind",
+                "type": {
+                  "enum": {
+                    "options": [
+                      "centre",
+                      "suburb"
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "evidence": {
+          "graded": {
+            "caps": [],
+            "sources": [
+              "geocoder"
+            ]
+          }
+        },
+        "freshness": "not_required",
+        "name": "centre_subareas",
+        "provenance": [
+          "third-party"
+        ],
+        "type": {
+          "list": {
+            "item": {
+              "text": {
+                "max_bytes": 32
+              }
+            },
+            "max_items": 20
+          }
+        }
+      }
+    ],
+    "limits": {
+      "deadline_ms": 1000,
+      "distribution_tolerance": "0.000001",
+      "max_projection_bytes": 0,
+      "max_semantic_requests": 0,
+      "on_excess": "refuse"
+    },
+    "name": "eq-lodging",
+    "package": "synthetic",
+    "policy": {
+      "adjustments": [],
+      "on_unresolved": [],
+      "rules": [
+        {
+          "id": "fallback",
+          "then": {
+            "escalate": {
+              "reason": "review"
+            }
+          },
+          "when": "always"
+        }
+      ]
+    },
+    "schema": "rustev.definition/2",
+    "steps": [
+      {
+        "body": {
+          "exact": {
+            "args": {
+              "key": "id",
+              "left": "input:hotels",
+              "right": "input:quotes"
+            },
+            "op": "join_keyed",
+            "version": 1
+          }
+        },
+        "id": "joined"
+      },
+      {
+        "body": {
+          "exact": {
+            "args": {
+              "base": "input:hotels",
+              "overlay": "step:joined",
+              "rules": [
+                {
+                  "field": "id",
+                  "rule": "base_only"
+                },
+                {
+                  "field": "price",
+                  "rule": "overlay_only"
+                },
+                {
+                  "field": "unit_price",
+                  "rule": "overlay_only"
+                },
+                {
+                  "field": "description",
+                  "rule": "base_only"
+                }
+              ]
+            },
+            "op": "merge_fields",
+            "version": 1
+          }
+        },
+        "id": "merged"
+      },
+      {
+        "body": {
+          "exact": {
+            "args": {
+              "id_field": "id",
+              "list": "step:joined",
+              "rules": [
+                {
+                  "name": "under_budget",
+                  "predicate": {
+                    "cmp": {
+                      "left": {
+                        "ref": "item:match/price"
+                      },
+                      "op": "le",
+                      "right": {
+                        "lit": {
+                          "decimal": "200"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            "op": "filter_with_reasons",
+            "version": 1
+          }
+        },
+        "id": "affordable"
+      },
+      {
+        "body": {
+          "exact": {
+            "args": {
+              "id_field": "id",
+              "list": "step:merged",
+              "rules": [
+                {
+                  "name": "under_budget",
+                  "predicate": {
+                    "cmp": {
+                      "left": {
+                        "ref": "item:price"
+                      },
+                      "op": "le",
+                      "right": {
+                        "lit": {
+                          "decimal": "200"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            "op": "filter_with_reasons",
+            "version": 1
+          }
+        },
+        "id": "merged_ok"
+      },
+      {
+        "body": {
+          "corroborate": {
+            "by": [
+              {
+                "on_false": "contradicts",
+                "predicate": {
+                  "member_ref": {
+                    "set": "input:centre_subareas",
+                    "value": {
+                      "ref": "input:district/name"
+                    }
+                  }
+                }
+              }
+            ],
+            "claim": "input:district",
+            "mode": "all",
+            "on_contradiction": "conflict",
+            "upgrade_to": "cached"
+          }
+        },
+        "id": "district_ok"
+      },
+      {
+        "body": {
+          "exact": {
+            "args": {
+              "predicate": {
+                "cmp": {
+                  "left": {
+                    "ref": "step:district_ok/kind"
+                  },
+                  "op": "eq",
+                  "right": {
+                    "lit": {
+                      "enum": "centre"
+                    }
+                  }
+                }
+              }
+            },
+            "op": "compare",
+            "version": 1
+          }
+        },
+        "id": "is_centre"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  "refusal": {
+    "category": 11,
+    "detail": "reserved_reason: a rule cannot be named \"predicate_failed\"",
+    "subject": "step:affordable"
+  },
+  "refused": {
+    "inputs": [
+      {
+        "evidence": {
+          "graded": {
+            "caps": [],
+            "sources": [
+              "catalogue"
+            ]
+          }
+        },
+        "freshness": "not_required",
+        "name": "hotels",
+        "provenance": [
+          "system-of-record"
+        ],
+        "type": {
+          "list": {
+            "item": {
+              "record": {
+                "fields": [
+                  {
+                    "name": "id",
+                    "type": {
+                      "text": {
+                        "max_bytes": 16
+                      }
+                    }
+                  },
+                  {
+                    "name": "price",
+                    "type": "decimal"
+                  },
+                  {
+                    "name": "description",
+                    "type": {
+                      "text": {
+                        "max_bytes": 64
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "max_items": 20
+          }
+        }
+      },
+      {
+        "evidence": {
+          "graded": {
+            "caps": [],
+            "sources": [
+              "live-quote"
+            ]
+          }
+        },
+        "freshness": {
+          "max_age_ms": 600000
+        },
+        "name": "quotes",
+        "provenance": [
+          "third-party"
+        ],
+        "type": {
+          "map": {
+            "key_max_bytes": 16,
+            "max_entries": 20,
+            "value": {
+              "record": {
+                "fields": [
+                  {
+                    "name": "price",
+                    "type": {
+                      "nullable": {
+                        "type": "decimal"
+                      }
+                    }
+                  },
+                  {
+                    "name": "unit_price",
+                    "type": {
+                      "nullable": {
+                        "type": "decimal"
+                      }
+                    }
+                  }
+                ],
+                "present_when": {
+                  "any_non_null": [
+                    "price",
+                    "unit_price"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "evidence": {
+          "graded": {
+            "caps": [],
+            "sources": [
+              "geocoder"
+            ]
+          }
+        },
+        "freshness": "not_required",
+        "name": "district",
+        "provenance": [
+          "third-party"
+        ],
+        "type": {
+          "record": {
+            "fields": [
+              {
+                "name": "name",
+                "type": {
+                  "text": {
+                    "max_bytes": 32
+                  }
+                }
+              },
+              {
+                "name": "kind",
+                "type": {
+                  "enum": {
+                    "options": [
+                      "centre",
+                      "suburb"
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "evidence": {
+          "graded": {
+            "caps": [],
+            "sources": [
+              "geocoder"
+            ]
+          }
+        },
+        "freshness": "not_required",
+        "name": "centre_subareas",
+        "provenance": [
+          "third-party"
+        ],
+        "type": {
+          "list": {
+            "item": {
+              "text": {
+                "max_bytes": 32
+              }
+            },
+            "max_items": 20
+          }
+        }
+      }
+    ],
+    "limits": {
+      "deadline_ms": 1000,
+      "distribution_tolerance": "0.000001",
+      "max_projection_bytes": 0,
+      "max_semantic_requests": 0,
+      "on_excess": "refuse"
+    },
+    "name": "eq-lodging",
+    "package": "synthetic",
+    "policy": {
+      "adjustments": [],
+      "on_unresolved": [],
+      "rules": [
+        {
+          "id": "fallback",
+          "then": {
+            "escalate": {
+              "reason": "review"
+            }
+          },
+          "when": "always"
+        }
+      ]
+    },
+    "schema": "rustev.definition/2",
+    "steps": [
+      {
+        "body": {
+          "exact": {
+            "args": {
+              "key": "id",
+              "left": "input:hotels",
+              "right": "input:quotes"
+            },
+            "op": "join_keyed",
+            "version": 1
+          }
+        },
+        "id": "joined"
+      },
+      {
+        "body": {
+          "exact": {
+            "args": {
+              "base": "input:hotels",
+              "overlay": "step:joined",
+              "rules": [
+                {
+                  "field": "id",
+                  "rule": "base_only"
+                },
+                {
+                  "field": "price",
+                  "rule": "overlay_only"
+                },
+                {
+                  "field": "unit_price",
+                  "rule": "overlay_only"
+                },
+                {
+                  "field": "description",
+                  "rule": "base_only"
+                }
+              ]
+            },
+            "op": "merge_fields",
+            "version": 1
+          }
+        },
+        "id": "merged"
+      },
+      {
+        "body": {
+          "exact": {
+            "args": {
+              "id_field": "id",
+              "list": "step:joined",
+              "rules": [
+                {
+                  "name": "predicate_failed",
+                  "predicate": {
+                    "cmp": {
+                      "left": {
+                        "ref": "item:match/price"
+                      },
+                      "op": "le",
+                      "right": {
+                        "lit": {
+                          "decimal": "200"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            "op": "filter_with_reasons",
+            "version": 1
+          }
+        },
+        "id": "affordable"
+      },
+      {
+        "body": {
+          "exact": {
+            "args": {
+              "id_field": "id",
+              "list": "step:merged",
+              "rules": [
+                {
+                  "name": "under_budget",
+                  "predicate": {
+                    "cmp": {
+                      "left": {
+                        "ref": "item:price"
+                      },
+                      "op": "le",
+                      "right": {
+                        "lit": {
+                          "decimal": "200"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            "op": "filter_with_reasons",
+            "version": 1
+          }
+        },
+        "id": "merged_ok"
+      },
+      {
+        "body": {
+          "corroborate": {
+            "by": [
+              {
+                "on_false": "contradicts",
+                "predicate": {
+                  "member_ref": {
+                    "set": "input:centre_subareas",
+                    "value": {
+                      "ref": "input:district/name"
+                    }
+                  }
+                }
+              }
+            ],
+            "claim": "input:district",
+            "mode": "all",
+            "on_contradiction": "conflict",
+            "upgrade_to": "cached"
+          }
+        },
+        "id": "district_ok"
+      },
+      {
+        "body": {
+          "exact": {
+            "args": {
+              "predicate": {
+                "cmp": {
+                  "left": {
+                    "ref": "step:district_ok/kind"
+                  },
+                  "op": "eq",
+                  "right": {
+                    "lit": {
+                      "enum": "centre"
+                    }
+                  }
+                }
+              }
+            },
+            "op": "compare",
+            "version": 1
+          }
+        },
+        "id": "is_centre"
+      }
+    ],
+    "version": "0.1.0"
+  }
+}

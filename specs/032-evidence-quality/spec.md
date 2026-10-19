@@ -2,7 +2,7 @@
 id: "032-evidence-quality"
 title: "Evidence quality: grades, presence predicates, typed joins, corroboration and conflict policy (amends 002 and 003)"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-10-17"
 summary: >
   An amendment of approved specs 002 and 003 (R-16), for #76 child B2.
@@ -19,8 +19,7 @@ summary: >
   `rustev.evidence/2`, `rustev.run/3` and the registry `rustev.exact/2`,
   to which later #76 specs add optional members; every version 1
   definition keeps its bytes, its plan and its `PlanId`. Approved (A-29);
-  implementation is in progress in increments (see the implementation
-  record).
+  implemented in four increments (see the implementation record).
 amends:
   - "002-decision-contract-and-pure-core"
   - "003-runtime-execution-and-evidence"
@@ -668,7 +667,26 @@ quality claims from synthetic fixtures (R-04, R-37).
 
 ## Verification
 
-Pending with implementation. Approval satisfies no acceptance item.
+```verify:cli
+# 3.1 to 3.4: documents, versions, optional members and version selection.
+cargo test -p rustev-contract --locked --test track_versions
+# 3.2 to 3.9: grades, presence, joins, merges, corroboration, the conflict
+# policy and the grade compilation phase, at compile and evaluation time.
+cargo test -p rustev-core --locked --test track_versions --test evidence_quality_compile --test evidence_quality_eval
+cargo test -p rustev-core --locked --lib
+# 3.10 and 3.11: evidence 2, run 3, and the runtime's preparation and
+# capture refusals.
+cargo test -p rustev-runtime --locked --test plan_3
+# The SYNTHETIC golden fixtures, the plan 3 decision through the runtime and
+# the optional-member golden bytes.
+cargo test -p rustev-pkg-lodging --locked --test evidence_quality
+# 3.12: every existing golden is unchanged.
+cargo test -p rustev-core --locked
+cargo test -p rustev-pkg-lodging --locked
+# Negative control: the seeded defects of the Acceptance section are each
+# detected.
+sh crates/rustev-core/mutation/seeds.sh
+```
 
 ## Implementation record
 
@@ -909,3 +927,42 @@ ignoring check grades, `prefer` choosing the last entry and a requirement
 ignoring `max_age_ms`; each is detected. The corroboration seed is caught by
 `a_check_reading_below_upgrade_to_is_no_evidence`, which a snapshot claim
 below `upgrade_to` drives.
+
+**Increment 4, third change (coverage and close).** The remaining
+Acceptance items: `propagation_through_every_exact_operator` runs every
+operator of `rustev.exact/1` and the join and merge of `rustev.exact/2` over
+a catalogue claimed `hint` (a hard gate is `insufficient_grade`, every other
+result `hint`) and at its `cached` ceiling (every result `cached`; the
+ungraded rates table and the authoritative quotes never raise it);
+`field_presence_and_top_k_over_absent_values` (an input failing its presence
+predicate is listed missing; an absent list item is excluded
+`predicate_failed` and never ranked); `no_cached_price_reaches_a_proposal`
+(no catalogue price appears anywhere in a judgment whose proposal carries
+the merged records); and
+`a_cached_claim_on_an_authoritative_ceiling_falls_short_of_authoritative`.
+The lodging fixtures gain a refusal golden, with its passing neighbour, for
+every refusal of categories 11, 13 and 15 introduced here (19 in all) and a
+second district source (`atlas`), whose supply leaves the plan's bytes
+unchanged. `crates/rustev-runtime/tests/plan_3.rs` adds the runtime half of
+the snapshot version row: a snapshot 2 for a plan 2 is
+`Rejection::InvalidRequest` before admission.
+
+Section 5, row by row: the empty quote entry, the nested predicate, the
+merge rows and the unmatched entry are in `evidence_quality_eval.rs`
+(`joins_presence_and_merges`, `merge_grade_rules`,
+`a_nested_presence_predicate_records_its_canonical_tree`); predicate bounds,
+reserved names, disagreement declarations, merges without a rule, caps,
+category 13 and 14 rows and the version rows are in
+`evidence_quality_compile.rs`, `track_versions.rs` and the refusal goldens;
+corroboration rows are `corroboration_outcomes`,
+`an_uncorroborated_estimated_claim_keeps_its_grade_and_basis` and
+`a_check_reading_below_upgrade_to_is_no_evidence`; requirement, freshness,
+claim and propagation rows are `requirements_freshness_and_claims`,
+`propagation_takes_the_minimum_and_ungraded_never_raises`,
+`propagation_through_every_exact_operator` and
+`semantic_steps_are_at_most_estimated`; the conflict policy rows are
+`admission_and_the_conflict_policy`; snapshot versions are
+`snapshot_versions_follow_the_plan` and the runtime test above; preparation
+and capture are `plan_3.rs` and the lodging runtime tests; category 8 is
+`evidence_quality_compile.rs`; and every existing golden is unchanged
+because every pre-existing test passes unmodified.
