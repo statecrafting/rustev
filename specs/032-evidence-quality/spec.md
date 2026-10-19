@@ -774,3 +774,17 @@ minimum in a hard gate) and phase (c) source binding (category 15). The
 refusal categories 13 to 15 exist from this change, with their CLI names.
 Unit tests in the module cover each refusal beside a passing neighbour; the
 compiler calls none of it until the change that admits plan 3.
+
+**Increment 2, third change (static ceilings).** In
+`crates/rustev-core/src/quality.rs`: the phase (e2) static ceiling tree of
+an input (each node's ceiling is the highest over the input's sources of
+the minimum of declarations on the node and its ancestors, capped; a cap
+never raises), the reads of operators, predicates, policy conditions,
+semantic steps and corroboration checks, step trees (a join keeps its
+matched values' ceilings, a merge has one per field, a semantic step is at
+most `estimated`, a corroboration raises its claim to `upgrade_to`), and
+the category 13 and 14 judgement of requirements and graded hard gates. A
+read of a list node alone (`Mode::Node`) uses the node's own declaration,
+not its items' fields. Unit tests in the module cover ceilings, caps and
+the judgement; the compiler calls none of it until the change that admits
+plan 3.

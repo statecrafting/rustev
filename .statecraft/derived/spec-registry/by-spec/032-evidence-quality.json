@@ -119,7 +119,7 @@
       }
     ],
     "sectionDigests": {
-      "032-evidence-quality-grades-presence-predicates-typed-joins-corroboration-and-conflict-policy-amends-002-and-003": "96a4187048c887d4c0f4d832d4738704947de39569f518de74cf8683f8a88866",
+      "032-evidence-quality-grades-presence-predicates-typed-joins-corroboration-and-conflict-policy-amends-002-and-003": "031376fcb14a9554ad73cd4a9ec719b9ccf9763b5f61b990d490f1d0005b35e1",
       "1-purpose": "9489dd5680e40807a9030a20b5efa1d04784d21af4aac6f95e6579586ee6d335",
       "2-1-binding-principles-of-76": "988c95fb200be82cbbdf0eaf16fd4e26223ef97d46a17fab45b7b5bd6ebebde5",
       "2-territory": "863e9577ad470309a0a5ad38c7da1b8c20086017fe7afc1db1313d4d2a056360",
@@ -139,7 +139,7 @@
       "4-out-of-scope": "5824a53f7ecd30401c213431c33969f269ad12bd7ced02a80c76910ab7fe00e6",
       "5-observable-negative-cases": "f1c3130a8e1ecc8f38f8d671b7c9a821f5576faa3650ce6e2fc5f1f3cd4f3d18",
       "acceptance": "32d0512c9f78283fc5f0b47952280b7b37e93ade2a2f5e5fa296b9ef427185bb",
-      "decisions-at-approval": "8807cd8b747f8ad877f95109fda6cbbb3efd03fd78ddfe42ff5859ad7e85f9b7",
+      "decisions-at-approval": "e601866ed19523c999ab2209f6bbf279101f82ca31bfb8bc94c536a09f088acd",
       "implementation-record": "e9bd75eef8584e0f853912cf538d4b463d664ca949115beb1879f4292f1b97a0",
       "verification": "72d9ce9d72381b934cb1e22e97d9cea27ca579d841781145106e83cec6fb512f"
     },
@@ -173,6 +173,6 @@
     "summary": "An amendment of approved specs 002 and 003 (R-16), for #76 child B2. Adds an ordered evidence grade (`authoritative`, `cached`, `estimated`, `hint`) and value metadata (grade, provenance set, sources, oldest as-of) to every value of a plan that opts in, declared per field by a new context source descriptor (`rustev.source/1`) and lowered, never raised, by the definition; presence predicates so key existence is never presence; typed keyed joins (`join_keyed@1`) and per-field merges (`merge_fields@1`) with no implicit fallback; a corroboration step, the only way a grade rises; and a per-fact conflict policy that makes silent last-writer-wins impossible. Introduces the shared #76 track versions `rustev.definition/2`, `rustev.plan/3`, `rustev.snapshot/2`, `rustev.evidence/2`, `rustev.run/3` and the registry `rustev.exact/2`, to which later #76 specs add optional members; every version 1 definition keeps its bytes, its plan and its `PlanId`. Approved (A-29); implementation is in progress in increments (see the implementation record).\n",
     "title": "Evidence quality: grades, presence predicates, typed joins, corroboration and conflict policy (amends 002 and 003)"
   },
-  "shardHash": "4ee21ee63e9f9c25f76c6a41dffaa8522fac11ea04246532dc43ab980674199a",
+  "shardHash": "e4d64a50d59dca4cb4908b5db118e69e1046f4b327fa95eb1eda282431812217",
   "specVersion": "1.9.0"
 }
