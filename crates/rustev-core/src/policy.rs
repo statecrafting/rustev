@@ -24,6 +24,10 @@ pub(crate) trait View {
     /// `Ok(value)`, or the unresolved reason, for `input:`/`step:` refs.
     fn get(&self, r: &str) -> Result<Seen<'_>, Unresolved>;
     fn scope(&self) -> Scope<'_>;
+    /// The input or step a reference reads.
+    fn base(&self, r: &str) -> String {
+        crate::expr::base_ref(r)
+    }
 }
 
 pub(crate) struct PolicyResult {
@@ -41,7 +45,7 @@ struct Run<'v, V: View> {
 
 impl<V: View> Run<'_, V> {
     fn read(&mut self, r: &str) {
-        let r = crate::expr::base_ref(r);
+        let r = self.view.base(r);
         if !self.reads.contains(&r) {
             self.reads.push(r);
         }
@@ -97,7 +101,7 @@ impl<V: View> Run<'_, V> {
                 let refs: Vec<String> = refs
                     .iter()
                     .filter(|r| r.starts_with("input:") || r.starts_with("step:"))
-                    .map(|r| crate::expr::base_ref(r))
+                    .map(|r| self.view.base(r))
                     .collect();
                 if refs.iter().any(|r| self.unmet.contains(r)) {
                     return Ok(false);
@@ -110,7 +114,7 @@ impl<V: View> Run<'_, V> {
                     .map_err(|f| Unresolved::invalid([], format!("{f:?}")))?
             }
             Cond::Empty(r) | Cond::Nonempty(r) => {
-                if self.unmet.contains(&crate::expr::base_ref(r)) {
+                if self.unmet.contains(&self.view.base(r)) {
                     return Ok(false);
                 }
                 self.read(r);
@@ -180,7 +184,7 @@ impl<V: View> Run<'_, V> {
                     let v = match &p.value {
                         ParamSource::Lit(l) => Value::from_literal(l).to_out(),
                         ParamSource::Ref(r) => {
-                            if self.unmet.contains(&crate::expr::base_ref(r)) {
+                            if self.unmet.contains(&self.view.base(r)) {
                                 return Ok(None);
                             }
                             self.read(r);

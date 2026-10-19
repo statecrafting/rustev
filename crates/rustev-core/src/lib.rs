@@ -16,6 +16,10 @@ pub mod compile;
 pub mod evaluate;
 pub(crate) mod execution;
 pub mod expr;
+// Read by plan 3 evaluation, which the change that admits it wires in
+// (spec 032).
+#[allow(dead_code)]
+pub(crate) mod grading;
 pub mod kinds;
 pub mod ops;
 pub(crate) mod policy;

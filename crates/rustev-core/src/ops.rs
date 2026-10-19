@@ -20,7 +20,7 @@ use crate::expr::{
     expr_structure, predicate_refs, predicate_structure, ref_ty, type_expr, type_predicate,
 };
 use crate::sem::{SemInstances, SemKind, SemValue};
-use crate::value::{Ty, Value};
+use crate::value::{JoinMatch, Ty, Value};
 
 /// Every registered `(name, version)`.
 pub const REGISTRY: &[(&str, u32)] = &[
@@ -1012,6 +1012,11 @@ fn record_field(item: &Ty, name: &str) -> Result<Ty, String> {
 fn id_field_bytes(item: &Ty, name: &str) -> Result<u64, String> {
     match record_field(item, name)? {
         Ty::Text { max_bytes } => Ok(max_bytes),
+        // A merged id can be absent; an item whose id cannot be read is
+        // refused at evaluation as any item without an id.
+        Ty::Nullable(t) if matches!(*t, Ty::Text { .. } | Ty::Enum(_)) => {
+            id_field_bytes(&Ty::Record(vec![(name.to_string(), *t)]), name)
+        }
         Ty::Enum(o) => Ok(o.iter().map(|s| s.len() as u64).max().unwrap_or(0)),
         t => Err(format!("id field {name:?} is {}, not text", t.name())),
     }
@@ -1040,6 +1045,15 @@ fn fault(f: Fault, cx: &OpContext<'_>) -> Unresolved {
 
 fn items(r: &str, cx: &OpContext<'_>) -> Result<Vec<Value>, Unresolved> {
     match eval_ref(r, &cx.scope) {
+        // An operator that does not exclude absent items reads them as
+        // missing evidence for their path (spec 032, 3.4.4).
+        Ok(Value::List(v)) if cx.scope.v2 && v.iter().any(|i| matches!(i, Value::Absent(_))) => {
+            Err(missing_items(r))
+        }
+        Ok(Value::Joined(entries)) if cx.scope.v2 => entries
+            .iter()
+            .map(|e| e.item().ok_or_else(|| missing_items(r)))
+            .collect(),
         Ok(Value::List(v)) => Ok(v),
         Ok(_) => Err(Unresolved::invalid(
             cx.lineage_inputs.iter().cloned(),
@@ -1098,6 +1112,155 @@ fn keyed<'v>(
         out.push((id, it));
     }
     Ok(out)
+}
+
+/// Missing evidence for the items of `r`, named as an input or step is
+/// named in a missing reason: without its `input:` or `step:` kind.
+fn missing_items(r: &str) -> Unresolved {
+    let path = r.split_once(':').map_or(r, |(_, p)| p);
+    Unresolved::missing([format!("{path}/*")])
+}
+
+/// A row a version 2 filter judges: an id and the item, or the reason it
+/// is excluded before any rule.
+type Row = (String, Result<Value, &'static str>);
+
+/// The rows a version 2 filter judges (spec 032, 3.4.4 and 3.5.4). An
+/// absent item has no readable id; it is named by its position.
+fn rows_v2(list: &str, id_field: &str, cx: &OpContext<'_>) -> Result<Vec<Row>, Unresolved> {
+    let invalid = |d: String| Unresolved::invalid(cx.lineage_inputs.iter().cloned(), d);
+    let rows: Vec<(String, Result<Value, &'static str>)> =
+        match eval_ref(list, &cx.scope).map_err(|f| fault(f, cx))? {
+            Value::Joined(entries) => entries
+                .iter()
+                .map(|e| {
+                    // `item` is `Some` exactly for a matched entry; the reason
+                    // names why any other entry has none.
+                    let row = e.item().ok_or(match &e.matched {
+                        JoinMatch::MatchedAbsent(a) => a.reason.name(),
+                        _ => "unmatched",
+                    });
+                    (e.id.clone(), row)
+                })
+                .collect(),
+            Value::List(items) => items
+                .iter()
+                .enumerate()
+                .map(|(i, it)| match it {
+                    Value::Absent(a) => Ok((crate::grading::position_id(i), Err(a.reason.name()))),
+                    it => id_of(it, id_field)
+                        .map(|id| (id, Ok(it.clone())))
+                        .ok_or_else(|| invalid(format!("item without {id_field:?}"))),
+                })
+                .collect::<Result<_, _>>()?,
+            _ => return Err(invalid(format!("{list} is not a list"))),
+        };
+    let mut seen = BTreeSet::new();
+    for (id, _) in &rows {
+        if !seen.insert(id.clone()) {
+            return Err(invalid(format!("duplicate id {id:?}")));
+        }
+    }
+    Ok(rows)
+}
+
+/// `filter_with_reasons@1` in `rustev.exact/2`: absent and unmatched items
+/// are excluded before the rules, and a rule reading an absent value or a
+/// `null` field excludes the item `missing:<path>`.
+fn filter_v2(a: &FilterWithReasons, cx: &OpContext<'_>) -> Result<Value, Unresolved> {
+    let mut eligible = Vec::new();
+    let mut excluded = Vec::new();
+    let mut counts: BTreeMap<String, u64> = BTreeMap::new();
+    for (id, row) in rows_v2(&a.list, &a.id_field, cx)? {
+        let mut reasons: Vec<String> = Vec::new();
+        match row {
+            Err(r) => reasons.push(r.into()),
+            Ok(item) => {
+                let scope = item_scope(cx, &item);
+                for r in &a.rules {
+                    let reason = match eval_predicate(&r.predicate, &scope) {
+                        Ok(true) => continue,
+                        Ok(false) => r.name.clone(),
+                        Err(Fault::Absent(p)) => format!("missing:{p}"),
+                        Err(_) => format!("unevaluable:{}", r.name),
+                    };
+                    if !reasons.contains(&reason) {
+                        reasons.push(reason);
+                    }
+                }
+            }
+        }
+        if reasons.is_empty() {
+            eligible.push(id);
+        } else {
+            for r in &reasons {
+                *counts.entry(r.clone()).or_default() += 1;
+            }
+            excluded.push(Excluded { id, reasons });
+        }
+    }
+    Ok(Value::Filtered(Filtered {
+        eligible,
+        excluded,
+        counts,
+    }))
+}
+
+/// `top_k@1` in `rustev.exact/2`: a key reading an absent value or a `null`
+/// field excludes the item `missing:<path>`.
+fn top_k_v2(a: &TopK, cx: &OpContext<'_>) -> Result<Value, Unresolved> {
+    let f = |e: Fault| fault(e, cx);
+    let rows = rows_v2(&a.list, &a.id_field, cx)?;
+    let among: BTreeSet<String> = match eval_ref(&a.among, &cx.scope).map_err(f)? {
+        Value::Filtered(fl) => fl.eligible.into_iter().collect(),
+        _ => return Err(f(Fault::Invalid("top_k among a non-filter".into()))),
+    };
+    if let Some(missing) = among
+        .iter()
+        .find(|id| !rows.iter().any(|(k, r)| k == *id && r.is_ok()))
+    {
+        return Err(f(Fault::Invalid(format!(
+            "eligible id {missing:?} is not in {}",
+            a.list
+        ))));
+    }
+    let mut scored = Vec::new();
+    let mut excluded = Vec::new();
+    for (id, row) in rows.into_iter().filter(|(id, _)| among.contains(id)) {
+        let Ok(item) = row else { continue };
+        match eval_expr(&a.key, &item_scope(cx, &item)) {
+            Ok(v) => match order_key(&v) {
+                Some(k) => scored.push((k, id)),
+                None => excluded.push(Excluded {
+                    id,
+                    reasons: vec!["unevaluable:key".into()],
+                }),
+            },
+            Err(Fault::Absent(p)) => excluded.push(Excluded {
+                id,
+                reasons: vec![format!("missing:{p}")],
+            }),
+            Err(_) => excluded.push(Excluded {
+                id,
+                reasons: vec!["unevaluable:key".into()],
+            }),
+        }
+    }
+    scored.sort_by(|(ka, ia), (kb, ib)| {
+        let by_key = match a.direction {
+            Direction::Ascending => ka.cmp(kb),
+            Direction::Descending => kb.cmp(ka),
+        };
+        by_key.then_with(|| ia.as_bytes().cmp(ib.as_bytes()))
+    });
+    let k = usize::try_from(a.k).unwrap_or(usize::MAX);
+    let truncated = scored.len().saturating_sub(k) as u64;
+    let ids = scored.into_iter().take(k).map(|(_, id)| id).collect();
+    Ok(Value::Shortlist(Shortlist {
+        ids,
+        truncated,
+        excluded,
+    }))
 }
 
 fn order_key(v: &Value) -> Option<(u8, i128)> {
@@ -1244,6 +1407,8 @@ impl OpArgs {
                 }
                 Ok(Value::List(missing))
             }
+            OpArgs::FilterWithReasons(a) if cx.scope.v2 => filter_v2(a, cx),
+            OpArgs::TopK(a) if cx.scope.v2 => top_k_v2(a, cx),
             OpArgs::FilterWithReasons(a) => {
                 let list = items(&a.list, cx)?;
                 let keyed = keyed(&list, &a.id_field, cx)?;
