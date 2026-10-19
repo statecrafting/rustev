@@ -1,20 +1,26 @@
 //! Evidence quality at compile time (spec 032): the structure of version 2
-//! definitions (phase b) and source binding (phase c, category 15). Static
-//! grade ceilings and the grade phase (e2) follow in the next change.
+//! definitions (phase b), source binding (phase c, category 15) and static
+//! grade ceilings and the grade phase (e2, categories 13 and 14). The plan 3
+//! grade table and the evidence record bound follow with the change that
+//! admits plan 3.
+//!
+//! A ceiling is the highest grade a value can have. It is computed from
+//! source descriptors, definition caps, propagation and corroboration only;
+//! a snapshot claim can lower a grade at evaluation, never raise it.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use rustev_contract::definition::{
-    Cond, CorroborateDecl, Definition, Disagreement, EvidenceDecl, Expr, InputDecl, Predicate,
-    ProvenanceClass, StepBody, TypeDecl,
+    Cond, CorroborateDecl, Definition, Disagreement, EvidenceDecl, Expr, GradeRequirement,
+    InputDecl, Predicate, ProvenanceClass, StepBody, TypeDecl,
 };
-use rustev_contract::grade::{Grade, PresentWhen};
-use rustev_contract::plan::BoundSource;
+use rustev_contract::grade::{Grade, PresentWhen, ValueGrade};
+use rustev_contract::plan::{BoundSource, StaticGrade};
 use rustev_contract::source::{FactGrade, SourceDescriptor, valid_source_name};
 use rustev_contract::{Identified, schema};
 
 use crate::compile::{Category, Refusal};
-use crate::expr::Ref;
+use crate::expr::{Ref, split_item, split_step};
 use crate::ops::{FilterWithReasons, OpArgs};
 
 /// Bounds of a presence predicate (spec 032, 3.4.2).
@@ -555,6 +561,698 @@ fn fact_declarations(grades: &[FactGrade], ty: &TypeDecl) -> Result<Declarations
     Ok(out)
 }
 
+/// A static ceiling tree: `here` is the ceiling at a node from declarations
+/// on it and its ancestors; `own` is the ceiling of the node as a whole
+/// value, the combination of itself and its descendants (spec 032, 3.2.2).
+/// `corroborated` marks a value a corroboration step lies upstream of.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Ceil {
+    pub here: ValueGrade,
+    pub own: ValueGrade,
+    pub corroborated: bool,
+    pub fields: BTreeMap<String, Ceil>,
+    pub item: Option<Box<Ceil>>,
+}
+
+impl Ceil {
+    pub fn leaf(g: ValueGrade, corroborated: bool) -> Ceil {
+        Ceil {
+            here: g,
+            own: g,
+            corroborated,
+            fields: BTreeMap::new(),
+            item: None,
+        }
+    }
+
+    /// The node at `path`; past the tree's depth, a leaf carrying the
+    /// deepest node's whole ceiling.
+    pub fn at(&self, path: &[String]) -> Ceil {
+        let Some((head, rest)) = path.split_first() else {
+            return self.clone();
+        };
+        let child = if head == "*" {
+            self.item.as_deref()
+        } else {
+            self.fields.get(head)
+        };
+        match child {
+            Some(c) => c.at(rest),
+            None => Ceil::leaf(self.own, self.corroborated),
+        }
+    }
+
+    fn finish(mut self) -> Ceil {
+        let mut own = self.here;
+        for c in self.fields.values().chain(self.item.as_deref()) {
+            own = own.combine(c.own);
+        }
+        self.own = own;
+        self
+    }
+
+    /// Every node with its path, root first.
+    pub fn walk(&self, prefix: &str, out: &mut Vec<StaticGrade>) {
+        out.push(StaticGrade {
+            subject: prefix.to_string(),
+            ceiling: self.own,
+        });
+        for (n, c) in &self.fields {
+            c.walk(&format!("{prefix}/{n}"), out);
+        }
+        if let Some(c) = &self.item {
+            c.walk(&format!("{prefix}/*"), out);
+        }
+    }
+}
+
+fn prefix_of(decl: &[String], path: &[String]) -> bool {
+    decl.len() <= path.len() && decl.iter().zip(path).all(|(a, b)| a == b)
+}
+
+impl Grading {
+    /// The ceiling at `path` through one source: the minimum over its
+    /// declarations on the path and its ancestors (a deeper one only
+    /// lowers).
+    fn source_here(decls: &[(Vec<String>, Grade)], path: &[String]) -> Grade {
+        decls
+            .iter()
+            .filter(|(d, _)| prefix_of(d, path))
+            .map(|(_, g)| *g)
+            .min()
+            .unwrap_or(Grade::Hint)
+    }
+
+    /// The cap at `path`: the minimum over caps on it and its ancestors.
+    fn cap_here(&self, path: &[String]) -> Option<Grade> {
+        self.caps
+            .iter()
+            .filter(|(c, _)| prefix_of(c, path))
+            .map(|(_, g)| *g)
+            .min()
+    }
+
+    /// The effective ceiling of `path` through `source` (None: the highest
+    /// over every source), capped.
+    pub fn here(&self, path: &[String], source: Option<&str>) -> Grade {
+        let g = self
+            .sources
+            .iter()
+            .filter(|(n, _, _)| source.is_none_or(|s| s == n))
+            .map(|(_, _, d)| Self::source_here(d, path))
+            .max()
+            .unwrap_or(Grade::Hint);
+        match self.cap_here(path) {
+            Some(c) => g.min(c),
+            None => g,
+        }
+    }
+}
+
+/// The static ceiling tree of an input (ungraded inputs are ungraded
+/// throughout), or with `source` the tree through that one source.
+pub(crate) fn input_tree(ty: &TypeDecl, grading: Option<&Grading>, source: Option<&str>) -> Ceil {
+    fn build(
+        t: &TypeDecl,
+        path: &mut Vec<String>,
+        g: Option<&Grading>,
+        source: Option<&str>,
+    ) -> Ceil {
+        let here = match g {
+            Some(g) => ValueGrade::from(g.here(path, source)),
+            None => ValueGrade::Ungraded,
+        };
+        let mut node = Ceil::leaf(here, false);
+        match t {
+            TypeDecl::Nullable { ty } => return build(ty, path, g, source),
+            TypeDecl::Record { fields, .. } => {
+                for f in fields {
+                    path.push(f.name.clone());
+                    node.fields
+                        .insert(f.name.clone(), build(&f.ty, path, g, source));
+                    path.pop();
+                }
+            }
+            TypeDecl::List { item, .. } | TypeDecl::Map { value: item, .. } => {
+                path.push("*".into());
+                node.item = Some(Box::new(build(item, path, g, source)));
+                path.pop();
+            }
+            _ => {}
+        }
+        node.finish()
+    }
+    build(ty, &mut vec![], grading, source)
+}
+
+/// How a read uses a value: as a whole (the node and everything under it),
+/// or only the node itself (a list's items exist, whatever their fields).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Mode {
+    Whole,
+    Node,
+}
+
+/// One read of a step or policy item (spec 032, 3.2.3 and 3.9).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Read {
+    /// `input:<name>` or `step:<id>`.
+    pub base: String,
+    pub path: Vec<String>,
+    pub mode: Mode,
+    pub require: Option<GradeRequirement>,
+    pub gate: bool,
+}
+
+impl Read {
+    /// `input:x/a/b` or `step:y/a`, as evidence and refusals name it.
+    pub fn name(&self) -> String {
+        if self.path.is_empty() {
+            self.base.clone()
+        } else {
+            format!("{}/{}", self.base, self.path.join("/"))
+        }
+    }
+}
+
+/// The base and path a reference names; item references resolve against
+/// `item_base` (the list a per-item operator iterates, with `*`).
+fn resolve(r: &str, item_base: Option<(&str, &[String])>) -> Option<(String, Vec<String>)> {
+    match Ref::parse(r).ok()? {
+        Ref::Input(n, p) => Some((format!("input:{n}"), p)),
+        Ref::Step(s) => {
+            let (id, p) = split_step(&s);
+            Some((format!("step:{id}"), p))
+        }
+        Ref::Item(p) => {
+            let (b, lp) = item_base?;
+            let mut path = lp.to_vec();
+            path.push("*".into());
+            path.extend(split_item(p));
+            Some((b.to_string(), path))
+        }
+        Ref::Now | Ref::Bind(_) => None,
+    }
+}
+
+fn expr_reads(e: &Expr, item: Option<(&str, &[String])>, gate: bool, out: &mut Vec<Read>) {
+    let mut push = |r: &str, require: Option<GradeRequirement>| {
+        if let Some((base, path)) = resolve(r, item) {
+            out.push(Read {
+                base,
+                path,
+                mode: Mode::Whole,
+                require,
+                gate,
+            });
+        }
+    };
+    match e {
+        Expr::Ref(r) => push(r, None),
+        Expr::Graded { reference, require } => push(reference, Some(require.clone())),
+        Expr::Lit(_) => {}
+        Expr::Add { left, right }
+        | Expr::Sub { left, right }
+        | Expr::Mul { left, right }
+        | Expr::Div { left, right } => {
+            expr_reads(left, item, gate, out);
+            expr_reads(right, item, gate, out);
+        }
+        Expr::Round { value, .. } | Expr::Len(value) | Expr::ToDecimal(value) => {
+            expr_reads(value, item, gate, out)
+        }
+        Expr::Fx {
+            amount,
+            from,
+            to,
+            rates,
+            ..
+        } => {
+            expr_reads(amount, item, gate, out);
+            expr_reads(from, item, gate, out);
+            expr_reads(to, item, gate, out);
+            expr_reads(&Expr::Ref(rates.clone()), item, gate, out);
+        }
+    }
+}
+
+pub(crate) fn predicate_reads(
+    p: &Predicate,
+    item: Option<(&str, &[String])>,
+    gate: bool,
+    out: &mut Vec<Read>,
+) {
+    match p {
+        Predicate::Cmp { left, right, .. } => {
+            expr_reads(left, item, gate, out);
+            expr_reads(right, item, gate, out);
+        }
+        Predicate::All(ps) | Predicate::Any(ps) => {
+            ps.iter().for_each(|p| predicate_reads(p, item, gate, out))
+        }
+        Predicate::Not(p) => predicate_reads(p, item, gate, out),
+        Predicate::Member { value, .. } => expr_reads(value, item, gate, out),
+        Predicate::MemberRef { value, set } => {
+            expr_reads(value, item, gate, out);
+            expr_reads(&Expr::Ref(set.clone()), item, gate, out);
+        }
+        Predicate::Present(r) => {
+            if let Some((base, path)) = resolve(r, item) {
+                out.push(Read {
+                    base,
+                    path,
+                    mode: Mode::Node,
+                    require: None,
+                    gate,
+                });
+            }
+        }
+    }
+}
+
+fn whole(r: &str) -> Option<Read> {
+    resolve(r, None).map(|(base, path)| Read {
+        base,
+        path,
+        mode: Mode::Whole,
+        require: None,
+        gate: false,
+    })
+}
+
+fn node(r: &str) -> Option<Read> {
+    whole(r).map(|r| Read {
+        mode: Mode::Node,
+        ..r
+    })
+}
+
+fn item_field(list: &str, field: &str) -> Option<Read> {
+    resolve(list, None).map(|(base, mut path)| {
+        path.push("*".into());
+        path.push(field.into());
+        Read {
+            base,
+            path,
+            mode: Mode::Whole,
+            require: None,
+            gate: false,
+        }
+    })
+}
+
+/// Every value an exact step reads, for propagation and the grade phase.
+/// The step's value metadata is the combination of these reads (spec 032,
+/// 3.2.3); the gate reads are the hard gates of 3.9.2.
+pub(crate) fn op_reads(args: &OpArgs) -> Vec<Read> {
+    let mut out: Vec<Read> = Vec::new();
+    let list_base = |r: &str| resolve(r, None);
+    match args {
+        OpArgs::CountWhere(a) => {
+            out.extend(node(&a.list));
+            if let Some((b, p)) = list_base(&a.list) {
+                predicate_reads(&a.predicate, Some((&b, &p)), true, &mut out);
+            }
+        }
+        OpArgs::WindowFilter(a) => {
+            out.extend(whole(&a.list));
+            if let Some((b, p)) = list_base(&a.list) {
+                predicate_reads(&a.predicate, Some((&b, &p)), true, &mut out);
+            }
+        }
+        OpArgs::Extremum(a) => {
+            out.extend(node(&a.list));
+            out.extend(item_field(&a.list, &a.field));
+        }
+        OpArgs::TimestampDiff(a) => {
+            expr_reads(&a.later, None, false, &mut out);
+            expr_reads(&a.earlier, None, false, &mut out);
+        }
+        OpArgs::Compare(a) => predicate_reads(&a.predicate, None, true, &mut out),
+        OpArgs::Arith(a) => expr_reads(&a.expr, None, false, &mut out),
+        OpArgs::FxConvert(a) => {
+            expr_reads(&a.amount, None, false, &mut out);
+            expr_reads(&a.from, None, false, &mut out);
+            expr_reads(&a.to, None, false, &mut out);
+            out.extend(whole(&a.rates));
+        }
+        OpArgs::MemberOf(a) => expr_reads(&a.value, None, true, &mut out),
+        OpArgs::FieldPresence(a) => out.extend(a.inputs.iter().filter_map(|r| node(r))),
+        OpArgs::FilterWithReasons(a) => {
+            out.extend(node(&a.list));
+            out.extend(item_field(&a.list, &a.id_field));
+            if let Some((b, p)) = list_base(&a.list) {
+                for r in &a.rules {
+                    predicate_reads(&r.predicate, Some((&b, &p)), true, &mut out);
+                }
+            }
+        }
+        OpArgs::TopK(a) => {
+            out.extend(node(&a.list));
+            out.extend(item_field(&a.list, &a.id_field));
+            out.extend(whole(&a.among));
+            if let Some((b, p)) = list_base(&a.list) {
+                expr_reads(&a.key, Some((&b, &p)), false, &mut out);
+            }
+        }
+        OpArgs::WeightedRank(a) => {
+            out.extend(whole(&a.candidates));
+            for c in &a.components {
+                match &c.source {
+                    crate::ops::Source::PropositionMean { step, weights, .. } => {
+                        out.extend(whole(step));
+                        out.extend(whole(&weights.list));
+                    }
+                    crate::ops::Source::RubricExpectation { step } => out.extend(whole(step)),
+                    crate::ops::Source::ShortlistPosition => {}
+                }
+            }
+        }
+        OpArgs::JoinKeyed(a) => {
+            out.extend(node(&a.left));
+            if a.key != "id" {
+                out.extend(item_field(&a.left, &a.key));
+            } else if let Some((base, mut path)) = list_base(&a.left) {
+                path.push("*".into());
+                out.push(Read {
+                    base,
+                    path,
+                    mode: Mode::Whole,
+                    require: None,
+                    gate: false,
+                });
+            }
+            out.extend(node(&a.right));
+        }
+        OpArgs::MergeFields(a) => {
+            out.extend(whole(&a.base));
+            out.extend(whole(&a.overlay));
+        }
+    }
+    out
+}
+
+/// The reads of a policy condition: every one is a hard gate unless the
+/// condition is `always` (spec 032, 3.9.2).
+pub(crate) fn cond_reads(c: &Cond, out: &mut Vec<Read>) {
+    match c {
+        Cond::Always => {}
+        Cond::TopLabel { step, .. }
+        | Cond::MassAtLeast { step, .. }
+        | Cond::TopMassBelow { step, .. }
+        | Cond::ExpectationAtLeast { step, .. } => out.push(Read {
+            base: format!("step:{step}"),
+            path: vec![],
+            mode: Mode::Whole,
+            require: None,
+            gate: true,
+        }),
+        Cond::Exact(p) => predicate_reads(p, None, true, out),
+        Cond::Empty(r) | Cond::Nonempty(r) => {
+            if let Some((base, path)) = resolve(r, None) {
+                out.push(Read {
+                    base,
+                    path,
+                    mode: Mode::Node,
+                    require: None,
+                    gate: true,
+                });
+            }
+        }
+        Cond::All(cs) | Cond::Any(cs) => cs.iter().for_each(|c| cond_reads(c, out)),
+        Cond::Not(c) => cond_reads(c, out),
+    }
+}
+
+/// The reads of a semantic step's projection, fan-out and candidates.
+pub(crate) fn semantic_reads(d: &rustev_contract::definition::SemanticDecl) -> Vec<Read> {
+    let mut out: Vec<Read> = d
+        .project
+        .iter()
+        .filter(|r| !r.starts_with("bind:"))
+        .filter_map(|r| whole(r))
+        .collect();
+    for f in &d.for_each {
+        out.extend(whole(&f.over));
+        if let rustev_contract::definition::ItemSource::List { list, .. } = &f.items {
+            out.extend(whole(list));
+        }
+    }
+    if let rustev_contract::definition::Candidates::From(c) = &d.candidates {
+        out.extend(whole(c));
+    }
+    out
+}
+
+/// The reads of a corroboration step's checks.
+pub(crate) fn check_reads(c: &CorroborateDecl) -> Vec<Vec<Read>> {
+    c.by.iter()
+        .map(|check| {
+            let mut out = Vec::new();
+            predicate_reads(&check.predicate, None, false, &mut out);
+            out
+        })
+        .collect()
+}
+
+/// The claim's base and path.
+pub(crate) fn claim_path(c: &CorroborateDecl) -> (String, Vec<String>) {
+    resolve(&c.claim, None).unwrap_or_default()
+}
+
+/// Whether a read is of the claim itself (or a part of it): such a read is
+/// not evidence for the claim, so its grade does not count against
+/// `upgrade_to` (spec 032, 3.7.3).
+pub(crate) fn reads_claim(r: &Read, claim: &(String, Vec<String>)) -> bool {
+    r.base == claim.0 && prefix_of(&claim.1, &r.path)
+}
+
+/// The ceiling a read sees.
+pub(crate) fn read_ceiling(r: &Read, trees: &BTreeMap<String, Ceil>) -> Ceil {
+    let node = trees
+        .get(&r.base)
+        .map(|t| t.at(&r.path))
+        .unwrap_or_else(|| Ceil::leaf(ValueGrade::Ungraded, false));
+    match r.mode {
+        Mode::Whole => node,
+        Mode::Node => Ceil {
+            own: node.here,
+            ..node
+        },
+    }
+}
+
+/// The combination of reads' ceilings, as one leaf.
+pub(crate) fn combine_reads(reads: &[Read], trees: &BTreeMap<String, Ceil>) -> Ceil {
+    let mut g = ValueGrade::Ungraded;
+    let mut corroborated = false;
+    for r in reads {
+        let c = read_ceiling(r, trees);
+        g = g.combine(c.own);
+        corroborated |= c.corroborated;
+    }
+    Ceil::leaf(g, corroborated)
+}
+
+/// Raise every node of a claim's tree to at least `g` (spec 032, 3.7.5): a
+/// corroborated claim has grade `max(claim grade, upgrade_to)`; an ungraded
+/// claim takes `upgrade_to`.
+pub(crate) fn raised(t: &Ceil, g: Grade) -> Ceil {
+    let up = |v: ValueGrade| match v.graded() {
+        Some(x) => ValueGrade::from(x.max(g)),
+        None => ValueGrade::from(g),
+    };
+    // An interior node without a declaration of its own (a merge root)
+    // takes its content's ceiling, so `own` stays `combine(here, children)`
+    // and equals `max(own, upgrade_to)`.
+    let interior = !t.fields.is_empty() || t.item.is_some();
+    let here = match t.here.graded() {
+        None if interior => up(t.own),
+        _ => up(t.here),
+    };
+    Ceil {
+        here,
+        own: here,
+        corroborated: true,
+        fields: t
+            .fields
+            .iter()
+            .map(|(k, c)| (k.clone(), raised(c, g)))
+            .collect(),
+        item: t.item.as_ref().map(|c| Box::new(raised(c, g))),
+    }
+    .finish()
+}
+
+/// The category 13 or 14 refusal a requirement or gate read earns, if any
+/// (spec 032, 3.9.3).
+pub(crate) fn requirement_refusal(
+    subject: &str,
+    r: &Read,
+    trees: &BTreeMap<String, Ceil>,
+) -> Option<Refusal> {
+    let c = read_ceiling(r, trees);
+    let ceiling = c.own.graded()?;
+    let min = match &r.require {
+        Some(req) => req.min,
+        None if r.gate => Grade::Estimated,
+        None => return None,
+    };
+    if ceiling >= min {
+        return None;
+    }
+    let (category, name) = if ceiling == Grade::Hint && !c.corroborated {
+        (Category::UncorroboratedHint, "uncorroborated_hint")
+    } else {
+        (Category::GradeRequirement, "grade_requirement")
+    };
+    Some(refusal(
+        category,
+        subject,
+        format!(
+            "{name}: {} has ceiling {} where {} is required",
+            r.name(),
+            ceiling.name(),
+            min.name()
+        ),
+    ))
+}
+
+fn max_grade(a: ValueGrade, b: ValueGrade) -> ValueGrade {
+    match (a.graded(), b.graded()) {
+        (Some(x), Some(y)) => x.max(y).into(),
+        (Some(x), None) | (None, Some(x)) => x.into(),
+        (None, None) => ValueGrade::Ungraded,
+    }
+}
+
+fn tree_at(trees: &BTreeMap<String, Ceil>, r: &str, extra: &[&str]) -> Ceil {
+    let (base, mut path) = resolve(r, None).unwrap_or_default();
+    path.extend(extra.iter().map(|s| s.to_string()));
+    trees
+        .get(&base)
+        .map(|t| t.at(&path))
+        .unwrap_or_else(|| Ceil::leaf(ValueGrade::Ungraded, false))
+}
+
+/// The static tree of an exact step: one node, the combination of its
+/// reads, except a join (whose matched values keep their own ceilings) and a
+/// merge (one ceiling per field).
+pub(crate) fn step_tree(args: &OpArgs, trees: &BTreeMap<String, Ceil>) -> Ceil {
+    let whole = combine_reads(&op_reads(args), trees);
+    match args {
+        OpArgs::JoinKeyed(a) => {
+            let id = if a.key == "id" {
+                tree_at(trees, &a.left, &["*"])
+            } else {
+                tree_at(trees, &a.left, &["*", &a.key])
+            };
+            let matched = tree_at(trees, &a.right, &["*"]);
+            let mut item = Ceil::leaf(id.own, id.corroborated);
+            item.fields.insert("id".into(), id);
+            item.fields.insert("match".into(), matched);
+            let mut node = Ceil::leaf(whole.here, whole.corroborated);
+            node.item = Some(Box::new(item.finish()));
+            node.finish()
+        }
+        OpArgs::MergeFields(m) => {
+            let per_item = matches!(trees.get(&resolve(&m.overlay, None).unwrap_or_default().0), Some(t) if t.item.as_ref().is_some_and(|i| i.fields.contains_key("match")));
+            let mut rec = Ceil::leaf(ValueGrade::Ungraded, whole.corroborated);
+            for r in &m.rules {
+                let (base, overlay) = if per_item {
+                    (
+                        tree_at(trees, &m.base, &["*", &r.field]),
+                        tree_at(trees, &m.overlay, &["*", "match", &r.field]),
+                    )
+                } else {
+                    (
+                        tree_at(trees, &m.base, &[&r.field]),
+                        tree_at(trees, &m.overlay, &[&r.field]),
+                    )
+                };
+                let field = match &r.rule {
+                    crate::ops::MergeRule::OverlayOnly => overlay,
+                    crate::ops::MergeRule::BaseOnly => base,
+                    crate::ops::MergeRule::OverlayElseBaseIfGradeAtLeast { grade } => {
+                        let base_ok = base.own.graded().is_some_and(|b| b >= *grade);
+                        let g = if base_ok {
+                            max_grade(overlay.own, base.own)
+                        } else {
+                            overlay.own
+                        };
+                        Ceil::leaf(g, overlay.corroborated || base.corroborated)
+                    }
+                };
+                rec.fields.insert(r.field.clone(), field);
+            }
+            let rec = rec.finish();
+            if per_item {
+                let mut node = Ceil::leaf(ValueGrade::Ungraded, rec.corroborated);
+                node.item = Some(Box::new(rec));
+                node.finish()
+            } else {
+                rec
+            }
+        }
+        _ => whole,
+    }
+}
+
+/// A semantic step: at most `estimated` when it reads a graded value,
+/// otherwise `ungraded` (spec 032, 3.2.3).
+pub(crate) fn semantic_tree(
+    d: &rustev_contract::definition::SemanticDecl,
+    trees: &BTreeMap<String, Ceil>,
+) -> Ceil {
+    let c = combine_reads(&semantic_reads(d), trees);
+    match c.own.graded() {
+        Some(g) => Ceil::leaf(g.min(Grade::Estimated).into(), c.corroborated),
+        None => Ceil::leaf(ValueGrade::Ungraded, c.corroborated),
+    }
+}
+
+/// A corroboration step: the claim's tree raised to `upgrade_to`, its
+/// highest possible grade.
+pub(crate) fn corroborate_tree(c: &CorroborateDecl, trees: &BTreeMap<String, Ceil>) -> Ceil {
+    raised(&tree_at(trees, &c.claim, &[]), c.upgrade_to)
+}
+
+/// The grade checks of a corroboration step (spec 032, 3.9.3): explicit
+/// requirements in its checks, and no check may read a value (other than
+/// the claim) whose ceiling is below `upgrade_to`.
+pub(crate) fn corroborate_refusal(
+    subject: &str,
+    c: &CorroborateDecl,
+    trees: &BTreeMap<String, Ceil>,
+) -> Option<Refusal> {
+    let claim = claim_path(c);
+    for reads in check_reads(c) {
+        for r in &reads {
+            if let Some(x) = requirement_refusal(subject, r, trees) {
+                return Some(x);
+            }
+            if reads_claim(r, &claim) {
+                continue;
+            }
+            if let Some(g) = read_ceiling(r, trees).own.graded() {
+                if g < c.upgrade_to {
+                    return Some(refusal(
+                        Category::GradeRequirement,
+                        subject,
+                        format!(
+                            "grade_requirement: a check reads {} with ceiling {}, below upgrade_to {}",
+                            r.name(),
+                            g.name(),
+                            c.upgrade_to.name()
+                        ),
+                    ));
+                }
+            }
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -719,5 +1417,125 @@ mod tests {
             Category::SourceBinding,
             "a malformed cap path is not the root"
         );
+    }
+
+    fn graded_tree(caps: Value) -> Ceil {
+        let v = json!({"schema": "rustev.source/1", "name": "live-quote", "version": "1.0.0",
+            "facts": [{"name": "quotes", "provenance": "third-party", "grades": [
+                {"path": "", "max_grade": "authoritative", "reliability": "reliable"},
+                {"path": "*/price", "max_grade": "cached", "reliability": "reliable"}]}]});
+        let d = SourceDescriptor::parse(v.to_string().as_bytes()).unwrap();
+        let mut b = base();
+        b["inputs"][0]["evidence"]["graded"]["caps"] = caps;
+        let def = def(&b);
+        let bound = bind_sources(&def, &[d]).unwrap();
+        input_tree(&def.inputs[0].ty, bound.inputs.get("quotes"), None)
+    }
+
+    fn path(p: &str) -> Vec<String> {
+        parse_path(p).unwrap()
+    }
+
+    #[test]
+    fn raising_a_tree_keeps_each_ceiling_the_combination_of_its_parts() {
+        let g = |x: Grade| ValueGrade::from(x);
+        let merge_root = |fields: &[(&str, Grade)]| {
+            let mut t = Ceil::leaf(ValueGrade::Ungraded, false);
+            for (k, x) in fields {
+                t.fields.insert(k.to_string(), Ceil::leaf(g(*x), false));
+            }
+            t.finish()
+        };
+        let consistent =
+            |t: &Ceil| t.fields.values().fold(t.here, |own, c| own.combine(c.own)) == t.own;
+        // Every field above `upgrade_to`: the whole keeps its own grade.
+        let r = raised(&merge_root(&[("a", Grade::Authoritative)]), Grade::Cached);
+        assert_eq!(r.own, g(Grade::Authoritative));
+        assert!(consistent(&r));
+        // A field below `upgrade_to` is raised to it, and the whole with it.
+        let r = raised(
+            &merge_root(&[("a", Grade::Authoritative), ("b", Grade::Hint)]),
+            Grade::Cached,
+        );
+        assert_eq!(r.fields["b"].own, g(Grade::Cached));
+        assert_eq!(r.own, g(Grade::Cached));
+        assert!(consistent(&r));
+        // An ungraded leaf takes `upgrade_to`.
+        let r = raised(&Ceil::leaf(ValueGrade::Ungraded, false), Grade::Estimated);
+        assert_eq!((r.here, r.own), (g(Grade::Estimated), g(Grade::Estimated)));
+    }
+
+    #[test]
+    fn a_ceiling_is_the_lowest_declaration_on_the_path_capped() {
+        let t = graded_tree(json!([{"path": "*/unit_price", "max_grade": "estimated"}]));
+        assert_eq!(t.here, ValueGrade::from(Grade::Authoritative));
+        assert_eq!(t.at(&path("*/price")).own, ValueGrade::from(Grade::Cached));
+        assert_eq!(
+            t.at(&path("*/unit_price")).own,
+            ValueGrade::from(Grade::Estimated),
+            "a cap lowers"
+        );
+        // A whole value is as weak as its weakest part.
+        assert_eq!(t.own, ValueGrade::from(Grade::Estimated));
+        // A cap above the source's declaration never raises it.
+        let high = graded_tree(json!([{"path": "*/price", "max_grade": "authoritative"}]));
+        assert_eq!(
+            high.at(&path("*/price")).own,
+            ValueGrade::from(Grade::Cached)
+        );
+        // An ungraded input is ungraded throughout.
+        let def = def(&base());
+        let ungraded = input_tree(&def.inputs[0].ty, None, None);
+        assert_eq!(ungraded.own, ValueGrade::Ungraded);
+        assert_eq!(ungraded.at(&path("*/price")).own, ValueGrade::Ungraded);
+    }
+
+    #[test]
+    fn requirements_and_gates_are_judged_against_the_static_ceiling() {
+        let read = |p: &str, require: Option<Grade>, gate: bool, mode: Mode| Read {
+            base: "input:quotes".into(),
+            path: path(p),
+            mode,
+            require: require.map(|min| GradeRequirement {
+                min,
+                max_age_ms: rustev_contract::definition::AgeLimit::NotRequired,
+            }),
+            gate,
+        };
+        let hint = graded_tree(json!([{"path": "*/price", "max_grade": "hint"}]));
+        let trees = BTreeMap::from([("input:quotes".to_string(), hint.clone())]);
+        let gate = read("*/price", None, true, Mode::Whole);
+        let r = requirement_refusal("step:s", &gate, &trees).expect("refused");
+        assert_eq!(r.category, Category::UncorroboratedHint);
+        // Corroboration raises the hint: the gate's default `estimated` holds.
+        let raised_trees =
+            BTreeMap::from([("input:quotes".to_string(), raised(&hint, Grade::Cached))]);
+        assert!(requirement_refusal("step:s", &gate, &raised_trees).is_none());
+        // An explicit requirement above the ceiling is category 13.
+        let strict = read(
+            "*/unit_price",
+            Some(Grade::Authoritative),
+            false,
+            Mode::Whole,
+        );
+        let trees = BTreeMap::from([("input:quotes".to_string(), graded_tree(json!([])))]);
+        assert_eq!(
+            requirement_refusal("step:s", &strict, &trees).map(|r| r.category),
+            None,
+            "unit_price inherits authoritative"
+        );
+        let strict = read("*/price", Some(Grade::Authoritative), false, Mode::Whole);
+        assert_eq!(
+            requirement_refusal("step:s", &strict, &trees).map(|r| r.category),
+            Some(Category::GradeRequirement)
+        );
+        // Reading only the list node ignores its items' weaker fields.
+        let node = read("", Some(Grade::Authoritative), false, Mode::Node);
+        assert!(requirement_refusal("step:s", &node, &trees).is_none());
+        let whole = read("", Some(Grade::Authoritative), false, Mode::Whole);
+        assert!(requirement_refusal("step:s", &whole, &trees).is_some());
+        // A plain read is never judged.
+        let plain = read("*/price", None, false, Mode::Whole);
+        assert!(requirement_refusal("step:s", &plain, &trees).is_none());
     }
 }
