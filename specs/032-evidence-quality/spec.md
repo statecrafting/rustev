@@ -836,3 +836,16 @@ none) and loads with `Compiled::load_with_sources`. In
 with a passing neighbour, cap behaviour, `PlanId` sensitivity to a cap and
 insensitivity to an unbound descriptor, and plan 3 loading. Evaluating a
 plan 3 is refused at `Evaluation::start` until increment 3.
+
+**Increment 3, second change (runtime).** 3.11 at the runtime:
+`EvidenceSink::accepts` names the run record schemas a sink accepts, by
+default `rustev.run/1` only; `Runtime::prepare` refuses a plan 3 on a sink
+that does not accept `rustev.run/3` (`PrepareError::SinkVersionUnsupported`,
+the CLI's `sink_version_unsupported`), and `decide_with_capture` refuses a
+plan 3 before admission (`CaptureConfigError::CaptureUnsupported`), with no
+run record and nothing dispatched. The CLI's record file sink accepts
+`rustev.run/1` only, so the CLI refuses a plan 3 at preparation.
+A plan 3 decision's run record is
+`rustev.run/3` (3.10.3); a plan 2 decision's stays `rustev.run/1`.
+`crates/rustev-runtime/tests/plan_3.rs` covers the two refusals; the
+change that admits plan 3 evaluation tests the record.

@@ -190,6 +190,12 @@ pub trait Evaluator: Send + Sync {
 /// terms, nothing more.
 pub trait EvidenceSink: Send + Sync {
     fn deliver<'a>(&'a self, record: &'a RunRecord) -> BoxFuture<'a, Result<String, String>>;
+
+    /// Whether the sink accepts run records of `schema` (spec 032, 3.11.2).
+    /// A sink accepts only `rustev.run/1` unless it says otherwise.
+    fn accepts(&self, schema: &str) -> bool {
+        schema == rustev_contract::schema::RUN
+    }
 }
 
 /// A one-way, clonable cancellation signal with children, using `std` only.

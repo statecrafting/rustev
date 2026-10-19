@@ -84,6 +84,9 @@ pub enum PrepareError {
         backend_id: String,
         model: CostModel,
     },
+    /// A plan 3 and an evidence sink that does not accept `rustev.run/3`
+    /// (spec 032, 3.11.2).
+    SinkVersionUnsupported { schema: &'static str },
 }
 
 /// Why a decision was not admitted (spec 003, 3.4.1). Nothing was dispatched
@@ -401,6 +404,11 @@ impl Runtime {
     /// Check a compiled plan against the registered backends (spec 003,
     /// 3.5.3 and 3.6.5).
     pub fn prepare(&self, compiled: Compiled) -> Result<PreparedPlan, PrepareError> {
+        if compiled.plan.schema == schema::PLAN_V3 && !self.inner.sink.accepts(schema::RUN_V3) {
+            return Err(PrepareError::SinkVersionUnsupported {
+                schema: schema::RUN_V3,
+            });
+        }
         let (policy, fallbacks, execution) = match &compiled.plan.execution {
             PlanExecution::None => (None, vec![], RecordedExecution::None),
             PlanExecution::Declared(d) => (
@@ -569,6 +577,13 @@ impl Runtime {
         cancel: &CancelSignal,
         capture: &CaptureConfig,
     ) -> Result<CapturedDecision, CaptureConfigError> {
+        // Replay bundles admit plan 2 items only until spec 004 is amended
+        // (spec 032, 3.11.3).
+        if plan.compiled.plan.schema == schema::PLAN_V3 {
+            return Err(CaptureConfigError::CaptureUnsupported {
+                plan_schema: schema::PLAN_V3,
+            });
+        }
         capture.check()?;
         let decision_id = req.decision_id.clone();
         let mut capturing = capture::Capturing::new(capture);
@@ -677,7 +692,13 @@ impl Runtime {
         };
         let elapsed_ms = i.clock.now().saturating_sub(submitted);
         let record = Arc::new(RunRecord {
-            schema: schema::RUN.into(),
+            // A plan 3 decision's record holds evidence 2 (spec 032, 3.10.3).
+            schema: if plan.compiled.plan.schema == schema::PLAN_V3 {
+                schema::RUN_V3
+            } else {
+                schema::RUN
+            }
+            .into(),
             decision_id: req.decision_id.clone(),
             plan_id: compiled.id.clone(),
             execution: plan.execution.clone(),

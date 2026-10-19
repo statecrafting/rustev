@@ -40,7 +40,13 @@ pub struct CaptureConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CaptureConfigError {
     ZeroLimit,
-    LimitTooLarge { max_bytes: u64 },
+    LimitTooLarge {
+        max_bytes: u64,
+    },
+    /// A plan whose items no replay bundle admits yet (spec 032, 3.11.3).
+    CaptureUnsupported {
+        plan_schema: &'static str,
+    },
 }
 
 impl fmt::Display for CaptureConfigError {
@@ -51,6 +57,12 @@ impl fmt::Display for CaptureConfigError {
                 f,
                 "a capture byte limit is at most {MAX_CAPTURE_BYTES}, not {max_bytes}"
             ),
+            CaptureConfigError::CaptureUnsupported { plan_schema } => {
+                write!(
+                    f,
+                    "capture_unsupported: no replay bundle admits a {plan_schema}"
+                )
+            }
         }
     }
 }
