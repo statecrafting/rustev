@@ -29,6 +29,9 @@ pub fn category_name(c: Category) -> &'static str {
         Category::CalibrationBinding => "calibration_binding",
         Category::InvalidDefinition => "invalid_definition",
         Category::InvalidExecution => "invalid_execution",
+        Category::GradeRequirement => "grade_requirement",
+        Category::UncorroboratedHint => "uncorroborated_hint",
+        Category::SourceBinding => "source_binding",
     }
 }
 

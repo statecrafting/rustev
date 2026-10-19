@@ -53,6 +53,14 @@ pub enum Category {
     InvalidDefinition = 11,
     /// An execution policy that is not valid (spec 003, 3.2.3).
     InvalidExecution = 12,
+    /// A requirement or hard gate reads a value whose static ceiling is
+    /// below the required grade (spec 032, 3.9.3; phase e2).
+    GradeRequirement = 13,
+    /// A requirement or hard gate reads a `hint` no corroboration raises
+    /// (spec 032, 3.9.3; phase e2).
+    UncorroboratedHint = 14,
+    /// A graded input's sources do not bind (spec 032, 3.3.4; phase c).
+    SourceBinding = 15,
 }
 
 /// Why one candidate backend cannot serve a step.

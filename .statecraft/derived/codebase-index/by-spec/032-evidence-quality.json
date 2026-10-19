@@ -17,6 +17,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rustev-cli/",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rustev-contract/",
         "source": "spec-edge"
       },
@@ -34,6 +38,19 @@
       }
     ],
     "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-cli/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-cli/"
+        }
+      },
       {
         "locations": [
           {
@@ -130,5 +147,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "0b8fb51f7387e4037c5a2a7ffccb16fa8fd4450e156a02bfcac1737f6de8d51d"
+  "shardHash": "4ee21ee63e9f9c25f76c6a41dffaa8522fac11ea04246532dc43ab980674199a"
 }
