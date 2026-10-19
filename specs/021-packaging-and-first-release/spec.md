@@ -29,6 +29,18 @@ extends:
   - { spec: "006-cli-surface", unit: { kind: file, path: "crates/rustev-cli/Cargo.toml" }, nature: amending }
   - { spec: "007-support-routing-package", unit: { kind: file, path: "packages/rustev-pkg-support-routing/Cargo.toml" }, nature: amending }
   - { spec: "009-remote-adapter-protocol", unit: { kind: file, path: "integrations/rustev-remote-http/Cargo.toml" }, nature: amending }
+  # Each archive's license text (3.3): a link to the root LICENSE.
+  - { spec: "002-decision-contract-and-pure-core", unit: { kind: file, path: "crates/rustev-contract/LICENSE" }, nature: additive }
+  - { spec: "002-decision-contract-and-pure-core", unit: { kind: file, path: "crates/rustev-core/LICENSE" }, nature: additive }
+  - { spec: "003-runtime-execution-and-evidence", unit: { kind: file, path: "crates/rustev-runtime/LICENSE" }, nature: additive }
+  - { spec: "004-evaluation-and-replay", unit: { kind: file, path: "crates/rustev-eval/LICENSE" }, nature: additive }
+  - { spec: "005-reference-backends", unit: { kind: file, path: "backends/rustev-backend-rules/LICENSE" }, nature: additive }
+  - { spec: "006-cli-surface", unit: { kind: file, path: "crates/rustev-cli/LICENSE" }, nature: additive }
+  - { spec: "007-support-routing-package", unit: { kind: file, path: "packages/rustev-pkg-support-routing/LICENSE" }, nature: additive }
+  - { spec: "009-remote-adapter-protocol", unit: { kind: file, path: "integrations/rustev-remote-http/LICENSE" }, nature: additive }
+  # The release tool spec 031 plans; this spec's candidate machinery lives
+  # there (031, 2.2).
+  - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "002-decision-contract-and-pure-core"
@@ -390,6 +402,60 @@ manifests, checks and candidate evidence only. Commands that create or push a
 tag, upload to a registry, create a hosted release, yank a version, access a
 credential or make a public availability claim remain outside that authority
 until the owner gives the exact instruction required by 3.9.
+
+## Implementation record
+
+Delivered in increments, each its own pull request; nothing here claims an
+acceptance item before the increment that satisfies it, and no increment
+uploads, tags, signs with the owner identity or reads a registry credential.
+Plan, in dependency order:
+
+1. Release set and manifest policy (2, 3.2 to 3.4).
+2. Archive policy: per-package allowlists, byte bounds, prohibited-content
+   scan and unpacked verification outside the workspace (3.5, 3.7).
+3. Dependency, license and advisory audit with a pinned tool and policy
+   (3.6).
+4. Reproducibility, the canonical release manifest, `SHA256SUMS`, signature
+   binding fixtures, the dry-run lifecycle state machine and the
+   fake-registry harness (3.1, 3.7 to 3.9, section 4).
+5. Candidate evidence at an exact commit (3.7), then the owner's
+   publication instruction (I-4), publication, and the registry-only
+   consumer (3.10).
+
+**Increment 1 (release set and manifest policy).** `tools/rustev-release/`
+(the release tool spec 031 owns and says holds this spec's candidate
+machinery, 031 2.2; `publish = false`, an exclusion) holds `release-set.json`
+(`rustev.release-set/1`: version `0.1.0`, tag `v0.1.0`, crates.io, the four
+layers of section 2, the upload order, the `rustev` binary of package
+`rustev-cli`, and the exclusions with reasons) and `rustev-release
+manifests`, which judges `cargo metadata` against it. The eight manifests
+inherit the family version, the shared edition, MSRV, license, repository,
+homepage and README, name their docs.rs target, keywords and categories,
+declare `publish = ["crates-io"]` and no feature, and take every internal
+dependency from `[workspace.dependencies]` as `{ path, version = "=0.1.0" }`;
+each package directory links the root `LICENSE`, so the archive carries the
+complete license text. Layers are computed over normal and build
+dependencies, as section 2's table is. Upload order is topological over
+every dependency kind, because the registry refuses an upload whose
+development dependency is not yet public: within layer 3 it runs runtime,
+rules backend, eval, remote HTTP, and `rustev-pkg-support-routing` uploads
+after `rustev-cli`, whose library its tests drive (spec 007, `rustev eval`
+over the dataset). That ordering still uploads every package only after
+each package it requires (3.9). `tools/rustev-release/tests/manifests.rs`
+passes on the workspace and breaks each rule once: a path-only or
+non-exact internal requirement (section 4 row 2 and 3), a dependency of any
+kind on an excluded crate, publication unrestricted or by an exclusion,
+each metadata field, a feature, a Git, alternate-registry or patched path
+source, the binary name, a layer and an upload order.
+
+Open for the owner: spec 031 3.1, which amends this section, orders each
+layer by name and starts a layer only after every package of the earlier
+layers is public. With today's development dependencies that order cannot
+be uploaded (the rules backend's tests use the runtime, and the
+support-routing package's tests use `rustev-cli`). This spec's text allows
+the order above; reconciling 031 3.1 (an ordering amendment, or removing
+those development dependencies from published manifests) is the owner's
+choice before 031 is implemented.
 
 ## Questions settled by R-34
 

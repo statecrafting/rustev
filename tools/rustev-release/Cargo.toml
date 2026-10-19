@@ -1,0 +1,19 @@
+[package]
+name = "rustev-release"
+version = "0.1.0"
+description = "Release-candidate checks of spec 021: the release set, manifest policy and package evidence. Never uploads, tags or reads a credential."
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[package.metadata.spec-spine]
+spec = "031-public-api-and-release-family"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

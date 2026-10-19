@@ -1,12 +1,18 @@
 [package]
 name = "rustev-contract"
-version = "0.1.0"
+version.workspace = true
 description = "Rustev's versioned wire contract: documents, bounded parsing, canonical form and identities."
-publish = false
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/rustev-contract"
+readme.workspace = true
+keywords = ["decision-engine", "canonical-json", "schema"]
+categories = ["data-structures", "encoding"]
+# Spec 021, 3.4: the intended public registry only.
+publish = ["crates-io"]
 
 [package.metadata.spec-spine]
 spec = "002-decision-contract-and-pure-core"

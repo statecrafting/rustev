@@ -1,19 +1,25 @@
 [package]
 name = "rustev-runtime"
-version = "0.1.0"
+version.workspace = true
 description = "Rustev's runtime: bounded execution of compiled plans through backend seams, with honest cost, cancellation and evidence."
-publish = false
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/rustev-runtime"
+readme.workspace = true
+keywords = ["decision-engine", "runtime", "evidence"]
+categories = ["asynchronous"]
+# Spec 021, 3.4: the intended public registry only.
+publish = ["crates-io"]
 
 [package.metadata.spec-spine]
 spec = "003-runtime-execution-and-evidence"
 
 [dependencies]
-rustev-contract = { path = "../rustev-contract" }
-rustev-core = { path = "../rustev-core" }
+rustev-contract.workspace = true
+rustev-core.workspace = true
 tokio = { workspace = true, features = ["sync", "time", "rt"] }
 
 [dev-dependencies]

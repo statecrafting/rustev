@@ -74,6 +74,14 @@
       {
         "path": "tools/rustev-boundaries/",
         "source": "spec-edge"
+      },
+      {
+        "path": "tools/rustev-release",
+        "source": "manifest-metadata"
+      },
+      {
+        "path": "tools/rustev-release/",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
@@ -87,7 +95,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "tools/rustev-release/"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -308,5 +320,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "268752373c25442d39dfb4f3b9d726960389da0a4776fa00e2e41d5807fb51fb"
+  "shardHash": "46f297cd2a1b43fd437e23a18d1d5f03a46b848200e7a507eec0651e85d4d086"
 }

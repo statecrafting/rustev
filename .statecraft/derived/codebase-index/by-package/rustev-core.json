@@ -3,9 +3,8 @@
     "kind": "rust-lib",
     "name": "rustev-core",
     "path": "crates/rustev-core",
-    "specRef": "002-decision-contract-and-pure-core",
-    "version": "0.1.0"
+    "specRef": "002-decision-contract-and-pure-core"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "35fd4f1e3f5bde276bd535ff090f0d698aae56d1f7c11bae459b10384579e551"
+  "shardHash": "3e17d229fd27d4f4f612e32b22fa4c80cd199cbc002170f4e6b34aac11987962"
 }

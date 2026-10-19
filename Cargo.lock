@@ -393,6 +393,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustev-release"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "rustev-remote-http"
 version = "0.1.0"
 dependencies = [

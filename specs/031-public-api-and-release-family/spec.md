@@ -29,7 +29,8 @@ amends:
   - "021-packaging-and-first-release"
 establishes:
   - { kind: directory, path: "integrations/rustev/", planned: true }
-  - { kind: directory, path: "tools/rustev-release/", planned: true }
+  # Written by spec 021 increment 1 (021 extends it; 2.2 below).
+  - { kind: directory, path: "tools/rustev-release/" }
 extends:
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.toml" }, nature: amending }
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.lock" }, nature: amending }
@@ -619,6 +620,14 @@ Environment; approval of this spec is not that approval.
 Pending with implementation. Approval authorizes the facade, release tooling,
 manifest changes, CI changes through 3.12's path, and candidate evidence.
 Upload, tag push and hosted release creation happen only under 3.11.
+
+## Implementation record
+
+**2026-10-19, written by spec 021.** `tools/rustev-release/` exists: spec
+021 increment 1 wrote the release-set file and the manifest policy there,
+as 2.2 provides, so this spec's unit is established rather than planned and
+spec 021 extends it. Nothing of this spec is implemented by that change;
+its implementation remains pending.
 
 ## Decisions at approval
 

@@ -3,9 +3,8 @@
     "kind": "rust-lib",
     "name": "rustev-pkg-support-routing",
     "path": "packages/rustev-pkg-support-routing",
-    "specRef": "007-support-routing-package",
-    "version": "0.1.0"
+    "specRef": "007-support-routing-package"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "46f90a5596a0374c50ccceb28ad2c6c6c78e8a5cfb43dee1504336ce47c322af"
+  "shardHash": "f735e1755da6b63f845cf7d80a680c04ab4b16121eb170ba1ff3049248dbf9ca"
 }

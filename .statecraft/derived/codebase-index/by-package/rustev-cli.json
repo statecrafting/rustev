@@ -3,9 +3,8 @@
     "kind": "rust-lib-bin",
     "name": "rustev-cli",
     "path": "crates/rustev-cli",
-    "specRef": "006-cli-surface",
-    "version": "0.1.0"
+    "specRef": "006-cli-surface"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "96eebf268f083eb48c647f57159d492607cd93b3a9d3f2b5b8eabc16eea57518"
+  "shardHash": "2228b43ca5d4465bb776c5abfcd7c434bb8ffb65d6ac5adcca2d962cfe3fc28f"
 }
