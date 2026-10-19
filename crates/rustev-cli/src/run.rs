@@ -173,6 +173,9 @@ fn prepare_json(e: &PrepareError) -> serde_json::Value {
         PrepareError::HardBudgetUnenforceable { backend_id, model } => json!({
             "kind": "hard_budget_unenforceable", "backend_id": backend_id, "model": model,
         }),
+        PrepareError::SinkVersionUnsupported { schema } => {
+            json!({"kind": "sink_version_unsupported", "schema": schema})
+        }
     }
 }
 
@@ -338,7 +341,9 @@ async fn decide(
                 scope: c.scope.clone(),
                 max_bytes: c.max_bytes,
             };
-            // The configuration was checked with the flags.
+            // The configuration was checked with the flags, and the record
+            // file sink accepts `rustev.run/1` only, so a plan 3, which
+            // capture refuses, was refused at `prepare`.
             let captured = runtime
                 .decide_with_capture(&prepared, req, cancel, &config)
                 .await
