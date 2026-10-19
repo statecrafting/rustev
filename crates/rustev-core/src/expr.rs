@@ -72,6 +72,24 @@ pub struct TyEnv<'a> {
     pub inputs: &'a BTreeMap<String, Ty>,
     pub steps: &'a BTreeMap<String, StepTy>,
     pub item: Option<&'a Ty>,
+    /// A version 2 definition: step references may carry a field path
+    /// (`step:<id>/<field>`) and item paths may use `/` (spec 032, 3.4.4
+    /// and 3.5.4). Version 2 step ids and field names hold no `/` or `.`.
+    pub v2: bool,
+}
+
+/// A version 2 step reference's id and field path.
+pub fn split_step(s: &str) -> (String, Vec<String>) {
+    let mut parts = s.split('/');
+    let id = parts.next().unwrap_or_default().to_string();
+    (id, parts.map(String::from).collect())
+}
+
+/// A version 2 item path, with `/` as well as `.` separating fields.
+pub fn split_item(path: Vec<String>) -> Vec<String> {
+    path.iter()
+        .flat_map(|p| p.split('/').map(String::from))
+        .collect()
 }
 
 /// The dependency a reference names: `input:<name>` or `step:<id>` without
@@ -80,6 +98,15 @@ pub fn base_ref(r: &str) -> String {
     match r.strip_prefix("input:") {
         Some(rest) => format!("input:{}", rest.split('/').next().unwrap_or_default()),
         None => r.to_string(),
+    }
+}
+
+/// [`base_ref`] for a version 2 definition, whose step references may carry
+/// a field path.
+pub fn base_ref_v2(r: &str) -> String {
+    match r.strip_prefix("step:") {
+        Some(s) => format!("step:{}", split_step(s).0),
+        None => base_ref(r),
     }
 }
 
@@ -230,8 +257,18 @@ pub fn predicate_structure(p: &Predicate) -> Result<(), String> {
 }
 
 fn field_ty<'t>(ty: &'t Ty, path: &[String]) -> Result<&'t Ty, String> {
+    let unwrap = |t: &'t Ty| match t {
+        // Reading a nullable field yields its type; `null` is missing.
+        Ty::Nullable(inner) => inner.as_ref(),
+        t => t,
+    };
+    // A root is never nullable (`nullable` is a record field type only,
+    // spec 032 3.4.1), so only a field read is unwrapped.
     let mut cur = ty;
     for f in path {
+        if f.is_empty() {
+            return Err("a path has an empty field name".into());
+        }
         match cur {
             Ty::Record(fields) => {
                 cur = fields
@@ -239,6 +276,7 @@ fn field_ty<'t>(ty: &'t Ty, path: &[String]) -> Result<&'t Ty, String> {
                     .find(|(n, _)| n == f)
                     .map(|(_, t)| t)
                     .ok_or_else(|| format!("no field {f:?}"))?;
+                cur = unwrap(cur);
             }
             other => return Err(format!("{} has no field {f:?}", other.name())),
         }
@@ -256,17 +294,24 @@ pub fn ref_ty(r: &str, env: &TyEnv<'_>) -> Result<Ty, String> {
                 .ok_or_else(|| format!("unknown input {n:?}"))?;
             field_ty(t, &path).cloned()
         }
-        Ref::Step(s) => match env.steps.get(&s) {
-            Some(StepTy::Exact(t)) => Ok(t.clone()),
-            Some(StepTy::Semantic(..)) => Err(format!(
-                "step {s:?} is semantic; exact operators cannot read it"
-            )),
-            None => Err(format!("unknown step {s:?}")),
-        },
+        Ref::Step(s) => {
+            let (s, path) = if env.v2 { split_step(&s) } else { (s, vec![]) };
+            if s.is_empty() {
+                return Err(format!("{r:?} names no step"));
+            }
+            match env.steps.get(&s) {
+                Some(StepTy::Exact(t)) => field_ty(t, &path).cloned(),
+                Some(StepTy::Semantic(..)) => Err(format!(
+                    "step {s:?} is semantic; exact operators cannot read it"
+                )),
+                None => Err(format!("unknown step {s:?}")),
+            }
+        }
         Ref::Item(path) => {
             let item = env
                 .item
                 .ok_or_else(|| format!("{r:?} outside a per-item operator"))?;
+            let path = if env.v2 { split_item(path) } else { path };
             field_ty(item, &path).cloned()
         }
         Ref::Now => Ok(Ty::Timestamp),
@@ -447,6 +492,9 @@ pub enum Fault {
     Missing(String),
     /// Two different values for one fact.
     Conflict(String),
+    /// A read of an absent value or a `null` field, naming its path
+    /// (spec 032, 3.4.4); only plan 3 values can be absent.
+    Absent(String),
 }
 
 impl From<ArithError> for Fault {
@@ -462,16 +510,27 @@ pub struct Scope<'a> {
     pub steps: &'a BTreeMap<String, Value>,
     pub present: &'a BTreeSet<String>,
     pub item: Option<&'a Value>,
+    /// See [`TyEnv::v2`].
+    pub v2: bool,
 }
 
-fn field<'v>(v: &'v Value, path: &[String]) -> Result<&'v Value, Fault> {
-    let mut cur = v;
+/// Reads `path` from `v`. A `null` or absent value on the way is missing
+/// evidence named by `name`. That includes the root: `field_ty` does not
+/// unwrap a root because no root is typed nullable (spec 032 3.4.1), so a
+/// null root can only be a fault, never a value.
+fn field<'v>(v: &'v Value, path: &[String], name: &dyn Fn() -> String) -> Result<&'v Value, Fault> {
+    let present = |v: &'v Value| match v {
+        Value::Null | Value::Absent(_) => Err(Fault::Absent(name())),
+        v => Ok(v),
+    };
+    let mut cur = present(v)?;
     for f in path {
         match cur {
             Value::Record(m) => {
-                cur = m
-                    .get(f)
-                    .ok_or_else(|| Fault::Invalid(format!("no field {f:?}")))?
+                cur = present(
+                    m.get(f)
+                        .ok_or_else(|| Fault::Invalid(format!("no field {f:?}")))?,
+                )?
             }
             _ => return Err(Fault::Invalid(format!("no field {f:?}"))),
         }
@@ -483,14 +542,35 @@ pub fn eval_ref(r: &str, s: &Scope<'_>) -> Result<Value, Fault> {
     match Ref::parse(r).map_err(Fault::Invalid)? {
         Ref::Input(n, path) => {
             let v = s.inputs.get(&n).ok_or_else(|| Fault::Missing(n.clone()))?;
-            field(v, &path).cloned()
+            field(v, &path, &|| {
+                [vec![n.clone()], path.clone()].concat().join("/")
+            })
+            .cloned()
+        }
+        Ref::Step(n) if s.v2 => {
+            let (id, path) = split_step(&n);
+            if id.is_empty() {
+                return Err(Fault::Invalid(format!("{r:?} names no step")));
+            }
+            let v = s.steps.get(&id).ok_or_else(|| Fault::Missing(id.clone()))?;
+            field(v, &path, &|| format!("step:{n}")).cloned()
         }
         Ref::Step(n) => s.steps.get(&n).cloned().ok_or(Fault::Missing(n)),
         Ref::Item(path) => {
             let item = s
                 .item
                 .ok_or_else(|| Fault::Invalid("no current item".into()))?;
-            field(item, &path).cloned()
+            let path = if s.v2 { split_item(path) } else { path };
+            // `Ref::parse` refuses a bare `item:`; the fallback keeps a
+            // missing-evidence name non-empty regardless.
+            let name = || {
+                if path.is_empty() {
+                    "item".to_string()
+                } else {
+                    path.join("/")
+                }
+            };
+            field(item, &path, &name).cloned()
         }
         Ref::Now => Ok(Value::Timestamp(s.now)),
         Ref::Bind(b) => Err(Fault::Invalid(format!("bind:{b} outside a projection"))),
@@ -504,9 +584,10 @@ fn time_err(_: rustev_contract::time::TimeRangeError) -> Fault {
 fn rate(rates: &[Value], currency: &str, table: &str) -> Result<Decimal, Fault> {
     let mut found: Option<Decimal> = None;
     for r in rates {
-        let (Ok(Value::Text(c) | Value::Enum(c)), Ok(Value::Decimal(v))) =
-            (field(r, &["currency".into()]), field(r, &["rate".into()]))
-        else {
+        let (Ok(Value::Text(c) | Value::Enum(c)), Ok(Value::Decimal(v))) = (
+            field(r, &["currency".into()], &String::new),
+            field(r, &["rate".into()], &String::new),
+        ) else {
             continue;
         };
         if c == currency {
@@ -776,6 +857,7 @@ mod tests {
             steps: &steps,
             present: &present,
             item: None,
+            v2: false,
         };
         let big = Expr::Lit(L::Integer(i64::MAX));
         let add = Expr::Add {
@@ -802,6 +884,60 @@ mod tests {
     }
 
     #[test]
+    fn an_empty_field_name_in_a_path_is_refused() {
+        let rec = Ty::Record(vec![("a".into(), Ty::Integer)]);
+        assert_eq!(field_ty(&rec, &["a".into()]), Ok(&Ty::Integer));
+        let e = field_ty(&rec, &["".into(), "a".into()]).unwrap_err();
+        assert!(e.contains("empty field name"), "{e}");
+    }
+
+    #[test]
+    fn version_2_step_paths_split_at_the_step_id() {
+        assert_eq!(
+            split_step("join/match/total"),
+            (
+                "join".to_string(),
+                vec!["match".to_string(), "total".to_string()]
+            )
+        );
+        assert_eq!(split_step("plain"), ("plain".to_string(), vec![]));
+        // `Ref::parse` takes a step reference whole, so a version 2 path
+        // with an empty id is refused where it is split.
+        assert!(Ref::parse("step:/a").is_ok());
+        let inputs = BTreeMap::new();
+        let steps = BTreeMap::from([("".to_string(), StepTy::Exact(Ty::Bool))]);
+        let env = TyEnv {
+            inputs: &inputs,
+            steps: &steps,
+            item: None,
+            v2: true,
+        };
+        let e = ref_ty("step:/a", &env).unwrap_err();
+        assert!(e.contains("names no step"), "{e}");
+        let values = BTreeMap::from([("".to_string(), Value::Bool(true))]);
+        let present = BTreeSet::new();
+        let s = Scope {
+            now: Timestamp::from_ms(0).unwrap(),
+            inputs: &BTreeMap::new(),
+            steps: &values,
+            present: &present,
+            item: None,
+            v2: true,
+        };
+        assert!(
+            matches!(eval_ref("step:/a", &s), Err(Fault::Invalid(e)) if e.contains("names no step"))
+        );
+        assert_eq!(base_ref_v2("step:join/match"), "step:join");
+        assert_eq!(base_ref_v2("input:a/b"), "input:a");
+        // Version 1 keeps a step reference whole.
+        assert_eq!(base_ref("step:join/match"), "step:join/match");
+        assert_eq!(
+            split_item(vec!["match/total".into(), "unit".into()]),
+            vec!["match", "total", "unit"]
+        );
+    }
+
+    #[test]
     fn member_ref_of_a_map_tests_its_keys() {
         let map_ty = Ty::Map {
             key_max: 8,
@@ -821,6 +957,7 @@ mod tests {
             inputs: &tys,
             steps: &step_tys,
             item: None,
+            v2: true,
         };
         let member = |value: &str| Predicate::MemberRef {
             value: Expr::Ref(value.into()),
@@ -851,6 +988,7 @@ mod tests {
             steps: &steps,
             present: &present,
             item: None,
+            v2: true,
         };
         assert_eq!(eval_predicate(&member("input:tier"), &s), Ok(true));
         assert_eq!(
@@ -861,6 +999,26 @@ mod tests {
     }
 
     #[test]
+    fn a_reference_that_names_nothing_is_refused() {
+        for r in ["item:", "input:", "step:", "bind:"] {
+            assert!(Ref::parse(r).is_err(), "{r}");
+        }
+        let item = Value::Null;
+        let inputs = BTreeMap::new();
+        let steps = BTreeMap::new();
+        let present = BTreeSet::new();
+        let s = Scope {
+            now: Timestamp::from_ms(0).unwrap(),
+            inputs: &inputs,
+            steps: &steps,
+            present: &present,
+            item: Some(&item),
+            v2: true,
+        };
+        assert_eq!(eval_ref("item:a", &s), Err(Fault::Absent("a".into())));
+    }
+
+    #[test]
     fn integers_and_decimals_do_not_mix_silently() {
         let inputs = BTreeMap::new();
         let steps = BTreeMap::new();
@@ -868,6 +1026,7 @@ mod tests {
             inputs: &inputs,
             steps: &steps,
             item: None,
+            v2: false,
         };
         let mixed = Expr::Add {
             left: Box::new(Expr::Lit(L::Integer(1))),
@@ -898,6 +1057,7 @@ mod tests {
             inputs: &inputs,
             steps: &steps,
             item: None,
+            v2: false,
         };
         let ok = Predicate::Cmp {
             left: Expr::Ref("input:tier".into()),
