@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 
 use rustev_contract::decimal::Decimal;
 use rustev_contract::definition::{Literal, TypeDecl};
+use rustev_contract::grade::{AbsentReason, PresentWhen};
 use rustev_contract::judgment::{Filtered, OutValue, Ranking, Shortlist};
 use rustev_contract::time::{DurationMs, Timestamp};
 use serde_json::Value as Json;
@@ -21,6 +22,9 @@ pub enum Ty {
     Enum(Vec<String>),
     Timestamp,
     Duration,
+    /// An operator result that may be empty, such as `extremum@1` over no
+    /// items or a `timestamp_diff@1` of one; distinct from [`Ty::Nullable`],
+    /// a declared version 2 record field.
     Maybe(Box<Ty>),
     List {
         item: Box<Ty>,
@@ -39,12 +43,24 @@ pub enum Ty {
     Ranking {
         max: u64,
     },
+    /// Version 2, record fields only: the field's type, or `null` (spec 032,
+    /// 3.4.1). Reading the field yields the inner type; a `null` read is
+    /// `missing_evidence`.
+    Nullable(Box<Ty>),
     /// Version 2: text keys of at most `key_max` bytes, at most `max`
     /// entries.
     Map {
         key_max: u64,
         value: Box<Ty>,
         max: u64,
+    },
+    /// A `join_keyed@1` result: one entry per left item, in left order
+    /// (spec 032, 3.5.2). Per-item operators see a matched entry as the
+    /// record `{id, match}`.
+    Joined {
+        value: Box<Ty>,
+        max: u64,
+        id_bytes: u64,
     },
 }
 
@@ -70,8 +86,11 @@ impl Ty {
                     .collect(),
             ),
             // Version 2 types are refused in a version 1 definition before
-            // typing (spec 032, 3.1.3); plan 3 typing handles them itself.
-            TypeDecl::Nullable { ty } => Ty::Maybe(Box::new(Ty::from_decl(ty))),
+            // typing (spec 032, 3.1.3: `first_v2_construct` in compile.rs,
+            // tested in tests/track_versions.rs), so `Ty::Maybe` stays the
+            // type of an operator's optional result and `Ty::Nullable` that
+            // of a declared field; plan 3 typing handles them itself.
+            TypeDecl::Nullable { ty } => Ty::Nullable(Box::new(Ty::from_decl(ty))),
             TypeDecl::Map {
                 key_max_bytes,
                 value,
@@ -92,7 +111,6 @@ impl Ty {
             (Ty::Enum(_), Ty::Enum(_)) => true,
             (Ty::Maybe(a), Ty::Maybe(b)) => a.same_shape(b),
             (Ty::List { item: a, .. }, Ty::List { item: b, .. }) => a.same_shape(b),
-            (Ty::Map { value: a, .. }, Ty::Map { value: b, .. }) => a.same_shape(b),
             (Ty::Record(a), Ty::Record(b)) => {
                 a.len() == b.len()
                     && a.iter()
@@ -102,6 +120,9 @@ impl Ty {
             (Ty::Filtered { .. }, Ty::Filtered { .. }) => true,
             (Ty::Shortlist { .. }, Ty::Shortlist { .. }) => true,
             (Ty::Ranking { .. }, Ty::Ranking { .. }) => true,
+            (Ty::Nullable(a), Ty::Nullable(b)) => a.same_shape(b),
+            (Ty::Map { value: a, .. }, Ty::Map { value: b, .. }) => a.same_shape(b),
+            (Ty::Joined { value: a, .. }, Ty::Joined { value: b, .. }) => a.same_shape(b),
             (a, b) => a == b,
         }
     }
@@ -118,12 +139,27 @@ impl Ty {
             Ty::Duration => "duration".into(),
             Ty::Maybe(t) => format!("maybe<{}>", t.name()),
             Ty::List { item, .. } => format!("list<{}>", item.name()),
-            Ty::Map { value, .. } => format!("map<{}>", value.name()),
             Ty::Record(_) => "record".into(),
             Ty::Filtered { .. } => "filtered".into(),
             Ty::Shortlist { .. } => "shortlist".into(),
             Ty::Ranking { .. } => "ranking".into(),
+            Ty::Nullable(t) => format!("nullable<{}>", t.name()),
+            Ty::Map { value, .. } => format!("map<{}>", value.name()),
+            Ty::Joined { value, .. } => format!("joined<{}>", value.name()),
         }
+    }
+
+    /// The record a per-item operator sees for one joined entry.
+    pub fn join_item(value: &Ty, id_bytes: u64) -> Ty {
+        Ty::Record(vec![
+            (
+                "id".into(),
+                Ty::Text {
+                    max_bytes: id_bytes,
+                },
+            ),
+            ("match".into(), value.clone()),
+        ])
     }
 
     /// An upper bound on the canonical JSON bytes of a value of this type:
@@ -152,6 +188,7 @@ impl Ty {
                 64u64.saturating_add(max.saturating_mul(text(*id_bytes).saturating_add(64)))
             }
             Ty::Ranking { max } => 64u64.saturating_add(max.saturating_mul(1024)),
+            Ty::Nullable(t) => t.max_json_bytes().max(4),
             Ty::Map {
                 key_max,
                 value,
@@ -161,6 +198,17 @@ impl Ty {
                     text(*key_max)
                         .saturating_add(2)
                         .saturating_add(value.max_json_bytes()),
+                ),
+            ),
+            Ty::Joined {
+                value,
+                max,
+                id_bytes,
+            } => 2u64.saturating_add(
+                max.saturating_mul(
+                    Ty::join_item(value, *id_bytes)
+                        .max_json_bytes()
+                        .saturating_add(1),
                 ),
             ),
         }
@@ -187,10 +235,56 @@ pub enum Value {
     Maybe(Option<Box<Value>>),
     List(Vec<Value>),
     Record(BTreeMap<String, Value>),
-    Map(BTreeMap<String, Value>),
     Filtered(Filtered),
     Shortlist(Shortlist),
     Ranking(Ranking),
+    /// A `null` nullable field (spec 032, 3.4.1).
+    Null,
+    /// A value that failed its presence predicate, or a merged field that
+    /// could not be filled (spec 032, 3.4.3 and 3.6.2). Reading it is
+    /// `missing_evidence`; it is never a present value with empty fields.
+    Absent(Absence),
+    Map(BTreeMap<String, Value>),
+    Joined(Vec<JoinEntry>),
+}
+
+/// Why a value is absent.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Absence {
+    pub reason: AbsentReason,
+    /// The canonical predicate, for `predicate_failed`.
+    pub predicate: Option<PresentWhen>,
+}
+
+/// One `join_keyed@1` result entry; its id is the left item's id.
+#[derive(Debug, Clone, PartialEq)]
+pub struct JoinEntry {
+    pub id: String,
+    pub matched: JoinMatch,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum JoinMatch {
+    Matched(Box<Value>),
+    /// No entry; `key_path` names a left key that was `null` or absent.
+    Unmatched {
+        key_path: Option<String>,
+    },
+    MatchedAbsent(Absence),
+}
+
+impl JoinEntry {
+    /// The record `{id, match}` a per-item operator reads, for a matched
+    /// entry.
+    pub fn item(&self) -> Option<Value> {
+        match &self.matched {
+            JoinMatch::Matched(v) => Some(Value::Record(BTreeMap::from([
+                ("id".to_string(), Value::Text(self.id.clone())),
+                ("match".to_string(), (**v).clone()),
+            ]))),
+            _ => None,
+        }
+    }
 }
 
 impl Value {
@@ -239,9 +333,18 @@ impl Value {
             Value::Filtered(f) => OutValue::Filtered(f.clone()),
             Value::Shortlist(s) => OutValue::Shortlist(s.clone()),
             Value::Ranking(r) => OutValue::Ranking(r.clone()),
+            // A proposal never reads an absent or null value: the read is
+            // `missing_evidence` first (spec 032, 3.4.4).
+            Value::Null | Value::Absent(_) => OutValue::None,
             Value::Map(m) => {
                 OutValue::Record(m.iter().map(|(k, v)| (k.clone(), v.to_out())).collect())
             }
+            Value::Joined(entries) => OutValue::List(
+                entries
+                    .iter()
+                    .filter_map(|e| e.item().map(|v| v.to_out()))
+                    .collect(),
+            ),
         }
     }
 
@@ -264,9 +367,27 @@ impl Value {
             Value::Filtered(f) => serde_json::to_value(f).unwrap_or(Json::Null),
             Value::Shortlist(s) => serde_json::to_value(s).unwrap_or(Json::Null),
             Value::Ranking(_) => Json::Null,
+            // Projections carry values only, never metadata or presence
+            // (spec 032, 3.11.1).
+            Value::Null | Value::Absent(_) => Json::Null,
             Value::Map(m) => {
                 Json::Object(m.iter().map(|(k, v)| (k.clone(), v.to_json())).collect())
             }
+            Value::Joined(entries) => Json::Array(
+                entries
+                    .iter()
+                    .map(|e| match &e.matched {
+                        JoinMatch::Matched(v) => {
+                            serde_json::json!({"id": e.id, "match": v.to_json()})
+                        }
+                        // A projection carries values, never presence
+                        // (spec 032, 3.11.1): `unmatched` and
+                        // `matched_absent` both project no match. Evidence 2
+                        // records each entry's match status (3.10.1).
+                        _ => serde_json::json!({"id": e.id, "match": null}),
+                    })
+                    .collect(),
+            ),
         }
     }
 
@@ -303,10 +424,97 @@ impl Value {
     }
 }
 
+/// Decode a plan 3 snapshot value strictly against its declared version 2
+/// type (spec 032, 3.4): a `nullable` field accepts `null` or a missing key,
+/// stored as `null`; a map is a JSON object within its bounds; a record that
+/// fails its presence predicate is absent. Key existence is never presence.
+pub fn decode_v2(decl: &TypeDecl, json: &Json) -> Result<Value, String> {
+    match (decl, json) {
+        (TypeDecl::Nullable { .. }, Json::Null) => Ok(Value::Null),
+        (TypeDecl::Nullable { ty }, v) => decode_v2(ty, v),
+        (TypeDecl::List { item, max_items }, Json::Array(a)) => {
+            if a.len() as u64 > *max_items {
+                return Err(format!("list of {} items exceeds {max_items}", a.len()));
+            }
+            a.iter()
+                .enumerate()
+                .map(|(i, v)| decode_v2(item, v).map_err(|e| format!("[{i}]: {e}")))
+                .collect::<Result<Vec<_>, _>>()
+                .map(Value::List)
+        }
+        (
+            TypeDecl::Map {
+                key_max_bytes,
+                value,
+                max_entries,
+            },
+            Json::Object(o),
+        ) => {
+            if o.len() as u64 > *max_entries {
+                return Err(format!("map of {} entries exceeds {max_entries}", o.len()));
+            }
+            let mut out = BTreeMap::new();
+            for (k, v) in o {
+                if k.len() as u64 > *key_max_bytes {
+                    return Err(format!("key of {} bytes exceeds {key_max_bytes}", k.len()));
+                }
+                out.insert(
+                    k.clone(),
+                    decode_v2(value, v).map_err(|e| format!("[{k:?}]: {e}"))?,
+                );
+            }
+            Ok(Value::Map(out))
+        }
+        (
+            TypeDecl::Record {
+                fields,
+                present_when,
+            },
+            Json::Object(o),
+        ) => {
+            if let Some(extra) = o.keys().find(|k| !fields.iter().any(|f| &f.name == *k)) {
+                return Err(format!("undeclared field {extra:?}"));
+            }
+            let mut out = BTreeMap::new();
+            for f in fields {
+                let v = match (o.get(&f.name), &f.ty) {
+                    (None, TypeDecl::Nullable { .. }) => Value::Null,
+                    (None, _) => return Err(format!("missing field {:?}", f.name)),
+                    (Some(v), t) => decode_v2(t, v).map_err(|e| format!(".{}: {e}", f.name))?,
+                };
+                out.insert(f.name.clone(), v);
+            }
+            if let Some(p) = present_when {
+                // The compiler admits only declared nullable fields (3.4.2);
+                // a predicate naming any other field is never evaluated.
+                let mut named = Vec::new();
+                p.fields(&mut named);
+                if let Some(n) = named.iter().find(|n| !out.contains_key(*n)) {
+                    return Err(format!("present_when names undeclared field {n:?}"));
+                }
+                // An absent nested record is never present (3.4.3), so it
+                // counts as null here.
+                let is_null = |n: &str| matches!(out.get(n), Some(Value::Null | Value::Absent(_)));
+                if !p.holds(&is_null) {
+                    return Ok(Value::Absent(Absence {
+                        reason: AbsentReason::PredicateFailed,
+                        predicate: Some(p.canonical()),
+                    }));
+                }
+            }
+            Ok(Value::Record(out))
+        }
+        (d, j) => decode(&Ty::from_decl(d), j),
+    }
+}
+
 /// Decode a snapshot JSON value strictly against its declared type: no
 /// coercion, no default, every record field required, no extra field.
 pub fn decode(ty: &Ty, json: &Json) -> Result<Value, String> {
     match (ty, json) {
+        // A nullable field's value, as `decode_v2` reads it (3.4.1).
+        (Ty::Nullable(_), Json::Null) => Ok(Value::Null),
+        (Ty::Nullable(t), v) => decode(t, v),
         (Ty::Bool, Json::Bool(b)) => Ok(Value::Bool(*b)),
         (Ty::Integer, Json::Number(n)) => n
             .as_i64()
@@ -391,6 +599,98 @@ pub fn decode(ty: &Ty, json: &Json) -> Result<Value, String> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn version_2_decoding_separates_null_absent_and_present() {
+        use rustev_contract::definition::FieldDecl;
+        use rustev_contract::grade::PresentWhen;
+        let nullable = |ty| TypeDecl::Nullable { ty: Box::new(ty) };
+        let rec = TypeDecl::Record {
+            fields: vec![
+                FieldDecl {
+                    name: "total".into(),
+                    ty: nullable(TypeDecl::Integer),
+                },
+                FieldDecl {
+                    name: "unit".into(),
+                    ty: nullable(TypeDecl::Integer),
+                },
+            ],
+            present_when: Some(PresentWhen::AnyNonNull(vec!["total".into(), "unit".into()])),
+        };
+        let present = decode_v2(&rec, &json!({"total": 3})).unwrap();
+        assert_eq!(
+            present,
+            Value::Record(BTreeMap::from([
+                ("total".into(), Value::Integer(3)),
+                ("unit".into(), Value::Null),
+            ])),
+            "a missing nullable key is null"
+        );
+        // Key existence is never presence: both keys exist, both are null.
+        assert!(matches!(
+            decode_v2(&rec, &json!({"total": null, "unit": null})),
+            Ok(Value::Absent(Absence {
+                reason: AbsentReason::PredicateFailed,
+                predicate: Some(_),
+            }))
+        ));
+        assert!(
+            decode_v2(&rec, &json!({"total": 1, "x": 1})).is_err(),
+            "extra field"
+        );
+        // A predicate naming an undeclared field is an error, never null.
+        let mut stray = rec.clone();
+        if let TypeDecl::Record { present_when, .. } = &mut stray {
+            *present_when = Some(PresentWhen::AnyNonNull(vec!["total".into(), "x".into()]));
+        }
+        assert!(decode_v2(&stray, &json!({"total": 1})).is_err());
+        // `decode` reads a nullable type as `decode_v2` does.
+        let n = Ty::Nullable(Box::new(Ty::Integer));
+        assert_eq!(decode(&n, &json!(null)), Ok(Value::Null));
+        assert_eq!(decode(&n, &json!(2)), Ok(Value::Integer(2)));
+        // A parent whose predicate names an absent nested record is absent.
+        let parent = TypeDecl::Record {
+            fields: vec![FieldDecl {
+                name: "quote".into(),
+                ty: nullable(rec.clone()),
+            }],
+            present_when: Some(PresentWhen::AnyNonNull(vec!["quote".into()])),
+        };
+        assert!(matches!(
+            decode_v2(&parent, &json!({"quote": {"total": null, "unit": null}})),
+            Ok(Value::Absent(_))
+        ));
+        assert!(matches!(
+            decode_v2(&parent, &json!({"quote": {"total": 1}})),
+            Ok(Value::Record(_))
+        ));
+        let strict = TypeDecl::Record {
+            fields: vec![FieldDecl {
+                name: "n".into(),
+                ty: TypeDecl::Integer,
+            }],
+            present_when: None,
+        };
+        assert!(
+            decode_v2(&strict, &json!({})).is_err(),
+            "missing non-nullable field"
+        );
+        let map = TypeDecl::Map {
+            key_max_bytes: 2,
+            value: Box::new(nullable(TypeDecl::Integer)),
+            max_entries: 1,
+        };
+        assert_eq!(
+            decode_v2(&map, &json!({"a": null})),
+            Ok(Value::Map(BTreeMap::from([("a".into(), Value::Null)])))
+        );
+        assert!(
+            decode_v2(&map, &json!({"a": 1, "b": 2})).is_err(),
+            "entries"
+        );
+        assert!(decode_v2(&map, &json!({"abc": 1})).is_err(), "key bytes");
+    }
 
     #[test]
     fn a_map_decodes_by_key_within_its_bounds() {

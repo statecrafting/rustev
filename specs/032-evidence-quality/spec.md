@@ -749,3 +749,14 @@ decided here within the binding principles:
 10. **`member_of` extended** as the predicate `member_ref` over a
     referenced list or map keys, leaving `member_of@1` and `member` with
     literal sets unchanged.
+
+**Increment 2, first change (plan 3 vocabulary).** The value, type,
+operator and reference forms plan 3 compiles to, ahead of the compiler that
+admits a `rustev.definition/2`: `nullable`, `map` and `joined` types, the
+absent and `null` values, `join_keyed@1` and `merge_fields@1` in the
+registry `rustev.exact/2` (`ops::decode_v2`, `ops::is_registered_v2`),
+version 2 step and item field paths behind a `v2` flag on `TyEnv` and
+`Scope`, and the presence predicate bounds (3.4.2). The compiler still
+refuses every version 2 definition in phase (a), so none of it is reachable
+from `compile` until the change that admits plan 3; unit tests in
+`value.rs`, `ops.rs` and `expr.rs` cover it directly.

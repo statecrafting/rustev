@@ -154,6 +154,8 @@ pub(crate) struct Info {
     /// argument order.
     pub deps: BTreeMap<String, Vec<String>>,
     pub order: Vec<String>,
+    /// A plan 3 (spec 032). Always false until plan 3 compiles.
+    pub v2: bool,
 }
 
 /// A plan with everything evaluation needs.
@@ -1014,6 +1016,7 @@ fn compile_inner(
             inputs: &input_tys,
             steps: &step_tys,
             item: None,
+            v2: false,
         };
         let km = |e: String| Refusal {
             category: C::KindMismatch,
@@ -1424,6 +1427,7 @@ fn compile_inner(
             steps: infos,
             deps,
             order,
+            v2: false,
         },
     })
 }
@@ -1788,6 +1792,7 @@ fn check_policy(
         inputs: input_tys,
         steps: step_tys,
         item: None,
+        v2: false,
     };
     let policy = &def.policy;
 

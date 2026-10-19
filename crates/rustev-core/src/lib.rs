@@ -19,6 +19,7 @@ pub mod expr;
 pub mod kinds;
 pub mod ops;
 pub(crate) mod policy;
+pub(crate) mod quality;
 pub mod seams;
 pub mod sem;
 pub mod value;

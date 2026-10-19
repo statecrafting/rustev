@@ -783,6 +783,7 @@ impl<'c> Evaluation<'c> {
                 steps: &self.exact_values,
                 present: &self.present,
                 item: None,
+                v2: self.compiled.info.v2,
             },
             semantic: &semantic,
             inputs_status: &self.inputs_status,
@@ -1116,6 +1117,7 @@ impl View for Evaluation<'_> {
             steps: &self.exact_values,
             present: &self.present,
             item: None,
+            v2: self.compiled.info.v2,
         }
     }
 }

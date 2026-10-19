@@ -1,4 +1,6 @@
-//! The closed exact-operator registry `rustev.exact/1` (spec 002, 3.8).
+//! The closed exact-operator registries `rustev.exact/1` (spec 002, 3.8) and
+//! `rustev.exact/2` (spec 032, 3.5 and 3.6), which adds `join_keyed@1` and
+//! `merge_fields@1` with every `rustev.exact/1` operator unchanged.
 //!
 //! An operator is named with a version. Changing what an operator means is a
 //! new version, never an edit (E-06). Each operator's arguments are decoded
@@ -36,8 +38,80 @@ pub const REGISTRY: &[(&str, u32)] = &[
     ("weighted_rank", 1),
 ];
 
+/// Operators `rustev.exact/2` adds (spec 032, 3.1.1).
+pub const REGISTRY_V2_ADDS: &[(&str, u32)] = &[("join_keyed", 1), ("merge_fields", 1)];
+
 pub fn is_registered(op: &str, version: u32) -> bool {
     REGISTRY.iter().any(|(n, v)| *n == op && *v == version)
+}
+
+/// Whether `(op, version)` is in `rustev.exact/2`.
+pub fn is_registered_v2(op: &str, version: u32) -> bool {
+    is_registered(op, version)
+        || REGISTRY_V2_ADDS
+            .iter()
+            .any(|(n, v)| *n == op && *v == version)
+}
+
+/// A typed keyed join (spec 032, 3.5).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct JoinKeyed {
+    /// A list of records, or a list of ids.
+    pub left: String,
+    /// `id` for a list of ids, or a text or enum item field.
+    pub key: String,
+    /// A map.
+    pub right: String,
+}
+
+/// A typed per-field merge (spec 032, 3.6). There is no default rule.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MergeFields {
+    pub base: String,
+    pub overlay: String,
+    pub rules: Vec<FieldRule>,
+    /// Evaluated over the merged record's fields (spec 032, 3.6.3).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub present_when: Option<rustev_contract::grade::PresentWhen>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FieldRule {
+    pub field: String,
+    pub rule: MergeRule,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum MergeRule {
+    OverlayOnly,
+    BaseOnly,
+    OverlayElseBaseIfGradeAtLeast {
+        grade: rustev_contract::grade::Grade,
+    },
+}
+
+impl MergeRule {
+    pub fn name(&self) -> &'static str {
+        match self {
+            MergeRule::OverlayOnly => "overlay_only",
+            MergeRule::BaseOnly => "base_only",
+            MergeRule::OverlayElseBaseIfGradeAtLeast { .. } => {
+                "overlay_else_base_if_grade_at_least"
+            }
+        }
+    }
+
+    pub fn reads_base(&self) -> bool {
+        !matches!(self, MergeRule::OverlayOnly)
+    }
+
+    pub fn reads_overlay(&self) -> bool {
+        !matches!(self, MergeRule::BaseOnly)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -213,6 +287,8 @@ pub enum OpArgs {
     FilterWithReasons(FilterWithReasons),
     TopK(TopK),
     WeightedRank(WeightedRank),
+    JoinKeyed(JoinKeyed),
+    MergeFields(MergeFields),
 }
 
 fn de<T: DeserializeOwned>(args: &Json) -> Result<T, String> {
@@ -235,6 +311,8 @@ impl OpArgs {
             OpArgs::FilterWithReasons(_) => ("filter_with_reasons", 1),
             OpArgs::TopK(_) => ("top_k", 1),
             OpArgs::WeightedRank(_) => ("weighted_rank", 1),
+            OpArgs::JoinKeyed(_) => ("join_keyed", 1),
+            OpArgs::MergeFields(_) => ("merge_fields", 1),
         }
     }
 
@@ -253,10 +331,26 @@ impl OpArgs {
             OpArgs::FilterWithReasons(a) => serde_json::to_value(a),
             OpArgs::TopK(a) => serde_json::to_value(a),
             OpArgs::WeightedRank(a) => serde_json::to_value(a),
+            OpArgs::JoinKeyed(a) => serde_json::to_value(a),
+            OpArgs::MergeFields(a) => serde_json::to_value(a),
         };
         // Every argument type serializes to a JSON object.
         v.unwrap_or(Json::Null)
     }
+}
+
+/// A field name an operator argument carries, which in version 2 is
+/// non-empty and holds no '/', '.' or '*' (spec 032, 3.4.4).
+fn plain_field_name(what: &str, name: &str) -> Result<(), String> {
+    if name.is_empty() {
+        return Err(format!("{what} is empty"));
+    }
+    if name.contains(['/', '.', '*']) {
+        return Err(format!(
+            "{what} {name:?} is not a field name: it holds '/', '.' or '*'"
+        ));
+    }
+    Ok(())
 }
 
 /// Decode the arguments of a registered operator; `None` when `(op,
@@ -265,6 +359,22 @@ pub fn decode(op: &str, version: u32, args: &Json) -> Option<Result<OpArgs, Stri
     if !is_registered(op, version) {
         return None;
     }
+    decode_any(op, args)
+}
+
+/// Decode the arguments of an operator of `rustev.exact/2`.
+pub fn decode_v2(op: &str, version: u32, args: &Json) -> Option<Result<OpArgs, String>> {
+    if !is_registered_v2(op, version) {
+        return None;
+    }
+    match op {
+        "join_keyed" => Some(de(args).map(OpArgs::JoinKeyed)),
+        "merge_fields" => Some(de(args).map(OpArgs::MergeFields)),
+        _ => decode_any(op, args),
+    }
+}
+
+fn decode_any(op: &str, args: &Json) -> Option<Result<OpArgs, String>> {
     Some(match op {
         "count_where" => de(args).map(OpArgs::CountWhere),
         "window_filter" => de(args).map(OpArgs::WindowFilter),
@@ -367,6 +477,14 @@ impl OpArgs {
                     }
                 }
             }
+            OpArgs::JoinKeyed(a) => {
+                out.push(a.left.clone());
+                out.push(a.right.clone());
+            }
+            OpArgs::MergeFields(a) => {
+                out.push(a.base.clone());
+                out.push(a.overlay.clone());
+            }
         }
         deps_only(out)
     }
@@ -408,6 +526,7 @@ impl OpArgs {
             OpArgs::CountWhere(a) => predicate_uses_v2(&a.predicate),
             OpArgs::WindowFilter(a) => predicate_uses_v2(&a.predicate),
             OpArgs::Extremum(_) | OpArgs::FieldPresence(_) | OpArgs::WeightedRank(_) => false,
+            OpArgs::JoinKeyed(_) | OpArgs::MergeFields(_) => true,
             OpArgs::TimestampDiff(a) => expr_uses_v2(&a.later) || expr_uses_v2(&a.earlier),
             OpArgs::Compare(a) => predicate_uses_v2(&a.predicate),
             OpArgs::Arith(a) => expr_uses_v2(&a.expr),
@@ -487,6 +606,25 @@ impl OpArgs {
                 }
                 Ok(())
             }
+            OpArgs::JoinKeyed(a) => {
+                if a.key.is_empty() {
+                    return Err("join_keyed names no key".into());
+                }
+                plain_field_name("join_keyed key", &a.key)
+            }
+            OpArgs::MergeFields(a) => {
+                let mut fields = BTreeSet::new();
+                for r in &a.rules {
+                    plain_field_name("merge rule field", &r.field)?;
+                    if !fields.insert(&r.field) {
+                        return Err(format!("merge rule names {:?} twice", r.field));
+                    }
+                }
+                if let Some(p) = &a.present_when {
+                    crate::quality::present_when_structure(p)?;
+                }
+                Ok(())
+            }
         }
     }
 
@@ -503,7 +641,12 @@ impl OpArgs {
             _ => false,
         };
         match self {
-            OpArgs::Extremum(_) | OpArgs::FieldPresence(_) | OpArgs::WeightedRank(_) => {}
+            OpArgs::Extremum(_)
+            | OpArgs::FieldPresence(_)
+            | OpArgs::WeightedRank(_)
+            | OpArgs::MergeFields(_) => {}
+            // `join_keyed@1` included: duplicate left ids are
+            // `invalid_input` (spec 032, 3.5.3).
             _ => {
                 r.insert(ReasonKind::InvalidInput);
             }
@@ -673,7 +816,148 @@ impl OpArgs {
                 }
                 Ok(Ty::Ranking { max })
             }
+            OpArgs::JoinKeyed(a) => {
+                let (item, max) = list_item_max(&a.left, env)?;
+                let id_bytes = if a.key == "id" {
+                    match &item {
+                        Ty::Text { max_bytes } => *max_bytes,
+                        Ty::Enum(o) => o.iter().map(|s| s.len() as u64).max().unwrap_or(0),
+                        _ => id_field_bytes(&item, &a.key)?,
+                    }
+                } else {
+                    id_field_bytes(&item, &a.key)?
+                };
+                match ref_ty(&a.right, env)? {
+                    Ty::Map { value, .. } => Ok(Ty::Joined {
+                        value,
+                        max,
+                        id_bytes,
+                    }),
+                    t => Err(format!("join_keyed right is {}, not a map", t.name())),
+                }
+            }
+            OpArgs::MergeFields(a) => {
+                let (base, overlay, list) = merge_sides(a, env)?;
+                let mut out = Vec::new();
+                for r in &a.rules {
+                    let b = record_field(&base, &r.field).ok();
+                    let o = record_field(&overlay, &r.field).ok();
+                    let t = match (&r.rule, b, o) {
+                        (MergeRule::OverlayOnly, _, Some(o)) => o,
+                        (MergeRule::BaseOnly, Some(b), _) => b,
+                        (MergeRule::OverlayElseBaseIfGradeAtLeast { .. }, Some(b), Some(o)) => {
+                            if !unwrap_nullable(&b).same_shape(unwrap_nullable(&o)) {
+                                return Err(format!(
+                                    "field {:?} is {} in the base and {} in the overlay",
+                                    r.field,
+                                    unwrap_nullable(&b).name(),
+                                    unwrap_nullable(&o).name()
+                                ));
+                            }
+                            o
+                        }
+                        _ => return Err(format!("no side of {:?} carries it", r.field)),
+                    };
+                    // A merged field can be absent, so reading it yields its
+                    // type or `missing_evidence`.
+                    let t = match t {
+                        Ty::Nullable(t) => Ty::Nullable(t),
+                        t => Ty::Nullable(Box::new(t)),
+                    };
+                    out.push((r.field.clone(), t));
+                }
+                out.sort_by(|(a, _), (b, _)| a.cmp(b));
+                // The output's presence predicate names only its own fields,
+                // all nullable after merging (spec 032, 3.6.3 and 3.4.2).
+                if let Some(p) = &a.present_when {
+                    let mut named = Vec::new();
+                    p.fields(&mut named);
+                    if let Some(n) = named.iter().find(|n| !out.iter().any(|(f, _)| f == *n)) {
+                        return Err(format!(
+                            "present_when names {n:?}, which is not a merged field"
+                        ));
+                    }
+                }
+                let rec = Ty::Record(out);
+                Ok(match list {
+                    Some(max) => Ty::List {
+                        item: Box::new(rec),
+                        max,
+                    },
+                    None => rec,
+                })
+            }
         }
+    }
+
+    /// The category 11 refusals of `merge_fields@1` (spec 032, 3.6.1): a
+    /// field of either side with no rule, or a rule naming a field missing
+    /// from a side it reads.
+    pub fn merge_rule_error(&self, env: &TyEnv<'_>) -> Option<String> {
+        let OpArgs::MergeFields(a) = self else {
+            return None;
+        };
+        let (base, overlay, _) = merge_sides(a, env).ok()?;
+        let names = |t: &Ty| -> Vec<String> {
+            match t {
+                Ty::Record(f) => f.iter().map(|(n, _)| n.clone()).collect(),
+                _ => vec![],
+            }
+        };
+        let (bn, on) = (names(&base), names(&overlay));
+        for r in &a.rules {
+            if r.rule.reads_base() && !bn.contains(&r.field) {
+                return Some(format!(
+                    "{} reads {:?}, which the base record lacks",
+                    r.rule.name(),
+                    r.field
+                ));
+            }
+            if r.rule.reads_overlay() && !on.contains(&r.field) {
+                return Some(format!(
+                    "{} reads {:?}, which the overlay record lacks",
+                    r.rule.name(),
+                    r.field
+                ));
+            }
+        }
+        // Every field of either side without a rule, each once, in name order.
+        let missing: BTreeSet<&String> = bn
+            .iter()
+            .chain(on.iter())
+            .filter(|f| !a.rules.iter().any(|r| &r.field == *f))
+            .collect();
+        (!missing.is_empty()).then(|| {
+            let each: Vec<String> = missing
+                .iter()
+                .map(|f| format!("field {f:?} has no merge rule"))
+                .collect();
+            format!("{}, and there is no default", each.join("; "))
+        })
+    }
+}
+
+fn unwrap_nullable(t: &Ty) -> &Ty {
+    match t {
+        Ty::Nullable(t) => t,
+        t => t,
+    }
+}
+
+/// The base and overlay record types of a merge, and the list bound when
+/// it merges per item.
+fn merge_sides(a: &MergeFields, env: &TyEnv<'_>) -> Result<(Ty, Ty, Option<u64>), String> {
+    match (ref_ty(&a.base, env)?, ref_ty(&a.overlay, env)?) {
+        (b @ Ty::Record(_), o @ Ty::Record(_)) => Ok((b, o, None)),
+        (Ty::List { item, max }, Ty::Joined { value, .. }) => match (*item, *value) {
+            (b @ Ty::Record(_), o @ Ty::Record(_)) => Ok((b, o, Some(max))),
+            _ => Err("a per-item merge joins records to records".into()),
+        },
+        (b, o) => Err(format!(
+            "merge_fields takes two records, or a list of records and a join over it; got {} and {}",
+            b.name(),
+            o.name()
+        )),
     }
 }
 
@@ -693,12 +977,19 @@ fn with_item<'a>(env: &TyEnv<'a>, item: &'a Ty) -> TyEnv<'a> {
         inputs: env.inputs,
         steps: env.steps,
         item: Some(item),
+        v2: env.v2,
     }
 }
 
 fn list_item_max(r: &str, env: &TyEnv<'_>) -> Result<(Ty, u64), String> {
     match ref_ty(r, env)? {
         Ty::List { item, max } => Ok((*item, max)),
+        // A join result's items, as per-item operators read them.
+        Ty::Joined {
+            value,
+            max,
+            id_bytes,
+        } if env.v2 => Ok((Ty::join_item(&value, id_bytes), max)),
         t => Err(format!("{r} is {}, not a list", t.name())),
     }
 }
@@ -743,6 +1034,7 @@ fn fault(f: Fault, cx: &OpContext<'_>) -> Unresolved {
         Fault::Invalid(d) => Unresolved::invalid(cx.lineage_inputs.iter().cloned(), d),
         Fault::Missing(m) => Unresolved::missing([m]),
         Fault::Conflict(c) => Unresolved::conflict([c]),
+        Fault::Absent(p) => Unresolved::missing([p]),
     }
 }
 
@@ -764,6 +1056,7 @@ fn item_scope<'a>(cx: &'a OpContext<'a>, item: &'a Value) -> Scope<'a> {
         steps: cx.scope.steps,
         present: cx.scope.present,
         item: Some(item),
+        v2: cx.scope.v2,
     }
 }
 
@@ -823,6 +1116,11 @@ impl OpArgs {
     pub fn eval(&self, cx: &OpContext<'_>) -> Result<Value, Unresolved> {
         let f = |e: Fault| fault(e, cx);
         match self {
+            // Plan 3 evaluation is increment 3 of spec 032; `Evaluation::start`
+            // refuses a plan 3 until then, so these are never reached.
+            OpArgs::JoinKeyed(_) | OpArgs::MergeFields(_) => Err(Unresolved::Unsupported {
+                capability: format!("{}@1 evaluation", self.op().0),
+            }),
             OpArgs::CountWhere(a) => {
                 let list = items(&a.list, cx)?;
                 let mut n: i64 = 0;
@@ -1179,4 +1477,120 @@ fn semantic_of<'c>(r: &str, cx: &'c OpContext<'_>) -> Result<&'c SemInstances, U
             format!("{r} has no value"),
         )
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn joins_and_merges_are_only_in_registry_2() {
+        for (op, v) in REGISTRY_V2_ADDS {
+            assert!(!is_registered(op, *v), "{op} is not in rustev.exact/1");
+            assert!(is_registered_v2(op, *v), "{op} is in rustev.exact/2");
+            assert!(decode(op, *v, &json!({})).is_none());
+        }
+        assert!(REGISTRY.iter().all(|(op, v)| is_registered_v2(op, *v)));
+        assert!(!is_registered_v2("join_keyed", 2));
+    }
+
+    #[test]
+    fn a_merge_presence_predicate_names_merged_fields_only() {
+        let nullable_decimal = Ty::Nullable(Box::new(Ty::Decimal));
+        let inputs = BTreeMap::from([
+            (
+                "base".to_string(),
+                Ty::Record(vec![
+                    ("id".into(), Ty::Text { max_bytes: 8 }),
+                    ("price".into(), nullable_decimal.clone()),
+                ]),
+            ),
+            (
+                "over".to_string(),
+                Ty::Record(vec![("price".into(), nullable_decimal)]),
+            ),
+        ]);
+        let steps = BTreeMap::new();
+        let env = TyEnv {
+            inputs: &inputs,
+            steps: &steps,
+            item: None,
+            v2: true,
+        };
+        let merge = |present: &str| {
+            decode_v2(
+                "merge_fields",
+                1,
+                &json!({"base": "input:base", "overlay": "input:over", "rules": [
+                    {"field": "id", "rule": "base_only"},
+                    {"field": "price", "rule": "overlay_only"}],
+                    "present_when": {"any_non_null": [present]}}),
+            )
+            .unwrap()
+            .unwrap()
+        };
+        assert!(merge("price").type_check(&env).is_ok());
+        // Every field without a rule is named, each once.
+        let bare = decode_v2(
+            "merge_fields",
+            1,
+            &json!({"base": "input:base", "overlay": "input:over", "rules": []}),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            bare.merge_rule_error(&env).as_deref(),
+            Some(
+                "field \"id\" has no merge rule; field \"price\" has no merge rule, \
+                 and there is no default"
+            )
+        );
+        let e = merge("total").type_check(&env).unwrap_err();
+        assert!(e.contains("not a merged field"), "{e}");
+    }
+
+    #[test]
+    fn a_join_key_is_a_plain_field_name() {
+        let join = |key: &str| {
+            decode_v2(
+                "join_keyed",
+                1,
+                &json!({"left": "input:hotels", "key": key, "right": "input:quotes"}),
+            )
+            .unwrap()
+            .unwrap()
+        };
+        assert!(join("id").structure().is_ok());
+        for bad in ["", "price/net", "price.net", "*"] {
+            assert!(join(bad).structure().is_err(), "{bad:?}");
+        }
+        let merge = |field: &str| {
+            decode_v2(
+                "merge_fields",
+                1,
+                &json!({"base": "input:base", "overlay": "input:over",
+                    "rules": [{"field": field, "rule": "base_only"}]}),
+            )
+            .unwrap()
+            .unwrap()
+        };
+        assert!(merge("id").structure().is_ok());
+        for bad in ["", "price/net", "price.net", "*"] {
+            assert!(merge(bad).structure().is_err(), "{bad:?}");
+        }
+    }
+
+    #[test]
+    fn registry_2_decodes_strictly() {
+        assert!(matches!(
+            decode_v2("join_keyed", 1, &json!({})),
+            Some(Err(_))
+        ));
+        assert!(matches!(
+            decode_v2("merge_fields", 1, &json!({"surprise": 1})),
+            Some(Err(_))
+        ));
+        assert!(decode_v2("join_keyed", 2, &json!({})).is_none());
+    }
 }
