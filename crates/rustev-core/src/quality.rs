@@ -829,6 +829,11 @@ pub(crate) fn predicate_reads(
     }
 }
 
+/// A whole-value read of a reference, outside any per-item operator.
+pub(crate) fn whole_read(r: &str) -> Option<Read> {
+    whole(r)
+}
+
 fn whole(r: &str) -> Option<Read> {
     resolve(r, None).map(|(base, path)| Read {
         base,

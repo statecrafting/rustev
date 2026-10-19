@@ -864,3 +864,19 @@ A plan 3 decision's run record is
 `rustev.run/3` (3.10.3); a plan 2 decision's stays `rustev.run/1`.
 `crates/rustev-runtime/tests/plan_3.rs` covers the two refusals; the
 change that admits plan 3 evaluation tests the record.
+
+**Increment 3, third change (plan 3 evaluation).** `Evaluation::start`
+admits a plan 3 with a snapshot 1 or 2 (a plan 2 takes a snapshot 1 only,
+and a snapshot 1 entry claims no grade): each graded input is validated
+through `grading::validate_input`, each exact step's requirements and graded
+hard gates are judged on its reads, `join_keyed@1`, `merge_fields@1` and
+`corroborate` steps evaluate with their metadata, and the policy reads
+version 2 paths. A plan 3 evaluation produces `rustev.evidence/2` with the
+per-input, per-step, join, merge and corroboration records of 3.10.1; a
+plan 2 still produces `rustev.evidence/1`, unchanged.
+`crates/rustev-core/tests/evidence_quality_eval.rs` covers joins and
+presence, the merge grade rules, a nested presence predicate's canonical
+tree, corroboration outcomes, an uncorroborated claim keeping its grade,
+requirements and freshness, propagation, semantic steps at most
+`estimated`, admission and the conflict policy, and snapshot versions; the
+synthetic fixtures are shared with the compile tests in `tests/eq/`.

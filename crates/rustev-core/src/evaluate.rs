@@ -15,8 +15,11 @@ use rustev_contract::definition::{
 };
 use rustev_contract::descriptor::OutputKind;
 use rustev_contract::evidence::{
-    EvidenceRecord, InputEvidence, InputStatus, StepEvidence, StepStatus,
+    CheckEvidence, CheckReason, CheckResult, Corroboration, CorroborationOutcome, EvidenceRecord,
+    InputEvidence, InputStatus, JoinEvidence, MatchStatus, MergeEvidence, ReadEvidence,
+    StepEvidence, StepStatus,
 };
+use rustev_contract::grade::{Basis, Grade, ValueGrade, ValueMeta};
 use rustev_contract::ids::SnapshotId;
 use rustev_contract::judgment::{Derivation, Judgment, Lineage, Notice, NoticeKind, Unresolved};
 use rustev_contract::output::{BackendOutputDoc, RawOutput};
@@ -31,9 +34,11 @@ use serde_json::{Map, Value as Json, json};
 use crate::calibrate::{self, BindingCheck, CalibrationInput};
 use crate::compile::{Compiled, StepInfo};
 use crate::expr::{Ref, Scope};
+use crate::grading::{self, InputQuality, Meta};
 use crate::kinds::{Distribution, ModelScore, OrdinalLevel, ScoreScope, SelectedLabel};
 use crate::ops::{OpArgs, OpContext};
 use crate::policy::{self, Seen, View};
+use crate::quality;
 use crate::sem::{SemInstances, SemKind, SemValue};
 use crate::value::{Value, decode};
 
@@ -166,6 +171,22 @@ pub struct Evaluation<'c> {
     pending: BTreeMap<(String, Vec<String>), SemanticRequest>,
     issued: u64,
     notices: Vec<Notice>,
+    /// Plan 3 (spec 032): the value metadata of every input and step that
+    /// has a value.
+    metas: BTreeMap<String, Meta>,
+    input_quality: BTreeMap<String, InputQuality>,
+    step_quality: BTreeMap<String, StepQuality>,
+    /// Plan 3: policy reads whose requirement failed, by the input or step
+    /// they read (spec 032, 3.9.1).
+    policy_failures: BTreeMap<String, Unresolved>,
+}
+
+/// What a plan 3 step records in evidence 2 beside its metadata.
+#[derive(Debug, Clone, Default)]
+struct StepQuality {
+    join: Option<Vec<JoinEvidence>>,
+    merge: Option<Vec<MergeEvidence>>,
+    corroboration: Option<Corroboration>,
 }
 
 fn validate_input(
@@ -266,14 +287,29 @@ impl<'c> Evaluation<'c> {
         snapshot: &Snapshot,
         now: Timestamp,
     ) -> Result<Self, StartError> {
-        if snapshot.schema != schema::SNAPSHOT {
-            return Err(StartError::Schema(snapshot.schema.clone()));
+        // A plan 3 accepts a snapshot 1 or 2, a plan 2 only a snapshot 1,
+        // so a grade claim is never silently dropped (spec 032, 3.1.4).
+        let v2 = compiled.info.v2;
+        let accepted =
+            snapshot.schema == schema::SNAPSHOT || (v2 && snapshot.schema == schema::SNAPSHOT_V2);
+        if !accepted {
+            return Err(StartError::Schema(
+                if snapshot.schema == schema::SNAPSHOT_V2 {
+                    format!(
+                        "snapshot_version: {} is not accepted by {}",
+                        schema::SNAPSHOT_V2,
+                        schema::PLAN
+                    )
+                } else {
+                    snapshot.schema.clone()
+                },
+            ));
         }
-        if compiled.info.v2 {
-            // Plan 3 evaluation is increment 3 of spec 032.
+        if snapshot.schema == schema::SNAPSHOT && snapshot.entries.iter().any(|e| e.grade.is_some())
+        {
             return Err(StartError::Schema(format!(
-                "{} evaluation is not implemented yet",
-                schema::PLAN_V3
+                "snapshot_version: a {} entry claims a grade",
+                schema::SNAPSHOT
             )));
         }
         let info = &compiled.info;
@@ -301,6 +337,10 @@ impl<'c> Evaluation<'c> {
             pending: BTreeMap::new(),
             issued: 0,
             notices: compiled.plan.notices.clone(),
+            metas: BTreeMap::new(),
+            input_quality: BTreeMap::new(),
+            step_quality: BTreeMap::new(),
+            policy_failures: BTreeMap::new(),
         };
         for (name, (ty, decl)) in &info.inputs {
             let entries: Vec<&Entry> = snapshot
@@ -309,6 +349,10 @@ impl<'c> Evaluation<'c> {
                 .filter(|e| &e.field == name)
                 .collect();
             let key = format!("input:{name}");
+            if v2 {
+                ev.start_input_v2(name, decl, &entries);
+                continue;
+            }
             match validate_input(name, decl, ty, &entries, now) {
                 Ok((v, class, evidence)) => {
                     ev.inputs_status.insert(name.clone(), Ok(()));
@@ -726,14 +770,23 @@ impl<'c> Evaluation<'c> {
                                 .copied()
                                 .unwrap_or(Derivation::ExactDerived)
                         }));
-                        let result = if matches!(args, OpArgs::FieldPresence(_)) {
-                            self.eval_op(id, args, &lineage.inputs)
+                        let v2 = info.v2;
+                        let unresolved = if matches!(args, OpArgs::FieldPresence(_)) {
+                            None
                         } else {
-                            match merge(deps.iter().filter_map(|d| self.status(d).err()).collect())
-                            {
-                                Some(u) => Err(u),
-                                None => self.eval_op(id, args, &lineage.inputs),
+                            merge(deps.iter().filter_map(|d| self.status(d).err()).collect())
+                        };
+                        let result = match unresolved {
+                            Some(u) => Err(u),
+                            None if v2 => {
+                                let (r, meta, q) = self.eval_exact_v2(id, args, &lineage.inputs);
+                                if let Some(m) = meta {
+                                    self.metas.insert(key.clone(), m);
+                                }
+                                self.step_quality.insert(id.clone(), q);
+                                r
                             }
+                            None => self.eval_op(id, args, &lineage.inputs),
                         };
                         if let Ok(v) = &result {
                             self.exact_values.insert(id.clone(), v.clone());
@@ -741,21 +794,47 @@ impl<'c> Evaluation<'c> {
                         self.exact.insert(id.clone(), result);
                         self.derivation.insert(key.clone(), derivation);
                     }
-                    // Plan 3 evaluation is increment 3 of spec 032; `start`
-                    // refuses a plan 3 until then.
-                    StepInfo::Corroborate { .. } => {
-                        self.exact.insert(
-                            id.clone(),
-                            Err(Unresolved::Unsupported {
-                                capability: "corroborate evaluation".into(),
-                            }),
-                        );
+                    StepInfo::Corroborate { decl, .. } => {
+                        // Corroboration never changes a derivation class: the
+                        // step's is its claim's (spec 032, 2.1).
+                        let (claim, _) = quality::claim_path(decl);
+                        let derivation = self
+                            .derivation
+                            .get(&claim)
+                            .copied()
+                            .unwrap_or(Derivation::ExactDerived);
+                        let (result, meta, q) = self.eval_corroborate(id, decl);
+                        if let Ok(v) = &result {
+                            self.exact_values.insert(id.clone(), v.clone());
+                        }
+                        if let Some(m) = meta {
+                            self.metas.insert(key.clone(), m);
+                        }
+                        self.step_quality.insert(id.clone(), q);
+                        self.exact.insert(id.clone(), result);
+                        self.derivation.insert(key.clone(), derivation);
                     }
-                    StepInfo::Semantic { .. } => {
+                    StepInfo::Semantic { decl, .. } => {
                         self.derivation
                             .insert(key.clone(), Derivation::ModelDerived);
                         let state = self.start_semantic(id, deps);
                         self.semantic.insert(id.clone(), state);
+                        if info.v2 {
+                            // A backend output is never better than
+                            // `estimated`; an ungraded projection stays
+                            // ungraded (spec 032, 3.2.3).
+                            let mut m = grading::combine_reads(
+                                &quality::semantic_reads(decl),
+                                &self.metas,
+                                Basis::Computed,
+                            );
+                            m.grade = match m.grade.graded() {
+                                Some(g) => g.min(Grade::Estimated).into(),
+                                None => ValueGrade::Ungraded,
+                            };
+                            let node = m.grade;
+                            self.metas.insert(key.clone(), Meta { whole: m, node });
+                        }
                     }
                 }
                 self.lineage.insert(key, lineage);
@@ -764,6 +843,311 @@ impl<'c> Evaluation<'c> {
                 break;
             }
         }
+    }
+
+    /// Validate one plan 3 input (spec 032, 3.3 and 3.8).
+    fn start_input_v2(
+        &mut self,
+        name: &str,
+        decl: &rustev_contract::definition::InputDecl,
+        entries: &[&Entry],
+    ) {
+        let compiled = self.compiled;
+        let key = format!("input:{name}");
+        let grading = compiled.info.bound.inputs.get(name);
+        let (res, q) = grading::validate_input(name, decl, entries, grading, self.now);
+        match res {
+            Ok((v, derived, used)) => {
+                self.inputs_status.insert(name.into(), Ok(()));
+                self.input_values.insert(name.into(), v);
+                self.input_evidence.insert(
+                    name.into(),
+                    InputStatus::Resolved {
+                        provenance: used.provenance,
+                        as_of_ms: used.as_of_ms,
+                        source: used.source.clone(),
+                    },
+                );
+                self.present.insert(name.into());
+                self.derivation.insert(
+                    key.clone(),
+                    match derived {
+                        grading::Derived::Model => Derivation::ModelDerived,
+                        grading::Derived::Exact => Derivation::ExactDerived,
+                    },
+                );
+                if let Some(m) = &q.meta {
+                    self.metas.insert(key.clone(), m.clone());
+                }
+            }
+            Err(u) => {
+                self.inputs_status.insert(name.into(), Err(u.clone()));
+                self.input_evidence
+                    .insert(name.into(), InputStatus::Unresolved(u));
+                self.derivation
+                    .insert(key.clone(), Derivation::ExactDerived);
+            }
+        }
+        self.input_quality.insert(name.into(), q);
+        self.lineage.insert(
+            key,
+            Lineage {
+                inputs: vec![name.to_string()],
+                steps: vec![],
+            },
+        );
+    }
+
+    /// The value and metadata a reference names, or why it has none.
+    fn value_and_meta(&self, r: &str) -> Result<(Value, ValueMeta), Unresolved> {
+        let read = quality::whole_read(r)
+            .ok_or_else(|| Unresolved::invalid([], format!("{r} reads nothing")))?;
+        self.status(&read.base)?;
+        let v = crate::expr::eval_ref(r, &View::scope(self)).map_err(|f| match f {
+            crate::expr::Fault::Absent(p) | crate::expr::Fault::Missing(p) => {
+                Unresolved::missing([p])
+            }
+            crate::expr::Fault::Conflict(c) => Unresolved::conflict([c]),
+            crate::expr::Fault::Invalid(d) => Unresolved::invalid([], d),
+        })?;
+        Ok((v, grading::read_meta(&read, &self.metas)))
+    }
+
+    /// Evaluate a plan 3 exact step: its requirements and graded hard gates
+    /// first (spec 032, 3.9.1), then the operator, then its metadata.
+    fn eval_exact_v2(
+        &self,
+        id: &str,
+        args: &OpArgs,
+        lineage_inputs: &[String],
+    ) -> (Result<Value, Unresolved>, Option<Meta>, StepQuality) {
+        let info = &self.compiled.info;
+        let none = StepQuality::default();
+        let reads = quality::op_reads(args);
+        for r in &reads {
+            let ceiling = quality::read_ceiling(r, &info.trees);
+            let meta = grading::read_meta(r, &self.metas);
+            if let Err(u) = grading::check_read(r, &ceiling, &meta, self.now) {
+                return (Err(u), None, none);
+            }
+        }
+        let here = grading::combine_reads(&reads, &self.metas, Basis::Computed);
+        match args {
+            OpArgs::JoinKeyed(a) => {
+                let joined = (|| {
+                    let (lv, lm) = self.value_and_meta(&a.left)?;
+                    let (rv, rm) = self.value_and_meta(&a.right)?;
+                    // Named as a missing reason names it: without its kind.
+                    let left = a.left.split_once(':').map_or(a.left.as_str(), |(_, p)| p);
+                    let key_path = format!("{left}/*/{}", a.key);
+                    grading::join((&lv, &lm), &a.key, &key_path, (&rv, &rm), here.clone())
+                        .map_err(|d| Unresolved::invalid(lineage_inputs.iter().cloned(), d))
+                })();
+                match joined {
+                    Ok((v, whole)) => {
+                        let join = match &v {
+                            Value::Joined(entries) => entries
+                                .iter()
+                                .map(|e| JoinEvidence {
+                                    id: e.id.clone(),
+                                    status: match e.matched {
+                                        crate::value::JoinMatch::Matched(_) => MatchStatus::Matched,
+                                        crate::value::JoinMatch::Unmatched { .. } => {
+                                            MatchStatus::Unmatched
+                                        }
+                                        crate::value::JoinMatch::MatchedAbsent(_) => {
+                                            MatchStatus::MatchedAbsent
+                                        }
+                                    },
+                                })
+                                .collect(),
+                            _ => vec![],
+                        };
+                        let node = here.grade;
+                        (
+                            Ok(v),
+                            Some(Meta { whole, node }),
+                            StepQuality {
+                                join: Some(join),
+                                ..Default::default()
+                            },
+                        )
+                    }
+                    Err(u) => (Err(u), None, none),
+                }
+            }
+            OpArgs::MergeFields(m) => {
+                let merged = (|| {
+                    let (bv, bm) = self.value_and_meta(&m.base)?;
+                    let (ov, om) = self.value_and_meta(&m.overlay)?;
+                    grading::merge(m, id, (&bv, &bm), (&ov, &om))
+                        .map_err(|d| Unresolved::invalid(lineage_inputs.iter().cloned(), d))
+                })();
+                match merged {
+                    Ok((v, whole, evidence)) => {
+                        let node = whole.grade;
+                        (
+                            Ok(v),
+                            Some(Meta { whole, node }),
+                            StepQuality {
+                                merge: Some(evidence),
+                                ..Default::default()
+                            },
+                        )
+                    }
+                    Err(u) => (Err(u), None, none),
+                }
+            }
+            _ => {
+                let result = self.eval_op(id, args, lineage_inputs);
+                let node = here.grade;
+                let meta = result.is_ok().then_some(Meta { whole: here, node });
+                (result, meta, none)
+            }
+        }
+    }
+
+    /// Evaluate a corroboration step (spec 032, 3.7).
+    fn eval_corroborate(
+        &self,
+        id: &str,
+        decl: &rustev_contract::definition::CorroborateDecl,
+    ) -> (Result<Value, Unresolved>, Option<Meta>, StepQuality) {
+        use rustev_contract::definition::{CorroborationMode, OnContradiction, OnFalse};
+        let info = &self.compiled.info;
+        let claim_path = quality::claim_path(decl);
+        // An unresolved claim makes the step unresolved with its reason.
+        let (claim, claim_meta) = match self.value_and_meta(&decl.claim) {
+            Ok(x) => x,
+            Err(u) => return (Err(u), None, StepQuality::default()),
+        };
+        let scope = View::scope(self);
+        let mut checks = Vec::new();
+        let mut contradicting: Vec<String> = Vec::new();
+        for (check, reads) in decl.by.iter().zip(quality::check_reads(decl)) {
+            let mut reason: Option<CheckReason> = None;
+            let mut records = Vec::new();
+            for r in &reads {
+                let name = r.name();
+                let (digest, grade) = match self.value_and_meta(&name) {
+                    Ok((v, m)) => (Some(grading::digest(&v.to_json())), m.grade),
+                    Err(u) => {
+                        reason.get_or_insert(CheckReason::Unresolved(u));
+                        (None, ValueGrade::Ungraded)
+                    }
+                };
+                let meta = grading::read_meta(r, &self.metas);
+                if reason.is_none() {
+                    let ceiling = quality::read_ceiling(r, &info.trees);
+                    if let Err(u) = grading::check_read(r, &ceiling, &meta, self.now) {
+                        reason = Some(CheckReason::Unresolved(u));
+                    }
+                }
+                // A check counts only if what it reads has at least the
+                // target grade; the claim itself is not its own evidence.
+                if reason.is_none()
+                    && !quality::reads_claim(r, &claim_path)
+                    && meta.grade.graded().is_none_or(|g| g < decl.upgrade_to)
+                {
+                    reason = Some(CheckReason::BelowGrade { read: name.clone() });
+                }
+                records.push(ReadEvidence {
+                    reference: name,
+                    digest,
+                    grade,
+                });
+            }
+            let (result, reason) = match reason {
+                Some(r) => (CheckResult::NoEvidence, r),
+                None => match crate::expr::eval_predicate(&check.predicate, &scope) {
+                    Ok(true) => (CheckResult::Supports, CheckReason::True),
+                    Ok(false) => (
+                        match check.on_false {
+                            OnFalse::Contradicts => CheckResult::Contradicts,
+                            OnFalse::NoEvidence => CheckResult::NoEvidence,
+                        },
+                        CheckReason::False(check.on_false),
+                    ),
+                    Err(crate::expr::Fault::Absent(p)) => (
+                        CheckResult::NoEvidence,
+                        CheckReason::Unresolved(Unresolved::missing([p])),
+                    ),
+                    Err(f) => (
+                        CheckResult::NoEvidence,
+                        CheckReason::Unresolved(Unresolved::invalid([], format!("{f:?}"))),
+                    ),
+                },
+            };
+            if result == CheckResult::Contradicts {
+                contradicting.extend(records.iter().map(|r| r.reference.clone()));
+            }
+            checks.push(CheckEvidence {
+                result,
+                reason,
+                reads: records,
+            });
+        }
+        let supports = checks
+            .iter()
+            .filter(|c| c.result == CheckResult::Supports)
+            .count();
+        let outcome = if !contradicting.is_empty() {
+            CorroborationOutcome::Contradicted
+        } else if match decl.mode {
+            CorroborationMode::All => supports == checks.len(),
+            CorroborationMode::Any => supports > 0,
+        } {
+            CorroborationOutcome::Corroborated
+        } else {
+            CorroborationOutcome::Uncorroborated
+        };
+        let claim_name = if claim_path.1.is_empty() {
+            claim_path.0.clone()
+        } else {
+            format!("{}/{}", claim_path.0, claim_path.1.join("/"))
+        };
+        let (result, meta) = match (outcome, decl.on_contradiction) {
+            (CorroborationOutcome::Corroborated, _) => {
+                let m = grading::raise(&claim_meta, decl.upgrade_to, id);
+                (Ok(claim.clone()), Some(m))
+            }
+            (CorroborationOutcome::Uncorroborated, _) => {
+                (Ok(claim.clone()), Some(claim_meta.clone()))
+            }
+            (CorroborationOutcome::Contradicted, OnContradiction::Conflict) => {
+                let mut facts = vec![claim_name];
+                facts.extend(contradicting);
+                (Err(Unresolved::conflict(facts)), None)
+            }
+            (CorroborationOutcome::Contradicted, OnContradiction::TreatAsHint) => {
+                (Ok(claim.clone()), Some(grading::lower_to_hint(&claim_meta)))
+            }
+            (CorroborationOutcome::Contradicted, OnContradiction::Abstain) => (
+                Err(Unresolved::Abstained {
+                    rule: id.to_string(),
+                }),
+                None,
+            ),
+        };
+        let record = Corroboration {
+            claim: decl.claim.clone(),
+            claim_digest: grading::digest(&claim.to_json()),
+            grade_before: claim_meta.grade,
+            grade_after: meta.as_ref().map(|m| m.grade).unwrap_or(claim_meta.grade),
+            outcome,
+            checks,
+        };
+        (
+            result,
+            meta.map(|whole| {
+                let node = whole.grade;
+                Meta { whole, node }
+            }),
+            StepQuality {
+                corroboration: Some(record),
+                ..Default::default()
+            },
+        )
     }
 
     fn eval_op(
@@ -969,13 +1353,35 @@ impl<'c> Evaluation<'c> {
     }
 
     /// Finish: evaluate the policy and build the judgment and evidence.
-    pub fn finish(self, decision_id: &str) -> Result<(Judgment, EvidenceRecord), NotReady> {
+    pub fn finish(mut self, decision_id: &str) -> Result<(Judgment, EvidenceRecord), NotReady> {
         if !self.pending.is_empty() {
             return Err(NotReady {
                 pending: self.pending.len(),
             });
         }
         let compiled = self.compiled;
+        let v2 = compiled.info.v2;
+        if v2 {
+            // A policy read below its requirement makes the input or step it
+            // reads unresolved for the policy, so its handlers apply (spec
+            // 032, 3.9.1 and 3.9.4).
+            let mut failures = BTreeMap::new();
+            for (_, c) in quality::policy_conds(&compiled.plan.definition) {
+                let mut reads = Vec::new();
+                quality::cond_reads(c, &mut reads);
+                for r in &reads {
+                    if failures.contains_key(&r.base) || self.status(&r.base).is_err() {
+                        continue;
+                    }
+                    let ceiling = quality::read_ceiling(r, &compiled.info.trees);
+                    let meta = grading::read_meta(r, &self.metas);
+                    if let Err(u) = grading::check_read(r, &ceiling, &meta, self.now) {
+                        failures.insert(r.base.clone(), u);
+                    }
+                }
+            }
+            self.policy_failures = failures;
+        }
         let result = policy::evaluate(&compiled.plan.definition.policy, &self);
         let derivation = if result.reads.is_empty() {
             Derivation::ExactDerived
@@ -1006,13 +1412,16 @@ impl<'c> Evaluation<'c> {
         let inputs = self
             .input_evidence
             .iter()
-            .map(|(k, v)| InputEvidence {
-                field: k.clone(),
-                status: v.clone(),
-                meta: None,
-                presence: None,
-                entries: None,
-                resolution: None,
+            .map(|(k, v)| {
+                let q = self.input_quality.get(k).cloned().unwrap_or_default();
+                InputEvidence {
+                    field: k.clone(),
+                    status: v.clone(),
+                    meta: q.meta.map(|m| m.whole),
+                    presence: q.presence,
+                    entries: q.entries,
+                    resolution: q.resolution,
+                }
             })
             .collect();
         let mut steps = Vec::new();
@@ -1027,17 +1436,19 @@ impl<'c> Evaluation<'c> {
                 self.exact.get(id),
                 self.semantic.get(id),
             ) {
-                (StepInfo::Exact { ty, .. }, Some(r), _) => steps.push(StepEvidence::new(
-                    id.clone(),
-                    vec![],
-                    match r {
-                        Ok(_) => StepStatus::Resolved {
-                            kind: ty.name(),
-                            derivation,
+                (StepInfo::Exact { ty, .. } | StepInfo::Corroborate { ty, .. }, Some(r), _) => {
+                    steps.push(StepEvidence::new(
+                        id.clone(),
+                        vec![],
+                        match r {
+                            Ok(_) => StepStatus::Resolved {
+                                kind: ty.name(),
+                                derivation,
+                            },
+                            Err(u) => StepStatus::Unresolved(u.clone()),
                         },
-                        Err(u) => StepStatus::Unresolved(u.clone()),
-                    },
-                )),
+                    ))
+                }
                 (StepInfo::Semantic { kind, .. }, _, Some(SemState::Instances { values, .. })) => {
                     for (k, v) in values {
                         steps.push(StepEvidence::new(
@@ -1061,8 +1472,28 @@ impl<'c> Evaluation<'c> {
                 _ => {}
             }
         }
+        if v2 {
+            // Evidence 2: each step's metadata and its join, merge or
+            // corroboration record (spec 032, 3.10.1).
+            for s in &mut steps {
+                let key = format!("step:{}", s.step);
+                s.meta = self.metas.get(&key).map(|m| m.whole.clone());
+                if s.instance.is_empty() {
+                    if let Some(q) = self.step_quality.get(&s.step) {
+                        s.join = q.join.clone();
+                        s.merge = q.merge.clone();
+                        s.corroboration = q.corroboration.clone();
+                    }
+                }
+            }
+        }
         let evidence = EvidenceRecord {
-            schema: schema::EVIDENCE.into(),
+            schema: if v2 {
+                schema::EVIDENCE_V2
+            } else {
+                schema::EVIDENCE
+            }
+            .into(),
             decision_id: decision_id.into(),
             plan_id: compiled.id.clone(),
             definition_id: compiled.plan.definition_id.clone(),
@@ -1087,7 +1518,45 @@ impl<'c> Evaluation<'c> {
 }
 
 impl View for Evaluation<'_> {
+    fn base(&self, r: &str) -> String {
+        if self.compiled.info.v2 {
+            crate::expr::base_ref_v2(r)
+        } else {
+            crate::expr::base_ref(r)
+        }
+    }
+
     fn get(&self, r: &str) -> Result<Seen<'_>, Unresolved> {
+        if self.compiled.info.v2 {
+            if let Some(u) = self.policy_failures.get(&self.base(r)) {
+                return Err(u.clone());
+            }
+            // A version 2 path may reach a `null` field or an absent value,
+            // which is missing evidence for that path (spec 032, 3.4.4).
+            let base = self.base(r);
+            if base != r && base.starts_with("step:") {
+                self.status(&base)?;
+                let (id, path) = crate::expr::split_step(r.trim_start_matches("step:"));
+                let mut v = self
+                    .exact_values
+                    .get(&id)
+                    .ok_or_else(|| Unresolved::invalid([], format!("{r} has no value")))?;
+                for f in &path {
+                    v = match v {
+                        Value::Record(m) => m
+                            .get(f)
+                            .ok_or_else(|| Unresolved::invalid([], format!("no field {f:?}")))?,
+                        _ => return Err(Unresolved::invalid([], format!("no field {f:?}"))),
+                    };
+                    if matches!(v, Value::Null | Value::Absent(_)) {
+                        return Err(Unresolved::missing([r
+                            .trim_start_matches("step:")
+                            .to_string()]));
+                    }
+                }
+                return Ok(Seen::Exact(v));
+            }
+        }
         if let Some(rest) = r.strip_prefix("input:") {
             let mut parts = rest.split('/');
             let n = parts.next().unwrap_or_default();
@@ -1108,6 +1577,10 @@ impl View for Evaluation<'_> {
                         ));
                     }
                 };
+                // Only plan 3 values can be `null` or absent.
+                if matches!(v, Value::Null | Value::Absent(_)) {
+                    return Err(Unresolved::missing([rest.to_string()]));
+                }
             }
             return Ok(Seen::Exact(v));
         }
