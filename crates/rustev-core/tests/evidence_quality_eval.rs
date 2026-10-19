@@ -570,6 +570,319 @@ fn propagation_takes_the_minimum_and_ungraded_never_raises() {
     assert_eq!(m.sources, ["catalogue", "geocoder"]);
 }
 
+/// Every exact operator of `rustev.exact/1`, and the join and merge of
+/// `rustev.exact/2`, over a catalogue claimed `hint`: a hard gate reading it
+/// is `insufficient_grade`, and every other result is at most `hint`. With
+/// the catalogue at its `cached` ceiling every result is `cached`: the
+/// ungraded rates table and the authoritative quotes never raise it.
+#[test]
+fn propagation_through_every_exact_operator() {
+    let mut v = base();
+    let fields = v["inputs"][0]["type"]["list"]["item"]["record"]["fields"]
+        .as_array_mut()
+        .unwrap();
+    fields.push(json!({"name": "listed_at", "type": "timestamp"}));
+    fields.push(json!({"name": "currency", "type": {"enum": {"options": ["USD", "EUR"]}}}));
+    let rules = v["steps"][1]["body"]["exact"]["args"]["rules"]
+        .as_array_mut()
+        .unwrap();
+    rules.push(json!({"field": "listed_at", "rule": "base_only"}));
+    rules.push(json!({"field": "currency", "rule": "base_only"}));
+    v["inputs"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"name": "rates",
+        "type": {"list": {"max_items": 4, "item": {"record": {"fields": [
+            {"name": "currency", "type": {"enum": {"options": ["USD", "EUR"]}}},
+            {"name": "rate", "type": "decimal"}]}}}},
+        "provenance": ["system-of-record"], "freshness": "not_required"}));
+    let exact = |id: &str, op: &str, args: Value| json!({"id": id, "body": {"exact": {"op": op, "version": 1, "args": args}}});
+    let cheap = decimal_le("item:price", "200");
+    let len_positive = json!({"cmp": {"left": {"len": {"ref": "input:hotels"}}, "op": "gt",
+        "right": {"lit": {"integer": 0}}}});
+    for step in [
+        exact(
+            "count",
+            "count_where",
+            json!({"list": "input:hotels", "predicate": cheap}),
+        ),
+        exact(
+            "recent",
+            "window_filter",
+            json!({"list": "input:hotels", "field": "listed_at", "within_ms": 86_400_000u64,
+                "predicate": cheap}),
+        ),
+        exact(
+            "latest",
+            "extremum",
+            json!({"list": "input:hotels", "field": "listed_at", "which": "max"}),
+        ),
+        exact(
+            "age",
+            "timestamp_diff",
+            json!({"later": {"ref": "now"}, "earlier": {"ref": "step:latest"}, "unit_ms": 1000}),
+        ),
+        exact("any", "compare", json!({"predicate": len_positive})),
+        exact(
+            "count_dec",
+            "arith",
+            json!({"expr": {"to_decimal": {"len": {"ref": "input:hotels"}}}}),
+        ),
+        exact(
+            "in_eur",
+            "fx_convert",
+            json!({"amount": {"ref": "step:count_dec"}, "from": {"lit": {"enum": "USD"}},
+                "to": {"lit": {"enum": "EUR"}}, "rates": "input:rates", "scale": 2}),
+        ),
+        exact(
+            "three",
+            "member_of",
+            json!({"value": {"len": {"ref": "input:hotels"}}, "set": [{"integer": 3}]}),
+        ),
+        exact(
+            "present",
+            "field_presence",
+            json!({"inputs": ["input:hotels"]}),
+        ),
+        exact(
+            "cheap",
+            "filter_with_reasons",
+            json!({"list": "input:hotels", "id_field": "id",
+                "rules": [{"name": "cheap", "predicate": cheap}]}),
+        ),
+        exact(
+            "top",
+            "top_k",
+            json!({"list": "input:hotels", "id_field": "id", "among": "step:cheap",
+                "key": {"ref": "item:price"}, "direction": "ascending", "k": 2}),
+        ),
+        exact(
+            "ranked",
+            "weighted_rank",
+            json!({"candidates": "step:top", "components": [
+                {"name": "price", "source": "shortlist_position", "weight": "1"}]}),
+        ),
+    ] {
+        push_step(&mut v, step);
+    }
+    let hotels = |grade: Option<&str>| {
+        let e = entry(
+            "hotels",
+            json!([
+                {"id": "h1", "price": "150", "description": "near",
+                 "listed_at": NOW - 1_000, "currency": "USD"},
+                {"id": "h2", "price": "120", "description": "far",
+                 "listed_at": NOW - 2_000, "currency": "EUR"}
+            ]),
+            "system-of-record",
+            5_000,
+            "catalogue",
+        );
+        grade.map_or(e.clone(), |g| claimed(e, g))
+    };
+    let rates = entry(
+        "rates",
+        json!([{"currency": "USD", "rate": "1"}, {"currency": "EUR", "rate": "0.8"}]),
+        "system-of-record",
+        0,
+        "bank",
+    );
+    let entries = |grade| {
+        let mut es = all_entries();
+        es[0] = hotels(grade);
+        es.push(rates.clone());
+        es
+    };
+    let ops = [
+        "joined",
+        "merged",
+        "count",
+        "recent",
+        "latest",
+        "age",
+        "any",
+        "count_dec",
+        "in_eur",
+        "three",
+        "present",
+        "cheap",
+        "top",
+        "ranked",
+    ];
+    let (_, ev) = run(&v, entries(Some("hint")));
+    for id in ops {
+        let s = step(&ev, id);
+        match &s.status {
+            rustev_contract::evidence::StepStatus::Unresolved(u) => assert!(
+                matches!(u, Unresolved::InsufficientGrade { .. }),
+                "{id}: {u:?}"
+            ),
+            _ => assert_eq!(
+                s.meta.as_ref().map(|m| m.grade),
+                Some(ValueGrade::Hint),
+                "{id}: a hint operand makes the result at most hint"
+            ),
+        }
+    }
+    // The operators that gate nothing resolve, at `hint`.
+    for id in ["joined", "merged", "latest", "age", "count_dec", "in_eur"] {
+        assert_eq!(
+            step(&ev, id).meta.as_ref().map(|m| m.grade),
+            Some(ValueGrade::Hint),
+            "{id}"
+        );
+    }
+    let (_, ev) = run(&v, entries(None));
+    for id in ops {
+        let s = step(&ev, id);
+        assert_eq!(
+            s.meta.as_ref().map(|m| m.grade),
+            Some(ValueGrade::Cached),
+            "{id}: {:?}",
+            s.status
+        );
+    }
+}
+
+/// `field_presence@1` lists an input whose value fails its presence
+/// predicate as missing, and `top_k@1` excludes an absent list item with
+/// its reason instead of reading it (spec 032, 3.4.4).
+#[test]
+fn field_presence_and_top_k_over_absent_values() {
+    let mut v = base();
+    let nullable = |t: Value| json!({"nullable": {"type": t}});
+    v["inputs"].as_array_mut().unwrap().extend([
+        json!({"name": "contact", "type": {"record": {"fields": [
+            {"name": "email", "type": nullable(json!({"text": {"max_bytes": 32}}))},
+            {"name": "phone", "type": nullable(json!({"text": {"max_bytes": 16}}))}],
+            "present_when": {"any_non_null": ["email", "phone"]}}},
+            "provenance": ["user-supplied"], "freshness": "not_required"}),
+        json!({"name": "rooms", "type": {"list": {"max_items": 8, "item": {"record": {
+            "fields": [
+                {"name": "id", "type": {"text": {"max_bytes": 8}}},
+                {"name": "rate", "type": nullable(json!("decimal"))}],
+            "present_when": {"any_non_null": ["rate"]}}}}},
+            "provenance": ["user-supplied"], "freshness": "not_required"}),
+    ]);
+    for step in [
+        json!({"id": "who", "body": {"exact": {"op": "field_presence", "version": 1,
+            "args": {"inputs": ["input:contact", "input:hotels"]}}}}),
+        json!({"id": "open", "body": {"exact": {"op": "filter_with_reasons", "version": 1,
+            "args": {"list": "input:rooms", "id_field": "id", "rules": [
+                {"name": "affordable", "predicate": decimal_le("item:rate", "300")}]}}}}),
+        json!({"id": "best", "body": {"exact": {"op": "top_k", "version": 1,
+            "args": {"list": "input:rooms", "id_field": "id", "among": "step:open",
+                "key": {"ref": "item:rate"}, "direction": "ascending", "k": 2}}}}),
+    ] {
+        push_step(&mut v, step);
+    }
+    let mut es = all_entries();
+    es.push(entry(
+        "contact",
+        json!({"email": null, "phone": null}),
+        "user-supplied",
+        0,
+        "form",
+    ));
+    es.push(entry(
+        "rooms",
+        json!([{"id": "r1", "rate": "100"}, {"id": "r2", "rate": null},
+            {"id": "r3", "rate": "50"}]),
+        "user-supplied",
+        0,
+        "form",
+    ));
+    let c = compiled(&v);
+    let s = snapshot(schema::SNAPSHOT_V2, es);
+    let e = Evaluation::start(&c, &s, Timestamp::from_ms(NOW).unwrap()).unwrap();
+    assert_eq!(
+        e.exact_value("who"),
+        Some(&V::List(vec![V::Text("contact".into())])),
+        "an input failing its presence predicate is missing; hotels is present"
+    );
+    let Some(V::Filtered(open)) = e.exact_value("open") else {
+        panic!("open")
+    };
+    assert_eq!(open.eligible, ["r1", "r3"]);
+    assert_eq!(open.excluded.len(), 1);
+    assert_eq!(open.excluded[0].reasons, ["predicate_failed"]);
+    let Some(V::Shortlist(best)) = e.exact_value("best") else {
+        panic!("best")
+    };
+    assert_eq!(best.ids, ["r3", "r1"], "the absent room is never ranked");
+}
+
+/// No cached catalogue price reaches an output, the judgment or a proposal
+/// parameter once the merge takes prices from the live quotes only: the
+/// proposal carries the merged records and the filter over them, and none
+/// of the catalogue's prices (150, 120, 90) appears anywhere in the
+/// judgment.
+#[test]
+fn no_cached_price_reaches_a_proposal() {
+    let mut v = base();
+    push_step(&mut v, merged_filter());
+    v["policy"]["rules"] = json!([{"id": "offer", "when": "always", "then": {"propose": {
+        "action": "offer", "params": [
+            {"name": "merged", "value": {"ref": "step:merged"}},
+            {"name": "eligible", "value": {"ref": "step:merged_ok"}}]}}}]);
+    v["policy"]["on_unresolved"] = json!([
+        {"action": "propagate", "reasons": "any", "target": "step:merged"},
+        {"action": "propagate", "reasons": "any", "target": "step:merged_ok"}]);
+    let (judgment, _) = run(&v, all_entries());
+    let json = serde_json::to_value(&judgment).unwrap();
+    assert!(
+        json.to_string().contains("\"offer\""),
+        "the proposal was made: {json}"
+    );
+    fn leaves(v: &Value, out: &mut Vec<String>) {
+        match v {
+            Value::Array(a) => a.iter().for_each(|x| leaves(x, out)),
+            Value::Object(o) => o.values().for_each(|x| leaves(x, out)),
+            Value::String(s) => out.push(s.clone()),
+            Value::Number(n) => out.push(n.to_string()),
+            _ => {}
+        }
+    }
+    let mut all = Vec::new();
+    leaves(&json, &mut all);
+    for cached in ["150", "120", "90"] {
+        assert!(
+            !all.iter().any(|l| l == cached),
+            "cached price {cached} reached the judgment"
+        );
+    }
+    assert!(all.iter().any(|l| l == "180"), "the live price is proposed");
+}
+
+/// A `cached` claim on a value whose ceiling is `authoritative` is
+/// `insufficient_grade` where `authoritative` is required; unclaimed, the
+/// same value meets the requirement.
+#[test]
+fn a_cached_claim_on_an_authoritative_ceiling_falls_short_of_authoritative() {
+    let mut v = base();
+    push_step(
+        &mut v,
+        compare_step(
+            "quoted",
+            json!({"cmp": {"left": {"graded": {"ref": "input:district/name",
+                "require": {"min": "authoritative", "max_age_ms": "not_required"}}},
+                "op": "eq", "right": {"lit": {"text": "old-town"}}}}),
+        ),
+    );
+    let (_, ev) = run(&v, all_entries());
+    assert!(matches!(
+        step(&ev, "quoted").status,
+        rustev_contract::evidence::StepStatus::Resolved { .. }
+    ));
+    let mut es = all_entries();
+    es[2] = claimed(district("old-town"), "cached");
+    let (_, ev) = run(&v, es);
+    assert_eq!(
+        unresolved(step(&ev, "quoted")),
+        &Unresolved::insufficient(["input:district/name".to_string()])
+    );
+}
+
 #[test]
 fn semantic_steps_are_at_most_estimated() {
     let semantic = |project: &str| {

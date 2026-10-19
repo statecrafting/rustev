@@ -51,6 +51,12 @@ fn source_documents() -> Vec<(&'static str, Value)> {
                 {"path": "", "max_grade": "authoritative", "reliability": "reliable"}]}]}),
         ),
         (
+            "atlas",
+            json!({"schema": "rustev.source/1", "name": "atlas", "version": "1.0.0",
+            "facts": [{"name": "district", "provenance": "third-party", "grades": [
+                {"path": "", "max_grade": "cached", "reliability": "reliable"}]}]}),
+        ),
+        (
             "geocoder",
             json!({"schema": "rustev.source/1", "name": "geocoder", "version": "2.1.0",
             "facts": [
@@ -331,9 +337,140 @@ fn refusals() -> Vec<Refusal> {
     refused["inputs"][0]["evidence"]["graded"]["sources"] = json!(["warehouse"]);
     out.push(Refusal {
         name: "15-source-binding",
-        neighbour: base,
+        neighbour: base.clone(),
         refused,
     });
+    // The other refusals of categories 11, 13 and 15 this spec introduces,
+    // each as (name, neighbour, refused).
+    let with = |f: &dyn Fn(&mut Value)| {
+        let mut v = base.clone();
+        f(&mut v);
+        v
+    };
+    let quotes_presence = |p: Value| {
+        with(&|v: &mut Value| {
+            v["inputs"][1]["type"]["map"]["value"]["record"]["present_when"] = p.clone()
+        })
+    };
+    let leaf = json!({"any_non_null": ["price"]});
+    let nest = |depth: usize| (0..depth).fold(leaf.clone(), |p, _| json!({"all": [p]}));
+    let leaves = |n: usize| json!({"any": vec![leaf.clone(); n]});
+    let district_sources = |sources: Value, prefer: Value| {
+        with(&|v: &mut Value| {
+            v["inputs"][2]["evidence"]["graded"]["sources"] = sources.clone();
+            v["inputs"][2]["on_disagreement"] = json!({"prefer": {"sources": prefer.clone()}});
+        })
+    };
+    let gate = |min: &str| {
+        with(&|v: &mut Value| {
+            push(
+                v,
+                compare(
+                    "has_hotels",
+                    json!({"cmp": {"left": {"len": {"graded": {"ref": "input:hotels",
+                        "require": {"min": min, "max_age_ms": "not_required"}}}},
+                        "op": "gt", "right": {"lit": {"integer": 0}}}}),
+                ),
+            )
+        })
+    };
+    let upgrade = |cap: Option<&str>| {
+        with(&|v: &mut Value| {
+            v["steps"][4]["body"]["corroborate"]["upgrade_to"] = json!("authoritative");
+            if let Some(g) = cap {
+                v["inputs"][3]["evidence"]["graded"]["caps"] =
+                    json!([{"path": "", "max_grade": g}]);
+            }
+        })
+    };
+    let cap_path = |path: &str| {
+        with(&|v: &mut Value| {
+            v["inputs"][0]["evidence"]["graded"]["caps"] =
+                json!([{"path": path, "max_grade": "hint"}]);
+        })
+    };
+    for (name, neighbour, refused) in [
+        (
+            "11-reserved-reason",
+            base.clone(),
+            with(&|v: &mut Value| {
+                v["steps"][2]["body"]["exact"]["args"]["rules"][0]["name"] =
+                    json!("predicate_failed")
+            }),
+        ),
+        (
+            "11-presence-depth",
+            quotes_presence(nest(3)),
+            quotes_presence(nest(4)),
+        ),
+        (
+            "11-presence-leaves",
+            quotes_presence(leaves(32)),
+            quotes_presence(leaves(33)),
+        ),
+        (
+            "11-presence-empty",
+            quotes_presence(leaves(1)),
+            quotes_presence(leaves(0)),
+        ),
+        (
+            "11-nullable-outside-a-record",
+            base.clone(),
+            with(&|v: &mut Value| {
+                v["inputs"][3]["type"]["list"]["item"] =
+                    json!({"nullable": {"type": {"text": {"max_bytes": 32}}}})
+            }),
+        ),
+        (
+            "11-map-entries",
+            with(&|v: &mut Value| v["inputs"][1]["type"]["map"]["max_entries"] = json!(10_000)),
+            with(&|v: &mut Value| v["inputs"][1]["type"]["map"]["max_entries"] = json!(10_001)),
+        ),
+        (
+            "11-disagreement-sources",
+            district_sources(json!(["atlas", "geocoder"]), json!(["geocoder", "atlas"])),
+            district_sources(
+                json!(["atlas", "geocoder"]),
+                json!(["geocoder", "geocoder"]),
+            ),
+        ),
+        (
+            "11-merge-field-without-rule",
+            base.clone(),
+            with(&|v: &mut Value| {
+                v["steps"][1]["body"]["exact"]["args"]["rules"]
+                    .as_array_mut()
+                    .unwrap()
+                    .pop();
+            }),
+        ),
+        ("11-hint-in-a-hard-gate", gate("estimated"), gate("hint")),
+        (
+            "13-corroboration-above-its-checks",
+            upgrade(None),
+            upgrade(Some("cached")),
+        ),
+        (
+            "15-source-provenance",
+            base.clone(),
+            with(&|v: &mut Value| v["inputs"][0]["provenance"] = json!(["user-supplied"])),
+        ),
+        ("15-capped-path", cap_path("*/price"), cap_path("rating")),
+        (
+            "15-source-without-the-fact",
+            district_sources(json!(["atlas", "geocoder"]), json!(["geocoder", "atlas"])),
+            district_sources(
+                json!(["catalogue", "geocoder"]),
+                json!(["geocoder", "catalogue"]),
+            ),
+        ),
+    ] {
+        out.push(Refusal {
+            name,
+            neighbour,
+            refused,
+        });
+    }
     out
 }
 
