@@ -448,6 +448,14 @@ kind on an excluded crate, publication unrestricted or by an exclusion,
 each metadata field, a feature, a Git, alternate-registry or patched path
 source, the binary name, a layer and an upload order.
 
+**2026-10-19, dependency repair found by the audit (3.6).** The pinned
+cargo-deny 0.20.2 reports RUSTSEC-2026-0346, 0347, 0348 and 0349 against
+rustls 0.23.45, which `rustev-remote-http` reaches. As 3.6 requires, the
+repair is its own reviewed change rather than part of the audit increment:
+the workspace requirement for rustls moves to `0.23.46` (the fixed
+release), so a registry consumer cannot resolve a vulnerable version, and
+`Cargo.lock` follows. No API or behavior of spec 009 changes.
+
 Open for the owner: spec 031 3.1, which amends this section, orders each
 layer by name and starts a layer only after every package of the earlier
 layers is public. With today's development dependencies that order cannot
