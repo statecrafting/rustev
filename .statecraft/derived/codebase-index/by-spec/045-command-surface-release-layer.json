@@ -1,0 +1,32 @@
+{
+  "mapping": {
+    "amends": [
+      "031-public-api-and-release-family"
+    ],
+    "dependsOn": [
+      "021-packaging-and-first-release",
+      "027-node-and-wasm-bindings",
+      "031-public-api-and-release-family"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "docs/decisions/00-founding-decisions.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "specId": "045-command-surface-release-layer",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.2.0",
+  "shardHash": "b4f40e551f8602e71cc4ca65d88f73f199675d2f0996726dc3044937e9438a36"
+}
