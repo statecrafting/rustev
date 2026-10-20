@@ -28,6 +28,14 @@
 //! `rustev-release verify-release <dir> [<repo>]` checks every binding of
 //! 3.8 against the committed `allowed_signers` and the owner identity.
 //!
+//! `rustev-release publish <release-dir> <instruction.json> <journal>` is the
+//! owner-authorized publication of 3.9: it verifies the signed release in
+//! `<release-dir>` against the local tag, checks the instruction names
+//! exactly that release (I-4), records the account and release identity in
+//! the journal (a file outside the repository), and uploads the exact
+//! verified archives to crates.io in order. It reads `CARGO_REGISTRY_TOKEN`
+//! only for the account query and the uploads.
+//!
 //! `rustev-release exceptions <YYYY-MM-DD>` exits 1 unless every advisory
 //! `deny.toml` ignores has an owner-approved exception unexpired on that
 //! date (3.6).
@@ -288,6 +296,22 @@ fn field(set: &ReleaseSet, name: &str) -> ExitCode {
         "version" => vec![set.version.clone()],
         "packages" => set.upload_order.clone(),
         "excluded" => set.excluded.iter().map(|e| e.name.clone()).collect(),
+        "msrv" => match metadata().map(|m| {
+            m.packages
+                .into_iter()
+                .find(|p| Some(&p.name) == set.upload_order.first())
+                .and_then(|p| p.rust_version)
+        }) {
+            Ok(Some(v)) => vec![v],
+            Ok(None) => {
+                eprintln!("no rust-version declared");
+                return ExitCode::from(2);
+            }
+            Err(e) => {
+                eprintln!("{e}");
+                return ExitCode::from(2);
+            }
+        },
         "target" => match target_directory() {
             Ok(t) => vec![t],
             Err(e) => {
@@ -296,7 +320,7 @@ fn field(set: &ReleaseSet, name: &str) -> ExitCode {
             }
         },
         _ => {
-            eprintln!("field is version, packages, excluded or target");
+            eprintln!("field is version, packages, excluded, msrv or target");
             return ExitCode::from(2);
         }
     };
@@ -561,6 +585,115 @@ fn verify_release_cmd(dir: &str, repo: &str) -> ExitCode {
     }
 }
 
+fn publish_cmd(dir: &str, instruction: &str, journal_path: &str) -> ExitCode {
+    use rustev_release::cratesio::CratesIo;
+    use rustev_release::lifecycle::{
+        Entry, Event, Instruction, Journal, Lifecycle, Outcome, publish,
+    };
+    use rustev_release::manifest::ReleaseManifest;
+    let result = (|| -> Result<Outcome, String> {
+        let dir = Path::new(dir);
+        let journal_path = Path::new(journal_path);
+        // The journal lives outside Git (3.9).
+        let top = command_line("git", &["rev-parse", "--show-toplevel"])?;
+        // Both sides canonical, so a symlink cannot hide the journal inside.
+        let top = Path::new(&top)
+            .canonicalize()
+            .map_err(|e| format!("{top}: {e}"))?;
+        let parent = journal_path
+            .parent()
+            .filter(|p| !p.as_os_str().is_empty())
+            .unwrap_or(Path::new("."));
+        let parent = parent
+            .canonicalize()
+            .map_err(|e| format!("{}: {e}", parent.display()))?;
+        if parent.starts_with(&top) {
+            return Err(
+                "021 3.9: the publication journal is inside the repository; it must live outside it"
+                    .into(),
+            );
+        }
+        // The signed release: archives, manifest, checksums, tag and key bind.
+        let scratch = rustev_release::repro::fresh_dir("rustev-release-signers")?;
+        let signers = scratch.join("allowed_signers");
+        std::fs::write(&signers, rustev_release::manifest::ALLOWED_SIGNERS)
+            .map_err(|e| e.to_string())?;
+        let v = rustev_release::manifest::verify_release(
+            dir,
+            &top,
+            &signers,
+            rustev_release::manifest::OWNER_IDENTITY,
+        );
+        if !v.is_empty() {
+            return Err(v.join("\n"));
+        }
+        let bytes = std::fs::read(dir.join("release-manifest.json")).map_err(|e| e.to_string())?;
+        let m = ReleaseManifest::parse(&bytes)?;
+        // The candidate evidence the manifest names is the evidence present.
+        for (name, digest) in &m.evidence {
+            let b = std::fs::read(dir.join(name)).map_err(|e| format!("{name}: {e}"))?;
+            if rustev_release::archive::sha256_hex(&b) != *digest {
+                return Err(format!(
+                    "021 3.7: evidence {name} is not the one the manifest names"
+                ));
+            }
+        }
+        let instruction: Instruction = serde_json::from_slice(
+            &std::fs::read(instruction).map_err(|e| format!("{instruction}: {e}"))?,
+        )
+        .map_err(|e| format!("unreadable instruction: {e}"))?;
+        let mut life = Lifecycle::new(m.clone());
+        life.apply(Event::GatesPass).map_err(|r| r.0)?;
+        life.apply(Event::CandidateVerified {
+            commit: m.commit.clone(),
+        })
+        .map_err(|r| r.0)?;
+        life.apply(Event::Authorized(instruction))
+            .map_err(|r| r.0)?;
+        let mut journal = match std::fs::read_to_string(journal_path) {
+            Ok(text) => Journal::from_lines(&text)?,
+            // Only an absent journal starts empty; any other read failure
+            // would discard the history the publisher resumes from.
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Journal::default(),
+            Err(e) => return Err(format!("journal {}: {e}", journal_path.display())),
+        };
+        journal.file = Some(journal_path.to_path_buf());
+        let registry = CratesIo { wait_seconds: 10 };
+        let account = registry.account()?;
+        journal.record(Entry::Preflight {
+            account,
+            commit: m.commit.clone(),
+            tag: m.tag.clone(),
+            manifest_sha256: m.digest(),
+        });
+        let mut archives = std::collections::BTreeMap::new();
+        for p in &m.packages {
+            let b = std::fs::read(dir.join(&p.crate_file)).map_err(|e| e.to_string())?;
+            archives.insert(p.crate_file.clone(), b);
+        }
+        let mut registry = registry;
+        let outcome = publish(&mut life, &archives, &mut registry, &mut journal);
+        println!("lifecycle state: {:?}", life.state);
+        Ok(outcome)
+    })();
+    match result {
+        Ok(rustev_release::lifecycle::Outcome::Complete) => {
+            println!(
+                "every package is public with its verified checksum (published, not yet released or qualified)"
+            );
+            ExitCode::SUCCESS
+        }
+        Ok(rustev_release::lifecycle::Outcome::Stopped { reason }) => {
+            eprintln!("publication stopped: {reason}");
+            ExitCode::from(1)
+        }
+        Err(e) => {
+            eprintln!("{e}");
+            ExitCode::from(2)
+        }
+    }
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let set = match ReleaseSet::parse(SET.as_bytes()) {
@@ -576,6 +709,7 @@ fn main() -> ExitCode {
         ["compare", a, b] => compare(&set, a, b),
         ["field", name] => field(&set, name),
         ["deps"] => deps(&set),
+        ["publish", dir, instruction, journal] => publish_cmd(dir, instruction, journal),
         ["manifest", dir] => manifest(&set, dir),
         ["verify-release", dir] => verify_release_cmd(dir, "."),
         ["verify-release", dir, repo] => verify_release_cmd(dir, repo),
@@ -584,7 +718,7 @@ fn main() -> ExitCode {
         ["unpacked", dir, work, toolchain] => unpacked(&set, dir, work, Some(toolchain)),
         _ => {
             eprintln!(
-                "usage: rustev-release manifests | archives <dir> | compare <dir-a> <dir-b> | field <name> | unpacked <dir> <work> [<toolchain>] | deps | exceptions <YYYY-MM-DD> | manifest <evidence-dir> | verify-release <dir> [<repo>]"
+                "usage: rustev-release manifests | archives <dir> | compare <dir-a> <dir-b> | field <name> | unpacked <dir> <work> [<toolchain>] | deps | exceptions <YYYY-MM-DD> | manifest <evidence-dir> | publish <release-dir> <instruction.json> <journal> | verify-release <dir> [<repo>]"
             );
             ExitCode::from(2)
         }

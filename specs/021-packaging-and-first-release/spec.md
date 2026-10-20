@@ -597,6 +597,37 @@ version, and a release without consumer proof (rows 8 and 9). No
 credential, network write or tag is involved; the adapter for the real
 registry belongs to the publication step.
 
+**Increment 7 (candidate matrix and the crates.io adapter).** The
+candidate now also tests every unpacked archive at the declared MSRV
+(`rustev-release field msrv`, today 1.88) from a fresh work directory, as
+well as on the pinned toolchain. `tools/rustev-release/src/cratesio.rs` is
+the publisher's real registry: visibility comes from the public sparse
+index (`index.crates.io`, the recorded `cksum`), and an upload sends the
+exact verified `.crate` bytes through the registry's publish API with
+metadata read from the archive's own normalized manifest, because `cargo
+publish` would rebuild the archive (3.9). HTTP goes through the system
+`curl` (no HTTP crate in tools, spec 001 3.4.2); the token is read from
+`CARGO_REGISTRY_TOKEN` only for the account query and the uploads and is
+passed on standard input, never in an argument, log or journal entry. A
+2xx is accepted, a 4xx refused, and anything else ambiguous. The journal
+now appends each entry to its file as it is recorded, and the publisher
+uploads nothing once a write fails; a `preflight` entry records the
+account, commit, tag and manifest digest. `rustev-release publish
+<release-dir> <instruction.json> <journal>` refuses a journal inside the
+repository, verifies the signed release against the local tag and the
+evidence digests, applies the owner's instruction to the lifecycle (I-4)
+and publishes. `tests/cratesio.rs` covers the index layout and checksum,
+response classes, the request body carrying the exact archive, the
+journal on disk, and an unwritable journal uploading nothing. The README
+states the intended scope and that nothing is published.
+
+What remains before `implementation: complete`, none of it an implementer
+act: the owner's signature of the manifest, checksums and tag; the
+publication act, which spec 031 3.11 makes conditional on every check of
+this spec and of 031 3.9 passing (so 031's own pre-publication checks come
+first); the upload; the hosted release; and the fresh registry-only
+consumer of 3.10.
+
 Open for the owner: spec 031 3.1, which amends this section, orders each
 layer by name and starts a layer only after every package of the earlier
 layers is public. With today's development dependencies that order cannot

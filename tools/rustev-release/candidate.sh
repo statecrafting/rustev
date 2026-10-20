@@ -100,6 +100,16 @@ step compare.txt "$release" compare "$out/a" "$out/b"
 step archives.json "$release" archives "$out/a"
 work=$(mktemp -d "${TMPDIR:-/tmp}/rustev-candidate-$short.XXXXXX")
 step unpacked.txt "$release" unpacked "$out/a" "$work"
+# 3.7: the candidate matrix also tests every unpacked archive at the
+# declared MSRV, from a fresh work directory.
+# `set -e` stops on a failing `field`; an empty answer is refused too.
+msrv=$(field msrv)
+if [ -z "$msrv" ]; then
+  echo "021 3.7: the release set declares no MSRV" >&2
+  exit 1
+fi
+rm -rf "$work" && work=$(mktemp -d "${TMPDIR:-/tmp}/rustev-candidate-$short.XXXXXX")
+step unpacked-msrv.txt "$release" unpacked "$out/a" "$work" "$msrv"
 # 3.6: the pinned audit tool and policy, the exceptions rule and the report.
 deny_pin=0.20.2
 if [ "$(cargo deny --version)" != "cargo-deny $deny_pin" ]; then
@@ -118,7 +128,7 @@ step dependencies.json "$release" deps
 # 3.8: the canonical manifest and SHA256SUMS of run a. Signing them and the
 # tag is the owner's act; nothing here signs.
 step manifest.txt "$release" manifest "$out"
-cat "$out/compare.txt" "$out/unpacked.txt" "$out/exceptions.txt"
+cat "$out/compare.txt" "$out/unpacked.txt" "$out/unpacked-msrv.txt" "$out/exceptions.txt"
 # `step` stops the script on a failing audit, so reaching here means it
 # passed; every diagnostic stays in deny.txt, part of the candidate evidence.
 echo "cargo deny: passed ($out/deny.txt)"

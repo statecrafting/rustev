@@ -528,3 +528,58 @@ fn redaction_never_splits_a_multibyte_character() {
         "日本語 only"
     );
 }
+
+#[test]
+fn a_journal_write_failure_is_the_one_stop_entry() {
+    let (mut l, a) = authorized();
+    let first = l.manifest.packages[0].clone();
+    let mut reg = FakeRegistry::default();
+    reg.index.insert(
+        (first.name.clone(), l.manifest.version.clone()),
+        (sha256_hex(b"someone else's bytes"), 0),
+    );
+    // A directory is not appendable: the first record fails.
+    let dir = std::env::temp_dir().join(format!("rustev-journal-dir-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let mut j = Journal {
+        file: Some(dir.clone()),
+        ..Journal::default()
+    };
+    let out = publish(&mut l, &a, &mut reg, &mut j);
+    std::fs::remove_dir_all(&dir).unwrap();
+    assert!(
+        matches!(out, Outcome::Stopped { ref reason } if reason.contains("the version is spent"))
+    );
+    let stops: Vec<_> = j
+        .entries
+        .iter()
+        .filter(|e| matches!(e, Entry::Stopped { .. }))
+        .collect();
+    assert_eq!(stops.len(), 1, "{stops:?}");
+    assert!(matches!(stops[0], Entry::Stopped { reason } if reason.contains("not writable")));
+    assert!(reg.uploads.is_empty());
+}
+
+#[test]
+fn a_stop_that_cannot_be_written_is_still_one_stop_entry() {
+    let dir = std::env::temp_dir().join(format!("rustev-journal-stop-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let mut j = Journal {
+        file: Some(dir.clone()),
+        ..Journal::default()
+    };
+    j.record(Entry::Stopped {
+        reason: "an empty package set publishes nothing".into(),
+    });
+    std::fs::remove_dir_all(&dir).unwrap();
+    let stops: Vec<_> = j
+        .entries
+        .iter()
+        .filter_map(|e| match e {
+            Entry::Stopped { reason } => Some(reason.clone()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(stops.len(), 1, "{stops:?}");
+    assert!(stops[0].contains("publishes nothing") && stops[0].contains("not writable"));
+}
