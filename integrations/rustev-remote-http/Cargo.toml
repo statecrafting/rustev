@@ -13,6 +13,9 @@ keywords = ["decision-engine", "http", "protocol"]
 categories = ["network-programming"]
 # Spec 021, 3.4: the intended public registry only.
 publish = ["crates-io"]
+# Spec 021, 3.5: the archive holds the library source; the reviewed file list
+# is tools/rustev-release/archive-policy.json.
+include = ["/src/**/*.rs", "/LICENSE"]
 
 [package.metadata.spec-spine]
 spec = "009-remote-adapter-protocol"
