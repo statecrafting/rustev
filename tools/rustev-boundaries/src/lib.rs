@@ -1,6 +1,7 @@
-//! The workspace dependency rules of spec 001, section 3.4, and the package
-//! rule of spec 007, section 3.3.1, checked over the
-//! output of `cargo metadata --format-version 1`.
+//! The workspace dependency rules of spec 001, section 3.4, the package
+//! rule of spec 007, section 3.3.1, and the binding rules of spec 027,
+//! section 3.14, checked over the output of `cargo metadata
+//! --format-version 1`.
 //!
 //! The forbidden families are a conservative denylist matched by package name
 //! (spec 001, 3.5). Passing this check is not a proof that a crate performs no
@@ -40,8 +41,37 @@ pub const EXECUTORS: &[&str] = &[
     "async-executor",
 ];
 
-/// The crates whose whole normal and build dependency graph is checked.
-pub const PURE_CRATES: &[&str] = &["rustev-contract", "rustev-core"];
+/// The Node-API family (spec 027, 3.14.1), by exact name.
+pub const NAPI_FAMILY: &[&str] = &["napi", "napi-derive", "napi-sys", "napi-build"];
+
+/// Node-API and WebAssembly binding families no crate outside
+/// `integrations/` may depend on (spec 027, 3.14.1); the first four are
+/// [`NAPI_FAMILY`].
+pub const BINDING_FAMILIES: &[&str] = &[
+    "napi",
+    "napi-derive",
+    "napi-sys",
+    "napi-build",
+    "wasm-bindgen",
+    "wasm-bindgen-macro",
+    "wasm-bindgen-futures",
+    "js-sys",
+    "web-sys",
+];
+/// What `rustev-wasm`'s normal and build graph may not contain beyond the
+/// executors, HTTP stacks and Node-API families (spec 027, 3.14.3).
+pub const WASM_FORBIDDEN: &[&str] = &[
+    "rustev-runtime",
+    "getrandom",
+    "web-sys",
+    "wasm-bindgen-futures",
+];
+/// The WebAssembly binding crate.
+pub const WASM_CRATE: &str = "rustev-wasm";
+
+/// The crates whose whole normal and build dependency graph is checked; the
+/// shared command surface joins the contract and core (spec 027, 3.14.2).
+pub const PURE_CRATES: &[&str] = &["rustev-contract", "rustev-core", "rustev-surface"];
 /// The only normal or build dependencies a crate under `packages/` may have
 /// (design section 15; spec 007, 3.3.1).
 pub const PACKAGE_DEPENDENCIES: &[&str] = &["rustev-contract", "rustev-core"];
@@ -108,6 +138,10 @@ pub enum Violation {
     /// normal or build dependency other than `rustev-contract` and
     /// `rustev-core`.
     PackageDependency { krate: String, dependency: String },
+    /// Spec 027 3.14.3: `rustev-wasm`'s graph reaches the runtime, an
+    /// executor, an HTTP stack, a Node-API crate, `getrandom`, `web-sys` or
+    /// `wasm-bindgen-futures`.
+    WasmGraph { path: Vec<String> },
 }
 
 impl fmt::Display for Violation {
@@ -134,6 +168,11 @@ impl fmt::Display for Violation {
                 f,
                 "007 3.3.1 package rule: `{krate}` is a package and may depend only on rustev-contract and rustev-core, not `{dependency}`"
             ),
+            Violation::WasmGraph { path } => write!(
+                f,
+                "027 3.14.3: `{WASM_CRATE}` reaches a forbidden crate: {}",
+                path.join(" -> ")
+            ),
         }
     }
 }
@@ -148,6 +187,24 @@ fn is_http(name: &str) -> bool {
 
 fn is_executor(name: &str) -> bool {
     EXECUTORS.contains(&name)
+}
+
+fn is_binding(name: &str) -> bool {
+    BINDING_FAMILIES.contains(&name)
+}
+
+fn is_napi(name: &str) -> bool {
+    NAPI_FAMILY.contains(&name)
+}
+
+/// Forbidden in the pure crates' graphs (spec 001 3.4.1, spec 027 3.14.2).
+fn forbidden_for_pure(name: &str) -> bool {
+    is_ecosystem(name) || is_http(name) || is_executor(name) || is_binding(name)
+}
+
+/// Forbidden in `rustev-wasm`'s graph (spec 027, 3.14.3).
+fn forbidden_for_wasm(name: &str) -> bool {
+    is_executor(name) || is_http(name) || is_napi(name) || WASM_FORBIDDEN.contains(&name)
 }
 
 /// Where a workspace member lives, relative to the workspace root.
@@ -210,7 +267,9 @@ pub fn check(meta: &Metadata) -> Vec<Violation> {
                     dependency: dep.name.clone(),
                 });
             }
-            if !in_integrations && (is_ecosystem(&dep.name) || is_http(&dep.name)) {
+            if !in_integrations
+                && (is_ecosystem(&dep.name) || is_http(&dep.name) || is_binding(&dep.name))
+            {
                 out.insert(Violation::ForbiddenFamily {
                     krate: pkg.name.clone(),
                     dependency: dep.name.clone(),
@@ -258,11 +317,16 @@ pub fn check(meta: &Metadata) -> Vec<Violation> {
             PURE_CRATES.contains(&p.name.as_str())
                 || under_packages(&relative_dir(&meta.workspace_root, &p.manifest_path))
         }) {
-            if let Some(path) = forbidden_path(&graph, &by_id, &pkg.id) {
+            if let Some(path) = forbidden_path(&graph, &by_id, &pkg.id, forbidden_for_pure) {
                 out.insert(Violation::ForbiddenTransitive {
                     krate: pkg.name.clone(),
                     path,
                 });
+            }
+        }
+        for pkg in members.iter().filter(|p| p.name == WASM_CRATE) {
+            if let Some(path) = forbidden_path(&graph, &by_id, &pkg.id, forbidden_for_wasm) {
+                out.insert(Violation::WasmGraph { path });
             }
         }
     }
@@ -270,11 +334,12 @@ pub fn check(meta: &Metadata) -> Vec<Violation> {
 }
 
 /// Breadth-first search for the shortest normal or build path from `start`
-/// to a package in a forbidden family; the path lists package names.
+/// to a package `forbidden` names; the path lists package names.
 fn forbidden_path(
     graph: &BTreeMap<&str, Vec<&str>>,
     by_id: &BTreeMap<&str, &Package>,
     start: &str,
+    forbidden: fn(&str) -> bool,
 ) -> Option<Vec<String>> {
     let name_of = |id: &str| {
         by_id
@@ -292,7 +357,7 @@ fn forbidden_path(
             }
             parent.insert(next, id);
             let name = name_of(next);
-            if is_ecosystem(&name) || is_http(&name) || is_executor(&name) {
+            if forbidden(&name) {
                 let mut path = vec![name];
                 let mut cur = next;
                 while let Some(&p) = parent.get(cur) {
@@ -741,6 +806,191 @@ mod tests {
                 "tokio".into()
             ],
         }));
+    }
+
+    #[test]
+    fn the_node_api_family_is_named_exactly_in_both_rules() {
+        // One membership test for 3.14.1 and 3.14.3: the four names, no
+        // prefix match.
+        for n in NAPI_FAMILY {
+            assert!(is_binding(n) && is_napi(n), "{n}");
+        }
+        assert!(!is_napi("napi-helper") && !is_binding("napi-helper"));
+    }
+
+    #[test]
+    fn a_binding_family_outside_integrations_fails() {
+        // Spec 027, 3.14.1: every Node-API and WebAssembly family.
+        for dep in BINDING_FAMILIES {
+            let deps: &[Dep<'_>] = &[(dep, None, None)];
+            let m = meta(
+                &[CONTRACT, ("rustev-x", "crates/rustev-x", deps)],
+                &["serde", dep],
+                &[],
+            );
+            assert_eq!(
+                check(&m),
+                vec![Violation::ForbiddenFamily {
+                    krate: "rustev-x".into(),
+                    dependency: dep.to_string()
+                }],
+                "{dep}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_binding_crates_under_integrations_pass() {
+        let m = meta(
+            &[
+                CONTRACT,
+                CORE,
+                (
+                    "rustev-node",
+                    "integrations/rustev-node",
+                    &[
+                        ("rustev-core", None, Some("crates/rustev-core")),
+                        ("napi", None, None),
+                        ("napi-derive", None, None),
+                        ("napi-build", Some("build"), None),
+                        ("tokio", None, None),
+                    ],
+                ),
+                (
+                    "rustev-wasm",
+                    "integrations/rustev-wasm",
+                    &[
+                        ("rustev-core", None, Some("crates/rustev-core")),
+                        ("wasm-bindgen", None, None),
+                        ("js-sys", None, None),
+                    ],
+                ),
+            ],
+            &[
+                "serde",
+                "napi",
+                "napi-derive",
+                "napi-build",
+                "tokio",
+                "wasm-bindgen",
+                "js-sys",
+            ],
+            &[
+                ("rustev-core", "rustev-contract", None),
+                ("rustev-node", "rustev-core", None),
+                ("rustev-node", "napi", None),
+                ("rustev-node", "napi-derive", None),
+                ("rustev-node", "napi-build", Some("build")),
+                ("rustev-node", "tokio", None),
+                ("rustev-wasm", "rustev-core", None),
+                ("rustev-wasm", "wasm-bindgen", None),
+                ("rustev-wasm", "js-sys", None),
+            ],
+        );
+        assert_eq!(check(&m), vec![]);
+    }
+
+    #[test]
+    fn a_pure_crate_reaching_a_binding_family_fails_and_the_surface_is_checked() {
+        // Spec 027, 3.14.2: contract and core refuse the families
+        // transitively, and `rustev-surface` joins the checked set.
+        let surface: Member<'static> = (
+            "rustev-surface",
+            "crates/rustev-surface",
+            &[("rustev-core", None, Some("crates/rustev-core"))],
+        );
+        let m = meta(
+            &[CONTRACT, CORE, surface],
+            &["serde", "helper", "wasm-bindgen"],
+            &[
+                ("rustev-core", "rustev-contract", None),
+                ("rustev-surface", "rustev-core", None),
+                ("rustev-contract", "helper", None),
+                ("helper", "wasm-bindgen", None),
+            ],
+        );
+        let v = check(&m);
+        for krate in ["rustev-contract", "rustev-core", "rustev-surface"] {
+            assert!(
+                v.iter().any(
+                    |x| matches!(x, Violation::ForbiddenTransitive { krate: k, path }
+                    if k == krate && path.last().map(String::as_str) == Some("wasm-bindgen"))
+                ),
+                "{krate}: {v:?}"
+            );
+        }
+        // An executor reached by the surface fails too.
+        let m = meta(
+            &[CONTRACT, CORE, surface],
+            &["serde", "tokio"],
+            &[
+                ("rustev-core", "rustev-contract", None),
+                ("rustev-surface", "rustev-core", None),
+                ("rustev-surface", "tokio", None),
+            ],
+        );
+        assert_eq!(
+            check(&m),
+            vec![Violation::ForbiddenTransitive {
+                krate: "rustev-surface".into(),
+                path: vec!["rustev-surface".into(), "tokio".into()]
+            }]
+        );
+    }
+
+    #[test]
+    fn the_wasm_graph_refuses_each_forbidden_crate() {
+        // Spec 027, 3.14.3, through a helper so the path is named.
+        for bad in [
+            "rustev-runtime",
+            "tokio",
+            "hyper",
+            "napi",
+            "napi-sys",
+            "getrandom",
+            "web-sys",
+            "wasm-bindgen-futures",
+        ] {
+            let m = meta(
+                &[
+                    CONTRACT,
+                    (
+                        "rustev-wasm",
+                        "integrations/rustev-wasm",
+                        &[("helper", None, None)],
+                    ),
+                ],
+                &["serde", "helper", bad],
+                &[("rustev-wasm", "helper", None), ("helper", bad, None)],
+            );
+            let v = check(&m);
+            assert!(
+                v.contains(&Violation::WasmGraph {
+                    path: vec!["rustev-wasm".into(), "helper".into(), bad.into()]
+                }),
+                "{bad}: {v:?}"
+            );
+            assert!(v.iter().any(|x| x.to_string().starts_with("027 3.14.3")));
+        }
+        // A dev-only edge is outside the graph; js-sys and wasm-bindgen are
+        // allowed.
+        let m = meta(
+            &[
+                CONTRACT,
+                (
+                    "rustev-wasm",
+                    "integrations/rustev-wasm",
+                    &[("wasm-bindgen", None, None), ("js-sys", None, None)],
+                ),
+            ],
+            &["serde", "wasm-bindgen", "js-sys", "getrandom"],
+            &[
+                ("rustev-wasm", "wasm-bindgen", None),
+                ("rustev-wasm", "js-sys", None),
+                ("rustev-wasm", "getrandom", Some("dev")),
+            ],
+        );
+        assert_eq!(check(&m), vec![]);
     }
 
     #[test]
