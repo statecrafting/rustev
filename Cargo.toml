@@ -10,7 +10,10 @@ members = ["crates/*", "backends/*", "tools/*", "integrations/*", "packages/*"]
 # 3.2); each internal dependency below names it exactly.
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+# The MSRV: the oldest toolchain that builds the release members. 1.88
+# stabilized the `let` chains rustev-core uses; 1.87 refuses them (spec 021,
+# 3.7 candidate matrix; spec 031, 3.6.7).
+rust-version = "1.88"
 license = "Apache-2.0"
 repository = "https://github.com/statecrafting/rustev"
 homepage = "https://github.com/statecrafting/rustev"

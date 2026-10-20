@@ -130,14 +130,13 @@ fn refusal_inputs(s: &Scratch) -> Vec<(u8, Vec<String>)> {
     cases.push((5, d));
     // 6: a mass threshold without a declared uncalibrated reason.
     let mut d = base.clone();
-    if let Cond::Any(cs) = &mut d.policy.adjustments[0].when {
-        if let Cond::MassAtLeast {
+    if let Cond::Any(cs) = &mut d.policy.adjustments[0].when
+        && let Cond::MassAtLeast {
             uncalibrated_threshold,
             ..
         } = &mut cs[1]
-        {
-            *uncalibrated_threshold = UncalibratedThreshold::NotDeclared;
-        }
+    {
+        *uncalibrated_threshold = UncalibratedThreshold::NotDeclared;
     }
     cases.push((6, d));
     // 7: three requests against a ceiling of two.

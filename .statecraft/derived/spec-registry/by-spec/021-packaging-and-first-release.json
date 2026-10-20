@@ -229,7 +229,7 @@
       }
     ],
     "sectionDigests": {
-      "021-packaging-and-first-public-release": "ca1de8582dddd0670ee1908707dc7eac9b9d64a8761f80586c004cc35fc13a39",
+      "021-packaging-and-first-public-release": "2721e308841e473e8b7e1541df9e27c573d6e941a7cf6b614080f47aceef7978",
       "1-purpose": "06117bd1d659705227fb77273ed1f536626be5f1c2d876bab4dafcc2508e6b0d",
       "2-first-release-scope": "9f6956ecfcb382633ecc39fbd98c6426d77e53c16b92b539239ad0f02a03ee38",
       "3-1-lifecycle-and-authority": "b641fd2242e1d0d5cbe9c3aee40c8b79d901a9464843d1424cadb54c4c5f86de",
@@ -245,7 +245,7 @@
       "3-contract": "fd2a3c4613cd80129cb0f46bc819533eff3e28759624ea5f8bbb0fa5e2697233",
       "4-observable-negative-cases": "2a6c8bba48ed4102c220ab54c57c63d551cd1b3c907731a6b68f9e18c1735d96",
       "acceptance": "3fb6e446eb21f0958276d7c92ec302874efd13434dc99b9734f897319414bcdf",
-      "implementation-record": "e870dc8835b75954d639d0fc97f8e6e354d3d1a8489c55d75b778d79f01b7b43",
+      "implementation-record": "74c0dbb7ca88a5e46c43581a5499be694b6383aa47caa5a64d4bdedfeab0b60c",
       "questions-settled-by-r-34": "98ecbd74b36f3a6ab92bf9755eac98ab8825bc2a494d3947da9a75d58984fe09",
       "verification": "9f16fc7fb6df9503918bae4433d72118078ee5b2abe6c1c7bb3645bbb3efb0e5"
     },
@@ -275,6 +275,6 @@
     "summary": "Defines the intended first public Rustev crate family, its lockstep pre-1.0 version policy, registry contents and features, internal dependency pins, license and dependency audit, reproducible package checks, signed release identity, publication journal, and fresh registry-only consumer proof. Candidate construction, owner publication authorization, registry upload, public availability, and consumer qualification are distinct lifecycle states. Approval authorizes candidate implementation only: no crate is publishable yet and no release, tag, upload, name reservation, or availability claim is authorized or made.\n",
     "title": "Packaging and first public release"
   },
-  "shardHash": "06b3ae124ea6f1ba55f0e17e207c97e176280ace6e98cabb8090ca7f6f3c0957",
+  "shardHash": "f14d1128a72564e030d0bc03c8bfcbc57b19fe1006152cc5c38f91ee246089fb",
   "specVersion": "1.9.0"
 }

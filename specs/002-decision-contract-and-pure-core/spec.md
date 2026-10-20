@@ -530,6 +530,11 @@ rather than made silently, and the text above now states them:
 Evidence: `spec-spine verify 002` runs the block above; the goldens for both
 reference plans are under `crates/rustev-core/tests/golden/`.
 
+**2026-10-19, mechanical lint rewrite (no behavior change).** The
+workspace MSRV moved to 1.88 (spec 021's implementation record), so
+clippy's `collapsible_if` now proposes `let` chains; `cargo clippy --fix`
+collapsed the nested `if`s in crates/rustev-core/src/{compile,evaluate,execution,quality}.rs. Every test and golden is unchanged.
+
 ## Decision history
 
 - 2026-09-23: approved by the owner with bounded corrections (A-02 in

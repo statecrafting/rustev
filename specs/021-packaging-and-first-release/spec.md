@@ -480,6 +480,20 @@ ruleset only (3.5). `tests/archives.rs` compares every list with `cargo
 package --list` and breaks each rule once; the bounds are fixed in the
 policy, measured from the first packaging, and a check never raises them.
 
+**2026-10-19, MSRV correction (3.7).** The declared MSRV was 1.85, which
+no check had exercised (spec 031 2.1 records the same). Built at the
+declared version for the candidate matrix, `rustev-core` fails: it uses
+`let` chains, stable since 1.88. `cargo +1.88.0 check --locked` of the
+eight members passes and 1.87 cannot accept `let` chains, so the workspace
+declares `rust-version = "1.88"`, the true minimum, before any release
+(no published version is affected). This is its own reviewed change, as
+spec 031 3.6.7 asks of an MSRV change; the candidate matrix of increment 7
+builds and tests the unpacked archives on it. With the MSRV at 1.88,
+clippy's `collapsible_if` proposes `let` chains and its
+`manual_is_multiple_of` applies; `cargo clippy --fix` collapsed the nested
+`if`s it named (12 files) and rewrote one `% 10 == 0` as `is_multiple_of`,
+recorded in each owning spec, with no behavior change.
+
 Open for the owner: spec 031 3.1, which amends this section, orders each
 layer by name and starts a layer only after every package of the earlier
 layers is public. With today's development dependencies that order cannot

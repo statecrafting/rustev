@@ -208,16 +208,16 @@ pub(crate) fn validate(
                     ),
                 );
             }
-            if let BoundCalibration::Bound { binding, .. } = &primary.calibration {
-                if binding.artifact != b.artifact {
-                    return refuse(
-                        subject,
-                        format!(
-                            "fallback {id:?} is artifact {}; the calibration is bound to {}",
-                            b.artifact, binding.artifact
-                        ),
-                    );
-                }
+            if let BoundCalibration::Bound { binding, .. } = &primary.calibration
+                && binding.artifact != b.artifact
+            {
+                return refuse(
+                    subject,
+                    format!(
+                        "fallback {id:?} is artifact {}; the calibration is bound to {}",
+                        b.artifact, binding.artifact
+                    ),
+                );
             }
             let descriptor = b.id().map_err(|e| Refusal {
                 category: Category::Parse,

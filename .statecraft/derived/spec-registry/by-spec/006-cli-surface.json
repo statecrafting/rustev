@@ -34,7 +34,7 @@
     "id": "006-cli-surface",
     "implementation": "complete",
     "sectionDigests": {
-      "006-cli-surface": "c40ba473df5965baa5602958b9b0cb9c9fe54438550e5f6a2482ee76ada536f6",
+      "006-cli-surface": "481585c53602ee8f5d9c66a3b6f75d13c1e8cc03f16b7beb5a85b8e72cb6b377",
       "1-purpose": "4e2e2f237b2a801fa00173df8cfad9bc84473b9b0606fbb2bcf9d0270d91a3bc",
       "2-territory": "ee3b1cab96531588fb2efc6d6a7b67db773b6749d4e9b4106a7b164f0213b910",
       "3-1-invocation-and-output": "a4493237889bb81be796ff380faec13dbf8dfd484ca6479dacb10d7b4f42f959",
@@ -54,7 +54,7 @@
       "contract-compatibility-record-2026-10-18": "8747c094441f99038938797b55fe042ddc4ae8c552417490e35c7f106c95c437",
       "decision-history": "303ad270260dd9e6decd8555255783cb5b83e2046e6c17d77768aecba51c445e",
       "engineering-choices": "dc8108b84dc3fbaa8d5ff56c1b148b3a62864fffc727e3c78579f07ba1a29d42",
-      "implementation-record": "2ba4f184fc021b8188c92d76c8e0985f2a889a842fdb1b2e31f0327e8e2addf7",
+      "implementation-record": "03e56a9a8c3d02f7c3a1c43b678024f1574a9f6368cf21b7e5910f243cc7d86c",
       "tooling-compatibility-record-2026-10-02": "cbfadd7e1ab5201b963edec7122b6f8a21e0b2ddcce73fd622343d1688945f6a",
       "verification": "8a26cd5de979bcae91f5dc431f30058c5c5754e4c6909a618892cf285d2733df"
     },
@@ -88,6 +88,6 @@
     "summary": "Increment 2: `rustev`, a command-line host over the library. Plan check, compile and show against descriptor, rules-program, calibration and execution-policy files; run one snapshot through `rustev-runtime` on rules-program backends with a file evidence sink and optional bounded capture into a replay bundle; offline replay under an explicitly supplied trusted scope; evaluation reports with their detail and configuration companions, regression gates, and temperature fitting with its lineage record, through `rustev-eval`. Bounded file access, stable JSON output and distinct exit codes. No network, no hosting, no live inference beyond the deterministic rules backend.\n",
     "title": "CLI surface"
   },
-  "shardHash": "0de1e082d571c83844c27de60c43429f26aa0c893614afd3a99c29c2df7722e5",
+  "shardHash": "ae450b1de904dabd6afe9d05c10500e49bc79b0837b822d7d5e9b7986475b9d8",
   "specVersion": "1.9.0"
 }

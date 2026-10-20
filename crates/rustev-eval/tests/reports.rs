@@ -282,10 +282,10 @@ async fn bundles(
             scope(),
         )
         .await;
-        if c.keep == Keep::Altered {
-            if let CoreEvidence::Recorded(e) = &mut r.run.core {
-                e.judgment.trace.push("SYNTHETIC altered".into());
-            }
+        if c.keep == Keep::Altered
+            && let CoreEvidence::Recorded(e) = &mut r.run.core
+        {
+            e.judgment.trace.push("SYNTHETIC altered".into());
         }
         let created = if c.keep == Keep::Old {
             WALL - 8 * DAY

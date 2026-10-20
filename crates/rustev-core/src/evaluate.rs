@@ -1478,12 +1478,12 @@ impl<'c> Evaluation<'c> {
             for s in &mut steps {
                 let key = format!("step:{}", s.step);
                 s.meta = self.metas.get(&key).map(|m| m.whole.clone());
-                if s.instance.is_empty() {
-                    if let Some(q) = self.step_quality.get(&s.step) {
-                        s.join = q.join.clone();
-                        s.merge = q.merge.clone();
-                        s.corroboration = q.corroboration.clone();
-                    }
+                if s.instance.is_empty()
+                    && let Some(q) = self.step_quality.get(&s.step)
+                {
+                    s.join = q.join.clone();
+                    s.merge = q.merge.clone();
+                    s.corroboration = q.corroboration.clone();
                 }
             }
         }

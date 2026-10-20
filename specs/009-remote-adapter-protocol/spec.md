@@ -618,6 +618,11 @@ first, so a caller holding its result could find the sink still empty. The
 spec 012 adapter had the same order and failed a stage 1 test that way; no
 requirement changes.
 
+**2026-10-19, mechanical lint rewrite (no behavior change).** The
+workspace MSRV moved to 1.88 (spec 021's implementation record), so
+clippy's `collapsible_if` now proposes `let` chains; `cargo clippy --fix`
+collapsed the nested `if`s in integrations/rustev-remote-http/src/{client,server}.rs. Every test and golden is unchanged.
+
 ## Verification
 
 Run by `make verify` (009 is in `VERIFIED_SPECS`).

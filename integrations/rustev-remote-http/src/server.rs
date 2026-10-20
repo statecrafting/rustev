@@ -487,10 +487,10 @@ async fn infer(state: &Arc<State>, body: &[u8]) -> Result<Vec<u8>, Refusal> {
     }
     // An output with no JSON form (a non-finite number) cannot be sent.
     for i in &mut resp.items {
-        if let ItemResult::Output(o) = &i.result {
-            if rustev_contract::canonical::record_canonical_bytes(o).is_err() {
-                i.result = failure(RemoteCode::RemoteError, "output has no JSON form");
-            }
+        if let ItemResult::Output(o) = &i.result
+            && rustev_contract::canonical::record_canonical_bytes(o).is_err()
+        {
+            i.result = failure(RemoteCode::RemoteError, "output has no JSON form");
         }
     }
     resp.record_canonical()

@@ -121,7 +121,7 @@
       }
     ],
     "sectionDigests": {
-      "012-jev-integration-remote-decision-backend": "2113db5d8489abe082962e756a7388be229a19092472c8698e1e1f2e33ba8e25",
+      "012-jev-integration-remote-decision-backend": "01e3b28a23028e225cbb267395be49a49c35f7670be59f34b21d652cd26ede85",
       "1-purpose": "1084471762749dfa367cabbbae66a59a75b9464e3075c6224307063a2379367e",
       "2-territory": "0c3f4184b8bfa40b2d72ecb43886b43034f8387d6b56468823c7e80d58388ad3",
       "3-1-position-and-names": "a4c6133fea19e6ee2ee18eb6cbce1c615050135b5b9ec44cd5176efab795653c",
@@ -136,10 +136,10 @@
       "4-out-of-scope": "57f8220823250e32939bad2fa46f2ef92d116fe040d497dce5137a600d44ef4f",
       "5-observable-negative-cases": "85a19045a4ef5a2639ca857608d9f1f3b212060778354743099421cced0238eb",
       "acceptance": "37b8b372e51725a11f537ff62f2d74f3e88ad9430662d00d67f7de9ab702387d",
-      "implementation-record": "0f136cb826491a33fb83096e646d2bb4bdae5f4a5405bd12f24e4e2f94851c62",
+      "implementation-record": "027d0526264891628e9a931ecae53e91b2eb484f087cc3d72a119bebf554a0aa",
       "open-questions": "86a189422e58a0b735b33b56bbaf05a2bc490e1e283ff43a3b332ba8a0d9d5b4",
       "resolved-questions": "1e43e2be2253c8d2504dcd3164a543a9820de28e3e1921ddf8b1e08cd8605b3a",
-      "stage-3-qualification-record-2026-09-26": "e337a45238dfac5f9aca1980574c98d98bd5c1f0c270e20421ad557ea6b24bb4",
+      "stage-3-qualification-record-2026-09-26": "c6c0b85b16a7f37f2fecb43abe41bfdbdabb527605199e12ee3859e2b396512e",
       "verification": "4e85525972520a884e2263493edcb3c29cab80aae24fbb88ca75744aa87dbfe5"
     },
     "sectionHeadings": [
@@ -169,6 +169,6 @@
     "summary": "A remote decision backend under `integrations/` that answers Rustev's `proposition`, `classify` and `rubric` steps by calling TypeSafe's Jev model, through the Vercel AI Gateway by default or TypeSafe's own API as an alternative transport, as an ordinary integration. It conforms to Part A of spec 009: explicit served identity (unknown on the Gateway), one total budget, unconfirmed cancellation once sent, closed error codes, estimated cost, requested privacy options, and exchange records. Many Rustev questions over one state go in one request. Provider confidence is recorded, never treated as calibrated. `rank` is not declared. No Jev wire-compatible surface is exposed. Paid inference for smoke and qualification is authorized by R-27 (zero data retention, synthetic and independently labeled data only); testing is capped at USD 5 in total and production at USD 25 per month (R-29), and production requires a pinned model version (R-28). Approved (A-09); implemented.\n",
     "title": "Jev integration (remote decision backend)"
   },
-  "shardHash": "7c4608cb427bfa11a2676f9aecaf1a82a25ca2e49d9e9d1812db660bc12436ca",
+  "shardHash": "00c6e52b8f5f225e7511e65f51d2554a85157b12ec1f398973d9b9904bf7b5a3",
   "specVersion": "1.9.0"
 }
