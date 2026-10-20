@@ -70,6 +70,18 @@ work, not current behavior. Remaining unscheduled and research items are in
 - Decisions: [docs/decisions/00-founding-decisions.md](docs/decisions/00-founding-decisions.md)
 - Specs: [`specs/`](specs/); `spec-spine registry list` shows each status.
 
+## Release
+
+No version is published. The intended first family version is `0.1.0`
+(spec `021`, as amended by `031`): `rustev-contract`, `rustev-core`,
+`rustev-runtime`, `rustev-eval`, `rustev-backend-rules`,
+`rustev-remote-http`, `rustev-pkg-support-routing` and `rustev-cli` (whose
+binary is `rustev`), source archives only, MSRV 1.88, edition 2024, no
+Cargo features. `make release-candidate` produces candidate evidence for a
+clean commit; it uploads, tags and signs nothing. A candidate is not a
+release, and a release is publicly accessible only once a fresh
+registry-only consumer has passed against it (spec `021`, 3.10).
+
 ## Governance
 
 Governed by [spec-spine](https://github.com/statecrafting/spec-spine), pinned

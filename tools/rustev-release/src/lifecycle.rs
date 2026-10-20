@@ -142,7 +142,14 @@ impl Lifecycle {
 #[serde(rename_all = "snake_case")]
 pub enum Lookup {
     Absent,
-    Visible { checksum: String },
+    Visible {
+        checksum: String,
+    },
+    /// Public state could not be read (a network error, a server error, an
+    /// unreadable index). It is never taken for absence.
+    Unknown {
+        detail: String,
+    },
 }
 
 /// What an upload returned.
@@ -250,14 +257,65 @@ pub enum Entry {
     Stopped {
         reason: String,
     },
+    /// What the operator verified before the first upload (3.9).
+    Preflight {
+        account: String,
+        commit: String,
+        tag: String,
+        manifest_sha256: String,
+    },
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Journal {
     pub entries: Vec<Entry>,
+    /// When set, every entry is appended to this file as it is recorded,
+    /// so an attempt is on disk before its upload starts (3.9).
+    pub file: Option<std::path::PathBuf>,
+    /// Set when a write to `file` failed; nothing is uploaded after it.
+    pub failed: bool,
 }
 
 impl Journal {
+    /// Record one entry, appending it to the journal file first when set.
+    /// A journal that cannot be written stops nothing silently: the entry
+    /// is kept in memory and the failure is recorded as a stop reason.
+    pub fn record(&mut self, e: Entry) {
+        if let Some(path) = &self.file {
+            use std::io::Write;
+            let line = serde_json::to_string(&e).expect("entries serialize") + "\n";
+            let written = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(path)
+                .and_then(|mut f| f.write_all(line.as_bytes()).and_then(|()| f.sync_all()));
+            if let Err(err) = written {
+                let failure = format!("journal {} not writable: {err}", path.display());
+                // One `Stopped` entry, whatever was being recorded: a stop
+                // that could not be written carries the write failure.
+                match e {
+                    Entry::Stopped { reason } => self.entries.push(Entry::Stopped {
+                        reason: format!("{reason}; {failure}"),
+                    }),
+                    other => {
+                        self.entries.push(other);
+                        self.entries.push(Entry::Stopped { reason: failure });
+                    }
+                }
+                self.file = None;
+                self.failed = true;
+                return;
+            }
+        }
+        self.entries.push(e);
+    }
+
+    /// Whether the journal file failed; the publisher stops before any
+    /// further upload when it did.
+    pub fn broken(&self) -> bool {
+        self.failed
+    }
+
     /// JSON lines, one entry each.
     pub fn to_lines(&self) -> String {
         self.entries
@@ -272,7 +330,11 @@ impl Journal {
             .filter(|l| !l.trim().is_empty())
             .map(|l| serde_json::from_str(l).map_err(|e| format!("journal line {l:?}: {e}")))
             .collect::<Result<_, _>>()?;
-        Ok(Journal { entries })
+        Ok(Journal {
+            entries,
+            file: None,
+            failed: false,
+        })
     }
 
     /// May `package` be uploaded now? Not after an accepted or ambiguous
@@ -335,10 +397,14 @@ pub fn publish(
     registry: &mut dyn Registry,
     journal: &mut Journal,
 ) -> Outcome {
+    // A journal whose write failed already ends with that failure as its
+    // one `Stopped` entry; a later stop reports its reason without a second.
     let stop = |journal: &mut Journal, reason: String| {
-        journal.entries.push(Entry::Stopped {
-            reason: reason.clone(),
-        });
+        if !journal.broken() {
+            journal.record(Entry::Stopped {
+                reason: reason.clone(),
+            });
+        }
         Outcome::Stopped { reason }
     };
     if !matches!(
@@ -396,7 +462,7 @@ pub fn publish(
         // again, and different bytes under this version are a stop.
         match registry.lookup(&p.name, &m.version) {
             Lookup::Visible { checksum } if checksum == p.sha256 => {
-                journal.entries.push(Entry::Query {
+                journal.record(Entry::Query {
                     package: p.name.clone(),
                     observed: Lookup::Visible { checksum },
                 });
@@ -404,7 +470,7 @@ pub fn publish(
                 continue;
             }
             Lookup::Visible { checksum } => {
-                journal.entries.push(Entry::Query {
+                journal.record(Entry::Query {
                     package: p.name.clone(),
                     observed: Lookup::Visible { checksum },
                 });
@@ -418,19 +484,47 @@ pub fn publish(
                 );
             }
             Lookup::Absent => {}
+            Lookup::Unknown { detail } => {
+                journal.record(Entry::Query {
+                    package: p.name.clone(),
+                    observed: Lookup::Unknown {
+                        detail: detail.clone(),
+                    },
+                });
+                observe(life, visible);
+                return stop(
+                    journal,
+                    format!(
+                        "public state of {} is unknown ({detail}); nothing uploaded",
+                        p.name
+                    ),
+                );
+            }
         }
         if let Err(e) = journal.may_attempt(&p.name) {
             observe(life, visible);
             return stop(journal, e);
         }
-        journal.entries.push(Entry::Attempt {
+        if journal.broken() {
+            observe(life, visible);
+            return Outcome::Stopped {
+                reason: "the journal cannot be written".into(),
+            };
+        }
+        journal.record(Entry::Attempt {
             package: p.name.clone(),
             version: m.version.clone(),
             sha256: p.sha256.clone(),
             registry: m.registry.clone(),
         });
+        if journal.broken() {
+            observe(life, visible);
+            return Outcome::Stopped {
+                reason: "the attempt could not be journaled; not uploaded".into(),
+            };
+        }
         let outcome = redacted(registry.upload(&p.name, &m.version, bytes));
-        journal.entries.push(Entry::Result {
+        journal.record(Entry::Result {
             package: p.name.clone(),
             outcome: outcome.clone(),
         });
@@ -442,7 +536,7 @@ pub fn publish(
             Upload::Ambiguous { detail } => {
                 // Query public state first; record it; never retry blindly.
                 let observed = registry.lookup(&p.name, &m.version);
-                journal.entries.push(Entry::Query {
+                journal.record(Entry::Query {
                     package: p.name.clone(),
                     observed: observed.clone(),
                 });
@@ -467,9 +561,15 @@ pub fn publish(
         // Wait until it is visible with the expected checksum before the
         // next package, which may depend on it.
         let mut seen = None;
+        // The last observation, journaled as it was if the package never
+        // appears (absent and unknown are recorded as themselves).
+        let mut last = Lookup::Absent;
         for _ in 0..VISIBILITY_POLLS {
             match registry.lookup(&p.name, &m.version) {
-                Lookup::Absent => registry.wait(),
+                l @ (Lookup::Absent | Lookup::Unknown { .. }) => {
+                    last = l;
+                    registry.wait();
+                }
                 v => {
                     seen = Some(v);
                     break;
@@ -478,14 +578,14 @@ pub fn publish(
         }
         match seen {
             Some(Lookup::Visible { checksum }) if checksum == p.sha256 => {
-                journal.entries.push(Entry::Query {
+                journal.record(Entry::Query {
                     package: p.name.clone(),
                     observed: Lookup::Visible { checksum },
                 });
                 visible += 1;
             }
             Some(other) => {
-                journal.entries.push(Entry::Query {
+                journal.record(Entry::Query {
                     package: p.name.clone(),
                     observed: other,
                 });
@@ -500,9 +600,9 @@ pub fn publish(
                 );
             }
             None => {
-                journal.entries.push(Entry::Query {
+                journal.record(Entry::Query {
                     package: p.name.clone(),
-                    observed: Lookup::Absent,
+                    observed: last,
                 });
                 observe(life, visible);
                 return stop(
