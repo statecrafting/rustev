@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use serde::Serialize;
 use serde_json::value::RawValue;
 
-use crate::io::IoFail;
+use crate::host::IoFail;
 
 /// Exit codes (spec 006, 3.2).
 pub mod code {

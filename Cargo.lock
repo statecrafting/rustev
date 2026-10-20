@@ -745,6 +745,7 @@ dependencies = [
  "rustev-core",
  "rustev-eval",
  "rustev-runtime",
+ "rustev-surface",
  "serde",
  "serde_json",
  "sha2",
@@ -874,6 +875,18 @@ dependencies = [
  "rustev-core",
  "serde_json",
  "tokio",
+]
+
+[[package]]
+name = "rustev-surface"
+version = "0.1.0"
+dependencies = [
+ "rustev-backend-rules",
+ "rustev-contract",
+ "rustev-core",
+ "rustev-eval",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

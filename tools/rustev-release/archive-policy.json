@@ -163,7 +163,7 @@
       "max_archive_bytes": 163840,
       "max_unpacked_bytes": 327680
     },
-    "rustev-cli": {
+    "rustev-surface": {
       "files": [
         ".cargo_vcs_info.json",
         "Cargo.lock",
@@ -172,6 +172,27 @@
         "LICENSE",
         "README.md",
         "src/adapter.rs",
+        "src/calibrate.rs",
+        "src/deps.rs",
+        "src/eval.rs",
+        "src/host.rs",
+        "src/lib.rs",
+        "src/out.rs",
+        "src/plan.rs",
+        "src/replay.rs",
+        "src/run.rs"
+      ],
+      "max_archive_bytes": 131072,
+      "max_unpacked_bytes": 262144
+    },
+    "rustev-cli": {
+      "files": [
+        ".cargo_vcs_info.json",
+        "Cargo.lock",
+        "Cargo.toml",
+        "Cargo.toml.orig",
+        "LICENSE",
+        "README.md",
         "src/args.rs",
         "src/calibrate.rs",
         "src/deps.rs",
@@ -180,7 +201,6 @@
         "src/io.rs",
         "src/lib.rs",
         "src/main.rs",
-        "src/out.rs",
         "src/plan.rs",
         "src/replay.rs",
         "src/run.rs",

@@ -8,11 +8,9 @@ use std::sync::Arc;
 
 use rustev_backend_rules::{PlanMismatchKind, RulesBackend};
 use rustev_contract::Document;
-use rustev_contract::judgment::Judgment;
 use rustev_contract::limits::SNAPSHOT_V1;
-use rustev_contract::replay::{CaptureStatus, ItemLocation};
+use rustev_contract::replay::ItemLocation;
 use rustev_contract::retention::{DEFAULT_METADATA_LIFETIME_MS, MAX_BUNDLE_LIFETIME_MS};
-use rustev_contract::run::RunRecord;
 use rustev_contract::scope::Scope;
 use rustev_contract::snapshot::Snapshot;
 use rustev_contract::time::{DurationMs, Timestamp};
@@ -32,6 +30,7 @@ use crate::host::{self, SCOPE_FLAGS};
 use crate::io::{self, IoFail, Reads};
 use crate::out::{Done, Out, Res, code};
 use crate::plan::{dep_failed, load_plan, read_plan};
+use rustev_surface::run as envelope;
 
 /// How captured document bytes are kept (spec 006, 3.6.3).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -186,40 +185,6 @@ fn rejection_kind(r: &Rejection) -> (&'static str, String) {
         Rejection::Cancelled => ("cancelled", String::new()),
         Rejection::InvalidRequest(d) => ("invalid_request", d.clone()),
     }
-}
-
-/// For a `rustev.judgment/2`, the outcome's `addressed_to` and `transient`
-/// beside the judgment (spec 033, 3.11.3): an unresolved or `needs_input`
-/// outcome's action party and transience, a refusal's combined party and
-/// `false`, and `null` for a proposal or an escalation (`escalate`, which
-/// carries no action). A version 1 judgment's output keeps its bytes. The
-/// status stays `judged` and the exit code 0 for every outcome.
-fn addressing(out: crate::out::Out, j: &Judgment) -> crate::out::Out {
-    use rustev_contract::judgment::Outcome;
-    if j.schema != rustev_contract::schema::JUDGMENT_V2 {
-        return out;
-    }
-    let (to, transient) = match &j.outcome {
-        Outcome::UnresolvedAction { action, .. } => {
-            (json!(action.addressed_to), json!(action.transient))
-        }
-        Outcome::NeedsInput(n) => (json!(n.action.addressed_to), json!(n.action.transient)),
-        Outcome::Refused { addressed_to, .. } => (json!(addressed_to), json!(false)),
-        _ => (json!(null), json!(null)),
-    };
-    out.set("addressed_to", &to).set("transient", &transient)
-}
-
-fn judgment_bytes(j: &Judgment) -> Vec<u8> {
-    // Every judgment the core finishes has a record form; a failure here is
-    // a defect in the core's number handling.
-    j.record_canonical()
-        .expect("a judgment has a record canonical form")
-}
-
-fn record_bytes(r: &RunRecord) -> Vec<u8> {
-    r.record_canonical()
-        .expect("a run record has a record canonical form")
 }
 
 pub fn run(p: &Parsed, cx: &Context) -> Result<Res, Usage> {
@@ -384,19 +349,12 @@ async fn decide(
             (captured.result, Some((c, captured.capture)))
         }
     };
-    let base = Out::new(command, "")
-        .set("decision_id", &s.decision_id)
-        .set("plan_id", &plan_id);
+    let base = envelope::base(command, &s.decision_id, &plan_id);
     // The decision fields, and the status the decision alone gives.
-    let (mut out, mut exit, record) = match result {
+    let ((mut out, mut exit), record) = match result {
         Err(DecideError::Rejected(r)) => {
             let (kind, detail) = rejection_kind(&r);
-            return Ok(Done::new(
-                code::REJECTED,
-                base.set("status", "rejected")
-                    .set("rejection", kind)
-                    .set("detail", &detail),
-            ));
+            return Ok(envelope::rejected(base, kind, &detail));
         }
         Ok(Decided {
             completion,
@@ -408,41 +366,17 @@ async fn decide(
                 // `fail_decision` only acknowledges or fails.
                 _ => unreachable!("fail_decision delivers inline"),
             };
-            let out = base.set("record", &s.record_out).set("receipt", &receipt);
-            match completion {
-                Completion::Judged(j) => (
-                    addressing(
-                        out.set("status", "judged")
-                            .set("completion", "judged")
-                            .raw("judgment", judgment_bytes(&j)),
-                        &j,
-                    ),
-                    code::OK,
-                    record,
-                ),
-                Completion::Cancelled => (
-                    out.set("status", "cancelled")
-                        .set("completion", "cancelled"),
-                    code::CANCELLED,
-                    record,
-                ),
-            }
-        }
-        Err(DecideError::EvidenceNotDelivered { record, failure }) => {
-            let completion = match record.termination {
-                rustev_contract::run::Termination::Judged => "judged",
-                rustev_contract::run::Termination::Cancelled => "cancelled",
+            let out = envelope::delivered(base, &s.record_out, &receipt);
+            let printed = match completion {
+                Completion::Judged(j) => envelope::judged(out, &j),
+                Completion::Cancelled => envelope::cancelled(out),
             };
-            (
-                base.set("status", "evidence_not_delivered")
-                    .set("completion", completion)
-                    .set("detail", &failure.detail)
-                    .set("uncertain", &failure.uncertain)
-                    .raw("run_record", record_bytes(&record)),
-                code::EVIDENCE_NOT_DELIVERED,
-                record,
-            )
+            (printed, record)
         }
+        Err(DecideError::EvidenceNotDelivered { record, failure }) => (
+            envelope::not_delivered(base, &record, &failure.detail, failure.uncertain),
+            record,
+        ),
     };
     if let Some((c, outcome)) = capture {
         let capture = match outcome {
@@ -452,7 +386,7 @@ async fn decide(
         out = out.set(
             "capture",
             &json!({
-                "status": capture_status(capture.status),
+                "status": envelope::capture_status(capture.status),
                 "entries": capture.supplies.len(),
             }),
         );
@@ -481,16 +415,6 @@ async fn decide(
         }
     }
     Ok(Done::new(exit, out))
-}
-
-fn capture_status(s: CaptureStatus) -> &'static str {
-    match s {
-        CaptureStatus::Complete => "complete",
-        CaptureStatus::Disabled => "disabled",
-        CaptureStatus::LimitExceeded => "limit_exceeded",
-        CaptureStatus::Cancelled => "cancelled",
-        CaptureStatus::Abandoned => "abandoned",
-    }
 }
 
 type BundleFail = (&'static str, u8, String, String);

@@ -18,7 +18,13 @@ import tempfile
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 S = "crates/rustev-cli/src/"
+# The command logic the CLI calls lives in the shared surface (spec 027,
+# 3.1.1); its defects are still the CLI's, caught by the CLI's tests.
+U = "crates/rustev-surface/src/"
 CLI = ["rustev-cli"]
+# A seed in the surface is caught by the CLI's tests or the surface's own
+# (its unit tests moved with the code).
+CLI_AND_SURFACE = ["rustev-cli", "rustev-surface"]
 # Spec 006, acceptance: every one needs at least one detected seed.
 REQUIRED = [
     "adapter correctness",
@@ -41,34 +47,34 @@ SEEDS = [
     (
         "unusable bundles",
         "a corrupt bundle is treated as absent (spec 015)",
-        S + "eval.rs",
+        U + "eval.rs",
         "Err(e) => LoadFailure::new(BundleLoad::Corrupt, &e.to_string()).into(),",
         "Err(_) => continue,",
-        CLI,
+        CLI_AND_SURFACE,
     ),
     (
         "unusable bundles",
         "an unreadable bundle stops the command (spec 015)",
-        S + "eval.rs",
+        U + "eval.rs",
         "Err(ReadFail::File(e)) => LoadFailure::new(BundleLoad::Inaccessible, &e.detail).into(),",
         "Err(ReadFail::File(e)) => return Err(Done::io(command, e)),",
-        CLI,
+        CLI_AND_SURFACE,
     ),
     (
         "unusable bundles",
         "an oversized bundle is reported as corrupt (spec 015)",
-        S + "eval.rs",
+        U + "eval.rs",
         "                BundleLoad::Oversized,",
         "                BundleLoad::Corrupt,",
-        CLI,
+        CLI_AND_SURFACE,
     ),
     (
         "unusable bundles",
         "fitting skips an unusable bundle as missing (spec 015)",
-        S + "calibrate.rs",
+        U + "calibrate.rs",
         "bump(&mut skipped, f.kind.code());",
         'bump(&mut skipped, "bundle-missing");',
-        CLI,
+        CLI_AND_SURFACE,
     ),
     (
         "scope flag handling",
@@ -134,10 +140,10 @@ SEEDS = [
     (
         "exit-code mapping",
         "a rejection exits as a cancellation",
-        S + "out.rs",
+        U + "out.rs",
         "pub const REJECTED: u8 = 6;",
         "pub const REJECTED: u8 = 7;",
-        CLI,
+        CLI_AND_SURFACE,
     ),
     (
         "exit-code mapping",
@@ -150,10 +156,10 @@ SEEDS = [
     (
         "exit-code mapping",
         "a refusal category is misnamed",
-        S + "plan.rs",
+        U + "plan.rs",
         'Category::NoCapableBackend => "no_capable_backend",',
         'Category::NoCapableBackend => "no_backend",',
-        CLI,
+        CLI_AND_SURFACE,
     ),
     (
         "store confinement",
@@ -176,25 +182,25 @@ SEEDS = [
     (
         "adapter correctness",
         "an unmapped value is compared unmapped",
-        S + "adapter.rs",
+        U + "adapter.rs",
         "r.map.get(&value).cloned().or_else(|| r.otherwise.clone())",
         "r.map.get(&value).cloned().or(Some(value.clone()))",
-        CLI,
+        CLI_AND_SURFACE,
     ),
     (
         "adapter correctness",
         "the last ranked candidate is selected",
-        S + "adapter.rs",
+        U + "adapter.rs",
         "r.entries.first().map(|e| e.candidate.clone())",
         "r.entries.last().map(|e| e.candidate.clone())",
-        CLI,
+        CLI_AND_SURFACE,
     ),
     (
         "adapter correctness",
         "a gate ignores a changed adapter",
         # Two layers since spec 014: the CLI's byte comparison and the
         # library's rules precondition; removing one alone is equivalent.
-        [S + "eval.rs", "crates/rustev-eval/src/report.rs"],
+        [U + "eval.rs", "crates/rustev-eval/src/report.rs"],
         [
             "let result = if badapter != cadapter {",
             '        (Some(x), Some(y)) if x != y => {\n            return unknown("the task adapter rules differ");\n        }\n',
@@ -203,15 +209,15 @@ SEEDS = [
             "let result = if badapter.is_empty() && cadapter.is_empty() {",
             "",
         ],
-        CLI,
+        CLI_AND_SURFACE,
     ),
     (
         "adapter correctness",
         "a fallback output is fitted as the primary's",
-        S + "calibrate.rs",
+        U + "calibrate.rs",
         "if supply.target != 0 || *a != artifact =>",
         "if supply.target > 7 && *a != artifact =>",
-        CLI,
+        CLI_AND_SURFACE,
     ),
     (
         "sink acknowledgement",
@@ -232,10 +238,10 @@ SEEDS = [
     (
         "no-clobber",
         "compile skips the output pre-check",
-        S + "plan.rs",
-        "    io::ensure_absent(out).map_err(|e| Done::io(command, e))?;\n",
+        U + "plan.rs",
+        "    host.ensure_absent(out).map_err(|e| Done::io(command, e))?;\n",
         "",
-        CLI,
+        CLI_AND_SURFACE,
     ),
     (
         "no-clobber",
@@ -276,18 +282,18 @@ SEEDS = [
     (
         "exit-code mapping",
         "a missing dependency file is an input error",
-        S + "plan.rs",
+        U + "plan.rs",
         "DepFail::Io(e) => Done::io(command, e),",
         "DepFail::Io(e) => Done::invalid(command, &e.path, e.detail),",
-        CLI,
+        CLI_AND_SURFACE,
     ),
     (
         "exit-code mapping",
         "a recompile refusal names the wrong category",
-        S + "plan.rs",
+        U + "plan.rs",
         '"category": r.category as u8,',
         '"category": r.category as u8 + 1,',
-        CLI,
+        CLI_AND_SURFACE,
     ),
 ]
 

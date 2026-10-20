@@ -19,7 +19,7 @@
       "contentHash": "9bdb73e6b5bf39970fe22c93aec881a762ecb1ddad85ca76a714ef6d59cd01c9"
     },
     "Cargo.toml": {
-      "contentHash": "2112822977dd4b70a1813b8caea45574f56683a24bf7e875973ad94d04ca8af9"
+      "contentHash": "c964328456e973a140ac93bd5d825ab1a8aad054c74600eb3fcab31ec679c3af"
     },
     "Makefile": {
       "contentHash": "efd943bddf5c0f95481b3138cc693eba4c6c74779e33b100d38e920fd574a169"
@@ -44,6 +44,9 @@
     },
     "crates/rustev-runtime/LICENSE": {
       "contentHash": "555c3777d1cf0db4a55bbd7a553f6301d4271644504d7f83b13d414186fd73c6"
+    },
+    "crates/rustev-surface/LICENSE": {
+      "contentHash": "072d2e398214742e99e621a17e1d7a251ecee2df58716910d13ede057bbf6d82"
     },
     "docs/backlog.md": {
       "contentHash": "7760f24163d3e76d164233ab32487cda20a859061f9488c17dec0e13044f2645"

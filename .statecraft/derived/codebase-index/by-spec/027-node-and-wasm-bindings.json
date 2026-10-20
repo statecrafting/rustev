@@ -39,6 +39,14 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rustev-surface",
+        "source": "manifest-metadata"
+      },
+      {
+        "path": "crates/rustev-surface/",
+        "source": "spec-edge"
+      },
+      {
         "path": "tools/rustev-boundaries/",
         "source": "spec-edge"
       },
@@ -49,7 +57,11 @@
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rustev-surface/"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -232,5 +244,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "c38c899596d8cc197fa5409a68b28a05e6625e58fbb90c9e08bfe4745c9e5fc4"
+  "shardHash": "455b7303ca4ed5176e83b7b5c26699d9be17e0f99a4b4c236e95674e1095a95b"
 }

@@ -23,8 +23,7 @@
       },
       {
         "kind": "directory",
-        "path": "crates/rustev-surface/",
-        "planned": true
+        "path": "crates/rustev-surface/"
       },
       {
         "kind": "directory",
@@ -175,7 +174,7 @@
       }
     ],
     "sectionDigests": {
-      "027-node-api-binding-and-webassembly-build": "78bdc3c52cd9f841f6ce144b23c06b0e4081b16d6b376d63fc76889ce94670c8",
+      "027-node-api-binding-and-webassembly-build": "b9874f0b1e22d76dd5ca36670446fa3a40ee9ba87bb99b05baf30f1c7517135a",
       "1-purpose": "8248211a41b85b51d1bfae9bc8fdbc1c3e326401ca9a926d748c532ffe36120d",
       "2-territory": "01c60a7d58cbc5c98a9af18fab1fc80ce6caa06e9bd86e299bd7fd0a54c7cf33",
       "3-1-surfaces-and-crates": "2edf806df6ee8344f0f4a1ded63a0cae7c800f18fd15075656c0519f104a72bc",
@@ -198,7 +197,7 @@
       "5-observable-negative-cases": "ee56c10e4a806e990283b1ac16005970128ba627473abc36bef812ee50a4d971",
       "acceptance": "ede76f03d4516dab9362c7e567698c16b1ac066490b717b68e0adf3fa27a6482",
       "decisions-at-approval": "19951ed3bcdf1fb4be7400ba6a13c8772ae82231ec28253c8e7c7e07bdfbb42f",
-      "implementation-record": "917cb5794ce57986269395912816f8b0905c9d57cdb613e3b41d134c8bc98035",
+      "implementation-record": "7755a9d9c6f849b82058b6b45ef99e93068ab7a44cb5c7a62e799f6ab8366037",
       "verification": "15ba26e91a61b950a8ee96466526720b0b48615044f44c02ea802da23df21d73"
     },
     "sectionHeadings": [
@@ -233,6 +232,6 @@
     "summary": "Approved (A-23). Two host surfaces over the existing engine: `rustev-node`, a napi-rs Node-API binding through which a TypeScript service compiles plans, runs decisions, replays and evaluates in-process and implements Rustev's seams in TypeScript as explicit composition (R-38); and `rustev-wasm`, a wasm-bindgen build of the pure crates for browsers, edge runtimes and tooling. Documents cross as the contract's canonical JSON, TypeScript types are generated from JSON Schema emitted by `rustev-contract`, command rendering moves into one pure crate shared by every surface, and every surface (CLI, native binding, WebAssembly, later HTTP and gRPC) runs one shared conformance suite. Approval does not authorize npm or crates.io publication, name reservation, a release, a live provider call, spend, or a claim that cross-target floating point agrees beyond what the parity suite measures.\n",
     "title": "Node-API binding and WebAssembly build"
   },
-  "shardHash": "c38c899596d8cc197fa5409a68b28a05e6625e58fbb90c9e08bfe4745c9e5fc4",
+  "shardHash": "455b7303ca4ed5176e83b7b5c26699d9be17e0f99a4b4c236e95674e1095a95b",
   "specVersion": "1.9.0"
 }
