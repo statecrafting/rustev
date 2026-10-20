@@ -516,6 +516,31 @@ file, a file in one run only, identical files in differing containers
 (section 4 row 5), a missing archive, the vendored checksum and the
 offline source configuration.
 
+**Increment 4 (dependency, license and advisory audit).** The audit tool
+is cargo-deny, pinned at 0.20.2 (`make release-candidate` refuses another
+version); its policy is `tools/rustev-release/deny.toml`, run over the
+eight members with development dependencies excluded: unknown registries
+and Git sources fail; licenses must be one of a reviewed allowlist
+(Apache-2.0, its LLVM exception, BSD-3-Clause, CDLA-Permissive-2.0, ISC,
+MIT, Unicode-3.0, Unlicense), so missing license data fails too; every
+vulnerability, unmaintained, unsound or yanked finding fails; a second
+version of a crate fails unless listed with its reason (today only
+`windows-sys` 0.52, which ring 0.17 pins). An advisory is ignored only
+when `advisory-exceptions.json` (`rustev.advisory-exceptions/1`) names it
+with a reason, the owner's approval and an expiry date, and
+`rustev-release exceptions <date>` fails an ignore without one, an
+expired or undated exception (section 4 row 10), or an approved one not
+applied. `rustev-release deps` writes the dependency report
+(`rustev.dependency-report/1`): every package of the members' normal and
+build closure with version, source, lockfile checksum and SPDX expression,
+and what development dependencies add, apart. The archives redistribute no
+dependency source (increment 2), so license obligations of dependencies
+attach to future binary artifacts, not to these archives; the report
+records which licenses were checked and draws no legal conclusion. The
+first run found RUSTSEC-2026-0346 to 0349 in rustls 0.23.45; their repair
+is the separate change recorded above. `tests/audit.rs` covers the report
+over the real workspace and each exception rule.
+
 Open for the owner: spec 031 3.1, which amends this section, orders each
 layer by name and starts a layer only after every package of the earlier
 layers is public. With today's development dependencies that order cannot

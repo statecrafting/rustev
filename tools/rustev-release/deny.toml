@@ -1,0 +1,65 @@
+# Spec 021, 3.6: the dependency, license, advisory and source policy of the
+# first-release family, checked by the pinned cargo-deny (candidate.sh pins
+# the version and refuses another). Run over the eight release members with
+# development dependencies excluded; `rustev-release deps` records those
+# separately. A change here is a reviewed source change, never a way to make
+# an audit pass.
+
+[graph]
+all-features = false
+no-default-features = false
+# The one place dev-dependencies are excluded; `candidate.sh` passes no
+# duplicate flag.
+exclude-dev = true
+
+[advisories]
+# The advisory database is fetched fresh at each candidate run (no `db-path`
+# pinned offline): the candidate runs on the owner's machine with network
+# access, and a stale local copy would miss advisories published since.
+# Every vulnerability, unmaintained crate, unsound crate and yanked version
+# fails. An exception must name an advisory listed in
+# advisory-exceptions.json with the owner's approval and an unexpired date;
+# `rustev-release exceptions` refuses any other ignore entry.
+# cargo-deny 0.20 takes a scope here ("all" | "workspace" | "transitive" |
+# "none"), not a lint level, and has no `vulnerability` key: every
+# vulnerability is an error unless ignored. The pinned 0.20.2 refuses the
+# key outright ("this key has been removed", cargo-deny pull request 611),
+# so there is no level to set.
+unmaintained = "all"
+unsound = "all"
+yanked = "deny"
+ignore = []
+
+[licenses]
+# Licenses whose terms permit redistribution of the source archives; any
+# other expression, or a crate without license data, fails (3.6).
+allow = [
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-3-Clause",
+  "CDLA-Permissive-2.0",
+  "ISC",
+  "MIT",
+  "Unicode-3.0",
+  "Unlicense",
+]
+confidence-threshold = 0.93
+unused-allowed-license = "allow"
+
+[bans]
+# A second major version of one crate fails until reviewed and listed below
+# with its reason.
+multiple-versions = "deny"
+wildcards = "deny"
+allow-wildcard-paths = false
+skip = [
+  # ring 0.17 requires windows-sys 0.52 while tokio, mio and socket2 use
+  # 0.61; Windows-only bindings with no shared state. Reviewed 2026-10-19.
+  { crate = "windows-sys@0.52.0", reason = "ring 0.17 pins windows-sys 0.52; Windows-only bindings" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

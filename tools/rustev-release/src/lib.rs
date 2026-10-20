@@ -12,6 +12,7 @@
 //! passing check is candidate evidence only (spec 021, I-1).
 
 pub mod archive;
+pub mod audit;
 pub mod repro;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -78,6 +79,9 @@ impl ReleaseSet {
 pub struct Metadata {
     pub packages: Vec<Package>,
     pub workspace_members: Vec<String>,
+    /// Present unless `--no-deps`; the audit walks it (3.6).
+    #[serde(default)]
+    pub resolve: Option<audit::Resolve>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
