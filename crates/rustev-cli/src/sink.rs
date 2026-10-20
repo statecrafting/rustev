@@ -50,6 +50,14 @@ impl EvidenceSink for FileSink {
         let result = self.publish(record);
         Box::pin(async move { result })
     }
+
+    /// `rustev.run/1`, and `rustev.run/3` for a plan 3, so a plan with
+    /// `actionability` runs and prints its `rustev.judgment/2` (spec 033,
+    /// 3.11.3). The record file is written as the record canonical bytes of
+    /// either version alike.
+    fn accepts(&self, schema: &str) -> bool {
+        schema == rustev_contract::schema::RUN || schema == rustev_contract::schema::RUN_V3
+    }
 }
 
 #[cfg(test)]

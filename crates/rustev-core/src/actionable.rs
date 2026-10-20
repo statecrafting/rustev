@@ -1216,7 +1216,7 @@ pub(crate) fn computed_remediation(
 /// Whether retrying the same request unchanged can succeed (3.6.4): only for
 /// `backend_unavailable`, `deadline_exceeded`, and `invalid_backend_output`
 /// from a backend whose determinism is not `bitwise`.
-pub(crate) fn transient(
+pub fn transient(
     u: &rustev_contract::judgment::Unresolved,
     determinism: Option<rustev_contract::definition::Determinism>,
 ) -> bool {

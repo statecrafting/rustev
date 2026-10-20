@@ -26,8 +26,11 @@ pub mod seams;
 pub mod sem;
 pub mod value;
 
+/// Whether retrying an unresolved request unchanged can succeed (spec 033,
+/// 3.6.4).
+pub use actionable::transient;
 pub use compile::{
     Category, Compiled, LoadError, Refusal, compile, compile_bytes, compile_with,
     compile_with_sources,
 };
-pub use evaluate::{Evaluation, RequestIdentityError, SemanticRequest, Supplied};
+pub use evaluate::{Evaluation, FailureContext, RequestIdentityError, SemanticRequest, Supplied};

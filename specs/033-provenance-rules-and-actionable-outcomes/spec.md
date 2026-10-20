@@ -783,6 +783,39 @@ addressed to no one, a declared override beside the computed party,
 continuation, `provenance_within` both ways, and a remediation parameter
 reading an unresolved input.
 
+**Increment 4 (runtime origin and CLI).** `RuntimeBuilder::host_backend`
+registers a backend the host implements itself, origin `host`;
+`RuntimeBuilder::backend` keeps registering with origin `upstream`, the
+default (3.9.1). Before supplying a failure the runtime notes the
+backend of the request's last attempt to the core
+(`Evaluation::note_failure` with `FailureContext`: its registered origin
+and its descriptor's declared determinism), so the `backend` cause carries
+that origin and `invalid_backend_output`'s transience follows that
+backend's determinism (3.6.4, 3.9.2); a plan without `actionability` reads
+neither, so run records keep their bytes. `rustev_core::transient` exposes
+the table of 3.6.4. The CLI names categories 16 and 17 (3.11.1); `plan
+show` of a plan with `actionability` adds `caller_controlled`, per check
+its id, subject and each branch's classes, consequence kind and static
+party, then `constraint_groups`, `remediations` and question ids, and
+prints every other plan as before (3.11.2); `run` prints a
+`rustev.judgment/2` whole and adds top-level `addressed_to` and
+`transient` (a refusal's combined party and `false`; `null` for a
+proposal or escalation), status `judged` and exit code 0 for every
+outcome (3.11.3). So that a plan 3 runs, the CLI's record file sink
+accepts `rustev.run/3` as well as `rustev.run/1`; capture of a plan 3
+decision is refused before any decision runs (invalid input), since spec
+032 3.11 defers it to spec 036. Tests:
+`crates/rustev-core/tests/actionability_origin.rs` (section 5's backend
+rows: a host backend's `backend_unavailable` addressed `host`, transient,
+`retry`; `upstream` by default; `invalid_backend_output` from a `bitwise`
+backend not transient with `report_backend{step}`, from others transient
+with `retry`; the transience table for every reason and determinism),
+`crates/rustev-runtime/tests/actionability_origin.rs` (the runtime
+carries the registered origin), and `crates/rustev-cli/tests/actionability.rs`
+with goldens `refusal-16.json`, `refusal-17.json`, `actionable.show.json`
+and `actionable.run-{propose,refused,needs,unresolved}.json`; every
+existing CLI golden is unchanged.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

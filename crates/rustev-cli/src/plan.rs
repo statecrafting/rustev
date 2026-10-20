@@ -275,22 +275,67 @@ pub fn show(p: &Parsed) -> Res {
         ),
     };
     let def = &plan.definition;
-    Ok(Done::ok(
-        Out::new(command, "ok")
-            .set("plan_id", &c.id)
-            .set("compiler", &plan.compiler)
-            .set("registry", &plan.registry)
-            .set("definition_id", &plan.definition_id)
-            .set(
-                "definition",
-                &json!({"package": def.package, "name": def.name, "version": def.version}),
-            )
-            .set("execution", &execution)
-            .set("fallbacks", &fallbacks)
-            .set("order", &plan.order)
-            .set(
-                "steps",
-                &plan.steps.iter().map(step_json).collect::<Vec<_>>(),
-            ),
-    ))
+    let out = Out::new(command, "ok")
+        .set("plan_id", &c.id)
+        .set("compiler", &plan.compiler)
+        .set("registry", &plan.registry)
+        .set("definition_id", &plan.definition_id)
+        .set(
+            "definition",
+            &json!({"package": def.package, "name": def.name, "version": def.version}),
+        )
+        .set("execution", &execution)
+        .set("fallbacks", &fallbacks)
+        .set("order", &plan.order)
+        .set(
+            "steps",
+            &plan.steps.iter().map(step_json).collect::<Vec<_>>(),
+        );
+    Ok(Done::ok(actionability(out, plan)))
+}
+
+/// A plan with `actionability` adds its declarations and, per check, each
+/// branch's classes, consequence kind and static party (spec 033, 3.11.2);
+/// every other plan prints exactly as before.
+fn actionability(out: Out, plan: &rustev_contract::plan::Plan) -> Out {
+    let (Some(a), Some(table)) = (&plan.definition.actionability, &plan.actionability) else {
+        return out;
+    };
+    out.set("caller_controlled", &a.caller_controlled)
+        .set(
+            "checks",
+            &table
+                .checks
+                .iter()
+                .map(|c| {
+                    json!({
+                        "id": c.check,
+                        "subject": c.subject,
+                        "branches": c.branches.iter().map(|b| json!({
+                            "classes": b.classes,
+                            "consequence": b.consequence,
+                            "party": b.party,
+                        })).collect::<Vec<_>>(),
+                    })
+                })
+                .collect::<Vec<_>>(),
+        )
+        .set(
+            "constraint_groups",
+            &a.constraint_groups
+                .iter()
+                .map(|g| json!({"name": g.name, "checks": g.checks}))
+                .collect::<Vec<_>>(),
+        )
+        .set(
+            "remediations",
+            &a.remediations
+                .iter()
+                .map(|r| json!({"code": r.code, "for": r.for_party}))
+                .collect::<Vec<_>>(),
+        )
+        .set(
+            "questions",
+            &a.questions.iter().map(|q| &q.id).collect::<Vec<_>>(),
+        )
 }
