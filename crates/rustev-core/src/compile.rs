@@ -185,6 +185,9 @@ pub(crate) struct Info {
     /// Plan 3: the static ceiling tree of every input and step.
     #[allow(dead_code)] // read by plan 3 evaluation, spec 032 increment 3
     pub trees: BTreeMap<String, quality::Ceil>,
+    /// The declared determinism of each semantic step's bound backend, for
+    /// the transience of `invalid_backend_output` (spec 033, 3.6.4).
+    pub determinism: BTreeMap<String, rustev_contract::definition::Determinism>,
 }
 
 /// A plan with everything evaluation needs.
@@ -1369,6 +1372,7 @@ fn compile_inner(
 
     let mut notices: Vec<Notice> = Vec::new();
     let mut details: BTreeMap<String, PlanStepDetail> = BTreeMap::new();
+    let mut determinism = BTreeMap::new();
     let mut bind_ctx: BTreeMap<String, (u64, u64)> = BTreeMap::new();
     for s in &def.steps {
         let subject = format!("step:{}", s.id);
@@ -1501,6 +1505,7 @@ fn compile_inner(
                 }
             },
         };
+        determinism.insert(s.id.clone(), backend.determinism);
         let calibration = match (requires, resolved_cal.get(&s.id)) {
             (RequiredKind::CalibratedProbability, Some((art, cid))) => {
                 if art.binding.artifact != backend.artifact {
@@ -1685,6 +1690,7 @@ fn compile_inner(
             v2,
             bound,
             trees,
+            determinism,
         },
     })
 }

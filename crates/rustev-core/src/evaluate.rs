@@ -9,6 +9,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
+use rustev_contract::actionability::Party;
 use rustev_contract::canonical::canonical_value_bytes;
 use rustev_contract::definition::{
     Candidates, Freshness, ItemSource, Operation, ProvenanceClass, ReasonKind, RequiredKind,
@@ -21,7 +22,9 @@ use rustev_contract::evidence::{
 };
 use rustev_contract::grade::{Basis, Grade, ValueGrade, ValueMeta};
 use rustev_contract::ids::SnapshotId;
-use rustev_contract::judgment::{Derivation, Judgment, Lineage, Notice, NoticeKind, Unresolved};
+use rustev_contract::judgment::{
+    Derivation, Judgment, Lineage, Notice, NoticeKind, OutValue, Outcome, Unresolved,
+};
 use rustev_contract::output::{BackendOutputDoc, RawOutput};
 use rustev_contract::plan::{PlanExecution, PlanStepDetail};
 use rustev_contract::request::RequestDoc;
@@ -179,6 +182,11 @@ pub struct Evaluation<'c> {
     /// Plan 3: policy reads whose requirement failed, by the input or step
     /// they read (spec 032, 3.9.1).
     policy_failures: BTreeMap<String, Unresolved>,
+    /// Spec 033: what the checks did.
+    checks: crate::actionable::CheckRun,
+    /// Spec 033: each input's observed classes: the used entry's class, or
+    /// every accepted entry's class when none was used (3.5.2).
+    observed: BTreeMap<String, Vec<ProvenanceClass>>,
 }
 
 /// What a plan 3 step records in evidence 2 beside its metadata.
@@ -251,6 +259,34 @@ fn validate_input(
     ))
 }
 
+/// The `OutValue` subset a remediation carries (spec 033, 3.6.1).
+fn remediation_value(v: &OutValue) -> Option<rustev_contract::actionability::RemediationValue> {
+    use rustev_contract::actionability::RemediationValue as R;
+    Some(match v {
+        OutValue::Bool(b) => R::Bool(*b),
+        OutValue::Integer(i) => R::Integer(*i),
+        OutValue::Decimal(d) => R::Decimal(*d),
+        OutValue::Text(t) => R::Text(t.clone()),
+        OutValue::Enum(e) => R::Enum(e.clone()),
+        OutValue::Timestamp(t) => R::Timestamp(*t),
+        OutValue::Duration(d) => R::Duration(*d),
+        OutValue::List(l) => R::List(l.iter().map(remediation_value).collect::<Option<_>>()?),
+        _ => return None,
+    })
+}
+
+/// Lower every grade of a metadata tree to at most `to`; never raise one
+/// (spec 033, 3.3).
+fn lower(m: &mut ValueMeta, to: Grade) {
+    m.grade = m.grade.combine(to.into());
+    for f in m.fields.iter_mut().flat_map(|f| f.values_mut()) {
+        lower(f, to);
+    }
+    for i in m.items.iter_mut().flatten() {
+        lower(i, to);
+    }
+}
+
 /// Merge the reasons of unresolved dependencies (spec 002, 3.10.4).
 fn merge(reasons: Vec<Unresolved>) -> Option<Unresolved> {
     let first = reasons.first()?.clone();
@@ -312,14 +348,6 @@ impl<'c> Evaluation<'c> {
                 schema::SNAPSHOT
             )));
         }
-        // Checks and actionable outcomes are evaluated from spec 033's
-        // increment 3 on; until then such a plan runs no decision rather
-        // than one that ignores its checks.
-        if compiled.plan.actionability.is_some() {
-            return Err(StartError::Schema(
-                "actionability: spec 033 evaluation is not implemented yet".into(),
-            ));
-        }
         let info = &compiled.info;
         for e in &snapshot.entries {
             if !info.inputs.contains_key(&e.field) {
@@ -349,6 +377,8 @@ impl<'c> Evaluation<'c> {
             input_quality: BTreeMap::new(),
             step_quality: BTreeMap::new(),
             policy_failures: BTreeMap::new(),
+            checks: Default::default(),
+            observed: BTreeMap::new(),
         };
         for (name, (ty, decl)) in &info.inputs {
             let entries: Vec<&Entry> = snapshot
@@ -357,8 +387,23 @@ impl<'c> Evaluation<'c> {
                 .filter(|e| &e.field == name)
                 .collect();
             let key = format!("input:{name}");
+            let mut accepted: Vec<ProvenanceClass> = entries
+                .iter()
+                .filter(|e| decl.provenance.contains(&e.provenance))
+                .map(|e| e.provenance)
+                .collect();
+            accepted.sort();
+            accepted.dedup();
+            ev.observed.insert(name.clone(), accepted);
+            // Only a version 2 definition declares `actionability`, the one
+            // reader of `observed`; a version 1 input keeps its accepted
+            // classes, which nothing reads.
             if v2 {
                 ev.start_input_v2(name, decl, &entries);
+                if let Some(InputStatus::Resolved { provenance, .. }) = ev.input_evidence.get(name)
+                {
+                    ev.observed.insert(name.clone(), vec![*provenance]);
+                }
                 continue;
             }
             match validate_input(name, decl, ty, &entries, now) {
@@ -391,8 +436,417 @@ impl<'c> Evaluation<'c> {
                 },
             );
         }
-        ev.advance();
+        // Checks run after input validation and before any step (spec 033,
+        // 3.4.1); a terminal outcome evaluates no step and issues no
+        // semantic request (3.4.6).
+        if compiled.plan.actionability.is_some() {
+            ev.run_checks();
+        }
+        if ev.checks.terminal.is_none() {
+            ev.advance();
+        }
         Ok(ev)
+    }
+
+    /// Spec 033, 3.3 and 3.4: every check in declaration order.
+    fn run_checks(&mut self) {
+        use crate::actionable::{PendingNotice, PendingRefusal, Terminal};
+        use rustev_contract::actionability::{
+            Address, CheckRecord, CheckStatus, Consequence, DefaultConsequence,
+        };
+        let Some(a) = self.compiled.plan.definition.actionability.as_ref() else {
+            return;
+        };
+        let mut relaxed: BTreeMap<String, String> = BTreeMap::new();
+        for c in &a.checks {
+            let record = |status| CheckRecord {
+                check: c.id.clone(),
+                subject: c.subject.clone(),
+                status,
+            };
+            if let Some(by) = relaxed.get(&c.id) {
+                self.checks
+                    .records
+                    .push(record(CheckStatus::Relaxed { by: by.clone() }));
+                continue;
+            }
+            if let Err(u) = self.status(&format!("input:{}", c.subject)) {
+                self.checks
+                    .records
+                    .push(record(CheckStatus::NotEvaluated { reason: u }));
+                continue;
+            }
+            let mut refs = Vec::new();
+            crate::expr::predicate_refs(&c.test, &mut refs);
+            // Only inputs can be unresolved here: the compiler refuses a
+            // check reading a step (3.8, `types`), and `now` and literals
+            // always resolve.
+            let mut reads: Vec<String> = refs
+                .iter()
+                .filter(|r| r.starts_with("input:"))
+                .map(|r| crate::expr::base_ref(r))
+                .collect();
+            reads.sort();
+            reads.dedup();
+            let unresolved = reads.iter().find_map(|r| self.status(r).err());
+            let tested = match unresolved {
+                Some(u) => Err(u),
+                None => crate::expr::eval_predicate(&c.test, &View::scope(self))
+                    .map_err(|f| Unresolved::invalid([c.subject.clone()], format!("{f:?}"))),
+            };
+            let passed = match tested {
+                Err(u) => {
+                    // The subject becomes unresolved with the reason, so no
+                    // failure is mistaken for a pass (3.4.3).
+                    let merged = merge(vec![u.clone()]).unwrap_or(u.clone());
+                    self.inputs_status
+                        .insert(c.subject.clone(), Err(merged.clone()));
+                    self.present.remove(&c.subject);
+                    self.checks
+                        .records
+                        .push(record(CheckStatus::Unevaluable { reason: merged }));
+                    continue;
+                }
+                Ok(p) => p,
+            };
+            if passed {
+                self.checks.records.push(record(CheckStatus::Passed));
+                continue;
+            }
+            // A resolved subject has a used entry; should it not, the check
+            // is recorded as not evaluated rather than silently skipped.
+            let class = match self.input_evidence.get(&c.subject) {
+                Some(InputStatus::Resolved { provenance, .. }) => *provenance,
+                _ => {
+                    self.checks.records.push(record(CheckStatus::NotEvaluated {
+                        reason: Unresolved::missing([c.subject.clone()]),
+                    }));
+                    continue;
+                }
+            };
+            let consequence = match c.on_fail.by_provenance.get(&class) {
+                Some(k) => k.clone(),
+                None => match &c.on_fail.default {
+                    DefaultConsequence::Consequence(k) => k.clone(),
+                    // Exhaustiveness (3.2.3) makes this unreachable; a check
+                    // without a consequence changes nothing.
+                    DefaultConsequence::None => continue,
+                },
+            };
+            self.checks.records.push(record(CheckStatus::Failed {
+                class,
+                consequence: consequence.kind().into(),
+            }));
+            let causes: Vec<rustev_contract::actionability::Cause> = reads
+                .iter()
+                .filter_map(|r| r.strip_prefix("input:"))
+                .map(|f| self.input_cause(f))
+                .collect();
+            let notice = |kind, subject: String, reason: &str, address: &Address| PendingNotice {
+                kind,
+                subject,
+                reason: reason.into(),
+                causes: causes.clone(),
+                address: address.clone(),
+            };
+            match &consequence {
+                Consequence::DropField { notice: n, address } => {
+                    // Absent for every reader; the entry stays in evidence.
+                    self.inputs_status.insert(
+                        c.subject.clone(),
+                        Err(Unresolved::missing([c.subject.clone()])),
+                    );
+                    self.input_values.remove(&c.subject);
+                    self.present.remove(&c.subject);
+                    self.metas.remove(&format!("input:{}", c.subject));
+                    self.checks.dropped.insert(c.subject.clone(), c.id.clone());
+                    self.checks.notices.push(notice(
+                        NoticeKind::FieldDropped,
+                        format!("input:{}", c.subject),
+                        n,
+                        address,
+                    ));
+                }
+                Consequence::Relax {
+                    group,
+                    notice: n,
+                    address,
+                } => {
+                    if let Some(g) = a.constraint_groups.iter().find(|g| &g.name == group) {
+                        for id in &g.checks {
+                            relaxed.entry(id.clone()).or_insert_with(|| c.id.clone());
+                        }
+                    }
+                    self.checks.notices.push(notice(
+                        NoticeKind::ConstraintsRelaxed,
+                        format!("group:{group}"),
+                        n,
+                        address,
+                    ));
+                }
+                Consequence::DowngradeGrade {
+                    to,
+                    notice: n,
+                    address,
+                } => {
+                    if let Some(m) = self.metas.get_mut(&format!("input:{}", c.subject)) {
+                        lower(&mut m.whole, *to);
+                        m.node = m.node.combine((*to).into());
+                    }
+                    self.checks.notices.push(notice(
+                        NoticeKind::GradeDowngraded,
+                        format!("input:{}", c.subject),
+                        n,
+                        address,
+                    ));
+                }
+                Consequence::ContinueWithNotice { notice: n, address } => {
+                    self.checks.notices.push(notice(
+                        NoticeKind::CheckNotice,
+                        format!("check:{}", c.id),
+                        n,
+                        address,
+                    ));
+                }
+                Consequence::Refuse {
+                    remediation,
+                    address,
+                } => {
+                    self.checks.refusals.push(PendingRefusal {
+                        check: c.id.clone(),
+                        subject: c.subject.clone(),
+                        causes: causes.clone(),
+                        remediation: remediation.clone(),
+                        address: address.clone(),
+                    });
+                    if self.checks.terminal.is_none() {
+                        self.checks.terminal = Some(Terminal::Refused);
+                    }
+                    if matches!(self.checks.terminal, Some(Terminal::Refused)) {
+                        self.checks.deciding_reads.extend(reads.iter().cloned());
+                    }
+                }
+                Consequence::Abstain => {
+                    if self.checks.terminal.is_none() {
+                        self.checks.terminal = Some(Terminal::Abstain {
+                            check: c.id.clone(),
+                        });
+                        self.checks.deciding_reads = reads.clone();
+                    }
+                }
+                Consequence::Escalate { reason } => {
+                    if self.checks.terminal.is_none() {
+                        self.checks.terminal = Some(Terminal::Escalate {
+                            check: c.id.clone(),
+                            reason: reason.clone(),
+                        });
+                        self.checks.deciding_reads = reads.clone();
+                    }
+                }
+            }
+        }
+        self.checks.deciding_reads.sort();
+        self.checks.deciding_reads.dedup();
+    }
+
+    /// An input cause (3.5.2): the observed class when an accepted entry
+    /// existed, else the classes the input accepts.
+    fn input_cause(&self, field: &str) -> rustev_contract::actionability::Cause {
+        use rustev_contract::actionability::{Cause, CauseProvenance};
+        // One observed class names it; otherwise (no accepted entry, or
+        // several of different classes with none used) the cause lists the
+        // declared classes, as 3.5.2 defines `accepted`, which bounds every
+        // class the field could have had. `conflict` lists each entry's
+        // observed class itself (3.5.6).
+        let provenance = match self.observed.get(field).map(Vec::as_slice) {
+            Some([one]) => CauseProvenance::Observed { class: *one },
+            _ => CauseProvenance::Accepted {
+                classes: self
+                    .compiled
+                    .info
+                    .inputs
+                    .get(field)
+                    .map(|(_, d)| {
+                        let mut v = d.provenance.clone();
+                        v.sort();
+                        v
+                    })
+                    .unwrap_or_default(),
+            },
+        };
+        Cause::Input {
+            field: field.into(),
+            provenance,
+        }
+    }
+
+    /// The causes of an unresolved reason (3.5.6).
+    fn reason_causes(
+        &self,
+        u: &Unresolved,
+        site: &str,
+    ) -> Vec<rustev_contract::actionability::Cause> {
+        use rustev_contract::actionability::{Cause, CauseProvenance, Origin};
+        match u {
+            Unresolved::Conflict { .. } => crate::actionable::reason_fields(u)
+                .into_iter()
+                .flat_map(|f| {
+                    let classes = self.observed.get(&f).cloned().unwrap_or_default();
+                    if classes.is_empty() {
+                        vec![self.input_cause(&f)]
+                    } else {
+                        classes
+                            .into_iter()
+                            .map(|class| Cause::Input {
+                                field: f.clone(),
+                                provenance: CauseProvenance::Observed { class },
+                            })
+                            .collect()
+                    }
+                })
+                .collect(),
+            Unresolved::MissingEvidence { .. }
+            | Unresolved::StaleEvidence { .. }
+            | Unresolved::InvalidInput { .. }
+            | Unresolved::InsufficientGrade { .. } => crate::actionable::reason_fields(u)
+                .into_iter()
+                .map(|f| self.input_cause(&f))
+                .collect(),
+            Unresolved::Abstained { rule } => vec![Cause::Policy {
+                site: if site.starts_with("check:") {
+                    site.into()
+                } else {
+                    format!("rule:{rule}")
+                },
+            }],
+            Unresolved::BackendUnavailable { .. } | Unresolved::InvalidBackendOutput { .. } => {
+                vec![Cause::Backend {
+                    step: self.failed_step(u).unwrap_or_default(),
+                    origin: Origin::Upstream,
+                }]
+            }
+            Unresolved::BudgetExhausted { resource } => vec![Cause::Budget {
+                resource: resource.clone(),
+            }],
+            Unresolved::DeadlineExceeded => vec![Cause::Deadline],
+            Unresolved::Unsupported { capability } => vec![Cause::Capability {
+                name: capability.clone(),
+            }],
+        }
+    }
+
+    /// The first semantic step, in step and instance order, whose request
+    /// failed with `u`'s reason (3.5.6).
+    fn failed_step(&self, u: &Unresolved) -> Option<String> {
+        self.compiled
+            .info
+            .step_ids
+            .iter()
+            .find_map(|id| match self.semantic.get(id) {
+                Some(SemState::Unresolved(x)) if x.kind() == u.kind() => Some(id.clone()),
+                Some(SemState::Instances { values, .. })
+                    if values
+                        .values()
+                        .any(|v| matches!(v, Err(x) if x.kind() == u.kind())) =>
+                {
+                    Some(id.clone())
+                }
+                _ => None,
+            })
+    }
+
+    /// The action of an unresolved reason at `site`, with a handler's
+    /// declared remediation and address when one decided (3.5.5).
+    fn reason_action(
+        &self,
+        u: &Unresolved,
+        site: &str,
+        declared: Option<(
+            &Option<rustev_contract::actionability::RemediationUse>,
+            &rustev_contract::actionability::Address,
+        )>,
+    ) -> rustev_contract::actionability::Action {
+        use rustev_contract::actionability::Address;
+        let step = self.failed_step(u);
+        let determinism = step
+            .as_ref()
+            .and_then(|s| self.compiled.info.determinism.get(s))
+            .copied();
+        let transient = crate::actionable::transient(u, determinism);
+        let cc = self.caller_controlled();
+        let computed = Address::Computed;
+        let (address, remediation) = match declared {
+            Some((r, a)) => (a, r.as_ref().map(|r| self.resolve_remediation(r))),
+            None => (&computed, None),
+        };
+        crate::actionable::action(
+            self.reason_causes(u, site),
+            crate::actionable::ActionInputs {
+                caller_controlled: &cc,
+                address,
+                declared: remediation,
+                computed: crate::actionable::computed_remediation(u, transient, step.as_deref()),
+                transient,
+            },
+        )
+    }
+
+    fn caller_controlled(&self) -> Vec<ProvenanceClass> {
+        self.compiled
+            .plan
+            .definition
+            .actionability
+            .as_ref()
+            .map(|a| a.caller_controlled.clone())
+            .unwrap_or_default()
+    }
+
+    /// A declared or built-in remediation with its parameters evaluated, and
+    /// the party it is declared for; a parameter reading an unresolved
+    /// input makes it `none` (3.6.3).
+    fn resolve_remediation(
+        &self,
+        r: &rustev_contract::actionability::RemediationUse,
+    ) -> (rustev_contract::actionability::Remediation, Option<Party>) {
+        use rustev_contract::actionability::{Remediation, RemediationUse};
+        let declared = self
+            .compiled
+            .plan
+            .definition
+            .actionability
+            .as_ref()
+            .and_then(|a| a.remediations.iter().find(|d| d.code == r.code()));
+        let party = declared.map(|d| d.for_party);
+        let params = match r {
+            RemediationUse::Code(_) => BTreeMap::new(),
+            RemediationUse::WithParams(c) => c.params.clone(),
+        };
+        let mut values = BTreeMap::new();
+        for (name, p) in &params {
+            let v = match p {
+                rustev_contract::definition::ParamSource::Lit(l) => {
+                    Some(Value::from_literal(l).to_out())
+                }
+                rustev_contract::definition::ParamSource::Ref(x) => {
+                    crate::expr::eval_ref(x, &View::scope(self))
+                        .ok()
+                        .map(|v| v.to_out())
+                }
+            };
+            match v.and_then(|v| remediation_value(&v)) {
+                Some(v) => {
+                    values.insert(name.clone(), v);
+                }
+                None => return (Remediation::None, party),
+            }
+        }
+        (
+            Remediation::Some {
+                code: r.code().into(),
+                params: values,
+            },
+            party,
+        )
     }
 
     /// The evaluation time.
@@ -1370,32 +1824,81 @@ impl<'c> Evaluation<'c> {
         }
         let compiled = self.compiled;
         let v2 = compiled.info.v2;
-        if v2 {
-            // A policy read below its requirement makes the input or step it
-            // reads unresolved for the policy, so its handlers apply (spec
-            // 032, 3.9.1 and 3.9.4).
-            let mut failures = BTreeMap::new();
-            for (_, c) in quality::policy_conds(&compiled.plan.definition) {
-                let mut reads = Vec::new();
-                quality::cond_reads(c, &mut reads);
-                for r in &reads {
-                    if failures.contains_key(&r.base) || self.status(&r.base).is_err() {
-                        continue;
-                    }
-                    let ceiling = quality::read_ceiling(r, &compiled.info.trees);
-                    let meta = grading::read_meta(r, &self.metas);
-                    if let Err(u) = grading::check_read(r, &ceiling, &meta, self.now) {
-                        failures.insert(r.base.clone(), u);
-                    }
-                }
+        let actionable = compiled.plan.actionability.is_some();
+        // A terminal check decides without the policy (spec 033, 3.4.6).
+        let (outcome, reads, trace, site, handler) = match self.checks.terminal.clone() {
+            Some(t) => {
+                use crate::actionable::Terminal;
+                let (outcome, trace) = match &t {
+                    Terminal::Refused => (
+                        Outcome::Refused {
+                            refusals: vec![],
+                            addressed_to: Party::None,
+                        },
+                        self.checks
+                            .refusals
+                            .iter()
+                            .map(|r| format!("check:{}", r.check))
+                            .collect(),
+                    ),
+                    Terminal::Abstain { check } => (
+                        Outcome::Unresolved(Unresolved::Abstained {
+                            rule: check.clone(),
+                        }),
+                        vec![format!("check:{check}")],
+                    ),
+                    Terminal::Escalate { check, reason } => (
+                        Outcome::Escalate {
+                            reason: reason.clone(),
+                        },
+                        vec![format!("check:{check}")],
+                    ),
+                };
+                let site = trace.first().cloned();
+                (
+                    outcome,
+                    self.checks.deciding_reads.clone(),
+                    trace,
+                    site,
+                    None,
+                )
             }
-            self.policy_failures = failures;
-        }
-        let result = policy::evaluate(&compiled.plan.definition.policy, &self);
-        let derivation = if result.reads.is_empty() {
+            None => {
+                if v2 {
+                    // A policy read below its requirement makes the input or
+                    // step it reads unresolved for the policy, so its handlers
+                    // apply (spec 032, 3.9.1 and 3.9.4).
+                    let mut failures = BTreeMap::new();
+                    for (_, c) in quality::policy_conds(&compiled.plan.definition) {
+                        let mut reads = Vec::new();
+                        quality::cond_reads(c, &mut reads);
+                        for r in &reads {
+                            if failures.contains_key(&r.base) || self.status(&r.base).is_err() {
+                                continue;
+                            }
+                            let ceiling = quality::read_ceiling(r, &compiled.info.trees);
+                            let meta = grading::read_meta(r, &self.metas);
+                            if let Err(u) = grading::check_read(r, &ceiling, &meta, self.now) {
+                                failures.insert(r.base.clone(), u);
+                            }
+                        }
+                    }
+                    self.policy_failures = failures;
+                }
+                let result = policy::evaluate(&compiled.plan.definition.policy, &self);
+                (
+                    result.outcome,
+                    result.reads,
+                    result.trace,
+                    result.site,
+                    result.handler,
+                )
+            }
+        };
+        let derivation = if reads.is_empty() {
             Derivation::ExactDerived
         } else {
-            combine(result.reads.iter().map(|r| {
+            combine(reads.iter().map(|r| {
                 // The judgment is computed exactly from what it read.
                 match self.derivation.get(r) {
                     Some(Derivation::ExactDerived) => Derivation::ExactDerived,
@@ -1403,20 +1906,31 @@ impl<'c> Evaluation<'c> {
                 }
             }))
         };
-        let lineage = self.lineage_of(&result.reads);
+        let lineage = self.lineage_of(&reads);
         let mut notices = self.notices.clone();
+        let outcome = if actionable {
+            notices = self.actionable_notices(notices);
+            self.actionable_outcome(outcome, site.as_deref(), handler)
+        } else {
+            outcome
+        };
         notices.sort();
         notices.dedup();
         let judgment = Judgment {
-            schema: schema::JUDGMENT.into(),
+            schema: if actionable {
+                schema::JUDGMENT_V2
+            } else {
+                schema::JUDGMENT
+            }
+            .into(),
             plan_id: compiled.id.clone(),
             snapshot_id: self.snapshot_id.clone(),
             evaluation_time_ms: self.now,
-            outcome: result.outcome,
+            outcome,
             derivation,
             lineage,
             notices,
-            trace: result.trace,
+            trace,
         };
         let inputs = self
             .input_evidence
@@ -1430,7 +1944,11 @@ impl<'c> Evaluation<'c> {
                     presence: q.presence,
                     entries: q.entries,
                     resolution: q.resolution,
-                    dropped: None,
+                    dropped: self.checks.dropped.get(k).map(|check| {
+                        rustev_contract::evidence::DroppedBy {
+                            check: check.clone(),
+                        }
+                    }),
                 }
             })
             .collect();
@@ -1512,9 +2030,223 @@ impl<'c> Evaluation<'c> {
             inputs,
             steps,
             judgment: judgment.clone(),
-            checks: None,
+            checks: actionable.then(|| self.checks.records.clone()),
         };
         Ok((judgment, evidence))
+    }
+
+    /// Every notice with its action (spec 033, 3.5.4): the existing kinds
+    /// from their causes, the checks' from theirs.
+    fn actionable_notices(&self, notices: Vec<Notice>) -> Vec<Notice> {
+        use rustev_contract::actionability::{Address, Cause, Remediation, RemediationValue};
+        let cc = self.caller_controlled();
+        let computed = Address::Computed;
+        let mut out: Vec<Notice> = notices
+            .into_iter()
+            .map(|mut n| {
+                let name = n
+                    .subject
+                    .strip_prefix("step:")
+                    .unwrap_or(&n.subject)
+                    .to_string();
+                let (causes, remediation) = match n.kind {
+                    NoticeKind::Truncation => (
+                        vec![Cause::Budget {
+                            resource: "semantic_requests".into(),
+                        }],
+                        Remediation::with(
+                            "raise_budget",
+                            [(
+                                "resource".to_string(),
+                                RemediationValue::Text("semantic_requests".into()),
+                            )],
+                        ),
+                    ),
+                    NoticeKind::UncalibratedThreshold | NoticeKind::Fallback => (
+                        vec![Cause::Capability { name: name.clone() }],
+                        Remediation::with(
+                            "provide_capability",
+                            [("name".to_string(), RemediationValue::Text(name))],
+                        ),
+                    ),
+                    // The checks' kinds are not among the policy's notices;
+                    // they are built with their own causes below.
+                    NoticeKind::FieldDropped
+                    | NoticeKind::ConstraintsRelaxed
+                    | NoticeKind::GradeDowngraded
+                    | NoticeKind::CheckNotice => return n,
+                };
+                n.action = Some(crate::actionable::action(
+                    causes,
+                    crate::actionable::ActionInputs {
+                        caller_controlled: &cc,
+                        address: &computed,
+                        declared: None,
+                        computed: remediation,
+                        transient: false,
+                    },
+                ));
+                n
+            })
+            .collect();
+        for p in &self.checks.notices {
+            out.push(Notice {
+                kind: p.kind,
+                subject: p.subject.clone(),
+                reason: p.reason.clone(),
+                action: Some(crate::actionable::action(
+                    p.causes.clone(),
+                    crate::actionable::ActionInputs {
+                        caller_controlled: &cc,
+                        address: &p.address,
+                        declared: None,
+                        computed: Remediation::None,
+                        transient: false,
+                    },
+                )),
+            });
+        }
+        out
+    }
+
+    /// A judgment 2 outcome (spec 033, 3.5.1): every unresolved outcome,
+    /// refusal and request for input carries its action.
+    fn actionable_outcome(
+        &self,
+        outcome: Outcome,
+        site: Option<&str>,
+        handler: Option<usize>,
+    ) -> Outcome {
+        use rustev_contract::actionability::{Action, Cause, Override, Refusal, Remediation};
+        let cc = self.caller_controlled();
+        match outcome {
+            Outcome::Refused { .. } => {
+                let refusals: Vec<Refusal> = self
+                    .checks
+                    .refusals
+                    .iter()
+                    .map(|r| Refusal {
+                        check: r.check.clone(),
+                        subject: r.subject.clone(),
+                        action: crate::actionable::action(
+                            r.causes.clone(),
+                            crate::actionable::ActionInputs {
+                                caller_controlled: &cc,
+                                address: &r.address,
+                                declared: Some(self.resolve_remediation(&r.remediation)),
+                                computed: Remediation::None,
+                                transient: false,
+                            },
+                        ),
+                    })
+                    .collect();
+                let addressed_to = Party::combine(refusals.iter().map(|r| r.action.addressed_to));
+                Outcome::Refused {
+                    refusals,
+                    addressed_to,
+                }
+            }
+            Outcome::Unresolved(u) => {
+                let site = site.map(str::to_string).unwrap_or_else(|| match &u {
+                    Unresolved::Abstained { rule } => format!("rule:{rule}"),
+                    _ => "policy".into(),
+                });
+                let declared = handler
+                    .and_then(|i| self.compiled.plan.definition.policy.on_unresolved.get(i))
+                    .and_then(|h| match &h.action {
+                        rustev_contract::definition::HandlerAction::PropagateWith {
+                            remediation,
+                            address,
+                        } => Some((remediation, address)),
+                        _ => None,
+                    });
+                let action = self.reason_action(&u, &site, declared);
+                Outcome::UnresolvedAction { reason: u, action }
+            }
+            Outcome::NeedsInput(mut n) => {
+                let declared = self
+                    .compiled
+                    .plan
+                    .definition
+                    .actionability
+                    .as_ref()
+                    .map(|a| a.questions.clone())
+                    .unwrap_or_default();
+                // The compiler refused undeclared question ids (3.7.1), so
+                // none is dropped; the digest covers exactly the questions
+                // the outcome carries either way.
+                n.questions = std::mem::take(&mut n.questions)
+                    .into_iter()
+                    .filter_map(|q| declared.iter().find(|d| d.id == q.id).cloned())
+                    .collect();
+                let ids: Vec<String> = n.questions.iter().map(|q| q.id.clone()).collect();
+                let site = site.unwrap_or("policy").to_string();
+                let bytes = rustev_contract::canonical::record_canonical_bytes(&json!({
+                    "plan_id": self.compiled.id.to_string(),
+                    "snapshot_id": self.snapshot_id.to_string(),
+                    "evaluation_time_ms": self.now,
+                    "site": site,
+                    "fields": n.fields,
+                    "questions": ids,
+                }))
+                // An object of strings, an integer and string lists always
+                // has canonical bytes; a failure is a defect, not a digest.
+                .expect("continuation inputs have canonical bytes");
+                let digest = rustev_contract::canonical::tagged_digest(
+                    rustev_contract::actionability::CONTINUATION_TAG,
+                    &bytes,
+                );
+                // A tagged digest is a digest by construction; a failure is a
+                // defect, never a placeholder continuation.
+                n.continuation = serde_json::from_value(json!(digest))
+                    .expect("a tagged digest parses as a digest");
+                let causes: Vec<Cause> = n
+                    .fields
+                    .iter()
+                    .map(|f| {
+                        let classes = self
+                            .compiled
+                            .info
+                            .inputs
+                            .get(f)
+                            .map(|(_, d)| {
+                                let mut v: Vec<ProvenanceClass> = d
+                                    .provenance
+                                    .iter()
+                                    .filter(|c| cc.contains(c))
+                                    .copied()
+                                    .collect();
+                                v.sort();
+                                v
+                            })
+                            .unwrap_or_default();
+                        Cause::Input {
+                            field: f.clone(),
+                            provenance: rustev_contract::actionability::CauseProvenance::Accepted {
+                                classes,
+                            },
+                        }
+                    })
+                    .collect();
+                // Addressed to the caller by construction (3.7.2).
+                n.action = Action {
+                    addressed_to: Party::Caller,
+                    computed: Party::Caller,
+                    override_: Override::None,
+                    remediation: Remediation::with(
+                        "provide_fields",
+                        [(
+                            "fields".to_string(),
+                            Remediation::texts(n.fields.iter().cloned()),
+                        )],
+                    ),
+                    caused_by: crate::actionable::sort_causes(causes),
+                    transient: false,
+                };
+                Outcome::NeedsInput(n)
+            }
+            other => other,
+        }
     }
 
     /// The value of an exact step, if resolved.
@@ -1535,6 +2267,23 @@ impl View for Evaluation<'_> {
         } else {
             crate::expr::base_ref(r)
         }
+    }
+
+    fn provenance(&self, r: &str) -> Result<Vec<ProvenanceClass>, Unresolved> {
+        let base = View::base(self, r);
+        self.status(&base)?;
+        if let Some(n) = base.strip_prefix("input:") {
+            return match self.input_evidence.get(n) {
+                Some(InputStatus::Resolved { provenance, .. }) => Ok(vec![*provenance]),
+                _ => Err(Unresolved::missing([n.to_string()])),
+            };
+        }
+        // A plan 3 step value's provenance set (spec 032, 3.2).
+        Ok(self
+            .metas
+            .get(&base)
+            .map(|m| m.whole.provenance.clone())
+            .unwrap_or_default())
     }
 
     fn get(&self, r: &str) -> Result<Seen<'_>, Unresolved> {
