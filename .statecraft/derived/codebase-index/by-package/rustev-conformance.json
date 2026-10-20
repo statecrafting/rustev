@@ -1,0 +1,10 @@
+{
+  "package": {
+    "kind": "rust-lib",
+    "name": "rustev-conformance",
+    "path": "tools/rustev-conformance",
+    "specRef": "027-node-and-wasm-bindings"
+  },
+  "schemaVersion": "1.2.0",
+  "shardHash": "e317bb2d5442ae2beb6db87a8e4affcb09f5ea288ce44912ea9e3d970b9ea807"
+}

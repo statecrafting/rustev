@@ -1,0 +1,43 @@
+{
+  "argv": [
+    "plan",
+    "check",
+    "--definition",
+    "cat-04.definition.json",
+    "--rules",
+    "support.rules.json",
+    "--calibration",
+    "topic.calibration.json"
+  ],
+  "command": "plan check",
+  "exit": 5,
+  "id": "refusal-04",
+  "inputs": [
+    {
+      "name": "cat-04.definition.json",
+      "path": "tools/rustev-conformance/fixtures/cli/refusal-04/cat-04.definition.json",
+      "sha256": "6a8a04cc455be73057fbad7bdb59197773d7b6a0c6096427f9f479e134a2ae07"
+    },
+    {
+      "name": "support.rules.json",
+      "path": "tools/rustev-conformance/fixtures/cli/refusal-04/support.rules.json",
+      "sha256": "0f5307bacf8286cefa680806176e1247cea3505f57de68bd8b7af557eea41886"
+    },
+    {
+      "name": "topic.calibration.json",
+      "path": "tools/rustev-conformance/fixtures/cli/refusal-04/topic.calibration.json",
+      "sha256": "43d79a11847a371d756e3f727a7fba399bb3f144c4ec972921a10858e3efb883"
+    }
+  ],
+  "outputs": [
+    {
+      "golden": "crates/rustev-cli/tests/golden/refusal-04.json",
+      "normalize": [],
+      "sha256": "aadc521cd12947c7bb9f73e3d00da7a552214ac738dd92a0f3207940fb02d88a",
+      "stream": "stdout"
+    }
+  ],
+  "surfaces": [
+    "cli"
+  ]
+}

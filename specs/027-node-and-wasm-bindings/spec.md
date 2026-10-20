@@ -34,7 +34,7 @@ establishes:
   - { kind: directory, path: "integrations/rustev-node/", planned: true }
   - { kind: directory, path: "integrations/rustev-wasm/", planned: true }
   - { kind: directory, path: "crates/rustev-surface/" }
-  - { kind: directory, path: "tools/rustev-conformance/", planned: true }
+  - { kind: directory, path: "tools/rustev-conformance/" }
 depends_on:
   - "001-boundaries-and-authority"
   - "002-decision-contract-and-pure-core"
@@ -811,6 +811,38 @@ seeds (`crates/rustev-cli/mutation/seeds.py`) follow the code they seed:
 the defects in command logic now sit in `rustev-surface`, where the CLI
 calls it, and each must still be detected, by the CLI's tests or by the
 surface's own (the adapter's unit tests moved with it).
+
+**Increment 4, first change (the suite and its CLI cases).**
+`tools/rustev-conformance` (`publish = false`, excluded from the release
+set as repository tooling) holds `cases/manifest.json`, a
+`rustev.conformance-manifest/1` document listing each case by id with its
+command, surfaces, argument vector, exit code, inputs (repository path,
+the name the case reads it by, SHA-256) and outputs (printed or written,
+the golden it must equal by repository path and SHA-256, and the
+normalizations applied first). Its 29 cases are every CLI golden under
+`crates/rustev-cli/tests/golden/`, referenced in place, never copied:
+`plan check`, `compile` and `show` of both reference plans and of the
+actionable plan, every refusal golden (categories 1 to 12, 16 and 17),
+`run` of both reference plans (stdout and record) and of the four
+actionable outcomes, and `replay` of both. The cases are harvested from
+the CLI tests that pin those goldens: with `RUSTEV_HARVEST=1`, the test
+harness copies each pinned invocation's inputs, as they were before it
+ran, under `tools/rustev-conformance/fixtures/<case>/` and records the
+case (`make conformance-harvest` rebuilds the manifest and fixtures). The
+normalizations are the goldens' own (`receipt` for a `run` output's sink
+receipt, `timing` for a record's timings), in one file the CLI tests and
+the runners share. The Rust runner (`make conformance`, no Node
+toolchain) runs every `cli` case through `rustev_cli::execute` in a fresh
+directory holding exactly its pinned inputs and compares every output and
+the exit code; every CLI golden is covered, every pinned input and golden
+matches its digest, every printed `plan_id` is compared as bytes (no
+declared normalization touches it), and a differing output or exit code
+is reported. The CLI cases are harvested into one file each under
+`cases/cli/`, and the manifest is the aggregate of every case file, checked
+for drift (`RUSTEV_BLESS=1` rewrites it).
+
+The runtime cases follow in the second change. `eval` and `gate` on the packaged reference tasks and the
+bindings' surfaces come in later changes.
 
 ## Decisions at approval
 

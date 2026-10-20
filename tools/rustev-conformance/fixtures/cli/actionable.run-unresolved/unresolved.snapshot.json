@@ -1,0 +1,1 @@
+{"entries":[{"as_of_ms":1790164740000,"field":"ticket.message","provenance":"user-supplied","source":"synthetic","value":"SYNTHETIC: my card was charged twice and I need this fixed by Friday"},{"as_of_ms":1790161200000,"field":"account.tier","provenance":"authenticated-app-field","source":"synthetic","value":"pro"}],"schema":"rustev.snapshot/2"}

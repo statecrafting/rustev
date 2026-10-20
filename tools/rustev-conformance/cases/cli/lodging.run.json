@@ -1,0 +1,58 @@
+{
+  "argv": [
+    "run",
+    "--plan",
+    "lodging.plan.json",
+    "--rules",
+    "lodging.rules.json",
+    "--snapshot",
+    "lodging.snapshot.json",
+    "--evaluation-time",
+    "1790164800000",
+    "--decision-id",
+    "lodging-1",
+    "--record-out",
+    "lodging.record.json"
+  ],
+  "command": "run",
+  "exit": 0,
+  "id": "lodging.run",
+  "inputs": [
+    {
+      "name": "lodging.plan.json",
+      "path": "tools/rustev-conformance/fixtures/cli/lodging.run/lodging.plan.json",
+      "sha256": "7281eea84e0f03022315c90d17381434adcfe77abe37a576923afb0332b5c752"
+    },
+    {
+      "name": "lodging.rules.json",
+      "path": "tools/rustev-conformance/fixtures/cli/lodging.run/lodging.rules.json",
+      "sha256": "2ea95eb029ab24ccc090fc56bcc7b78e9e611b43b884a46cff61d486db608091"
+    },
+    {
+      "name": "lodging.snapshot.json",
+      "path": "tools/rustev-conformance/fixtures/cli/lodging.run/lodging.snapshot.json",
+      "sha256": "e1bcf21bbd3a5eae35a9e530ad3a5c270e269f6498be3ecf77a9c82cf944baeb"
+    }
+  ],
+  "outputs": [
+    {
+      "golden": "crates/rustev-cli/tests/golden/lodging.run.json",
+      "normalize": [
+        "receipt"
+      ],
+      "sha256": "7a2d15501532982a00a0c1496963a933f7017d56f63dbaac39be40b25d762a5e",
+      "stream": "stdout"
+    },
+    {
+      "file": "lodging.record.json",
+      "golden": "crates/rustev-cli/tests/golden/lodging.record.json",
+      "normalize": [
+        "timing"
+      ],
+      "sha256": "c3e0b9e65ae95c71b9c068b5859e8344fefa78438ca1085523b563deddca8ed8"
+    }
+  ],
+  "surfaces": [
+    "cli"
+  ]
+}

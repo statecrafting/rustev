@@ -1,0 +1,36 @@
+{
+  "argv": [
+    "replay",
+    "--bundle",
+    "support-emb.bundle.json",
+    "--now-ms",
+    "1800003600000",
+    "--tenant",
+    "tenant-a",
+    "--context-revision",
+    "rev-1",
+    "--principal-scope",
+    "scope-p"
+  ],
+  "command": "replay",
+  "exit": 0,
+  "id": "support.replay",
+  "inputs": [
+    {
+      "name": "support-emb.bundle.json",
+      "path": "tools/rustev-conformance/fixtures/cli/support.replay/support-emb.bundle.json",
+      "sha256": "42f6349e3f65d8caa4746a3607bd9848132e5789e9a8b8d39e71bdd782f683cc"
+    }
+  ],
+  "outputs": [
+    {
+      "golden": "crates/rustev-cli/tests/golden/support.replay.json",
+      "normalize": [],
+      "sha256": "d5e8aa2b3b1abef44ac557e233ab86b13053cc55ccebe624e8f5f871031d2359",
+      "stream": "stdout"
+    }
+  ],
+  "surfaces": [
+    "cli"
+  ]
+}

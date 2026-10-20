@@ -6,6 +6,11 @@
 
 #[path = "../../../rustev-core/tests/common/mod.rs"]
 pub mod core;
+#[path = "harvest.rs"]
+pub mod harvest;
+/// The normalizations the goldens use, shared with the conformance suite.
+#[path = "../../../../tools/rustev-conformance/src/normalize.rs"]
+pub mod normalize;
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -62,11 +67,13 @@ impl Scratch {
 
     /// Run the `rustev` binary here.
     pub fn rustev(&self, args: &[&str]) -> Ran {
+        harvest::before(&self.0, args);
         let o = Command::new(env!("CARGO_BIN_EXE_rustev"))
             .args(args)
             .current_dir(&self.0)
             .output()
             .unwrap();
+        harvest::after(&o.stdout, o.status.code().unwrap_or(-1));
         Ran {
             code: o.status.code().unwrap_or(-1),
             stdout: o.stdout,
@@ -182,7 +189,8 @@ pub fn reference_inputs(s: &Scratch) {
 /// Compare `bytes` with the committed CLI golden `name`; `RUSTEV_BLESS=1`
 /// rewrites it (goldens are emitted, R-02).
 pub fn cli_golden(name: &str, bytes: &[u8]) {
-    golden(name, bytes)
+    golden(name, bytes);
+    harvest::golden(name, bytes);
 }
 
 /// The support-routing snapshot the rules backend routes to billing.
@@ -284,12 +292,5 @@ impl Scratch {
 /// Zero the runtime's elapsed-time fields of a run record's JSON, the only
 /// fields a golden normalizes (with the digests computed over them).
 pub fn normalize_timing(record: &mut Json) {
-    record["timing"]["elapsed_ms"] = 0.into();
-    record["timing"]["queued_ms"] = 0.into();
-    for r in record["requests"].as_array_mut().into_iter().flatten() {
-        for a in r["attempts"].as_array_mut().into_iter().flatten() {
-            a["dispatched_ms"] = 0.into();
-            a["ended_ms"] = 0.into();
-        }
-    }
+    normalize::normalize_timing(record)
 }

@@ -1,0 +1,36 @@
+{
+  "argv": [
+    "replay",
+    "--bundle",
+    "lodging-emb.bundle.json",
+    "--now-ms",
+    "1800003600000",
+    "--tenant",
+    "tenant-a",
+    "--context-revision",
+    "rev-1",
+    "--principal-scope",
+    "scope-p"
+  ],
+  "command": "replay",
+  "exit": 0,
+  "id": "lodging.replay",
+  "inputs": [
+    {
+      "name": "lodging-emb.bundle.json",
+      "path": "tools/rustev-conformance/fixtures/cli/lodging.replay/lodging-emb.bundle.json",
+      "sha256": "4d8e5aa6eb9b94ecb27503d2e32be72282e69384e29e5954ca250a3b5518f424"
+    }
+  ],
+  "outputs": [
+    {
+      "golden": "crates/rustev-cli/tests/golden/lodging.replay.json",
+      "normalize": [],
+      "sha256": "bffcfbaa393e73b0be78efd89e80e8f056e5884c7b50b8d04a42438279c9ba00",
+      "stream": "stdout"
+    }
+  ],
+  "surfaces": [
+    "cli"
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "argv": [
+    "plan",
+    "compile",
+    "--definition",
+    "lodging.definition.json",
+    "--out",
+    "lodging.plan.json",
+    "--rules",
+    "lodging.rules.json"
+  ],
+  "command": "plan compile",
+  "exit": 0,
+  "id": "lodging.compile",
+  "inputs": [
+    {
+      "name": "lodging.definition.json",
+      "path": "tools/rustev-conformance/fixtures/cli/lodging.compile/lodging.definition.json",
+      "sha256": "e76e1ba3b63dac8d86c149f97a2532751e0187cf9c02682c633d833ba5f2b716"
+    },
+    {
+      "name": "lodging.rules.json",
+      "path": "tools/rustev-conformance/fixtures/cli/lodging.compile/lodging.rules.json",
+      "sha256": "2ea95eb029ab24ccc090fc56bcc7b78e9e611b43b884a46cff61d486db608091"
+    }
+  ],
+  "outputs": [
+    {
+      "golden": "crates/rustev-cli/tests/golden/lodging.compile.json",
+      "normalize": [],
+      "sha256": "53b94760ffb1ca413fb897fa1ad313c8c3a094f834de40460880faf4bef2bf3c",
+      "stream": "stdout"
+    }
+  ],
+  "surfaces": [
+    "cli"
+  ]
+}

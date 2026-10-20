@@ -18,7 +18,7 @@ CRATE_MANIFESTS := $(wildcard crates/*/Cargo.toml backends/*/Cargo.toml tools/*/
 SKIP_NOTE := no crate exists yet, so cargo has nothing to judge
 VERIFIED_SPECS := 001 002 003 004 005 006 007 008 009 012 013 014 015 017 033
 
-.PHONY: tools gate refresh code build test clippy fmt boundaries verify release-candidate
+.PHONY: tools gate refresh code build test clippy fmt boundaries verify release-candidate conformance conformance-harvest
 
 tools:
 	@test -n "$(SPEC_SPINE_VERSION)" || { echo "no required_version in spec-spine.toml"; exit 3; }
@@ -63,3 +63,17 @@ verify:
 ## Never uploads, tags, signs or reads a credential.
 release-candidate:
 	sh tools/rustev-release/candidate.sh
+
+# Spec 027, 3.12: the shared conformance suite's Rust runner. Needs no Node
+# toolchain.
+conformance:
+	cargo test -p rustev-conformance --locked
+
+# Spec 027, 3.12.2: rebuild the CLI cases and their fixtures from the CLI
+# tests that pin each golden (`RUSTEV_HARVEST`), then the manifest that
+# aggregates every case, then check them.
+conformance-harvest:
+	rm -rf tools/rustev-conformance/cases/cli tools/rustev-conformance/fixtures/cli
+	RUSTEV_HARVEST=1 cargo test -p rustev-cli --locked
+	RUSTEV_BLESS=1 cargo test -p rustev-conformance --locked --test manifest
+	cargo test -p rustev-conformance --locked
