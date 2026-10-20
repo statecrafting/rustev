@@ -567,6 +567,7 @@ fn condition_refs(c: &Cond, out: &mut Vec<String>) {
         Cond::Empty(r) | Cond::Nonempty(r) => out.push(r.clone()),
         Cond::All(cs) | Cond::Any(cs) => cs.iter().for_each(|c| condition_refs(c, out)),
         Cond::Not(c) => condition_refs(c, out),
+        Cond::ProvenanceWithin { reference, .. } => out.push(reference.clone()),
     }
 }
 
@@ -581,6 +582,9 @@ fn outcome_refs(o: &OutcomeDecl, out: &mut Vec<String>) {
         }
         OutcomeDecl::Escalate { .. } => {}
         OutcomeDecl::MissingEvidenceFrom { step } => out.push(format!("step:{step}")),
+        OutcomeDecl::NeedsInput { fields, .. } => {
+            out.extend(fields.iter().map(|f| format!("input:{f}")))
+        }
     }
 }
 
@@ -684,7 +688,24 @@ fn compile_inner(
         }
     }
 
-    // (b) Structure. A version 1 definition carries no construct of spec
+    // (b) Structure. A construct of spec 033 needs a version 2 definition
+    // (3.1.1); a version 2 definition using one waits for the compilation
+    // phase of spec 033's increment 2 (3.8), so neither is compiled yet.
+    if let Some((subject, construct)) = crate::actionable::first_construct(def) {
+        return refuse(
+            C::InvalidDefinition,
+            subject,
+            if v2 {
+                format!("{construct}: spec 033 compilation is not implemented yet")
+            } else {
+                format!(
+                    "requires-definition-2: {construct} needs {}",
+                    schema::DEFINITION_V2
+                )
+            },
+        );
+    }
+    // A version 1 definition carries no construct of spec
     // 032 other than an operator outside `rustev.exact/1`, which phase (c)
     // refuses as before (spec 032, 3.1.3).
     if v2 {
@@ -1438,6 +1459,7 @@ fn compile_inner(
                     kind: NoticeKind::Fallback,
                     subject: subject.clone(),
                     reason: format!("unsupported: {capability}"),
+                    action: None,
                 });
                 details.insert(s.id.clone(), PlanStepDetail::Unsupported { capability });
                 continue;
@@ -1448,6 +1470,7 @@ fn compile_inner(
                         kind: NoticeKind::Fallback,
                         subject: subject.clone(),
                         reason: reason.clone(),
+                        action: None,
                     });
                     (b, o, *requires, true)
                 }
@@ -1571,6 +1594,7 @@ fn compile_inner(
                     "worst case {total} requests; at most {} are issued",
                     def.limits.max_semantic_requests
                 ),
+                action: None,
             }),
         }
     }
@@ -1623,6 +1647,7 @@ fn compile_inner(
         execution: plan_execution,
         sources: (!bound.sources.is_empty()).then(|| bound.sources.clone()),
         grades: (!grade_table.is_empty()).then_some(grade_table),
+        actionability: None,
     };
     let id = plan.id().map_err(|e| Refusal {
         category: C::Parse,
@@ -1895,6 +1920,8 @@ fn cond_structure(
     };
     match c {
         Cond::Always => Ok(()),
+        // Validated with the rest of spec 033's constructs (3.8).
+        Cond::ProvenanceWithin { reference, .. } => known(reference),
         Cond::TopLabel { step, label } => {
             if !semantic_opts(step)?.contains(label) {
                 return Err(format!("{label:?} is not an option of {step:?}"));
@@ -2216,7 +2243,7 @@ fn check_policy(
                         );
                     }
                 },
-                OutcomeDecl::Escalate { .. } => {}
+                OutcomeDecl::Escalate { .. } | OutcomeDecl::NeedsInput { .. } => {}
             }
         }
     }
@@ -2323,6 +2350,7 @@ fn check_cond(
                         kind: NoticeKind::UncalibratedThreshold,
                         subject: subject.to_string(),
                         reason: reason.clone(),
+                        action: None,
                     });
                     Ok(())
                 }
@@ -2345,7 +2373,7 @@ fn check_cond(
         }
     };
     match c {
-        Cond::Always => Ok(()),
+        Cond::Always | Cond::ProvenanceWithin { .. } => Ok(()),
         Cond::TopLabel { step, .. } => match sem(step)? {
             SemKind::Scores => refuse(
                 C::KindMismatch,

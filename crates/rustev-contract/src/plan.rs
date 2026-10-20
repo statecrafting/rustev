@@ -5,6 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::actionability::PlanActionability;
 use crate::calibration::CalibrationBinding;
 use crate::definition::{Definition, RequiredKind};
 use crate::descriptor::OutputKind;
@@ -42,6 +43,10 @@ pub struct Plan {
     /// Plan 3: the static grade table (spec 032, 3.9.3).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub grades: Option<Vec<StaticGrade>>,
+    /// Plan 3: present exactly when the definition has `actionability`
+    /// (spec 033, 3.1.2).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actionability: Option<PlanActionability>,
 }
 
 crate::document::versioned_document!(

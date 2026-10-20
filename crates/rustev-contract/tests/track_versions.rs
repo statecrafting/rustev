@@ -144,6 +144,7 @@ fn plan_evidence_and_run_versions_parse_without_the_new_members() {
         presence: None,
         entries: None,
         resolution: None,
+        dropped: None,
     };
     let json = serde_json::to_string(&input).unwrap();
     assert!(!json.contains("meta") && !json.contains("presence"));

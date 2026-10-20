@@ -7,11 +7,13 @@
 //! Every field is required: absence is always an explicit variant. The
 //! exception is spec 032's optional members, which version 1 never carries
 //! and which are omitted from canonical bytes when unused (spec 032, 3.1.2);
-//! the compiler refuses them in a version 1 definition.
+//! the compiler refuses them in a version 1 definition. Spec 033 adds
+//! `actionability` and its policy constructs on the same terms.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::actionability::{Actionability, Address, RemediationUse};
 use crate::decimal::Decimal;
 use crate::grade::{Grade, PresentWhen};
 use crate::ids::{ArtifactId, CalibrationId, DefinitionId};
@@ -32,6 +34,10 @@ pub struct Definition {
     pub steps: Vec<StepDecl>,
     pub policy: PolicyDecl,
     pub limits: LimitsDecl,
+    /// Version 2: provenance-conditional checks and actionable outcomes
+    /// (spec 033, 3.1.1); omitted when unused.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actionability: Option<Actionability>,
 }
 
 crate::document::versioned_document!(
@@ -568,6 +574,18 @@ pub enum HandlerAction {
     /// Atomic conditions reading the target are false; a rule whose outcome
     /// reads it does not match.
     AsUnmet,
+    /// `propagate` with a declared remediation or address override (spec
+    /// 033, 3.5.5).
+    PropagateWith {
+        remediation: Option<RemediationUse>,
+        #[serde(default, skip_serializing_if = "Address::is_computed")]
+        address: Address,
+    },
+    /// The caller is asked for these fields (spec 033, 3.7).
+    NeedsInput {
+        fields: Vec<String>,
+        questions: Vec<String>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -616,6 +634,13 @@ pub enum Cond {
     All(Vec<Cond>),
     Any(Vec<Cond>),
     Not(Box<Cond>),
+    /// True when the referenced value's provenance is within `classes`
+    /// (spec 033, 3.4.7).
+    ProvenanceWithin {
+        #[serde(rename = "ref")]
+        reference: String,
+        classes: Vec<ProvenanceClass>,
+    },
 }
 
 /// What a matching rule proposes. Never a grant (spec 001, 3.2).
@@ -632,6 +657,11 @@ pub enum OutcomeDecl {
     /// `missing_evidence` naming the fields listed by a step.
     MissingEvidenceFrom {
         step: String,
+    },
+    /// The caller is asked for these fields (spec 033, 3.7).
+    NeedsInput {
+        fields: Vec<String>,
+        questions: Vec<String>,
     },
 }
 

@@ -37,6 +37,12 @@ extends:
   - { spec: "003-runtime-execution-and-evidence", unit: { kind: directory, path: "crates/rustev-runtime/" }, nature: additive }
   # `plan show` and `run` output for plans using this spec (3.11).
   - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: amending }
+  # The evaluation case outcome of a judgment 2 outcome (an abstention by
+  # its own name); no evaluation document changes.
+  - { spec: "004-evaluation-and-replay", unit: { kind: directory, path: "crates/rustev-eval/" }, nature: additive }
+  # Each new source file of a release member joins the reviewed archive
+  # list (spec 021, 3.5).
+  - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
   # Adds 033 to `make verify` when the implementation is complete.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
 depends_on:
@@ -637,6 +643,51 @@ synthetic fixtures (R-04, R-37).
 ## Verification
 
 Pending with implementation. Approval satisfies no acceptance item.
+
+## Implementation record
+
+Delivered in increments, each its own pull request; nothing here claims an
+acceptance item before the increment that satisfies it. Plan:
+
+1. Contract: the wire types of 3.1 to 3.7 and their version gate.
+2. Compilation: phases (b), (e) and (h2), categories 16 and 17, and the
+   plan 3 static table (3.8).
+3. Evaluation: checks, consequences and statuses, terminal outcomes and
+   `provenance_within` (3.3, 3.4), evidence 2 records.
+4. Actionable outcomes: causes, parties, overrides, remediations,
+   transience, notices with actions, `needs_input` and its continuation
+   (3.5 to 3.7), and the runtime origin (3.9).
+5. CLI output and goldens (3.11), compatibility goldens (3.12), mutation
+   seeds, every section 5 row, verification.
+
+**Increment 1 (contract).** `rustev-contract` carries every member of
+3.1: `actionability` in definition 2 (`caller_controlled`, remediations,
+questions, constraint groups, checks with `on_fail` branches by provenance
+and a `default` that is `none` or a consequence), the consequences of 3.3
+with their optional `address` (omitted when computed), the condition
+`provenance_within`, the handler actions `propagate_with` and
+`needs_input`, the rule outcome `needs_input`, plan 3's static table
+(`PlanActionability`), evidence 2's check records and dropped inputs, and
+`rustev.judgment/2`: `Outcome` gains `UnresolvedAction`, `Refused` and
+`NeedsInput`, and both unresolved forms share the wire key `unresolved`
+(version 1 `{"unresolved": <reason>}`, version 2 `{"unresolved":
+{"reason", "action"}}`), which never overlap because no reason is named
+`reason` or `action`. `Notice` gains an optional `action`, omitted in
+version 1, and `NoticeKind` the four kinds of 3.5.4. `Action` writes every
+member; causes, parties (ordered so their combination is the greatest),
+overrides and remediations (a subset of `OutValue` in the same wire form)
+are typed. Every new member is omitted when unused, so every existing
+document keeps its bytes. `rustev-core` refuses every construct of this
+spec at phase (b): in a version 1 definition, category 11 with detail
+`requires-definition-2` (3.1.1); in a version 2 definition, until the
+compilation phase of increment 2 lands, so nothing is compiled from one.
+The evaluation crate maps the new outcomes to abstentions by name. The two
+new source files join spec 021's reviewed archive list.
+`crates/rustev-contract/tests/actionability_wire.rs` round-trips each
+form, including the future-window example of 3.2.4 and a judgment 2
+document; `crates/rustev-core/tests/actionability_versions.rs` covers the
+version 1 refusal of each construct (section 5, last but one row) and the
+version 2 interim refusal.
 
 ## Decisions at approval
 

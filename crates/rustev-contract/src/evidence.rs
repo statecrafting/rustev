@@ -4,6 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::actionability::CheckRecord;
 use crate::definition::{OnFalse, ProvenanceClass};
 use crate::grade::{AbsentReason, Grade, MergeSide, Presence, ValueGrade, ValueMeta};
 use crate::ids::{DefinitionId, PlanId, SnapshotId};
@@ -25,6 +26,10 @@ pub struct EvidenceRecord {
     pub inputs: Vec<InputEvidence>,
     pub steps: Vec<StepEvidence>,
     pub judgment: Judgment,
+    /// Evidence 2 with `actionability`: every check, in declaration order
+    /// (spec 033, 3.4.8).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checks: Option<Vec<CheckRecord>>,
 }
 
 crate::document::versioned_document!(
@@ -50,6 +55,17 @@ pub struct InputEvidence {
     /// Evidence 2: how a disagreement was resolved (spec 032, 3.8.4).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resolution: Option<Resolution>,
+    /// Evidence 2: the check whose `drop_field` made this input absent; its
+    /// entry digest, source and provenance stay recorded (spec 033, 3.4.8).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dropped: Option<DroppedBy>,
+}
+
+/// Which check dropped an input (spec 033, 3.4.8).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DroppedBy {
+    pub check: String,
 }
 
 /// One snapshot entry considered for a graded input.
