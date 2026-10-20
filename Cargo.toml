@@ -34,6 +34,9 @@ serde = { version = "1", features = ["derive"] }
 # to exactly the value that was supplied (spec 004, 5.6).
 serde_json = { version = "1", features = ["float_roundtrip"] }
 sha2 = { version = "0.10", default-features = false }
+# JSON Schema emission for the contract's documents (spec 027, 3.2.2): pure,
+# no I/O, exact-pinned so emitted schemas stay byte-identical.
+schemars = { version = "=1.2.3", default-features = false, features = ["derive", "std"] }
 # The runtime's executor (R-03); never a dependency of rustev-contract or
 # rustev-core (spec 001, 3.4.1). Added by spec 003.
 tokio = { version = "1.53", default-features = false }

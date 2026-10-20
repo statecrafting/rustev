@@ -8,7 +8,7 @@ use crate::ids::{ArtifactId, DescriptorId};
 use crate::limits::DESCRIPTOR_V1;
 use crate::schema;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct BackendDescriptor {
     pub schema: String,
@@ -26,7 +26,7 @@ crate::document::document!(
     DescriptorId
 );
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct OperationSupport {
     pub operation: Operation,
@@ -36,7 +36,19 @@ pub struct OperationSupport {
 }
 
 /// What a backend returns for an operation (design section 8.2).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum OutputKind {
     Label,
@@ -45,7 +57,7 @@ pub enum OutputKind {
     Logits,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct InputLimit {
     /// Largest projected input, in canonical JSON bytes.
@@ -53,7 +65,7 @@ pub struct InputLimit {
     pub on_excess: InputExcess,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum InputExcess {
     Refuse,

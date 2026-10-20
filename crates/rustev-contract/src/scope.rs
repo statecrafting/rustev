@@ -57,6 +57,22 @@ impl Serialize for Handle {
     }
 }
 
+impl schemars::JsonSchema for Handle {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "Handle".into()
+    }
+
+    /// 1 to `MAX_HANDLE_BYTES` bytes; a schema bounds characters, so the
+    /// byte bound is the parser's.
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema!({
+            "type": "string",
+            "minLength": 1,
+            "maxLength": MAX_HANDLE_BYTES
+        })
+    }
+}
+
 impl<'de> Deserialize<'de> for Handle {
     fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         Handle::new(String::deserialize(d)?).map_err(serde::de::Error::custom)
@@ -64,7 +80,9 @@ impl<'de> Deserialize<'de> for Handle {
 }
 
 /// The isolation scope of a capture, a bundle and every request identity.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(tag = "mode", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Scope {
     /// Reuse across principals within one tenant and context revision: an

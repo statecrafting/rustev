@@ -11,7 +11,7 @@ use crate::ids::{ArtifactId, CalibrationId, DatasetId};
 use crate::limits::DESCRIPTOR_V1;
 use crate::schema;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CalibrationArtifact {
     pub schema: String,
@@ -29,7 +29,7 @@ crate::document::document!(
 );
 
 /// What the calibration was fitted for.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CalibrationBinding {
     pub artifact: ArtifactId,
@@ -41,14 +41,14 @@ pub struct CalibrationBinding {
 }
 
 /// The only method in increment 1.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub enum CalibrationMethod {
     /// `softmax(z / T)` over logits, or over natural logarithms of masses.
     #[serde(rename = "temperature/1")]
     Temperature1,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum CalibrationParameters {
     /// Temperature in `(0, 1000]`.

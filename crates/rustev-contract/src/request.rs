@@ -18,7 +18,7 @@ use crate::plan::Normalization;
 use crate::schema;
 use crate::scope::Scope;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RequestDoc {
     pub schema: String,

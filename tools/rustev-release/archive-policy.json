@@ -41,6 +41,7 @@
         "src/request.rs",
         "src/retention.rs",
         "src/run.rs",
+        "src/schema_emit.rs",
         "src/scope.rs",
         "src/snapshot.rs",
         "src/source.rs",

@@ -41,6 +41,10 @@
       {
         "path": "tools/rustev-boundaries/",
         "source": "spec-edge"
+      },
+      {
+        "path": "tools/rustev-release/",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
@@ -148,6 +152,19 @@
       {
         "locations": [
           {
+            "file": "tools/rustev-release/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-release/"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "Cargo.lock"
           }
         ],
@@ -215,5 +232,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "f424ba12e4b9bf618c4155ab2409671ce9d8d977263478692ec19b98f26e4f16"
+  "shardHash": "c38c899596d8cc197fa5409a68b28a05e6625e58fbb90c9e08bfe4745c9e5fc4"
 }

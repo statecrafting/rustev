@@ -18,7 +18,7 @@ use crate::ids::ContentDigest;
 use crate::time::{DurationMs, Timestamp};
 
 /// The definition 2 member (spec 033, 3.1.1). Each list may be empty.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Actionability {
     /// Sorted, duplicate-free; only `user-supplied`,
@@ -32,7 +32,19 @@ pub struct Actionability {
 
 /// Who can act on an outcome (3.5.2), ordered from most to least able to
 /// act on it themselves: the combination of parties is the greatest.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Party {
     None,
@@ -50,7 +62,7 @@ impl Party {
 }
 
 /// A declared remediation (3.6.3).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RemediationDecl {
     /// `[a-z][a-z0-9_]{0,63}`; never a built-in code.
@@ -61,7 +73,7 @@ pub struct RemediationDecl {
     pub params: Vec<RemediationParam>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RemediationParam {
     pub name: String,
@@ -71,7 +83,9 @@ pub struct RemediationParam {
 }
 
 /// A declared, literal question template (3.7.3).
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(deny_unknown_fields)]
 pub struct QuestionDecl {
     pub id: String,
@@ -82,7 +96,7 @@ pub struct QuestionDecl {
 }
 
 /// A named group of checks a `relax` consequence switches off (3.3.3).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ConstraintGroup {
     pub name: String,
@@ -91,7 +105,7 @@ pub struct ConstraintGroup {
 }
 
 /// A provenance-conditional check (3.2.2).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CheckDecl {
     pub id: String,
@@ -102,7 +116,7 @@ pub struct CheckDecl {
     pub on_fail: OnFail,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct OnFail {
     pub by_provenance: BTreeMap<ProvenanceClass, Consequence>,
@@ -110,7 +124,7 @@ pub struct OnFail {
 }
 
 /// A check's `default`: the string `none`, or a consequence.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum DefaultConsequence {
     None,
@@ -120,7 +134,7 @@ pub enum DefaultConsequence {
 
 /// What a failed check does (3.3). `refuse`, `abstain` and `escalate` are
 /// terminal; the others are field-level.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Consequence {
     Refuse {
@@ -182,7 +196,7 @@ impl Consequence {
 
 /// Where an outcome is addressed: computed from its causes (when omitted),
 /// or an override toward a party less able to act (3.5.3).
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Address {
     #[default]
@@ -197,7 +211,7 @@ impl Address {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AddressOverride {
     /// `host`, `upstream` or `none`; never `caller`.
@@ -208,14 +222,14 @@ pub struct AddressOverride {
 
 /// A use of a declared or built-in remediation: its code alone, or its
 /// code with parameters (3.6.3).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(untagged)]
 pub enum RemediationUse {
     Code(String),
     WithParams(RemediationCall),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RemediationCall {
     pub code: String,
@@ -247,7 +261,9 @@ pub const BUILTIN_REMEDIATIONS: &[&str] = &[
 
 /// A scalar or list value in a remediation's parameters: the subset of
 /// `OutValue` (spec 002) a remediation can carry, in the same wire form.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum RemediationValue {
     Bool(bool),
@@ -262,7 +278,9 @@ pub enum RemediationValue {
 
 /// A remediation as an action carries it: `none`, or a code and its
 /// canonical parameters (3.6.1).
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Remediation {
     None,
@@ -298,7 +316,9 @@ impl Remediation {
 }
 
 /// The provenance an input cause records (3.5.2).
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum CauseProvenance {
     /// An accepted entry existed (including a dropped or invalid one).
@@ -309,7 +329,18 @@ pub enum CauseProvenance {
 
 /// Who registered a backend (3.9): `upstream` unless the host implements it.
 #[derive(
-    Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
 )]
 #[serde(rename_all = "snake_case")]
 pub enum Origin {
@@ -319,7 +350,9 @@ pub enum Origin {
 }
 
 /// One cause of an outcome or notice (3.5.2).
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Cause {
     Input {
@@ -344,7 +377,9 @@ pub enum Cause {
 }
 
 /// How an override came about (3.5.2).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum OverrideBasis {
     Declared,
@@ -352,7 +387,9 @@ pub enum OverrideBasis {
 }
 
 /// `none`, or the party an author moved the outcome to and why.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Override {
     None,
@@ -366,7 +403,9 @@ pub enum Override {
 
 /// Who can act on an outcome or notice, how, why, and whether retrying the
 /// same request can succeed (3.5.2). Every member is always written.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(deny_unknown_fields)]
 pub struct Action {
     pub addressed_to: Party,
@@ -380,7 +419,7 @@ pub struct Action {
 }
 
 /// One refusing check of a `refused` outcome (3.5.1).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Refusal {
     pub check: String,
@@ -393,7 +432,7 @@ pub struct Refusal {
 pub type Question = QuestionDecl;
 
 /// The `needs_input` outcome (3.7).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct NeedsInput {
     pub fields: Vec<String>,
@@ -418,7 +457,7 @@ pub struct ContinuationInputs<'a> {
 pub const CONTINUATION_TAG: &str = "rustev.continuation/1";
 
 /// A check's status in evidence 2 (3.4.8).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum CheckStatus {
     Passed,
@@ -439,7 +478,7 @@ pub enum CheckStatus {
 }
 
 /// One check's evidence record (3.4.8).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CheckRecord {
     pub check: String,
@@ -449,14 +488,14 @@ pub struct CheckRecord {
 
 /// The plan 3 member: the static causes and party of every check branch
 /// and policy site (3.8.3).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PlanActionability {
     pub checks: Vec<StaticCheck>,
     pub sites: Vec<StaticSite>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct StaticCheck {
     pub check: String,
@@ -466,7 +505,7 @@ pub struct StaticCheck {
     pub branches: Vec<StaticBranch>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct StaticBranch {
     pub classes: Vec<ProvenanceClass>,
@@ -476,7 +515,7 @@ pub struct StaticBranch {
 }
 
 /// A policy site that can produce an action (`rule:<id>`, `handler:<n>`).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct StaticSite {
     pub site: String,

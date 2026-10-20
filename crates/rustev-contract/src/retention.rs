@@ -21,7 +21,7 @@ pub const MAX_BUNDLE_LIFETIME_MS: u64 = 30 * DAY_MS;
 const DAY_MS: u64 = 24 * 60 * 60 * 1000;
 
 /// One retained document, as the host declares it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RetentionItem {
     /// The schema string the document must carry.
@@ -32,7 +32,7 @@ pub struct RetentionItem {
 }
 
 /// How the bytes were kept. Every mode has an expiry.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Retention {
     /// The record canonical document, embedded as a JSON UTF-8 string.
@@ -83,7 +83,19 @@ impl Retention {
 
 /// What a retained input is at replay time. Only `available` contributes
 /// to reproduction; none of the others is a pass.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Availability {
     Available,

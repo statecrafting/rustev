@@ -63,7 +63,19 @@ pub fn cut_to(s: &str, max: usize) -> String {
 /// The closed error taxonomy (spec 009, 3.6). Each code maps to exactly one
 /// spec 003 failure class; the mapping lives with the adapters, because the
 /// failure classes of the backend seam are not contract types.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum RemoteCode {
     TransportUnsent,
@@ -117,7 +129,7 @@ impl RemoteCode {
 }
 
 /// How far the remote side supports cancellation (spec 009, 3.2.4).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum CancelSupport {
     None,
@@ -128,7 +140,9 @@ pub enum CancelSupport {
 }
 
 /// What a served identity is worth (spec 009, 3.7).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Disclosure {
     /// The remote side guarantees the identity.
@@ -141,7 +155,7 @@ pub enum Disclosure {
 
 /// Served-identity disclosure as negotiated. `identity` is the pinned
 /// identity, present exactly when `disclosure` is `pinned`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ServedTerms {
     pub disclosure: Disclosure,
@@ -149,7 +163,7 @@ pub struct ServedTerms {
 }
 
 /// Shared-state batching support (spec 009, 3.10.4).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Batching {
     None,
@@ -158,7 +172,7 @@ pub enum Batching {
 
 /// Terms negotiated beside the descriptor (spec 009, 3.2.4). The runtime
 /// never reads them; the adapter enforces and records them.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RemoteTerms {
     /// The per-call cost disclosure, in the remote side's units. `bounded`
@@ -179,7 +193,7 @@ pub struct RemoteTerms {
 }
 
 /// A served identity as recorded (spec 009, 3.7).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ServedIdentity {
     pub identity: Option<String>,
@@ -200,7 +214,7 @@ impl ServedIdentity {
 // rustev.remote-describe/1
 
 /// The protocol major versions the client supports (spec 009, 3.10.1).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DescribeRequest {
     pub schema: String,
@@ -211,7 +225,7 @@ crate::document::document!(DescribeRequest, schema::REMOTE_DESCRIBE, REMOTE_V1);
 
 /// The chosen version and, per hosted backend, its descriptor, descriptor
 /// identity and terms.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DescribeResponse {
     pub schema: String,
@@ -221,7 +235,7 @@ pub struct DescribeResponse {
 
 crate::document::document!(DescribeResponse, schema::REMOTE_DESCRIBE, REMOTE_V1);
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct HostedBackend {
     pub descriptor: BackendDescriptor,
@@ -232,7 +246,7 @@ pub struct HostedBackend {
 // ---------------------------------------------------------------------------
 // rustev.remote-infer/1
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct InferRequest {
     pub schema: String,
@@ -252,7 +266,7 @@ pub struct InferRequest {
 
 crate::document::document!(InferRequest, schema::REMOTE_INFER, REMOTE_V1);
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct InferItem {
     /// The idempotency key (3.3).
@@ -261,7 +275,7 @@ pub struct InferItem {
     pub projection: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct InferResponse {
     pub schema: String,
@@ -282,14 +296,14 @@ pub struct InferResponse {
 
 crate::document::document!(InferResponse, schema::REMOTE_INFER, REMOTE_V1);
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ItemAnswer {
     pub attempt_id: String,
     pub result: ItemResult,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum ItemResult {
     /// The `rustev.backend-output/1` vocabulary.
@@ -305,7 +319,7 @@ pub enum ItemResult {
 // ---------------------------------------------------------------------------
 // rustev.remote-cancel/1
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CancelRequest {
     pub schema: String,
@@ -316,7 +330,7 @@ pub struct CancelRequest {
 
 crate::document::document!(CancelRequest, schema::REMOTE_CANCEL, REMOTE_V1);
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CancelResponse {
     pub schema: String,
@@ -326,14 +340,14 @@ pub struct CancelResponse {
 
 crate::document::document!(CancelResponse, schema::REMOTE_CANCEL, REMOTE_V1);
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CancelItem {
     pub attempt_id: String,
     pub answer: RemoteCancelAnswer,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum RemoteCancelAnswer {
     /// Work and charges stopped; the final charge, in remote units.
@@ -352,7 +366,7 @@ pub enum RemoteCancelAnswer {
 /// to its cap by [`ExchangeRecord::bounded`], so a record never exceeds
 /// [`EXCHANGE_V1`]'s `max_bytes`. Request and response bytes are never in
 /// the record; only their digests are.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ExchangeRecord {
     pub schema: String,
@@ -394,7 +408,7 @@ pub struct ExchangeRecord {
 
 crate::document::document!(ExchangeRecord, schema::REMOTE_EXCHANGE, EXCHANGE_V1);
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ExchangeMember {
     pub attempt_id: String,
@@ -404,7 +418,7 @@ pub struct ExchangeMember {
     pub charge: Charge,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum MemberOutcome {
     /// An output; `digest` is `sha256:` of its record canonical bytes.
@@ -417,7 +431,7 @@ pub enum MemberOutcome {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ReportedCost {
     /// A decimal string exactly as reported.
@@ -426,7 +440,7 @@ pub struct ReportedCost {
 }
 
 /// How an exchange's charge reached its members (spec 009, 3.10.4).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Attribution {
     /// One member carries the whole charge.
