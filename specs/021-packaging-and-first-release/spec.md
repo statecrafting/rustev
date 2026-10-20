@@ -494,6 +494,28 @@ clippy's `collapsible_if` proposes `let` chains and its
 `if`s it named (12 files) and rewrote one `% 10 == 0` as `is_multiple_of`,
 recorded in each owning spec, with no behavior change.
 
+**Increment 3 (unpacked verification and reproducibility).** `make
+release-candidate` runs `tools/rustev-release/candidate.sh` on the clean
+commit at HEAD (a dirty tree is refused): two detached worktrees under the
+worktree root each set every tracked file's time to the commit time (the
+fixed source-date input) and run `cargo package --locked` for the eight
+packages, without `--allow-dirty` or `--no-verify`; `rustev-release
+compare` then names every difference between the two runs' archives, by
+file or, when every file is identical, as container metadata, and never
+normalizes one away; `rustev-release archives` records the archive
+evidence of increment 2; and `rustev-release unpacked` tests each unpacked
+archive outside any workspace (a work directory inside one is refused),
+offline, with `--locked`, against a directory source holding the exact
+candidate archives (each with its `.crate` SHA-256 as package checksum)
+and the workspace's locked third-party crates from `cargo vendor`: no
+workspace manifest, path or Git override, `[patch]` or network. The
+toolchain is the pinned one or one named for the matrix (3.7). Evidence
+lands in the ignored `target/release-candidate/<commit>/`, with
+`SHA256SUMS` of run a. `tests/repro.rs` covers identical runs, a changed
+file, a file in one run only, identical files in differing containers
+(section 4 row 5), a missing archive, the vendored checksum and the
+offline source configuration.
+
 Open for the owner: spec 031 3.1, which amends this section, orders each
 layer by name and starts a layer only after every package of the earlier
 layers is public. With today's development dependencies that order cannot
