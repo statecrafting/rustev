@@ -1,0 +1,42 @@
+[package]
+name = "rustev-node"
+version.workspace = true
+description = "Rustev's Node-API binding: compile, decide, replay and evaluate in-process, with host-implemented seams."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+# Spec 027 section 2 and spec 031 3.1: shipped only as npm packages.
+publish = false
+
+[package.metadata.spec-spine]
+spec = "027-node-and-wasm-bindings"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+rustev-contract.workspace = true
+rustev-core.workspace = true
+rustev-runtime.workspace = true
+rustev-eval.workspace = true
+rustev-surface.workspace = true
+rustev-backend-rules.workspace = true
+serde_json.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "time", "sync"] }
+# Node-API version 8 (spec 027, 3.13.1): Node 20, 22 and 24 provide it.
+napi = { version = "=3.14.2", default-features = false, features = ["napi8", "serde-json", "async"] }
+napi-derive = "=3.6.12"
+
+[build-dependencies]
+napi-build = "=2.6.0"
+
+# Spec 027, 3.14: napi-rs's macro-generated glue uses `unsafe` (registration
+# and value conversion), so this crate relaxes the workspace's `forbid` to
+# `deny`, which the generated code's own `allow` can lift; hand-written code
+# stays without `unsafe`, and `tests/no_unsafe.rs` fails on any.
+# Cargo cannot inherit the workspace's lints and override one, so they are
+# restated here; today the workspace has only `unsafe_code`, and any lint
+# it gains is to be mirrored in this table too.
+[lints.rust]
+unsafe_code = "deny"
