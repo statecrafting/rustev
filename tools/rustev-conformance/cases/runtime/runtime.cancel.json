@@ -38,13 +38,13 @@
       "sha256": "2313edf2bf75c4e9a9f248f9e4533d485ced06acd09e97dbbe1b4919ce148072"
     }
   ],
-  "mirrors": "crates/rustev-runtime/tests/cancel.rs::a_confirmed_stop_is_recorded_as_stopped_with_its_charge",
+  "mirrors": "crates/rustev-runtime/tests/cancel.rs::no_answer_means_local_waiting_stopped_and_nothing_more",
   "outputs": [
     {
       "file": "d1.record.json",
       "golden": "tools/rustev-conformance/expected/runtime/runtime.cancel/d1.record.json",
       "normalize": [],
-      "sha256": "bf82b57d6c4316afd40e0c4fd94bdf9252f597eb8caa97a4dac1b4237012b10f"
+      "sha256": "70604120d9627222b261b7f597e06f49f02975e271bff4a9eab102555668ed3c"
     },
     {
       "file": "d1.result.json",
@@ -75,15 +75,7 @@
         "cost_model": "bounded",
         "descriptor": "synthetic-linear-head.descriptor.json",
         "max_concurrency": 8,
-        "on_cancel": {
-          "stop": {
-            "charge": {
-              "observed": {
-                "units": 2
-              }
-            }
-          }
-        },
+        "on_cancel": "ignore",
         "on_release": {},
         "remote": "finished"
       }
@@ -127,6 +119,7 @@
     ]
   },
   "surfaces": [
-    "rust-api"
+    "rust-api",
+    "native"
   ]
 }

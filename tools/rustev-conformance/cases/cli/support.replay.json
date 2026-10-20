@@ -20,7 +20,7 @@
     {
       "name": "support-emb.bundle.json",
       "path": "tools/rustev-conformance/fixtures/cli/support.replay/support-emb.bundle.json",
-      "sha256": "51a2c421677de9071f12f020ba5756e8fb39bc1e029ef7ad7c37906869cfe8c8"
+      "sha256": "57b167bae363fcb6896d7a979d6cf7601ac94058112a8e4d93f50603b4b46325"
     }
   ],
   "outputs": [
@@ -33,6 +33,7 @@
   ],
   "surfaces": [
     "cli",
+    "native",
     "wasm"
   ]
 }

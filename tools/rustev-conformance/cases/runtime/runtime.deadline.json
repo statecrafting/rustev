@@ -120,6 +120,7 @@
     ]
   },
   "surfaces": [
-    "rust-api"
+    "rust-api",
+    "native"
   ]
 }

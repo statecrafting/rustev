@@ -987,6 +987,21 @@ package for this process or names the missing one, downloading nothing.
 tests each section 5 row of the native package, with the refusals the
 review rounds added (27 tests).
 
+**Increment 6, third change (the native conformance cases).** Every CLI
+case is marked for the native surface too (pure commands also for
+WebAssembly), and a `run` case records the derived descriptors a native
+runner prepares its plan against. Running the runtime cases against host
+seams, which answer asynchronously, required two corrections to their
+driver: it advances the clock only when the expected retry delay is
+pending and no attempt is in flight (read through
+`ManualClock::pending_delays`, the additive accessor the first change of
+this increment added to spec 003's crate); and
+the cancellation case shared by every runner mirrors
+`cancel.rs::no_answer_means_local_waiting_stopped_and_nothing_more`,
+while the confirmed-stop case stays a Rust-runner case
+(`runtime.cancel-stop`). The JavaScript runner's native adapter is the
+fourth change.
+
 ## Decisions at approval
 
 1. **npm package names and scope** (left to the implementer by #56; decided

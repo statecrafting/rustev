@@ -15,7 +15,13 @@
     "lodging.record.json"
   ],
   "command": "run",
-  "derived": [],
+  "derived": [
+    {
+      "from": "lodging.rules.json",
+      "path": "tools/rustev-conformance/fixtures/cli/lodging.run/lodging.rules.json.descriptor.json",
+      "sha256": "a3c75af9f729ea17958b305c824553bf38f3a44895a180a23fbfc5cdc441bb6d"
+    }
+  ],
   "exit": 0,
   "id": "lodging.run",
   "inputs": [
@@ -54,6 +60,7 @@
     }
   ],
   "surfaces": [
-    "cli"
+    "cli",
+    "native"
   ]
 }

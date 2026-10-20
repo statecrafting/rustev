@@ -20,7 +20,7 @@
     {
       "name": "lodging-emb.bundle.json",
       "path": "tools/rustev-conformance/fixtures/cli/lodging.replay/lodging-emb.bundle.json",
-      "sha256": "cdd5a90196b4677aafb5891fb5b4d4c3b870e2fd1caac48f655970d1f5c3f7e8"
+      "sha256": "4d155379e06263eb8ad7522a00858d418ce8a8e20cb28a5b0bce36304d146b6d"
     }
   ],
   "outputs": [
@@ -33,6 +33,7 @@
   ],
   "surfaces": [
     "cli",
+    "native",
     "wasm"
   ]
 }

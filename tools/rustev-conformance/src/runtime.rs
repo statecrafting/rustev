@@ -146,8 +146,17 @@ pub enum Step {
     WaitQueued {
         count: usize,
     },
-    /// Until something sleeps on the clock.
+    /// Until something sleeps on the clock (a deadline's timer, armed
+    /// whenever the runtime arms it).
     WaitSleeper,
+    /// Until a timer is pending exactly `delay_ms` ahead and no attempt is
+    /// in flight, then advance the clock by it: a retry delay. Other timers
+    /// (the decision's deadline) never match, and a host seam's
+    /// asynchronous answers cannot make the driver advance early or end an
+    /// attempt at a later time than a synchronous seam would.
+    AdvanceTimer {
+        delay_ms: u64,
+    },
     AdvanceMs {
         ms: u64,
     },
@@ -460,6 +469,14 @@ pub fn run(case: &RuntimeCase, inputs: &Inputs) -> Result<Outputs, String> {
                 }
                 Step::WaitQueued { count } => {
                     until("queued decisions", || rt.gauges().queued >= *count).await?;
+                }
+                Step::AdvanceTimer { delay_ms } => {
+                    until("the timer, with no attempt in flight", || {
+                        clock.pending_delays().contains(delay_ms)
+                            && rt.gauges().backend_in_flight.values().all(|n| *n == 0)
+                    })
+                    .await?;
+                    clock.advance(*delay_ms);
                 }
                 Step::WaitSleeper => until("a sleeper", || clock.sleepers() > 0).await?,
                 Step::AdvanceMs { ms } => clock.advance(*ms),
