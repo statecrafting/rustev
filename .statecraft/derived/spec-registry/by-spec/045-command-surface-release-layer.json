@@ -1,0 +1,68 @@
+{
+  "record": {
+    "amends": [
+      "031-public-api-and-release-family"
+    ],
+    "created": "2026-10-20",
+    "dependsOn": [
+      "021-packaging-and-first-release",
+      "027-node-and-wasm-bindings",
+      "031-public-api-and-release-family"
+    ],
+    "id": "045-command-surface-release-layer",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-1-membership",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "Every normal or build dependency of a release member that is a workspace crate is itself a member of the same release, in an earlier crate layer."
+      },
+      {
+        "anchor": "3-2-crate-layers",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "A crate's layer is one past the deepest layer of its member dependencies, recomputed from cargo metadata at the candidate commit; the release-set file must equal that recomputation."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "045-the-command-surface-in-the-release-family-amends-031": "ee26a8ee666dd78e67f45ac8c3c89e8a4ff50f79513828c932f9a4d06c7c1048",
+      "1-purpose": "e51613373cad11d1d6b59afac13b846d346ae0704cf8d1e3242f4fb28d328cc3",
+      "2-territory": "04be079fe1004445065fd3df22ffc30e4f5984132d1444aa930a80d03d1ced7f",
+      "3-1-membership": "c53cc0541f4fe54aeb037abbaa092aa090c3df5251f54818df44d43f08f29024",
+      "3-2-crate-layers": "f5ec76baaa761e286f87f96f4140b9e903c7a30badbc5b610dfdc186f5d8c3fb",
+      "3-behavior": "ea4aa1860a6afe911920f4aa78824adb8293a96525d8fb52385d479aad05b0e7",
+      "4-out-of-scope": "9a6267ccffbbb1f9949398dc28958e8bb96796f030c9be98b8965a8c5d722769",
+      "5-observable-negative-cases": "40ede3961bc0459e815e77b82e22d81f38fc8a1172a8280a94cfddc6a4975e5c",
+      "acceptance": "89794d621751f5b248119dafc4dc8ff2a70fc6da153039af26423a444e8ccd85",
+      "verification": "0c26242c03ceca7fab9d7ef8a3d4a25fea964f73e26c38ccb027a5bbfe333d52"
+    },
+    "sectionHeadings": [
+      "045: The command surface in the release family (amends 031)",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 Membership",
+      "3.2 Crate layers",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification"
+    ],
+    "specPath": "specs/045-command-surface-release-layer/spec.md",
+    "status": "approved",
+    "summary": "A narrow amendment of approved spec 031 (itself amending spec 021). Spec 027 adds `rustev-surface`, the pure command renderer every host calls, and requires the CLI to call it instead of its own copy. The CLI is a published release member, so its new dependency must be published first, in a crate layer of its own: 031 3.1's layer table has no slot between `rustev-eval` and the CLI. This spec adds `rustev-surface` to the release family, states the crate layers as the topological levels the release policy already computes from `cargo metadata`, admits a crate that a release member depends on once the crate exists and passes its checks, and keeps the release-set test's member list as the deliberate, reviewed record of membership. Ratified by the owner on 2026-10-20 (A-42).\n",
+    "title": "The command surface in the release family (amends 031)"
+  },
+  "shardHash": "246cc47f9906b14110e328a57783d5e54ee605f782e947452c285649cada8d33",
+  "specVersion": "1.9.0"
+}

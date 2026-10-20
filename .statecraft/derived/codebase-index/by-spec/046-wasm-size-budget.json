@@ -1,0 +1,30 @@
+{
+  "mapping": {
+    "amends": [
+      "027-node-and-wasm-bindings"
+    ],
+    "dependsOn": [
+      "027-node-and-wasm-bindings"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "docs/decisions/00-founding-decisions.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "specId": "046-wasm-size-budget",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.2.0",
+  "shardHash": "7eaaf28ad5fe5ee330c8d22d9e3bd30a1ae35cbcf64f34405287f1ef32e8d42d"
+}
