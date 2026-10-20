@@ -12,6 +12,7 @@
 //! passing check is candidate evidence only (spec 021, I-1).
 
 pub mod archive;
+pub mod repro;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;

@@ -18,7 +18,7 @@ CRATE_MANIFESTS := $(wildcard crates/*/Cargo.toml backends/*/Cargo.toml tools/*/
 SKIP_NOTE := no crate exists yet, so cargo has nothing to judge
 VERIFIED_SPECS := 001 002 003 004 005 006 007 008 009 012 013 014 015 017
 
-.PHONY: tools gate refresh code build test clippy fmt boundaries verify
+.PHONY: tools gate refresh code build test clippy fmt boundaries verify release-candidate
 
 tools:
 	@test -n "$(SPEC_SPINE_VERSION)" || { echo "no required_version in spec-spine.toml"; exit 3; }
@@ -57,3 +57,9 @@ boundaries:
 ## Runs code the corpus declares; deliberately not part of `gate`.
 verify:
 	@for id in $(VERIFIED_SPECS); do $(SPEC_SPINE) verify $$id || exit 1; done
+
+## Spec 021, 3.5 and 3.7: package evidence for the clean commit at HEAD.
+## Two clean worktrees, byte comparison, archive policy and unpacked tests.
+## Never uploads, tags, signs or reads a credential.
+release-candidate:
+	sh tools/rustev-release/candidate.sh
