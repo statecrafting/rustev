@@ -25,7 +25,19 @@ pub fn value_digest(value: &Value) -> Result<String, CanonicalError> {
 
 /// The closed, ordered evidence grade. The derived order runs weakest to
 /// strongest, so `min` and `max` are the grade order of spec 032, 3.2.1.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Grade {
     /// A label from a source declared unreliable for that field, or a
@@ -60,7 +72,7 @@ impl Grade {
 
 /// A value's grade, or `ungraded` when no graded value contributed.
 /// `ungraded` is not a point of the grade order (spec 032, 3.2.3).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ValueGrade {
     Authoritative,
@@ -111,7 +123,7 @@ impl From<Grade> for ValueGrade {
 }
 
 /// The oldest as-of among contributing graded values, or `none`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum AsOf {
     None,
@@ -130,7 +142,19 @@ impl AsOf {
 }
 
 /// Which side of a merge a field came from (spec 032, 3.6.3).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum MergeSide {
     Base,
@@ -138,7 +162,7 @@ pub enum MergeSide {
 }
 
 /// How a value's metadata came about (spec 032, 3.2.2).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Basis {
     /// An input.
@@ -161,7 +185,7 @@ pub enum Basis {
 /// Value metadata (spec 032, 3.2.2): carried by every input and step value
 /// of a plan 3 evaluation. A record carries one per field, a list one per
 /// item and a map one per entry, in the optional members.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ValueMeta {
     pub grade: ValueGrade,
@@ -214,7 +238,7 @@ impl ValueMeta {
 
 /// A record presence predicate (spec 032, 3.4.2). Each list is non-empty;
 /// the canonical form sorts and deduplicates every field list.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum PresentWhen {
     AnyNonNull(Vec<String>),
@@ -273,7 +297,19 @@ impl PresentWhen {
 }
 
 /// Why a value is absent (spec 032, 3.4.3 and 3.6.2).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum AbsentReason {
     PredicateFailed,
@@ -296,7 +332,7 @@ impl AbsentReason {
 }
 
 /// A value's presence status. Key existence alone is never presence.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Presence {
     Present,

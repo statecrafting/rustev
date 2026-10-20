@@ -27,6 +27,9 @@ extends:
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.lock" }, nature: additive }
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
   - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "tools/rustev-boundaries/" }, nature: additive }
+  # Each new source file of a release member joins the reviewed archive
+  # list, under spec 021 3.5's rule, in the directory spec 031 owns.
+  - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
 establishes:
   - { kind: directory, path: "integrations/rustev-node/", planned: true }
   - { kind: directory, path: "integrations/rustev-wasm/", planned: true }
@@ -744,6 +747,35 @@ crates passing under it, a pure crate and the surface reaching a binding
 family or executor, each forbidden crate in the WebAssembly graph, and the
 dev-only and allowed edges of that graph; `make boundaries` passes on the
 workspace.
+
+**Increment 2 (JSON Schema emission).** `rustev-contract` gains
+`schema_emit::document_schemas()`, which emits a JSON Schema (draft
+2020-12) for every public document type and version: definition 1 and 2,
+plan 2 and 3, snapshot 1 and 2, evidence 1 and 2, run 1 and 3, judgment 1
+and 2, backend descriptor, calibration, backend output, evaluation report,
+execution policy, replay bundle, request, runtime reason, source
+descriptor, the request and response of each `rustev.remote/1` exchange,
+and the exchange record. Each schema is derived (through `schemars`
+=1.2.3, pure, exact-pinned) from the same serde definitions the bounded
+parser uses: closed objects where the parser denies unknown fields, tagged
+enums, and hand-written schemas for the types with their own serde
+(identities and digests by their `sha256:` pattern, decimals by their
+string syntax, scope handles by length); `schema` is fixed to the version
+by `const`, and the document's `ParseLimits`, which a schema cannot
+express, are recorded as `x-rustev-parse-limits`. Emission is canonical
+JSON, byte-identical across runs; the schemas are committed under
+`crates/rustev-contract/schema/` and `crates/rustev-contract/tests/schemas.rs`
+fails when emitted bytes or the file set differ (`RUSTEV_BLESS=1` rewrites
+them). The same test validates every committed JSON document under a test
+directory of the workspace whose `schema` names an emitted version against
+that schema (`jsonschema` =0.59.0 as a dev-dependency, without HTTP or
+file resolution), and checks that a schema refuses an unknown member and
+another version's `schema`. No document, parse bound or canonical byte
+changes. The new source file joins the reviewed archive list
+(`tools/rustev-release/archive-policy.json`, spec 021 3.5), hence this
+spec's `extends` edge on `tools/rustev-release/`; the release audit
+(cargo-deny bans, licenses and sources over the release set) passes with
+the new dependency.
 
 ## Decisions at approval
 

@@ -14,7 +14,7 @@ use crate::limits::SNAPSHOT_V1;
 use crate::schema;
 use crate::time::Timestamp;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Snapshot {
     pub schema: String,
@@ -29,7 +29,7 @@ crate::document::versioned_document!(
     SnapshotId
 );
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Entry {
     /// The declared input name.

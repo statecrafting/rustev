@@ -9,7 +9,7 @@ use crate::ids::ArtifactId;
 use crate::limits::BACKEND_OUTPUT_V1;
 use crate::schema;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct BackendOutputDoc {
     pub schema: String,
@@ -23,7 +23,7 @@ pub struct BackendOutputDoc {
 crate::document::document!(BackendOutputDoc, schema::BACKEND_OUTPUT, BACKEND_OUTPUT_V1);
 
 /// What a backend returned, before validation.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum RawOutput {
     Label(String),

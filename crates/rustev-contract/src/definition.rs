@@ -22,7 +22,7 @@ use crate::schema;
 use crate::time::Timestamp;
 
 /// A versioned, authored description of a recurring decision.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Definition {
     pub schema: String,
@@ -49,7 +49,7 @@ crate::document::versioned_document!(
 );
 
 /// One declared input field (spec 002, 3.7.1).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct InputDecl {
     pub name: String,
@@ -69,7 +69,7 @@ pub struct InputDecl {
 }
 
 /// How an input is graded (spec 032, 3.3.3).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum EvidenceDecl {
     Graded {
@@ -80,7 +80,7 @@ pub enum EvidenceDecl {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Cap {
     pub path: String,
@@ -89,7 +89,7 @@ pub struct Cap {
 
 /// The conflict policy of a graded input (spec 032, 3.8). There is no
 /// recency rule: entry order never chooses a value.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Disagreement {
     RequireAgreement,
@@ -99,7 +99,19 @@ pub enum Disagreement {
 }
 
 /// The closed set of provenance classes (spec 002, 3.7.1).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum ProvenanceClass {
     AuthenticatedAppField,
@@ -111,7 +123,7 @@ pub enum ProvenanceClass {
 }
 
 /// How old an input may be at evaluation time.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Freshness {
     MaxAgeMs(u64),
@@ -119,7 +131,7 @@ pub enum Freshness {
 }
 
 /// Input value types (spec 002, 3.7.2). Every record field is required.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum TypeDecl {
     Bool,
@@ -156,7 +168,7 @@ pub enum TypeDecl {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct FieldDecl {
     pub name: String,
@@ -165,14 +177,14 @@ pub struct FieldDecl {
 }
 
 /// One step of the plan graph.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct StepDecl {
     pub id: String,
     pub body: StepBody,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum StepBody {
     Exact(ExactDecl),
@@ -182,7 +194,7 @@ pub enum StepBody {
 }
 
 /// A corroboration step (spec 032, 3.7.1).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CorroborateDecl {
     /// An input path or step value.
@@ -195,28 +207,28 @@ pub struct CorroborateDecl {
     pub on_contradiction: OnContradiction,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Check {
     pub predicate: Predicate,
     pub on_false: OnFalse,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum OnFalse {
     Contradicts,
     NoEvidence,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum CorroborationMode {
     All,
     Any,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum OnContradiction {
     Conflict,
@@ -228,7 +240,7 @@ pub enum OnContradiction {
 /// arguments are decoded against the operator's own schema by the compiler,
 /// so an unknown operator is refused as `unknown_operator`, not as a parse
 /// failure (spec 002, 3.9.5).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ExactDecl {
     pub op: String,
@@ -237,7 +249,19 @@ pub struct ExactDecl {
 }
 
 /// The four semantic operations (R-05).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Operation {
     Classify,
@@ -247,7 +271,19 @@ pub enum Operation {
 }
 
 /// The value kind a semantic step requires (spec 002, 3.9.3).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum RequiredKind {
     Label,
@@ -258,7 +294,7 @@ pub enum RequiredKind {
 }
 
 /// A question answered by a decision backend.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SemanticDecl {
     pub operation: Operation,
@@ -281,7 +317,7 @@ pub struct SemanticDecl {
     pub fallback: Fallback,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Candidates {
     None,
@@ -289,7 +325,7 @@ pub enum Candidates {
 }
 
 /// Fan-out over the ids produced by a step.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ForEach {
     /// `step:<id>` whose result is an id list, a filter result or a shortlist.
@@ -300,7 +336,7 @@ pub struct ForEach {
     pub items: ItemSource,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum ItemSource {
     None,
@@ -312,7 +348,7 @@ pub enum ItemSource {
 }
 
 /// Declared backend requirements beyond the operation and value kind.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct BackendReq {
     pub min_determinism: Determinism,
@@ -321,7 +357,19 @@ pub struct BackendReq {
 }
 
 /// Declared determinism of a backend, weakest first.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Determinism {
     Unspecified,
@@ -329,7 +377,7 @@ pub enum Determinism {
     Bitwise,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum ArtifactPin {
     Any,
@@ -337,14 +385,14 @@ pub enum ArtifactPin {
 }
 
 /// An explicit binding makes that backend the only candidate (3.9.4).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum BindingChoice {
     Auto,
     Backend(String),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum CalibrationRef {
     None,
@@ -352,7 +400,7 @@ pub enum CalibrationRef {
 }
 
 /// What happens when no candidate satisfies the step (3.9.6).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Fallback {
     None,
@@ -366,7 +414,7 @@ pub enum Fallback {
 }
 
 /// Declared ceilings (spec 002, 3.9.5 category 7, and 3.10.3).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct LimitsDecl {
     pub max_semantic_requests: u64,
@@ -378,7 +426,7 @@ pub struct LimitsDecl {
     pub deadline_ms: u64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExcessPolicy {
     Refuse,
@@ -386,7 +434,7 @@ pub enum ExcessPolicy {
 }
 
 /// A typed literal.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Literal {
     Bool(bool),
@@ -402,7 +450,7 @@ pub enum Literal {
 /// (registry `rustev.exact/1`). References are `input:<name>`,
 /// `step:<id>`, `item:<field>[.<field>...]` (inside a per-item operator) and
 /// `now`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Expr {
     Ref(String),
@@ -452,21 +500,21 @@ pub enum Expr {
 }
 
 /// What a graded read requires (spec 032, 3.9.1).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct GradeRequirement {
     pub min: Grade,
     pub max_age_ms: AgeLimit,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum AgeLimit {
     Ms(u64),
     NotRequired,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum CmpOp {
     Eq,
@@ -478,7 +526,7 @@ pub enum CmpOp {
 }
 
 /// Boolean predicates. `all([])` is true; `any([])` is false.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Predicate {
     Cmp {
@@ -504,7 +552,7 @@ pub enum Predicate {
 }
 
 /// The selection policy (spec 002, 3.11).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PolicyDecl {
     pub on_unresolved: Vec<Handler>,
@@ -513,7 +561,7 @@ pub struct PolicyDecl {
 }
 
 /// Handles one input or step being unresolved.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Handler {
     /// `input:<name>` or `step:<id>`.
@@ -522,7 +570,7 @@ pub struct Handler {
     pub action: HandlerAction,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum ReasonSet {
     Any,
@@ -530,7 +578,19 @@ pub enum ReasonSet {
 }
 
 /// The names of the closed `Unresolved` reasons.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum ReasonKind {
     MissingEvidence,
@@ -563,7 +623,7 @@ impl ReasonKind {
     ];
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum HandlerAction {
     /// The judgment is the target's unresolved reason.
@@ -588,7 +648,7 @@ pub enum HandlerAction {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Rule {
     pub id: String,
@@ -597,7 +657,7 @@ pub struct Rule {
 }
 
 /// Whether a probability threshold may read an uncalibrated distribution.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum UncalibratedThreshold {
     NotDeclared,
@@ -605,7 +665,7 @@ pub enum UncalibratedThreshold {
 }
 
 /// Policy conditions (spec 002, 3.11.3).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Cond {
     Always,
@@ -644,7 +704,7 @@ pub enum Cond {
 }
 
 /// What a matching rule proposes. Never a grant (spec 001, 3.2).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum OutcomeDecl {
     Propose {
@@ -665,14 +725,14 @@ pub enum OutcomeDecl {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ParamDecl {
     pub name: String,
     pub value: ParamSource,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum ParamSource {
     Ref(String),
@@ -680,7 +740,7 @@ pub enum ParamSource {
 }
 
 /// Raises a proposal parameter one position on an ordered scale, saturating.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Adjustment {
     pub id: String,

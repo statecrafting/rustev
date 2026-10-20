@@ -16,7 +16,7 @@ use crate::limits::RECORD_V1;
 use crate::optimization::{OptimizationOutcome, OptimizationRecord};
 use crate::schema;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RunRecord {
     pub schema: String,
@@ -41,14 +41,14 @@ crate::document::versioned_document!(
     RECORD_V1
 );
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum RecordedExecution {
     None,
     Declared(ExecutionPolicyId),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Termination {
     /// Every request resolved and the core finished a judgment.
@@ -57,7 +57,7 @@ pub enum Termination {
     Cancelled,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum CoreEvidence {
     /// Exactly what the core's `finish` returned.
@@ -66,7 +66,7 @@ pub enum CoreEvidence {
 }
 
 /// Monotonic milliseconds from submission; never wall-clock time.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Timing {
     pub queued_ms: u64,
@@ -75,7 +75,7 @@ pub struct Timing {
     pub deadline_expired: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RequestRecord {
     pub step: String,
@@ -143,7 +143,7 @@ impl RequestRecord {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum RequestResult {
     /// An output was supplied, from this target (0 is the bound backend).
@@ -154,7 +154,7 @@ pub enum RequestResult {
     NotSupplied,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AttemptRecord {
     /// `<decision id>/<step>/<instance ids joined by ','>/<n>`, each
@@ -171,7 +171,7 @@ pub struct AttemptRecord {
     pub cost: AttemptCost,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum AttemptEnd {
     /// A valid output.
@@ -187,14 +187,14 @@ pub enum AttemptEnd {
 }
 
 /// What is known about cancelling an attempt (spec 003, 3.7.3).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Cancellation {
     NotRequested,
     Requested { answer: CancelAnswer },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum CancelAnswer {
     /// The backend confirmed that its work and charges stopped.
@@ -205,7 +205,7 @@ pub enum CancelAnswer {
     NotObserved,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum RemoteState {
     /// The backend returned a result of its own accord.
@@ -216,7 +216,7 @@ pub enum RemoteState {
     PossiblyContinuing,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AttemptCost {
     pub bound: CostBound,
@@ -225,7 +225,7 @@ pub struct AttemptCost {
 }
 
 /// A backend's static cost disclosure.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum CostModel {
     /// Every call has an enforceable upper bound.
@@ -236,7 +236,7 @@ pub enum CostModel {
 }
 
 /// A backend's per-call cost disclosure, before dispatch.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum CostBound {
     /// The call cannot cost more than this.
@@ -250,7 +250,7 @@ pub enum CostBound {
 }
 
 /// What an attempt cost, as far as is known when it ends.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Charge {
     Observed { units: u64 },
@@ -258,7 +258,7 @@ pub enum Charge {
     Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Transition {
     /// Retry the same target after attempt `after`.
@@ -277,7 +277,7 @@ pub enum Transition {
     Stop { after: u32, reason: String },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum CostMode {
     Unlimited,
@@ -286,7 +286,7 @@ pub enum CostMode {
 }
 
 /// A decision's cost at the moment its record was built (spec 003, 3.5.6).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CostSummary {
     pub mode: CostMode,
@@ -303,7 +303,7 @@ pub struct CostSummary {
     pub within_guaranteed_cap: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum FinalCost {
     Known,

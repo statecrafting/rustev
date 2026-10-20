@@ -27,7 +27,7 @@ pub const MAX_BUNDLE_ITEMS: usize = 4096;
 /// The most resolved bytes of one case, external items included.
 pub const MAX_RESOLVED_BYTES: usize = 16 * 1024 * 1024;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ReplayBundle {
     pub schema: String,
@@ -56,7 +56,7 @@ pub struct ReplayBundle {
 crate::document::document!(ReplayBundle, schema::REPLAY, REPLAY_V1);
 
 /// Whether every supplied value was captured. Only `complete` reproduces.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum CaptureStatus {
     Complete,
@@ -68,7 +68,7 @@ pub enum CaptureStatus {
 }
 
 /// One value successfully supplied to the core.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SupplyEntry {
     pub step: String,
@@ -90,7 +90,19 @@ pub struct SupplyEntry {
 }
 
 /// Where in a bundle a problem is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum ItemLocation {
     Bundle,

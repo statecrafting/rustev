@@ -24,6 +24,12 @@ spec = "002-decision-contract-and-pure-core"
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
+schemars.workspace = true
+
+[dev-dependencies]
+# Validates every golden document against its emitted schema (spec 027,
+# 3.2.2); no HTTP or file resolution.
+jsonschema = { version = "=0.59.0", default-features = false }
 
 [lints]
 workspace = true

@@ -11,7 +11,7 @@ use crate::ids::SourceId;
 use crate::limits::DESCRIPTOR_V1;
 use crate::schema;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SourceDescriptor {
     pub schema: String,
@@ -29,7 +29,7 @@ pub struct SourceDescriptor {
 crate::document::document!(SourceDescriptor, schema::SOURCE, DESCRIPTOR_V1, SourceId);
 
 /// What a source attests for one definition input.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Fact {
     /// A definition input name.
@@ -40,7 +40,7 @@ pub struct Fact {
 }
 
 /// The highest grade a path can have from this source.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct FactGrade {
     /// `""` (the whole value) or segments joined by `/`: a record field
@@ -50,7 +50,7 @@ pub struct FactGrade {
     pub reliability: Reliability,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Reliability {
     Reliable,

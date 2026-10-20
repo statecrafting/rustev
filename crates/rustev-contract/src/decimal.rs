@@ -315,6 +315,20 @@ impl Serialize for Decimal {
     }
 }
 
+impl schemars::JsonSchema for Decimal {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "Decimal".into()
+    }
+
+    /// A decimal string; the parser alone judges canonical form and bounds.
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema!({
+            "type": "string",
+            "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$"
+        })
+    }
+}
+
 struct DecimalVisitor;
 
 impl Visitor<'_> for DecimalVisitor {

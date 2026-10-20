@@ -18,7 +18,7 @@ use crate::limits::RECORD_V1;
 use crate::schema;
 use crate::time::{DurationMs, Timestamp};
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Judgment {
     pub schema: String,
@@ -47,7 +47,7 @@ crate::document::versioned_document!(
 /// forms share the wire key `unresolved`: `{"unresolved": <reason>}` in
 /// version 1, `{"unresolved": {"reason": <reason>, "action": <action>}}` in
 /// version 2.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(from = "OutcomeWire", into = "OutcomeWire")]
 pub enum Outcome {
     Propose {
@@ -79,7 +79,7 @@ impl Outcome {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 enum OutcomeWire {
     Propose {
@@ -99,14 +99,14 @@ enum OutcomeWire {
 
 /// Version 2's `{reason, action}` is tried first; no version 1 reason is
 /// named `reason` or `action`, so the two forms never overlap.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(untagged)]
 enum UnresolvedWire {
     Actionable(ActionableUnresolved),
     Plain(Unresolved),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct ActionableUnresolved {
     reason: Unresolved,
@@ -161,7 +161,9 @@ impl From<Outcome> for OutcomeWire {
 
 /// The closed set of unresolved reasons (spec 002, 3.5.6). Field and fact
 /// lists are sorted and deduplicated.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Unresolved {
     MissingEvidence {
@@ -289,7 +291,19 @@ impl fmt::Display for Unresolved {
 }
 
 /// Derivation classes (spec 001, 3.3; spec 002, 3.12).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum Derivation {
     ExactDerived,
@@ -298,14 +312,16 @@ pub enum Derivation {
 }
 
 /// What a value was computed from: input fields and steps, sorted.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Lineage {
     pub inputs: Vec<String>,
     pub steps: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(deny_unknown_fields)]
 pub struct Notice {
     pub kind: NoticeKind,
@@ -317,7 +333,9 @@ pub struct Notice {
     pub action: Option<Action>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum NoticeKind {
     UncalibratedThreshold,
@@ -331,7 +349,7 @@ pub enum NoticeKind {
 }
 
 /// A value placed in a proposal's parameters.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum OutValue {
     Bool(bool),
@@ -351,7 +369,7 @@ pub enum OutValue {
 }
 
 /// The result of `filter_with_reasons@1`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Filtered {
     pub eligible: Vec<String>,
@@ -360,7 +378,7 @@ pub struct Filtered {
     pub counts: BTreeMap<String, u64>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Excluded {
     pub id: String,
@@ -368,7 +386,7 @@ pub struct Excluded {
 }
 
 /// The result of `top_k@1`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Shortlist {
     pub ids: Vec<String>,
@@ -378,7 +396,7 @@ pub struct Shortlist {
 }
 
 /// A `RankPosition` in wire form: an order, not a probability of being best.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Ranking {
     pub entries: Vec<RankEntry>,
@@ -386,7 +404,7 @@ pub struct Ranking {
     pub excluded: Vec<Excluded>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RankEntry {
     pub candidate: String,

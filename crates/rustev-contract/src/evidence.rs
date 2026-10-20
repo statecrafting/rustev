@@ -13,7 +13,7 @@ use crate::limits::RECORD_V1;
 use crate::schema;
 use crate::time::Timestamp;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct EvidenceRecord {
     pub schema: String,
@@ -39,7 +39,7 @@ crate::document::versioned_document!(
     RECORD_V1
 );
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct InputEvidence {
     pub field: String,
@@ -62,14 +62,14 @@ pub struct InputEvidence {
 }
 
 /// Which check dropped an input (spec 033, 3.4.8).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DroppedBy {
     pub check: String,
 }
 
 /// One snapshot entry considered for a graded input.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct EntryEvidence {
     pub source: String,
@@ -83,7 +83,7 @@ pub struct EntryEvidence {
     pub disposition: Disposition,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Disposition {
     Used,
@@ -93,7 +93,7 @@ pub enum Disposition {
 }
 
 /// The rule applied to a disagreement and what it chose.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Resolution {
     pub rule: ResolutionRule,
@@ -102,7 +102,7 @@ pub struct Resolution {
 
 /// The conflict rule applied (spec 032, 3.8.1); the source order of
 /// `prefer` and `treat_as_hint` is the plan's.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ResolutionRule {
     RequireAgreement,
@@ -111,7 +111,7 @@ pub enum ResolutionRule {
     Abstain,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum UsedEntry {
     None,
@@ -119,7 +119,7 @@ pub enum UsedEntry {
     Entry(u64),
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum InputStatus {
     Resolved {
@@ -130,7 +130,7 @@ pub enum InputStatus {
     Unresolved(Unresolved),
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct StepEvidence {
     pub step: String,
@@ -150,7 +150,7 @@ pub struct StepEvidence {
     pub corroboration: Option<Corroboration>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum MatchStatus {
     Matched,
@@ -158,7 +158,7 @@ pub enum MatchStatus {
     MatchedAbsent,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct JoinEvidence {
     pub id: String,
@@ -166,7 +166,7 @@ pub struct JoinEvidence {
 }
 
 /// One merged field: its side (or why it is absent), rule and grade.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct MergeEvidence {
     /// The item id when merging per item; empty for two records.
@@ -177,14 +177,14 @@ pub struct MergeEvidence {
     pub result: MergedField,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum MergedField {
     Taken { side: MergeSide, grade: ValueGrade },
     Absent { reason: AbsentReason },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum CorroborationOutcome {
     Corroborated,
@@ -194,7 +194,7 @@ pub enum CorroborationOutcome {
 
 /// A corroboration step's record: the claim before and after, the outcome
 /// and every check.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Corroboration {
     pub claim: String,
@@ -205,7 +205,7 @@ pub struct Corroboration {
     pub checks: Vec<CheckEvidence>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum CheckResult {
     Supports,
@@ -213,7 +213,7 @@ pub enum CheckResult {
     NoEvidence,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CheckEvidence {
     pub result: CheckResult,
@@ -222,7 +222,7 @@ pub struct CheckEvidence {
     pub reads: Vec<ReadEvidence>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum CheckReason {
     /// The predicate was true.
@@ -235,7 +235,7 @@ pub enum CheckReason {
     BelowGrade { read: String },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ReadEvidence {
     pub reference: String,
@@ -245,7 +245,7 @@ pub struct ReadEvidence {
     pub grade: ValueGrade,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum StepStatus {
     Resolved {

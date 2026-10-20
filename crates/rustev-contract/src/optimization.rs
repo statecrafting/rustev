@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 pub const MAX_OPTIMIZATION_DIAGNOSTICS: usize = 8;
 
 /// Plan-identified controls for reusable semantic work.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct OptimizationPolicy {
     pub key_schema_version: u32,
@@ -26,7 +26,7 @@ pub struct OptimizationPolicy {
     pub memory_cache: Option<MemoryCachePolicy>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum OptimizationAdmission {
     /// Refuse when an enabled optimization cannot safely admit the request.
@@ -35,7 +35,7 @@ pub enum OptimizationAdmission {
     ExecuteIndependent,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExpiryBasis {
     /// The monotonic clock injected into the runtime. It is process-relative,
@@ -43,7 +43,7 @@ pub enum ExpiryBasis {
     InjectedRuntimeTime,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct BatchPolicy {
     pub max_members: u32,
@@ -58,7 +58,7 @@ pub struct BatchPolicy {
 
 /// Deterministic settlement of one observed batch charge across its logical
 /// members. Member order is the runtime-recorded batch index order.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum BatchChargeAllocation {
     /// Divide integer units evenly. Members with the lowest indices receive
@@ -70,7 +70,7 @@ pub enum BatchChargeAllocation {
 
 /// Bounds apply to one plan's cache namespace; no plan's policy evicts
 /// another plan's entries.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct MemoryCachePolicy {
     pub max_bytes: u64,
@@ -81,7 +81,7 @@ pub struct MemoryCachePolicy {
     pub eviction: EvictionOrder,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum EvictionOrder {
     /// First admitted, first evicted. Cache hits do not reorder entries. A
@@ -89,7 +89,7 @@ pub enum EvictionOrder {
     Fifo,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum OptimizationMechanism {
     Independent,
@@ -97,7 +97,7 @@ pub enum OptimizationMechanism {
     MemoryCache,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum OptimizationOutcome {
     Bypassed,
@@ -109,7 +109,7 @@ pub enum OptimizationOutcome {
 
 /// Per-logical-request runtime observations. Secret key material and cached
 /// content are deliberately absent.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct OptimizationRecord {
     pub mechanism: OptimizationMechanism,

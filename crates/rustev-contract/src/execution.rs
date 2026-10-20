@@ -11,7 +11,7 @@ use crate::limits::DESCRIPTOR_V1;
 use crate::optimization::OptimizationPolicy;
 use crate::schema;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ExecutionPolicy {
     pub schema: String,
@@ -37,7 +37,7 @@ crate::document::document!(
 
 /// The cost budget of one decision, in integer units the deployment chooses
 /// (spec 003, 3.5).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum CostPolicy {
     /// Nothing is refused; charges are still recorded.
@@ -50,7 +50,7 @@ pub enum CostPolicy {
     Estimated { max_units: u64 },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct StepExecution {
     pub step: String,
@@ -60,7 +60,7 @@ pub struct StepExecution {
 }
 
 /// Retries on the same target (spec 003, 3.6.1 and 3.6.3).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RetryPolicy {
     /// Attempts per target, including the first; `1..=8`.
@@ -83,7 +83,7 @@ impl RetryPolicy {
 }
 
 /// The delay before retry `n` (1-based). No jitter.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Delay {
     None,
@@ -111,7 +111,7 @@ impl Delay {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum AttemptTimeout {
     None,
@@ -120,7 +120,7 @@ pub enum AttemptTimeout {
 
 /// Runtime failure fallback (spec 003, 3.6.2), distinct from the
 /// definition's compile-time capability fallback.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct FallbackPolicy {
     /// Backend ids tried in order after the bound backend; at most 4, none
@@ -142,7 +142,19 @@ impl FallbackPolicy {
 /// How a dispatched attempt failed (spec 003, 3.6.1). Deadline and
 /// cancellation are not classes: they end a request, and are never retried
 /// or a fallback trigger.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum FailureClass {
     /// The output failed the core's validation.

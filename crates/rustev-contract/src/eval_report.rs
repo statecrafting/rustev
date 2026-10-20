@@ -11,7 +11,7 @@ use crate::ids::{ArtifactId, CalibrationId, DatasetId, EvaluatorConfigId, PlanId
 use crate::limits::RECORD_V1;
 use crate::schema;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct EvalReport {
     pub schema: String,
@@ -26,7 +26,7 @@ pub struct EvalReport {
 
 crate::document::document!(EvalReport, schema::EVAL_REPORT, RECORD_V1);
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DatasetRef {
     pub id: DatasetId,
@@ -35,7 +35,7 @@ pub struct DatasetRef {
 }
 
 /// A split used to fit a head or a calibration map is not a holdout afterwards.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Split {
     Training,
@@ -44,7 +44,7 @@ pub enum Split {
     FinalTest,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum DatasetProvenance {
     /// Generated; evidence of mechanics, never of semantic quality (R-04).
@@ -57,7 +57,7 @@ pub enum DatasetProvenance {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum ReportStatus {
     Complete,
@@ -65,14 +65,14 @@ pub enum ReportStatus {
     Incomparable { reason: String },
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Metric {
     pub name: String,
     pub value: MetricValue,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum MetricValue {
     Measured { value: f64, n: u64 },

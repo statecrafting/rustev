@@ -18,7 +18,7 @@ use crate::judgment::{Derivation, Notice};
 use crate::limits::PLAN_V1;
 use crate::schema;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Plan {
     pub schema: String,
@@ -58,7 +58,7 @@ crate::document::versioned_document!(
 );
 
 /// A source descriptor bound at compile time.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct BoundSource {
     pub name: String,
@@ -67,7 +67,7 @@ pub struct BoundSource {
 }
 
 /// The highest grade an input path or step value can have.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct StaticGrade {
     /// `input:<name>`, `input:<name>/<path>` or `step:<id>`.
@@ -75,14 +75,14 @@ pub struct StaticGrade {
     pub ceiling: ValueGrade,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum PlanExecution {
     None,
     Declared(Box<DeclaredExecution>),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DeclaredExecution {
     pub id: ExecutionPolicyId,
@@ -92,7 +92,7 @@ pub struct DeclaredExecution {
 }
 
 /// A runtime fallback target bound at compile time.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct FallbackBinding {
     pub step: String,
@@ -105,7 +105,7 @@ pub struct FallbackBinding {
     pub output: OutputKind,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PlanStep {
     pub id: String,
@@ -114,7 +114,7 @@ pub struct PlanStep {
     pub detail: PlanStepDetail,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum PlanStepDetail {
     Exact {
@@ -130,7 +130,7 @@ pub enum PlanStepDetail {
     Corroborate,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SemanticBinding {
     pub backend_id: String,
@@ -148,7 +148,7 @@ pub struct SemanticBinding {
     pub max_projection_bytes: u64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Normalization {
     None,
@@ -157,7 +157,7 @@ pub enum Normalization {
     Softmax1,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum BoundCalibration {
     None,

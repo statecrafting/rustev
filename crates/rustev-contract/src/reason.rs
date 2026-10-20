@@ -12,7 +12,7 @@ use crate::judgment::Unresolved;
 use crate::limits::RECORD_V1;
 use crate::schema;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RuntimeReasonDoc {
     pub schema: String,

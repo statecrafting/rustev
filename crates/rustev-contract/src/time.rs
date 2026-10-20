@@ -13,8 +13,35 @@ pub const MAX_TIMESTAMP_MS: i64 = 253_402_300_799_999;
 #[serde(transparent)]
 pub struct Timestamp(i64);
 
+impl schemars::JsonSchema for Timestamp {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "Timestamp".into()
+    }
+
+    /// The range the parser enforces.
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema!({
+            "type": "integer",
+            "minimum": 0,
+            "maximum": MAX_TIMESTAMP_MS
+        })
+    }
+}
+
 /// A non-negative span in milliseconds.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+)]
 #[serde(transparent)]
 pub struct DurationMs(pub u64);
 
