@@ -2,7 +2,7 @@
 id: "033-provenance-rules-and-actionable-outcomes"
 title: "Provenance-conditional rules and actionable outcomes (amends 002 and 006)"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-17"
 summary: >
   An amendment of approved specs 002 and 006, for #76 child B3. A
@@ -20,8 +20,8 @@ summary: >
   outcomes to transport semantics. Adds to the #76 track versions
   `rustev.definition/2`, `rustev.plan/3` and `rustev.evidence/2`, and
   introduces `rustev.judgment/2`; plans using no construct of this spec
-  keep their bytes and `PlanId`. Approved (A-30); implementation is
-  pending.
+  keep their bytes and `PlanId`. Approved (A-30); implemented, with
+  the Node binding's conformance item awaiting spec 027.
 amends:
   - "002-decision-contract-and-pure-core"
   - "006-cli-surface"
@@ -85,8 +85,8 @@ obligations:
 # 033: Provenance-conditional rules and actionable outcomes (amends 002 and 006)
 
 Approved by the owner (A-30, 2026-10-17, under the 2026-10-16 delivery work
-order) as its own reviewable change before any code (R-16); implementation
-is pending. This spec implements #76 child B3 (#61). The approved texts of
+order) as its own reviewable change before any code (R-16); implemented in
+five increments (see the Implementation record). This spec implements #76 child B3 (#61). The approved texts of
 specs 002 and 006 are not edited; this spec records what changes. It builds
 on spec 032 (#76 B2, evidence quality), which introduces the #76 track
 versions `rustev.definition/2`, `rustev.plan/3` and `rustev.evidence/2`,
@@ -642,7 +642,31 @@ synthetic fixtures (R-04, R-37).
 
 ## Verification
 
-Pending with implementation. Approval satisfies no acceptance item.
+```verify:cli
+# 3.1: documents, versions and the wire forms of every new type.
+cargo test -p rustev-contract --locked --test actionability_wire
+# 3.1 and 3.8: the version gate, the actionability phase, categories 16
+# and 17, and the plan 3 static table.
+cargo test -p rustev-core --locked --test actionability_versions --test actionability_compile
+# 3.3 to 3.7: checks, consequences, statuses, terminal outcomes,
+# provenance_within, needs_input and every action; section 5's remaining
+# rows, the computed party of every cause class and the future-window
+# judgment 2 and evidence 2 goldens.
+cargo test -p rustev-core --locked --test actionability_eval --test actionability_rows
+# 3.6.4 and 3.9: backend origin and transience, in the core and through the
+# runtime.
+cargo test -p rustev-core --locked --test actionability_origin
+cargo test -p rustev-runtime --locked --test actionability_origin
+# 3.11: the CLI's refusal, plan show and run goldens.
+cargo test -p rustev-cli --locked --test actionability
+# 3.12: every existing golden is unchanged.
+cargo test -p rustev-core --locked
+cargo test -p rustev-cli --locked
+cargo test -p rustev-pkg-lodging --locked
+# Negative control: the seeded defects of the Acceptance section are each
+# detected (with spec 032's).
+sh crates/rustev-core/mutation/seeds.sh
+```
 
 ## Implementation record
 
@@ -815,6 +839,42 @@ carries the registered origin), and `crates/rustev-cli/tests/actionability.rs`
 with goldens `refusal-16.json`, `refusal-17.json`, `actionable.show.json`
 and `actionable.run-{propose,refused,needs,unresolved}.json`; every
 existing CLI golden is unchanged.
+
+**Increment 5 (coverage, seeds and close).** The remaining rows of
+section 5 and Acceptance items, in
+`crates/rustev-core/tests/actionability_rows.rs`: the computed party of
+every cause class, as the golden table `actionability.addressing.json`
+(each provenance class declared and not declared caller-controlled,
+observed and accepted, an accepted cause mixing a caller and a host class,
+`backend` with each origin, `budget`, `deadline`, `capability`, `policy`,
+no cause, and mixed causes combining toward `upstream`), through
+`rustev_core::computed_party`, now public beside `transient`;
+`downgrade_grade` over spec 032's graded fixtures (an authoritative
+district becomes `estimated` with a `grade_downgraded` notice addressed
+`upstream`, a `hint` claim stays `hint`, a passing check changes nothing);
+`provenance_within` on a step value's provenance set; `relax` (the group's
+later check is `relaxed{by}`, a `constraints_relaxed` notice addressed to
+the caller, and the decision continues); an `escalate` consequence deciding
+without the policy; a `third-party` and a `user-supplied` missing field in
+one `missing_evidence`, computed `upstream`; a refusing check on support
+routing's caller message issuing none of its three semantic requests; and
+the future-window example
+as judgment 2 and evidence 2 goldens
+(`actionability.trip-{refused,dropped}.{judgment,evidence}.json`). The
+core mutation harness (`crates/rustev-core/mutation/seeds.py`) gains the
+seven seeds of the Acceptance section: party combination preferring
+`caller`, an override to `caller` accepted, `accepted` causes ignoring a
+non-caller class, a dropped value replaced by its entry, an unevaluable
+check treated as passed, a terminal check not stopping semantic requests,
+and `transient` true for `invalid_input`; each makes a named test fail
+(checked by applying each seed in place and running its tests to
+completion; the terminal seed survived until the support-routing test
+above was added). The Verification
+section declares the acceptance commands and `make verify` runs them.
+Every existing golden is byte-identical (the existing suites pass
+unchanged). The Node binding's conformance item stays externally blocked
+on spec 027, which is not yet implemented; it is not claimed. With that
+exception reported, the implementation is complete.
 
 ## Decisions at approval
 

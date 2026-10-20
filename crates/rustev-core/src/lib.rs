@@ -26,9 +26,9 @@ pub mod seams;
 pub mod sem;
 pub mod value;
 
-/// Whether retrying an unresolved request unchanged can succeed (spec 033,
-/// 3.6.4).
-pub use actionable::transient;
+/// The computed party of causes (spec 033, 3.5.2) and whether retrying an
+/// unresolved request unchanged can succeed (3.6.4).
+pub use actionable::{computed_party, transient};
 pub use compile::{
     Category, Compiled, LoadError, Refusal, compile, compile_bytes, compile_with,
     compile_with_sources,

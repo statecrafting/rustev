@@ -119,6 +119,12 @@ pub(crate) fn cause_party(cause: &Cause, caller_controlled: &[ProvenanceClass]) 
     }
 }
 
+/// The computed party of a list of causes under the declared
+/// caller-controlled classes (3.5.2): each cause's party, combined.
+pub fn computed_party(causes: &[Cause], caller_controlled: &[ProvenanceClass]) -> Party {
+    Party::combine(causes.iter().map(|c| cause_party(c, caller_controlled)))
+}
+
 /// Duplicate-free causes sorted by their canonical JSON bytes (3.5.2).
 pub(crate) fn sort_causes(causes: Vec<Cause>) -> Vec<Cause> {
     let mut keyed: Vec<(Vec<u8>, Cause)> = causes

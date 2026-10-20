@@ -72,7 +72,7 @@
       }
     ],
     "id": "033-provenance-rules-and-actionable-outcomes",
-    "implementation": "pending",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-12-compatibility",
@@ -128,7 +128,7 @@
       }
     ],
     "sectionDigests": {
-      "033-provenance-conditional-rules-and-actionable-outcomes-amends-002-and-006": "f94951575c58caef4ea7a226cce488b6a8152b1cba4583640a02cd76a79ac8ce",
+      "033-provenance-conditional-rules-and-actionable-outcomes-amends-002-and-006": "114fb89dc1e56a87b1321f0873153cb25df5f4e7881ae3b81ccda14a4850a4ca",
       "1-purpose": "3f29e160e1f528730995f1d3485e5d734becd4da175391f91e0519a65618231e",
       "2-1-binding-principles-of-76": "dd20445f4d5dcab10d699ca800a441225bde9534a11dea3ad0b52decac3e7b47",
       "2-territory": "170894fab17e2c9874ac3e54df628ecee26620b90061bfd126a77c4cc85b8bd3",
@@ -149,8 +149,8 @@
       "5-observable-negative-cases": "0c445bfb7674290de4d6391a17e2d869b04c6bba052464979d34ec5fc35ab113",
       "acceptance": "b641889d14003c48eece9936b067885c16f6d569c44c637876c8c987a6ab7fe8",
       "decisions-at-approval": "4b72d6b78048ffbfc966f689ced5a540635e9029fb9417d24c4d5d4adc102d65",
-      "implementation-record": "e0c4cbdb0025fc509a321098d990daf6787bbc73faeaec38e9eba23b3414be6f",
-      "verification": "4efc643d528d57e8b0a2c01bc3a7179dd16d653f9f394610184d93e40d5d2554"
+      "implementation-record": "a482ab46b74b44a0b4068fb7b3e12326fa5f2b5d9496d79974cf2266b08fd783",
+      "verification": "c9d48ef39f738cdb3d7db79e5d8c0c4860f21f11efaabf3ec231914ee4f93589"
     },
     "sectionHeadings": [
       "033: Provenance-conditional rules and actionable outcomes (amends 002 and 006)",
@@ -179,9 +179,9 @@
     ],
     "specPath": "specs/033-provenance-rules-and-actionable-outcomes/spec.md",
     "status": "approved",
-    "summary": "An amendment of approved specs 002 and 006, for #76 child B3. A definition may declare which provenance classes the caller controls, input checks whose consequence on failure depends on the provenance of the value tested (refuse, drop the field, relax a named constraint group, downgrade its grade, abstain, escalate, or continue with a notice), exhaustive over the classes the input accepts, and policy conditions over provenance. Every unresolved outcome, refusal and notice of such a plan carries who can act on it, a typed remediation, its causes with provenance, and whether retrying can succeed; who can act is computed from the causes, and an author may only move it away from the caller, never toward it. Adds the `needs_input` outcome with declared, literal questions and a continuation digest, and documents how hosts map outcomes to transport semantics. Adds to the #76 track versions `rustev.definition/2`, `rustev.plan/3` and `rustev.evidence/2`, and introduces `rustev.judgment/2`; plans using no construct of this spec keep their bytes and `PlanId`. Approved (A-30); implementation is pending.\n",
+    "summary": "An amendment of approved specs 002 and 006, for #76 child B3. A definition may declare which provenance classes the caller controls, input checks whose consequence on failure depends on the provenance of the value tested (refuse, drop the field, relax a named constraint group, downgrade its grade, abstain, escalate, or continue with a notice), exhaustive over the classes the input accepts, and policy conditions over provenance. Every unresolved outcome, refusal and notice of such a plan carries who can act on it, a typed remediation, its causes with provenance, and whether retrying can succeed; who can act is computed from the causes, and an author may only move it away from the caller, never toward it. Adds the `needs_input` outcome with declared, literal questions and a continuation digest, and documents how hosts map outcomes to transport semantics. Adds to the #76 track versions `rustev.definition/2`, `rustev.plan/3` and `rustev.evidence/2`, and introduces `rustev.judgment/2`; plans using no construct of this spec keep their bytes and `PlanId`. Approved (A-30); implemented, with the Node binding's conformance item awaiting spec 027.\n",
     "title": "Provenance-conditional rules and actionable outcomes (amends 002 and 006)"
   },
-  "shardHash": "26045e66cab3cf664d83d10811e84bc89ff774fb66f929cbd778b21b18ca48f7",
+  "shardHash": "29bb2d7153771ef1fd2138135191460e382bba0d4633a15b02a4e2b5ed7f9c52",
   "specVersion": "1.9.0"
 }
