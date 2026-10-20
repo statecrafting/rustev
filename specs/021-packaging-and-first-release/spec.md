@@ -417,10 +417,11 @@ Plan, in dependency order:
    reproducibility comparison (3.7).
 4. Dependency, license and advisory audit with a pinned tool and policy
    (3.6).
-5. The canonical release manifest, `SHA256SUMS`, signature binding
-   fixtures, the dry-run lifecycle state machine and the fake-registry
-   harness (3.1, 3.8, 3.9, section 4).
-6. Candidate evidence at an exact commit (3.7), then the owner's
+5. The canonical release manifest, `SHA256SUMS` and the signature binding
+   fixtures (3.8).
+6. The dry-run lifecycle state machine, the publication journal and the
+   fake-registry harness (3.1, 3.9, section 4).
+7. Candidate evidence at an exact commit (3.7), then the owner's
    publication instruction (I-4), publication, and the registry-only
    consumer (3.10).
 
@@ -540,6 +541,31 @@ records which licenses were checked and draws no legal conclusion. The
 first run found RUSTSEC-2026-0346 to 0349 in rustls 0.23.45; their repair
 is the separate change recorded above. `tests/audit.rs` covers the report
 over the real workspace and each exception rule.
+
+**Increment 5 (release manifest and signature binding).**
+`rustev-release manifest <evidence-dir>` writes, for the clean commit at
+HEAD, the canonical `release-manifest.json` (`rustev.release-manifest/1`:
+compact JSON in field order, so equal inputs give equal bytes) with the
+version, tag, full commit and tree ids, registry, layers and upload order,
+each archive's file name, length and SHA-256 (the checksum the registry is
+expected to record; the observed one belongs to the journal), the rustc,
+Cargo, host and audit-tool identities, the source date, the SHA-256 of
+every evidence file of the candidate run, and the stated limitations; and
+`SHA256SUMS` over the archives. `make release-candidate` ends with it.
+Signing is the owner's act and nothing here signs or reads a private key.
+The documented owner identity is the owner's Git SSH signing key,
+committed as `tools/rustev-release/allowed_signers` (public key only);
+file signatures use the SSH namespace `rustev-release`, and the tag is the
+owner's signed annotated `v0.1.0` whose message names the manifest digest
+and the package set. `rustev-release verify-release <dir> [<repo>]` checks
+every binding: both detached signatures under that identity, the archives
+against the manifest and `SHA256SUMS`, the tag's type, signature, commit
+and message, and the commit's tree. `tests/signing.rs` builds each fixture
+from a throwaway key generated at test time and rejects the substitution
+of each member: an archive, the manifest's signer, the manifest's content,
+the checksums (even re-signed), the tag's commit, the manifest's tree, the
+tag's message, an unsigned or lightweight tag, and a non-canonical
+manifest.
 
 Open for the owner: spec 031 3.1, which amends this section, orders each
 layer by name and starts a layer only after every package of the earlier

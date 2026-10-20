@@ -115,13 +115,9 @@ step deny.txt cargo deny --manifest-path Cargo.toml --config tools/rustev-releas
   --workspace $excluded --locked check
 step exceptions.txt "$release" exceptions "$(date -u +%Y-%m-%d)"
 step dependencies.json "$release" deps
-sha256() {
-  if command -v sha256sum >/dev/null 2>&1; then sha256sum "$@"; else shasum -a 256 "$@"; fi
-}
-# The release set's archives by name: never a glob that could match none.
-# Written whole or not at all.
-(cd "$out/a" && for p in $packages; do sha256 "$p-$version.crate"; done) >"$out/SHA256SUMS.partial"
-mv "$out/SHA256SUMS.partial" "$out/SHA256SUMS"
+# 3.8: the canonical manifest and SHA256SUMS of run a. Signing them and the
+# tag is the owner's act; nothing here signs.
+step manifest.txt "$release" manifest "$out"
 cat "$out/compare.txt" "$out/unpacked.txt" "$out/exceptions.txt"
 # `step` stops the script on a failing audit, so reaching here means it
 # passed; every diagnostic stays in deny.txt, part of the candidate evidence.

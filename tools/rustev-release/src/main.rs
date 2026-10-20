@@ -20,6 +20,14 @@
 //! build closure, development-only additions, each with source, checksum
 //! and license) and exits 1 on a missing license or checksum.
 //!
+//! `rustev-release manifest <evidence-dir>` writes the canonical
+//! `release-manifest.json` and `SHA256SUMS` for the archives in
+//! `<evidence-dir>/a` at the clean commit at HEAD (3.8). Signing them and
+//! the tag is the owner's act.
+//!
+//! `rustev-release verify-release <dir> [<repo>]` checks every binding of
+//! 3.8 against the committed `allowed_signers` and the owner identity.
+//!
 //! `rustev-release exceptions <YYYY-MM-DD>` exits 1 unless every advisory
 //! `deny.toml` ignores has an owner-approved exception unexpired on that
 //! date (3.6).
@@ -405,6 +413,154 @@ fn exceptions(today: &str) -> ExitCode {
     }
 }
 
+fn command_line(program: &str, args: &[&str]) -> Result<String, String> {
+    let mut cmd = Command::new(program);
+    // No inherited `GIT_*` variable (such as `GIT_DIR`) may point the dirty
+    // check or the recorded commit and tree at another repository.
+    for (k, _) in std::env::vars_os() {
+        if k.to_string_lossy().starts_with("GIT_") {
+            cmd.env_remove(&k);
+        }
+    }
+    let out = cmd
+        .args(args)
+        .output()
+        .map_err(|e| format!("could not run {program}: {e}"))?;
+    if !out.status.success() {
+        return Err(format!(
+            "{program} {} failed: {}",
+            args.join(" "),
+            String::from_utf8_lossy(&out.stderr).trim()
+        ));
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+}
+
+fn manifest(set: &ReleaseSet, evidence_dir: &str) -> ExitCode {
+    use rustev_release::archive::sha256_hex;
+    use rustev_release::manifest::{Inputs, Toolchain, build, sha256sums};
+    let dir = Path::new(evidence_dir);
+    let result = (|| -> Result<(), String> {
+        if !command_line("git", &["status", "--porcelain", "--untracked-files=no"])?.is_empty() {
+            return Err(
+                "021 3.8: the manifest names an exact clean commit; the tree is dirty".into(),
+            );
+        }
+        let commit = command_line("git", &["rev-parse", "HEAD"])?;
+        // Clean and at the same commit after reading it, so nothing changed
+        // between the check above and the commit recorded.
+        if !command_line("git", &["status", "--porcelain", "--untracked-files=no"])?.is_empty()
+            || command_line("git", &["rev-parse", "HEAD"])? != commit
+        {
+            return Err("021 3.8: the tree changed while the manifest was being built".into());
+        }
+        let tree = command_line("git", &["rev-parse", &format!("{commit}^{{tree}}")])?;
+        let epoch: u64 = command_line("git", &["log", "-1", "--format=%ct", &commit])?
+            .parse()
+            .map_err(|e| format!("commit time: {e}"))?;
+        let rustc = command_line("rustc", &["-vV"])?;
+        let host = rustc
+            .lines()
+            .find_map(|l| l.strip_prefix("host: "))
+            .unwrap_or("unknown")
+            .to_string();
+        let mut evidence = std::collections::BTreeMap::new();
+        for name in [
+            "compare.txt",
+            "archives.json",
+            "unpacked.txt",
+            "deny.txt",
+            "exceptions.txt",
+            "dependencies.json",
+        ] {
+            let bytes = std::fs::read(dir.join(name)).map_err(|e| format!("{name}: {e}"))?;
+            evidence.insert(name.to_string(), sha256_hex(&bytes));
+        }
+        let m = build(
+            set,
+            &dir.join("a"),
+            Inputs {
+                commit,
+                tree,
+                toolchain: Toolchain {
+                    rustc: rustc.lines().next().unwrap_or_default().to_string(),
+                    cargo: command_line("cargo", &["--version"])?,
+                    host,
+                    audit: command_line("cargo", &["deny", "--version"])?,
+                },
+                source_date_epoch: epoch,
+                evidence,
+                limitations: LIMITATIONS.iter().map(|l| l.to_string()).collect(),
+            },
+        )?;
+        // Both files are written in full beside their targets, then renamed
+        // (each rename atomic), the manifest last: a manifest present means
+        // its SHA256SUMS is complete, and an interrupted run leaves only
+        // `.partial` files, which a re-run overwrites.
+        let put = |name: &str, bytes: &[u8]| -> Result<(), String> {
+            let partial = dir.join(format!("{name}.partial"));
+            std::fs::write(&partial, bytes).map_err(|e| format!("{}: {e}", partial.display()))
+        };
+        put("SHA256SUMS", sha256sums(&m).as_bytes())?;
+        put("release-manifest.json", &m.canonical())?;
+        for name in ["SHA256SUMS", "release-manifest.json"] {
+            std::fs::rename(dir.join(format!("{name}.partial")), dir.join(name))
+                .map_err(|e| format!("{name}: {e}"))?;
+        }
+        println!("release-manifest.json sha256 {}", m.digest());
+        Ok(())
+    })();
+    match result {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(e) => {
+            eprintln!("{e}");
+            ExitCode::from(1)
+        }
+    }
+}
+
+/// Every limitation the first release states (3.8); the release notes
+/// repeat them.
+const LIMITATIONS: &[&str] = &[
+    "Source archives only: no prebuilt binary, container or npm package.",
+    "Supported targets are those the candidate matrix tested; others are unsupported.",
+    "Synthetic reference datasets and reports support no quality or calibration claim.",
+    "Pre-1.0: a minor version may change any public contract (3.2).",
+];
+
+fn verify_release_cmd(dir: &str, repo: &str) -> ExitCode {
+    // The built-in record, written to a scratch file `ssh-keygen` can read.
+    let scratch = match rustev_release::repro::fresh_dir("rustev-release-signers") {
+        Ok(d) => d,
+        Err(e) => {
+            eprintln!("{e}");
+            return ExitCode::from(2);
+        }
+    };
+    // `scratch` is a `Scratch` guard: the directory is removed when it drops
+    // at the end of this function, on every path.
+    let signers = scratch.join("allowed_signers");
+    if let Err(e) = std::fs::write(&signers, rustev_release::manifest::ALLOWED_SIGNERS) {
+        eprintln!("{}: {e}", signers.display());
+        return ExitCode::from(2);
+    }
+    let v = rustev_release::manifest::verify_release(
+        Path::new(dir),
+        Path::new(repo),
+        &signers,
+        rustev_release::manifest::OWNER_IDENTITY,
+    );
+    if v.is_empty() {
+        println!("release in {dir}: commit, tree, tag, manifest, checksums and key bind (3.8)");
+        ExitCode::SUCCESS
+    } else {
+        for x in &v {
+            eprintln!("{x}");
+        }
+        ExitCode::from(1)
+    }
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let set = match ReleaseSet::parse(SET.as_bytes()) {
@@ -420,12 +576,15 @@ fn main() -> ExitCode {
         ["compare", a, b] => compare(&set, a, b),
         ["field", name] => field(&set, name),
         ["deps"] => deps(&set),
+        ["manifest", dir] => manifest(&set, dir),
+        ["verify-release", dir] => verify_release_cmd(dir, "."),
+        ["verify-release", dir, repo] => verify_release_cmd(dir, repo),
         ["exceptions", today] => exceptions(today),
         ["unpacked", dir, work] => unpacked(&set, dir, work, None),
         ["unpacked", dir, work, toolchain] => unpacked(&set, dir, work, Some(toolchain)),
         _ => {
             eprintln!(
-                "usage: rustev-release manifests | archives <dir> | compare <dir-a> <dir-b> | field <name> | unpacked <dir> <work> [<toolchain>] | deps | exceptions <YYYY-MM-DD>"
+                "usage: rustev-release manifests | archives <dir> | compare <dir-a> <dir-b> | field <name> | unpacked <dir> <work> [<toolchain>] | deps | exceptions <YYYY-MM-DD> | manifest <evidence-dir> | verify-release <dir> [<repo>]"
             );
             ExitCode::from(2)
         }
