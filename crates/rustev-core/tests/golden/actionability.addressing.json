@@ -1,0 +1,644 @@
+[
+  {
+    "caller_controlled": [],
+    "case": "observed AuthenticatedAppField, not caller-controlled",
+    "causes": [
+      {
+        "input": {
+          "field": "f",
+          "provenance": {
+            "observed": {
+              "class": "authenticated-app-field"
+            }
+          }
+        }
+      }
+    ],
+    "computed": "host"
+  },
+  {
+    "caller_controlled": [],
+    "case": "accepted AuthenticatedAppField, not caller-controlled",
+    "causes": [
+      {
+        "input": {
+          "field": "f",
+          "provenance": {
+            "accepted": {
+              "classes": [
+                "authenticated-app-field"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "computed": "host"
+  },
+  {
+    "caller_controlled": [
+      "authenticated-app-field"
+    ],
+    "case": "observed AuthenticatedAppField, caller-controlled",
+    "causes": [
+      {
+        "input": {
+          "field": "f",
+          "provenance": {
+            "observed": {
+              "class": "authenticated-app-field"
+            }
+          }
+        }
+      }
+    ],
+    "computed": "caller"
+  },
+  {
+    "caller_controlled": [
+      "authenticated-app-field"
+    ],
+    "case": "accepted AuthenticatedAppField, caller-controlled",
+    "causes": [
+      {
+        "input": {
+          "field": "f",
+          "provenance": {
+            "accepted": {
+              "classes": [
+                "authenticated-app-field"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "computed": "caller"
+  },
+  {
+    "caller_controlled": [],
+    "case": "observed SystemOfRecord, not caller-controlled",
+    "causes": [
+      {
+        "input": {
+          "field": "f",
+          "provenance": {
+            "observed": {
+              "class": "system-of-record"
+            }
+          }
+        }
+      }
+    ],
+    "computed": "upstream"
+  },
+  {
+    "caller_controlled": [],
+    "case": "accepted SystemOfRecord, not caller-controlled",
+    "causes": [
+      {
+        "input": {
+          "field": "f",
+          "provenance": {
+            "accepted": {
+              "classes": [
+                "system-of-record"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "computed": "upstream"
+  },
+  {
+    "caller_controlled": [
+      "system-of-record"
+    ],
+    "case": "observed SystemOfRecord, caller-controlled",
+    "causes": [
+      {
+        "input": {
+          "field": "f",
+          "provenance": {
+            "observed": {
+              "class": "system-of-record"
+            }
+          }
+        }
+      }
+    ],
+    "computed": "caller"
+  },
+  {
+    "caller_controlled": [
+      "system-of-record"
+    ],
+    "case": "accepted SystemOfRecord, caller-controlled",
+    "causes": [
+      {
+        "input": {
+          "field": "f",
+          "provenance": {
+            "accepted": {
+              "classes": [
+                "system-of-record"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "computed": "caller"
+  },
+  {
+    "caller_controlled": [],
+    "case": "observed UserSupplied, not caller-controlled",
+    "causes": [
+      {
+        "input": {
+          "field": "f",
+          "provenance": {
+            "observed": {
+              "class": "user-supplied"
+            }
+          }
+        }
+      }
+    ],
+    "computed": "host"
+  },
+  {
+    "caller_controlled": [],
+    "case": "accepted UserSupplied, not caller-controlled",
+    "causes": [
+      {
+        "input": {
+          "field": "f",
+          "provenance": {
+            "accepted": {
+              "classes": [
+                "user-supplied"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "computed": "host"
+  },
+  {
+    "caller_controlled": [
+      "user-supplied"
+    ],
+    "case": "observed UserSupplied, caller-controlled",
+    "causes": [
+      {
+        "input": {
+          "field": "f",
+          "provenance": {
+            "observed": {
+              "class": "user-supplied"
+            }
+          }
+        }
+      }
+    ],
+    "computed": "caller"
+  },
+  {
+    "caller_controlled": [
+      "user-supplied"
+    ],
+    "case": "accepted UserSupplied, caller-controlled",
+    "causes": [
+      {
+        "input": {
+          "field": "f",
+          "provenance": {
+            "accepted": {
+              "classes": [
+                "user-supplied"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "computed": "caller"
+  },
+  {
+    "caller_controlled": [],
+    "case": "observed ThirdParty, not caller-controlled",
+    "causes": [
+      {
+        "input": {
+          "field": "f",
+          "provenance": {
+            "observed": {
+              "class": "third-party"
+            }
+          }
+        }
+      }
+    ],
+    "computed": "upstream"
+  },
+  {
+    "caller_controlled": [],
+    "case": "accepted ThirdParty, not caller-controlled",
+    "causes": [
+      {
+        "input": {
+          "field": "f",
+          "provenance": {
+            "accepted": {
+              "classes": [
+                "third-party"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "computed": "upstream"
+  },
+  {
+    "caller_controlled": [
+      "third-party"
+    ],
+    "case": "observed ThirdParty, caller-controlled",
+    "causes": [
+      {
+        "input": {
+          "field": "f",
+          "provenance": {
+            "observed": {
+              "class": "third-party"
+            }
+          }
+        }
+      }
+    ],
+    "computed": "caller"
+  },
+  {
+    "caller_controlled": [
+      "third-party"
+    ],
+    "case": "accepted ThirdParty, caller-controlled",
+    "causes": [
+      {
+        "input": {
+          "field": "f",
+          "provenance": {
+            "accepted": {
+              "classes": [
+                "third-party"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "computed": "caller"
+  },
+  {
+    "caller_controlled": [],
+    "case": "observed AttributedClaim, not caller-controlled",
+    "causes": [
+      {
+        "input": {
+          "field": "f",
+          "provenance": {
+            "observed": {
+              "class": "attributed-claim"
+            }
+          }
+        }
+      }
+    ],
+    "computed": "host"
+  },
+  {
+    "caller_controlled": [],
+    "case": "accepted AttributedClaim, not caller-controlled",
+    "causes": [
+      {
+        "input": {
+          "field": "f",
+          "provenance": {
+            "accepted": {
+              "classes": [
+                "attributed-claim"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "computed": "host"
+  },
+  {
+    "caller_controlled": [
+      "attributed-claim"
+    ],
+    "case": "observed AttributedClaim, caller-controlled",
+    "causes": [
+      {
+        "input": {
+          "field": "f",
+          "provenance": {
+            "observed": {
+              "class": "attributed-claim"
+            }
+          }
+        }
+      }
+    ],
+    "computed": "caller"
+  },
+  {
+    "caller_controlled": [
+      "attributed-claim"
+    ],
+    "case": "accepted AttributedClaim, caller-controlled",
+    "causes": [
+      {
+        "input": {
+          "field": "f",
+          "provenance": {
+            "accepted": {
+              "classes": [
+                "attributed-claim"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "computed": "caller"
+  },
+  {
+    "caller_controlled": [],
+    "case": "observed ModelDerived, not caller-controlled",
+    "causes": [
+      {
+        "input": {
+          "field": "f",
+          "provenance": {
+            "observed": {
+              "class": "model-derived"
+            }
+          }
+        }
+      }
+    ],
+    "computed": "host"
+  },
+  {
+    "caller_controlled": [],
+    "case": "accepted ModelDerived, not caller-controlled",
+    "causes": [
+      {
+        "input": {
+          "field": "f",
+          "provenance": {
+            "accepted": {
+              "classes": [
+                "model-derived"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "computed": "host"
+  },
+  {
+    "caller_controlled": [
+      "model-derived"
+    ],
+    "case": "observed ModelDerived, caller-controlled",
+    "causes": [
+      {
+        "input": {
+          "field": "f",
+          "provenance": {
+            "observed": {
+              "class": "model-derived"
+            }
+          }
+        }
+      }
+    ],
+    "computed": "caller"
+  },
+  {
+    "caller_controlled": [
+      "model-derived"
+    ],
+    "case": "accepted ModelDerived, caller-controlled",
+    "causes": [
+      {
+        "input": {
+          "field": "f",
+          "provenance": {
+            "accepted": {
+              "classes": [
+                "model-derived"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "computed": "caller"
+  },
+  {
+    "caller_controlled": [
+      "user-supplied"
+    ],
+    "case": "accepted, caller and host classes",
+    "causes": [
+      {
+        "input": {
+          "field": "f",
+          "provenance": {
+            "accepted": {
+              "classes": [
+                "user-supplied",
+                "model-derived"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "computed": "host"
+  },
+  {
+    "caller_controlled": [
+      "user-supplied"
+    ],
+    "case": "backend Upstream",
+    "causes": [
+      {
+        "backend": {
+          "origin": "upstream",
+          "step": "s"
+        }
+      }
+    ],
+    "computed": "upstream"
+  },
+  {
+    "caller_controlled": [
+      "user-supplied"
+    ],
+    "case": "backend Host",
+    "causes": [
+      {
+        "backend": {
+          "origin": "host",
+          "step": "s"
+        }
+      }
+    ],
+    "computed": "host"
+  },
+  {
+    "caller_controlled": [
+      "user-supplied"
+    ],
+    "case": "budget",
+    "causes": [
+      {
+        "budget": {
+          "resource": "semantic_requests"
+        }
+      }
+    ],
+    "computed": "host"
+  },
+  {
+    "caller_controlled": [
+      "user-supplied"
+    ],
+    "case": "deadline",
+    "causes": [
+      "deadline"
+    ],
+    "computed": "host"
+  },
+  {
+    "caller_controlled": [
+      "user-supplied"
+    ],
+    "case": "capability",
+    "causes": [
+      {
+        "capability": {
+          "name": "s"
+        }
+      }
+    ],
+    "computed": "host"
+  },
+  {
+    "caller_controlled": [
+      "user-supplied"
+    ],
+    "case": "policy",
+    "causes": [
+      {
+        "policy": {
+          "site": "rule:r"
+        }
+      }
+    ],
+    "computed": "none"
+  },
+  {
+    "caller_controlled": [
+      "user-supplied"
+    ],
+    "case": "no cause",
+    "causes": [],
+    "computed": "none"
+  },
+  {
+    "caller_controlled": [
+      "user-supplied"
+    ],
+    "case": "caller and policy",
+    "causes": [
+      {
+        "input": {
+          "field": "f",
+          "provenance": {
+            "observed": {
+              "class": "user-supplied"
+            }
+          }
+        }
+      },
+      {
+        "policy": {
+          "site": "rule:r"
+        }
+      }
+    ],
+    "computed": "caller"
+  },
+  {
+    "caller_controlled": [
+      "user-supplied"
+    ],
+    "case": "caller and deadline",
+    "causes": [
+      {
+        "input": {
+          "field": "f",
+          "provenance": {
+            "observed": {
+              "class": "user-supplied"
+            }
+          }
+        }
+      },
+      "deadline"
+    ],
+    "computed": "host"
+  },
+  {
+    "caller_controlled": [
+      "user-supplied"
+    ],
+    "case": "caller, host and upstream",
+    "causes": [
+      {
+        "input": {
+          "field": "f",
+          "provenance": {
+            "observed": {
+              "class": "user-supplied"
+            }
+          }
+        }
+      },
+      "deadline",
+      {
+        "input": {
+          "field": "f",
+          "provenance": {
+            "observed": {
+              "class": "third-party"
+            }
+          }
+        }
+      }
+    ],
+    "computed": "upstream"
+  }
+]

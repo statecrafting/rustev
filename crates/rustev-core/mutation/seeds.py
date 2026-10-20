@@ -1,5 +1,6 @@
-"""Seeded defects in evidence quality (spec 032, acceptance: seeds in the
-core mutation harness).
+"""Seeded defects in evidence quality (spec 032) and in provenance-conditional
+rules and actionable outcomes (spec 033): each spec's acceptance names seeds
+in the core mutation harness.
 
 Each seed rewrites exact text in a copy of the workspace, must still compile,
 and must make the named tests fail. The script exits non-zero if a seed's
@@ -18,6 +19,17 @@ import tempfile
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 CORE = "crates/rustev-core/src/"
 EVAL = ["--test", "evidence_quality_eval"]
+ACT = [
+    "--lib",
+    "--test",
+    "actionability_compile",
+    "--test",
+    "actionability_eval",
+    "--test",
+    "actionability_origin",
+    "--test",
+    "actionability_rows",
+]
 
 # (name, file, old, new, cargo test arguments)
 SEEDS = [
@@ -69,6 +81,56 @@ SEEDS = [
         "        if elapsed > max {\n            return Err(Unresolved::stale([name]));",
         "        if false && elapsed > max {\n            return Err(Unresolved::stale([name]));",
         ["--lib"] + EVAL,
+    ),
+    # Spec 033.
+    (
+        "party combination prefers caller",
+        "crates/rustev-contract/src/actionability.rs",
+        "parties.into_iter().max().unwrap_or(Party::None)",
+        "{\n            let v: Vec<Party> = parties.into_iter().collect();\n            if v.contains(&Party::Caller) {\n                Party::Caller\n            } else {\n                v.into_iter().max().unwrap_or(Party::None)\n            }\n        }",
+        ACT,
+    ),
+    (
+        "an override to caller is accepted",
+        CORE + "actionable.rs",
+        "            if o.to == Party::Caller {",
+        "            if false && o.to == Party::Caller {",
+        ACT,
+    ),
+    (
+        "accepted causes ignore a non-caller class",
+        CORE + "actionable.rs",
+        "Party::combine(classes.iter().map(|c| class_party(*c, caller_controlled)))",
+        "Party::combine(\n                    classes\n                        .iter()\n                        .filter(|c| caller_controlled.contains(*c))\n                        .map(|c| class_party(*c, caller_controlled)),\n                )",
+        ACT,
+    ),
+    (
+        "a dropped value is replaced by its entry",
+        CORE + "evaluate.rs",
+        "                    self.inputs_status.insert(\n                        c.subject.clone(),\n                        Err(Unresolved::missing([c.subject.clone()])),\n                    );\n                    self.input_values.remove(&c.subject);\n                    self.present.remove(&c.subject);\n",
+        "",
+        ACT,
+    ),
+    (
+        "an unevaluable check is treated as passed",
+        CORE + "evaluate.rs",
+        "            let passed = match tested {\n                Err(u) => {",
+        "            let passed = match tested {\n                Err(_) if c.id != \"\" => true,\n                Err(u) => {",
+        ACT,
+    ),
+    (
+        "a terminal check does not stop semantic requests",
+        CORE + "evaluate.rs",
+        "        if ev.checks.terminal.is_none() {\n            ev.advance();\n        }",
+        "        ev.advance();",
+        ACT,
+    ),
+    (
+        "transient is true for invalid_input",
+        CORE + "actionable.rs",
+        "U::BackendUnavailable { .. } | U::DeadlineExceeded => true,",
+        "U::BackendUnavailable { .. } | U::DeadlineExceeded | U::InvalidInput { .. } => true,",
+        ACT,
     ),
 ]
 
