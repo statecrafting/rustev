@@ -74,8 +74,18 @@ impl CaseOutcome {
             Outcome::Escalate { .. } => CaseOutcome::Abstention {
                 kind: "escalation".into(),
             },
-            Outcome::Unresolved(u) => CaseOutcome::Abstention {
-                kind: u.kind().name().into(),
+            Outcome::Unresolved(u) | Outcome::UnresolvedAction { reason: u, .. } => {
+                CaseOutcome::Abstention {
+                    kind: u.kind().name().into(),
+                }
+            }
+            // Judgment 2 outcomes (spec 033, 3.5.1) are abstentions by their
+            // own names; neither is a proposal.
+            Outcome::Refused { .. } => CaseOutcome::Abstention {
+                kind: "refused".into(),
+            },
+            Outcome::NeedsInput(_) => CaseOutcome::Abstention {
+                kind: "needs_input".into(),
             },
         }
     }

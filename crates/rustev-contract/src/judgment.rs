@@ -1,12 +1,16 @@
-//! Judgments, `rustev.judgment/1`: the typed result of a plan. A judgment is a
-//! proposal, an escalation or an unresolved outcome; it is never a grant and
-//! never an effect (spec 001, 3.2).
+//! Judgments, `rustev.judgment/1`, and `rustev.judgment/2` for plans with
+//! `actionability` (spec 033, 3.1.3): the typed result of a plan. A judgment
+//! is a proposal, an escalation, an unresolved outcome, or (version 2) a
+//! refusal or a request for input; it is never a grant and never an effect
+//! (spec 001, 3.2). Version 2 carries an action on every unresolved
+//! outcome, refusal, request for input and notice (spec 033, 3.5).
 
 use std::collections::BTreeMap;
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
+use crate::actionability::{Action, NeedsInput, Party, Refusal};
 use crate::decimal::Decimal;
 use crate::definition::ReasonKind;
 use crate::ids::{PlanId, SnapshotId};
@@ -30,10 +34,21 @@ pub struct Judgment {
     pub trace: Vec<String>,
 }
 
-crate::document::document!(Judgment, schema::JUDGMENT, RECORD_V1);
+crate::document::versioned_document!(
+    Judgment,
+    [schema::JUDGMENT, schema::JUDGMENT_V2],
+    "rustev.judgment/1 or rustev.judgment/2",
+    RECORD_V1
+);
 
+/// A judgment's outcome. Version 1 uses `Propose`, `Escalate` and
+/// `Unresolved`; version 2 (spec 033, 3.5.1) replaces `Unresolved` with
+/// `UnresolvedAction` and adds `Refused` and `NeedsInput`. Both unresolved
+/// forms share the wire key `unresolved`: `{"unresolved": <reason>}` in
+/// version 1, `{"unresolved": {"reason": <reason>, "action": <action>}}` in
+/// version 2.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case", deny_unknown_fields)]
+#[serde(from = "OutcomeWire", into = "OutcomeWire")]
 pub enum Outcome {
     Propose {
         action: String,
@@ -43,6 +58,105 @@ pub enum Outcome {
         reason: String,
     },
     Unresolved(Unresolved),
+    UnresolvedAction {
+        reason: Unresolved,
+        action: Action,
+    },
+    Refused {
+        refusals: Vec<Refusal>,
+        addressed_to: Party,
+    },
+    NeedsInput(Box<NeedsInput>),
+}
+
+impl Outcome {
+    /// The unresolved reason of either version, if the outcome is one.
+    pub fn unresolved(&self) -> Option<&Unresolved> {
+        match self {
+            Outcome::Unresolved(u) | Outcome::UnresolvedAction { reason: u, .. } => Some(u),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+enum OutcomeWire {
+    Propose {
+        action: String,
+        params: BTreeMap<String, OutValue>,
+    },
+    Escalate {
+        reason: String,
+    },
+    Unresolved(UnresolvedWire),
+    Refused {
+        refusals: Vec<Refusal>,
+        addressed_to: Party,
+    },
+    NeedsInput(Box<NeedsInput>),
+}
+
+/// Version 2's `{reason, action}` is tried first; no version 1 reason is
+/// named `reason` or `action`, so the two forms never overlap.
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
+enum UnresolvedWire {
+    Actionable(ActionableUnresolved),
+    Plain(Unresolved),
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ActionableUnresolved {
+    reason: Unresolved,
+    action: Action,
+}
+
+impl From<OutcomeWire> for Outcome {
+    fn from(w: OutcomeWire) -> Self {
+        match w {
+            OutcomeWire::Propose { action, params } => Outcome::Propose { action, params },
+            OutcomeWire::Escalate { reason } => Outcome::Escalate { reason },
+            OutcomeWire::Unresolved(UnresolvedWire::Plain(u)) => Outcome::Unresolved(u),
+            OutcomeWire::Unresolved(UnresolvedWire::Actionable(a)) => Outcome::UnresolvedAction {
+                reason: a.reason,
+                action: a.action,
+            },
+            OutcomeWire::Refused {
+                refusals,
+                addressed_to,
+            } => Outcome::Refused {
+                refusals,
+                addressed_to,
+            },
+            OutcomeWire::NeedsInput(n) => Outcome::NeedsInput(n),
+        }
+    }
+}
+
+impl From<Outcome> for OutcomeWire {
+    fn from(o: Outcome) -> Self {
+        match o {
+            Outcome::Propose { action, params } => OutcomeWire::Propose { action, params },
+            Outcome::Escalate { reason } => OutcomeWire::Escalate { reason },
+            Outcome::Unresolved(u) => OutcomeWire::Unresolved(UnresolvedWire::Plain(u)),
+            Outcome::UnresolvedAction { reason, action } => {
+                OutcomeWire::Unresolved(UnresolvedWire::Actionable(ActionableUnresolved {
+                    reason,
+                    action,
+                }))
+            }
+            Outcome::Refused {
+                refusals,
+                addressed_to,
+            } => OutcomeWire::Refused {
+                refusals,
+                addressed_to,
+            },
+            Outcome::NeedsInput(n) => OutcomeWire::NeedsInput(n),
+        }
+    }
 }
 
 /// The closed set of unresolved reasons (spec 002, 3.5.6). Field and fact
@@ -198,6 +312,9 @@ pub struct Notice {
     /// The step or policy item it concerns.
     pub subject: String,
     pub reason: String,
+    /// Judgment 2: who can act on it (spec 033, 3.5.4); omitted in version 1.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub action: Option<Action>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -206,6 +323,11 @@ pub enum NoticeKind {
     UncalibratedThreshold,
     Truncation,
     Fallback,
+    /// Spec 033, 3.3: a check's field-level consequences.
+    FieldDropped,
+    ConstraintsRelaxed,
+    GradeDowngraded,
+    CheckNotice,
 }
 
 /// A value placed in a proposal's parameters.

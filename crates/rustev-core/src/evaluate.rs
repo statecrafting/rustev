@@ -1288,6 +1288,7 @@ impl<'c> Evaluation<'c> {
                 kind: NoticeKind::Truncation,
                 subject: format!("step:{id}"),
                 reason: format!("{truncated} request(s) not issued: max_semantic_requests reached"),
+                action: None,
             });
         }
         SemState::Instances { values, expected }
@@ -1421,6 +1422,7 @@ impl<'c> Evaluation<'c> {
                     presence: q.presence,
                     entries: q.entries,
                     resolution: q.resolution,
+                    dropped: None,
                 }
             })
             .collect();
@@ -1502,6 +1504,7 @@ impl<'c> Evaluation<'c> {
             inputs,
             steps,
             judgment: judgment.clone(),
+            checks: None,
         };
         Ok((judgment, evidence))
     }

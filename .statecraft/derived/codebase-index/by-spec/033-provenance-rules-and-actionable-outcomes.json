@@ -30,7 +30,15 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rustev-eval/",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rustev-runtime/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "tools/rustev-release/",
         "source": "spec-edge"
       }
     ],
@@ -77,6 +85,19 @@
       {
         "locations": [
           {
+            "file": "crates/rustev-eval/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-eval/"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/rustev-runtime/"
           }
         ],
@@ -85,6 +106,19 @@
         "unit": {
           "kind": "directory",
           "path": "crates/rustev-runtime/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "tools/rustev-release/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-release/"
         }
       },
       {
@@ -131,5 +165,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "7b7ec0ab1a02d6127e2f672e26adcfcd91b02e6aa49b76a838b15b8ce620b39b"
+  "shardHash": "ef711ab42fb546152c53efb2d86c676ddebda497fe1d0c550c3ae60387f2284c"
 }

@@ -10,6 +10,7 @@
 //! bytes from a transport, and bounding that buffer, is the caller's job.
 #![forbid(unsafe_code)]
 
+pub mod actionability;
 pub mod bounded;
 pub mod calibration;
 pub mod canonical;
@@ -81,6 +82,8 @@ pub mod schema {
     pub const EVIDENCE_V2: &str = "rustev.evidence/2";
     pub const RUN_V3: &str = "rustev.run/3";
     pub const EXACT_REGISTRY_V2: &str = "rustev.exact/2";
+    /// Judgments of plans with `actionability` (spec 033, 3.1.3).
+    pub const JUDGMENT_V2: &str = "rustev.judgment/2";
     /// Context source descriptors (spec 032, 3.3.1).
     pub const SOURCE: &str = "rustev.source/1";
 }

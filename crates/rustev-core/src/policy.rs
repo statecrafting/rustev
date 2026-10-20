@@ -153,6 +153,14 @@ impl<V: View> Run<'_, V> {
                 false
             }
             Cond::Not(c) => !self.cond(c)?,
+            // Compilation refuses spec 033's constructs until its
+            // evaluation lands (spec 033 increment 1); never a default.
+            Cond::ProvenanceWithin { reference, .. } => {
+                return Err(Unresolved::invalid(
+                    [],
+                    format!("provenance_within({reference}) is not evaluated yet"),
+                ));
+            }
         })
     }
 
@@ -177,6 +185,9 @@ impl<V: View> Run<'_, V> {
                     ))),
                     _ => Err(Unresolved::invalid([], format!("{r} lists no fields"))),
                 }
+            }
+            OutcomeDecl::NeedsInput { .. } => {
+                Err(Unresolved::invalid([], "needs_input is not evaluated yet"))
             }
             OutcomeDecl::Propose { action, params } => {
                 let mut out = BTreeMap::new();
@@ -248,6 +259,9 @@ pub(crate) fn evaluate<V: View>(policy: &PolicyDecl, view: &V) -> PolicyResult {
             }
             HandlerAction::AsUnmet => {
                 run.unmet.insert(h.target.clone());
+            }
+            HandlerAction::PropagateWith { .. } | HandlerAction::NeedsInput { .. } => {
+                return done(Outcome::Unresolved(u), run, trace);
             }
         }
     }

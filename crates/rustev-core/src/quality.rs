@@ -972,6 +972,14 @@ pub(crate) fn cond_reads(c: &Cond, out: &mut Vec<Read>) {
             gate: true,
         }),
         Cond::Exact(p) => predicate_reads(p, None, true, out),
+        // Reads its reference like any atomic condition (spec 033, 3.4.7).
+        Cond::ProvenanceWithin { reference, .. } => out.push(Read {
+            base: crate::expr::base_ref(reference),
+            path: vec![],
+            mode: Mode::Whole,
+            require: None,
+            gate: true,
+        }),
         Cond::Empty(r) | Cond::Nonempty(r) => {
             if let Some((base, path)) = resolve(r, None) {
                 out.push(Read {
