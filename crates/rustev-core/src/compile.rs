@@ -65,6 +65,12 @@ pub enum Category {
     UncorroboratedHint = 14,
     /// A graded input's sources do not bind (spec 032, 3.3.4; phase c).
     SourceBinding = 15,
+    /// A check leaves an accepted class of its subject without a branch or
+    /// default (spec 033, 3.2.3; phase h2).
+    UncoveredProvenance = 16,
+    /// A declaration would address the caller where the caller cannot act
+    /// (spec 033, 3.8.2; phases b and h2).
+    CallerCannotAct = 17,
 }
 
 /// Why one candidate backend cannot serve a step.
@@ -582,9 +588,11 @@ fn outcome_refs(o: &OutcomeDecl, out: &mut Vec<String>) {
         }
         OutcomeDecl::Escalate { .. } => {}
         OutcomeDecl::MissingEvidenceFrom { step } => out.push(format!("step:{step}")),
-        OutcomeDecl::NeedsInput { fields, .. } => {
-            out.extend(fields.iter().map(|f| format!("input:{f}")))
-        }
+        // It names fields for the caller to supply; it reads none of them
+        // (spec 033, 3.7), so no handler coverage applies to them. Only a
+        // version 2 definition declares it: `first_construct` refuses it in
+        // version 1, so no version 1 plan reaches this arm.
+        OutcomeDecl::NeedsInput { .. } => {}
     }
 }
 
@@ -689,20 +697,15 @@ fn compile_inner(
     }
 
     // (b) Structure. A construct of spec 033 needs a version 2 definition
-    // (3.1.1); a version 2 definition using one waits for the compilation
-    // phase of spec 033's increment 2 (3.8), so neither is compiled yet.
-    if let Some((subject, construct)) = crate::actionable::first_construct(def) {
+    // (spec 033, 3.1.1); its own structure is checked after the policy's.
+    if !v2 && let Some((subject, construct)) = crate::actionable::first_construct(def) {
         return refuse(
             C::InvalidDefinition,
             subject,
-            if v2 {
-                format!("{construct}: spec 033 compilation is not implemented yet")
-            } else {
-                format!(
-                    "requires-definition-2: {construct} needs {}",
-                    schema::DEFINITION_V2
-                )
-            },
+            format!(
+                "requires-definition-2: {construct} needs {}",
+                schema::DEFINITION_V2
+            ),
         );
     }
     // A version 1 definition carries no construct of spec
@@ -1014,6 +1017,14 @@ fn compile_inner(
         }
         cond_structure(&a.when, &options_of, &known).or_else(|e| inv(subject, e))?;
     }
+    // Spec 033's structure (3.8.1), after the policy's: checks, groups,
+    // remediations, questions and the policy constructs it adds.
+    if v2 {
+        let mut taken: BTreeSet<String> = ids.iter().cloned().collect();
+        taken.extend(rule_ids.iter().cloned());
+        taken.extend(adj_ids.iter().cloned());
+        crate::actionable::structure(def, &inputs, &taken)?;
+    }
 
     // (c) Resolve operators and calibrations.
     let calibration_ids: Vec<(CalibrationId, &CalibrationArtifact)> = calibrations
@@ -1290,6 +1301,9 @@ fn compile_inner(
             }
         }
     }
+
+    // (e) continued: spec 033's checks and remediation parameters (3.8.1).
+    crate::actionable::types(def, &input_tys, v2)?;
 
     // (e2) Grades (spec 032, 3.9.3): the static ceiling of every input path
     // and step value, then every requirement and hard gate, steps in
@@ -1612,6 +1626,10 @@ fn compile_inner(
     }
     check_policy(def, &input_tys, &step_tys, &reasons, &mut notices, v2)?;
 
+    // (h2) Exhaustiveness and caller addressing, and the static table
+    // (spec 033, 3.8.2 and 3.8.3).
+    let actionability = crate::actionable::phase_h2(def, &inputs, &deps, &reasons)?;
+
     // (i) Emit.
     let derivations = static_derivations(def, &inputs, &order, &deps, &infos);
     // A plan records the lowest registry containing every operator,
@@ -1647,7 +1665,7 @@ fn compile_inner(
         execution: plan_execution,
         sources: (!bound.sources.is_empty()).then(|| bound.sources.clone()),
         grades: (!grade_table.is_empty()).then_some(grade_table),
-        actionability: None,
+        actionability,
     };
     let id = plan.id().map_err(|e| Refusal {
         category: C::Parse,
@@ -2099,7 +2117,9 @@ fn possible_reasons(
         }
         out.insert(format!("input:{name}"), r);
     }
-    let _ = def;
+    // A check can make its subject unresolved (spec 033, 3.4.3), so every
+    // step reading it inherits those reasons too.
+    crate::actionable::extend_reasons(def, &mut out);
     for id in order {
         let mut r = BTreeSet::new();
         match (&infos[id], &details[id]) {

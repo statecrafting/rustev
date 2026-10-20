@@ -312,6 +312,14 @@ impl<'c> Evaluation<'c> {
                 schema::SNAPSHOT
             )));
         }
+        // Checks and actionable outcomes are evaluated from spec 033's
+        // increment 3 on; until then such a plan runs no decision rather
+        // than one that ignores its checks.
+        if compiled.plan.actionability.is_some() {
+            return Err(StartError::Schema(
+                "actionability: spec 033 evaluation is not implemented yet".into(),
+            ));
+        }
         let info = &compiled.info;
         for e in &snapshot.entries {
             if !info.inputs.contains_key(&e.field) {
