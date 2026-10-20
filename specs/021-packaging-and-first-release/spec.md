@@ -567,6 +567,36 @@ the checksums (even re-signed), the tag's commit, the manifest's tree, the
 tag's message, an unsigned or lightweight tag, and a non-canonical
 manifest.
 
+**Increment 6 (lifecycle, journal and fake registry).**
+`tools/rustev-release/src/lifecycle.rs` holds the lifecycle of 3.1 as a
+state machine over its named states: each event applies only in its state
+and otherwise is refused with the state unchanged, so no state is skipped
+or reported as another (I-1); candidate evidence must be for the
+manifest's commit, and the owner's instruction must name exactly its
+version, commit, registry and package set (I-4); only `qualified` answers
+the public-accessibility question. The publication journal is append-only
+JSON lines (attempt before each upload, its result after, every query of
+public state, and why a run stopped); an upload is refused after an
+accepted result, or after an ambiguous one until a recorded query found
+the package absent (3.9). The publisher uploads only the verified
+archives, by checksum, in the manifest's order; skips a package already
+public with the same checksum and stops when a version is public with
+other bytes (a spent version needs a new family version); waits, after
+each acceptance, until the package is visible with its expected checksum
+before the next; and stops on a refusal, an ambiguity (after querying and
+recording public state) or a package that never appears.
+`tests/lifecycle.rs` drives it against `FakeRegistry`, a scripted
+in-memory registry: every transition in order, refused out-of-order
+events, local packaging before authorization (section 4 row 1), a wrong
+instruction, propagation waits and the journal's order, a package that
+never appears, a refusal, four public and the fifth failing (row 7,
+`partially published`, never released), an ambiguous upload in both
+outcomes and its recovery (row 6), an ambiguous journal entry blocking a
+retry, a rerun skipping public packages, a rebuilt archive and a spent
+version, and a release without consumer proof (rows 8 and 9). No
+credential, network write or tag is involved; the adapter for the real
+registry belongs to the publication step.
+
 Open for the owner: spec 031 3.1, which amends this section, orders each
 layer by name and starts a layer only after every package of the earlier
 layers is public. With today's development dependencies that order cannot
