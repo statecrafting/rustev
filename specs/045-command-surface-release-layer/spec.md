@@ -1,7 +1,7 @@
 ---
 id: "045-command-surface-release-layer"
 title: "The command surface in the release family (amends 031)"
-status: draft
+status: approved
 implementation: pending
 created: "2026-10-20"
 summary: >
@@ -15,8 +15,7 @@ summary: >
   policy already computes from `cargo metadata`, admits a crate that a
   release member depends on once the crate exists and passes its checks,
   and keeps the release-set test's member list as the deliberate, reviewed
-  record of membership. Draft: a proposal for the owner's ratification; it
-  claims nothing about code.
+  record of membership. Ratified by the owner on 2026-10-20 (A-42).
 amends:
   - "031-public-api-and-release-family"
 depends_on:
@@ -38,7 +37,7 @@ obligations:
 
 # 045: The command surface in the release family (amends 031)
 
-Draft: a proposal for the owner's ratification, not a claim about code.
+Approved: ratified by the owner on 2026-10-20 (decision A-42).
 The approved texts of specs 021, 027 and 031 are not edited; this spec
 records what changes in 031. Implementation is the release-set change of
 spec 027's increment 3, which waits on this spec's approval.
