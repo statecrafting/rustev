@@ -1,0 +1,1 @@
+{"category":16,"category_name":"uncovered_provenance","command":"plan check","detail":"uncovered_provenance: trip.window accepts model-derived without a branch or default","shortfalls":[],"status":"refused","subject":"check:future_window"}

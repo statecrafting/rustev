@@ -249,6 +249,25 @@ pub(crate) async fn run_requests(
                     // The request is pending until this call, and the runtime
                     // supplies only outputs and the four runtime reasons; a
                     // refusal is a defect, not a runtime condition.
+                    // A failure carries its backend's registered origin and
+                    // declared determinism (spec 033, 3.9.2): the last
+                    // attempt's backend served it.
+                    if let rustev_core::Supplied::Failed(_) = &s
+                        && let Some(r) = out
+                            .record
+                            .attempts
+                            .last()
+                            .and_then(|a| cx.rt.backends.get(&a.backend_id))
+                    {
+                        ev.note_failure(
+                            &out.step,
+                            &out.instance,
+                            rustev_core::FailureContext {
+                                origin: r.origin,
+                                determinism: r.backend.descriptor().determinism,
+                            },
+                        );
+                    }
                     ev.supply(&out.step, &out.instance, s)
                         .expect("the core accepts what the runtime supplies");
                 }

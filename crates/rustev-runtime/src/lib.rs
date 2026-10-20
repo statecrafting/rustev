@@ -180,6 +180,9 @@ pub(crate) struct Registered {
     pub backend: Arc<dyn DecisionBackend>,
     pub permits: Arc<Semaphore>,
     pub max: usize,
+    /// Who implements it (spec 033, 3.9): `upstream` unless registered as
+    /// the host's own.
+    pub origin: rustev_contract::actionability::Origin,
 }
 
 pub(crate) struct Inner {
@@ -208,14 +211,39 @@ pub struct RuntimeBuilder {
     clock: Arc<dyn Clock>,
     sink: Arc<dyn EvidenceSink>,
     config: RuntimeConfig,
-    backends: Vec<(Arc<dyn DecisionBackend>, usize)>,
+    backends: Vec<(
+        Arc<dyn DecisionBackend>,
+        usize,
+        rustev_contract::actionability::Origin,
+    )>,
     shared: Option<Arc<Ledger>>,
 }
 
 impl RuntimeBuilder {
     /// Register a backend with its own attempt concurrency limit.
     pub fn backend(mut self, backend: Arc<dyn DecisionBackend>, max_concurrency: usize) -> Self {
-        self.backends.push((backend, max_concurrency));
+        self.backends.push((
+            backend,
+            max_concurrency,
+            rustev_contract::actionability::Origin::Upstream,
+        ));
+        self
+    }
+
+    /// Register a backend the host implements itself (spec 033, 3.9.1): its
+    /// failures are caused by the host, not an upstream service. A host
+    /// relaying a failure from its own upstream may still report it as
+    /// `upstream`; nothing reports the caller.
+    pub fn host_backend(
+        mut self,
+        backend: Arc<dyn DecisionBackend>,
+        max_concurrency: usize,
+    ) -> Self {
+        self.backends.push((
+            backend,
+            max_concurrency,
+            rustev_contract::actionability::Origin::Host,
+        ));
         self
     }
 
@@ -238,7 +266,7 @@ impl RuntimeBuilder {
             }
         }
         let mut backends = BTreeMap::new();
-        for (b, max) in self.backends {
+        for (b, max, origin) in self.backends {
             if max == 0 {
                 return Err(ConfigError::Zero("backend max_concurrency"));
             }
@@ -247,6 +275,7 @@ impl RuntimeBuilder {
                 backend: b,
                 permits: Arc::new(Semaphore::new(max)),
                 max,
+                origin,
             };
             if backends.insert(id.clone(), r).is_some() {
                 return Err(ConfigError::DuplicateBackend(id));

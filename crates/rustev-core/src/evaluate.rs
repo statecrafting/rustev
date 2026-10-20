@@ -157,6 +157,16 @@ enum SemState {
     },
 }
 
+/// What the runtime knows about a failed request's backend (spec 033, 3.9):
+/// who registered it and the determinism its descriptor declares. Recorded
+/// as the `backend` cause's origin and used for transience (3.6.4); plans
+/// without `actionability` ignore it, so their records keep their bytes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FailureContext {
+    pub origin: rustev_contract::actionability::Origin,
+    pub determinism: rustev_contract::definition::Determinism,
+}
+
 /// An evaluation in progress.
 pub struct Evaluation<'c> {
     compiled: &'c Compiled,
@@ -187,6 +197,8 @@ pub struct Evaluation<'c> {
     /// Spec 033: each input's observed classes: the used entry's class, or
     /// every accepted entry's class when none was used (3.5.2).
     observed: BTreeMap<String, Vec<ProvenanceClass>>,
+    /// Spec 033, 3.9: the backend context of each failed request.
+    failures: BTreeMap<(String, Vec<String>), FailureContext>,
 }
 
 /// What a plan 3 step records in evidence 2 beside its metadata.
@@ -379,6 +391,7 @@ impl<'c> Evaluation<'c> {
             policy_failures: BTreeMap::new(),
             checks: Default::default(),
             observed: BTreeMap::new(),
+            failures: BTreeMap::new(),
         };
         for (name, (ty, decl)) in &info.inputs {
             let entries: Vec<&Entry> = snapshot
@@ -722,7 +735,12 @@ impl<'c> Evaluation<'c> {
             Unresolved::BackendUnavailable { .. } | Unresolved::InvalidBackendOutput { .. } => {
                 vec![Cause::Backend {
                     step: self.failed_step(u).unwrap_or_default(),
-                    origin: Origin::Upstream,
+                    // `upstream` unless the runtime noted a host-registered
+                    // backend (3.9.1).
+                    origin: self
+                        .failure_context(u)
+                        .map(|c| c.origin)
+                        .unwrap_or(Origin::Upstream),
                 }]
             }
             Unresolved::BudgetExhausted { resource } => vec![Cause::Budget {
@@ -735,24 +753,32 @@ impl<'c> Evaluation<'c> {
         }
     }
 
-    /// The first semantic step, in step and instance order, whose request
-    /// failed with `u`'s reason (3.5.6).
-    fn failed_step(&self, u: &Unresolved) -> Option<String> {
+    /// The first failed request, in step and instance order, whose reason
+    /// is `u`'s kind (3.5.6).
+    fn failed_request(&self, u: &Unresolved) -> Option<(String, Vec<String>)> {
         self.compiled
             .info
             .step_ids
             .iter()
             .find_map(|id| match self.semantic.get(id) {
-                Some(SemState::Unresolved(x)) if x.kind() == u.kind() => Some(id.clone()),
-                Some(SemState::Instances { values, .. })
-                    if values
-                        .values()
-                        .any(|v| matches!(v, Err(x) if x.kind() == u.kind())) =>
-                {
-                    Some(id.clone())
-                }
+                Some(SemState::Unresolved(x)) if x.kind() == u.kind() => Some((id.clone(), vec![])),
+                Some(SemState::Instances { values, .. }) => values
+                    .iter()
+                    .find(|(_, v)| matches!(v, Err(x) if x.kind() == u.kind()))
+                    .map(|(k, _)| (id.clone(), k.clone())),
                 _ => None,
             })
+    }
+
+    /// The first failed request's step, if any.
+    fn failed_step(&self, u: &Unresolved) -> Option<String> {
+        self.failed_request(u).map(|(s, _)| s)
+    }
+
+    /// The runtime's context of the first failed request, if it noted one.
+    fn failure_context(&self, u: &Unresolved) -> Option<FailureContext> {
+        self.failed_request(u)
+            .and_then(|k| self.failures.get(&k).copied())
     }
 
     /// The action of an unresolved reason at `site`, with a handler's
@@ -768,10 +794,13 @@ impl<'c> Evaluation<'c> {
     ) -> rustev_contract::actionability::Action {
         use rustev_contract::actionability::Address;
         let step = self.failed_step(u);
-        let determinism = step
-            .as_ref()
-            .and_then(|s| self.compiled.info.determinism.get(s))
-            .copied();
+        // The failed request's backend, as the runtime noted it, else the
+        // step's bound backend (3.6.4).
+        let determinism = self.failure_context(u).map(|c| c.determinism).or_else(|| {
+            step.as_ref()
+                .and_then(|s| self.compiled.info.determinism.get(s))
+                .copied()
+        });
         let transient = crate::actionable::transient(u, determinism);
         let cc = self.caller_controlled();
         let computed = Address::Computed;
@@ -959,6 +988,14 @@ impl<'c> Evaluation<'c> {
             &doc.instance,
             Supplied::Output(doc.output.clone()),
         )
+    }
+
+    /// Record the backend context of a request the runtime is about to
+    /// supply as failed (spec 033, 3.9). Only `backend_unavailable` and
+    /// `invalid_backend_output` read it.
+    pub fn note_failure(&mut self, step: &str, instance: &[String], context: FailureContext) {
+        self.failures
+            .insert((step.to_string(), instance.to_vec()), context);
     }
 
     /// Supply one request's result.

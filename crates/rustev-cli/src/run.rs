@@ -188,6 +188,28 @@ fn rejection_kind(r: &Rejection) -> (&'static str, String) {
     }
 }
 
+/// For a `rustev.judgment/2`, the outcome's `addressed_to` and `transient`
+/// beside the judgment (spec 033, 3.11.3): an unresolved or `needs_input`
+/// outcome's action party and transience, a refusal's combined party and
+/// `false`, and `null` for a proposal or an escalation (`escalate`, which
+/// carries no action). A version 1 judgment's output keeps its bytes. The
+/// status stays `judged` and the exit code 0 for every outcome.
+fn addressing(out: crate::out::Out, j: &Judgment) -> crate::out::Out {
+    use rustev_contract::judgment::Outcome;
+    if j.schema != rustev_contract::schema::JUDGMENT_V2 {
+        return out;
+    }
+    let (to, transient) = match &j.outcome {
+        Outcome::UnresolvedAction { action, .. } => {
+            (json!(action.addressed_to), json!(action.transient))
+        }
+        Outcome::NeedsInput(n) => (json!(n.action.addressed_to), json!(n.action.transient)),
+        Outcome::Refused { addressed_to, .. } => (json!(addressed_to), json!(false)),
+        _ => (json!(null), json!(null)),
+    };
+    out.set("addressed_to", &to).set("transient", &transient)
+}
+
 fn judgment_bytes(j: &Judgment) -> Vec<u8> {
     // Every judgment the core finishes has a record form; a failure here is
     // a defect in the core's number handling.
@@ -227,6 +249,16 @@ fn execute(p: &Parsed, cx: &Context, s: &RunSettings) -> Res {
     }
     let plan = read_plan(command, &reads, p.req("plan"))?;
     let compiled = load_plan(command, &plan, &deps)?;
+    // A plan 3 runs (spec 033, 3.11.3), but its decisions are not captured
+    // until spec 036 admits them to a replay bundle (spec 032, 3.11): the
+    // flag is refused before any decision runs.
+    if s.capture.is_some() && compiled.plan.schema == rustev_contract::schema::PLAN_V3 {
+        return Err(Done::invalid(
+            command,
+            p.req("plan"),
+            "a rustev.plan/3 decision is not captured yet",
+        ));
+    }
     let mismatches: Vec<_> = deps
         .rules
         .iter()
@@ -341,9 +373,10 @@ async fn decide(
                 scope: c.scope.clone(),
                 max_bytes: c.max_bytes,
             };
-            // The configuration was checked with the flags, and the record
-            // file sink accepts `rustev.run/1` only, so a plan 3, which
-            // capture refuses, was refused at `prepare`.
+            // The configuration was checked with the flags. The runtime
+            // refuses to capture a plan 3 decision (spec 032, 3.11), whatever
+            // the sink accepts; `execute` refused that combination before
+            // any decision, so this capture never meets the refusal.
             let captured = runtime
                 .decide_with_capture(&prepared, req, cancel, &config)
                 .await
@@ -378,9 +411,12 @@ async fn decide(
             let out = base.set("record", &s.record_out).set("receipt", &receipt);
             match completion {
                 Completion::Judged(j) => (
-                    out.set("status", "judged")
-                        .set("completion", "judged")
-                        .raw("judgment", judgment_bytes(&j)),
+                    addressing(
+                        out.set("status", "judged")
+                            .set("completion", "judged")
+                            .raw("judgment", judgment_bytes(&j)),
+                        &j,
+                    ),
                     code::OK,
                     record,
                 ),
