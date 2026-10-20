@@ -17,6 +17,7 @@
     "propose.record.json"
   ],
   "command": "run",
+  "derived": [],
   "exit": 0,
   "id": "actionable.run-propose",
   "inputs": [

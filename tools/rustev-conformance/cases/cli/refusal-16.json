@@ -6,6 +6,7 @@
     "cat-16.definition.json"
   ],
   "command": "plan check",
+  "derived": [],
   "exit": 5,
   "id": "refusal-16",
   "inputs": [
@@ -24,6 +25,7 @@
     }
   ],
   "surfaces": [
-    "cli"
+    "cli",
+    "wasm"
   ]
 }

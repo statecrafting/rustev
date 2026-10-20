@@ -45,6 +45,10 @@ pub struct Case {
     pub mirrors: Option<String>,
     #[serde(default)]
     pub runtime: Option<serde_json::Value>,
+    /// For each rules program the case reads, the descriptor the CLI derives
+    /// from it, for surfaces without a rules backend (WebAssembly).
+    #[serde(default)]
+    pub derived: Vec<Derived>,
     pub inputs: Vec<Input>,
     pub outputs: Vec<Output>,
 }
@@ -56,6 +60,15 @@ pub struct Case {
 pub struct Input {
     pub path: String,
     pub name: String,
+    pub sha256: String,
+}
+
+/// A descriptor derived from a rules program the case reads.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Derived {
+    pub from: String,
+    pub path: String,
     pub sha256: String,
 }
 

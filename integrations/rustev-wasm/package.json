@@ -1,0 +1,34 @@
+{
+  "name": "@statecrafting/rustev-wasm",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Rustev's pure commands as a WebAssembly module: check, compile, show, offline replay, evaluation, gates and calibration.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/statecrafting/rustev.git",
+    "directory": "integrations/rustev-wasm"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "sideEffects": false,
+  "exports": {
+    "./web": {
+      "types": "./web/rustev_wasm.d.ts",
+      "import": "./web/rustev_wasm.js"
+    },
+    "./bundler": {
+      "types": "./bundler/rustev_wasm.d.ts",
+      "import": "./bundler/rustev_wasm.js"
+    },
+    "./node": {
+      "types": "./node/rustev_wasm.d.ts",
+      "require": "./node/rustev_wasm.js"
+    },
+    "./documents": {
+      "types": "./types/rustev-documents.d.ts"
+    }
+  },
+  "files": ["web", "bundler", "node", "types"]
+}

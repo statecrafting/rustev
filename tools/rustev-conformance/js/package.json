@@ -1,0 +1,14 @@
+{
+  "name": "rustev-conformance-js",
+  "private": true,
+  "description": "Spec 027 tooling: the JavaScript conformance runner, the WebAssembly checks and the document type generator. Never published.",
+  "type": "module",
+  "//": "Every package in the lockfile, transitive ones included (lodash 4.18.1, js-yaml 4.3.2 and others newer than some references know), is published on the public registry; npm ci checks each against its locked integrity, and make bindings verifies every installed package's registry signature (npm audit signatures).",
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "json-schema-to-typescript": "16.0.0",
+    "typescript": "5.9.3"
+  }
+}

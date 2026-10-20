@@ -6,6 +6,7 @@
     "cat-17.definition.json"
   ],
   "command": "plan check",
+  "derived": [],
   "exit": 5,
   "id": "refusal-17",
   "inputs": [
@@ -24,6 +25,7 @@
     }
   ],
   "surfaces": [
-    "cli"
+    "cli",
+    "wasm"
   ]
 }

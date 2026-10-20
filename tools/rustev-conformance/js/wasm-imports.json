@@ -1,0 +1,27 @@
+{
+  "comment": "Spec 027, 3.10.3: the only imports the WebAssembly module may have: wasm-bindgen's generated glue, by base name (the `__wbg_` prefix and hash suffix removed). Each is reviewed: `call` invokes the host's resolver callback; `length`, `prototypesetcall` and `instanceof_Uint8Array` move bytes across; `Error` builds a thrown error; the `__wbindgen_*` intrinsics manage references and strings. No time, randomness, network, storage, DOM, WASI or `env` import. Listed as exact module:name pairs, each reviewed: the same glue is imported from `wbg` or `./rustev_wasm_bg.js` depending on the target.",
+  "imports": [
+    "./rustev_wasm_bg.js:Error",
+    "./rustev_wasm_bg.js:__wbindgen_generic",
+    "./rustev_wasm_bg.js:__wbindgen_is_null",
+    "./rustev_wasm_bg.js:__wbindgen_is_undefined",
+    "./rustev_wasm_bg.js:__wbindgen_object_drop_ref",
+    "./rustev_wasm_bg.js:__wbindgen_string_get",
+    "./rustev_wasm_bg.js:__wbindgen_throw",
+    "./rustev_wasm_bg.js:call",
+    "./rustev_wasm_bg.js:instanceof_Uint8Array",
+    "./rustev_wasm_bg.js:length",
+    "./rustev_wasm_bg.js:prototypesetcall",
+    "wbg:Error",
+    "wbg:__wbindgen_generic",
+    "wbg:__wbindgen_is_null",
+    "wbg:__wbindgen_is_undefined",
+    "wbg:__wbindgen_object_drop_ref",
+    "wbg:__wbindgen_string_get",
+    "wbg:__wbindgen_throw",
+    "wbg:call",
+    "wbg:instanceof_Uint8Array",
+    "wbg:length",
+    "wbg:prototypesetcall"
+  ]
+}

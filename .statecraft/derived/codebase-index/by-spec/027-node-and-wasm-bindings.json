@@ -47,6 +47,14 @@
         "source": "spec-edge"
       },
       {
+        "path": "integrations/rustev-wasm",
+        "source": "manifest-metadata"
+      },
+      {
+        "path": "integrations/rustev-wasm/",
+        "source": "spec-edge"
+      },
+      {
         "path": "tools/rustev-boundaries/",
         "source": "spec-edge"
       },
@@ -87,7 +95,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "integrations/rustev-wasm/"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -256,5 +268,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "49c3b5750684b0d74ffb7937e20b99e844b7afaaefb2036e854accadc5089906"
+  "shardHash": "095cd75b4bba576856d956ef7ac4d39be59d71c2d5813ff49cc5040177c23e2f"
 }

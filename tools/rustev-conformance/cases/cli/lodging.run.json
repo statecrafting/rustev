@@ -15,6 +15,7 @@
     "lodging.record.json"
   ],
   "command": "run",
+  "derived": [],
   "exit": 0,
   "id": "lodging.run",
   "inputs": [

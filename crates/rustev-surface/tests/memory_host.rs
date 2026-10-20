@@ -2,67 +2,9 @@
 //! gets the CLI's bytes. Inputs are named byte strings; outputs land in
 //! memory. SYNTHETIC reference fixtures.
 
-use std::cell::RefCell;
-use std::collections::BTreeMap;
-
 use rustev_surface::deps::{DepArgs, no_rules};
-use rustev_surface::host::{Host, IoFail, ReadFail};
+use rustev_surface::host::{Host, Memory};
 use rustev_surface::plan::{CompileArgs, check, compile_cmd, show};
-
-/// Named inputs and the outputs a command published.
-#[derive(Default)]
-struct Memory {
-    inputs: BTreeMap<String, Vec<u8>>,
-    outputs: RefCell<BTreeMap<String, Vec<u8>>>,
-}
-
-impl Host for Memory {
-    // At most `max` bytes, as the CLI's file host reads: a caller that must
-    // tell an oversized input asks for its limit plus one byte and compares
-    // lengths. This host has no aggregate budget, so it never reports one.
-    fn read_classified(&self, label: &str, max: usize) -> Result<Option<Vec<u8>>, ReadFail> {
-        Ok(self
-            .inputs
-            .get(label)
-            .map(|b| b[..b.len().min(max)].to_vec()))
-    }
-
-    fn ensure_absent(&self, label: &str) -> Result<(), IoFail> {
-        if self.outputs.borrow().contains_key(label) {
-            return Err(IoFail {
-                path: label.into(),
-                detail: "already exists; outputs are never overwritten".into(),
-            });
-        }
-        Ok(())
-    }
-
-    fn create(&self, label: &str, bytes: &[u8]) -> Result<(), IoFail> {
-        self.ensure_absent(label)?;
-        self.outputs
-            .borrow_mut()
-            .insert(label.into(), bytes.to_vec());
-        Ok(())
-    }
-
-    fn write_all(&self, files: &[(String, Vec<u8>)]) -> Result<(), IoFail> {
-        // All or none: a failure removes what this call already wrote.
-        for (i, (l, b)) in files.iter().enumerate() {
-            if let Err(e) = self.create(l, b) {
-                let mut out = self.outputs.borrow_mut();
-                for (written, _) in &files[..i] {
-                    out.remove(written);
-                }
-                return Err(e);
-            }
-        }
-        Ok(())
-    }
-
-    fn join(&self, dir: &str, name: &str) -> String {
-        format!("{dir}/{name}")
-    }
-}
 
 const DEFINITION: &[u8] = include_bytes!("../../rustev-core/tests/golden/lodging.definition.json");
 
@@ -70,11 +12,16 @@ const RULES: &[u8] =
     include_bytes!("../../../backends/rustev-backend-rules/tests/fixtures/lodging.rules.json");
 
 fn memory() -> Memory {
-    let mut m = Memory::default();
-    m.inputs
-        .insert("definition".into(), DEFINITION.trim_ascii_end().to_vec());
-    m.inputs.insert("lodging.rules".into(), RULES.to_vec());
-    m
+    Memory::new(
+        [
+            (
+                "definition".to_string(),
+                DEFINITION.trim_ascii_end().to_vec(),
+            ),
+            ("lodging.rules".to_string(), RULES.to_vec()),
+        ]
+        .into(),
+    )
 }
 
 static RULES_LABELS: std::sync::LazyLock<Vec<String>> =
@@ -121,7 +68,7 @@ fn compile_publishes_the_plan_and_show_reads_it() {
     let m = memory();
     let done = compile_cmd("plan compile", &m, args(), &mut rules_backend, "plan").unwrap();
     assert_eq!(done.code, 0);
-    let plan = m.outputs.borrow()["plan"].clone();
+    let plan = m.output("plan").unwrap();
     // The published plan is the one `plan check` names.
     let compiled = String::from_utf8(done.out.bytes()).unwrap();
     let checked = String::from_utf8(
@@ -133,8 +80,9 @@ fn compile_publishes_the_plan_and_show_reads_it() {
     // An existing output is refused before any work, as on a file system.
     let again = compile_cmd("plan compile", &m, args(), &mut rules_backend, "plan").unwrap_err();
     assert_eq!(again.code, 3);
-    let mut m2 = memory();
-    m2.inputs.insert("plan".into(), plan);
+    let mut inputs = memory().inputs().clone();
+    inputs.insert("plan".into(), plan);
+    let m2 = Memory::new(inputs);
     let shown = show("plan show", &m2, "plan", deps(), &mut rules_backend).unwrap();
     assert_eq!(
         shown.out.bytes(),
@@ -152,4 +100,22 @@ fn a_rules_program_without_a_rules_backend_is_refused() {
             .unwrap()
             .contains("no rules backend")
     );
+}
+
+#[test]
+fn join_names_an_output_by_its_directory_or_alone() {
+    // An empty directory is the binding's top level: the label is the name
+    // itself, as the bindings return artifacts keyed by name.
+    let m = memory();
+    assert_eq!(m.join("", "plan.json"), "plan.json");
+    assert_eq!(m.join("out", "plan.json"), "out/plan.json");
+}
+
+#[test]
+fn an_output_never_replaces_an_input() {
+    // As on a file system, where the input is a file at that path.
+    let m = memory();
+    let e = m.ensure_absent("definition").unwrap_err();
+    assert!(e.detail.contains("names an input"), "{}", e.detail);
+    assert!(m.ensure_absent("plan").is_ok());
 }
