@@ -690,6 +690,15 @@ sh crates/rustev-eval/mutation/seeds.sh
   time is unknown latency. Of 34 seeded defects the tests missed 15;
   each now has a test and all are detected.
 
+**2026-10-19, mechanical lint rewrite (no behavior change).** The
+workspace MSRV moved to 1.88 (spec 021's implementation record), so
+clippy's `collapsible_if` now proposes `let` chains; `cargo clippy --fix`
+collapsed the nested `if`s in crates/rustev-eval/src/dataset.rs and
+crates/rustev-eval/tests/reports.rs, and its `manual_is_multiple_of` (also
+applicable from 1.88) wrote `percentile.is_multiple_of(10)` for
+`percentile % 10 == 0` in crates/rustev-eval/src/optimization.rs. Every
+test and golden is unchanged.
+
 ## Tooling compatibility record (2026-10-02)
 
 Mutation seed copies exclude the managed `.bin` engine directory introduced

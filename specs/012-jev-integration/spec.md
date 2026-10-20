@@ -687,6 +687,11 @@ first, so `capability_and_malformed_request_are_refused_unsent` in
 `tests/adapter.rs` intermittently found no record after its one valid call
 (seen in CI on 2026-09-27 and 2026-10-16). No requirement changes.
 
+**2026-10-19, mechanical lint rewrite (no behavior change).** The
+workspace MSRV moved to 1.88 (spec 021's implementation record), so
+clippy's `collapsible_if` now proposes `let` chains; `cargo clippy --fix`
+collapsed the nested `if`s in integrations/rustev-jev/src/{adapter,spend}.rs. Every test and golden is unchanged.
+
 ## Verification
 
 Run by `make verify` (012 is in `VERIFIED_SPECS`).

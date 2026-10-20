@@ -58,7 +58,7 @@ fn quantile(values: &[u64], percentile: u64) -> Option<u64> {
 }
 
 fn percentile_name(percentile: u64) -> String {
-    if percentile % 10 == 0 {
+    if percentile.is_multiple_of(10) {
         format!("p0.{}", percentile / 10)
     } else {
         format!("p0.{percentile}")

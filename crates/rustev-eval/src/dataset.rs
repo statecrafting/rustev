@@ -133,13 +133,11 @@ impl DatasetManifest {
             labeling,
             limitations,
         } = &self.provenance
-        {
-            if [source, license, labeling, limitations]
+            && [source, license, labeling, limitations]
                 .iter()
                 .any(|s| s.trim().is_empty())
-            {
-                return Err(DatasetError::Provenance);
-            }
+        {
+            return Err(DatasetError::Provenance);
         }
         let mut ids = BTreeSet::new();
         let mut split_of: BTreeMap<String, Split> = BTreeMap::new();

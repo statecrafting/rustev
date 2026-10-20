@@ -572,6 +572,11 @@ sh crates/rustev-cli/mutation/seeds.sh
   store resolver's choice of the no-follow open is not seeded by itself:
   no test can swap a path at the instant between check and open.
 
+**2026-10-19, mechanical lint rewrite (no behavior change).** The
+workspace MSRV moved to 1.88 (spec 021's implementation record), so
+clippy's `collapsible_if` now proposes `let` chains; `cargo clippy --fix`
+collapsed the nested `if`s in crates/rustev-cli/tests/plan.rs. Every test and golden is unchanged.
+
 ## Decision history
 
 - 2026-09-23: drafted with the increment 2 contracts, then aligned with the

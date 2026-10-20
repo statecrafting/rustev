@@ -272,13 +272,13 @@ impl Compiled {
         for step in &plan.steps {
             if let PlanStepDetail::Semantic(b) = &step.detail {
                 needed.push((b.backend_id.clone(), &b.descriptor));
-                if let BoundCalibration::Bound { id, .. } = &b.calibration {
-                    if !have_c.contains(id) {
-                        return Err(LoadError::MissingCalibration {
-                            step: step.id.clone(),
-                            calibration: id.clone(),
-                        });
-                    }
+                if let BoundCalibration::Bound { id, .. } = &b.calibration
+                    && !have_c.contains(id)
+                {
+                    return Err(LoadError::MissingCalibration {
+                        step: step.id.clone(),
+                        calibration: id.clone(),
+                    });
                 }
             }
         }
@@ -542,13 +542,13 @@ pub(crate) fn check_candidate(
             required: format!("{:?}", d.backend.min_determinism),
         });
     }
-    if let ArtifactPin::Pinned(a) = &d.backend.artifact {
-        if a != &b.artifact {
-            reasons.push(ShortfallReason::ArtifactPin {
-                pinned: a.to_string(),
-                offered: b.artifact.to_string(),
-            });
-        }
+    if let ArtifactPin::Pinned(a) = &d.backend.artifact
+        && a != &b.artifact
+    {
+        reasons.push(ShortfallReason::ArtifactPin {
+            pinned: a.to_string(),
+            offered: b.artifact.to_string(),
+        });
     }
     match chosen {
         Some(o) if reasons.is_empty() => Ok(o.output),
@@ -887,15 +887,15 @@ fn compile_inner(
                         "a calibration is bound only to a calibrated_probability step".into(),
                     )?;
                 }
-                if let BindingChoice::Backend(b) = &d.backend.binding {
-                    if b.is_empty() {
-                        inv(subject.clone(), "binding names no backend".into())?;
-                    }
+                if let BindingChoice::Backend(b) = &d.backend.binding
+                    && b.is_empty()
+                {
+                    inv(subject.clone(), "binding names no backend".into())?;
                 }
-                if let Fallback::Kind { reason, .. } = &d.fallback {
-                    if reason.is_empty() {
-                        inv(subject.clone(), "a fallback states its reason".into())?;
-                    }
+                if let Fallback::Kind { reason, .. } = &d.fallback
+                    && reason.is_empty()
+                {
+                    inv(subject.clone(), "a fallback states its reason".into())?;
                 }
             }
         }
@@ -1152,17 +1152,13 @@ fn compile_inner(
                         .map(|s| crate::expr::split_step(s).0);
                     if let Some(OpArgs::JoinKeyed(j)) =
                         overlay.as_deref().and_then(|o| decoded.get(o))
+                        && j.left != m.base
                     {
-                        if j.left != m.base {
-                            return refuse(
-                                C::InvalidDefinition,
-                                subject,
-                                format!(
-                                    "the overlay joins {}, not the base list {}",
-                                    j.left, m.base
-                                ),
-                            );
-                        }
+                        return refuse(
+                            C::InvalidDefinition,
+                            subject,
+                            format!("the overlay joins {}, not the base list {}", j.left, m.base),
+                        );
                     }
                     if let Some(e) = args.merge_rule_error(&env) {
                         return refuse(C::InvalidDefinition, subject, e);
@@ -1581,10 +1577,8 @@ fn compile_inner(
 
     // (g) continued: per-item and per-field evidence 2 records fit
     // `RECORD_V1` (spec 032, 3.10.4).
-    if v2 {
-        if let Err(detail) = quality::evidence_bound(def, &infos) {
-            return refuse(C::Budget, "limits", format!("evidence-bound: {detail}"));
-        }
+    if v2 && let Err(detail) = quality::evidence_bound(def, &infos) {
+        return refuse(C::Budget, "limits", format!("evidence-bound: {detail}"));
     }
 
     // (h) Policy.
@@ -2038,23 +2032,22 @@ fn consumers_accept(def: &Definition, step: &str, kind: SemKind) -> Result<(), S
         walk(&a.when, step, kind)?;
     }
     for s in &def.steps {
-        if let StepBody::Exact(e) = &s.body {
-            if let Some(Ok(OpArgs::WeightedRank(w))) = ops::decode(&e.op, e.version, &e.args) {
-                for c in &w.components {
-                    match &c.source {
-                        ops::Source::PropositionMean { step: s2, .. }
-                            if step_ref(s2) == Some(step) && !kind.has_mass() =>
-                        {
-                            return Err(format!("proposition_mean cannot read {}", kind.name()));
-                        }
-                        ops::Source::RubricExpectation { step: s2 }
-                            if step_ref(s2) == Some(step)
-                                && !matches!(kind, SemKind::Ordinal(_)) =>
-                        {
-                            return Err(format!("rubric_expectation cannot read {}", kind.name()));
-                        }
-                        _ => {}
+        if let StepBody::Exact(e) = &s.body
+            && let Some(Ok(OpArgs::WeightedRank(w))) = ops::decode(&e.op, e.version, &e.args)
+        {
+            for c in &w.components {
+                match &c.source {
+                    ops::Source::PropositionMean { step: s2, .. }
+                        if step_ref(s2) == Some(step) && !kind.has_mass() =>
+                    {
+                        return Err(format!("proposition_mean cannot read {}", kind.name()));
                     }
+                    ops::Source::RubricExpectation { step: s2 }
+                        if step_ref(s2) == Some(step) && !matches!(kind, SemKind::Ordinal(_)) =>
+                    {
+                        return Err(format!("rubric_expectation cannot read {}", kind.name()));
+                    }
+                    _ => {}
                 }
             }
         }

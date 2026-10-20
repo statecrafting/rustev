@@ -376,10 +376,10 @@ impl SpendJournal {
             let line = serde_json::to_vec(&header).map_err(|e| JournalError::Io(e.to_string()))?;
             append(&mut file, &line).map_err(io)?;
             file.sync_all().map_err(io)?;
-            if let Some(dir) = path.parent().filter(|d| !d.as_os_str().is_empty()) {
-                if let Ok(d) = File::open(dir) {
-                    let _ = d.sync_all();
-                }
+            if let Some(dir) = path.parent().filter(|d| !d.as_os_str().is_empty())
+                && let Ok(d) = File::open(dir)
+            {
+                let _ = d.sync_all();
             }
             text = String::from_utf8(line).unwrap_or_default() + "\n";
         }

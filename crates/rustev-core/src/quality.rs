@@ -340,17 +340,17 @@ pub(crate) fn structure(
                 let Some(args) = decoded.get(&s.id) else {
                     continue;
                 };
-                if let OpArgs::FilterWithReasons(FilterWithReasons { rules, .. }) = args {
-                    if let Some(r) = rules.iter().find(|r| {
+                if let OpArgs::FilterWithReasons(FilterWithReasons { rules, .. }) = args
+                    && let Some(r) = rules.iter().find(|r| {
                         r.name == "unmatched"
                             || r.name == "predicate_failed"
                             || r.name.contains(':')
-                    }) {
-                        return Err(invalid(
-                            &subject,
-                            format!("reserved_reason: a rule cannot be named {:?}", r.name),
-                        ));
-                    }
+                    })
+                {
+                    return Err(invalid(
+                        &subject,
+                        format!("reserved_reason: a rule cannot be named {:?}", r.name),
+                    ));
                 }
                 let mut mins = Vec::new();
                 gate_predicates(args)
@@ -1238,19 +1238,19 @@ pub(crate) fn corroborate_refusal(
             if reads_claim(r, &claim) {
                 continue;
             }
-            if let Some(g) = read_ceiling(r, trees).own.graded() {
-                if g < c.upgrade_to {
-                    return Some(refusal(
-                        Category::GradeRequirement,
-                        subject,
-                        format!(
-                            "grade_requirement: a check reads {} with ceiling {}, below upgrade_to {}",
-                            r.name(),
-                            g.name(),
-                            c.upgrade_to.name()
-                        ),
-                    ));
-                }
+            if let Some(g) = read_ceiling(r, trees).own.graded()
+                && g < c.upgrade_to
+            {
+                return Some(refusal(
+                    Category::GradeRequirement,
+                    subject,
+                    format!(
+                        "grade_requirement: a check reads {} with ceiling {}, below upgrade_to {}",
+                        r.name(),
+                        g.name(),
+                        c.upgrade_to.name()
+                    ),
+                ));
             }
         }
     }
@@ -1317,12 +1317,11 @@ pub(crate) fn evidence_bound(
     for (id, info) in infos {
         if let crate::compile::StepInfo::Exact { ty, .. }
         | crate::compile::StepInfo::Corroborate { ty, .. } = info
+            && ty_widest(ty) > collection
         {
-            if ty_widest(ty) > collection {
-                return Err(format!(
-                    "step:{id} produces a collection over {collection} entries"
-                ));
-            }
+            return Err(format!(
+                "step:{id} produces a collection over {collection} entries"
+            ));
         }
         nodes = nodes.saturating_add(match info {
             crate::compile::StepInfo::Exact { ty, .. }

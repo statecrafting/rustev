@@ -82,11 +82,11 @@ impl<'e> DecisionCtx<'_, 'e> {
             shared.units_for(bound)?;
         }
         self.ledger.reserve(units)?;
-        if let Some(shared) = &self.rt.shared {
-            if let Err(e) = shared.reserve(units) {
-                self.ledger.release(units);
-                return Err(e);
-            }
+        if let Some(shared) = &self.rt.shared
+            && let Err(e) = shared.reserve(units)
+        {
+            self.ledger.release(units);
+            return Err(e);
         }
         Ok(units)
     }

@@ -155,10 +155,10 @@ impl RecentIds {
         if self.set.contains(id) {
             return false;
         }
-        if self.order.len() >= RECENT_IDS {
-            if let Some(old) = self.order.pop_front() {
-                self.set.remove(&old);
-            }
+        if self.order.len() >= RECENT_IDS
+            && let Some(old) = self.order.pop_front()
+        {
+            self.set.remove(&old);
         }
         self.set.insert(id.to_string());
         self.order.push_back(id.to_string());
@@ -614,19 +614,19 @@ fn join(
     member: Member,
 ) -> Arc<Exchange> {
     let mut open = lock(&inner.open);
-    if let Some(k) = &key {
-        if let Some(ex) = open.get(k).cloned() {
-            let mut st = lock(&ex.state);
-            if st.phase == Phase::Collecting && st.members.len() < inner.max_items {
-                st.members.push(member);
-                if st.members.len() >= inner.max_items {
-                    if let Some(f) = st.flush.take() {
-                        let _ = f.send(());
-                    }
-                }
-                drop(st);
-                return ex;
+    if let Some(k) = &key
+        && let Some(ex) = open.get(k).cloned()
+    {
+        let mut st = lock(&ex.state);
+        if st.phase == Phase::Collecting && st.members.len() < inner.max_items {
+            st.members.push(member);
+            if st.members.len() >= inner.max_items
+                && let Some(f) = st.flush.take()
+            {
+                let _ = f.send(());
             }
+            drop(st);
+            return ex;
         }
     }
     let (flush_tx, flush_rx) = oneshot::channel();
@@ -754,10 +754,10 @@ async fn run_exchange(
     // Close the batch and snapshot the members still waiting.
     let (questions, budget) = {
         let mut open = lock(&inner.open);
-        if let Some(k) = &ex.key {
-            if open.get(k).is_some_and(|e| Arc::ptr_eq(e, &ex)) {
-                open.remove(k);
-            }
+        if let Some(k) = &ex.key
+            && open.get(k).is_some_and(|e| Arc::ptr_eq(e, &ex))
+        {
+            open.remove(k);
         }
         let mut st = lock(&ex.state);
         st.phase = Phase::Sending;
