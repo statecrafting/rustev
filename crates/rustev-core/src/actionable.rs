@@ -1060,6 +1060,195 @@ pub(crate) fn party_name(p: Party) -> &'static str {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Evaluation (3.4 to 3.7).
+
+/// A notice a check emitted, before its action is computed.
+#[derive(Debug, Clone)]
+pub(crate) struct PendingNotice {
+    pub kind: rustev_contract::judgment::NoticeKind,
+    pub subject: String,
+    pub reason: String,
+    pub causes: Vec<Cause>,
+    pub address: Address,
+}
+
+/// A refusing check, before its action is computed.
+#[derive(Debug, Clone)]
+pub(crate) struct PendingRefusal {
+    pub check: String,
+    pub subject: String,
+    pub causes: Vec<Cause>,
+    pub remediation: RemediationUse,
+    pub address: Address,
+}
+
+/// The terminal outcome checks decided (3.4.6).
+#[derive(Debug, Clone)]
+pub(crate) enum Terminal {
+    Refused,
+    Abstain { check: String },
+    Escalate { check: String, reason: String },
+}
+
+/// What the checks of one evaluation did.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct CheckRun {
+    pub records: Vec<rustev_contract::actionability::CheckRecord>,
+    /// Dropped input -> the check that dropped it.
+    pub dropped: BTreeMap<String, String>,
+    pub notices: Vec<PendingNotice>,
+    pub refusals: Vec<PendingRefusal>,
+    pub terminal: Option<Terminal>,
+    /// The input references the deciding checks read (3.4.6).
+    pub deciding_reads: Vec<String>,
+}
+
+/// What an action is computed from, beyond its causes.
+pub(crate) struct ActionInputs<'a> {
+    pub caller_controlled: &'a [ProvenanceClass],
+    /// An explicit address of the site, if any (3.5.3).
+    pub address: &'a Address,
+    /// A declared or built-in remediation already resolved to its value,
+    /// with the party a declared one is `for` (a built-in has none); `None`
+    /// uses the computed remediation.
+    pub declared: Option<(rustev_contract::actionability::Remediation, Option<Party>)>,
+    pub computed: rustev_contract::actionability::Remediation,
+    pub transient: bool,
+}
+
+/// Build an action from its causes (3.5.2, 3.5.3).
+pub(crate) fn action(
+    causes: Vec<Cause>,
+    a: ActionInputs<'_>,
+) -> rustev_contract::actionability::Action {
+    use rustev_contract::actionability::{Action, Override, OverrideBasis, Remediation};
+    let caused_by = sort_causes(causes);
+    let computed = Party::combine(
+        caused_by
+            .iter()
+            .map(|c| cause_party(c, a.caller_controlled)),
+    );
+    let (remediation, remediation_for) = match a.declared {
+        Some((r, p)) => (r, p),
+        None => (a.computed, None),
+    };
+    let override_ = match (a.address, remediation_for, &remediation) {
+        (Address::Override(o), _, _) => Override::Applied {
+            to: o.to,
+            basis: OverrideBasis::Declared,
+            reason: o.reason.clone(),
+        },
+        (Address::Computed, Some(p), Remediation::Some { code, .. }) if p != computed => {
+            Override::Applied {
+                to: p,
+                basis: OverrideBasis::Remediation,
+                reason: code.clone(),
+            }
+        }
+        _ => Override::None,
+    };
+    let addressed_to = match &override_ {
+        Override::Applied { to, .. } => *to,
+        Override::None => computed,
+    };
+    Action {
+        addressed_to,
+        computed,
+        override_,
+        remediation,
+        caused_by,
+        transient: a.transient,
+    }
+}
+
+/// The computed remediation of a reason (3.6.2).
+pub(crate) fn computed_remediation(
+    u: &rustev_contract::judgment::Unresolved,
+    transient: bool,
+    failed_step: Option<&str>,
+) -> rustev_contract::actionability::Remediation {
+    use rustev_contract::actionability::{Remediation, RemediationValue};
+    use rustev_contract::judgment::Unresolved as U;
+    let texts = |key: &str, v: &[String]| {
+        Remediation::with(key, [(key_for(key), Remediation::texts(v.iter().cloned()))])
+    };
+    fn key_for(code: &str) -> String {
+        if code == "resolve_conflict" {
+            "facts".into()
+        } else {
+            "fields".into()
+        }
+    }
+    match u {
+        U::MissingEvidence { fields } => texts("provide_fields", fields),
+        U::StaleEvidence { fields } => texts("refresh_fields", fields),
+        U::InvalidInput { fields, .. } => texts("correct_fields", fields),
+        U::Conflict { facts } => texts("resolve_conflict", facts),
+        U::InsufficientGrade { fields } => texts("improve_evidence", fields),
+        U::BackendUnavailable { .. } | U::DeadlineExceeded => Remediation::code("retry"),
+        U::InvalidBackendOutput { .. } if transient => Remediation::code("retry"),
+        U::InvalidBackendOutput { .. } => Remediation::with(
+            "report_backend",
+            [(
+                "step".to_string(),
+                RemediationValue::Text(failed_step.unwrap_or_default().to_string()),
+            )],
+        ),
+        U::BudgetExhausted { resource } => Remediation::with(
+            "raise_budget",
+            [(
+                "resource".to_string(),
+                RemediationValue::Text(resource.clone()),
+            )],
+        ),
+        U::Unsupported { capability } => Remediation::with(
+            "provide_capability",
+            [(
+                "name".to_string(),
+                RemediationValue::Text(capability.clone()),
+            )],
+        ),
+        U::Abstained { .. } => Remediation::None,
+    }
+}
+
+/// Whether retrying the same request unchanged can succeed (3.6.4): only for
+/// `backend_unavailable`, `deadline_exceeded`, and `invalid_backend_output`
+/// from a backend whose determinism is not `bitwise`.
+pub(crate) fn transient(
+    u: &rustev_contract::judgment::Unresolved,
+    determinism: Option<rustev_contract::definition::Determinism>,
+) -> bool {
+    use rustev_contract::definition::Determinism;
+    use rustev_contract::judgment::Unresolved as U;
+    match u {
+        U::BackendUnavailable { .. } | U::DeadlineExceeded => true,
+        U::InvalidBackendOutput { .. } => determinism != Some(Determinism::Bitwise),
+        _ => false,
+    }
+}
+
+/// The input fields a reason names, each reduced to its input (3.5.6).
+pub(crate) fn reason_fields(u: &rustev_contract::judgment::Unresolved) -> Vec<String> {
+    use rustev_contract::judgment::Unresolved as U;
+    let fields: &[String] = match u {
+        U::MissingEvidence { fields }
+        | U::StaleEvidence { fields }
+        | U::InvalidInput { fields, .. }
+        | U::InsufficientGrade { fields } => fields,
+        U::Conflict { facts } => facts,
+        _ => &[],
+    };
+    let mut out: Vec<String> = fields
+        .iter()
+        .map(|f| f.split('/').next().unwrap_or(f).to_string())
+        .collect();
+    out.sort();
+    out.dedup();
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -308,21 +308,6 @@ fn the_plan_id_changes_with_any_declaration() {
 }
 
 #[test]
-fn a_compiled_plan_with_checks_runs_no_decision_until_evaluation_lands() {
-    // Increment 2 compiles checks; evaluating them is increment 3. Until
-    // then such a plan starts no decision rather than one that ignores its
-    // checks.
-    let compiled = compile(&def(&base()), &[], &[]).unwrap();
-    let snapshot = rustev_contract::snapshot::Snapshot {
-        schema: rustev_contract::schema::SNAPSHOT.into(),
-        entries: vec![],
-    };
-    let now = rustev_contract::time::Timestamp::from_ms(0).unwrap();
-    let started = rustev_core::evaluate::Evaluation::start(&compiled, &snapshot, now);
-    assert!(started.is_err());
-}
-
-#[test]
 fn a_listed_reason_the_target_never_produces_adds_no_cause() {
     // An input never yields `backend_unavailable`; the handler's static
     // causes are its input's alone.

@@ -4,6 +4,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use rustev_contract::definition::ProvenanceClass;
 use rustev_contract::definition::{
     Cond, HandlerAction, OutcomeDecl, ParamSource, PolicyDecl, ReasonSet,
 };
@@ -24,6 +25,10 @@ pub(crate) trait View {
     /// `Ok(value)`, or the unresolved reason, for `input:`/`step:` refs.
     fn get(&self, r: &str) -> Result<Seen<'_>, Unresolved>;
     fn scope(&self) -> Scope<'_>;
+    /// The provenance classes of a resolved `input:`/`step:` reference: an
+    /// input's accepted entry's class, or a plan 3 step value's provenance
+    /// set (spec 033, 3.4.7).
+    fn provenance(&self, r: &str) -> Result<Vec<ProvenanceClass>, Unresolved>;
     /// The input or step a reference reads.
     fn base(&self, r: &str) -> String {
         crate::expr::base_ref(r)
@@ -35,6 +40,11 @@ pub(crate) struct PolicyResult {
     /// References read, in reading order, deduplicated.
     pub reads: Vec<String>,
     pub trace: Vec<String>,
+    /// The site that produced the outcome (spec 033, 3.5.2): `rule:<id>` or
+    /// `handler:<n>`; `None` when no declaration decided it.
+    pub site: Option<String>,
+    /// The deciding handler's position, when a handler decided.
+    pub handler: Option<usize>,
 }
 
 struct Run<'v, V: View> {
@@ -155,11 +165,19 @@ impl<V: View> Run<'_, V> {
             Cond::Not(c) => !self.cond(c)?,
             // Compilation refuses spec 033's constructs until its
             // evaluation lands (spec 033 increment 1); never a default.
-            Cond::ProvenanceWithin { reference, .. } => {
-                return Err(Unresolved::invalid(
-                    [],
-                    format!("provenance_within({reference}) is not evaluated yet"),
-                ));
+            // Reads its reference like any atomic condition (spec 033, 3.4.7):
+            // an input's accepted entry's class, or every class of a step
+            // value's provenance set (an empty set is within).
+            Cond::ProvenanceWithin { reference, classes } => {
+                if self.unmet.contains(&self.view.base(reference)) {
+                    return Ok(false);
+                }
+                self.read(reference);
+                self.view.get(reference)?;
+                self.view
+                    .provenance(reference)?
+                    .iter()
+                    .all(|c| classes.contains(c))
             }
         })
     }
@@ -186,8 +204,10 @@ impl<V: View> Run<'_, V> {
                     _ => Err(Unresolved::invalid([], format!("{r} lists no fields"))),
                 }
             }
-            OutcomeDecl::NeedsInput { .. } => {
-                Err(Unresolved::invalid([], "needs_input is not evaluated yet"))
+            // Its questions, continuation and action are filled in by the
+            // evaluation, which knows the plan and snapshot (spec 033, 3.7).
+            OutcomeDecl::NeedsInput { fields, questions } => {
+                Ok(Some(needs_input(fields, questions)))
             }
             OutcomeDecl::Propose { action, params } => {
                 let mut out = BTreeMap::new();
@@ -247,25 +267,51 @@ pub(crate) fn evaluate<V: View>(policy: &PolicyDecl, view: &V) -> PolicyResult {
         run.read(&h.target);
         trace.push(format!("on_unresolved[{i}]"));
         match &h.action {
-            HandlerAction::Propagate => return done(Outcome::Unresolved(u), run, trace),
+            HandlerAction::Propagate => {
+                return decided(
+                    Outcome::Unresolved(u),
+                    run,
+                    trace,
+                    format!("handler:{i}"),
+                    Some(i),
+                );
+            }
             HandlerAction::Escalate { reason } => {
-                return done(
+                return decided(
                     Outcome::Escalate {
                         reason: reason.clone(),
                     },
                     run,
                     trace,
+                    format!("handler:{i}"),
+                    Some(i),
                 );
             }
             HandlerAction::AsUnmet => {
                 run.unmet.insert(h.target.clone());
             }
-            HandlerAction::PropagateWith { .. } | HandlerAction::NeedsInput { .. } => {
-                return done(Outcome::Unresolved(u), run, trace);
+            HandlerAction::PropagateWith { .. } => {
+                return decided(
+                    Outcome::Unresolved(u),
+                    run,
+                    trace,
+                    format!("handler:{i}"),
+                    Some(i),
+                );
+            }
+            HandlerAction::NeedsInput { fields, questions } => {
+                return decided(
+                    needs_input(fields, questions),
+                    run,
+                    trace,
+                    format!("handler:{i}"),
+                    Some(i),
+                );
             }
         }
     }
     let mut outcome = None;
+    let mut site = None;
     for r in &policy.rules {
         let matched = match run.cond(&r.when) {
             Ok(m) => m,
@@ -283,6 +329,7 @@ pub(crate) fn evaluate<V: View>(policy: &PolicyDecl, view: &V) -> PolicyResult {
             Ok(Some(o)) => {
                 trace.push(format!("rule:{}", r.id));
                 outcome = Some(o);
+                site = Some(format!("rule:{}", r.id));
                 break;
             }
             Ok(None) => continue,
@@ -322,7 +369,9 @@ pub(crate) fn evaluate<V: View>(policy: &PolicyDecl, view: &V) -> PolicyResult {
             }
         }
     }
-    done(outcome, run, trace)
+    let mut result = done(outcome, run, trace);
+    result.site = site;
+    result
 }
 
 fn done<V: View>(outcome: Outcome, run: Run<'_, V>, trace: Vec<String>) -> PolicyResult {
@@ -330,5 +379,52 @@ fn done<V: View>(outcome: Outcome, run: Run<'_, V>, trace: Vec<String>) -> Polic
         outcome,
         reads: run.reads,
         trace,
+        site: None,
+        handler: None,
     }
+}
+
+fn decided<V: View>(
+    outcome: Outcome,
+    run: Run<'_, V>,
+    trace: Vec<String>,
+    site: String,
+    handler: Option<usize>,
+) -> PolicyResult {
+    PolicyResult {
+        site: Some(site),
+        handler,
+        ..done(outcome, run, trace)
+    }
+}
+
+/// A `needs_input` outcome naming its fields and question ids; the
+/// evaluation fills in each template, the continuation and the action.
+fn needs_input(fields: &[String], questions: &[String]) -> Outcome {
+    use rustev_contract::actionability::{
+        Action, NeedsInput, Override, Party, QuestionDecl, Remediation,
+    };
+    let placeholder: rustev_contract::ids::ContentDigest =
+        serde_json::from_value(serde_json::json!(format!("sha256:{}", "0".repeat(64))))
+            .expect("a well-formed digest");
+    Outcome::NeedsInput(Box::new(NeedsInput {
+        fields: fields.to_vec(),
+        questions: questions
+            .iter()
+            .map(|id| QuestionDecl {
+                id: id.clone(),
+                fields: vec![],
+                text: String::new(),
+            })
+            .collect(),
+        continuation: placeholder,
+        action: Action {
+            addressed_to: Party::Caller,
+            computed: Party::Caller,
+            override_: Override::None,
+            remediation: Remediation::None,
+            caused_by: vec![],
+            transient: false,
+        },
+    }))
 }

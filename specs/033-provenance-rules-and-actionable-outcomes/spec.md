@@ -653,12 +653,12 @@ acceptance item before the increment that satisfies it. Plan:
 2. Compilation: phases (b), (e) and (h2), categories 16 and 17, and the
    plan 3 static table (3.8).
 3. Evaluation: checks, consequences and statuses, terminal outcomes and
-   `provenance_within` (3.3, 3.4), evidence 2 records.
-4. Actionable outcomes: causes, parties, overrides, remediations,
-   transience, notices with actions, `needs_input` and its continuation
-   (3.5 to 3.7), and the runtime origin (3.9).
-5. CLI output and goldens (3.11), compatibility goldens (3.12), mutation
-   seeds, every section 5 row, verification.
+   `provenance_within` (3.3, 3.4), evidence 2 records, and the actions of
+   3.5 to 3.7, which every judgment 2 outcome and notice carries, so they
+   land together.
+4. The runtime origin (3.9) and the CLI output and goldens (3.11).
+5. Compatibility goldens (3.12), mutation seeds, every section 5 row,
+   verification.
 
 **Increment 1 (contract).** `rustev-contract` carries every member of
 3.1: `actionability` in definition 2 (`caller_controlled`, remediations,
@@ -734,6 +734,54 @@ case of 3.8.2), `unreachable-branch`, `relax-order`, `ungraded-subject`,
 an invalid and a valid override reason, a step read in a test, an unknown
 remediation or parameter, and a `PlanId` that changes with an unused
 question.
+
+**Increment 3 (evaluation and actionable outcomes).** A plan with
+`actionability` evaluates its checks after input validation and before any
+step (3.4.1), in declaration order: a check of a relaxed group is
+`relaxed{by}`; an unresolved or absent subject leaves the check
+`not_evaluated` with that reason; a test whose read is unresolved, or which
+faults, is `unevaluable` and makes the subject unresolved with the reason
+(merged as spec 002 3.10.4), so no failure passes; a `true` test passes;
+a `false` one applies the branch of the subject's accepted entry's class,
+else the default. `drop_field` makes the subject absent for every reader
+(`missing_evidence`) while its entry stays in evidence with
+`dropped{check}`; `relax` relaxes the named group's later checks;
+`downgrade_grade` lowers every grade of the subject's metadata, never
+raising one; `continue_with_notice` keeps the value. Each emits its notice.
+The first failing terminal check decides (3.4.6): `refused` lists every
+failing refusing check in declaration order, `abstain` and `escalate` are
+that check's; no step is evaluated, no semantic request is issued, the
+policy does not run, and derivation and lineage are the deciding checks'
+reads. `provenance_within` reads its reference like any atomic condition:
+an input's accepted entry's class, or every class of a plan 3 step value's
+provenance set (3.4.7). The policy reports the site that decided
+(`rule:<id>` or `handler:<n>`); `propagate_with` carries its declared
+remediation and address, and `needs_input` (rule outcome or handler) its
+fields and question ids. Such a plan produces `rustev.judgment/2`: each
+unresolved outcome becomes `{reason, action}`; a refusal carries one action
+per refusing check and `addressed_to` is their combination; `needs_input`
+carries each named template byte-identical, its continuation
+`tagged_digest("rustev.continuation/1", ...)` over the plan, snapshot,
+evaluation time, site, fields and question ids, and an action addressed to
+the caller with `provide_fields`; every notice, the existing kinds
+included, carries an action. Causes follow 3.5.6 (input causes observed
+when an accepted entry existed, accepted classes otherwise, one per class
+for a conflict; `policy{site}` for an abstention; the first failed step,
+in step and instance order, for a backend reason, with origin `upstream`
+until the runtime supplies one in increment 4); `computed` is their
+combination; an explicit override, or a declared remediation `for` another
+party, is recorded beside it; remediations follow 3.6.2's table or the
+declared one, with parameters evaluated and `none` when one reads an
+unresolved input; `transient` follows 3.6.4, with the bound backend's
+declared determinism. Evidence 2 records every check and each dropped
+input. `crates/rustev-core/tests/actionability_eval.rs` covers the
+future-window example both ways (section 5 rows 1 and 2), a passing check,
+a missing subject, a stale read making the check unevaluable and its
+subject stale, terminal precedence with a kept notice, an abstention
+addressed to no one, a declared override beside the computed party,
+`needs_input`'s literal questions and an independently recomputed
+continuation, `provenance_within` both ways, and a remediation parameter
+reading an unresolved input.
 
 ## Decisions at approval
 
