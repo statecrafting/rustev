@@ -15,6 +15,14 @@
 //! unpacked archive outside any workspace, offline, against a vendored
 //! source of the candidate archives and the locked third-party crates
 //! (3.7). `<work>` must not lie inside a Cargo workspace.
+//!
+//! `rustev-release deps` prints the dependency report of 3.6 (normal and
+//! build closure, development-only additions, each with source, checksum
+//! and license) and exits 1 on a missing license or checksum.
+//!
+//! `rustev-release exceptions <YYYY-MM-DD>` exits 1 unless every advisory
+//! `deny.toml` ignores has an owner-approved exception unexpired on that
+//! date (3.6).
 
 use std::path::Path;
 use std::process::{Command, ExitCode};
@@ -24,6 +32,9 @@ use rustev_release::{Metadata, ReleaseSet, check_manifests};
 
 const SET: &str = include_str!("../release-set.json");
 const POLICY: &str = include_str!("../archive-policy.json");
+const DENY: &str = include_str!("../deny.toml");
+const EXCEPTIONS: &str = include_str!("../advisory-exceptions.json");
+const LOCK: &str = include_str!("../../../Cargo.lock");
 
 fn metadata() -> Result<Metadata, String> {
     let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
@@ -316,6 +327,84 @@ fn target_directory() -> Result<String, String> {
         .map_err(|e| format!("unreadable cargo metadata: {e}"))
 }
 
+fn deps(set: &ReleaseSet) -> ExitCode {
+    let meta = match metadata() {
+        Ok(m) => m,
+        Err(e) => {
+            eprintln!("{e}");
+            return ExitCode::from(2);
+        }
+    };
+    let report = rustev_release::audit::report(set, &meta, LOCK);
+    for p in &report.problems {
+        eprintln!("{p}");
+    }
+    match serde_json::to_string_pretty(&report) {
+        Ok(json) => println!("{json}"),
+        Err(e) => {
+            eprintln!("{e}");
+            return ExitCode::from(2);
+        }
+    }
+    if report.problems.is_empty() {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::from(1)
+    }
+}
+
+/// Today's UTC date as `YYYY-MM-DD`, from the system clock.
+fn utc_today() -> String {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    rustev_release::audit::civil_date(secs)
+}
+
+fn exceptions(today: &str) -> ExitCode {
+    // Expiry is judged against the real date: the argument must be a
+    // `YYYY-MM-DD` date and today's UTC date, so a later date cannot pass an
+    // expired exception.
+    let well_formed = today.len() == 10
+        && today.char_indices().all(|(i, c)| {
+            if i == 4 || i == 7 {
+                c == '-'
+            } else {
+                c.is_ascii_digit()
+            }
+        });
+    // One reading of the clock, for the check and its message alike.
+    let utc = utc_today();
+    if !well_formed || today != utc {
+        eprintln!(
+            "021 3.6: exceptions takes today's UTC date as YYYY-MM-DD ({utc}), not {today:?}"
+        );
+        return ExitCode::from(2);
+    }
+    let ex = match rustev_release::audit::Exceptions::parse(EXCEPTIONS.as_bytes()) {
+        Ok(e) => e,
+        Err(e) => {
+            eprintln!("{e}");
+            return ExitCode::from(2);
+        }
+    };
+    let ignored = rustev_release::audit::deny_ignored(DENY);
+    let v = rustev_release::audit::check_exceptions(&ex, &ignored, today);
+    if v.is_empty() {
+        println!(
+            "{} advisory exception(s), each owner-approved and unexpired on {today}",
+            ex.exceptions.len()
+        );
+        ExitCode::SUCCESS
+    } else {
+        for x in &v {
+            eprintln!("{x}");
+        }
+        ExitCode::from(1)
+    }
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let set = match ReleaseSet::parse(SET.as_bytes()) {
@@ -330,11 +419,13 @@ fn main() -> ExitCode {
         ["archives", dir] => archives(&set, dir),
         ["compare", a, b] => compare(&set, a, b),
         ["field", name] => field(&set, name),
+        ["deps"] => deps(&set),
+        ["exceptions", today] => exceptions(today),
         ["unpacked", dir, work] => unpacked(&set, dir, work, None),
         ["unpacked", dir, work, toolchain] => unpacked(&set, dir, work, Some(toolchain)),
         _ => {
             eprintln!(
-                "usage: rustev-release manifests | archives <dir> | compare <dir-a> <dir-b> | field <name> | unpacked <dir> <work> [<toolchain>]"
+                "usage: rustev-release manifests | archives <dir> | compare <dir-a> <dir-b> | field <name> | unpacked <dir> <work> [<toolchain>] | deps | exceptions <YYYY-MM-DD>"
             );
             ExitCode::from(2)
         }

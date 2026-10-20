@@ -85,6 +85,8 @@ done
 # No pipelines: each step's own exit status stops the script (set -e).
 # Each step's output, stdout and stderr, is its evidence file; a failing
 # step prints that file and stops the script.
+# Each step's standard output and standard error both go to its evidence
+# file, so a tool that reports on stderr (cargo deny) leaves its diagnostics.
 step() {
   name=$1
   shift
@@ -98,6 +100,21 @@ step compare.txt "$release" compare "$out/a" "$out/b"
 step archives.json "$release" archives "$out/a"
 work=$(mktemp -d "${TMPDIR:-/tmp}/rustev-candidate-$short.XXXXXX")
 step unpacked.txt "$release" unpacked "$out/a" "$work"
+# 3.6: the pinned audit tool and policy, the exceptions rule and the report.
+deny_pin=0.20.2
+if [ "$(cargo deny --version)" != "cargo-deny $deny_pin" ]; then
+  echo "021 3.6: the audit needs cargo-deny $deny_pin (cargo install cargo-deny --version $deny_pin --locked)" >&2
+  exit 1
+fi
+excluded=""
+for e in $(field excluded); do excluded="$excluded --exclude $e"; done
+# `--locked` is a cargo-deny global flag (before the subcommand), like
+# `--manifest-path`.
+# shellcheck disable=SC2086
+step deny.txt cargo deny --manifest-path Cargo.toml --config tools/rustev-release/deny.toml \
+  --workspace $excluded --locked check
+step exceptions.txt "$release" exceptions "$(date -u +%Y-%m-%d)"
+step dependencies.json "$release" deps
 sha256() {
   if command -v sha256sum >/dev/null 2>&1; then sha256sum "$@"; else shasum -a 256 "$@"; fi
 }
@@ -105,5 +122,8 @@ sha256() {
 # Written whole or not at all.
 (cd "$out/a" && for p in $packages; do sha256 "$p-$version.crate"; done) >"$out/SHA256SUMS.partial"
 mv "$out/SHA256SUMS.partial" "$out/SHA256SUMS"
-cat "$out/compare.txt" "$out/unpacked.txt"
+cat "$out/compare.txt" "$out/unpacked.txt" "$out/exceptions.txt"
+# `step` stops the script on a failing audit, so reaching here means it
+# passed; every diagnostic stays in deny.txt, part of the candidate evidence.
+echo "cargo deny: passed ($out/deny.txt)"
 echo "candidate evidence for $commit in $out"
