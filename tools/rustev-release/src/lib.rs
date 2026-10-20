@@ -13,6 +13,7 @@
 
 pub mod archive;
 pub mod audit;
+pub mod manifest;
 pub mod repro;
 
 use std::collections::{BTreeMap, BTreeSet};
