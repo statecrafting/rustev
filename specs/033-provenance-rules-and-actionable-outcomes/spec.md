@@ -689,6 +689,52 @@ document; `crates/rustev-core/tests/actionability_versions.rs` covers the
 version 1 refusal of each construct (section 5, last but one row) and the
 version 2 interim refusal.
 
+**Increment 2 (compilation).** `rustev-core`'s `actionable` module adds the
+actionability phase of 3.8 to compilation. Phase (b), after the policy's
+existing structure: `caller_controlled` holds only caller-controllable
+classes (category 17 `not-caller-controllable` otherwise) sorted and
+duplicate-free; declared remediations have unique codes that are not
+built in, a party other than `none` and scalar parameters; questions have
+unique ids, declared fields and 1 to 1024 bytes of text; constraint
+groups name declared checks; each check has an id unique among checks,
+steps and policy items, a declared subject, branches only for classes the
+subject accepts (`unreachable-branch`), and consequences whose notice and
+reason codes, remediations (declared or built in, with exactly their
+parameters), groups (`relax-order`) and downgrades (`ungraded-subject`,
+below `authoritative`) are valid; an override names `host`, `upstream` or
+`none` with a code as reason (category 17 `override-to-caller` for
+`caller`); `propagate_with`, `needs_input` (declared fields and questions
+whose fields it names) and `provenance_within` (an input or step, sorted
+non-empty classes) are checked where the policy declares them. Phase (e):
+a check's test is a `bool` predicate reading inputs, `now` and literals
+only, and remediation parameters have their declared types (category 3).
+Phase (h): a check's subject can also be unresolved with every reason of
+the inputs its test reads, `invalid_input` for a test that faults, and
+`insufficient_grade` after a downgrade, so spec 002's handler coverage
+sees them. `needs_input` names fields for the caller to supply and reads
+none, so it adds no coverage requirement. Phase (h2): exhaustiveness
+(category 16 naming the uncovered classes in class order), a `needs_input`
+field accepting no caller-controlled class (category 17
+`field-not-caller-supplied`), and a remediation `for: caller` at a site
+whose static party is not `caller` (category 17, naming each input and
+class the caller cannot act on). Plan 3's `actionability` records, per
+check branch, its classes, consequence kind, static causes and static
+party, and per handler and `needs_input` rule its site, static causes and
+party; a backend's registration origin is unknown before the runtime, so
+its static cause is the stronger `upstream`. The CLI names
+categories 16 and 17 `uncovered_provenance` and `caller_cannot_act`
+(3.11.1). A `rustev.definition/2`
+whose only #76 construct is `actionability` is a track definition. Until
+increment 3 evaluates checks, `Evaluation::start` refuses a plan with
+`actionability` rather than run a decision that would ignore them.
+`crates/rustev-core/tests/actionability_compile.rs` covers the
+future-window example and its static parties, and each section 5
+compile-time row with its passing neighbour: categories 16 and 17 (every
+case of 3.8.2), `unreachable-branch`, `relax-order`, `ungraded-subject`,
+an invalid and a valid override reason, a step read in a test, an unknown
+remediation or parameter, and a `PlanId` that changes with an unused
+question.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

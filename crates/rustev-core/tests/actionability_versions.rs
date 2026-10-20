@@ -1,8 +1,7 @@
 //! Spec 033, 3.1.1 and section 5 row "A rustev.definition/1 with a check":
 //! every construct of spec 033 in a version 1 definition is refused,
-//! category 11, detail `requires-definition-2`, at phase (b). Until the
-//! compilation phase of 3.8 lands (increment 2), a version 2 definition
-//! using one is refused at the same point and nothing is compiled from it.
+//! category 11, detail `requires-definition-2`, at phase (b); the same
+//! declarations in a version 2 definition reach spec 033's own structure.
 //! Each refusal has a passing neighbour: the reference definition it was
 //! derived from. SYNTHETIC definitions only.
 
@@ -90,7 +89,7 @@ fn version_1_policy_constructs_require_definition_2() {
             },
         },
     );
-    requires_v2(&def, "policy:handler:0");
+    requires_v2(&def, "policy:on_unresolved[0]");
 
     let mut def = support_routing();
     def.policy.on_unresolved.insert(
@@ -104,7 +103,7 @@ fn version_1_policy_constructs_require_definition_2() {
             },
         },
     );
-    requires_v2(&def, "policy:handler:0");
+    requires_v2(&def, "policy:on_unresolved[0]");
 
     let mut def = support_routing();
     let field = def.inputs[0].name.clone();
@@ -141,13 +140,15 @@ fn version_1_policy_constructs_require_definition_2() {
 }
 
 #[test]
-fn a_version_2_definition_with_actionability_is_not_compiled_yet() {
+fn a_version_2_definition_passes_the_version_gate() {
+    // The same declarations in a version 2 definition reach spec 033's own
+    // structure: here the built-in `provide_fields` lacks its parameter.
     let mut def = with_actionability(support_routing());
     def.schema = schema::DEFINITION_V2.into();
     let (category, subject, detail) = refusal(&def).expect("refused");
     assert_eq!(
         (category, subject.as_str()),
-        (Category::InvalidDefinition, "definition")
+        (Category::InvalidDefinition, "check:present_first")
     );
-    assert!(detail.contains("not implemented yet"), "{detail}");
+    assert!(!detail.starts_with("requires-definition-2"), "{detail}");
 }

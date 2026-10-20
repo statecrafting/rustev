@@ -32,6 +32,9 @@ pub fn category_name(c: Category) -> &'static str {
         Category::GradeRequirement => "grade_requirement",
         Category::UncorroboratedHint => "uncorroborated_hint",
         Category::SourceBinding => "source_binding",
+        // Spec 033, 3.11.1: printed like every category.
+        Category::UncoveredProvenance => "uncovered_provenance",
+        Category::CallerCannotAct => "caller_cannot_act",
     }
 }
 
