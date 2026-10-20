@@ -81,6 +81,8 @@ fn the_release_set_fixes_the_first_family() {
                 "rustev-remote-http",
                 "rustev-runtime"
             ],
+            // Spec 045: the command surface the CLI depends on (spec 027).
+            vec!["rustev-surface"],
             vec!["rustev-cli"],
         ]
     );

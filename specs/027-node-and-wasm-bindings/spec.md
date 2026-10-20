@@ -33,7 +33,7 @@ extends:
 establishes:
   - { kind: directory, path: "integrations/rustev-node/", planned: true }
   - { kind: directory, path: "integrations/rustev-wasm/", planned: true }
-  - { kind: directory, path: "crates/rustev-surface/", planned: true }
+  - { kind: directory, path: "crates/rustev-surface/" }
   - { kind: directory, path: "tools/rustev-conformance/", planned: true }
 depends_on:
   - "001-boundaries-and-authority"
@@ -776,6 +776,41 @@ changes. The new source file joins the reviewed archive list
 spec's `extends` edge on `tools/rustev-release/`; the release audit
 (cargo-deny bans, licenses and sources over the release set) passes with
 the new dependency.
+
+**Increment 3 (the command surface).** `crates/rustev-surface` holds the
+pure command surface: `plan check`, `compile` and `show`, offline
+`replay`, `eval`, `gate`, `calibrate fit` and `calibrate qualify`, the
+dependency reading they share, the task adapter, the command output and
+exit codes, and the result envelope of `run` (base fields, rejection,
+delivery, judged with spec 033's addressing, cancelled, evidence not
+delivered, capture status). Its code is the CLI's, moved: each command
+takes typed arguments and a `Host` (reads by label, bounded and budgeted
+as the host's transport is; outputs published by label, never
+overwritten, all or none; label joining), and a hook through which the
+host derives a rules program's descriptor, so the surface depends on
+`rustev-contract`, `rustev-core`, `rustev-eval`, `serde` and `serde_json`
+only. The CLI keeps argument parsing, its file system host (`Reads`
+implements `Host`; labels are paths), the content-addressed store, the
+rules backend and the runtime: each of its commands checks its flags and
+calls the surface, and `run` prints its outcome through the surface's
+envelope. Every existing CLI test passes with its goldens unchanged, none
+re-blessed. `crates/rustev-surface/tests/memory_host.rs` drives the
+surface from an in-memory host (named inputs, outputs in memory) and gets
+the CLI's golden bytes for `plan check` and `plan show`, the plan `plan
+compile` publishes, the refusal of an existing output, and a rules
+program refused by a host without a rules backend. Because the published
+CLI depends on it, `rustev-surface` joins the release family as a crate
+member in its own layer before the CLI (the release-set file, its test's
+member list and the archive allowlists change accordingly; like every
+member's, the surface's allowlist names the `Cargo.lock` that
+`cargo package` writes into each archive, library or not), under spec 045
+(ratified 2026-10-20, decision A-42, in its own change, which adds
+`specs/045-command-surface-release-layer/`), which amends spec 031 3.1
+for it; this increment merges after that change. Spec 006's mutation
+seeds (`crates/rustev-cli/mutation/seeds.py`) follow the code they seed:
+the defects in command logic now sit in `rustev-surface`, where the CLI
+calls it, and each must still be detected, by the CLI's tests or by the
+surface's own (the adapter's unit tests moved with it).
 
 ## Decisions at approval
 

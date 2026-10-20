@@ -17,25 +17,13 @@ pub const MAX_RULES_FILES: usize = 64;
 pub const MAX_DESCRIPTOR_FILES: usize = 4096;
 pub const MAX_CALIBRATION_FILES: usize = 4096;
 
-/// Why a file could not be read or written: status `io_error`, exit 3.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct IoFail {
-    pub path: String,
-    pub detail: String,
-}
+pub use rustev_surface::host::{IoFail, ReadFail};
 
 fn fail<T>(path: &str, detail: impl Into<String>) -> Result<T, IoFail> {
     Err(IoFail {
         path: path.into(),
         detail: detail.into(),
     })
-}
-
-/// A classified read failure: the file's own, or the command budget's.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ReadFail {
-    File(IoFail),
-    Budget(IoFail),
 }
 
 fn file_fail<T>(path: &str, detail: impl Into<String>) -> Result<T, ReadFail> {
@@ -126,6 +114,37 @@ impl Reads {
     }
 }
 
+/// The file system as a command's host (spec 027, 3.1): labels are paths.
+impl rustev_surface::host::Host for Reads {
+    fn read_classified(&self, label: &str, max: usize) -> Result<Option<Vec<u8>>, ReadFail> {
+        Reads::read_classified(self, label, max)
+    }
+
+    fn ensure_absent(&self, label: &str) -> Result<(), IoFail> {
+        ensure_absent(label)
+    }
+
+    fn create(&self, label: &str, bytes: &[u8]) -> Result<(), IoFail> {
+        create(label, bytes)
+    }
+
+    fn write_all(&self, files: &[(String, Vec<u8>)]) -> Result<(), IoFail> {
+        for (i, (p, bytes)) in files.iter().enumerate() {
+            if let Err(e) = create(p, bytes) {
+                for (written, _) in &files[..i] {
+                    let _ = std::fs::remove_file(written);
+                }
+                return Err(e);
+            }
+        }
+        Ok(())
+    }
+
+    fn join(&self, dir: &str, name: &str) -> String {
+        join(dir, name)
+    }
+}
+
 /// Open a file for reading without blocking (spec 006, 3.3.1): a path
 /// swapped for a FIFO or device after the caller's regular-file check
 /// opens at once instead of waiting for a writer, and the caller's check
@@ -149,10 +168,7 @@ pub fn open_input(path: &Path, no_follow: bool) -> std::io::Result<File> {
 }
 
 fn missing(path: &str) -> IoFail {
-    IoFail {
-        path: path.into(),
-        detail: "no such file".into(),
-    }
+    rustev_surface::host::missing(path)
 }
 
 /// Refuse an output path that already exists, before any work.

@@ -1,0 +1,40 @@
+[package]
+name = "rustev-surface"
+version.workspace = true
+description = "Rustev's pure command surface: check, compile, show, offline replay, evaluation, gates and calibration, rendered once for every host."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/rustev-surface"
+readme.workspace = true
+keywords = ["decision-engine", "commands", "bindings"]
+categories = ["development-tools"]
+# Spec 031, 3.1: a release family member (the published CLI depends on it).
+publish = ["crates-io"]
+# Spec 021, 3.5: the archive holds the library source; the reviewed file list
+# is tools/rustev-release/archive-policy.json. Cargo adds `Cargo.toml.orig`,
+# `Cargo.lock`, `.cargo_vcs_info.json` and the workspace readme beyond
+# `include`; the release tool's archives test checks the full list.
+include = ["/src/**/*.rs", "/LICENSE"]
+
+[package.metadata.spec-spine]
+spec = "027-node-and-wasm-bindings"
+
+# Spec 027, section 2: contract, core, evaluation, serde and serde_json
+# only; no runtime, executor, filesystem or HTTP stack.
+[dependencies]
+rustev-contract.workspace = true
+rustev-core.workspace = true
+rustev-eval.workspace = true
+serde.workspace = true
+serde_json = { workspace = true, features = ["raw_value"] }
+
+# The rules backend derives descriptors in tests only, as the CLI's host
+# does (spec 027, 3.3.2).
+[dev-dependencies]
+rustev-backend-rules.workspace = true
+
+[lints]
+workspace = true

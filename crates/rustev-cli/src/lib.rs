@@ -8,14 +8,14 @@
 //! and output, so tests drive the same code the binary does.
 #![forbid(unsafe_code)]
 
-mod adapter;
 pub mod args;
 mod calibrate;
 mod deps;
 mod eval;
 mod host;
 pub mod io;
-pub mod out;
+/// Command output, shared with every host (spec 027, 3.1).
+pub use rustev_surface::out;
 mod plan;
 mod replay;
 mod run;

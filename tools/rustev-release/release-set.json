@@ -14,6 +14,7 @@
       "rustev-remote-http",
       "rustev-runtime"
     ],
+    ["rustev-surface"],
     ["rustev-cli"]
   ],
   "upload_order": [
@@ -23,6 +24,7 @@
     "rustev-backend-rules",
     "rustev-eval",
     "rustev-remote-http",
+    "rustev-surface",
     "rustev-cli",
     "rustev-pkg-support-routing"
   ],
