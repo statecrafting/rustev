@@ -709,6 +709,42 @@ item. The implementation adds `verify:cli` entries for `make conformance`
 and `make boundaries` here, and records the first WebAssembly measurements
 and the CI jobs that ran the matrix.
 
+## Implementation record
+
+Delivered in increments, each its own pull request; nothing here claims an
+acceptance item before the increment that satisfies it. Plan:
+
+1. Dependency boundaries (3.14).
+2. The JSON Schema emitter and committed schemas (3.2.2).
+3. `rustev-surface`, adopted by the CLI with its goldens unchanged (3.1,
+   section 2).
+4. The conformance suite and its Rust runner, and `make conformance`
+   (3.12).
+5. `rustev-wasm`, type generation and the JavaScript runner's WebAssembly
+   adapter, the import allowlist and the budgets (3.2.3, 3.10, 3.11).
+6. `rustev-node`: the engine, errors, cancellation, host seams, trace
+   context, shutdown and gauges (3.3 to 3.9).
+7. The `bindings` CI job, the native matrix and the differential corpus
+   (3.11 to 3.13), after the owner approves the
+   `statecraft-review-exception` Environment for it.
+
+**Increment 1 (dependency boundaries).** `tools/rustev-boundaries` gains
+the Node-API and WebAssembly binding families (`napi`, `napi-derive`,
+`napi-sys`, `napi-build`, `wasm-bindgen`, `wasm-bindgen-macro`,
+`wasm-bindgen-futures`, `js-sys`, `web-sys`) as integration-only
+families: a crate outside `integrations/` depending on one is a
+`ForbiddenFamily` violation, as for HTTP stacks (3.14.1). The transitive
+purity check of `rustev-contract` and `rustev-core` also refuses them, and
+`rustev-surface` joins the checked set (3.14.2). `rustev-wasm`'s normal and
+build graph may not reach `rustev-runtime`, an executor, an HTTP stack, a
+Node-API crate, `getrandom`, `web-sys` or `wasm-bindgen-futures`; a reach
+is a `WasmGraph` violation naming the path (3.14.3). Unit tests, in the
+existing style, cover each family outside `integrations/`, both binding
+crates passing under it, a pure crate and the surface reaching a binding
+family or executor, each forbidden crate in the WebAssembly graph, and the
+dev-only and allowed edges of that graph; `make boundaries` passes on the
+workspace.
+
 ## Decisions at approval
 
 1. **npm package names and scope** (left to the implementer by #56; decided
