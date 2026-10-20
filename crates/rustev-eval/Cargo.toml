@@ -13,6 +13,9 @@ keywords = ["decision-engine", "evaluation", "replay", "calibration"]
 categories = ["development-tools::testing"]
 # Spec 021, 3.4: the intended public registry only.
 publish = ["crates-io"]
+# Spec 021, 3.5: the archive holds the library source; the reviewed file list
+# is tools/rustev-release/archive-policy.json.
+include = ["/src/**/*.rs", "/LICENSE"]
 
 [package.metadata.spec-spine]
 spec = "004-evaluation-and-replay"

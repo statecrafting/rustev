@@ -11,6 +11,8 @@
 //! Nothing here uploads, tags, signs or reads a registry credential. A
 //! passing check is candidate evidence only (spec 021, I-1).
 
+pub mod archive;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 

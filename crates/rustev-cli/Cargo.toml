@@ -13,6 +13,12 @@ keywords = ["decision-engine", "cli"]
 categories = ["command-line-utilities"]
 # Spec 021, 3.4: the intended public registry only.
 publish = ["crates-io"]
+# Spec 021, 3.5: the archive holds the library source and the files its
+# unit tests or public API embed; the reviewed file list
+# is tools/rustev-release/archive-policy.json.
+# A file a source embeds but the archive lacks fails the unpacked build of
+# 3.7 (`include_bytes!` is a compile error), so a gap is never silent.
+include = ["/src/**/*.rs", "/tests/golden/support.record.json", "/LICENSE"]
 
 [package.metadata.spec-spine]
 spec = "006-cli-surface"

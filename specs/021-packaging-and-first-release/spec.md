@@ -411,14 +411,16 @@ uploads, tags, signs with the owner identity or reads a registry credential.
 Plan, in dependency order:
 
 1. Release set and manifest policy (2, 3.2 to 3.4).
-2. Archive policy: per-package allowlists, byte bounds, prohibited-content
-   scan and unpacked verification outside the workspace (3.5, 3.7).
-3. Dependency, license and advisory audit with a pinned tool and policy
+2. Archive policy: per-package allowlists, byte bounds and the
+   prohibited-content scan (3.5).
+3. Unpacked verification outside the workspace and the two-build
+   reproducibility comparison (3.7).
+4. Dependency, license and advisory audit with a pinned tool and policy
    (3.6).
-4. Reproducibility, the canonical release manifest, `SHA256SUMS`, signature
-   binding fixtures, the dry-run lifecycle state machine and the
-   fake-registry harness (3.1, 3.7 to 3.9, section 4).
-5. Candidate evidence at an exact commit (3.7), then the owner's
+5. The canonical release manifest, `SHA256SUMS`, signature binding
+   fixtures, the dry-run lifecycle state machine and the fake-registry
+   harness (3.1, 3.8, 3.9, section 4).
+6. Candidate evidence at an exact commit (3.7), then the owner's
    publication instruction (I-4), publication, and the registry-only
    consumer (3.10).
 
@@ -455,6 +457,28 @@ repair is its own reviewed change rather than part of the audit increment:
 the workspace requirement for rustls moves to `0.23.46` (the fixed
 release), so a registry consumer cannot resolve a vulnerable version, and
 `Cargo.lock` follows. No API or behavior of spec 009 changes.
+
+**Increment 2 (archive policy).** Each manifest's `include` limits its
+archive to `src/**/*.rs`, `LICENSE` and what the package embeds
+(`rustev-pkg-support-routing`'s `data/**/*.json`, which its public API
+embeds; `rustev-cli`'s `tests/golden/support.record.json`, which a unit
+test embeds); Cargo adds the README and its generated `Cargo.toml`,
+`Cargo.lock` and `.cargo_vcs_info.json`. Integration tests stay in the
+workspace: they share harnesses and fixtures across sibling crates, so no
+archive could hold them whole. `tools/rustev-release/archive-policy.json`
+(`rustev.archive-policy/1`) is the reviewed allowlist: per package the
+exact file list, the archive and unpacked byte bounds, a per-file bound,
+and which files Cargo generated. `rustev-release archives <dir>` unpacks
+each `.crate` `cargo package` wrote, compares it with the list, measures
+the bounds, runs the prohibited-content scan `rustev.archive-scan/1`
+(private-key headers, cloud, registry, source-host and model-provider
+token shapes, local home-directory paths; prohibited path components such
+as `.git`, `.statecraft`, `target`, `.env*`, keys and credentials) and
+prints the evidence: per file its size, SHA-256 and whether Cargo
+generated it, and the `.crate` SHA-256. A scan pass is evidence for that
+ruleset only (3.5). `tests/archives.rs` compares every list with `cargo
+package --list` and breaks each rule once; the bounds are fixed in the
+policy, measured from the first packaging, and a check never raises them.
 
 Open for the owner: spec 031 3.1, which amends this section, orders each
 layer by name and starts a layer only after every package of the earlier

@@ -13,6 +13,10 @@ keywords = ["decision-engine", "example", "synthetic"]
 categories = ["algorithms"]
 # Spec 021, 3.4: the intended public registry only.
 publish = ["crates-io"]
+# Spec 021, 3.5: the archive holds the library source and the files its
+# unit tests or public API embed; the reviewed file list
+# is tools/rustev-release/archive-policy.json.
+include = ["/src/**/*.rs", "/data/**/*.json", "/LICENSE"]
 
 [package.metadata.spec-spine]
 spec = "007-support-routing-package"
