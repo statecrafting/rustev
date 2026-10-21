@@ -118,5 +118,5 @@
     "title": "Production transport and served identity for the Jev adapter (amends 012)"
   },
   "shardHash": "25df0ccc65b9d23b6b2f9bd815eb79ae7393ec3e3c0f697d21fa7f45542d2a21",
-  "specVersion": "1.9.0"
+  "specVersion": "1.10.0"
 }

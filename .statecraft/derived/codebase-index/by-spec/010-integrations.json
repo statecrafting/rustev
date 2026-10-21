@@ -135,6 +135,6 @@
     "specId": "010-integrations",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "7a34c85683ebdf14d661ee7c9a0e8a28cfc55cac05814d553f295ce72db4e7ff"
 }

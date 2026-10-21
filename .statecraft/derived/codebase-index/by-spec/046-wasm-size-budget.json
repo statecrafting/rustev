@@ -25,6 +25,6 @@
     "specId": "046-wasm-size-budget",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "1f41cd08e929282bdbd7185cb6c929bbcac9105b12ac9f554e17f68c1a94a883"
 }

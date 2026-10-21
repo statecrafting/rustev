@@ -118,6 +118,6 @@
     "specId": "040-decision-explanation",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "e79f159ae375e478fb98ba9903c3fcc92f81f34a806e3d4c526de80ae482fe29"
 }

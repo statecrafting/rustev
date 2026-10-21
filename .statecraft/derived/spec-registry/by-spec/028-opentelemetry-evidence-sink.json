@@ -195,5 +195,5 @@
     "title": "OpenTelemetry evidence sink and redaction policy"
   },
   "shardHash": "980b4785735b8e405ec066c6139ecf28755b92e3814acc14815603e0b254639f",
-  "specVersion": "1.9.0"
+  "specVersion": "1.10.0"
 }

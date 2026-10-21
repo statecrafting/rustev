@@ -146,6 +146,6 @@
     "specId": "032-evidence-quality",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "ac73ceb52ddaf8566648a48fbb79674f87091d24c3551d5e75b749f16ad5524c"
 }

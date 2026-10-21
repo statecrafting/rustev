@@ -215,5 +215,5 @@
     "title": "Live re-execution at dataset scale with spend caps (amends 026 and 006)"
   },
   "shardHash": "d199699104fc4e104f6335c98ef081ac9e3b671616bd6dd4e1e46fd79930fe65",
-  "specVersion": "1.9.0"
+  "specVersion": "1.10.0"
 }

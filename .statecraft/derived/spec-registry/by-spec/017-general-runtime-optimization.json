@@ -144,5 +144,5 @@
     "title": "General runtime batching, duplicate suppression, and caches"
   },
   "shardHash": "40d3d2870f2be1da3bc18b88d4a747bf4dff476db59065475cf474984ed88795",
-  "specVersion": "1.9.0"
+  "specVersion": "1.10.0"
 }

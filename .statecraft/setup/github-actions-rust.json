@@ -79,43 +79,48 @@
   },
   "files": [
     {
-      "digest": "55735fbf5ec33087649915fef6080e1aa9dc4ddc20f92c768d93ab3257fac494",
+      "digest": "7a857e68f67985865fe5f2ba5fc142e5027b3359e1acc30cfb561f33ab75521e",
       "path": ".github/workflows/statecraft-ci.yml",
       "role": "workflow"
     },
     {
-      "digest": "0ac1a959dd1f864b1bdf03ebd835eb945c49091992b5607a6ebc1eac680b8103",
+      "digest": "061ede83b139e4e2626bab53dfdbc3f0e650f951d39264846da2944a9d1e5a71",
       "path": ".github/workflows/statecraft-ai-review.yml",
       "role": "workflow"
     },
     {
-      "digest": "a24fb4002e45e70d66ba73451c134845df24e9f998ec13764595ddfd84733076",
+      "digest": "7c05aa153a73f66e248d64913e1d292ca5de314bd396795ade8ac730faecaafe",
       "path": "scripts/statecraft/install-spec-spine.sh",
       "role": "script"
     },
     {
-      "digest": "d6ce7281279313ddcc819134cfabe8561587bbae1ca27c5afedebdeaf1b478f8",
+      "digest": "9d5ef19713f715481a77493eccab58c9122bd643fbdb3b5a8e58d015e9b99fb6",
       "path": "scripts/statecraft/gate.sh",
       "role": "script"
     },
     {
-      "digest": "d52af3b26f05585ec8a0ced1c411e3e41c4dffd0e0bbca039ac2a1131f0e104e",
+      "digest": "ad34b47fc85ab8f950b5d6f525544b49bd9a677d1cc6d7d413ba5eb01b09c3e2",
       "path": "scripts/statecraft/ci-gate.sh",
       "role": "script"
     },
     {
-      "digest": "5673101bee17c39f38a5fceb7a6a038004f266280dcf269a73d1106f26cc98b0",
+      "digest": "9757ac56f148f7645d747b40b9892858f57c999b50a279c1ae591df3df2f9403",
       "path": "scripts/statecraft/ai-review.sh",
       "role": "script"
     },
     {
-      "digest": "dd9780df9a6e96f44978b49d7572abec0f03a2ec7e592ce835921259b168ab28",
+      "digest": "a987af5a89b8df7b8f53360245e2c6c20f4c5d3a6eff1e2a35400635f8c5886c",
       "path": ".github/CODEOWNERS",
       "role": "codeowners"
+    },
+    {
+      "digest": "dddf74b51172890721fdd50965d5672acc21ccff9dcb4d79402bc7b8ffcf3199",
+      "path": ".statecraft/setup/github-actions-rust.remote.json",
+      "role": "remote-state"
     }
   ],
   "id": "github-actions-rust",
-  "identity": "9eb589951883f6a94ad174678b50a683982915ac463e0782cfc0efbab8c960c9",
+  "identity": "fe0e763c8f217652df7975e429a8eb2c762657abc33344ef79f6d4e18733e7a6",
   "jobs": {
     "ai-review": {
       "merge_group": "recorded-review",
@@ -173,6 +178,7 @@
     "code_owners": [
       "@bartekus"
     ],
+    "contextPaths": [],
     "context_tokens": 200000,
     "default_branch": "main",
     "deletion_cap": 20000,
@@ -224,10 +230,21 @@
     "revision 11: the commit walk copies the spec-spine binary into each commit's temporary worktree as a regular file instead of linking to a binary outside it, so spec-spine's containment rule (its spec 144, from 0.28.0) can read every commit's tree; the walk's verdicts are otherwise unchanged (spec 023)",
     "revision 12: the AI review leaves a managed file out only when its bytes match the digest the policy records, sends a file that only removes lines as a list under review.deletion_cap, measures the change in estimated tokens (bytes / 3) against a call budget of half review.context_tokens and a ceiling of review.max_calls calls, and reviews a larger change in file groups whose verdicts are merged; review.diff_cap is an added-line backstop, 20000 unless declared. With governance.require_ratified (default true) the coupling steps refuse a changed path a draft spec owns, and a pull request that moves a spec to approved needs the owner exception (spec 024)",
     "revision 13: the repository-local spec-spine is installed at .bin/spec-spine. The installer builds in a scratch root outside the repository and atomically moves only the executable into .bin; rendered gates, workflow caches, commit checks, policy commands, delivered hooks and local resolution use that one location. The previous .tooling ignore remains on upgrade, and .bin is also ignored (spec 031)",
+    "revision 14: external code selection runs the project-owned reusable workflow and script behind the required code job; that script joins the trusted-base authority set, and failed, cancelled or skipped code still blocks ci-gate (spec 032)",
+    "revision 15: an exact consented spec-spine pin move is reviewed with its initialization plan, and the managed installer reads that adopted pin; this changes no required remote check or branch-protection authority (spec 033)",
+    "revision 16: the profile renders .statecraft/setup/github-actions-rust.remote.json (schema statecraft/remote-desired-state/1), a canonical desired-state document of what this profile expects of the remote: required checks with their App, the extra required jobs and their aggregation by ci-gate, code-owner review and the governed paths CODEOWNERS covers, the merge queue (remote.merge_queue), the exception Environment and its reviewers (remote.exception_reviewers), workflow-token defaults, secret names, and repository custom properties (remote.custom_properties). An omitted field is no claim. `doctor --remote` compares every field read-only and reports each as matching, drifted, unavailable, unauthorized, unsupported or unverified; this product never applies it, and an owner-operated applier outside this product needs its own authorization (spec 012)",
+    "revision 17: the AI review reads governance documents as Git blobs at the base commit (AGENTS.md, .statecraft/AGENTS.md, standards/spec/constitution.md, standards/spec/contract.md by default, absent ones recorded as absent) plus review.context_paths, at most 32 literal repository-relative paths read from the policy at the base, never from the candidate; the documents must fit a quarter of review.context_tokens whole or the review refuses with 2 before any provider call, every call's whole input must fit three quarters of it, the diff budget is what remains (at most half), and the evidence records each document's blob, digest and length and each call's budget (spec 041)",
     "a repository that already runs these checks by hand keeps them by setting governance.enforce_coverage (index coverage --fail-on-untraced), governance.authored_content (the script's path; absent or not executable refuses), governance.authored_content_text (the title, the body and every commit message), governance.gate_each_commit (each commit's tree passes the gate and cargo fmt) and governance.require_signed_commits (each commit verified as signed by GitHub) (revision 4)"
   ],
   "review": {
+    "context_paths": [],
     "credential": "CLAUDE_CODE_OAUTH_TOKEN",
+    "default_context_paths": [
+      "AGENTS.md",
+      ".statecraft/AGENTS.md",
+      "standards/spec/constitution.md",
+      "standards/spec/contract.md"
+    ],
     "findings_rule": {
       "exception_environment": "statecraft-review-exception",
       "requires": "a no-findings review, or an owner exception approved for the run"
@@ -248,5 +265,5 @@
     "tool": "claude-code",
     "tool_version": "2.1.116"
   },
-  "revision": 14
+  "revision": 17
 }

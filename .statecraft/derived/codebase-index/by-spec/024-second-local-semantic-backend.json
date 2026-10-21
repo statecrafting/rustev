@@ -53,6 +53,6 @@
     "specId": "024-second-local-semantic-backend",
     "specStatus": "draft"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "b84e5ecee78b7598ecbb9dfb2cba578b0cf46cc7dd674fafd7a9302a022003b6"
 }

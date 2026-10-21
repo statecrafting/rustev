@@ -105,6 +105,6 @@
     "specId": "041-ranking-and-rubric-metrics",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "a3a1f549c65dd6e3e9920e4a42ab1ecdd338b058cc92b4db278326f8c67a9c4f"
 }

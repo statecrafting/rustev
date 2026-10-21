@@ -5,6 +5,6 @@
     "path": "crates/rustev-runtime",
     "specRef": "003-runtime-execution-and-evidence"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "9c0a6ba2aa04afd9fc1bc972da44640633be2fb923a49091b54c76e311632560"
 }

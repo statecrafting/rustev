@@ -174,5 +174,5 @@
     "title": "Evidence quality: grades, presence predicates, typed joins, corroboration and conflict policy (amends 002 and 003)"
   },
   "shardHash": "ac73ceb52ddaf8566648a48fbb79674f87091d24c3551d5e75b749f16ad5524c",
-  "specVersion": "1.9.0"
+  "specVersion": "1.10.0"
 }

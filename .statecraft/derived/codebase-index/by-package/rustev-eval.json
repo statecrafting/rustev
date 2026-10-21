@@ -5,6 +5,6 @@
     "path": "crates/rustev-eval",
     "specRef": "004-evaluation-and-replay"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "a9dba479c6c82933917e86411d5272a8c3f47f674dd7d56889ebbf9ea9a96c32"
 }

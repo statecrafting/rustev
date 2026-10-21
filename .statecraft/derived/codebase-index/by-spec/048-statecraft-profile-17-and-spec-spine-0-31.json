@@ -1,0 +1,16 @@
+{
+  "mapping": {
+    "amends": [
+      "018-statecraft-profile-14"
+    ],
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "018-statecraft-profile-14"
+    ],
+    "implementingPaths": [],
+    "specId": "048-statecraft-profile-17-and-spec-spine-0-31",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "f5dd124acefd167015ed9d39e43c96b75ea01fc9f3249a669b2d17a5adbd4ead"
+}

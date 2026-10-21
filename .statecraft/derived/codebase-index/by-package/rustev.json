@@ -5,6 +5,6 @@
     "path": "integrations/rustev",
     "specRef": "031-public-api-and-release-family"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "058822ba5b26b4f3037fa920eccfbe1c77935400fbedf2db9822a93df049d090"
 }

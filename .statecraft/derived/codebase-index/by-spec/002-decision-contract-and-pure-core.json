@@ -104,6 +104,6 @@
     "specId": "002-decision-contract-and-pure-core",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "57c00d94c15e26936a57046114adf8d4e97f5861d1f2c2c6adb2636de8543e98"
 }

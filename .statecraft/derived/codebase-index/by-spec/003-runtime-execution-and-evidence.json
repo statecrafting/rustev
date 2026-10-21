@@ -120,6 +120,6 @@
     "specId": "003-runtime-execution-and-evidence",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "e27994104d668cfb9d4b0023907f14d6f29b60f87ae0d6fd9ddca3e74de08a09"
 }

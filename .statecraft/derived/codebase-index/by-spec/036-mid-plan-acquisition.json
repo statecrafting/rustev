@@ -151,6 +151,6 @@
     "specId": "036-mid-plan-acquisition",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "9aaf225d1a321363381bd1e44254f13673ef56917fd44e7c6ef37f3afddbfcb5"
 }

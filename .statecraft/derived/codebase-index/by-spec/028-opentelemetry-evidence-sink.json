@@ -157,6 +157,6 @@
     "specId": "028-opentelemetry-evidence-sink",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "980b4785735b8e405ec066c6139ecf28755b92e3814acc14815603e0b254639f"
 }

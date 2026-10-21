@@ -223,5 +223,5 @@
     "title": "Decision service sidecar and remote context and sink protocols (amends 010)"
   },
   "shardHash": "e1b69b53bf62fd77e79e25f245ce541be6c2d65e0e84d374f281864c56414d51",
-  "specVersion": "1.9.0"
+  "specVersion": "1.10.0"
 }

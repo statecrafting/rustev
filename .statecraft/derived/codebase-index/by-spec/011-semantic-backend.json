@@ -138,6 +138,6 @@
     "specId": "011-semantic-backend",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "dc08be503cbb8c74b5c5ab7dd93375e37b18017152771ee105adfd859ea6e4b3"
 }

@@ -195,5 +195,5 @@
     "title": "Generation steps with deterministic backstops and per-field origin (amends 002, 003 and 004)"
   },
   "shardHash": "ed9bb9cce67464fd695a5803b447e024f340b41cc638fb1479c74f79f1fc3212",
-  "specVersion": "1.9.0"
+  "specVersion": "1.10.0"
 }

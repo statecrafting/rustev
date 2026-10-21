@@ -113,6 +113,6 @@
     "specId": "026-live-re-execution",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "02e0067fd07fbfc8ec3b3d28f87a6a81336e1fd96bf9d2528881c25414314dfc"
 }

@@ -170,5 +170,5 @@
     "title": "Jev integration (remote decision backend)"
   },
   "shardHash": "00c6e52b8f5f225e7511e65f51d2554a85157b12ec1f398973d9b9904bf7b5a3",
-  "specVersion": "1.9.0"
+  "specVersion": "1.10.0"
 }

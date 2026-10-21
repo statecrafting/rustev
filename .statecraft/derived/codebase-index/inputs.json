@@ -4,7 +4,7 @@
       "contentHash": "dc2a885b01ebb2e6cbb7bdd397a286cb621ca6e58075b732e88ce3ad6110809f"
     },
     ".github/workflows/statecraft-ai-review.yml": {
-      "contentHash": "cd73dc1e84948114345d9b50c517d7172053d66e49eaa8c6872ccb11fc0bf57a"
+      "contentHash": "1880b5380c2457b28ea8b34903d2044ae099edc53ce735874092d0be8daab94c"
     },
     ".github/workflows/statecraft-ci.yml": {
       "contentHash": "f65c866123c039d2c82d522228e2033859bd604e4b913a1c6dbc83b1249f7d51"
@@ -16,10 +16,10 @@
       "contentHash": "218b76a5e1c09226bf9d0f4b5fd2f5ef13c7d8419386e4ca3907b422f50e1bef"
     },
     "AGENTS.md": {
-      "contentHash": "9bdb73e6b5bf39970fe22c93aec881a762ecb1ddad85ca76a714ef6d59cd01c9"
+      "contentHash": "5221e5c8f18b1014b2833f2c596490a4c17e7768aa76828abb8d43c4f8da224e"
     },
     "Cargo.toml": {
-      "contentHash": "96d8298999060567a56c32f5d001b7e2659e2d9d12992b09be3bc28ed9e12d7f"
+      "contentHash": "5e22dd47de05fe0df9a5ffe86d73b33855bc52f33449e59a84c5078f777c8a29"
     },
     "Makefile": {
       "contentHash": "40425fc3caf9f8b8d4c348cf128fff398dfcfd41ea8ac2f0f338e68ac5822515"
@@ -103,7 +103,7 @@
       "contentHash": "85cbab11005a37eada09d774bcf825cdd527a5daccdd27353ccca5605f31763c"
     },
     "spec-spine.toml": {
-      "contentHash": "32b20ee7844e76fcfe4e8151b014c17e04f8e0a0d3047f395ceef81b51ead68d"
+      "contentHash": "a33436d1bbf52a70796908997b27d8a6817f9f10181cb618fada044a02cd897b"
     },
     "standards/spec/constitution.md": {
       "contentHash": "010d2e3af85bb45a1208b6dc521803e99bccd7a2f1b00d08c5f5c9aacf0bd766"
@@ -118,5 +118,5 @@
       "contentHash": "ff016dd58ed2e6e59fed062a49961c76496b37a7a60d1f321af75b76574eef4f"
     }
   },
-  "schemaVersion": "1.2.0"
+  "schemaVersion": "1.3.0"
 }

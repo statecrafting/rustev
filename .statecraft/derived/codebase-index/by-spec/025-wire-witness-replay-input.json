@@ -38,6 +38,6 @@
     "specId": "025-wire-witness-replay-input",
     "specStatus": "draft"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "10fe2407153569084f2a1fe23107f4e0e4d4133e30decbae34a386d3d081527c"
 }

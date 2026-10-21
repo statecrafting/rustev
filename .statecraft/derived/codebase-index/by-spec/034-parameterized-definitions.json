@@ -133,6 +133,6 @@
     "specId": "034-parameterized-definitions",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "7bf740ffabd2f8a52dbd8a091728151b7e1f9a04f6a5f7a476ec43a7c58ef3c6"
 }

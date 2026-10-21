@@ -68,6 +68,6 @@
     "specId": "006-cli-surface",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "ae450b1de904dabd6afe9d05c10500e49bc79b0837b822d7d5e9b7986475b9d8"
 }
