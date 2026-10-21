@@ -15,6 +15,7 @@
 mod capture;
 pub mod clock;
 mod driver;
+mod dynamic;
 pub mod ledger;
 mod live;
 mod optimization;
@@ -47,6 +48,8 @@ use tokio::sync::{OwnedSemaphorePermit, Semaphore, mpsc, oneshot};
 
 pub use capture::{CaptureConfig, CaptureConfigError, MAX_CAPTURE_BYTES};
 pub use clock::{Clock, Instant, ManualClock, TokioClock};
+/// Dynamic questions (spec 019): the only execution entry point.
+pub use dynamic::{DynamicAsked, DynamicBounds, DynamicDelivery, ask_dynamic};
 pub use ledger::Ledger;
 pub use live::{DispatchAnswer, LiveAuthorizer, LiveRefusal, LiveRequest, LiveResult};
 pub use optimization::InvalidationResult;

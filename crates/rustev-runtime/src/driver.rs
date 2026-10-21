@@ -1655,7 +1655,7 @@ async fn attempt(
 }
 
 /// What an adapter's answer to a raised signal establishes (spec 003, 3.7.3).
-fn answered(ack: CancelAck, charge: Charge) -> (Cancellation, RemoteState, Charge) {
+pub(crate) fn answered(ack: CancelAck, charge: Charge) -> (Cancellation, RemoteState, Charge) {
     let requested = |answer| Cancellation::Requested { answer };
     match ack {
         CancelAck::Stopped => (

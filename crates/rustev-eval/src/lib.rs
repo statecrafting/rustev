@@ -15,6 +15,7 @@ pub mod compare;
 pub mod config;
 pub mod dataset;
 mod doc;
+pub mod dynamic;
 pub mod fit;
 pub mod live;
 pub mod metrics;

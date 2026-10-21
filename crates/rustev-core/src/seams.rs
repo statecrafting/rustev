@@ -13,8 +13,10 @@ use std::sync::{Arc, Mutex, Weak};
 use std::task::{Context, Poll, Waker};
 
 use rustev_contract::descriptor::BackendDescriptor;
+use rustev_contract::dynamic::{DynamicCapability, DynamicOutcome, DynamicRawOutput, TemplateRef};
 use rustev_contract::eval_report::EvalReport;
 use rustev_contract::output::RawOutput;
+use rustev_contract::remote::ServedIdentity;
 use rustev_contract::run::{Charge, CostBound, CostModel, RunRecord};
 use rustev_contract::snapshot::Snapshot;
 use rustev_contract::time::DurationMs;
@@ -190,6 +192,53 @@ pub trait DecisionBackend: Send + Sync {
             }
         })
     }
+}
+
+/// One dynamic question's single attempt (spec 019, 3.5).
+pub struct DynamicCall<'a> {
+    /// The canonical `DynamicProjection` bytes: data only.
+    pub projection: &'a [u8],
+    /// The template the capability declared; the adapter maps the
+    /// projection through it and nothing else.
+    pub template: &'a TemplateRef,
+    pub attempt_id: &'a str,
+    /// Raised on caller cancellation or the deadline.
+    pub cancel: CancelSignal,
+    pub cx: &'a CallContext,
+}
+
+/// What a dynamic attempt produced, who served it, what it cost and how
+/// cancellation went. Invalid answers are judged by the core.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DynamicReport {
+    pub result: Result<DynamicRawOutput, (AdapterFailure, String)>,
+    /// The served identity as the adapter can state it; `unknown` is a
+    /// value, never replaced by the requested artifact.
+    pub served: ServedIdentity,
+    pub charge: Charge,
+    pub cancel: CancelAck,
+    pub remote: RemoteEnd,
+}
+
+/// Answers dynamic questions (spec 019, 3.4). Separate from
+/// [`DecisionBackend`]: implementing that trait never makes a backend
+/// dynamic, and a backend answers only when it returns a dynamic
+/// capability. It is offered no tool, function or retrieval surface.
+pub trait DynamicBackend: Send + Sync {
+    fn backend_id(&self) -> &str;
+    /// The opt-in declaration, or `None`: then every request is refused
+    /// before dispatch.
+    fn dynamic_capability(&self) -> Option<&DynamicCapability>;
+    /// Per-call disclosure before dispatch; only `bounded` is admitted.
+    fn cost_bound(&self, projection: &[u8]) -> CostBound;
+    fn ask<'a>(&'a self, call: DynamicCall<'a>) -> BoxFuture<'a, DynamicReport>;
+}
+
+/// Receives dynamic outcomes (spec 019, 3.6). A receipt establishes that
+/// the sink accepted the outcome under its own durability terms, nothing
+/// more.
+pub trait DynamicEvidenceSink: Send + Sync {
+    fn deliver<'a>(&'a self, outcome: &'a DynamicOutcome) -> BoxFuture<'a, Result<String, String>>;
 }
 
 /// A task adapter producing an evaluation report envelope (R-06).

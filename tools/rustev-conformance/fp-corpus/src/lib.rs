@@ -40,7 +40,7 @@ enum Domain {
 
 /// The four call sites (spec 047, section 2). `tests/sites.rs` fails when
 /// the pure crates' `rustev_core::math` calls differ from this list.
-pub const SITES: [Site; 4] = [
+pub const SITES: [Site; 5] = [
     Site {
         id: "core.softmax.exp",
         file: "crates/rustev-core/src/kinds.rs",
@@ -68,6 +68,13 @@ pub const SITES: [Site; 4] = [
         f: rustev_core::math::ln,
         domain: Domain::Probability,
         seed: 0x0027_3113_0000_0004,
+    },
+    Site {
+        id: "eval.dynamic_log_loss.ln",
+        file: "crates/rustev-eval/src/dynamic.rs",
+        f: rustev_core::math::ln,
+        domain: Domain::Probability,
+        seed: 0x0027_3113_0000_0005,
     },
 ];
 

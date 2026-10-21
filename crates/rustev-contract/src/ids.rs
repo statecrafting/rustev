@@ -147,6 +147,21 @@ identity!(
     /// An evaluator configuration, identified by its producer.
     EvaluatorConfigId
 );
+identity!(
+    /// Identity of a canonical dynamic request, the tagged digest of its
+    /// `DynamicIdentity` (spec 019, 3.4).
+    DynamicRequestId
+);
+identity!(
+    /// Identity of a canonical dynamic capability declaration,
+    /// `rustev.dynamic-capability/1` (spec 019, 3.4).
+    DynamicCapabilityId
+);
+identity!(
+    /// A dynamic question's structured template, identified by its producer
+    /// (spec 019, 3.3).
+    TemplateId
+);
 
 #[cfg(test)]
 mod tests {

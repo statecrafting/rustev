@@ -18,6 +18,7 @@ pub mod decimal;
 pub mod definition;
 pub mod descriptor;
 pub mod document;
+pub mod dynamic;
 pub mod eval_report;
 pub mod evidence;
 pub mod execution;
@@ -48,8 +49,9 @@ pub use time::{DurationMs, Timestamp};
 /// Schema strings of every document (spec 002, 3.2.1, as amended by spec 003,
 /// 3.2: plans are at version 2; execution policies and run records are new;
 /// by spec 004, 5.1: replay, request and runtime-reason documents; and by
-/// spec 009, 3.10: the remote protocol documents; and by spec 032, 3.1.1:
-/// the #76 track versions and source descriptors).
+/// spec 009, 3.10: the remote protocol documents; by spec 032, 3.1.1:
+/// the #76 track versions and source descriptors; and by spec 019: the
+/// dynamic question documents).
 pub mod schema {
     pub const DEFINITION: &str = "rustev.definition/1";
     pub const PLAN: &str = "rustev.plan/2";
@@ -93,4 +95,9 @@ pub mod schema {
     pub const SOURCE: &str = "rustev.source/1";
     /// Live re-execution evidence (spec 026, 3.6).
     pub const LIVE_REEXECUTION: &str = "rustev.live-reexecution/1";
+    /// Dynamic questions (spec 019, 3.2 to 3.6): the request, a backend's
+    /// opt-in capability, and the outcome. None is a plan document.
+    pub const DYNAMIC_QUESTION: &str = "rustev.dynamic-question/1";
+    pub const DYNAMIC_CAPABILITY: &str = "rustev.dynamic-capability/1";
+    pub const DYNAMIC_OUTCOME: &str = "rustev.dynamic-outcome/1";
 }
