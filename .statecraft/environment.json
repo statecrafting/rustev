@@ -40,9 +40,9 @@
         "kind": "template",
         "identity": "statecraft-setup:github-actions-rust@17"
       },
-      "digest": "7a857e68f67985865fe5f2ba5fc142e5027b3359e1acc30cfb561f33ab75521e",
-      "bytes": 17071,
-      "written_at": "2026-10-21T17:12:33Z"
+      "digest": "e6a65e25a654d27de7992aa21c6fdfc0472affc3f91571e80a4558179a76b3da",
+      "bytes": 17265,
+      "written_at": "2026-10-21T20:24:35Z"
     },
     {
       "path": ".statecraft/AGENTS.md",
@@ -62,9 +62,9 @@
         "kind": "template",
         "identity": "statecraft-setup:github-actions-rust@17"
       },
-      "digest": "a9513ef5c1870b6a87a8cb13dcd810075212022369afcbcbdc60faa2f235bac9",
-      "bytes": 14090,
-      "written_at": "2026-10-21T17:12:33Z"
+      "digest": "e87cf3c1f72a3a3d48c0f7d918ae77b2146dbd2a6c9b873cb42260bd3b91168b",
+      "bytes": 14832,
+      "written_at": "2026-10-21T20:24:35Z"
     },
     {
       "path": ".statecraft/setup/github-actions-rust.remote.json",
@@ -73,9 +73,9 @@
         "kind": "template",
         "identity": "statecraft-setup:github-actions-rust@17"
       },
-      "digest": "dddf74b51172890721fdd50965d5672acc21ccff9dcb4d79402bc7b8ffcf3199",
-      "bytes": 1509,
-      "written_at": "2026-10-21T17:12:33Z"
+      "digest": "19fb2e419eb95f672627a210167588a7e029efdfa43ff30644e29ec75a6027c4",
+      "bytes": 1715,
+      "written_at": "2026-10-21T20:24:35Z"
     },
     {
       "path": "scripts/statecraft/ai-review.sh",
@@ -200,8 +200,16 @@
       "parameters": {
         "ci.extra_required_jobs": [
           {
+            "job": "bindings",
+            "workflow": ".github/workflows/bindings.yml"
+          },
+          {
             "job": "boundaries",
             "workflow": ".github/workflows/boundaries.yml"
+          },
+          {
+            "job": "release-checks",
+            "workflow": ".github/workflows/release-checks.yml"
           },
           {
             "job": "verify",
@@ -219,7 +227,7 @@
       },
       "remoteState": {
         "path": ".statecraft/setup/github-actions-rust.remote.json",
-        "digest": "dddf74b51172890721fdd50965d5672acc21ccff9dcb4d79402bc7b8ffcf3199",
+        "digest": "19fb2e419eb95f672627a210167588a7e029efdfa43ff30644e29ec75a6027c4",
         "schema": "statecraft/remote-desired-state/1"
       }
     }

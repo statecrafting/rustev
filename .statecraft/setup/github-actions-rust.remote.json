@@ -21,8 +21,16 @@
     "aggregate": "ci-gate",
     "jobs": [
       {
+        "job": "bindings",
+        "workflow": ".github/workflows/bindings.yml"
+      },
+      {
         "job": "boundaries",
         "workflow": ".github/workflows/boundaries.yml"
+      },
+      {
+        "job": "release-checks",
+        "workflow": ".github/workflows/release-checks.yml"
       },
       {
         "job": "verify",

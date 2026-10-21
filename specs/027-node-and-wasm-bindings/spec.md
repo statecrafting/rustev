@@ -1081,6 +1081,27 @@ standard library uses the same pure implementation, still matches: the
 divergence spec 047 removed. The results on every CI target come with the
 `bindings` job.
 
+**Increment 7, fourth change (the `bindings` CI job).** The declared extra
+required job `bindings` (3.12.5) is `.github/workflows/bindings.yml`, which
+this spec owns as spec 001 owns `boundaries.yml`. It is registered by
+adding it to `ci.extra_required_jobs` in `project.setup.parameters` of
+`.statecraft/environment.json` and re-rendering with the setup profile's
+revision-17 renderer (Statecraft producer commit `2f36691`), together with
+spec 031's `release-checks` job in the same change. Its jobs: `wasm` runs
+`make bindings` on the reference runner (`ubuntu-24.04` x64, Node 22) and
+uploads the measurement document, the Chromium samples and the corpus
+results; `node-versions` runs the native suite on linux-x64-gnu under Node
+20 and 24; `native` builds the addon on each of the seven platforms (glibc
+in Debian bookworm, glibc 2.36, tested on the runner; musl built and tested
+in Alpine 3.22 with its Node 22, the recorded emulation; macOS arm64 and
+x64 and Windows x64 on native runners, so no Rosetta emulation), runs the
+corpus there, stages the addon into its platform package, installs both
+packages into a fresh project from their tarballs and runs the native
+conformance suite on Node 22, and uploads the addon. Build images are
+pinned by digest. Checkout keeps the committed bytes on every platform
+(`core.autocrlf` off), because the fixtures and goldens are pinned by
+digest and the Windows runner would otherwise rewrite their line endings.
+
 ## Decisions at approval
 
 1. **npm package names and scope** (left to the implementer by #56; decided

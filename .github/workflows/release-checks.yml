@@ -1,0 +1,111 @@
+# The release family's continuous checks of spec 031 (3.5, 3.6.7, 3.8), a
+# reusable workflow that ci-gate calls and requires (ci.extra_required_jobs).
+# Not rendered by the setup profile: owned by spec 031.
+#
+# - `adoption`: each partial-adoption subset as a fresh consumer of the
+#   facade, its graph checked for omitted crates (3.5, R-1).
+# - `msrv`: every release member built and tested at the declared MSRV
+#   (3.6.7).
+# - `semver`: cargo-semver-checks against the previous release, or
+#   `no-baseline` when none exists, recorded as not applicable (3.8, R-3).
+name: release-checks
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: never
+
+jobs:
+  adoption:
+    name: adoption ${{ matrix.subset }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        subset: [documents, embedded, evaluation, remote-http, runtime, rules, remote-http-alone]
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Cache cargo registry and git
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: adoption-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: |
+            adoption-${{ runner.os }}-
+      - name: Subset ${{ matrix.subset }} (031 3.5)
+        run: sh tools/rustev-release/adoption.sh ${{ matrix.subset }}
+      - name: Subsets whose crate is not in this release
+        if: matrix.subset == 'documents'
+        run: sh tools/rustev-release/adoption.sh serve bedrock typesafe otel local-embed
+
+  msrv:
+    name: msrv
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Cache cargo registry, git and target
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: msrv-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'Cargo.toml') }}
+          restore-keys: |
+            msrv-${{ runner.os }}-
+      - name: Install the declared MSRV toolchain
+        run: |
+          msrv=$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[] | select(.name == "rustev-contract") | .rust_version')
+          rustup toolchain install "$msrv" --profile minimal
+      - name: Release members at the MSRV (031 3.6.7)
+        run: make msrv
+
+  semver:
+    name: semver
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Cache cargo registry, git and target
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: semver-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: |
+            semver-${{ runner.os }}-
+      - name: Cache the pinned cargo-semver-checks
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/semver-tools
+          key: cargo-semver-checks-0.51.0-${{ runner.os }}
+      - name: Install the pinned cargo-semver-checks (031 3.8)
+        run: |
+          test -x ~/semver-tools/bin/cargo-semver-checks || cargo install --locked --root ~/semver-tools cargo-semver-checks --version 0.51.0
+          echo "$HOME/semver-tools/bin" >> "$GITHUB_PATH"
+      - name: API compatibility against the previous release (031 3.8)
+        run: |
+          make semver
+          {
+            echo '### API compatibility (spec 031 3.8)'
+            echo
+            echo '`no-baseline` means no previous release exists: not applicable, never a pass.'
+            echo
+            sed 's/^/- /' target/semver.txt
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload the report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: semver-report
+          path: target/semver.txt
+          if-no-files-found: error

@@ -1,13 +1,19 @@
 {
   "inputs": {
+    ".github/workflows/bindings.yml": {
+      "contentHash": "7faf5fe98c9c4c73383d1f31427ff6530fe67c34eb1f56ecf78eaa24262fc05d"
+    },
     ".github/workflows/boundaries.yml": {
       "contentHash": "dc2a885b01ebb2e6cbb7bdd397a286cb621ca6e58075b732e88ce3ad6110809f"
+    },
+    ".github/workflows/release-checks.yml": {
+      "contentHash": "8be21a06b4c4b0571bc76fd80e5b8e756b8d69ba7728decc2c5c622c0d44bbdc"
     },
     ".github/workflows/statecraft-ai-review.yml": {
       "contentHash": "1880b5380c2457b28ea8b34903d2044ae099edc53ce735874092d0be8daab94c"
     },
     ".github/workflows/statecraft-ci.yml": {
-      "contentHash": "f65c866123c039d2c82d522228e2033859bd604e4b913a1c6dbc83b1249f7d51"
+      "contentHash": "a809bbfdf6252bf2ecf010ab529f87303fed0851473f9f57b7e4dc9805d7ac94"
     },
     ".github/workflows/verify.yml": {
       "contentHash": "dae84684a05021e54a8596a83c96d469d1c2895b0b6a87dfd9a84c7170247396"
