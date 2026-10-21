@@ -236,8 +236,9 @@ fn cases() -> Vec<(&'static str, &'static str, Json)> {
                 json!([request("d1", None)]),
                 json!([
                     "start",
-                    "wait_sleeper", { "advance_ms": { "ms": 10 } },
-                    "wait_sleeper", { "advance_ms": { "ms": 20 } }
+                    // Each retry delay's timer, once it is pending.
+                    { "advance_timer": { "delay_ms": 10 } },
+                    { "advance_timer": { "delay_ms": 20 } }
                 ]),
             ),
         ),
@@ -259,6 +260,20 @@ fn cases() -> Vec<(&'static str, &'static str, Json)> {
         ),
         (
             "runtime.cancel",
+            "crates/rustev-runtime/tests/cancel.rs::no_answer_means_local_waiting_stopped_and_nothing_more",
+            base(
+                "support.plan.json",
+                config(1, 0, 3),
+                json!([head(gate.clone(), json!({}), json!("ignore"), 5)]),
+                json!([request("d1", None)]),
+                json!([
+                    "start", { "wait_gated": { "backend": 0, "count": 3 } },
+                    { "cancel": { "request": 0 } }
+                ]),
+            ),
+        ),
+        (
+            "runtime.cancel-stop",
             "crates/rustev-runtime/tests/cancel.rs::a_confirmed_stop_is_recorded_as_stopped_with_its_charge",
             base(
                 "support.plan.json",
@@ -337,6 +352,21 @@ fn mirrors(id: &str, out: &BTreeMap<String, Vec<u8>>) {
             assert!(r.timing.deadline_expired);
         }
         "runtime.cancel" => {
+            use rustev_contract::run::{CancelAnswer, Cancellation, RemoteState};
+            let r = record(out, "d1");
+            assert_eq!(r.termination, Termination::Cancelled);
+            for q in &r.requests {
+                assert_eq!(
+                    q.attempts[0].cancellation,
+                    Cancellation::Requested {
+                        answer: CancelAnswer::NotObserved
+                    }
+                );
+                assert_eq!(q.attempts[0].remote, RemoteState::PossiblyContinuing);
+            }
+            assert_eq!(r.cost.liability, 15);
+        }
+        "runtime.cancel-stop" => {
             let r = record(out, "d1");
             assert_eq!(r.termination, Termination::Cancelled);
             for q in &r.requests {
@@ -380,7 +410,17 @@ fn every_runtime_case_produces_its_expected_bytes() {
         let case_file = json!({
             "id": id,
             "command": "decide",
-            "surfaces": ["rust-api"],
+            // The native runner interprets the same data with TypeScript
+            // scripted seams (3.12.4).
+            "surfaces": if id == "runtime.cancel-stop" {
+                // The runtime polls a cancelled attempt once for its answer
+                // (spec 003, 3.7.3); a host seam answers across threads and
+                // can never be ready then, so a host backend's confirmed stop
+                // is recorded honestly as not observed (`runtime.cancel`).
+                json!(["rust-api"])
+            } else {
+                json!(["rust-api", "native"])
+            },
             "mirrors": mirrored,
             "inputs": names.iter().map(|n| json!({
                 "path": format!("{DIR}/fixtures/runtime/{n}"), "name": n,
@@ -436,5 +476,5 @@ fn the_manifest_runtime_cases_pass_through_the_runner() {
         );
         ran += 1;
     }
-    assert!(ran >= 5, "{ran} runtime cases");
+    assert!(ran >= 6, "{ran} runtime cases");
 }

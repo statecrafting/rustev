@@ -200,11 +200,13 @@ pub fn golden(name: &str, bytes: &[u8]) {
         );
         // The WebAssembly surface runs no backend (spec 027, 3.10.1): for
         // each rules program a case it runs reads, the descriptor the CLI
-        // derives from it, which that surface reads instead. A case it does
-        // not run records none.
+        // derives from it, which that surface reads instead. A `run` case
+        // records it too: the native runner prepares a compiled plan
+        // against it (3.12.3). Other cases record none.
+        let is_run = command_of(&seen.args) == "run";
         let mut derived = vec![];
         for (i, a) in seen.args.iter().enumerate() {
-            if !pure || a != "--rules" {
+            if !(pure || is_run) || a != "--rules" {
                 continue;
             }
             let Some(name) = seen.args.get(i + 1) else {
@@ -235,10 +237,12 @@ pub fn golden(name: &str, bytes: &[u8]) {
             derived.push(json!({ "from": name, "path": format!("{fixtures}/{rel}"),
                                  "sha256": hex(&d) }));
         }
+        // Every CLI golden runs natively too; pure commands also on
+        // WebAssembly (spec 027, 3.12.4).
         let surfaces = if pure {
-            json!(["cli", "wasm"])
+            json!(["cli", "native", "wasm"])
         } else {
-            json!(["cli"])
+            json!(["cli", "native"])
         };
         let path = root().join(format!("tools/rustev-conformance/cases/cli/{id}.json"));
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();

@@ -48,6 +48,7 @@
   ],
   "surfaces": [
     "cli",
+    "native",
     "wasm"
   ]
 }

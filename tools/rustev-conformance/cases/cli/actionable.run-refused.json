@@ -17,7 +17,13 @@
     "refused.record.json"
   ],
   "command": "run",
-  "derived": [],
+  "derived": [
+    {
+      "from": "support.rules.json",
+      "path": "tools/rustev-conformance/fixtures/cli/actionable.run-refused/support.rules.json.descriptor.json",
+      "sha256": "98070801b3e95b1c3d38a6738d7dab635756c1dd4348b4a7fb05062e76083ced"
+    }
+  ],
   "exit": 0,
   "id": "actionable.run-refused",
   "inputs": [
@@ -53,6 +59,7 @@
     }
   ],
   "surfaces": [
-    "cli"
+    "cli",
+    "native"
   ]
 }

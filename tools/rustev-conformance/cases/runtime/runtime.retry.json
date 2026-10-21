@@ -164,16 +164,14 @@
     ],
     "drive": [
       "start",
-      "wait_sleeper",
       {
-        "advance_ms": {
-          "ms": 10
+        "advance_timer": {
+          "delay_ms": 10
         }
       },
-      "wait_sleeper",
       {
-        "advance_ms": {
-          "ms": 20
+        "advance_timer": {
+          "delay_ms": 20
         }
       }
     ],
@@ -187,6 +185,7 @@
     ]
   },
   "surfaces": [
-    "rust-api"
+    "rust-api",
+    "native"
   ]
 }

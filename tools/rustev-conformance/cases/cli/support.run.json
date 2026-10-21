@@ -17,7 +17,13 @@
     "topic.calibration.json"
   ],
   "command": "run",
-  "derived": [],
+  "derived": [
+    {
+      "from": "support.rules.json",
+      "path": "tools/rustev-conformance/fixtures/cli/support.run/support.rules.json.descriptor.json",
+      "sha256": "98070801b3e95b1c3d38a6738d7dab635756c1dd4348b4a7fb05062e76083ced"
+    }
+  ],
   "exit": 0,
   "id": "support.run",
   "inputs": [
@@ -61,6 +67,7 @@
     }
   ],
   "surfaces": [
-    "cli"
+    "cli",
+    "native"
   ]
 }
