@@ -1,14 +1,15 @@
 {
   "name": "rustev-conformance-js",
   "private": true,
-  "description": "Spec 027 tooling: the JavaScript conformance runner, the WebAssembly checks and the document type generator. Never published.",
+  "description": "Spec 027 tooling: the JavaScript conformance runner (Node and headless Chromium), the WebAssembly checks and the document type generator. Never published.",
   "type": "module",
-  "//": "Every package in the lockfile, transitive ones included (lodash 4.18.1, js-yaml 4.3.2 and others newer than some references know), is published on the public registry; npm ci checks each against its locked integrity, and make bindings verifies every installed package's registry signature (npm audit signatures).",
+  "//": "Every package in the lockfile, transitive ones included (lodash 4.18.1, js-yaml 4.3.2 and others newer than some references know), is published on the public registry; npm ci checks each against its locked integrity, and make bindings verifies every installed package's registry signature (npm audit signatures). playwright-core is exact-pinned and has no dependencies; make bindings installs the headless Chromium build that version pins, from Playwright's download host, and drives it only on a loopback server.",
   "engines": {
     "node": ">=20"
   },
   "devDependencies": {
     "json-schema-to-typescript": "16.0.0",
+    "playwright-core": "1.63.0",
     "typescript": "5.9.3"
   }
 }

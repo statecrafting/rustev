@@ -5,6 +5,7 @@
 // output's bytes under only the comparison the case declares.
 //
 //   node run.mjs wasm <wasm package dir>
+//   node run.mjs chromium <wasm package dir>   (the same cases in headless Chromium)
 //   node run.mjs native <native package dir>
 //
 // What a surface does not print is CLI presentation (3.1.3, 3.12.3): exit
@@ -20,8 +21,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 const [surface, pkg] = process.argv.slice(2);
-if (!['wasm', 'native'].includes(surface) || !pkg) {
-  console.error('usage: node run.mjs wasm|native <package dir>');
+if (!['wasm', 'chromium', 'native'].includes(surface) || !pkg) {
+  console.error('usage: node run.mjs wasm|chromium|native <package dir>');
   process.exit(2);
 }
 
@@ -163,53 +164,115 @@ function inputsOf(c) {
 
 // ---- WebAssembly --------------------------------------------------------
 
+const b64 = (bytes) => Buffer.from(bytes).toString('base64');
+
+/** A case as one call of the WebAssembly package: plain data (bytes as
+ * base64), so it crosses into a browser page unchanged. */
+function wasmCall(c) {
+  const { files, derived } = inputsOf(c);
+  const a = flags(c.argv);
+  // A rules program's derived descriptor stands in for it (3.10.1).
+  const inputs = [...files].map(([name, bytes]) => [name, b64(derived.get(name) ?? bytes)]);
+  const descriptors = [...a.many('descriptor'), ...a.many('rules')];
+  const calibrations = a.many('calibration');
+  const call = { inputs, artifacts: c.outputs.filter((o) => o.stream !== 'stdout').map((o) => o.file) };
+  // An absent optional argument is `null`, never `undefined`: a browser
+  // page receives `undefined` array elements as `null`, so Node and
+  // Chromium get the same value, which wasm-bindgen reads as `None`.
+  const opt = (v) => v ?? null;
+  switch (a.command) {
+    case 'plan check':
+      return { ...call, fn: 'check', args: [a.need('definition'), descriptors, calibrations, opt(a.one('execution'))] };
+    case 'plan compile':
+      return {
+        ...call,
+        fn: 'compile',
+        args: [a.need('definition'), descriptors, calibrations, opt(a.one('execution')), a.need('out')],
+      };
+    case 'plan show':
+      return { ...call, fn: 'show', args: [a.need('plan'), descriptors, calibrations] };
+    case 'replay': {
+      const cap = a.one('host-cap-ms');
+      // The store's items by reference: the synchronous resolver answers
+      // from them. An item that exists but is empty is still found: only
+      // an absent one is null.
+      const store = a.one('store');
+      const items = {};
+      if (store !== undefined) {
+        for (const [name, bytes] of files) {
+          if (name.startsWith(`${store}/`)) items[name.slice(store.length + 1)] = b64(bytes);
+        }
+      }
+      return {
+        ...call,
+        fn: 'replay',
+        args: [a.need('bundle'), JSON.stringify(scope(a)), Number(a.need('now-ms')), cap === undefined ? null : Number(cap)],
+        items,
+      };
+    }
+    default:
+      // `run` is no WebAssembly command (3.1.1); the per-case catch below
+      // reports a case that names one as a failure.
+      throw new Error(`${c.id}: the WebAssembly surface has no command ${a.command}`);
+  }
+}
+
+/** Runs a `wasmCall` against the package's glue and returns the exit code,
+ * the printed output and the named artifacts, base64. Self-contained (no
+ * outer name, only `atob` and `btoa`), so the same source runs in Node and,
+ * by its text, in a browser page. */
+function executeWasm(glue, call) {
+  const bytes = (s) => Uint8Array.from(atob(s), (ch) => ch.charCodeAt(0));
+  const text = (u8) => {
+    let s = '';
+    for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode(...u8.subarray(i, i + 0x8000));
+    return btoa(s);
+  };
+  const inputs = new glue.Inputs();
+  for (const [name, b] of call.inputs) inputs.add(name, bytes(b));
+  const args = [inputs, ...call.args];
+  if (call.fn === 'replay') {
+    args.push((reference) => (Object.hasOwn(call.items, reference) ? bytes(call.items[reference]) : null));
+  }
+  const r = glue[call.fn](...args);
+  const artifacts = {};
+  for (const name of call.artifacts) {
+    const got = r.artifact(name);
+    if (got !== undefined && got !== null) artifacts[name] = text(got);
+  }
+  return { code: r.code, out: text(r.out), artifacts };
+}
+
+/** A `wasmCall`'s result against its case. */
+function compareWasm(c, r) {
+  const fromB64 = (s) => (s === undefined ? undefined : Buffer.from(s, 'base64'));
+  comparePure(c, r.code, fromB64(r.out), (name) => fromB64(r.artifacts[name]));
+}
+
 async function wasmAdapter() {
   const glue = await import(pathToFileURL(resolve(pkg, 'web/rustev_wasm.js')).href);
   glue.initSync({ module: readFileSync(resolve(pkg, 'web/rustev_wasm_bg.wasm')) });
-  return async (c) => {
-    const { files, derived } = inputsOf(c);
-    const inputs = new glue.Inputs();
-    // A rules program's derived descriptor stands in for it (3.10.1).
-    for (const [name, bytes] of files) inputs.add(name, derived.get(name) ?? bytes);
-    const a = flags(c.argv);
-    const descriptors = [...a.many('descriptor'), ...a.many('rules')];
-    const calibrations = a.many('calibration');
-    const resolveItem = (reference) => {
-      const store = a.one('store');
-      // An item that exists but is empty is still found: only an absent
-      // one is null.
-      return store === undefined ? null : (files.get(`${store}/${reference}`) ?? null);
-    };
-    let r;
-    switch (a.command) {
-      case 'plan check':
-        r = glue.check(inputs, a.need('definition'), descriptors, calibrations, a.one('execution'));
-        break;
-      case 'plan compile':
-        r = glue.compile(inputs, a.need('definition'), descriptors, calibrations, a.one('execution'), a.need('out'));
-        break;
-      case 'plan show':
-        r = glue.show(inputs, a.need('plan'), descriptors, calibrations);
-        break;
-      case 'replay': {
-        const cap = a.one('host-cap-ms');
-        r = glue.replay(
-          inputs,
-          a.need('bundle'),
-          JSON.stringify(scope(a)),
-          Number(a.need('now-ms')),
-          cap === undefined ? undefined : Number(cap),
-          resolveItem,
-        );
-        break;
-      }
-      default:
-        // `run` is no WebAssembly command (3.1.1); the per-case catch below
-        // reports a case that names one as a failure.
-        throw new Error(`${c.id}: the WebAssembly surface has no command ${a.command}`);
-    }
-    comparePure(c, r.code, r.out, (name) => r.artifact(name));
+  return async (c) => compareWasm(c, executeWasm(glue, wasmCall(c)));
+}
+
+/** The same calls in headless Chromium (3.11.3, 3.13.3): one page holds the
+ * `web` target, served from loopback, and runs each case's call there. */
+async function chromiumAdapter() {
+  const { serve, open } = await import('./chromium.mjs');
+  const server = await serve(pkg);
+  const { browser, page } = await open(server.origin);
+  await page.evaluate(async () => {
+    const glue = await import('/web/rustev_wasm.js');
+    glue.initSync({ module: new Uint8Array(await (await fetch('/web/rustev_wasm_bg.wasm')).arrayBuffer()) });
+    globalThis.rustevGlue = glue;
+  });
+  await page.addScriptTag({ content: `globalThis.executeWasm = ${executeWasm.toString()};` });
+  const adapter = async (c) => compareWasm(c, await page.evaluate((call) => globalThis.executeWasm(globalThis.rustevGlue, call), wasmCall(c)));
+  adapter.close = async () => {
+    await browser.close();
+    server.close();
   };
+  return adapter;
 }
 
 // ---- native ---------------------------------------------------------------
@@ -536,9 +599,12 @@ async function nativeAdapter() {
 
 const manifest = JSON.parse(readFileSync(join(root, 'tools/rustev-conformance/cases/manifest.json'), 'utf8'));
 if (manifest.schema !== 'rustev.conformance-manifest/1') throw new Error('manifest schema');
-const run = surface === 'wasm' ? await wasmAdapter() : await nativeAdapter();
+const run =
+  surface === 'wasm' ? await wasmAdapter() : surface === 'chromium' ? await chromiumAdapter() : await nativeAdapter();
+// The Chromium adapter runs the cases that name the WebAssembly surface.
+const named = surface === 'chromium' ? 'wasm' : surface;
 let ran = 0;
-for (const c of manifest.cases.filter((c) => c.surfaces.includes(surface))) {
+for (const c of manifest.cases.filter((c) => c.surfaces.includes(named))) {
   if (process.env.RUSTEV_CONFORMANCE_TRACE) console.error(`case ${c.id}`);
   try {
     await run(c);
@@ -547,6 +613,7 @@ for (const c of manifest.cases.filter((c) => c.surfaces.includes(surface))) {
   }
   ran += 1;
 }
+await run.close?.();
 console.log(`conformance ${surface}: ${ran} case(s), ${failures.length} failure(s)`);
 for (const f of failures) console.error(f);
 process.exit(failures.length || ran === 0 ? 1 : 0);
