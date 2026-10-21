@@ -214,6 +214,24 @@ SEEDS = [
         "    if false && same_dataset && split == fit.split {",
         EVAL,
     ),
+    # Spec 026, 3.8: live comparison (not a spec 004 category).
+    (
+        "live-comparison",
+        "a changed live result is reported as agreement",
+        E + "live.rs",
+        """                ResultChange::Unchanged => ComparisonOutcome::Agreement,
+                _ => ComparisonOutcome::LiveDiverged,""",
+        """                _ => ComparisonOutcome::Agreement,""",
+        EVAL,
+    ),
+    (
+        "live-comparison",
+        "a bundle other than the linked one is compared",
+        E + "live.rs",
+        "if HistoricalLink::of(case.bundle).ok().as_ref() != Some(link) {",
+        "if false {",
+        EVAL,
+    ),
 ]
 
 

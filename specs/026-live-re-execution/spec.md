@@ -2,7 +2,7 @@
 id: "026-live-re-execution"
 title: "Live re-execution with fresh observations"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-26"
 summary: >
   A separately invoked live re-execution path that creates a new decision from
@@ -55,7 +55,8 @@ obligations:
 # 026: Live re-execution with fresh observations
 
 Approved (A-17, 2026-09-26) as its own reviewable change before any code
-(R-16); implementation is pending. Approval does not authorize a provider
+(R-16); implemented, see the implementation record. Neither approval nor
+implementation authorizes a provider
 call, select a provider, approve spend, change retention, or make a quality or
 production claim.
 
@@ -270,9 +271,28 @@ calibration, determinism, or cost claims.
 
 ## Verification
 
-Pending with implementation. Approval of this spec authorizes only the
-contract. No acceptance item is satisfied by approval or by existing offline
-replay evidence.
+The delivered implementation's acceptance, run by `make verify`. No
+acceptance item rests on approval or on existing offline replay evidence.
+
+```verify:cli
+# 3.3, 3.6: the live document, the authorization vocabulary and its bounds.
+cargo test -p rustev-contract --locked --test live
+# 3.1 to 3.5, section 5 rows 2 to 6 and 9: reexecute_live with scripted
+# backends, authorizers and sinks; the compile-fail examples.
+cargo test -p rustev-runtime --locked --test live
+cargo test -p rustev-runtime --locked --doc
+# 3.7, 3.8, section 5 rows 1, 7 and 8: comparison, retention, immutability
+# and separation; eval's dependencies; offline replay keeps zero backend
+# calls.
+cargo test -p rustev-eval --locked --test live
+cargo test -p rustev-eval --locked --test dependencies
+cargo test -p rustev-eval --locked --test reproduce
+cargo run -p rustev-boundaries --locked --quiet
+sh -c 'if grep -rnE "std::(fs|net|env|process|thread|time)|tokio|SystemTime|Instant" crates/rustev-eval/src; then exit 1; fi'
+# Negative control: the live seeds of both harnesses must each be detected.
+sh crates/rustev-runtime/mutation/seeds.sh live:
+sh crates/rustev-eval/mutation/seeds.sh live-comparison
+```
 
 ## Implementation record
 
@@ -360,6 +380,56 @@ with exact attempt attribution; a host refusing all external work still
 gets a judgment from exact steps; cache and batch bypass; capture). The
 compile-fail examples on `reexecute_live` show that `decide` and
 `decide_with_capture` take no authorizer.
+
+**Increment 2 (comparison and completion).**
+`crates/rustev-eval/src/live.rs` adds `compare_live(LiveCase)`, a pure
+function over host-supplied documents: the historical bundle with the
+host's synchronous resolver and a caller-supplied time, the live document,
+the new run record and the live plan. It refuses (incomparable) a document
+that does not check, a run record the document does not bind by digest, a
+plan whose identity is not the document's, and a bundle other than the
+linked one. It then verifies the historical case by spec 004
+reproduction: an unavailable item (expired, erased, missing, inaccessible,
+corrupt, mismatched) makes the comparison `unavailable` with its location
+and availability, recorded as an explicit historical retention
+observation, and nothing is restored; a diverged or otherwise incomparable
+historical case is incomparable. On a reproduced case it compares the
+outcome categories of `CaseOutcome` under the adapter's named agreement
+fields: equal is `agreement` (named fields only), a proposal on either side
+that differs is `live-diverged` with `proposal_changed`, and two different
+abstention categories are `live-diverged` with
+`unresolved_category_changed`; a cancelled live run is incomparable
+(`live-not-judged`). The comparison reports apart the snapshot, plan,
+evaluation-time and supplied-artifact changes (served identity is
+`unknown`: `rustev.run/1` does not record it), the backends, definition,
+execution policy and calibrations, both sides' runtime counts, both cost
+summaries (observed, estimated and liability kept apart), and termination,
+cancellation, remote-state, retention and delivery differences, with fixed
+exclusions and limitations. `with_comparison` returns a copy of the live
+document carrying the comparison; no source is modified. `reexecute_live` also refuses, before
+admission, a historical link whose decision id is outside 1 to 256 bytes,
+so every document it returns passes `check`.
+
+Tests: `crates/rustev-eval/tests/live.rs` (section 5 rows 1, 7 and 8;
+`live-diverged` without a failed reproduction; an unresolved-category
+change apart from a proposal change; cost, cancellation, retention and
+delivery reported apart; only the linked case and the bound run compared;
+bundle, capture, run record, judgment, stored items and the earlier
+receipt and delivered records byte-identical after a live run and its
+comparison; a source scan showing eval names no runtime, backend or
+authorizer). Mutation seeds: eight `live:` seeds in
+`crates/rustev-runtime/mutation/seeds.py` (dispatch without asking, a
+refused, mismatched or expired answer accepted, a reused historical id, a
+trusted stated snapshot identity, a retry presented as primary, a cache
+hit on the live path) and two `live-comparison` seeds in
+`crates/rustev-eval/mutation/seeds.py`; all ten are detected. 026 joins
+`make verify`.
+
+Limits stated rather than hidden: the comparison verifies the historical
+case and reports the first unavailable item reproduction meets, not every
+item; served identity stays unknown until a run record carries it; the
+live document's later members (spec 043 3.9) are not part of this
+implementation.
 
 ## Questions settled by R-34
 

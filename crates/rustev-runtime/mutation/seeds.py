@@ -168,6 +168,65 @@ SEEDS = [
         "let cancel = cancel;",
         ["--test", "cancel"],
     ),
+    # Spec 026: live re-execution.
+    (
+        "live: an attempt is dispatched without asking the host",
+        RT + "driver.rs",
+        "if let Some(live) = cx.live {",
+        "if let Some(live) = cx.live.filter(|_| false) {",
+        ["--test", "live"],
+    ),
+    (
+        "live: a refused attempt is dispatched anyway",
+        RT + "live.rs",
+        "AuthorizationOutcome::Refused { refusal, .. } => Err(*refusal),",
+        "AuthorizationOutcome::Refused { .. } => Ok(()),",
+        ["--test", "live"],
+    ),
+    (
+        "live: an answer naming another request is accepted",
+        RT + "live.rs",
+        "if answers != digest {",
+        "if false {",
+        ["--test", "live"],
+    ),
+    (
+        "live: an expired answer is accepted",
+        RT + "live.rs",
+        "} else if cx.rt.clock.now() >= now.saturating_add(valid_for_ms) {",
+        "} else if false {",
+        ["--test", "live"],
+    ),
+    (
+        "live: the historical decision id is reused",
+        RT + "live.rs",
+        ".is_some_and(|h| h.decision_id == req.decision_id)",
+        ".is_some_and(|_| false)",
+        ["--test", "live"],
+    ),
+    (
+        "live: a stated snapshot identity is trusted",
+        RT + "live.rs",
+        "&& *stated != snapshot_id",
+        "&& false",
+        ["--test", "live"],
+    ),
+    (
+        "live: a retry is presented as a primary attempt",
+        RT + "driver.rs",
+        "let role = if tries > 1 {",
+        "let role = if false {",
+        ["--test", "live"],
+    ),
+    (
+        "live: a live request is served from the memory cache",
+        RT + "driver.rs",
+        """    if cx.live.is_some() {
+        return CacheLookup::Run {""",
+        """    if false {
+        return CacheLookup::Run {""",
+        ["--test", "live"],
+    ),
 ]
 
 

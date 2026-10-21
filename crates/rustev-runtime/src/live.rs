@@ -105,6 +105,8 @@ pub struct LiveRequest {
 pub enum LiveRefusal {
     /// The decision id is the historical decision's.
     HistoricalDecisionId,
+    /// The historical link names a decision id outside 1 to 256 bytes.
+    InvalidHistoricalLink,
     /// The snapshot's computed identity is not the identity stated for it.
     SnapshotIdentity {
         stated: SnapshotId,
@@ -127,6 +129,9 @@ impl fmt::Display for LiveRefusal {
         match self {
             LiveRefusal::HistoricalDecisionId => {
                 f.write_str("a live re-execution needs a new decision id, not the historical one")
+            }
+            LiveRefusal::InvalidHistoricalLink => {
+                f.write_str("the historical link's decision id is not 1 to 256 bytes")
             }
             LiveRefusal::SnapshotIdentity { stated, computed } => write!(
                 f,
@@ -379,6 +384,13 @@ impl Runtime {
             .is_some_and(|h| h.decision_id == req.decision_id)
         {
             return Err(LiveRefusal::HistoricalDecisionId);
+        }
+        if req
+            .historical
+            .as_ref()
+            .is_some_and(|h| h.decision_id.is_empty() || h.decision_id.len() > 256)
+        {
+            return Err(LiveRefusal::InvalidHistoricalLink);
         }
         let snapshot_id = req
             .snapshot

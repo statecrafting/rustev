@@ -16,6 +16,7 @@ pub mod config;
 pub mod dataset;
 mod doc;
 pub mod fit;
+pub mod live;
 pub mod metrics;
 pub mod optimization;
 pub mod replay;

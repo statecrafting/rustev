@@ -232,6 +232,12 @@ async fn a_reused_historical_decision_id_is_refused_before_admission() {
     assert!(head.dispatched().is_empty(), "never dispatched");
     assert!(rig.sink.received().is_empty(), "no run record");
     assert_eq!(rig.rt.gauges().rejected, 0, "refused before admission");
+    // A link naming an oversized decision id is refused before anything.
+    let mut req = live_request("live-1");
+    req.historical.as_mut().unwrap().decision_id = "d".repeat(257);
+    let r = finish(start_live(&rig, &plan, req, &host, &CancelSignal::new())).await;
+    assert_eq!(r.unwrap_err(), LiveRefusal::InvalidHistoricalLink);
+    assert!(host.asked().is_empty() && head.dispatched().is_empty());
 }
 
 /// Row 3: changed snapshot bytes carrying the old identity.
