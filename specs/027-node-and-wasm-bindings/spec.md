@@ -954,7 +954,7 @@ context source is called once before admission with the plan's input
 fields when a request carries no snapshot; its failure is
 `ContextUnavailable` and nothing is defaulted. A `traceparent` (validated
 as W3C version 00) reaches every seam call of its decision and enters no
-record. The JavaScript layer over this crate follows in the second change.
+record. The JavaScript layer over this crate is the second change.
 
 Two findings for the owner. First, the runtime polls a cancelled attempt
 once for its answer (spec 003, 3.7.3); a host seam answers across threads
@@ -972,6 +972,20 @@ core refuses is `invalid_backend_output`, which the test shows. Either
 needs the owner's reading or an amendment. The native conformance adapter
 follows in the third change; the native matrix, prebuilt platform
 packages and CI come with increment 7.
+
+**Increment 6, second change (the JavaScript layer).** The JavaScript layer (`index.js`, declarations `index.d.ts`, and
+the generated document declarations, byte-identical to the WebAssembly
+package's) gives the API of 3.3: `Engine.create`, `compile`,
+`PlanHandle.decide` with `AbortSignal` (an already aborted signal is
+`CancelledBeforeAdmission`), the typed `RustevError` subclasses and codes of
+3.4 (a native failure crosses as `{ class, code, detail }` JSON; a
+`SinkFailure` carries the record's bytes), `onGauges` through a bounded
+drop-oldest subscription, and `shutdown` that stops admission, waits up to
+`drainMs` and raises cancellation on the rest; it loads the platform
+package for this process or names the missing one, downloading nothing.
+`integrations/rustev-node/test/negative.test.mjs`
+tests each section 5 row of the native package, with the refusals the
+review rounds added (27 tests).
 
 ## Decisions at approval
 

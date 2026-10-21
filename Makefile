@@ -117,3 +117,7 @@ bindings:
 	tools/rustev-conformance/js/node_modules/.bin/tsc --noEmit --strict integrations/rustev-wasm/types/rustev-documents.d.ts
 	node tools/rustev-conformance/js/wasm-check.mjs "$(BINDINGS_OUT)/rustev-wasm" "$(BINDINGS_OUT)/wasm-measurement.json"
 	node tools/rustev-conformance/js/run.mjs wasm "$(BINDINGS_OUT)/rustev-wasm"
+	cargo build -p rustev-node --locked --release
+	node tools/rustev-conformance/js/copy-addon.mjs "$(CARGO_TARGET)" integrations/rustev-node
+	tools/rustev-conformance/js/node_modules/.bin/tsc --noEmit --strict --lib es2022,dom integrations/rustev-node/index.d.ts
+	node --test integrations/rustev-node/test/*.test.mjs
