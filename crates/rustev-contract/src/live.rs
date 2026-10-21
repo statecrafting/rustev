@@ -672,7 +672,9 @@ impl LiveReexecution {
             return Err(LiveDocError::DecisionId);
         }
         if let Historical::Linked(h) = &self.historical
-            && (h.decision_id == self.decision_id || h.decision_id.len() > 256)
+            && (h.decision_id == self.decision_id
+                || h.decision_id.is_empty()
+                || h.decision_id.len() > 256)
         {
             return Err(LiveDocError::DecisionId);
         }

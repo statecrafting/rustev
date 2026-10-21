@@ -336,6 +336,24 @@ fn the_historical_decision_id_is_never_the_new_one() {
 }
 
 #[test]
+fn the_historical_decision_id_is_one_to_256_bytes() {
+    for bad in [String::new(), "h".repeat(257)] {
+        let mut doc = document();
+        let Historical::Linked(h) = &mut doc.historical else {
+            panic!("the fixture links a historical case");
+        };
+        h.decision_id = bad;
+        assert_eq!(doc.check(), Err(LiveDocError::DecisionId));
+    }
+    let mut doc = document();
+    let Historical::Linked(h) = &mut doc.historical else {
+        panic!("the fixture links a historical case");
+    };
+    h.decision_id = "h".repeat(256);
+    doc.check().unwrap();
+}
+
+#[test]
 fn a_wrong_schema_is_refused() {
     let mut doc = document();
     doc.schema = "rustev.replay/1".into();
