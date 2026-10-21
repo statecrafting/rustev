@@ -104,6 +104,7 @@ pub fn document_schemas() -> Vec<EmittedSchema> {
         emit::<EvidenceRecord>(schema::EVIDENCE, None),
         emit::<EvidenceRecord>(schema::EVIDENCE_V2, None),
         emit::<RunRecord>(schema::RUN, None),
+        emit::<RunRecord>(schema::RUN_V2, None),
         emit::<RunRecord>(schema::RUN_V3, None),
         emit::<Judgment>(schema::JUDGMENT, None),
         emit::<Judgment>(schema::JUDGMENT_V2, None),

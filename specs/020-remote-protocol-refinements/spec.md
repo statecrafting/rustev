@@ -473,6 +473,62 @@ principal rotation; a closed idle connection evicted at checkout; a stale
 connection failing after request bytes, interrupted with no reconnect;
 exhaustion refused before any byte).
 
+**Increment 4 (`rustev.run/2`).** `rustev-contract`: `schema::RUN_V2`;
+`RunRecord` gains `remote_evidence` (exactly in version 2) and
+`remote_evidence_truncated` (version 2 only, omitted when false), both
+absent in every other version, so version 1 and 3 bytes are unchanged
+(every existing golden passes untouched). `RemoteEvidence`: attempt id,
+step and instance, `ExchangeReference` (`retained` with the exchange
+record's digest, schema, retention class and opaque locator, or
+`unavailable` with `no_exchange`, `pending`, `not_delivered` or
+`no_locator`), requested and served identity with disclosure, binding,
+protocol or mapping version, endpoint class, remote code, final remote
+state, charge provenance (`reported`, `attributed`, `nothing_sent`,
+`unknown`), optional batch membership and optional principal digest.
+Bounds: at most 256 entries, each string at most 256 bytes, at most 8
+instance ids, at most 8 KiB of canonical bytes per entry (`bounded`
+cuts deterministically, further for strings that escape to several
+bytes); `check_version_members` refuses a member in the wrong version or
+beyond a bound. `project_v1` removes the list, changes only the schema tag
+and is refused, never partial, for anything but a valid version 2 record.
+`rustev-core`: `EvidenceSink::run_schema` (the one schema a sink selects,
+`rustev.run/1` by default) and `DecisionBackend::take_remote_evidence`
+(`None` by default). `rustev-runtime`: a plan 2 decision's record is
+`rustev.run/2` exactly when the sink selected it; each attempt's entry is
+taken once from the backend that ran it, in attempt order, with the step,
+instance and final remote state the record holds; entries leave from the
+end, and the record says so, until the record fits `RECORD_V1`. A rejected
+version 2 record is an evidence delivery failure like any other; nothing
+retries it as version 1. `rustev-remote-http`: `ClientConfig::run_evidence`
+(off by default; the binding gains `run_record_schema`, not written when
+off) keeps a pending entry per attempt, completes it from the delivered
+exchange record before any member is answered, and records `no_exchange`
+for an attempt refused before any exchange; `ExchangeSink::deliver_located`
+lets the host name a locator (the default names none), and
+`Exchanges::deliver` returns the record digest and the delivery result.
+`rustev-eval`: a version 2 record enters a bundle as its version 1
+projection, so `rustev.replay/1` bundles are unchanged and replay
+reproduces from retained raw outputs without reading any exchange record;
+`remote_evidence::availability` checks each reference against a
+host-supplied synchronous `ExchangeStore` (`available` only for the bounded
+record whose digest and canonical bytes match; otherwise `missing`,
+`expired`, `forbidden`, `corrupt`, `inaccessible`, or the record's own
+`not_referenced` reason), reported apart from judgment parity. Tests:
+`crates/rustev-contract/tests/run_v2.rs` (version 1 bytes, round trips at
+every bound, members per version, exact projection),
+`crates/rustev-runtime/tests/run_v2.rs` (a version 1 sink gets version 1
+and nothing is taken; one entry per remote attempt in order with the
+projection equal to the version 1 record; a rejected version 2 record
+delivered once, never as version 1, with the same judgment),
+`crates/rustev-eval/tests/remote_evidence.rs` (offline replay of a version
+2 record as its projection, byte-identical bundle, no backend call;
+available, missing, corrupt, swapped, expired, forbidden, inaccessible and
+not referenced) and `integrations/rustev-remote-http/tests/run_evidence.rs`
+(support routing over loopback: entries checked against the host's store,
+no body, credential or principal reference embedded, `no_locator`,
+`not_delivered`, the principal digest, `no_exchange` for a refused
+attempt). The new eval source file joins the reviewed archive list.
+
 Engineering choices made by the implementing agent, not by the owner:
 
 - 3.1 asks for explicit `disabled` values in the binding. They are explicit
@@ -496,6 +552,15 @@ Engineering choices made by the implementing agent, not by the owner:
 - The authority in the isolation key is the configured scheme, host and
   port, not the resolved address: two names for one address never share a
   connection.
+- A replay bundle holds a version 2 record's version 1 projection, so
+  `rustev.replay/1` admits exactly what it admitted; the remote evidence
+  stays with the delivered record. Replay itself never consults an
+  exchange store; the acceptance item's "without a transport or store
+  call" is read as that, and availability is a separate, explicit check
+  through the host's store.
+- A plan 3 decision's record stays `rustev.run/3` without remote evidence
+  even for a sink that selected version 2: this spec defines the list for
+  version 2 only.
 - A host-operated `rustev.remote/1` server hands a version 2 request's
   reference to the hosted backend as `CallContext::principal_handle`; spec
   009's engineering choice of an empty handle still holds for every

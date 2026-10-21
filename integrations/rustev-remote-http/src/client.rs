@@ -29,7 +29,10 @@ use rustev_contract::remote::{
     InferResponse, ItemResult, MAX_ITEMS, MemberOutcome, PROTOCOL_MAJOR, RemoteCancelAnswer,
     RemoteCode, RemoteTerms, ServedIdentity, WirePrincipal, protocol_name,
 };
-use rustev_contract::run::{Charge, CostBound, CostModel};
+use rustev_contract::run::{
+    BatchMembership, Charge, ChargeProvenance, CostBound, CostModel, EvidenceUnavailable,
+    ExchangeReference, RemoteEvidence, RemoteState, RetentionClass,
+};
 use rustev_contract::{Document, Identified, schema};
 use rustev_core::seams::{
     AttemptCall, AttemptReport, BoxFuture, CancelAck, CancelSignal, DecisionBackend, RemoteEnd,
@@ -125,6 +128,10 @@ pub struct ClientConfig {
     /// isolation-key member. With a custom configuration and no label the
     /// key is unknown and no connection is reused.
     pub tls_label: Option<String>,
+    /// The evidence sink accepts `rustev.run/2` (spec 020, 3.1 and 3.2):
+    /// keep each attempt's remote evidence for the runtime to take. Off by
+    /// default; enabling it changes the binding identity.
+    pub run_evidence: bool,
 }
 
 impl ClientConfig {
@@ -154,6 +161,7 @@ impl ClientConfig {
             principal: PrincipalPosture::Omitted,
             pool: None,
             tls_label: None,
+            run_evidence: false,
         }
     }
 }
@@ -287,6 +295,63 @@ struct Inner {
     /// The negotiated protocol major version and its name.
     version: u32,
     protocol: &'static str,
+    /// Remote evidence per attempt, for a `rustev.run/2` record.
+    evidence: Mutex<EvidenceStore>,
+}
+
+/// Remote evidence kept for the runtime to take, at most
+/// [`EVIDENCE_KEPT`] attempts (the oldest go first).
+#[derive(Default)]
+struct EvidenceStore {
+    map: HashMap<String, RemoteEvidence>,
+    order: VecDeque<String>,
+}
+
+const EVIDENCE_KEPT: usize = 4_096;
+
+impl EvidenceStore {
+    fn put(&mut self, e: RemoteEvidence) {
+        if !self.map.contains_key(&e.attempt_id) {
+            if self.order.len() >= EVIDENCE_KEPT
+                && let Some(old) = self.order.pop_front()
+            {
+                self.map.remove(&old);
+            }
+            self.order.push_back(e.attempt_id.clone());
+        }
+        self.map.insert(e.attempt_id.clone(), e);
+    }
+
+    fn take(&mut self, attempt_id: &str) -> Option<RemoteEvidence> {
+        let e = self.map.remove(attempt_id)?;
+        self.order.retain(|x| x != attempt_id);
+        Some(e)
+    }
+}
+
+/// An attempt's evidence before its exchange says more.
+fn evidence(
+    inner: &Inner,
+    attempt_id: &str,
+    principal: Option<&WirePrincipal>,
+    reason: EvidenceUnavailable,
+) -> RemoteEvidence {
+    RemoteEvidence {
+        attempt_id: attempt_id.to_string(),
+        step: String::new(),
+        instance: vec![],
+        exchange: ExchangeReference::Unavailable { reason },
+        requested_identity: None,
+        served: ServedIdentity::unknown(),
+        binding: inner.binding.clone(),
+        protocol: inner.protocol.into(),
+        endpoint_class: inner.config.endpoint_class.clone(),
+        code: None,
+        remote_state: RemoteState::Finished,
+        charge_provenance: ChargeProvenance::Unknown,
+        batch: None,
+        principal_digest: principal.map(|p| p.evidence().digest),
+    }
 }
 
 /// A `DecisionBackend` over `rustev.remote/1`. Clones share state.
@@ -454,6 +519,9 @@ impl RemoteClient {
             max_response_bytes: remote.terms.max_response_bytes,
             transport_phases: config.phases,
             principal_wire: principal_wire.clone(),
+            run_record_schema: config
+                .run_evidence
+                .then(|| rustev_contract::schema::RUN_V2.to_string()),
             connection_pool: config
                 .pool
                 .as_ref()
@@ -534,6 +602,7 @@ impl RemoteClient {
                 max_items,
                 version: config_version,
                 protocol,
+                evidence: Mutex::new(EvidenceStore::default()),
             }),
         })
     }
@@ -618,17 +687,61 @@ impl DecisionBackend for RemoteClient {
         Box::pin(async move {
             let Ok(principal) = principal else {
                 // Required context is absent: refused before any byte.
-                return unsent_failure(
+                let report = unsent_failure(
                     RemoteCode::MalformedRequest,
                     "no principal reference within its bounds; not sent",
                 );
+                note_unexchanged(&inner, &attempt_id, None, &report);
+                return report;
             };
-            attempt(
-                inner, attempt_id, projection, trace_id, principal, budget, signal,
+            let p = principal.clone();
+            let report = attempt(
+                inner.clone(),
+                attempt_id.clone(),
+                projection,
+                trace_id,
+                principal,
+                budget,
+                signal,
             )
-            .await
+            .await;
+            note_unexchanged(&inner, &attempt_id, p.as_ref(), &report);
+            report
         })
     }
+
+    fn take_remote_evidence(&self, attempt_id: &str) -> Option<RemoteEvidence> {
+        lock(&self.inner.evidence).take(attempt_id)
+    }
+}
+
+/// An attempt that never joined an exchange has evidence too: there was
+/// nothing to exchange (spec 020, 3.2).
+fn note_unexchanged(
+    inner: &Inner,
+    attempt_id: &str,
+    principal: Option<&WirePrincipal>,
+    report: &AttemptReport,
+) {
+    if !inner.config.run_evidence {
+        return;
+    }
+    let mut store = lock(&inner.evidence);
+    if store.map.contains_key(attempt_id) {
+        return;
+    }
+    let mut e = evidence(
+        inner,
+        attempt_id,
+        principal,
+        EvidenceUnavailable::NoExchange,
+    );
+    e.code = match &report.result {
+        Ok(_) => None,
+        Err((_, detail)) => crate::taxonomy::code_of_detail(detail),
+    };
+    e.charge_provenance = ChargeProvenance::NothingSent;
+    store.put(e);
 }
 
 fn unsent_failure(code: RemoteCode, detail: &str) -> AttemptReport {
@@ -708,6 +821,15 @@ async fn attempt(
         awaiting: false,
         late_share: None,
     };
+    if inner.config.run_evidence {
+        let e = evidence(
+            &inner,
+            &attempt_id,
+            principal.as_ref(),
+            EvidenceUnavailable::Pending,
+        );
+        lock(&inner.evidence).put(e);
+    }
     let ex = join(&inner, key, trace_id, principal, member);
 
     // One total budget (3.4.1): when it runs out the runtime raises the
@@ -1450,7 +1572,56 @@ fn finish(
         inner.exchanges.offer(o);
     }
     let retained = RetainedBytes { request, response };
-    inner.exchanges.deliver(record, Some(retained));
+    let (members, served, sent_any, batch_id) = (
+        record.members.clone(),
+        record.served.clone(),
+        record.bytes_sent,
+        record.request_digest.clone().unwrap_or_default(),
+    );
+    let note = inner.exchanges.deliver(record, Some(retained));
+    if inner.config.run_evidence {
+        // Evidence is complete before any member has its answer.
+        let exchange = match (note.digest, note.located) {
+            (Some(digest), Ok(Some(locator))) => ExchangeReference::Retained {
+                digest,
+                schema: rustev_contract::schema::REMOTE_EXCHANGE.into(),
+                retention: if inner.exchanges.retains_bytes() {
+                    RetentionClass::BytesRetained
+                } else {
+                    RetentionClass::DigestOnly
+                },
+                locator,
+            },
+            (_, Ok(None)) => ExchangeReference::Unavailable {
+                reason: EvidenceUnavailable::NoLocator,
+            },
+            _ => ExchangeReference::Unavailable {
+                reason: EvidenceUnavailable::NotDelivered,
+            },
+        };
+        let n = members.len();
+        let mut store = lock(&inner.evidence);
+        for (index, m) in members.iter().enumerate() {
+            if let Some(e) = store.map.get_mut(&m.attempt_id) {
+                e.exchange = exchange.clone();
+                e.served = served.clone();
+                e.code = match &m.outcome {
+                    MemberOutcome::Failure { code, .. } => Some(*code),
+                    MemberOutcome::Output { .. } => None,
+                };
+                e.charge_provenance = match m.charge {
+                    _ if !sent_any => ChargeProvenance::NothingSent,
+                    Charge::Unknown => ChargeProvenance::Unknown,
+                    _ if n > 1 => ChargeProvenance::Attributed,
+                    _ => ChargeProvenance::Reported,
+                };
+                e.batch = (n > 1).then(|| BatchMembership {
+                    batch_id: batch_id.clone(),
+                    index: index as u32,
+                });
+            }
+        }
+    }
     for (tx, report) in reports {
         let _ = tx.send(report);
     }

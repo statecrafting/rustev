@@ -138,7 +138,17 @@ pub fn assemble(
             lifetime_ms: lifetime,
         })?;
     let binding = |what| Err(AssemblyError::Binding { what });
-    let run = input.run;
+    // A `rustev.run/2` record enters the bundle as its deterministic
+    // version 1 projection (spec 020, 3.2); bundles hold version 1 records.
+    let projected;
+    let run = if input.run.schema == schema::RUN_V2 {
+        projected = input.run.project_v1().map_err(|_| AssemblyError::Binding {
+            what: "the run record's version 1 projection",
+        })?;
+        &projected
+    } else {
+        input.run
+    };
     let plan_id = input.plan.id().map_err(|_| AssemblyError::NotCanonical {
         location: ItemLocation::Plan,
     })?;

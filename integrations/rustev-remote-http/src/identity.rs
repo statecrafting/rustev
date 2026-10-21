@@ -49,6 +49,10 @@ pub struct AdapterBinding {
     /// 3.1 and 3.6); never a reference. Not written when omitted.
     #[serde(skip_serializing_if = "PrincipalWire::is_omitted")]
     pub principal_wire: PrincipalWire,
+    /// The run-record schema the evidence sink accepts, when it is
+    /// `rustev.run/2` (spec 020, 3.1 and 3.2). Not written otherwise.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub run_record_schema: Option<String>,
     /// The connection-pool policy and isolation-key schema (spec 020, 3.1
     /// and 3.5). Not written when disabled.
     #[serde(skip_serializing_if = "PoolBinding::is_disabled")]
@@ -175,6 +179,7 @@ mod tests {
             max_response_bytes: 1,
             transport_phases: TransportPhases::Disabled,
             principal_wire: PrincipalWire::Omitted,
+            run_record_schema: None,
             connection_pool: PoolBinding::Disabled,
         };
         assert_eq!(
@@ -205,6 +210,7 @@ mod tests {
             max_response_bytes: 1,
             transport_phases: TransportPhases::Disabled,
             principal_wire: PrincipalWire::Omitted,
+            run_record_schema: None,
             connection_pool: PoolBinding::Disabled,
         };
         let a = base.artifact().unwrap();
@@ -263,6 +269,10 @@ mod tests {
                     mapping_version: "m/1".into(),
                     scope: "s".into(),
                 },
+                ..base.clone()
+            },
+            AdapterBinding {
+                run_record_schema: Some("rustev.run/2".into()),
                 ..base.clone()
             },
             AdapterBinding {

@@ -120,6 +120,7 @@
         "src/live.rs",
         "src/metrics.rs",
         "src/optimization.rs",
+        "src/remote_evidence.rs",
         "src/replay.rs",
         "src/report.rs",
         "src/resolve.rs"

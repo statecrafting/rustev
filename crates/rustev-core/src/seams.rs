@@ -163,6 +163,18 @@ pub trait DecisionBackend: Send + Sync {
         None
     }
 
+    /// The remote evidence of an attempt this backend ran, for a
+    /// `rustev.run/2` record (spec 020, 3.2), taken once: the adapter's
+    /// part of the entry (exchange reference, identities, binding, code,
+    /// charge provenance); the runtime sets the step, instance and final
+    /// remote state. `None`, the default, for an in-process backend.
+    fn take_remote_evidence(
+        &self,
+        _attempt_id: &str,
+    ) -> Option<rustev_contract::run::RemoteEvidence> {
+        None
+    }
+
     /// Dispatch a declared-compatible batch. The default is unreachable for
     /// a backend that keeps the default `batch_capability` implementation.
     fn infer_batch<'a>(&'a self, _call: BatchAttemptCall) -> BoxFuture<'a, BatchAttemptReport> {
@@ -195,6 +207,15 @@ pub trait EvidenceSink: Send + Sync {
     /// A sink accepts only `rustev.run/1` unless it says otherwise.
     fn accepts(&self, schema: &str) -> bool {
         schema == rustev_contract::schema::RUN
+    }
+
+    /// The one run-record schema the sink selected at construction for a
+    /// plan 2 decision (spec 020, 2 and 3.2): `rustev.run/1`, the default,
+    /// or `rustev.run/2`. A sink that selects version 2 is never given
+    /// version 1 bytes in its place, and a rejected version 2 record is
+    /// never retried as version 1.
+    fn run_schema(&self) -> &'static str {
+        rustev_contract::schema::RUN
     }
 }
 
