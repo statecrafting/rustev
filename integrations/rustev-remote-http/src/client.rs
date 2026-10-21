@@ -1587,10 +1587,15 @@ fn read_response(
     };
     let resp = match InferResponse::parse(body) {
         Ok(r) if r.version == inner.version => r,
+        // A negotiated endpoint that drifts to another version is an
+        // identity mismatch, never an upgrade or downgrade (spec 020, 3.7).
         Ok(r) => {
             return all(
-                RemoteCode::MalformedResponse,
-                format!("protocol version {}", r.version),
+                RemoteCode::IdentityMismatch,
+                format!(
+                    "protocol version {} where {} was negotiated",
+                    r.version, inner.version
+                ),
                 None,
             );
         }

@@ -69,7 +69,9 @@ obligations:
 # 020: Remote protocol and evidence refinements
 
 Approved (A-19, 2026-09-26) as its own reviewable change before any code
-(R-16); implementation is pending. Approval does not claim that a remote
+(R-16). All six planned increments are delivered (see the implementation
+record); `implementation` stays `pending` until the owner rules on the
+acceptance items the record lists as not verifiable as written. Approval does not claim that a remote
 provider, transport, batch path, pool, principal mapping, migration, or
 consumer has been qualified.
 
@@ -560,6 +562,48 @@ runs alone, a plan without a batch policy never batches, and an adapter
 without batch dispatch offers no seam; a missing member answer fails that
 member only.
 
+**Increment 6 (Jev, drift, verification).** A negotiated endpoint that
+answers another protocol version is now `identity_mismatch` (3.7), not
+`malformed_response`. `integrations/rustev-jev/tests/refinements.rs`: the
+Jev adapter offers no general batch seam (with or without its own
+batching), its default batch dispatch refuses without contacting the
+gateway, its own adapter-scoped batch is still one request attributed as
+shared state, its exchange records carry no spec 020 member, and it keeps
+no remote evidence. No spec 020 refinement is enabled on the Jev adapter:
+its transport keeps phases and pooling disabled, its binding
+(`rustev.jev-binding/1`) and foreign-wire mapping are unchanged, so no
+mapping version changes and no earlier qualification is reused for a
+changed mapping.
+
+Acceptance, item by item:
+
+- Canonical fixtures: `crates/rustev-contract/tests/run_v2.rs`, the
+  exchange-record and binding byte pins, and every existing golden
+  unchanged.
+- Offline replay: `crates/rustev-eval/tests/remote_evidence.rs`.
+- Differential batches: `integrations/rustev-remote-http/tests/runtime_batch.rs`
+  (values, failures, cancellation, deadlines, charge, remote state,
+  evidence). Fallback is covered by eligibility: a step that can retry or
+  fall back never batches (spec 017, 3.3); the test uses a retrying step,
+  which takes the same rule.
+- Phases: `integrations/rustev-remote-http/tests/phases.rs`.
+- Pools: the pool's unit tests and `integrations/rustev-remote-http/tests/pool.rs`.
+- Principal: `integrations/rustev-remote-http/tests/principal.rs` and
+  `run_evidence.rs`.
+- Jev: `integrations/rustev-jev/tests/refinements.rs`.
+
+Not verifiable as written, for the owner to rule on:
+
+1. Multiplex cancellation (pool acceptance). The HTTP binding speaks
+   HTTP/1.1 only; a pool policy must declare one stream per connection,
+   so nothing is multiplexed and there is no multiplexed cancellation to
+   test. Covering it needs an HTTP/2 binding, a new dependency that spec
+   021's audit would have to admit.
+2. "New qualification evidence for every enabled refinement" (Jev). No
+   refinement is enabled on the Jev adapter, so there is none to produce;
+   enabling one would need a new mapping version and a newly authorized
+   qualification, which this spec does not authorize (3.7).
+
 Engineering choices made by the implementing agent, not by the owner:
 
 - 3.1 asks for explicit `disabled` values in the binding. They are explicit
@@ -605,9 +649,26 @@ Engineering choices made by the implementing agent, not by the owner:
 
 ## Verification
 
-Pending with implementation. Approval authorizes only this contract.
-The implementing change must add repository-local deterministic verification
-for every acceptance item before implementation can be called complete.
+Declared for `spec-spine verify 020`; 020 joins `make verify` when the
+implementation is complete.
+
+```verify:cli
+# 3.2, 3.4 to 3.6: documents, bounds, projection and byte pins.
+cargo test -p rustev-contract --locked
+# 3.2: the sink seam and the backend's remote evidence.
+cargo test -p rustev-core --locked
+# 3.2, 3.3: run/2 delivery and spec 017's batch seam.
+cargo test -p rustev-runtime --locked
+# 3.2: offline replay and remote evidence availability.
+cargo test -p rustev-eval --locked
+# 3.1, 3.3 to 3.7: phases, pools, principal, run evidence, batches.
+cargo test -p rustev-remote-http --locked
+# 3.3, 3.7: the Jev adapter's batch is not the runtime's; nothing enabled.
+cargo test -p rustev-jev --locked
+# Boundaries: no HTTP stack or async runtime below integrations/.
+cargo run -p rustev-boundaries --locked --quiet
+cargo clippy -p rustev-contract -p rustev-core -p rustev-runtime -p rustev-eval -p rustev-remote-http -p rustev-jev --all-targets --locked -- -D warnings
+```
 
 ## Questions settled by R-34
 

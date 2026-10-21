@@ -151,7 +151,7 @@
       }
     ],
     "sectionDigests": {
-      "020-remote-protocol-and-evidence-refinements": "7b0e9afb7b456ab4dd5b82e9d5287f2aefd1611d4aa8fb43997dafd10a8e53ee",
+      "020-remote-protocol-and-evidence-refinements": "8ec22006753cbd1c57e03b9f2a51dbb5d74c7c07f98c89bb866d73832512876e",
       "1-purpose": "cd00ba5a53f35045c907ea3cdce177cdbe5bba971cc946ff103e28240b4ea6a3",
       "2-territory-versions-and-compatibility": "e8777389583e391c67215692e80100ddbd042bcdf01c5cfad4eae256f3b21e55",
       "3-1-identified-configuration": "76ad82b56d06cece13b93933d00a40f990b7bb4a6dfca9f6537eafe05980d22d",
@@ -165,9 +165,9 @@
       "4-out-of-scope": "620527646aedf8f66febeff70113353edd3b9bfa11695cd1aac31356dda533d3",
       "5-observable-negative-cases": "e2d118fdbdb851ec7dc9826622c706e5dc0e3477c2314bface45ea0ecbd5d8be",
       "acceptance": "002f4a8729da09ff90bdb359ed264064012a06ca1a8fbfc1b628a4ccee601069",
-      "implementation-record": "5e77e20bb0f671c1ce895619b8c4176eb5e5400da10da3dee062e3ee8d4d1d1c",
+      "implementation-record": "cf24d01bd67e13721cb2ac375dcec94e0d63b1c89f3810a8b9ab216afb323054",
       "questions-settled-by-r-34": "bd7de3ca783fc231f3b1df0a823cde967a0cba761da40838ac22967fe2cb8290",
-      "verification": "ed9f4152bdac839f7ef1f32607f799de71a162233d4a970c1d57f99c10c3b656"
+      "verification": "ebf7fe6e0c70523c5def24d00d45dca3291904b13c07f3fe0a188a28ba7de026"
     },
     "sectionHeadings": [
       "020: Remote protocol and evidence refinements",
@@ -193,6 +193,6 @@
     "summary": "A separately reviewable refinement of the approved runtime and remote contracts: `rustev.run/2` references bounded remote exchange evidence, the runtime may dispatch an explicitly compatible general batch, transport phases receive identified ceilings inside one total attempt budget, connection reuse is bounded and isolation-keyed, and a host-operated endpoint may receive an opt-in opaque principal reference. All features default off or preserve version 1 behavior. Approval authorizes implementation only: no migration, qualification, deployment, live call, spend, or publication is authorized or claimed.\n",
     "title": "Remote protocol and evidence refinements"
   },
-  "shardHash": "991b7f3e2ae761b51557bb08aa787a5c4887b242385d66ef23453981fc366353",
+  "shardHash": "0861e4ea848ad86de1e362347a7316996cfc60fcfb7daffc8b215c742d7e3e46",
   "specVersion": "1.10.0"
 }

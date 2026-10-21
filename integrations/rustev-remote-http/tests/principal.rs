@@ -384,6 +384,19 @@ async fn a_redirect_is_never_followed_so_the_reference_reaches_no_other_endpoint
     assert_eq!(elsewhere.hits.load(Ordering::SeqCst), 0);
 }
 
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_endpoint_that_drifts_to_another_version_is_an_identity_mismatch() {
+    let srv = canned_backend(linear_head(), terms(), |req| {
+        ok_json(&infer_answer_v2(req, &linear_head()))
+    })
+    .await;
+    let (c, _) = connect(client_config(&srv.url(), "synthetic-linear-head")).await;
+    let r = call_as(&c, "drift/1", b"").await;
+    let (class, detail) = r.result.unwrap_err();
+    assert_eq!(class, AdapterFailure::Permanent);
+    assert!(detail.starts_with("remote:identity_mismatch"), "{detail}");
+}
+
 // ---------------------------------------------------------------------------
 // A canned version 2 endpoint.
 
