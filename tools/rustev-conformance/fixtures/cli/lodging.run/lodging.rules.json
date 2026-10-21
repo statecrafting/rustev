@@ -1,0 +1,63 @@
+{
+  "schema": "rustev.rules/1",
+  "backend_id": "synthetic-rules-lodging",
+  "limits": { "max_projection_bytes": 65536 },
+  "cost": { "units_per_call": 2 },
+  "tasks": [
+    {
+      "operation": "classify",
+      "task": "lodging.intent",
+      "question": "What is the purpose of this trip?",
+      "options": ["business", "leisure", "family", "other"],
+      "interpretation": "SYNTHETIC keyword heuristic over the trip text. Logits are authored preferences, not probabilities.",
+      "fields": [ { "name": "trip", "ref": "input:trip.text", "type": "text" } ],
+      "base": { "other": "1" },
+      "rules": [
+        { "name": "business", "when": { "contains_any": { "field": "trip", "terms": ["conference", "meeting", "client", "office"] } }, "then": [ { "add": { "business": "3" } } ], "stop": true },
+        { "name": "family", "when": { "contains_any": { "field": "trip", "terms": ["kids", "family", "children"] } }, "then": [ { "add": { "family": "3" } } ], "stop": true },
+        { "name": "leisure", "when": { "contains_any": { "field": "trip", "terms": ["beach", "vacation", "holiday", "relax"] } }, "then": [ { "add": { "leisure": "3" } } ], "stop": true }
+      ],
+      "on_no_match": "base"
+    },
+    {
+      "operation": "proposition",
+      "task": "lodging.supports_preference",
+      "question": "This lodging satisfies the traveler's stated preference.",
+      "options": ["false", "true"],
+      "interpretation": "SYNTHETIC heuristic matching a claim's wording against a lodging's declared attributes. Logits are authored preferences, not probabilities; they are not evidence that the lodging satisfies the preference.",
+      "fields": [
+        { "name": "claim", "ref": "bind:claim/statement", "type": "text" },
+        { "name": "description", "ref": "bind:candidate/description", "type": "text" },
+        { "name": "step_free", "ref": "bind:candidate/step_free", "type": "bool" }
+      ],
+      "base": { "false": "1" },
+      "rules": [
+        { "name": "accessible", "when": { "all": [ { "contains_any": { "field": "claim", "terms": ["step-free", "wheelchair", "accessible"] } }, { "equals": { "field": "step_free", "value": "true" } } ] }, "then": [ { "add": { "true": "3" } } ], "stop": true },
+        { "name": "accessibility_unmet", "when": { "contains_any": { "field": "claim", "terms": ["step-free", "wheelchair", "accessible"] } }, "then": [ { "add": { "false": "3" } } ], "stop": true },
+        { "name": "quiet", "when": { "all": [ { "contains_any": { "field": "claim", "terms": ["quiet"] } }, { "contains_any": { "field": "description", "terms": ["quiet"] } } ] }, "then": [ { "add": { "true": "2" } } ], "stop": false }
+      ],
+      "on_no_match": "base"
+    },
+    {
+      "operation": "rubric",
+      "task": "lodging.suitability",
+      "question": "How suitable is this lodging for the trip described?",
+      "options": ["poor", "fair", "good", "excellent"],
+      "interpretation": "SYNTHETIC linear heuristic over price, capacity, step-free access and trip wording. Logits are authored preferences over four ordered levels, not probabilities or a measured suitability.",
+      "fields": [
+        { "name": "price", "ref": "bind:candidate/price", "type": "decimal" },
+        { "name": "guests", "ref": "bind:candidate/max_guests", "type": "integer" },
+        { "name": "step_free", "ref": "bind:candidate/step_free", "type": "bool" },
+        { "name": "trip", "ref": "input:trip.text", "type": "text" }
+      ],
+      "base": { "fair": "1" },
+      "rules": [
+        { "name": "price", "when": "always", "then": [ { "linear": { "field": "price", "coefficients": { "poor": "0.01", "excellent": "-0.01" } } } ], "stop": false },
+        { "name": "capacity", "when": "always", "then": [ { "linear": { "field": "guests", "coefficients": { "good": "0.25" } } } ], "stop": false },
+        { "name": "access", "when": "always", "then": [ { "lookup": { "field": "step_free", "entries": [ { "key": "true", "add": { "excellent": "0.5" } }, { "key": "false", "add": { "fair": "0.25" } } ], "on_missing": "fail" } } ], "stop": false },
+        { "name": "conference", "when": { "contains_any": { "field": "trip", "terms": ["conference"] } }, "then": [ { "add": { "good": "0.5" } } ], "stop": false }
+      ],
+      "on_no_match": "base"
+    }
+  ]
+}

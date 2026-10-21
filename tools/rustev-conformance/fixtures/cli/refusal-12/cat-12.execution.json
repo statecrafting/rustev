@@ -1,0 +1,1 @@
+{"cost":"unlimited","max_attempts_per_decision":1000,"schema":"rustev.execution/1","steps":[{"attempt_timeout":"none","fallback":{"backends":[],"on":[]},"retry":{"delay":{"fixed":{"ms":0}},"max_attempts":2,"on":["transient"]},"step":"no_such_step"}]}

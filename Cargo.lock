@@ -753,6 +753,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustev-conformance"
+version = "0.1.0"
+dependencies = [
+ "rustev-cli",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "rustev-contract"
 version = "0.1.0"
 dependencies = [

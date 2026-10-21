@@ -1,0 +1,29 @@
+{
+  "argv": [
+    "plan",
+    "check",
+    "--definition",
+    "cat-16.definition.json"
+  ],
+  "command": "plan check",
+  "exit": 5,
+  "id": "refusal-16",
+  "inputs": [
+    {
+      "name": "cat-16.definition.json",
+      "path": "tools/rustev-conformance/fixtures/cli/refusal-16/cat-16.definition.json",
+      "sha256": "f46c9f810d859324ae12ed7e4f1fb59873b2dc11e4aa57447e1dcbef972d4c87"
+    }
+  ],
+  "outputs": [
+    {
+      "golden": "crates/rustev-cli/tests/golden/refusal-16.json",
+      "normalize": [],
+      "sha256": "05a42267586d5dd9be2cc5cbe86b2fbe2536d41459d5947fbeb95e6a14497217",
+      "stream": "stdout"
+    }
+  ],
+  "surfaces": [
+    "cli"
+  ]
+}

@@ -1,0 +1,22 @@
+[package]
+name = "rustev-conformance"
+version.workspace = true
+description = "The shared conformance suite every Rustev host surface runs: case manifest, fixtures and the Rust runner."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+# Repository tooling (spec 027, section 2): never published.
+publish = false
+
+[package.metadata.spec-spine]
+spec = "027-node-and-wasm-bindings"
+
+[dependencies]
+rustev-cli.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+sha2.workspace = true
+
+[lints]
+workspace = true

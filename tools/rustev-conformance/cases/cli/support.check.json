@@ -1,0 +1,43 @@
+{
+  "argv": [
+    "plan",
+    "check",
+    "--definition",
+    "support.definition.json",
+    "--rules",
+    "support.rules.json",
+    "--calibration",
+    "topic.calibration.json"
+  ],
+  "command": "plan check",
+  "exit": 0,
+  "id": "support.check",
+  "inputs": [
+    {
+      "name": "support.definition.json",
+      "path": "tools/rustev-conformance/fixtures/cli/support.check/support.definition.json",
+      "sha256": "d9d8c3edd18497290ee27b637574d8b386dc65c52ea2c67ca4bd865107e7113c"
+    },
+    {
+      "name": "support.rules.json",
+      "path": "tools/rustev-conformance/fixtures/cli/support.check/support.rules.json",
+      "sha256": "0f5307bacf8286cefa680806176e1247cea3505f57de68bd8b7af557eea41886"
+    },
+    {
+      "name": "topic.calibration.json",
+      "path": "tools/rustev-conformance/fixtures/cli/support.check/topic.calibration.json",
+      "sha256": "43d79a11847a371d756e3f727a7fba399bb3f144c4ec972921a10858e3efb883"
+    }
+  ],
+  "outputs": [
+    {
+      "golden": "crates/rustev-cli/tests/golden/support.check.json",
+      "normalize": [],
+      "sha256": "0f028b3209d9c5c7ff47f23d10fad4edb07782224d99973affd5232f1ae56cd1",
+      "stream": "stdout"
+    }
+  ],
+  "surfaces": [
+    "cli"
+  ]
+}

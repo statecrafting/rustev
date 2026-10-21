@@ -39,6 +39,10 @@
       "reason": "repository governance tooling, not a product crate"
     },
     {
+      "name": "rustev-conformance",
+      "reason": "repository conformance tooling (spec 027, 3.12), not a product crate"
+    },
+    {
       "name": "rustev-pkg-lodging",
       "reason": "separately implemented future package"
     },

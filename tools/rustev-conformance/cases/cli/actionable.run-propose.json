@@ -1,0 +1,57 @@
+{
+  "argv": [
+    "run",
+    "--plan",
+    "actionable.plan.json",
+    "--rules",
+    "support.rules.json",
+    "--calibration",
+    "topic.calibration.json",
+    "--snapshot",
+    "propose.snapshot.json",
+    "--evaluation-time",
+    "1790164800000",
+    "--decision-id",
+    "propose",
+    "--record-out",
+    "propose.record.json"
+  ],
+  "command": "run",
+  "exit": 0,
+  "id": "actionable.run-propose",
+  "inputs": [
+    {
+      "name": "actionable.plan.json",
+      "path": "tools/rustev-conformance/fixtures/cli/actionable.run-propose/actionable.plan.json",
+      "sha256": "84ae4058639f7be842f15950e19e72a2cfa8758721420cc2ec3314906e884a98"
+    },
+    {
+      "name": "propose.snapshot.json",
+      "path": "tools/rustev-conformance/fixtures/cli/actionable.run-propose/propose.snapshot.json",
+      "sha256": "3551ccfbf0cda97a552edbf6c57bce0eacd9b28c4f9b56ed56a49ab15688bc65"
+    },
+    {
+      "name": "support.rules.json",
+      "path": "tools/rustev-conformance/fixtures/cli/actionable.run-propose/support.rules.json",
+      "sha256": "0f5307bacf8286cefa680806176e1247cea3505f57de68bd8b7af557eea41886"
+    },
+    {
+      "name": "topic.calibration.json",
+      "path": "tools/rustev-conformance/fixtures/cli/actionable.run-propose/topic.calibration.json",
+      "sha256": "43d79a11847a371d756e3f727a7fba399bb3f144c4ec972921a10858e3efb883"
+    }
+  ],
+  "outputs": [
+    {
+      "golden": "crates/rustev-cli/tests/golden/actionable.run-propose.json",
+      "normalize": [
+        "receipt"
+      ],
+      "sha256": "2f2c97ac0c06ce3914fa1b11269d240f0b9ee13367393f494dffd7857a59e965",
+      "stream": "stdout"
+    }
+  ],
+  "surfaces": [
+    "cli"
+  ]
+}
