@@ -5,6 +5,7 @@
 #![forbid(unsafe_code)]
 
 pub mod normalize;
+pub mod runtime;
 
 use std::path::{Path, PathBuf};
 
@@ -85,11 +86,12 @@ pub fn sha256_hex(b: &[u8]) -> String {
         .collect()
 }
 
-/// The manifest the case files make: every `cases/cli/*.json` (harvested),
-/// sorted by id, as canonical pretty JSON.
+/// The manifest the case files make: every `cases/cli/*.json` (harvested)
+/// and `cases/runtime/*.json` (authored), sorted by id, as canonical
+/// pretty JSON.
 pub fn aggregate() -> Result<Vec<u8>, String> {
     let mut cases = vec![];
-    for dir in ["cli"] {
+    for dir in ["cli", "runtime"] {
         let d = root().join("tools/rustev-conformance/cases").join(dir);
         // Each case directory exists whenever the suite does; a missing one
         // is an error naming it, never a silently smaller manifest.

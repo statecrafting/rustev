@@ -1,0 +1,1 @@
+{"artifact":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","backend_id":"synthetic-label-only","determinism":"bitwise","input_limit":{"max_bytes":65536,"on_excess":"refuse"},"operations":[{"max_options":16,"operation":"classify","output":"label"},{"max_options":2,"operation":"proposition","output":"label"}],"schema":"rustev.backend/1"}

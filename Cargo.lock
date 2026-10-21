@@ -757,9 +757,13 @@ name = "rustev-conformance"
 version = "0.1.0"
 dependencies = [
  "rustev-cli",
+ "rustev-contract",
+ "rustev-core",
+ "rustev-runtime",
  "serde",
  "serde_json",
  "sha2",
+ "tokio",
 ]
 
 [[package]]

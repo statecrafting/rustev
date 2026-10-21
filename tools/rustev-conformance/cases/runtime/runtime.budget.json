@@ -1,0 +1,152 @@
+{
+  "command": "decide",
+  "id": "runtime.budget",
+  "inputs": [
+    {
+      "name": "budget.plan.json",
+      "path": "tools/rustev-conformance/fixtures/runtime/budget.plan.json",
+      "sha256": "e06e243a31c4d314b6d299e3c713e6f88be371175ff73fa92d1c47539c704291"
+    },
+    {
+      "name": "support.snapshot.json",
+      "path": "tools/rustev-conformance/fixtures/runtime/support.snapshot.json",
+      "sha256": "8009ccb469d24cae5f07b0cd3bbb91682f03b53856369a4f57ac9052156f8064"
+    },
+    {
+      "name": "synthetic-label-only.descriptor.json",
+      "path": "tools/rustev-conformance/fixtures/runtime/synthetic-label-only.descriptor.json",
+      "sha256": "57ef7512d8516439419ee66b281e234454d563ce928f896f7c4e2ae3ee6cc680"
+    },
+    {
+      "name": "synthetic-linear-head-replica.descriptor.json",
+      "path": "tools/rustev-conformance/fixtures/runtime/synthetic-linear-head-replica.descriptor.json",
+      "sha256": "bfea4d82292a03bbb6d7c63511d31b5ed49b816b057ebaaa17048fbdc810797d"
+    },
+    {
+      "name": "synthetic-linear-head.descriptor.json",
+      "path": "tools/rustev-conformance/fixtures/runtime/synthetic-linear-head.descriptor.json",
+      "sha256": "a95460744b245b084df38c6552019a0d36e7be25d477689b44e85d72e8d6ae74"
+    },
+    {
+      "name": "synthetic-other-head.descriptor.json",
+      "path": "tools/rustev-conformance/fixtures/runtime/synthetic-other-head.descriptor.json",
+      "sha256": "128d5ac80328e3ff1687826f6462be9b6e144be72c813fd1b27424d9cc1f2e81"
+    },
+    {
+      "name": "topic.calibration.json",
+      "path": "tools/rustev-conformance/fixtures/runtime/topic.calibration.json",
+      "sha256": "2313edf2bf75c4e9a9f248f9e4533d485ced06acd09e97dbbe1b4919ce148072"
+    }
+  ],
+  "mirrors": "crates/rustev-runtime/tests/budget.rs::retries_draw_from_the_same_budget",
+  "outputs": [
+    {
+      "file": "d1.record.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.budget/d1.record.json",
+      "normalize": [],
+      "sha256": "e80343aa0a9f9f132ae02ab7b79ea93ae19a831830b199449e248b27c8607a23"
+    },
+    {
+      "file": "d1.result.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.budget/d1.result.json",
+      "normalize": [],
+      "sha256": "209e19e6b2da7653c2900bc08e1a69c624f497a1b2c2f36b6c7f714287a1ace7"
+    }
+  ],
+  "runtime": {
+    "backends": [
+      {
+        "answers": {
+          "support.deadline": [
+            {
+              "output": {
+                "charge": {
+                  "observed": {
+                    "units": 4
+                  }
+                },
+                "output": {
+                  "logits": {
+                    "false": 3.0,
+                    "true": 0.0
+                  }
+                }
+              }
+            }
+          ],
+          "support.frustration": [
+            {
+              "output": {
+                "charge": {
+                  "observed": {
+                    "units": 4
+                  }
+                },
+                "output": {
+                  "logits": {
+                    "calm": 3.0,
+                    "frustrated": 0.0,
+                    "very_angry": 0.0
+                  }
+                }
+              }
+            }
+          ],
+          "support.topic": [
+            {
+              "fail": {
+                "charge": {
+                  "observed": {
+                    "units": 4
+                  }
+                },
+                "class": "transient",
+                "detail": "flaky"
+              }
+            }
+          ]
+        },
+        "cost_bound": {
+          "bounded": {
+            "max_units": 4
+          }
+        },
+        "cost_model": "bounded",
+        "descriptor": "synthetic-linear-head.descriptor.json",
+        "max_concurrency": 8,
+        "on_cancel": "ignore",
+        "on_release": {},
+        "remote": "finished"
+      }
+    ],
+    "calibrations": [
+      "topic.calibration.json"
+    ],
+    "config": {
+      "max_in_flight": 1,
+      "max_parallel_requests": 1,
+      "max_queued": 0,
+      "sink_timeout_ms": 1000
+    },
+    "descriptors": [
+      "synthetic-linear-head.descriptor.json",
+      "synthetic-label-only.descriptor.json",
+      "synthetic-linear-head-replica.descriptor.json",
+      "synthetic-other-head.descriptor.json"
+    ],
+    "drive": [
+      "start"
+    ],
+    "plan": "budget.plan.json",
+    "requests": [
+      {
+        "decision_id": "d1",
+        "evaluation_time_ms": 1790164800000,
+        "snapshot": "support.snapshot.json"
+      }
+    ]
+  },
+  "surfaces": [
+    "rust-api"
+  ]
+}

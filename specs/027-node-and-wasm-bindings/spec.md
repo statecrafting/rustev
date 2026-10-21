@@ -841,8 +841,34 @@ is reported. The CLI cases are harvested into one file each under
 `cases/cli/`, and the manifest is the aggregate of every case file, checked
 for drift (`RUSTEV_BLESS=1` rewrites it).
 
-The runtime cases follow in the second change. `eval` and `gate` on the packaged reference tasks and the
+`eval` and `gate` on the packaged reference tasks and the
 bindings' surfaces come in later changes.
+
+**Increment 4, second change (the runtime cases).** Runtime cases expressed as data (3.12.4) join the same manifest under
+`cases/runtime/`, each naming the test under `crates/rustev-runtime/tests`
+it mirrors: a full admission queue (`admission.rs`), retries drawing from
+a hard budget (`budget.rs`), transient retries with exponential delays
+(`retry.rs`), attempts in flight at the deadline (`time.rs`) and a
+confirmed stop on cancellation (`cancel.rs`). A case declares its plan,
+descriptors and calibrations (fixtures built from spec 002's shared
+builders, under `fixtures/runtime/`), the runtime bounds, a scripted
+backend per registration (per task, the answer of each attempt in order:
+an output with its charge, a classed failure with its charge, or a gate;
+the cost model and bound, the remote end, the answer to cancellation, and
+the answer a released gate gives), the requests, and the driver's steps on
+a manual clock (start a request, wait for gated attempts, queued
+decisions or a sleeper, advance the clock, release gates, cancel). The
+Rust runner (`rustev_conformance::runtime`) interprets a case with Rust
+seams; under the manual clock every timing is fixed, so each request's
+result and run-record bytes, committed under `expected/runtime/`, are
+compared without normalization. The expected records are checked against
+what each mirrored test asserts (the third request is rejected
+`overloaded` with no record; two attempts and 8 observed units before the
+budget refuses the third; attempts dispatched at 0, 10 and 30 ms; every
+request `deadline_exceeded` with unknown charges; every attempt stopped
+with its charge of 2), so a blessed record is never merely what the
+runner printed. A binding's runner interprets the same data with its
+host's seams.
 
 ## Decisions at approval
 
