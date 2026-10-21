@@ -1,7 +1,7 @@
 ---
 id: "046-wasm-size-budget"
 title: "The WebAssembly module's uncompressed size budget (amends 027)"
-status: draft
+status: approved
 implementation: pending
 created: "2026-10-20"
 summary: >
@@ -11,8 +11,7 @@ summary: >
   measurement is 2,215,589 bytes, 5.6% over, while the gzip and
   instantiation budgets hold. This spec raises the uncompressed budget to
   2,621,440 bytes (2.5 MiB) and keeps every other budget, the procedure and
-  the gate unchanged. Draft: a proposal for the owner's ratification; it
-  claims nothing about code.
+  the gate unchanged. Ratified by the owner on 2026-10-20 (A-43).
 amends:
   - "027-node-and-wasm-bindings"
 depends_on:
@@ -28,7 +27,7 @@ obligations:
 
 # 046: The WebAssembly module's uncompressed size budget (amends 027)
 
-Draft: a proposal for the owner's ratification, not a claim about code.
+Approved: ratified by the owner on 2026-10-20 (decision A-43).
 The approved text of spec 027 is not edited; this spec records what
 changes in 027 3.10.4.
 
