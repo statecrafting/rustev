@@ -121,3 +121,4 @@ bindings:
 	node tools/rustev-conformance/js/copy-addon.mjs "$(CARGO_TARGET)" integrations/rustev-node
 	tools/rustev-conformance/js/node_modules/.bin/tsc --noEmit --strict --lib es2022,dom integrations/rustev-node/index.d.ts
 	node --test integrations/rustev-node/test/*.test.mjs
+	node tools/rustev-conformance/js/run.mjs native integrations/rustev-node

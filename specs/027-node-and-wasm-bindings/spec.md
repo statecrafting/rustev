@@ -1002,6 +1002,16 @@ while the confirmed-stop case stays a Rust-runner case
 (`runtime.cancel-stop`). The JavaScript runner's native adapter is the
 fourth change.
 
+**Increment 6, fourth change (the native conformance runner).** The
+JavaScript conformance runner gains its native adapter, run by
+`make bindings`: every CLI case runs natively (pure commands compared
+whole, written outputs against the artifacts the command published; a
+`run` compared on the judgment and the run record, the envelope's paths,
+receipt and exit code being CLI presentation, with the sink checked to
+receive exactly the record's bytes), and every runtime case runs with
+TypeScript scripted seams on the engine's manual clock. All 34 produce
+their expected bytes, repeatedly.
+
 ## Decisions at approval
 
 1. **npm package names and scope** (left to the implementer by #56; decided
