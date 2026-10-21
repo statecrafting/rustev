@@ -1109,6 +1109,68 @@ number; `trace_not_found`; I/O errors; `--follow` across an append and to
 its timeout; `--text`; every usage rule; an invalid policy file.
 `src/trace.rs` joins the CLI's reviewed archive list.
 
+**Increment 6 (OTLP and the endpoint allowlist).** The workspace gains
+`opentelemetry`, `opentelemetry_sdk` and `opentelemetry-otlp` on the 0.33
+line with `default-features = false` (SDK: `trace`, `metrics`, `logs`,
+`rt-tokio`); `rustev-otel` uses them only behind `otlp-grpc`
+(`grpc-tonic`, `tls-ring`) and `otlp-http` (`http-proto`, `hyper-client`,
+with `opentelemetry-http`'s hyper client over this crate's own connector:
+hyper and `tokio-rustls` with ring). Neither `reqwest` nor `internal-logs`
+is enabled; the default features stay empty, and `cargo tree -p
+rustev-cli` shows no `opentelemetry*` package. `endpoint` (always built,
+pure) normalizes origins and refuses, before anything is built or dialed,
+an origin not exactly in the list, an empty list, user information,
+wildcards and plaintext to anything but a loopback IP literal.
+`OtlpExporter` implements `TelemetryExporter` for spans, logs and metrics.
+Readings taken within the spec:
+
+- The environment: `opentelemetry-otlp` 0.33.1 lets a programmatic
+  endpoint override every `OTEL_*` variable (read in its source), so the
+  endpoint checked is the one used, and the endpoints handed to the
+  builders are checked again after they are built. Beyond that, an
+  `OTEL_EXPORTER_OTLP_ENDPOINT` or per-signal endpoint variable naming an
+  origin outside the list refuses construction with `EndpointNotAllowed`
+  (I-3: an environment-supplied destination is refused), shown by a child
+  process of the test binary, since tests cannot set variables without
+  `unsafe`.
+- Endpoints: gRPC takes the configured origin; HTTP appends `/v1/traces`,
+  `/v1/metrics` and `/v1/logs` to it. A redirect is not followed and is an
+  export failure, counted.
+- Spans are SDK `SpanData` built from the span lines (sampled, the
+  registered `tracestate`, a remote host parent), exported through
+  `opentelemetry-otlp`'s exporter by this crate's queue; log records are
+  made by an SDK logger whose processor only collects them, then exported
+  by the same queue in their own call (`LogBatch::new`, which the SDK
+  documents as public but not meant for direct use, so an upgrade may need
+  to revisit it). Each signal is counted by what happened to it, and a
+  decision is counted once, under the first reason that lost any of its
+  telemetry. The OTLP form carries values only; the `r` mark is in the
+  JSONL lines.
+- Metrics: `ResourceMetrics` can only be filled by an SDK reader, and the
+  manual reader's `collect` needs `experimental_metrics_custom_reader`,
+  which 3.2.3 does not enable. So an SDK meter provider with a periodic
+  reader (interval one year) is driven by `flush_metrics`: counters are
+  added from the sink's snapshot as deltas, histograms are recorded as the
+  sink records them (the exporter's `observe` hook), and the reader's
+  export runs on the host's Tokio runtime. The SDK's final export when the
+  exporter is dropped is skipped, so metrics leave only through
+  `flush_metrics`, where they are counted.
+- TLS: gRPC over TLS needs the host's CA certificates (`ca_pem`), since no
+  root-store feature of tonic is enabled; HTTP uses them when given, else
+  the Web PKI roots. Header values (collector tokens) appear in no error
+  and no `Debug` output. The tests run plaintext to loopback only: the
+  workspace has no certificate generator, so the TLS paths are built and
+  type-checked but not exercised by a test.
+
+Tests (`tests/otlp.rs`, `--all-features`, with loopback fake collectors
+on h2 and hyper in `tests/collector/`): each transport exports spans, a
+log record and a metrics flush, with every count conserved, no canary of a
+dropped or digested field in the bytes on the wire, and the schema URL
+present; a redirect is a counted failure and its target is never dialed;
+an endpoint outside the list, configured or from the environment, is
+`EndpointNotAllowed` naming the origin with zero accepted connections at
+it; the other refusals; and a bad header's value in no error.
+
 ## Decisions at approval
 
 Each open point of #70 and of the work order, with the answer this spec

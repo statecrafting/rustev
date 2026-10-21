@@ -87,6 +87,15 @@ pub struct DecisionTelemetry {
     pub logs: Vec<LogRecord>,
 }
 
+/// One histogram measurement (3.6.1), its attributes already through the
+/// policy.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Measurement<'a> {
+    pub instrument: &'static str,
+    pub attrs: &'a [(String, String)],
+    pub value: f64,
+}
+
 /// Why an export did not succeed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ExportError {
@@ -116,7 +125,7 @@ impl fmt::Display for ExportError {
 
 /// Where telemetry goes: compiled in, configured explicitly (3.13.7).
 pub trait TelemetryExporter: Send + Sync + 'static {
-    /// Export one batch of whole decision trees.
+    /// Export the spans of one batch of whole decision trees.
     fn export<'a>(
         &'a self,
         batch: &'a [DecisionTelemetry],
@@ -130,8 +139,18 @@ pub trait TelemetryExporter: Send + Sync + 'static {
         Box::pin(async { Err(ExportError::Failed("metrics are not exported".into())) })
     }
 
-    /// Whether log records in a batch are exported. A sink with logs on
-    /// refuses an exporter that takes none.
+    /// Export the log records of one batch, after its spans; only called
+    /// when [`Self::takes_logs`].
+    fn export_logs<'a>(&'a self, _logs: &'a [LogRecord]) -> BoxFuture<'a, Result<(), ExportError>> {
+        Box::pin(async { Err(ExportError::Failed("logs are not exported".into())) })
+    }
+
+    /// One histogram measurement as the sink records it, for an exporter
+    /// that keeps its own instruments (3.6.2: every delivered record).
+    fn observe(&self, _measurement: &Measurement<'_>) {}
+
+    /// Whether log records are exported. A sink with logs on refuses an
+    /// exporter that takes none.
     fn takes_logs(&self) -> bool {
         false
     }
@@ -906,8 +925,16 @@ impl OtelSink {
                 f.fallbacks,
             );
         }
-        m.record(name::DECISION_DURATION, vec![], f.elapsed_ms as f64);
-        m.record(
+        record(
+            &mut m,
+            &*s.exporter,
+            name::DECISION_DURATION,
+            vec![],
+            f.elapsed_ms as f64,
+        );
+        record(
+            &mut m,
+            &*s.exporter,
             name::DECISION_COST,
             AttrSet::new(p)
                 .with(
@@ -920,7 +947,9 @@ impl OtelSink {
             f.cost_units as f64,
         );
         for a in &f.attempts {
-            m.record(
+            record(
+                &mut m,
+                &*s.exporter,
                 name::ATTEMPT_DURATION,
                 AttrSet::new(p)
                     .with(
@@ -979,13 +1008,27 @@ impl OtelSink {
             };
             if g.input_tokens.is_some() || g.output_tokens.is_some() {
                 if let Some(n) = g.input_tokens {
-                    m.record(name::TOKEN_USAGE, base(Some("input")), n as f64);
+                    record(
+                        &mut m,
+                        &*s.exporter,
+                        name::TOKEN_USAGE,
+                        base(Some("input")),
+                        n as f64,
+                    );
                 }
                 if let Some(n) = g.output_tokens {
-                    m.record(name::TOKEN_USAGE, base(Some("output")), n as f64);
+                    record(
+                        &mut m,
+                        &*s.exporter,
+                        name::TOKEN_USAGE,
+                        base(Some("output")),
+                        n as f64,
+                    );
                 }
                 // Seconds, as the GenAI conventions state.
-                m.record(
+                record(
+                    &mut m,
+                    &*s.exporter,
                     name::OPERATION_DURATION,
                     base(None),
                     a.duration_ms as f64 / 1000.0,
@@ -1036,6 +1079,23 @@ pub fn ratio_sampled(trace_id: &[u8; 16], per_million: u32) -> bool {
     let rnd = u64::from_be_bytes(last) >> 1;
     let bound = ((u128::from(per_million) << 63) / 1_000_000) as u64;
     rnd < bound
+}
+
+/// Record one histogram value and hand it to the exporter's own
+/// instruments.
+fn record(
+    m: &mut Instruments,
+    exporter: &dyn TelemetryExporter,
+    instrument: &'static str,
+    attrs: crate::metrics::Attrs,
+    value: f64,
+) {
+    exporter.observe(&Measurement {
+        instrument,
+        attrs: &attrs,
+        value,
+    });
+    m.record(instrument, attrs, value);
 }
 
 /// The log records of a sampled decision (3.6.3).
@@ -1150,31 +1210,49 @@ async fn worker(s: Arc<Shared>) {
         };
         let trees: Arc<Vec<DecisionTelemetry>> =
             Arc::new(batch.iter().map(|q| q.tree.clone()).collect());
+        let logs: Vec<LogRecord> = trees.iter().flat_map(|t| t.logs.iter().cloned()).collect();
         let ex = s.exporter.clone();
-        let r = run_export(s.config.export_timeout_ms, async move {
+        let spans = run_export(s.config.export_timeout_ms, async move {
             ex.export(&trees).await
         })
         .await;
+        // Log records go in their own export call, after the spans, so each
+        // signal is counted by what happened to it.
+        let logs = if logs.is_empty() {
+            Ok(())
+        } else {
+            let ex = s.exporter.clone();
+            run_export(s.config.export_timeout_ms, async move {
+                ex.export_logs(&logs).await
+            })
+            .await
+        };
         {
             let mut st = lock(&s.stats);
             for item in &batch {
                 st.spans.in_flight -= item.spans;
                 st.logs.in_flight -= item.logs;
-                match r {
-                    Ok(()) => {
-                        st.spans.exported += item.spans;
-                        st.logs.exported += item.logs;
-                    }
-                    Err(reason) => {
-                        st.spans.lose(reason, item.spans);
-                        st.logs.lose(reason, item.logs);
-                        st.lose_decision(reason);
-                    }
+                match spans {
+                    Ok(()) => st.spans.exported += item.spans,
+                    Err(reason) => st.spans.lose(reason, item.spans),
+                }
+                match logs {
+                    Ok(()) => st.logs.exported += item.logs,
+                    Err(reason) => st.logs.lose(reason, item.logs),
+                }
+                // A decision is lost under the first reason that lost any
+                // of its telemetry, and only once.
+                let first = spans
+                    .err()
+                    .or(if item.logs > 0 { logs.err() } else { None });
+                if let Some(reason) = first {
+                    st.lose_decision(reason);
                 }
             }
         }
         for item in batch {
             if let Some(w) = item.waiter {
+                let r = spans.and(if item.logs > 0 { logs } else { Ok(()) });
                 let _ = w.send(r);
             }
         }
