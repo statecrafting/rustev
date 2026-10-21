@@ -13,9 +13,14 @@
 
 pub mod config;
 pub mod context;
+pub mod endpoint;
 pub mod ids;
 pub mod jsonl;
 pub mod metrics;
+#[cfg(any(feature = "otlp-grpc", feature = "otlp-http"))]
+pub mod otlp;
+#[cfg(feature = "otlp-http")]
+mod otlp_http_client;
 pub mod project;
 pub mod sink;
 
@@ -29,6 +34,6 @@ pub use project::{
     UsageKeys, project,
 };
 pub use sink::{
-    BeginError, Begun, DecisionTelemetry, ExportError, Flow, LogRecord, OtelSink, OtelStats,
-    SinkClock, SystemClock, TeeSink, TelemetryExporter,
+    BeginError, Begun, DecisionTelemetry, ExportError, Flow, LogRecord, Measurement, OtelSink,
+    OtelStats, SinkClock, SystemClock, TeeSink, TelemetryExporter,
 };
