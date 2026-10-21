@@ -4,6 +4,7 @@
 // budget changes only by amending spec 027, never here.
 //
 //   node wasm-check.mjs <package dir> <measurement.json> [--chromium-ms <median>]
+//       [--chromium-record <chromium.mjs time output>]
 //
 // <package dir> holds the `web` target (`web/rustev_wasm.js` and its
 // optimized `web/rustev_wasm_bg.wasm`).
@@ -23,6 +24,23 @@ const chromiumMs = chromiumAt >= 0 ? Number(rest[chromiumAt + 1]) : null;
 if (chromiumAt >= 0 && !(chromiumMs >= 0)) {
   console.error('usage: --chromium-ms takes a non-negative median in milliseconds');
   process.exit(2);
+}
+// `--chromium-record <file>`: what chromium.mjs measured (browser version,
+// samples, median, p95), recorded in the measurement document (3.10.5,
+// 3.10.6); its median must be the one gated.
+const recordAt = rest.indexOf('--chromium-record');
+let chromiumRecord = null;
+if (recordAt >= 0) {
+  try {
+    chromiumRecord = JSON.parse(readFileSync(rest[recordAt + 1], 'utf8'));
+  } catch (e) {
+    console.error(`--chromium-record: ${e.message}`);
+    process.exit(2);
+  }
+  if (chromiumMs === null || chromiumRecord.median !== chromiumMs) {
+    console.error('--chromium-record: its median must equal --chromium-ms');
+    process.exit(2);
+  }
 }
 if (!pkg || !outPath) {
   console.error('usage: node wasm-check.mjs <package dir> <measurement.json>');
@@ -132,7 +150,13 @@ const measurement = {
   imports: seen.sort(),
   node_instantiation_ms: { samples, median, p95 },
   // Headless Chromium is measured by the CI job (3.10.6), null when not given.
-  chromium_instantiation_ms: chromiumMs === null ? null : { median: chromiumMs },
+  chromium_instantiation_ms:
+    chromiumMs === null
+      ? null
+      : chromiumRecord
+        ? { samples: chromiumRecord.samples, median: chromiumMs, p95: chromiumRecord.p95 }
+        : { median: chromiumMs },
+  chromium: chromiumRecord?.chromium ?? null,
   failures,
 };
 writeFileSync(outPath, JSON.stringify(measurement, null, 2) + '\n');

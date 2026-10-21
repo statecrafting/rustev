@@ -81,8 +81,9 @@ conformance-harvest:
 # Spec 027, 3.2, 3.10 and 3.12: build the WebAssembly package (web, bundler
 # and nodejs targets, optimized at -Oz), check the generated declarations
 # for drift and type-check them, enforce the import allowlist and the size
-# and instantiation budgets (writing the measurement document), and run the
-# JavaScript conformance runner on it. Needs Node 20 or later and the exact
+# and instantiation budgets, Node and headless Chromium (writing the
+# measurement document), and run the JavaScript conformance runner on it in
+# Node and in Chromium. Needs Node 20 or later and the exact
 # tool pins below; it refuses any other version.
 WASM_BINDGEN ?= wasm-bindgen
 WASM_OPT ?= wasm-opt
@@ -103,6 +104,8 @@ bindings:
 	cd tools/rustev-conformance/js && npm ci --no-audit --no-fund --ignore-scripts
 	@# Every installed package's registry signature is verified, lodash 4.18.1 included.
 	cd tools/rustev-conformance/js && npm audit signatures
+	@# Headless Chromium at the build playwright-core 1.63.0 pins (3.10.5).
+	cd tools/rustev-conformance/js && node_modules/.bin/playwright-core install chromium-headless-shell
 	cargo build -p rustev-wasm --locked --target wasm32-unknown-unknown --profile wasm
 	rm -rf "$(BINDINGS_OUT)/rustev-wasm"
 	for t in web bundler nodejs; do \
@@ -115,8 +118,10 @@ bindings:
 	cp -R integrations/rustev-wasm/package.json integrations/rustev-wasm/types "$(BINDINGS_OUT)/rustev-wasm/"
 	node tools/rustev-conformance/js/gen-types.mjs --check
 	tools/rustev-conformance/js/node_modules/.bin/tsc --noEmit --strict integrations/rustev-wasm/types/rustev-documents.d.ts
-	node tools/rustev-conformance/js/wasm-check.mjs "$(BINDINGS_OUT)/rustev-wasm" "$(BINDINGS_OUT)/wasm-measurement.json"
+	node tools/rustev-conformance/js/chromium.mjs time "$(BINDINGS_OUT)/rustev-wasm" "$(BINDINGS_OUT)/chromium-time.json" > "$(BINDINGS_OUT)/chromium-median"
+	node tools/rustev-conformance/js/wasm-check.mjs "$(BINDINGS_OUT)/rustev-wasm" "$(BINDINGS_OUT)/wasm-measurement.json" --chromium-ms "$$(cat "$(BINDINGS_OUT)/chromium-median")" --chromium-record "$(BINDINGS_OUT)/chromium-time.json"
 	node tools/rustev-conformance/js/run.mjs wasm "$(BINDINGS_OUT)/rustev-wasm"
+	node tools/rustev-conformance/js/run.mjs chromium "$(BINDINGS_OUT)/rustev-wasm"
 	cargo build -p rustev-node --locked --release
 	node tools/rustev-conformance/js/copy-addon.mjs "$(CARGO_TARGET)" integrations/rustev-node
 	tools/rustev-conformance/js/node_modules/.bin/tsc --noEmit --strict --lib es2022,dom integrations/rustev-node/index.d.ts

@@ -1031,6 +1031,26 @@ conformance suite on that install. Locally (macOS arm64) all 34 native
 cases pass on it. Building and smoke-testing each matrix target is the CI
 job's (a later change of this increment).
 
+**Increment 7, second change (headless Chromium).** The test harness pins
+`playwright-core` 1.63.0 exactly (no dependencies; covered by `npm audit
+signatures`), and so the Chromium build: `make bindings` installs that
+version's headless shell. `tools/rustev-conformance/js/chromium.mjs time`
+measures cold instantiation as 3.10.5 defines it, from module bytes in
+memory to the first successful `version()`, 3 discarded warm-up runs then
+21 measured, each in a fresh browser process, the page served from a
+loopback server holding only the package; it writes the browser version,
+samples, median and p95. `wasm-check.mjs` gates the median
+(`--chromium-ms`) and records the rest in the measurement document
+(`--chromium-record`, whose median must be the gated one). The JavaScript
+runner's WebAssembly adapter now builds each case as one plain call
+(`wasmCall`) run by one self-contained executor (`executeWasm`), so the
+same code runs in Node and, by its text, in a Chromium page:
+`run.mjs chromium` runs every WebAssembly case there (3.11.3, 3.13.3).
+Local measurement (macOS arm64, Chromium 153.0.8010.12 headless shell):
+median 3.1 ms, p95 3.3 ms against the 100 ms budget, all 23 WebAssembly
+cases passing in Chromium as in Node. The CI runner's measurement comes
+with the `bindings` job.
+
 ## Decisions at approval
 
 1. **npm package names and scope** (left to the implementer by #56; decided
