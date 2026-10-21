@@ -35,6 +35,9 @@ extends:
   # OpenTelemetry workspace dependencies, used only by integrations/rustev-otel.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.toml" }, nature: additive }
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.lock" }, nature: additive }
+  # Each new source file of a release member joins the reviewed archive
+  # list (spec 021 3.5's rule, in the directory spec 031 owns).
+  - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
   # Adds 028 to `make verify` at completion.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
 depends_on:
@@ -921,6 +924,51 @@ and move them there, the core repository's latest release is still v1.44.0,
 `schema_url` is itself, and `opentelemetry`, `opentelemetry_sdk`,
 `opentelemetry-otlp` and `opentelemetry-semantic-conventions` are at
 0.33.1 on crates.io. The pin of 3.2.2 (v1.41.1) therefore stands.
+
+**Increment 2 (the pure contract parts).** `rustev-contract` gains three
+modules and one dependency, `hmac` 0.12 (the line built on the `digest`
+0.10 that `sha2` 0.10 uses; 0.13 moves to `digest` 0.11):
+
+- `redaction`: the field classes of 3.3.1 with their defaults (3.4.3), the
+  lineage rule (3.3.2), the `rustev.redaction/1` document under
+  `DESCRIPTOR_V1` with `deny_unknown_fields` and its identity
+  `RedactionPolicyId`, validation naming the entry for every refusal of
+  3.4.2, the effective action (3.4.4), the keyed digest `DigestKey` (32 to
+  64 bytes, `key_id` 1 to 64 bytes, never serialized, `Debug` shows only the
+  `key_id`), and `Redactor`, which refuses a missing key when any action is
+  `digest` and is the one function that turns a value into an exported one
+  (3.4.7). An action is written `"drop"`, `"digest"`, `"allow"` or
+  `{"truncate":{"bytes":N}}`. An array of ids is digested element by
+  element, so each still correlates.
+- `trace_fields`: the closed catalogue, the span and event names, the fixed
+  fields, the pinned schema URL and span schema version. Event attributes
+  are catalogued as `<event>.<key>` (`rustev.input.source`) and metric-only
+  attributes as `<instrument>.<key>` (`rustev.unresolved.scope`), so every
+  exported value has one catalogue name for the policy and for
+  `rustev.redaction.withheld`. Attributes that arrive with later specs
+  (3.5.4 "arrives with") are added by those specs, not reserved here.
+- `trace`: the `rustev.trace/1` line under the new limit set `TRACE_V1`
+  (64 KiB per line), its invariants and its writer (record canonical
+  bytes: compact, keys sorted). The resource on the root line holds the
+  resource attributes, the schema URL and the instrumentation scope.
+- The reader rule of 3.11.3 (`RedactionPolicy::view`). A reader cannot
+  know the class a lineage-rule field (an outcome parameter or a ranking
+  score) had at export, so without a `fields` override it applies the most
+  withholding action among every class the rule can assign; it never shows
+  more than the policy would for the value's actual class.
+
+Tests: every refusal of 3.4.2, the default policy, the effective action,
+RFC 4231 vectors (cases 1 to 4, 6, 7), committed Rustev digest vectors
+computed independently, equal digests across two `id` fields and a
+different digest under another key, key bounds, the reader's view rules,
+and the line's round trip and refusals. The three source files join the
+reviewed archive list (hence 028's `extends` edge on
+`tools/rustev-release/`, as 027 and 033 took). No existing document,
+schema string, limit, canonical byte or identity changes. The two new
+documents are not added to spec 027's JSON Schema emission: doing so
+regenerates the committed binding declarations under
+`integrations/rustev-wasm/` and `integrations/rustev-node/`, which this
+spec does not extend.
 
 ## Decisions at approval
 
