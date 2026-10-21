@@ -35,6 +35,12 @@ pub mod exchange;
 pub mod http;
 #[path = "../../rustev-remote-http/src/identity.rs"]
 pub mod identity;
+#[path = "../../rustev-remote-http/src/phases.rs"]
+pub mod phases;
+#[path = "../../rustev-remote-http/src/pool.rs"]
+pub mod pool;
+#[path = "../../rustev-remote-http/src/principal.rs"]
+pub mod principal;
 #[path = "../../rustev-remote-http/src/taxonomy.rs"]
 pub mod taxonomy;
 #[path = "../../rustev-remote-http/src/wire.rs"]

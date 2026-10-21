@@ -34,7 +34,8 @@ use rustev_contract::optimization::OptimizationPolicy;
 use rustev_contract::plan::{PlanExecution, PlanStepDetail};
 use rustev_contract::replay::Capture;
 use rustev_contract::run::{
-    CoreEvidence, CostMode, CostModel, RecordedExecution, RunRecord, Termination, Timing,
+    CoreEvidence, CostMode, CostModel, MAX_REMOTE_EVIDENCE, RecordedExecution, RemoteEvidence,
+    RequestRecord, RunRecord, Termination, Timing,
 };
 use rustev_contract::snapshot::Snapshot;
 use rustev_contract::time::Timestamp;
@@ -726,10 +727,22 @@ impl Runtime {
             )
         };
         let elapsed_ms = i.clock.now().saturating_sub(submitted);
-        let record = Arc::new(RunRecord {
+        let plan_3 = plan.compiled.plan.schema == schema::PLAN_V3;
+        // A plan 2 decision's record is `rustev.run/2` exactly when the sink
+        // selected it (spec 020, 3.2).
+        let run_2 = !plan_3 && i.sink.run_schema() == schema::RUN_V2;
+        let (remote_evidence, remote_evidence_truncated) = if run_2 {
+            let (list, truncated) = remote_evidence(i, &requests);
+            (Some(list), truncated)
+        } else {
+            (None, false)
+        };
+        let mut record = RunRecord {
             // A plan 3 decision's record holds evidence 2 (spec 032, 3.10.3).
-            schema: if plan.compiled.plan.schema == schema::PLAN_V3 {
+            schema: if plan_3 {
                 schema::RUN_V3
+            } else if run_2 {
+                schema::RUN_V2
             } else {
                 schema::RUN
             }
@@ -750,7 +763,11 @@ impl Runtime {
             },
             requests,
             cost: ledger.summary(),
-        });
+            remote_evidence,
+            remote_evidence_truncated,
+        };
+        fit_remote_evidence(&mut record);
+        let record = Arc::new(record);
         let delivery = self.deliver(record.clone()).await;
         abandon.armed = false;
         match delivery {
@@ -837,5 +854,53 @@ fn stopped() -> DeliveryFailure {
     DeliveryFailure {
         detail: "the delivery worker stopped".into(),
         uncertain: false,
+    }
+}
+
+/// The remote evidence list of a `rustev.run/2` record (spec 020, 3.2): at
+/// most one entry per remote attempt, in attempt order, taken from the
+/// backend that ran it, with the step, instance and final remote state the
+/// record holds. Beyond [`MAX_REMOTE_EVIDENCE`] entries the list is cut and
+/// says so.
+fn remote_evidence(i: &Inner, requests: &[RequestRecord]) -> (Vec<RemoteEvidence>, bool) {
+    let mut out = Vec::new();
+    let mut truncated = false;
+    for r in requests {
+        for a in &r.attempts {
+            let Some(reg) = i.backends.get(&a.backend_id) else {
+                continue;
+            };
+            let Some(mut e) = reg.backend.take_remote_evidence(&a.attempt_id) else {
+                continue;
+            };
+            if out.len() >= MAX_REMOTE_EVIDENCE {
+                truncated = true;
+                continue;
+            }
+            e.attempt_id = a.attempt_id.clone();
+            e.step = r.step.clone();
+            e.instance = r.instance.clone();
+            e.remote_state = a.remote;
+            out.push(e.bounded());
+        }
+    }
+    (out, truncated)
+}
+
+/// Keep a `rustev.run/2` record within its parse bounds: remote evidence
+/// entries leave from the end, and the record says so, until it fits.
+fn fit_remote_evidence(record: &mut RunRecord) {
+    use rustev_contract::Document;
+    let max = rustev_contract::limits::RECORD_V1.max_bytes;
+    while record
+        .remote_evidence
+        .as_ref()
+        .is_some_and(|l| !l.is_empty())
+        && record.record_canonical().is_ok_and(|b| b.len() > max)
+    {
+        if let Some(l) = &mut record.remote_evidence {
+            l.pop();
+        }
+        record.remote_evidence_truncated = true;
     }
 }

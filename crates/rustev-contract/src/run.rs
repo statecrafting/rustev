@@ -14,6 +14,7 @@ use crate::ids::{ArtifactId, ExecutionPolicyId, PlanId};
 use crate::judgment::Unresolved;
 use crate::limits::RECORD_V1;
 use crate::optimization::{OptimizationOutcome, OptimizationRecord};
+use crate::remote::{MAX_TEXT_BYTES, RemoteCode, ServedIdentity};
 use crate::schema;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -30,16 +31,292 @@ pub struct RunRecord {
     /// In the order the core listed them.
     pub requests: Vec<RequestRecord>,
     pub cost: CostSummary,
+    /// `rustev.run/2` only (spec 020, 3.2): at most one entry per remote
+    /// attempt, in attempt order, at most [`MAX_REMOTE_EVIDENCE`]. Absent in
+    /// every other version, so their bytes are unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub remote_evidence: Option<Vec<RemoteEvidence>>,
+    /// `rustev.run/2` only: remote attempts beyond the bound have no entry.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub remote_evidence_truncated: bool,
 }
 
 // `rustev.run/3` is `rustev.run/1` with its core member holding
-// `rustev.evidence/2` (spec 032, 3.10.3).
+// `rustev.evidence/2` (spec 032, 3.10.3); `rustev.run/2` is `rustev.run/1`
+// with a remote evidence list (spec 020, 3.2).
 crate::document::versioned_document!(
     RunRecord,
-    [schema::RUN, schema::RUN_V3],
-    "rustev.run/1 or rustev.run/3",
-    RECORD_V1
+    [schema::RUN, schema::RUN_V2, schema::RUN_V3],
+    "rustev.run/1 or rustev.run/2 or rustev.run/3",
+    RECORD_V1,
+    check = RunRecord::parsed_members_fit
 );
+
+/// The most remote evidence entries one `rustev.run/2` record holds.
+pub const MAX_REMOTE_EVIDENCE: usize = 256;
+/// The most canonical bytes of one remote evidence entry, so the list never
+/// exceeds 2 MiB.
+pub const MAX_REMOTE_EVIDENCE_ENTRY_BYTES: usize = 8 * 1024;
+/// The most instance ids an entry names.
+pub const MAX_REMOTE_EVIDENCE_INSTANCE: usize = 8;
+
+/// Why a record has no version 1 projection, or does not fit its version.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RunVersionError {
+    /// Only a `rustev.run/2` record projects to version 1.
+    NotVersion2,
+    /// A version member is present where the schema has none, absent where
+    /// it is required, or beyond its bounds.
+    Members(&'static str),
+}
+
+impl std::fmt::Display for RunVersionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RunVersionError::NotVersion2 => f.write_str("only rustev.run/2 projects to version 1"),
+            RunVersionError::Members(why) => write!(f, "run record members: {why}"),
+        }
+    }
+}
+
+impl std::error::Error for RunVersionError {}
+
+impl RunRecord {
+    /// Whether the version-specific members fit the schema: the remote
+    /// evidence list exactly in `rustev.run/2`, within its bounds.
+    pub fn check_version_members(&self) -> Result<(), RunVersionError> {
+        let v2 = self.schema == schema::RUN_V2;
+        match &self.remote_evidence {
+            None if v2 => Err(RunVersionError::Members(
+                "rustev.run/2 needs remote_evidence",
+            )),
+            Some(_) if !v2 => Err(RunVersionError::Members(
+                "remote_evidence is a rustev.run/2 member",
+            )),
+            _ if self.remote_evidence_truncated && !v2 => Err(RunVersionError::Members(
+                "remote_evidence_truncated is a rustev.run/2 member",
+            )),
+            Some(list) if list.len() > MAX_REMOTE_EVIDENCE => {
+                Err(RunVersionError::Members("too many remote evidence entries"))
+            }
+            Some(list) if !list.iter().all(RemoteEvidence::is_bounded) => Err(
+                RunVersionError::Members("a remote evidence entry beyond its bounds"),
+            ),
+            _ => Ok(()),
+        }
+    }
+
+    /// The parser's version rule: a record carries the remote evidence
+    /// members exactly in `rustev.run/2`, within their bounds, so a version
+    /// 1 or 3 record with them, or a version 2 record without the list, is
+    /// refused when read, not only when projected.
+    fn parsed_members_fit(&self) -> Result<(), String> {
+        self.check_version_members().map_err(|e| e.to_string())
+    }
+
+    /// The deterministic version 1 projection of a `rustev.run/2` record
+    /// (spec 020, 3.2): the remote evidence removed, the schema tag
+    /// changed, every other member exactly as it is, so the canonical bytes
+    /// are the version 1 representation. Refused, never partial, for any
+    /// other record.
+    pub fn project_v1(&self) -> Result<RunRecord, RunVersionError> {
+        if self.schema != schema::RUN_V2 {
+            return Err(RunVersionError::NotVersion2);
+        }
+        self.check_version_members()?;
+        Ok(RunRecord {
+            schema: schema::RUN.into(),
+            remote_evidence: None,
+            remote_evidence_truncated: false,
+            ..self.clone()
+        })
+    }
+}
+
+/// One remote attempt's evidence reference in `rustev.run/2` (spec 020,
+/// 3.2, I-4). It names the exchange record, never embeds it: no request or
+/// response body, credential, secret address, unredacted principal
+/// reference, provider reasoning or header.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RemoteEvidence {
+    pub attempt_id: String,
+    /// The decision step and logical request (instance) the attempt served.
+    pub step: String,
+    pub instance: Vec<String>,
+    pub exchange: ExchangeReference,
+    /// What the adapter asked for; `None` when it names no model.
+    pub requested_identity: Option<String>,
+    pub served: ServedIdentity,
+    /// The adapter binding (its artifact), the protocol or foreign mapping
+    /// version, and the endpoint class (never a secret URL).
+    pub binding: ArtifactId,
+    pub protocol: String,
+    pub endpoint_class: String,
+    /// The remote error code of a failed attempt.
+    pub code: Option<RemoteCode>,
+    /// The attempt's final remote state, as the run record has it.
+    pub remote_state: RemoteState,
+    pub charge_provenance: ChargeProvenance,
+    /// Present when the attempt was a member of a batched exchange.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub batch: Option<BatchMembership>,
+    /// The principal reference's evidence digest, only when one was sent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub principal_digest: Option<String>,
+}
+
+impl RemoteEvidence {
+    /// Every string within [`MAX_TEXT_BYTES`], the instance within
+    /// [`MAX_REMOTE_EVIDENCE_INSTANCE`] ids, and the canonical bytes within
+    /// [`MAX_REMOTE_EVIDENCE_ENTRY_BYTES`].
+    pub fn is_bounded(&self) -> bool {
+        self.strings_within(MAX_TEXT_BYTES)
+            && crate::canonical::canonical_bytes(self)
+                .is_ok_and(|b| b.len() <= MAX_REMOTE_EVIDENCE_ENTRY_BYTES)
+    }
+
+    fn strings_within(&self, max: usize) -> bool {
+        let t = |s: &str| s.len() <= max;
+        let o = |s: &Option<String>| s.as_deref().is_none_or(t);
+        t(&self.attempt_id)
+            && t(&self.step)
+            && self.instance.len() <= MAX_REMOTE_EVIDENCE_INSTANCE
+            && self.instance.iter().all(|i| t(i))
+            && self.exchange.is_bounded(max)
+            && o(&self.requested_identity)
+            && o(&self.served.identity)
+            && t(&self.protocol)
+            && t(&self.endpoint_class)
+            && self.batch.as_ref().is_none_or(|b| t(&b.batch_id))
+            && o(&self.principal_digest)
+    }
+
+    /// The entry cut to its bounds: strings to [`MAX_TEXT_BYTES`], and when
+    /// the canonical bytes are still beyond the entry bound (strings that
+    /// escape to several bytes each), to 32 bytes. Deterministic.
+    pub fn bounded(self) -> Self {
+        let e = self.cut(MAX_TEXT_BYTES);
+        if e.is_bounded() { e } else { e.cut(32) }
+    }
+
+    fn cut(mut self, max: usize) -> Self {
+        let c = |s: &mut String| {
+            if s.len() > max {
+                *s = crate::remote::cut_to(s, max);
+            }
+        };
+        c(&mut self.attempt_id);
+        c(&mut self.step);
+        self.instance.truncate(MAX_REMOTE_EVIDENCE_INSTANCE);
+        self.instance.iter_mut().for_each(c);
+        if let ExchangeReference::Retained {
+            digest,
+            schema,
+            locator,
+            ..
+        } = &mut self.exchange
+        {
+            c(digest);
+            c(schema);
+            c(locator);
+        }
+        if let Some(r) = &mut self.requested_identity {
+            c(r);
+        }
+        if let Some(s) = &mut self.served.identity {
+            c(s);
+        }
+        c(&mut self.protocol);
+        c(&mut self.endpoint_class);
+        if let Some(b) = &mut self.batch {
+            c(&mut b.batch_id);
+        }
+        if let Some(p) = &mut self.principal_digest {
+            c(p);
+        }
+        self
+    }
+}
+
+/// Where the exchange record of an attempt is, or why it cannot be named.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum ExchangeReference {
+    Retained {
+        /// The exchange record's record digest.
+        digest: String,
+        /// The exchange record's schema.
+        schema: String,
+        retention: RetentionClass,
+        /// An opaque host reference, never a URL with credentials.
+        locator: String,
+    },
+    Unavailable {
+        reason: EvidenceUnavailable,
+    },
+}
+
+impl ExchangeReference {
+    fn is_bounded(&self, max: usize) -> bool {
+        match self {
+            ExchangeReference::Retained {
+                digest,
+                schema,
+                locator,
+                ..
+            } => [digest, schema, locator].iter().all(|s| s.len() <= max),
+            ExchangeReference::Unavailable { .. } => true,
+        }
+    }
+}
+
+/// What the host retained of an exchange.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RetentionClass {
+    /// The record with digests only (spec 009, 3.9.3).
+    DigestOnly,
+    /// The record and the request and response bytes.
+    BytesRetained,
+}
+
+/// Why an attempt's exchange record cannot be named (spec 020, 3.2): stated,
+/// never reconstructed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum EvidenceUnavailable {
+    /// Nothing was exchanged: the attempt was refused before any request.
+    NoExchange,
+    /// The exchange had not ended when the record was built.
+    Pending,
+    /// The exchange sink refused or failed the record.
+    NotDelivered,
+    /// The exchange sink accepted the record but named no locator.
+    NoLocator,
+}
+
+/// How the attempt's charge was established.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ChargeProvenance {
+    /// Reported by the remote side for this attempt's own exchange.
+    Reported,
+    /// A share of a batched exchange's reported charge.
+    Attributed,
+    /// No request byte left the process: nothing was charged.
+    NothingSent,
+    /// Not known; the reservation stays liability.
+    Unknown,
+}
+
+/// An attempt's place in a batched exchange.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct BatchMembership {
+    pub batch_id: String,
+    pub index: u32,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]

@@ -270,6 +270,8 @@ fn a_run_record_parses_under_record_limits() {
             final_cost: FinalCost::Known,
             within_guaranteed_cap: false,
         },
+        remote_evidence: None,
+        remote_evidence_truncated: false,
     };
     let bytes = serde_json::to_vec(&record).unwrap();
     assert_eq!(RunRecord::parse(&bytes).unwrap(), record);

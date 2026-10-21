@@ -11,11 +11,13 @@
 
 use std::io;
 use std::pin::Pin;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+
+use crate::phases::PhaseClock;
 
 const IDLE: u8 = 0;
 const WRITING: u8 = 1;
@@ -83,20 +85,52 @@ impl SentTracker {
     }
 }
 
+/// What a tracked stream reports to: the exchange's [`SentTracker`] and,
+/// under an enabled phase policy, its phase clock (spec 020, 3.4). A pooled
+/// connection (spec 020, 3.5) carries several exchanges, one at a time, so
+/// its hooks are swapped for each.
+#[derive(Debug, Clone, Default)]
+pub struct IoHooks {
+    pub sent: SentTracker,
+    pub clock: Option<PhaseClock>,
+}
+
+/// Hooks shared by a stream and the exchanges that use it.
+pub type SharedHooks = Arc<Mutex<IoHooks>>;
+
 /// A stream whose writes are tracked by a [`SentTracker`]. Wrap the layer
 /// that carries request bytes: plain TCP, or the plaintext side of TLS.
 pub struct TrackedIo<S> {
     inner: S,
-    sent: SentTracker,
+    hooks: SharedHooks,
+}
+
+fn hooks_of(h: &SharedHooks) -> IoHooks {
+    h.lock().unwrap_or_else(|e| e.into_inner()).clone()
 }
 
 impl<S> TrackedIo<S> {
     pub fn new(inner: S, sent: SentTracker) -> Self {
-        TrackedIo { inner, sent }
+        TrackedIo {
+            inner,
+            hooks: Arc::new(Mutex::new(IoHooks { sent, clock: None })),
+        }
     }
 
-    pub fn tracker(&self) -> &SentTracker {
-        &self.sent
+    /// A stream reporting to hooks its owner may swap between exchanges.
+    pub fn shared(inner: S, hooks: SharedHooks) -> Self {
+        TrackedIo { inner, hooks }
+    }
+
+    /// Report completed flushes and arriving response bytes to `clock`.
+    pub fn with_clock(self, clock: Option<PhaseClock>) -> Self {
+        self.hooks.lock().unwrap_or_else(|e| e.into_inner()).clock = clock;
+        self
+    }
+
+    /// The tracker of the exchange now using the stream.
+    pub fn tracker(&self) -> SentTracker {
+        hooks_of(&self.hooks).sent
     }
 }
 
@@ -113,7 +147,15 @@ impl<S: AsyncRead + Unpin> AsyncRead for TrackedIo<S> {
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        Pin::new(&mut self.inner).poll_read(cx, buf)
+        let before = buf.filled().len();
+        let r = Pin::new(&mut self.inner).poll_read(cx, buf);
+        if let Poll::Ready(Ok(())) = &r
+            && buf.filled().len() > before
+            && let Some(c) = hooks_of(&self.hooks).clock
+        {
+            c.response_byte();
+        }
+        r
     }
 }
 
@@ -126,12 +168,13 @@ impl<S: AsyncWrite + Unpin> AsyncWrite for TrackedIo<S> {
         if buf.is_empty() {
             return Poll::Ready(Ok(0));
         }
-        if !self.sent.begin_write() {
+        let sent = hooks_of(&self.hooks).sent;
+        if !sent.begin_write() {
             return Poll::Ready(Err(aborted()));
         }
         let r = Pin::new(&mut self.inner).poll_write(cx, buf);
         if let Poll::Ready(Ok(n)) = &r {
-            self.sent.add(*n);
+            sent.add(*n);
         }
         r
     }
@@ -144,12 +187,13 @@ impl<S: AsyncWrite + Unpin> AsyncWrite for TrackedIo<S> {
         if bufs.iter().all(|b| b.is_empty()) {
             return Poll::Ready(Ok(0));
         }
-        if !self.sent.begin_write() {
+        let sent = hooks_of(&self.hooks).sent;
+        if !sent.begin_write() {
             return Poll::Ready(Err(aborted()));
         }
         let r = Pin::new(&mut self.inner).poll_write_vectored(cx, bufs);
         if let Poll::Ready(Ok(n)) = &r {
-            self.sent.add(*n);
+            sent.add(*n);
         }
         r
     }
@@ -159,7 +203,13 @@ impl<S: AsyncWrite + Unpin> AsyncWrite for TrackedIo<S> {
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Pin::new(&mut self.inner).poll_flush(cx)
+        let r = Pin::new(&mut self.inner).poll_flush(cx);
+        if let Poll::Ready(Ok(())) = &r
+            && let Some(c) = hooks_of(&self.hooks).clock
+        {
+            c.flushed();
+        }
+        r
     }
 
     fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {

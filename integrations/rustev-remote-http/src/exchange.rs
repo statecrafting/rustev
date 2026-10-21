@@ -53,6 +53,26 @@ pub trait ExchangeSink: Send + Sync {
         let _ = offer;
         Ok(())
     }
+
+    /// [`Self::deliver`], naming where the host keeps the record: an opaque
+    /// locator a `rustev.run/2` record may reference (spec 020, 3.2), never
+    /// a URL with credentials. The default delivers and names none.
+    fn deliver_located(
+        &self,
+        record: &ExchangeRecord,
+        retained: Option<&RetainedBytes>,
+    ) -> Result<Option<String>, String> {
+        self.deliver(record, retained).map(|()| None)
+    }
+}
+
+/// What delivering one record established, for remote evidence.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeliveryNote {
+    /// The delivered (bounded) record's record digest.
+    pub digest: Option<String>,
+    /// The locator the sink named; `Err` when delivery failed.
+    pub located: Result<Option<String>, ()>,
 }
 
 /// A sink that keeps nothing.
@@ -101,18 +121,25 @@ impl Exchanges {
     }
 
     /// Bound the record and hand it over. Never fails: a refusal or a panic
-    /// in the sink is counted.
-    pub fn deliver(&self, record: ExchangeRecord, bytes: Option<RetainedBytes>) {
+    /// in the sink is counted, and the note says so.
+    pub fn deliver(&self, record: ExchangeRecord, bytes: Option<RetainedBytes>) -> DeliveryNote {
+        use rustev_contract::Document;
         let record = record.bounded();
+        let digest = record.record_digest().ok().map(|d| d.as_str().to_string());
         let retained = if self.retain_bytes { bytes } else { None };
-        let ok = matches!(
-            catch_unwind(AssertUnwindSafe(|| self
-                .sink
-                .deliver(&record, retained.as_ref()))),
-            Ok(Ok(()))
-        );
-        let counter = if ok { &self.delivered } else { &self.failed };
+        let located = match catch_unwind(AssertUnwindSafe(|| {
+            self.sink.deliver_located(&record, retained.as_ref())
+        })) {
+            Ok(Ok(locator)) => Ok(locator),
+            _ => Err(()),
+        };
+        let counter = if located.is_ok() {
+            &self.delivered
+        } else {
+            &self.failed
+        };
         counter.fetch_add(1, Ordering::SeqCst);
+        DeliveryNote { digest, located }
     }
 
     /// Offer a charge for reconciliation. Never fails; failures are counted.
@@ -176,6 +203,9 @@ pub fn blank_record(
         provider_extras: BTreeMap::new(),
         late: false,
         truncated: false,
+        phase_expiry: None,
+        principal: None,
+        connection: None,
     }
 }
 

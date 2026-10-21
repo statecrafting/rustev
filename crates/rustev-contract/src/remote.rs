@@ -28,6 +28,26 @@ use crate::schema;
 pub const PROTOCOL_MAJOR: u32 = 1;
 /// The protocol's name, as recorded in exchange records.
 pub const PROTOCOL: &str = "rustev.remote/1";
+/// `rustev.remote/2` (spec 020, 2): version 1 plus the wire members spec 020
+/// defines, today the host-endpoint principal reference of an infer request
+/// (3.6). The documents keep their schema strings and carry `version: 2`.
+pub const PROTOCOL_MAJOR_V2: u32 = 2;
+pub const PROTOCOL_V2: &str = "rustev.remote/2";
+/// The most bytes of an opaque principal reference (spec 020, 3.6).
+pub const MAX_PRINCIPAL_BYTES: usize = 128;
+/// The most bytes of a principal mapping version or scope.
+pub const MAX_PRINCIPAL_LABEL_BYTES: usize = 64;
+/// The domain tag of a principal reference's evidence digest.
+pub const PRINCIPAL_DIGEST_TAG: &str = "rustev.principal-reference/1";
+
+/// The protocol name of a major version this crate defines.
+pub const fn protocol_name(major: u32) -> Option<&'static str> {
+    match major {
+        PROTOCOL_MAJOR => Some(PROTOCOL),
+        PROTOCOL_MAJOR_V2 => Some(PROTOCOL_V2),
+        _ => None,
+    }
+}
 /// Free text in a failure detail or an exchange record is cut to this many
 /// bytes (spec 009, 3.9.1; spec 003, 3.9.3).
 pub const MAX_TEXT_BYTES: usize = 256;
@@ -262,9 +282,119 @@ pub struct InferRequest {
     /// Privacy options requested (3.8.2); never claimed honored.
     pub privacy: BTreeMap<String, String>,
     pub items: Vec<InferItem>,
+    /// `rustev.remote/2` only, and only to an endpoint the host operates:
+    /// the opaque principal reference (spec 020, 3.6). Routing and isolation
+    /// context, never a credential, grant or policy input. Absent otherwise,
+    /// so a version 1 request keeps its bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub principal: Option<WirePrincipal>,
 }
 
 crate::document::document!(InferRequest, schema::REMOTE_INFER, REMOTE_V1);
+
+impl InferRequest {
+    /// Whether the version-specific members agree with `version`: a
+    /// principal reference is a `rustev.remote/2` member, and a present one
+    /// is canonical and within its bounds.
+    pub fn members_fit_version(&self) -> bool {
+        match &self.principal {
+            None => true,
+            Some(p) => self.version == PROTOCOL_MAJOR_V2 && p.is_canonical(),
+        }
+    }
+}
+
+/// An opaque principal reference on the wire (spec 020, 3.6): the host's
+/// bytes as lowercase hexadecimal, the host's mapping version, and the
+/// declared scope. Rustev never interprets, authenticates, authorizes or
+/// expands it.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WirePrincipal {
+    pub reference: String,
+    pub mapping_version: String,
+    pub scope: String,
+}
+
+impl std::fmt::Debug for WirePrincipal {
+    /// The reference never prints; only its evidence digest does.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WirePrincipal")
+            .field("reference", &"<redacted>")
+            .field("mapping_version", &self.mapping_version)
+            .field("scope", &self.scope)
+            .finish()
+    }
+}
+
+fn is_label(s: &str) -> bool {
+    !s.is_empty() && s.len() <= MAX_PRINCIPAL_LABEL_BYTES && s.bytes().all(|b| b.is_ascii_graphic())
+}
+
+fn hex(bytes: &[u8]) -> String {
+    let mut s = String::with_capacity(bytes.len() * 2);
+    for b in bytes {
+        s.push_str(&format!("{b:02x}"));
+    }
+    s
+}
+
+impl WirePrincipal {
+    /// Encode `reference` canonically. `None` when the reference is empty
+    /// or beyond [`MAX_PRINCIPAL_BYTES`], or a label is empty, beyond
+    /// [`MAX_PRINCIPAL_LABEL_BYTES`] or not printable ASCII.
+    pub fn encode(reference: &[u8], mapping_version: &str, scope: &str) -> Option<Self> {
+        let p = WirePrincipal {
+            reference: hex(reference),
+            mapping_version: mapping_version.to_string(),
+            scope: scope.to_string(),
+        };
+        p.is_canonical().then_some(p)
+    }
+
+    /// The reference's bytes, when it is canonical lowercase hexadecimal.
+    pub fn reference_bytes(&self) -> Option<Vec<u8>> {
+        let r = self.reference.as_bytes();
+        if r.is_empty() || !r.len().is_multiple_of(2) || r.len() > MAX_PRINCIPAL_BYTES * 2 {
+            return None;
+        }
+        let nibble = |c: u8| match c {
+            b'0'..=b'9' => Some(c - b'0'),
+            b'a'..=b'f' => Some(c - b'a' + 10),
+            _ => None,
+        };
+        r.chunks(2)
+            .map(|p| Some(nibble(p[0])? << 4 | nibble(p[1])?))
+            .collect()
+    }
+
+    pub fn is_canonical(&self) -> bool {
+        self.reference_bytes().is_some() && is_label(&self.mapping_version) && is_label(&self.scope)
+    }
+
+    /// What evidence holds instead of the reference: a domain-separated
+    /// digest over the mapping version, the scope and the reference.
+    pub fn evidence(&self) -> PrincipalEvidence {
+        let mut b = Vec::new();
+        for part in [&self.mapping_version, &self.scope, &self.reference] {
+            b.extend_from_slice(&(part.len() as u64).to_be_bytes());
+            b.extend_from_slice(part.as_bytes());
+        }
+        PrincipalEvidence {
+            digest: crate::canonical::tagged_digest(PRINCIPAL_DIGEST_TAG, &b),
+            mapping_version: self.mapping_version.clone(),
+        }
+    }
+}
+
+/// A principal reference as evidence holds it (spec 020, 3.2 and 3.6): its
+/// domain-separated digest and mapping version, never the reference.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PrincipalEvidence {
+    pub digest: String,
+    pub mapping_version: String,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -404,9 +534,164 @@ pub struct ExchangeRecord {
     pub late: bool,
     /// Something was cut to fit the record's bounds.
     pub truncated: bool,
+    /// The digest and mapping version of the principal reference the
+    /// request carried (spec 020, 3.6); absent when none was sent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub principal: Option<PrincipalEvidence>,
+    /// The transport phase that ran out, when an enabled phase policy
+    /// governed the exchange (spec 020, 3.4). Absent otherwise, so a record
+    /// without one keeps its spec 009 bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub phase_expiry: Option<PhaseExpiry>,
+    /// The pooled connection the exchange used (spec 020, 3.5); absent
+    /// when connection reuse is disabled.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connection: Option<ConnectionObservation>,
 }
 
 crate::document::document!(ExchangeRecord, schema::REMOTE_EXCHANGE, EXCHANGE_V1);
+
+/// Whether an exchange's connection was opened for it or reused.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ConnectionReuse {
+    Fresh,
+    Reused,
+}
+
+/// A connection's age when an exchange took it, bucketed so evidence holds
+/// no timing beyond what the bound needs.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum AgeBucket {
+    Under1s,
+    Under10s,
+    Under60s,
+    Under600s,
+    Over600s,
+}
+
+impl AgeBucket {
+    pub fn of_ms(ms: u64) -> Self {
+        match ms {
+            0..1_000 => AgeBucket::Under1s,
+            1_000..10_000 => AgeBucket::Under10s,
+            10_000..60_000 => AgeBucket::Under60s,
+            60_000..600_000 => AgeBucket::Under600s,
+            _ => AgeBucket::Over600s,
+        }
+    }
+}
+
+/// How requests share a connection. HTTP/1.1, the only binding today,
+/// carries one request at a time.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Multiplex {
+    None,
+}
+
+/// Why a pooled connection left the pool (spec 020, 3.5).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum EvictionReason {
+    /// Idle longer than the policy's idle lifetime.
+    IdleExpired,
+    /// Older than the policy's absolute lifetime.
+    LifetimeExpired,
+    /// Used as often as the policy allows.
+    MaxUses,
+    /// More idle connections than the policy allows.
+    IdleCapacity,
+    /// Closed to make room for a connection under another key.
+    Capacity,
+    /// Found closed by the remote side or the connection.
+    Closed,
+    /// The exchange on it failed or did not finish its response.
+    Failed,
+}
+
+/// The connection an exchange used (spec 020, 3.5): fresh or reused, a
+/// nonsecret instance id, its age bucket and use count, the multiplex
+/// posture, the isolation-key digest, and why it left the pool after this
+/// exchange, if it did.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ConnectionObservation {
+    pub reuse: ConnectionReuse,
+    pub instance_id: String,
+    pub age_bucket: AgeBucket,
+    pub use_count: u64,
+    pub multiplex: Multiplex,
+    pub key_digest: String,
+    pub eviction: Option<EvictionReason>,
+}
+
+/// A transport phase with its own ceiling inside the one attempt budget
+/// (spec 020, 3.4), in the order an exchange passes through them.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum TransportPhase {
+    Resolution,
+    Connect,
+    SecureHandshake,
+    RequestWrite,
+    FirstResponseByte,
+    ResponseBody,
+    CancellationAck,
+}
+
+impl TransportPhase {
+    /// Every phase, in exchange order.
+    pub const ALL: [TransportPhase; 7] = [
+        TransportPhase::Resolution,
+        TransportPhase::Connect,
+        TransportPhase::SecureHandshake,
+        TransportPhase::RequestWrite,
+        TransportPhase::FirstResponseByte,
+        TransportPhase::ResponseBody,
+        TransportPhase::CancellationAck,
+    ];
+}
+
+/// What bounded a phase that ran out: its own ceiling, or the remaining
+/// attempt budget when that was smaller (spec 020, 3.4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum PhaseLimit {
+    Ceiling,
+    Budget,
+}
+
+/// The phase that ran out (spec 020, 3.4): its configured ceiling, the
+/// effective allowance it started with (the lesser of the ceiling and the
+/// remaining attempt budget), the time observed in it, whether request
+/// bytes had left, and the existing code the expiry mapped to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PhaseExpiry {
+    pub phase: TransportPhase,
+    pub ceiling_ms: u64,
+    pub allowance_ms: u64,
+    pub elapsed_ms: u64,
+    pub limit: PhaseLimit,
+    pub bytes_sent: bool,
+    pub code: RemoteCode,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -448,6 +733,10 @@ pub enum Attribution {
     /// Integer shares in attempt-id order over the members that received
     /// the response; members that stopped waiting report `unknown`.
     SharedState { coalescing_window_ms: u64 },
+    /// A batch the runtime planned and dispatched whole (spec 020, 3.3):
+    /// the runtime allocates the exchange charge over its members (spec
+    /// 017, 3.5), and members that stopped waiting report `unknown`.
+    RuntimePlanned,
 }
 
 fn cut_flag(s: &mut String, truncated: &mut bool) {
@@ -533,6 +822,17 @@ impl ExchangeRecord {
         }
         self.privacy_requested = cut_map(std::mem::take(&mut self.privacy_requested), &mut t);
         self.provider_extras = cut_map(std::mem::take(&mut self.provider_extras), &mut t);
+        if let Some(c) = &mut self.connection {
+            cut_flag(&mut c.instance_id, &mut t);
+            cut_flag(&mut c.key_digest, &mut t);
+        }
+        if let Some(p) = &mut self.principal {
+            cut_flag(&mut p.digest, &mut t);
+            if p.mapping_version.len() > MAX_PRINCIPAL_LABEL_BYTES {
+                p.mapping_version = cut_to(&p.mapping_version, MAX_PRINCIPAL_LABEL_BYTES);
+                t = true;
+            }
+        }
         self.truncated = t;
         self
     }
@@ -569,6 +869,13 @@ impl ExchangeRecord {
             && [&self.privacy_requested, &self.provider_extras]
                 .iter()
                 .all(|m| m.len() <= MAX_ENTRIES && m.iter().all(|(k, v)| t(k) && t(v)))
+            && self.principal.as_ref().is_none_or(|p| {
+                t(&p.digest) && p.mapping_version.len() <= MAX_PRINCIPAL_LABEL_BYTES
+            })
+            && self
+                .connection
+                .as_ref()
+                .is_none_or(|c| t(&c.instance_id) && t(&c.key_digest))
     }
 
     /// Parse under [`EXCHANGE_V1`] and refuse a record beyond its bounds.
@@ -660,6 +967,7 @@ mod tests {
                 attempt_id: "d-1/topic//1".into(),
                 projection: r#"{"operation":"classify"}"#.into(),
             }],
+            principal: None,
         }
     }
 
@@ -763,6 +1071,9 @@ mod tests {
             provider_extras: BTreeMap::new(),
             late: false,
             truncated: false,
+            phase_expiry: None,
+            principal: None,
+            connection: None,
         }
     }
 
@@ -771,6 +1082,112 @@ mod tests {
         let back = T::parse(&bytes).unwrap();
         assert_eq!(&back, doc);
         assert_eq!(back.record_canonical().unwrap(), bytes);
+    }
+
+    #[test]
+    fn a_principal_reference_is_a_version_2_member_and_evidence_holds_only_its_digest() {
+        let v1 = infer_request();
+        assert!(v1.members_fit_version());
+        let bytes = String::from_utf8(v1.canonical().unwrap()).unwrap();
+        assert!(!bytes.contains("principal"), "version 1 bytes unchanged");
+        let p = WirePrincipal::encode(b"SYNTHETIC", "map/1", "routing").unwrap();
+        assert_eq!(p.reference, "53594e544845544943");
+        assert_eq!(p.reference_bytes().unwrap(), b"SYNTHETIC");
+        let mut with = infer_request();
+        with.principal = Some(p.clone());
+        assert!(
+            !with.members_fit_version(),
+            "a version 1 request carries none"
+        );
+        with.version = PROTOCOL_MAJOR_V2;
+        assert!(with.members_fit_version());
+        round_trip(&with);
+        // Bounds and canonical encoding.
+        assert!(WirePrincipal::encode(b"", "m", "s").is_none());
+        assert!(WirePrincipal::encode(&[1; MAX_PRINCIPAL_BYTES + 1], "m", "s").is_none());
+        assert!(WirePrincipal::encode(&[1; MAX_PRINCIPAL_BYTES], "m", "s").is_some());
+        for bad in ["ABCD", "abc", "zz", ""] {
+            let q = WirePrincipal {
+                reference: bad.into(),
+                ..p.clone()
+            };
+            assert!(!q.is_canonical(), "{bad}");
+        }
+        // Evidence: a digest that changes with the reference, the mapping
+        // version and the scope, and never holds the reference.
+        let e = p.evidence();
+        assert!(!e.digest.contains(&p.reference));
+        for other in [
+            WirePrincipal::encode(b"SYNTHETIC2", "map/1", "routing").unwrap(),
+            WirePrincipal::encode(b"SYNTHETIC", "map/2", "routing").unwrap(),
+            WirePrincipal::encode(b"SYNTHETIC", "map/1", "other").unwrap(),
+        ] {
+            assert_ne!(other.evidence().digest, e.digest);
+        }
+        assert!(!format!("{p:?}").contains(&p.reference));
+        let mut rec = exchange();
+        rec.principal = Some(e);
+        round_trip(&rec);
+        assert!(rec.is_bounded());
+    }
+
+    #[test]
+    fn a_connection_observation_is_omitted_without_a_pool_and_round_trips_with_one() {
+        let plain = String::from_utf8(exchange().canonical().unwrap()).unwrap();
+        assert!(!plain.contains("connection"));
+        let mut rec = exchange();
+        rec.connection = Some(ConnectionObservation {
+            reuse: ConnectionReuse::Reused,
+            instance_id: "conn-7".into(),
+            age_bucket: AgeBucket::of_ms(1_500),
+            use_count: 2,
+            multiplex: Multiplex::None,
+            key_digest: A.into(),
+            eviction: Some(EvictionReason::MaxUses),
+        });
+        round_trip(&rec);
+        assert_eq!(
+            rec.connection.as_ref().unwrap().age_bucket,
+            AgeBucket::Under10s
+        );
+        for (ms, b) in [
+            (0, AgeBucket::Under1s),
+            (999, AgeBucket::Under1s),
+            (1_000, AgeBucket::Under10s),
+            (59_999, AgeBucket::Under60s),
+            (60_000, AgeBucket::Under600s),
+            (600_000, AgeBucket::Over600s),
+        ] {
+            assert_eq!(AgeBucket::of_ms(ms), b);
+        }
+    }
+
+    #[test]
+    fn a_phase_expiry_is_omitted_when_absent_and_round_trips_when_present() {
+        // Spec 020, 3.4: a record without a phase policy keeps its bytes.
+        let plain = exchange();
+        let bytes = String::from_utf8(plain.canonical().unwrap()).unwrap();
+        assert!(!bytes.contains("phase_expiry"), "{bytes}");
+        let mut timed = exchange();
+        timed.phase_expiry = Some(PhaseExpiry {
+            phase: TransportPhase::FirstResponseByte,
+            ceiling_ms: 50,
+            allowance_ms: 40,
+            elapsed_ms: 40,
+            limit: PhaseLimit::Budget,
+            bytes_sent: true,
+            code: RemoteCode::TransportInterrupted,
+        });
+        round_trip(&timed);
+        let text = String::from_utf8(timed.canonical().unwrap()).unwrap();
+        assert!(text.contains(r#""phase_expiry":{"allowance_ms":40,"bytes_sent":true,"ceiling_ms":50,"code":"transport_interrupted","elapsed_ms":40,"limit":"budget","phase":"first_response_byte"}"#), "{text}");
+        assert!(
+            ExchangeRecord::parse(
+                text.replace(r#""limit":"budget""#, r#""limit":"budget","extra":1"#)
+                    .as_bytes()
+            )
+            .is_err()
+        );
     }
 
     #[test]

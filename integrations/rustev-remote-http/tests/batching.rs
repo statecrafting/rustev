@@ -242,6 +242,61 @@ async fn a_member_that_leaves_before_sending_is_stopped_and_never_sent() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_member_withdrawn_before_sending_has_no_exchange_in_its_evidence() {
+    // Spec 020, 3.2: the withdrawn member's evidence, prepared as pending
+    // when it joined, says there was no exchange; its sibling's names the
+    // exchange that carried it.
+    use rustev_contract::run::{ChargeProvenance, EvidenceUnavailable, ExchangeReference};
+    use rustev_core::seams::DecisionBackend;
+    let s = scripted_head(|c| ok(c.task(), 1));
+    let (_srv, h) = serve(
+        batching_server(),
+        vec![Hosted::new(Arc::new(Handle(s.clone())))],
+    )
+    .await;
+    let mut cfg = client_config(&h.url(), "synthetic-linear-head");
+    cfg.batching = Some(BatchConfig {
+        window_ms: 1_500,
+        max_items: 3,
+    });
+    cfg.run_evidence = true;
+    let (c, sink) = connect(cfg).await;
+    let reqs = siblings();
+    let sigs: Vec<CancelSignal> = (0..2).map(|_| CancelSignal::new()).collect();
+    let mut hs = spawn_all(&c, &reqs[..2], &sigs);
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    sigs[0].raise();
+    let r = hs.remove(0).await.unwrap();
+    assert_eq!(r.cancel, CancelAck::Stopped);
+    assert!(hs.remove(0).await.unwrap().result.is_ok());
+    sink.until_records(1).await;
+    let gone = c.take_remote_evidence(&reqs[0].0).expect("an entry");
+    assert_eq!(
+        gone.exchange,
+        ExchangeReference::Unavailable {
+            reason: EvidenceUnavailable::NoExchange
+        }
+    );
+    assert_eq!(
+        (gone.code, gone.charge_provenance),
+        (Some(RemoteCode::Cancelled), ChargeProvenance::NothingSent)
+    );
+    let kept = c.take_remote_evidence(&reqs[1].0).expect("an entry");
+    assert_ne!(
+        kept.exchange,
+        ExchangeReference::Unavailable {
+            reason: EvidenceUnavailable::Pending
+        }
+    );
+    assert_ne!(
+        kept.exchange,
+        ExchangeReference::Unavailable {
+            reason: EvidenceUnavailable::NoExchange
+        }
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn all_members_leaving_abandons_the_exchange_and_offers_the_late_shares() {
     let server = ServerConfig {
         cancellation: CancelSupport::None,

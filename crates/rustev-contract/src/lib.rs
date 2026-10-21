@@ -62,6 +62,9 @@ pub mod schema {
     pub const EVAL_REPORT: &str = "rustev.eval-report/1";
     pub const EXECUTION: &str = "rustev.execution/1";
     pub const RUN: &str = "rustev.run/1";
+    /// `rustev.run/1` plus a bounded `remote_evidence` list (spec 020,
+    /// 3.2); emitted only for a sink that selects it.
+    pub const RUN_V2: &str = "rustev.run/2";
     /// The exact-operator registry version a plan was compiled against.
     pub const EXACT_REGISTRY: &str = "rustev.exact/1";
     /// Replay bundles, request identities and retained runtime reasons

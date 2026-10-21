@@ -7255,8 +7255,28 @@ export namespace RustevRemoteExchange1 {
         shared_state: {
           coalescing_window_ms: number;
         };
-      };
+      }
+    | "runtime_planned";
   export type ArtifactId = string;
+  /**
+   * A connection's age when an exchange took it, bucketed so evidence holds
+   * no timing beyond what the bound needs.
+   */
+  export type AgeBucket = "under1s" | "under10s" | "under60s" | "under600s" | "over600s";
+  /**
+   * Why a pooled connection left the pool (spec 020, 3.5).
+   */
+  export type EvictionReason =
+    "idle_expired" | "lifetime_expired" | "max_uses" | "idle_capacity" | "capacity" | "closed" | "failed";
+  /**
+   * How requests share a connection. HTTP/1.1, the only binding today,
+   * carries one request at a time.
+   */
+  export type Multiplex = "none";
+  /**
+   * Whether an exchange's connection was opened for it or reused.
+   */
+  export type ConnectionReuse = "fresh" | "reused";
   /**
    * What an attempt cost, as far as is known when it ends.
    */
@@ -7303,6 +7323,23 @@ export namespace RustevRemoteExchange1 {
     | "remote_error"
     | "cancelled";
   /**
+   * What bounded a phase that ran out: its own ceiling, or the remaining
+   * attempt budget when that was smaller (spec 020, 3.4).
+   */
+  export type PhaseLimit = "ceiling" | "budget";
+  /**
+   * A transport phase with its own ceiling inside the one attempt budget
+   * (spec 020, 3.4), in the order an exchange passes through them.
+   */
+  export type TransportPhase =
+    | "resolution"
+    | "connect"
+    | "secure_handshake"
+    | "request_write"
+    | "first_response_byte"
+    | "response_body"
+    | "cancellation_ack";
+  /**
    * What a served identity is worth (spec 009, 3.7).
    */
   export type Disclosure = "pinned" | "reported" | "unknown";
@@ -7325,6 +7362,11 @@ export namespace RustevRemoteExchange1 {
      */
     bytes_sent: boolean;
     /**
+     * The pooled connection the exchange used (spec 020, 3.5); absent
+     * when connection reuse is disabled.
+     */
+    connection?: ConnectionObservation | null;
+    /**
      * The exchange's charge in deployment units, before attribution.
      */
     exchange_charge: Charge;
@@ -7338,6 +7380,17 @@ export namespace RustevRemoteExchange1 {
      * Every member attempt, in attempt-id order.
      */
     members: ExchangeMember[];
+    /**
+     * The transport phase that ran out, when an enabled phase policy
+     * governed the exchange (spec 020, 3.4). Absent otherwise, so a record
+     * without one keeps its spec 009 bytes.
+     */
+    phase_expiry?: PhaseExpiry | null;
+    /**
+     * The digest and mapping version of the principal reference the
+     * request carried (spec 020, 3.6); absent when none was sent.
+     */
+    principal?: PrincipalEvidence | null;
     privacy_requested: {
       [k: string]: string | undefined;
     };
@@ -7383,6 +7436,21 @@ export namespace RustevRemoteExchange1 {
       [k: string]: number | undefined;
     };
   }
+  /**
+   * The connection an exchange used (spec 020, 3.5): fresh or reused, a
+   * nonsecret instance id, its age bucket and use count, the multiplex
+   * posture, the isolation-key digest, and why it left the pool after this
+   * exchange, if it did.
+   */
+  export interface ConnectionObservation {
+    age_bucket: AgeBucket;
+    eviction?: EvictionReason | null;
+    instance_id: string;
+    key_digest: string;
+    multiplex: Multiplex;
+    reuse: ConnectionReuse;
+    use_count: number;
+  }
   export interface ExchangeMember {
     attempt_id: string;
     /**
@@ -7391,6 +7459,29 @@ export namespace RustevRemoteExchange1 {
      */
     charge: Charge;
     outcome: MemberOutcome;
+  }
+  /**
+   * The phase that ran out (spec 020, 3.4): its configured ceiling, the
+   * effective allowance it started with (the lesser of the ceiling and the
+   * remaining attempt budget), the time observed in it, whether request
+   * bytes had left, and the existing code the expiry mapped to.
+   */
+  export interface PhaseExpiry {
+    allowance_ms: number;
+    bytes_sent: boolean;
+    ceiling_ms: number;
+    code: RemoteCode;
+    elapsed_ms: number;
+    limit: PhaseLimit;
+    phase: TransportPhase;
+  }
+  /**
+   * A principal reference as evidence holds it (spec 020, 3.2 and 3.6): its
+   * domain-separated digest and mapping version, never the reference.
+   */
+  export interface PrincipalEvidence {
+    digest: string;
+    mapping_version: string;
   }
   export interface ReportedCost {
     /**
@@ -7429,6 +7520,13 @@ export namespace RustevRemoteInfer1Request {
     descriptor: DescriptorId;
     items: InferItem[];
     /**
+     * `rustev.remote/2` only, and only to an endpoint the host operates:
+     * the opaque principal reference (spec 020, 3.6). Routing and isolation
+     * context, never a credential, grant or policy input. Absent otherwise,
+     * so a version 1 request keeps its bytes.
+     */
+    principal?: WirePrincipal | null;
+    /**
      * Privacy options requested (3.8.2); never claimed honored.
      */
     privacy: {
@@ -7447,6 +7545,17 @@ export namespace RustevRemoteInfer1Request {
      * The projection's exact canonical bytes, which are UTF-8 JSON.
      */
     projection: string;
+  }
+  /**
+   * An opaque principal reference on the wire (spec 020, 3.6): the host's
+   * bytes as lowercase hexadecimal, the host's mapping version, and the
+   * declared scope. Rustev never interprets, authenticates, authorizes or
+   * expands it.
+   */
+  export interface WirePrincipal {
+    mapping_version: string;
+    reference: string;
+    scope: string;
   }
 }
 export type RustevRemoteInfer1Request = RustevRemoteInfer1Request.RustevRemoteInfer1Request;
@@ -8741,6 +8850,1124 @@ export namespace RustevRun1 {
   }
 }
 export type RustevRun1 = RustevRun1.RustevRun1;
+
+export namespace RustevRun2 {
+  export type CoreEvidence =
+    | "not_produced"
+    | {
+        recorded: EvidenceRecord;
+      };
+  /**
+   * A check's status in evidence 2 (3.4.8).
+   */
+  export type CheckStatus =
+    | "passed"
+    | {
+        failed: {
+          class: ProvenanceClass;
+          /**
+           * The consequence kind applied.
+           */
+          consequence: string;
+        };
+      }
+    | {
+        not_evaluated: {
+          reason: Unresolved;
+        };
+      }
+    | {
+        unevaluable: {
+          reason: Unresolved;
+        };
+      }
+    | {
+        relaxed: {
+          by: string;
+        };
+      };
+  /**
+   * The closed set of provenance classes (spec 002, 3.7.1).
+   */
+  export type ProvenanceClass =
+    | "authenticated-app-field"
+    | "system-of-record"
+    | "user-supplied"
+    | "third-party"
+    | "attributed-claim"
+    | "model-derived";
+  /**
+   * The closed set of unresolved reasons (spec 002, 3.5.6). Field and fact
+   * lists are sorted and deduplicated.
+   */
+  export type Unresolved =
+    | "deadline_exceeded"
+    | {
+        missing_evidence: {
+          fields: string[];
+        };
+      }
+    | {
+        stale_evidence: {
+          fields: string[];
+        };
+      }
+    | {
+        invalid_input: {
+          detail: string;
+          fields: string[];
+        };
+      }
+    | {
+        abstained: {
+          rule: string;
+        };
+      }
+    | {
+        backend_unavailable: {
+          detail: string;
+        };
+      }
+    | {
+        invalid_backend_output: {
+          detail: string;
+        };
+      }
+    | {
+        budget_exhausted: {
+          resource: string;
+        };
+      }
+    | {
+        conflict: {
+          facts: string[];
+        };
+      }
+    | {
+        unsupported: {
+          capability: string;
+        };
+      }
+    | {
+        insufficient_grade: {
+          fields: string[];
+        };
+      };
+  export type DefinitionId = string;
+  export type Timestamp = number;
+  /**
+   * A value's grade, or `ungraded` when no graded value contributed.
+   * `ungraded` is not a point of the grade order (spec 032, 3.2.3).
+   */
+  export type ValueGrade = "authoritative" | "cached" | "estimated" | "hint" | "ungraded";
+  /**
+   * The closed, ordered evidence grade. The derived order runs weakest to
+   * strongest, so `min` and `max` are the grade order of spec 032, 3.2.1.
+   */
+  export type Grade = "hint" | "estimated" | "cached" | "authoritative";
+  export type Disposition =
+    | ("used" | "outvoted")
+    | {
+        ignored: {
+          reason: string;
+        };
+      }
+    | {
+        rejected: {
+          reason: string;
+        };
+      };
+  /**
+   * The oldest as-of among contributing graded values, or `none`.
+   */
+  export type AsOf =
+    | "none"
+    | {
+        ms: Timestamp;
+      };
+  /**
+   * How a value's metadata came about (spec 032, 3.2.2).
+   */
+  export type Basis =
+    | "declared"
+    | "computed"
+    | {
+        corroborated: {
+          step: string;
+        };
+      }
+    | {
+        merged: {
+          side: MergeSide;
+          step: string;
+        };
+      }
+    | {
+        resolved: {
+          input: string;
+        };
+      };
+  /**
+   * Which side of a merge a field came from (spec 032, 3.6.3).
+   */
+  export type MergeSide = "base" | "overlay";
+  /**
+   * A value's presence status. Key existence alone is never presence.
+   */
+  export type Presence =
+    | "present"
+    | {
+        absent: {
+          /**
+           * The canonical predicate that failed, for `predicate_failed`.
+           */
+          predicate?: PresentWhen | null;
+          reason: AbsentReason;
+        };
+      };
+  /**
+   * A record presence predicate (spec 032, 3.4.2). Each list is non-empty;
+   * the canonical form sorts and deduplicates every field list.
+   */
+  export type PresentWhen =
+    | {
+        any_non_null: string[];
+      }
+    | {
+        all_non_null: string[];
+      }
+    | {
+        all: PresentWhen[];
+      }
+    | {
+        any: PresentWhen[];
+      };
+  /**
+   * Why a value is absent (spec 032, 3.4.3 and 3.6.2).
+   */
+  export type AbsentReason =
+    | "predicate_failed"
+    | "overlay_missing"
+    | "base_missing"
+    | "overlay_missing_base_below_grade"
+    | "overlay_and_base_missing";
+  /**
+   * The conflict rule applied (spec 032, 3.8.1); the source order of
+   * `prefer` and `treat_as_hint` is the plan's.
+   */
+  export type ResolutionRule = "require_agreement" | "prefer" | "treat_as_hint" | "abstain";
+  export type UsedEntry =
+    | "none"
+    | {
+        entry: number;
+      };
+  export type InputStatus =
+    | {
+        resolved: {
+          as_of_ms: Timestamp;
+          provenance: ProvenanceClass;
+          source: string;
+        };
+      }
+    | {
+        unresolved: Unresolved;
+      };
+  /**
+   * Derivation classes (spec 001, 3.3; spec 002, 3.12).
+   */
+  export type Derivation = "exact-derived" | "model-derived" | "mixed-derived";
+  /**
+   * Who can act on an outcome (3.5.2), ordered from most to least able to
+   * act on it themselves: the combination of parties is the greatest.
+   */
+  export type Party = "none" | "caller" | "host" | "upstream";
+  /**
+   * One cause of an outcome or notice (3.5.2).
+   */
+  export type Cause =
+    | "deadline"
+    | {
+        input: {
+          field: string;
+          provenance: CauseProvenance;
+        };
+      }
+    | {
+        backend: {
+          origin: Origin;
+          step: string;
+        };
+      }
+    | {
+        budget: {
+          resource: string;
+        };
+      }
+    | {
+        capability: {
+          name: string;
+        };
+      }
+    | {
+        policy: {
+          site: string;
+        };
+      };
+  /**
+   * The provenance an input cause records (3.5.2).
+   */
+  export type CauseProvenance =
+    | {
+        observed: {
+          class: ProvenanceClass;
+        };
+      }
+    | {
+        accepted: {
+          classes: ProvenanceClass[];
+        };
+      };
+  /**
+   * Who registered a backend (3.9): `upstream` unless the host implements it.
+   */
+  export type Origin = "upstream" | "host";
+  /**
+   * `none`, or the party an author moved the outcome to and why.
+   */
+  export type Override =
+    | "none"
+    | {
+        basis: OverrideBasis;
+        reason: string;
+        to: Party;
+      };
+  /**
+   * How an override came about (3.5.2).
+   */
+  export type OverrideBasis = "declared" | "remediation";
+  /**
+   * A remediation as an action carries it: `none`, or a code and its
+   * canonical parameters (3.6.1).
+   */
+  export type Remediation =
+    | "none"
+    | {
+        code: string;
+        params: {
+          [k: string]: RemediationValue | undefined;
+        };
+      };
+  /**
+   * A scalar or list value in a remediation's parameters: the subset of
+   * `OutValue` (spec 002) a remediation can carry, in the same wire form.
+   */
+  export type RemediationValue =
+    | {
+        bool: boolean;
+      }
+    | {
+        integer: number;
+      }
+    | {
+        decimal: Decimal;
+      }
+    | {
+        text: string;
+      }
+    | {
+        enum: string;
+      }
+    | {
+        timestamp: Timestamp;
+      }
+    | {
+        duration: DurationMs;
+      }
+    | {
+        list: RemediationValue[];
+      };
+  export type Decimal = string;
+  /**
+   * A non-negative span in milliseconds.
+   */
+  export type DurationMs = number;
+  export type NoticeKind =
+    | ("uncalibrated_threshold" | "truncation" | "fallback" | "constraints_relaxed" | "grade_downgraded" | "check_notice")
+    | "field_dropped";
+  /**
+   * A judgment's outcome. Version 1 uses `Propose`, `Escalate` and
+   * `Unresolved`; version 2 (spec 033, 3.5.1) replaces `Unresolved` with
+   * `UnresolvedAction` and adds `Refused` and `NeedsInput`. Both unresolved
+   * forms share the wire key `unresolved`: `{"unresolved": <reason>}` in
+   * version 1, `{"unresolved": {"reason": <reason>, "action": <action>}}` in
+   * version 2.
+   */
+  export type Outcome =
+    | {
+        propose: {
+          action: string;
+          params: {
+            [k: string]: OutValue | undefined;
+          };
+        };
+      }
+    | {
+        escalate: {
+          reason: string;
+        };
+      }
+    | {
+        unresolved: UnresolvedWire;
+      }
+    | {
+        refused: {
+          addressed_to: Party;
+          refusals: Refusal[];
+        };
+      }
+    | {
+        needs_input: NeedsInput;
+      };
+  /**
+   * A value placed in a proposal's parameters.
+   */
+  export type OutValue =
+    | {
+        bool: boolean;
+      }
+    | {
+        integer: number;
+      }
+    | {
+        decimal: Decimal;
+      }
+    | {
+        text: string;
+      }
+    | {
+        enum: string;
+      }
+    | {
+        timestamp: Timestamp;
+      }
+    | {
+        duration: DurationMs;
+      }
+    | "none"
+    | {
+        list: OutValue[];
+      }
+    | {
+        record: {
+          [k: string]: OutValue | undefined;
+        };
+      }
+    | {
+        filtered: Filtered;
+      }
+    | {
+        shortlist: Shortlist;
+      }
+    | {
+        ranking: Ranking;
+      };
+  /**
+   * Version 2's `{reason, action}` is tried first; no version 1 reason is
+   * named `reason` or `action`, so the two forms never overlap.
+   */
+  export type UnresolvedWire = ActionableUnresolved | Unresolved;
+  export type ContentDigest = string;
+  export type PlanId = string;
+  export type SnapshotId = string;
+  export type CheckReason =
+    | "true"
+    | {
+        false: OnFalse;
+      }
+    | {
+        unresolved: Unresolved;
+      }
+    | {
+        below_grade: {
+          read: string;
+        };
+      };
+  export type OnFalse = "contradicts" | "no_evidence";
+  export type CheckResult = "supports" | "contradicts" | "no_evidence";
+  export type CorroborationOutcome = "corroborated" | "uncorroborated" | "contradicted";
+  export type MatchStatus = "matched" | "unmatched" | "matched_absent";
+  export type MergedField =
+    | {
+        taken: {
+          grade: ValueGrade;
+          side: MergeSide;
+        };
+      }
+    | {
+        absent: {
+          reason: AbsentReason;
+        };
+      };
+  export type StepStatus =
+    | {
+        resolved: {
+          derivation: Derivation;
+          kind: string;
+        };
+      }
+    | {
+        unresolved: Unresolved;
+      };
+  export type FinalCost = "known" | "includes_estimates" | "unknown";
+  export type CostMode = "unlimited" | "hard" | "estimated";
+  export type RecordedExecution =
+    | "none"
+    | {
+        declared: ExecutionPolicyId;
+      };
+  export type ExecutionPolicyId = string;
+  export type ArtifactId = string;
+  /**
+   * How the attempt's charge was established.
+   */
+  export type ChargeProvenance = "reported" | "attributed" | "nothing_sent" | "unknown";
+  /**
+   * The closed error taxonomy (spec 009, 3.6). Each code maps to exactly one
+   * spec 003 failure class; the mapping lives with the adapters, because the
+   * failure classes of the backend seam are not contract types.
+   */
+  export type RemoteCode =
+    | "transport_unsent"
+    | "transport_interrupted"
+    | "rate_limited"
+    | "overloaded"
+    | "unauthorized"
+    | "capability"
+    | "malformed_request"
+    | "malformed_response"
+    | "identity_mismatch"
+    | "remote_deadline"
+    | "remote_error"
+    | "cancelled";
+  /**
+   * Where the exchange record of an attempt is, or why it cannot be named.
+   */
+  export type ExchangeReference =
+    | {
+        retained: {
+          /**
+           * The exchange record's record digest.
+           */
+          digest: string;
+          /**
+           * An opaque host reference, never a URL with credentials.
+           */
+          locator: string;
+          retention: RetentionClass;
+          /**
+           * The exchange record's schema.
+           */
+          schema: string;
+        };
+      }
+    | {
+        unavailable: {
+          reason: EvidenceUnavailable;
+        };
+      };
+  /**
+   * What the host retained of an exchange.
+   */
+  export type RetentionClass = "digest_only" | "bytes_retained";
+  /**
+   * Why an attempt's exchange record cannot be named (spec 020, 3.2): stated,
+   * never reconstructed.
+   */
+  export type EvidenceUnavailable = "no_exchange" | "pending" | "not_delivered" | "no_locator";
+  export type RemoteState = "finished" | "stopped" | "possibly_continuing";
+  /**
+   * What a served identity is worth (spec 009, 3.7).
+   */
+  export type Disclosure = "pinned" | "reported" | "unknown";
+  /**
+   * What is known about cancelling an attempt (spec 003, 3.7.3).
+   */
+  export type Cancellation =
+    | "not_requested"
+    | {
+        requested: {
+          answer: CancelAnswer;
+        };
+      };
+  export type CancelAnswer = "stopped" | "unconfirmed" | "not_observed";
+  /**
+   * A backend's per-call cost disclosure, before dispatch.
+   */
+  export type CostBound =
+    | "unknown"
+    | {
+        bounded: {
+          max_units: number;
+        };
+      }
+    | {
+        estimated: {
+          units: number;
+        };
+      };
+  /**
+   * What an attempt cost, as far as is known when it ends.
+   */
+  export type Charge =
+    | "unknown"
+    | {
+        observed: {
+          units: number;
+        };
+      }
+    | {
+        estimated: {
+          units: number;
+        };
+      };
+  export type AttemptEnd =
+    | "output"
+    | {
+        failed: {
+          class: FailureClass;
+          detail: string;
+        };
+      }
+    | "deadline"
+    | "cancelled";
+  /**
+   * How a dispatched attempt failed (spec 003, 3.6.1). Deadline and
+   * cancellation are not classes: they end a request, and are never retried
+   * or a fallback trigger.
+   */
+  export type FailureClass = "invalid_output" | "transient" | "overloaded" | "permanent" | "timed_out" | "adapter_fault";
+  export type OptimizationMechanism = "independent" | "batch" | "memory_cache";
+  export type OptimizationOutcome = "bypassed" | "miss" | "hit" | "batched" | "refused";
+  export type RequestResult =
+    | {
+        output: {
+          target: number;
+        };
+      }
+    | {
+        failed: Unresolved;
+      }
+    | "not_supplied";
+  export type Transition =
+    | {
+        retry: {
+          after: number;
+          class: FailureClass;
+          delay_ms: number;
+        };
+      }
+    | {
+        fallback: {
+          after: number;
+          class: FailureClass;
+          to: number;
+        };
+      }
+    | {
+        stop: {
+          after: number;
+          reason: string;
+        };
+      };
+  export type Termination = "judged" | "cancelled";
+
+  export interface RustevRun2 {
+    core: CoreEvidence;
+    cost: CostSummary;
+    /**
+     * Supplied by the caller; the delivery key sinks deduplicate by.
+     */
+    decision_id: string;
+    execution: RecordedExecution;
+    plan_id: PlanId;
+    /**
+     * `rustev.run/2` only (spec 020, 3.2): at most one entry per remote
+     * attempt, in attempt order, at most [`MAX_REMOTE_EVIDENCE`]. Absent in
+     * every other version, so their bytes are unchanged.
+     */
+    remote_evidence: RemoteEvidence[];
+    /**
+     * `rustev.run/2` only: remote attempts beyond the bound have no entry.
+     */
+    remote_evidence_truncated?: boolean;
+    /**
+     * In the order the core listed them.
+     */
+    requests: RequestRecord[];
+    schema: "rustev.run/2";
+    termination: Termination;
+    timing: Timing;
+  }
+  export interface EvidenceRecord {
+    /**
+     * Evidence 2 with `actionability`: every check, in declaration order
+     * (spec 033, 3.4.8).
+     */
+    checks?: CheckRecord[] | null;
+    /**
+     * Per execution, supplied by the caller; not a digest.
+     */
+    decision_id: string;
+    definition_id: DefinitionId;
+    evaluation_time_ms: Timestamp;
+    inputs: InputEvidence[];
+    judgment: Judgment;
+    plan_id: PlanId;
+    schema: string;
+    snapshot_id: SnapshotId;
+    steps: StepEvidence[];
+  }
+  /**
+   * One check's evidence record (3.4.8).
+   */
+  export interface CheckRecord {
+    check: string;
+    status: CheckStatus;
+    subject: string;
+  }
+  export interface InputEvidence {
+    /**
+     * Evidence 2: the check whose `drop_field` made this input absent; its
+     * entry digest, source and provenance stay recorded (spec 033, 3.4.8).
+     */
+    dropped?: DroppedBy | null;
+    /**
+     * Evidence 2, graded inputs: every entry considered, in snapshot order.
+     */
+    entries?: EntryEvidence[] | null;
+    field: string;
+    /**
+     * Evidence 2 (spec 032, 3.10.1): the input's value metadata.
+     */
+    meta?: ValueMeta | null;
+    presence?: Presence | null;
+    /**
+     * Evidence 2: how a disagreement was resolved (spec 032, 3.8.4).
+     */
+    resolution?: Resolution | null;
+    status: InputStatus;
+  }
+  /**
+   * Which check dropped an input (spec 033, 3.4.8).
+   */
+  export interface DroppedBy {
+    check: string;
+  }
+  /**
+   * One snapshot entry considered for a graded input.
+   */
+  export interface EntryEvidence {
+    as_of_ms: Timestamp;
+    ceiling: ValueGrade;
+    claim?: Grade | null;
+    digest: string;
+    disposition: Disposition;
+    effective: ValueGrade;
+    provenance: ProvenanceClass;
+    source: string;
+  }
+  /**
+   * Value metadata (spec 032, 3.2.2): carried by every input and step value
+   * of a plan 3 evaluation. A record carries one per field, a list one per
+   * item and a map one per entry, in the optional members.
+   */
+  export interface ValueMeta {
+    as_of_ms: AsOf;
+    basis: Basis;
+    entries?: {
+      [k: string]: ValueMeta | undefined;
+    } | null;
+    fields?: {
+      [k: string]: ValueMeta | undefined;
+    } | null;
+    grade: ValueGrade;
+    items?: ValueMeta[] | null;
+    /**
+     * Sorted, duplicate-free.
+     */
+    provenance: ProvenanceClass[];
+    /**
+     * Sorted, duplicate-free source names.
+     */
+    sources: string[];
+  }
+  /**
+   * The rule applied to a disagreement and what it chose.
+   */
+  export interface Resolution {
+    rule: ResolutionRule;
+    used: UsedEntry;
+  }
+  export interface Judgment {
+    derivation: Derivation;
+    evaluation_time_ms: Timestamp;
+    lineage: Lineage;
+    /**
+     * Uncalibrated thresholds used, truncation, fallbacks.
+     */
+    notices: Notice[];
+    outcome: Outcome;
+    plan_id: PlanId;
+    schema: string;
+    snapshot_id: SnapshotId;
+    /**
+     * Which handler, rule and adjustments produced the outcome, in order.
+     */
+    trace: string[];
+  }
+  /**
+   * What a value was computed from: input fields and steps, sorted.
+   */
+  export interface Lineage {
+    inputs: string[];
+    steps: string[];
+  }
+  export interface Notice {
+    /**
+     * Judgment 2: who can act on it (spec 033, 3.5.4); omitted in version 1.
+     */
+    action?: Action | null;
+    kind: NoticeKind;
+    reason: string;
+    /**
+     * The step or policy item it concerns.
+     */
+    subject: string;
+  }
+  /**
+   * Who can act on an outcome or notice, how, why, and whether retrying the
+   * same request can succeed (3.5.2). Every member is always written.
+   */
+  export interface Action {
+    addressed_to: Party;
+    /**
+     * Duplicate-free, sorted by each cause's canonical JSON bytes.
+     */
+    caused_by: Cause[];
+    computed: Party;
+    override: Override;
+    remediation: Remediation;
+    transient: boolean;
+  }
+  /**
+   * The result of `filter_with_reasons@1`.
+   */
+  export interface Filtered {
+    /**
+     * How many items each rule excluded.
+     */
+    counts: {
+      [k: string]: number | undefined;
+    };
+    eligible: string[];
+    excluded: Excluded[];
+  }
+  export interface Excluded {
+    id: string;
+    reasons: string[];
+  }
+  /**
+   * The result of `top_k@1`.
+   */
+  export interface Shortlist {
+    excluded: Excluded[];
+    ids: string[];
+    /**
+     * Eligible ids not kept because of `k`.
+     */
+    truncated: number;
+  }
+  /**
+   * A `RankPosition` in wire form: an order, not a probability of being best.
+   */
+  export interface Ranking {
+    entries: RankEntry[];
+    /**
+     * Candidates left out because a component was unresolved.
+     */
+    excluded: Excluded[];
+  }
+  export interface RankEntry {
+    candidate: string;
+    components: {
+      [k: string]: number | undefined;
+    };
+    /**
+     * 1-based.
+     */
+    position: number;
+    score: number;
+  }
+  export interface ActionableUnresolved {
+    action: Action;
+    reason: Unresolved;
+  }
+  /**
+   * One refusing check of a `refused` outcome (3.5.1).
+   */
+  export interface Refusal {
+    action: Action;
+    check: string;
+    subject: string;
+  }
+  /**
+   * The `needs_input` outcome (3.7).
+   */
+  export interface NeedsInput {
+    action: Action;
+    /**
+     * `tagged_digest("rustev.continuation/1", ...)` (3.7.4).
+     */
+    continuation: ContentDigest;
+    fields: string[];
+    questions: QuestionDecl[];
+  }
+  /**
+   * A declared, literal question template (3.7.3).
+   */
+  export interface QuestionDecl {
+    /**
+     * A non-empty subset of the outcome's fields.
+     */
+    fields: string[];
+    id: string;
+    /**
+     * 1 to 1024 bytes of UTF-8, carried byte-identical; no interpolation.
+     */
+    text: string;
+  }
+  export interface StepEvidence {
+    /**
+     * Evidence 2, `corroborate` (spec 032, 3.7.6).
+     */
+    corroboration?: Corroboration | null;
+    instance: string[];
+    /**
+     * Evidence 2, `join_keyed@1`: each entry's id and match status.
+     */
+    join?: JoinEvidence[] | null;
+    /**
+     * Evidence 2, `merge_fields@1`: each merged field.
+     */
+    merge?: MergeEvidence[] | null;
+    /**
+     * Evidence 2: the step value's metadata.
+     */
+    meta?: ValueMeta | null;
+    status: StepStatus;
+    step: string;
+  }
+  /**
+   * A corroboration step's record: the claim before and after, the outcome
+   * and every check.
+   */
+  export interface Corroboration {
+    checks: CheckEvidence[];
+    claim: string;
+    claim_digest: string;
+    grade_after: ValueGrade;
+    grade_before: ValueGrade;
+    outcome: CorroborationOutcome;
+  }
+  export interface CheckEvidence {
+    reads: ReadEvidence[];
+    /**
+     * Why a check is `no_evidence`, or its declared `on_false`.
+     */
+    reason: CheckReason;
+    result: CheckResult;
+  }
+  export interface ReadEvidence {
+    /**
+     * Absent when the read has no value (it was unresolved or absent).
+     */
+    digest?: string | null;
+    grade: ValueGrade;
+    reference: string;
+  }
+  export interface JoinEvidence {
+    id: string;
+    status: MatchStatus;
+  }
+  /**
+   * One merged field: its side (or why it is absent), rule and grade.
+   */
+  export interface MergeEvidence {
+    field: string;
+    /**
+     * The item id when merging per item; empty for two records.
+     */
+    item: string;
+    result: MergedField;
+    /**
+     * `overlay_only`, `base_only` or `overlay_else_base_if_grade_at_least`.
+     */
+    rule: string;
+  }
+  /**
+   * A decision's cost at the moment its record was built (spec 003, 3.5.6).
+   */
+  export interface CostSummary {
+    /**
+     * Observed charges above a `bounded` reservation.
+     */
+    bound_violations: number;
+    estimated: number;
+    final_cost: FinalCost;
+    /**
+     * Reservations kept because the final cost is unknown.
+     */
+    liability: number;
+    /**
+     * 0 under `unlimited`.
+     */
+    limit: number;
+    mode: CostMode;
+    observed: number;
+    /**
+     * True only under `hard` with no liability and no bound violation.
+     */
+    within_guaranteed_cap: boolean;
+  }
+  /**
+   * One remote attempt's evidence reference in `rustev.run/2` (spec 020,
+   * 3.2, I-4). It names the exchange record, never embeds it: no request or
+   * response body, credential, secret address, unredacted principal
+   * reference, provider reasoning or header.
+   */
+  export interface RemoteEvidence {
+    attempt_id: string;
+    /**
+     * Present when the attempt was a member of a batched exchange.
+     */
+    batch?: BatchMembership | null;
+    /**
+     * The adapter binding (its artifact), the protocol or foreign mapping
+     * version, and the endpoint class (never a secret URL).
+     */
+    binding: ArtifactId;
+    charge_provenance: ChargeProvenance;
+    /**
+     * The remote error code of a failed attempt.
+     */
+    code?: RemoteCode | null;
+    endpoint_class: string;
+    exchange: ExchangeReference;
+    instance: string[];
+    /**
+     * The principal reference's evidence digest, only when one was sent.
+     */
+    principal_digest?: string | null;
+    protocol: string;
+    /**
+     * The attempt's final remote state, as the run record has it.
+     */
+    remote_state: RemoteState;
+    /**
+     * What the adapter asked for; `None` when it names no model.
+     */
+    requested_identity?: string | null;
+    served: ServedIdentity;
+    /**
+     * The decision step and logical request (instance) the attempt served.
+     */
+    step: string;
+  }
+  /**
+   * An attempt's place in a batched exchange.
+   */
+  export interface BatchMembership {
+    batch_id: string;
+    index: number;
+  }
+  /**
+   * A served identity as recorded (spec 009, 3.7).
+   */
+  export interface ServedIdentity {
+    disclosure: Disclosure;
+    identity?: string | null;
+  }
+  export interface RequestRecord {
+    attempts: AttemptRecord[];
+    instance: string[];
+    /**
+     * Absent for unoptimized execution, preserving existing record bytes.
+     */
+    optimization?: OptimizationRecord | null;
+    result: RequestResult;
+    step: string;
+    transitions: Transition[];
+  }
+  export interface AttemptRecord {
+    artifact: ArtifactId;
+    /**
+     * `<decision id>/<step>/<instance ids joined by ','>/<n>`, each
+     * component with `%`, `/` and `,` percent-escaped.
+     */
+    attempt_id: string;
+    backend_id: string;
+    cancellation: Cancellation;
+    cost: AttemptCost;
+    dispatched_ms: number;
+    end: AttemptEnd;
+    ended_ms: number;
+    remote: RemoteState;
+    target: number;
+  }
+  export interface AttemptCost {
+    bound: CostBound;
+    charge: Charge;
+    reserved: number;
+  }
+  /**
+   * Per-logical-request runtime observations. Secret key material and cached
+   * content are deliberately absent.
+   */
+  export interface OptimizationRecord {
+    age_ms: number;
+    allocated_charge_units: number;
+    batch_id?: string | null;
+    batch_member?: number | null;
+    charge_owner: boolean;
+    /**
+     * Every refusal or diagnostic, in the order observed, at most
+     * [`MAX_OPTIMIZATION_DIAGNOSTICS`].
+     */
+    diagnostics?: string[];
+    entry_id?: string | null;
+    invalidation_generation: number;
+    key_schema_version: number;
+    mechanism: OptimizationMechanism;
+    outcome: OptimizationOutcome;
+    shared_liability_units: number;
+    /**
+     * The attempt that produced the supplied output. For a cache hit it is
+     * an attempt of an earlier decision, and the record has no attempt of
+     * its own; replay takes it as the output's origin.
+     */
+    source_attempt_id?: string | null;
+  }
+  /**
+   * Monotonic milliseconds from submission; never wall-clock time.
+   */
+  export interface Timing {
+    deadline_expired: boolean;
+    deadline_ms: number;
+    elapsed_ms: number;
+    queued_ms: number;
+  }
+}
+export type RustevRun2 = RustevRun2.RustevRun2;
 
 export namespace RustevRun3 {
   export type CoreEvidence =

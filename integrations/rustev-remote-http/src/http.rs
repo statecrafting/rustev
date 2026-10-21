@@ -12,15 +12,18 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use http_body_util::{BodyExt, Full};
-use hyper::body::Bytes;
+use hyper::body::{Body, Bytes, Frame, SizeHint};
 use hyper::header::{AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, HOST, RETRY_AFTER};
 use hyper::{Request, StatusCode};
 use hyper_util::rt::TokioIo;
+use rustev_contract::remote::{ConnectionObservation, PhaseExpiry, TransportPhase};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpStream;
 
 use crate::budget::Budget;
-use crate::wire::{SentTracker, TrackedIo};
+use crate::phases::{PhaseClock, TransportPhases, phased};
+use crate::pool::{ConnectionPool, KeyMaterial, Lease, Pooled};
+use crate::wire::{IoHooks, SentTracker, SharedHooks, TrackedIo};
 
 /// A credential supplied by the host. Its `Debug` never shows the value,
 /// and no identity or exchange record ever holds it.
@@ -170,6 +173,9 @@ pub enum TransportError {
     TooLarge { limit: usize },
     /// The budget, or a shorter transport limit, ran out.
     Expired { sent: bool },
+    /// A transport phase's allowance ran out under an enabled phase policy
+    /// (spec 020, 3.4); the expiry names the phase and its code.
+    PhaseExpired(PhaseExpiry),
 }
 
 /// The default TLS client configuration: the webpki roots, `ring`.
@@ -193,6 +199,30 @@ pub struct HttpTransport {
     tls: Option<tokio_rustls::TlsConnector>,
     bearer: Option<Secret>,
     transport_timeout: Option<Duration>,
+    phases: TransportPhases,
+    pool: Option<PoolUse>,
+}
+
+/// A pooled HTTP/1.1 connection (spec 020, 3.5): its request sender and the
+/// hooks its stream reports to, swapped for each exchange that uses it.
+pub struct HttpConn {
+    sender: hyper::client::conn::http1::SendRequest<SignalBody>,
+    hooks: SharedHooks,
+}
+
+impl Pooled for HttpConn {
+    fn is_closed(&self) -> bool {
+        self.sender.is_closed()
+    }
+}
+
+/// The connection pool of the HTTP binding.
+pub type HttpPool = ConnectionPool<HttpConn>;
+
+#[derive(Clone)]
+struct PoolUse {
+    pool: Arc<HttpPool>,
+    material: KeyMaterial,
 }
 
 impl fmt::Debug for HttpTransport {
@@ -202,6 +232,8 @@ impl fmt::Debug for HttpTransport {
             .field("tls", &self.tls.is_some())
             .field("bearer", &self.bearer)
             .field("transport_timeout", &self.transport_timeout)
+            .field("phases", &self.phases)
+            .field("pooled", &self.pool.is_some())
             .finish()
     }
 }
@@ -230,7 +262,28 @@ impl HttpTransport {
             tls,
             bearer,
             transport_timeout,
+            phases: TransportPhases::Disabled,
+            pool: None,
         })
+    }
+
+    /// Reuse connections from `pool` under the isolation key `material`
+    /// names (spec 020, 3.5), for [`Self::post_observed`]. The per-exchange
+    /// principal digest is filled in per call.
+    pub fn with_pool(mut self, pool: Arc<HttpPool>, material: KeyMaterial) -> Self {
+        self.pool = Some(PoolUse { pool, material });
+        self
+    }
+
+    /// Divide every exchange's budget into phase ceilings (spec 020, 3.4).
+    /// The caller validates the policy first; disabled changes nothing.
+    pub fn with_phases(mut self, phases: TransportPhases) -> Self {
+        self.phases = phases;
+        self
+    }
+
+    pub fn phases(&self) -> &TransportPhases {
+        &self.phases
     }
 
     pub fn endpoint(&self) -> &Endpoint {
@@ -249,12 +302,18 @@ impl HttpTransport {
         sent: &SentTracker,
     ) -> Result<HttpReply, TransportError> {
         let deadline = budget.phase_deadline(self.transport_timeout);
-        match tokio::time::timeout_at(
-            deadline,
-            self.exchange(path, body, max_response_bytes, sent),
-        )
-        .await
-        {
+        let clock = self
+            .phases
+            .policy()
+            .map(|p| PhaseClock::start(*p, *budget, TransportPhase::Resolution));
+        let run = async {
+            let exchange = self.exchange(path, body, max_response_bytes, sent, clock.clone());
+            match &clock {
+                Some(c) => phased(c, sent, exchange).await,
+                None => exchange.await,
+            }
+        };
+        match tokio::time::timeout_at(deadline, run).await {
             Ok(r) => r,
             Err(_) => Err(TransportError::Expired {
                 sent: sent.may_have_sent(),
@@ -262,7 +321,7 @@ impl HttpTransport {
         }
     }
 
-    async fn connect(&self) -> Result<TcpStream, TransportError> {
+    async fn connect(&self, clock: &Option<PhaseClock>) -> Result<TcpStream, TransportError> {
         let unsent = |e: std::io::Error| TransportError::Unsent(format!("connect: {e}"));
         let addrs: Vec<SocketAddr> =
             tokio::net::lookup_host((self.endpoint.host.as_str(), self.endpoint.port))
@@ -270,6 +329,9 @@ impl HttpTransport {
                 .map_err(|e| TransportError::Unsent(format!("resolve: {e}")))?
                 .filter(|a| self.endpoint.scheme == Scheme::Https || a.ip().is_loopback())
                 .collect();
+        if let Some(c) = clock {
+            c.enter(TransportPhase::Connect);
+        }
         let mut last = TransportError::Unsent("resolve: no usable address".into());
         for a in addrs {
             match TcpStream::connect(a).await {
@@ -289,22 +351,31 @@ impl HttpTransport {
         body: Vec<u8>,
         max: usize,
         sent: &SentTracker,
+        clock: Option<PhaseClock>,
     ) -> Result<HttpReply, TransportError> {
-        let tcp = self.connect().await?;
+        let tcp = self.connect(&clock).await?;
+        let enter = |p| {
+            if let Some(c) = &clock {
+                c.enter(p);
+            }
+        };
         match &self.tls {
             None => {
-                self.http1(TrackedIo::new(tcp, sent.clone()), path, body, max, sent)
-                    .await
+                enter(TransportPhase::RequestWrite);
+                let io = TrackedIo::new(tcp, sent.clone()).with_clock(clock.clone());
+                self.http1(io, path, body, max, sent, clock).await
             }
             Some(connector) => {
                 let name = rustls::pki_types::ServerName::try_from(self.endpoint.host.clone())
                     .map_err(|e| TransportError::Unsent(format!("server name: {e}")))?;
+                enter(TransportPhase::SecureHandshake);
                 let tls = connector
                     .connect(name, tcp)
                     .await
                     .map_err(|e| TransportError::Unsent(format!("TLS handshake: {e}")))?;
-                self.http1(TrackedIo::new(tls, sent.clone()), path, body, max, sent)
-                    .await
+                enter(TransportPhase::RequestWrite);
+                let io = TrackedIo::new(tls, sent.clone()).with_clock(clock.clone());
+                self.http1(io, path, body, max, sent, clock).await
             }
         }
     }
@@ -316,6 +387,7 @@ impl HttpTransport {
         body: Vec<u8>,
         max: usize,
         sent: &SentTracker,
+        clock: Option<PhaseClock>,
     ) -> Result<HttpReply, TransportError>
     where
         S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
@@ -329,20 +401,11 @@ impl HttpTransport {
             }
         };
         let (mut sender, conn) =
-            hyper::client::conn::http1::handshake::<_, Full<Bytes>>(TokioIo::new(stream))
+            hyper::client::conn::http1::handshake::<_, SignalBody>(TokioIo::new(stream))
                 .await
                 .map_err(|e| failed("http handshake", &e))?;
         tokio::pin!(conn);
-        let mut req = Request::post(format!("{}{}", self.endpoint.base_path, path))
-            .header(HOST, self.endpoint.authority())
-            .header(CONTENT_TYPE, "application/json")
-            .header(CONTENT_LENGTH, body.len());
-        if let Some(b) = &self.bearer {
-            req = req.header(AUTHORIZATION, format!("Bearer {}", b.expose()));
-        }
-        let req = req
-            .body(Full::new(Bytes::from(body)))
-            .map_err(|e| TransportError::Unsent(format!("request: {e}")))?;
+        let req = self.request(path, body, clock)?;
         let send = sender.send_request(req);
         tokio::pin!(send);
         let resp = tokio::select! {
@@ -402,6 +465,267 @@ impl HttpTransport {
             retry_after,
             body: buf,
         })
+    }
+}
+
+impl HttpTransport {
+    fn request(
+        &self,
+        path: &str,
+        body: Vec<u8>,
+        clock: Option<PhaseClock>,
+    ) -> Result<Request<SignalBody>, TransportError> {
+        let mut req = Request::post(format!("{}{}", self.endpoint.base_path, path))
+            .header(HOST, self.endpoint.authority())
+            .header(CONTENT_TYPE, "application/json")
+            .header(CONTENT_LENGTH, body.len());
+        if let Some(b) = &self.bearer {
+            req = req.header(AUTHORIZATION, format!("Bearer {}", b.expose()));
+        }
+        req.body(SignalBody {
+            inner: Full::new(Bytes::from(body)),
+            clock,
+        })
+        .map_err(|e| TransportError::Unsent(format!("request: {e}")))
+    }
+
+    /// [`Self::post`], on a pooled connection when a pool is configured:
+    /// an idle connection under exactly this exchange's isolation key, or a
+    /// fresh one within the pool's bounds. Also returns what evidence
+    /// states about the connection. A pool with no room is
+    /// `transport_unsent`; a stale connection fails as its bytes say, and
+    /// is never replaced mid-exchange (spec 020, 3.5).
+    pub async fn post_observed(
+        &self,
+        path: &str,
+        body: Vec<u8>,
+        max_response_bytes: usize,
+        budget: &Budget,
+        sent: &SentTracker,
+        principal_digest: Option<String>,
+    ) -> (
+        Result<HttpReply, TransportError>,
+        Option<ConnectionObservation>,
+    ) {
+        let Some(pu) = &self.pool else {
+            return (
+                self.post(path, body, max_response_bytes, budget, sent)
+                    .await,
+                None,
+            );
+        };
+        let deadline = budget.phase_deadline(self.transport_timeout);
+        let mut material = pu.material.clone();
+        material.principal = principal_digest;
+        let key = material.key();
+        let mut lease = match tokio::time::timeout_at(deadline, pu.pool.acquire(&key, budget)).await
+        {
+            Ok(Ok(l)) => l,
+            _ => {
+                return (
+                    Err(TransportError::Unsent(
+                        "the connection pool has no room within the budget".into(),
+                    )),
+                    None,
+                );
+            }
+        };
+        let clock = self
+            .phases
+            .policy()
+            .map(|p| PhaseClock::start(*p, *budget, TransportPhase::Resolution));
+        let run = async {
+            let exchange = self.pooled(
+                &mut lease,
+                path,
+                body,
+                max_response_bytes,
+                sent,
+                clock.clone(),
+            );
+            match &clock {
+                Some(c) => phased(c, sent, exchange).await,
+                None => exchange.await,
+            }
+        };
+        let result = match tokio::time::timeout_at(deadline, run).await {
+            Ok(r) => r,
+            Err(_) => Err(TransportError::Expired {
+                sent: sent.may_have_sent(),
+            }),
+        };
+        let mut observed = lease.observation(key.digest.as_deref().unwrap_or("none"));
+        if let Some(c) = lease.conn() {
+            // Idle: no exchange's tracker or clock is reachable from it.
+            let idle = SentTracker::new();
+            idle.try_abort();
+            *c.hooks.lock().unwrap_or_else(|e| e.into_inner()) = IoHooks {
+                sent: idle,
+                clock: None,
+            };
+        }
+        let eviction = pu.pool.release(lease, result.is_ok());
+        if let Some(o) = &mut observed {
+            o.eviction = eviction;
+        }
+        (result, observed)
+    }
+
+    async fn pooled(
+        &self,
+        lease: &mut Lease<HttpConn>,
+        path: &str,
+        body: Vec<u8>,
+        max: usize,
+        sent: &SentTracker,
+        clock: Option<PhaseClock>,
+    ) -> Result<HttpReply, TransportError> {
+        let failed = |what: &str, e: &dyn fmt::Display| {
+            let d = format!("{what}: {e}");
+            if sent.may_have_sent() {
+                TransportError::Interrupted(d)
+            } else {
+                TransportError::Unsent(d)
+            }
+        };
+        let enter = |p| {
+            if let Some(c) = &clock {
+                c.enter(p);
+            }
+        };
+        let hooks = IoHooks {
+            sent: sent.clone(),
+            clock: clock.clone(),
+        };
+        if lease.conn().is_none() {
+            let tcp = self.connect(&clock).await?;
+            let shared: SharedHooks = Arc::new(std::sync::Mutex::new(hooks.clone()));
+            let sender = match &self.tls {
+                None => {
+                    enter(TransportPhase::RequestWrite);
+                    spawn_http1(TrackedIo::shared(tcp, shared.clone()))
+                        .await
+                        .map_err(|e| failed("http handshake", &e))?
+                }
+                Some(connector) => {
+                    let name = rustls::pki_types::ServerName::try_from(self.endpoint.host.clone())
+                        .map_err(|e| TransportError::Unsent(format!("server name: {e}")))?;
+                    enter(TransportPhase::SecureHandshake);
+                    let tls = connector
+                        .connect(name, tcp)
+                        .await
+                        .map_err(|e| TransportError::Unsent(format!("TLS handshake: {e}")))?;
+                    enter(TransportPhase::RequestWrite);
+                    spawn_http1(TrackedIo::shared(tls, shared.clone()))
+                        .await
+                        .map_err(|e| failed("http handshake", &e))?
+                }
+            };
+            lease.fill(HttpConn {
+                sender,
+                hooks: shared,
+            });
+        } else {
+            // Reuse skips resolution, connect and handshake; their unused
+            // ceilings are not carried over (spec 020, 3.4).
+            enter(TransportPhase::RequestWrite);
+        }
+        let conn = lease.conn_mut().expect("filled above");
+        *conn.hooks.lock().unwrap_or_else(|e| e.into_inner()) = hooks;
+        // A stale connection found closed here has sent nothing.
+        conn.sender
+            .ready()
+            .await
+            .map_err(|e| failed("pooled connection", &e))?;
+        let req = self.request(path, body, clock)?;
+        let resp = conn
+            .sender
+            .send_request(req)
+            .await
+            .map_err(|e| failed("request", &e))?;
+        let status = resp.status();
+        let retry_after = resp
+            .headers()
+            .get(RETRY_AFTER)
+            .map(|v| String::from_utf8_lossy(v.as_bytes()).into_owned());
+        let declared = resp
+            .headers()
+            .get(CONTENT_LENGTH)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.parse::<u64>().ok());
+        if declared.is_some_and(|n| n > max as u64) {
+            return Err(TransportError::TooLarge { limit: max });
+        }
+        let mut body = resp.into_body();
+        let mut buf = Vec::new();
+        loop {
+            match body.frame().await {
+                None => break,
+                Some(Err(e)) => return Err(failed("response body", &e)),
+                Some(Ok(f)) => {
+                    if let Ok(data) = f.into_data() {
+                        if buf.len() + data.len() > max {
+                            return Err(TransportError::TooLarge { limit: max });
+                        }
+                        buf.extend_from_slice(&data);
+                    }
+                }
+            }
+        }
+        Ok(HttpReply {
+            status: status_code(status),
+            retry_after,
+            body: buf,
+        })
+    }
+}
+
+/// An HTTP/1.1 handshake whose connection is driven by its own task, so the
+/// sender can carry later exchanges.
+async fn spawn_http1<S>(
+    stream: S,
+) -> Result<hyper::client::conn::http1::SendRequest<SignalBody>, hyper::Error>
+where
+    S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
+{
+    let (sender, conn) =
+        hyper::client::conn::http1::handshake::<_, SignalBody>(TokioIo::new(stream)).await?;
+    tokio::spawn(async move {
+        let _ = conn.await;
+    });
+    Ok(sender)
+}
+
+/// A request body that tells the phase clock when the connection took it,
+/// so the next completed flush ends the request-write phase (spec 020, 3.4).
+struct SignalBody {
+    inner: Full<Bytes>,
+    clock: Option<PhaseClock>,
+}
+
+impl Body for SignalBody {
+    type Data = Bytes;
+    type Error = std::convert::Infallible;
+
+    fn poll_frame(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Result<Frame<Bytes>, Self::Error>>> {
+        let r = std::pin::Pin::new(&mut self.inner).poll_frame(cx);
+        if r.is_ready()
+            && let Some(c) = &self.clock
+        {
+            c.body_taken();
+        }
+        r
+    }
+
+    fn is_end_stream(&self) -> bool {
+        self.inner.is_end_stream()
+    }
+
+    fn size_hint(&self) -> SizeHint {
+        self.inner.size_hint()
     }
 }
 

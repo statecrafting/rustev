@@ -42,7 +42,19 @@
         "source": "spec-edge"
       },
       {
+        "path": "integrations/rustev-node/",
+        "source": "spec-edge"
+      },
+      {
         "path": "integrations/rustev-remote-http/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "integrations/rustev-wasm/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "tools/rustev-release/",
         "source": "spec-edge"
       }
     ],
@@ -115,6 +127,19 @@
       {
         "locations": [
           {
+            "file": "integrations/rustev-node/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-node/"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "integrations/rustev-remote-http/"
           }
         ],
@@ -123,6 +148,32 @@
         "unit": {
           "kind": "directory",
           "path": "integrations/rustev-remote-http/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "integrations/rustev-wasm/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-wasm/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "tools/rustev-release/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-release/"
         }
       },
       {
@@ -182,5 +233,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "06c55563e9f71c9974bb1b5e841e285940c278977791020770a6ed66dcd9c647"
+  "shardHash": "b9add3d001f4617535bc663a54a987013f91237b903b3cb976f1d34342d7876d"
 }

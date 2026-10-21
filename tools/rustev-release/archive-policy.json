@@ -120,6 +120,7 @@
         "src/live.rs",
         "src/metrics.rs",
         "src/optimization.rs",
+        "src/remote_evidence.rs",
         "src/replay.rs",
         "src/report.rs",
         "src/resolve.rs"
@@ -160,6 +161,9 @@
         "src/http.rs",
         "src/identity.rs",
         "src/lib.rs",
+        "src/phases.rs",
+        "src/pool.rs",
+        "src/principal.rs",
         "src/server.rs",
         "src/taxonomy.rs",
         "src/wire.rs"

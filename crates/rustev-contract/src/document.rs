@@ -158,8 +158,13 @@ pub(crate) const fn lists_schemas(expected: &str, schemas: &[&str]) -> bool {
 /// as `expected`), and the record digest and
 /// identity are tagged with the document's own schema, so a first-version
 /// identity is what it always was.
+///
+/// `check = f` adds a rule the parser applies after the schema string:
+/// `f(&doc)` returning `Err(message)` refuses the document as
+/// [`ParseError::Schema`](crate::bounded::ParseError::Schema), for members
+/// that belong to some versions only.
 macro_rules! versioned_document {
-    ($ty:ty, [$first:expr $(, $rest:expr)*], $expected:literal, $limits:expr) => {
+    (@impl $ty:ty, [$first:expr $(, $rest:expr)*], $expected:literal, $limits:expr, $check:expr) => {
         const _: () = assert!(
             $crate::document::lists_schemas($expected, &[$first $(, $rest)*]),
             "`expected` must list the accepted schemas, joined with \" or \"",
@@ -180,6 +185,9 @@ macro_rules! versioned_document {
                         found: doc.schema.chars().take(80).collect(),
                     });
                 }
+                ($check)(&doc).map_err(|message: String| {
+                    $crate::DocumentError::Parse($crate::bounded::ParseError::Schema { message })
+                })?;
                 Ok(doc)
             }
 
@@ -191,6 +199,17 @@ macro_rules! versioned_document {
                 ))
             }
         }
+    };
+    ($ty:ty, [$first:expr $(, $rest:expr)*], $expected:literal, $limits:expr, check = $check:path) => {
+        $crate::document::versioned_document!(
+            @impl $ty, [$first $(, $rest)*], $expected, $limits, $check
+        );
+    };
+    ($ty:ty, [$first:expr $(, $rest:expr)*], $expected:literal, $limits:expr) => {
+        $crate::document::versioned_document!(
+            @impl $ty, [$first $(, $rest)*], $expected, $limits,
+            |_: &$ty| -> Result<(), String> { Ok(()) }
+        );
     };
     ($ty:ty, [$first:expr $(, $rest:expr)*], $expected:literal, $limits:expr, $id:ty) => {
         $crate::document::versioned_document!($ty, [$first $(, $rest)*], $expected, $limits);

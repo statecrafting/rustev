@@ -27,6 +27,13 @@ extends:
   - { spec: "009-remote-adapter-protocol", unit: { kind: directory, path: "integrations/rustev-remote-http/" }, nature: amending }
   - { spec: "012-jev-integration", unit: { kind: directory, path: "integrations/rustev-jev/" }, nature: amending }
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  # Each new source file of a release member joins the reviewed archive
+  # list (spec 021, 3.5).
+  - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
+  # The document declarations generated from the contract's schemas (spec
+  # 027, 3.2.3), regenerated when an exchange or run member is added.
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-node/" }, nature: additive }
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-wasm/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "002-decision-contract-and-pure-core"
@@ -62,7 +69,9 @@ obligations:
 # 020: Remote protocol and evidence refinements
 
 Approved (A-19, 2026-09-26) as its own reviewable change before any code
-(R-16); implementation is pending. Approval does not claim that a remote
+(R-16). All six planned increments are delivered (see the implementation
+record); `implementation` stays `pending` until the owner rules on the
+acceptance items the record lists as not verifiable as written. Approval does not claim that a remote
 provider, transport, batch path, pool, principal mapping, migration, or
 consumer has been qualified.
 
@@ -327,11 +336,348 @@ qualification.
   batching and use new qualification evidence for every enabled refinement.
 - `make code`, each declared spec verification, and `make gate` pass.
 
+## Implementation record
+
+Delivered in increments, each its own change; nothing here claims an
+acceptance item before the increment that satisfies it. Plan:
+
+1. Phase-specific time ceilings (3.4) and the binding's phase member (3.1).
+2. The host-endpoint principal reference and `rustev.remote/2` (3.6, 3.7).
+3. Bounded connection reuse (3.5).
+4. `rustev.run/2` and offline remote-evidence availability (3.2).
+5. Runtime-planned remote batches (3.3).
+6. Jev mapping versions, the remaining acceptance items, verification.
+
+**Increment 1 (phase ceilings).** `integrations/rustev-remote-http/src/phases.rs`:
+`PhasePolicy` (a positive ceiling for resolution, connect, secure
+handshake, request write, first response byte, response body and
+cancellation acknowledgement; zero is refused at construction as
+`SetupError::Config`) and `TransportPhases`, `disabled` by default.
+`PhaseClock` holds the running phase; entering a phase fixes its effective
+allowance as the lesser of its ceiling and the budget left at that moment,
+and phases only move forward, so unused time returns to the budget, a
+skipped phase transfers nothing, and a chunk never restarts the response
+body. `phased` watches the running phase's deadline and ends the exchange
+with `TransportError::PhaseExpired`. `HttpTransport::with_phases` enters
+the phases on the real connection: resolution, connect, the TLS handshake
+(absent on plaintext loopback), request write, first response byte (from
+the flush that follows the connection taking the request body, reported by
+`TrackedIo`), and response body (from the first response byte to the
+complete bounded body). An expiry before request bytes left is
+`transport_unsent` with `observed{0}`; after, `transport_interrupted` with
+charge `unknown` and `possibly_continuing` (spec 013). The cancellation
+acknowledgement ceiling cuts the budget of every cancel exchange. The
+adapter adds no retry. `rustev.remote-exchange/1` gains an optional
+`phase_expiry` (phase, configured ceiling, effective allowance, elapsed
+time, whether the ceiling or the budget bounded it, bytes sent, code),
+omitted when absent, so every existing record keeps its bytes.
+`AdapterBinding` gains `transport_phases`, not written when disabled: a
+binding with every refinement disabled keeps its spec 009 bytes and
+artifact (pinned by `a_binding_with_every_refinement_disabled_keeps_its_spec_009_bytes`),
+and an enabled policy changes the artifact and so every affected
+`PlanId`. The Jev adapter compiles the new module and maps the new
+transport error, but keeps the policy disabled. Tests:
+`integrations/rustev-remote-http/tests/phases.rs` runs a deterministic fake
+transport on Tokio's paused clock (every phase boundary and its code,
+exact exhaustion, no carry-over, budget-bounded allowances, slow response
+chunks, a cancellation raised first or at the same instant) and loopback
+exchanges (refusal of a zero ceiling, unchanged binding and records when
+disabled, a silent remote expiring the first-byte phase, a dribbled body
+expiring the body ceiling, a never-answered cancel bounded by the
+acknowledgement ceiling). The schemas and the generated declarations are
+regenerated; `src/phases.rs` joins the reviewed archive list.
+
+**Increment 2 (principal reference and `rustev.remote/2`).**
+`rustev-contract`: `PROTOCOL_V2` and `protocol_name`; the documents keep
+their schema strings and carry `version: 2`. `InferRequest` gains an
+optional `principal` (`WirePrincipal`: the reference as lowercase
+hexadecimal of at most 128 bytes, a mapping version and a scope of 1 to 64
+printable ASCII bytes), omitted when absent so version 1 bytes are
+unchanged; `members_fit_version` refuses it in a version 1 request or when
+not canonical. `WirePrincipal::evidence` is the domain-separated digest
+(`rustev.principal-reference/1`, over mapping version, scope and
+reference) with the mapping version; the exchange record gains an optional
+`principal` holding exactly that. `WirePrincipal`'s `Debug` never prints
+the reference. `integrations/rustev-remote-http/src/principal.rs`:
+`EndpointOperator` (third party by default), `PrincipalSource` (the host
+supplies the reference per attempt; `HandleAsReference` sends the opaque
+principal handle), `PrincipalPosture` (omitted by default) and its binding
+view `PrincipalWire`. The client negotiates exactly
+`ClientConfig::protocol_major` (1 by default): a server that answers
+another version, or none, fails construction, and nothing is upgraded or
+downgraded per call. Construction refuses a principal posture for a
+third-party endpoint, over version 1, or with a bad label. Per attempt, a
+missing or oversized reference refuses the attempt before any byte
+(`malformed_request`, `observed{0}`, `finished`). The reference is sent
+only in the request's `principal` field; batched members share an exchange
+only with the same reference. The record holds its digest, and retained
+request bytes hold the digest in its place. The binding gains
+`principal_wire` (posture, mapping version and scope), not written when
+omitted; rotating the reference keeps the binding and changes the digest.
+The server serves `ServerConfig::versions` (`[1]` by default), refuses a
+principal in a version 1 request or a non-canonical one (400), includes
+the principal in the idempotency content (another principal under the same
+attempt id is `attempt_id_conflict`), and hands the reference to the hosted
+backend as its opaque principal handle. Redirects stay unfollowed, so the
+reference reaches no other endpoint. Tests:
+`integrations/rustev-remote-http/tests/principal.rs` (default omission,
+host-only construction and exact negotiation, the reference reaching only
+the host-operated endpoint with evidence and retained bytes redacted,
+rotation, refusal before send when missing or beyond 128 bytes, the
+conflict, a version 1 request refused, a returned principal member failing
+the answer closed and an authorization claim kept as a provider extra
+without effect, a redirect never followed), unit tests in the module and in
+the contract.
+
+**Increment 3 (bounded connection reuse).**
+`integrations/rustev-remote-http/src/pool.rs`: `PoolPolicy` (total
+connections, per origin, streams per connection, idle connections, idle
+lifetime, absolute lifetime, uses per connection, and `refuse` or
+`queue{max_wait_ms}` on exhaustion; every bound positive, per-origin and
+idle bounds within the total), `ConnectionPool`, a host-owned object
+clients may share, and `KeyMaterial`, the isolation key: endpoint class,
+scheme and authority, wire protocol and HTTP version, proxy route
+(`direct`), TLS posture (`plaintext`, `webpki-roots`, or the host's
+`ClientConfig::tls_label` for its own configuration), the credential
+identity digest (`rustev.credential-identity/1`, never the credential),
+privacy options, principal posture with mapping version and scope, the
+principal reference's evidence digest per exchange, the key schema
+(`rustev.pool-key/1`) and the adapter binding. The key is the tagged
+digest of its canonical material; an unknown member (a custom TLS
+configuration without a label, no binding, another schema) makes a key
+that never reuses. An idle connection is taken only under the exact key;
+when the pool is full, an idle connection of another key is closed (never
+moved) to make room. Checkout sweeps closed, idle-expired and
+lifetime-expired connections; release evicts on failure or an unfinished
+response, closure, the use bound or the lifetime, and the oldest idle
+connection gives way past the idle bound. Exhaustion refuses at once or
+waits within the declared wait and the attempt budget, then is
+`transport_unsent` with `observed{0}`. `HttpTransport::post_observed`
+runs an exchange on a pooled connection whose stream reports to hooks
+swapped per exchange (`wire::IoHooks`), so the request-byte tracker and the
+phase clock are always the current exchange's; a reused connection skips
+resolution, connect and handshake without carrying their ceilings. A stale
+connection is never replaced mid-exchange: one that fails before request
+bytes is `transport_unsent`, after them `transport_interrupted`, and the
+adapter adds no reconnect or replay. Cancel exchanges always use a fresh
+connection. The exchange record gains an optional `connection`: fresh or
+reused, the nonsecret instance id, an age bucket, the use count, the
+multiplex posture (`none`), the isolation-key digest and the eviction
+reason. The binding gains `connection_pool` (policy and key schema), not
+written when disabled. Tests: the pool's unit tests (every key member,
+unknown material, every bound and eviction rule on a paused clock, refuse
+and queue within the wait and the budget) and
+`integrations/rustev-remote-http/tests/pool.rs` over loopback behind a
+counting TCP front (no reuse when disabled; one connection for three
+exchanges; the use bound; credential rotation and two clients with one
+binding sharing; privacy options and endpoint class as key members;
+principal rotation; a closed idle connection evicted at checkout; a stale
+connection failing after request bytes, interrupted with no reconnect;
+exhaustion refused before any byte).
+
+**Increment 4 (`rustev.run/2`).** `rustev-contract`: `schema::RUN_V2`;
+`RunRecord` gains `remote_evidence` (exactly in version 2) and
+`remote_evidence_truncated` (version 2 only, omitted when false), both
+absent in every other version, so version 1 and 3 bytes are unchanged
+(every existing golden passes untouched). `RemoteEvidence`: attempt id,
+step and instance, `ExchangeReference` (`retained` with the exchange
+record's digest, schema, retention class and opaque locator, or
+`unavailable` with `no_exchange`, `pending`, `not_delivered` or
+`no_locator`), requested and served identity with disclosure, binding,
+protocol or mapping version, endpoint class, remote code, final remote
+state, charge provenance (`reported`, `attributed`, `nothing_sent`,
+`unknown`), optional batch membership and optional principal digest.
+Bounds: at most 256 entries, each string at most 256 bytes, at most 8
+instance ids, at most 8 KiB of canonical bytes per entry (`bounded`
+cuts deterministically, further for strings that escape to several
+bytes); `check_version_members` refuses a member in the wrong version or
+beyond a bound, and the run record's parser applies it, so a version 1 or 3
+record carrying either member, or a version 2 record without the list or
+beyond its bounds, is refused when read. The `rustev.run/1` and
+`rustev.run/3` schemas therefore keep their bytes, and the `rustev.run/2`
+schema requires the list (spec 027, 3.2.2: a schema describes its parser).
+`project_v1` removes the list, changes only the schema tag
+and is refused, never partial, for anything but a valid version 2 record.
+`rustev-core`: `EvidenceSink::run_schema` (the one schema a sink selects,
+`rustev.run/1` by default) and `DecisionBackend::take_remote_evidence`
+(`None` by default). `rustev-runtime`: a plan 2 decision's record is
+`rustev.run/2` exactly when the sink selected it; each attempt's entry is
+taken once from the backend that ran it, in attempt order, with the step,
+instance and final remote state the record holds; entries leave from the
+end, and the record says so, until the record fits `RECORD_V1`. A rejected
+version 2 record is an evidence delivery failure like any other; nothing
+retries it as version 1. `rustev-remote-http`: `ClientConfig::run_evidence`
+(off by default; the binding gains `run_record_schema`, not written when
+off) keeps a pending entry per attempt, completes it from the delivered
+exchange record before any member is answered, and records `no_exchange`
+for an attempt refused before any exchange or stopped before any of its
+request bytes left (a member withdrawn from a coalescing exchange is in no
+exchange record, so its pending entry would otherwise stay pending);
+`ExchangeSink::deliver_located`
+lets the host name a locator (the default names none), and
+`Exchanges::deliver` returns the record digest and the delivery result.
+`rustev-eval`: a version 2 record enters a bundle as its version 1
+projection, so `rustev.replay/1` bundles are unchanged and replay
+reproduces from retained raw outputs without reading any exchange record;
+`remote_evidence::availability` checks each reference against a
+host-supplied synchronous `ExchangeStore` (`available` only for the bounded
+record whose digest and canonical bytes match; otherwise `missing`,
+`expired`, `forbidden`, `corrupt`, `inaccessible`, or the record's own
+`not_referenced` reason), reported apart from judgment parity. Tests:
+`crates/rustev-contract/tests/run_v2.rs` (version 1 bytes, round trips at
+every bound, members per version, exact projection),
+`crates/rustev-runtime/tests/run_v2.rs` (a version 1 sink gets version 1
+and nothing is taken; one entry per remote attempt in order with the
+projection equal to the version 1 record; a rejected version 2 record
+delivered once, never as version 1, with the same judgment),
+`crates/rustev-eval/tests/remote_evidence.rs` (offline replay of a version
+2 record as its projection, byte-identical bundle, no backend call;
+available, missing, corrupt, swapped, expired, forbidden, inaccessible and
+not referenced) and `integrations/rustev-remote-http/tests/run_evidence.rs`
+(support routing over loopback: entries checked against the host's store,
+no body, credential or principal reference embedded, `no_locator`,
+`not_delivered`, the principal digest, `no_exchange` for a refused
+attempt) and `integrations/rustev-remote-http/tests/batching.rs` (a member
+withdrawn before sending has `no_exchange`). The new eval source file joins the reviewed archive list.
+
+**Increment 5 (runtime-planned remote batches).** The batch-capable seam
+is spec 017's (`DecisionBackend::batch_capability` and `infer_batch`);
+`DecisionBackend::infer` is unchanged. `RemoteClient` offers it only when
+`ClientConfig::batch_dispatch` (2 to 32 members, off by default; the
+binding gains `batch_dispatch_max_members`, not written when off) and the
+negotiated terms declare shared-state batching; the effective bound is the
+lesser of the two, so terms never raise it. Equal compatibility means the
+same binding and the same shared state, which is what one request may
+carry. `infer_batch` refuses a batch beyond the bound, or whose members
+differ in principal or decision, before any byte; checks every member as
+an independent attempt would (a member already cancelled or out of budget
+is removed and reported unsent); sends the rest in one exchange, in the
+runtime's order (never sorted, added to, merged or retried), bounded by
+the earliest member budget; and answers each member from its own answer,
+so a missing, duplicate or mismatched answer fails only that member and an
+answer naming an unasked attempt, which no member owns, fails every member
+(spec 009's envelope rule). The batch report's charge is the sum of the
+members' (the runtime allocates it, spec 017), its cancellation is
+`unconfirmed` if any member's is, and its remote state is possibly
+continuing if any member's is. The exchange record's attribution is the
+new `runtime_planned`, and remote evidence names the runtime's batch id and
+member index. Tests: `integrations/rustev-remote-http/tests/runtime_batch.rs`
+compares the support-routing decision batched (one exchange of three
+members in member-index order, one batch id) with the same decision
+dispatched independently (three exchanges): values and judgment, a member
+failure, a deadline and a cancellation after send (every member possibly
+continuing with charge unknown, in both), and the cost; a retrying step
+runs alone, a plan without a batch policy never batches, and an adapter
+without batch dispatch offers no seam; a missing member answer fails that
+member only.
+
+**Increment 6 (Jev, drift, verification).** A negotiated endpoint that
+answers another protocol version is now `identity_mismatch` (3.7), not
+`malformed_response`. `integrations/rustev-jev/tests/refinements.rs`: the
+Jev adapter offers no general batch seam (with or without its own
+batching), its default batch dispatch refuses without contacting the
+gateway, its own adapter-scoped batch is still one request attributed as
+shared state, its exchange records carry no spec 020 member, and it keeps
+no remote evidence. No spec 020 refinement is enabled on the Jev adapter:
+its transport keeps phases and pooling disabled, its binding
+(`rustev.jev-binding/1`) and foreign-wire mapping are unchanged, so no
+mapping version changes and no earlier qualification is reused for a
+changed mapping.
+
+Acceptance, item by item:
+
+- Canonical fixtures: `crates/rustev-contract/tests/run_v2.rs`, the
+  exchange-record and binding byte pins, and every existing golden
+  unchanged.
+- Offline replay: `crates/rustev-eval/tests/remote_evidence.rs`.
+- Differential batches: `integrations/rustev-remote-http/tests/runtime_batch.rs`
+  (values, failures, cancellation, deadlines, charge, remote state,
+  evidence). Fallback is covered by eligibility: a step that can retry or
+  fall back never batches (spec 017, 3.3); the test uses a retrying step,
+  which takes the same rule.
+- Phases: `integrations/rustev-remote-http/tests/phases.rs`.
+- Pools: the pool's unit tests and `integrations/rustev-remote-http/tests/pool.rs`.
+- Principal: `integrations/rustev-remote-http/tests/principal.rs` and
+  `run_evidence.rs`.
+- Jev: `integrations/rustev-jev/tests/refinements.rs`.
+
+Not verifiable as written, for the owner to rule on:
+
+1. Multiplex cancellation (pool acceptance). The HTTP binding speaks
+   HTTP/1.1 only; a pool policy must declare one stream per connection,
+   so nothing is multiplexed and there is no multiplexed cancellation to
+   test. Covering it needs an HTTP/2 binding, a new dependency that spec
+   021's audit would have to admit.
+2. "New qualification evidence for every enabled refinement" (Jev). No
+   refinement is enabled on the Jev adapter, so there is none to produce;
+   enabling one would need a new mapping version and a newly authorized
+   qualification, which this spec does not authorize (3.7).
+
+Engineering choices made by the implementing agent, not by the owner:
+
+- 3.1 asks for explicit `disabled` values in the binding. They are explicit
+  in the configuration types, which have no implicit state, but are not
+  written into the binding document, so the artifact and `PlanId` of every
+  existing adapter stay byte-identical as section 2 requires.
+- The request-write phase ends at the first completed flush after the
+  connection took the request body; the response-body phase includes the
+  response head, from the first response byte to the complete body.
+- The cancellation acknowledgement ceiling bounds the whole cancel
+  exchange, whose own transport phases also apply.
+- `rustev.remote/2` keeps the HTTP paths `/rustev/remote/1/...` and the
+  document schema strings; the `version` member distinguishes it. A
+  version 1 server refuses a version 2 describe with 400, which
+  construction reports as a negotiation failure (`malformed_request`); no
+  plan can be compiled against the adapter.
+- The HTTP binding speaks HTTP/1.1 only, so a pool policy must declare
+  one stream per connection and nothing is multiplexed; the multiplex
+  cancellation item of the acceptance therefore has nothing to cover until
+  a binding that multiplexes exists.
+- The authority in the isolation key is the configured scheme, host and
+  port, not the resolved address: two names for one address never share a
+  connection.
+- A replay bundle holds a version 2 record's version 1 projection, so
+  `rustev.replay/1` admits exactly what it admitted; the remote evidence
+  stays with the delivered record. Replay itself never consults an
+  exchange store; the acceptance item's "without a transport or store
+  call" is read as that, and availability is a separate, explicit check
+  through the host's store.
+- A plan 3 decision's record stays `rustev.run/3` without remote evidence
+  even for a sink that selected version 2: this spec defines the list for
+  version 2 only.
+- Spec 017's batch report carries one cancellation answer and one remote
+  state for the batch. A member whose work may continue therefore makes
+  every member of its batch possibly continuing with charge unknown: per
+  member liability is never understated, but can be overstated until the
+  host reconciles it. Finer per-member remote state needs a change to the
+  spec 017 seam, which this spec does not make.
+- A host-operated `rustev.remote/1` server hands a version 2 request's
+  reference to the hosted backend as `CallContext::principal_handle`; spec
+  009's engineering choice of an empty handle still holds for every
+  version 1 request.
+
 ## Verification
 
-Pending with implementation. Approval authorizes only this contract.
-The implementing change must add repository-local deterministic verification
-for every acceptance item before implementation can be called complete.
+Declared for `spec-spine verify 020`; 020 joins `make verify` when the
+implementation is complete.
+
+```verify:cli
+# 3.2, 3.4 to 3.6: documents, bounds, projection and byte pins.
+cargo test -p rustev-contract --locked
+# 3.2: the sink seam and the backend's remote evidence.
+cargo test -p rustev-core --locked
+# 3.2, 3.3: run/2 delivery and spec 017's batch seam.
+cargo test -p rustev-runtime --locked
+# 3.2: offline replay and remote evidence availability.
+cargo test -p rustev-eval --locked
+# 3.1, 3.3 to 3.7: phases, pools, principal, run evidence, batches.
+cargo test -p rustev-remote-http --locked
+# 3.3, 3.7: the Jev adapter's batch is not the runtime's; nothing enabled.
+cargo test -p rustev-jev --locked
+# Boundaries: no HTTP stack or async runtime below integrations/.
+cargo run -p rustev-boundaries --locked --quiet
+cargo clippy -p rustev-contract -p rustev-core -p rustev-runtime -p rustev-eval -p rustev-remote-http -p rustev-jev --all-targets --locked -- -D warnings
+```
 
 ## Questions settled by R-34
 

@@ -19,6 +19,7 @@ pub mod fit;
 pub mod live;
 pub mod metrics;
 pub mod optimization;
+pub mod remote_evidence;
 pub mod replay;
 pub mod report;
 pub mod resolve;

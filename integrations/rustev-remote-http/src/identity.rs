@@ -8,6 +8,10 @@ use rustev_contract::ids::{ArtifactId, DescriptorId};
 use rustev_contract::remote::{Disclosure, ServedIdentity, ServedTerms};
 use serde::Serialize;
 
+use crate::phases::TransportPhases;
+use crate::pool::PoolBinding;
+use crate::principal::PrincipalWire;
+
 /// The tag of an adapter binding's digest.
 pub const BINDING_SCHEMA: &str = "rustev.remote-binding/1";
 
@@ -36,6 +40,28 @@ pub struct AdapterBinding {
     pub routing_privacy: BTreeMap<String, String>,
     pub max_request_bytes: u64,
     pub max_response_bytes: u64,
+    /// The transport phase policy (spec 020, 3.1 and 3.4). `disabled` is
+    /// not written, so a binding with every spec 020 refinement disabled
+    /// keeps its spec 009 bytes and artifact.
+    #[serde(skip_serializing_if = "TransportPhases::is_disabled")]
+    pub transport_phases: TransportPhases,
+    /// The principal wire posture, mapping version and scope (spec 020,
+    /// 3.1 and 3.6); never a reference. Not written when omitted.
+    #[serde(skip_serializing_if = "PrincipalWire::is_omitted")]
+    pub principal_wire: PrincipalWire,
+    /// The run-record schema the evidence sink accepts, when it is
+    /// `rustev.run/2` (spec 020, 3.1 and 3.2). Not written otherwise.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub run_record_schema: Option<String>,
+    /// The most members of a runtime-planned batch this binding accepts
+    /// (spec 020, 3.1 and 3.3), when that dispatch is enabled. Not written
+    /// when disabled.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub batch_dispatch_max_members: Option<u32>,
+    /// The connection-pool policy and isolation-key schema (spec 020, 3.1
+    /// and 3.5). Not written when disabled.
+    #[serde(skip_serializing_if = "PoolBinding::is_disabled")]
+    pub connection_pool: PoolBinding,
 }
 
 impl AdapterBinding {
@@ -141,6 +167,40 @@ mod tests {
     }
 
     #[test]
+    fn a_binding_with_every_refinement_disabled_keeps_its_spec_009_bytes() {
+        // Spec 020, 2: disabled refinements are not written, so the binding
+        // and the artifact of every existing adapter are unchanged.
+        let b = AdapterBinding {
+            protocol: "rustev.remote/1".into(),
+            endpoint_class: "synthetic-loopback".into(),
+            remote_artifact: None,
+            remote_descriptor: None,
+            requested_model: None,
+            model_pin: None,
+            mapping_version: "identity/1".into(),
+            mapping_tables: BTreeMap::new(),
+            routing_privacy: BTreeMap::new(),
+            max_request_bytes: 1,
+            max_response_bytes: 1,
+            transport_phases: TransportPhases::Disabled,
+            principal_wire: PrincipalWire::Omitted,
+            run_record_schema: None,
+            batch_dispatch_max_members: None,
+            connection_pool: PoolBinding::Disabled,
+        };
+        assert_eq!(
+            String::from_utf8(canonical_bytes(&b).unwrap()).unwrap(),
+            concat!(
+                r#"{"endpoint_class":"synthetic-loopback","mapping_tables":{},"#,
+                r#""mapping_version":"identity/1","max_request_bytes":1,"#,
+                r#""max_response_bytes":1,"model_pin":null,"protocol":"rustev.remote/1","#,
+                r#""remote_artifact":null,"remote_descriptor":null,"requested_model":null,"#,
+                r#""routing_privacy":{}}"#
+            )
+        );
+    }
+
+    #[test]
     fn every_binding_member_changes_the_artifact() {
         let base = AdapterBinding {
             protocol: "rustev.remote/1".into(),
@@ -154,6 +214,11 @@ mod tests {
             routing_privacy: BTreeMap::new(),
             max_request_bytes: 1,
             max_response_bytes: 1,
+            transport_phases: TransportPhases::Disabled,
+            principal_wire: PrincipalWire::Omitted,
+            run_record_schema: None,
+            batch_dispatch_max_members: None,
+            connection_pool: PoolBinding::Disabled,
         };
         let a = base.artifact().unwrap();
         assert_eq!(a, base.clone().artifact().unwrap());
@@ -192,6 +257,56 @@ mod tests {
             },
             AdapterBinding {
                 max_response_bytes: 2,
+                ..base.clone()
+            },
+            AdapterBinding {
+                transport_phases: TransportPhases::Enabled(crate::phases::PhasePolicy {
+                    resolution_ms: 1,
+                    connect_ms: 1,
+                    secure_handshake_ms: 1,
+                    request_write_ms: 1,
+                    first_response_byte_ms: 1,
+                    response_body_ms: 1,
+                    cancellation_ack_ms: 1,
+                }),
+                ..base.clone()
+            },
+            AdapterBinding {
+                principal_wire: PrincipalWire::HostOperated {
+                    mapping_version: "m/1".into(),
+                    scope: "s".into(),
+                },
+                ..base.clone()
+            },
+            AdapterBinding {
+                run_record_schema: Some("rustev.run/2".into()),
+                ..base.clone()
+            },
+            AdapterBinding {
+                batch_dispatch_max_members: Some(4),
+                ..base.clone()
+            },
+            AdapterBinding {
+                connection_pool: PoolBinding::Enabled {
+                    policy: crate::pool::PoolPolicy {
+                        max_connections: 1,
+                        max_per_origin: 1,
+                        max_streams: 1,
+                        max_idle: 1,
+                        idle_lifetime_ms: 1,
+                        max_lifetime_ms: 1,
+                        max_uses: 1,
+                        on_exhaustion: crate::pool::OnExhaustion::Refuse,
+                    },
+                    key_schema: crate::pool::POOL_KEY_SCHEMA.into(),
+                },
+                ..base.clone()
+            },
+            AdapterBinding {
+                principal_wire: PrincipalWire::HostOperated {
+                    mapping_version: "m/2".into(),
+                    scope: "s".into(),
+                },
                 ..base.clone()
             },
         ];
