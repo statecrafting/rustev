@@ -32,6 +32,8 @@ REQUIRED = [
     "split leakage",
     "unusable bundles",
     "adapter rules",
+    # Spec 023, section 5: the qualification procedure's refusals.
+    "qualification refusals",
 ]
 # Generous: a new test binary can wait on the OS before it starts.
 TEST_TIMEOUT_S = 1800
@@ -230,6 +232,71 @@ SEEDS = [
         E + "live.rs",
         "if HistoricalLink::of(case.bundle).ok().as_ref() != Some(link) {",
         "if false {",
+        EVAL,
+    ),
+    (
+        "qualification refusals",
+        "a synthetic manifest is admitted (spec 023, I-1)",
+        E + "dataset.rs",
+        "    if matches!(manifest.provenance, DatasetProvenance::Synthetic { .. }) {",
+        "    if false && matches!(manifest.provenance, DatasetProvenance::Synthetic { .. }) {",
+        EVAL,
+    ),
+    (
+        "qualification refusals",
+        "labels from the model under test are admitted (spec 023, 5 row 2)",
+        E + "dataset.rs",
+        "                && m.related(s)",
+        "                && false && m.related(s)",
+        EVAL,
+    ),
+    (
+        "qualification refusals",
+        "a claim cites another admission (spec 023, 5 row 1)",
+        E + "report.rs",
+        "    if &r.dataset != admitted.dataset() || &r.admission != admitted.id() {\n"
+        "        return Err(ClaimError::NotAdmitted);",
+        "    if false {\n        return Err(ClaimError::NotAdmitted);",
+        EVAL,
+    ),
+    (
+        "qualification refusals",
+        "a calibration without lineage or fitted on the final test freezes (spec 023, 5 row 3)",
+        E + "report.rs",
+        "=> return Err(void(reason)),",
+        "=> drop(reason),",
+        EVAL,
+    ),
+    (
+        "qualification refusals",
+        "a report under a changed configuration is measured (spec 023, 5 row 4)",
+        E + "report.rs",
+        "        if e.report.evaluator_config != r.config {",
+        "        if false && e.report.evaluator_config != r.config {",
+        EVAL,
+    ),
+    (
+        "qualification refusals",
+        "a slice below its minimum is a figure (spec 023, 5 row 5)",
+        E + "report.rs",
+        "            if (members.len() as u64) < min {",
+        "            if false && (members.len() as u64) < min {",
+        EVAL,
+    ),
+    (
+        "qualification refusals",
+        "a claim names another population (spec 023, 5 row 6)",
+        E + "report.rs",
+        "    if request.population != a.population.id {",
+        "    if false && request.population != a.population.id {",
+        EVAL,
+    ),
+    (
+        "qualification refusals",
+        "exposed cases stay in the headline (spec 023, 3.2.1)",
+        E + "report.rs",
+        "final_test.difference(&exposed).copied().collect();",
+        "final_test.iter().copied().collect();",
         EVAL,
     ),
 ]

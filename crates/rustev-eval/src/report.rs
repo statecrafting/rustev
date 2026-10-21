@@ -29,8 +29,9 @@ use serde::{Deserialize, Serialize};
 use crate::bundle::BundleInput;
 use crate::compare::compare;
 use crate::config::{ConfigError, Direction, EvaluatorConfig, Gate};
-use crate::dataset::{DatasetCase, DatasetError, DatasetManifest};
+use crate::dataset::{DatasetCase, DatasetError, DatasetManifest, ModelRef};
 use crate::doc::eval_document;
+use crate::fit::CalibrationFit;
 use crate::metrics::{
     self, CaseOutcome, Measure, Scored, TaskAdapter, brier, mean_log_loss, nearest_rank,
     probabilities, reliability,
@@ -804,4 +805,898 @@ pub fn evaluate_gate(gate: &Gate, baseline: &Evaluated, candidate: &Evaluated) -
             ),
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Qualification on admitted data (spec 023, 3.3 to 3.5).
+//
+// A qualification freezes, before any final-test case is evaluated, the
+// evaluator configuration, bindings, baselines, calibrations, minimum sizes
+// and analysis, and digests them. Measurement then reads spec 004 reports of
+// the candidate and its baselines side by side, refusing any that is not of
+// the frozen dataset, split, configuration and bindings. A claim is composed
+// here from the frozen and admitted identities, so it cannot name another
+// population, binding or split. Nothing here adds a metric to spec 004:
+// figures are its counts and values, regrouped by role, slice and exposure.
+// ---------------------------------------------------------------------------
+
+/// Schema of a qualification record's frozen part (spec 023, 3.3).
+pub const QUALIFICATION: &str = "rustev.qualification/1";
+
+/// What a qualification fixes before the final test (spec 023, 3.3.1). Its
+/// digest is the frozen identity. It holds no binary64 number.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct QualificationRecord {
+    pub schema: String,
+    /// The task qualified, as the host names it.
+    pub task: String,
+    pub dataset: DatasetId,
+    /// The admission record's digest.
+    pub admission: ContentDigest,
+    /// The evaluator configuration: gates, thresholds and minimum coverage
+    /// are its own (spec 004, 3.5.8).
+    pub config: EvaluatorConfigId,
+    pub candidate: CandidateBinding,
+    /// The rules backend's binding (spec 005).
+    pub rules_baseline: ArtifactId,
+    pub exact_baseline: ExactBaseline,
+    /// Calibration artifacts the calibrated candidate binds; empty when none.
+    pub calibrations: Vec<CalibrationId>,
+    /// The sample-size target: final-test cases, exposed ones excluded,
+    /// below which every headline figure is unknown.
+    pub min_final_test: u64,
+    /// The minimum size of each declared slice (spec 023, 6.2).
+    pub min_slice: BTreeMap<String, u64>,
+    /// The metrics to be reported, each declared by the configuration.
+    pub analysis: Vec<String>,
+    /// The previous qualified result for the same task, for regression.
+    pub previous: Option<ContentDigest>,
+    /// The qualification this one replaces after a change (3.3.3).
+    pub supersedes: Option<ContentDigest>,
+    pub frozen_on: String,
+}
+
+eval_document!(QualificationRecord, QUALIFICATION, REPLAY_V1, ContentDigest);
+
+/// The candidate's binding and the model it serves.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CandidateBinding {
+    pub artifact: ArtifactId,
+    pub model: ModelRef,
+}
+
+/// The exact baseline: the task's exact plan steps, or why the task allows
+/// none (spec 023, 3.4.6).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum ExactBaseline {
+    Evaluated,
+    NotApplicable { reason: String },
+}
+
+/// A report's role in a qualification.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Role {
+    Candidate,
+    /// The candidate with the frozen calibration artifacts applied.
+    CandidateCalibrated,
+    RulesBaseline,
+    ExactBaseline,
+}
+
+impl Role {
+    pub fn name(self) -> &'static str {
+        match self {
+            Role::Candidate => "candidate",
+            Role::CandidateCalibrated => "candidate, calibrated",
+            Role::RulesBaseline => "rules baseline",
+            Role::ExactBaseline => "exact baseline",
+        }
+    }
+}
+
+/// Why a qualification step refused.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum QualificationError {
+    Schema,
+    Incomplete(&'static str),
+    /// No admission record for this dataset, or one for another dataset
+    /// (spec 023, I-1): refused as qualification input.
+    NotAdmitted,
+    /// The configuration is not the one frozen, or cannot be frozen.
+    Config(String),
+    /// A frozen model labeled the data or shares a labeler's family.
+    LabelsNotIndependent {
+        producer: ModelRef,
+    },
+    /// The admission did not judge independence against this model.
+    UndeclaredSystem,
+    /// A calibration lacks lineage, or was fitted on or with final-test
+    /// data: the qualification is void (spec 004, 3.6.4).
+    CalibrationVoid {
+        calibration: String,
+        reason: String,
+    },
+    /// A slice without a frozen minimum, or a minimum for no slice.
+    Slice(String),
+    /// A replacement qualification reuses the old final test (3.3.3).
+    Supersedes(String),
+    /// A report under another configuration than the frozen one: a new
+    /// qualification is required; this result is not the frozen one.
+    ConfigChanged {
+        frozen: EvaluatorConfigId,
+        found: EvaluatorConfigId,
+    },
+    /// A report that is not of the frozen dataset, split, cases or
+    /// bindings, a role missing or repeated, or a detail not bound to it.
+    Report {
+        role: &'static str,
+        reason: String,
+    },
+}
+
+impl fmt::Display for QualificationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
+impl std::error::Error for QualificationError {}
+
+/// A checked, digested freeze. Only [`freeze`] makes one.
+#[derive(Debug, Clone)]
+pub struct Frozen {
+    record: QualificationRecord,
+    id: ContentDigest,
+}
+
+impl Frozen {
+    pub fn record(&self) -> &QualificationRecord {
+        &self.record
+    }
+    /// The frozen record's digest.
+    pub fn id(&self) -> &ContentDigest {
+        &self.id
+    }
+}
+
+/// What a freeze takes.
+pub struct FreezeInputs<'a> {
+    pub record: &'a QualificationRecord,
+    pub manifest: &'a DatasetManifest,
+    /// The dataset's checked admission; none when there is no record.
+    pub admission: Option<&'a crate::dataset::Admitted>,
+    pub config: &'a EvaluatorConfig,
+    /// Every frozen calibration artifact with its fit record, if any.
+    pub calibrations: &'a [(CalibrationArtifact, Option<CalibrationFit>)],
+    /// The record and manifest of the qualification this one supersedes.
+    pub superseded: Option<(&'a QualificationRecord, &'a DatasetManifest)>,
+}
+
+fn admitted_for<'a>(
+    admission: Option<&'a crate::dataset::Admitted>,
+    manifest: &DatasetManifest,
+) -> Result<&'a crate::dataset::Admitted, QualificationError> {
+    let a = admission.ok_or(QualificationError::NotAdmitted)?;
+    if manifest.id().ok().as_ref() != Some(a.dataset()) {
+        return Err(QualificationError::NotAdmitted);
+    }
+    Ok(a)
+}
+
+/// Freeze a qualification before any final-test case is evaluated (spec
+/// 023, 3.3). Refuses unadmitted data, a configuration other than the
+/// frozen one or with unbound rules, a candidate whose family labeled the
+/// data, a calibration without lineage or touching the final test, slices
+/// without minimums, and a replacement that reuses the old final test.
+pub fn freeze(inputs: &FreezeInputs<'_>) -> Result<Frozen, QualificationError> {
+    use QualificationError as E;
+    let r = inputs.record;
+    if r.schema != QUALIFICATION {
+        return Err(E::Schema);
+    }
+    let blank = |s: &str| s.trim().is_empty();
+    if blank(&r.task) || blank(&r.frozen_on) {
+        return Err(E::Incomplete("task and freeze date"));
+    }
+    let admitted = admitted_for(inputs.admission, inputs.manifest)?;
+    if &r.dataset != admitted.dataset() || &r.admission != admitted.id() {
+        return Err(E::NotAdmitted);
+    }
+    let config = inputs.config;
+    config.check().map_err(|e| E::Config(e.0))?;
+    if config.id().ok().as_ref() != Some(&r.config) {
+        return Err(E::Config("the configuration is not the frozen one".into()));
+    }
+    let mapping = &admitted.record().task_mapping;
+    if config.bound_rules() != Some(&mapping.rules) {
+        return Err(E::Config(
+            "the configuration does not bind the admitted adapter rules".into(),
+        ));
+    }
+    if config.adapter.reference() != mapping.adapter {
+        return Err(E::Config("the configuration names another adapter".into()));
+    }
+    let declared: BTreeSet<&str> = config.metrics.iter().map(|m| m.name.as_str()).collect();
+    if r.analysis.is_empty()
+        || r.analysis
+            .iter()
+            .any(|m| !declared.contains(m.split('/').next().unwrap_or_default()))
+    {
+        return Err(E::Config(
+            "the analysis names a metric the configuration does not declare".into(),
+        ));
+    }
+    if let Some(producer) = admitted.related_labeler(&r.candidate.model) {
+        return Err(E::LabelsNotIndependent {
+            producer: producer.clone(),
+        });
+    }
+    if !admitted.declares_system(&r.candidate.model) {
+        return Err(E::UndeclaredSystem);
+    }
+    if let ExactBaseline::NotApplicable { reason } = &r.exact_baseline
+        && blank(reason)
+    {
+        return Err(E::Incomplete("why no exact baseline"));
+    }
+    if r.min_final_test == 0 {
+        return Err(E::Incomplete("the final-test sample-size target"));
+    }
+    let slices: BTreeSet<&str> = admitted
+        .record()
+        .population
+        .slices
+        .iter()
+        .map(|s| s.name.as_str())
+        .collect();
+    let minimums: BTreeSet<&str> = r.min_slice.keys().map(String::as_str).collect();
+    if slices != minimums || r.min_slice.values().any(|m| *m == 0) {
+        return Err(E::Slice(
+            "every declared slice, and only those, has a positive minimum".into(),
+        ));
+    }
+    if let Some(s) = slices
+        .iter()
+        .find(|s| !config.subgroups.iter().any(|g| g == *s))
+    {
+        return Err(E::Slice(format!(
+            "slice {s} is not a configuration subgroup"
+        )));
+    }
+    // Calibrations: exactly the frozen ones, each with lineage, fitted off
+    // the final test (spec 004, 3.6.4).
+    let mut frozen_cals: Vec<&CalibrationId> = r.calibrations.iter().collect();
+    frozen_cals.sort();
+    let mut given = vec![];
+    for (artifact, fit) in inputs.calibrations {
+        let id = artifact
+            .id()
+            .map_err(|_| E::Incomplete("a calibration artifact's identity"))?;
+        let void = |reason: String| E::CalibrationVoid {
+            calibration: id.to_string(),
+            reason,
+        };
+        match crate::fit::qualify(artifact, fit.as_ref(), inputs.manifest, Split::FinalTest) {
+            crate::fit::Qualification::Qualified => {}
+            crate::fit::Qualification::Unknown { reason }
+            | crate::fit::Qualification::Refused { reason } => return Err(void(reason)),
+        }
+        if fit.as_ref().is_some_and(|f| f.split != Split::Calibration) {
+            return Err(void("not fitted on the calibration split".into()));
+        }
+        given.push(id);
+    }
+    given.sort();
+    if given.iter().collect::<Vec<_>>() != frozen_cals {
+        return Err(E::Config(
+            "the calibrations supplied are not exactly the frozen ones".into(),
+        ));
+    }
+    match (&r.supersedes, inputs.superseded) {
+        (None, None) => {}
+        (Some(old_id), Some((old, old_manifest))) => {
+            if old.id().ok().as_ref() != Some(old_id) {
+                return Err(E::Supersedes(
+                    "the superseded record's digest differs".into(),
+                ));
+            }
+            if old_manifest.id().ok().as_ref() != Some(&old.dataset) {
+                return Err(E::Supersedes(
+                    "the superseded manifest is not its dataset".into(),
+                ));
+            }
+            for c in inputs.manifest.split(Split::FinalTest) {
+                if old_manifest
+                    .split(Split::FinalTest)
+                    .any(|o| o.source == c.source || o.snapshot == c.snapshot)
+                {
+                    return Err(E::Supersedes(format!(
+                        "final-test case {} reuses the superseded final test",
+                        c.id
+                    )));
+                }
+            }
+        }
+        _ => {
+            return Err(E::Supersedes(
+                "a replacement names, and is given, what it supersedes".into(),
+            ));
+        }
+    }
+    let id = r.id().map_err(|_| E::Incomplete("canonical form"))?;
+    Ok(Frozen {
+        record: r.clone(),
+        id,
+    })
+}
+
+/// One figure. A ratio carries its numerator and denominator; a value is a
+/// spec 004 measurement with its count. `Unknown` carries the reason a
+/// figure cannot be given (for example a zero denominator, a slice below its
+/// minimum, or exposed final-test cases); it is never replaced by a number, and
+/// `scope_claim` refuses to compose a claim from it.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Figure {
+    Ratio { numerator: u64, denominator: u64 },
+    Value { value: f64, n: u64 },
+    Unknown { reason: String },
+}
+
+impl Figure {
+    fn ratio(numerator: u64, denominator: u64) -> Figure {
+        if denominator == 0 {
+            Figure::Unknown {
+                reason: "zero denominator".into(),
+            }
+        } else {
+            Figure::Ratio {
+                numerator,
+                denominator,
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Row {
+    pub name: String,
+    pub figure: Figure,
+}
+
+/// One slice's figures.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SliceRows {
+    pub slice: String,
+    /// Final-test cases in the slice, exposed ones excluded.
+    pub cases: u64,
+    pub rows: Vec<Row>,
+}
+
+/// One role's figures: coverage and abstention rows always come before
+/// accuracy and probability rows (spec 023, R-1).
+#[derive(Debug, Clone, PartialEq)]
+pub struct RoleFigures {
+    pub role: Role,
+    /// The report's record digest.
+    pub report: ContentDigest,
+    pub headline: Vec<Row>,
+    pub slices: Vec<SliceRows>,
+    /// Exposed final-test cases, reported separately (spec 023, 3.2.1).
+    pub exposed: Vec<Row>,
+}
+
+/// The side-by-side measurement of one frozen qualification.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Measurement {
+    qualification: ContentDigest,
+    pub roles: Vec<RoleFigures>,
+}
+
+impl Measurement {
+    /// The frozen qualification measured.
+    pub fn qualification(&self) -> &ContentDigest {
+        &self.qualification
+    }
+    pub fn role(&self, role: Role) -> Option<&RoleFigures> {
+        self.roles.iter().find(|r| r.role == role)
+    }
+}
+
+/// Coverage, exclusions, acceptance, labels and abstentions over `cases`,
+/// from the detail's per-case outcomes and the manifest's labels.
+fn count_rows(detail: &EvalDetail, manifest: &DatasetManifest, cases: &BTreeSet<&str>) -> Vec<Row> {
+    let mut excluded: BTreeMap<String, u64> = BTreeMap::new();
+    let mut abstentions: BTreeMap<String, u64> = BTreeMap::new();
+    let (mut comparable, mut proposals, mut labeled) = (0u64, 0u64, 0u64);
+    for d in detail
+        .cases
+        .iter()
+        .filter(|d| cases.contains(d.case.as_str()))
+    {
+        if let Some(kind) = d.outcome.strip_prefix("abstention:") {
+            comparable += 1;
+            bump(&mut abstentions, kind);
+        } else if d.outcome.starts_with("proposal:") {
+            comparable += 1;
+            proposals += 1;
+            let label = manifest.cases.iter().find(|c| c.id == d.case);
+            if label.is_some_and(|c| c.label.value().is_some()) {
+                labeled += 1;
+            }
+        } else {
+            let reason = match (&d.outcome[..], &d.reason) {
+                ("incomparable", Some(r)) => format!("incomparable:{r}"),
+                (o, _) => o.to_string(),
+            };
+            bump(&mut excluded, reason);
+        }
+    }
+    let n = cases.len() as u64;
+    let mut rows = vec![Row {
+        name: "coverage".into(),
+        figure: Figure::ratio(comparable, n),
+    }];
+    for (reason, k) in excluded {
+        rows.push(Row {
+            name: format!("excluded/{reason}"),
+            figure: Figure::ratio(k, n),
+        });
+    }
+    rows.push(Row {
+        name: "acceptance_coverage".into(),
+        figure: Figure::ratio(proposals, comparable),
+    });
+    for (kind, k) in abstentions {
+        rows.push(Row {
+            name: format!("abstention/{kind}"),
+            figure: Figure::ratio(k, comparable),
+        });
+    }
+    rows.push(Row {
+        name: "labeled_proposal_coverage".into(),
+        figure: Figure::ratio(labeled, proposals),
+    });
+    rows
+}
+
+/// The report's own values for `names` and series under `prefix`, or
+/// unknown with `blocked` when they may not be shown.
+fn value_rows(
+    report: &EvalReport,
+    names: &[&str],
+    prefix: &str,
+    blocked: Option<&str>,
+) -> Vec<Row> {
+    report
+        .metrics
+        .iter()
+        .filter(|m| names.contains(&m.name.as_str()) || m.name.starts_with(prefix))
+        .map(|m| Row {
+            name: m.name.clone(),
+            figure: match (blocked, &m.value) {
+                (Some(r), _) => Figure::Unknown { reason: r.into() },
+                (None, MetricValue::Measured { value, n }) if value.is_finite() => Figure::Value {
+                    value: *value,
+                    n: *n,
+                },
+                (None, MetricValue::Measured { .. }) => Figure::Unknown {
+                    reason: "non-finite".into(),
+                },
+                (None, MetricValue::Unknown { reason }) => Figure::Unknown {
+                    reason: reason.clone(),
+                },
+            },
+        })
+        .collect()
+}
+
+fn all_unknown(rows: Vec<Row>, reason: &str) -> Vec<Row> {
+    rows.into_iter()
+        .map(|r| Row {
+            name: r.name,
+            figure: Figure::Unknown {
+                reason: reason.into(),
+            },
+        })
+        .collect()
+}
+
+/// Measure a frozen qualification from spec 004 reports of its roles on the
+/// final-test split (spec 023, 3.4). Every report must be of the admitted
+/// dataset, the final-test split, every final-test case and the frozen
+/// configuration and bindings; a report under another configuration is
+/// [`QualificationError::ConfigChanged`]. Exposed cases are counted apart
+/// and keep every accuracy and probability figure unknown, since a spec 004
+/// report cannot leave them out. A slice below its frozen minimum, and a
+/// headline below the sample-size target, is unknown, never a figure.
+pub fn measure(
+    frozen: &Frozen,
+    admission: Option<&crate::dataset::Admitted>,
+    manifest: &DatasetManifest,
+    reports: &[(Role, &Evaluated)],
+) -> Result<Measurement, QualificationError> {
+    use QualificationError as E;
+    let admitted = admitted_for(admission, manifest)?;
+    let r = &frozen.record;
+    if &r.dataset != admitted.dataset() || &r.admission != admitted.id() {
+        return Err(E::NotAdmitted);
+    }
+    let mut expected = vec![Role::Candidate, Role::RulesBaseline];
+    if !r.calibrations.is_empty() {
+        expected.push(Role::CandidateCalibrated);
+    }
+    if r.exact_baseline == ExactBaseline::Evaluated {
+        expected.push(Role::ExactBaseline);
+    }
+    expected.sort();
+    let mut given: Vec<Role> = reports.iter().map(|(role, _)| *role).collect();
+    given.sort();
+    if given != expected {
+        return Err(E::Report {
+            role: "all",
+            reason: format!("roles {given:?} are not the frozen {expected:?}"),
+        });
+    }
+    let final_test: BTreeSet<&str> = manifest
+        .split(Split::FinalTest)
+        .map(|c| c.id.as_str())
+        .collect();
+    let exposed: BTreeSet<&str> = admitted
+        .record()
+        .exposure
+        .exposed_final_test
+        .iter()
+        .map(String::as_str)
+        .collect();
+    let cohort: BTreeSet<&str> = final_test.difference(&exposed).copied().collect();
+    let mut frozen_cals = r.calibrations.clone();
+    frozen_cals.sort();
+    let mut roles = vec![];
+    for (role, e) in reports {
+        let bad = |reason: &str| E::Report {
+            role: role.name(),
+            reason: reason.into(),
+        };
+        let digest = e
+            .report
+            .record_digest()
+            .map_err(|_| bad("the report has no record form"))?;
+        if digest != e.detail.report {
+            return Err(bad("the detail is not bound to its report"));
+        }
+        if e.config.id().ok().as_ref() != Some(&e.report.evaluator_config)
+            || e.detail.config != e.report.evaluator_config
+        {
+            return Err(bad("the configuration is not the report's"));
+        }
+        if e.report.evaluator_config != r.config {
+            return Err(E::ConfigChanged {
+                frozen: r.config.clone(),
+                found: e.report.evaluator_config.clone(),
+            });
+        }
+        if &e.report.dataset.id != admitted.dataset()
+            || e.detail.dataset != e.report.dataset.id
+            || e.report.dataset.split != Split::FinalTest
+            || e.detail.split != Split::FinalTest
+            || e.report.dataset.provenance != manifest.provenance
+        {
+            return Err(bad("not the admitted dataset's final-test split"));
+        }
+        e.detail.reconcile().map_err(|x| bad(&x))?;
+        let cases: BTreeSet<&str> = e.detail.cases.iter().map(|c| c.case.as_str()).collect();
+        if cases != final_test || cases.len() != e.detail.cases.len() {
+            return Err(bad("the report is not over every final-test case once"));
+        }
+        let names = |a: &ArtifactId| e.report.artifacts.contains(a);
+        let mut cals = e.report.calibrations.clone();
+        cals.sort();
+        let binding_ok = match role {
+            Role::Candidate => names(&r.candidate.artifact) && cals.is_empty(),
+            Role::CandidateCalibrated => names(&r.candidate.artifact) && cals == frozen_cals,
+            Role::RulesBaseline => names(&r.rules_baseline),
+            Role::ExactBaseline => e.report.artifacts.is_empty(),
+        };
+        if !binding_ok {
+            return Err(bad("the report's bindings are not the frozen ones"));
+        }
+        let small = format!(
+            "{} final-test cases, below the frozen target {}",
+            cohort.len(),
+            r.min_final_test
+        );
+        let below = (cohort.len() as u64) < r.min_final_test;
+        let blocked = if !exposed.is_empty() {
+            Some("the report's cohort includes exposed cases")
+        } else {
+            None
+        };
+        let mut headline = count_rows(&e.detail, manifest, &cohort);
+        headline.extend(value_rows(
+            &e.report,
+            &["error_among_accepted", "mean_log_loss", "brier"],
+            "reliability/all/",
+            blocked,
+        ));
+        if below {
+            headline = all_unknown(headline, &small);
+        }
+        let mut slices = vec![];
+        for s in &admitted.record().population.slices {
+            let members: BTreeSet<&str> = manifest
+                .split(Split::FinalTest)
+                .filter(|c| cohort.contains(c.id.as_str()) && c.subgroups.contains(&s.name))
+                .map(|c| c.id.as_str())
+                .collect();
+            let min = r.min_slice.get(&s.name).copied().unwrap_or(u64::MAX);
+            let mut rows = count_rows(&e.detail, manifest, &members);
+            rows.push(Row {
+                name: "error_among_accepted".into(),
+                figure: Figure::Unknown {
+                    reason: "a spec 004 report states no per-slice error".into(),
+                },
+            });
+            rows.extend(value_rows(
+                &e.report,
+                &[],
+                &format!("reliability/{}/", s.name),
+                blocked,
+            ));
+            if (members.len() as u64) < min {
+                rows = all_unknown(
+                    rows,
+                    &format!("{} cases, below the frozen minimum {min}", members.len()),
+                );
+            }
+            slices.push(SliceRows {
+                slice: s.name.clone(),
+                cases: members.len() as u64,
+                rows,
+            });
+        }
+        let exposed_rows = if exposed.is_empty() {
+            vec![]
+        } else {
+            count_rows(&e.detail, manifest, &exposed)
+        };
+        roles.push(RoleFigures {
+            role: *role,
+            report: digest,
+            headline,
+            slices,
+            exposed: exposed_rows,
+        });
+    }
+    roles.sort_by_key(|x| x.role);
+    Ok(Measurement {
+        qualification: frozen.id.clone(),
+        roles,
+    })
+}
+
+/// Regression against the previous qualified result for the same task
+/// (spec 023, 3.4.5): each frozen gate over the previous result's report
+/// (baseline role) and this one's (candidate role), by spec 004's own
+/// [`evaluate_gate`], which is unknown unless both share dataset, split and
+/// configuration. Empty when the freeze names no previous result; unknown
+/// when it names one that is not supplied.
+pub fn regression(
+    frozen: &Frozen,
+    previous: Option<(&Frozen, &Evaluated)>,
+    current: &Evaluated,
+) -> Vec<(String, GateResult)> {
+    let Some(want) = &frozen.record.previous else {
+        return vec![];
+    };
+    let unknown = |reason: &str| {
+        current
+            .config
+            .gates
+            .iter()
+            .map(|g| {
+                (
+                    g.name.clone(),
+                    GateResult::Unknown {
+                        reason: reason.into(),
+                    },
+                )
+            })
+            .collect()
+    };
+    let Some((old, baseline)) = previous else {
+        return unknown("the previous qualified result was not supplied");
+    };
+    if old.id() != want || old.record.task != frozen.record.task {
+        return unknown("the supplied result is not the frozen previous one");
+    }
+    current
+        .config
+        .gates
+        .iter()
+        .map(|g| (g.name.clone(), evaluate_gate(g, baseline, current)))
+        .collect()
+}
+
+/// The served model identity, as observed for the calls a claim covers
+/// (spec 012, 3.6.3).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Served {
+    Observed { version: String },
+    Unknown,
+}
+
+/// What a claim asks to state. Its scope is not free text: dataset, split,
+/// configuration and binding come from the freeze, and the population must
+/// be the admitted one.
+pub struct ClaimRequest<'a> {
+    pub role: Role,
+    /// A headline row name, or a slice row name with `slice`.
+    pub figure: &'a str,
+    pub slice: Option<&'a str>,
+    pub population: &'a str,
+    pub call_dates: &'a str,
+    pub served: &'a Served,
+}
+
+/// A claim sentence and the limits that bound it (spec 023, 3.5).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScopedClaim {
+    pub sentence: String,
+    pub limits: Vec<String>,
+}
+
+/// Why a claim was rejected.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ClaimError {
+    /// The dataset has no admission record, or the freeze another one.
+    NotAdmitted,
+    /// The measurement is of another freeze.
+    NotThisQualification,
+    /// The claim names another population than the admitted one.
+    PopulationOutside {
+        claimed: String,
+        admitted: String,
+    },
+    Incomplete(&'static str),
+    NoSuchFigure,
+    /// An unknown figure is never claimed as a figure.
+    UnknownFigure {
+        reason: String,
+    },
+}
+
+impl fmt::Display for ClaimError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
+impl std::error::Error for ClaimError {}
+
+/// Compose a scoped claim (spec 023, 3.5, I-3). The sentence names the
+/// dataset id, split, evaluator configuration id, binding identity, call
+/// dates, served identity disclosure and population; the limits carry the
+/// admission's stated limits. Anything beyond them is rejected.
+pub fn scope_claim(
+    admission: Option<&crate::dataset::Admitted>,
+    frozen: &Frozen,
+    measurement: &Measurement,
+    request: &ClaimRequest<'_>,
+) -> Result<ScopedClaim, ClaimError> {
+    let admitted = admission.ok_or(ClaimError::NotAdmitted)?;
+    let r = &frozen.record;
+    if &r.dataset != admitted.dataset() || &r.admission != admitted.id() {
+        return Err(ClaimError::NotAdmitted);
+    }
+    if measurement.qualification() != frozen.id() {
+        return Err(ClaimError::NotThisQualification);
+    }
+    let a = admitted.record();
+    if request.population != a.population.id {
+        return Err(ClaimError::PopulationOutside {
+            claimed: request.population.into(),
+            admitted: a.population.id.clone(),
+        });
+    }
+    if request.call_dates.trim().is_empty() {
+        return Err(ClaimError::Incomplete("call dates"));
+    }
+    if let Served::Observed { version } = request.served
+        && version.trim().is_empty()
+    {
+        return Err(ClaimError::Incomplete("served version"));
+    }
+    let figures = measurement
+        .role(request.role)
+        .ok_or(ClaimError::NoSuchFigure)?;
+    let rows = match request.slice {
+        None => &figures.headline,
+        Some(s) => {
+            &figures
+                .slices
+                .iter()
+                .find(|x| x.slice == s)
+                .ok_or(ClaimError::NoSuchFigure)?
+                .rows
+        }
+    };
+    let row = rows
+        .iter()
+        .find(|x| x.name == request.figure)
+        .ok_or(ClaimError::NoSuchFigure)?;
+    let value = match &row.figure {
+        Figure::Unknown { reason } => {
+            return Err(ClaimError::UnknownFigure {
+                reason: reason.clone(),
+            });
+        }
+        Figure::Ratio {
+            numerator,
+            denominator,
+        } => format!("{numerator}/{denominator}"),
+        Figure::Value { value, n } => format!("{value} (n = {n})"),
+    };
+    let binding = match request.role {
+        Role::Candidate => format!("binding {}", r.candidate.artifact),
+        Role::CandidateCalibrated => {
+            let cals: Vec<String> = r.calibrations.iter().map(ToString::to_string).collect();
+            format!(
+                "binding {} with calibration {}",
+                r.candidate.artifact,
+                cals.join(", ")
+            )
+        }
+        Role::RulesBaseline => format!("rules baseline binding {}", r.rules_baseline),
+        Role::ExactBaseline => "the exact plan steps (no semantic binding)".into(),
+    };
+    let served = match request.served {
+        Served::Observed { version } => format!("served identity {version}"),
+        Served::Unknown => "served identity not observable".into(),
+    };
+    let slice = request
+        .slice
+        .map(|s| format!(" in slice {s}"))
+        .unwrap_or_default();
+    let sentence = format!(
+        "On dataset {}, split final_test, evaluator configuration {}, {binding}, calls {}, \
+         {served}, population {}: {} ({}){slice} is {value}.",
+        r.dataset,
+        r.config,
+        request.call_dates,
+        a.population.id,
+        request.figure,
+        request.role.name(),
+    );
+    let mut limits = vec![
+        format!("population: {}", a.population.limitations),
+        format!("near-duplicates: {}", a.splits.near_duplicates),
+        "no claim about another population, another binding, real user data not represented, \
+         or a served model version not observed"
+            .to_string(),
+        "point estimates without intervals (spec 023, 6.3)".to_string(),
+    ];
+    if !a.exposure.training_data.trim().is_empty() {
+        limits.push(format!(
+            "training-data exposure: {}",
+            a.exposure.training_data
+        ));
+    }
+    if !a.exposure.exposed_final_test.is_empty() {
+        limits.push(format!(
+            "{} exposed final-test cases are reported apart and excluded",
+            a.exposure.exposed_final_test.len()
+        ));
+    }
+    if let Some(c) = &a.exposure.ranking_caveat {
+        limits.push(format!("ranking exposure: {c}"));
+    }
+    if *request.served == Served::Unknown {
+        limits.push(
+            "a change of served model version during the calls would not have been visible".into(),
+        );
+    }
+    Ok(ScopedClaim { sentence, limits })
 }
