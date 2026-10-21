@@ -491,7 +491,12 @@ Bounds: at most 256 entries, each string at most 256 bytes, at most 8
 instance ids, at most 8 KiB of canonical bytes per entry (`bounded`
 cuts deterministically, further for strings that escape to several
 bytes); `check_version_members` refuses a member in the wrong version or
-beyond a bound. `project_v1` removes the list, changes only the schema tag
+beyond a bound, and the run record's parser applies it, so a version 1 or 3
+record carrying either member, or a version 2 record without the list or
+beyond its bounds, is refused when read. The `rustev.run/1` and
+`rustev.run/3` schemas therefore keep their bytes, and the `rustev.run/2`
+schema requires the list (spec 027, 3.2.2: a schema describes its parser).
+`project_v1` removes the list, changes only the schema tag
 and is refused, never partial, for anything but a valid version 2 record.
 `rustev-core`: `EvidenceSink::run_schema` (the one schema a sink selects,
 `rustev.run/1` by default) and `DecisionBackend::take_remote_evidence`

@@ -192,3 +192,64 @@ fn version_2_projects_to_the_exact_version_1_bytes() {
     };
     assert_eq!(truncated.project_v1().unwrap(), v1());
 }
+
+#[test]
+fn the_parser_and_the_schemas_hold_the_version_rule() {
+    // Spec 020, 3.2: the remote evidence members are `rustev.run/2` only.
+    // The parser refuses them in versions 1 and 3 and requires the list in
+    // version 2, and each version's schema states the same (spec 027,
+    // 3.2.2: the schema describes the parser).
+    let schemas = rustev_contract::schema_emit::document_schemas();
+    let validator = |file: &str| {
+        let s = schemas.iter().find(|s| s.file == file).unwrap();
+        let v: serde_json::Value = serde_json::from_slice(&s.bytes).unwrap();
+        jsonschema::validator_for(&v).unwrap()
+    };
+    let refused = |r: &RunRecord| {
+        let bytes = rustev_contract::canonical::canonical_bytes(r).unwrap();
+        assert!(
+            matches!(RunRecord::parse(&bytes), Err(DocumentError::Parse(_))),
+            "{}",
+            String::from_utf8_lossy(&bytes)
+        );
+        serde_json::from_slice::<serde_json::Value>(&bytes).unwrap()
+    };
+    for (version, file) in [
+        (schema::RUN, "rustev.run-1.schema.json"),
+        (schema::RUN_V3, "rustev.run-3.schema.json"),
+    ] {
+        let schema = validator(file);
+        let stray = RunRecord {
+            schema: version.into(),
+            remote_evidence: Some(vec![entry(0, 4)]),
+            ..v1()
+        };
+        assert!(!schema.is_valid(&refused(&stray)), "{file}");
+        let flag = RunRecord {
+            schema: version.into(),
+            remote_evidence_truncated: true,
+            ..v1()
+        };
+        assert!(!schema.is_valid(&refused(&flag)), "{file}");
+    }
+    let v2_schema = validator("rustev.run-2.schema.json");
+    let missing = RunRecord {
+        schema: schema::RUN_V2.into(),
+        ..v1()
+    };
+    assert!(!v2_schema.is_valid(&refused(&missing)));
+    let mut null = refused(&missing);
+    null["remote_evidence"] = serde_json::Value::Null;
+    assert!(RunRecord::parse(&serde_json::to_vec(&null).unwrap()).is_err());
+    assert!(!v2_schema.is_valid(&null));
+    // Beyond its bounds, the list is refused when read too.
+    refused(&v2((0..=MAX_REMOTE_EVIDENCE)
+        .map(|i| entry(i, 4))
+        .collect()));
+    // Valid records of each version are read and fit their schema.
+    let ok = v2(vec![entry(0, 4)]);
+    let bytes = ok.canonical().unwrap();
+    assert_eq!(RunRecord::parse(&bytes).unwrap(), ok);
+    assert!(v2_schema.is_valid(&serde_json::from_slice(&bytes).unwrap()));
+    assert!(validator("rustev.run-1.schema.json").is_valid(&serde_json::from_str(V1).unwrap()));
+}

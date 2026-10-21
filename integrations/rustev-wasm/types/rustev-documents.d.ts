@@ -8339,68 +8339,6 @@ export namespace RustevRun1 {
   export type ExecutionPolicyId = string;
   export type ArtifactId = string;
   /**
-   * How the attempt's charge was established.
-   */
-  export type ChargeProvenance = "reported" | "attributed" | "nothing_sent" | "unknown";
-  /**
-   * The closed error taxonomy (spec 009, 3.6). Each code maps to exactly one
-   * spec 003 failure class; the mapping lives with the adapters, because the
-   * failure classes of the backend seam are not contract types.
-   */
-  export type RemoteCode =
-    | "transport_unsent"
-    | "transport_interrupted"
-    | "rate_limited"
-    | "overloaded"
-    | "unauthorized"
-    | "capability"
-    | "malformed_request"
-    | "malformed_response"
-    | "identity_mismatch"
-    | "remote_deadline"
-    | "remote_error"
-    | "cancelled";
-  /**
-   * Where the exchange record of an attempt is, or why it cannot be named.
-   */
-  export type ExchangeReference =
-    | {
-        retained: {
-          /**
-           * The exchange record's record digest.
-           */
-          digest: string;
-          /**
-           * An opaque host reference, never a URL with credentials.
-           */
-          locator: string;
-          retention: RetentionClass;
-          /**
-           * The exchange record's schema.
-           */
-          schema: string;
-        };
-      }
-    | {
-        unavailable: {
-          reason: EvidenceUnavailable;
-        };
-      };
-  /**
-   * What the host retained of an exchange.
-   */
-  export type RetentionClass = "digest_only" | "bytes_retained";
-  /**
-   * Why an attempt's exchange record cannot be named (spec 020, 3.2): stated,
-   * never reconstructed.
-   */
-  export type EvidenceUnavailable = "no_exchange" | "pending" | "not_delivered" | "no_locator";
-  export type RemoteState = "finished" | "stopped" | "possibly_continuing";
-  /**
-   * What a served identity is worth (spec 009, 3.7).
-   */
-  export type Disclosure = "pinned" | "reported" | "unknown";
-  /**
    * What is known about cancelling an attempt (spec 003, 3.7.3).
    */
   export type Cancellation =
@@ -8457,6 +8395,7 @@ export namespace RustevRun1 {
    * or a fallback trigger.
    */
   export type FailureClass = "invalid_output" | "transient" | "overloaded" | "permanent" | "timed_out" | "adapter_fault";
+  export type RemoteState = "finished" | "stopped" | "possibly_continuing";
   export type OptimizationMechanism = "independent" | "batch" | "memory_cache";
   export type OptimizationOutcome = "bypassed" | "miss" | "hit" | "batched" | "refused";
   export type RequestResult =
@@ -8501,16 +8440,6 @@ export namespace RustevRun1 {
     decision_id: string;
     execution: RecordedExecution;
     plan_id: PlanId;
-    /**
-     * `rustev.run/2` only (spec 020, 3.2): at most one entry per remote
-     * attempt, in attempt order, at most [`MAX_REMOTE_EVIDENCE`]. Absent in
-     * every other version, so their bytes are unchanged.
-     */
-    remote_evidence?: RemoteEvidence[] | null;
-    /**
-     * `rustev.run/2` only: remote attempts beyond the bound have no entry.
-     */
-    remote_evidence_truncated?: boolean;
     /**
      * In the order the core listed them.
      */
@@ -8849,64 +8778,6 @@ export namespace RustevRun1 {
      * True only under `hard` with no liability and no bound violation.
      */
     within_guaranteed_cap: boolean;
-  }
-  /**
-   * One remote attempt's evidence reference in `rustev.run/2` (spec 020,
-   * 3.2, I-4). It names the exchange record, never embeds it: no request or
-   * response body, credential, secret address, unredacted principal
-   * reference, provider reasoning or header.
-   */
-  export interface RemoteEvidence {
-    attempt_id: string;
-    /**
-     * Present when the attempt was a member of a batched exchange.
-     */
-    batch?: BatchMembership | null;
-    /**
-     * The adapter binding (its artifact), the protocol or foreign mapping
-     * version, and the endpoint class (never a secret URL).
-     */
-    binding: ArtifactId;
-    charge_provenance: ChargeProvenance;
-    /**
-     * The remote error code of a failed attempt.
-     */
-    code?: RemoteCode | null;
-    endpoint_class: string;
-    exchange: ExchangeReference;
-    instance: string[];
-    /**
-     * The principal reference's evidence digest, only when one was sent.
-     */
-    principal_digest?: string | null;
-    protocol: string;
-    /**
-     * The attempt's final remote state, as the run record has it.
-     */
-    remote_state: RemoteState;
-    /**
-     * What the adapter asked for; `None` when it names no model.
-     */
-    requested_identity?: string | null;
-    served: ServedIdentity;
-    /**
-     * The decision step and logical request (instance) the attempt served.
-     */
-    step: string;
-  }
-  /**
-   * An attempt's place in a batched exchange.
-   */
-  export interface BatchMembership {
-    batch_id: string;
-    index: number;
-  }
-  /**
-   * A served identity as recorded (spec 009, 3.7).
-   */
-  export interface ServedIdentity {
-    disclosure: Disclosure;
-    identity?: string | null;
   }
   export interface RequestRecord {
     attempts: AttemptRecord[];
@@ -9624,7 +9495,7 @@ export namespace RustevRun2 {
      * attempt, in attempt order, at most [`MAX_REMOTE_EVIDENCE`]. Absent in
      * every other version, so their bytes are unchanged.
      */
-    remote_evidence?: RemoteEvidence[] | null;
+    remote_evidence: RemoteEvidence[];
     /**
      * `rustev.run/2` only: remote attempts beyond the bound have no entry.
      */
@@ -10575,68 +10446,6 @@ export namespace RustevRun3 {
   export type ExecutionPolicyId = string;
   export type ArtifactId = string;
   /**
-   * How the attempt's charge was established.
-   */
-  export type ChargeProvenance = "reported" | "attributed" | "nothing_sent" | "unknown";
-  /**
-   * The closed error taxonomy (spec 009, 3.6). Each code maps to exactly one
-   * spec 003 failure class; the mapping lives with the adapters, because the
-   * failure classes of the backend seam are not contract types.
-   */
-  export type RemoteCode =
-    | "transport_unsent"
-    | "transport_interrupted"
-    | "rate_limited"
-    | "overloaded"
-    | "unauthorized"
-    | "capability"
-    | "malformed_request"
-    | "malformed_response"
-    | "identity_mismatch"
-    | "remote_deadline"
-    | "remote_error"
-    | "cancelled";
-  /**
-   * Where the exchange record of an attempt is, or why it cannot be named.
-   */
-  export type ExchangeReference =
-    | {
-        retained: {
-          /**
-           * The exchange record's record digest.
-           */
-          digest: string;
-          /**
-           * An opaque host reference, never a URL with credentials.
-           */
-          locator: string;
-          retention: RetentionClass;
-          /**
-           * The exchange record's schema.
-           */
-          schema: string;
-        };
-      }
-    | {
-        unavailable: {
-          reason: EvidenceUnavailable;
-        };
-      };
-  /**
-   * What the host retained of an exchange.
-   */
-  export type RetentionClass = "digest_only" | "bytes_retained";
-  /**
-   * Why an attempt's exchange record cannot be named (spec 020, 3.2): stated,
-   * never reconstructed.
-   */
-  export type EvidenceUnavailable = "no_exchange" | "pending" | "not_delivered" | "no_locator";
-  export type RemoteState = "finished" | "stopped" | "possibly_continuing";
-  /**
-   * What a served identity is worth (spec 009, 3.7).
-   */
-  export type Disclosure = "pinned" | "reported" | "unknown";
-  /**
    * What is known about cancelling an attempt (spec 003, 3.7.3).
    */
   export type Cancellation =
@@ -10693,6 +10502,7 @@ export namespace RustevRun3 {
    * or a fallback trigger.
    */
   export type FailureClass = "invalid_output" | "transient" | "overloaded" | "permanent" | "timed_out" | "adapter_fault";
+  export type RemoteState = "finished" | "stopped" | "possibly_continuing";
   export type OptimizationMechanism = "independent" | "batch" | "memory_cache";
   export type OptimizationOutcome = "bypassed" | "miss" | "hit" | "batched" | "refused";
   export type RequestResult =
@@ -10737,16 +10547,6 @@ export namespace RustevRun3 {
     decision_id: string;
     execution: RecordedExecution;
     plan_id: PlanId;
-    /**
-     * `rustev.run/2` only (spec 020, 3.2): at most one entry per remote
-     * attempt, in attempt order, at most [`MAX_REMOTE_EVIDENCE`]. Absent in
-     * every other version, so their bytes are unchanged.
-     */
-    remote_evidence?: RemoteEvidence[] | null;
-    /**
-     * `rustev.run/2` only: remote attempts beyond the bound have no entry.
-     */
-    remote_evidence_truncated?: boolean;
     /**
      * In the order the core listed them.
      */
@@ -11085,64 +10885,6 @@ export namespace RustevRun3 {
      * True only under `hard` with no liability and no bound violation.
      */
     within_guaranteed_cap: boolean;
-  }
-  /**
-   * One remote attempt's evidence reference in `rustev.run/2` (spec 020,
-   * 3.2, I-4). It names the exchange record, never embeds it: no request or
-   * response body, credential, secret address, unredacted principal
-   * reference, provider reasoning or header.
-   */
-  export interface RemoteEvidence {
-    attempt_id: string;
-    /**
-     * Present when the attempt was a member of a batched exchange.
-     */
-    batch?: BatchMembership | null;
-    /**
-     * The adapter binding (its artifact), the protocol or foreign mapping
-     * version, and the endpoint class (never a secret URL).
-     */
-    binding: ArtifactId;
-    charge_provenance: ChargeProvenance;
-    /**
-     * The remote error code of a failed attempt.
-     */
-    code?: RemoteCode | null;
-    endpoint_class: string;
-    exchange: ExchangeReference;
-    instance: string[];
-    /**
-     * The principal reference's evidence digest, only when one was sent.
-     */
-    principal_digest?: string | null;
-    protocol: string;
-    /**
-     * The attempt's final remote state, as the run record has it.
-     */
-    remote_state: RemoteState;
-    /**
-     * What the adapter asked for; `None` when it names no model.
-     */
-    requested_identity?: string | null;
-    served: ServedIdentity;
-    /**
-     * The decision step and logical request (instance) the attempt served.
-     */
-    step: string;
-  }
-  /**
-   * An attempt's place in a batched exchange.
-   */
-  export interface BatchMembership {
-    batch_id: string;
-    index: number;
-  }
-  /**
-   * A served identity as recorded (spec 009, 3.7).
-   */
-  export interface ServedIdentity {
-    disclosure: Disclosure;
-    identity?: string | null;
   }
   export interface RequestRecord {
     attempts: AttemptRecord[];

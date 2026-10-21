@@ -48,7 +48,8 @@ crate::document::versioned_document!(
     RunRecord,
     [schema::RUN, schema::RUN_V2, schema::RUN_V3],
     "rustev.run/1 or rustev.run/2 or rustev.run/3",
-    RECORD_V1
+    RECORD_V1,
+    check = RunRecord::parsed_members_fit
 );
 
 /// The most remote evidence entries one `rustev.run/2` record holds.
@@ -103,6 +104,14 @@ impl RunRecord {
             ),
             _ => Ok(()),
         }
+    }
+
+    /// The parser's version rule: a record carries the remote evidence
+    /// members exactly in `rustev.run/2`, within their bounds, so a version
+    /// 1 or 3 record with them, or a version 2 record without the list, is
+    /// refused when read, not only when projected.
+    fn parsed_members_fit(&self) -> Result<(), String> {
+        self.check_version_members().map_err(|e| e.to_string())
     }
 
     /// The deterministic version 1 projection of a `rustev.run/2` record
