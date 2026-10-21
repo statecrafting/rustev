@@ -1,0 +1,28 @@
+{
+  "name": "@statecrafting/rustev-linux-arm64-musl",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Rustev's Node-API addon for linux-arm64-musl; installed through @statecrafting/rustev, never directly.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/statecrafting/rustev.git",
+    "directory": "integrations/rustev-node/npm/linux-arm64-musl"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "libc": [
+    "musl"
+  ],
+  "main": "rustev.linux-arm64-musl.node",
+  "files": [
+    "rustev.linux-arm64-musl.node"
+  ]
+}
