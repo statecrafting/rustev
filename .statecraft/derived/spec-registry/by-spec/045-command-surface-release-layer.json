@@ -35,7 +35,7 @@
       }
     ],
     "sectionDigests": {
-      "045-the-command-surface-in-the-release-family-amends-031": "ee26a8ee666dd78e67f45ac8c3c89e8a4ff50f79513828c932f9a4d06c7c1048",
+      "045-the-command-surface-in-the-release-family-amends-031": "3c83c70bc6eaa2a63a13ae0f7fe7a95215eff68c7a5806c626eabb1b56198f03",
       "1-purpose": "e51613373cad11d1d6b59afac13b846d346ae0704cf8d1e3242f4fb28d328cc3",
       "2-territory": "04be079fe1004445065fd3df22ffc30e4f5984132d1444aa930a80d03d1ced7f",
       "3-1-membership": "c53cc0541f4fe54aeb037abbaa092aa090c3df5251f54818df44d43f08f29024",
@@ -44,7 +44,8 @@
       "4-out-of-scope": "9a6267ccffbbb1f9949398dc28958e8bb96796f030c9be98b8965a8c5d722769",
       "5-observable-negative-cases": "40ede3961bc0459e815e77b82e22d81f38fc8a1172a8280a94cfddc6a4975e5c",
       "acceptance": "89794d621751f5b248119dafc4dc8ff2a70fc6da153039af26423a444e8ccd85",
-      "verification": "0c26242c03ceca7fab9d7ef8a3d4a25fea964f73e26c38ccb027a5bbfe333d52"
+      "implementation-record": "fa902ed26ab95aa89c878a7d58eba1d0fb09189902ea66fbdaad662b14d6a34a",
+      "verification": "e9d423c50246cd7eaa7fa5e24a23b8287bf30260d855bfae599114e508eb6f49"
     },
     "sectionHeadings": [
       "045: The command surface in the release family (amends 031)",
@@ -56,13 +57,14 @@
       "4. Out of scope",
       "5. Observable negative cases",
       "Acceptance",
-      "Verification"
+      "Verification",
+      "Implementation record"
     ],
     "specPath": "specs/045-command-surface-release-layer/spec.md",
     "status": "approved",
     "summary": "A narrow amendment of approved spec 031 (itself amending spec 021). Spec 027 adds `rustev-surface`, the pure command renderer every host calls, and requires the CLI to call it instead of its own copy. The CLI is a published release member, so its new dependency must be published first, in a crate layer of its own: 031 3.1's layer table has no slot between `rustev-eval` and the CLI. This spec adds `rustev-surface` to the release family, states the crate layers as the topological levels the release policy already computes from `cargo metadata`, admits a crate that a release member depends on once the crate exists and passes its checks, and keeps the release-set test's member list as the deliberate, reviewed record of membership. Ratified by the owner on 2026-10-20 (A-42).\n",
     "title": "The command surface in the release family (amends 031)"
   },
-  "shardHash": "246cc47f9906b14110e328a57783d5e54ee605f782e947452c285649cada8d33",
+  "shardHash": "a19af69b1a8e85d880a2f77ed4c7d353c134e138ffe5c31eac95e4eaf5176a00",
   "specVersion": "1.10.0"
 }

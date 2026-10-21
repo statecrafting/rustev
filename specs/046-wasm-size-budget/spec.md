@@ -2,7 +2,7 @@
 id: "046-wasm-size-budget"
 title: "The WebAssembly module's uncompressed size budget (amends 027)"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-20"
 summary: >
   A narrow amendment of approved spec 027 3.10.4. The uncompressed size
@@ -93,5 +93,31 @@ budgets; the native package.
 
 ## Verification
 
-Pending with implementation: spec 027's increment 5 applies the new value
-and records it.
+`make bindings` runs `tools/rustev-conformance/js/wasm-check.mjs`, which
+fails the run when the optimized module exceeds either gated size, and the
+CI `bindings` job (a required job of `ci-gate`) runs it on every pull
+request and push to `main`.
+
+## Implementation record
+
+**2026-10-21.** Spec 027's increment 5 applied the value:
+`tools/rustev-conformance/js/wasm-check.mjs` gates `raw_bytes` at
+2,621,440 and `gzip_bytes` at 786,432, names the measured and budgeted
+sizes in each failure, and writes both budgets into the measurement
+document (`rustev.wasm-measurement/1`, field `budgets`). Spec 027's
+increment 7 (#153) made `bindings` a required job. Its CI run 39684537149
+on #153's head `093f834` passed every job, among them `bindings / wasm`
+and the seven native platforms (darwin-arm64, darwin-x64,
+linux-x64-gnu, linux-arm64-gnu, linux-x64-musl, linux-arm64-musl,
+win32-x64-msvc); its measurement document (linux-x64, Node 22.23.3)
+records the optimized module at 2,251,563 bytes raw and 772,853 bytes
+gzip, within 2,621,440 and 786,432, with no failure. The push run on
+`main` at the merge commit `00a4b7c` (run 39688068295) passed the same
+jobs. The gzip budget, kept on purpose (3.3), now has 13,579 bytes of
+headroom.
+
+Both acceptance items hold, so `implementation` is `complete`: the first
+by the gate and measurement document above, the second because `make
+gate` passes at this change. Completion is a delivery record against the
+text the owner ratified (A-43), not a new owner decision; like every
+completed spec's, it needs none.

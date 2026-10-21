@@ -100,7 +100,7 @@
       }
     ],
     "id": "020-remote-protocol-refinements",
-    "implementation": "pending",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-4-phase-specific-time-ceilings",
@@ -151,7 +151,7 @@
       }
     ],
     "sectionDigests": {
-      "020-remote-protocol-and-evidence-refinements": "275f12ebf628a003c0876d00bcf07f0c19002e590382b510972ba682b4fd66c5",
+      "020-remote-protocol-and-evidence-refinements": "2cf968ef4bd5a14b720f98d46cf32934e99ca0eabe48256a5b1135236c496765",
       "1-purpose": "cd00ba5a53f35045c907ea3cdce177cdbe5bba971cc946ff103e28240b4ea6a3",
       "2-territory-versions-and-compatibility": "e8777389583e391c67215692e80100ddbd042bcdf01c5cfad4eae256f3b21e55",
       "3-1-identified-configuration": "76ad82b56d06cece13b93933d00a40f990b7bb4a6dfca9f6537eafe05980d22d",
@@ -165,9 +165,9 @@
       "4-out-of-scope": "620527646aedf8f66febeff70113353edd3b9bfa11695cd1aac31356dda533d3",
       "5-observable-negative-cases": "e2d118fdbdb851ec7dc9826622c706e5dc0e3477c2314bface45ea0ecbd5d8be",
       "acceptance": "002f4a8729da09ff90bdb359ed264064012a06ca1a8fbfc1b628a4ccee601069",
-      "implementation-record": "17c735dcaa51d7b6959f4c5abc7d1042c0627501e95c26f910493a10a27548b7",
+      "implementation-record": "b8aa06b88ff1c3d0e7bffb87f335871df46bb086679d2c0c02815e722b0dbb47",
       "questions-settled-by-r-34": "bd7de3ca783fc231f3b1df0a823cde967a0cba761da40838ac22967fe2cb8290",
-      "verification": "ebf7fe6e0c70523c5def24d00d45dca3291904b13c07f3fe0a188a28ba7de026"
+      "verification": "d4d96c978a1bcab24a209c5504c43a5e048869a885195a4bb5979c59c01f8cd1"
     },
     "sectionHeadings": [
       "020: Remote protocol and evidence refinements",
@@ -193,6 +193,6 @@
     "summary": "A separately reviewable refinement of the approved runtime and remote contracts: `rustev.run/2` references bounded remote exchange evidence, the runtime may dispatch an explicitly compatible general batch, transport phases receive identified ceilings inside one total attempt budget, connection reuse is bounded and isolation-keyed, and a host-operated endpoint may receive an opt-in opaque principal reference. All features default off or preserve version 1 behavior. Approval authorizes implementation only: no migration, qualification, deployment, live call, spend, or publication is authorized or claimed.\n",
     "title": "Remote protocol and evidence refinements"
   },
-  "shardHash": "b9add3d001f4617535bc663a54a987013f91237b903b3cb976f1d34342d7876d",
+  "shardHash": "82b8c39bc47924ebd0efb13079bfe9f84c7592e4282f10e1a299cc61af93d252",
   "specVersion": "1.10.0"
 }

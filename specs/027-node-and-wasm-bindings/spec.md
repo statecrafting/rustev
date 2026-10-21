@@ -2,7 +2,7 @@
 id: "027-node-and-wasm-bindings"
 title: "Node-API binding and WebAssembly build"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-16"
 summary: >
   Approved (A-23). Two host surfaces over the existing engine: `rustev-node`,
@@ -88,7 +88,7 @@ obligations:
 
 Approved by the owner (A-23, 2026-10-16, under the 2026-10-16 delivery work
 order) as its own reviewable change before any code (R-16); implementation is
-pending. It implements #76 child A1 (#56) and rests on R-38 (OD-5 of #76).
+complete (2026-10-21, with the known limitations R-47 records). It implements #76 child A1 (#56) and rests on R-38 (OD-5 of #76).
 Approval does not authorize publication to npm or crates.io, reservation of a
 package name or scope, a release or tag (spec 021 and its amendment by #76
 child A3 govern those, and each remains a separate owner act), a live provider
@@ -710,10 +710,21 @@ spans (#76 D1); any change to plan, identity or evidence bytes.
 
 ## Verification
 
-Pending with implementation. Approval of this spec satisfies no acceptance
-item. The implementation adds `verify:cli` entries for `make conformance`
-and `make boundaries` here, and records the first WebAssembly measurements
-and the CI jobs that ran the matrix.
+Declared for `spec-spine verify 027`; 027 joins `make verify`. The
+WebAssembly package, the native matrix and the Node versions are the CI
+`bindings` job's (`make bindings` and `.github/workflows/bindings.yml`),
+a required job of `ci-gate`; the first measurements and the CI runs are
+in the implementation record.
+
+```verify:cli
+# 3.12: the shared conformance suite's Rust runner (make conformance).
+cargo test -p rustev-conformance --locked
+# Section 2: the pure command surface and the CLI goldens it renders.
+cargo test -p rustev-surface --locked
+# 3.1, 3.10.1: the new families stay in integrations/ (make boundaries).
+cargo run -p rustev-boundaries --locked --quiet
+cargo test -p rustev-boundaries --locked
+```
 
 ## Implementation record
 
@@ -1101,6 +1112,36 @@ conformance suite on Node 22, and uploads the addon. Build images are
 pinned by digest. Checkout keeps the committed bytes on every platform
 (`core.autocrlf` off), because the fixtures and goldens are pinned by
 digest and the Windows runner would otherwise rewrite their line endings.
+
+**Completion, 2026-10-21.** CI run 39684537149 on #153's head `093f834`
+passed every job of `ci-gate`, among them `bindings / wasm` (the
+WebAssembly package in Node and headless Chromium, the drift checks, the
+import allowlist and the size and instantiation budgets: 2,251,563 bytes
+raw and 772,853 gzip against spec 046's 2,621,440 and 786,432, Node median
+7.7 ms, Chromium median 6.8 ms, on linux-x64 with Node 22.23.3), `bindings /
+node 20` and `node 24`, and `bindings / native` on the seven platforms,
+each running the differential corpus; the measurement document and the
+corpus results are that run's `bindings-measurement` artifact. The push
+run on `main` at `00a4b7c` (39688068295) passed the same jobs.
+
+Known limitations, recorded by the owner's ruling (R-47) rather than
+fixed. The owner chose to complete this spec with these two departures
+recorded instead of amending section 5 or 3.6.5: the approved text stands
+as written, and this record is the authoritative statement of where the
+implementation departs from it. Removing either departure, or amending
+the text to match it, is a later change under its own spec.
+
+1. A host backend's answer to an `AbortSignal` is always recorded
+   `not_observed` with possibly continuing work, never `stopped` or
+   `unconfirmed`: the runtime polls a cancelled attempt once (spec 003,
+   3.7.3), and a host seam, answering across threads without blocking
+   (3.6.1), is never ready then. Section 5's row "aborted after dispatch,
+   backend unconfirmed: the result records `unconfirmed`" holds for Rust
+   backends; for host backends the record is this more conservative one.
+2. Output failing the bounded parse follows 3.6.5 (the seam's typed
+   failure: `permanent`, charge unknown), not section 5's row naming
+   spec 003's invalid backend output; output that parses but the core
+   refuses is `invalid_backend_output`, as the tests show.
 
 ## Decisions at approval
 

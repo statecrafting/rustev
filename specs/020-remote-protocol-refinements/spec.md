@@ -2,7 +2,7 @@
 id: "020-remote-protocol-refinements"
 title: "Remote protocol and evidence refinements"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-26"
 summary: >
   A separately reviewable refinement of the approved runtime and remote
@@ -70,8 +70,9 @@ obligations:
 
 Approved (A-19, 2026-09-26) as its own reviewable change before any code
 (R-16). All six planned increments are delivered (see the implementation
-record); `implementation` stays `pending` until the owner rules on the
-acceptance items the record lists as not verifiable as written. Approval does not claim that a remote
+record); the owner ruled the two acceptance items the record lists as not
+verifiable as written not applicable as built (R-47), and `implementation`
+is `complete`. Approval does not claim that a remote
 provider, transport, batch path, pool, principal mapping, migration, or
 consumer has been qualified.
 
@@ -613,6 +614,13 @@ Not verifiable as written, for the owner to rule on:
    enabling one would need a new mapping version and a newly authorized
    qualification, which this spec does not authorize (3.7).
 
+**Ruling, 2026-10-21 (R-47).** The owner ruled both items not applicable
+as built: the binding is HTTP/1.1 only, so there is no multiplexed
+cancellation, and no refinement is enabled on the Jev adapter, so there is
+no new qualification evidence. `implementation` is `complete`, and 020
+joins `make verify`. An HTTP/2 binding or an enabled refinement would make
+the item applicable again, under its own authorization.
+
 Engineering choices made by the implementing agent, not by the owner:
 
 - 3.1 asks for explicit `disabled` values in the binding. They are explicit
@@ -658,8 +666,7 @@ Engineering choices made by the implementing agent, not by the owner:
 
 ## Verification
 
-Declared for `spec-spine verify 020`; 020 joins `make verify` when the
-implementation is complete.
+Declared for `spec-spine verify 020`; 020 is in `make verify` (R-47).
 
 ```verify:cli
 # 3.2, 3.4 to 3.6: documents, bounds, projection and byte pins.
