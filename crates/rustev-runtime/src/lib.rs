@@ -16,6 +16,7 @@ mod capture;
 pub mod clock;
 mod driver;
 pub mod ledger;
+mod live;
 mod optimization;
 mod sink;
 mod wait;
@@ -46,6 +47,7 @@ use tokio::sync::{OwnedSemaphorePermit, Semaphore, mpsc, oneshot};
 pub use capture::{CaptureConfig, CaptureConfigError, MAX_CAPTURE_BYTES};
 pub use clock::{Clock, Instant, ManualClock, TokioClock};
 pub use ledger::Ledger;
+pub use live::{DispatchAnswer, LiveAuthorizer, LiveRefusal, LiveRequest, LiveResult};
 pub use optimization::InvalidationResult;
 pub use sink::{DeliveryFailure, DeliveryTicket, SinkPolicy, SinkStats};
 
@@ -593,7 +595,7 @@ impl Runtime {
         req: DecisionRequest,
         cancel: &CancelSignal,
     ) -> Result<Decided, DecideError> {
-        self.run(plan, req, cancel, None).await
+        self.run(plan, req, cancel, None, None).await
     }
 
     /// [`Runtime::decide`] with opt-in bounded capture of every supplied
@@ -616,7 +618,9 @@ impl Runtime {
         capture.check()?;
         let decision_id = req.decision_id.clone();
         let mut capturing = capture::Capturing::new(capture);
-        let result = self.run(plan, req, cancel, Some(&mut capturing)).await;
+        let result = self
+            .run(plan, req, cancel, Some(&mut capturing), None)
+            .await;
         let capture = match &result {
             Err(DecideError::Rejected(_)) => CaptureOutcome::NotAdmitted,
             Ok(Decided { record, .. }) | Err(DecideError::EvidenceNotDelivered { record, .. }) => {
@@ -634,6 +638,7 @@ impl Runtime {
         req: DecisionRequest,
         cancel: &CancelSignal,
         capture: Option<&mut capture::Capturing<'_>>,
+        live: Option<&live::LiveCtx<'_>>,
     ) -> Result<Decided, DecideError> {
         let i = &*self.inner;
         // The runtime waits on its own child of the caller's signal, so a
@@ -702,6 +707,7 @@ impl Runtime {
                 decision_id: &req.decision_id,
                 principal: &req.principal_handle,
                 ev: &ev,
+                live,
             };
             driver::run_requests(&cx, capture).await
         };

@@ -28,6 +28,10 @@
       {
         "path": "crates/rustev-runtime/",
         "source": "spec-edge"
+      },
+      {
+        "path": "tools/rustev-release/",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
@@ -68,6 +72,19 @@
         "unit": {
           "kind": "directory",
           "path": "crates/rustev-runtime/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "tools/rustev-release/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-release/"
         }
       },
       {
@@ -114,5 +131,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "02e0067fd07fbfc8ec3b3d28f87a6a81336e1fd96bf9d2528881c25414314dfc"
+  "shardHash": "915e17b3863ca1719a8ba50f4ff72f2c94cbcc6d1c4b42a40ea5b56e980d6bcf"
 }

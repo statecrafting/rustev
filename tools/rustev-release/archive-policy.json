@@ -32,6 +32,7 @@
         "src/judgment.rs",
         "src/lib.rs",
         "src/limits.rs",
+        "src/live.rs",
         "src/optimization.rs",
         "src/output.rs",
         "src/plan.rs",
@@ -92,6 +93,7 @@
         "src/driver.rs",
         "src/ledger.rs",
         "src/lib.rs",
+        "src/live.rs",
         "src/optimization.rs",
         "src/sink.rs",
         "src/wait.rs"
@@ -115,6 +117,7 @@
         "src/doc.rs",
         "src/fit.rs",
         "src/lib.rs",
+        "src/live.rs",
         "src/metrics.rs",
         "src/optimization.rs",
         "src/replay.rs",

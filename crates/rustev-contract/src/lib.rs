@@ -25,6 +25,7 @@ pub mod grade;
 pub mod ids;
 pub mod judgment;
 pub mod limits;
+pub mod live;
 pub mod optimization;
 pub mod output;
 pub mod plan;
@@ -87,4 +88,6 @@ pub mod schema {
     pub const JUDGMENT_V2: &str = "rustev.judgment/2";
     /// Context source descriptors (spec 032, 3.3.1).
     pub const SOURCE: &str = "rustev.source/1";
+    /// Live re-execution evidence (spec 026, 3.6).
+    pub const LIVE_REEXECUTION: &str = "rustev.live-reexecution/1";
 }
