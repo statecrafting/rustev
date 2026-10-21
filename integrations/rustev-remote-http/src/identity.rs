@@ -9,6 +9,7 @@ use rustev_contract::remote::{Disclosure, ServedIdentity, ServedTerms};
 use serde::Serialize;
 
 use crate::phases::TransportPhases;
+use crate::pool::PoolBinding;
 use crate::principal::PrincipalWire;
 
 /// The tag of an adapter binding's digest.
@@ -48,6 +49,10 @@ pub struct AdapterBinding {
     /// 3.1 and 3.6); never a reference. Not written when omitted.
     #[serde(skip_serializing_if = "PrincipalWire::is_omitted")]
     pub principal_wire: PrincipalWire,
+    /// The connection-pool policy and isolation-key schema (spec 020, 3.1
+    /// and 3.5). Not written when disabled.
+    #[serde(skip_serializing_if = "PoolBinding::is_disabled")]
+    pub connection_pool: PoolBinding,
 }
 
 impl AdapterBinding {
@@ -170,6 +175,7 @@ mod tests {
             max_response_bytes: 1,
             transport_phases: TransportPhases::Disabled,
             principal_wire: PrincipalWire::Omitted,
+            connection_pool: PoolBinding::Disabled,
         };
         assert_eq!(
             String::from_utf8(canonical_bytes(&b).unwrap()).unwrap(),
@@ -199,6 +205,7 @@ mod tests {
             max_response_bytes: 1,
             transport_phases: TransportPhases::Disabled,
             principal_wire: PrincipalWire::Omitted,
+            connection_pool: PoolBinding::Disabled,
         };
         let a = base.artifact().unwrap();
         assert_eq!(a, base.clone().artifact().unwrap());
@@ -255,6 +262,22 @@ mod tests {
                 principal_wire: PrincipalWire::HostOperated {
                     mapping_version: "m/1".into(),
                     scope: "s".into(),
+                },
+                ..base.clone()
+            },
+            AdapterBinding {
+                connection_pool: PoolBinding::Enabled {
+                    policy: crate::pool::PoolPolicy {
+                        max_connections: 1,
+                        max_per_origin: 1,
+                        max_streams: 1,
+                        max_idle: 1,
+                        idle_lifetime_ms: 1,
+                        max_lifetime_ms: 1,
+                        max_uses: 1,
+                        on_exhaustion: crate::pool::OnExhaustion::Refuse,
+                    },
+                    key_schema: crate::pool::POOL_KEY_SCHEMA.into(),
                 },
                 ..base.clone()
             },

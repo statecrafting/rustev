@@ -543,9 +543,91 @@ pub struct ExchangeRecord {
     /// without one keeps its spec 009 bytes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub phase_expiry: Option<PhaseExpiry>,
+    /// The pooled connection the exchange used (spec 020, 3.5); absent
+    /// when connection reuse is disabled.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connection: Option<ConnectionObservation>,
 }
 
 crate::document::document!(ExchangeRecord, schema::REMOTE_EXCHANGE, EXCHANGE_V1);
+
+/// Whether an exchange's connection was opened for it or reused.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ConnectionReuse {
+    Fresh,
+    Reused,
+}
+
+/// A connection's age when an exchange took it, bucketed so evidence holds
+/// no timing beyond what the bound needs.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum AgeBucket {
+    Under1s,
+    Under10s,
+    Under60s,
+    Under600s,
+    Over600s,
+}
+
+impl AgeBucket {
+    pub fn of_ms(ms: u64) -> Self {
+        match ms {
+            0..1_000 => AgeBucket::Under1s,
+            1_000..10_000 => AgeBucket::Under10s,
+            10_000..60_000 => AgeBucket::Under60s,
+            60_000..600_000 => AgeBucket::Under600s,
+            _ => AgeBucket::Over600s,
+        }
+    }
+}
+
+/// How requests share a connection. HTTP/1.1, the only binding today,
+/// carries one request at a time.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Multiplex {
+    None,
+}
+
+/// Why a pooled connection left the pool (spec 020, 3.5).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum EvictionReason {
+    /// Idle longer than the policy's idle lifetime.
+    IdleExpired,
+    /// Older than the policy's absolute lifetime.
+    LifetimeExpired,
+    /// Used as often as the policy allows.
+    MaxUses,
+    /// More idle connections than the policy allows.
+    IdleCapacity,
+    /// Closed to make room for a connection under another key.
+    Capacity,
+    /// Found closed by the remote side or the connection.
+    Closed,
+    /// The exchange on it failed or did not finish its response.
+    Failed,
+}
+
+/// The connection an exchange used (spec 020, 3.5): fresh or reused, a
+/// nonsecret instance id, its age bucket and use count, the multiplex
+/// posture, the isolation-key digest, and why it left the pool after this
+/// exchange, if it did.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ConnectionObservation {
+    pub reuse: ConnectionReuse,
+    pub instance_id: String,
+    pub age_bucket: AgeBucket,
+    pub use_count: u64,
+    pub multiplex: Multiplex,
+    pub key_digest: String,
+    pub eviction: Option<EvictionReason>,
+}
 
 /// A transport phase with its own ceiling inside the one attempt budget
 /// (spec 020, 3.4), in the order an exchange passes through them.
@@ -736,6 +818,10 @@ impl ExchangeRecord {
         }
         self.privacy_requested = cut_map(std::mem::take(&mut self.privacy_requested), &mut t);
         self.provider_extras = cut_map(std::mem::take(&mut self.provider_extras), &mut t);
+        if let Some(c) = &mut self.connection {
+            cut_flag(&mut c.instance_id, &mut t);
+            cut_flag(&mut c.key_digest, &mut t);
+        }
         if let Some(p) = &mut self.principal {
             cut_flag(&mut p.digest, &mut t);
             if p.mapping_version.len() > MAX_PRINCIPAL_LABEL_BYTES {
@@ -782,6 +868,10 @@ impl ExchangeRecord {
             && self.principal.as_ref().is_none_or(|p| {
                 t(&p.digest) && p.mapping_version.len() <= MAX_PRINCIPAL_LABEL_BYTES
             })
+            && self
+                .connection
+                .as_ref()
+                .is_none_or(|c| t(&c.instance_id) && t(&c.key_digest))
     }
 
     /// Parse under [`EXCHANGE_V1`] and refuse a record beyond its bounds.
@@ -979,6 +1069,7 @@ mod tests {
             truncated: false,
             phase_expiry: None,
             principal: None,
+            connection: None,
         }
     }
 
@@ -1034,6 +1125,37 @@ mod tests {
         rec.principal = Some(e);
         round_trip(&rec);
         assert!(rec.is_bounded());
+    }
+
+    #[test]
+    fn a_connection_observation_is_omitted_without_a_pool_and_round_trips_with_one() {
+        let plain = String::from_utf8(exchange().canonical().unwrap()).unwrap();
+        assert!(!plain.contains("connection"));
+        let mut rec = exchange();
+        rec.connection = Some(ConnectionObservation {
+            reuse: ConnectionReuse::Reused,
+            instance_id: "conn-7".into(),
+            age_bucket: AgeBucket::of_ms(1_500),
+            use_count: 2,
+            multiplex: Multiplex::None,
+            key_digest: A.into(),
+            eviction: Some(EvictionReason::MaxUses),
+        });
+        round_trip(&rec);
+        assert_eq!(
+            rec.connection.as_ref().unwrap().age_bucket,
+            AgeBucket::Under10s
+        );
+        for (ms, b) in [
+            (0, AgeBucket::Under1s),
+            (999, AgeBucket::Under1s),
+            (1_000, AgeBucket::Under10s),
+            (59_999, AgeBucket::Under60s),
+            (60_000, AgeBucket::Under600s),
+            (600_000, AgeBucket::Over600s),
+        ] {
+            assert_eq!(AgeBucket::of_ms(ms), b);
+        }
     }
 
     #[test]

@@ -161,6 +161,7 @@
         "src/identity.rs",
         "src/lib.rs",
         "src/phases.rs",
+        "src/pool.rs",
         "src/principal.rs",
         "src/server.rs",
         "src/taxonomy.rs",

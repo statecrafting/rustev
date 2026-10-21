@@ -427,6 +427,52 @@ the answer closed and an authorization claim kept as a provider extra
 without effect, a redirect never followed), unit tests in the module and in
 the contract.
 
+**Increment 3 (bounded connection reuse).**
+`integrations/rustev-remote-http/src/pool.rs`: `PoolPolicy` (total
+connections, per origin, streams per connection, idle connections, idle
+lifetime, absolute lifetime, uses per connection, and `refuse` or
+`queue{max_wait_ms}` on exhaustion; every bound positive, per-origin and
+idle bounds within the total), `ConnectionPool`, a host-owned object
+clients may share, and `KeyMaterial`, the isolation key: endpoint class,
+scheme and authority, wire protocol and HTTP version, proxy route
+(`direct`), TLS posture (`plaintext`, `webpki-roots`, or the host's
+`ClientConfig::tls_label` for its own configuration), the credential
+identity digest (`rustev.credential-identity/1`, never the credential),
+privacy options, principal posture with mapping version and scope, the
+principal reference's evidence digest per exchange, the key schema
+(`rustev.pool-key/1`) and the adapter binding. The key is the tagged
+digest of its canonical material; an unknown member (a custom TLS
+configuration without a label, no binding, another schema) makes a key
+that never reuses. An idle connection is taken only under the exact key;
+when the pool is full, an idle connection of another key is closed (never
+moved) to make room. Checkout sweeps closed, idle-expired and
+lifetime-expired connections; release evicts on failure or an unfinished
+response, closure, the use bound or the lifetime, and the oldest idle
+connection gives way past the idle bound. Exhaustion refuses at once or
+waits within the declared wait and the attempt budget, then is
+`transport_unsent` with `observed{0}`. `HttpTransport::post_observed`
+runs an exchange on a pooled connection whose stream reports to hooks
+swapped per exchange (`wire::IoHooks`), so the request-byte tracker and the
+phase clock are always the current exchange's; a reused connection skips
+resolution, connect and handshake without carrying their ceilings. A stale
+connection is never replaced mid-exchange: one that fails before request
+bytes is `transport_unsent`, after them `transport_interrupted`, and the
+adapter adds no reconnect or replay. Cancel exchanges always use a fresh
+connection. The exchange record gains an optional `connection`: fresh or
+reused, the nonsecret instance id, an age bucket, the use count, the
+multiplex posture (`none`), the isolation-key digest and the eviction
+reason. The binding gains `connection_pool` (policy and key schema), not
+written when disabled. Tests: the pool's unit tests (every key member,
+unknown material, every bound and eviction rule on a paused clock, refuse
+and queue within the wait and the budget) and
+`integrations/rustev-remote-http/tests/pool.rs` over loopback behind a
+counting TCP front (no reuse when disabled; one connection for three
+exchanges; the use bound; credential rotation and two clients with one
+binding sharing; privacy options and endpoint class as key members;
+principal rotation; a closed idle connection evicted at checkout; a stale
+connection failing after request bytes, interrupted with no reconnect;
+exhaustion refused before any byte).
+
 Engineering choices made by the implementing agent, not by the owner:
 
 - 3.1 asks for explicit `disabled` values in the binding. They are explicit
@@ -443,6 +489,13 @@ Engineering choices made by the implementing agent, not by the owner:
   version 1 server refuses a version 2 describe with 400, which
   construction reports as a negotiation failure (`malformed_request`); no
   plan can be compiled against the adapter.
+- The HTTP binding speaks HTTP/1.1 only, so a pool policy must declare
+  one stream per connection and nothing is multiplexed; the multiplex
+  cancellation item of the acceptance therefore has nothing to cover until
+  a binding that multiplexes exists.
+- The authority in the isolation key is the configured scheme, host and
+  port, not the resolved address: two names for one address never share a
+  connection.
 - A host-operated `rustev.remote/1` server hands a version 2 request's
   reference to the hosted backend as `CallContext::principal_handle`; spec
   009's engineering choice of an empty handle still holds for every

@@ -44,10 +44,13 @@ use crate::exchange::{
     ExchangeSink, ExchangeStats, Exchanges, ReconciliationOffer, RetainedBytes, blank_record,
     output_digest,
 };
-use crate::http::{Endpoint, EndpointError, HttpReply, HttpTransport, Secret, TransportError};
+use crate::http::{
+    Endpoint, EndpointError, HttpPool, HttpReply, HttpTransport, Scheme, Secret, TransportError,
+};
 use crate::identity::{AdapterBinding, served_identity};
 use crate::phases::TransportPhases;
-use crate::principal::{EndpointOperator, PrincipalPosture};
+use crate::pool::{KeyMaterial, POOL_KEY_SCHEMA, PoolBinding, credential_identity};
+use crate::principal::{EndpointOperator, PrincipalPosture, PrincipalWire};
 use crate::server::{CANCEL_PATH, DESCRIBE_PATH, INFER_PATH};
 use crate::taxonomy::{RemoteFailure, classify_status, is_local_only};
 use crate::wire::{SentTracker, digest_bytes};
@@ -114,6 +117,14 @@ pub struct ClientConfig {
     pub operator: EndpointOperator,
     /// The principal wire posture; omitted by default (spec 020, 3.6).
     pub principal: PrincipalPosture,
+    /// Reuse connections from this host-owned pool (spec 020, 3.5); none
+    /// by default, so every exchange opens its own connection. Clients
+    /// sharing a pool share connections only under an exact isolation key.
+    pub pool: Option<Arc<HttpPool>>,
+    /// The host's nonsecret label for its own `tls` configuration, an
+    /// isolation-key member. With a custom configuration and no label the
+    /// key is unknown and no connection is reused.
+    pub tls_label: Option<String>,
 }
 
 impl ClientConfig {
@@ -141,6 +152,8 @@ impl ClientConfig {
             protocol_major: PROTOCOL_MAJOR,
             operator: EndpointOperator::ThirdParty,
             principal: PrincipalPosture::Omitted,
+            pool: None,
+            tls_label: None,
         }
     }
 }
@@ -440,10 +453,56 @@ impl RemoteClient {
             max_request_bytes: remote.terms.max_request_bytes,
             max_response_bytes: remote.terms.max_response_bytes,
             transport_phases: config.phases,
-            principal_wire,
+            principal_wire: principal_wire.clone(),
+            connection_pool: config
+                .pool
+                .as_ref()
+                .map(|p| p.binding())
+                .unwrap_or(PoolBinding::Disabled),
         }
         .artifact()
         .map_err(|e| SetupError::Identity(e.to_string()))?;
+        // Exchanges after negotiation may reuse connections; negotiation
+        // itself used a fresh one.
+        let transport = match &config.pool {
+            None => transport,
+            Some(pool) => {
+                let endpoint = transport.endpoint().clone();
+                let tls = match (endpoint.scheme, &config.tls, &config.tls_label) {
+                    (Scheme::Http, _, _) => Some("plaintext".to_string()),
+                    (Scheme::Https, None, _) => Some("webpki-roots".to_string()),
+                    (Scheme::Https, Some(_), label) => label.clone(),
+                };
+                let material = KeyMaterial {
+                    schema: POOL_KEY_SCHEMA.into(),
+                    endpoint_class: config.endpoint_class.clone(),
+                    authority: format!(
+                        "{}://{}:{}",
+                        match endpoint.scheme {
+                            Scheme::Http => "http",
+                            Scheme::Https => "https",
+                        },
+                        endpoint.host,
+                        endpoint.port
+                    ),
+                    protocol: format!("{protocol} http/1.1"),
+                    proxy_route: "direct".into(),
+                    tls,
+                    credential: credential_identity(config.bearer.as_ref().map(|s| s.expose())),
+                    privacy: config.privacy.clone(),
+                    principal_posture: match &principal_wire {
+                        PrincipalWire::Omitted => "omitted".into(),
+                        PrincipalWire::HostOperated {
+                            mapping_version,
+                            scope,
+                        } => format!("host_operated {mapping_version} {scope}"),
+                    },
+                    principal: None,
+                    binding: Some(binding.clone()),
+                };
+                transport.with_pool(pool.clone(), material)
+            }
+        };
         // A remote adapter cannot prove any determinism across a network
         // and a remote side it does not control (3.2.2).
         let descriptor = BackendDescriptor {
@@ -1039,10 +1098,18 @@ async fn run_exchange(
         )
     } else {
         let max = (terms.max_response_bytes as usize).min(REMOTE_V1.max_bytes);
-        let r = inner
+        let (r, connection) = inner
             .transport
-            .post(INFER_PATH, body.clone(), max, &budget, &ex.sent)
+            .post_observed(
+                INFER_PATH,
+                body.clone(),
+                max,
+                &budget,
+                &ex.sent,
+                ex.principal.as_ref().map(|p| p.evidence().digest),
+            )
             .await;
+        record.connection = connection;
         match r {
             Err(e) => {
                 live_only = budget_ran_out(&e, &budget);

@@ -178,6 +178,7 @@ pub fn blank_record(
         truncated: false,
         phase_expiry: None,
         principal: None,
+        connection: None,
     }
 }
 

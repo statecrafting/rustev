@@ -7258,6 +7258,25 @@ export namespace RustevRemoteExchange1 {
       };
   export type ArtifactId = string;
   /**
+   * A connection's age when an exchange took it, bucketed so evidence holds
+   * no timing beyond what the bound needs.
+   */
+  export type AgeBucket = "under1s" | "under10s" | "under60s" | "under600s" | "over600s";
+  /**
+   * Why a pooled connection left the pool (spec 020, 3.5).
+   */
+  export type EvictionReason =
+    "idle_expired" | "lifetime_expired" | "max_uses" | "idle_capacity" | "capacity" | "closed" | "failed";
+  /**
+   * How requests share a connection. HTTP/1.1, the only binding today,
+   * carries one request at a time.
+   */
+  export type Multiplex = "none";
+  /**
+   * Whether an exchange's connection was opened for it or reused.
+   */
+  export type ConnectionReuse = "fresh" | "reused";
+  /**
    * What an attempt cost, as far as is known when it ends.
    */
   export type Charge =
@@ -7342,6 +7361,11 @@ export namespace RustevRemoteExchange1 {
      */
     bytes_sent: boolean;
     /**
+     * The pooled connection the exchange used (spec 020, 3.5); absent
+     * when connection reuse is disabled.
+     */
+    connection?: ConnectionObservation | null;
+    /**
      * The exchange's charge in deployment units, before attribution.
      */
     exchange_charge: Charge;
@@ -7410,6 +7434,21 @@ export namespace RustevRemoteExchange1 {
     usage: {
       [k: string]: number | undefined;
     };
+  }
+  /**
+   * The connection an exchange used (spec 020, 3.5): fresh or reused, a
+   * nonsecret instance id, its age bucket and use count, the multiplex
+   * posture, the isolation-key digest, and why it left the pool after this
+   * exchange, if it did.
+   */
+  export interface ConnectionObservation {
+    age_bucket: AgeBucket;
+    eviction?: EvictionReason | null;
+    instance_id: string;
+    key_digest: string;
+    multiplex: Multiplex;
+    reuse: ConnectionReuse;
+    use_count: number;
   }
   export interface ExchangeMember {
     attempt_id: string;
