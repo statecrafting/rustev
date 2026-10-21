@@ -64,7 +64,7 @@
       }
     ],
     "id": "019-dynamic-questions",
-    "implementation": "pending",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-1-separate-class-and-api",
@@ -108,7 +108,7 @@
       }
     ],
     "sectionDigests": {
-      "019-dynamic-questions-as-a-narrow-evaluated-class": "b2987fddc244e898b783bb7b56254aa08c9089be6994f556e8d287a0b6c921a5",
+      "019-dynamic-questions-as-a-narrow-evaluated-class": "2a31ce7e2b9fb3ff27d05b94a461286e0a695ecc83ce58271c2f9c66ea10e37e",
       "1-purpose": "a876c2dd0828605e3821cefa4147b773412f9825962f17eeea6db78d0a8cd48d",
       "2-territory-and-compatibility": "c37b59d7ebdfefc8d73dd0fee8a019c53dda44fef86a56804eb3f1f0bf41cd80",
       "3-1-separate-class-and-api": "b84ce761bd48bfb8d61ca5956af61ffcf56dde566e4c6d39c0b729c74ebf103d",
@@ -122,9 +122,9 @@
       "4-out-of-scope": "2a03b831b04fff0f6cd2b653d0a9362c8408bc54f11e25ff1ae898e08566c9cc",
       "5-observable-negative-cases": "decf882d48535846a132a9111436e1e8768cbebf6b15875291b4d02b60e5b818",
       "acceptance": "eb03d3a7ff6817ba0444c647c058bbca9a70f1fcea53f045502cca077799dff1",
-      "implementation-record": "7cabd3c621900ec29e7cc901f4a891da7887dff9b8bd7ccf71660b4b00bcc45e",
+      "implementation-record": "2902b868ba052c9c390327ee1e6989d32c42b6ea6263a0d40e03a360ec2d88b1",
       "questions-settled-by-r-34": "be45bb809983f9fe2365f5e759916e429b2875ab600e14eca511b68a27f18ace",
-      "verification": "44ba84b339f67300913b7576c1ae843e3cd0fe3b801022fad3ecb55a6163d44a"
+      "verification": "85ab06e44172072f5710c2dc2fc9818cf97056ff6bbf837e50eeaa9635c925be"
     },
     "sectionHeadings": [
       "019: Dynamic questions as a narrow evaluated class",
@@ -150,6 +150,6 @@
     "summary": "A separate, explicitly invoked class for one bounded proposition, classification, or rubric question over caller-selected context. Dynamic questions use a dedicated backend capability, structured data-only inputs, fixed request-time labels or levels, one attempt, hard cost and time limits, explicit abstention, model-derived lineage, and class-specific evaluation. They do not alter a registered plan, supply a value into a running plan, create calibration or probability by implication, invoke tools, or grant authority.\n",
     "title": "Dynamic questions as a narrow evaluated class"
   },
-  "shardHash": "83bbb4658056566ef1be814923b888b98b908e34d37a518c9c0dbfdc55a5ca0c",
+  "shardHash": "ea6f4cabeb11b917ff357e28fe97928d8608c4a6f21c072b81dce80560edc80b",
   "specVersion": "1.10.0"
 }

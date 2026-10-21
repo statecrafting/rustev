@@ -118,6 +118,7 @@
         "src/config.rs",
         "src/dataset.rs",
         "src/doc.rs",
+        "src/dynamic.rs",
         "src/fit.rs",
         "src/lib.rs",
         "src/live.rs",

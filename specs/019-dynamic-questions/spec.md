@@ -2,7 +2,7 @@
 id: "019-dynamic-questions"
 title: "Dynamic questions as a narrow evaluated class"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-26"
 summary: >
   A separate, explicitly invoked class for one bounded proposition,
@@ -57,9 +57,10 @@ obligations:
 # 019: Dynamic questions as a narrow evaluated class
 
 Approved (A-18, 2026-09-26) as its own reviewable change before any code
-(R-16); implementation is pending. Approval does not select a backend,
-authorize live inference or spend, or claim accuracy, calibration, safety,
-general question answering, or production readiness.
+(R-16); implemented, as the implementation record states, with scripted
+backends only. Neither approval nor implementation selects a backend,
+authorizes live inference or spend, or claims accuracy, calibration,
+safety, general question answering, or production readiness.
 
 ## 1. Purpose
 
@@ -270,9 +271,40 @@ general accuracy, calibration, safety, or production claims.
 
 ## Verification
 
-Pending with implementation. Approval of this spec authorizes only the
-contract. Existing backend, plan, replay, and evaluation evidence does not
-satisfy dynamic-question acceptance.
+Existing backend, plan, replay, and evaluation evidence does not satisfy
+dynamic-question acceptance; these commands do. Every fixture is
+synthetic (R-04, R-09).
+
+```verify:cli
+# 3.2 to 3.6: the three documents round-trip under their bounds, refuse
+# unknown fields, duplicate labels and oversized data before unbounded
+# allocation, and bind the canonical request identity.
+cargo test -p rustev-contract --locked --test dynamic_wire
+# 3.2 to 3.6: validation, capability fit, cost admission, judgment,
+# abstention, lineage, and the adversarial fixtures in every
+# caller-controlled field.
+cargo test -p rustev-core --locked --test dynamic
+# 3.1 and section 5: a dynamic outcome, raw output or proposal cannot
+# become a plan output, enter staged evaluation or become a judgment
+# (compile-fail tests with a compiling negative control).
+cargo test -p rustev-core --locked --doc dynamic
+# 3.1, 3.5 and 3.6: ask_dynamic, section 5 rows 1 to 7 with a dispatch
+# counter, deadline, cancellation, unknown liability, malformed output,
+# served-identity mismatch, abstention and evidence delivery.
+cargo test -p rustev-runtime --locked --test dynamic
+# 3.7: offline reproduction with zero backend calls, section 5 row 9, the
+# dynamic dataset and configuration, and a synthetic report of mechanics.
+cargo test -p rustev-eval --locked --test dynamic
+# 2: contract and core gain no I/O or async runtime.
+cargo run -p rustev-boundaries --locked --quiet
+sh -c '! grep -nE "std::(fs|net|process|env|time)|tokio|async fn" crates/rustev-contract/src/dynamic.rs crates/rustev-core/src/dynamic.rs'
+# Existing registered-plan goldens, plan ids, judgments, runtime records,
+# replay bundles and tests are unchanged.
+cargo test -p rustev-contract --locked
+cargo test -p rustev-core --locked
+cargo test -p rustev-runtime --locked
+cargo test -p rustev-eval --locked
+```
 
 ## Implementation record
 
@@ -368,10 +400,56 @@ identity mismatch, abstention, host ledgers and evidence delivery). The
 three new source files join spec 021's reviewed archive list. No existing
 document, golden, plan id or test changed.
 
-Not done here: the JSON Schema emitter of spec 027 (3.2.2) does not yet
-emit the three dynamic documents, because emitting them changes the
-generated binding types that spec 027 owns; this is left to the owner (see
-the final increment).
+Not done here: the JSON Schema emitter of spec 027 (3.2.2) does not
+emit the three dynamic documents; see increment 2.
+
+**Increment 2 (evaluation, verification).** `rustev-eval` adds
+`dynamic.rs`. `reproduce` takes a retained outcome, the request and the
+capability, and no backend: it revalidates the request, recomputes the
+canonical identity and compares it and the capability identity with the
+retained ones, then judges the retained raw response again and compares
+validation, abstention and result. A changed identity is
+`incomparable{request_changed}` (so evidence reused after the labels are
+reordered is incomparable, section 5's last row), another declaration
+`capability_changed`, an outcome with no raw response
+`raw_response_unavailable`, and a different judgment `diverged`; dynamic
+evidence never becomes a replay bundle. `rustev.dynamic-dataset/1` binds
+the task family, the exact question schema (operation, question, ordered
+labels, output kind), context sources, artifact and template, provenance,
+license, labeling method, exclusions and limitations; it refuses an empty
+or unlicensed dataset, real provenance with an empty field, duplicate
+cases, a source or request id in two splits, a dataset with no
+injection-adversarial case, and any case whose request is invalid, differs
+from the question schema, requires another artifact, reads an undeclared
+context source or carries an undeclared label.
+`rustev.dynamic-evaluator-config/1` binds the same task family, question
+schema, artifact and template, a label interpretation and gates.
+`evaluate` compares one split's retained outcomes (a missing or
+non-reproducing outcome is listed as incomparable and left out of every
+denominator) and writes `rustev.dynamic-eval-report/1`: coverage first,
+then abstention overall and by reason, then accepted error over accepted
+labeled cases, then uncalibrated Brier and log loss (distributions) or
+mean level distance (ordinal distributions), and the same metrics over the
+adversarial cases; an empty denominator is `unknown`. The report states
+`uncalibrated`, claims `mechanics_only` on synthetic provenance, lists the
+non-transfer limitations and flags a capability with hidden state as not
+qualifiable. Every gate is reported `unknown`: over synthetic data a gate
+would claim quality from mechanics, and real data needs separately
+governed admission (spec 023) that no dynamic dataset binds yet. No
+calibration is fitted, so no dynamic distribution can be called
+calibrated. `crates/rustev-eval/tests/dynamic.rs` covers reproduction,
+section 5's last row with a dispatch counter, the dataset and binding
+checks and a synthetic evaluation. 019 joins `make verify`.
+
+Left for the owner, not claimed: the JSON Schema emitter of spec 027
+(3.2.2, "every public document type") does not emit the dynamic
+documents. Emitting them would add schema files under
+`crates/rustev-contract/schema/` and change the generated binding types
+under `integrations/rustev-wasm/types/` that spec 027 owns and checks in
+`make bindings`; whether dynamic documents belong in the binding surface
+is not stated by either spec. Calibration of a dynamic task family (3.7)
+needs a separately fitted artifact with its own binding; none exists, and
+none is claimed.
 
 ## Questions settled by R-34
 
