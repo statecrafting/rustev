@@ -733,6 +733,10 @@ pub enum Attribution {
     /// Integer shares in attempt-id order over the members that received
     /// the response; members that stopped waiting report `unknown`.
     SharedState { coalescing_window_ms: u64 },
+    /// A batch the runtime planned and dispatched whole (spec 020, 3.3):
+    /// the runtime allocates the exchange charge over its members (spec
+    /// 017, 3.5), and members that stopped waiting report `unknown`.
+    RuntimePlanned,
 }
 
 fn cut_flag(s: &mut String, truncated: &mut bool) {

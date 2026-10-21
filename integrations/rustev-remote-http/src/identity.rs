@@ -53,6 +53,11 @@ pub struct AdapterBinding {
     /// `rustev.run/2` (spec 020, 3.1 and 3.2). Not written otherwise.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub run_record_schema: Option<String>,
+    /// The most members of a runtime-planned batch this binding accepts
+    /// (spec 020, 3.1 and 3.3), when that dispatch is enabled. Not written
+    /// when disabled.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub batch_dispatch_max_members: Option<u32>,
     /// The connection-pool policy and isolation-key schema (spec 020, 3.1
     /// and 3.5). Not written when disabled.
     #[serde(skip_serializing_if = "PoolBinding::is_disabled")]
@@ -180,6 +185,7 @@ mod tests {
             transport_phases: TransportPhases::Disabled,
             principal_wire: PrincipalWire::Omitted,
             run_record_schema: None,
+            batch_dispatch_max_members: None,
             connection_pool: PoolBinding::Disabled,
         };
         assert_eq!(
@@ -211,6 +217,7 @@ mod tests {
             transport_phases: TransportPhases::Disabled,
             principal_wire: PrincipalWire::Omitted,
             run_record_schema: None,
+            batch_dispatch_max_members: None,
             connection_pool: PoolBinding::Disabled,
         };
         let a = base.artifact().unwrap();
@@ -273,6 +280,10 @@ mod tests {
             },
             AdapterBinding {
                 run_record_schema: Some("rustev.run/2".into()),
+                ..base.clone()
+            },
+            AdapterBinding {
+                batch_dispatch_max_members: Some(4),
                 ..base.clone()
             },
             AdapterBinding {

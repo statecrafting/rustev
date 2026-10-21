@@ -35,7 +35,9 @@ use rustev_contract::run::{
 };
 use rustev_contract::{Document, Identified, schema};
 use rustev_core::seams::{
-    AttemptCall, AttemptReport, BoxFuture, CancelAck, CancelSignal, DecisionBackend, RemoteEnd,
+    AdapterFailure, AttemptCall, AttemptReport, BatchAttemptCall, BatchAttemptReport,
+    BatchCapability, BatchMemberReport, BoxFuture, CancelAck, CancelSignal, DecisionBackend,
+    RemoteEnd,
 };
 use serde::Deserialize;
 use tokio::sync::oneshot;
@@ -128,6 +130,11 @@ pub struct ClientConfig {
     /// isolation-key member. With a custom configuration and no label the
     /// key is unknown and no connection is reused.
     pub tls_label: Option<String>,
+    /// Accept runtime-planned batches of at most this many members (spec
+    /// 020, 3.3), when the remote terms offer shared-state batching. Off by
+    /// default; the runtime still batches only under an enabled spec 017
+    /// policy. Enabling it changes the binding identity.
+    pub batch_dispatch: Option<u32>,
     /// The evidence sink accepts `rustev.run/2` (spec 020, 3.1 and 3.2):
     /// keep each attempt's remote evidence for the runtime to take. Off by
     /// default; enabling it changes the binding identity.
@@ -162,6 +169,7 @@ impl ClientConfig {
             pool: None,
             tls_label: None,
             run_evidence: false,
+            batch_dispatch: None,
         }
     }
 }
@@ -280,6 +288,9 @@ struct Exchange {
     key: Option<(String, String)>,
     /// The principal reference every member of the exchange carries.
     principal: Option<WirePrincipal>,
+    /// A runtime-planned batch (spec 020, 3.3): its id, and the members
+    /// keep the order the runtime gave them.
+    batch_id: Option<String>,
 }
 
 struct Inner {
@@ -297,6 +308,9 @@ struct Inner {
     protocol: &'static str,
     /// Remote evidence per attempt, for a `rustev.run/2` record.
     evidence: Mutex<EvidenceStore>,
+    /// The most members of a runtime-planned batch: the binding's bound
+    /// cut to the negotiated `max_items`; `None` when not offered.
+    batch_max: Option<usize>,
 }
 
 /// Remote evidence kept for the runtime to take, at most
@@ -444,6 +458,14 @@ impl RemoteClient {
             .principal
             .validate(config.operator, config.protocol_major)
             .map_err(|e| SetupError::Config(e.to_string()))?;
+        if config
+            .batch_dispatch
+            .is_some_and(|m| m < 2 || m as usize > MAX_ITEMS)
+        {
+            return Err(SetupError::Config(format!(
+                "a runtime-planned batch has 2 to {MAX_ITEMS} members"
+            )));
+        }
         let endpoint = Endpoint::parse(&config.endpoint).map_err(SetupError::Endpoint)?;
         let transport = HttpTransport::new(
             endpoint,
@@ -522,6 +544,7 @@ impl RemoteClient {
             run_record_schema: config
                 .run_evidence
                 .then(|| rustev_contract::schema::RUN_V2.to_string()),
+            batch_dispatch_max_members: config.batch_dispatch,
             connection_pool: config
                 .pool
                 .as_ref()
@@ -584,6 +607,14 @@ impl RemoteClient {
             }
             _ => 1,
         };
+        // Negotiated terms never enable what the binding disabled nor raise
+        // its bound (spec 020, 3.1).
+        let batch_max = match (config.batch_dispatch, remote.terms.batching) {
+            (Some(m), Batching::SharedState { max_items }) => {
+                Some((m.min(max_items) as usize).min(MAX_ITEMS)).filter(|n| *n >= 2)
+            }
+            _ => None,
+        };
         let exchanges = Exchanges::new(sink, config.retain_bytes);
         let config_version = config.protocol_major;
         Ok(RemoteClient {
@@ -603,6 +634,7 @@ impl RemoteClient {
                 version: config_version,
                 protocol,
                 evidence: Mutex::new(EvidenceStore::default()),
+                batch_max,
             }),
         })
     }
@@ -713,6 +745,205 @@ impl DecisionBackend for RemoteClient {
     fn take_remote_evidence(&self, attempt_id: &str) -> Option<RemoteEvidence> {
         lock(&self.inner.evidence).take(attempt_id)
     }
+
+    /// Offered only when the binding enables runtime-planned batches and the
+    /// negotiated terms declare shared-state batching (spec 020, 3.3).
+    /// Equal compatibility means the same binding and the same shared state
+    /// (`instance` and `values`), which is what one request may carry.
+    fn batch_capability(&self, projection: &[u8]) -> Option<BatchCapability> {
+        self.inner.batch_max?;
+        let head =
+            rustev_contract::bounded::parse_bounded::<ProjectionHead>(projection, &REMOTE_V1)
+                .ok()?;
+        self.inner
+            .descriptor
+            .operations
+            .iter()
+            .any(|o| o.operation == head.operation)
+            .then_some(())?;
+        let state = canonical_value_bytes(&serde_json::json!({
+            "binding": self.inner.binding.as_str(),
+            "instance": head.instance,
+            "values": head.values,
+        }))
+        .ok()?;
+        Some(BatchCapability {
+            compatibility: digest_bytes(&state),
+            work_units: 1,
+        })
+    }
+
+    fn infer_batch<'a>(&'a self, call: BatchAttemptCall) -> BoxFuture<'a, BatchAttemptReport> {
+        let inner = self.inner.clone();
+        Box::pin(async move { batch(inner, call).await })
+    }
+}
+
+/// A whole-batch refusal before any byte was sent.
+fn batch_refused(failure: AdapterFailure, code: RemoteCode, detail: &str) -> BatchAttemptReport {
+    BatchAttemptReport {
+        result: Err((failure, crate::taxonomy::failure_detail(code, detail))),
+        charge: Charge::Observed { units: 0 },
+        cancel: CancelAck::NotRequested,
+        remote: RemoteEnd::Finished,
+    }
+}
+
+/// One runtime-planned batch (spec 020, 3.3): every member checked as an
+/// independent attempt would be, the dispatchable ones sent in one exchange
+/// in the runtime's order, each answered on its own (its output, failure,
+/// cancellation and remote state), never filled from a sibling. A member
+/// cancelled before the first request byte is removed and reported unsent.
+async fn batch(inner: Arc<Inner>, call: BatchAttemptCall) -> BatchAttemptReport {
+    let Some(max) = inner.batch_max else {
+        return batch_refused(
+            AdapterFailure::Permanent,
+            RemoteCode::Capability,
+            "runtime-planned batches are not enabled",
+        );
+    };
+    if call.members.is_empty() || call.members.len() > max {
+        return batch_refused(
+            AdapterFailure::Permanent,
+            RemoteCode::Capability,
+            "the batch exceeds the negotiated bound",
+        );
+    }
+    // One exchange carries one principal reference.
+    let handle = &call.members[0].cx.principal_handle;
+    if call
+        .members
+        .iter()
+        .any(|m| &m.cx.principal_handle != handle || m.cx.trace_id != call.members[0].cx.trace_id)
+    {
+        return batch_refused(
+            AdapterFailure::Permanent,
+            RemoteCode::MalformedRequest,
+            "batch members differ in principal or decision",
+        );
+    }
+    let Ok(principal) = inner.config.principal.for_attempt(handle) else {
+        for m in &call.members {
+            let r = unsent_failure(RemoteCode::MalformedRequest, "no principal reference");
+            note_unexchanged(&inner, &m.attempt_id, None, &r);
+        }
+        return batch_refused(
+            AdapterFailure::Permanent,
+            RemoteCode::MalformedRequest,
+            "no principal reference within its bounds; not sent",
+        );
+    };
+    let trace_id = call.members[0].cx.trace_id.clone();
+    let mut answers: Vec<Option<AttemptReport>> = Vec::with_capacity(call.members.len());
+    let mut waiting = vec![];
+    let mut members = vec![];
+    for (i, m) in call.members.iter().enumerate() {
+        let budget = Budget::start(m.cx.remaining_ms);
+        if call.cancel.is_raised() || budget.expired() {
+            answers.push(Some(cancelled_report(
+                cancel_outcome(false, inner.remote.terms.cancellation, None),
+                "removed before sending",
+            )));
+            continue;
+        }
+        match prepare(
+            &inner,
+            &m.attempt_id,
+            m.projection.clone(),
+            &principal,
+            budget,
+            &m.cancel,
+        ) {
+            Ok((member, rx, _)) => {
+                answers.push(None);
+                waiting.push((i, rx, budget));
+                members.push(member);
+            }
+            Err(report) => answers.push(Some(report)),
+        }
+    }
+    if !members.is_empty() {
+        let ex = open_batch(&inner, trace_id, principal.clone(), call.batch_id, members);
+        for (i, rx, budget) in waiting {
+            let m = &call.members[i];
+            answers[i] =
+                Some(wait_member(&inner, &ex, &m.attempt_id, rx, budget, m.cancel.clone()).await);
+        }
+    }
+    let reports: Vec<AttemptReport> = answers
+        .into_iter()
+        .map(|r| r.expect("every member answered"))
+        .collect();
+    for (m, r) in call.members.iter().zip(&reports) {
+        note_unexchanged(&inner, &m.attempt_id, principal.as_ref(), r);
+    }
+    BatchAttemptReport {
+        charge: crate::cost::sum_charges(&reports.iter().map(|r| r.charge).collect::<Vec<_>>()),
+        cancel: if reports.iter().any(|r| r.cancel == CancelAck::Unconfirmed) {
+            CancelAck::Unconfirmed
+        } else if reports.iter().any(|r| r.cancel == CancelAck::Stopped) {
+            CancelAck::Stopped
+        } else {
+            CancelAck::NotRequested
+        },
+        // The seam carries one remote state: possibly continuing when any
+        // member's work may be, so liability is never understated.
+        remote: if reports
+            .iter()
+            .any(|r| r.remote == RemoteEnd::PossiblyContinuing)
+        {
+            RemoteEnd::PossiblyContinuing
+        } else {
+            RemoteEnd::Finished
+        },
+        result: Ok(call
+            .members
+            .iter()
+            .zip(reports)
+            .map(|(m, r)| BatchMemberReport {
+                attempt_id: m.attempt_id.clone(),
+                result: r.result,
+            })
+            .collect()),
+    }
+}
+
+/// Open one exchange holding exactly these members, in this order, sent at
+/// once: no window, no joiner.
+fn open_batch(
+    inner: &Arc<Inner>,
+    trace_id: String,
+    principal: Option<WirePrincipal>,
+    batch_id: String,
+    members: Vec<Member>,
+) -> Arc<Exchange> {
+    let (flush_tx, flush_rx) = oneshot::channel();
+    let first_budget = members
+        .iter()
+        .map(|m| m.budget)
+        .reduce(Budget::min)
+        .expect("non-empty");
+    let ex = Arc::new(Exchange {
+        state: Mutex::new(ExState {
+            phase: Phase::Collecting,
+            members,
+            flush: Some(flush_tx),
+            finished: None,
+        }),
+        sent: SentTracker::new(),
+        trace_id,
+        key: None,
+        principal,
+        batch_id: Some(batch_id),
+    });
+    tokio::spawn(run_exchange(
+        inner.clone(),
+        ex.clone(),
+        flush_rx,
+        Duration::ZERO,
+        first_budget,
+    ));
+    ex
 }
 
 /// An attempt that never joined an exchange has evidence too: there was
@@ -764,27 +995,61 @@ async fn attempt(
     budget: Budget,
     signal: CancelSignal,
 ) -> AttemptReport {
+    let (member, rx, state) =
+        match prepare(&inner, &attempt_id, projection, &principal, budget, &signal) {
+            Ok(p) => p,
+            Err(report) => return report,
+        };
+    // Members share an exchange only with the same state and the same
+    // principal reference (spec 020, 3.6).
+    let key = (inner.max_items > 1)
+        .then_some(state)
+        .flatten()
+        .map(|digest| (trace_id.clone(), digest));
+    let ex = join(&inner, key, trace_id, principal, member);
+    wait_member(&inner, &ex, &attempt_id, rx, budget, signal).await
+}
+
+/// Check one attempt before it may join an exchange: not cancelled, its id
+/// never submitted before (3.3.1), within the declared input limit, JSON,
+/// and a declared operation. Returns the member, its answer channel and the
+/// digest of its shared state (with the principal), or the report of an
+/// attempt that sent nothing.
+fn prepare(
+    inner: &Arc<Inner>,
+    attempt_id: &str,
+    projection: Vec<u8>,
+    principal: &Option<WirePrincipal>,
+    budget: Budget,
+    signal: &CancelSignal,
+) -> Result<(Member, oneshot::Receiver<AttemptReport>, Option<String>), AttemptReport> {
     if signal.is_raised() {
-        return cancelled_report(
+        return Err(cancelled_report(
             cancel_outcome(false, inner.remote.terms.cancellation, None),
             "cancelled before sending",
-        );
+        ));
     }
     // At most one submission per attempt id (3.3.1).
-    if !lock(&inner.recent).insert(&attempt_id) {
-        return unsent_failure(
+    if !lock(&inner.recent).insert(attempt_id) {
+        return Err(unsent_failure(
             RemoteCode::MalformedRequest,
             "attempt id already submitted; not resubmitted",
-        );
+        ));
     }
     if projection.len() as u64 > inner.descriptor.input_limit.max_bytes {
-        return unsent_failure(RemoteCode::Capability, "input exceeds the declared limit");
+        return Err(unsent_failure(
+            RemoteCode::Capability,
+            "input exceeds the declared limit",
+        ));
     }
     let (Ok(text), Ok(head)) = (
         String::from_utf8(projection.clone()),
         rustev_contract::bounded::parse_bounded::<ProjectionHead>(&projection, &REMOTE_V1),
     ) else {
-        return unsent_failure(RemoteCode::MalformedRequest, "the projection is not JSON");
+        return Err(unsent_failure(
+            RemoteCode::MalformedRequest,
+            "the projection is not JSON",
+        ));
     };
     let Some(kind) = inner
         .descriptor
@@ -793,24 +1058,21 @@ async fn attempt(
         .find(|o| o.operation == head.operation)
         .map(|o| o.output)
     else {
-        return unsent_failure(RemoteCode::Capability, "operation not declared");
+        return Err(unsent_failure(
+            RemoteCode::Capability,
+            "operation not declared",
+        ));
     };
-    // Members share an exchange only with the same state and the same
-    // principal reference (spec 020, 3.6).
-    let key = if inner.max_items > 1 {
-        canonical_value_bytes(&serde_json::json!({
-            "instance": head.instance,
-            "values": head.values,
-            "principal": principal.as_ref().map(|p| p.evidence().digest),
-        }))
-        .ok()
-        .map(|b| (trace_id.clone(), digest_bytes(&b)))
-    } else {
-        None
-    };
-    let (tx, mut rx) = oneshot::channel();
+    let state = canonical_value_bytes(&serde_json::json!({
+        "instance": head.instance,
+        "values": head.values,
+        "principal": principal.as_ref().map(|p| p.evidence().digest),
+    }))
+    .ok()
+    .map(|b| digest_bytes(&b));
+    let (tx, rx) = oneshot::channel();
     let member = Member {
-        attempt_id: attempt_id.clone(),
+        attempt_id: attempt_id.to_string(),
         projection: text,
         kind,
         budget,
@@ -823,25 +1085,34 @@ async fn attempt(
     };
     if inner.config.run_evidence {
         let e = evidence(
-            &inner,
-            &attempt_id,
+            inner,
+            attempt_id,
             principal.as_ref(),
             EvidenceUnavailable::Pending,
         );
         lock(&inner.evidence).put(e);
     }
-    let ex = join(&inner, key, trace_id, principal, member);
+    Ok((member, rx, state))
+}
 
-    // One total budget (3.4.1): when it runs out the runtime raises the
-    // signal at the same moment, and the attempt answers as for
-    // cancellation (3.4.2) without waiting past it.
+/// Wait for a member's answer within its one budget (3.4.1): when it runs
+/// out the runtime raises the signal at the same moment, and the attempt
+/// answers as for cancellation (3.4.2) without waiting past it.
+async fn wait_member(
+    inner: &Arc<Inner>,
+    ex: &Arc<Exchange>,
+    attempt_id: &str,
+    mut rx: oneshot::Receiver<AttemptReport>,
+    budget: Budget,
+    signal: CancelSignal,
+) -> AttemptReport {
     tokio::select! {
         biased;
         _ = signal.raised() => {}
         r = &mut rx => return r.unwrap_or_else(|_| lost(ex.sent.may_have_sent())),
         _ = budget.expiry() => {}
     }
-    cancel_member(&inner, &ex, &attempt_id, rx, budget).await
+    cancel_member(inner, ex, attempt_id, rx, budget).await
 }
 
 /// Whether a member leaving its exchange must assume its request bytes left
@@ -914,6 +1185,7 @@ fn join(
         trace_id,
         key: key.clone(),
         principal,
+        batch_id: None,
     });
     if let Some(k) = key {
         open.insert(k, ex.clone());
@@ -1142,7 +1414,11 @@ async fn run_exchange(
         let mut st = lock(&ex.state);
         st.phase = Phase::Sending;
         st.members.retain(|m| m.status != Status::Withdrawn);
-        st.members.sort_by(|a, b| a.attempt_id.cmp(&b.attempt_id));
+        // A runtime-planned batch keeps the runtime's member order; the
+        // adapter never reorders it (spec 020, 3.3).
+        if ex.batch_id.is_none() {
+            st.members.sort_by(|a, b| a.attempt_id.cmp(&b.attempt_id));
+        }
         if st.members.is_empty() {
             return;
         }
@@ -1186,6 +1462,9 @@ async fn run_exchange(
         record.attribution = Attribution::SharedState {
             coalescing_window_ms: b.window_ms,
         };
+    }
+    if ex.batch_id.is_some() {
+        record.attribution = Attribution::RuntimePlanned;
     }
     let n = request.items.len();
     let all = |code: RemoteCode, detail: &str, share: Option<Charge>| -> Vec<Determined> {
@@ -1576,7 +1855,9 @@ fn finish(
         record.members.clone(),
         record.served.clone(),
         record.bytes_sent,
-        record.request_digest.clone().unwrap_or_default(),
+        ex.batch_id
+            .clone()
+            .unwrap_or_else(|| record.request_digest.clone().unwrap_or_default()),
     );
     let note = inner.exchanges.deliver(record, Some(retained));
     if inner.config.run_evidence {

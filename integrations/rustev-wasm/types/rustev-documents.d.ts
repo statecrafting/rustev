@@ -7255,7 +7255,8 @@ export namespace RustevRemoteExchange1 {
         shared_state: {
           coalescing_window_ms: number;
         };
-      };
+      }
+    | "runtime_planned";
   export type ArtifactId = string;
   /**
    * A connection's age when an exchange took it, bucketed so evidence holds

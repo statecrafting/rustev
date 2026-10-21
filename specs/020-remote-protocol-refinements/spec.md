@@ -529,6 +529,37 @@ no body, credential or principal reference embedded, `no_locator`,
 `not_delivered`, the principal digest, `no_exchange` for a refused
 attempt). The new eval source file joins the reviewed archive list.
 
+**Increment 5 (runtime-planned remote batches).** The batch-capable seam
+is spec 017's (`DecisionBackend::batch_capability` and `infer_batch`);
+`DecisionBackend::infer` is unchanged. `RemoteClient` offers it only when
+`ClientConfig::batch_dispatch` (2 to 32 members, off by default; the
+binding gains `batch_dispatch_max_members`, not written when off) and the
+negotiated terms declare shared-state batching; the effective bound is the
+lesser of the two, so terms never raise it. Equal compatibility means the
+same binding and the same shared state, which is what one request may
+carry. `infer_batch` refuses a batch beyond the bound, or whose members
+differ in principal or decision, before any byte; checks every member as
+an independent attempt would (a member already cancelled or out of budget
+is removed and reported unsent); sends the rest in one exchange, in the
+runtime's order (never sorted, added to, merged or retried), bounded by
+the earliest member budget; and answers each member from its own answer,
+so a missing, duplicate or mismatched answer fails only that member and an
+answer naming an unasked attempt, which no member owns, fails every member
+(spec 009's envelope rule). The batch report's charge is the sum of the
+members' (the runtime allocates it, spec 017), its cancellation is
+`unconfirmed` if any member's is, and its remote state is possibly
+continuing if any member's is. The exchange record's attribution is the
+new `runtime_planned`, and remote evidence names the runtime's batch id and
+member index. Tests: `integrations/rustev-remote-http/tests/runtime_batch.rs`
+compares the support-routing decision batched (one exchange of three
+members in member-index order, one batch id) with the same decision
+dispatched independently (three exchanges): values and judgment, a member
+failure, a deadline and a cancellation after send (every member possibly
+continuing with charge unknown, in both), and the cost; a retrying step
+runs alone, a plan without a batch policy never batches, and an adapter
+without batch dispatch offers no seam; a missing member answer fails that
+member only.
+
 Engineering choices made by the implementing agent, not by the owner:
 
 - 3.1 asks for explicit `disabled` values in the binding. They are explicit
@@ -561,6 +592,12 @@ Engineering choices made by the implementing agent, not by the owner:
 - A plan 3 decision's record stays `rustev.run/3` without remote evidence
   even for a sink that selected version 2: this spec defines the list for
   version 2 only.
+- Spec 017's batch report carries one cancellation answer and one remote
+  state for the batch. A member whose work may continue therefore makes
+  every member of its batch possibly continuing with charge unknown: per
+  member liability is never understated, but can be overstated until the
+  host reconciles it. Finer per-member remote state needs a change to the
+  spec 017 seam, which this spec does not make.
 - A host-operated `rustev.remote/1` server hands a version 2 request's
   reference to the hosted backend as `CallContext::principal_handle`; spec
   009's engineering choice of an empty handle still holds for every
