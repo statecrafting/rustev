@@ -1052,6 +1052,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustev-otel"
+version = "0.1.0"
+dependencies = [
+ "rustev-contract",
+ "rustev-core",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "rustev-pkg-lodging"
 version = "0.1.0"
 dependencies = [

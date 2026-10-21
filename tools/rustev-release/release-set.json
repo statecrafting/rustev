@@ -61,6 +61,10 @@
     {
       "name": "rustev-release",
       "reason": "repository release tooling, not a product crate"
+    },
+    {
+      "name": "rustev-otel",
+      "reason": "publish = false until the release family is extended to it (spec 028 section 2, #76 A3)"
     }
   ]
 }
