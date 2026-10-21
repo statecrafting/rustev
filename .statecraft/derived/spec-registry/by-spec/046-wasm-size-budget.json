@@ -27,7 +27,7 @@
       }
     ],
     "sectionDigests": {
-      "046-the-webassembly-module-s-uncompressed-size-budget-amends-027": "0c0d33017b7c65b83f12900c2ad78a829bca0de20c644e793c4809a653896dfa",
+      "046-the-webassembly-module-s-uncompressed-size-budget-amends-027": "a979da32204e425e34041cfd57224bdbf1dc5ce84031d6d9ebbd6b029e7eefb5",
       "1-purpose": "910fd96d1a0a453b9f220ca442e50d0b5499e9c556eb9fabb1e9afdf64664c66",
       "2-territory": "525ccc705fc8389fd0f6e398d78a313628cd9659960e9fcfa35f58007ef21a47",
       "3-budget": "ff099577e863b93a1dc8ea230f41b777f5c69b8c71cbefb3e13c3e44cee139f4",
@@ -47,10 +47,10 @@
       "Verification"
     ],
     "specPath": "specs/046-wasm-size-budget/spec.md",
-    "status": "draft",
-    "summary": "A narrow amendment of approved spec 027 3.10.4. The uncompressed size budget of the optimized `rustev_wasm_bg.wasm` was declared at 2,097,152 bytes before specs 032 and 033 added their document types; the first measurement is 2,215,589 bytes, 5.6% over, while the gzip and instantiation budgets hold. This spec raises the uncompressed budget to 2,621,440 bytes (2.5 MiB) and keeps every other budget, the procedure and the gate unchanged. Draft: a proposal for the owner's ratification; it claims nothing about code.\n",
+    "status": "approved",
+    "summary": "A narrow amendment of approved spec 027 3.10.4. The uncompressed size budget of the optimized `rustev_wasm_bg.wasm` was declared at 2,097,152 bytes before specs 032 and 033 added their document types; the first measurement is 2,215,589 bytes, 5.6% over, while the gzip and instantiation budgets hold. This spec raises the uncompressed budget to 2,621,440 bytes (2.5 MiB) and keeps every other budget, the procedure and the gate unchanged. Ratified by the owner on 2026-10-20 (A-43).\n",
     "title": "The WebAssembly module's uncompressed size budget (amends 027)"
   },
-  "shardHash": "7eaaf28ad5fe5ee330c8d22d9e3bd30a1ae35cbcf64f34405287f1ef32e8d42d",
+  "shardHash": "1f41cd08e929282bdbd7185cb6c929bbcac9105b12ac9f554e17f68c1a94a883",
   "specVersion": "1.9.0"
 }
