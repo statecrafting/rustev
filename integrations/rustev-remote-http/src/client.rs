@@ -26,8 +26,8 @@ use rustev_contract::output::RawOutput;
 use rustev_contract::remote::{
     Attribution, Batching, CancelRequest, CancelResponse, CancelSupport, DescribeRequest,
     DescribeResponse, Disclosure, ExchangeMember, HostedBackend, InferItem, InferRequest,
-    InferResponse, ItemResult, MAX_ITEMS, MemberOutcome, PROTOCOL, PROTOCOL_MAJOR,
-    RemoteCancelAnswer, RemoteCode, RemoteTerms, ServedIdentity,
+    InferResponse, ItemResult, MAX_ITEMS, MemberOutcome, PROTOCOL_MAJOR, RemoteCancelAnswer,
+    RemoteCode, RemoteTerms, ServedIdentity, WirePrincipal, protocol_name,
 };
 use rustev_contract::run::{Charge, CostBound, CostModel};
 use rustev_contract::{Document, Identified, schema};
@@ -47,6 +47,7 @@ use crate::exchange::{
 use crate::http::{Endpoint, EndpointError, HttpReply, HttpTransport, Secret, TransportError};
 use crate::identity::{AdapterBinding, served_identity};
 use crate::phases::TransportPhases;
+use crate::principal::{EndpointOperator, PrincipalPosture};
 use crate::server::{CANCEL_PATH, DESCRIBE_PATH, INFER_PATH};
 use crate::taxonomy::{RemoteFailure, classify_status, is_local_only};
 use crate::wire::{SentTracker, digest_bytes};
@@ -106,6 +107,13 @@ pub struct ClientConfig {
     /// Phase ceilings inside each attempt's one budget (spec 020, 3.4).
     /// Disabled by default; enabling it changes the binding identity.
     pub phases: TransportPhases,
+    /// The protocol major version this binding negotiates, exactly: 1 (the
+    /// default) or 2 (spec 020, 2). No per-call upgrade or downgrade.
+    pub protocol_major: u32,
+    /// Who operates the endpoint; third party by default (spec 020, 3.6).
+    pub operator: EndpointOperator,
+    /// The principal wire posture; omitted by default (spec 020, 3.6).
+    pub principal: PrincipalPosture,
 }
 
 impl ClientConfig {
@@ -130,6 +138,9 @@ impl ClientConfig {
             await_cancel_confirmation: false,
             cancel_budget_ms: 1_000,
             phases: TransportPhases::Disabled,
+            protocol_major: PROTOCOL_MAJOR,
+            operator: EndpointOperator::ThirdParty,
+            principal: PrincipalPosture::Omitted,
         }
     }
 }
@@ -246,6 +257,8 @@ struct Exchange {
     sent: SentTracker,
     trace_id: String,
     key: Option<(String, String)>,
+    /// The principal reference every member of the exchange carries.
+    principal: Option<WirePrincipal>,
 }
 
 struct Inner {
@@ -258,6 +271,9 @@ struct Inner {
     recent: Mutex<RecentIds>,
     open: Mutex<HashMap<(String, String), Arc<Exchange>>>,
     max_items: usize,
+    /// The negotiated protocol major version and its name.
+    version: u32,
+    protocol: &'static str,
 }
 
 /// A `DecisionBackend` over `rustev.remote/1`. Clones share state.
@@ -343,6 +359,13 @@ impl RemoteClient {
             .phases
             .validate()
             .map_err(|e| SetupError::Config(e.to_string()))?;
+        let protocol = protocol_name(config.protocol_major).ok_or_else(|| {
+            SetupError::Config(format!("no protocol version {}", config.protocol_major))
+        })?;
+        let principal_wire = config
+            .principal
+            .validate(config.operator, config.protocol_major)
+            .map_err(|e| SetupError::Config(e.to_string()))?;
         let endpoint = Endpoint::parse(&config.endpoint).map_err(SetupError::Endpoint)?;
         let transport = HttpTransport::new(
             endpoint,
@@ -354,7 +377,7 @@ impl RemoteClient {
         .with_phases(config.phases);
         let body = DescribeRequest {
             schema: schema::REMOTE_DESCRIBE.into(),
-            versions: vec![PROTOCOL_MAJOR],
+            versions: vec![config.protocol_major],
         }
         .canonical()
         .map_err(|e| SetupError::Terms(e.to_string()))?;
@@ -377,7 +400,7 @@ impl RemoteClient {
         }
         let described = DescribeResponse::parse(&reply.body)
             .map_err(|e| setup_failure(RemoteCode::MalformedResponse, e.to_string()))?;
-        if described.version != PROTOCOL_MAJOR {
+        if described.version != config.protocol_major {
             return Err(SetupError::NoCommonVersion(described.version));
         }
         let remote = described
@@ -405,7 +428,7 @@ impl RemoteClient {
             )));
         }
         let binding = AdapterBinding {
-            protocol: PROTOCOL.into(),
+            protocol: protocol.into(),
             endpoint_class: config.endpoint_class.clone(),
             remote_artifact: Some(remote.descriptor.artifact.clone()),
             remote_descriptor: Some(remote.descriptor_id.clone()),
@@ -417,6 +440,7 @@ impl RemoteClient {
             max_request_bytes: remote.terms.max_request_bytes,
             max_response_bytes: remote.terms.max_response_bytes,
             transport_phases: config.phases,
+            principal_wire,
         }
         .artifact()
         .map_err(|e| SetupError::Identity(e.to_string()))?;
@@ -434,6 +458,7 @@ impl RemoteClient {
             _ => 1,
         };
         let exchanges = Exchanges::new(sink, config.retain_bytes);
+        let config_version = config.protocol_major;
         Ok(RemoteClient {
             inner: Arc::new(Inner {
                 transport,
@@ -448,6 +473,8 @@ impl RemoteClient {
                 }),
                 open: Mutex::new(HashMap::new()),
                 max_items,
+                version: config_version,
+                protocol,
             }),
         })
     }
@@ -524,9 +551,24 @@ impl DecisionBackend for RemoteClient {
         let budget = Budget::start(call.cx.remaining_ms);
         let trace_id = call.cx.trace_id.clone();
         let projection = call.projection.to_vec();
-        Box::pin(
-            async move { attempt(inner, attempt_id, projection, trace_id, budget, signal).await },
-        )
+        // Resolved now; the handle itself never leaves this call.
+        let principal = inner
+            .config
+            .principal
+            .for_attempt(&call.cx.principal_handle);
+        Box::pin(async move {
+            let Ok(principal) = principal else {
+                // Required context is absent: refused before any byte.
+                return unsent_failure(
+                    RemoteCode::MalformedRequest,
+                    "no principal reference within its bounds; not sent",
+                );
+            };
+            attempt(
+                inner, attempt_id, projection, trace_id, principal, budget, signal,
+            )
+            .await
+        })
     }
 }
 
@@ -546,6 +588,7 @@ async fn attempt(
     attempt_id: String,
     projection: Vec<u8>,
     trace_id: String,
+    principal: Option<WirePrincipal>,
     budget: Budget,
     signal: CancelSignal,
 ) -> AttemptReport {
@@ -580,10 +623,13 @@ async fn attempt(
     else {
         return unsent_failure(RemoteCode::Capability, "operation not declared");
     };
+    // Members share an exchange only with the same state and the same
+    // principal reference (spec 020, 3.6).
     let key = if inner.max_items > 1 {
         canonical_value_bytes(&serde_json::json!({
             "instance": head.instance,
             "values": head.values,
+            "principal": principal.as_ref().map(|p| p.evidence().digest),
         }))
         .ok()
         .map(|b| (trace_id.clone(), digest_bytes(&b)))
@@ -603,7 +649,7 @@ async fn attempt(
         awaiting: false,
         late_share: None,
     };
-    let ex = join(&inner, key, trace_id, member);
+    let ex = join(&inner, key, trace_id, principal, member);
 
     // One total budget (3.4.1): when it runs out the runtime raises the
     // signal at the same moment, and the attempt answers as for
@@ -651,6 +697,7 @@ fn join(
     inner: &Arc<Inner>,
     key: Option<(String, String)>,
     trace_id: String,
+    principal: Option<WirePrincipal>,
     member: Member,
 ) -> Arc<Exchange> {
     let mut open = lock(&inner.open);
@@ -685,6 +732,7 @@ fn join(
         sent: SentTracker::new(),
         trace_id,
         key: key.clone(),
+        principal,
     });
     if let Some(k) = key {
         open.insert(k, ex.clone());
@@ -860,7 +908,7 @@ async fn send_cancel(
 ) -> Option<CancelResponse> {
     let body = CancelRequest {
         schema: schema::REMOTE_CANCEL.into(),
-        version: PROTOCOL_MAJOR,
+        version: inner.version,
         backend_id: inner.remote.descriptor.backend_id.clone(),
         attempt_ids,
     }
@@ -938,7 +986,7 @@ async fn run_exchange(
     let told = budget.told_ms(inner.config.transit_margin_ms);
     let request = InferRequest {
         schema: schema::REMOTE_INFER.into(),
-        version: PROTOCOL_MAJOR,
+        version: inner.version,
         backend_id: inner.remote.descriptor.backend_id.clone(),
         descriptor: inner.remote.descriptor_id.clone(),
         artifact: inner.remote.descriptor.artifact.clone(),
@@ -946,9 +994,11 @@ async fn run_exchange(
         trace_id: ex.trace_id.clone(),
         privacy: inner.config.privacy.clone(),
         items,
+        principal: ex.principal.clone(),
     };
     let body = request.canonical().unwrap_or_default();
-    let mut record = blank_record(PROTOCOL, inner.binding.clone(), vec![]);
+    let mut record = blank_record(inner.protocol, inner.binding.clone(), vec![]);
+    record.principal = request.principal.as_ref().map(WirePrincipal::evidence);
     record.privacy_requested = inner.config.privacy.clone();
     record.request_digest = Some(digest_bytes(&body));
     if let (Some(b), true) = (inner.config.batching, request.items.len() > 1) {
@@ -1025,7 +1075,28 @@ async fn run_exchange(
         }
     };
     record.bytes_sent = ex.sent.may_have_sent();
-    finish(&inner, &ex, determined, live_only, record, body, reply_body);
+    // Retained bytes never hold the principal reference: its digest stands
+    // in for it (spec 020, 3.6).
+    let retained_request = match &request.principal {
+        None => body,
+        Some(p) => {
+            let mut r = request.clone();
+            r.principal = Some(WirePrincipal {
+                reference: p.evidence().digest,
+                ..p.clone()
+            });
+            r.canonical().unwrap_or_default()
+        }
+    };
+    finish(
+        &inner,
+        &ex,
+        determined,
+        live_only,
+        record,
+        retained_request,
+        reply_body,
+    );
 }
 
 /// Validate a 2xx body into per-member results (3.5).
@@ -1047,7 +1118,7 @@ fn read_response(
             .collect()
     };
     let resp = match InferResponse::parse(body) {
-        Ok(r) if r.version == PROTOCOL_MAJOR => r,
+        Ok(r) if r.version == inner.version => r,
         Ok(r) => {
             return all(
                 RemoteCode::MalformedResponse,
@@ -1324,9 +1395,7 @@ fn finish(
 /// the model; it makes no remote call.
 pub fn map_retained(body: &[u8], attempt_id: &str, declared: OutputKind) -> Option<RawOutput> {
     let resp = InferResponse::parse(body).ok()?;
-    if resp.version != PROTOCOL_MAJOR {
-        return None;
-    }
+    protocol_name(resp.version)?;
     let mut answers = resp.items.iter().filter(|a| a.attempt_id == attempt_id);
     let one = answers.next()?;
     if answers.next().is_some() {

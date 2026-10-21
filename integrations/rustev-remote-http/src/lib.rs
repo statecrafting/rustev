@@ -4,7 +4,8 @@
 //! format ([`taxonomy`], [`budget`], [`cancel`], [`wire`], [`http`],
 //! [`identity`], [`cost`], [`exchange`]); Part B, the `rustev.remote/1`
 //! HTTP binding ([`client`], [`server`]). Spec 020's refinements, each off
-//! by default: phase ceilings inside the one budget ([`phases`]).
+//! by default: phase ceilings inside the one budget ([`phases`]) and the
+//! host-endpoint principal reference of `rustev.remote/2` ([`principal`]).
 #![forbid(unsafe_code)]
 
 pub mod budget;
@@ -15,6 +16,7 @@ pub mod exchange;
 pub mod http;
 pub mod identity;
 pub mod phases;
+pub mod principal;
 pub mod server;
 pub mod taxonomy;
 pub mod wire;

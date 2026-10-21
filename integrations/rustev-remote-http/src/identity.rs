@@ -9,6 +9,7 @@ use rustev_contract::remote::{Disclosure, ServedIdentity, ServedTerms};
 use serde::Serialize;
 
 use crate::phases::TransportPhases;
+use crate::principal::PrincipalWire;
 
 /// The tag of an adapter binding's digest.
 pub const BINDING_SCHEMA: &str = "rustev.remote-binding/1";
@@ -43,6 +44,10 @@ pub struct AdapterBinding {
     /// keeps its spec 009 bytes and artifact.
     #[serde(skip_serializing_if = "TransportPhases::is_disabled")]
     pub transport_phases: TransportPhases,
+    /// The principal wire posture, mapping version and scope (spec 020,
+    /// 3.1 and 3.6); never a reference. Not written when omitted.
+    #[serde(skip_serializing_if = "PrincipalWire::is_omitted")]
+    pub principal_wire: PrincipalWire,
 }
 
 impl AdapterBinding {
@@ -164,6 +169,7 @@ mod tests {
             max_request_bytes: 1,
             max_response_bytes: 1,
             transport_phases: TransportPhases::Disabled,
+            principal_wire: PrincipalWire::Omitted,
         };
         assert_eq!(
             String::from_utf8(canonical_bytes(&b).unwrap()).unwrap(),
@@ -192,6 +198,7 @@ mod tests {
             max_request_bytes: 1,
             max_response_bytes: 1,
             transport_phases: TransportPhases::Disabled,
+            principal_wire: PrincipalWire::Omitted,
         };
         let a = base.artifact().unwrap();
         assert_eq!(a, base.clone().artifact().unwrap());
@@ -242,6 +249,20 @@ mod tests {
                     response_body_ms: 1,
                     cancellation_ack_ms: 1,
                 }),
+                ..base.clone()
+            },
+            AdapterBinding {
+                principal_wire: PrincipalWire::HostOperated {
+                    mapping_version: "m/1".into(),
+                    scope: "s".into(),
+                },
+                ..base.clone()
+            },
+            AdapterBinding {
+                principal_wire: PrincipalWire::HostOperated {
+                    mapping_version: "m/2".into(),
+                    scope: "s".into(),
+                },
                 ..base.clone()
             },
         ];

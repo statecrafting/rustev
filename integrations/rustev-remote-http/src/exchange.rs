@@ -177,6 +177,7 @@ pub fn blank_record(
         late: false,
         truncated: false,
         phase_expiry: None,
+        principal: None,
     }
 }
 

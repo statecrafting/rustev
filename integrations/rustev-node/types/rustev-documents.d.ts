@@ -7361,6 +7361,11 @@ export namespace RustevRemoteExchange1 {
      * without one keeps its spec 009 bytes.
      */
     phase_expiry?: PhaseExpiry | null;
+    /**
+     * The digest and mapping version of the principal reference the
+     * request carried (spec 020, 3.6); absent when none was sent.
+     */
+    principal?: PrincipalEvidence | null;
     privacy_requested: {
       [k: string]: string | undefined;
     };
@@ -7430,6 +7435,14 @@ export namespace RustevRemoteExchange1 {
     limit: PhaseLimit;
     phase: TransportPhase;
   }
+  /**
+   * A principal reference as evidence holds it (spec 020, 3.2 and 3.6): its
+   * domain-separated digest and mapping version, never the reference.
+   */
+  export interface PrincipalEvidence {
+    digest: string;
+    mapping_version: string;
+  }
   export interface ReportedCost {
     /**
      * A decimal string exactly as reported.
@@ -7467,6 +7480,13 @@ export namespace RustevRemoteInfer1Request {
     descriptor: DescriptorId;
     items: InferItem[];
     /**
+     * `rustev.remote/2` only, and only to an endpoint the host operates:
+     * the opaque principal reference (spec 020, 3.6). Routing and isolation
+     * context, never a credential, grant or policy input. Absent otherwise,
+     * so a version 1 request keeps its bytes.
+     */
+    principal?: WirePrincipal | null;
+    /**
      * Privacy options requested (3.8.2); never claimed honored.
      */
     privacy: {
@@ -7485,6 +7505,17 @@ export namespace RustevRemoteInfer1Request {
      * The projection's exact canonical bytes, which are UTF-8 JSON.
      */
     projection: string;
+  }
+  /**
+   * An opaque principal reference on the wire (spec 020, 3.6): the host's
+   * bytes as lowercase hexadecimal, the host's mapping version, and the
+   * declared scope. Rustev never interprets, authenticates, authorizes or
+   * expands it.
+   */
+  export interface WirePrincipal {
+    mapping_version: string;
+    reference: string;
+    scope: string;
   }
 }
 export type RustevRemoteInfer1Request = RustevRemoteInfer1Request.RustevRemoteInfer1Request;

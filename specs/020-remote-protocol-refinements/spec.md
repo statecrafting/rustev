@@ -385,6 +385,48 @@ expiring the body ceiling, a never-answered cancel bounded by the
 acknowledgement ceiling). The schemas and the generated declarations are
 regenerated; `src/phases.rs` joins the reviewed archive list.
 
+**Increment 2 (principal reference and `rustev.remote/2`).**
+`rustev-contract`: `PROTOCOL_V2` and `protocol_name`; the documents keep
+their schema strings and carry `version: 2`. `InferRequest` gains an
+optional `principal` (`WirePrincipal`: the reference as lowercase
+hexadecimal of at most 128 bytes, a mapping version and a scope of 1 to 64
+printable ASCII bytes), omitted when absent so version 1 bytes are
+unchanged; `members_fit_version` refuses it in a version 1 request or when
+not canonical. `WirePrincipal::evidence` is the domain-separated digest
+(`rustev.principal-reference/1`, over mapping version, scope and
+reference) with the mapping version; the exchange record gains an optional
+`principal` holding exactly that. `WirePrincipal`'s `Debug` never prints
+the reference. `integrations/rustev-remote-http/src/principal.rs`:
+`EndpointOperator` (third party by default), `PrincipalSource` (the host
+supplies the reference per attempt; `HandleAsReference` sends the opaque
+principal handle), `PrincipalPosture` (omitted by default) and its binding
+view `PrincipalWire`. The client negotiates exactly
+`ClientConfig::protocol_major` (1 by default): a server that answers
+another version, or none, fails construction, and nothing is upgraded or
+downgraded per call. Construction refuses a principal posture for a
+third-party endpoint, over version 1, or with a bad label. Per attempt, a
+missing or oversized reference refuses the attempt before any byte
+(`malformed_request`, `observed{0}`, `finished`). The reference is sent
+only in the request's `principal` field; batched members share an exchange
+only with the same reference. The record holds its digest, and retained
+request bytes hold the digest in its place. The binding gains
+`principal_wire` (posture, mapping version and scope), not written when
+omitted; rotating the reference keeps the binding and changes the digest.
+The server serves `ServerConfig::versions` (`[1]` by default), refuses a
+principal in a version 1 request or a non-canonical one (400), includes
+the principal in the idempotency content (another principal under the same
+attempt id is `attempt_id_conflict`), and hands the reference to the hosted
+backend as its opaque principal handle. Redirects stay unfollowed, so the
+reference reaches no other endpoint. Tests:
+`integrations/rustev-remote-http/tests/principal.rs` (default omission,
+host-only construction and exact negotiation, the reference reaching only
+the host-operated endpoint with evidence and retained bytes redacted,
+rotation, refusal before send when missing or beyond 128 bytes, the
+conflict, a version 1 request refused, a returned principal member failing
+the answer closed and an authorization claim kept as a provider extra
+without effect, a redirect never followed), unit tests in the module and in
+the contract.
+
 Engineering choices made by the implementing agent, not by the owner:
 
 - 3.1 asks for explicit `disabled` values in the binding. They are explicit
@@ -396,6 +438,15 @@ Engineering choices made by the implementing agent, not by the owner:
   response head, from the first response byte to the complete body.
 - The cancellation acknowledgement ceiling bounds the whole cancel
   exchange, whose own transport phases also apply.
+- `rustev.remote/2` keeps the HTTP paths `/rustev/remote/1/...` and the
+  document schema strings; the `version` member distinguishes it. A
+  version 1 server refuses a version 2 describe with 400, which
+  construction reports as a negotiation failure (`malformed_request`); no
+  plan can be compiled against the adapter.
+- A host-operated `rustev.remote/1` server hands a version 2 request's
+  reference to the hosted backend as `CallContext::principal_handle`; spec
+  009's engineering choice of an empty handle still holds for every
+  version 1 request.
 
 ## Verification
 

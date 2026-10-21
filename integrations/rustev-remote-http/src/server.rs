@@ -71,6 +71,10 @@ pub struct ServerConfig {
     /// Attempt ids remembered at most; beyond it, and with none expired,
     /// requests are refused `503`.
     pub max_remembered: usize,
+    /// The protocol major versions served; `[1]` by default. With 2, a
+    /// request may carry a principal reference (spec 020, 3.6), which the
+    /// hosted backend receives as its opaque principal handle.
+    pub versions: Vec<u32>,
 }
 
 impl Default for ServerConfig {
@@ -86,6 +90,7 @@ impl Default for ServerConfig {
             max_in_flight: 64,
             cancel_wait_ms: 1_000,
             max_remembered: 10_000,
+            versions: vec![PROTOCOL_MAJOR],
         }
     }
 }
@@ -363,9 +368,15 @@ fn terms(state: &State, h: &Hosted) -> RemoteTerms {
 
 fn describe(state: &State, body: &[u8]) -> Result<Vec<u8>, Refusal> {
     let req = DescribeRequest::parse(body).map_err(|e| bad(e.to_string()))?;
-    if !req.versions.contains(&PROTOCOL_MAJOR) {
+    let Some(version) = req
+        .versions
+        .iter()
+        .filter(|v| state.config.versions.contains(v))
+        .max()
+        .copied()
+    else {
         return Err(bad("no common protocol version"));
-    }
+    };
     let hosted = lock(&state.hosted).clone();
     let mut backends = vec![];
     for h in hosted.values() {
@@ -381,7 +392,7 @@ fn describe(state: &State, body: &[u8]) -> Result<Vec<u8>, Refusal> {
     }
     DescribeResponse {
         schema: schema::REMOTE_DESCRIBE.into(),
-        version: PROTOCOL_MAJOR,
+        version,
         backends,
     }
     .record_canonical()
@@ -419,12 +430,18 @@ fn state_bytes(projection: &str) -> Option<Vec<u8>> {
     canonical_value_bytes(&s).ok()
 }
 
-fn content_key(backend_id: &str, descriptor: &DescriptorId, projection: &str) -> String {
+fn content_key(
+    backend_id: &str,
+    descriptor: &DescriptorId,
+    projection: &str,
+    principal: &str,
+) -> String {
     let mut b = Vec::new();
     for part in [
         backend_id.as_bytes(),
         descriptor.as_str().as_bytes(),
         projection.as_bytes(),
+        principal.as_bytes(),
     ] {
         b.extend_from_slice(&(part.len() as u64).to_be_bytes());
         b.extend_from_slice(part);
@@ -441,9 +458,13 @@ async fn infer(state: &Arc<State>, body: &[u8]) -> Result<Vec<u8>, Refusal> {
     if ids.len() != req.items.len() {
         return Err(bad("an attempt id appears twice"));
     }
+    // A principal reference only in version 2, canonical and bounded.
+    if !req.members_fit_version() {
+        return Err(bad("principal reference not allowed or not canonical"));
+    }
     let hosted = lock(&state.hosted).get(&req.backend_id).cloned();
     let answers: Vec<(String, Recorded)> = match hosted {
-        _ if req.version != PROTOCOL_MAJOR => {
+        _ if !state.config.versions.contains(&req.version) => {
             refused_all(&req, RemoteCode::Capability, "unsupported protocol version")
         }
         None => refused_all(&req, RemoteCode::Capability, "no such backend"),
@@ -473,7 +494,7 @@ async fn infer(state: &Arc<State>, body: &[u8]) -> Result<Vec<u8>, Refusal> {
         .collect();
     let mut resp = InferResponse {
         schema: schema::REMOTE_INFER.into(),
-        version: PROTOCOL_MAJOR,
+        version: req.version,
         artifact,
         served,
         route: vec![],
@@ -553,8 +574,23 @@ async fn run_items(
         if attempts.len() + new > state.config.max_remembered {
             return Err((StatusCode::SERVICE_UNAVAILABLE, "overloaded".into()));
         }
+        let principal_digest = req
+            .principal
+            .as_ref()
+            .map(|p| p.evidence().digest)
+            .unwrap_or_default();
+        let principal_handle = req
+            .principal
+            .as_ref()
+            .and_then(|p| p.reference_bytes())
+            .unwrap_or_default();
         for item in &req.items {
-            let content = content_key(&req.backend_id, &req.descriptor, &item.projection);
+            let content = content_key(
+                &req.backend_id,
+                &req.descriptor,
+                &item.projection,
+                &principal_digest,
+            );
             if let Some(e) = attempts.get(&item.attempt_id) {
                 let recorded = e.done.borrow().clone();
                 slots.push(Slot::Answer(if e.content != content {
@@ -607,6 +643,7 @@ async fn run_items(
                 item.projection.clone().into_bytes(),
                 req.budget_ms,
                 req.trace_id.clone(),
+                principal_handle.clone(),
                 signal,
                 cancel_requested,
                 tx,
@@ -641,6 +678,7 @@ fn spawn_attempt(
     projection: Vec<u8>,
     budget_ms: u64,
     trace_id: String,
+    principal_handle: Vec<u8>,
     signal: CancelSignal,
     cancel_requested: Arc<AtomicBool>,
     tx: watch::Sender<Option<Recorded>>,
@@ -664,8 +702,10 @@ fn spawn_attempt(
         let cx = CallContext {
             remaining_ms: DurationMs(budget_ms),
             trace_id,
-            // Never forwarded (3.1.3): the hosted backend sees no principal.
-            principal_handle: vec![],
+            // Spec 009 3.1.3: empty unless a version 2 request carried the
+            // host's opaque principal reference (spec 020, 3.6), which the
+            // hosted backend receives uninterpreted.
+            principal_handle,
         };
         let fut = backend.infer(AttemptCall {
             projection: &projection,
@@ -786,7 +826,7 @@ fn cancel_answer(support: CancelSupport, r: &Recorded) -> RemoteCancelAnswer {
 async fn cancel(state: &Arc<State>, body: &[u8]) -> Result<Vec<u8>, Refusal> {
     let req = CancelRequest::parse(body).map_err(|e| bad(e.to_string()))?;
     let support = state.config.cancellation;
-    if req.version != PROTOCOL_MAJOR || support == CancelSupport::None {
+    if !state.config.versions.contains(&req.version) || support == CancelSupport::None {
         return Err((
             StatusCode::UNPROCESSABLE_ENTITY,
             "cancellation is not supported".into(),
@@ -820,7 +860,7 @@ async fn cancel(state: &Arc<State>, body: &[u8]) -> Result<Vec<u8>, Refusal> {
     }
     CancelResponse {
         schema: schema::REMOTE_CANCEL.into(),
-        version: PROTOCOL_MAJOR,
+        version: req.version,
         answers,
     }
     .record_canonical()
