@@ -504,13 +504,28 @@ fn bounded_served(mut s: ServedIdentity) -> ServedIdentity {
 
 /// An unrecognized excerpt cut to 256 bytes; labels and masses are kept as
 /// returned (a label longer than any declared one is invalid anyway, and is
-/// cut so the record stays bounded).
+/// cut so the record stays bounded). A distribution with a NaN or infinite
+/// mass cannot be written as JSON, so it is recorded, and then judged, as
+/// `non_finite_mass` material with the masses as text: the outcome stays a
+/// writable record and offline reproduction judges what was recorded.
 fn bounded_raw(
     raw: rustev_contract::dynamic::DynamicRawOutput,
 ) -> rustev_contract::dynamic::DynamicRawOutput {
-    use rustev_contract::dynamic::DynamicRawOutput as R;
+    use rustev_contract::dynamic::{DynamicRawOutput as R, ResponseShape};
     match raw {
         R::Label(l) => R::Label(cut(&l, DETAIL_BYTES)),
+        R::Distribution(m) if m.values().any(|v| !v.is_finite()) => {
+            let text = m
+                .iter()
+                .take(rustev_contract::dynamic::MAX_CLASSIFY_LABELS + 1)
+                .map(|(k, v)| format!("{:?}={v}", k.chars().take(64).collect::<String>()))
+                .collect::<Vec<_>>()
+                .join(", ");
+            R::Unrecognized {
+                shape: ResponseShape::NonFiniteMass,
+                excerpt: cut(&text, DETAIL_BYTES),
+            }
+        }
         R::Distribution(m) => R::Distribution(
             m.into_iter()
                 .take(rustev_contract::dynamic::MAX_CLASSIFY_LABELS + 1)

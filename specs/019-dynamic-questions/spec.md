@@ -384,7 +384,10 @@ No retry, fallback, batching, duplicate suppression or cache exists on this
 path. The outcome records the served identity as reported (never replaced
 by the requested artifact), the raw output or failure (free text cut to
 256 bytes), validation, abstention and the result; delivery to the sink is
-reported beside it and never changes it.
+reported beside it and never changes it. A distribution with a NaN or
+infinite mass, which JSON cannot carry, is recorded and judged as
+`non_finite_mass` material with its masses as text, so the outcome stays a
+writable record and reproduction judges what was recorded.
 
 Tests: `crates/rustev-contract/tests/dynamic_wire.rs` (round trips,
 unknown members, duplicate labels, size and count bounds, scan refusals

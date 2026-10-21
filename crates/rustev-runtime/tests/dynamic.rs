@@ -672,6 +672,13 @@ async fn adapter_failures_and_malformed_outputs_are_named_and_never_retried() {
             shape: ResponseShape::UrlFetch,
             excerpt: "GET https://attacker.invalid".repeat(40),
         },
+        // JSON cannot carry these masses; the outcome must still be a record.
+        dist(&[("billing", f64::NAN), ("shipping", 0.5), ("other", 0.5)]),
+        dist(&[
+            ("billing", f64::INFINITY),
+            ("shipping", 0.0),
+            ("other", f64::NEG_INFINITY),
+        ]),
     ] {
         let b = Scripted::new(reply(raw.clone()));
         let o = ask(&q(), &b).await;
@@ -681,6 +688,21 @@ async fn adapter_failures_and_malformed_outputs_are_named_and_never_retried() {
         );
         if let DynamicRaw::Output(DynamicRawOutput::Unrecognized { excerpt, .. }) = &o.raw {
             assert!(excerpt.len() <= 256, "the excerpt is bounded");
+        }
+        if let DynamicRawOutput::Distribution(m) = &raw
+            && m.values().any(|v| !v.is_finite())
+        {
+            assert!(
+                matches!(
+                    &o.raw,
+                    DynamicRaw::Output(DynamicRawOutput::Unrecognized {
+                        shape: ResponseShape::NonFiniteMass,
+                        ..
+                    })
+                ),
+                "{:?}",
+                o.raw
+            );
         }
         round_trips(&o);
     }

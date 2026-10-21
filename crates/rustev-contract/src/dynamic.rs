@@ -668,6 +668,9 @@ pub enum ResponseShape {
     UrlFetch,
     Action,
     FreeText,
+    /// A distribution with a NaN or infinite mass: JSON cannot carry the
+    /// masses, so the outcome records them as an excerpt (3.3, 3.6).
+    NonFiniteMass,
     Other,
 }
 
@@ -680,6 +683,7 @@ impl ResponseShape {
             ResponseShape::UrlFetch => "url_fetch",
             ResponseShape::Action => "action",
             ResponseShape::FreeText => "free_text",
+            ResponseShape::NonFiniteMass => "non_finite_mass",
             ResponseShape::Other => "other",
         }
     }
