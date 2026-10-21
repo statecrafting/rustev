@@ -1,0 +1,32 @@
+[package]
+name = "rustev-rahi"
+version = "0.1.0"
+description = "An evidence sink storing Rustev run records in a Rahi cell's store through Rahi's receipts, under spec 010's binding record."
+# Not in the release family (spec 031 3.4 names no feature for it).
+publish = false
+edition.workspace = true
+# Rahi 0.7.1 declares 1.96 (spec 010, binding record item 1).
+rust-version = "1.96"
+license.workspace = true
+repository.workspace = true
+
+[package.metadata.spec-spine]
+spec = "010-integrations"
+
+# Spec 010 3.2.4: no features. The binding is the one Rahi release its
+# record names, pinned exactly; another version needs a new record.
+[dependencies]
+rustev-contract.workspace = true
+rustev-core.workspace = true
+rahi-store = "=0.7.1"
+rahi-types = "=0.7.1"
+
+# A single-voter Rahi store in a temporary directory, on loopback, and the
+# runtime the sink seam is exercised through.
+[dev-dependencies]
+serde.workspace = true
+serde_json.workspace = true
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+
+[lints]
+workspace = true

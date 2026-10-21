@@ -130,6 +130,20 @@ beyond 3.4.2 and is held in review. `make boundaries` runs it and `make
 code` includes it. Its rules are unit-tested against synthetic metadata,
 including one violating case per rule.
 
+`cargo metadata` resolves features once for the whole workspace, so one
+member's dependencies can switch on an optional edge of a shared crate
+that another member's own build never takes. A transitive violation (3.4.1
+reached through a dependency, and spec 027 3.14.3 for the WebAssembly
+binding) therefore stands only when the crate's own resolution confirms
+it: `cargo tree -p <crate> -e normal,build --locked`, for every target
+(`--target all`), or for `wasm32-unknown-unknown` for the WebAssembly
+binding, also lists a package the violated rule forbids. The check prints
+how many paths it dismissed this way. It fails closed: when the crate's
+own graph cannot be read (`cargo tree` cannot run or exits non-zero), the
+violation stands. A violation of a declared edge (3.4.1 direct, 3.4.2,
+3.4.4, 3.4.5) needs no confirmation. The confirmation rule is unit-tested
+with its negative control (R-45).
+
 Forbidden families are matched by package name: `aicortex*`, `rahi*`,
 `statecraft*`, `spec-spine*`; HTTP stacks `hyper`, `reqwest`, `axum`,
 `actix-web`, `warp`, `tonic`, `ureq`, `isahc`, `surf`, `h2`, `http`; async
@@ -219,6 +233,15 @@ sh -c 'for d in crates tools; do [ -d "$d" ] || continue; if grep -rnE "(struct|
   issue #76: status notes added to the design, backlog states point at their
   owning specs or #76 children. Editorial only; no principle, boundary or
   check changed.
+
+- 2026-10-21: R-45. 3.5 amended: a transitive violation found in the
+  workspace-wide `cargo metadata` resolution stands only when the crate's
+  own `cargo tree -p` resolution confirms it, and it stands when that graph
+  cannot be read. Found while adding `rustev-rahi` (spec 010): Rahi's graph
+  switches on `crypto-common`'s optional `rand_core` edge, and the
+  unconfirmed checker reported seven paths ending `rand_core -> getrandom`
+  (and `js-sys`) for the pure crates and the bindings that none of their
+  own builds hold. Approved by the owner on 2026-10-21.
 
 ## Profile upgrade record (2026-10-02)
 

@@ -425,6 +425,41 @@ pub fn check(meta: &Metadata) -> Vec<Violation> {
     out.into_iter().collect()
 }
 
+/// The crate and `cargo tree --target` whose own resolution confirms a
+/// transitive violation ([`confirmed`]); `None` for a violation that is not
+/// transitive.
+pub fn own_graph_of(v: &Violation) -> Option<(&str, &'static str)> {
+    match v {
+        Violation::ForbiddenTransitive { krate, .. } => Some((krate.as_str(), "all")),
+        Violation::WasmGraph { .. } => Some((WASM_CRATE, "wasm32-unknown-unknown")),
+        _ => None,
+    }
+}
+
+/// Spec 001 3.5 (R-45), found with spec 010's first integration:
+/// `cargo metadata` resolves features once for the whole workspace, so an
+/// integration's graph can switch on an optional edge of a shared crate
+/// (for example `crypto-common` to `rand_core`) that a pure crate's own
+/// build never takes. A transitive violation therefore stands only when
+/// the crate's own resolution, as `cargo tree -p <crate> -e normal,build`
+/// lists it (`own_graph`, package names), also holds a forbidden package.
+/// Every other violation stands as found.
+pub fn confirmed(v: &Violation, own_graph: &[&str]) -> bool {
+    match v {
+        Violation::ForbiddenTransitive { .. } => own_graph.iter().any(|n| forbidden_for_pure(n)),
+        Violation::WasmGraph { .. } => own_graph.iter().any(|n| forbidden_for_wasm(n)),
+        _ => true,
+    }
+}
+
+/// The package names in `cargo tree --prefix none --format {p}` output.
+pub fn tree_names(output: &str) -> Vec<&str> {
+    output
+        .lines()
+        .filter_map(|l| l.split_whitespace().next())
+        .collect()
+}
+
 /// Breadth-first search for the shortest normal or build path from `start`
 /// to a package `forbidden` names; the path lists package names.
 fn forbidden_path(
@@ -1321,5 +1356,51 @@ mod tests {
                 dependency: "rustev-remote-http".into()
             }]
         );
+    }
+
+    #[test]
+    fn a_transitive_violation_stands_only_when_the_crate_own_graph_confirms_it() {
+        // Spec 001 3.5 (R-45): a path the workspace-wide feature resolution shows, but
+        // the crate's own resolution does not hold, is not a violation.
+        let pure = Violation::ForbiddenTransitive {
+            krate: "rustev-contract".into(),
+            path: vec![
+                "rustev-contract".into(),
+                "sha2".into(),
+                "getrandom".into(),
+                "js-sys".into(),
+            ],
+        };
+        let own = tree_names(
+            "rustev-contract v0.1.0 (/ws/crates/rustev-contract)\nsha2 v0.10.9\nserde v1.0.0 (*)\n",
+        );
+        assert_eq!(own, vec!["rustev-contract", "sha2", "serde"]);
+        assert_eq!(own_graph_of(&pure), Some(("rustev-contract", "all")));
+        assert!(!confirmed(&pure, &own));
+        // The negative control: the crate's own graph holds the family.
+        assert!(confirmed(&pure, &["rustev-contract", "tokio"]));
+        assert!(confirmed(&pure, &["rustev-contract", "js-sys"]));
+
+        let wasm = Violation::WasmGraph {
+            path: vec!["rustev-wasm".into(), "getrandom".into()],
+        };
+        assert_eq!(
+            own_graph_of(&wasm),
+            Some((WASM_CRATE, "wasm32-unknown-unknown"))
+        );
+        // The binding itself reaches js-sys; only the 3.14.3 list counts.
+        assert!(!confirmed(
+            &wasm,
+            &["rustev-wasm", "js-sys", "wasm-bindgen"]
+        ));
+        assert!(confirmed(&wasm, &["rustev-wasm", "getrandom"]));
+
+        // Every other rule is about declared edges and stands as found.
+        let direct = Violation::ForbiddenFamily {
+            krate: "rustev-core".into(),
+            dependency: "rahi-store".into(),
+        };
+        assert_eq!(own_graph_of(&direct), None);
+        assert!(confirmed(&direct, &[]));
     }
 }
