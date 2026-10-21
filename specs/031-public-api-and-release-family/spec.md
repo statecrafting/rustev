@@ -695,6 +695,34 @@ crate in this release. The CI jobs that will run these are to be
 registered by a later workflow change, together with spec 027's
 `bindings` job; this increment changes no workflow.
 
+**Increment 3, 2026-10-21 (the changelog and the crates' SBOMs).** `rustev-release changelog
+<out> [<previous tag>]` (`make changelog`, `PREVIOUS=<tag>`) generates the
+release changelog (3.10) at a clean commit: the specs come from
+`spec-spine registry list --json` at HEAD and, for a previous release, at
+that tag's tree (extracted with `git archive`), never from
+`.statecraft/derived/` directly; a spec is listed when it is new, its
+status or implementation state changed, or its approved text changed
+(every section digest but the implementation record's), with its id,
+title, the decision rows that ratified or approved it, its amendment
+edges and the commits since the previous release that touched it. The
+compatibility facts come first: MSRV and edition from the members'
+manifests, each reference plan's `PlanId` from its `plan check` golden
+(compared with the previous release's, a change stated as breaking under
+3.6.4), and superseded versions with their end dates (none so far). The
+text is a pure function of those inputs (`changelog::render`), with unit
+tests for what is listed, ordering independence, a changed `PlanId`, an
+implementation-record-only change and the decision rows; two runs at one
+commit produce identical bytes, and the command prints the digest the
+release manifest will carry. For the first release it lists all 47
+specs.
+`make release-candidate` now also writes, from run a's clean tree at the
+source date, a CycloneDX SBOM per crate member (`cargo-cyclonedx` 0.5.9
+exactly, CycloneDX 1.5, every target's dependencies), and the changelog
+of that commit; the release manifest's evidence map carries the digest of
+each `sbom-<member>.cdx.json` and of `changelog.md`, and a missing one
+fails the candidate (3.9.1). The SBOMs of the npm tarballs, binaries and
+image are their artifact kinds' own, with those kinds.
+
 ## Decisions at approval
 
 1. **Crate and package names** (left to the implementer by #58): decided

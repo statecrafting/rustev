@@ -13,6 +13,7 @@
 
 pub mod archive;
 pub mod audit;
+pub mod changelog;
 pub mod cratesio;
 pub mod lifecycle;
 pub mod manifest;

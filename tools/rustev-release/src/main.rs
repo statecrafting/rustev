@@ -36,6 +36,11 @@
 //! verified archives to crates.io in order. It reads `CARGO_REGISTRY_TOKEN`
 //! only for the account query and the uploads.
 //!
+//! `rustev-release changelog <out.md> [<previous tag>]` writes the release
+//! changelog generated from the governed corpus (spec 031, 3.10) through
+//! `spec-spine registry list --json` at the clean commit at HEAD and, when a
+//! previous release is named, at that tag. It reads only the repository.
+//!
 //! `rustev-release exceptions <YYYY-MM-DD>` exits 1 unless every advisory
 //! `deny.toml` ignores has an owner-approved exception unexpired on that
 //! date (3.6).
@@ -437,6 +442,198 @@ fn exceptions(today: &str) -> ExitCode {
     }
 }
 
+/// The workspace's spec-spine (`.bin/spec-spine`, which `make tools`
+/// installs, or `SPEC_SPINE`), accepted only at the exact version
+/// `spec-spine.toml` pins, so no other binary can answer for the corpus.
+fn spec_spine() -> Result<String, String> {
+    let bin = std::env::var("SPEC_SPINE").unwrap_or_else(|_| ".bin/spec-spine".to_string());
+    let toml =
+        std::fs::read_to_string("spec-spine.toml").map_err(|e| format!("spec-spine.toml: {e}"))?;
+    let pin = toml
+        .lines()
+        .find_map(|l| {
+            let (k, v) = l.split_once('=')?;
+            (k.trim() == "required_version").then(|| {
+                v.trim()
+                    .trim_matches('"')
+                    .trim_start_matches('=')
+                    .to_string()
+            })
+        })
+        .ok_or("spec-spine.toml pins no required_version")?;
+    let version = command_line(&bin, &["--version"])?;
+    if version != format!("spec-spine {pin}") {
+        return Err(format!(
+            "{bin} is `{version}`, not the pinned spec-spine {pin}"
+        ));
+    }
+    Ok(bin)
+}
+
+/// The registry listing of the corpus at `repo`.
+fn registry(repo: &str) -> Result<Vec<rustev_release::changelog::Spec>, String> {
+    let text = command_line(
+        &spec_spine()?,
+        &["--repo", repo, "registry", "list", "--json"],
+    )?;
+    serde_json::from_str::<rustev_release::changelog::Registry>(&text)
+        .map(|r| r.items)
+        .map_err(|e| format!("unreadable registry listing at {repo}: {e}"))
+}
+
+fn changelog_cmd(set: &ReleaseSet, out: &str, previous: Option<&str>) -> ExitCode {
+    match changelog(set, previous) {
+        Ok(text) => {
+            if let Err(e) = std::fs::write(out, &text) {
+                eprintln!("{out}: {e}");
+                return ExitCode::from(1);
+            }
+            let digest = rustev_release::archive::sha256_hex(text.as_bytes());
+            println!("changelog {out}: sha256 {digest}");
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("031 3.10: {e}");
+            ExitCode::from(1)
+        }
+    }
+}
+
+fn changelog(set: &ReleaseSet, previous: Option<&str>) -> Result<String, String> {
+    use rustev_release::changelog::{Inputs, PlanIdentity, approvals, render};
+    if !command_line("git", &["status", "--porcelain", "--untracked-files=no"])?.is_empty() {
+        return Err("the changelog is generated at a clean commit; the tree is dirty".into());
+    }
+    // `command_line` returns trimmed output, so no newline reaches the text.
+    let commit = command_line("git", &["rev-parse", "HEAD"])?;
+    let after = registry(".")?;
+    // The previous release's corpus, read from its tag's tree.
+    let before = match previous {
+        None => Vec::new(),
+        Some(tag) => {
+            // A fresh private directory (`mktemp -d`, mode 0700), never a
+            // predictable or reused path.
+            let dir = std::path::PathBuf::from(command_line(
+                "mktemp",
+                &[
+                    "-d",
+                    &format!("{}/rustev-changelog.XXXXXX", std::env::temp_dir().display()),
+                ],
+            )?);
+            let dir_s = dir.display().to_string();
+            let archive = dir.join("tree.tar").display().to_string();
+            // Every step's result is taken before the directory is removed,
+            // so a failing `git archive` or `tar` leaves nothing behind.
+            let r = command_line("git", &["archive", "--output", &archive, tag])
+                .and_then(|_| command_line("tar", &["-xf", &archive, "-C", &dir_s]))
+                .and_then(|_| registry(&dir_s));
+            let _ = std::fs::remove_dir_all(&dir);
+            r?
+        }
+    };
+    let decisions = std::fs::read_to_string("docs/decisions/00-founding-decisions.md")
+        .map_err(|e| format!("decisions: {e}"))?;
+    let range = previous.map_or("HEAD".to_string(), |p| format!("{p}..HEAD"));
+    let mut commits = std::collections::BTreeMap::new();
+    for s in &after {
+        let log = command_line(
+            "git",
+            &[
+                "log",
+                "--reverse",
+                "--format=%h%x09%s",
+                &range,
+                "--",
+                &format!("specs/{}/", s.id),
+            ],
+        )?;
+        let list: Vec<(String, String)> = log
+            .lines()
+            .filter_map(|l| l.split_once('\t'))
+            .map(|(h, s)| (h.to_string(), s.to_string()))
+            .collect();
+        commits.insert(s.id.clone(), list);
+    }
+    let meta = metadata()?;
+    let first = meta
+        .packages
+        .iter()
+        .find(|p| Some(&p.name) == set.upload_order.first())
+        .ok_or("the first release member is not in the workspace")?;
+    // One MSRV and edition for the family: the release policy refuses a
+    // member that differs (021 3.3), and the changelog states it only when
+    // every member agrees.
+    for p in meta
+        .packages
+        .iter()
+        .filter(|p| set.members().any(|m| m == p.name))
+    {
+        if p.rust_version != first.rust_version || p.edition != first.edition {
+            return Err(format!(
+                "`{}` declares rust-version {:?} and edition {}, not the family's {:?} and {}",
+                p.name, p.rust_version, p.edition, first.rust_version, first.edition
+            ));
+        }
+    }
+    // Each reference plan's identity, as its `plan check` golden pins it.
+    let mut plan_ids = Vec::new();
+    let golden = "crates/rustev-cli/tests/golden";
+    let mut names: Vec<String> = std::fs::read_dir(golden)
+        .map_err(|e| format!("{golden}: {e}"))?
+        .filter_map(|e| e.ok()?.file_name().into_string().ok())
+        .filter(|n| n.ends_with(".check.json") && !n.contains("refus"))
+        .collect();
+    names.sort();
+    let plan_id = |text: &str| -> Option<String> {
+        serde_json::from_str::<serde_json::Value>(text).ok()?["plan_id"]
+            .as_str()
+            .map(str::to_string)
+    };
+    for n in names {
+        let path = format!("{golden}/{n}");
+        let now = std::fs::read_to_string(&path).map_err(|e| format!("{path}: {e}"))?;
+        // A `plan check` golden always carries a `plan_id`; one without it
+        // is an error, here as at the previous release.
+        let after = plan_id(&now).ok_or_else(|| format!("{path}: no plan_id"))?;
+        // Absent at the previous release is `None`; present but unreadable
+        // is an error, never a silent "unchanged".
+        let before = match previous {
+            None => None,
+            Some(p) => {
+                let at = format!("{p}:{path}");
+                if command_line("git", &["cat-file", "-e", &at]).is_err() {
+                    None
+                } else {
+                    let text = command_line("git", &["show", &at])?;
+                    Some(plan_id(&text).ok_or_else(|| format!("{at}: no plan_id"))?)
+                }
+            }
+        };
+        plan_ids.push(PlanIdentity {
+            plan: n.trim_end_matches(".check.json").to_string(),
+            before,
+            after,
+        });
+    }
+    let inputs = Inputs {
+        version: set.version.clone(),
+        previous: previous.map(str::to_string),
+        commit,
+        approvals: approvals(&decisions, &after),
+        before,
+        after,
+        commits,
+        msrv: first
+            .rust_version
+            .clone()
+            .unwrap_or_else(|| "unknown".into()),
+        edition: first.edition.clone(),
+        plan_ids,
+        superseded: Vec::new(),
+    };
+    Ok(render(&inputs))
+}
+
 fn command_line(program: &str, args: &[&str]) -> Result<String, String> {
     let mut cmd = Command::new(program);
     // No inherited `GIT_*` variable (such as `GIT_DIR`) may point the dirty
@@ -499,6 +696,18 @@ fn manifest(set: &ReleaseSet, evidence_dir: &str) -> ExitCode {
         ] {
             let bytes = std::fs::read(dir.join(name)).map_err(|e| format!("{name}: {e}"))?;
             evidence.insert(name.to_string(), sha256_hex(&bytes));
+        }
+        // Spec 031 3.9.1 and 3.10: every member's SBOM and the changelog are
+        // release artifacts whose digests the manifest carries; a missing one
+        // fails the candidate.
+        let sboms = set
+            .upload_order
+            .iter()
+            .map(|n| (format!("sbom-{n}.cdx.json"), "031 3.9.1"));
+        for (name, clause) in sboms.chain([("changelog.md".to_string(), "031 3.10")]) {
+            let bytes =
+                std::fs::read(dir.join(&name)).map_err(|e| format!("{clause}: {name}: {e}"))?;
+            evidence.insert(name, sha256_hex(&bytes));
         }
         let m = build(
             set,
@@ -714,11 +923,13 @@ fn main() -> ExitCode {
         ["verify-release", dir] => verify_release_cmd(dir, "."),
         ["verify-release", dir, repo] => verify_release_cmd(dir, repo),
         ["exceptions", today] => exceptions(today),
+        ["changelog", out] => changelog_cmd(&set, out, None),
+        ["changelog", out, previous] => changelog_cmd(&set, out, Some(previous)),
         ["unpacked", dir, work] => unpacked(&set, dir, work, None),
         ["unpacked", dir, work, toolchain] => unpacked(&set, dir, work, Some(toolchain)),
         _ => {
             eprintln!(
-                "usage: rustev-release manifests | archives <dir> | compare <dir-a> <dir-b> | field <name> | unpacked <dir> <work> [<toolchain>] | deps | exceptions <YYYY-MM-DD> | manifest <evidence-dir> | publish <release-dir> <instruction.json> <journal> | verify-release <dir> [<repo>]"
+                "usage: rustev-release manifests | archives <dir> | compare <dir-a> <dir-b> | field <name> | unpacked <dir> <work> [<toolchain>] | deps | exceptions <YYYY-MM-DD> | changelog <out.md> [<previous tag>] | manifest <evidence-dir> | publish <release-dir> <instruction.json> <journal> | verify-release <dir> [<repo>]"
             );
             ExitCode::from(2)
         }
