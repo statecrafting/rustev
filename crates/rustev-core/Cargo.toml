@@ -21,6 +21,7 @@ include = ["/src/**/*.rs", "/LICENSE"]
 spec = "002-decision-contract-and-pure-core"
 
 [dependencies]
+libm.workspace = true
 rustev-contract.workspace = true
 serde.workspace = true
 serde_json.workspace = true

@@ -19,6 +19,7 @@ pub(crate) mod execution;
 pub mod expr;
 pub(crate) mod grading;
 pub mod kinds;
+pub mod math;
 pub mod ops;
 pub(crate) mod policy;
 pub(crate) mod quality;

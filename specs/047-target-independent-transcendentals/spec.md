@@ -2,7 +2,7 @@
 id: "047-target-independent-transcendentals"
 title: "One implementation of exp and ln on every target (amends 002 and 027)"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-21"
 summary: >
   Approved (A-44). The remedy spec 027 3.11.5 names for
@@ -20,6 +20,16 @@ summary: >
 amends:
   - "002-decision-contract-and-pure-core"
   - "027-node-and-wasm-bindings"
+extends:
+  # `rustev_core::math` and the softmax and calibration call sites.
+  - { spec: "002-decision-contract-and-pure-core", unit: { kind: directory, path: "crates/rustev-core/" }, nature: amending }
+  # The log-loss and temperature-fit call sites.
+  - { spec: "004-evaluation-and-replay", unit: { kind: directory, path: "crates/rustev-eval/" }, nature: amending }
+  # The `libm` workspace dependency and its lock entry.
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.toml" }, nature: additive }
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.lock" }, nature: additive }
+  # Core's new source file joins its reviewed archive list (spec 021 3.5).
+  - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
 depends_on:
   - "002-decision-contract-and-pure-core"
   - "004-evaluation-and-replay"
@@ -172,9 +182,24 @@ backend output under spec 002 3.4.6; `sqrt` and `powi`.
 
 ## Verification
 
-Pending with implementation. Spec 027's increment 7 runs the differential
-corpus that shows the result on every target.
+`cargo test -p rustev-core` runs the math module's tests (special values
+and pinned bit patterns) and `tests/platform_math.rs` (3.3). Spec 027's
+increment 7 runs the differential corpus that shows the result on every
+target.
 
 ## Implementation record
 
-Not started.
+**2026-10-21.** `rustev_core::math::{exp, ln}` wrap `libm::exp` and
+`libm::log` (`libm` =0.2.16, `default-features = false`, a workspace
+dependency of core only). The four call sites use them: softmax in
+`kinds.rs`, the log of a distribution mass in `calibrate.rs`, log loss in
+`rustev-eval`'s `metrics.rs` and the temperature fit's loss in `fit.rs`;
+evaluation's dependencies are unchanged. The module's unit tests pin
+special values and three results' bit patterns, so a pin change that
+moves a bit fails there first. `crates/rustev-core/tests/platform_math.rs`
+scans the sources of contract, core, evaluation and the surface and fails
+on a call of a platform math method (the list of 3.3) outside `math.rs`,
+comments excluded; a second test shows the scan finds each seeded form.
+Core's new `src/math.rs` joins its reviewed archive list
+(`tools/rustev-release/archive-policy.json`). Every existing test and
+golden passes unchanged, none re-blessed.

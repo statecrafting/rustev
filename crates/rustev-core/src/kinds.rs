@@ -98,7 +98,8 @@ fn argmax(values: &[f64]) -> usize {
 }
 
 /// Softmax with max subtraction, in declared order. Uses `exp`, so it is
-/// numerically, not byte, repeatable (spec 002, 3.4.6).
+/// outside exact computation (spec 002, 3.4.6), but it computes the same
+/// bits on every target (spec 047).
 pub(crate) fn softmax(z: &[f64]) -> Vec<f64> {
     let max = z.iter().copied().fold(f64::NEG_INFINITY, f64::max);
     let e: Vec<f64> = z
@@ -107,7 +108,7 @@ pub(crate) fn softmax(z: &[f64]) -> Vec<f64> {
             if *v == f64::NEG_INFINITY {
                 0.0
             } else {
-                (v - max).exp()
+                crate::math::exp(v - max)
             }
         })
         .collect();

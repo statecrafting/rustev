@@ -10,8 +10,50 @@
       "004-evaluation-and-replay",
       "027-node-and-wasm-bindings"
     ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-core/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "004-evaluation-and-replay",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-eval/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-public-api-and-release-family",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-release/"
+        }
+      }
+    ],
     "id": "047-target-independent-transcendentals",
-    "implementation": "pending",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-one-implementation",
@@ -36,15 +78,15 @@
       }
     ],
     "sectionDigests": {
-      "047-one-implementation-of-exp-and-ln-on-every-target-amends-002-and-027": "e32f7712b6d0654006e31a53fff82cc522b011d563c777a61c13cfdabd74eadc",
+      "047-one-implementation-of-exp-and-ln-on-every-target-amends-002-and-027": "625d845740cdd3df2e205d99eba86c9d251fd3dc4d216c11231448b3f0de7455",
       "1-purpose": "79e3aacdc80eb763cca3fec9337b1f28597152a54ec985082c2c24c186fc2919",
       "2-territory": "2561cf7c5c3eef3ca1cf09d8dd8fbbb74a01e2797c193d134421b4e15fd54679",
       "3-one-implementation": "8205e17c23db6079c592dda4fc62690b70d21128b406ebf7a7abc54d0a265901",
       "4-out-of-scope": "eda7f7ea7a3d1496ab004a1d4b793f643f39091dd7943ffaf468b078a45955cc",
       "5-observable-negative-cases": "248f0c9a2f6216c093ad421584db7393f38913234b784e81a5ed14dee96f3005",
       "acceptance": "41182f5090151bc9ee80291be2058b33746b3e0fb22af2828f1655993688641e",
-      "implementation-record": "648e37f73ad3e0039072654a01a4acf651e8d6d56a640ea10b293acfdd33d511",
-      "verification": "2b58e4f2caad64491eca101957a5f6ac322f8fb1df5dec7b10d65d2a7bca60a9",
+      "implementation-record": "c4b082f00760a6b15dd84374effdc696ec438048407b7b9b388c3c4a2e1abb72",
+      "verification": "07c39a9605797163c29a5dd0ebb0080cb5e2f5bb87f69ad470818e5667b30873",
       "what-changes-in-spec-002": "6867b16bfea229e1447d1c96778e41a51eb6593a81072e852ac108a31ace5943",
       "what-changes-in-spec-027": "47a5f95367b061396ad9b2b30445aec18bb7c31364ab439bd6ed34c44703d9a2"
     },
@@ -66,6 +108,6 @@
     "summary": "Approved (A-44). The remedy spec 027 3.11.5 names for a cross-target floating-point divergence. The pure crates' four transcendental call sites (`exp` in core's softmax, `ln` in core's calibration, `ln` in evaluation's log loss and temperature fit) call the platform's math library on native targets and Rust's bundled one on WebAssembly; measured on 2026-10-21 they differ by one unit in the last place on 0.08% to 7.1% of a million inputs per input domain (macOS arm64 against `wasm32-unknown-unknown`). This spec routes all four through one pure Rust implementation, the `libm` crate exact-pinned at 0.2.16 without default features, exposed as `rustev_core::math`, so each produces the same bits on every target; no existing golden changes. Ratified by the owner on 2026-10-21 (A-44). Approval does not authorize a release.\n",
     "title": "One implementation of exp and ln on every target (amends 002 and 027)"
   },
-  "shardHash": "dc20b7a503efc756c5e2b27c806c7337e75bae1de77af9b43aa9e196cc935d42",
+  "shardHash": "aa2e61fe62d4de2ae35c996f21872faa398543e04eb75ad8e40c93d25539c728",
   "specVersion": "1.9.0"
 }

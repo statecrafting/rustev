@@ -218,7 +218,7 @@ pub fn mean_log_loss(cases: &[Scored<'_>]) -> Measure {
             .find(|(o, _)| o == c.label)
             .map(|(_, p)| *p);
         match p {
-            Some(p) if p > 0.0 => sum -= p.ln(),
+            Some(p) if p > 0.0 => sum -= rustev_core::math::ln(p),
             Some(_) => {
                 return Measure::Unknown {
                     reason: format!(
