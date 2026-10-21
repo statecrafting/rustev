@@ -1,0 +1,10 @@
+{
+  "package": {
+    "kind": "rust-lib",
+    "name": "rustev-node",
+    "path": "integrations/rustev-node",
+    "specRef": "027-node-and-wasm-bindings"
+  },
+  "schemaVersion": "1.2.0",
+  "shardHash": "0d9f4f5c54673c5348d14c5f19239fd10eb08326aac53f70af31317ffe5889af"
+}

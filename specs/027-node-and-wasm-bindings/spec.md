@@ -22,6 +22,9 @@ extends:
   - { spec: "002-decision-contract-and-pure-core", unit: { kind: directory, path: "crates/rustev-contract/" }, nature: additive }
   - { spec: "002-decision-contract-and-pure-core", unit: { kind: directory, path: "crates/rustev-core/" }, nature: additive }
   - { spec: "004-evaluation-and-replay", unit: { kind: directory, path: "crates/rustev-eval/" }, nature: additive }
+  # A read-only accessor on the manual clock (its pending delays), so a
+  # conformance runner drives it deterministically (3.12.4).
+  - { spec: "003-runtime-execution-and-evidence", unit: { kind: directory, path: "crates/rustev-runtime/" }, nature: additive }
   - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: amending }
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.toml" }, nature: additive }
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.lock" }, nature: additive }
@@ -31,7 +34,7 @@ extends:
   # list, under spec 021 3.5's rule, in the directory spec 031 owns.
   - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
 establishes:
-  - { kind: directory, path: "integrations/rustev-node/", planned: true }
+  - { kind: directory, path: "integrations/rustev-node/" }
   - { kind: directory, path: "integrations/rustev-wasm/" }
   - { kind: directory, path: "crates/rustev-surface/" }
   - { kind: directory, path: "tools/rustev-conformance/" }
@@ -918,6 +921,57 @@ raw budget to 2,621,440 bytes and keeps every other budget and the gate;
 the measurement check applies it, so `make bindings` passes with the
 module at 2,216,152 bytes. Headless Chromium timing and the CI
 measurement come with the `bindings` job.
+
+**Increment 6, first change (the native crate).** `integrations/rustev-node`
+(`publish = false`; excluded from the crates.io release set, shipped as
+`@statecrafting/rustev` and its platform packages) is a napi-rs binding
+(napi 3.14.2 with Node-API version 8, napi-derive 3.6.12, napi-build
+2.6.0). Its native layer: an `Engine` owning one Tokio multi-thread runtime
+sized by its configuration (1 to 64 workers, 1 to 512 blocking threads;
+refusals before any thread), its registered backends (rules programs as
+bytes, and host backends), its sink and optional context source;
+`compile` of a definition, or of an already compiled plan as the CLI's
+`run` loads it, and `prepare`, on the blocking pool (with blocking
+`compileSync`); `decide` running on the engine's runtime (the promise
+only awaits it), returning the judgment, run record and delivery with the
+contract's canonical bytes, an unresolved outcome being a value; the pure
+commands through `rustev-surface` and `host::Memory` on the blocking pool
+(`check` and `show` also synchronous); a manual clock option with its
+pending delays for tests; gauges; shutdown. Hand-written code has no
+`unsafe`: napi-rs's generated glue needs it, so this crate relaxes the
+workspace's `forbid` to `deny` with the reason at the manifest, and
+`tests/no_unsafe.rs` fails on any hand-written `unsafe`. Host seams
+(3.6) are threadsafe functions, weak so an idle engine never holds the
+event loop: each seam has a declared queue (1 to 65,536) whose overflow is
+refused at once (a backend's attempt fails `overloaded` with nothing
+charged and nothing running; a sink's delivery fails; a context source is
+`ContextUnavailable`), every call carries its remaining time, identity,
+an `AbortSignal` the runtime's cancellation aborts, the reserved bound and
+the decision's `traceparent`, a settlement after the runtime finished the
+call is discarded and counted, and a rejection that is not a `SeamFailure`
+is `permanent` with an unknown charge and possibly continuing work. A
+context source is called once before admission with the plan's input
+fields when a request carries no snapshot; its failure is
+`ContextUnavailable` and nothing is defaulted. A `traceparent` (validated
+as W3C version 00) reaches every seam call of its decision and enters no
+record. The JavaScript layer over this crate follows in the second change.
+
+Two findings for the owner. First, the runtime polls a cancelled attempt
+once for its answer (spec 003, 3.7.3); a host seam answers across threads
+and, not blocking (3.6.1), is never ready then, so a host backend's answer
+to an `AbortSignal` is always recorded `not_observed` with possibly
+continuing work, never `stopped` or `unconfirmed`: section 5's row
+"aborted after dispatch, backend unconfirmed: the result records
+`unconfirmed`" holds for Rust backends, and for host backends only as this
+more conservative record. Second, section 5's row "a host backend returns
+output failing the bounded parse: spec 003 invalid backend output" and
+3.6.5's "a value that fails the bounded parse maps to the seam's typed
+failure" disagree; the binding follows 3.6.5 (an unparseable answer is
+`permanent` with an unknown charge), and an output that parses but the
+core refuses is `invalid_backend_output`, which the test shows. Either
+needs the owner's reading or an amendment. The native conformance adapter
+follows in the third change; the native matrix, prebuilt platform
+packages and CI come with increment 7.
 
 ## Decisions at approval
 

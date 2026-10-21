@@ -84,6 +84,20 @@ impl ManualClock {
         }
     }
 
+    /// How far ahead of now each pending sleeper is due, sorted: a host
+    /// driving the clock (a conformance runner, spec 027 3.12.4) waits for
+    /// the delay it expects before advancing, whatever else sleeps.
+    pub fn pending_delays(&self) -> Vec<u64> {
+        let s = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        let mut v: Vec<u64> = s
+            .sleepers
+            .iter()
+            .map(|(_, at, _)| at.saturating_sub(s.now))
+            .collect();
+        v.sort_unstable();
+        v
+    }
+
     /// Sleepers not yet due, for tests that wait until the runtime is idle.
     pub fn sleepers(&self) -> usize {
         self.0
