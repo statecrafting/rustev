@@ -1,26 +1,40 @@
 [package]
 name = "rustev-pkg-lodging"
-version = "0.1.0"
-description = "Rustev reference package: lodging recommendation definition and SYNTHETIC mechanics material."
-publish = false
+version.workspace = true
+description = "Rustev reference package: the lodging recommendation definition and SYNTHETIC mechanics material."
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/rustev-pkg-lodging"
+readme.workspace = true
+keywords = ["decision-engine", "example", "synthetic"]
+categories = ["algorithms"]
+# Spec 031 3.1 (amending spec 008): a release member, published to the
+# intended public registry only (spec 021, 3.4).
+publish = ["crates-io"]
+# Spec 021, 3.5: the archive holds the library source and the files its
+# public API embeds; the reviewed file list is
+# tools/rustev-release/archive-policy.json. Cargo also adds the workspace
+# README.md that `readme` names; the list names it, checked against
+# `cargo package --list`.
+include = ["/src/**/*.rs", "/data/**/*.json", "/LICENSE"]
 
 [package.metadata.spec-spine]
 spec = "008-reference-package-lodging"
 
 # Contract and core only (spec 008 section 2); `make boundaries` enforces it.
 [dependencies]
-rustev-contract = { path = "../../crates/rustev-contract" }
-rustev-core = { path = "../../crates/rustev-core" }
+rustev-contract.workspace = true
+rustev-core.workspace = true
 
+# The runtime, a backend, eval and the CLI run the package's own tests only.
 [dev-dependencies]
-rustev-runtime = { path = "../../crates/rustev-runtime" }
-rustev-eval = { path = "../../crates/rustev-eval" }
-rustev-cli = { path = "../../crates/rustev-cli" }
-rustev-backend-rules = { path = "../../backends/rustev-backend-rules" }
+rustev-runtime.workspace = true
+rustev-eval.workspace = true
+rustev-cli.workspace = true
+rustev-backend-rules.workspace = true
 serde_json.workspace = true
 tokio = { workspace = true, features = ["rt", "macros", "sync", "time"] }
 

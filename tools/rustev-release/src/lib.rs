@@ -57,6 +57,9 @@ pub const RELEASE_SET_SCHEMA: &str = "rustev.release-set/1";
 pub const CRATES_IO_INDEX: &str = "registry+https://github.com/rust-lang/crates.io-index";
 pub const REPOSITORY: &str = "https://github.com/statecrafting/rustev";
 pub const LICENSE: &str = "Apache-2.0";
+/// The facade crate (spec 031, 3.2): the one member with Cargo features,
+/// always alone in the last crate layer (3.1).
+pub const FACADE: &str = "rustev";
 
 impl ReleaseSet {
     pub fn parse(bytes: &[u8]) -> Result<Self, String> {
@@ -128,6 +131,8 @@ pub struct Dependency {
     pub source: Option<String>,
     pub path: Option<String>,
     pub registry: Option<String>,
+    #[serde(default)]
+    pub optional: bool,
 }
 
 impl Dependency {
@@ -156,8 +161,12 @@ pub enum Violation {
         field: String,
         detail: String,
     },
-    /// 3.3: the first release declares no Cargo feature.
+    /// 3.3: the first release declares no Cargo feature (the facade's
+    /// excepted, spec 031 3.2).
     Feature { name: String, feature: String },
+    /// Spec 031 3.2 and I-3: a facade feature that is not exactly one
+    /// optional dependency on a release member, or a non-empty default.
+    FacadeFeature { feature: String, detail: String },
     /// 3.2 and 3.4: an internal dependency is not a member at the exact
     /// family version.
     InternalDependency {
@@ -214,6 +223,9 @@ impl fmt::Display for Violation {
             }
             Violation::Feature { name, feature } => {
                 write!(f, "021 3.3: `{name}` declares the feature `{feature}`")
+            }
+            Violation::FacadeFeature { feature, detail } => {
+                write!(f, "031 3.2: the facade's feature `{feature}` {detail}")
             }
             Violation::InternalDependency {
                 name,
@@ -280,6 +292,18 @@ pub fn check_set(set: &ReleaseSet) -> Vec<Violation> {
     for layer in &set.layers {
         if layer.windows(2).any(|w| w[0] >= w[1]) {
             bad(format!("layer {layer:?} is not sorted by name"));
+        }
+    }
+    // Spec 031 3.1: the facade, when a member, is the last crate layer
+    // alone and uploads last.
+    if seen.contains(FACADE) {
+        if set.layers.last().map(Vec::as_slice) != Some(&[FACADE.to_string()][..]) {
+            bad(format!(
+                "the facade `{FACADE}` is not alone in the last layer"
+            ));
+        }
+        if set.upload_order.last().map(String::as_str) != Some(FACADE) {
+            bad(format!("the facade `{FACADE}` does not upload last"));
         }
     }
     let order: BTreeSet<&str> = set.upload_order.iter().map(String::as_str).collect();
@@ -403,6 +427,13 @@ pub fn check_manifests(set: &ReleaseSet, meta: &Metadata) -> Vec<Violation> {
             .filter_map(|d| set.layer_of(&d.name))
             .max()
             .unwrap_or(0);
+        // The facade is always the last crate layer, alone (spec 031 3.1):
+        // every optional dependency must already be public.
+        let expected = if *name == FACADE {
+            expected.max(set.layers.len())
+        } else {
+            expected
+        };
         if let Some(declared) = set.layer_of(name)
             && declared != expected
         {
@@ -523,10 +554,64 @@ fn check_member(set: &ReleaseSet, p: &Package, rust_version: Option<&str>, v: &m
             format!("{:?}, not the shared {rust_version:?}", p.rust_version),
         );
     }
-    v.extend(p.features.keys().map(|f| Violation::Feature {
-        name: name.to_string(),
-        feature: f.clone(),
-    }));
+    if name == FACADE {
+        check_facade_features(set, p, v);
+    } else {
+        v.extend(p.features.keys().map(|f| Violation::Feature {
+            name: name.to_string(),
+            feature: f.clone(),
+        }));
+    }
+}
+
+/// Spec 031 3.2 and I-3: no default features, and each feature enables
+/// exactly one optional normal dependency that is a member of this release;
+/// a feature whose crate is not released is absent, never a stub.
+fn check_facade_features(set: &ReleaseSet, p: &Package, v: &mut Vec<Violation>) {
+    let mut bad = |feature: &str, detail: String| {
+        v.push(Violation::FacadeFeature {
+            feature: feature.to_string(),
+            detail,
+        })
+    };
+    for (feature, enables) in &p.features {
+        if feature == "default" {
+            if !enables.is_empty() {
+                bad(feature, format!("enables {enables:?}; it must be empty"));
+            }
+            continue;
+        }
+        let [one] = enables.as_slice() else {
+            bad(
+                feature,
+                format!("enables {enables:?}, not exactly one dependency"),
+            );
+            continue;
+        };
+        let Some(dep) = one.strip_prefix("dep:") else {
+            bad(feature, format!("enables {one:?}, not a `dep:` dependency"));
+            continue;
+        };
+        if !set.members().any(|m| m == dep) {
+            bad(
+                feature,
+                format!("enables `{dep}`, which is not a member of this release"),
+            );
+            // One violation per feature: an unreleased crate is not a
+            // dependency either, which this already explains.
+            continue;
+        }
+        let declared = p
+            .dependencies
+            .iter()
+            .any(|d| d.name == dep && d.optional && d.kind_name() == "normal");
+        if !declared {
+            bad(
+                feature,
+                format!("enables `{dep}`, which is not an optional normal dependency"),
+            );
+        }
+    }
 }
 
 fn check_internal(

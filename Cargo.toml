@@ -30,6 +30,8 @@ rustev-backend-rules = { path = "backends/rustev-backend-rules", version = "=0.1
 rustev-remote-http = { path = "integrations/rustev-remote-http", version = "=0.1.0" }
 rustev-cli = { path = "crates/rustev-cli", version = "=0.1.0" }
 rustev-surface = { path = "crates/rustev-surface", version = "=0.1.0" }
+rustev-pkg-support-routing = { path = "packages/rustev-pkg-support-routing", version = "=0.1.0" }
+rustev-pkg-lodging = { path = "packages/rustev-pkg-lodging", version = "=0.1.0" }
 serde = { version = "1", features = ["derive"] }
 # `float_roundtrip`: parsing is correctly rounded, so a retained output parses
 # to exactly the value that was supplied (spec 004, 5.6).

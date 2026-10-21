@@ -247,6 +247,40 @@
       ],
       "max_archive_bytes": 65536,
       "max_unpacked_bytes": 131072
+    },
+    "rustev-pkg-lodging": {
+      "files": [
+        ".cargo_vcs_info.json",
+        "Cargo.lock",
+        "Cargo.toml",
+        "Cargo.toml.orig",
+        "LICENSE",
+        "README.md",
+        "data/lodging-recommendation.definition.json",
+        "data/ranking.adapter.json",
+        "data/ranking.config.json",
+        "data/ranking.dataset.json",
+        "data/snapshots/lg-c01.json",
+        "data/snapshots/lg-f01.json",
+        "data/snapshots/lg-m01.json",
+        "data/snapshots/lg-t01.json",
+        "src/lib.rs"
+      ],
+      "max_archive_bytes": 65536,
+      "max_unpacked_bytes": 196608
+    },
+    "rustev": {
+      "files": [
+        ".cargo_vcs_info.json",
+        "Cargo.lock",
+        "Cargo.toml",
+        "Cargo.toml.orig",
+        "LICENSE",
+        "README.md",
+        "src/lib.rs"
+      ],
+      "max_archive_bytes": 65536,
+      "max_unpacked_bytes": 131072
     }
   }
 }

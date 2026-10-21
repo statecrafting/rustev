@@ -77,6 +77,8 @@ fn the_release_set_fixes_the_first_family() {
             vec![
                 "rustev-backend-rules",
                 "rustev-eval",
+                // Spec 031 3.1: lodging joins the family.
+                "rustev-pkg-lodging",
                 "rustev-pkg-support-routing",
                 "rustev-remote-http",
                 "rustev-runtime"
@@ -84,9 +86,11 @@ fn the_release_set_fixes_the_first_family() {
             // Spec 045: the command surface the CLI depends on (spec 027).
             vec!["rustev-surface"],
             vec!["rustev-cli"],
+            // Spec 031 3.1: the facade, always the last crate layer.
+            vec!["rustev"],
         ]
     );
-    // Every workspace package outside the eight is excluded, by name.
+    // Every workspace package outside the members is excluded, by name.
     let mut excluded: Vec<&str> = s.excluded.iter().map(|e| e.name.as_str()).collect();
     excluded.sort();
     let m = metadata();
@@ -99,7 +103,7 @@ fn the_release_set_fixes_the_first_family() {
         .collect();
     outside.sort();
     assert_eq!(excluded, outside);
-    for name in ["rustev-boundaries", "rustev-pkg-lodging", "rustev-release"] {
+    for name in ["rustev-boundaries", "rustev-release"] {
         assert!(excluded.contains(&name), "{name} must be excluded (021 2)");
     }
     // The provider adapter (section 2's first exclusion) is identified by its
@@ -149,14 +153,14 @@ fn an_internal_dependency_at_another_version_fails() {
 #[test]
 fn a_dev_dependency_on_an_excluded_crate_fails() {
     let mut m = metadata();
-    let mut lodging = package(&mut m, "rustev-cli").dependencies[0].clone();
-    lodging.name = "rustev-pkg-lodging".into();
-    lodging.kind = Some("dev".into());
-    package(&mut m, "rustev-eval").dependencies.push(lodging);
+    let mut excluded = package(&mut m, "rustev-cli").dependencies[0].clone();
+    excluded.name = "rustev-boundaries".into();
+    excluded.kind = Some("dev".into());
+    package(&mut m, "rustev-eval").dependencies.push(excluded);
     assert!(matches!(
         only(check_manifests(&set(), &m)),
         Violation::InternalDependency { ref dependency, ref kind, .. }
-            if dependency == "rustev-pkg-lodging" && kind == "dev"
+            if dependency == "rustev-boundaries" && kind == "dev"
     ));
 }
 
@@ -193,7 +197,7 @@ fn a_member_that_may_publish_anywhere_fails() {
 #[test]
 fn a_publishable_exclusion_fails() {
     let mut m = metadata();
-    package(&mut m, "rustev-pkg-lodging").publish = Some(vec!["crates-io".into()]);
+    package(&mut m, "rustev-boundaries").publish = Some(vec!["crates-io".into()]);
     assert!(matches!(
         only(check_manifests(&set(), &m)),
         Violation::Publish { .. }
@@ -253,6 +257,68 @@ fn a_cargo_feature_fails() {
         only(check_manifests(&set(), &m)),
         Violation::Feature { .. }
     ));
+}
+
+#[test]
+fn the_facade_alone_may_declare_features_each_one_released_dependency() {
+    // Spec 031 3.2 and I-3: a feature naming a crate outside the release
+    // (here `bedrock`, whose crate does not exist yet) fails.
+    let mut m = metadata();
+    package(&mut m, "rustev")
+        .features
+        .insert("bedrock".into(), vec!["dep:rustev-bedrock".into()]);
+    // Exactly one violation for that feature.
+    assert!(matches!(
+        only(check_manifests(&set(), &m)),
+        Violation::FacadeFeature { ref feature, ref detail }
+            if feature == "bedrock" && detail.contains("not a member of this release")
+    ));
+    // A non-empty default fails.
+    let mut m = metadata();
+    package(&mut m, "rustev")
+        .features
+        .insert("default".into(), vec!["runtime".into()]);
+    assert!(matches!(
+        only(check_manifests(&set(), &m)),
+        Violation::FacadeFeature { ref feature, .. } if feature == "default"
+    ));
+    // A feature enabling two dependencies fails.
+    let mut m = metadata();
+    package(&mut m, "rustev").features.insert(
+        "runtime".into(),
+        vec!["dep:rustev-runtime".into(), "dep:rustev-eval".into()],
+    );
+    assert!(matches!(
+        only(check_manifests(&set(), &m)),
+        Violation::FacadeFeature { ref feature, .. } if feature == "runtime"
+    ));
+}
+
+#[test]
+fn the_facade_is_alone_in_the_last_layer_and_uploads_last() {
+    // Placed one layer early (beside the CLI), it fails the layer rule and
+    // the set's shape (`check_manifests` begins with `check_set`'s verdict).
+    let mut s = set();
+    let last = s.layers.pop().unwrap();
+    s.layers.last_mut().unwrap().extend(last);
+    s.layers.last_mut().unwrap().sort();
+    let v = check_manifests(&s, &metadata());
+    assert!(
+        v.iter()
+            .any(|x| matches!(x, Violation::ReleaseSet { detail }
+            if detail.contains("not alone in the last layer"))),
+        "{v:#?}"
+    );
+    let mut s = set();
+    s.upload_order.retain(|n| n != "rustev");
+    s.upload_order.insert(0, "rustev".into());
+    let v = check_set(&s);
+    assert!(
+        v.iter()
+            .any(|x| matches!(x, Violation::ReleaseSet { detail }
+            if detail.contains("does not upload last"))),
+        "{v:#?}"
+    );
 }
 
 #[test]
@@ -351,15 +417,15 @@ fn the_release_set_shape_is_checked() {
     s.version = "0.1".into();
     assert_eq!(check_set(&s).len(), 2, "version and tag");
     let mut s = set();
-    s.upload_order.pop();
+    s.upload_order.retain(|n| n != "rustev-core");
     assert_eq!(check_set(&s).len(), 1);
     let mut s = set();
     s.excluded[0].name = "rustev-core".into();
     assert!(!check_set(&s).is_empty());
     let mut s = set();
-    s.excluded.retain(|e| e.name != "rustev-pkg-lodging");
+    s.excluded.retain(|e| e.name != "rustev-boundaries");
     assert!(matches!(
         only(check_manifests(&s, &metadata())),
-        Violation::Unlisted { ref name } if name == "rustev-pkg-lodging"
+        Violation::Unlisted { ref name } if name == "rustev-boundaries"
     ));
 }

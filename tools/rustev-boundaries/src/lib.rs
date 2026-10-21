@@ -76,6 +76,10 @@ pub const PURE_CRATES: &[&str] = &["rustev-contract", "rustev-core", "rustev-sur
 /// (design section 15; spec 007, 3.3.1).
 pub const PACKAGE_DEPENDENCIES: &[&str] = &["rustev-contract", "rustev-core"];
 
+/// The facade crate (spec 031, 3.2): the one crate that may depend on a
+/// crate under `integrations/`, and only optionally (3.3).
+pub const FACADE: &str = "rustev";
+
 /// The subset of `cargo metadata` output this check reads.
 #[derive(Debug, Deserialize)]
 pub struct Metadata {
@@ -91,6 +95,9 @@ pub struct Package {
     pub name: String,
     pub manifest_path: String,
     pub dependencies: Vec<Dependency>,
+    /// The package's Cargo features, each with what it enables.
+    #[serde(default)]
+    pub features: BTreeMap<String, Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -98,6 +105,8 @@ pub struct Dependency {
     pub name: String,
     pub kind: Option<String>,
     pub path: Option<String>,
+    #[serde(default)]
+    pub optional: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -131,6 +140,17 @@ pub enum Violation {
     ForbiddenTransitive { krate: String, path: Vec<String> },
     /// 3.4.4: a crate depends on a crate under `integrations/`.
     DependsOnIntegration { krate: String, dependency: String },
+    /// Spec 031 3.3.1: the facade depends on an integration crate other
+    /// than as an optional normal dependency enabled by exactly one feature.
+    FacadeIntegration { dependency: String, detail: String },
+    /// Spec 031 3.3.2: a workspace crate depends on the facade.
+    DependsOnFacade { krate: String },
+    /// Spec 031 3.3.3: the facade's `default` feature enables something.
+    FacadeDefault { enables: Vec<String> },
+    /// Spec 031 3.3 and 3.13: the facade declares a direct dependency on an
+    /// ecosystem, HTTP or binding family; it reaches them only through the
+    /// integration crates it re-exports.
+    FacadeFamily { dependency: String },
     /// 3.4.5: `rustev-contract` depends on a workspace crate, or `rustev-core`
     /// on one other than `rustev-contract`.
     WorkspaceEdge { krate: String, dependency: String },
@@ -159,6 +179,22 @@ impl fmt::Display for Violation {
             Violation::DependsOnIntegration { krate, dependency } => write!(
                 f,
                 "001 3.4.4: `{krate}` depends on the integration `{dependency}`"
+            ),
+            Violation::FacadeIntegration { dependency, detail } => write!(
+                f,
+                "031 3.3.1: the facade `{FACADE}` depends on the integration `{dependency}` {detail}"
+            ),
+            Violation::DependsOnFacade { krate } => write!(
+                f,
+                "031 3.3.2: `{krate}` depends on the facade `{FACADE}`; no workspace crate may"
+            ),
+            Violation::FacadeDefault { enables } => write!(
+                f,
+                "031 3.3.3: the facade's default features must be empty, not {enables:?}"
+            ),
+            Violation::FacadeFamily { dependency } => write!(
+                f,
+                "031 3.3: the facade `{FACADE}` declares `{dependency}` directly; it reaches a family only through an integration crate"
             ),
             Violation::WorkspaceEdge { krate, dependency } => write!(
                 f,
@@ -246,6 +282,13 @@ pub fn check(meta: &Metadata) -> Vec<Violation> {
         .map(|p| p.name.as_str())
         .collect();
 
+    if let Some(facade) = members.iter().find(|p| p.name == FACADE) {
+        let enables = facade.features.get("default").cloned().unwrap_or_default();
+        if !enables.is_empty() {
+            out.insert(Violation::FacadeDefault { enables });
+        }
+    }
+
     for pkg in &members {
         let rel = relative_dir(&meta.workspace_root, &pkg.manifest_path);
         let in_integrations = under_integrations(&rel);
@@ -261,9 +304,54 @@ pub fn check(meta: &Metadata) -> Vec<Violation> {
                     ))
                 })
                 .unwrap_or(false);
-            if integration_names.contains(dep.name.as_str()) || dep_under_integrations {
-                out.insert(Violation::DependsOnIntegration {
+            // A dependency on the facade is `DependsOnFacade` (031 3.3.2)
+            // alone, not also a dependency on an integration.
+            if (integration_names.contains(dep.name.as_str()) || dep_under_integrations)
+                && dep.name != FACADE
+            {
+                if pkg.name == FACADE {
+                    // 031 3.3.1: optional, normal, and enabled by exactly
+                    // one facade feature (`default` names none, 3.3.3).
+                    let enabling = pkg
+                        .features
+                        .iter()
+                        .filter(|(f, _)| f.as_str() != "default")
+                        .filter(|(_, on)| on.iter().any(|e| *e == format!("dep:{}", dep.name)))
+                        .count();
+                    let detail = if dep.kind.is_some() {
+                        Some(format!(
+                            "as a {} dependency",
+                            dep.kind.as_deref().unwrap_or("")
+                        ))
+                    } else if !dep.optional {
+                        Some("without `optional = true`".to_string())
+                    } else if enabling != 1 {
+                        Some(format!("enabled by {enabling} features, not exactly one"))
+                    } else {
+                        None
+                    };
+                    if let Some(detail) = detail {
+                        out.insert(Violation::FacadeIntegration {
+                            dependency: dep.name.clone(),
+                            detail,
+                        });
+                    }
+                } else {
+                    out.insert(Violation::DependsOnIntegration {
+                        krate: pkg.name.clone(),
+                        dependency: dep.name.clone(),
+                    });
+                }
+            }
+            if dep.name == FACADE && member_names.contains(FACADE) {
+                out.insert(Violation::DependsOnFacade {
                     krate: pkg.name.clone(),
+                });
+            }
+            if pkg.name == FACADE
+                && (is_ecosystem(&dep.name) || is_http(&dep.name) || is_binding(&dep.name))
+            {
+                out.insert(Violation::FacadeFamily {
                     dependency: dep.name.clone(),
                 });
             }
@@ -312,9 +400,13 @@ pub fn check(meta: &Metadata) -> Vec<Violation> {
                 (n.id.as_str(), deps)
             })
             .collect();
-        // Packages are as pure as the core (spec 007, 3.3.2).
+        // Packages are as pure as the core (spec 007, 3.3.2), and so is the
+        // facade with no features (spec 031, 3.3.4): `cargo metadata`
+        // resolves members with their default features, which for the
+        // facade are none, so its optional dependencies are not in the graph.
         for pkg in members.iter().filter(|p| {
             PURE_CRATES.contains(&p.name.as_str())
+                || p.name == FACADE
                 || under_packages(&relative_dir(&meta.workspace_root, &p.manifest_path))
         }) {
             if let Some(path) = forbidden_path(&graph, &by_id, &pkg.id, forbidden_for_pure) {
@@ -999,5 +1091,235 @@ mod tests {
         assert!(is_ecosystem("spec-spine-core"));
         assert!(is_ecosystem("aicortex-read"));
         assert!(!is_ecosystem("serde"));
+    }
+
+    // ---- spec 031 3.3: the facade ------------------------------------------
+
+    /// The facade over contract, core and the remote binding, with
+    /// `remote-http` enabling the binding as an optional dependency; `edit`
+    /// adjusts the metadata before the check.
+    fn facade_ws(edit: impl FnOnce(&mut Metadata)) -> Vec<Violation> {
+        let mut m = meta(
+            &[
+                CONTRACT,
+                CORE,
+                (
+                    "rustev-remote-http",
+                    "integrations/rustev-remote-http",
+                    &[("rustev-core", None, Some("crates/rustev-core"))],
+                ),
+                (
+                    FACADE,
+                    "integrations/rustev",
+                    &[
+                        ("rustev-contract", None, Some("crates/rustev-contract")),
+                        ("rustev-core", None, Some("crates/rustev-core")),
+                        (
+                            "rustev-remote-http",
+                            None,
+                            Some("integrations/rustev-remote-http"),
+                        ),
+                    ],
+                ),
+            ],
+            &["serde"],
+            &[
+                ("rustev-contract", "serde", None),
+                ("rustev-core", "rustev-contract", None),
+                ("rustev-remote-http", "rustev-core", None),
+                (FACADE, "rustev-contract", None),
+                (FACADE, "rustev-core", None),
+            ],
+        );
+        let f = m.packages.iter_mut().find(|p| p.name == FACADE).unwrap();
+        f.dependencies
+            .iter_mut()
+            .find(|d| d.name == "rustev-remote-http")
+            .unwrap()
+            .optional = true;
+        f.features = BTreeMap::from([
+            ("default".to_string(), vec![]),
+            (
+                "remote-http".to_string(),
+                vec!["dep:rustev-remote-http".to_string()],
+            ),
+        ]);
+        edit(&mut m);
+        check(&m)
+    }
+
+    fn facade(m: &mut Metadata) -> &mut Package {
+        m.packages.iter_mut().find(|p| p.name == FACADE).unwrap()
+    }
+
+    #[test]
+    fn the_facade_with_an_optional_integration_behind_one_feature_passes() {
+        assert_eq!(facade_ws(|_| {}), vec![]);
+    }
+
+    #[test]
+    fn the_facade_depending_on_an_integration_without_optional_fails() {
+        let v = facade_ws(|m| {
+            facade(m)
+                .dependencies
+                .iter_mut()
+                .for_each(|d| d.optional = false);
+        });
+        assert_eq!(
+            v,
+            vec![Violation::FacadeIntegration {
+                dependency: "rustev-remote-http".into(),
+                detail: "without `optional = true`".into()
+            }]
+        );
+    }
+
+    #[test]
+    fn the_facade_enabling_an_integration_by_two_features_or_none_fails() {
+        let two = facade_ws(|m| {
+            facade(m)
+                .features
+                .insert("http".into(), vec!["dep:rustev-remote-http".into()]);
+        });
+        assert_eq!(
+            two,
+            vec![Violation::FacadeIntegration {
+                dependency: "rustev-remote-http".into(),
+                detail: "enabled by 2 features, not exactly one".into()
+            }]
+        );
+        let none = facade_ws(|m| {
+            facade(m).features.remove("remote-http");
+        });
+        assert_eq!(
+            none,
+            vec![Violation::FacadeIntegration {
+                dependency: "rustev-remote-http".into(),
+                detail: "enabled by 0 features, not exactly one".into()
+            }]
+        );
+    }
+
+    #[test]
+    fn a_workspace_crate_depending_on_the_facade_fails_in_every_kind() {
+        for kind in [None, Some("dev"), Some("build")] {
+            // `rustev-eval`, which no other rule restricts here.
+            let v = facade_ws(|m| {
+                m.workspace_members.push("rustev-eval 0.1.0".into());
+                m.packages.push(Package {
+                    id: "rustev-eval 0.1.0".into(),
+                    name: "rustev-eval".into(),
+                    manifest_path: "/ws/crates/rustev-eval/Cargo.toml".into(),
+                    dependencies: vec![Dependency {
+                        name: FACADE.into(),
+                        kind: kind.map(str::to_string),
+                        path: Some("/ws/integrations/rustev".into()),
+                        optional: false,
+                    }],
+                    features: BTreeMap::new(),
+                });
+            });
+            // Exactly one violation, named by 031 3.3.2.
+            assert_eq!(
+                v,
+                vec![Violation::DependsOnFacade {
+                    krate: "rustev-eval".into()
+                }],
+                "{kind:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_non_empty_default_feature_fails() {
+        let v = facade_ws(|m| {
+            facade(m)
+                .features
+                .insert("default".into(), vec!["remote-http".into()]);
+        });
+        assert_eq!(
+            v,
+            vec![Violation::FacadeDefault {
+                enables: vec!["remote-http".into()]
+            }]
+        );
+    }
+
+    #[test]
+    fn the_facade_reaching_an_executor_with_no_features_fails() {
+        // A non-optional path to an executor is in the default-feature graph.
+        let v = facade_ws(|m| {
+            m.packages.push(Package {
+                id: "tokio 0.1.0".into(),
+                name: "tokio".into(),
+                manifest_path: "/registry/tokio/Cargo.toml".into(),
+                dependencies: vec![],
+                features: BTreeMap::new(),
+            });
+            let r = m.resolve.as_mut().unwrap();
+            r.nodes.push(Node {
+                id: "tokio 0.1.0".into(),
+                deps: vec![],
+            });
+            let core = r
+                .nodes
+                .iter_mut()
+                .find(|n| n.id == "rustev-core 0.1.0")
+                .unwrap();
+            core.deps.push(NodeDep {
+                pkg: "tokio 0.1.0".into(),
+                dep_kinds: vec![DepKind { kind: None }],
+            });
+        });
+        assert!(v.contains(&Violation::ForbiddenTransitive {
+            krate: FACADE.into(),
+            path: vec![FACADE.into(), "rustev-core".into(), "tokio".into()]
+        }));
+    }
+
+    #[test]
+    fn the_facade_declaring_a_family_directly_fails() {
+        let v = facade_ws(|m| {
+            facade(m).dependencies.push(Dependency {
+                name: "hyper".into(),
+                kind: None,
+                path: None,
+                optional: true,
+            });
+        });
+        assert_eq!(
+            v,
+            vec![Violation::FacadeFamily {
+                dependency: "hyper".into()
+            }]
+        );
+    }
+
+    #[test]
+    fn another_integration_depending_on_an_integration_still_fails() {
+        // The exception names the facade alone (3.3): a second integration
+        // crate depending on the remote binding still breaks 001 3.4.4.
+        let v = facade_ws(|m| {
+            m.workspace_members.push("rustev-serve 0.1.0".into());
+            m.packages.push(Package {
+                id: "rustev-serve 0.1.0".into(),
+                name: "rustev-serve".into(),
+                manifest_path: "/ws/integrations/rustev-serve/Cargo.toml".into(),
+                dependencies: vec![Dependency {
+                    name: "rustev-remote-http".into(),
+                    kind: None,
+                    path: Some("/ws/integrations/rustev-remote-http".into()),
+                    optional: true,
+                }],
+                features: BTreeMap::new(),
+            });
+        });
+        assert_eq!(
+            v,
+            vec![Violation::DependsOnIntegration {
+                krate: "rustev-serve".into(),
+                dependency: "rustev-remote-http".into()
+            }]
+        );
     }
 }

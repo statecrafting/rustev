@@ -19,7 +19,7 @@
       "contentHash": "9bdb73e6b5bf39970fe22c93aec881a762ecb1ddad85ca76a714ef6d59cd01c9"
     },
     "Cargo.toml": {
-      "contentHash": "56e4e7e7ec3d91ea5e1f8e0ce3950a04aff48b9089a45ef1e156f630a84431a9"
+      "contentHash": "96d8298999060567a56c32f5d001b7e2659e2d9d12992b09be3bc28ed9e12d7f"
     },
     "Makefile": {
       "contentHash": "40425fc3caf9f8b8d4c348cf128fff398dfcfd41ea8ac2f0f338e68ac5822515"
@@ -92,6 +92,12 @@
     },
     "integrations/rustev-remote-http/LICENSE": {
       "contentHash": "491bb1f843fe2e3b03b56199f2e1bcabaea41d2cd46e58f6c3cc7a9493dcaaa0"
+    },
+    "integrations/rustev/LICENSE": {
+      "contentHash": "6430bf3db81660c093b1c7a352ba0baf313ba2f914d39a40ab6eeebe05dafbe2"
+    },
+    "packages/rustev-pkg-lodging/LICENSE": {
+      "contentHash": "510b2bbb208f53de92a3755da536615d496e76b168e09b023b2222521a9ec415"
     },
     "packages/rustev-pkg-support-routing/LICENSE": {
       "contentHash": "85cbab11005a37eada09d774bcf825cdd527a5daccdd27353ccca5605f31763c"
