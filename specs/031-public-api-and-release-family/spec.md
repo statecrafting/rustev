@@ -666,6 +666,35 @@ the reviewed archive list. Subsets, MSRV and semver checks, SBOMs, the
 changelog, the extended dry run and the release workflow come in later
 increments.
 
+**Increment 2, 2026-10-21 (subsets, MSRV and API compatibility as
+repository checks).** `tools/rustev-release/adoption.sh` (`make adoption`)
+builds each partial-adoption subset of 3.5 as a fresh consumer project
+outside the workspace (its own empty `[workspace]`, the workspace's
+lockfile copied in): the facade by path with `default-features = false`
+and exactly the subset's features, plus the package crate for embedded
+decisions; a test that names every module the subset takes and parses a
+definition through the facade must run and pass; and `cargo tree -e
+normal` must contain each chosen crate and none of the omitted ones. The
+subsets are documents and pure compilation (no feature), embedded
+decisions (`runtime`, `rules`, with `rustev-pkg-support-routing`), the
+evaluation harness (`eval`), the remote backend over HTTP (`runtime`,
+`remote-http`), and each remaining present feature alone (`runtime`,
+`rules`, `remote-http`); `serve`, `bedrock`, `typesafe`, `otel` and
+`local-embed` are reported as skipped with the reason their crate is not
+in this release, never as passing. `tools/rustev-release/msrv.sh`
+(`make msrv`) builds and tests every release member at the MSRV the
+release policy reads from the members' `rust-version`.
+`tools/rustev-release/semver.sh` (`make semver`; it needs `curl`, Node 20
+or later to read the index's JSON lines, and the pinned checker, each
+refused by name when missing) runs `cargo semver-checks` (exact pin 0.51.0) for each member against the newest
+earlier non-yanked version in the crates.io sparse index; with none it
+writes `no-baseline`, not applicable and not passed. For the npm packages
+it reports `no-baseline` while neither is published and refuses a verdict
+once one is, until the declaration diff exists; the service API has no
+crate in this release. The CI jobs that will run these are to be
+registered by a later workflow change, together with spec 027's
+`bindings` job; this increment changes no workflow.
+
 ## Decisions at approval
 
 1. **Crate and package names** (left to the implementer by #58): decided
