@@ -368,6 +368,11 @@ fn outputs_outside_the_declared_support_are_invalid_and_unresolved() {
             label: "other".into()
         })
     );
+    // No abstention rule ran, so the lineage lists validation alone.
+    let id = request_identity(&lq, &c).unwrap();
+    let p = proposal(&lq, id, &c, "q-1/1", j.result.unwrap());
+    assert_eq!(p.derivation, Derivation::ModelDerived);
+    assert_eq!(p.lineage.exact_processing, ["validate"]);
 }
 
 #[test]

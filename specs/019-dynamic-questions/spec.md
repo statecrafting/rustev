@@ -367,7 +367,9 @@ applies `min_top_mass` and `min_margin` (top mass minus the second mass;
 ties go to the earlier declared label) and names the rule that abstained.
 `proposal` writes a `model-derived` proposal whose lineage holds the
 request identity, context names, backend, artifact, attempt and the exact
-steps (`validate`, `abstention`). `DynamicBackend` (with
+steps that ran (`validate`, then `abstention` when thresholds were applied;
+a label accepted under `label_only` runs no abstention rule and lists
+`validate` alone). `DynamicBackend` (with
 `dynamic_capability`, `cost_bound` and `ask`) is separate from
 `DecisionBackend`; `DynamicCall` offers projection bytes, the template,
 the attempt id, a cancellation signal and the call context, and no tool,

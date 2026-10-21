@@ -512,8 +512,11 @@ fn judge_distribution(q: &DynamicQuestion, map: &BTreeMap<String, f64>) -> Judge
 }
 
 /// A proposal for an accepted answer (3.6): always `model-derived`, with
-/// the request and the backend output in its lineage; the exact validation
-/// and abstention steps are listed, never a relabeling.
+/// the request and the backend output in its lineage; the exact steps that
+/// ran are listed, never a relabeling. `validate` always ran; `abstention`
+/// is listed only when thresholds were applied, so a label accepted under
+/// the explicit `label_only` posture, where no abstention rule runs
+/// (`AbstentionDecision::LabelOnly`), lists `validate` alone.
 pub fn proposal(
     q: &ValidatedQuestion,
     request: DynamicRequestId,
