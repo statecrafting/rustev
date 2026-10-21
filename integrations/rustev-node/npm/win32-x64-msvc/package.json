@@ -1,0 +1,25 @@
+{
+  "name": "@statecrafting/rustev-win32-x64-msvc",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Rustev's Node-API addon for win32-x64-msvc; installed through @statecrafting/rustev, never directly.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/statecrafting/rustev.git",
+    "directory": "integrations/rustev-node/npm/win32-x64-msvc"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "main": "rustev.win32-x64-msvc.node",
+  "files": [
+    "rustev.win32-x64-msvc.node"
+  ]
+}

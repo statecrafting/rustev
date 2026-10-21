@@ -1012,6 +1012,25 @@ receive exactly the record's bytes), and every runtime case runs with
 TypeScript scripted seams on the engine's manual clock. All 34 produce
 their expected bytes, repeatedly.
 
+**Increment 7, first change (the platform packages).** The seven
+platform packages of 3.13.1 sit under `integrations/rustev-node/npm/<platform>/`
+in napi-rs's optional-dependency layout, one per optional dependency of
+the main package: each is `@statecrafting/rustev-<platform>` at the main
+package's version, license and engines, with the `os`, `cpu` and (on
+Linux) `libc` its name stands for, the addon `rustev.<platform>.node` as
+its `main` and only file, no script, and `private` until spec 031's
+release makes the family publishable. `tools/rustev-conformance/js/platform-packages.mjs`
+checks that agreement (`check`), stages this host's release addon into its
+platform package (`stage`, sharing `copy-addon.mjs`'s naming), and packs
+the main package and this host's platform package and installs both into a
+fresh project from the tarballs alone (`fresh`), omitting optional
+dependencies so nothing is fetched for another platform; the installed main
+package carries no addon and loads the platform package as a consumer's
+install does (3.13.2). `make bindings` runs all three and the native
+conformance suite on that install. Locally (macOS arm64) all 34 native
+cases pass on it. Building and smoke-testing each matrix target is the CI
+job's (a later change of this increment).
+
 ## Decisions at approval
 
 1. **npm package names and scope** (left to the implementer by #56; decided

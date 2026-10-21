@@ -122,3 +122,10 @@ bindings:
 	tools/rustev-conformance/js/node_modules/.bin/tsc --noEmit --strict --lib es2022,dom integrations/rustev-node/index.d.ts
 	node --test integrations/rustev-node/test/*.test.mjs
 	node tools/rustev-conformance/js/run.mjs native integrations/rustev-node
+	@# 3.13: the platform packages agree with the main package; this host's
+	@# addon is staged into its own, both are packed and installed into a
+	@# fresh project from the tarballs alone, and the suite runs on that install.
+	node tools/rustev-conformance/js/platform-packages.mjs check
+	node tools/rustev-conformance/js/platform-packages.mjs stage "$(CARGO_TARGET)"
+	node tools/rustev-conformance/js/platform-packages.mjs fresh "$(BINDINGS_OUT)/native-fresh" > "$(BINDINGS_OUT)/native-fresh.path"
+	node tools/rustev-conformance/js/run.mjs native "$$(cat "$(BINDINGS_OUT)/native-fresh.path")"
