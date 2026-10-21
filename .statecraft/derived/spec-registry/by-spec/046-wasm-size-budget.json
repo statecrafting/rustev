@@ -52,5 +52,5 @@
     "title": "The WebAssembly module's uncompressed size budget (amends 027)"
   },
   "shardHash": "1f41cd08e929282bdbd7185cb6c929bbcac9105b12ac9f554e17f68c1a94a883",
-  "specVersion": "1.9.0"
+  "specVersion": "1.10.0"
 }

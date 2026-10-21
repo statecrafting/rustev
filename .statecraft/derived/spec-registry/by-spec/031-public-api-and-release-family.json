@@ -302,5 +302,5 @@
     "title": "Public API facade, compatibility policy and release family (amends 021)"
   },
   "shardHash": "01e443e83cc7f0f47b3b2438c75fe722d007715e67fe862fc0224da523f5ff64",
-  "specVersion": "1.9.0"
+  "specVersion": "1.10.0"
 }

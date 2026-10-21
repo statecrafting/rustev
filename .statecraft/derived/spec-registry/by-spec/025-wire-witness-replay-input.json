@@ -79,5 +79,5 @@
     "title": "Wire-witness exchanges as remote-exchange and replay evidence (deferred)"
   },
   "shardHash": "10fe2407153569084f2a1fe23107f4e0e4d4133e30decbae34a386d3d081527c",
-  "specVersion": "1.9.0"
+  "specVersion": "1.10.0"
 }

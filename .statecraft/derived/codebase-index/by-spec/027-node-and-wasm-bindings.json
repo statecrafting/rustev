@@ -296,6 +296,6 @@
     "specId": "027-node-and-wasm-bindings",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "d63903643e5cf8a6c9268852852180212eb627e686a23e53001432c5f1288362"
 }

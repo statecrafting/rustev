@@ -109,5 +109,5 @@
     "title": "One implementation of exp and ln on every target (amends 002 and 027)"
   },
   "shardHash": "aa2e61fe62d4de2ae35c996f21872faa398543e04eb75ad8e40c93d25539c728",
-  "specVersion": "1.9.0"
+  "specVersion": "1.10.0"
 }

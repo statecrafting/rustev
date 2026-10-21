@@ -114,6 +114,6 @@
     "specId": "047-target-independent-transcendentals",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "aa2e61fe62d4de2ae35c996f21872faa398543e04eb75ad8e40c93d25539c728"
 }

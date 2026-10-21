@@ -137,6 +137,6 @@
     "specId": "038-structured-extraction",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "ae2166823ee58709b0535c73b42dd81d441992c68342f5aa9b5412a5c3d205ed"
 }

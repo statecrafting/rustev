@@ -247,5 +247,5 @@
     "title": "Runtime optimization increment 2: duplicate suppression, persistent and decision-result caches, batching qualification (amends 017, 003, 002, 009, 012 and 020)"
   },
   "shardHash": "294b3a51bbcbabb6236b82325d278bc0af25461521b73f0502dcaa0707fee28b",
-  "specVersion": "1.9.0"
+  "specVersion": "1.10.0"
 }

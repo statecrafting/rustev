@@ -181,6 +181,6 @@
     "specId": "020-remote-protocol-refinements",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "06c55563e9f71c9974bb1b5e841e285940c278977791020770a6ed66dcd9c647"
 }

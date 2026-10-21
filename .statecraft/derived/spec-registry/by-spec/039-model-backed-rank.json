@@ -214,5 +214,5 @@
     "title": "Model-backed rank and deterministic backfill (amends 002 and 005)"
   },
   "shardHash": "c6400f116e32ce9a9c7561ece640d5868cc6f5b23f55dd995be00cb4e69e5574",
-  "specVersion": "1.9.0"
+  "specVersion": "1.10.0"
 }

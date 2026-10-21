@@ -210,5 +210,5 @@
     "title": "Local semantic backend: frozen embeddings and a linear head"
   },
   "shardHash": "dc08be503cbb8c74b5c5ab7dd93375e37b18017152771ee105adfd859ea6e4b3",
-  "specVersion": "1.9.0"
+  "specVersion": "1.10.0"
 }

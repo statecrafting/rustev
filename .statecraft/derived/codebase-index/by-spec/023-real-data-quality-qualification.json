@@ -58,6 +58,6 @@
     "specId": "023-real-data-quality-qualification",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "ff640d693e4c34103196e6c39430c859514f6b622f0371d2f4080d9d6cb367e8"
 }

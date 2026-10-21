@@ -124,6 +124,6 @@
     "specId": "030-bedrock-backend",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "4497579390504fd3a1689783b14354cadeb68ce23b428c2a3e43e9acbd565aef"
 }

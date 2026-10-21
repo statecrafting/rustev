@@ -197,6 +197,6 @@
     "specId": "043-live-re-execution-at-scale",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "d199699104fc4e104f6335c98ef081ac9e3b671616bd6dd4e1e46fd79930fe65"
 }

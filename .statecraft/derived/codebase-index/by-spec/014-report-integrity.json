@@ -78,6 +78,6 @@
     "specId": "014-report-integrity",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "e10ed5758dce915519cbdc8910a0534d947eda0c697c6d3372c647907ece2d33"
 }

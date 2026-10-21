@@ -96,6 +96,6 @@
     "specId": "029-evaluation-repeatability",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "ad3f54d09bd81caa5af5eb93fa4316ffac8820f7e92f784d6cb08167da66b5a1"
 }

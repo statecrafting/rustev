@@ -130,6 +130,6 @@
     "specId": "019-dynamic-questions",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "a78857a867a0ff76aee0a972b5b62eca6cbc1e7370b4b7f61b46ccc3adfff439"
 }

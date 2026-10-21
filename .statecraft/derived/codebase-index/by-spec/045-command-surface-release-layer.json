@@ -27,6 +27,6 @@
     "specId": "045-command-surface-release-layer",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "246cc47f9906b14110e328a57783d5e54ee605f782e947452c285649cada8d33"
 }

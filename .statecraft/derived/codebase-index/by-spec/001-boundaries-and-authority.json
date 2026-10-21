@@ -121,6 +121,6 @@
     "specId": "001-boundaries-and-authority",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "af8450b30b1d962d6db5a952138767bccd2cedf024c0b6c2bf94a4074d0a54e2"
 }

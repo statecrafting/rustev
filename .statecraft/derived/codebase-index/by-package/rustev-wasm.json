@@ -5,6 +5,6 @@
     "path": "integrations/rustev-wasm",
     "specRef": "027-node-and-wasm-bindings"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "66ba9997c9ea51bcadaa8b5d11f1e774c3a00315fa228d111880cdb46c5eef92"
 }

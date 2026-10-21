@@ -112,5 +112,5 @@
     "title": "Deterministic rules backend"
   },
   "shardHash": "9f68468193da5f6969ea72e3dfb6c72b42a66911bd3005d426e5c66df172eef5",
-  "specVersion": "1.9.0"
+  "specVersion": "1.10.0"
 }

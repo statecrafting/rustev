@@ -164,6 +164,6 @@
     "specId": "033-provenance-rules-and-actionable-outcomes",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "29bb2d7153771ef1fd2138135191460e382bba0d4633a15b02a4e2b5ed7f9c52"
 }

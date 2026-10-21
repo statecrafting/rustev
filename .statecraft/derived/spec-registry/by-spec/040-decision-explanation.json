@@ -180,5 +180,5 @@
     "title": "Decision explanation API and `rustev explain` (amends 004 and 006)"
   },
   "shardHash": "e79f159ae375e478fb98ba9903c3fcc92f81f34a806e3d4c526de80ae482fe29",
-  "specVersion": "1.9.0"
+  "specVersion": "1.10.0"
 }

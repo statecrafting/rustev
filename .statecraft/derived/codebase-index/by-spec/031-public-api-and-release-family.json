@@ -348,6 +348,6 @@
     "specId": "031-public-api-and-release-family",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "01e443e83cc7f0f47b3b2438c75fe722d007715e67fe862fc0224da523f5ff64"
 }

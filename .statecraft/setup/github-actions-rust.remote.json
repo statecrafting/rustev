@@ -1,0 +1,65 @@
+{
+  "codeOwnerReview": {
+    "owners": [
+      "@bartekus"
+    ],
+    "paths": [
+      "/.github/workflows/statecraft-ai-review.yml",
+      "/.github/workflows/statecraft-ci.yml",
+      "/.statecraft/setup/github-actions-rust.json",
+      "/.statecraft/setup/github-actions-rust.remote.json",
+      "/Makefile",
+      "/scripts/statecraft/ai-review.sh",
+      "/scripts/statecraft/ci-gate.sh",
+      "/scripts/statecraft/gate.sh",
+      "/scripts/statecraft/install-spec-spine.sh"
+    ],
+    "required": true
+  },
+  "defaultBranch": "main",
+  "extraRequiredJobs": {
+    "aggregate": "ci-gate",
+    "jobs": [
+      {
+        "job": "boundaries",
+        "workflow": ".github/workflows/boundaries.yml"
+      },
+      {
+        "job": "verify",
+        "workflow": ".github/workflows/verify.yml"
+      }
+    ]
+  },
+  "profile": {
+    "id": "github-actions-rust",
+    "identity": "fe0e763c8f217652df7975e429a8eb2c762657abc33344ef79f6d4e18733e7a6",
+    "revision": 17
+  },
+  "requiredChecks": [
+    {
+      "appId": 15368,
+      "name": "ci-gate"
+    }
+  ],
+  "reviewException": {
+    "environment": "statecraft-review-exception",
+    "preventSelfReview": true
+  },
+  "schema": "statecraft/remote-desired-state/1",
+  "secrets": [
+    {
+      "anyOf": [
+        "ANTHROPIC_API_KEY",
+        "CLAUDE_CODE_OAUTH_TOKEN"
+      ],
+      "visibility": [
+        "repository",
+        "organization"
+      ]
+    }
+  ],
+  "workflowToken": {
+    "canApprovePullRequestReviews": false,
+    "defaultPermissions": "read"
+  }
+}

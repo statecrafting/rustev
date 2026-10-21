@@ -76,5 +76,5 @@
     "title": "Second local semantic backend (deferred)"
   },
   "shardHash": "b84e5ecee78b7598ecbb9dfb2cba578b0cf46cc7dd674fafd7a9302a022003b6",
-  "specVersion": "1.9.0"
+  "specVersion": "1.10.0"
 }

@@ -5,6 +5,6 @@
     "path": "packages/rustev-pkg-lodging",
     "specRef": "008-reference-package-lodging"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "b8bb02d14f60d539cd65e0a22213b9ae9b57055674c8266640543aecc85504b0"
 }

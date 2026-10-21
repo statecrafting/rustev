@@ -160,5 +160,5 @@
     "title": "Ranking, constraint-match and rubric metrics; pluggable scorers (amends 004, 014 and 029)"
   },
   "shardHash": "a3a1f549c65dd6e3e9920e4a42ab1ecdd338b058cc92b4db278326f8c67a9c4f",
-  "specVersion": "1.9.0"
+  "specVersion": "1.10.0"
 }
