@@ -14,6 +14,7 @@ mod actionable;
 pub mod builder;
 pub mod calibrate;
 pub mod compile;
+pub mod dynamic;
 pub mod evaluate;
 pub(crate) mod execution;
 pub mod expr;

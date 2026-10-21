@@ -22,6 +22,9 @@ extends:
   - { spec: "002-decision-contract-and-pure-core", unit: { kind: directory, path: "crates/rustev-core/" }, nature: amending }
   - { spec: "003-runtime-execution-and-evidence", unit: { kind: directory, path: "crates/rustev-runtime/" }, nature: amending }
   - { spec: "004-evaluation-and-replay", unit: { kind: directory, path: "crates/rustev-eval/" }, nature: amending }
+  # Each new source file of a release member joins the reviewed archive
+  # list (spec 021, 3.5).
+  - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
@@ -270,6 +273,105 @@ general accuracy, calibration, safety, or production claims.
 Pending with implementation. Approval of this spec authorizes only the
 contract. Existing backend, plan, replay, and evaluation evidence does not
 satisfy dynamic-question acceptance.
+
+## Implementation record
+
+Delivered in increments; nothing here claims an acceptance item before the
+increment that satisfies it. Plan:
+
+1. Contract, core and runtime: the three documents and their bounds,
+   request validation, canonical identity, capability fit, cost admission,
+   response judgment, lineage and `ask_dynamic` (3.1 to 3.6); section 5
+   rows 1 to 8.
+2. Evaluation: offline reproduction with zero backend calls, the dynamic
+   dataset, evaluator configuration and report (3.7); section 5 row 9;
+   verification.
+
+**Increment 1 (contract, core, runtime).** `rustev-contract` adds
+`dynamic.rs`: `rustev.dynamic-question/1` (`DynamicQuestion`),
+`rustev.dynamic-capability/1` (`DynamicCapability`, identified by
+`DynamicCapabilityId`) and `rustev.dynamic-outcome/1` (`DynamicOutcome`,
+`RECORD_V1`), the identities `DynamicRequestId` and `TemplateId`, and the
+parse limit set `DYNAMIC_QUESTION_V1`. Parsing a request or a capability
+scans the bytes first (256 KiB raw, 64 members per collection, depth 8, no
+fractional numbers), then checks the structural bounds of 3.2: request id,
+task family, question (1 to 4096 bytes), 2 to 32 labels of 1 to 128 bytes,
+byte-exact uniqueness of labels and context names (no normalization), at
+most 64 context fields, 64 KiB of context value bytes and 128 KiB of
+canonical bytes; unknown members are refused everywhere. The canonical
+request identity is the digest, tagged `rustev.dynamic-question/1`, of
+`DynamicIdentity`: scope, operation, task family, question, ordered labels,
+context, output kind, required artifact, privacy, and the capability's
+template and preprocessing. The request id, deadline, cost cap and
+abstention policy bound or judge the computation and are not part of it.
+The backend receives `DynamicProjection`, the canonical JSON of the data
+fields under fixed member names (context as name and value only).
+
+`rustev-core` adds `dynamic.rs` and two seam traits. `validate` (and
+`parse_question`) builds the only `ValidatedQuestion`: proposition takes
+exactly `false`, `true`; classify 2 to 32 labels; rubric 2 to 16 levels;
+output kinds per operation; a `label` output only under the explicit
+`label_only` posture and thresholds in [0, 1] only for distributions;
+positive deadline and cost cap; the host task-family allowlist. `admit`
+refuses a backend with no dynamic capability, a capability failing its own
+bounds, another artifact, an undeclared operation, output kind or task
+family, a request exceeding any declared limit (no truncation), an
+undeclared privacy option, and any cost model but `bounded`;
+`admit_cost` admits only an enforceable per-call bound at or below the
+hard cap. `judge` refuses a pinned served-identity mismatch, response
+material that is not an answer (tool call, instruction, schema, URL fetch,
+action, free text), a label where a distribution is required, a
+distribution where a label is required, and any distribution outside the
+exact declared support (masses must be finite, non-negative and sum to 1
+within `DISTRIBUTION_TOLERANCE`, 0.000001, an implementation choice equal
+to the reference plans' tolerance, since 019 declares none); it then
+applies `min_top_mass` and `min_margin` (top mass minus the second mass;
+ties go to the earlier declared label) and names the rule that abstained.
+`proposal` writes a `model-derived` proposal whose lineage holds the
+request identity, context names, backend, artifact, attempt and the exact
+steps (`validate`, `abstention`). `DynamicBackend` (with
+`dynamic_capability`, `cost_bound` and `ask`) is separate from
+`DecisionBackend`; `DynamicCall` offers projection bytes, the template,
+the attempt id, a cancellation signal and the call context, and no tool,
+function or retrieval surface. `DynamicEvidenceSink` receives outcomes.
+Compile-fail tests in `rustev_core::dynamic` (with a compiling negative
+control) prove that an outcome, a raw dynamic output or a proposal cannot
+become `Supplied`, enter `Evaluation::supply` or become a `Judgment`, and
+that a `ValidatedQuestion` cannot be forged.
+
+`rustev-runtime` adds `ask_dynamic`, a free function: one validated
+request, one host-selected backend, `DynamicBounds` (the clock, an
+optional tighter deadline, an optional host ledger and an optional sink
+with its timeout), the call context and the caller's cancellation. It
+checks cancellation and the deadline, admits the capability, binds the
+identity, asks for the per-call bound, reserves it in a fresh hard ledger
+at the request's cap (and in the host ledger), checks the deadline again,
+and dispatches exactly one attempt raced against cancellation and the
+deadline, recording what the backend acknowledged as spec 003 and 013 do.
+No retry, fallback, batching, duplicate suppression or cache exists on this
+path. The outcome records the served identity as reported (never replaced
+by the requested artifact), the raw output or failure (free text cut to
+256 bytes), validation, abstention and the result; delivery to the sink is
+reported beside it and never changes it.
+
+Tests: `crates/rustev-contract/tests/dynamic_wire.rs` (round trips,
+unknown members, duplicate labels, size and count bounds, scan refusals
+before deserialization, the canonical bound, identity inputs),
+`crates/rustev-core/tests/dynamic.rs` (every validation rule, capability
+fit, cost admission, invalid outputs, abstention, lineage, served identity,
+and adversarial fixtures placing instruction, role, tool, URL and
+schema-like text in every caller-controlled field), and
+`crates/rustev-runtime/tests/dynamic.rs` (section 5 rows 1 to 7 with a
+dispatch counter, row 8 by the compile-fail tests; deadline, cancellation
+under each acknowledgement, unknown liability, malformed output, served
+identity mismatch, abstention, host ledgers and evidence delivery). The
+three new source files join spec 021's reviewed archive list. No existing
+document, golden, plan id or test changed.
+
+Not done here: the JSON Schema emitter of spec 027 (3.2.2) does not yet
+emit the three dynamic documents, because emitting them changes the
+generated binding types that spec 027 owns; this is left to the owner (see
+the final increment).
 
 ## Questions settled by R-34
 

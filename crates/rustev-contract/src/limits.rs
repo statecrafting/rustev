@@ -114,3 +114,18 @@ pub const EXCHANGE_V1: ParseLimits = ParseLimits {
     max_number_bytes: 40,
     allow_fractional_numbers: false,
 };
+
+/// Dynamic questions, `rustev.dynamic-question/1` (spec 019, 3.2): the
+/// request's own bounds (128 KiB canonical, 64 KiB of context values) are
+/// checked after this scan; the scan admits at most twice the canonical
+/// bound in raw bytes, so whitespace and escapes cannot force an unbounded
+/// allocation.
+pub const DYNAMIC_QUESTION_V1: ParseLimits = ParseLimits {
+    max_bytes: 256 * KIB,
+    max_depth: 8,
+    max_string_bytes: 128 * KIB,
+    max_collection_len: 64,
+    max_total_values: 4096,
+    max_number_bytes: 40,
+    allow_fractional_numbers: false,
+};
