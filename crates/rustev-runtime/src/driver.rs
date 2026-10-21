@@ -23,6 +23,7 @@ use rustev_contract::Identified;
 use rustev_contract::canonical::tagged_digest;
 use rustev_contract::execution::{AttemptTimeout, FailureClass};
 use rustev_contract::judgment::Unresolved;
+use rustev_contract::live::AttemptRole;
 use rustev_contract::optimization::{
     OptimizationAdmission, OptimizationMechanism, OptimizationOutcome, OptimizationPolicy,
     OptimizationRecord,
@@ -43,12 +44,17 @@ use rustev_core::seams::{
 use crate::capture::Capturing;
 use crate::clock::Instant;
 use crate::ledger::{Ledger, Refused};
+use crate::live::{LiveCtx, Proposal};
 use crate::optimization::{CacheMiss, CacheRefusal, CacheWrite, KeyParts, RequestKey, request_key};
 use crate::wait::{CatchUnwind, Raced, cut, poll_once, race};
 use crate::{Inner, PreparedPlan, Target};
 
 /// Bytes kept of any free text the runtime records (spec 003, 3.9.3).
 pub(crate) const DETAIL_BYTES: usize = 256;
+
+/// Why a live request was served by neither the memory cache nor a batch.
+const LIVE_BYPASS: &str =
+    "live re-execution observes fresh backend work: memory cache and general batching bypassed";
 
 pub(crate) struct DecisionCtx<'a, 'e> {
     pub rt: &'a Inner,
@@ -60,6 +66,8 @@ pub(crate) struct DecisionCtx<'a, 'e> {
     pub decision_id: &'a str,
     pub principal: &'a [u8],
     pub ev: &'a Mutex<Evaluation<'e>>,
+    /// Present only on the live re-execution path (spec 026).
+    pub live: Option<&'a LiveCtx<'a>>,
 }
 
 impl<'e> DecisionCtx<'_, 'e> {
@@ -71,7 +79,7 @@ impl<'e> DecisionCtx<'_, 'e> {
         self.now().saturating_sub(self.submitted)
     }
 
-    fn ev(&self) -> std::sync::MutexGuard<'_, Evaluation<'e>> {
+    pub(crate) fn ev(&self) -> std::sync::MutexGuard<'_, Evaluation<'e>> {
         self.ev.lock().unwrap_or_else(|e| e.into_inner())
     }
 
@@ -354,6 +362,15 @@ fn cache_lookup(cx: &DecisionCtx<'_, '_>, req: &SemanticRequest) -> CacheLookup 
     if policy.memory_cache.is_none() {
         return run;
     }
+    // A live re-execution observes fresh backend work: no earlier
+    // observation is credited to it (spec 026, 3.4).
+    if cx.live.is_some() {
+        return CacheLookup::Run {
+            key: None,
+            generation: 0,
+            diagnostics: vec![LIVE_BYPASS.into()],
+        };
+    }
     let target = &cx.plan.steps[&req.step].targets[0];
     let descriptor = target
         .registered
@@ -539,6 +556,11 @@ impl BatchCandidate {
 
 fn batch_capability(cx: &DecisionCtx<'_, '_>, req: &SemanticRequest) -> Option<BatchCapability> {
     cx.optimization()?.batch.as_ref()?;
+    // Every live attempt is authorized on its own (spec 026, 3.3), so a
+    // live request is never a general batch member.
+    if cx.live.is_some() {
+        return None;
+    }
     let step = &cx.plan.steps[&req.step];
     // A general batch is one attempt. Requests whose identified execution
     // policy can retry, time out independently, or select fallback retain the
@@ -1371,6 +1393,50 @@ async fn drive(
                 instance,
                 n
             );
+            // Live re-execution: the host authorizes this exact attempt,
+            // after its reservation and immediately before dispatch. A
+            // refusal ends the request; nothing retries, falls back or
+            // downgrades to avoid it (spec 026, 3.3).
+            if let Some(live) = cx.live {
+                let role = if tries > 1 {
+                    AttemptRole::Retry
+                } else if t > 0 {
+                    AttemptRole::Fallback
+                } else {
+                    AttemptRole::Primary
+                };
+                let answer = live.authorize(
+                    cx,
+                    Proposal {
+                        req: &req,
+                        target_index: t,
+                        target,
+                        role,
+                        attempt_id: &attempt_id,
+                        bound,
+                        reserved,
+                    },
+                );
+                if let Err(refusal) = answer {
+                    cx.release(reserved);
+                    let detail = refusal.to_string();
+                    return b.stop(
+                        &detail,
+                        Unresolved::BackendUnavailable {
+                            detail: cut(&detail, DETAIL_BYTES),
+                        },
+                    );
+                }
+                // The host's answer is adapter-like code: check again.
+                if cx.now() >= cx.deadline {
+                    cx.release(reserved);
+                    return b.stop("deadline", Unresolved::DeadlineExceeded);
+                }
+                if cx.cancel.is_raised() {
+                    cx.release(reserved);
+                    return b.cancelled();
+                }
+            }
             let held = cx.hold(
                 &attempt_id,
                 reserved,
