@@ -13,13 +13,14 @@
     "scope-p"
   ],
   "command": "replay",
+  "derived": [],
   "exit": 0,
   "id": "lodging.replay",
   "inputs": [
     {
       "name": "lodging-emb.bundle.json",
       "path": "tools/rustev-conformance/fixtures/cli/lodging.replay/lodging-emb.bundle.json",
-      "sha256": "4d8e5aa6eb9b94ecb27503d2e32be72282e69384e29e5954ca250a3b5518f424"
+      "sha256": "cdd5a90196b4677aafb5891fb5b4d4c3b870e2fd1caac48f655970d1f5c3f7e8"
     }
   ],
   "outputs": [
@@ -31,6 +32,7 @@
     }
   ],
   "surfaces": [
-    "cli"
+    "cli",
+    "wasm"
   ]
 }

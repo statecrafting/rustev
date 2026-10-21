@@ -10,6 +10,13 @@
     "topic.calibration.json"
   ],
   "command": "plan check",
+  "derived": [
+    {
+      "from": "support.rules.json",
+      "path": "tools/rustev-conformance/fixtures/cli/refusal-03/support.rules.json.descriptor.json",
+      "sha256": "98070801b3e95b1c3d38a6738d7dab635756c1dd4348b4a7fb05062e76083ced"
+    }
+  ],
   "exit": 5,
   "id": "refusal-03",
   "inputs": [
@@ -38,6 +45,7 @@
     }
   ],
   "surfaces": [
-    "cli"
+    "cli",
+    "wasm"
   ]
 }

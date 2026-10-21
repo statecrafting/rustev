@@ -10,6 +10,13 @@
     "lodging.rules.json"
   ],
   "command": "plan compile",
+  "derived": [
+    {
+      "from": "lodging.rules.json",
+      "path": "tools/rustev-conformance/fixtures/cli/lodging.compile/lodging.rules.json.descriptor.json",
+      "sha256": "a3c75af9f729ea17958b305c824553bf38f3a44895a180a23fbfc5cdc441bb6d"
+    }
+  ],
   "exit": 0,
   "id": "lodging.compile",
   "inputs": [
@@ -33,6 +40,7 @@
     }
   ],
   "surfaces": [
-    "cli"
+    "cli",
+    "wasm"
   ]
 }

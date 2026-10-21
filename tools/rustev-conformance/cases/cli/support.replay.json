@@ -13,13 +13,14 @@
     "scope-p"
   ],
   "command": "replay",
+  "derived": [],
   "exit": 0,
   "id": "support.replay",
   "inputs": [
     {
       "name": "support-emb.bundle.json",
       "path": "tools/rustev-conformance/fixtures/cli/support.replay/support-emb.bundle.json",
-      "sha256": "42f6349e3f65d8caa4746a3607bd9848132e5789e9a8b8d39e71bdd782f683cc"
+      "sha256": "51a2c421677de9071f12f020ba5756e8fb39bc1e029ef7ad7c37906869cfe8c8"
     }
   ],
   "outputs": [
@@ -31,6 +32,7 @@
     }
   ],
   "surfaces": [
-    "cli"
+    "cli",
+    "wasm"
   ]
 }

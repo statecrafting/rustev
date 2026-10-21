@@ -18,7 +18,7 @@ CRATE_MANIFESTS := $(wildcard crates/*/Cargo.toml backends/*/Cargo.toml tools/*/
 SKIP_NOTE := no crate exists yet, so cargo has nothing to judge
 VERIFIED_SPECS := 001 002 003 004 005 006 007 008 009 012 013 014 015 017 033
 
-.PHONY: tools gate refresh code build test clippy fmt boundaries verify release-candidate conformance conformance-harvest
+.PHONY: tools gate refresh code build test clippy fmt boundaries verify release-candidate conformance conformance-harvest bindings
 
 tools:
 	@test -n "$(SPEC_SPINE_VERSION)" || { echo "no required_version in spec-spine.toml"; exit 3; }
@@ -77,3 +77,43 @@ conformance-harvest:
 	RUSTEV_HARVEST=1 cargo test -p rustev-cli --locked
 	RUSTEV_BLESS=1 cargo test -p rustev-conformance --locked --test manifest
 	cargo test -p rustev-conformance --locked
+
+# Spec 027, 3.2, 3.10 and 3.12: build the WebAssembly package (web, bundler
+# and nodejs targets, optimized at -Oz), check the generated declarations
+# for drift and type-check them, enforce the import allowlist and the size
+# and instantiation budgets (writing the measurement document), and run the
+# JavaScript conformance runner on it. Needs Node 20 or later and the exact
+# tool pins below; it refuses any other version.
+WASM_BINDGEN ?= wasm-bindgen
+WASM_OPT ?= wasm-opt
+WASM_BINDGEN_PIN := wasm-bindgen 0.2.129
+WASM_OPT_PIN := wasm-opt version 116
+# Cargo's target directory, wherever the configuration puts it.
+# Parsed as JSON, so any path cargo reports is read exactly.
+# Evaluated on first use, once: only `bindings` pays for cargo and node.
+CARGO_TARGET = $(eval CARGO_TARGET := $(shell cargo metadata --format-version 1 --no-deps 2>/dev/null | node -e 'let s="";process.stdin.on("data",(d)=>(s+=d)).on("end",()=>{try{process.stdout.write(JSON.parse(s).target_directory)}catch{}})'))$(CARGO_TARGET)
+BINDINGS_OUT = $(CARGO_TARGET)/bindings
+WASM_FEATURES := --enable-bulk-memory --enable-nontrapping-float-to-int --enable-sign-ext --enable-mutable-globals
+
+bindings:
+	@test "$$($(WASM_BINDGEN) --version)" = "$(WASM_BINDGEN_PIN)" || { echo "027 3.10.2: need $(WASM_BINDGEN_PIN) (cargo install wasm-bindgen-cli --version 0.2.129 --locked)" >&2; exit 1; }
+	@$(WASM_OPT) --version | grep -Eq "^$(WASM_OPT_PIN)( |$$)" || { echo "027 3.10.2: need $(WASM_OPT_PIN) (cargo install wasm-opt --version 0.116.1 --locked)" >&2; exit 1; }
+	@node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 20 ? 0 : 1)' || { echo "027 3.12.5: need Node 20 or later" >&2; exit 1; }
+	@test -n "$(CARGO_TARGET)" || { echo "bindings: no cargo target directory (it is read with cargo metadata and Node 20 or later, both needed on PATH)" >&2; exit 1; }
+	cd tools/rustev-conformance/js && npm ci --no-audit --no-fund --ignore-scripts
+	@# Every installed package's registry signature is verified, lodash 4.18.1 included.
+	cd tools/rustev-conformance/js && npm audit signatures
+	cargo build -p rustev-wasm --locked --target wasm32-unknown-unknown --profile wasm
+	rm -rf "$(BINDINGS_OUT)/rustev-wasm"
+	for t in web bundler nodejs; do \
+	  d=$$t; [ $$t = nodejs ] && d=node; \
+	  $(WASM_BINDGEN) --target $$t --out-dir "$(BINDINGS_OUT)/rustev-wasm/$$d" "$(CARGO_TARGET)/wasm32-unknown-unknown/wasm/rustev_wasm.wasm" || exit 1; \
+	  $(WASM_OPT) -Oz $(WASM_FEATURES) -o "$(BINDINGS_OUT)/rustev-wasm/$$d/rustev_wasm_bg.wasm" "$(BINDINGS_OUT)/rustev-wasm/$$d/rustev_wasm_bg.wasm" || exit 1; \
+	  ty=module; [ $$t = nodejs ] && ty=commonjs; \
+	  printf '{ "type": "%s" }\n' $$ty > "$(BINDINGS_OUT)/rustev-wasm/$$d/package.json"; \
+	done
+	cp -R integrations/rustev-wasm/package.json integrations/rustev-wasm/types "$(BINDINGS_OUT)/rustev-wasm/"
+	node tools/rustev-conformance/js/gen-types.mjs --check
+	tools/rustev-conformance/js/node_modules/.bin/tsc --noEmit --strict integrations/rustev-wasm/types/rustev-documents.d.ts
+	node tools/rustev-conformance/js/wasm-check.mjs "$(BINDINGS_OUT)/rustev-wasm" "$(BINDINGS_OUT)/wasm-measurement.json"
+	node tools/rustev-conformance/js/run.mjs wasm "$(BINDINGS_OUT)/rustev-wasm"

@@ -32,7 +32,7 @@ extends:
   - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
 establishes:
   - { kind: directory, path: "integrations/rustev-node/", planned: true }
-  - { kind: directory, path: "integrations/rustev-wasm/", planned: true }
+  - { kind: directory, path: "integrations/rustev-wasm/" }
   - { kind: directory, path: "crates/rustev-surface/" }
   - { kind: directory, path: "tools/rustev-conformance/" }
 depends_on:
@@ -869,6 +869,55 @@ request `deadline_exceeded` with unknown charges; every attempt stopped
 with its charge of 2), so a blessed record is never merely what the
 runner printed. A binding's runner interprets the same data with its
 host's seams.
+
+**Increment 5 (the WebAssembly package).** `integrations/rustev-wasm`
+(`publish = false`; excluded from the crates.io release set, shipped only
+through npm) exports `version`, `check`, `compile`, `show`, `replay`,
+`eval`, `gate`, `calibrateFit` and `calibrateQualify` through
+`rustev-surface`: a host puts named documents into an `Inputs`, calls a
+command naming them, and gets the CLI's exit code, the output object's
+bytes and the artifacts the command published by name. The surface gains
+`host::Memory`, the in-memory host every binding uses (the surface's own
+tests now use it). No runtime, backend, sink or clock: a rules program is
+not read (its derived descriptor is), time is an argument, and replay and
+evaluation resolve external items through a synchronous host callback, a
+throw or invalid answer being inaccessible as for the CLI's store. The
+`wasm` cargo profile (size first, link-time optimization, one codegen
+unit, no unwinding, stripped) builds it; `make bindings` checks the exact
+pins (`wasm-bindgen-cli` 0.2.129, the crate's version, and `wasm-opt`
+116), builds the `web`, `bundler` and `nodejs` targets optimized at `-Oz`,
+regenerates and type-checks the document declarations, enforces the import
+allowlist and the budgets, writes the measurement document, and runs the
+JavaScript conformance runner on the package. The declarations
+(`rustev-documents.d.ts`) are generated offline from the committed schemas
+by `json-schema-to-typescript` 16.0.0 under a committed lockfile, one
+namespace per document and version, and type-check under TypeScript 5.9.3
+in strict mode; the drift check fails when a committed copy differs. The
+module's imports are only `wasm-bindgen`'s glue, each listed by base name
+in `tools/rustev-conformance/js/wasm-imports.json` with its reason; the
+check fails on any other. The JavaScript runner's WebAssembly adapter runs
+every manifest case that names the `wasm` surface (the harvest marks
+`plan check`, `compile`, `show` and `replay`, 23 cases, and records each
+rules program's derived descriptor for it): all 23 print the CLI's golden
+bytes and exit codes, refusals and replays included. Its `package.json` stays `"private": true` until
+publication: spec 031 owns the npm release and makes the package
+publishable as part of it, so no build of this increment can be published
+by accident.
+
+First measurement (3.10.6), local, macOS arm64, Node 24.6.0, commit of this
+increment: optimized `rustev_wasm_bg.wasm` raw 2,215,589 bytes, gzip
+(level 9) 762,689 bytes, Brotli (quality 11) 543,501 bytes; Node cold
+instantiation median 3.5 ms over 21 fresh processes. The gzip and
+instantiation budgets hold; the raw budget of 2,097,152 bytes does not
+(5.6% over): the contract's document types, most of them added by specs
+032 and 033 after this budget was declared, account for most of the
+module (their serde code is about 1 MB before optimization), and every
+pure command needs them, and no `wasm-opt` option closes the gap (`-Oz`
+is the smallest). The owner ratified spec 046 (A-43), which raises the
+raw budget to 2,621,440 bytes and keeps every other budget and the gate;
+the measurement check applies it, so `make bindings` passes with the
+module at 2,216,152 bytes. Headless Chromium timing and the CI
+measurement come with the `bindings` job.
 
 ## Decisions at approval
 

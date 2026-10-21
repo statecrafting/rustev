@@ -71,6 +71,15 @@ fn files(dir: &Path, path: &Path, out: &mut BTreeMap<String, Vec<u8>>) {
     }
 }
 
+/// The command words of an argument vector.
+fn command_of(args: &[String]) -> String {
+    args.iter()
+        .take_while(|a| !a.starts_with('-'))
+        .map(String::as_str)
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 /// Before an invocation: the inputs its arguments name.
 pub fn before(dir: &Path, args: &[&str]) {
     if !on() {
@@ -184,14 +193,56 @@ pub fn golden(name: &str, bytes: &[u8]) {
                 json!({ "path": format!("{fixtures}/{rel}"), "name": rel, "sha256": hex(b) }),
             );
         }
+        // Pure commands also run on the WebAssembly surface.
+        let pure = matches!(
+            command_of(&seen.args).as_str(),
+            "plan check" | "plan compile" | "plan show" | "replay"
+        );
+        // The WebAssembly surface runs no backend (spec 027, 3.10.1): for
+        // each rules program a case it runs reads, the descriptor the CLI
+        // derives from it, which that surface reads instead. A case it does
+        // not run records none.
+        let mut derived = vec![];
+        for (i, a) in seen.args.iter().enumerate() {
+            if !pure || a != "--rules" {
+                continue;
+            }
+            let Some(name) = seen.args.get(i + 1) else {
+                continue;
+            };
+            let Some(bytes) = seen.inputs.get(name) else {
+                continue;
+            };
+            // The descriptor is written next to the fixtures under this
+            // name: only a plain relative path stays inside them.
+            assert!(
+                Path::new(name)
+                    .components()
+                    .all(|c| matches!(c, std::path::Component::Normal(_))),
+                "--rules {name:?} is not a plain relative path"
+            );
+            use rustev_core::seams::DecisionBackend;
+            let Ok(b) = rustev_backend_rules::RulesBackend::from_bytes(bytes) else {
+                continue;
+            };
+            // A descriptor that does not canonicalize cannot be a case's
+            // input: the harvest fails rather than record a case without it.
+            let d = rustev_contract::Document::canonical(b.descriptor())
+                .unwrap_or_else(|e| panic!("{name}: its derived descriptor: {e}"));
+            let rel = format!("{name}.descriptor.json");
+            let p = root().join(&fixtures).join(&rel);
+            std::fs::write(&p, &d).unwrap();
+            derived.push(json!({ "from": name, "path": format!("{fixtures}/{rel}"),
+                                 "sha256": hex(&d) }));
+        }
+        let surfaces = if pure {
+            json!(["cli", "wasm"])
+        } else {
+            json!(["cli"])
+        };
         let path = root().join(format!("tools/rustev-conformance/cases/cli/{id}.json"));
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        let command: Vec<&str> = seen
-            .args
-            .iter()
-            .take_while(|a| !a.starts_with('-'))
-            .map(String::as_str)
-            .collect();
+        let command = command_of(&seen.args);
         // A second golden of the same invocation joins its case.
         // A case file that exists but does not parse is an error, never
         // silently replaced (it would lose the outputs harvested into it).
@@ -203,8 +254,9 @@ pub fn golden(name: &str, bytes: &[u8]) {
             .unwrap_or_else(|| {
                 json!({
                     "id": id,
-                    "command": command.join(" "),
-                    "surfaces": ["cli"],
+                    "command": command,
+                    "surfaces": surfaces,
+                    "derived": derived,
                     "argv": seen.args,
                     "exit": seen.code,
                     "inputs": inputs,
@@ -218,6 +270,18 @@ pub fn golden(name: &str, bytes: &[u8]) {
             case["inputs"],
             json!(inputs),
             "{}: stale case file; rebuild with `make conformance-harvest`",
+            path.display()
+        );
+        assert_eq!(
+            case.get("derived").cloned().unwrap_or_else(|| json!([])),
+            json!(derived),
+            "{}: stale derived descriptors; rebuild with `make conformance-harvest`",
+            path.display()
+        );
+        assert_eq!(
+            case["surfaces"],
+            surfaces,
+            "{}: stale surfaces; rebuild with `make conformance-harvest`",
             path.display()
         );
         let outs = case["outputs"].as_array_mut().unwrap();

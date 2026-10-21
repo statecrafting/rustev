@@ -39,6 +39,10 @@
       "reason": "repository governance tooling, not a product crate"
     },
     {
+      "name": "rustev-wasm",
+      "reason": "ships only as an npm package (spec 027 section 2, spec 031 3.1); publish = false on crates.io"
+    },
+    {
       "name": "rustev-conformance",
       "reason": "repository conformance tooling (spec 027, 3.12), not a product crate"
     },

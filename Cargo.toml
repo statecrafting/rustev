@@ -55,3 +55,15 @@ webpki-roots = { version = "1.0.5", default-features = false }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
+
+# The WebAssembly module's build (spec 027, 3.10): size first, one codegen
+# unit, link-time optimization, no unwinding, no debug data. Only
+# `make bindings` uses it; every other build keeps the default profiles.
+[profile.wasm]
+inherits = "release"
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+debug = false

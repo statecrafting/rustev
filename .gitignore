@@ -56,3 +56,5 @@ target
 .DS_Store
 .env*
 
+# Spec 027: the JavaScript tooling's installed packages.
+node_modules/

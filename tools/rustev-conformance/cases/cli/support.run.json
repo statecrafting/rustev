@@ -17,6 +17,7 @@
     "topic.calibration.json"
   ],
   "command": "run",
+  "derived": [],
   "exit": 0,
   "id": "support.run",
   "inputs": [

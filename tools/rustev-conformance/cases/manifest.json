@@ -19,6 +19,7 @@
         "needs.record.json"
       ],
       "command": "run",
+      "derived": [],
       "exit": 0,
       "id": "actionable.run-needs",
       "inputs": [
@@ -76,6 +77,7 @@
         "propose.record.json"
       ],
       "command": "run",
+      "derived": [],
       "exit": 0,
       "id": "actionable.run-propose",
       "inputs": [
@@ -133,6 +135,7 @@
         "refused.record.json"
       ],
       "command": "run",
+      "derived": [],
       "exit": 0,
       "id": "actionable.run-refused",
       "inputs": [
@@ -190,6 +193,7 @@
         "unresolved.record.json"
       ],
       "command": "run",
+      "derived": [],
       "exit": 0,
       "id": "actionable.run-unresolved",
       "inputs": [
@@ -240,6 +244,13 @@
         "topic.calibration.json"
       ],
       "command": "plan show",
+      "derived": [
+        {
+          "from": "support.rules.json",
+          "path": "tools/rustev-conformance/fixtures/cli/actionable.show/support.rules.json.descriptor.json",
+          "sha256": "98070801b3e95b1c3d38a6738d7dab635756c1dd4348b4a7fb05062e76083ced"
+        }
+      ],
       "exit": 0,
       "id": "actionable.show",
       "inputs": [
@@ -268,7 +279,8 @@
         }
       ],
       "surfaces": [
-        "cli"
+        "cli",
+        "wasm"
       ]
     },
     {
@@ -281,6 +293,13 @@
         "lodging.rules.json"
       ],
       "command": "plan check",
+      "derived": [
+        {
+          "from": "lodging.rules.json",
+          "path": "tools/rustev-conformance/fixtures/cli/lodging.check/lodging.rules.json.descriptor.json",
+          "sha256": "a3c75af9f729ea17958b305c824553bf38f3a44895a180a23fbfc5cdc441bb6d"
+        }
+      ],
       "exit": 0,
       "id": "lodging.check",
       "inputs": [
@@ -304,7 +323,8 @@
         }
       ],
       "surfaces": [
-        "cli"
+        "cli",
+        "wasm"
       ]
     },
     {
@@ -319,6 +339,13 @@
         "lodging.rules.json"
       ],
       "command": "plan compile",
+      "derived": [
+        {
+          "from": "lodging.rules.json",
+          "path": "tools/rustev-conformance/fixtures/cli/lodging.compile/lodging.rules.json.descriptor.json",
+          "sha256": "a3c75af9f729ea17958b305c824553bf38f3a44895a180a23fbfc5cdc441bb6d"
+        }
+      ],
       "exit": 0,
       "id": "lodging.compile",
       "inputs": [
@@ -342,7 +369,8 @@
         }
       ],
       "surfaces": [
-        "cli"
+        "cli",
+        "wasm"
       ]
     },
     {
@@ -360,13 +388,14 @@
         "scope-p"
       ],
       "command": "replay",
+      "derived": [],
       "exit": 0,
       "id": "lodging.replay",
       "inputs": [
         {
           "name": "lodging-emb.bundle.json",
           "path": "tools/rustev-conformance/fixtures/cli/lodging.replay/lodging-emb.bundle.json",
-          "sha256": "4d8e5aa6eb9b94ecb27503d2e32be72282e69384e29e5954ca250a3b5518f424"
+          "sha256": "cdd5a90196b4677aafb5891fb5b4d4c3b870e2fd1caac48f655970d1f5c3f7e8"
         }
       ],
       "outputs": [
@@ -378,7 +407,8 @@
         }
       ],
       "surfaces": [
-        "cli"
+        "cli",
+        "wasm"
       ]
     },
     {
@@ -398,6 +428,7 @@
         "lodging.record.json"
       ],
       "command": "run",
+      "derived": [],
       "exit": 0,
       "id": "lodging.run",
       "inputs": [
@@ -449,6 +480,13 @@
         "lodging.rules.json"
       ],
       "command": "plan show",
+      "derived": [
+        {
+          "from": "lodging.rules.json",
+          "path": "tools/rustev-conformance/fixtures/cli/lodging.show/lodging.rules.json.descriptor.json",
+          "sha256": "a3c75af9f729ea17958b305c824553bf38f3a44895a180a23fbfc5cdc441bb6d"
+        }
+      ],
       "exit": 0,
       "id": "lodging.show",
       "inputs": [
@@ -472,7 +510,8 @@
         }
       ],
       "surfaces": [
-        "cli"
+        "cli",
+        "wasm"
       ]
     },
     {
@@ -487,6 +526,13 @@
         "topic.calibration.json"
       ],
       "command": "plan check",
+      "derived": [
+        {
+          "from": "support.rules.json",
+          "path": "tools/rustev-conformance/fixtures/cli/refusal-01/support.rules.json.descriptor.json",
+          "sha256": "98070801b3e95b1c3d38a6738d7dab635756c1dd4348b4a7fb05062e76083ced"
+        }
+      ],
       "exit": 5,
       "id": "refusal-01",
       "inputs": [
@@ -515,7 +561,8 @@
         }
       ],
       "surfaces": [
-        "cli"
+        "cli",
+        "wasm"
       ]
     },
     {
@@ -530,6 +577,13 @@
         "topic.calibration.json"
       ],
       "command": "plan check",
+      "derived": [
+        {
+          "from": "support.rules.json",
+          "path": "tools/rustev-conformance/fixtures/cli/refusal-02/support.rules.json.descriptor.json",
+          "sha256": "98070801b3e95b1c3d38a6738d7dab635756c1dd4348b4a7fb05062e76083ced"
+        }
+      ],
       "exit": 5,
       "id": "refusal-02",
       "inputs": [
@@ -558,7 +612,8 @@
         }
       ],
       "surfaces": [
-        "cli"
+        "cli",
+        "wasm"
       ]
     },
     {
@@ -573,6 +628,13 @@
         "topic.calibration.json"
       ],
       "command": "plan check",
+      "derived": [
+        {
+          "from": "support.rules.json",
+          "path": "tools/rustev-conformance/fixtures/cli/refusal-03/support.rules.json.descriptor.json",
+          "sha256": "98070801b3e95b1c3d38a6738d7dab635756c1dd4348b4a7fb05062e76083ced"
+        }
+      ],
       "exit": 5,
       "id": "refusal-03",
       "inputs": [
@@ -601,7 +663,8 @@
         }
       ],
       "surfaces": [
-        "cli"
+        "cli",
+        "wasm"
       ]
     },
     {
@@ -616,6 +679,13 @@
         "topic.calibration.json"
       ],
       "command": "plan check",
+      "derived": [
+        {
+          "from": "support.rules.json",
+          "path": "tools/rustev-conformance/fixtures/cli/refusal-04/support.rules.json.descriptor.json",
+          "sha256": "98070801b3e95b1c3d38a6738d7dab635756c1dd4348b4a7fb05062e76083ced"
+        }
+      ],
       "exit": 5,
       "id": "refusal-04",
       "inputs": [
@@ -644,7 +714,8 @@
         }
       ],
       "surfaces": [
-        "cli"
+        "cli",
+        "wasm"
       ]
     },
     {
@@ -659,6 +730,13 @@
         "topic.calibration.json"
       ],
       "command": "plan check",
+      "derived": [
+        {
+          "from": "support.rules.json",
+          "path": "tools/rustev-conformance/fixtures/cli/refusal-05/support.rules.json.descriptor.json",
+          "sha256": "98070801b3e95b1c3d38a6738d7dab635756c1dd4348b4a7fb05062e76083ced"
+        }
+      ],
       "exit": 5,
       "id": "refusal-05",
       "inputs": [
@@ -687,7 +765,8 @@
         }
       ],
       "surfaces": [
-        "cli"
+        "cli",
+        "wasm"
       ]
     },
     {
@@ -702,6 +781,13 @@
         "topic.calibration.json"
       ],
       "command": "plan check",
+      "derived": [
+        {
+          "from": "support.rules.json",
+          "path": "tools/rustev-conformance/fixtures/cli/refusal-06/support.rules.json.descriptor.json",
+          "sha256": "98070801b3e95b1c3d38a6738d7dab635756c1dd4348b4a7fb05062e76083ced"
+        }
+      ],
       "exit": 5,
       "id": "refusal-06",
       "inputs": [
@@ -730,7 +816,8 @@
         }
       ],
       "surfaces": [
-        "cli"
+        "cli",
+        "wasm"
       ]
     },
     {
@@ -745,6 +832,13 @@
         "topic.calibration.json"
       ],
       "command": "plan check",
+      "derived": [
+        {
+          "from": "support.rules.json",
+          "path": "tools/rustev-conformance/fixtures/cli/refusal-07/support.rules.json.descriptor.json",
+          "sha256": "98070801b3e95b1c3d38a6738d7dab635756c1dd4348b4a7fb05062e76083ced"
+        }
+      ],
       "exit": 5,
       "id": "refusal-07",
       "inputs": [
@@ -773,7 +867,8 @@
         }
       ],
       "surfaces": [
-        "cli"
+        "cli",
+        "wasm"
       ]
     },
     {
@@ -788,6 +883,13 @@
         "topic.calibration.json"
       ],
       "command": "plan check",
+      "derived": [
+        {
+          "from": "support.rules.json",
+          "path": "tools/rustev-conformance/fixtures/cli/refusal-08/support.rules.json.descriptor.json",
+          "sha256": "98070801b3e95b1c3d38a6738d7dab635756c1dd4348b4a7fb05062e76083ced"
+        }
+      ],
       "exit": 5,
       "id": "refusal-08",
       "inputs": [
@@ -816,7 +918,8 @@
         }
       ],
       "surfaces": [
-        "cli"
+        "cli",
+        "wasm"
       ]
     },
     {
@@ -831,6 +934,13 @@
         "topic.calibration.json"
       ],
       "command": "plan check",
+      "derived": [
+        {
+          "from": "support.rules.json",
+          "path": "tools/rustev-conformance/fixtures/cli/refusal-09/support.rules.json.descriptor.json",
+          "sha256": "98070801b3e95b1c3d38a6738d7dab635756c1dd4348b4a7fb05062e76083ced"
+        }
+      ],
       "exit": 5,
       "id": "refusal-09",
       "inputs": [
@@ -859,7 +969,8 @@
         }
       ],
       "surfaces": [
-        "cli"
+        "cli",
+        "wasm"
       ]
     },
     {
@@ -874,6 +985,13 @@
         "topic.calibration.json"
       ],
       "command": "plan check",
+      "derived": [
+        {
+          "from": "support.rules.json",
+          "path": "tools/rustev-conformance/fixtures/cli/refusal-10/support.rules.json.descriptor.json",
+          "sha256": "98070801b3e95b1c3d38a6738d7dab635756c1dd4348b4a7fb05062e76083ced"
+        }
+      ],
       "exit": 5,
       "id": "refusal-10",
       "inputs": [
@@ -902,7 +1020,8 @@
         }
       ],
       "surfaces": [
-        "cli"
+        "cli",
+        "wasm"
       ]
     },
     {
@@ -917,6 +1036,13 @@
         "topic.calibration.json"
       ],
       "command": "plan check",
+      "derived": [
+        {
+          "from": "support.rules.json",
+          "path": "tools/rustev-conformance/fixtures/cli/refusal-11/support.rules.json.descriptor.json",
+          "sha256": "98070801b3e95b1c3d38a6738d7dab635756c1dd4348b4a7fb05062e76083ced"
+        }
+      ],
       "exit": 5,
       "id": "refusal-11",
       "inputs": [
@@ -945,7 +1071,8 @@
         }
       ],
       "surfaces": [
-        "cli"
+        "cli",
+        "wasm"
       ]
     },
     {
@@ -962,6 +1089,13 @@
         "topic.calibration.json"
       ],
       "command": "plan check",
+      "derived": [
+        {
+          "from": "support.rules.json",
+          "path": "tools/rustev-conformance/fixtures/cli/refusal-12/support.rules.json.descriptor.json",
+          "sha256": "98070801b3e95b1c3d38a6738d7dab635756c1dd4348b4a7fb05062e76083ced"
+        }
+      ],
       "exit": 5,
       "id": "refusal-12",
       "inputs": [
@@ -995,7 +1129,8 @@
         }
       ],
       "surfaces": [
-        "cli"
+        "cli",
+        "wasm"
       ]
     },
     {
@@ -1006,6 +1141,7 @@
         "cat-16.definition.json"
       ],
       "command": "plan check",
+      "derived": [],
       "exit": 5,
       "id": "refusal-16",
       "inputs": [
@@ -1024,7 +1160,8 @@
         }
       ],
       "surfaces": [
-        "cli"
+        "cli",
+        "wasm"
       ]
     },
     {
@@ -1035,6 +1172,7 @@
         "cat-17.definition.json"
       ],
       "command": "plan check",
+      "derived": [],
       "exit": 5,
       "id": "refusal-17",
       "inputs": [
@@ -1053,7 +1191,8 @@
         }
       ],
       "surfaces": [
-        "cli"
+        "cli",
+        "wasm"
       ]
     },
     {
@@ -1888,6 +2027,13 @@
         "topic.calibration.json"
       ],
       "command": "plan check",
+      "derived": [
+        {
+          "from": "support.rules.json",
+          "path": "tools/rustev-conformance/fixtures/cli/support.check/support.rules.json.descriptor.json",
+          "sha256": "98070801b3e95b1c3d38a6738d7dab635756c1dd4348b4a7fb05062e76083ced"
+        }
+      ],
       "exit": 0,
       "id": "support.check",
       "inputs": [
@@ -1916,7 +2062,8 @@
         }
       ],
       "surfaces": [
-        "cli"
+        "cli",
+        "wasm"
       ]
     },
     {
@@ -1933,6 +2080,13 @@
         "topic.calibration.json"
       ],
       "command": "plan compile",
+      "derived": [
+        {
+          "from": "support.rules.json",
+          "path": "tools/rustev-conformance/fixtures/cli/support.compile/support.rules.json.descriptor.json",
+          "sha256": "98070801b3e95b1c3d38a6738d7dab635756c1dd4348b4a7fb05062e76083ced"
+        }
+      ],
       "exit": 0,
       "id": "support.compile",
       "inputs": [
@@ -1961,7 +2115,8 @@
         }
       ],
       "surfaces": [
-        "cli"
+        "cli",
+        "wasm"
       ]
     },
     {
@@ -1979,13 +2134,14 @@
         "scope-p"
       ],
       "command": "replay",
+      "derived": [],
       "exit": 0,
       "id": "support.replay",
       "inputs": [
         {
           "name": "support-emb.bundle.json",
           "path": "tools/rustev-conformance/fixtures/cli/support.replay/support-emb.bundle.json",
-          "sha256": "42f6349e3f65d8caa4746a3607bd9848132e5789e9a8b8d39e71bdd782f683cc"
+          "sha256": "51a2c421677de9071f12f020ba5756e8fb39bc1e029ef7ad7c37906869cfe8c8"
         }
       ],
       "outputs": [
@@ -1997,7 +2153,8 @@
         }
       ],
       "surfaces": [
-        "cli"
+        "cli",
+        "wasm"
       ]
     },
     {
@@ -2019,6 +2176,7 @@
         "topic.calibration.json"
       ],
       "command": "run",
+      "derived": [],
       "exit": 0,
       "id": "support.run",
       "inputs": [
@@ -2077,6 +2235,13 @@
         "topic.calibration.json"
       ],
       "command": "plan show",
+      "derived": [
+        {
+          "from": "support.rules.json",
+          "path": "tools/rustev-conformance/fixtures/cli/support.show/support.rules.json.descriptor.json",
+          "sha256": "98070801b3e95b1c3d38a6738d7dab635756c1dd4348b4a7fb05062e76083ced"
+        }
+      ],
       "exit": 0,
       "id": "support.show",
       "inputs": [
@@ -2105,7 +2270,8 @@
         }
       ],
       "surfaces": [
-        "cli"
+        "cli",
+        "wasm"
       ]
     }
   ],
