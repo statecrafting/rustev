@@ -25,6 +25,9 @@ extends:
   # Each new source file of a release member joins the reviewed archive
   # list (spec 021, 3.5).
   - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
+  # The dynamic log loss's `rustev_core::math::ln` call joins the
+  # differential floating-point corpus (spec 027, 3.11.3).
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "tools/rustev-conformance/" }, nature: additive }
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
@@ -295,6 +298,9 @@ cargo test -p rustev-runtime --locked --test dynamic
 # 3.7: offline reproduction with zero backend calls, section 5 row 9, the
 # dynamic dataset and configuration, and a synthetic report of mechanics.
 cargo test -p rustev-eval --locked --test dynamic
+# The dynamic log loss's math call is a measured corpus site (spec 027,
+# 3.11.3) and this target reproduces its committed digests.
+cargo test -p rustev-fp-corpus --locked --test corpus
 # 2: contract and core gain no I/O or async runtime.
 cargo run -p rustev-boundaries --locked --quiet
 sh -c '! grep -nE "std::(fs|net|process|env|time)|tokio|async fn" crates/rustev-contract/src/dynamic.rs crates/rustev-core/src/dynamic.rs'
@@ -442,7 +448,11 @@ governed admission (spec 023) that no dynamic dataset binds yet. No
 calibration is fitted, so no dynamic distribution can be called
 calibrated. `crates/rustev-eval/tests/dynamic.rs` covers reproduction,
 section 5's last row with a dispatch counter, the dataset and binding
-checks and a synthetic evaluation. 019 joins `make verify`.
+checks and a synthetic evaluation. 019 joins `make verify`. The log
+loss's `rustev_core::math::ln` call is a new pure call site, so it joins
+spec 027's differential floating-point corpus as `eval.dynamic_log_loss.ln`
+(probabilities in (0, 1] and just above, as the existing log-loss site),
+with its digests committed in `fp-corpus/expected.json`.
 
 Left for the owner, not claimed: the JSON Schema emitter of spec 027
 (3.2.2, "every public document type") does not emit the dynamic
