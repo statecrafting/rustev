@@ -32,7 +32,7 @@ fn main() -> ExitCode {
     let violations = rustev_boundaries::check(&meta);
     if violations.is_empty() {
         println!(
-            "boundaries: {} workspace crate(s), no violation of spec 001 3.4, the package rule of spec 007 3.3.1 or the binding rules of spec 027 3.14",
+            "boundaries: {} workspace crate(s), no violation of spec 001 3.4, the package rule of spec 007 3.3.1, the binding rules of spec 027 3.14 or the telemetry rule of spec 028 3.12",
             meta.workspace_members.len()
         );
         ExitCode::SUCCESS

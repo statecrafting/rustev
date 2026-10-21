@@ -878,6 +878,50 @@ outside `integrations/` reaches an `opentelemetry*` package, and the
 benchmark smoke run; and adds `028` to `VERIFIED_SPECS`. Approval creates no
 crate and no runnable acceptance.
 
+## Implementation record
+
+Delivered in increments; nothing here claims an acceptance item before the
+increment that satisfies it. Plan:
+
+1. The telemetry exporter family in the boundary check (3.12), and the
+   re-confirmation of the pinned facts (3.2.1).
+2. The pure contract parts: `rustev.redaction/1`, the field catalogue,
+   policy evaluation, the keyed digest and `rustev.trace/1` (3.3, 3.4,
+   3.10.1).
+3. `integrations/rustev-otel`: the projection to span trees, the JSONL
+   exporter and the committed goldens (3.5, 3.10.2).
+4. The sink: acknowledgement modes, the export queue and loss counters,
+   `TeeSink`, trace context, plan and exchange registration, sampling,
+   metrics and logs (3.6 to 3.8, 3.9.4).
+5. `rustev trace tail` (3.11).
+6. The OTLP exporters behind features and the endpoint allowlist (3.2.3,
+   3.9.1 to 3.9.3).
+7. The redaction property test, the overhead benchmark, the `verify:cli`
+   block and `028` in `VERIFIED_SPECS` (3.14, Acceptance).
+
+**Increment 1 (dependency boundary and pinned facts).**
+`tools/rustev-boundaries` gains the telemetry exporter family: every
+package whose name starts with `opentelemetry`, and `tracing-opentelemetry`
+(3.12.1). A crate outside `integrations/` that declares one as a normal or
+build dependency (optional ones included, since the resolved graph leaves
+them out), or reaches one through its resolved normal and build graph, is a
+`TelemetryOutsideIntegrations` violation naming the path (3.12.2); rule
+3.4.1 for the pure crates is unchanged. Unit tests cover each named family
+member as a normal and a build dependency from `crates/`, `backends/`,
+`packages/` and `tools/`, an optional declaration, a transitive path through
+a build edge, the contract and core reaching the family, a dev-only
+dependency passing, and `rustev-otel` with its OTLP transports passing under
+`integrations/`; `make boundaries` passes on the workspace.
+
+The facts of 3.2.1 were re-confirmed on 2026-10-21 and hold unchanged:
+`open-telemetry/semantic-conventions-genai` has published no release (so
+no schema URL), core v1.42.0's notes deprecate every `gen_ai.*` convention
+and move them there, the core repository's latest release is still v1.44.0,
+`https://opentelemetry.io/schemas/1.41.1` serves a schema file whose
+`schema_url` is itself, and `opentelemetry`, `opentelemetry_sdk`,
+`opentelemetry-otlp` and `opentelemetry-semantic-conventions` are at
+0.33.1 on crates.io. The pin of 3.2.2 (v1.41.1) therefore stands.
+
 ## Decisions at approval
 
 Each open point of #70 and of the work order, with the answer this spec
