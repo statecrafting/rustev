@@ -29,6 +29,7 @@ pub mod optimization;
 pub mod output;
 pub mod plan;
 pub mod reason;
+pub mod redaction;
 pub mod remote;
 pub mod replay;
 pub mod request;
@@ -39,6 +40,8 @@ pub mod scope;
 pub mod snapshot;
 pub mod source;
 pub mod time;
+pub mod trace;
+pub mod trace_fields;
 
 pub use decimal::Decimal;
 pub use document::{Document, DocumentError, Identified};

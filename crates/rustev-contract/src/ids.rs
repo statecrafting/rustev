@@ -135,6 +135,11 @@ identity!(
     ContentDigest
 );
 identity!(
+    /// Identity of a canonical redaction policy, `rustev.redaction/1`
+    /// (spec 028, 3.4.1).
+    RedactionPolicyId
+);
+identity!(
     /// A backend artifact (model, tokenizer, preprocessing, truncation,
     /// precision), identified by its producer.
     ArtifactId
