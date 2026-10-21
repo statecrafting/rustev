@@ -1018,6 +1018,63 @@ outcome, error status for a failed attempt, unregistered plans, unknown
 records, the event and value bounds, canaries in default-deny and digest
 slots, and the JSONL exporter's mode, append and bound.
 
+**Increment 4 (the sink).** `OtelSink` implements `EvidenceSink`: it
+projects and redacts synchronously, updates the metrics (never sampled),
+samples, and queues the whole tree as one unit in a queue bounded in spans;
+a worker exports batches of whole trees through the host's
+`TelemetryExporter`, each call its own task under the export timeout, so a
+failure, a hang (the task is aborted) and a panic are counted as
+`export_failed` (or `file_full`), `export_timeout` and `exporter_panicked`.
+Receipts are `otel:accepted:`, `otel:exported:` and `otel:sampled_out:`
+over the record digest. `begin`, `abandon`, `register_plan`,
+`record_exchange`, `observe_runtime`, `metrics`, `flush_metrics`, `stats`
+and `shutdown` are as 3.6 to 3.9.4 state, and `TeeSink` keeps the primary's
+receipt. The JSONL exporter is a `TelemetryExporter`. Readings taken within
+the spec:
+
+- Conservation is kept per signal in items (`spans`, `logs`,
+  `metric_exports`: accepted equals exported plus lost plus in flight).
+  `rustev.telemetry.lost{reason}` counts decisions, each under exactly one
+  reason (I-2); `TeeSink` counts `tee_failed` only for a telemetry failure
+  no other reason counts, so a decision is never counted twice. After
+  `shutdown`, a delivery is lost as `shutdown_unflushed`.
+- Metric attributes are added only when the policy's action for their
+  catalogue field is `allow`; anything else omits the dimension, so no
+  digest or truncated value becomes one. `rustev.decision.duration` carries
+  no attribute (the three 3.6.1 lists are attempt fields);
+  `gen_ai.client.operation.duration` is in seconds, as the GenAI
+  conventions state, for attempts with reported usage. Metrics are an
+  in-memory snapshot (`metrics()`), exported by `flush_metrics()` when the
+  exporter takes metrics; the runtime's gauges are read through the host's
+  callback at that moment.
+- Logs need an exporter that takes log records; the JSONL exporter takes
+  none, so `logs: on` with it is refused at construction.
+- Only span schema version 1 exists, so `schema` accepts `1` alone; the
+  dual-emit window of 3.2.4 has nothing to select until a version 2 is
+  specified.
+- Ranges: `max_queued_spans` 1 to 1 048 576, `batch_size` 1 to 8 192,
+  `export_timeout_ms` 1 to 600 000, the value bound 16 to 4 096 bytes,
+  `max_pending_contexts` and the join buffer 1 to 65 536,
+  `context_ttl_ms` 1 to 86 400 000, the ratio 0 to 1 000 000 per million.
+  Construction needs a Tokio runtime for the worker. The join buffer
+  remembers at least 4 096 exported attempt ids, so a late exchange record
+  is `exchange_unjoined` at once rather than at its expiry.
+- The trace-id ratio is OpenTelemetry's rule in integer form: the last
+  eight bytes of the trace id, shifted right by one, below
+  `per_million * 2^63 / 10^6`.
+
+Tests (`tests/sink.rs`): both acknowledgement modes through the runtime
+under `fail_decision`, `backpressure` and `drop_counted`, including a
+collector outage; conservation with succeeding, failing, hanging and
+panicking exporters; a full queue; shutdown; `TeeSink` with and without
+`require_telemetry`; the equivalence of 3.8.6 (both reference decisions
+with a file sink alone and in a tee with the sink: identical record bytes
+up to the runtime's measured times, identical judgment bytes); valid,
+malformed, full, expired and abandoned trace contexts with the returned
+root span id equal to the exported root's; the join buffer; every sampling
+mode and `always_sample_on` trigger with metrics recorded for sampled-out
+decisions; metric dimensions; logs; and every configuration refusal.
+
 ## Decisions at approval
 
 Each open point of #70 and of the work order, with the answer this spec
