@@ -1,0 +1,32 @@
+[package]
+name = "rustev-otel"
+version.workspace = true
+description = "Rustev's OpenTelemetry evidence sink: delivered run records as redacted spans, metrics and logs."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+# Spec 028, section 2: not published until spec 021's release family is
+# extended to it (#76 A3).
+publish = false
+
+[package.metadata.spec-spine]
+spec = "028-opentelemetry-evidence-sink"
+
+# Spec 028, 3.2.3: the default features are empty, so the projection,
+# redaction and the JSONL exporter build with no OpenTelemetry crate.
+[features]
+default = []
+
+[dependencies]
+rustev-contract.workspace = true
+rustev-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+
+
+[lints]
+workspace = true
