@@ -27,6 +27,13 @@ extends:
   - { spec: "009-remote-adapter-protocol", unit: { kind: directory, path: "integrations/rustev-remote-http/" }, nature: amending }
   - { spec: "012-jev-integration", unit: { kind: directory, path: "integrations/rustev-jev/" }, nature: amending }
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  # Each new source file of a release member joins the reviewed archive
+  # list (spec 021, 3.5).
+  - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
+  # The document declarations generated from the contract's schemas (spec
+  # 027, 3.2.3), regenerated when an exchange or run member is added.
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-node/" }, nature: additive }
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-wasm/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "002-decision-contract-and-pure-core"
@@ -326,6 +333,69 @@ qualification.
 - Jev tests distinguish its existing adapter batch from general runtime
   batching and use new qualification evidence for every enabled refinement.
 - `make code`, each declared spec verification, and `make gate` pass.
+
+## Implementation record
+
+Delivered in increments, each its own change; nothing here claims an
+acceptance item before the increment that satisfies it. Plan:
+
+1. Phase-specific time ceilings (3.4) and the binding's phase member (3.1).
+2. The host-endpoint principal reference and `rustev.remote/2` (3.6, 3.7).
+3. Bounded connection reuse (3.5).
+4. `rustev.run/2` and offline remote-evidence availability (3.2).
+5. Runtime-planned remote batches (3.3).
+6. Jev mapping versions, the remaining acceptance items, verification.
+
+**Increment 1 (phase ceilings).** `integrations/rustev-remote-http/src/phases.rs`:
+`PhasePolicy` (a positive ceiling for resolution, connect, secure
+handshake, request write, first response byte, response body and
+cancellation acknowledgement; zero is refused at construction as
+`SetupError::Config`) and `TransportPhases`, `disabled` by default.
+`PhaseClock` holds the running phase; entering a phase fixes its effective
+allowance as the lesser of its ceiling and the budget left at that moment,
+and phases only move forward, so unused time returns to the budget, a
+skipped phase transfers nothing, and a chunk never restarts the response
+body. `phased` watches the running phase's deadline and ends the exchange
+with `TransportError::PhaseExpired`. `HttpTransport::with_phases` enters
+the phases on the real connection: resolution, connect, the TLS handshake
+(absent on plaintext loopback), request write, first response byte (from
+the flush that follows the connection taking the request body, reported by
+`TrackedIo`), and response body (from the first response byte to the
+complete bounded body). An expiry before request bytes left is
+`transport_unsent` with `observed{0}`; after, `transport_interrupted` with
+charge `unknown` and `possibly_continuing` (spec 013). The cancellation
+acknowledgement ceiling cuts the budget of every cancel exchange. The
+adapter adds no retry. `rustev.remote-exchange/1` gains an optional
+`phase_expiry` (phase, configured ceiling, effective allowance, elapsed
+time, whether the ceiling or the budget bounded it, bytes sent, code),
+omitted when absent, so every existing record keeps its bytes.
+`AdapterBinding` gains `transport_phases`, not written when disabled: a
+binding with every refinement disabled keeps its spec 009 bytes and
+artifact (pinned by `a_binding_with_every_refinement_disabled_keeps_its_spec_009_bytes`),
+and an enabled policy changes the artifact and so every affected
+`PlanId`. The Jev adapter compiles the new module and maps the new
+transport error, but keeps the policy disabled. Tests:
+`integrations/rustev-remote-http/tests/phases.rs` runs a deterministic fake
+transport on Tokio's paused clock (every phase boundary and its code,
+exact exhaustion, no carry-over, budget-bounded allowances, slow response
+chunks, a cancellation raised first or at the same instant) and loopback
+exchanges (refusal of a zero ceiling, unchanged binding and records when
+disabled, a silent remote expiring the first-byte phase, a dribbled body
+expiring the body ceiling, a never-answered cancel bounded by the
+acknowledgement ceiling). The schemas and the generated declarations are
+regenerated; `src/phases.rs` joins the reviewed archive list.
+
+Engineering choices made by the implementing agent, not by the owner:
+
+- 3.1 asks for explicit `disabled` values in the binding. They are explicit
+  in the configuration types, which have no implicit state, but are not
+  written into the binding document, so the artifact and `PlanId` of every
+  existing adapter stay byte-identical as section 2 requires.
+- The request-write phase ends at the first completed flush after the
+  connection took the request body; the response-body phase includes the
+  response head, from the first response byte to the complete body.
+- The cancellation acknowledgement ceiling bounds the whole cancel
+  exchange, whose own transport phases also apply.
 
 ## Verification
 

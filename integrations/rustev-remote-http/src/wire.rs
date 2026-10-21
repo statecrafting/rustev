@@ -17,6 +17,8 @@ use std::task::{Context, Poll};
 
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
+use crate::phases::PhaseClock;
+
 const IDLE: u8 = 0;
 const WRITING: u8 = 1;
 const ABORTED: u8 = 2;
@@ -88,11 +90,24 @@ impl SentTracker {
 pub struct TrackedIo<S> {
     inner: S,
     sent: SentTracker,
+    /// Told when a flush completes and when a response byte arrives, for
+    /// the phase ceilings of spec 020, 3.4.
+    clock: Option<PhaseClock>,
 }
 
 impl<S> TrackedIo<S> {
     pub fn new(inner: S, sent: SentTracker) -> Self {
-        TrackedIo { inner, sent }
+        TrackedIo {
+            inner,
+            sent,
+            clock: None,
+        }
+    }
+
+    /// Report completed flushes and arriving response bytes to `clock`.
+    pub fn with_clock(mut self, clock: Option<PhaseClock>) -> Self {
+        self.clock = clock;
+        self
     }
 
     pub fn tracker(&self) -> &SentTracker {
@@ -113,7 +128,14 @@ impl<S: AsyncRead + Unpin> AsyncRead for TrackedIo<S> {
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        Pin::new(&mut self.inner).poll_read(cx, buf)
+        let before = buf.filled().len();
+        let r = Pin::new(&mut self.inner).poll_read(cx, buf);
+        if let (Poll::Ready(Ok(())), Some(c)) = (&r, &self.clock)
+            && buf.filled().len() > before
+        {
+            c.response_byte();
+        }
+        r
     }
 }
 
@@ -159,7 +181,11 @@ impl<S: AsyncWrite + Unpin> AsyncWrite for TrackedIo<S> {
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Pin::new(&mut self.inner).poll_flush(cx)
+        let r = Pin::new(&mut self.inner).poll_flush(cx);
+        if let (Poll::Ready(Ok(())), Some(c)) = (&r, &self.clock) {
+            c.flushed();
+        }
+        r
     }
 
     fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {

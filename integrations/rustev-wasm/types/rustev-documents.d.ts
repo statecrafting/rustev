@@ -7303,6 +7303,23 @@ export namespace RustevRemoteExchange1 {
     | "remote_error"
     | "cancelled";
   /**
+   * What bounded a phase that ran out: its own ceiling, or the remaining
+   * attempt budget when that was smaller (spec 020, 3.4).
+   */
+  export type PhaseLimit = "ceiling" | "budget";
+  /**
+   * A transport phase with its own ceiling inside the one attempt budget
+   * (spec 020, 3.4), in the order an exchange passes through them.
+   */
+  export type TransportPhase =
+    | "resolution"
+    | "connect"
+    | "secure_handshake"
+    | "request_write"
+    | "first_response_byte"
+    | "response_body"
+    | "cancellation_ack";
+  /**
    * What a served identity is worth (spec 009, 3.7).
    */
   export type Disclosure = "pinned" | "reported" | "unknown";
@@ -7338,6 +7355,12 @@ export namespace RustevRemoteExchange1 {
      * Every member attempt, in attempt-id order.
      */
     members: ExchangeMember[];
+    /**
+     * The transport phase that ran out, when an enabled phase policy
+     * governed the exchange (spec 020, 3.4). Absent otherwise, so a record
+     * without one keeps its spec 009 bytes.
+     */
+    phase_expiry?: PhaseExpiry | null;
     privacy_requested: {
       [k: string]: string | undefined;
     };
@@ -7391,6 +7414,21 @@ export namespace RustevRemoteExchange1 {
      */
     charge: Charge;
     outcome: MemberOutcome;
+  }
+  /**
+   * The phase that ran out (spec 020, 3.4): its configured ceiling, the
+   * effective allowance it started with (the lesser of the ceiling and the
+   * remaining attempt budget), the time observed in it, whether request
+   * bytes had left, and the existing code the expiry mapped to.
+   */
+  export interface PhaseExpiry {
+    allowance_ms: number;
+    bytes_sent: boolean;
+    ceiling_ms: number;
+    code: RemoteCode;
+    elapsed_ms: number;
+    limit: PhaseLimit;
+    phase: TransportPhase;
   }
   export interface ReportedCost {
     /**

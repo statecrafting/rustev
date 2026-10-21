@@ -404,9 +404,78 @@ pub struct ExchangeRecord {
     pub late: bool,
     /// Something was cut to fit the record's bounds.
     pub truncated: bool,
+    /// The transport phase that ran out, when an enabled phase policy
+    /// governed the exchange (spec 020, 3.4). Absent otherwise, so a record
+    /// without one keeps its spec 009 bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub phase_expiry: Option<PhaseExpiry>,
 }
 
 crate::document::document!(ExchangeRecord, schema::REMOTE_EXCHANGE, EXCHANGE_V1);
+
+/// A transport phase with its own ceiling inside the one attempt budget
+/// (spec 020, 3.4), in the order an exchange passes through them.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum TransportPhase {
+    Resolution,
+    Connect,
+    SecureHandshake,
+    RequestWrite,
+    FirstResponseByte,
+    ResponseBody,
+    CancellationAck,
+}
+
+impl TransportPhase {
+    /// Every phase, in exchange order.
+    pub const ALL: [TransportPhase; 7] = [
+        TransportPhase::Resolution,
+        TransportPhase::Connect,
+        TransportPhase::SecureHandshake,
+        TransportPhase::RequestWrite,
+        TransportPhase::FirstResponseByte,
+        TransportPhase::ResponseBody,
+        TransportPhase::CancellationAck,
+    ];
+}
+
+/// What bounded a phase that ran out: its own ceiling, or the remaining
+/// attempt budget when that was smaller (spec 020, 3.4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum PhaseLimit {
+    Ceiling,
+    Budget,
+}
+
+/// The phase that ran out (spec 020, 3.4): its configured ceiling, the
+/// effective allowance it started with (the lesser of the ceiling and the
+/// remaining attempt budget), the time observed in it, whether request
+/// bytes had left, and the existing code the expiry mapped to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PhaseExpiry {
+    pub phase: TransportPhase,
+    pub ceiling_ms: u64,
+    pub allowance_ms: u64,
+    pub elapsed_ms: u64,
+    pub limit: PhaseLimit,
+    pub bytes_sent: bool,
+    pub code: RemoteCode,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -763,6 +832,7 @@ mod tests {
             provider_extras: BTreeMap::new(),
             late: false,
             truncated: false,
+            phase_expiry: None,
         }
     }
 
@@ -771,6 +841,34 @@ mod tests {
         let back = T::parse(&bytes).unwrap();
         assert_eq!(&back, doc);
         assert_eq!(back.record_canonical().unwrap(), bytes);
+    }
+
+    #[test]
+    fn a_phase_expiry_is_omitted_when_absent_and_round_trips_when_present() {
+        // Spec 020, 3.4: a record without a phase policy keeps its bytes.
+        let plain = exchange();
+        let bytes = String::from_utf8(plain.canonical().unwrap()).unwrap();
+        assert!(!bytes.contains("phase_expiry"), "{bytes}");
+        let mut timed = exchange();
+        timed.phase_expiry = Some(PhaseExpiry {
+            phase: TransportPhase::FirstResponseByte,
+            ceiling_ms: 50,
+            allowance_ms: 40,
+            elapsed_ms: 40,
+            limit: PhaseLimit::Budget,
+            bytes_sent: true,
+            code: RemoteCode::TransportInterrupted,
+        });
+        round_trip(&timed);
+        let text = String::from_utf8(timed.canonical().unwrap()).unwrap();
+        assert!(text.contains(r#""phase_expiry":{"allowance_ms":40,"bytes_sent":true,"ceiling_ms":50,"code":"transport_interrupted","elapsed_ms":40,"limit":"budget","phase":"first_response_byte"}"#), "{text}");
+        assert!(
+            ExchangeRecord::parse(
+                text.replace(r#""limit":"budget""#, r#""limit":"budget","extra":1"#)
+                    .as_bytes()
+            )
+            .is_err()
+        );
     }
 
     #[test]

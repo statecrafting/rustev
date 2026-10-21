@@ -46,6 +46,7 @@ use crate::exchange::{
 };
 use crate::http::{Endpoint, EndpointError, HttpReply, HttpTransport, Secret, TransportError};
 use crate::identity::{AdapterBinding, served_identity};
+use crate::phases::TransportPhases;
 use crate::server::{CANCEL_PATH, DESCRIBE_PATH, INFER_PATH};
 use crate::taxonomy::{RemoteFailure, classify_status, is_local_only};
 use crate::wire::{SentTracker, digest_bytes};
@@ -102,6 +103,9 @@ pub struct ClientConfig {
     pub await_cancel_confirmation: bool,
     /// The budget of a cancel exchange sent after the attempt answered.
     pub cancel_budget_ms: u64,
+    /// Phase ceilings inside each attempt's one budget (spec 020, 3.4).
+    /// Disabled by default; enabling it changes the binding identity.
+    pub phases: TransportPhases,
 }
 
 impl ClientConfig {
@@ -125,6 +129,7 @@ impl ClientConfig {
             retain_bytes: false,
             await_cancel_confirmation: false,
             cancel_budget_ms: 1_000,
+            phases: TransportPhases::Disabled,
         }
     }
 }
@@ -145,6 +150,9 @@ pub enum SetupError {
     Identity(String),
     /// The terms are unusable or refuse the configuration.
     Terms(String),
+    /// The host configuration is incomplete or inconsistent (spec 020,
+    /// 3.1); refused before any network use.
+    Config(String),
 }
 
 impl fmt::Display for SetupError {
@@ -159,6 +167,7 @@ impl fmt::Display for SetupError {
             SetupError::NoSuchBackend(b) => write!(f, "the remote side hosts no `{b}`"),
             SetupError::Identity(s) => write!(f, "descriptor identity: {s}"),
             SetupError::Terms(s) => write!(f, "remote terms: {s}"),
+            SetupError::Config(s) => write!(f, "configuration: {s}"),
         }
     }
 }
@@ -283,6 +292,26 @@ fn transport_code(e: &TransportError) -> (RemoteCode, String) {
             RemoteCode::TransportInterrupted,
             "the budget ran out before a complete response".into(),
         ),
+        TransportError::PhaseExpired(p) => (
+            p.code,
+            format!(
+                "the {:?} phase ran out after {} ms of its {} ms allowance",
+                p.phase, p.elapsed_ms, p.allowance_ms
+            ),
+        ),
+    }
+}
+
+/// Whether a transport error is the attempt budget running out, rather than
+/// a shorter limit: the members whose own budget ran out then answer their
+/// own signals.
+fn budget_ran_out(e: &TransportError, budget: &Budget) -> bool {
+    match e {
+        TransportError::Expired { .. } => budget.expired(),
+        TransportError::PhaseExpired(p) => {
+            p.limit == rustev_contract::remote::PhaseLimit::Budget && budget.expired()
+        }
+        _ => false,
     }
 }
 
@@ -310,6 +339,10 @@ impl RemoteClient {
     ) -> Result<RemoteClient, SetupError> {
         check_transport_timeout(config.transport_timeout_ms, config.setup_budget_ms)
             .map_err(SetupError::TimeoutBeyondBudget)?;
+        config
+            .phases
+            .validate()
+            .map_err(|e| SetupError::Config(e.to_string()))?;
         let endpoint = Endpoint::parse(&config.endpoint).map_err(SetupError::Endpoint)?;
         let transport = HttpTransport::new(
             endpoint,
@@ -317,7 +350,8 @@ impl RemoteClient {
             config.bearer.clone(),
             config.transport_timeout_ms.map(Duration::from_millis),
         )
-        .map_err(SetupError::Endpoint)?;
+        .map_err(SetupError::Endpoint)?
+        .with_phases(config.phases);
         let body = DescribeRequest {
             schema: schema::REMOTE_DESCRIBE.into(),
             versions: vec![PROTOCOL_MAJOR],
@@ -382,6 +416,7 @@ impl RemoteClient {
             routing_privacy: config.privacy.clone(),
             max_request_bytes: remote.terms.max_request_bytes,
             max_response_bytes: remote.terms.max_response_bytes,
+            transport_phases: config.phases,
         }
         .artifact()
         .map_err(|e| SetupError::Identity(e.to_string()))?;
@@ -732,7 +767,7 @@ async fn cancel_member(
     }
     let ids = vec![attempt_id.to_string()];
     if awaiting {
-        let confirmed = send_cancel(inner, ids, budget)
+        let confirmed = send_cancel(inner, ids, inner.config.phases.cancel_budget(budget))
             .await
             .and_then(|answers| stopped_charge(&answers, attempt_id))
             .map(|c| convert_charge(c, inner.config.unit_rate));
@@ -767,7 +802,10 @@ async fn cancel_member(
     // Answer now; a confirmation that arrives later is offered for
     // reconciliation, never supplied.
     let (inner2, ex2, id) = (inner.clone(), ex.clone(), attempt_id.to_string());
-    let cancel_budget = Budget::from_ms(inner.config.cancel_budget_ms);
+    let cancel_budget = inner
+        .config
+        .phases
+        .cancel_budget(Budget::from_ms(inner.config.cancel_budget_ms));
     tokio::spawn(async move {
         let confirmed = send_cancel(&inner2, ids, cancel_budget)
             .await
@@ -957,7 +995,10 @@ async fn run_exchange(
             .await;
         match r {
             Err(e) => {
-                live_only = matches!(e, TransportError::Expired { .. }) && budget.expired();
+                live_only = budget_ran_out(&e, &budget);
+                if let TransportError::PhaseExpired(p) = &e {
+                    record.phase_expiry = Some(*p);
+                }
                 let (code, detail) = transport_code(&e);
                 all(code, &detail, None)
             }

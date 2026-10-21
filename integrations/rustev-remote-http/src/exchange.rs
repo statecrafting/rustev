@@ -176,6 +176,7 @@ pub fn blank_record(
         provider_extras: BTreeMap::new(),
         late: false,
         truncated: false,
+        phase_expiry: None,
     }
 }
 

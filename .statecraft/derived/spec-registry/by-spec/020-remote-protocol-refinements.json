@@ -73,6 +73,30 @@
           "kind": "file",
           "path": "Makefile"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-public-api-and-release-family",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-release/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "027-node-and-wasm-bindings",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-node/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "027-node-and-wasm-bindings",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-wasm/"
+        }
       }
     ],
     "id": "020-remote-protocol-refinements",
@@ -127,7 +151,7 @@
       }
     ],
     "sectionDigests": {
-      "020-remote-protocol-and-evidence-refinements": "835235e9c68294f1eb4972172184aec558be653dd2e4e699e2518da127c3a156",
+      "020-remote-protocol-and-evidence-refinements": "c0c9b2ddbc2e2d89415a9ea16beb7fa57773db496c7a9bc813b74e9c1b0425a5",
       "1-purpose": "cd00ba5a53f35045c907ea3cdce177cdbe5bba971cc946ff103e28240b4ea6a3",
       "2-territory-versions-and-compatibility": "e8777389583e391c67215692e80100ddbd042bcdf01c5cfad4eae256f3b21e55",
       "3-1-identified-configuration": "76ad82b56d06cece13b93933d00a40f990b7bb4a6dfca9f6537eafe05980d22d",
@@ -141,6 +165,7 @@
       "4-out-of-scope": "620527646aedf8f66febeff70113353edd3b9bfa11695cd1aac31356dda533d3",
       "5-observable-negative-cases": "e2d118fdbdb851ec7dc9826622c706e5dc0e3477c2314bface45ea0ecbd5d8be",
       "acceptance": "002f4a8729da09ff90bdb359ed264064012a06ca1a8fbfc1b628a4ccee601069",
+      "implementation-record": "610f98a5d25c65c067790c8a781a303cfb931a27496dc89682a988339052f817",
       "questions-settled-by-r-34": "bd7de3ca783fc231f3b1df0a823cde967a0cba761da40838ac22967fe2cb8290",
       "verification": "ed9f4152bdac839f7ef1f32607f799de71a162233d4a970c1d57f99c10c3b656"
     },
@@ -159,6 +184,7 @@
       "4. Out of scope",
       "5. Observable negative cases",
       "Acceptance",
+      "Implementation record",
       "Verification",
       "Questions settled by R-34"
     ],
@@ -167,6 +193,6 @@
     "summary": "A separately reviewable refinement of the approved runtime and remote contracts: `rustev.run/2` references bounded remote exchange evidence, the runtime may dispatch an explicitly compatible general batch, transport phases receive identified ceilings inside one total attempt budget, connection reuse is bounded and isolation-keyed, and a host-operated endpoint may receive an opt-in opaque principal reference. All features default off or preserve version 1 behavior. Approval authorizes implementation only: no migration, qualification, deployment, live call, spend, or publication is authorized or claimed.\n",
     "title": "Remote protocol and evidence refinements"
   },
-  "shardHash": "06c55563e9f71c9974bb1b5e841e285940c278977791020770a6ed66dcd9c647",
+  "shardHash": "d9caf6dbf24e46968a21c2480ffd0e6058e1779eaa5e945ea058356707f49839",
   "specVersion": "1.10.0"
 }

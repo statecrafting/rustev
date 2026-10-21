@@ -8,6 +8,8 @@ use rustev_contract::ids::{ArtifactId, DescriptorId};
 use rustev_contract::remote::{Disclosure, ServedIdentity, ServedTerms};
 use serde::Serialize;
 
+use crate::phases::TransportPhases;
+
 /// The tag of an adapter binding's digest.
 pub const BINDING_SCHEMA: &str = "rustev.remote-binding/1";
 
@@ -36,6 +38,11 @@ pub struct AdapterBinding {
     pub routing_privacy: BTreeMap<String, String>,
     pub max_request_bytes: u64,
     pub max_response_bytes: u64,
+    /// The transport phase policy (spec 020, 3.1 and 3.4). `disabled` is
+    /// not written, so a binding with every spec 020 refinement disabled
+    /// keeps its spec 009 bytes and artifact.
+    #[serde(skip_serializing_if = "TransportPhases::is_disabled")]
+    pub transport_phases: TransportPhases,
 }
 
 impl AdapterBinding {
@@ -141,6 +148,36 @@ mod tests {
     }
 
     #[test]
+    fn a_binding_with_every_refinement_disabled_keeps_its_spec_009_bytes() {
+        // Spec 020, 2: disabled refinements are not written, so the binding
+        // and the artifact of every existing adapter are unchanged.
+        let b = AdapterBinding {
+            protocol: "rustev.remote/1".into(),
+            endpoint_class: "synthetic-loopback".into(),
+            remote_artifact: None,
+            remote_descriptor: None,
+            requested_model: None,
+            model_pin: None,
+            mapping_version: "identity/1".into(),
+            mapping_tables: BTreeMap::new(),
+            routing_privacy: BTreeMap::new(),
+            max_request_bytes: 1,
+            max_response_bytes: 1,
+            transport_phases: TransportPhases::Disabled,
+        };
+        assert_eq!(
+            String::from_utf8(canonical_bytes(&b).unwrap()).unwrap(),
+            concat!(
+                r#"{"endpoint_class":"synthetic-loopback","mapping_tables":{},"#,
+                r#""mapping_version":"identity/1","max_request_bytes":1,"#,
+                r#""max_response_bytes":1,"model_pin":null,"protocol":"rustev.remote/1","#,
+                r#""remote_artifact":null,"remote_descriptor":null,"requested_model":null,"#,
+                r#""routing_privacy":{}}"#
+            )
+        );
+    }
+
+    #[test]
     fn every_binding_member_changes_the_artifact() {
         let base = AdapterBinding {
             protocol: "rustev.remote/1".into(),
@@ -154,6 +191,7 @@ mod tests {
             routing_privacy: BTreeMap::new(),
             max_request_bytes: 1,
             max_response_bytes: 1,
+            transport_phases: TransportPhases::Disabled,
         };
         let a = base.artifact().unwrap();
         assert_eq!(a, base.clone().artifact().unwrap());
@@ -192,6 +230,18 @@ mod tests {
             },
             AdapterBinding {
                 max_response_bytes: 2,
+                ..base.clone()
+            },
+            AdapterBinding {
+                transport_phases: TransportPhases::Enabled(crate::phases::PhasePolicy {
+                    resolution_ms: 1,
+                    connect_ms: 1,
+                    secure_handshake_ms: 1,
+                    request_write_ms: 1,
+                    first_response_byte_ms: 1,
+                    response_body_ms: 1,
+                    cancellation_ack_ms: 1,
+                }),
                 ..base.clone()
             },
         ];

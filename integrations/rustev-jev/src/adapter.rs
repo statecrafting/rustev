@@ -281,6 +281,9 @@ fn transport_code(e: &TransportError) -> (RemoteCode, String) {
             RemoteCode::TransportInterrupted,
             "the budget ran out before a complete response".into(),
         ),
+        // Unreachable while this adapter's transport keeps spec 020's phase
+        // policy disabled (its default); mapped as 3.4 says regardless.
+        TransportError::PhaseExpired(p) => (p.code, format!("the {:?} phase ran out", p.phase)),
     }
 }
 

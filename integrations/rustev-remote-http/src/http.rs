@@ -12,14 +12,16 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use http_body_util::{BodyExt, Full};
-use hyper::body::Bytes;
+use hyper::body::{Body, Bytes, Frame, SizeHint};
 use hyper::header::{AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, HOST, RETRY_AFTER};
 use hyper::{Request, StatusCode};
 use hyper_util::rt::TokioIo;
+use rustev_contract::remote::{PhaseExpiry, TransportPhase};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpStream;
 
 use crate::budget::Budget;
+use crate::phases::{PhaseClock, TransportPhases, phased};
 use crate::wire::{SentTracker, TrackedIo};
 
 /// A credential supplied by the host. Its `Debug` never shows the value,
@@ -170,6 +172,9 @@ pub enum TransportError {
     TooLarge { limit: usize },
     /// The budget, or a shorter transport limit, ran out.
     Expired { sent: bool },
+    /// A transport phase's allowance ran out under an enabled phase policy
+    /// (spec 020, 3.4); the expiry names the phase and its code.
+    PhaseExpired(PhaseExpiry),
 }
 
 /// The default TLS client configuration: the webpki roots, `ring`.
@@ -193,6 +198,7 @@ pub struct HttpTransport {
     tls: Option<tokio_rustls::TlsConnector>,
     bearer: Option<Secret>,
     transport_timeout: Option<Duration>,
+    phases: TransportPhases,
 }
 
 impl fmt::Debug for HttpTransport {
@@ -202,6 +208,7 @@ impl fmt::Debug for HttpTransport {
             .field("tls", &self.tls.is_some())
             .field("bearer", &self.bearer)
             .field("transport_timeout", &self.transport_timeout)
+            .field("phases", &self.phases)
             .finish()
     }
 }
@@ -230,7 +237,19 @@ impl HttpTransport {
             tls,
             bearer,
             transport_timeout,
+            phases: TransportPhases::Disabled,
         })
+    }
+
+    /// Divide every exchange's budget into phase ceilings (spec 020, 3.4).
+    /// The caller validates the policy first; disabled changes nothing.
+    pub fn with_phases(mut self, phases: TransportPhases) -> Self {
+        self.phases = phases;
+        self
+    }
+
+    pub fn phases(&self) -> &TransportPhases {
+        &self.phases
     }
 
     pub fn endpoint(&self) -> &Endpoint {
@@ -249,12 +268,18 @@ impl HttpTransport {
         sent: &SentTracker,
     ) -> Result<HttpReply, TransportError> {
         let deadline = budget.phase_deadline(self.transport_timeout);
-        match tokio::time::timeout_at(
-            deadline,
-            self.exchange(path, body, max_response_bytes, sent),
-        )
-        .await
-        {
+        let clock = self
+            .phases
+            .policy()
+            .map(|p| PhaseClock::start(*p, *budget, TransportPhase::Resolution));
+        let run = async {
+            let exchange = self.exchange(path, body, max_response_bytes, sent, clock.clone());
+            match &clock {
+                Some(c) => phased(c, sent, exchange).await,
+                None => exchange.await,
+            }
+        };
+        match tokio::time::timeout_at(deadline, run).await {
             Ok(r) => r,
             Err(_) => Err(TransportError::Expired {
                 sent: sent.may_have_sent(),
@@ -262,7 +287,7 @@ impl HttpTransport {
         }
     }
 
-    async fn connect(&self) -> Result<TcpStream, TransportError> {
+    async fn connect(&self, clock: &Option<PhaseClock>) -> Result<TcpStream, TransportError> {
         let unsent = |e: std::io::Error| TransportError::Unsent(format!("connect: {e}"));
         let addrs: Vec<SocketAddr> =
             tokio::net::lookup_host((self.endpoint.host.as_str(), self.endpoint.port))
@@ -270,6 +295,9 @@ impl HttpTransport {
                 .map_err(|e| TransportError::Unsent(format!("resolve: {e}")))?
                 .filter(|a| self.endpoint.scheme == Scheme::Https || a.ip().is_loopback())
                 .collect();
+        if let Some(c) = clock {
+            c.enter(TransportPhase::Connect);
+        }
         let mut last = TransportError::Unsent("resolve: no usable address".into());
         for a in addrs {
             match TcpStream::connect(a).await {
@@ -289,22 +317,31 @@ impl HttpTransport {
         body: Vec<u8>,
         max: usize,
         sent: &SentTracker,
+        clock: Option<PhaseClock>,
     ) -> Result<HttpReply, TransportError> {
-        let tcp = self.connect().await?;
+        let tcp = self.connect(&clock).await?;
+        let enter = |p| {
+            if let Some(c) = &clock {
+                c.enter(p);
+            }
+        };
         match &self.tls {
             None => {
-                self.http1(TrackedIo::new(tcp, sent.clone()), path, body, max, sent)
-                    .await
+                enter(TransportPhase::RequestWrite);
+                let io = TrackedIo::new(tcp, sent.clone()).with_clock(clock.clone());
+                self.http1(io, path, body, max, sent, clock).await
             }
             Some(connector) => {
                 let name = rustls::pki_types::ServerName::try_from(self.endpoint.host.clone())
                     .map_err(|e| TransportError::Unsent(format!("server name: {e}")))?;
+                enter(TransportPhase::SecureHandshake);
                 let tls = connector
                     .connect(name, tcp)
                     .await
                     .map_err(|e| TransportError::Unsent(format!("TLS handshake: {e}")))?;
-                self.http1(TrackedIo::new(tls, sent.clone()), path, body, max, sent)
-                    .await
+                enter(TransportPhase::RequestWrite);
+                let io = TrackedIo::new(tls, sent.clone()).with_clock(clock.clone());
+                self.http1(io, path, body, max, sent, clock).await
             }
         }
     }
@@ -316,6 +353,7 @@ impl HttpTransport {
         body: Vec<u8>,
         max: usize,
         sent: &SentTracker,
+        clock: Option<PhaseClock>,
     ) -> Result<HttpReply, TransportError>
     where
         S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
@@ -329,7 +367,7 @@ impl HttpTransport {
             }
         };
         let (mut sender, conn) =
-            hyper::client::conn::http1::handshake::<_, Full<Bytes>>(TokioIo::new(stream))
+            hyper::client::conn::http1::handshake::<_, SignalBody>(TokioIo::new(stream))
                 .await
                 .map_err(|e| failed("http handshake", &e))?;
         tokio::pin!(conn);
@@ -341,7 +379,10 @@ impl HttpTransport {
             req = req.header(AUTHORIZATION, format!("Bearer {}", b.expose()));
         }
         let req = req
-            .body(Full::new(Bytes::from(body)))
+            .body(SignalBody {
+                inner: Full::new(Bytes::from(body)),
+                clock,
+            })
             .map_err(|e| TransportError::Unsent(format!("request: {e}")))?;
         let send = sender.send_request(req);
         tokio::pin!(send);
@@ -402,6 +443,39 @@ impl HttpTransport {
             retry_after,
             body: buf,
         })
+    }
+}
+
+/// A request body that tells the phase clock when the connection took it,
+/// so the next completed flush ends the request-write phase (spec 020, 3.4).
+struct SignalBody {
+    inner: Full<Bytes>,
+    clock: Option<PhaseClock>,
+}
+
+impl Body for SignalBody {
+    type Data = Bytes;
+    type Error = std::convert::Infallible;
+
+    fn poll_frame(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Result<Frame<Bytes>, Self::Error>>> {
+        let r = std::pin::Pin::new(&mut self.inner).poll_frame(cx);
+        if r.is_ready()
+            && let Some(c) = &self.clock
+        {
+            c.body_taken();
+        }
+        r
+    }
+
+    fn is_end_stream(&self) -> bool {
+        self.inner.is_end_stream()
+    }
+
+    fn size_hint(&self) -> SizeHint {
+        self.inner.size_hint()
     }
 }
 
