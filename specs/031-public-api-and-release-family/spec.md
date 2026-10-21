@@ -723,6 +723,21 @@ each `sbom-<member>.cdx.json` and of `changelog.md`, and a missing one
 fails the candidate (3.9.1). The SBOMs of the npm tarballs, binaries and
 image are their artifact kinds' own, with those kinds.
 
+**Increment 4, 2026-10-21 (the release checks in CI).** The CI jobs of
+increment 2 are `.github/workflows/release-checks.yml`, a reusable workflow
+this spec owns (3.12), registered as the required job `release-checks` by
+adding it to `ci.extra_required_jobs` in `project.setup.parameters` and
+re-rendering with the setup profile's revision-17 renderer, in the same
+change as spec 027's `bindings` job. `adoption` is one job per subset of
+3.5 (`documents`, `embedded`, `evaluation`, `remote-http`, `runtime`,
+`rules`, `remote-http-alone`), each running `adoption.sh <subset>`, and the
+`documents` job also reports the five subsets whose crate is not in this
+release as skipped; `msrv` installs the toolchain the members'
+`rust-version` declares and runs `make msrv` (3.6.7); `semver` installs the
+pinned `cargo-semver-checks` 0.51.0, runs `make semver` (3.8) and uploads
+its report, where `no-baseline` is recorded as not applicable, never as a
+pass. Until this change merges, the MSRV stays unverified (3.6.7).
+
 ## Decisions at approval
 
 1. **Crate and package names** (left to the implementer by #58): decided

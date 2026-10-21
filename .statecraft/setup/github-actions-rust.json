@@ -79,7 +79,7 @@
   },
   "files": [
     {
-      "digest": "7a857e68f67985865fe5f2ba5fc142e5027b3359e1acc30cfb561f33ab75521e",
+      "digest": "e6a65e25a654d27de7992aa21c6fdfc0472affc3f91571e80a4558179a76b3da",
       "path": ".github/workflows/statecraft-ci.yml",
       "role": "workflow"
     },
@@ -114,7 +114,7 @@
       "role": "codeowners"
     },
     {
-      "digest": "dddf74b51172890721fdd50965d5672acc21ccff9dcb4d79402bc7b8ffcf3199",
+      "digest": "19fb2e419eb95f672627a210167588a7e029efdfa43ff30644e29ec75a6027c4",
       "path": ".statecraft/setup/github-actions-rust.remote.json",
       "role": "remote-state"
     }
@@ -128,6 +128,15 @@
       "pull_request": "required-review",
       "push": "inapplicable",
       "required": true
+    },
+    "bindings": {
+      "declared": "ci.extra_required_jobs",
+      "merge_group": "required",
+      "optional": false,
+      "pull_request": "required",
+      "push": "required",
+      "required": true,
+      "workflow": ".github/workflows/bindings.yml"
     },
     "boundaries": {
       "declared": "ci.extra_required_jobs",
@@ -151,6 +160,15 @@
       "pull_request": "required",
       "push": "required",
       "required": true
+    },
+    "release-checks": {
+      "declared": "ci.extra_required_jobs",
+      "merge_group": "required",
+      "optional": false,
+      "pull_request": "required",
+      "push": "required",
+      "required": true,
+      "workflow": ".github/workflows/release-checks.yml"
     },
     "review-exception": {
       "merge_group": "inapplicable",
@@ -189,8 +207,16 @@
     ],
     "extra_required_jobs": [
       {
+        "job": "bindings",
+        "workflow": ".github/workflows/bindings.yml"
+      },
+      {
         "job": "boundaries",
         "workflow": ".github/workflows/boundaries.yml"
+      },
+      {
+        "job": "release-checks",
+        "workflow": ".github/workflows/release-checks.yml"
       },
       {
         "job": "verify",

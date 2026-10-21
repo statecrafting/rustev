@@ -275,9 +275,17 @@ jobs:
           RATIFICATION: ${{ needs.governance.outputs.ratification }}
         run: echo "owner exception approved for a pull request whose review was ${RESULT} (authority change ${AUTHORITY_CHANGE}, ratification ${RATIFICATION})"
 
+  bindings:
+    name: bindings
+    uses: ./.github/workflows/bindings.yml
+
   boundaries:
     name: boundaries
     uses: ./.github/workflows/boundaries.yml
+
+  release-checks:
+    name: release-checks
+    uses: ./.github/workflows/release-checks.yml
 
   verify:
     name: verify
@@ -289,7 +297,7 @@ jobs:
   ci-gate:
     name: ci-gate
     if: always()
-    needs: [governance, code, ai-review, review-exception, boundaries, verify]
+    needs: [governance, code, ai-review, review-exception, bindings, boundaries, release-checks, verify]
     runs-on: ubuntu-latest
     # Read-only: on merge_group the gate reads the recorded review (the
     # entry's pull request, its runs, their jobs and the evidence artifact).
