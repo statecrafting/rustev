@@ -1051,6 +1051,36 @@ median 3.1 ms, p95 3.3 ms against the 100 ms budget, all 23 WebAssembly
 cases passing in Chromium as in Node. The CI runner's measurement comes
 with the `bindings` job.
 
+**Increment 7, third change (the differential corpus).** After spec 047
+every transcendental call reachable from a pure command is a call of
+`rustev_core::math`, at four sites: `exp` in core's softmax, `ln` in core's
+calibration, `ln` in evaluation's log loss and `ln` in its temperature fit.
+`tools/rustev-conformance/fp-corpus` (crate `rustev-fp-corpus`,
+`publish = false`, excluded from the release set as tooling) runs each site
+over 131,072 inputs drawn as the site sees them (non-positive arguments of
+`exp`; positive finite masses; probabilities in (0, 1] and just above), each
+set beginning with its boundary values (zeros, the smallest and largest
+subnormals, `f64::MIN_POSITIVE`, one ulp either side of 1, the arguments
+where `exp` leaves the normal range and where it rounds to 0, and the
+format's extremes) and continued by a seeded SplitMix64 generator that uses
+integer arithmetic and correctly rounded basic operations only, so every
+target draws the same bits. The input set is fixed by that file and pinned
+by its SHA-256 per site; each site's output bits are digested the same
+way, and both digests are committed in `fp-corpus/expected.json`. The
+native runner (`rustev-fp-corpus check`, and a test running it) and the
+WebAssembly module (the same crate for `wasm32-unknown-unknown`, plain
+exports and no imports; `js/fp-corpus.mjs` in Node and in headless
+Chromium) must each reproduce every digest; any difference fails
+(3.11.5). A test fails when the pure crates' `rustev_core::math` calls and
+the corpus's sites differ, so a new call site cannot go unmeasured.
+`make bindings` runs all three. Locally (macOS arm64) native, Node 24.6.0
+and Chromium 153.0.8010.12 agree on all four sites. Seeded with the
+platform's `exp` and `ln` in place of `rustev_core::math`, the native run
+differs from the committed digests and fails, while WebAssembly, whose
+standard library uses the same pure implementation, still matches: the
+divergence spec 047 removed. The results on every CI target come with the
+`bindings` job.
+
 ## Decisions at approval
 
 1. **npm package names and scope** (left to the implementer by #56; decided

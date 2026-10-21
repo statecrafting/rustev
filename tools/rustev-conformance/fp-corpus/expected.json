@@ -1,0 +1,10 @@
+{
+  "schema": "rustev.fp-corpus/1",
+  "inputs_per_site": 131072,
+  "sites": [
+    { "id": "core.softmax.exp", "inputs_sha256": "20ab420b18dc0b5a9e67c8277406fa2b9a757daca870bc9eadeb886ef9b9a79d", "outputs_sha256": "51e8de02c4824ceac235e1cf7ffc58a1fa763d83680560768115fe04b1367e9c" },
+    { "id": "core.calibrate.ln", "inputs_sha256": "93b06ac6f0df3a97eb7b7503e042d849d52e4fa0549a2771c6805ceaaaf01c43", "outputs_sha256": "79f6f12303b0e4d4a34cafce4da514c02862d48b58d6e90bdb8c0e585dba00fb" },
+    { "id": "eval.log_loss.ln", "inputs_sha256": "24a601bbe6a656a32affdbeb02649b2f8c9d3ac6cb201b2b9a89602e12405c79", "outputs_sha256": "a1d966a4082f9d7d328845da654813f51bd6e4e881f44cd9df50a7470b1b20e1" },
+    { "id": "eval.temperature_fit.ln", "inputs_sha256": "0a8982a076d900d71ac07067c3bcdba5d788bd6a6e92f436421d3f0d6f6b5ee8", "outputs_sha256": "426183cda66e92fcec2e9b9e5161bf2a49da2f6554ab4baba9d52c3fc7206784" }
+  ]
+}

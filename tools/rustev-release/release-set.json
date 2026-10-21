@@ -55,6 +55,10 @@
       "reason": "repository conformance tooling (spec 027, 3.12), not a product crate"
     },
     {
+      "name": "rustev-fp-corpus",
+      "reason": "repository conformance tooling, the differential floating-point corpus (spec 027, 3.11.3), not a product crate"
+    },
+    {
       "name": "rustev-release",
       "reason": "repository release tooling, not a product crate"
     }

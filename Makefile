@@ -122,6 +122,12 @@ bindings:
 	node tools/rustev-conformance/js/wasm-check.mjs "$(BINDINGS_OUT)/rustev-wasm" "$(BINDINGS_OUT)/wasm-measurement.json" --chromium-ms "$$(cat "$(BINDINGS_OUT)/chromium-median")" --chromium-record "$(BINDINGS_OUT)/chromium-time.json"
 	node tools/rustev-conformance/js/run.mjs wasm "$(BINDINGS_OUT)/rustev-wasm"
 	node tools/rustev-conformance/js/run.mjs chromium "$(BINDINGS_OUT)/rustev-wasm"
+	@# 3.11.3: the differential floating-point corpus, natively, then as
+	@# WebAssembly in Node and in Chromium, each against the committed digests.
+	cargo run -p rustev-fp-corpus --locked --release -- check tools/rustev-conformance/fp-corpus/expected.json
+	cargo build -p rustev-fp-corpus --locked --release --target wasm32-unknown-unknown
+	node tools/rustev-conformance/js/fp-corpus.mjs node "$(CARGO_TARGET)/wasm32-unknown-unknown/release/rustev_fp_corpus.wasm" "$(BINDINGS_OUT)/fp-corpus-node.json"
+	node tools/rustev-conformance/js/fp-corpus.mjs chromium "$(CARGO_TARGET)/wasm32-unknown-unknown/release/rustev_fp_corpus.wasm" "$(BINDINGS_OUT)/fp-corpus-chromium.json"
 	cargo build -p rustev-node --locked --release
 	node tools/rustev-conformance/js/copy-addon.mjs "$(CARGO_TARGET)" integrations/rustev-node
 	tools/rustev-conformance/js/node_modules/.bin/tsc --noEmit --strict --lib es2022,dom integrations/rustev-node/index.d.ts
