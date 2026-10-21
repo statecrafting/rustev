@@ -68,6 +68,7 @@
         "src/grading.rs",
         "src/kinds.rs",
         "src/lib.rs",
+        "src/math.rs",
         "src/ops.rs",
         "src/policy.rs",
         "src/quality.rs",

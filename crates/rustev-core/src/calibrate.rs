@@ -152,7 +152,7 @@ pub fn apply(
         } else if v == 0.0 {
             f64::NEG_INFINITY
         } else {
-            v.ln()
+            crate::math::ln(v)
         });
     }
     // Shift by the maximum before dividing, so a large logit and a small

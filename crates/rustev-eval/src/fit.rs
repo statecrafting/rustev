@@ -223,7 +223,11 @@ pub fn fit_temperature(
                     }
                 })?;
             let q = p.mass(label).unwrap_or(0.0);
-            sum += if q > 0.0 { -q.ln() } else { f64::INFINITY };
+            sum += if q > 0.0 {
+                -rustev_core::math::ln(q)
+            } else {
+                f64::INFINITY
+            };
         }
         let loss = sum / rows.len() as f64;
         if loss.is_finite() && best.is_none_or(|(_, b)| loss < b) {
