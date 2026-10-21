@@ -20,6 +20,20 @@ use tokio::net::TcpListener;
 pub struct Seen {
     pub connections: AtomicU64,
     pub requests: Mutex<Vec<(String, Vec<u8>)>>,
+    /// Request body bytes received.
+    pub total: AtomicU64,
+    /// Count bodies without keeping them (the benchmark), so the collector
+    /// does not hold every export in this process's memory.
+    pub count_only: bool,
+}
+
+impl Seen {
+    fn record(&self, path: String, body: Vec<u8>) {
+        self.total.fetch_add(body.len() as u64, Ordering::SeqCst);
+        if !self.count_only {
+            self.requests.lock().unwrap().push((path, body));
+        }
+    }
 }
 
 impl Seen {
@@ -42,12 +56,7 @@ impl Seen {
     }
 
     pub fn total_bytes(&self) -> usize {
-        self.requests
-            .lock()
-            .unwrap()
-            .iter()
-            .map(|(_, b)| b.len())
-            .sum()
+        self.total.load(Ordering::SeqCst) as usize
     }
 }
 
@@ -61,9 +70,17 @@ pub enum Answer {
 
 /// An OTLP/HTTP collector on 127.0.0.1.
 pub async fn http(answer: Answer) -> (SocketAddr, Arc<Seen>) {
+    http_with(answer, false).await
+}
+
+/// [`http`], keeping no request body when `count_only`.
+pub async fn http_with(answer: Answer, count_only: bool) -> (SocketAddr, Arc<Seen>) {
     let l = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = l.local_addr().unwrap();
-    let seen = Arc::new(Seen::default());
+    let seen = Arc::new(Seen {
+        count_only,
+        ..Seen::default()
+    });
     let s = seen.clone();
     tokio::spawn(async move {
         loop {
@@ -78,7 +95,7 @@ pub async fn http(answer: Answer) -> (SocketAddr, Arc<Seen>) {
                     async move {
                         let path = req.uri().path().to_string();
                         let body = req.into_body().collect().await.unwrap().to_bytes();
-                        s.requests.lock().unwrap().push((path, body.to_vec()));
+                        s.record(path, body.to_vec());
                         let resp = match answer {
                             Answer::Ok => Response::builder()
                                 .status(200)
@@ -106,9 +123,17 @@ pub async fn http(answer: Answer) -> (SocketAddr, Arc<Seen>) {
 /// An OTLP/gRPC collector on 127.0.0.1 answering every export with an
 /// empty response and `grpc-status: 0`.
 pub async fn grpc() -> (SocketAddr, Arc<Seen>) {
+    grpc_with(false).await
+}
+
+/// [`grpc`], keeping no request body when `count_only`.
+pub async fn grpc_with(count_only: bool) -> (SocketAddr, Arc<Seen>) {
     let l = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = l.local_addr().unwrap();
-    let seen = Arc::new(Seen::default());
+    let seen = Arc::new(Seen {
+        count_only,
+        ..Seen::default()
+    });
     let s = seen.clone();
     tokio::spawn(async move {
         loop {
@@ -131,7 +156,7 @@ pub async fn grpc() -> (SocketAddr, Arc<Seen>) {
                             let _ = body.flow_control().release_capacity(chunk.len());
                             bytes.extend_from_slice(&chunk);
                         }
-                        s.requests.lock().unwrap().push((path, bytes));
+                        s.record(path, bytes);
                         let resp = http::Response::builder()
                             .status(200)
                             .header("content-type", "application/grpc")
