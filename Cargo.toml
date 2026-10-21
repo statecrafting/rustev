@@ -46,6 +46,9 @@ serde = { version = "1", features = ["derive"] }
 # to exactly the value that was supplied (spec 004, 5.6).
 serde_json = { version = "1", features = ["float_roundtrip"] }
 sha2 = { version = "0.10", default-features = false }
+# HMAC over `sha2` for the redaction policy's keyed digest (spec 028, 3.4.5);
+# the 0.12 line is the one built on the `digest` 0.10 that `sha2` 0.10 uses.
+hmac = { version = "0.12", default-features = false }
 # `exp` and `ln` for the pure crates (spec 047): one pure Rust
 # implementation on every target, exact-pinned; without default features it
 # takes no architecture-specific path.

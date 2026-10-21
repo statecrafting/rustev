@@ -1,7 +1,7 @@
 //! The workspace dependency rules of spec 001, section 3.4, the package
-//! rule of spec 007, section 3.3.1, and the binding rules of spec 027,
-//! section 3.14, checked over the output of `cargo metadata
-//! --format-version 1`.
+//! rule of spec 007, section 3.3.1, the binding rules of spec 027,
+//! section 3.14, and the telemetry exporter rule of spec 028, section 3.12,
+//! checked over the output of `cargo metadata --format-version 1`.
 //!
 //! The forbidden families are a conservative denylist matched by package name
 //! (spec 001, 3.5). Passing this check is not a proof that a crate performs no
@@ -68,6 +68,14 @@ pub const WASM_FORBIDDEN: &[&str] = &[
 ];
 /// The WebAssembly binding crate.
 pub const WASM_CRATE: &str = "rustev-wasm";
+
+/// The telemetry exporter family (spec 028, 3.12.1) is every package whose
+/// name starts with this prefix (`opentelemetry_sdk`, `opentelemetry-otlp`,
+/// `opentelemetry-proto`, the appenders and the rest), plus
+/// [`TELEMETRY_NAMES`].
+pub const TELEMETRY_PREFIX: &str = "opentelemetry";
+/// Members of the telemetry exporter family named exactly (spec 028, 3.12.1).
+pub const TELEMETRY_NAMES: &[&str] = &["tracing-opentelemetry"];
 
 /// The crates whose whole normal and build dependency graph is checked; the
 /// shared command surface joins the contract and core (spec 027, 3.14.2).
@@ -162,6 +170,10 @@ pub enum Violation {
     /// executor, an HTTP stack, a Node-API crate, `getrandom`, `web-sys` or
     /// `wasm-bindgen-futures`.
     WasmGraph { path: Vec<String> },
+    /// Spec 028 3.12.2: a crate outside `integrations/` reaches the
+    /// telemetry exporter family, directly or through its normal or build
+    /// graph.
+    TelemetryOutsideIntegrations { krate: String, path: Vec<String> },
 }
 
 impl fmt::Display for Violation {
@@ -209,6 +221,11 @@ impl fmt::Display for Violation {
                 "027 3.14.3: `{WASM_CRATE}` reaches a forbidden crate: {}",
                 path.join(" -> ")
             ),
+            Violation::TelemetryOutsideIntegrations { krate, path } => write!(
+                f,
+                "028 3.12.2: `{krate}` is outside integrations/ and reaches the telemetry exporter family: {}",
+                path.join(" -> ")
+            ),
         }
     }
 }
@@ -231,6 +248,11 @@ fn is_binding(name: &str) -> bool {
 
 fn is_napi(name: &str) -> bool {
     NAPI_FAMILY.contains(&name)
+}
+
+/// The telemetry exporter family (spec 028, 3.12.1).
+fn is_telemetry(name: &str) -> bool {
+    name.starts_with(TELEMETRY_PREFIX) || TELEMETRY_NAMES.contains(&name)
 }
 
 /// Forbidden in the pure crates' graphs (spec 001 3.4.1, spec 027 3.14.2).
@@ -364,6 +386,14 @@ pub fn check(meta: &Metadata) -> Vec<Violation> {
                 });
             }
             let is_dev = dep.kind.as_deref() == Some("dev");
+            // Spec 028 3.12.2: a declared normal or build dependency, even an
+            // optional one the resolved graph leaves out.
+            if !in_integrations && !is_dev && is_telemetry(&dep.name) {
+                out.insert(Violation::TelemetryOutsideIntegrations {
+                    krate: pkg.name.clone(),
+                    path: vec![pkg.name.clone(), dep.name.clone()],
+                });
+            }
             if in_packages && !is_dev && !PACKAGE_DEPENDENCIES.contains(&dep.name.as_str()) {
                 out.insert(Violation::PackageDependency {
                     krate: pkg.name.clone(),
@@ -419,6 +449,19 @@ pub fn check(meta: &Metadata) -> Vec<Violation> {
         for pkg in members.iter().filter(|p| p.name == WASM_CRATE) {
             if let Some(path) = forbidden_path(&graph, &by_id, &pkg.id, forbidden_for_wasm) {
                 out.insert(Violation::WasmGraph { path });
+            }
+        }
+        // Spec 028 3.12.2: every crate outside `integrations/`, through its
+        // normal and build graph.
+        for pkg in members
+            .iter()
+            .filter(|p| !under_integrations(&relative_dir(&meta.workspace_root, &p.manifest_path)))
+        {
+            if let Some(path) = forbidden_path(&graph, &by_id, &pkg.id, is_telemetry) {
+                out.insert(Violation::TelemetryOutsideIntegrations {
+                    krate: pkg.name.clone(),
+                    path,
+                });
             }
         }
     }
@@ -1321,5 +1364,200 @@ mod tests {
                 dependency: "rustev-remote-http".into()
             }]
         );
+    }
+
+    /// The telemetry exporter family of spec 028, 3.12.1, as named there.
+    const TELEMETRY: &[&str] = &[
+        "opentelemetry",
+        "opentelemetry_sdk",
+        "opentelemetry-otlp",
+        "opentelemetry-proto",
+        "opentelemetry-http",
+        "opentelemetry-stdout",
+        "opentelemetry-semantic-conventions",
+        "opentelemetry-appender-tracing",
+        "opentelemetry-appender-log",
+        "tracing-opentelemetry",
+    ];
+
+    #[test]
+    fn the_telemetry_family_is_matched_by_prefix_and_exact_name() {
+        for n in TELEMETRY {
+            assert!(is_telemetry(n), "{n}");
+        }
+        for n in ["tracing", "tracing-subscriber", "otel", "open-telemetry"] {
+            assert!(!is_telemetry(n), "{n}");
+        }
+    }
+
+    #[test]
+    fn a_telemetry_dependency_outside_integrations_fails_in_normal_and_build() {
+        // Spec 028, 3.12.2, negative control: each family member, as a
+        // normal and as a build dependency, from crates/, backends/,
+        // packages/ and tools/.
+        for dep in TELEMETRY {
+            for kind in [None, Some("build")] {
+                for dir in [
+                    "crates/rustev-x",
+                    "backends/rustev-x",
+                    "packages/rustev-x",
+                    "tools/rustev-x",
+                ] {
+                    let deps: &[Dep<'_>] = &[(dep, kind, None)];
+                    let m = meta(
+                        &[CONTRACT, ("rustev-x", dir, deps)],
+                        &["serde", dep],
+                        &[("rustev-x", dep, kind)],
+                    );
+                    let v = check(&m);
+                    assert!(
+                        v.contains(&Violation::TelemetryOutsideIntegrations {
+                            krate: "rustev-x".into(),
+                            path: vec!["rustev-x".into(), dep.to_string()],
+                        }),
+                        "{dep} {kind:?} {dir}: {v:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn an_optional_telemetry_dependency_outside_integrations_fails() {
+        // Declared but absent from the resolved graph (a feature left off):
+        // the declaration alone is a violation.
+        let deps: &[Dep<'_>] = &[("opentelemetry_sdk", None, None)];
+        let m = meta(
+            &[CONTRACT, ("rustev-runtime", "crates/rustev-runtime", deps)],
+            &["serde", "opentelemetry_sdk"],
+            &[],
+        );
+        assert_eq!(
+            check(&m),
+            vec![Violation::TelemetryOutsideIntegrations {
+                krate: "rustev-runtime".into(),
+                path: vec!["rustev-runtime".into(), "opentelemetry_sdk".into()],
+            }]
+        );
+    }
+
+    #[test]
+    fn a_transitive_telemetry_dependency_outside_integrations_fails_with_its_path() {
+        // Spec 028, 3.12.2 and section 5: a crate under crates/ gaining
+        // `opentelemetry` even transitively; the violation names the path.
+        let m = meta(
+            &[
+                CONTRACT,
+                ("rustev-cli", "crates/rustev-cli", &[("helper", None, None)]),
+            ],
+            &["serde", "helper", "inner", "opentelemetry"],
+            &[
+                ("rustev-cli", "helper", None),
+                ("helper", "inner", Some("build")),
+                ("inner", "opentelemetry", None),
+            ],
+        );
+        assert_eq!(
+            check(&m),
+            vec![Violation::TelemetryOutsideIntegrations {
+                krate: "rustev-cli".into(),
+                path: vec![
+                    "rustev-cli".into(),
+                    "helper".into(),
+                    "inner".into(),
+                    "opentelemetry".into()
+                ],
+            }]
+        );
+    }
+
+    #[test]
+    fn a_dev_only_telemetry_dependency_outside_integrations_passes() {
+        // The rule is over normal and build dependencies (3.12.2).
+        let deps: &[Dep<'_>] = &[("opentelemetry", Some("dev"), None)];
+        let m = meta(
+            &[CONTRACT, ("rustev-eval", "crates/rustev-eval", deps)],
+            &["serde", "opentelemetry"],
+            &[("rustev-eval", "opentelemetry", Some("dev"))],
+        );
+        assert_eq!(check(&m), vec![]);
+    }
+
+    #[test]
+    fn the_telemetry_sink_under_integrations_passes() {
+        // `rustev-otel` as spec 028 section 2 lays it out, with its OTLP
+        // transports (already HTTP families, legal only here).
+        let m = meta(
+            &[
+                CONTRACT,
+                CORE,
+                (
+                    "rustev-otel",
+                    "integrations/rustev-otel",
+                    &[
+                        ("rustev-contract", None, Some("crates/rustev-contract")),
+                        ("rustev-core", None, Some("crates/rustev-core")),
+                        ("tokio", None, None),
+                        ("opentelemetry", None, None),
+                        ("opentelemetry_sdk", None, None),
+                        ("opentelemetry-otlp", None, None),
+                        ("tonic", None, None),
+                        ("hyper", None, None),
+                    ],
+                ),
+            ],
+            &[
+                "serde",
+                "tokio",
+                "opentelemetry",
+                "opentelemetry_sdk",
+                "opentelemetry-otlp",
+                "opentelemetry-proto",
+                "tonic",
+                "hyper",
+            ],
+            &[
+                ("rustev-core", "rustev-contract", None),
+                ("rustev-otel", "rustev-core", None),
+                ("rustev-otel", "opentelemetry_sdk", None),
+                ("rustev-otel", "opentelemetry-otlp", None),
+                ("opentelemetry-otlp", "opentelemetry-proto", None),
+                ("opentelemetry-otlp", "tonic", None),
+            ],
+        );
+        assert_eq!(check(&m), vec![]);
+    }
+
+    #[test]
+    fn a_pure_crate_reaching_telemetry_fails_under_the_new_rule() {
+        // Rule 3.4.1 is unchanged (028 3.12.2); the contract and the core
+        // reaching the family are telemetry violations naming the path.
+        let m = meta(
+            &[CONTRACT, CORE],
+            &["serde", "opentelemetry"],
+            &[
+                ("rustev-core", "rustev-contract", None),
+                ("rustev-contract", "serde", None),
+                ("serde", "opentelemetry", None),
+            ],
+        );
+        let v = check(&m);
+        assert!(v.contains(&Violation::TelemetryOutsideIntegrations {
+            krate: "rustev-contract".into(),
+            path: vec![
+                "rustev-contract".into(),
+                "serde".into(),
+                "opentelemetry".into()
+            ],
+        }));
+        assert!(v.contains(&Violation::TelemetryOutsideIntegrations {
+            krate: "rustev-core".into(),
+            path: vec![
+                "rustev-core".into(),
+                "rustev-contract".into(),
+                "serde".into(),
+                "opentelemetry".into()
+            ],
+        }));
     }
 }
