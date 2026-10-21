@@ -201,8 +201,116 @@ plan, threshold or calibration from final-test results.
 
 ## Verification
 
-Pending with implementation. Approval satisfies no acceptance item, and no
-existing report is a qualification under this spec.
+The first acceptance item (section 5's refusals on labeled synthetic
+fixtures, repository-local, no real data, no network) is run here. The
+second (one owner-reviewed admission and qualification record per task)
+needs an admitted dataset, which no host has offered; no existing report
+is a qualification under this spec.
+
+```verify:cli
+# Section 5, by row, and 3.1 to 3.5: admission, freeze, measurement and
+# claim scoping on SYNTHETIC fixtures only.
+cargo test -p rustev-eval --locked --test qualification
+cargo clippy -p rustev-eval --all-targets --locked -- -D warnings
+# Negative control: each refusal's seeded defect must be detected.
+sh crates/rustev-eval/mutation/seeds.sh "spec 023"
+```
+
+## Implementation record
+
+**2026-10-21, increment 1: the procedure and its refusal checks.** What
+can be built and proven without an admitted dataset. Implementation stays
+`pending`: no dataset is admitted, no qualification exists, and no quality,
+calibration or usefulness claim is made or implied by anything below.
+
+- `crates/rustev-eval/src/dataset.rs`: `rustev.dataset-admission/1`
+  (`AdmissionRecord`, identified by its digest, Decimal strings only) with
+  every statement of 3.1 and 3.2: source (public with publisher, version
+  and content digest, or commissioned with labeler and instruction), license
+  permissions, privacy basis, labeling method (guidelines, annotators per
+  case, an agreement statistic with its denominator, adjudication, label
+  producers), the systems under test, the task mapping bound to the spec
+  014 rules digest with unmapped and unlabeled counts, split assignment
+  with method, seed, per-split counts and the near-duplicate limit, the
+  population with its slices, exposure (training-data statement, exposed
+  final-test cases, ranking caveat) and the owner's review. `admit` refuses
+  a synthetic manifest (I-1), a record for another manifest, any empty
+  statement, real-user-derived data without a privacy decision, a model
+  labeler that is a system under test or of its family, another adapter, a
+  source label mapped twice, missing labels that do not reconcile with the
+  manifest (dropped or invented cases), split counts or slice sizes the
+  manifest does not hold, and exposed cases outside the final test. Only
+  `admit` makes an `Admitted`.
+- `crates/rustev-eval/src/report.rs`: `rustev.qualification/1`
+  (`QualificationRecord`) and `freeze` (3.3): the admitted dataset only;
+  the frozen evaluator configuration, version 2 with the admitted rules
+  digest and adapter; an analysis declared by that configuration; a
+  candidate model declared under test and of no labeler's family; an exact
+  baseline or the reason the task allows none; a positive final-test
+  target and a positive minimum for every declared slice, each slice a
+  configuration subgroup; exactly the frozen calibrations, each qualified
+  by spec 004's `fit::qualify` against the final test (missing lineage,
+  the fitting split or a shared case, source or snapshot voids the
+  freeze); and a replacement that supplies what it supersedes and shares
+  no final-test source or snapshot with it (3.3.3). `measure` (3.4) takes
+  spec 004 reports by role (candidate, calibrated candidate when
+  calibrations are frozen, rules baseline, exact baseline unless not
+  applicable) and refuses a missing or repeated role, a detail not bound
+  to its report, a configuration other than the frozen one
+  (`ConfigChanged`: a new qualification is required), another dataset or
+  split, a report not over every final-test case once, and bindings other
+  than the frozen ones (an exact baseline names no semantic artifact).
+  Rows put coverage, exclusions by reason, acceptance coverage,
+  abstentions by kind and labeled-proposal coverage, each with numerator
+  and denominator, before spec 004's error among accepted, log loss, Brier
+  and reliability values (R-1). `regression` runs each frozen gate through
+  spec 004's `evaluate_gate`. `scope_claim` (3.5) composes the claim
+  sentence from the freeze and the admission (dataset id, split,
+  configuration id, binding, call dates, served identity disclosure,
+  population) with the admission's limits, and rejects an unadmitted
+  dataset, another freeze's measurement, another population, missing call
+  dates and any unknown figure.
+- Tests: `crates/rustev-eval/tests/qualification.rs`, one test per
+  section 5 row (`a_real_dataset_without_an_admission_record_is_refused`,
+  `labels_from_the_model_under_test_are_refused`,
+  `a_calibration_fitted_on_the_final_test_voids_the_qualification`,
+  `a_changed_configuration_needs_a_new_qualification`,
+  `a_slice_below_its_minimum_is_unknown`,
+  `a_claim_outside_the_admitted_population_is_rejected`), plus the
+  positive path, admission completeness, exposure, report refusals, freeze
+  preconditions and regression. The manifest is synthetic content marked
+  `real` only to exercise the procedure, and every report is built by
+  hand. Seeds: category `qualification refusals` in the eval harness, one
+  defect per refusal; 8 of 8 detected.
+- Placement: the code lives in the existing `dataset.rs` and `report.rs`
+  because a new source file would change spec 021's reviewed archive list
+  (`tools/rustev-release/archive-policy.json`); moving it to its own module
+  is mechanical once that list may change.
+
+Limits found, for the owner (none changes this spec's text):
+
+- A spec 004 report cannot leave cases out, and its detail records outcome
+  keys, not correctness. Exposed cases (3.2.1) and slices (3.4.4) therefore
+  get count figures (coverage, exclusions, acceptance, abstentions,
+  labeled proposals) recomputed from per-case outcomes; error among
+  accepted and probability figures are spec 004's whole-split values, shown
+  per slice only where spec 004 already reports them (reliability by
+  subgroup). With any exposed final-test case those values are unknown, and
+  per-slice error among accepted is always unknown. Excluding exposed cases
+  from, or computing per-slice, error and probability figures needs a spec
+  004 amendment (a case exclusion list, or per-subgroup metrics).
+- Spec 004 gates require an identical dataset, split and configuration,
+  while 3.3.3 requires a new final-test split for a new qualification, so
+  a regression gate against a previous qualification (3.4.5) is unknown
+  unless both share the dataset; `regression` reports that unknown rather
+  than a pass.
+- Intervals (6.3) wait for the spec 004 amendment of #76 child E2; every
+  claim states point estimates as a limit.
+
+Not done, and blocked on owner-supplied inputs: an admitted dataset per
+task (6.1), its admission and qualification records, the live or retained
+candidate runs (within R-29 and the work order's scope), and the owner's
+review of each record (acceptance item 2).
 
 ## 6. Questions settled at approval
 
