@@ -1,0 +1,10 @@
+{
+  "package": {
+    "kind": "rust-lib-bin",
+    "name": "rustev-fp-corpus",
+    "path": "tools/rustev-conformance/fp-corpus",
+    "specRef": "027-node-and-wasm-bindings"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "5881ad92c625c1a9baa2deea0af212767331e941333ce897339733b54df0cf0f"
+}

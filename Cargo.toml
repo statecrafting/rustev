@@ -3,7 +3,16 @@
 # manifest (an `extends` edge) and claims the directory itself.
 [workspace]
 resolver = "3"
-members = ["crates/*", "backends/*", "tools/*", "integrations/*", "packages/*"]
+members = [
+  "crates/*",
+  "backends/*",
+  "tools/*",
+  "integrations/*",
+  "packages/*",
+  # The differential floating-point corpus (spec 027, 3.11.3), a crate of
+  # its own inside the conformance suite's directory.
+  "tools/rustev-conformance/fp-corpus",
+]
 
 [workspace.package]
 # One lockstep family version for the eight first-release packages (spec 021,

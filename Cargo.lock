@@ -992,6 +992,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustev-fp-corpus"
+version = "0.1.0"
+dependencies = [
+ "rustev-core",
+ "sha2",
+]
+
+[[package]]
 name = "rustev-jev"
 version = "0.1.0"
 dependencies = [

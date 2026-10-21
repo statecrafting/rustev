@@ -1,0 +1,30 @@
+[package]
+name = "rustev-fp-corpus"
+version.workspace = true
+description = "The differential floating-point corpus of spec 027 3.11.3: each transcendental call site of the pure crates over a fixed input set, digested bit for bit on every target."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+# Repository tooling (spec 027, section 2): never published.
+publish = false
+
+[package.metadata.spec-spine]
+spec = "027-node-and-wasm-bindings"
+
+# `rlib` for the native runner and tests; `cdylib` for the WebAssembly
+# module the JavaScript runner instantiates in Node and Chromium (3.11.3).
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+[dependencies]
+rustev-core.workspace = true
+sha2.workspace = true
+
+# The module's exports need `#[unsafe(no_mangle)]` (an export name is an
+# unsafe attribute since edition 2024): this crate relaxes the workspace's
+# `forbid` to `deny`, and only the export functions allow it. No `unsafe`
+# block exists. Cargo cannot inherit the workspace's lints and override one,
+# so they are restated; today the workspace has only `unsafe_code`.
+[lints.rust]
+unsafe_code = "deny"
