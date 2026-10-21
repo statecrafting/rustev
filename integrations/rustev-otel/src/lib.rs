@@ -11,13 +11,24 @@
 //! (principle VI).
 #![forbid(unsafe_code)]
 
+pub mod config;
+pub mod context;
 pub mod ids;
 pub mod jsonl;
+pub mod metrics;
 pub mod project;
+pub mod sink;
 
+pub use config::{
+    AckMode, AlwaysSampleOn, ConfigError, ParentSampling, RootSampling, Sampling, SinkConfig,
+};
 pub use ids::{IdSource, RandomIds, SeededIds};
 pub use jsonl::{JsonlError, JsonlExporter};
 pub use project::{
     Anchor, AnchorKind, Bindings, Projected, ProjectionInput, ProjectionUnknown, RootIds,
     UsageKeys, project,
+};
+pub use sink::{
+    BeginError, Begun, DecisionTelemetry, ExportError, Flow, LogRecord, OtelSink, OtelStats,
+    SinkClock, SystemClock, TeeSink, TelemetryExporter,
 };

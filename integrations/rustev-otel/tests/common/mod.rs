@@ -183,3 +183,100 @@ pub fn golden(name: &str, bytes: &[u8]) {
         "{name} differs from its golden; run with RUSTEV_BLESS=1 to review"
     );
 }
+
+/// The reference decision of `task` run through the runtime with the rules
+/// backend, delivering to `sink` under `policy` (spec 003's sink policies).
+pub mod run {
+    use std::sync::Arc;
+
+    use rustev_backend_rules::RulesBackend;
+    use rustev_contract::Document;
+    use rustev_contract::calibration::CalibrationArtifact;
+    use rustev_contract::snapshot::Snapshot;
+    use rustev_contract::time::Timestamp;
+    use rustev_core::Compiled;
+    use rustev_core::seams::{CancelSignal, EvidenceSink};
+    use rustev_runtime::{
+        DecideError, Decided, DecisionRequest, Runtime, RuntimeConfig, SinkPolicy, TokioClock,
+    };
+
+    use super::{here, plan};
+
+    fn rules(task: &str) -> RulesBackend {
+        let name = match task {
+            "support" => "support-routing.rules.json",
+            _ => "lodging.rules.json",
+        };
+        let p = here(&format!(
+            "../../backends/rustev-backend-rules/tests/fixtures/{name}"
+        ));
+        RulesBackend::from_bytes(&std::fs::read(p).unwrap()).unwrap()
+    }
+
+    /// The runtime and prepared plan for `task`.
+    pub fn runtime(
+        task: &str,
+        sink: Arc<dyn EvidenceSink>,
+        policy: SinkPolicy,
+    ) -> (Runtime, rustev_runtime::PreparedPlan) {
+        let backend = rules(task);
+        let calibrations = if task == "support" {
+            vec![
+                CalibrationArtifact::parse(
+                    &std::fs::read(here("tests/fixtures/topic.calibration.json")).unwrap(),
+                )
+                .unwrap(),
+            ]
+        } else {
+            vec![]
+        };
+        use rustev_core::seams::DecisionBackend;
+        let compiled = Compiled::load_checked(
+            &plan(task),
+            std::slice::from_ref(backend.descriptor()),
+            &calibrations,
+        )
+        .unwrap();
+        let runtime = Runtime::builder(
+            Arc::new(TokioClock::new()),
+            sink,
+            RuntimeConfig {
+                max_in_flight: 4,
+                max_queued: 16,
+                max_parallel_requests: 4,
+                sink: policy,
+            },
+        )
+        .backend(Arc::new(backend), 4)
+        .build()
+        .unwrap();
+        let prepared = runtime.prepare(compiled).unwrap();
+        (runtime, prepared)
+    }
+
+    /// One decision of `task` with id `decision_id`.
+    pub async fn decide(
+        runtime: &Runtime,
+        prepared: &rustev_runtime::PreparedPlan,
+        task: &str,
+        decision_id: &str,
+    ) -> Result<Decided, DecideError> {
+        let snapshot = Snapshot::parse(
+            &std::fs::read(here(&format!("tests/fixtures/{task}.snapshot.json"))).unwrap(),
+        )
+        .unwrap();
+        runtime
+            .decide(
+                prepared,
+                DecisionRequest {
+                    decision_id: decision_id.into(),
+                    snapshot,
+                    evaluation_time: Timestamp::from_ms(1_790_164_800_000).unwrap(),
+                    deadline_ms: None,
+                    principal_handle: vec![],
+                },
+                &CancelSignal::new(),
+            )
+            .await
+    }
+}
