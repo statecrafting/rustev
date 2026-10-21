@@ -1075,6 +1075,40 @@ root span id equal to the exported root's; the join buffer; every sampling
 mode and `always_sample_on` trigger with metrics recorded for sampled-out
 decisions; metric dimensions; logs; and every configuration refusal.
 
+**Increment 5 (`rustev trace tail`).** `crates/rustev-cli` gains the
+command with the flags of 3.11.1, using `rustev-contract` alone (no new
+dependency). The argument grammar gains switches (`--follow`, `--text`:
+no value, at most once); `--timeout-ms` without `--follow`, a value outside
+1 to 3 600 000, and a `--trace-id` that is not 32 lowercase hex digits are
+usage errors. Readings taken within the spec:
+
+- A decision is complete in the file when its root line and its policy
+  span (which the exporter writes last, in the same write) are both there;
+  its spans are found by parent links, so several decisions under one host
+  trace id are told apart, and the last complete root wins. A trailing
+  line without its newline waits for the next poll; a partial line already
+  over 64 KiB is `invalid_input`.
+- `--follow` re-reads only what was appended, within the same 256 MiB
+  budget, and counts its timeout in 200 ms polls, so it reads no clock.
+- Output: `spans` holds the root node; each node has its name, span id,
+  kind, status, start and end, the attributes shown (each as written,
+  `{"v", "r"}`, or cut further), its events, its children,
+  `withheld_by_reader` (catalogue names only) and `not_in_catalogue` (a
+  count: a key outside the catalogue is never echoed). The root also shows
+  its resource. `policy_mismatch` compares the root line's
+  `rustev.redaction.policy_id` with the reader's. `--text` prints one span
+  per line, indented by depth, with its status, duration and shown
+  attributes.
+
+Tests (`crates/rustev-cli/tests/trace.rs`, through the binary, over
+`rustev-otel`'s committed goldens): the last complete root and
+`--trace-id`; fields the reader drops and raw values it would digest
+withheld, with `policy_mismatch`; a truncating reader policy; a key outside
+the catalogue; malformed, foreign-schema and oversized lines naming their
+number; `trace_not_found`; I/O errors; `--follow` across an append and to
+its timeout; `--text`; every usage rule; an invalid policy file.
+`src/trace.rs` joins the CLI's reviewed archive list.
+
 ## Decisions at approval
 
 Each open point of #70 and of the work order, with the answer this spec
