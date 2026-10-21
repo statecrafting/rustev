@@ -1,0 +1,33 @@
+{
+  "mapping": {
+    "amends": [
+      "002-decision-contract-and-pure-core",
+      "027-node-and-wasm-bindings"
+    ],
+    "dependsOn": [
+      "002-decision-contract-and-pure-core",
+      "004-evaluation-and-replay",
+      "027-node-and-wasm-bindings"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "docs/decisions/00-founding-decisions.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "specId": "047-target-independent-transcendentals",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.2.0",
+  "shardHash": "dc20b7a503efc756c5e2b27c806c7337e75bae1de77af9b43aa9e196cc935d42"
+}

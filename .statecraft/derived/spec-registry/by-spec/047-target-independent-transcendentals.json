@@ -1,0 +1,71 @@
+{
+  "record": {
+    "amends": [
+      "002-decision-contract-and-pure-core",
+      "027-node-and-wasm-bindings"
+    ],
+    "created": "2026-10-21",
+    "dependsOn": [
+      "002-decision-contract-and-pure-core",
+      "004-evaluation-and-replay",
+      "027-node-and-wasm-bindings"
+    ],
+    "id": "047-target-independent-transcendentals",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-one-implementation",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "Every exp and ln reachable from a pure command is computed by rustev_core::math, one pure Rust implementation (libm =0.2.16, default features off) on every target; no pure crate calls f64::exp, f64::ln or another platform math function, and a test fails when one does."
+      },
+      {
+        "anchor": "3-one-implementation",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "Changing the implementation's pin is a reviewed change that runs spec 027's differential corpus and every golden on every target; it never happens through an unpinned update."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "047-one-implementation-of-exp-and-ln-on-every-target-amends-002-and-027": "e32f7712b6d0654006e31a53fff82cc522b011d563c777a61c13cfdabd74eadc",
+      "1-purpose": "79e3aacdc80eb763cca3fec9337b1f28597152a54ec985082c2c24c186fc2919",
+      "2-territory": "2561cf7c5c3eef3ca1cf09d8dd8fbbb74a01e2797c193d134421b4e15fd54679",
+      "3-one-implementation": "8205e17c23db6079c592dda4fc62690b70d21128b406ebf7a7abc54d0a265901",
+      "4-out-of-scope": "eda7f7ea7a3d1496ab004a1d4b793f643f39091dd7943ffaf468b078a45955cc",
+      "5-observable-negative-cases": "248f0c9a2f6216c093ad421584db7393f38913234b784e81a5ed14dee96f3005",
+      "acceptance": "41182f5090151bc9ee80291be2058b33746b3e0fb22af2828f1655993688641e",
+      "implementation-record": "648e37f73ad3e0039072654a01a4acf651e8d6d56a640ea10b293acfdd33d511",
+      "verification": "2b58e4f2caad64491eca101957a5f6ac322f8fb1df5dec7b10d65d2a7bca60a9",
+      "what-changes-in-spec-002": "6867b16bfea229e1447d1c96778e41a51eb6593a81072e852ac108a31ace5943",
+      "what-changes-in-spec-027": "47a5f95367b061396ad9b2b30445aec18bb7c31364ab439bd6ed34c44703d9a2"
+    },
+    "sectionHeadings": [
+      "047: One implementation of exp and ln on every target (amends 002 and 027)",
+      "1. Purpose",
+      "2. Territory",
+      "3. One implementation",
+      "What changes in spec 002",
+      "What changes in spec 027",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Implementation record"
+    ],
+    "specPath": "specs/047-target-independent-transcendentals/spec.md",
+    "status": "approved",
+    "summary": "Approved (A-44). The remedy spec 027 3.11.5 names for a cross-target floating-point divergence. The pure crates' four transcendental call sites (`exp` in core's softmax, `ln` in core's calibration, `ln` in evaluation's log loss and temperature fit) call the platform's math library on native targets and Rust's bundled one on WebAssembly; measured on 2026-10-21 they differ by one unit in the last place on 0.08% to 7.1% of a million inputs per input domain (macOS arm64 against `wasm32-unknown-unknown`). This spec routes all four through one pure Rust implementation, the `libm` crate exact-pinned at 0.2.16 without default features, exposed as `rustev_core::math`, so each produces the same bits on every target; no existing golden changes. Ratified by the owner on 2026-10-21 (A-44). Approval does not authorize a release.\n",
+    "title": "One implementation of exp and ln on every target (amends 002 and 027)"
+  },
+  "shardHash": "dc20b7a503efc756c5e2b27c806c7337e75bae1de77af9b43aa9e196cc935d42",
+  "specVersion": "1.9.0"
+}
