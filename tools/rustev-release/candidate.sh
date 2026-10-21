@@ -59,6 +59,16 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# The SBOM paths are read from cargo metadata with Node (as `make bindings`
+# requires it too).
+command -v node >/dev/null 2>&1 || { echo "031 3.9.1: the candidate needs node on PATH" >&2; exit 1; }
+# 031 3.9.1: the pinned SBOM generator.
+cyclonedx_pin=0.5.9
+# The tool prints its name doubled when run as a cargo subcommand.
+if [ "$(cargo cyclonedx --version 2>/dev/null)" != "cargo-cyclonedx-cyclonedx $cyclonedx_pin" ]; then
+  echo "031 3.9.1: the SBOMs need cargo-cyclonedx $cyclonedx_pin (cargo install cargo-cyclonedx --version $cyclonedx_pin --locked)" >&2
+  exit 1
+fi
 for run in a b; do
   wt="$worktrees/candidate-$run-$commit"
   git worktree add --detach --quiet "$wt" "$commit"
@@ -78,6 +88,44 @@ for run in a b; do
     SOURCE_DATE_EPOCH=$epoch cargo package --locked $flags >"$out/$run.package.log" 2>&1
     wt_target=$("$release" field target)
     for p in $packages; do cp "$wt_target/package/$p-$version.crate" "$out/$run/"; done
+    # Spec 031 3.9.1: a CycloneDX SBOM per member (pinned generator and
+    # specification version), from run a's clean tree at the source date.
+    if [ "$run" = a ]; then
+      # cargo-cyclonedx 0.5.9 has no `--workspace` flag (it refuses one):
+      # run at the root of this virtual workspace it writes `<name>.cdx.json`
+      # beside every member's manifest, and each member's file is required
+      # below.
+      if ! SOURCE_DATE_EPOCH=$epoch cargo cyclonedx --format json --spec-version 1.5 --target all \
+        >"$out/sbom.log" 2>&1; then
+        echo "031 3.9.1: cargo cyclonedx failed:" >&2
+        cat "$out/sbom.log" >&2
+        exit 1
+      fi
+      # The workspace's metadata, read once; a failure stops the candidate
+      # with cargo's own message.
+      if ! meta=$(cargo metadata --format-version 1 --no-deps --locked); then
+        echo "031 3.9.1: cargo metadata failed" >&2
+        exit 1
+      fi
+      for p in $packages; do
+        # Each member's SBOM lands beside its own manifest: the path comes
+        # from cargo metadata (read once, above), never from a search.
+        dir=$(printf '%s' "$meta" | P="$p" node -e '
+          let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => {
+            const m = JSON.parse(s).packages.find((x) => x.name === process.env.P);
+            // A member cargo metadata does not list is an error, never an
+            // empty path.
+            if (!m) process.exit(1);
+            process.stdout.write(require("path").dirname(m.manifest_path));
+          });') || { echo "031 3.9.1: cargo metadata lists no package $p" >&2; exit 1; }
+        f="$dir/$p.cdx.json"
+        if [ -z "$dir" ] || [ ! -f "$f" ]; then
+          echo "031 3.9.1: no SBOM was generated for $p (expected $f)" >&2
+          exit 1
+        fi
+        cp "$f" "$out/sbom-$p.cdx.json"
+      done
+    fi
   )
   git worktree remove --force "$wt"
 done
@@ -125,6 +173,12 @@ step deny.txt cargo deny --manifest-path Cargo.toml --config tools/rustev-releas
   --workspace $excluded --locked check
 step exceptions.txt "$release" exceptions "$(date -u +%Y-%m-%d)"
 step dependencies.json "$release" deps
+# 031 3.10: the changelog generated from the governed corpus at this commit
+# (PREVIOUS names the previous release's tag, when there is one).
+# Unquoted on purpose: with PREVIOUS unset or empty, `${PREVIOUS:-}` expands
+# to no argument at all (not to ""), so the first-release form runs.
+# shellcheck disable=SC2086
+step changelog.txt "$release" changelog "$out/changelog.md" ${PREVIOUS:-}
 # 3.8: the canonical manifest and SHA256SUMS of run a. Signing them and the
 # tag is the owner's act; nothing here signs.
 step manifest.txt "$release" manifest "$out"

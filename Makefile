@@ -18,7 +18,7 @@ CRATE_MANIFESTS := $(wildcard crates/*/Cargo.toml backends/*/Cargo.toml tools/*/
 SKIP_NOTE := no crate exists yet, so cargo has nothing to judge
 VERIFIED_SPECS := 001 002 003 004 005 006 007 008 009 012 013 014 015 017 033
 
-.PHONY: tools gate refresh code build test clippy fmt boundaries verify release-candidate adoption msrv semver conformance conformance-harvest bindings
+.PHONY: tools gate refresh code build test clippy fmt boundaries verify release-candidate adoption msrv semver changelog conformance conformance-harvest bindings
 
 tools:
 	@test -n "$(SPEC_SPINE_VERSION)" || { echo "no required_version in spec-spine.toml"; exit 3; }
@@ -72,6 +72,14 @@ adoption:
 ## Spec 031 3.6.7: every release member built and tested at the MSRV.
 msrv:
 	sh tools/rustev-release/msrv.sh
+
+## Spec 031 3.10: the release changelog, generated from the governed corpus
+## at the clean commit at HEAD (PREVIOUS=<tag> compares with that release).
+changelog:
+	cargo build --quiet --locked -p rustev-release
+	@# PREVIOUS reaches the shell as an environment variable (make exports
+	@# command-line variables), never as text spliced into the command.
+	t="$$(cargo run --quiet --locked -p rustev-release -- field target)" && "$$t/debug/rustev-release" changelog "$$t/changelog.md" $${PREVIOUS:+"$$PREVIOUS"}
 
 ## Spec 031 3.8: cargo-semver-checks against the previous release, or
 ## `no-baseline` (not applicable) when there is none. Needs curl, Node 20 or
