@@ -220,6 +220,7 @@
         "src/replay.rs",
         "src/run.rs",
         "src/sink.rs",
+        "src/trace.rs",
         "tests/golden/support.record.json"
       ],
       "max_archive_bytes": 131072,

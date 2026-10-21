@@ -20,6 +20,7 @@ mod plan;
 mod replay;
 mod run;
 mod sink;
+mod trace;
 
 use rustev_core::seams::CancelSignal;
 
@@ -56,6 +57,14 @@ pub fn execute(argv: &[String], cx: &Context) -> Exit {
         Ok(Invocation::Command(p)) => p,
         Err(u) => return usage_exit(u),
     };
+    // `trace tail --text` is the one command whose stdout is not one JSON
+    // object (spec 028, 3.11.4).
+    if parsed.spec.path == ["trace", "tail"] {
+        return match trace::tail(&parsed) {
+            Ok(exit) => exit,
+            Err(u) => usage_exit(u),
+        };
+    }
     match dispatch(&parsed, cx) {
         Ok(done) => Exit {
             code: done.code,
