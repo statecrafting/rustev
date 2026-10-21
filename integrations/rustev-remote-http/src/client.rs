@@ -975,6 +975,31 @@ fn note_unexchanged(
     store.put(e);
 }
 
+/// A member stopped before any of its request bytes left: its report, and
+/// its evidence, prepared as `pending` when it joined, now `no_exchange`
+/// (spec 020, 3.2). An exchange record that later names it, as an aborted
+/// exchange's can, completes the entry as for any member.
+fn stopped_unsent(inner: &Inner, attempt_id: &str, support: CancelSupport) -> AttemptReport {
+    let report = cancelled_report(
+        cancel_outcome(false, support, None),
+        "stopped before sending",
+    );
+    if inner.config.run_evidence
+        && let Some(e) = lock(&inner.evidence).map.get_mut(attempt_id)
+        && e.exchange
+            == (ExchangeReference::Unavailable {
+                reason: EvidenceUnavailable::Pending,
+            })
+    {
+        e.exchange = ExchangeReference::Unavailable {
+            reason: EvidenceUnavailable::NoExchange,
+        };
+        e.code = Some(RemoteCode::Cancelled);
+        e.charge_provenance = ChargeProvenance::NothingSent;
+    }
+    report
+}
+
 fn unsent_failure(code: RemoteCode, detail: &str) -> AttemptReport {
     RemoteFailure::new(
         code,
@@ -1233,10 +1258,10 @@ async fn cancel_member(
                 m.status = Status::Withdrawn;
                 m.settled = true;
                 m.tx = None;
-                return cancelled_report(
-                    cancel_outcome(false, support, None),
-                    "stopped before sending",
-                );
+                drop(st);
+                // Withdrawn before the exchange closed: it is never sent and
+                // never in the exchange's record.
+                return stopped_unsent(inner, attempt_id, support);
             }
             Phase::Sending => {
                 m.status = Status::Abandoned;
@@ -1258,10 +1283,7 @@ async fn cancel_member(
         }
     }
     if !sent {
-        return cancelled_report(
-            cancel_outcome(false, support, None),
-            "stopped before sending",
-        );
+        return stopped_unsent(inner, attempt_id, support);
     }
     if support == CancelSupport::None {
         return cancelled_report(cancel_outcome(true, support, None), "stopped waiting");

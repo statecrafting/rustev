@@ -510,7 +510,10 @@ retries it as version 1. `rustev-remote-http`: `ClientConfig::run_evidence`
 (off by default; the binding gains `run_record_schema`, not written when
 off) keeps a pending entry per attempt, completes it from the delivered
 exchange record before any member is answered, and records `no_exchange`
-for an attempt refused before any exchange; `ExchangeSink::deliver_located`
+for an attempt refused before any exchange or stopped before any of its
+request bytes left (a member withdrawn from a coalescing exchange is in no
+exchange record, so its pending entry would otherwise stay pending);
+`ExchangeSink::deliver_located`
 lets the host name a locator (the default names none), and
 `Exchanges::deliver` returns the record digest and the delivery result.
 `rustev-eval`: a version 2 record enters a bundle as its version 1
@@ -534,7 +537,8 @@ not referenced) and `integrations/rustev-remote-http/tests/run_evidence.rs`
 (support routing over loopback: entries checked against the host's store,
 no body, credential or principal reference embedded, `no_locator`,
 `not_delivered`, the principal digest, `no_exchange` for a refused
-attempt). The new eval source file joins the reviewed archive list.
+attempt) and `integrations/rustev-remote-http/tests/batching.rs` (a member
+withdrawn before sending has `no_exchange`). The new eval source file joins the reviewed archive list.
 
 **Increment 5 (runtime-planned remote batches).** The batch-capable seam
 is spec 017's (`DecisionBackend::batch_capability` and `infer_batch`);
