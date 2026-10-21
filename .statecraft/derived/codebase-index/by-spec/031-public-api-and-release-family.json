@@ -60,11 +60,23 @@
         "source": "spec-edge"
       },
       {
+        "path": "integrations/rustev",
+        "source": "manifest-metadata"
+      },
+      {
         "path": "integrations/rustev-remote-http/Cargo.toml",
         "source": "spec-edge"
       },
       {
+        "path": "integrations/rustev/",
+        "source": "spec-edge"
+      },
+      {
         "path": "packages/rustev-pkg-lodging/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "packages/rustev-pkg-lodging/LICENSE",
         "source": "spec-edge"
       },
       {
@@ -86,7 +98,11 @@
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "integrations/rustev/"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -266,6 +282,19 @@
       {
         "locations": [
           {
+            "file": "packages/rustev-pkg-lodging/LICENSE"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "packages/rustev-pkg-lodging/LICENSE"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "packages/rustev-pkg-support-routing/Cargo.toml"
           }
         ],
@@ -320,5 +349,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "46f297cd2a1b43fd437e23a18d1d5f03a46b848200e7a507eec0651e85d4d086"
+  "shardHash": "01e443e83cc7f0f47b3b2438c75fe722d007715e67fe862fc0224da523f5ff64"
 }

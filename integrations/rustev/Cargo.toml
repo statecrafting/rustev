@@ -1,0 +1,52 @@
+[package]
+name = "rustev"
+version.workspace = true
+description = "Rustev, an embeddable decision engine: one facade over the release family, with one optional feature per adoptable slice."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/rustev"
+readme.workspace = true
+keywords = ["decision-engine", "rules", "compiler", "evaluation"]
+categories = ["algorithms"]
+# Spec 021, 3.4: the intended public registry only.
+publish = ["crates-io"]
+# Spec 021, 3.5: the archive holds the library source; the reviewed file list
+# is tools/rustev-release/archive-policy.json. Cargo also adds the workspace
+# README.md that `readme` names, whatever `include` says; the reviewed list
+# names it, and tools/rustev-release/tests/archives.rs checks that list
+# against `cargo package --list`.
+include = ["/src/**/*.rs", "/LICENSE"]
+
+[package.metadata.spec-spine]
+spec = "031-public-api-and-release-family"
+
+[package.metadata.docs.rs]
+all-features = true
+
+# Spec 031 3.2 and 3.4: no default features; each feature enables exactly one
+# optional dependency and one module re-exporting it. A feature exists only
+# when its crate is a member of this release (I-3): `bedrock`, `typesafe`,
+# `otel`, `serve` and `local-embed` join with their crates.
+[features]
+default = []
+runtime = ["dep:rustev-runtime"]
+eval = ["dep:rustev-eval"]
+rules = ["dep:rustev-backend-rules"]
+remote-http = ["dep:rustev-remote-http"]
+
+[dependencies]
+rustev-contract.workspace = true
+rustev-core.workspace = true
+rustev-runtime = { workspace = true, optional = true }
+rustev-eval = { workspace = true, optional = true }
+rustev-backend-rules = { workspace = true, optional = true }
+rustev-remote-http = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true

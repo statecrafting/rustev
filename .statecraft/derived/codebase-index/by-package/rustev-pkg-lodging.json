@@ -3,9 +3,8 @@
     "kind": "rust-lib",
     "name": "rustev-pkg-lodging",
     "path": "packages/rustev-pkg-lodging",
-    "specRef": "008-reference-package-lodging",
-    "version": "0.1.0"
+    "specRef": "008-reference-package-lodging"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "c1ef8c402759a08cdcb4cbc47fa5ba1ef749b501d0fd98aabca0250f7051b8c2"
+  "shardHash": "b8bb02d14f60d539cd65e0a22213b9ae9b57055674c8266640543aecc85504b0"
 }

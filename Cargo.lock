@@ -894,6 +894,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6b1e7f9a428571be2dc5bc0505c13fb6bf936822b894ec87abf8a08a4e51742d"
 
 [[package]]
+name = "rustev"
+version = "0.1.0"
+dependencies = [
+ "rustev-backend-rules",
+ "rustev-contract",
+ "rustev-core",
+ "rustev-eval",
+ "rustev-remote-http",
+ "rustev-runtime",
+ "serde_json",
+]
+
+[[package]]
 name = "rustev-backend-rules"
 version = "0.1.0"
 dependencies = [

@@ -28,7 +28,7 @@ amends:
   - "010-integrations"
   - "021-packaging-and-first-release"
 establishes:
-  - { kind: directory, path: "integrations/rustev/", planned: true }
+  - { kind: directory, path: "integrations/rustev/" }
   # Written by spec 021 increment 1 (021 extends it; 2.2 below).
   - { kind: directory, path: "tools/rustev-release/" }
 extends:
@@ -44,6 +44,8 @@ extends:
   - { spec: "006-cli-surface", unit: { kind: file, path: "crates/rustev-cli/Cargo.toml" }, nature: amending }
   - { spec: "007-support-routing-package", unit: { kind: file, path: "packages/rustev-pkg-support-routing/Cargo.toml" }, nature: amending }
   - { spec: "008-reference-package-lodging", unit: { kind: file, path: "packages/rustev-pkg-lodging/Cargo.toml" }, nature: amending }
+  # The license file `cargo package` puts in lodging's archive (021 3.5).
+  - { spec: "008-reference-package-lodging", unit: { kind: file, path: "packages/rustev-pkg-lodging/LICENSE" }, nature: additive }
   - { spec: "009-remote-adapter-protocol", unit: { kind: file, path: "integrations/rustev-remote-http/Cargo.toml" }, nature: amending }
 depends_on:
   - "001-boundaries-and-authority"
@@ -628,6 +630,41 @@ Upload, tag push and hosted release creation happen only under 3.11.
 as 2.2 provides, so this spec's unit is established rather than planned and
 spec 021 extends it. Nothing of this spec is implemented by that change;
 its implementation remains pending.
+
+**Increment 1, 2026-10-21 (the facade, its boundary rules and the two new
+members).** `integrations/rustev/` is the facade crate `rustev` (3.2):
+`#![forbid(unsafe_code)]`, no binary, `rustev::contract` and
+`rustev::decision_core` always, and the features present today (3.4)
+`runtime`, `eval`, `rules` and `remote-http`, each enabling exactly one
+optional dependency and one module named after it; `default = []`, no
+feature implies another, and the documentation lists each feature with its
+module, crate and subset (3.2.5). `tests/public_items.rs` fails when the
+source holds anything but those re-exports, when a feature enables other
+than its one `dep:`, when `default` is not empty, or when a feature is
+undocumented. `tests/plan_ids.rs` compiles both reference plans through
+`rustev::decision_core` from the conformance suite's pinned `plan check`
+fixtures and gets the plan identities the CLI goldens pin (3.7), with no
+feature and with every feature. `tools/rustev-boundaries` enforces 3.3:
+the facade may depend on an integration crate only as an optional normal
+dependency enabled by exactly one feature (`FacadeIntegration`), no
+workspace crate depends on the facade in any dependency kind
+(`DependsOnFacade`), its default features are empty (`FacadeDefault`), it
+declares no ecosystem, HTTP or binding family itself (`FacadeFamily`), and
+its graph with no features is checked transitively as the pure crates'
+are; another integration crate depending on an integration still fails.
+Each rule has a synthetic-metadata fixture. The release policy
+(`tools/rustev-release`) admits `rustev-pkg-lodging` (layer 3, uploading
+after the CLI it dev-depends on, as support-routing does) and the facade
+(the last crate layer, alone, uploading last; 3.1): the facade alone may
+declare features, each exactly one optional normal dependency on a release
+member, so a feature for a crate outside the release fails (I-3), and the
+set's shape refuses a facade sharing its layer or uploading early; both
+have tests. `rustev-pkg-lodging` takes the family metadata, `publish =
+["crates-io"]`, the archive `include` list and workspace dependencies
+(amending spec 008's out-of-scope publication), and both new members join
+the reviewed archive list. Subsets, MSRV and semver checks, SBOMs, the
+changelog, the extended dry run and the release workflow come in later
+increments.
 
 ## Decisions at approval
 
