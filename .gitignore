@@ -58,3 +58,6 @@ target
 
 # Spec 027: the JavaScript tooling's installed packages.
 node_modules/
+
+# Spec 027: a local native addon build.
+*.node
