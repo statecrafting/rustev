@@ -18,7 +18,7 @@ CRATE_MANIFESTS := $(wildcard crates/*/Cargo.toml backends/*/Cargo.toml tools/*/
 SKIP_NOTE := no crate exists yet, so cargo has nothing to judge
 VERIFIED_SPECS := 001 002 003 004 005 006 007 008 009 012 013 014 015 017 033
 
-.PHONY: tools gate refresh code build test clippy fmt boundaries verify release-candidate conformance conformance-harvest bindings
+.PHONY: tools gate refresh code build test clippy fmt boundaries verify release-candidate adoption msrv semver conformance conformance-harvest bindings
 
 tools:
 	@test -n "$(SPEC_SPINE_VERSION)" || { echo "no required_version in spec-spine.toml"; exit 3; }
@@ -63,6 +63,21 @@ verify:
 ## Never uploads, tags, signs or reads a credential.
 release-candidate:
 	sh tools/rustev-release/candidate.sh
+
+## Spec 031 3.5: each partial-adoption subset as a fresh consumer of the
+## facade, with its graph checked for omitted crates.
+adoption:
+	sh tools/rustev-release/adoption.sh
+
+## Spec 031 3.6.7: every release member built and tested at the MSRV.
+msrv:
+	sh tools/rustev-release/msrv.sh
+
+## Spec 031 3.8: cargo-semver-checks against the previous release, or
+## `no-baseline` (not applicable) when there is none. Needs curl, Node 20 or
+## later and cargo-semver-checks 0.51.0 on PATH.
+semver:
+	sh tools/rustev-release/semver.sh
 
 # Spec 027, 3.12: the shared conformance suite's Rust runner. Needs no Node
 # toolchain.
