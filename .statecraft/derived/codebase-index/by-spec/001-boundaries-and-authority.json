@@ -21,6 +21,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "scripts/acceptance/",
+        "source": "spec-edge"
+      },
+      {
         "path": "standards/spec/constitution.md",
         "source": "spec-edge"
       },
@@ -34,6 +38,19 @@
       }
     ],
     "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "scripts/acceptance/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "scripts/acceptance/"
+        }
+      },
       {
         "locations": [
           {
@@ -122,5 +139,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "f5e84785f71fd436e557fe5b946560643b803ee8de8656b17bc615678b70253c"
+  "shardHash": "54a3e372a4c99c078eaf99ad93b69fa4d6100f9f914b9ee6a203f28dfab3ebef"
 }

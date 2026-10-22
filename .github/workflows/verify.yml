@@ -1,6 +1,6 @@
 # Every approved spec's declared acceptance (`make verify`, `spec-spine
 # verify`), a reusable workflow that ci-gate calls and requires
-# (ci.extra_required_jobs). It runs 20+ minutes, so it is its own job.
+# (ci.extra_required_jobs). Whole specs run in four isolated groups.
 # Not rendered by the setup profile: owned by spec 001.
 name: verify
 
@@ -11,8 +11,27 @@ permissions:
   contents: read
 
 jobs:
-  verify:
-    name: verify
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.partition.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Test acceptance partition controls
+        run: python3 -m unittest discover -s scripts/acceptance -p 'test_*.py'
+      - name: Check complete coverage and plan groups
+        id: partition
+        run: |
+          matrix=$(python3 scripts/acceptance/verify.py --matrix)
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  acceptance:
+    name: acceptance (${{ matrix.group }})
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     runs-on: ubuntu-latest
     # The runtime tests use a manual clock and never sleep on wall time, so a
     # hang is a defect; fail it instead of waiting for the platform limit.
@@ -27,7 +46,12 @@ jobs:
           path: .bin
           key: spec-spine-${{ runner.os }}-${{ hashFiles('spec-spine.toml') }}
       - name: Install the pinned spec-spine
-        run: test -x .bin/spec-spine && .bin/spec-spine --version || make tools
+        run: |
+          if test -x .bin/spec-spine && .bin/spec-spine --version; then
+            :
+          else
+            make tools
+          fi
       - name: Cache cargo registry, git and target
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -35,8 +59,23 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: verify-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          key: verify-${{ matrix.group }}-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
           restore-keys: |
-            verify-${{ runner.os }}-
+            verify-${{ matrix.group }}-${{ runner.os }}-
       - name: Declared acceptance
-        run: make verify
+        env:
+          ACCEPTANCE_GROUP: ${{ matrix.group }}
+        run: python3 scripts/acceptance/verify.py "$ACCEPTANCE_GROUP"
+
+  verify:
+    name: verify
+    if: always()
+    needs: [plan, acceptance]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every acceptance group
+        env:
+          PLAN_RESULT: ${{ needs.plan.result }}
+          ACCEPTANCE_RESULT: ${{ needs.acceptance.result }}
+        run: test "$PLAN_RESULT" = success && test "$ACCEPTANCE_RESULT" = success

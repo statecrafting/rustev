@@ -18,7 +18,7 @@ CRATE_MANIFESTS := $(wildcard crates/*/Cargo.toml backends/*/Cargo.toml tools/*/
 SKIP_NOTE := no crate exists yet, so cargo has nothing to judge
 VERIFIED_SPECS := 001 002 003 004 005 006 007 008 009 010 012 013 014 015 017 019 020 026 027 028 033
 
-.PHONY: tools gate refresh code build test clippy fmt boundaries verify release-candidate adoption msrv semver changelog conformance conformance-harvest bindings
+.PHONY: tools gate refresh code build test clippy fmt boundaries verify verified-specs release-candidate adoption msrv semver changelog conformance conformance-harvest bindings
 
 tools:
 	@test -n "$(SPEC_SPINE_VERSION)" || { echo "no required_version in spec-spine.toml"; exit 3; }
@@ -53,6 +53,10 @@ fmt:
 
 boundaries:
 	@if [ -z "$(CRATE_MANIFESTS)" ]; then echo "$(SKIP_NOTE)"; else set -x; cargo run -p rustev-boundaries --locked --quiet; fi
+
+## Authoritative acceptance list for CI partition validation.
+verified-specs:
+	@echo $(VERIFIED_SPECS)
 
 ## Runs code the corpus declares; deliberately not part of `gate`.
 verify:
