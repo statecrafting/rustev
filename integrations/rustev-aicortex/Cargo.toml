@@ -1,0 +1,40 @@
+[package]
+name = "rustev-aicortex"
+version = "0.1.0"
+description = "A context source over Aicortex claims and an observation proposer, through Aicortex's host-library mode, under spec 010's binding record."
+# Not in the release family; its Aicortex dependency is a git revision.
+publish = false
+edition.workspace = true
+# Aicortex and Rahi 0.6.0 declare 1.96 (spec 010, binding record item 1).
+rust-version = "1.96"
+license.workspace = true
+repository.workspace = true
+
+[package.metadata.spec-spine]
+spec = "010-integrations"
+
+# Spec 010 3.2.4: no features. Aicortex publishes no crate; its record pins
+# this exact revision (Aicortex spec 053 names a revision as the handoff),
+# and the Rahi release that revision pins.
+[dependencies]
+rustev-contract.workspace = true
+rustev-core.workspace = true
+aicortex-types = { git = "https://github.com/statecrafting/aicortex", rev = "6415b765e5267188b4ecf302a93869352e28cccc" }
+aicortex-claims = { git = "https://github.com/statecrafting/aicortex", rev = "6415b765e5267188b4ecf302a93869352e28cccc" }
+aicortex-store = { git = "https://github.com/statecrafting/aicortex", rev = "6415b765e5267188b4ecf302a93869352e28cccc" }
+rahi-store = "=0.6.0"
+rahi-types = "=0.6.0"
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tokio = { workspace = true, features = ["time"] }
+uuid = { version = "1", default-features = false }
+
+# A single-voter Rahi 0.6.0 store on loopback with Aicortex's schema, and
+# Aicortex's gate to admit the claims the reads are tested against.
+[dev-dependencies]
+aicortex-gate = { git = "https://github.com/statecrafting/aicortex", rev = "6415b765e5267188b4ecf302a93869352e28cccc" }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+
+[lints]
+workspace = true

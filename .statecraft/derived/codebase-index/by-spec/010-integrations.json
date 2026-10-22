@@ -21,6 +21,14 @@
         "source": "spec-edge"
       },
       {
+        "path": "integrations/rustev-aicortex",
+        "source": "manifest-metadata"
+      },
+      {
+        "path": "integrations/rustev-aicortex/",
+        "source": "spec-edge"
+      },
+      {
         "path": "integrations/rustev-rahi",
         "source": "manifest-metadata"
       },
@@ -39,7 +47,11 @@
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "integrations/rustev-aicortex/"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -165,5 +177,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "9dd4f9a7f207bf3de033c465248d6310a51ece29e00b4fd43ada91178cccbf8e"
+  "shardHash": "59e1f6f6e26ee27a99c313a990bb5a7dfe8854a8c957690540b485e2325df1bf"
 }

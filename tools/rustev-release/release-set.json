@@ -67,6 +67,10 @@
       "reason": "publish = false until the release family is extended to it (spec 028 section 2, #76 A3)"
     },
     {
+      "name": "rustev-aicortex",
+      "reason": "optional Aicortex context source and observation proposer (spec 010); its Aicortex dependency is a Git revision outside the release closure (021 3.4, R-49); publish = false"
+    },
+    {
       "name": "rustev-rahi",
       "reason": "optional Rahi evidence sink (spec 010); not in the release family, which names no feature for it (spec 031 3.4); publish = false"
     }

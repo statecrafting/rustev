@@ -1,0 +1,11 @@
+{
+  "package": {
+    "kind": "rust-lib",
+    "name": "rustev-aicortex",
+    "path": "integrations/rustev-aicortex",
+    "specRef": "010-integrations",
+    "version": "0.1.0"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "a9e4efc9f74fba1931c121b1fe633581a7ba7aa8c9fe8cdff59fac7abb574fa2"
+}
