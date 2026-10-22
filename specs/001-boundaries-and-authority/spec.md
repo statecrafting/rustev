@@ -18,6 +18,7 @@ establishes:
   - "Cargo.toml"
   - "Cargo.lock"
   - "Makefile"
+  - { kind: directory, path: "scripts/acceptance/" }
   - { kind: directory, path: "tools/rustev-boundaries/" }
 depends_on:
   - "000-bootstrap"
@@ -210,6 +211,12 @@ sh -c 'for d in crates tools; do [ -d "$d" ] || continue; if grep -rnE "(struct|
 ```
 
 ## Implementation record
+
+- 2026-10-22: CI declared acceptance runs in four isolated groups of whole
+  specs. A checked partition covers the Makefile `VERIFIED_SPECS` list exactly
+  once; all groups must succeed. Local `make verify` still runs the full list.
+  Per-spec elapsed times are recorded to support measured rebalancing.
+  Verification commands and mutation checks are unchanged.
 
 - The boundary check, the workspace manifest and the Makefile targets
   (`boundaries`, `verify`, coverage in `gate`) landed with this spec marked

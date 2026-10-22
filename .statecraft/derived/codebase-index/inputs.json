@@ -19,7 +19,7 @@
       "contentHash": "a809bbfdf6252bf2ecf010ab529f87303fed0851473f9f57b7e4dc9805d7ac94"
     },
     ".github/workflows/verify.yml": {
-      "contentHash": "dae84684a05021e54a8596a83c96d469d1c2895b0b6a87dfd9a84c7170247396"
+      "contentHash": "ab00b8c33bb0b0ea3f89aa88ffb1d6bb6634e9c91d779ff4aa096507f9fa906f"
     },
     ".gitignore": {
       "contentHash": "218b76a5e1c09226bf9d0f4b5fd2f5ef13c7d8419386e4ca3907b422f50e1bef"
@@ -31,7 +31,7 @@
       "contentHash": "030604a1083297c1f6faaebafb0b4ba6ae835f3332f5ba730dbd7b9d390ca10f"
     },
     "Makefile": {
-      "contentHash": "babf82f3c043cf719b53388622727b7c7cdf0202e6807c00bebe8dc7617aef29"
+      "contentHash": "710be572dc91a2c36e4402fedc8adb43e338d7302ff3f6c324a45de5f8919a90"
     },
     "README.md": {
       "contentHash": "a7db75e7b6703725ffe56c47b26272ff6b2571ff1b33d5106c2f8a1780d76c5c"
