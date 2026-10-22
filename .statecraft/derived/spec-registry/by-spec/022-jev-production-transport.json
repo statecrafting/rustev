@@ -25,7 +25,7 @@
       }
     ],
     "id": "022-jev-production-transport",
-    "implementation": "pending",
+    "implementation": "in-progress",
     "obligations": [
       {
         "anchor": "3-1-production-eligibility",
@@ -75,7 +75,7 @@
       }
     ],
     "sectionDigests": {
-      "022-production-transport-and-served-identity-for-the-jev-adapter-amends-012": "79d081fe95100972d20b800df93a7547a167b2173c43a1caeb6a2ab4e5878675",
+      "022-production-transport-and-served-identity-for-the-jev-adapter-amends-012": "1a64c0b94e01d9edf42ebeb7e27382e6d3e65ea77eb313f24655d394278b96d4",
       "1-purpose": "70685a3a8f2e016c3a9760e89eae9aa998656191292f5b263ff26808718464e3",
       "2-territory": "4a45c86e472a6db4261c0e696c9dc2bfa1bae8537cea3019838eb88ef89b9ac9",
       "3-1-production-eligibility": "5bbe7c4185d15c476faa590abf8439f6d499f73705640f322f9e0a4a76c3697d",
@@ -90,6 +90,7 @@
       "4-out-of-scope": "faec5ae3c40f8d5a9c745c348c9220a55d9e7664134a1e287c82c2111276cc6d",
       "5-observable-negative-cases": "5b99adb770ee25dd51d6cc1b4ede93768054d4733c8844340056c7001bd524d1",
       "acceptance": "127f5e5a31574b48797ce57290177b3f7c74aedf4a8f1a6df5779d2590ac247d",
+      "implementation-record": "f72f2144c50ee789791855a0784a89f905ad49b543a025bbe317c7e682585e30",
       "questions-settled-at-approval": "bbb44939011f2ecd900f8a50706b4d52fc0027562980e9aae1562f38e72eebd9",
       "verification": "1dee4c917066c53a8beef4478397a932ab12ba3a346c1f73bf40dae730a8e532"
     },
@@ -110,6 +111,7 @@
       "5. Observable negative cases",
       "Acceptance",
       "Verification",
+      "Implementation record",
       "Questions settled at approval"
     ],
     "specPath": "specs/022-jev-production-transport/spec.md",
@@ -117,6 +119,6 @@
     "summary": "The separately reviewable spec 012 amendment that backlog item RUSTEV-010 and spec 012 R-3 require before production use: a Jev binding is production-eligible only when its transport pins a model version and every answered exchange proves the served identity against that pin. Defines the qualification of TypeSafe's direct API with a pinned version, the evidence under which Gateway pinning could be accepted instead, and the transport, TLS, timeout, connection, privacy and cost-reconciliation facts a production binding records. Development evidence with `served: unknown` is never relabeled as production evidence. Approved (A-21) with the additions of tracking issue #76 child C3 (section 3.8). Approval authorizes implementation of the no-network stage; live stages stay inside R-29's testing cap, and no deployment is authorized.\n",
     "title": "Production transport and served identity for the Jev adapter (amends 012)"
   },
-  "shardHash": "25df0ccc65b9d23b6b2f9bd815eb79ae7393ec3e3c0f697d21fa7f45542d2a21",
+  "shardHash": "7cdf2ea591672f161d4c66915235d2e8e0a9bd9a9d95c57b38462d931fc3757b",
   "specVersion": "1.10.0"
 }

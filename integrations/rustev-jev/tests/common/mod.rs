@@ -175,6 +175,7 @@ impl Seen {
 pub struct FakeGateway {
     pub addr: SocketAddr,
     pub hits: Arc<AtomicUsize>,
+    pub connections: Arc<AtomicUsize>,
     pub seen: Arc<Mutex<Vec<Seen>>>,
     task: JoinHandle<()>,
 }
@@ -231,6 +232,8 @@ pub async fn gateway(f: impl Fn(&Json) -> Canned + Send + Sync + 'static) -> Fak
     let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
     let addr = listener.local_addr().unwrap();
     let hits = Arc::new(AtomicUsize::new(0));
+    let connections = Arc::new(AtomicUsize::new(0));
+    let accepted = connections.clone();
     let seen = Arc::new(Mutex::new(vec![]));
     let f: Arc<Script> = Arc::new(f);
     let (h, s) = (hits.clone(), seen.clone());
@@ -239,6 +242,7 @@ pub async fn gateway(f: impl Fn(&Json) -> Canned + Send + Sync + 'static) -> Fak
             let Ok((stream, _)) = listener.accept().await else {
                 continue;
             };
+            accepted.fetch_add(1, Ordering::SeqCst);
             let (f, h, s) = (f.clone(), h.clone(), s.clone());
             tokio::spawn(async move {
                 let svc = service_fn(move |req: Request<Incoming>| {
@@ -269,6 +273,7 @@ pub async fn gateway(f: impl Fn(&Json) -> Canned + Send + Sync + 'static) -> Fak
     FakeGateway {
         addr,
         hits,
+        connections,
         seen,
         task,
     }
