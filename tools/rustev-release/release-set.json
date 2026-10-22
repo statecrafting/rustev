@@ -33,6 +33,44 @@
     "rustev"
   ],
   "binaries": [{ "package": "rustev-cli", "name": "rustev" }],
+  "npm": [
+    { "name": "@statecrafting/rustev-darwin-arm64", "directory": "integrations/rustev-node/npm/darwin-arm64" },
+    { "name": "@statecrafting/rustev-darwin-x64", "directory": "integrations/rustev-node/npm/darwin-x64" },
+    { "name": "@statecrafting/rustev-linux-arm64-gnu", "directory": "integrations/rustev-node/npm/linux-arm64-gnu" },
+    { "name": "@statecrafting/rustev-linux-arm64-musl", "directory": "integrations/rustev-node/npm/linux-arm64-musl" },
+    { "name": "@statecrafting/rustev-linux-x64-gnu", "directory": "integrations/rustev-node/npm/linux-x64-gnu" },
+    { "name": "@statecrafting/rustev-linux-x64-musl", "directory": "integrations/rustev-node/npm/linux-x64-musl" },
+    { "name": "@statecrafting/rustev-win32-x64-msvc", "directory": "integrations/rustev-node/npm/win32-x64-msvc" },
+    { "name": "@statecrafting/rustev", "directory": "integrations/rustev-node" },
+    { "name": "@statecrafting/rustev-wasm", "directory": "integrations/rustev-wasm" }
+  ],
+  "absent": [
+    {
+      "kind": "binary",
+      "name": "rustev",
+      "reason": "prebuilt CLI binaries are built and attached by the release workflow (spec 031 3.9.5, 3.12), which does not exist yet; the CLI ships as the rustev-cli crate"
+    },
+    {
+      "kind": "image",
+      "name": "ghcr.io/statecrafting/rustev-serve",
+      "reason": "its crate rustev-serve does not exist at the candidate commit (spec 010 is in progress); there is no service to put in an image"
+    },
+    {
+      "kind": "crate",
+      "name": "rustev-serve",
+      "reason": "integrations/rustev-serve/ does not exist at the candidate commit; spec 010, which plans it, is in progress"
+    },
+    {
+      "kind": "crate",
+      "name": "rustev-bedrock",
+      "reason": "planned by its own spec (#66), not implemented"
+    },
+    {
+      "kind": "crate",
+      "name": "rustev-backend-embed-linear",
+      "reason": "the local semantic backend of spec 011 (#69) is not implemented"
+    }
+  ],
   "excluded": [
     {
       "name": "rustev-jev",

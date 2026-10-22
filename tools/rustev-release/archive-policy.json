@@ -137,7 +137,7 @@
         "src/resolve.rs"
       ],
       "max_archive_bytes": 131072,
-      "max_unpacked_bytes": 262144
+      "max_unpacked_bytes": 393216
     },
     "rustev-backend-rules": {
       "files": [

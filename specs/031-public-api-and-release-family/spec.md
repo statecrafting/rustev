@@ -738,6 +738,40 @@ pinned `cargo-semver-checks` 0.51.0, runs `make semver` (3.8) and uploads
 its report, where `no-baseline` is recorded as not applicable, never as a
 pass. Until this change merges, the MSRV stays unverified (3.6.7).
 
+**Increment 5, 2026-10-21 (the npm members and the absences in the
+release set).** Spec 027 is complete (R-47), so its npm packages join the
+release family as 3.1 admits a planned member. `release-set.json` lists
+them under `npm` in the npm layer's upload order (3.1's layer 6, which follows the last crate layer, spec 045 3.2.4): the seven per-platform
+packages `@statecrafting/rustev-<platform>` by name, then the native main
+package `@statecrafting/rustev`, then `@statecrafting/rustev-wasm`, each
+with the directory its `package.json` is in. Under `absent` it lists, each
+with its reason, what 3.1 plans but this release does not ship: the
+prebuilt `rustev` CLI binaries (the release workflow that builds and
+attaches them, 3.9.5 and 3.12, does not exist yet; the CLI ships as the
+`rustev-cli` crate), the `ghcr.io/statecrafting/rustev-serve` image and
+its crate `rustev-serve` (which does not exist yet; spec 010 is in
+progress), and the planned crates `rustev-bedrock` (#66) and
+`rustev-backend-embed-linear` (spec 011). `rustev-otel` (spec 028) exists
+and is listed under `excluded` with its reason, as every workspace
+package outside the family is, so it is not repeated as absent. `tools/rustev-release/src/npm.rs` checks each member's
+`package.json` (`rustev-release manifests` runs it with the crates'
+manifest policy): its name, the family version, the license, the
+repository URL and directory, a description and a `files` list, `os` and
+`cpu` for a platform package, no runtime dependency, and, for the native
+main package, `optionalDependencies` naming exactly the release's platform
+packages at exactly the family version; the set's shape refuses a platform
+package after the main package, platform packages out of name order, the
+WebAssembly package not last, a package outside the `@statecrafting/`
+scope or built from another directory, and an absence with an unknown
+kind, no reason, a duplicate, or the name of a member. Every package keeps
+`"private": true` in the repository, as spec 027 requires until
+publication, and the check requires it; the release's packing step is to
+remove exactly that field (3.12). `tests/npm.rs` passes on the repository,
+fixes the member and absence lists, and breaks each rule once. Packing,
+the npm tarballs' SBOMs and reproducibility (3.9.1, 3.9.3), npm provenance
+(3.9.6) and the release workflow come next; this increment changes no
+workflow and publishes nothing.
+
 ## Decisions at approval
 
 1. **Crate and package names** (left to the implementer by #58): decided

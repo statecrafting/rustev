@@ -14,7 +14,7 @@ fn set() -> ReleaseSet {
     ReleaseSet::parse(
         br#"{"schema":"rustev.release-set/1","version":"0.1.0","tag":"v0.1.0",
         "registry":"crates-io","index":"registry+https://github.com/rust-lang/crates.io-index",
-        "layers":[["pkg"]],"upload_order":["pkg"],"binaries":[],"excluded":[]}"#,
+        "layers":[["pkg"]],"upload_order":["pkg"],"binaries":[],"npm":[],"absent":[],"excluded":[]}"#,
     )
     .unwrap()
 }

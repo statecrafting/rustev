@@ -653,6 +653,32 @@ the order above; reconciling 031 3.1 (an ordering amendment, or removing
 those development dependencies from published manifests) is the owner's
 choice before 031 is implemented.
 
+**Candidate run, 2026-10-21, at `00a4b7c` (`make release-candidate`,
+local, macOS arm64, `cargo-cyclonedx` 0.5.9, `cargo-deny` 0.20.2).** The
+two clean packaging runs produced the eleven archives byte-identical
+(3.7), the archive policy passed (3.5), every unpacked archive's tests
+passed outside the workspace on 1.98.1 and on the MSRV 1.88, and a
+CycloneDX SBOM was written per member (031 3.9.1). The audit then failed
+(3.6): RUSTSEC-2026-0381 (`webpki-roots` 1.0.9) and RUSTSEC-2026-0382
+(`rustls-webpki` 0.103.15), both reached through `rustev-remote-http` and
+published after the last passing audit. This change takes the fixed
+releases: the lock holds `rustls-webpki` 0.103.16 and `webpki-roots`
+1.0.10, and the workspace's `webpki-roots` requirement is raised to that
+floor so no consumer of the published manifest resolves an affected
+version; `cargo deny check` with the release policy then reports
+advisories, bans, licenses and sources ok. 3.7 is not yet closed: the
+candidate is reproduced in full at a commit that contains this change.
+
+**Candidate run, 2026-10-21, at `3670e6b` (this change's first head, on
+`main` with spec 029's statistics core).** The two packaging runs and
+the SBOMs passed again; the archive policy failed (3.5): `rustev-eval`'s
+unpacked total is 279,602 bytes against its reviewed bound of 262,144,
+because spec 029 increment 1 added its statistics modules (the archive is
+73,245 bytes, within its 131,072). The bound is raised here, by review
+and not automatically, to 393,216 bytes (384 KiB), leaving room for the
+rest of 029's evaluation code; every other bound is unchanged, and the
+file list stays the exact reviewed allowlist.
+
 ## Questions settled by R-34
 
 The owner accepted each recommendation below when approving this spec.
