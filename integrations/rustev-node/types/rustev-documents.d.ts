@@ -1806,6 +1806,734 @@ export namespace RustevDefinition2 {
 }
 export type RustevDefinition2 = RustevDefinition2.RustevDefinition2;
 
+export namespace RustevDynamicCapability1 {
+  export type ArtifactId = string;
+  /**
+   * How far the remote side supports cancellation (spec 009, 3.2.4).
+   */
+  export type CancelSupport = "none" | "best_effort" | "confirmed";
+  /**
+   * A backend's static cost disclosure.
+   */
+  export type CostModel = "unknown" | "bounded" | "estimated";
+  /**
+   * Whether output-affecting state exists that the request does not carry
+   * (3.4). Declared `present` makes the backend ineligible for
+   * qualification.
+   */
+  export type HiddenState = "none" | "present";
+  /**
+   * The three dynamic operations (3.2). Their names are R-05's; `rank`,
+   * `generate` and `extract` are not dynamic operations in version 1.
+   */
+  export type DynamicOperation = "proposition" | "classify" | "rubric";
+  /**
+   * The output kind a request requires (3.2): `label` for any operation,
+   * `distribution` for `proposition` and `classify`, `ordinal_distribution`
+   * for `rubric`. A distribution is never a calibrated probability, and an
+   * ordinal distribution is never an interval score (3.6).
+   */
+  export type DynamicOutputKind = "label" | "distribution" | "ordinal_distribution";
+  /**
+   * What a served identity is worth (spec 009, 3.7).
+   */
+  export type Disclosure = "pinned" | "reported" | "unknown";
+  export type TemplateId = string;
+  export type InputExcess = "refuse" | "truncate_start" | "truncate_end";
+
+  /**
+   * A backend's opt-in dynamic capability, `rustev.dynamic-capability/1`
+   * (3.4), distinct from its registered-plan descriptor: `classify` there
+   * never implies dynamic classification here.
+   */
+  export interface RustevDynamicCapability1 {
+    artifact: ArtifactId;
+    backend_id: string;
+    cancellation: CancelSupport;
+    /**
+     * The cost-bound mode; only `bounded` can be admitted (3.5).
+     */
+    cost: CostModel;
+    hidden_state: HiddenState;
+    max_context_bytes: number;
+    max_context_fields: number;
+    max_question_bytes: number;
+    operations: DynamicOperationSupport[];
+    /**
+     * The named, versioned preprocessing policy.
+     */
+    preprocessing: string;
+    /**
+     * Privacy options the backend accepts, by name.
+     */
+    privacy: string[];
+    schema: "rustev.dynamic-capability/1";
+    served: ServedTerms;
+    /**
+     * The task families this backend answers, by name and version.
+     */
+    task_families: TaskFamily[];
+    template: TemplateRef;
+    /**
+     * The declared truncation policy. The runtime never relies on it: a
+     * request must fit every declared limit without truncation (3.4).
+     */
+    truncation: InputExcess;
+  }
+  /**
+   * What a backend declares for one dynamic operation.
+   */
+  export interface DynamicOperationSupport {
+    /**
+     * The most labels or levels one request may carry.
+     */
+    max_labels: number;
+    operation: DynamicOperation;
+    outputs: DynamicOutputKind[];
+  }
+  /**
+   * Served-identity disclosure as negotiated. `identity` is the pinned
+   * identity, present exactly when `disclosure` is `pinned`.
+   */
+  export interface ServedTerms {
+    disclosure: Disclosure;
+    identity?: string | null;
+  }
+  /**
+   * A task family and its version, selected from a host allowlist (3.2).
+   */
+  export interface TaskFamily {
+    name: string;
+    version: string;
+  }
+  /**
+   * A structured template, identified by its producer (3.3, 3.4): the
+   * versioned mapping from request fields to the provider's request, with
+   * fixed control instructions no caller value can enter.
+   */
+  export interface TemplateRef {
+    id: TemplateId;
+    name: string;
+    version: string;
+  }
+}
+export type RustevDynamicCapability1 = RustevDynamicCapability1.RustevDynamicCapability1;
+
+export namespace RustevDynamicOutcome1 {
+  /**
+   * How the abstention policy was applied (3.5). Exact processing over
+   * model-derived masses; the thresholds are not calibration claims.
+   */
+  export type AbstentionDecision =
+    | "not_applied"
+    | "label_only"
+    | {
+        passed: {
+          margin: number;
+          top_mass: number;
+        };
+      }
+    | {
+        abstained: {
+          margin: number;
+          rule: AbstentionRule;
+          top_mass: number;
+        };
+      };
+  /**
+   * The abstention rule that refused a distribution.
+   */
+  export type AbstentionRule = "min_top_mass" | "min_margin";
+  /**
+   * What is known about cancelling an attempt (spec 003, 3.7.3).
+   */
+  export type Cancellation =
+    | "not_requested"
+    | {
+        requested: {
+          answer: CancelAnswer;
+        };
+      };
+  export type CancelAnswer = "stopped" | "unconfirmed" | "not_observed";
+  /**
+   * A backend's per-call cost disclosure, before dispatch.
+   */
+  export type CostBound =
+    | "unknown"
+    | {
+        bounded: {
+          max_units: number;
+        };
+      }
+    | {
+        estimated: {
+          units: number;
+        };
+      };
+  /**
+   * What an attempt cost, as far as is known when it ends.
+   */
+  export type Charge =
+    | "unknown"
+    | {
+        observed: {
+          units: number;
+        };
+      }
+    | {
+        estimated: {
+          units: number;
+        };
+      };
+  export type AttemptEnd =
+    | "output"
+    | {
+        failed: {
+          class: FailureClass;
+          detail: string;
+        };
+      }
+    | "deadline"
+    | "cancelled";
+  /**
+   * How a dispatched attempt failed (spec 003, 3.6.1). Deadline and
+   * cancellation are not classes: they end a request, and are never retried
+   * or a fallback trigger.
+   */
+  export type FailureClass = "invalid_output" | "transient" | "overloaded" | "permanent" | "timed_out" | "adapter_fault";
+  export type RemoteState = "finished" | "stopped" | "possibly_continuing";
+  export type DynamicCapabilityId = string;
+  export type FinalCost = "known" | "includes_estimates" | "unknown";
+  export type CostMode = "unlimited" | "hard" | "estimated";
+  /**
+   * The three dynamic operations (3.2). Their names are R-05's; `rank`,
+   * `generate` and `extract` are not dynamic operations in version 1.
+   */
+  export type DynamicOperation = "proposition" | "classify" | "rubric";
+  /**
+   * The output kind a request requires (3.2): `label` for any operation,
+   * `distribution` for `proposition` and `classify`, `ordinal_distribution`
+   * for `rubric`. A distribution is never a calibrated probability, and an
+   * ordinal distribution is never an interval score (3.6).
+   */
+  export type DynamicOutputKind = "label" | "distribution" | "ordinal_distribution";
+  /**
+   * The raw output or failure (3.6).
+   */
+  export type DynamicRaw =
+    | "not_dispatched"
+    | {
+        output: DynamicRawOutput;
+      }
+    | {
+        failed: {
+          class: FailureClass;
+          detail: string;
+        };
+      }
+    | "no_answer";
+  /**
+   * What a dynamic backend returned, before validation (3.3). Material that
+   * is not a label or a distribution (a tool call, instructions, a schema, a
+   * URL to fetch, an action) is carried as `unrecognized`, recorded as
+   * invalid output and never executed.
+   */
+  export type DynamicRawOutput =
+    | {
+        label: string;
+      }
+    | {
+        distribution: {
+          [k: string]: number | undefined;
+        };
+      }
+    | {
+        unrecognized: {
+          /**
+           * At most 256 bytes of the material, as data.
+           */
+          excerpt: string;
+          shape: ResponseShape;
+        };
+      };
+  /**
+   * The shape of response material that is not an answer (3.3).
+   */
+  export type ResponseShape =
+    ("tool_call" | "instruction" | "schema" | "url_fetch" | "action" | "free_text" | "other") | "non_finite_mass";
+  export type DynamicRequestId = string;
+  export type ArtifactId = string;
+  /**
+   * A proposal or a named unresolved outcome (3.5, 3.6).
+   */
+  export type DynamicResult =
+    | {
+        proposal: DynamicProposal;
+      }
+    | {
+        unresolved: DynamicUnresolved;
+      };
+  /**
+   * What was proposed (3.6). A label is only a label; a distribution is
+   * uncalibrated mass, not a calibrated probability; an ordinal distribution
+   * is mass over ordered levels, not an interval score.
+   */
+  export type DynamicAnswer =
+    | {
+        label: {
+          label: string;
+        };
+      }
+    | {
+        uncalibrated_distribution: {
+          label: string;
+          masses: LabelMass[];
+        };
+      }
+    | {
+        ordinal_distribution: {
+          level: string;
+          masses: LabelMass[];
+        };
+      };
+  /**
+   * Derivation classes (spec 001, 3.3; spec 002, 3.12).
+   */
+  export type Derivation = "exact-derived" | "model-derived" | "mixed-derived";
+  /**
+   * A named unresolved outcome (3.5). No neutral score, first label,
+   * majority label, empty distribution or provider confidence replaces it.
+   */
+  export type DynamicUnresolved =
+    | ("deadline_exceeded" | "cancelled")
+    | {
+        refused: {
+          refusal: DynamicRefusal;
+        };
+      }
+    | {
+        backend_failed: {
+          class: FailureClass;
+          detail: string;
+        };
+      }
+    | {
+        invalid_output: {
+          detail: string;
+        };
+      }
+    | {
+        served_identity_mismatch: {
+          pinned: string;
+          served?: string | null;
+        };
+      }
+    | {
+        abstained: {
+          rule: AbstentionRule;
+        };
+      };
+  /**
+   * Why a request was refused before dispatch (3.4, 3.5).
+   */
+  export type DynamicRefusal =
+    | "task_family_undeclared"
+    | "no_dynamic_capability"
+    | {
+        capability_invalid: {
+          detail: string;
+        };
+      }
+    | {
+        artifact_mismatch: {
+          declared: ArtifactId;
+        };
+      }
+    | {
+        operation_unsupported: {
+          operation: DynamicOperation;
+          output: DynamicOutputKind;
+        };
+      }
+    | {
+        exceeds_declared_limit: {
+          declared: number;
+          limit: string;
+          requested: number;
+        };
+      }
+    | {
+        privacy_unsupported: {
+          option: string;
+        };
+      }
+    | {
+        cost_unenforceable: {
+          model: CostModel;
+        };
+      }
+    | "cost_unknown"
+    | {
+        cost_above_cap: {
+          bound: number;
+          cap: number;
+        };
+      }
+    | "budget_exhausted";
+  /**
+   * A backend's static cost disclosure.
+   */
+  export type CostModel = "unknown" | "bounded" | "estimated";
+  /**
+   * The isolation scope of a capture, a bundle and every request identity.
+   */
+  export type Scope =
+    | {
+        context_revision: Handle;
+        mode: "tenant_only";
+        tenant: Handle;
+      }
+    | {
+        context_revision: Handle;
+        mode: "principal";
+        principal_scope: Handle;
+        tenant: Handle;
+      };
+  export type Handle = string;
+  /**
+   * What a served identity is worth (spec 009, 3.7).
+   */
+  export type Disclosure = "pinned" | "reported" | "unknown";
+  export type TemplateId = string;
+  /**
+   * Exact validation of the raw output (3.3, 3.6). Exact processing: it
+   * never relabels the proposal exact-derived.
+   */
+  export type DynamicValidation =
+    | ("not_run" | "valid")
+    | {
+        invalid: {
+          detail: string;
+        };
+      };
+
+  /**
+   * A dynamic outcome, `rustev.dynamic-outcome/1` (3.6): evidence of what
+   * Rustev observed for one request, bounded by `RECORD_V1`. It is not proof
+   * that the context was true, the backend was correct, privacy options were
+   * honored, or an action was permitted.
+   */
+  export interface RustevDynamicOutcome1 {
+    abstention: AbstentionDecision;
+    /**
+     * The one attempt; absent when nothing was dispatched.
+     */
+    attempt?: DynamicAttempt | null;
+    backend_id: string;
+    /**
+     * Absent when the backend declares no dynamic capability.
+     */
+    capability?: DynamicCapabilityId | null;
+    /**
+     * The request's own ledger: mode `hard`, limit the cap.
+     */
+    cost: CostSummary;
+    operation: DynamicOperation;
+    output: DynamicOutputKind;
+    /**
+     * The privacy options requested; recorded, never proof of handling.
+     */
+    privacy: string[];
+    raw: DynamicRaw;
+    /**
+     * The canonical request identity; absent only when no capability was
+     * declared to bind its template and preprocessing.
+     */
+    request?: DynamicRequestId | null;
+    request_id: string;
+    /**
+     * The artifact the request required; never replaced by a served one.
+     */
+    requested_artifact: ArtifactId;
+    result: DynamicResult;
+    schema: "rustev.dynamic-outcome/1";
+    scope: Scope;
+    /**
+     * The served identity as the backend reported it, or `unknown`.
+     */
+    served: ServedIdentity;
+    task_family: TaskFamily;
+    template?: TemplateRef | null;
+    timing: DynamicTiming;
+    validation: DynamicValidation;
+  }
+  /**
+   * The one dispatched attempt (3.5).
+   */
+  export interface DynamicAttempt {
+    attempt_id: string;
+    cancellation: Cancellation;
+    cost: AttemptCost;
+    dispatched_ms: number;
+    end: AttemptEnd;
+    ended_ms: number;
+    remote: RemoteState;
+  }
+  export interface AttemptCost {
+    bound: CostBound;
+    charge: Charge;
+    reserved: number;
+  }
+  /**
+   * A decision's cost at the moment its record was built (spec 003, 3.5.6).
+   */
+  export interface CostSummary {
+    /**
+     * Observed charges above a `bounded` reservation.
+     */
+    bound_violations: number;
+    estimated: number;
+    final_cost: FinalCost;
+    /**
+     * Reservations kept because the final cost is unknown.
+     */
+    liability: number;
+    /**
+     * 0 under `unlimited`.
+     */
+    limit: number;
+    mode: CostMode;
+    observed: number;
+    /**
+     * True only under `hard` with no liability and no bound violation.
+     */
+    within_guaranteed_cap: boolean;
+  }
+  /**
+   * A dynamic proposal (3.6): always `model-derived`, with the request and
+   * backend output in its lineage. Never a grant, never a plan value.
+   */
+  export interface DynamicProposal {
+    answer: DynamicAnswer;
+    derivation: Derivation;
+    lineage: DynamicLineage;
+  }
+  /**
+   * One label's or level's mass, in declared order.
+   */
+  export interface LabelMass {
+    label: string;
+    mass: number;
+  }
+  /**
+   * What a proposal was computed from (3.6).
+   */
+  export interface DynamicLineage {
+    artifact: ArtifactId;
+    attempt_id: string;
+    backend_id: string;
+    /**
+     * The context field names, in request order.
+     */
+    context: string[];
+    /**
+     * Exact processing applied after the backend, in order (`validate`,
+     * then `abstention`); visible, never a relabeling.
+     */
+    exact_processing: string[];
+    request: DynamicRequestId;
+  }
+  /**
+   * A served identity as recorded (spec 009, 3.7).
+   */
+  export interface ServedIdentity {
+    disclosure: Disclosure;
+    identity?: string | null;
+  }
+  /**
+   * A task family and its version, selected from a host allowlist (3.2).
+   */
+  export interface TaskFamily {
+    name: string;
+    version: string;
+  }
+  /**
+   * A structured template, identified by its producer (3.3, 3.4): the
+   * versioned mapping from request fields to the provider's request, with
+   * fixed control instructions no caller value can enter.
+   */
+  export interface TemplateRef {
+    id: TemplateId;
+    name: string;
+    version: string;
+  }
+  /**
+   * Monotonic milliseconds from the start of the request.
+   */
+  export interface DynamicTiming {
+    deadline_expired: boolean;
+    deadline_ms: number;
+    elapsed_ms: number;
+  }
+}
+export type RustevDynamicOutcome1 = RustevDynamicOutcome1.RustevDynamicOutcome1;
+
+export namespace RustevDynamicQuestion1 {
+  /**
+   * How a request's result may be accepted (3.5). Thresholds exist only when
+   * the required result is a distribution; label-only acceptance exists only
+   * when the request permits it explicitly. Neither is a calibration claim.
+   */
+  export type AbstentionPolicy =
+    | {
+        thresholds: {
+          min_margin: Decimal;
+          min_top_mass: Decimal;
+        };
+      }
+    | "label_only";
+  export type Decimal = string;
+  export type ArtifactId = string;
+  /**
+   * Derivation classes (spec 001, 3.3; spec 002, 3.12).
+   */
+  export type Derivation = "exact-derived" | "model-derived" | "mixed-derived";
+  /**
+   * The closed set of provenance classes (spec 002, 3.7.1).
+   */
+  export type ProvenanceClass =
+    | "authenticated-app-field"
+    | "system-of-record"
+    | "user-supplied"
+    | "third-party"
+    | "attributed-claim"
+    | "model-derived";
+  /**
+   * A scalar or text context value in canonical form (3.2). Decimals are
+   * strings, so a request holds no binary floating-point number.
+   */
+  export type ContextValue =
+    | {
+        bool: boolean;
+      }
+    | {
+        integer: number;
+      }
+    | {
+        decimal: Decimal;
+      }
+    | {
+        text: string;
+      }
+    | {
+        timestamp: Timestamp;
+      };
+  export type Timestamp = number;
+  /**
+   * The three dynamic operations (3.2). Their names are R-05's; `rank`,
+   * `generate` and `extract` are not dynamic operations in version 1.
+   */
+  export type DynamicOperation = "proposition" | "classify" | "rubric";
+  /**
+   * The output kind a request requires (3.2): `label` for any operation,
+   * `distribution` for `proposition` and `classify`, `ordinal_distribution`
+   * for `rubric`. A distribution is never a calibrated probability, and an
+   * ordinal distribution is never an interval score (3.6).
+   */
+  export type DynamicOutputKind = "label" | "distribution" | "ordinal_distribution";
+  /**
+   * The isolation scope of a capture, a bundle and every request identity.
+   */
+  export type Scope =
+    | {
+        context_revision: Handle;
+        mode: "tenant_only";
+        tenant: Handle;
+      }
+    | {
+        context_revision: Handle;
+        mode: "principal";
+        principal_scope: Handle;
+        tenant: Handle;
+      };
+  export type Handle = string;
+
+  /**
+   * A dynamic question, `rustev.dynamic-question/1` (3.2).
+   */
+  export interface RustevDynamicQuestion1 {
+    abstention: AbstentionPolicy;
+    /**
+     * The artifact the backend must declare.
+     */
+    artifact: ArtifactId;
+    context: ContextField[];
+    /**
+     * The end-to-end deadline, from the moment the runtime starts the
+     * request; positive.
+     */
+    deadline_ms: number;
+    /**
+     * The ordered labels (`proposition`, `classify`) or levels, low to
+     * high (`rubric`). Unique by byte-exact comparison.
+     */
+    labels: string[];
+    /**
+     * The hard cost cap of the one attempt; positive.
+     */
+    max_cost_units: number;
+    operation: DynamicOperation;
+    output: DynamicOutputKind;
+    /**
+     * The privacy options requested; each must be declared by the
+     * capability. A request is evidence of what was asked, never that the
+     * options were honored.
+     */
+    privacy: string[];
+    /**
+     * One UTF-8 question, 1 to 4096 bytes.
+     */
+    question: string;
+    /**
+     * Unique per request, 1 to 256 bytes. Not part of the canonical
+     * request identity.
+     */
+    request_id: string;
+    schema: "rustev.dynamic-question/1";
+    /**
+     * The opaque authorized scope: an isolation key, never a grant.
+     */
+    scope: Scope;
+    task_family: TaskFamily;
+  }
+  /**
+   * One named context field (3.2). `provenance` and `source` state who
+   * asserted the value; they do not make it true or trusted (3.3).
+   */
+  export interface ContextField {
+    derivation: Derivation;
+    name: string;
+    provenance: ProvenanceClass;
+    /**
+     * Who asserted it; recorded, never trusted as authority.
+     */
+    source: string;
+    /**
+     * The revision of the source the value was read at.
+     */
+    source_revision: string;
+    value: ContextValue;
+  }
+  /**
+   * A task family and its version, selected from a host allowlist (3.2).
+   */
+  export interface TaskFamily {
+    name: string;
+    version: string;
+  }
+}
+export type RustevDynamicQuestion1 = RustevDynamicQuestion1.RustevDynamicQuestion1;
+
 export namespace RustevEvalReport1 {
   export type ArtifactId = string;
   export type CalibrationId = string;
@@ -4402,6 +5130,479 @@ export namespace RustevJudgment2 {
   }
 }
 export type RustevJudgment2 = RustevJudgment2.RustevJudgment2;
+
+export namespace RustevLiveReexecution1 {
+  /**
+   * The comparison member of a live document.
+   */
+  export type ComparisonSection =
+    | "not_requested"
+    | {
+        completed: LiveComparison;
+      };
+  export type Timestamp = number;
+  export type FinalCost = "known" | "includes_estimates" | "unknown";
+  export type CostMode = "unlimited" | "hard" | "estimated";
+  /**
+   * Whether a compared member changed. Unknown is never unchanged.
+   */
+  export type Change = "unchanged" | "changed" | "unknown";
+  /**
+   * The result of comparing the live proposal with the historical one.
+   */
+  export type ComparisonOutcome =
+    | "agreement"
+    | "live_diverged"
+    | {
+        unavailable: {
+          availability: Availability;
+          location: string;
+        };
+      }
+    | {
+        incomparable: {
+          reason: string;
+        };
+      };
+  /**
+   * What a retained input is at replay time. Only `available` contributes
+   * to reproduction; none of the others is a pass.
+   */
+  export type Availability = "available" | "missing" | "expired" | "erased" | "corrupt" | "inaccessible" | "mismatched";
+  /**
+   * How the compared result changed.
+   */
+  export type ResultChange = "unchanged" | "proposal_changed" | "unresolved_category_changed" | "not_compared";
+  /**
+   * What became of the new run record's delivery (spec 003, 3.9.4).
+   */
+  export type DeliveryObservation =
+    | {
+        acknowledged: {
+          receipt: string;
+        };
+      }
+    | "queued"
+    | {
+        dropped: {
+          dropped_total: number;
+        };
+      }
+    | {
+        not_delivered: {
+          detail: string;
+          uncertain: boolean;
+        };
+      };
+  export type ArtifactId = string;
+  /**
+   * What the host answered for one proposed attempt, as kept for evidence.
+   */
+  export type AuthorizationOutcome =
+    | {
+        allowed: {
+          reference: AuthorizationReference;
+        };
+      }
+    | {
+        refused: {
+          /**
+           * At most 256 bytes.
+           */
+          detail: string;
+          /**
+           * The host's reference, when its answer carried one.
+           */
+          reference?: AuthorizationReference | null;
+          refusal: AuthorizationRefusal;
+        };
+      };
+  export type AuthorizationReference = string;
+  /**
+   * Why an attempt was not authorized. Each prevents dispatch and is
+   * recorded as `authorization_refused` (spec 026, 3.3).
+   */
+  export type AuthorizationRefusal = "missing" | "expired" | "mismatched" | "errored" | "refused";
+  /**
+   * Whether a proposed attempt was sent, and what it observably did.
+   */
+  export type Dispatch =
+    | "not_dispatched"
+    | {
+        dispatched: {
+          cancellation: Cancellation;
+          charge: Charge;
+          end: AttemptEnd;
+          remote: RemoteState;
+        };
+      };
+  /**
+   * What is known about cancelling an attempt (spec 003, 3.7.3).
+   */
+  export type Cancellation =
+    | "not_requested"
+    | {
+        requested: {
+          answer: CancelAnswer;
+        };
+      };
+  export type CancelAnswer = "stopped" | "unconfirmed" | "not_observed";
+  /**
+   * What an attempt cost, as far as is known when it ends.
+   */
+  export type Charge =
+    | "unknown"
+    | {
+        observed: {
+          units: number;
+        };
+      }
+    | {
+        estimated: {
+          units: number;
+        };
+      };
+  export type AttemptEnd =
+    | "output"
+    | {
+        failed: {
+          class: FailureClass;
+          detail: string;
+        };
+      }
+    | "deadline"
+    | "cancelled";
+  /**
+   * How a dispatched attempt failed (spec 003, 3.6.1). Deadline and
+   * cancellation are not classes: they end a request, and are never retried
+   * or a fallback trigger.
+   */
+  export type FailureClass = "invalid_output" | "transient" | "overloaded" | "permanent" | "timed_out" | "adapter_fault";
+  export type RemoteState = "finished" | "stopped" | "possibly_continuing";
+  /**
+   * A backend's per-call cost disclosure, before dispatch.
+   */
+  export type CostBound =
+    | "unknown"
+    | {
+        bounded: {
+          max_units: number;
+        };
+      }
+    | {
+        estimated: {
+          units: number;
+        };
+      };
+  export type ContentDigest = string;
+  export type RequestId = string;
+  /**
+   * Which kind of external attempt is proposed.
+   */
+  export type AttemptRole = "primary" | "retry" | "fallback";
+  /**
+   * The historical case, or its explicit absence.
+   */
+  export type Historical =
+    | "none"
+    | {
+        linked: HistoricalLink;
+      };
+  export type PlanId = string;
+  export type SnapshotId = string;
+  /**
+   * The new run's capture, chosen independently of the historical case and
+   * off by default (spec 026, 3.7).
+   */
+  export type CapturePosture =
+    | "off"
+    | {
+        on: {
+          max_bytes: number;
+          scope: Scope;
+          status: CaptureStatus;
+        };
+      };
+  /**
+   * The isolation scope of a capture, a bundle and every request identity.
+   */
+  export type Scope =
+    | {
+        context_revision: Handle;
+        mode: "tenant_only";
+        tenant: Handle;
+      }
+    | {
+        context_revision: Handle;
+        mode: "principal";
+        principal_scope: Handle;
+        tenant: Handle;
+      };
+  export type Handle = string;
+  /**
+   * Whether every supplied value was captured. Only `complete` reproduces.
+   */
+  export type CaptureStatus = ("complete" | "disabled" | "cancelled" | "abandoned") | "limit_exceeded";
+  /**
+   * What is known of the historical case's retention. Live re-execution
+   * never extends it and never restores an item (spec 026, 3.7).
+   */
+  export type HistoricalRetention =
+    | "no_history"
+    | "not_observed"
+    | {
+        observed: {
+          bundle_expires_at_ms: Timestamp;
+          observed_at_ms: Timestamp;
+          /**
+           * Items that were not available, explicitly; empty when every item
+           * that was resolved was available.
+           */
+          unavailable: ItemObservation[];
+        };
+      };
+  export type Termination = "judged" | "cancelled";
+
+  /**
+   * `rustev.live-reexecution/1`: one live re-execution, bounded by
+   * `REPLAY_V1`. Holds no credential and no secret authorization material.
+   */
+  export interface RustevLiveReexecution1 {
+    admission: Admission;
+    comparison: ComparisonSection;
+    /**
+     * The new decision; never the historical one.
+     */
+    decision_id: string;
+    delivery: DeliveryObservation;
+    /**
+     * One per proposed external attempt, in proposal order.
+     */
+    effects: LiveEffect[];
+    evaluation_time_ms: Timestamp;
+    historical: Historical;
+    plan_id: PlanId;
+    retention: RetentionPosture;
+    run: RunLink;
+    /**
+     * The record digest of the new run record; absent only when the
+     * record has no record canonical form, which nothing then matches.
+     */
+    run_digest?: ContentDigest | null;
+    schema: "rustev.live-reexecution/1";
+    scope: Scope;
+    /**
+     * Computed from the current snapshot by the runtime.
+     */
+    snapshot_id: SnapshotId;
+    subject: Handle;
+    /**
+     * Attempts whose charge is unknown: outstanding liability for the host
+     * to reconcile (spec 003, 3.5.5). The record is never rewritten.
+     */
+    unreconciled: string[];
+  }
+  /**
+   * The new decision's admission (spec 003, 3.4): a document exists only for
+   * an admitted decision.
+   */
+  export interface Admission {
+    deadline_ms: number;
+    queued_ms: number;
+  }
+  /**
+   * The comparison of a finished live run with a verified historical case.
+   */
+  export interface LiveComparison {
+    compared_at_ms: Timestamp;
+    cost: CostComparison;
+    definition: ComparisonDefinition;
+    /**
+     * What was left out of the comparison, and why; at most 64.
+     */
+    exclusions: string[];
+    /**
+     * The historical and live outcome categories, by the adapter's names.
+     */
+    historical_result?: string | null;
+    identities: IdentityChanges;
+    /**
+     * What the comparison does not establish; at most 64.
+     */
+    limitations: string[];
+    live_result?: string | null;
+    observations: ObservationChanges;
+    other: OtherChanges;
+    outcome: ComparisonOutcome;
+    result: ResultChange;
+  }
+  /**
+   * Observed, estimated and unknown cost, kept apart, of each side.
+   */
+  export interface CostComparison {
+    historical?: CostSummary | null;
+    live: CostSummary;
+  }
+  /**
+   * A decision's cost at the moment its record was built (spec 003, 3.5.6).
+   */
+  export interface CostSummary {
+    /**
+     * Observed charges above a `bounded` reservation.
+     */
+    bound_violations: number;
+    estimated: number;
+    final_cost: FinalCost;
+    /**
+     * Reservations kept because the final cost is unknown.
+     */
+    liability: number;
+    /**
+     * 0 under `unlimited`.
+     */
+    limit: number;
+    mode: CostMode;
+    observed: number;
+    /**
+     * True only under `hard` with no liability and no bound violation.
+     */
+    within_guaranteed_cap: boolean;
+  }
+  /**
+   * What is compared: an explicitly named proposal payload or outcome
+   * category, chosen by a versioned task adapter. Full judgment bytes are
+   * never the agreement metric.
+   */
+  export interface ComparisonDefinition {
+    adapter: string;
+    adapter_version: string;
+    /**
+     * The proposal payload fields compared beside the action; at most 64.
+     */
+    fields: string[];
+  }
+  /**
+   * Identity changes between the historical case and the live run.
+   */
+  export interface IdentityChanges {
+    /**
+     * The artifacts whose outputs were supplied.
+     */
+    artifacts: Change;
+    evaluation_time: Change;
+    plan: Change;
+    /**
+     * A served identity is not recorded by `rustev.run/1`.
+     */
+    served_identity: Change;
+    snapshot: Change;
+  }
+  /**
+   * New backend, policy, calibration and runtime observations.
+   */
+  export interface ObservationChanges {
+    /**
+     * The backends attempted.
+     */
+    backends: Change;
+    calibration: Change;
+    execution_policy: Change;
+    historical_runtime?: RuntimeObservations | null;
+    live_runtime: RuntimeObservations;
+    /**
+     * The definition, whose selection policy is part of it.
+     */
+    policy: Change;
+  }
+  /**
+   * Counts of runtime observations of one side.
+   */
+  export interface RuntimeObservations {
+    attempts: number;
+    cancellations_requested: number;
+    deadline_expired: boolean;
+    fallbacks: number;
+    possibly_continuing: number;
+    retries: number;
+  }
+  /**
+   * Cancellation, remote-state, retention and delivery differences.
+   */
+  export interface OtherChanges {
+    cancellation: Change;
+    delivery: Change;
+    remote_state: Change;
+    retention: Change;
+    termination: Change;
+  }
+  /**
+   * One proposed external attempt of the new decision: what was presented,
+   * the host's answer, and the effect. Every attempted effect is attributable
+   * to the new decision by its attempt id (spec 026, 3.6).
+   */
+  export interface LiveEffect {
+    artifact: ArtifactId;
+    attempt_id: string;
+    authorization: AuthorizationOutcome;
+    backend_id: string;
+    dispatch: Dispatch;
+    exposure: Exposure;
+    instance: string[];
+    /**
+     * The digest of the request the host was asked about.
+     */
+    presented: ContentDigest;
+    remaining_ms: number;
+    request: RequestId;
+    role: AttemptRole;
+    step: string;
+    target: number;
+  }
+  /**
+   * The worst-case cost of one proposed attempt: the backend's disclosure and
+   * the units reserved for it before it was presented.
+   */
+  export interface Exposure {
+    bound: CostBound;
+    reserved_units: number;
+  }
+  /**
+   * A historical case, linked by digest and identities only: never embedded
+   * historical content (spec 026, 3.7).
+   */
+  export interface HistoricalLink {
+    /**
+     * The record digest of the `rustev.replay/1` bundle.
+     */
+    bundle_digest: ContentDigest;
+    decision_id: string;
+    evaluation_time_ms: Timestamp;
+    plan_id: PlanId;
+    snapshot_id: SnapshotId;
+  }
+  export interface RetentionPosture {
+    capture: CapturePosture;
+    historical: HistoricalRetention;
+  }
+  /**
+   * One historical item's availability, as observed at comparison.
+   */
+  export interface ItemObservation {
+    availability: Availability;
+    /**
+     * `bundle`, `plan`, `snapshot`, `run`, `descriptors[i]`, ...
+     */
+    location: string;
+  }
+  /**
+   * The new run record, linked by digest; it stays the evidence of execution.
+   */
+  export interface RunLink {
+    cost: CostSummary;
+    termination: Termination;
+  }
+}
+export type RustevLiveReexecution1 = RustevLiveReexecution1.RustevLiveReexecution1;
 
 export namespace RustevPlan2 {
   /**
@@ -7060,6 +8261,52 @@ export namespace RustevPlan3 {
   }
 }
 export type RustevPlan3 = RustevPlan3.RustevPlan3;
+
+export namespace RustevRedaction1 {
+  /**
+   * What happens to a field's value on export (3.4.1).
+   */
+  export type Action =
+    | "drop"
+    | "digest"
+    | {
+        truncate: {
+          bytes: number;
+        };
+      }
+    | "allow";
+
+  /**
+   * A redaction policy, `rustev.redaction/1` (3.4.1). Parse it with
+   * [`RedactionPolicy::parse_validated`]; a policy that has not passed
+   * [`RedactionPolicy::validate`] is never applied.
+   */
+  export interface RustevRedaction1 {
+    /**
+     * Class-wide actions; an unnamed class takes its default (3.4.3).
+     */
+    classes?: {
+      [k: string]: Action | undefined;
+    };
+    /**
+     * Catalogue content fields whose GenAI content events may be emitted.
+     */
+    content_events?: string[];
+    /**
+     * Per-field overrides, each naming one catalogue field exactly.
+     */
+    fields?: FieldOverride[];
+    schema: "rustev.redaction/1";
+  }
+  /**
+   * One `fields` override (3.4.1).
+   */
+  export interface FieldOverride {
+    action: Action;
+    field: string;
+  }
+}
+export type RustevRedaction1 = RustevRedaction1.RustevRedaction1;
 
 export namespace RustevRemoteCancel1Request {
   export interface RustevRemoteCancel1Request {
@@ -11192,3 +12439,94 @@ export namespace RustevSource1 {
   }
 }
 export type RustevSource1 = RustevSource1.RustevSource1;
+
+export namespace RustevTrace1 {
+  /**
+   * How an exported value was produced (3.10.1).
+   */
+  export type Mark = "allow" | "digest" | "truncated";
+  /**
+   * An attribute value: a string, integer, number, boolean or a homogeneous
+   * array of one of those (3.10.1).
+   */
+  export type TraceValue = string | number | boolean | string[] | number[] | boolean[];
+  /**
+   * Span kind (3.5.3).
+   */
+  export type SpanKind = "internal" | "client";
+  /**
+   * Span status (3.5.3). An unresolved, escalated or cancelled decision is an
+   * answer, so its root stays `unset`; only a failed or deadline attempt is
+   * `error`.
+   */
+  export type SpanStatus = "unset" | "error";
+
+  /**
+   * One span, one line (3.10.1).
+   */
+  export interface RustevTrace1 {
+    attributes: {
+      [k: string]: TraceAttr | undefined;
+    };
+    end_unix_nanos: number;
+    events: TraceEvent[];
+    kind: SpanKind;
+    name: string;
+    /**
+     * 16 lowercase hex digits, or null for a root without a host parent.
+     */
+    parent_span_id?: string | null;
+    resource?: TraceResource | null;
+    schema: "rustev.trace/1";
+    /**
+     * The span schema version, `1` for `rustev.otel/1`.
+     */
+    schema_version: number;
+    /**
+     * 16 lowercase hex digits.
+     */
+    span_id: string;
+    start_unix_nanos: number;
+    status: SpanStatus;
+    /**
+     * 32 lowercase hex digits.
+     */
+    trace_id: string;
+  }
+  /**
+   * One exported attribute: its value and how it was produced.
+   */
+  export interface TraceAttr {
+    r: Mark;
+    v: TraceValue;
+  }
+  /**
+   * A span event (3.5.5).
+   */
+  export interface TraceEvent {
+    attributes: {
+      [k: string]: TraceAttr | undefined;
+    };
+    name: string;
+    time_unix_nanos: number;
+  }
+  /**
+   * The resource, on the root line only (3.2.4, 3.10.1).
+   */
+  export interface TraceResource {
+    attributes: {
+      [k: string]: TraceAttr | undefined;
+    };
+    schema_url: string;
+    scope: TraceScope;
+  }
+  /**
+   * The instrumentation scope (3.2.4).
+   */
+  export interface TraceScope {
+    name: string;
+    schema_url: string;
+    version: string;
+  }
+}
+export type RustevTrace1 = RustevTrace1.RustevTrace1;

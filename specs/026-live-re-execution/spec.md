@@ -371,6 +371,10 @@ the owner's review:
   spec 027, 3.2.2: that would regenerate the committed TypeScript
   declarations under `integrations/rustev-wasm/` and
   `integrations/rustev-node/`, which this spec does not extend.
+  Superseded by the implementation on 2026-10-22 of R-46, the owner
+  ruling of 2026-10-21 that the document joins the emission, which spec 027's implementation record carries;
+  `crates/rustev-contract/tests/live.rs` checks a live document against
+  its emitted schema.
 
 Tests: `crates/rustev-contract/tests/live.rs` and
 `crates/rustev-runtime/tests/live.rs` (rows 2 to 6 and 9 of section 5;

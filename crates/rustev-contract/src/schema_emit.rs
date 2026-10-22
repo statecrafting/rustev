@@ -183,6 +183,14 @@ pub fn document_schemas() -> Vec<EmittedSchema> {
         replay::ReplayBundle, request::RequestDoc, run::RunRecord, snapshot::Snapshot,
         source::SourceDescriptor,
     };
+    // Specs 019, 026 and 028 (R-46): the dynamic-question documents, live
+    // re-execution evidence, the redaction policy and the span line.
+    use crate::{
+        dynamic::{DynamicCapability, DynamicOutcome, DynamicQuestion},
+        live::LiveReexecution,
+        redaction::{REDACTION, RedactionPolicy},
+        trace::{TRACE, TraceLine},
+    };
     let mut out = vec![
         emit::<Definition>(schema::DEFINITION, None),
         emit::<Definition>(schema::DEFINITION_V2, None),
@@ -213,6 +221,12 @@ pub fn document_schemas() -> Vec<EmittedSchema> {
         emit::<remote::CancelRequest>(schema::REMOTE_CANCEL, Some("request")),
         emit::<remote::CancelResponse>(schema::REMOTE_CANCEL, Some("response")),
         emit::<remote::ExchangeRecord>(schema::REMOTE_EXCHANGE, None),
+        emit::<DynamicQuestion>(schema::DYNAMIC_QUESTION, None),
+        emit::<DynamicCapability>(schema::DYNAMIC_CAPABILITY, None),
+        emit::<DynamicOutcome>(schema::DYNAMIC_OUTCOME, None),
+        emit::<LiveReexecution>(schema::LIVE_REEXECUTION, None),
+        emit::<RedactionPolicy>(REDACTION, None),
+        emit::<TraceLine>(TRACE, None),
     ];
     out.sort_by(|a, b| a.file.cmp(&b.file));
     out

@@ -22,7 +22,7 @@ pub const TRACE: &str = "rustev.trace/1";
 
 /// An attribute value: a string, integer, number, boolean or a homogeneous
 /// array of one of those (3.10.1).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(untagged)]
 pub enum TraceValue {
     Str(String),
@@ -83,7 +83,7 @@ impl From<bool> for TraceValue {
 }
 
 /// How an exported value was produced (3.10.1).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Mark {
     Allow,
@@ -92,7 +92,7 @@ pub enum Mark {
 }
 
 /// One exported attribute: its value and how it was produced.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct TraceAttr {
     pub v: TraceValue,
@@ -100,7 +100,7 @@ pub struct TraceAttr {
 }
 
 /// Span kind (3.5.3).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum SpanKind {
     Internal,
@@ -110,7 +110,7 @@ pub enum SpanKind {
 /// Span status (3.5.3). An unresolved, escalated or cancelled decision is an
 /// answer, so its root stays `unset`; only a failed or deadline attempt is
 /// `error`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum SpanStatus {
     Unset,
@@ -118,7 +118,7 @@ pub enum SpanStatus {
 }
 
 /// A span event (3.5.5).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct TraceEvent {
     pub name: String,
@@ -127,7 +127,7 @@ pub struct TraceEvent {
 }
 
 /// The instrumentation scope (3.2.4).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct TraceScope {
     pub name: String,
@@ -136,7 +136,7 @@ pub struct TraceScope {
 }
 
 /// The resource, on the root line only (3.2.4, 3.10.1).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct TraceResource {
     pub attributes: BTreeMap<String, TraceAttr>,
@@ -145,7 +145,7 @@ pub struct TraceResource {
 }
 
 /// One span, one line (3.10.1).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct TraceLine {
     pub schema: String,

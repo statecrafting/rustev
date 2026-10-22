@@ -80,6 +80,24 @@ fn effect(attempt_id: &str, authorization: AuthorizationOutcome, dispatch: Dispa
     }
 }
 
+/// Assert `v` fits the emitted JSON Schema of `version` (spec 027, 3.2.2;
+/// R-46 added this document to the emission).
+fn fits_emitted_schema(v: &serde_json::Value, version: &str) {
+    let file = format!("{}.schema.json", version.replace('/', "-"));
+    let s = rustev_contract::schema_emit::document_schemas()
+        .into_iter()
+        .find(|s| s.file == file)
+        .unwrap_or_else(|| panic!("{file} is emitted"));
+    let schema: serde_json::Value = serde_json::from_slice(&s.bytes).unwrap();
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    let errors: Vec<String> = validator
+        .iter_errors(v)
+        .take(3)
+        .map(|e| format!("{e} at {}", e.instance_path()))
+        .collect();
+    assert!(errors.is_empty(), "{version}: {errors:?}");
+}
+
 fn document() -> LiveReexecution {
     LiveReexecution {
         schema: schema::LIVE_REEXECUTION.into(),
@@ -363,4 +381,10 @@ fn a_wrong_schema_is_refused() {
         LiveReexecution::parse(&bytes),
         Err(DocumentError::Schema { .. })
     ));
+}
+
+#[test]
+fn a_live_document_fits_its_emitted_schema() {
+    let v = serde_json::to_value(document()).unwrap();
+    fits_emitted_schema(&v, schema::LIVE_REEXECUTION);
 }

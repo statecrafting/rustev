@@ -116,7 +116,7 @@
       }
     ],
     "sectionDigests": {
-      "019-dynamic-questions-as-a-narrow-evaluated-class": "067d0978146190585cda8e8b8b2d23396fa40d45f0958e19256b8b61618ef19f",
+      "019-dynamic-questions-as-a-narrow-evaluated-class": "19f7cfc4f7159c73017ac634f59b5de40458f40c668b91049f28a719a50e7b75",
       "1-purpose": "a876c2dd0828605e3821cefa4147b773412f9825962f17eeea6db78d0a8cd48d",
       "2-territory-and-compatibility": "c37b59d7ebdfefc8d73dd0fee8a019c53dda44fef86a56804eb3f1f0bf41cd80",
       "3-1-separate-class-and-api": "b84ce761bd48bfb8d61ca5956af61ffcf56dde566e4c6d39c0b729c74ebf103d",
@@ -130,7 +130,7 @@
       "4-out-of-scope": "2a03b831b04fff0f6cd2b653d0a9362c8408bc54f11e25ff1ae898e08566c9cc",
       "5-observable-negative-cases": "decf882d48535846a132a9111436e1e8768cbebf6b15875291b4d02b60e5b818",
       "acceptance": "eb03d3a7ff6817ba0444c647c058bbca9a70f1fcea53f045502cca077799dff1",
-      "implementation-record": "b325a78203626e60741a173ae8dff1fdab3104b80384fda6fedd75de7ebf0c7a",
+      "implementation-record": "4d0f6d864d68ffc2a10b4ff0916caae01f81e982eaec9dd464f0c1fb8751c70c",
       "questions-settled-by-r-34": "be45bb809983f9fe2365f5e759916e429b2875ab600e14eca511b68a27f18ace",
       "verification": "13e1b900b178371a9011bfac8b1deda9901d085b64e3fd64770626c9cc19d0ef"
     },
@@ -158,6 +158,6 @@
     "summary": "A separate, explicitly invoked class for one bounded proposition, classification, or rubric question over caller-selected context. Dynamic questions use a dedicated backend capability, structured data-only inputs, fixed request-time labels or levels, one attempt, hard cost and time limits, explicit abstention, model-derived lineage, and class-specific evaluation. They do not alter a registered plan, supply a value into a running plan, create calibration or probability by implication, invoke tools, or grant authority.\n",
     "title": "Dynamic questions as a narrow evaluated class"
   },
-  "shardHash": "70f096ff845384f8ffabd12b3970ccc0e8155b864eb4c697f0f6c3dc860be6cf",
+  "shardHash": "6eb409ed4bbb5b69d8ebe8d0142ff87c51a1aaf7ba86421d867ba125fce3dc1f",
   "specVersion": "1.10.0"
 }

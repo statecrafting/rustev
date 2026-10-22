@@ -66,7 +66,8 @@ fn emission_is_deterministic_and_canonical() {
 }
 
 /// Every JSON document committed under a test directory of the workspace,
-/// as `(path, value)`, when it parses as one JSON value.
+/// as `(path, value)`, when it parses as one JSON value, and every line of
+/// a committed `.jsonl` file (the span lines of spec 028) that parses as one.
 fn committed_documents() -> Vec<(PathBuf, serde_json::Value)> {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let mut out = Vec::new();
@@ -91,6 +92,15 @@ fn committed_documents() -> Vec<(PathBuf, serde_json::Value)> {
                 && let Ok(v) = serde_json::from_slice::<serde_json::Value>(&b)
             {
                 out.push((p, v));
+            } else if name.ends_with(".jsonl")
+                && p.components().any(|c| c.as_os_str() == "tests")
+                && let Ok(b) = std::fs::read(&p)
+            {
+                for line in b.split(|c| *c == b'\n').filter(|l| !l.is_empty()) {
+                    if let Ok(v) = serde_json::from_slice::<serde_json::Value>(line) {
+                        out.push((p.clone(), v));
+                    }
+                }
             }
         }
     }
@@ -112,6 +122,7 @@ fn every_committed_document_validates_against_its_schema() {
         })
         .collect();
     let mut checked = 0;
+    let mut seen = std::collections::BTreeSet::new();
     for (path, doc) in committed_documents() {
         let Some(version) = doc.get("schema").and_then(|s| s.as_str()) else {
             continue;
@@ -126,8 +137,13 @@ fn every_committed_document_validates_against_its_schema() {
             .collect();
         assert!(errors.is_empty(), "{}: {errors:?}", path.display());
         checked += 1;
+        seen.insert(version.to_string());
     }
     assert!(checked >= 30, "only {checked} documents checked");
+    // The span lines of spec 028 (R-46) are committed goldens; the other
+    // documents R-46 added are checked against their schemas in their own
+    // contract tests.
+    assert!(seen.contains("rustev.trace/1"), "no span line checked");
 }
 
 #[test]

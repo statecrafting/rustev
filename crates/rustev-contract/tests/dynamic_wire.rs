@@ -62,6 +62,24 @@ fn capability() -> serde_json::Value {
     })
 }
 
+/// Assert `v` fits the emitted JSON Schema of `version` (spec 027, 3.2.2;
+/// R-46 added this document to the emission).
+fn fits_emitted_schema(v: &serde_json::Value, version: &str) {
+    let file = format!("{}.schema.json", version.replace('/', "-"));
+    let s = rustev_contract::schema_emit::document_schemas()
+        .into_iter()
+        .find(|s| s.file == file)
+        .unwrap_or_else(|| panic!("{file} is emitted"));
+    let schema: serde_json::Value = serde_json::from_slice(&s.bytes).unwrap();
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    let errors: Vec<String> = validator
+        .iter_errors(v)
+        .take(3)
+        .map(|e| format!("{e} at {}", e.instance_path()))
+        .collect();
+    assert!(errors.is_empty(), "{version}: {errors:?}");
+}
+
 fn bytes(v: &serde_json::Value) -> Vec<u8> {
     serde_json::to_vec(v).unwrap()
 }
@@ -335,6 +353,7 @@ fn an_outcome_round_trips_in_record_canonical_form() {
         }}
     });
     let o = DynamicOutcome::parse(&bytes(&v)).unwrap();
+    fits_emitted_schema(&v, schema::DYNAMIC_OUTCOME);
     let rec = o.record_canonical().unwrap();
     let back = DynamicOutcome::parse(&rec).unwrap();
     assert_eq!(back, o);
@@ -342,4 +361,12 @@ fn an_outcome_round_trips_in_record_canonical_form() {
     let mut extra = v.clone();
     extra["permitted"] = true.into();
     assert!(DynamicOutcome::parse(&bytes(&extra)).is_err());
+}
+
+#[test]
+fn a_question_and_a_capability_fit_their_emitted_schemas() {
+    DynamicQuestion::parse(&bytes(&question())).unwrap();
+    fits_emitted_schema(&question(), schema::DYNAMIC_QUESTION);
+    DynamicCapability::parse(&bytes(&capability())).unwrap();
+    fits_emitted_schema(&capability(), schema::DYNAMIC_CAPABILITY);
 }
