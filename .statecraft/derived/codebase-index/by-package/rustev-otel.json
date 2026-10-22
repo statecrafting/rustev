@@ -1,0 +1,10 @@
+{
+  "package": {
+    "kind": "rust-lib",
+    "name": "rustev-otel",
+    "path": "integrations/rustev-otel",
+    "specRef": "028-opentelemetry-evidence-sink"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "4bfb07247ad96cec7a3ce240e90961abc4ab4a09bb7fa95bd16fd93176c28021"
+}

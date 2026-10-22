@@ -35,6 +35,14 @@
         "source": "spec-edge"
       },
       {
+        "path": "integrations/rustev-otel",
+        "source": "manifest-metadata"
+      },
+      {
+        "path": "integrations/rustev-otel/",
+        "source": "spec-edge"
+      },
+      {
         "path": "tools/rustev-boundaries/",
         "source": "spec-edge"
       },
@@ -45,7 +53,11 @@
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "integrations/rustev-otel/"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -175,5 +187,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "2fa320d413d0ad5af2b2132699876f86a73aad824354762722003f4bb5d077d5"
+  "shardHash": "e2dd8c7d8d64b13fe794cce53246125da995dcc4aa149aedf01240edd822be87"
 }

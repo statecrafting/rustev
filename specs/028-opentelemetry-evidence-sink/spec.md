@@ -22,7 +22,7 @@ amends:
   - "001-boundaries-and-authority"
   - "006-cli-surface"
 establishes:
-  - { kind: directory, path: "integrations/rustev-otel/", planned: true }
+  - { kind: directory, path: "integrations/rustev-otel/" }
 extends:
   # The redaction policy and trace span documents, the field catalogue, the
   # policy evaluation and the keyed digest (3.3 to 3.6). Purely additive: no
@@ -971,6 +971,54 @@ documents are not added to spec 027's JSON Schema emission: doing so
 regenerates the committed binding declarations under
 `integrations/rustev-wasm/` and `integrations/rustev-node/`, which this
 spec does not extend.
+
+**Increment 3 (projection, JSONL exporter, goldens).**
+`integrations/rustev-otel` exists (`publish = false`, listed as excluded in
+`release-set.json`; default features empty, no OpenTelemetry crate yet):
+`project` turns one delivered `rustev.run/1` record, the registered plan,
+the joined exchange records and the host's bindings into the span lines of
+3.5, every value through `Redactor` and the 4 096-byte value bound;
+`JsonlExporter` appends one decision per write to a file opened
+append-only with mode `0600`, stopping at `max_bytes` (`file_full`); ids
+come from a seeded or a randomly seeded source. Readings taken within the
+spec:
+
+- The projection knows `rustev.run/1` with `rustev.evidence/1` and
+  `rustev.judgment/1` (the documents of the specs 028 depends on). A
+  record of a later version, a judgment outcome of a later spec, a
+  corroboration step, or a step missing from its registered plan is
+  `projection_unknown`, never a guessed span; the core's sink seam accepts
+  only `rustev.run/1` by default as well.
+- A request with no step evidence entry (a decision whose evidence was not
+  produced) still gets its step span after the evidence entries, so its
+  attempts are not lost; it carries only request attributes.
+- An outcome parameter keeps its kind: booleans, integers and strings as
+  such, a decimal as its exact string, a timestamp as its milliseconds, a
+  composite value (list, record, filtered, shortlist, ranking) as its
+  record canonical JSON. A count beyond `i64` is its exact decimal string.
+  A lineage input with no recorded provenance counts as `attributed-claim`
+  for the lineage rule.
+- Root events are timed at the root's start, transitions at their step's
+  start, policy events at the root's end. The policy span is always
+  emitted. A line over 64 KiB loses events (halving, counted in
+  `events_cut`) and then long strings (cut to 256 bytes, counted in
+  `attributes_cut`).
+
+Goldens (R-2) under `integrations/rustev-otel/tests/golden/`:
+`support.trace.jsonl`, `lodging.trace.jsonl` and
+`support-remote.trace.jsonl` under the default policy, and an `.allow.`
+golden of each under an all-`allow` test policy (every field allowed by
+name, as 3.4.2 requires), in which no span withholds anything and every
+GenAI row of 3.5.4 appears. They read spec 006's committed run records and
+the committed plans that produced them (`tests/fixtures/`, each checked
+against the record's `PlanId`); the remote golden joins three synthetic
+`rustev.remote-exchange/1` records (pinned, reported and unknown
+disclosure, declared usage keys, provider extras, and a failed member's
+detail on an attempt the record shows as an output, which only exercises
+that row). Tests also cover timing, unset root status for an unresolved
+outcome, error status for a failed attempt, unregistered plans, unknown
+records, the event and value bounds, canaries in default-deny and digest
+slots, and the JSONL exporter's mode, append and bound.
 
 ## Decisions at approval
 
