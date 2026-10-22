@@ -679,6 +679,21 @@ and not automatically, to 393,216 bytes (384 KiB), leaving room for the
 rest of 029's evaluation code; every other bound is unchanged, and the
 file list stays the exact reviewed allowlist.
 
+**Candidate run, 2026-10-22, at `419b664` (a reviewed head of spec 031
+increment 5, #162; `main` has moved since, so this is evidence for that
+commit only).** `make release-candidate` passed in full, locally on macOS
+arm64: the eleven archives byte-identical across the two clean runs, the
+archive policy, the unpacked tests on 1.98.1 and on the MSRV 1.88, the
+audit (`cargo deny` 0.20.2: advisories, bans, licenses and sources ok;
+no advisory exception), the dependency report, the changelog, a CycloneDX
+SBOM per member, and the canonical release manifest
+(`release-manifest.json`, SHA-256
+`8b4e92e8dbd42fb91394474bb02fd58a59875c8fe8310f066174d44069b4761a`) with
+its `SHA256SUMS`. This is 3.7's package verification for that commit, on
+one owner-approved target; the candidate commit of a release is the one
+the owner names, and the candidate is run again there. Nothing was
+signed, tagged or uploaded.
+
 ## Questions settled by R-34
 
 The owner accepted each recommendation below when approving this spec.
