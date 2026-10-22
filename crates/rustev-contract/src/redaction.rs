@@ -38,7 +38,19 @@ pub const KEY_ID_BYTES: std::ops::RangeInclusive<usize> = 1..=64;
 pub const DIGEST_DOMAIN: &str = "rustev.digest/1";
 
 /// Field classes (3.3.1). Every exportable field belongs to exactly one.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum FieldClass {
     UserSupplied,
@@ -180,7 +192,7 @@ pub fn lineage_class(
 }
 
 /// What happens to a field's value on export (3.4.1).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Action {
     /// Withheld; its name is listed in `rustev.redaction.withheld`.
@@ -229,7 +241,7 @@ impl fmt::Display for Action {
 }
 
 /// One `fields` override (3.4.1).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct FieldOverride {
     pub field: String,
@@ -239,7 +251,7 @@ pub struct FieldOverride {
 /// A redaction policy, `rustev.redaction/1` (3.4.1). Parse it with
 /// [`RedactionPolicy::parse_validated`]; a policy that has not passed
 /// [`RedactionPolicy::validate`] is never applied.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RedactionPolicy {
     pub schema: String,

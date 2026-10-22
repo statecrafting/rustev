@@ -466,6 +466,12 @@ is not stated by either spec. Calibration of a dynamic task family (3.7)
 needs a separately fitted artifact with its own binding; none exists, and
 none is claimed.
 
+**Schema emission implemented, 2026-10-22 (R-46).** The owner ruled on
+2026-10-21 that the three dynamic documents belong in the emission. R-46
+identifies that earlier ruling; 2026-10-22 is the implementation date.
+The spec 027 implementation record carries the change, and `tests/dynamic_wire.rs` checks a question,
+a capability and an outcome against their emitted schemas.
+
 **Owner review, 2026-10-21 (R-47).** The owner accepted the defaults
 and engineering choices in this implementation record as recorded.
 

@@ -989,7 +989,11 @@ schema string, limit, canonical byte or identity changes. The two new
 documents are not added to spec 027's JSON Schema emission: doing so
 regenerates the committed binding declarations under
 `integrations/rustev-wasm/` and `integrations/rustev-node/`, which this
-spec does not extend.
+spec does not extend. Superseded by the implementation on 2026-10-22 of R-46, the owner
+ruling of 2026-10-21 that both documents join the emission, which spec 027's implementation
+record carries; their types derive `JsonSchema`, the span-line goldens are
+validated against `rustev.trace/1`, and `tests/redaction.rs` checks
+policies against `rustev.redaction/1`.
 
 **Increment 3 (projection, JSONL exporter, goldens).**
 `integrations/rustev-otel` exists (`publish = false`, listed as excluded in
