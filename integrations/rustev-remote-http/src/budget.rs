@@ -28,8 +28,13 @@ impl Budget {
     }
 
     pub fn from_ms(ms: u64) -> Self {
+        Self::from_start(Instant::now(), DurationMs(ms))
+    }
+
+    /// Anchor a remaining budget to dispatch, including member preparation time.
+    pub(crate) fn from_start(start: Instant, remaining: DurationMs) -> Self {
         Budget {
-            deadline: Instant::now() + Duration::from_millis(ms),
+            deadline: start + Duration::from_millis(remaining.0),
         }
     }
 
@@ -128,6 +133,21 @@ pub fn check_transport_timeout(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test(flavor = "current_thread", start_paused = true)]
+    async fn batch_preparation_does_not_extend_later_member_deadlines() {
+        let start = Instant::now();
+        let first = Budget::from_start(start, DurationMs(100));
+        tokio::time::advance(Duration::from_millis(40)).await;
+        let second = Budget::from_start(start, DurationMs(100));
+        let longer = Budget::from_start(start, DurationMs(150));
+        assert_eq!(second.remaining_ms(), 60);
+        first.expiry().await;
+        assert!(first.expired());
+        assert!(second.expired());
+        assert!(!longer.expired());
+        assert_eq!(longer.remaining_ms(), 50);
+    }
 
     #[tokio::test(flavor = "current_thread", start_paused = true)]
     async fn a_phase_limit_never_outlives_the_budget() {
