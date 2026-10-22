@@ -15,7 +15,7 @@ summary: >
   service. Concrete external API bindings and readiness claims require later
   evidence before implementation.
 establishes:
-  - { kind: directory, path: "integrations/rustev-aicortex/", planned: true }
+  - { kind: directory, path: "integrations/rustev-aicortex/" }
   - { kind: directory, path: "integrations/rustev-rahi/" }
   - { kind: directory, path: "integrations/rustev-serve/", planned: true }
 extends:
@@ -318,10 +318,11 @@ Before this spec may become implementation-complete:
 ## Verification
 
 Run by `make verify` (010 is in `VERIFIED_SPECS`). The implemented subset
-is `rustev-rahi` (see the implementation record); `rustev-aicortex` and
-`rustev-serve` are not implemented, because their records refuse. No step
-needs a network beyond loopback or a live service: the Rahi store runs in
-the test process.
+is `rustev-rahi` and `rustev-aicortex` (see the implementation record);
+`rustev-serve` is not implemented, because its record refuses. No step
+needs a network beyond loopback or a live service: each Rahi store runs in
+the test process. Cargo fetches the pinned Aicortex revision like any
+locked dependency.
 
 ```verify:cli
 # 3.6 and the rustev-rahi record: every failure row against a scripted
@@ -332,10 +333,16 @@ cargo clippy -p rustev-rahi --all-targets --locked -- -D warnings
 # I-2, I-4: the integration builds alone, and no crate outside
 # integrations/ reaches Rahi or Aicortex.
 cargo build -p rustev-rahi --locked
+# 3.5 and the rustev-aicortex record: the bounded projection, refusals and
+# proposal staging against a single-voter Rahi 0.6.0 store with Aicortex's
+# schema in a temporary directory.
+cargo test -p rustev-aicortex --locked
+cargo clippy -p rustev-aicortex --all-targets --locked -- -D warnings
+cargo build -p rustev-aicortex --locked
 sh -c 'for p in rustev-contract rustev-core rustev-runtime rustev-eval rustev-surface rustev-cli; do t=$(cargo tree -p "$p" -e normal,build --locked --prefix none) || exit 1; if printf "%s\n" "$t" | grep -E "^(rahi|aicortex)"; then exit 1; fi; done'
 cargo run -p rustev-boundaries --locked --quiet
 # 3.1.1: no authorization type in the integration.
-sh -c 'if grep -rnE "(struct|enum|trait|type)[[:space:]]+(Permitted|Grant)([^A-Za-z0-9_]|$)" integrations/rustev-rahi; then exit 1; fi'
+sh -c 'if grep -rnE "(struct|enum|trait|type)[[:space:]]+(Permitted|Grant)([^A-Za-z0-9_]|$)" integrations/rustev-rahi integrations/rustev-aicortex; then exit 1; fi'
 ```
 
 ## Implementation record
@@ -371,13 +378,20 @@ only when its record passes every row (3.4.8).
   WebAssembly target for `rustev-wasm`) also holds a forbidden package; a
   failure to read that graph keeps the violation. Every other rule is
   unchanged, and the new rule has a unit test with its negative control.
-- `rustev-aicortex` is not implemented. Implementing it showed that its
-  git-revision dependency fails Rustev's own supply-chain check: the
-  release tool's manifest test (`tools/rustev-release`, spec 021 3.4 as
-  implemented) refuses any package in the workspace resolution whose
-  source is not crates.io, not only those in the release closure. Its
-  record's item 1 is amended to refuse accordingly (below), and the crate
-  stays absent (3.4.8).
+- Increment 2, `integrations/rustev-aicortex/`: `AicortexContext` (a
+  bounded read of one claim-history page per bound subject under an
+  explicit transaction bound, mapped through a declared projection of 1 to
+  64 field bindings into attributed snapshot entries, with refusals and
+  missing fields named) and `stage_observation` (an observation proposal
+  with its Rustev lineage staged into the host's `TxnBuilder`, never
+  committed). It pins Aicortex at the record's revision and Rahi 0.6.0,
+  which that revision pins, so one host cell cannot link it and
+  `rustev-rahi` (record item 1's limitation). Not in the release family
+  (`tools/rustev-release/release-set.json` excludes it). Implementing it
+  first showed that its Git dependency failed the release tool's manifest
+  test, which then judged every package in the workspace resolution; the
+  owner chose to scope that rule to the release closure (spec 021 3.4,
+  R-49), and the record's item 1 passes since that change.
 - `Makefile` (additive): `010` joins `VERIFIED_SPECS`.
 
 ## Questions settled by R-34
@@ -430,7 +444,7 @@ only commit (Aicortex spec 053 I-3).
 
 | Item | Record | Result |
 |---|---|---|
-| 1. Upstream | Git dependency on `aicortex-types`, `aicortex-claims` and `aicortex-store` (each `version = "0.1.0"`, `publish = false`) at the immutable revision above. Nothing is on crates.io (`aicortex` and `aicortex-types` return 404 on 2026-10-21) and Aicortex spec 055 (publication) is pending (lines 33-34). Aicortex spec 053 (lines 289-291) names "one exact merged Git revision" as the downstream handoff, so a revision pin is the sanctioned way to consume it. License Apache-2.0 (`LICENSE`, `Cargo.toml:16`); no NOTICE file. Its graph pins `rahi-store`, `rahi-types` and `rahi-ledger` at `=0.6.0` (`Cargo.toml:26-34`; crates.io checksums `59f167d26959c4d7d5807fea2ea82328dcb693c50135f5e0ac58a0161c3db6a4`, `d08efc5b7a805d4610d7bfa90e7a585b6f3a70eaeebdab14a8655aad96ec7d3c`, `952f5bfbcf713c8b9f4febad833b531000868ef7153daeb1a3f6cab5c98ca8a7`) and `hiqlite-patched =0.15.0-patched.3` (`9d3586f7db4e971836ffc5982086bcfa1de0c0293492a194efd7d4ac21ff5ebf`). MSRV 1.96 (`Cargo.toml:15`), toolchain 1.96.0 (`rust-toolchain.toml:5`); Rustev builds it with its own pinned 1.98.1. Platforms: none stated; Aicortex CI runs on `ubuntu-latest`. Supply chain: its `deny.toml` (advisories `unmaintained = "all"`, crates.io sources only) under `cargo-deny-action` in CI; in Rustev, `Cargo.lock` fixes the git revision and every registry checksum. Limitation: Aicortex pins Rahi 0.6.0 and `rustev-rahi` pins 0.7.1, so one host cell cannot link both adapters until Aicortex adopts 0.7.1. Each crate builds and works alone (I-2). Rustev's own supply-chain check refuses the git source: the release tool's manifest test (`tools/rustev-release/tests/manifests.rs`, `the_workspace_passes_the_release_set`, implementing spec 021 3.4) rejects every package in the workspace resolution that is not from crates.io, so a workspace member with this dependency fails `make code` (found by building the adapter, 2026-10-21). This row passes once Aicortex publishes the crates (its spec 055) under a new record, or once the owner scopes that check to the release closure in a reviewed change to spec 021 or 031. | refuse |
+| 1. Upstream | Git dependency on `aicortex-types`, `aicortex-claims` and `aicortex-store` (each `version = "0.1.0"`, `publish = false`) at the immutable revision above. Nothing is on crates.io (`aicortex` and `aicortex-types` return 404 on 2026-10-21) and Aicortex spec 055 (publication) is pending (lines 33-34). Aicortex spec 053 (lines 289-291) names "one exact merged Git revision" as the downstream handoff, so a revision pin is the sanctioned way to consume it. License Apache-2.0 (`LICENSE`, `Cargo.toml:16`); no NOTICE file. Its graph pins `rahi-store`, `rahi-types` and `rahi-ledger` at `=0.6.0` (`Cargo.toml:26-34`; crates.io checksums `59f167d26959c4d7d5807fea2ea82328dcb693c50135f5e0ac58a0161c3db6a4`, `d08efc5b7a805d4610d7bfa90e7a585b6f3a70eaeebdab14a8655aad96ec7d3c`, `952f5bfbcf713c8b9f4febad833b531000868ef7153daeb1a3f6cab5c98ca8a7`) and `hiqlite-patched =0.15.0-patched.3` (`9d3586f7db4e971836ffc5982086bcfa1de0c0293492a194efd7d4ac21ff5ebf`). MSRV 1.96 (`Cargo.toml:15`), toolchain 1.96.0 (`rust-toolchain.toml:5`); Rustev builds it with its own pinned 1.98.1. Platforms: none stated; Aicortex CI runs on `ubuntu-latest`. Supply chain: its `deny.toml` (advisories `unmaintained = "all"`, crates.io sources only) under `cargo-deny-action` in CI; in Rustev, `Cargo.lock` fixes the git revision and every registry checksum. Limitation: Aicortex pins Rahi 0.6.0 and `rustev-rahi` pins 0.7.1, so one host cell cannot link both adapters until Aicortex adopts 0.7.1. Each crate builds and works alone (I-2). Rustev's own supply-chain check: the release tool's manifest test (`tools/rustev-release/tests/manifests.rs`, implementing spec 021 3.4) first rejected every package in the workspace resolution that is not from crates.io, so a workspace member with this dependency failed `make code` (found by building the adapter, 2026-10-21). The owner scoped that rule to the release closure (spec 021 3.4, R-49); `rustev-aicortex` is excluded from the release family, so its Git dependency is outside the closure, and every release member still resolves from crates.io only. New lockfile edges in the workspace: Aicortex enables `uuid`'s `serde` feature, so `uuid` 1.26.1 gains a dependency on `serde_core`, serde's own core crate (which `serde` 1.0.220 and later depend on; the lockfile already holds it at 1.0.229 from crates.io, checksum `67dca2c9c51e58a4791a4b1ed58308b39c64224d349a935ab5039aa360942a48`), and no new package entry. | pass |
 | 2. Schemas | Rust types at the revision, not a wire format: `Claim` (`crates/aicortex-types/src/claim.rs:292-315`, `deny_unknown_fields`, `CLAIM_SCHEMA_VERSION = 1` at line 32), `ClaimRecord` with `TxStamp { seq, recorded_at }` and `ValidTime` (`crates/aicortex-claims/src/history.rs:20-92`), `ProjectionCandidate`, `SlotState` and `CurrentView` (`crates/aicortex-claims/src/projection.rs:28-114`), `project` (line 416), `AsOf`, `TxBound` and `ValidBound` (`crates/aicortex-claims/src/asof.rs`), `ClaimProposal` (`crates/aicortex-types/src/claim_evidence.rs:299-316`), `SourceRef` and `Provenance` (`crates/aicortex-types/src/provenance.rs:79-241`). Compatibility: registered predicate versions are immutable (Aicortex spec 050 I-3) and every record carries its schema version (spec 011 B-11); any other revision needs a new record. Byte examples: `crates/aicortex-types/testdata/claims/*.json` (12 files). Negative fixtures: the `refuse-*` files under `crates/aicortex-gate/testdata/claims/`. The adapter's own boundary types (field bindings, the observation proposal) are Rust values validated at construction. | pass |
 | 3. Authentication | None inside Aicortex in library mode. The tenant boundary is `Scope { owner: Sub, kind }` (`crates/aicortex-types/src/scope.rs:176-182`), filtered on every statement (`crates/aicortex-store/src/claim_repo.rs:161-162`). The host supplies a resolver from Rustev's opaque principal handle to a `Scope`, and it may refuse. The adapter never derives a scope from content or a judgment (3.1.2). No TLS, endpoint or redirect exists at this seam; the store's Raft transport belongs to the host cell. | pass |
 | 4. Bounds | A read is one page of `ClaimRepo::history` per bound subject (`claim_repo.rs:421-433`; at most `MAX_CLAIM_PAGE_ROWS = 500`, refused above) under an explicit transaction bound. The adapter declares 1 to 64 field bindings and refuses a subject whose history fills the page, so a partial history is never read as complete. The whole fetch runs inside the call's remaining deadline. Dropping it after a deadline or cancellation has no effect, because a read writes nothing. A proposal stages one statement set per call and the adapter never commits, so cost, queueing and concurrency belong to the host's transaction. | pass |
@@ -439,10 +453,10 @@ only commit (Aicortex spec 053 I-3).
 | 7. Tests | Offline: unit tests of mapping, bounds, refusals and proposal construction, and integration tests against a single-voter Rahi 0.6.0 store in a temporary directory on loopback, as Aicortex's own tests run (`crates/aicortex-store/tests/common/mod.rs`). No live qualification is authorized or claimed. | pass |
 | 8. Proposal lineage (3.5.4) | `ClaimProposal` and `Provenance` have no typed decision, plan, snapshot or outcome member. The adapter writes lineage into the open members: `SourceRef { system: "rustev", external_id: <decision id>, locator: "rustev:plan/<PlanId>/snapshot/<SnapshotId>" }` (`provenance.rs:79-90`; `SourceSystem` grammar at lines 43-56), stance `observed`, and the host-attributed observer as proposer. The proposal and claim ids derive from the decision id and the observation key, so a resubmission is the same proposal. A judgment offered as an observation is refused before staging. | pass |
 
-Result: **refuse** on item 1, so `rustev-aicortex` stays unimplemented
-(3.4.8). Every other row passes. The record first read pass on item 1; it
-was amended when the adapter, built against this record, failed the
-workspace supply-chain check named in that row.
+Result: **pass** on every row, so implementation may begin. Item 1 first
+read pass, was amended to refuse when the adapter, built against this
+record, failed the workspace supply-chain check named in that row, and
+passes again since R-49 scoped that check to the release closure.
 
 ### `rustev-rahi`
 

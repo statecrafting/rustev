@@ -262,9 +262,9 @@ authoritative. Reconciled on 2026-10-16 (RUSTEV-004).
 - State: owned by spec `010`, approved (A-15), with implementation pending.
   The owner approved the three binding records and confirmed their
   written text (R-44, A-45). The
-  `rustev-rahi` record passes and the crate is implemented. The
-  `rustev-aicortex` record refuses until Aicortex publishes its crates or
-  the workspace source check is scoped to the release closure. The
+  `rustev-rahi` and `rustev-aicortex` records pass and both crates are
+  implemented; the `rustev-aicortex` record passes since spec `021` 3.4's
+  source rule covers the release closure (R-49). The
   `rustev-serve` record refuses until spec `042`'s contract documents exist
   and its Sigstore crate is assessed.
   The service part is carried by

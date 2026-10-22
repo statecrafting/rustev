@@ -1,0 +1,34 @@
+{
+  "namespace": "demo",
+  "version": 1,
+  "subject_kinds": ["account"],
+  "predicates": [
+    {
+      "name": "account.note",
+      "subjects": ["account"],
+      "value": { "type": "text" },
+      "cardinality": "one",
+      "valid_time": "timeless",
+      "supersession": "explicit_only",
+      "epistemic": ["asserted", "observed"]
+    },
+    {
+      "name": "account.tier",
+      "subjects": ["account"],
+      "value": { "type": "enum", "variants": ["gold", "silver"] },
+      "cardinality": "one",
+      "valid_time": "timeless",
+      "supersession": "explicit_only",
+      "epistemic": ["asserted", "observed"]
+    },
+    {
+      "name": "account.visits",
+      "subjects": ["account"],
+      "value": { "type": "integer" },
+      "cardinality": "one",
+      "valid_time": "timeless",
+      "supersession": "explicit_only",
+      "epistemic": ["asserted", "observed"]
+    }
+  ]
+}

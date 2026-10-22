@@ -405,12 +405,21 @@ fn a_git_source_only_an_excluded_package_reaches_is_not_judged() {
         Violation::Source { .. }
     ));
 
+    // Without a resolve graph every resolved package is judged: the added
+    // package fails, and so does any Git package an excluded integration
+    // really has (`rustev-aicortex`), so only the kind is asserted.
     let mut m = with_git(&excluded_id);
     m.resolve = None;
-    assert!(matches!(
-        only(check_manifests(&set(), &m)),
-        Violation::Source { .. }
-    ));
+    let v = check_manifests(&set(), &m);
+    assert!(
+        v.iter()
+            .any(|v| matches!(v, Violation::Source { name, .. } if name == "git-only")),
+        "{v:#?}"
+    );
+    assert!(
+        v.iter().all(|v| matches!(v, Violation::Source { .. })),
+        "{v:#?}"
+    );
 }
 
 #[test]

@@ -3,6 +3,30 @@
 version = 4
 
 [[package]]
+name = "action-gate-core"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "462261da44651a95c079c2e4a9f5f777eaa1bb22f76157bf70bc04b8e9a6e2b3"
+dependencies = [
+ "action-gate-types",
+ "canonical-keysort-json",
+ "hex",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+]
+
+[[package]]
+name = "action-gate-types"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f06b181e4649459d2fafaf0ffe087ee29f467d04044e50f9d1c0738564c63264"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "aead"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -33,6 +57,65 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c982642fa9e8606056828ee9a8505737230110bb1099153c79efe865c59d12ba"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "aicortex-claims"
+version = "0.1.0"
+source = "git+https://github.com/statecrafting/aicortex?rev=6415b765e5267188b4ecf302a93869352e28cccc#6415b765e5267188b4ecf302a93869352e28cccc"
+dependencies = [
+ "aicortex-types",
+ "blake3",
+ "chrono",
+ "chrono-tz",
+ "rahi-types 0.6.0",
+ "serde",
+ "serde_json",
+ "unicode-normalization",
+ "uuid",
+]
+
+[[package]]
+name = "aicortex-gate"
+version = "0.1.0"
+source = "git+https://github.com/statecrafting/aicortex?rev=6415b765e5267188b4ecf302a93869352e28cccc#6415b765e5267188b4ecf302a93869352e28cccc"
+dependencies = [
+ "action-gate-core",
+ "aicortex-claims",
+ "aicortex-types",
+ "rahi-types 0.6.0",
+ "serde",
+ "serde_json",
+ "unicode-normalization",
+]
+
+[[package]]
+name = "aicortex-store"
+version = "0.1.0"
+source = "git+https://github.com/statecrafting/aicortex?rev=6415b765e5267188b4ecf302a93869352e28cccc#6415b765e5267188b4ecf302a93869352e28cccc"
+dependencies = [
+ "aicortex-claims",
+ "aicortex-gate",
+ "aicortex-types",
+ "base64 0.23.1",
+ "blake3",
+ "rahi-ledger",
+ "rahi-store 0.6.0",
+ "rahi-types 0.6.0",
+ "ring",
+ "serde",
+ "serde_json",
+ "uuid",
+]
+
+[[package]]
+name = "aicortex-types"
+version = "0.1.0"
+source = "git+https://github.com/statecrafting/aicortex?rev=6415b765e5267188b4ecf302a93869352e28cccc#6415b765e5267188b4ecf302a93869352e28cccc"
+dependencies = [
+ "rahi-types 0.6.0",
+ "serde",
+ "uuid",
 ]
 
 [[package]]
@@ -244,11 +327,11 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
 name = "attest-ledger-core"
-version = "0.2.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9fe378fabe203deac490a6890c8f26a8005492f34df0fd9e8a25a1c30537f6ab"
+checksum = "a4aca8c7ac25fd332a7fe900b31949bd5c13246d13f57d99f03858f46bc473b0"
 dependencies = [
- "attest-ledger-types",
+ "attest-ledger-types 0.1.1",
  "base64 0.22.1",
  "canonical-keysort-json",
  "ed25519-dalek",
@@ -257,6 +340,33 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
+]
+
+[[package]]
+name = "attest-ledger-core"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9fe378fabe203deac490a6890c8f26a8005492f34df0fd9e8a25a1c30537f6ab"
+dependencies = [
+ "attest-ledger-types 0.2.0",
+ "base64 0.22.1",
+ "canonical-keysort-json",
+ "ed25519-dalek",
+ "getrandom 0.4.3",
+ "hex",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+]
+
+[[package]]
+name = "attest-ledger-types"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "977ebd000e8230ed0a13063848a45ab50815134d69440bd821db8ab192ea66e6"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -469,6 +579,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "blake3"
+version = "1.8.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d9e454fc11f76977dc803893aff6304ed33d6a26efae8696573bea74baa27ae"
+dependencies = [
+ "arrayvec",
+ "cc",
+ "cfg-if",
+ "constant_time_eq 0.4.2",
+ "cpufeatures 0.3.1",
+]
+
+[[package]]
 name = "block-buffer"
 version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -655,6 +778,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "chrono-tz"
+version = "0.10.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a6139a8597ed92cf816dfb33f5dd6cf0bb93a6adc938f11039f371bc5bcd26c3"
+dependencies = [
+ "chrono",
+ "phf 0.12.1",
+]
+
+[[package]]
 name = "cipher"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -754,6 +887,12 @@ checksum = "a6ef517f0926dd24a1582492c791b6a4818a4d94e789a334894aa15b0d12f55c"
 
 [[package]]
 name = "constant_time_eq"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b"
+
+[[package]]
+name = "constant_time_eq"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9eb6feb175df65d0a3ccd3e73484e940d0ac664e8034f0519fd49a93db3071d9"
@@ -833,7 +972,7 @@ checksum = "a5dcd6f69605c2956916ce24e8af637b754964c9a83f4662d3a2361654cdba09"
 dependencies = [
  "chrono",
  "once_cell",
- "phf",
+ "phf 0.11.3",
  "winnow 0.7.15",
 ]
 
@@ -1549,7 +1688,7 @@ dependencies = [
  "bincode",
  "bytes",
  "chrono",
- "constant_time_eq",
+ "constant_time_eq 0.6.1",
  "cron",
  "crossbeam",
  "cryptr",
@@ -2507,7 +2646,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1fd6780a80ae0c52cc120a26a1a42c1ae51b247a253e4e06113d23d2c2edd078"
 dependencies = [
  "phf_macros",
- "phf_shared",
+ "phf_shared 0.11.3",
+]
+
+[[package]]
+name = "phf"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "913273894cec178f401a31ec4b656318d95473527be05c0752cc41cdc32be8b7"
+dependencies = [
+ "phf_shared 0.12.1",
 ]
 
 [[package]]
@@ -2516,7 +2664,7 @@ version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c80231409c20246a13fddb31776fb942c38553c51e871f8cbd687a4cfb5843d"
 dependencies = [
- "phf_shared",
+ "phf_shared 0.11.3",
  "rand 0.8.8",
 ]
 
@@ -2527,7 +2675,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f84ac04429c13a7ff43785d75ad27569f2951ce0ffd30a3321230db2fc727216"
 dependencies = [
  "phf_generator",
- "phf_shared",
+ "phf_shared 0.11.3",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -2538,6 +2686,15 @@ name = "phf_shared"
 version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67eabc2ef2a60eb7faa00097bd1ffdb5bd28e62bf39990626a582201b7a754e5"
+dependencies = [
+ "siphasher",
+]
+
+[[package]]
+name = "phf_shared"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "06005508882fb681fd97892ecff4b7fd0fee13ef1aa569f8695dae7ab9099981"
 dependencies = [
  "siphasher",
 ]
@@ -2724,18 +2881,64 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
+name = "rahi-ledger"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "952f5bfbcf713c8b9f4febad833b531000868ef7153daeb1a3f6cab5c98ca8a7"
+dependencies = [
+ "async-trait",
+ "attest-ledger-core 0.1.1",
+ "attest-ledger-types 0.1.1",
+ "base64 0.23.1",
+ "canonical-keysort-json",
+ "ed25519-dalek",
+ "rahi-store 0.6.0",
+ "rahi-types 0.6.0",
+ "s3-simple",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "rahi-store"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "59f167d26959c4d7d5807fea2ea82328dcb693c50135f5e0ac58a0161c3db6a4"
+dependencies = [
+ "attest-ledger-core 0.1.1",
+ "futures-core",
+ "hiqlite-patched",
+ "rahi-types 0.6.0",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "rahi-store"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5ffe41f10c2c64e60c807d1a6c555bf1e72d5d650c6d24dc6c4ddf666b353403"
 dependencies = [
- "attest-ledger-core",
+ "attest-ledger-core 0.2.0",
  "futures-core",
  "hiqlite-patched",
- "rahi-types",
+ "rahi-types 0.7.1",
  "serde",
  "serde_json",
  "tokio",
+]
+
+[[package]]
+name = "rahi-types"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d08efc5b7a805d4610d7bfa90e7a585b6f3a70eaeebdab14a8655aad96ec7d3c"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -3089,6 +3292,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustev-aicortex"
+version = "0.1.0"
+dependencies = [
+ "aicortex-claims",
+ "aicortex-gate",
+ "aicortex-store",
+ "aicortex-types",
+ "rahi-store 0.6.0",
+ "rahi-types 0.6.0",
+ "rustev-contract",
+ "rustev-core",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "rustev-backend-rules"
 version = "0.1.0"
 dependencies = [
@@ -3269,8 +3491,8 @@ dependencies = [
 name = "rustev-rahi"
 version = "0.1.0"
 dependencies = [
- "rahi-store",
- "rahi-types",
+ "rahi-store 0.7.1",
+ "rahi-types 0.7.1",
  "rustev-contract",
  "rustev-core",
  "serde",
@@ -4216,6 +4438,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d245f478577f809a851594d02313b640fb437e0bb33866753cff937863096954"
 
 [[package]]
+name = "unicode-normalization"
+version = "0.1.26"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "75cd3fb03d5288b3ba9a1ee103ac7e9cbb59f0b03d64f8ddfcc04dd42758a85d"
+dependencies = [
+ "tinyvec",
+]
+
+[[package]]
 name = "unicode-segmentation"
 version = "1.13.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4299,6 +4530,7 @@ checksum = "2ef6dac1e96601b4fb3acccccff2139741fcb757cb9a36089bf5be91cfb285ce"
 dependencies = [
  "getrandom 0.4.3",
  "js-sys",
+ "serde_core",
  "wasm-bindgen",
 ]
 
