@@ -10,6 +10,7 @@
 #![forbid(unsafe_code)]
 
 pub mod assemble;
+pub mod baseline;
 pub mod bundle;
 pub mod compare;
 pub mod config;
@@ -19,6 +20,7 @@ pub mod dynamic;
 pub mod eval_cases;
 pub mod fit;
 pub mod generator;
+pub mod holdout;
 pub mod live;
 pub mod metrics;
 pub mod optimization;

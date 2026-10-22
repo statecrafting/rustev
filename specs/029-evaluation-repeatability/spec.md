@@ -738,10 +738,11 @@ acceptance item before the increment that satisfies it, and 029 joins
 3. Repeat sets (3.1, 3.2.5, 3.6): the `replay`, `captured` and refused
    `live` sources, the stable cohort, slices, `cost_per_1000/*` and
    `rustev.repeat-report/1`.
-4. The held-out ledger, baselines, the reproducibility check and diffs
-   (3.7 to 3.10).
-5. Multi-candidate comparison and selection gates (3.11, 3.12).
-6. The CLI surface and exit codes (3.13 to 3.15), the mutation seeds,
+4. The held-out ledger, baselines and the reproducibility check (3.7 to
+   3.9).
+5. Diffs, `rustev.eval-diff/1` and `diff.md` (3.10).
+6. Multi-candidate comparison and selection gates (3.11, 3.12).
+7. The CLI surface and exit codes (3.13 to 3.15), the mutation seeds,
    declared verification and completion. The `wasm32-wasip1` item stays
    externally blocked until a WASI runner exists in CI.
 
@@ -869,6 +870,51 @@ cost and `interval_width` bands equal to the interval's width; with cost
 units declared comparable, known cost per 1000 for a baseline and none for
 a candidate.
 
+**Increment 4 (held-out ledger, baselines, reproducibility).**
+`crates/rustev-eval/src/holdout.rs` defines `rustev.holdout-ledger/1`
+(`HoldoutLedger`, `REPLAY_V1`, canonical identity, no binary64): the
+dataset and entries of lineage handle (the contract's `Handle`), plan,
+repeat configuration, run report digests (1 to 64), host-supplied
+`recorded_at_ms` and `prev`, the chain digest
+`tagged_digest("rustev.holdout-ledger/1#entry", canonical entry)`.
+`verify` refuses another schema or dataset, more than 10 000 entries, an
+entry with no run or more than 64, and a broken chain; `append` verifies,
+refuses the bound, and returns a new ledger with the counts by lineage,
+plan and dataset (each including the new entry) and the heads before and
+after; the input is never modified. `repeat::repeat_held_out` counts a
+held-out repeat set against the host's ledger or an explicit new one and
+records `held_out` as that count (refused for a split that is not held
+out, `not-held-out`; a refused ledger is `holdout-ledger`).
+`src/baseline.rs` defines `rustev.baseline/1` (`REPLAY_V1`, record
+canonical): name, the repeat report's record digest, every run's
+document digests and seed, dataset, split, role and provenance,
+evaluator configuration id and version, adapter rules, repeat
+configuration, plan, source, N, `recorded_at_ms`, the held-out record,
+and every cohort's `pooled`, interval and band. `record` refuses an
+invalid name and verifies every binding by assembling the repeat set
+again from the supplied runs and configurations, which must reproduce the
+report exactly (the held-out count, which only the host's ledger states,
+is copied, and must be a count). `reproducibility` compares every
+stability metric in every baseline cohort: `not_reproducible` with every
+exceedance when `|pooled_run - pooled_baseline|` exceeds the baseline's
+band, whatever else is unknown; otherwise `unknown` with the reasons when
+a value or band is unknown or the configuration, dataset, split,
+evaluator configuration, repeat configuration or plan is not the
+baseline's; otherwise `reproducible`.
+
+Tests: `tests/holdout.rs` (counts by lineage, plan and dataset; chained
+heads; input unchanged; round trip; broken chains, an edited entry,
+another dataset, malformed entries, another schema, unknown fields and an
+empty lineage refused; a truncated ledger still verifies, as 3.7.5
+states; exactly 10 000 entries admitted and one more refused) and
+`tests/reports.rs` (held-out counting through `repeat_held_out` with a
+new ledger, a supplied one and another lineage, refusals of a broken
+chain and another dataset's ledger, unknown without a ledger; baseline
+binding, round trip, name rules, a tampered report and tampered run
+seeds refused; reproducibility at a zero band, one ulp beyond it, exactly
+at a band of 0.125 and one ulp beyond, an unknown band with and without an
+exceedance, another repeat configuration).
+
 **Needs an owner decision (D-029-1): `brier` per-case measures.** 3.2.3
 lists `brier` as a mean, and 3.2.6 requires the measures to reproduce the
 report's value bit for bit. Spec 004 computes Brier by adding every class
@@ -919,6 +965,14 @@ Engineering choices made by the implementing agent, not by the owner:
 - A held-out repeat set without a ledger is accepted by the library with
   its count recorded as unknown; the CLI of 3.13.1 still requires the
   ledger flags.
+- A baseline is verified by assembling its repeat set again from the
+  supplied runs and configurations rather than field by field, so every
+  binding of 3.8.1 is checked at once; the held-out count is the one
+  binding only the ledger can check.
+- `recorded_at_ms` in ledgers and baselines is a signed 64-bit integer of
+  milliseconds, as the host supplies it.
+- The reproducibility check compares the baseline's cohorts by name; a
+  stability metric missing on either side is unknown, never passed.
 - `cost_per_1000/*` follow 3.2.5's stricter rule (unknown unless cost
   units are declared comparable), not spec 004's rule that only refuses
   adding units across backends.
