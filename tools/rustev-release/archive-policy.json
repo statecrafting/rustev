@@ -121,6 +121,7 @@
         "src/compare.rs",
         "src/config.rs",
         "src/dataset.rs",
+        "src/diff.rs",
         "src/doc.rs",
         "src/dynamic.rs",
         "src/eval_cases.rs",

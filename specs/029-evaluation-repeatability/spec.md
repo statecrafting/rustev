@@ -917,6 +917,26 @@ exceedance, another repeat configuration; configuration and split
 mismatches combined with an exceedance preserve the definite failure,
 and a split mismatch without drift remains unknown).
 
+**Increment 5 (diffs).** `crates/rustev-eval/src/diff.rs` defines
+`rustev.eval-diff/1` (`EvalDiff`, `REPLAY_V1`, record canonical) and
+`diff`, which compares a baseline with a run's repeat report given the
+repeat configuration and both sides' `rustev.eval-cases/1` documents.
+A dataset, split, evaluator configuration, adapter rules (which must also
+be bound, 3.15.3) or repeat configuration mismatch yields `unknown` with
+the reason and no table; case documents that do not bind their runs, a
+configuration that does not bind the reports, or case order that differs
+between sides are refused. Per cohort and metric the diff states both
+pooled values, the delta (unknown when either value is, or when it is not
+finite), both intervals, `overlap` and `within_noise` as 3.10.2 states;
+changed cases follow 3.10.3 with the 10 000 cap, the total and
+`truncated`. `render_markdown` renders `diff.md` from the diff document
+alone, escaping Markdown and HTML metacharacters, with numbers in the
+contract's canonical binary64 spelling. Tests: `tests/diff.rs` (identical
+sides, each mismatch reason, overlap and within-noise at band edges and
+one ulp beyond, unknown intervals and bands, top-k changes, the cap at
+exactly 10 000 and 10 001, round trip and refusals, and byte-stable JSON
+and Markdown goldens under `tests/data/diff/`).
+
 **Needs an owner decision (D-029-1): `brier` per-case measures.** 3.2.3
 lists `brier` as a mean, and 3.2.6 requires the measures to reproduce the
 report's value bit for bit. Spec 004 computes Brier by adding every class
