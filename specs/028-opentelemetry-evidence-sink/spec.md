@@ -2,10 +2,11 @@
 id: "028-opentelemetry-evidence-sink"
 title: "OpenTelemetry evidence sink and redaction policy"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-16"
 summary: >
-  Approved (A-24) as its own reviewable change before code. A new optional
+  Approved (A-24) as its own reviewable change before code; implemented in
+  seven increments. A new optional
   integration, `integrations/rustev-otel`, exports each delivered run record
   as OpenTelemetry spans, metrics and optional log records, with GenAI
   semantic-convention attributes on backend attempts, W3C trace-context
@@ -89,8 +90,8 @@ obligations:
 # 028: OpenTelemetry evidence sink and redaction policy
 
 Approved by the owner (A-24, 2026-10-16, under the 2026-10-16 delivery work
-order) as its own reviewable change before any code (R-16); implementation is
-pending. It implements child D1 of tracking issue #76 (#70). Approval does not
+order) as its own reviewable change before any code (R-16); implemented in
+seven increments (see the implementation record). It implements child D1 of tracking issue #76 (#70). Approval does not
 authorize a release or publication, a deployment, an export to any collector
 other than test fixtures on loopback, retaining or exporting real-user data,
 or any change to an approved spec beyond the amendments of 001 and 006 stated
@@ -871,15 +872,33 @@ emitting two span schema versions in one trace.
 
 ## Verification
 
-Pending with implementation. The implementing change replaces this
-paragraph with a `verify:cli` block covering at least
-`cargo test -p rustev-otel --locked --all-features`,
-`cargo test -p rustev-contract --locked`, `cargo test -p rustev-cli
---locked`, `cargo test -p rustev-boundaries --locked`, `cargo run -p
-rustev-boundaries --locked --quiet`, a `cargo tree` check that no crate
-outside `integrations/` reaches an `opentelemetry*` package, and the
-benchmark smoke run; and adds `028` to `VERIFIED_SPECS`. Approval creates no
-crate and no runnable acceptance.
+Run by `make verify` (028 is in `VERIFIED_SPECS`).
+
+```verify:cli
+# 3.3, 3.4 and 3.10.1: the redaction policy, its refusals, the keyed digest
+# (RFC 4231 and committed vectors) and the span line; existing contract
+# goldens and identities unchanged.
+cargo test -p rustev-contract --locked
+# 3.5 to 3.10 and 3.14.3: goldens of both reference plans and the remote
+# exchange, the projection rows, the sink under every runtime sink policy,
+# conservation, trace context, sampling, metrics, logs, OTLP over gRPC and
+# HTTP to loopback, the endpoint allowlist with zero connections, the
+# redaction property test and the benchmark smoke run.
+cargo test -p rustev-otel --locked --all-features
+cargo clippy -p rustev-otel --all-targets --all-features --locked -- -D warnings
+# 3.11: `rustev trace tail` end to end through the binary; every existing
+# CLI golden unchanged.
+cargo test -p rustev-cli --locked
+# 3.12: the telemetry exporter family, with violating fixtures, and the real
+# workspace.
+cargo test -p rustev-boundaries --locked
+cargo run -p rustev-boundaries --locked --quiet
+# 3.12.2 and 3.11.5: no crate outside integrations/ reaches the family, with
+# every feature (rustev-cli included).
+sh -c 'for d in crates/* backends/* tools/* packages/*; do n=$(basename "$d"); out=$(cargo tree -p "$n" -e normal,build --all-features --prefix none --locked) || exit 1; if printf "%s\n" "$out" | grep -qE "^(opentelemetry|tracing-opentelemetry)"; then echo "$n reaches the telemetry family"; exit 1; fi; done'
+# 3.13.1: no authorization type.
+sh -c 'if grep -rnE "(struct|enum|trait|type)[[:space:]]+(Permitted|Grant)([^A-Za-z0-9_]|$)" integrations/rustev-otel crates/rustev-contract/src/redaction.rs crates/rustev-contract/src/trace.rs; then exit 1; fi'
+```
 
 ## Implementation record
 
@@ -1186,6 +1205,60 @@ present; a redirect is a counted failure and its target is never dialed;
 an endpoint outside the list, configured or from the environment, is
 `EndpointNotAllowed` naming the origin with zero accepted connections at
 it; the other refusals; and a bad header's value in no error.
+
+**Increment 7 (property test, benchmark, verification).**
+`tests/redaction_property.rs` is the redaction property test of the
+acceptance, with a seeded generator of its own (SplitMix64; no new
+dependency) rather than a property-testing crate: 200 arbitrary decisions
+built from both reference records, with unique canaries (letters `g` to
+`z`, which no digest, hex id or number contains) in every slot that can
+carry caller, provider or run-time text or an identifier (decision, input
+source, attempt and generation ids, notice reasons, unresolved fields and
+details, outcome parameters, failure details, stop reasons, member
+details, `retry_after`, provider extras, requested models), joined to
+generated exchange records, under generated valid policies (one in four
+the default). Each is exported through spans, events, logs and metrics to
+in-memory exporters and through the JSONL encoder; no canary of a field
+whose effective action is `drop` appears in any exported byte, raw or
+truncated, and no raw canary of a `digest` field; allowed canaries are
+found, so the bytes searched hold values.
+
+`examples/overhead.rs` is the benchmark of 3.14, and
+`tests/overhead_smoke.rs` runs it with 100 decisions and requires zero
+loss in every configuration built in. CPU time and resident memory are
+read with `ps` (the workspace forbids the `unsafe` a system call would
+need) and are those of the whole benchmark process, which also hosts the
+fake collector (counting bytes, keeping no body). Recorded result,
+`cargo run -p rustev-otel --release --all-features --example overhead`,
+on the increment 7 tree over commit `de4c43f`, aarch64 macOS (Darwin
+25.5.0, 18 CPUs), `rustc 1.98.1`, 10 000 decisions per configuration
+alternating the two reference plans after 1 000 warm-up decisions, at
+concurrency 4 under `backpressure` (64 pending):
+
+| Configuration | Decision p50 / p95 / p99 ms | `deliver` p50 / p99 ms | CPU ms per decision | Exported bytes per decision | Peak RSS KiB | Loss |
+|---|---|---|---|---|---|---|
+| (a) in-memory sink | 0.197 / 0.254 / 0.276 | 0.0001 / 0.0001 | 0.153 | 0 | 12 704 | 0 |
+| (b) no-op exporter | 0.180 / 0.234 / 0.250 | 0.603 / 0.846 | 0.722 | 0 | 14 672 | 0 |
+| (c) JSONL file | 0.206 / 0.427 / 0.536 | 0.730 / 1.595 | 1.336 | 22 657 | 28 784 | 0 |
+| (d) OTLP/gRPC, loopback | 0.187 / 0.249 / 0.266 | 0.633 / 0.885 | 0.874 | 13 566 | 31 008 | 0 |
+| (e) OTLP/HTTP, loopback | 0.188 / 0.252 / 0.279 | 0.623 / 0.904 | 0.834 | 13 561 | 32 464 | 0 |
+
+The CPU figures divide the recorded CPU time by all 11 000 decisions,
+including warm-up, matching the benchmark's accounting. They correct the
+original division by 10 000; this is not a new benchmark run.
+
+Loss is zero in every configuration: no decision failure, no runtime sink
+failure, timeout or drop, no telemetry lost and none in flight at the end.
+The decision latency does not include delivery under `backpressure`;
+`deliver` (projection, redaction with HMAC digests, metrics, enqueue) is
+where the sink's cost shows. No threshold is asserted (3.14.3).
+
+The `verify:cli` block replaces the pending paragraph, `028` joins
+`VERIFIED_SPECS`, and the spec's implementation is complete. What the
+increments leave to later work, none of it an acceptance item: the TLS
+transport paths are not exercised by a test (increment 6); the two new
+documents have no emitted JSON Schema (increment 2); spans, attributes and
+goldens of later #76 features arrive with their specs (3.5.6).
 
 ## Decisions at approval
 
