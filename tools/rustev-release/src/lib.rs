@@ -345,6 +345,46 @@ fn keyword_ok(k: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
 }
 
+/// The package ids in the release members' closure (3.4): every package a
+/// member reaches through a normal, build or development edge, then through
+/// normal and build edges from there. `None` when `meta` has no resolve
+/// graph. A dependency with no kind listed counts as normal.
+pub fn release_closure<'a>(
+    meta: &'a Metadata,
+    members: &BTreeSet<&str>,
+) -> Option<BTreeSet<&'a str>> {
+    let resolve = meta.resolve.as_ref()?;
+    let nodes: BTreeMap<&str, &audit::Node> =
+        resolve.nodes.iter().map(|n| (n.id.as_str(), n)).collect();
+    let is_normal = |d: &audit::NodeDep| {
+        d.dep_kinds.is_empty() || d.dep_kinds.iter().any(|k| k.kind.as_deref() != Some("dev"))
+    };
+    let mut stack: Vec<&str> = Vec::new();
+    for p in &meta.packages {
+        if !members.contains(p.name.as_str()) || !meta.workspace_members.contains(&p.id) {
+            continue;
+        }
+        if let Some(n) = nodes.get(p.id.as_str()) {
+            stack.extend(n.deps.iter().map(|d| d.pkg.as_str()));
+        }
+    }
+    let mut seen = BTreeSet::new();
+    while let Some(id) = stack.pop() {
+        if !seen.insert(id) {
+            continue;
+        }
+        if let Some(n) = nodes.get(id) {
+            stack.extend(
+                n.deps
+                    .iter()
+                    .filter(|d| is_normal(d))
+                    .map(|d| d.pkg.as_str()),
+            );
+        }
+    }
+    Some(seen)
+}
+
 /// Judge the workspace's metadata against the release set. An empty result
 /// is the passing verdict.
 pub fn check_manifests(set: &ReleaseSet, meta: &Metadata) -> Vec<Violation> {
@@ -446,10 +486,18 @@ pub fn check_manifests(set: &ReleaseSet, meta: &Metadata) -> Vec<Violation> {
         }
     }
 
-    // Every resolved package outside the workspace comes from crates.io;
-    // a path package outside the workspace would be a patch or override.
+    // Every resolved package outside the workspace in the members' closure
+    // comes from crates.io; a path package outside the workspace would be a
+    // patch or override. A package only a non-member reaches (an excluded
+    // integration's Git dependency) is not judged (3.4, R-49). Without a
+    // resolve graph every resolved package is judged, so the check never
+    // passes on less evidence.
+    let closure = release_closure(meta, &members);
     for p in &meta.packages {
         if ws.contains(p.id.as_str()) {
+            continue;
+        }
+        if closure.as_ref().is_some_and(|c| !c.contains(p.id.as_str())) {
             continue;
         }
         match &p.source {
