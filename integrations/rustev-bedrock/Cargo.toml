@@ -52,3 +52,8 @@ workspace = true
 
 [features]
 aws-config = ["dep:aws-config"]
+
+# Named apart from rustev-jev's `smoke` example so the two never collide in one target directory.
+[[example]]
+name = "bedrock-smoke"
+path = "examples/smoke.rs"

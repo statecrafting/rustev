@@ -710,6 +710,25 @@ non-cached input (AWS: total input is `inputTokens + cacheReadInputTokens
 nonzero `cache_write_tokens` is `unknown`, because AWS does not state
 whether `input_tokens` includes it.
 
+**Increment 2 (the backend, transport and probe; loopback only).**
+`src/adapter.rs` implements `DecisionBackend` for `classify`, `proposition`
+and `rubric` as `Label` outputs (3.7) over Rustev's hyper and rustls stack
+(`src/net.rs`), one undivided attempt budget and one fresh connection per
+attempt before spec 020's policies are declared (2), with served identity
+(3.8), cost and spend against spec 012's journal (3.9) and the failure
+taxonomy (3.10). `src/bin/rustev-bedrock.rs` is the reachability probe
+(3.11) and `examples/smoke.rs` the live smoke (3.14); neither runs in
+tests. Credentials come only from the host's provider unless the crate's
+`aws-config` feature adds `src/aws_config_provider.rs` (3.5). Tests:
+`tests/loopback.rs` (a loopback fake over each wire and error code),
+`tests/identity.rs` (artifact identity and the unchanged reference-plan
+goldens) and `tests/spend.rs`.
+
+Not done, and blocked on the owner: the live probe and smoke against AWS
+(3.11, 3.14), which need the owner's AWS credentials within R-29's cap,
+and therefore the recorded live fixtures; `030` joins `VERIFIED_SPECS` with
+its declared verification once those exist.
+
 ## Decisions at approval
 
 Each is decided by the implementer within this spec under the work order,

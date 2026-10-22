@@ -164,7 +164,7 @@
       }
     ],
     "sectionDigests": {
-      "030-hosted-model-platform-backend-aws-bedrock": "ba84a0a9784fcaa8784110fe1ae1327fd25032463f386adf319a83422dc4e0a7",
+      "030-hosted-model-platform-backend-aws-bedrock": "9c0663be1c61214ecd7a5871e55fbc2b900bff8b8cba262cac94da75f9afe7df",
       "1-purpose": "c8803f461f533a8c51de7505c7fdc8318afacf16f61e71ad6926686529d8e9b6",
       "2-territory": "5e34925b0ff05fffd186fdf11d173e08c3f855b37a0e27e51cf52683d46f442c",
       "3-1-position-authority-and-provenance": "665f12655de73b292d7c48e4b1b5c874c14a4d45b63b1c5d9f9b4e6506c4f020",
@@ -188,7 +188,7 @@
       "acceptance": "2380fef499558d98adbbf011b97ef78fe6edabd218668dedb0c453ac4b1f96e5",
       "decisions-at-approval": "3f7cf9bf7573b20c050abe01faca21294f95b5ffcf50068c3319858806c371fb",
       "facts-relied-on": "3d991387232049fac357bbc0b12eddb16a39dd34d682f58554f39f8d8cb4e1f7",
-      "implementation-record": "0c05c93b41f3119ec43f2f357495989a6208ad6b268766d11aaddc0dae25fbea",
+      "implementation-record": "56ba1f7e7a433e3bf81bf388ada6ff2d45041d5a28d16b059f309dfe1a13d7f4",
       "verification": "c64cf25085085002be6cbcdd3ad441584947868f180e32b7a669f890a7be2661"
     },
     "sectionHeadings": [
@@ -224,6 +224,6 @@
     "summary": "A remote decision backend under `integrations/rustev-bedrock/` for Amazon Bedrock over two wires on the `bedrock-runtime` endpoint, Converse and the OpenAI-compatible Responses API, signed with SigV4 over Rustev's existing hyper and rustls stack. A versioned binding document puts wire, region, model or inference profile, declared destination regions, residency policy, parameters, structured output mode, price table and reserved members for later operations into the artifact identity. A host-supplied `ModelPolicy` (deny wins, no default allowlist) is evaluated at bind time and again at runtime start. Wave 1 serves `classify`, `proposition` and `rubric` as `Label` outputs, because neither wire documents token log-probabilities; `rank`, `generate`, `extract` and Guardrails screening are added by their own specs into members reserved here. Amends spec 001 only by adding a cloud SDK dependency family to the boundary check. Approved (A-26) under the 2026-10-16 delivery work order; implementation is pending. The work order authorizes paid Bedrock smoke and probe calls on synthetic or spec 023 admitted data within R-29's USD 5 total testing cap across all providers; the owner supplies AWS credentials, whose absence blocks only the live stage. Approval makes no quality, residency-compliance or production claim.\n",
     "title": "Hosted model platform backend: AWS Bedrock"
   },
-  "shardHash": "b5ce05a67d408d28cf09c3d9558703b237f51a72182d79c3591c96f7c1a36609",
+  "shardHash": "75b0204e14c99633656b57b1bb0d8b7a61e1e20fabb41d2eaddbec1206c55df1",
   "specVersion": "1.10.0"
 }

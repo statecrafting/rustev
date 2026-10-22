@@ -1,5 +1,6 @@
 //! AWS Bedrock integration under spec 030.
 #![forbid(unsafe_code)]
+pub mod adapter;
 pub mod binding;
 #[path = "../../rustev-remote-http/src/budget.rs"]
 pub mod budget;
@@ -14,6 +15,7 @@ pub mod http;
 #[path = "../../rustev-remote-http/src/identity.rs"]
 pub mod identity;
 pub mod mapping;
+pub mod net;
 #[path = "../../rustev-remote-http/src/phases.rs"]
 pub mod phases;
 pub mod policy;
@@ -28,3 +30,6 @@ pub mod spend;
 pub mod taxonomy;
 #[path = "../../rustev-remote-http/src/wire.rs"]
 pub mod wire;
+pub use adapter::BedrockBackend;
+#[cfg(feature = "aws-config")]
+pub mod aws_config_provider;
