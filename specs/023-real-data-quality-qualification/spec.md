@@ -2,7 +2,7 @@
 id: "023-real-data-quality-qualification"
 title: "Semantic quality and calibration qualification on real labeled data"
 status: approved
-implementation: complete
+implementation: pending
 created: "2026-09-27"
 summary: >
   The governed path from "mechanics only" to a scoped empirical quality
@@ -192,7 +192,7 @@ plan, threshold or calibration from final-test results.
 - Section 5's cases are exercised on labeled synthetic fixtures before real
   data is used, to prove the procedure refuses them; each refusal is a
   repository-local test with no real data and no network.
-- Evidence is recorded per dataset (amended 2026-10-22, D-023-1): when a
+- Evidence is recorded per dataset (amended 2026-10-22, D-023-1, A-46): when a
   dataset is admitted, its admission record and qualification record are
   reviewed by the owner, with every spec 004 denominator reconciling to its
   cohort. Until a dataset is admitted for a task, every quality claim for
@@ -313,7 +313,7 @@ Limits found, for the owner (none changes this spec's text):
 - Intervals (6.3) wait for the spec 004 amendment of #76 child E2; every
   claim states point estimates as a limit.
 
-**Owner decision D-023-1 (2026-10-22 delivery work order).** Acceptance
+**Owner decision D-023-1 (A-46, 2026-10-22 delivery work order).** Acceptance
 item 2 is evidence recorded per dataset rather than a precondition of
 completion. This spec's implementation is the governed procedure: its
 summary already states that approval "authorizes the procedure and its
@@ -321,9 +321,10 @@ refusal checks, not any particular dataset", and 6.4 (OD-7) keeps every
 dataset, record and per-case detail with the host, outside this
 repository. Admitting a dataset is therefore a host act performed through
 the delivered procedure at any time, not a code change, and nothing in the
-repository could ever mark it done. `complete` claims exactly what is
-delivered: every unit of section 2 is written, the refusals of section 5
-are tests, and verification passes. It claims no quality figure: until a
+repository could ever mark it done. Completion, a separate change made
+against this amended text, would claim exactly what is delivered: every
+unit of section 2 is written, the refusals of section 5 are tests, and
+verification passes. It would claim no quality figure: until a
 dataset is admitted for a task, 3.5 refuses every quality claim for that
 task, which is the correct, settled behavior rather than an outstanding
 work item. Each admission later adds its claim sentence, digests and
