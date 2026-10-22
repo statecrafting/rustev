@@ -40,7 +40,7 @@ fn set() -> ReleaseSet {
     ReleaseSet::parse(
         br#"{"schema":"rustev.release-set/1","version":"0.1.0","tag":"v0.1.0",
         "registry":"crates-io","index":"registry+https://github.com/rust-lang/crates.io-index",
-        "layers":[["pkg-a"],["pkg-b"]],"upload_order":["pkg-a","pkg-b"],"binaries":[],"excluded":[]}"#,
+        "layers":[["pkg-a"],["pkg-b"]],"upload_order":["pkg-a","pkg-b"],"binaries":[],"npm":[],"absent":[],"excluded":[]}"#,
     )
     .unwrap()
 }

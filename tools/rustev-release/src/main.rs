@@ -2,7 +2,8 @@
 //! never uploads, tags, signs or reads a credential.
 //!
 //! `rustev-release manifests` runs `cargo metadata` for this workspace and
-//! exits 1 naming every violation of the release set's manifest policy.
+//! exits 1 naming every violation of the release set's manifest policy,
+//! and of the npm members' `package.json` (spec 031 3.1).
 //!
 //! `rustev-release archives <dir>` unpacks each member's `.crate` from
 //! `<dir>` (as `cargo package` writes them), prints the archive evidence as
@@ -80,12 +81,25 @@ fn manifests(set: &ReleaseSet) -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    let violations = check_manifests(set, &meta);
+    let mut violations: Vec<String> = check_manifests(set, &meta)
+        .iter()
+        .map(ToString::to_string)
+        .collect();
+    // Spec 031 3.1: the npm members' manifests, read from this checkout.
+    let root = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
+    violations.extend(
+        rustev_release::npm::check_npm(set, |p| {
+            std::fs::read(root.join(p)).map_err(|e| format!("{p}: {e}"))
+        })
+        .iter()
+        .map(ToString::to_string),
+    );
     if violations.is_empty() {
         println!(
-            "release set {}: {} package(s) pass the manifest policy of spec 021 (candidate evidence only)",
+            "release set {}: {} crate(s) pass the manifest policy of spec 021 and {} npm package(s) that of spec 031 3.1 (candidate evidence only)",
             set.version,
-            set.upload_order.len()
+            set.upload_order.len(),
+            set.npm.len()
         );
         ExitCode::SUCCESS
     } else {

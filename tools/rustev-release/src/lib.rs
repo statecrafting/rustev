@@ -17,6 +17,7 @@ pub mod changelog;
 pub mod cratesio;
 pub mod lifecycle;
 pub mod manifest;
+pub mod npm;
 pub mod repro;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -36,6 +37,10 @@ pub struct ReleaseSet {
     pub layers: Vec<Vec<String>>,
     pub upload_order: Vec<String>,
     pub binaries: Vec<Binary>,
+    /// Spec 031 3.1: the npm members, in the npm layer's upload order.
+    pub npm: Vec<npm::NpmPackage>,
+    /// Spec 031 3.1: planned members not in this release, each with why.
+    pub absent: Vec<npm::Absent>,
     pub excluded: Vec<Excluded>,
 }
 
