@@ -345,6 +345,75 @@ fn a_git_or_alternate_registry_source_fails() {
 }
 
 #[test]
+fn a_git_source_only_an_excluded_package_reaches_is_not_judged() {
+    // 3.4 (R-49): the source rule covers the members' closure. A Git
+    // package that only an excluded workspace package depends on is outside
+    // it; the same package in the closure fails, and without a resolve
+    // graph every package is judged.
+    let base = metadata();
+    let excluded = set().excluded[0].name.clone();
+    let excluded_id = base
+        .packages
+        .iter()
+        .find(|p| p.name == excluded && base.workspace_members.contains(&p.id))
+        .unwrap()
+        .id
+        .clone();
+    let with_git = |attach_to: &str| {
+        let mut m = base.clone();
+        let mut git = m
+            .packages
+            .iter()
+            .find(|p| p.name == "serde")
+            .unwrap()
+            .clone();
+        git.name = "git-only".into();
+        git.id = "git+https://example.invalid/git-only#git-only@0.1.0".into();
+        git.source = Some("git+https://example.invalid/git-only?rev=0".into());
+        let id = git.id.clone();
+        m.packages.push(git);
+        let resolve = m.resolve.as_mut().unwrap();
+        resolve.nodes.push(rustev_release::audit::Node {
+            id: id.clone(),
+            deps: vec![],
+        });
+        let owner = resolve
+            .nodes
+            .iter_mut()
+            .find(|n| n.id == attach_to)
+            .unwrap();
+        owner.deps.push(rustev_release::audit::NodeDep {
+            pkg: id,
+            dep_kinds: vec![],
+        });
+        m
+    };
+
+    let m = with_git(&excluded_id);
+    assert!(check_manifests(&set(), &m).is_empty(), "{excluded}");
+
+    let core = base
+        .packages
+        .iter()
+        .find(|p| p.name == "rustev-core")
+        .unwrap()
+        .id
+        .clone();
+    let m = with_git(&core);
+    assert!(matches!(
+        only(check_manifests(&set(), &m)),
+        Violation::Source { .. }
+    ));
+
+    let mut m = with_git(&excluded_id);
+    m.resolve = None;
+    assert!(matches!(
+        only(check_manifests(&set(), &m)),
+        Violation::Source { .. }
+    ));
+}
+
+#[test]
 fn a_patched_path_package_fails() {
     let mut m = metadata();
     let serde = m.packages.iter_mut().find(|p| p.name == "serde").unwrap();
