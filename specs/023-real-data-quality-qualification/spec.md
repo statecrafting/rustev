@@ -2,7 +2,7 @@
 id: "023-real-data-quality-qualification"
 title: "Semantic quality and calibration qualification on real labeled data"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-27"
 summary: >
   The governed path from "mechanics only" to a scoped empirical quality
@@ -192,11 +192,13 @@ plan, threshold or calibration from final-test results.
 - Section 5's cases are exercised on labeled synthetic fixtures before real
   data is used, to prove the procedure refuses them; each refusal is a
   repository-local test with no real data and no network.
-- For each task qualified, one admission record and one qualification
-  record, each reviewed by the owner, with every spec 004 denominator
-  reconciling to its cohort. The records' data stays outside the
-  repository; the repository holds at most the claim sentence, digests and
-  aggregate figures, naming no host.
+- Evidence is recorded per dataset (amended 2026-10-22, D-023-1): when a
+  dataset is admitted, its admission record and qualification record are
+  reviewed by the owner, with every spec 004 denominator reconciling to its
+  cohort. Until a dataset is admitted for a task, every quality claim for
+  that task is refused (3.5), and that refusal is the delivered state. The
+  records' data stays outside the repository; the repository holds at most
+  the claim sentence, digests and aggregate figures, naming no host.
 - `make code`, declared verification, and `make gate` pass.
 
 ## Verification
@@ -311,10 +313,13 @@ Limits found, for the owner (none changes this spec's text):
 - Intervals (6.3) wait for the spec 004 amendment of #76 child E2; every
   claim states point estimates as a limit.
 
-Not done, and blocked on owner-supplied inputs: an admitted dataset per
-task (6.1), its admission and qualification records, the live or retained
-candidate runs (within R-29 and the work order's scope), and the owner's
-review of each record (acceptance item 2).
+**Owner decision D-023-1 (2026-10-22).** Acceptance item 2 is evidence
+recorded per dataset rather than a precondition of completion. The
+procedure, its refusals and its verification are delivered; an admitted
+dataset per task (6.1), its admission and qualification records, the live
+or retained candidate runs (within R-29 and the work order's scope) and the
+owner's review of each record are recorded per dataset when one is
+admitted. Until then no quality claim is made: 3.5 refuses it.
 
 ## 6. Questions settled at approval
 
