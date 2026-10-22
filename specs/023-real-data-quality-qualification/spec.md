@@ -313,13 +313,21 @@ Limits found, for the owner (none changes this spec's text):
 - Intervals (6.3) wait for the spec 004 amendment of #76 child E2; every
   claim states point estimates as a limit.
 
-**Owner decision D-023-1 (2026-10-22).** Acceptance item 2 is evidence
-recorded per dataset rather than a precondition of completion. The
-procedure, its refusals and its verification are delivered; an admitted
-dataset per task (6.1), its admission and qualification records, the live
-or retained candidate runs (within R-29 and the work order's scope) and the
-owner's review of each record are recorded per dataset when one is
-admitted. Until then no quality claim is made: 3.5 refuses it.
+**Owner decision D-023-1 (2026-10-22 delivery work order).** Acceptance
+item 2 is evidence recorded per dataset rather than a precondition of
+completion. This spec's implementation is the governed procedure: its
+summary already states that approval "authorizes the procedure and its
+refusal checks, not any particular dataset", and 6.4 (OD-7) keeps every
+dataset, record and per-case detail with the host, outside this
+repository. Admitting a dataset is therefore a host act performed through
+the delivered procedure at any time, not a code change, and nothing in the
+repository could ever mark it done. `complete` claims exactly what is
+delivered: every unit of section 2 is written, the refusals of section 5
+are tests, and verification passes. It claims no quality figure: until a
+dataset is admitted for a task, 3.5 refuses every quality claim for that
+task, which is the correct, settled behavior rather than an outstanding
+work item. Each admission later adds its claim sentence, digests and
+aggregate figures here, as acceptance item 2 states.
 
 ## 6. Questions settled at approval
 

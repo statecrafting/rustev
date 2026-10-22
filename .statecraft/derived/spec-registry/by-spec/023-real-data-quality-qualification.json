@@ -64,7 +64,7 @@
       }
     ],
     "sectionDigests": {
-      "023-semantic-quality-and-calibration-qualification-on-real-labeled-data": "6aa986ecccbab2ca4dd9fb595990c251966ae5e8c720ef36e26934a666ea6804",
+      "023-semantic-quality-and-calibration-qualification-on-real-labeled-data": "eb6f48047e805315e44504c688116ad29ece38b3e53ce284969caa74cd2efc4b",
       "1-purpose": "44895a98ccce1b665b031d2706b09fd118cd3c1d577b104733cc98af4e871a89",
       "2-territory": "2cc9d6629c1229238e4fbd37196aad7c898b069aadc837a41d991f7d9ac31723",
       "3-1-dataset-admission": "f399c778f451b60eb9df1c36beb6f050e779e5490bfe416473eba96408da08c5",
@@ -77,7 +77,7 @@
       "5-observable-negative-cases": "468762d84d8ab58cbfaad154a56b0b8e831948710b7892731ea388083428193a",
       "6-questions-settled-at-approval": "4e4b05811cb58f941f7a625f9e70423877f85ad8c0be1e32910ef17055d112e4",
       "acceptance": "299a571d00176cfff31acf8f491079e238f0cbb991b2d4190eb56f68952c9808",
-      "implementation-record": "96ce2b4572fae920ff8b109e58c5c50906b2bc9c2402778b181f55cf015b25ea",
+      "implementation-record": "b81e5b78b485b279fd0cb873fd9230a1a726a9e9a1b6effd222c5718c7107369",
       "verification": "41892ee38172feef6f6dc2eacc19347b11ce90cbe3f6b451d075aa97374afc72"
     },
     "sectionHeadings": [
@@ -102,6 +102,6 @@
     "summary": "The governed path from \"mechanics only\" to a scoped empirical quality claim that backlog item RUSTEV-011 and owner decision R-04 require: how an appropriately licensed public dataset or an independently human-labeled dataset is admitted, with provenance, license, privacy basis, labeling method, annotator independence, splits and limitations recorded; how the evaluator configuration is frozen before the final-test split is read; how quality, calibration, abstention and regression are measured against exact and rules baselines under spec 004; and how every resulting claim is scoped to the evaluated population, task and binding identity. Approved (A-22). Admitted datasets and their per-case details stay outside this repository, held by the host (OD-7); approval authorizes the procedure and its refusal checks, not any particular dataset, live call or spend beyond R-29.\n",
     "title": "Semantic quality and calibration qualification on real labeled data"
   },
-  "shardHash": "6e1966c2c57b64ad93fce8e732a96c6b28a4ef8817e1585a495a3fea2caaedc5",
+  "shardHash": "77afafaa3b74e62c20494de6e2a995688a7fdaa44c86d5a8e65ae0873d59202b",
   "specVersion": "1.10.0"
 }
