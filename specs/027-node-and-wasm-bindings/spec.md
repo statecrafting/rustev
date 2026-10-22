@@ -1143,6 +1143,16 @@ the text to match it, is a later change under its own spec.
    spec 003's invalid backend output; output that parses but the core
    refuses is `invalid_backend_output`, as the tests show.
 
+**Follow-up, 2026-10-22 (a test-harness flake).** The waits in
+`integrations/rustev-node/test/negative.test.mjs` and the conformance
+driver (`tools/rustev-conformance/js/run.mjs`) were bounded by 100,000
+event-loop turns; on a loaded CI runner the test "a host backend resolving
+after the deadline is discarded and counted" exhausted them before the
+engine's threads counted the late resolution, and failed with "waited
+forever" (#151's `bindings / wasm`). Both waits are now bounded by 120 s
+of wall time, still yielding with `setImmediate` and never sleeping; no
+assertion changed.
+
 ## Decisions at approval
 
 1. **npm package names and scope** (left to the implementer by #56; decided
