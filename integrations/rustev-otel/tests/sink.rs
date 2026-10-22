@@ -114,6 +114,18 @@ impl TelemetryExporter for TestExporter {
         })
     }
 
+    fn export_logs<'a>(
+        &'a self,
+        _logs: &'a [rustev_otel::LogRecord],
+    ) -> BoxFuture<'a, Result<(), ExportError>> {
+        Box::pin(async move {
+            match *self.behavior.lock().unwrap() {
+                Behavior::Succeed => Ok(()),
+                _ => Err(ExportError::Failed("refused".into())),
+            }
+        })
+    }
+
     fn takes_logs(&self) -> bool {
         true
     }

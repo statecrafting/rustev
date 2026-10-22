@@ -19,6 +19,25 @@ spec = "028-opentelemetry-evidence-sink"
 # redaction and the JSONL exporter build with no OpenTelemetry crate.
 [features]
 default = []
+# OTLP over gRPC (tonic), TLS through rustls with ring (3.2.3, 3.9.1).
+otlp-grpc = ["otlp", "opentelemetry-otlp/grpc-tonic", "opentelemetry-otlp/tls-ring", "dep:http"]
+# OTLP over HTTP protobuf with the hyper client (3.2.3, 3.9.1).
+otlp-http = [
+    "otlp",
+    "opentelemetry-otlp/http-proto",
+    "opentelemetry-otlp/hyper-client",
+    "dep:opentelemetry-http",
+    "dep:http",
+    "dep:hyper",
+    "dep:hyper-util",
+    "dep:rustls",
+    "dep:tokio-rustls",
+    "dep:webpki-roots",
+    "dep:tower-service",
+    "tokio/net",
+]
+# The shared OTLP dependencies of both transports; enables nothing alone.
+otlp = ["dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp"]
 
 [dependencies]
 rustev-contract.workspace = true
@@ -28,11 +47,32 @@ serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 tokio = { workspace = true, features = ["sync", "time", "rt"] }
+opentelemetry = { workspace = true, optional = true }
+opentelemetry_sdk = { workspace = true, optional = true }
+opentelemetry-otlp = { workspace = true, optional = true }
+opentelemetry-http = { version = "0.33", default-features = false, features = ["hyper"], optional = true }
+# The OTLP/HTTP transport: hyper with rustls and ring (3.2.3); HTTP
+# families are legal only under integrations/ (spec 001, 3.4.2).
+http = { version = "1", default-features = false, features = ["std"], optional = true }
+hyper = { workspace = true, features = ["client", "http1"], optional = true }
+hyper-util = { workspace = true, features = ["client-legacy", "http1", "tokio"], optional = true }
+rustls = { workspace = true, optional = true }
+tokio-rustls = { workspace = true, optional = true }
+webpki-roots = { workspace = true, optional = true }
+tower-service = { version = "0.3", optional = true }
 
 # The reference decisions run through the runtime with the rules backend.
 [dev-dependencies]
 rustev-backend-rules.workspace = true
-tokio = { workspace = true, features = ["sync", "time", "rt", "rt-multi-thread", "macros"] }
+tokio = { workspace = true, features = ["sync", "time", "rt", "rt-multi-thread", "macros", "net"] }
+# Loopback fake collectors for the OTLP tests: HTTP/1 with hyper, gRPC
+# with h2.
+hyper = { workspace = true, features = ["server", "http1"] }
+hyper-util = { workspace = true, features = ["tokio"] }
+http-body-util.workspace = true
+h2 = { version = "0.4", default-features = false }
+bytes = { version = "1", default-features = false }
+http = { version = "1", default-features = false, features = ["std"] }
 
 [lints]
 workspace = true
