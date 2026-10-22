@@ -121,6 +121,7 @@
         "src/baseline.rs",
         "src/bundle.rs",
         "src/compare.rs",
+        "src/comparison.rs",
         "src/config.rs",
         "src/dataset.rs",
         "src/diff.rs",
@@ -140,7 +141,8 @@
         "src/repeat_stats.rs",
         "src/replay.rs",
         "src/report.rs",
-        "src/resolve.rs"
+        "src/resolve.rs",
+        "src/selection.rs"
       ],
       "max_archive_bytes": 131072,
       "max_unpacked_bytes": 393216

@@ -13,6 +13,7 @@ pub mod assemble;
 pub mod baseline;
 pub mod bundle;
 pub mod compare;
+pub mod comparison;
 pub mod config;
 pub mod dataset;
 pub mod diff;
@@ -32,5 +33,9 @@ pub mod repeat_stats;
 pub mod replay;
 pub mod report;
 pub mod resolve;
+pub mod selection;
 
 pub use diff::{EvalDiff, diff, render_markdown};
+
+pub use comparison::{Comparison, NamedCandidate, RepeatEvidence, compare_candidates};
+pub use selection::{Selection, SelectionGate, evaluate_selection};

@@ -937,6 +937,23 @@ one ulp beyond, unknown intervals and bands, top-k changes, the cap at
 exactly 10 000 and 10 001, round trip and refusals, and byte-stable JSON
 and Markdown goldens under `tests/data/diff/`).
 
+**Increment 6 (comparison and selection gates).**
+`crates/rustev-eval/src/comparison.rs` defines `rustev.comparison/1`
+(`REPLAY_V1`, record canonical) and the multi-candidate comparison of
+3.11; `src/selection.rs` defines `rustev.selection-gate/1`
+(`DESCRIPTOR_V1`, canonical, no binary64) and `rustev.selection/1`
+(`REPLAY_V1`, record canonical) with `evaluate_selection`: per-candidate
+preconditions (an unmet one makes the candidate `unknown` with its
+reason), the per-run coverage minimums on both sides, the clauses of
+3.12.3 and 3.12.4 (a historical latency, queue or cost observation is
+unknown), the verdict of 3.12.5 (a definite failure rejects regardless of
+unknown clauses; unknown never qualifies) and the ranking of 3.12.6 (an
+unknown or historical rank metric lists the candidate as `unranked`).
+Tests: `tests/comparison.rs` and `tests/selection.rs` with goldens under
+`tests/data/selection/`. Engineering choices: gate names at most 64 bytes,
+metric names at most 256 bytes, gate lists at most 1 024 entries, and
+`all_slices` with no declared slice is unknown.
+
 **Needs an owner decision (D-029-1): `brier` per-case measures.** 3.2.3
 lists `brier` as a mean, and 3.2.6 requires the measures to reproduce the
 report's value bit for bit. Spec 004 computes Brier by adding every class
