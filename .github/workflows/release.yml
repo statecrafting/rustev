@@ -1,0 +1,312 @@
+# The release workflow of spec 031 (3.9, 3.12): builds the release's npm
+# tarballs and prebuilt CLI binaries from the owner's signed tag, and gives
+# each a keyless signature with an in-toto SLSA build provenance
+# attestation bound to this workflow, the commit and the tag (3.9.5, SLSA
+# v1.0 Build Level 2). Not rendered by the setup profile: owned by spec 031.
+# It is not a required job of ci-gate.
+#
+# It runs only when dispatched by hand with the tag. By default it builds,
+# attests and uploads the artifacts, and publishes nothing. The `npm` job
+# publishes, with npm provenance (3.9.6), only when dispatched with
+# `publish-npm: true` and only after the owner approves the `npm-publish`
+# Environment: publication is the owner's act under 031 3.11 and spec 021
+# 3.9. It uses npm trusted publishing (OIDC); no registry token is stored
+# or read here. Crates are uploaded by `rustev-release publish` (spec 021),
+# never by this workflow.
+#
+# - `tag`: the dispatched tag is the release-set file's tag, signed and
+#   verified against `tools/rustev-release/allowed_signers`, and the
+#   checkout is that tag's commit.
+# - `bindings`: spec 027's bindings workflow at the tag (every test, the
+#   budgets and the corpus), which uploads each platform's addon.
+# - `cli`: the `rustev` binary per platform of 3.13.1, smoke tested
+#   (help, and a reference plan check equal to its golden), archived and
+#   attested.
+# - `pack`: the nine npm tarballs (each platform package with its addon,
+#   the native main package, the WebAssembly package), each `package.json`
+#   with exactly its `private` guard removed (spec 027 keeps it until
+#   publication), checked by `rustev-release manifests` first; attested.
+# - `npm`: the gated publication, in the release set's npm order.
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The signed release tag, vX.Y.Z (the release-set file's tag)"
+        required: true
+        type: string
+      publish-npm:
+        description: "Publish the npm tarballs (needs the owner's npm-publish Environment approval)"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: never
+
+concurrency:
+  group: release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    name: tag
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      commit: ${{ steps.tag.outputs.commit }}
+      version: ${{ steps.tag.outputs.version }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+          fetch-depth: 0
+      - name: The tag is the release set's, signed by the owner (021 3.8)
+        id: tag
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -eu
+          expected=$(jq -r .tag tools/rustev-release/release-set.json)
+          # Dispatched on the tag itself, so this workflow and the bindings
+          # workflow it calls are the tag's own files.
+          if [ "$GITHUB_REF" != "refs/tags/$TAG" ]; then
+            echo "031 3.12: dispatch on refs/tags/$TAG (gh workflow run release.yml --ref $TAG), not $GITHUB_REF" >&2
+            exit 1
+          fi
+          if [ "$TAG" != "$expected" ]; then
+            echo "031 3.12: dispatched tag $TAG is not the release set's $expected" >&2
+            exit 1
+          fi
+          test "$(git cat-file -t "refs/tags/$TAG")" = tag || { echo "021 3.8: $TAG is not an annotated tag" >&2; exit 1; }
+          git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile=tools/rustev-release/allowed_signers verify-tag "refs/tags/$TAG"
+          echo "commit=$(git rev-parse "refs/tags/$TAG^{commit}")" >> "$GITHUB_OUTPUT"
+          echo "version=$(jq -r .version tools/rustev-release/release-set.json)" >> "$GITHUB_OUTPUT"
+
+  bindings:
+    name: bindings
+    needs: tag
+    # bindings.yml asks only for `contents: read` (its top-level
+    # permissions; no job requests more), and uploading artifacts needs no
+    # token permission, so the caller's `contents: read` is enough. The
+    # addons are attested here, in `pack`, not there.
+    permissions:
+      contents: read
+    uses: ./.github/workflows/bindings.yml
+
+  cli:
+    name: cli ${{ matrix.platform }}
+    needs: tag
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        # The platforms and build images of spec 027 3.13.1 (bindings.yml).
+        include:
+          - { platform: linux-x64-gnu, runner: ubuntu-24.04, image: "rust:1.98.1-bookworm@sha256:93ce27a88655056a51dbdd8f5f2d7ddc071c7b0070fb288a37b5a285fc83971e" }
+          - { platform: linux-arm64-gnu, runner: ubuntu-24.04-arm, image: "rust:1.98.1-bookworm@sha256:93ce27a88655056a51dbdd8f5f2d7ddc071c7b0070fb288a37b5a285fc83971e" }
+          - { platform: linux-x64-musl, runner: ubuntu-24.04, image: "rust:1.98.1-alpine3.22@sha256:a1796ca6fa216d6727b5f61c69e4c665b120b1a4dcb969639e2f25f1ed309456" }
+          - { platform: linux-arm64-musl, runner: ubuntu-24.04-arm, image: "rust:1.98.1-alpine3.22@sha256:a1796ca6fa216d6727b5f61c69e4c665b120b1a4dcb969639e2f25f1ed309456" }
+          - { platform: darwin-arm64, runner: macos-15 }
+          - { platform: darwin-x64, runner: macos-15-intel }
+          - { platform: win32-x64-msvc, runner: windows-2025 }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out committed bytes
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.tag.outputs.commit }}
+      - name: Build the CLI in its pinned image
+        if: ${{ !startsWith(matrix.platform, 'darwin') && !startsWith(matrix.platform, 'win32') }}
+        run: |
+          # The source date is the commit's time (021 3.7).
+          epoch=$(git log -1 --format=%ct)
+          docker run --rm -v "$PWD":/w -w /w -e SOURCE_DATE_EPOCH="$epoch" "${{ matrix.image }}" \
+            cargo build -p rustev-cli --locked --release
+          sudo chown -R "$(id -u):$(id -g)" target
+      - name: Build the CLI
+        if: startsWith(matrix.platform, 'darwin') || startsWith(matrix.platform, 'win32')
+        run: SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) cargo build -p rustev-cli --locked --release
+      - name: Smoke test and archive (031 3.9.7d)
+        env:
+          VERSION: ${{ needs.tag.outputs.version }}
+        run: |
+          set -eu
+          exe=target/release/rustev
+          case "${{ matrix.platform }}" in win32-*) exe=target/release/rustev.exe ;; esac
+          run() {
+            case "${{ matrix.platform }}" in
+              *-musl) docker run --rm -v "$PWD":/w -w /w "${{ matrix.image }}" "$@" ;;
+              *) "$@" ;;
+            esac
+          }
+          # The CLI has no version command (spec 006), so 3.9.7d's version
+          # step is the archive name here; help and a reference plan check
+          # against the conformance suite's golden run.
+          run "$exe" --help > /dev/null
+          f=tools/rustev-conformance/fixtures/cli/lodging.check
+          run "$exe" plan check --definition "$f/lodging.definition.json" --rules "$f/lodging.rules.json" > dist-check.json
+          cmp dist-check.json crates/rustev-cli/tests/golden/lodging.check.json
+          name="rustev-$VERSION-${{ matrix.platform }}"
+          mkdir -p "dist/$name"
+          cp "$exe" LICENSE "dist/$name/"
+          # Fixed order, owner and times, so the archive is a function of
+          # the binary (031 3.9.3).
+          epoch=$(git log -1 --format=%ct)
+          if tar --version 2>/dev/null | grep -q 'GNU tar'; then
+            (cd dist && tar --sort=name --owner=0 --group=0 --numeric-owner --mtime="@$epoch" -cf - "$name" | gzip -9n > "$name.tar.gz")
+          else
+            # bsdtar (macOS, Windows): no fixed order or times, so these
+            # archives are not yet reproducible (031 3.9.3 stays open).
+            (cd dist && tar -cf - "$name" | gzip -9n > "$name.tar.gz")
+          fi
+          if command -v sha256sum > /dev/null; then
+            (cd dist && sha256sum "$name.tar.gz" > "$name.tar.gz.sha256")
+          else
+            (cd dist && shasum -a 256 "$name.tar.gz" > "$name.tar.gz.sha256")
+          fi
+      - name: Attest build provenance (031 3.9.5)
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/rustev-*.tar.gz
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cli-${{ matrix.platform }}
+          path: dist/rustev-*.tar.gz*
+          if-no-files-found: error
+
+  pack:
+    name: pack
+    needs: [tag, bindings]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.tag.outputs.commit }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: The npm members' manifests (031 3.1)
+        run: cargo run -p rustev-release --locked --quiet -- manifests
+      - name: Install the pinned WebAssembly tools (027 3.10.2)
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo install --locked --root ~/wasm-tools/wasm-bindgen-0.2.129 wasm-bindgen-cli --version 0.2.129
+          cargo install --locked --root ~/wasm-tools/wasm-opt-0.116.1 wasm-opt --version 0.116.1
+          echo "$HOME/wasm-tools/wasm-bindgen-0.2.129/bin" >> "$GITHUB_PATH"
+          echo "$HOME/wasm-tools/wasm-opt-0.116.1/bin" >> "$GITHUB_PATH"
+      - name: Build the WebAssembly package
+        run: |
+          cargo build -p rustev-wasm --locked --target wasm32-unknown-unknown --profile wasm
+          for t in web bundler nodejs; do
+            d=$t; [ $t = nodejs ] && d=node
+            wasm-bindgen --target $t --out-dir "integrations/rustev-wasm/$d" target/wasm32-unknown-unknown/wasm/rustev_wasm.wasm
+            wasm-opt -Oz --enable-bulk-memory --enable-nontrapping-float-to-int --enable-sign-ext --enable-mutable-globals \
+              -o "integrations/rustev-wasm/$d/rustev_wasm_bg.wasm" "integrations/rustev-wasm/$d/rustev_wasm_bg.wasm"
+            ty=module; [ $t = nodejs ] && ty=commonjs
+            printf '{ "type": "%s" }\n' $ty > "integrations/rustev-wasm/$d/package.json"
+          done
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: rustev-*
+          path: addons
+      - name: Stage each addon and pack the npm members in release order
+        run: |
+          set -eu
+          for d in addons/rustev-*; do
+            p=${d#addons/rustev-}
+            cp "$d/rustev.$p.node" "integrations/rustev-node/npm/$p/"
+          done
+          mkdir -p dist/npm
+          # The release set's npm order; each package.json loses exactly
+          # its `private` guard, and nothing else changes.
+          jq -r '.npm[].directory' tools/rustev-release/release-set.json | while read -r dir; do
+            # Under `node -e`, process.argv[1] is the first argument after the
+            # script (`node -e "console.log(process.argv[1])" x` prints x).
+            node -e '
+              const fs = require("fs"); const f = process.argv[1] + "/package.json";
+              const p = JSON.parse(fs.readFileSync(f, "utf8"));
+              if (p.private !== true) { console.error(f + ": the private guard is missing"); process.exit(1); }
+              delete p.private;
+              fs.writeFileSync(f, JSON.stringify(p, null, 2) + "\n");' "$dir"
+            (cd "$dir" && npm pack --pack-destination "$GITHUB_WORKSPACE/dist/npm" --ignore-scripts)
+          done
+          ls dist/npm
+          (cd dist/npm && sha256sum ./*.tgz > SHA256SUMS)
+      - name: Attest build provenance (031 3.9.5)
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/npm/*.tgz
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: npm
+          path: dist/npm
+          if-no-files-found: error
+
+  npm:
+    name: npm publish
+    needs: [tag, pack]
+    if: ${{ inputs.publish-npm }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # The owner approves this Environment for each publication (031 3.11).
+    environment: npm-publish
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.tag.outputs.commit }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      # Trusted publishing authenticates with the job's OIDC token and needs
+      # npm 11.5.1 or later; Node 22 bundles npm 10. No registry-url is set,
+      # so no .npmrc expects a NODE_AUTH_TOKEN, and no token exists here.
+      - name: Install the pinned npm for trusted publishing
+        # Pinned by content: the tarball's SHA-512 must equal the registry's
+        # integrity recorded here for npm 11.21.0 before it is installed.
+        env:
+          NPM_INTEGRITY: sha512-Zov8KhamNneiLdELtj5YALtNmJW4L4fCLTzjfpzXG2w6MSHcf0UxgdlK5uloCuksWT+7mGUU7wi79cO6RqivPg==
+        run: |
+          set -eu
+          curl -fsSL -o "$RUNNER_TEMP/npm-11.21.0.tgz" https://registry.npmjs.org/npm/-/npm-11.21.0.tgz
+          got="sha512-$(openssl dgst -sha512 -binary "$RUNNER_TEMP/npm-11.21.0.tgz" | base64 -w0)"
+          test "$got" = "$NPM_INTEGRITY" || { echo "031 3.12: npm tarball integrity $got is not $NPM_INTEGRITY" >&2; exit 1; }
+          npm install -g --ignore-scripts "$RUNNER_TEMP/npm-11.21.0.tgz"
+          test "$(npm --version)" = 11.21.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: npm
+          path: dist/npm
+      - name: Publish with npm provenance, in the release set's order (031 3.9.6)
+        env:
+          VERSION: ${{ needs.tag.outputs.version }}
+        run: |
+          set -eu
+          (cd dist/npm && sha256sum -c SHA256SUMS)
+          jq -r '.npm[].name' tools/rustev-release/release-set.json | while read -r name; do
+            file="dist/npm/$(printf %s "$name" | sed 's/^@//; s|/|-|')-$VERSION.tgz"
+            test -f "$file" || { echo "031 3.12: no tarball for $name ($file)" >&2; exit 1; }
+            # An already public identical version is skipped by npm's own
+            # refusal; any refusal stops the run (021 3.9: no blind retry).
+            npm publish "$file" --provenance --access public
+          done

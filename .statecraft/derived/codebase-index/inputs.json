@@ -9,6 +9,9 @@
     ".github/workflows/release-checks.yml": {
       "contentHash": "8be21a06b4c4b0571bc76fd80e5b8e756b8d69ba7728decc2c5c622c0d44bbdc"
     },
+    ".github/workflows/release.yml": {
+      "contentHash": "363f54d919543d64d432bd6237b39f3241f5d3bb9001b2df448bf79595d6c806"
+    },
     ".github/workflows/statecraft-ai-review.yml": {
       "contentHash": "1880b5380c2457b28ea8b34903d2044ae099edc53ce735874092d0be8daab94c"
     },

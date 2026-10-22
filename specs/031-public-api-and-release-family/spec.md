@@ -772,6 +772,44 @@ the npm tarballs' SBOMs and reproducibility (3.9.1, 3.9.3), npm provenance
 (3.9.6) and the release workflow come next; this increment changes no
 workflow and publishes nothing.
 
+**Increment 6, 2026-10-21 (the release workflow).**
+`.github/workflows/release.yml`, a non-managed workflow this spec owns
+(3.12), runs only when dispatched by hand on the release tag (`gh
+workflow run release.yml --ref vX.Y.Z -f tag=vX.Y.Z`); it is not a
+required job. Its `tag` job refuses a tag other than the release-set
+file's, a lightweight tag, a tag whose signature does not verify against
+`tools/rustev-release/allowed_signers`, and a dispatch on any other ref,
+so the workflow and spec 027's bindings workflow it calls are the tag's
+own files. `bindings` runs that workflow at the tag (every test, the
+budgets and the corpus on the seven platforms) and supplies each
+platform's addon. `cli` builds `rustev` on the seven platforms of spec
+027 3.13.1 in the same pinned images at the commit's source date,
+checks `--help` and that `plan check` of the lodging reference plan
+prints its golden bytes, archives it with the license and attests each
+archive. `pack` runs `rustev-release manifests` (increment 5), builds the
+WebAssembly package as `make bindings` does, stages each addon, removes
+exactly the `private` guard from each `package.json` and packs the nine
+npm members in the release set's order, and attests each tarball. The
+attestations are `actions/attest-build-provenance` 4.2.2: keyless Sigstore
+signatures over in-toto SLSA v1.0 provenance bound to this workflow, the
+commit and the tag, the Build Level 2 of 3.9.5. `npm` publishes the
+tarballs with npm provenance (3.9.6), in the release set's order, through
+npm trusted publishing with npm 11.21.0 pinned by its registry SHA-512 integrity (OIDC; no token is stored or read and no `.npmrc` expects one), only when dispatched
+with `publish-npm: true` and after the owner approves the `npm-publish`
+Environment; nothing in this increment dispatches it, configures that
+Environment or the trusted publisher, or publishes. Crates stay with
+`rustev-release publish` (spec 021).
+
+Open after this increment: the CLI has no version command (spec 006), so
+3.9.7d's version step cannot run as written; the macOS and Windows CLI
+archives are built with `bsdtar`, without a fixed entry order or times,
+so they are not yet reproducible (3.9.3), while the Linux archives are;
+two independent builds and the digest comparison of 3.9.3 for the npm
+tarballs and binaries, the npm audit of 3.9.2, the SBOMs of the
+tarballs and binaries (3.9.1), the hosted release with the manifest,
+checksums, SBOMs, provenance and changelog (layer 8), and the image,
+which is absent from this release (increment 5).
+
 ## Decisions at approval
 
 1. **Crate and package names** (left to the implementer by #58): decided
