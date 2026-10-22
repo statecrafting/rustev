@@ -1,0 +1,12 @@
+{
+  "schema": "rustev.bedrock-model-policy/1",
+  "allow": [
+    {
+      "model": "*",
+      "region": "*",
+      "profile_kind": "*",
+      "wire": "*"
+    }
+  ],
+  "deny": []
+}

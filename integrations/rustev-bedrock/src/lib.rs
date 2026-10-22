@@ -1,0 +1,30 @@
+//! AWS Bedrock integration under spec 030.
+#![forbid(unsafe_code)]
+pub mod binding;
+#[path = "../../rustev-remote-http/src/budget.rs"]
+pub mod budget;
+#[path = "../../rustev-remote-http/src/cancel.rs"]
+pub mod cancel;
+#[path = "../../rustev-remote-http/src/cost.rs"]
+pub mod cost;
+#[path = "../../rustev-remote-http/src/exchange.rs"]
+pub mod exchange;
+#[path = "../../rustev-remote-http/src/http.rs"]
+pub mod http;
+#[path = "../../rustev-remote-http/src/identity.rs"]
+pub mod identity;
+pub mod mapping;
+#[path = "../../rustev-remote-http/src/phases.rs"]
+pub mod phases;
+pub mod policy;
+#[path = "../../rustev-remote-http/src/pool.rs"]
+pub mod pool;
+#[path = "../../rustev-remote-http/src/principal.rs"]
+pub mod principal;
+pub mod signing;
+#[path = "../../rustev-jev/src/spend.rs"]
+pub mod spend;
+#[path = "../../rustev-remote-http/src/taxonomy.rs"]
+pub mod taxonomy;
+#[path = "../../rustev-remote-http/src/wire.rs"]
+pub mod wire;

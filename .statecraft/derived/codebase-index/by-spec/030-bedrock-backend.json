@@ -28,18 +28,51 @@
         "source": "spec-edge"
       },
       {
+        "path": "integrations/rustev-bedrock",
+        "source": "manifest-metadata"
+      },
+      {
+        "path": "integrations/rustev-bedrock/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "integrations/rustev-jev/",
+        "source": "spec-edge"
+      },
+      {
         "path": "tools/rustev-boundaries/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "tools/rustev-release/",
         "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "integrations/rustev-bedrock/"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
           "kind": "directory",
           "path": "integrations/rustev-bedrock/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "integrations/rustev-jev/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-jev/"
         }
       },
       {
@@ -53,6 +86,19 @@
         "unit": {
           "kind": "directory",
           "path": "tools/rustev-boundaries/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "tools/rustev-release/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-release/"
         }
       },
       {
@@ -125,5 +171,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "4497579390504fd3a1689783b14354cadeb68ce23b428c2a3e43e9acbd565aef"
+  "shardHash": "b5ce05a67d408d28cf09c3d9558703b237f51a72182d79c3591c96f7c1a36609"
 }

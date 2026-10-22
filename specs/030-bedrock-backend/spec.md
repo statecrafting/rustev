@@ -2,7 +2,7 @@
 id: "030-bedrock-backend"
 title: "Hosted model platform backend: AWS Bedrock"
 status: approved
-implementation: pending
+implementation: in-progress
 created: "2026-10-16"
 summary: >
   A remote decision backend under `integrations/rustev-bedrock/` for Amazon
@@ -27,16 +27,22 @@ summary: >
 amends:
   - "001-boundaries-and-authority"
 establishes:
-  - { kind: directory, path: "integrations/rustev-bedrock/", planned: true }
+  - { kind: directory, path: "integrations/rustev-bedrock/" }
 extends:
   # Adds the integration crate and the AWS signing crates as workspace
   # dependencies usable only under integrations/ (spec 001, 3.4.2).
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.toml" }, nature: additive }
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.lock" }, nature: additive }
-  # Adds 030 to `make verify` once implemented.
+  # Declared at approval, not by an increment: 030 joins `make verify`
+  # (Makefile) with its declared verification, which waits for the live
+  # stages (implementation record, increment 2).
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
   # Adds the cloud SDK family to the boundary check (3.13).
   - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "tools/rustev-boundaries/" }, nature: additive }
+  # Lists the crate as excluded from the release set (spec 031).
+  - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
+  # Keeps the spend journal it compiles in by path free of the Jev production module (spec 012).
+  - { spec: "012-jev-integration", unit: { kind: directory, path: "integrations/rustev-jev/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "002-decision-contract-and-pure-core"
@@ -674,6 +680,35 @@ Pending with implementation. The implementing change adds `030` to `make
 verify` with repository-local deterministic verification for every
 acceptance item; live smoke results, if any, are recorded with their
 journal totals and are not part of declared verification.
+
+## Implementation record
+
+Delivered in increments, each its own pull request; nothing here claims an
+acceptance item before the increment that satisfies it.
+
+**Increment 1 (documents, policy, wire mappings and signing; no network).**
+`integrations/rustev-bedrock/` is a new workspace crate (`publish = false`)
+that compiles spec 009's Part A sources and spec 012's spend journal in by
+path, as `rustev-jev` does. `src/binding.rs` defines
+`rustev.bedrock-binding/1` (3.2) with every member in the artifact identity
+and the members reserved for later specs (3.12); `src/policy.rs` the
+host's `ModelPolicy` (deny wins, no default allowlist, 3.4) and residency
+and inference-profile evaluation (3.3); `src/mapping.rs` the Converse and
+Responses request and response mappings under the binding's mapping
+version (3.6, 3.7); `src/signing.rs` SigV4 through `aws-sigv4` with an
+injected clock and a host credential provider whose errors never carry key
+material (3.5). `tools/rustev-boundaries/` adds the cloud SDK family
+(3.13). The workspace gains `aws-sigv4`, `aws-credential-types` and, for
+the crate's optional `aws-config` feature, `aws-config`; the full AWS SDK
+is not a dependency. Tests: `tests/signing.rs` against vendored vectors of
+the published AWS SigV4 test suite (`fixtures/sigv4/`, with their licence
+and provenance) and `tests/contract.rs` (binding, policy and mapping
+cases of section 5). Charge (3.9.2): Converse's `inputTokens` counts only
+non-cached input (AWS: total input is `inputTokens + cacheReadInputTokens
++ cacheWriteInputTokens`), so each count is priced once; Responses'
+`input_tokens` includes `cached_tokens`, which are subtracted, and a
+nonzero `cache_write_tokens` is `unknown`, because AWS does not state
+whether `input_tokens` includes it.
 
 ## Decisions at approval
 
