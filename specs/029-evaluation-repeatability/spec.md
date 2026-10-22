@@ -2,7 +2,7 @@
 id: "029-evaluation-repeatability"
 title: "Evaluation repeatability, baselines, diffs and selection gates (amends 004 and 006)"
 status: approved
-implementation: pending
+implementation: in-progress
 created: "2026-10-16"
 summary: >
   An amendment of approved specs 004 and 006 (R-16), for #76 child E2.
@@ -32,6 +32,9 @@ extends:
   - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: amending }
   # Adds 029 to `make verify` when the implementation is complete.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  # Each new source file of a release member joins the reviewed archive
+  # list (spec 021, 3.5).
+  - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
 depends_on:
   - "002-decision-contract-and-pure-core"
   - "004-evaluation-and-replay"
@@ -73,7 +76,7 @@ obligations:
 
 Approved by the owner (A-25, 2026-10-16, under the 2026-10-16 delivery work
 order) as its own reviewable change before any code (R-16); implementation
-is pending. This spec implements #76 child E2 (#73). The approved texts of
+is in progress, see the implementation record. This spec implements #76 child E2 (#73). The approved texts of
 specs 004 and 006, and of their amendments 014 and 015, are not edited;
 this spec records what changes, as 014 does for 004. Approval authorizes no
 live run, provider call or spend, no quality claim (R-04, R-37), and no
@@ -718,6 +721,92 @@ fixtures (R-04).
 
 Pending with implementation. Approval satisfies no acceptance item, and no
 existing evaluation is a repeat set under this spec.
+
+## Implementation record
+
+Delivered in increments, each its own pull request; nothing here claims an
+acceptance item before the increment that satisfies it, and 029 joins
+`make verify` only when every item it can verify is delivered. Plan:
+
+1. The statistics core (3.3 to 3.5): the generator, stream and run seeds,
+   `rustev.repeat-config/1`, across-run statistics and `pooled`, the
+   case-clustered bootstrap with exact ranks, noise bands; the Python
+   reference, its committed input and output, and the generator
+   known-answer vectors.
+2. Repeat sets (3.1, 3.2, 3.6): `rustev.eval-cases/1` per run, the measures
+   of spec 004's metrics and their reconciliation with the run report, the
+   `replay`, `captured` and refused `live` sources, the stable cohort,
+   slices and `rustev.repeat-report/1`.
+3. The held-out ledger, baselines, the reproducibility check and diffs
+   (3.7 to 3.10).
+4. Multi-candidate comparison and selection gates (3.11, 3.12).
+5. The CLI surface and exit codes (3.13 to 3.15), the mutation seeds,
+   declared verification and completion. The `wasm32-wasip1` item stays
+   externally blocked until a WASI runner exists in CI.
+
+**Increment 1 (the statistics core).**
+`crates/rustev-eval/src/generator.rs` implements
+`xoshiro256starstar-splitmix64/1` on wrapping `u64` arithmetic (3.4.2),
+the stream seed of 3.4.3 through the contract's `tagged_digest`, the
+rejection-sampled uniform index of 3.4.4, and the run seeds of 3.4.6.
+`src/repeat_config.rs` defines `rustev.repeat-config/1` (`RepeatConfig`,
+`REPLAY_V1`, identified by its canonical digest, unknown fields and
+duplicate keys refused, no binary64 number) and checks every rule of
+3.3.1; the rule that metrics are reported is a separate check over the
+names the evaluator configuration reports, which increment 2 supplies.
+`src/repeat_stats.rs` takes per-case contributions in manifest and run
+order (count ratio, mean or sample, 3.2.2) and computes the per-run
+values, `mean`, `sd`, `min`, `max` and `pooled` (3.3.2, 3.3.3), the
+`percentile-cluster/1` interval of every metric of one cohort over the
+cohort's own stream (3.4.1, 3.4.5, 3.4.7), with `B * C * N` above 10^9
+refused before drawing (3.4.8), and the band of 3.5 with its basis. An
+unknown run value makes the four across-run statistics unknown, naming the
+runs; an undefined resample makes the interval unknown with its count; an
+unknown `sd` or interval makes the band unknown, never the floor or zero.
+No dependency is added, and nothing reads a clock or performs I/O.
+
+Tests: `crates/rustev-eval/tests/bootstrap.rs` compares the generators
+with `tests/data/bootstrap/generators.json`, printed by `generators.c`
+from the authors' reference C implementations, and compares every stream
+seed, run seed, index draw, rank, per-run value, statistic and interval
+with `expected.json`, written by `reference.py` (Python 3 standard library
+only, written from this spec's text, which also checks the C vectors) from
+`cases.json`: four sets (N = 5 with an unknown run value and a slice,
+N = 1, N = 1 replay, and N = 2 with negative values and zeros of both
+signs), count ratios, means and quantiles, a metric whose resamples have
+zero denominators, four seeds and three levels, every binary64 value as
+its bit pattern. The bootstrap function also refuses a seed, level or
+resample count outside 3.3.1, and a contribution with a zero denominator
+(a case outside a denominator has none). `python3 -I reference.py --check`
+regenerates the output and compares bytes. `tests/repeat_config.rs`
+covers every rule of 3.3.1 and its bounds, the identity, the bands and
+their bases, and the section 5 rows on a one-run `captured` band and a
+zero band from deterministic replay (the candidate one ulp lower falls
+outside it). Acceptance items not yet satisfied: everything beyond the
+reference comparison and those two rows; the `wasm32-wasip1` item is
+externally blocked.
+
+Engineering choices made by the implementing agent, not by the owner:
+
+- A resample combines its drawn cases in draw order (3.4.1 says each draw
+  counts once per time it is drawn, not in which order); binary64 sums
+  start from zero, and a case's contributions are summed over runs first,
+  as for `pooled`.
+- Binary64 values are sorted by the IEEE 754 total order, so zeros of
+  opposite sign sort one way on every target; a sample quantile uses
+  spec 004's nearest-rank formula over binary64 samples.
+- The run seed of 3.4.6 numbers runs from 0 in run order (`run/0` is the
+  first run).
+- A seed is spelled without leading zeros (`0` itself excepted), so one
+  `u64` has one spelling and one configuration identity.
+- A band equal to its floor keeps the derived basis; `floor` is recorded
+  only when the floor is strictly larger.
+- An empty cohort has unknown intervals (`empty cohort`) rather than an
+  error, as a slice with no case is reported, not refused (3.6.3).
+- A case contributes a denominator of at most `u32::MAX` per run (a
+  contribution above it is refused), and integer sums are kept in `u128`,
+  so no sum can overflow whatever the number of cases. The quotient is
+  the two sums converted to binary64 (round to nearest) and divided.
 
 ## Decisions at approval
 
