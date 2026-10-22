@@ -147,7 +147,7 @@
       }
     ],
     "sectionDigests": {
-      "028-opentelemetry-evidence-sink-and-redaction-policy": "ff9cb177b92537cce5a191f92cee24240b8d52b12996004d4f33cd4d1a44e44e",
+      "028-opentelemetry-evidence-sink-and-redaction-policy": "572a1b818a5d5128cc979505efe0b5ced3378488406748e8ac11dfa5283534c0",
       "1-purpose": "9a8e269d964ec855a5b9a6750daaaf76b939617d2f39e6fd38b2fee73575c628",
       "2-territory": "95114a6fca9e3219a53a62ef9751cb78798a5167c3b16a5ee13b541bb81a28c4",
       "3-1-placement-of-the-pure-parts": "13821d83e7d6f7707a7d15ecc5603cd1a8fd73edda1048f1100d94768f93ba7f",
@@ -169,7 +169,7 @@
       "5-observable-negative-cases": "f0ee9489332d573db0a2e03c1f0dc9f029751efe3ef20e6b49cd4fd9e7c3bbb6",
       "acceptance": "c19c49061ebb84a0504d1045e739cc08faa53651d1189f5fdb3129cf5f85612c",
       "decisions-at-approval": "e6ae4fcb6d9e4479b0b6b670e35159ef90b7e24c981b5a33ecb7bfdfa4de5d9e",
-      "implementation-record": "8b32b0c29f2460f72d23dc9c20649b594d22dcc46685acbb6cc8ba7a5c5e9dd9",
+      "implementation-record": "514ed884d341fb4b9252d4ee9bd0f0b2e0b27a7066b2587308fbb37ed998379e",
       "verification": "ca8a6712e07a178060ca1feaee18af90ef23312ce849931c75276d87818c0229"
     },
     "sectionHeadings": [
@@ -203,6 +203,6 @@
     "summary": "Approved (A-24) as its own reviewable change before code. A new optional integration, `integrations/rustev-otel`, exports each delivered run record as OpenTelemetry spans, metrics and optional log records, with GenAI semantic-convention attributes on backend attempts, W3C trace-context parenting from the host, OTLP over gRPC or HTTP to allowlisted host collectors only, and a local JSONL exporter. Every exported field passes a declared redaction policy, `rustev.redaction/1`, that defaults to deny for caller, third-party, attributed-claim and generated text. The policy document, its evaluation, the keyed digest and the `rustev.trace/1` span line document are pure additions to `rustev-contract`; `rustev trace tail` is added to the CLI with no OpenTelemetry dependency; the boundary check gains the telemetry exporter family. Approval does not authorize a release, a deployment, an export to any collector outside tests, or real-user data.\n",
     "title": "OpenTelemetry evidence sink and redaction policy"
   },
-  "shardHash": "2fdc4f18b2afdc7ab0c3d80003c90157d6166db0617ca5381e7bf7422cd4f117",
+  "shardHash": "d39640f957912a297f61f9448cbafa04a9450cde308777d5e6d21715fb0c2cf2",
   "specVersion": "1.10.0"
 }

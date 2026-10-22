@@ -183,3 +183,10 @@ leaves that reconciliation to the owner (an ordering amendment, or
 published manifests without those development dependencies). The
 second acceptance item's archive, audit and reproducibility checks are
 `make release-candidate`'s, recorded in spec 021's implementation record.
+
+**2026-10-22.** The second acceptance item is met: `make
+release-candidate` at `419b664` (spec 021's record) passed with
+`rustev-surface` among the members, its archive within its allowlist and
+bounds, byte-identical across the two runs, its unpacked tests passing on
+1.98.1 and 1.88, and the audit passing. Only the upload-order item
+remains, for the owner.

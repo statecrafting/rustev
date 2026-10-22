@@ -350,6 +350,25 @@ pub fn run_stats(
         .collect();
     let pooled = statistic(&metric.form, pooled_clusters.iter());
 
+    let (mean, sd, min, max) = across_runs(&values, deterministic);
+    Ok(RunStats {
+        runs: values,
+        mean,
+        sd,
+        min,
+        max,
+        pooled,
+    })
+}
+
+/// `mean`, `sd`, `min` and `max` of per-run values (3.3.2), in run order.
+/// Any unknown value makes all four unknown, naming the runs; `sd` of a
+/// single run is unknown except for deterministic replay (3.5.3).
+pub fn across_runs(values: &[Figure], deterministic: bool) -> (Figure, Figure, Figure, Figure) {
+    if values.is_empty() {
+        let u = Figure::unknown("no run");
+        return (u.clone(), u.clone(), u.clone(), u);
+    }
     let unknown_runs: Vec<String> = values
         .iter()
         .enumerate()
@@ -362,8 +381,8 @@ pub fn run_stats(
         for x in &v {
             sum += *x;
         }
-        let mean = sum / runs as f64;
-        let sd = if runs == 1 {
+        let mean = sum / values.len() as f64;
+        let sd = if values.len() == 1 {
             if deterministic {
                 Figure::Known(0.0)
             } else {
@@ -375,7 +394,7 @@ pub fn run_stats(
                 let d = *x - mean;
                 ss += d * d;
             }
-            Figure::finite((ss / (runs - 1) as f64).sqrt())
+            Figure::finite((ss / (values.len() - 1) as f64).sqrt())
         };
         let min = v
             .iter()
@@ -397,14 +416,7 @@ pub fn run_stats(
         let u = Figure::unknown(format!("unknown at runs {}", unknown_runs.join(", ")));
         (u.clone(), u.clone(), u.clone(), u)
     };
-    Ok(RunStats {
-        runs: values,
-        mean,
-        sd,
-        min,
-        max,
-        pooled,
-    })
+    (mean, sd, min, max)
 }
 
 /// The bootstrap's declared inputs (3.3.1).

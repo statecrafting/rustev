@@ -428,12 +428,17 @@ async function nativeAdapter() {
     const controllers = rt.requests.map(() => new AbortController());
     const running = [];
     let next = 0;
+    // Bounded by wall time, not by a count of event loop turns, which a
+    // loaded runner can exhaust while the engine's threads are still
+    // answering; every turn yields with setImmediate, never a timed sleep.
     const until = async (what, cond) => {
-      for (let i = 0; i < 100_000; i++) {
+      const start = Date.now();
+      while (Date.now() - start < 120_000) {
         if (cond()) return;
         await new Promise((r) => setImmediate(r));
       }
-      throw new Error(`${c.id}: the driver waited forever for ${what}`);
+      if (cond()) return;
+      throw new Error(`${c.id}: the driver waited 120000 ms for ${what}`);
     };
     for (const step of rt.drive) {
       const [kind, arg] = typeof step === 'string' ? [step, {}] : Object.entries(step)[0];

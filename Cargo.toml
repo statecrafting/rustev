@@ -72,6 +72,14 @@ http-body-util = { version = "0.1", default-features = false }
 rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
 tokio-rustls = { version = "0.26.4", default-features = false, features = ["ring", "tls12"] }
 webpki-roots = { version = "1.0.10", default-features = false }
+# The telemetry exporter family (spec 028, 3.2.3 "Dependencies",
+# and 3.12 "Dependency boundary", which forbids every `opentelemetry*`
+# package outside `integrations/`): one exact minor line, no default
+# features, used only by integrations/rustev-otel behind its `otlp-grpc`
+# and `otlp-http` features; `make boundaries` refuses them anywhere else.
+opentelemetry = { version = "0.33", default-features = false, features = ["trace", "metrics", "logs"] }
+opentelemetry_sdk = { version = "0.33", default-features = false, features = ["trace", "metrics", "logs", "rt-tokio"] }
+opentelemetry-otlp = { version = "0.33", default-features = false, features = ["trace", "metrics", "logs"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

@@ -21,7 +21,7 @@ use rustev_contract::ids::{
 use rustev_contract::judgment::OutValue;
 use rustev_contract::limits::REPLAY_V1;
 use rustev_contract::plan::{BoundCalibration, Plan, PlanExecution, PlanStepDetail};
-use rustev_contract::run::RunRecord;
+use rustev_contract::run::{Charge, RunRecord};
 use rustev_contract::scope::Scope;
 use rustev_contract::{Document, Identified, schema};
 use rustev_core::Compiled;
@@ -807,6 +807,37 @@ fn case_measures_of(
                 },
             );
         }
+        // Spec 029, 3.2.5: 1000 times the case's series cost, a mean per
+        // comparable case; unknown cost is never counted as zero. Still
+        // inside `inputs.candidate.is_none()`: a candidate's cases carry no
+        // cost measure, whatever the historical run recorded.
+        let not_comparable = || CaseMeasure::Unknown {
+            reason: "cost units are not declared comparable".into(),
+        };
+        let per_1000 = |units: u64| CaseMeasure::Mean {
+            num: 1000.0 * units as f64,
+            den: 1,
+        };
+        let unknown_charge = run.cost.liability > 0
+            || run
+                .requests
+                .iter()
+                .flat_map(|q| q.attempts.iter())
+                .any(|a| a.cost.charge == Charge::Unknown);
+        let observed = match (config.cost_units_comparable, unknown_charge) {
+            (false, _) => not_comparable(),
+            (true, true) => CaseMeasure::Unknown {
+                reason: "the case carries unknown cost liability".into(),
+            },
+            (true, false) => per_1000(run.cost.observed),
+        };
+        let estimated = if config.cost_units_comparable {
+            per_1000(run.cost.estimated)
+        } else {
+            not_comparable()
+        };
+        measures.insert(eval_cases::COST_PER_1000_OBSERVED.into(), observed);
+        measures.insert(eval_cases::COST_PER_1000_ESTIMATED.into(), estimated);
     }
 }
 

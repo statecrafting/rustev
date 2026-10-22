@@ -30,12 +30,20 @@ const OUTPUTS = {
   'support.deadline': { logits: { false: 3, true: 0 } },
 };
 const task = (call) => JSON.parse(Buffer.from(call.projection).toString('utf8')).task;
+// The engine answers on its own threads, so a condition can take many event
+// loop turns on a loaded runner: a count of turns flaked in CI (100,000
+// turns were not enough on a shared runner). The bound is wall time instead,
+// generous because it only ends a wait that would otherwise hang; each turn
+// still yields with setImmediate, never a timed sleep.
+const UNTIL_MS = 120_000;
 const until = async (cond) => {
-  for (let i = 0; i < 100_000; i++) {
+  const start = Date.now();
+  while (Date.now() - start < UNTIL_MS) {
     if (cond()) return;
     await new Promise((r) => setImmediate(r));
   }
-  throw new Error('waited forever');
+  if (cond()) return;
+  throw new Error(`waited ${UNTIL_MS} ms for a condition`);
 };
 
 /** An engine on a manual clock with one host backend answering `infer`. */
