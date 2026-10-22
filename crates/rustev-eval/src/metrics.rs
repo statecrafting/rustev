@@ -212,29 +212,48 @@ pub fn mean_log_loss(cases: &[Scored<'_>]) -> Measure {
     }
     let mut sum = 0.0;
     for c in cases {
-        let p = c
-            .probabilities
-            .iter()
-            .find(|(o, _)| o == c.label)
-            .map(|(_, p)| *p);
-        match p {
-            Some(p) if p > 0.0 => sum -= rustev_core::math::ln(p),
-            Some(_) => {
-                return Measure::Unknown {
-                    reason: format!(
-                        "infinite loss: zero true-class probability at case {}",
-                        c.case
-                    ),
-                };
-            }
-            None => {
-                return Measure::Unknown {
-                    reason: format!("label is not an option at case {}", c.case),
-                };
-            }
+        // `sum + -ln(p)` is `sum - ln(p)` bit for bit (IEEE 754 defines
+        // subtraction as addition of the negation).
+        match log_loss_term(c) {
+            Ok(term) => sum += term,
+            Err(reason) => return Measure::Unknown { reason },
         }
     }
     Measure::finite(sum / cases.len() as f64, cases.len() as u64)
+}
+
+/// One case's log loss contribution, `-ln(p[label])` (spec 029, 3.2.3): the
+/// term `mean_log_loss` subtracts, or why it has none.
+pub fn log_loss_term(c: &Scored<'_>) -> Result<f64, String> {
+    match c
+        .probabilities
+        .iter()
+        .find(|(o, _)| o == c.label)
+        .map(|(_, p)| *p)
+    {
+        Some(p) if p > 0.0 => Ok(-rustev_core::math::ln(p)),
+        Some(_) => Err(format!(
+            "infinite loss: zero true-class probability at case {}",
+            c.case
+        )),
+        None => Err(format!("label is not an option at case {}", c.case)),
+    }
+}
+
+/// One case's Brier sum, `sum_class (p - y)^2` added left to right from
+/// zero, or why it has none. Summing these over cases does not in general
+/// reproduce [`brier`]'s bits, which add every term to one running sum, so
+/// spec 029 does not use it as a per-case measure yet.
+pub fn brier_term(c: &Scored<'_>) -> Result<f64, String> {
+    if !c.probabilities.iter().any(|(o, _)| o == c.label) {
+        return Err(format!("label is not an option at case {}", c.case));
+    }
+    let mut sum = 0.0;
+    for (o, p) in c.probabilities {
+        let y = if o == c.label { 1.0 } else { 0.0 };
+        sum += (p - y) * (p - y);
+    }
+    Ok(sum)
 }
 
 /// Multiclass Brier: `sum_case sum_class (p - y)^2 / n`.
@@ -270,30 +289,39 @@ pub struct Bin {
     pub accuracy: Measure,
 }
 
+/// A scored case's reliability bin: the bin index, the top-label
+/// confidence and the top label. The top label is the first option with
+/// the greatest mass; bins are half-open `[b_i, b_{i+1})`, the last closed
+/// at 1. None for a case with no option or no bin.
+pub fn reliability_bin<'a>(
+    probabilities: &'a [(String, f64)],
+    bounds: &[Decimal],
+) -> Option<(usize, f64, &'a str)> {
+    let n = bounds.len().saturating_sub(1);
+    let (top, conf) =
+        probabilities
+            .iter()
+            .fold(None::<(&str, f64)>, |best, (o, p)| match best {
+                Some((_, bp)) if bp >= *p => best,
+                _ => Some((o, *p)),
+            })?;
+    let i = (0..n).find(|&i| {
+        let lo = bounds[i].to_f64_nearest();
+        let hi = bounds[i + 1].to_f64_nearest();
+        // The last bin is closed and also takes a mass a tolerated
+        // normalization left just above 1: no scored case is dropped.
+        conf >= lo && (conf < hi || i + 1 == n)
+    })?;
+    Some((i, conf, top))
+}
+
 /// Reliability over half-open bins `[b_i, b_{i+1})`, the last closed at 1.
 /// The top label is the first option with the greatest mass.
 pub fn reliability(cases: &[Scored<'_>], bounds: &[Decimal]) -> Vec<Bin> {
     let n = bounds.len().saturating_sub(1);
     let mut acc: Vec<(u64, f64, u64)> = vec![(0, 0.0, 0); n];
     for c in cases {
-        let Some((top, conf)) = c
-            .probabilities
-            .iter()
-            .fold(None::<(&str, f64)>, |best, (o, p)| match best {
-                Some((_, bp)) if bp >= *p => best,
-                _ => Some((o, *p)),
-            })
-        else {
-            continue;
-        };
-        let i = (0..n).find(|&i| {
-            let lo = bounds[i].to_f64_nearest();
-            let hi = bounds[i + 1].to_f64_nearest();
-            // The last bin is closed and also takes a mass a tolerated
-            // normalization left just above 1: no scored case is dropped.
-            conf >= lo && (conf < hi || i + 1 == n)
-        });
-        if let Some(i) = i {
+        if let Some((i, conf, top)) = reliability_bin(c.probabilities, bounds) {
             acc[i].0 += 1;
             acc[i].1 += conf;
             acc[i].2 += u64::from(top == c.label);

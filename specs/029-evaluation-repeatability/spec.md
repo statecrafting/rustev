@@ -733,14 +733,15 @@ acceptance item before the increment that satisfies it, and 029 joins
    case-clustered bootstrap with exact ranks, noise bands; the Python
    reference, its committed input and output, and the generator
    known-answer vectors.
-2. Repeat sets (3.1, 3.2, 3.6): `rustev.eval-cases/1` per run, the measures
-   of spec 004's metrics and their reconciliation with the run report, the
-   `replay`, `captured` and refused `live` sources, the stable cohort,
-   slices and `rustev.repeat-report/1`.
-3. The held-out ledger, baselines, the reproducibility check and diffs
+2. Per-case measures (3.2): `rustev.eval-cases/1` per run, the measures
+   of spec 004's metrics and their reconciliation with the run report.
+3. Repeat sets (3.1, 3.2.5, 3.6): the `replay`, `captured` and refused
+   `live` sources, the stable cohort, slices, `cost_per_1000/*` and
+   `rustev.repeat-report/1`.
+4. The held-out ledger, baselines, the reproducibility check and diffs
    (3.7 to 3.10).
-4. Multi-candidate comparison and selection gates (3.11, 3.12).
-5. The CLI surface and exit codes (3.13 to 3.15), the mutation seeds,
+5. Multi-candidate comparison and selection gates (3.11, 3.12).
+6. The CLI surface and exit codes (3.13 to 3.15), the mutation seeds,
    declared verification and completion. The `wasm32-wasip1` item stays
    externally blocked until a WASI runner exists in CI.
 
@@ -786,6 +787,57 @@ outside it). Acceptance items not yet satisfied: everything beyond the
 reference comparison and those two rows; the `wasm32-wasip1` item is
 externally blocked.
 
+**Increment 2 (per-case measures).**
+`crates/rustev-eval/src/eval_cases.rs` defines `rustev.eval-cases/1`
+(`EvalCases`, `REPLAY_V1`, record canonical): the run report's record
+digest, the declared top-k parameter, and per case in manifest order its
+id, the record digest of the run record it was measured from (none for an
+incomparable or diverged case), its detail outcome key, its top-k list and
+its measures by metric (`count`, `mean`, `sample`, or `unknown` with the
+reason for a case inside a denominator without a finite contribution).
+`report::evaluate_with_cases` runs the unchanged spec 004 evaluation and
+records, beside each case's outcome, the term the report's own function
+adds for it: 0/1 counts for coverage, acceptance coverage, labeled
+proposal coverage, error among accepted and candidate outcome change;
+`-ln(p[label])` for mean log loss (`metrics::log_loss_term`, which
+`mean_log_loss` now adds, so spec 027's corpus keeps one `ln` call site
+there and `sum + -ln(p)` is the former `sum - ln(p)` bit for bit); top-label confidence and correctness for the
+case's reliability bin in `all` and each of its subgroups
+(`metrics::reliability_bin`, which `reliability` now uses); elapsed minus
+queued and queued time for each latency and queue quantile, for a
+baseline only (a candidate's run records are historical, 3.11.2). It then
+reconciles (3.2.6): the document must bind the report, list the detail's
+cases and outcome keys in order, hold measures only for reported
+case-decomposable metrics, reproduce every such metric bit for bit (both
+unknown counts as equal), and sum to the detail's counts; otherwise the
+run is refused (`reconcile`). `evaluate` is unchanged and its report and
+detail are byte-identical with or without the measures. A case's
+`unknown` contribution makes every statistic over it unknown and every
+resample drawing it undefined (`repeat_stats::Contribution::Unknown`).
+
+Tests: `tests/reports.rs` (the support baseline and candidate: report and
+detail bytes unchanged, reconciliation, the record canonical round trip,
+coverage and run binding per case, no latency for a candidate; refusal of
+a flipped count, a changed mean, an unknown contribution, a dropped
+measure, a measure for an unreported metric or a total, another report,
+another case order, another outcome and a dropped case; the lodging top-k
+lists), `tests/metrics.rs` (the Brier counterexample below) and
+`tests/bootstrap.rs` (unknown contributions are never dropped).
+
+**Needs an owner decision (D-029-1): `brier` per-case measures.** 3.2.3
+lists `brier` as a mean, and 3.2.6 requires the measures to reproduce the
+report's value bit for bit. Spec 004 computes Brier by adding every class
+term of every case to one running sum, so the sum of per-case sums differs
+in the last bit for ordinary inputs (three binary cases with true-class
+probabilities 0.3, 0.2 and 0.6 already differ, `tests/metrics.rs`), and
+spec 029 may not change how spec 004
+computes a metric (section 4). Until the owner decides, `brier` has no
+per-case measure: it is reported from the run reports only, and its
+interval is unknown, never approximated. Options: (a) keep it so (Brier
+is not case-decomposable); (b) reconcile Brier within a stated tolerance;
+(c) amend spec 004 to sum per case first, which changes Brier's bits in
+existing reports.
+
 Engineering choices made by the implementing agent, not by the owner:
 
 - A resample combines its drawn cases in draw order (3.4.1 says each draw
@@ -807,6 +859,15 @@ Engineering choices made by the implementing agent, not by the owner:
   contribution above it is refused), and integer sums are kept in `u128`,
   so no sum can overflow whatever the number of cases. The quotient is
   the two sums converted to binary64 (round to nearest) and divided.
+- A top-k list is read from a `ranking` parameter (entries in order) or a
+  `shortlist` parameter (ids in order); a proposal whose parameter is
+  absent or of another kind has none, as an abstention does.
+- Reconciliation compares known values by bit pattern and treats two
+  unknown values as equal whatever their reasons, since spec 004 names
+  the first failing case and the measures name each one.
+- A case's run record digest is the record digest of the run record the
+  report measured; for a candidate, that is the historical run whose raw
+  outputs the candidate reused.
 
 ## Decisions at approval
 

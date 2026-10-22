@@ -23,8 +23,13 @@ use rustev_eval::config::{
     AdapterRules, Agreement, ConfigAdapter, Direction, EvaluatorConfig, Gate, MetricFormula,
 };
 use rustev_eval::dataset::{AdapterRef, DatasetCase, DatasetManifest, Label};
+use rustev_eval::eval_cases::{CaseMeasure, EvalCases, form_of, metric_cases, reconcile};
 use rustev_eval::metrics::TaskAdapter;
-use rustev_eval::report::{EvalDetail, Evaluated, GateResult, Inputs, evaluate, evaluate_gate};
+use rustev_eval::repeat_config::TopK;
+use rustev_eval::repeat_stats::Form;
+use rustev_eval::report::{
+    EvalDetail, Evaluated, GateResult, Inputs, evaluate, evaluate_gate, evaluate_with_cases,
+};
 use rustev_eval::resolve::NoExternal;
 use serde_json::json;
 
@@ -793,6 +798,40 @@ async fn the_lodging_baseline_report_counts_missing_evidence_as_abstention() {
     assert!(unknown_metric(&e, "mean_log_loss").contains("zero denominator"));
     assert!(unknown_metric(&e, "brier").contains("zero denominator"));
     assert!(unknown_metric(&e, "reliability/all/0/confidence").contains("empty"));
+
+    // Spec 029, 3.2.4: the first k candidates of the ranking parameter of
+    // each proposal; none for an abstention or an incomparable case.
+    let inputs = Inputs {
+        manifest: &manifest,
+        split: Split::FinalTest,
+        config: &config,
+        adapter: &Lodging,
+        bundles: &inputs_of(&bundles),
+        resolver: &NoExternal,
+        replay: &config_for(&scope()),
+        candidate: None,
+    };
+    let top = TopK {
+        param: "ranking".into(),
+        k: 2,
+    };
+    let (again, cases) = evaluate_with_cases(&inputs, Some(&top)).unwrap();
+    assert_eq!(again.report, e.report);
+    assert_eq!(cases.top_k, Some(top));
+    for (c, d) in cases.cases.iter().zip(&e.detail.cases) {
+        if d.outcome.starts_with("proposal:present_ranked_lodging") {
+            let ranked = c.top_k.as_ref().expect("a ranked proposal lists its top k");
+            assert!(!ranked.is_empty() && ranked.len() <= 2, "{ranked:?}");
+        } else if !d.outcome.starts_with("proposal:") {
+            assert_eq!(c.top_k, None, "{}", d.outcome);
+        }
+    }
+    assert!(
+        cases
+            .cases
+            .iter()
+            .any(|c| c.top_k.as_ref().is_some_and(|t| t.len() == 2))
+    );
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -1663,4 +1702,220 @@ async fn gates_need_bound_equal_adapter_rules() {
     let mut bad = s.config.clone();
     bad.adapter.rules = None;
     assert!(bad.check().is_err());
+}
+
+fn with_cases(
+    s: &SupportRun,
+    candidate: Option<rustev_eval::report::Candidate<'_>>,
+) -> (Evaluated, EvalCases) {
+    evaluate_with_cases(
+        &Inputs {
+            manifest: &s.manifest,
+            split: Split::FinalTest,
+            config: &s.config,
+            adapter: &Support,
+            bundles: &inputs_of(&s.bundles),
+            resolver: &NoExternal,
+            replay: &config_for(&scope()),
+            candidate,
+        },
+        None,
+    )
+    .unwrap()
+}
+
+/// Spec 029, 3.2 and 3.15.1: the case measures reproduce the report bit
+/// for bit, and asking for them changes no byte of the report or detail.
+#[tokio::test(flavor = "current_thread")]
+async fn case_measures_reproduce_the_report_and_change_none_of_its_bytes() {
+    let s = support_run().await;
+    let base = run(&s, None);
+    let (e, cases) = with_cases(&s, None);
+    assert_eq!(
+        e.report.record_canonical().unwrap(),
+        base.report.record_canonical().unwrap()
+    );
+    assert_eq!(
+        e.detail.record_canonical().unwrap(),
+        base.detail.record_canonical().unwrap()
+    );
+    assert_eq!(cases.report, base.report.record_digest().unwrap());
+    assert_eq!(cases.cases.len(), base.detail.cases.len());
+    reconcile(&e, &cases).unwrap();
+    // The document round-trips through its record canonical form.
+    let bytes = cases.record_canonical().unwrap();
+    let parsed = EvalCases::parse(&bytes).unwrap();
+    assert_eq!(parsed, cases);
+    assert_eq!(
+        parsed.record_digest().unwrap(),
+        cases.record_digest().unwrap()
+    );
+    // Every case has a coverage measure; comparable cases name their run.
+    for (c, d) in cases.cases.iter().zip(&base.detail.cases) {
+        let comparable = !matches!(d.outcome.as_str(), "incomparable" | "diverged");
+        assert_eq!(
+            c.measures["coverage"],
+            CaseMeasure::Count {
+                num: u64::from(comparable),
+                den: 1
+            }
+        );
+        assert_eq!(c.run.is_some(), comparable, "{}", c.case);
+        assert_eq!(c.top_k, None);
+        assert!(
+            c.measures.keys().all(|m| form_of(m).is_some()),
+            "{:?}",
+            c.measures.keys()
+        );
+    }
+    // The baseline measures latency per comparable case.
+    assert!(
+        cases
+            .cases
+            .iter()
+            .any(|c| c.measures.contains_key("latency_ms/p0.5"))
+    );
+    assert!(
+        cases
+            .cases
+            .iter()
+            .any(|c| c.measures.contains_key("mean_log_loss"))
+    );
+    assert!(
+        cases
+            .cases
+            .iter()
+            .any(|c| c.measures.contains_key("reliability/pro/2/accuracy")
+                || c.measures.contains_key("reliability/pro/1/accuracy")
+                || c.measures.contains_key("reliability/pro/0/accuracy"))
+    );
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn a_candidates_case_measures_carry_no_latency_and_count_outcome_changes() {
+    let s = support_run().await;
+    let (sharp, cals) = candidate_with("0.5", &s.probe);
+    let cand = rustev_eval::report::Candidate {
+        plan: &sharp,
+        calibrations: &cals,
+    };
+    let plain = run(&s, Some(cand));
+    let (e, cases) = with_cases(&s, Some(cand));
+    assert_eq!(e.report, plain.report);
+    reconcile(&e, &cases).unwrap();
+    assert!(cases.cases.iter().all(|c| {
+        !c.measures
+            .keys()
+            .any(|m| m.starts_with("latency_ms/") || m.starts_with("queue_ms/"))
+    }));
+    let changes = cases
+        .cases
+        .iter()
+        .filter(|c| c.measures.contains_key("candidate_outcome_change"))
+        .count() as u64;
+    assert_eq!(changes, count(&e.detail, "candidate_outcome_change").1);
+}
+
+/// Spec 029, 3.2.6 and section 5: measures that do not reproduce the
+/// report are refused.
+#[tokio::test(flavor = "current_thread")]
+async fn case_measures_that_do_not_reproduce_the_report_are_refused() {
+    let s = support_run().await;
+    let (e, cases) = with_cases(&s, None);
+    let first_comparable = cases.cases.iter().position(|c| c.run.is_some()).unwrap();
+    let tamper = |f: &dyn Fn(&mut EvalCases)| {
+        let mut x = cases.clone();
+        f(&mut x);
+        reconcile(&e, &x)
+    };
+    // A count flipped: coverage no longer reproduces.
+    assert!(
+        tamper(&|x| {
+            x.cases[first_comparable]
+                .measures
+                .insert("coverage".into(), CaseMeasure::Count { num: 0, den: 1 });
+        })
+        .is_err()
+    );
+    // A mean changed.
+    let scored = cases
+        .cases
+        .iter()
+        .position(|c| c.measures.contains_key("mean_log_loss"))
+        .unwrap();
+    assert!(
+        tamper(&|x| {
+            if let Some(CaseMeasure::Mean { num, .. }) =
+                x.cases[scored].measures.get_mut("mean_log_loss")
+            {
+                *num += 0.25;
+            }
+        })
+        .is_err()
+    );
+    // An unknown contribution where the report measured a value.
+    assert!(
+        tamper(&|x| {
+            x.cases[scored].measures.insert(
+                "mean_log_loss".into(),
+                CaseMeasure::Unknown {
+                    reason: "SYNTHETIC".into(),
+                },
+            );
+        })
+        .is_err()
+    );
+    // A dropped measure, a measure for an unreported metric, a total.
+    assert!(
+        tamper(&|x| {
+            x.cases[first_comparable]
+                .measures
+                .remove("acceptance_coverage");
+        })
+        .is_err()
+    );
+    assert!(
+        tamper(&|x| {
+            x.cases[0].measures.insert(
+                "candidate_outcome_change".into(),
+                CaseMeasure::Count { num: 0, den: 1 },
+            );
+        })
+        .is_err()
+    );
+    assert!(
+        tamper(&|x| {
+            x.cases[0].measures.insert(
+                "cost_observed_units".into(),
+                CaseMeasure::Mean { num: 1.0, den: 1 },
+            );
+        })
+        .is_err()
+    );
+    // Another report, another case order, another outcome.
+    let other =
+        rustev_contract::ids::ContentDigest::parse(&format!("sha256:{}", "0".repeat(64))).unwrap();
+    assert!(tamper(&|x| x.report = other.clone()).is_err());
+    assert!(tamper(&|x| x.cases.swap(0, 1)).is_err());
+    assert!(tamper(&|x| x.cases[0].outcome = "abstention:escalation".into()).is_err());
+    assert!(
+        tamper(&|x| {
+            x.cases.pop();
+        })
+        .is_err()
+    );
+    reconcile(&e, &cases).unwrap();
+    // Runs that do not list the same cases in the same order are refused,
+    // never truncated or padded, whichever run comes first.
+    let mut shorter = cases.clone();
+    shorter.cases.pop();
+    let mut swapped = cases.clone();
+    swapped.cases.swap(0, 1);
+    for runs in [[&cases, &shorter], [&shorter, &cases], [&cases, &swapped]] {
+        let err = metric_cases("coverage", Form::CountRatio, &runs).unwrap_err();
+        assert!(err.starts_with("mixed-runs"), "{err}");
+    }
+    let both = metric_cases("coverage", Form::CountRatio, &[&cases, &cases]).unwrap();
+    assert_eq!(both.cases.len(), cases.cases.len());
+    assert!(both.cases.iter().all(|c| c.len() == 2));
 }

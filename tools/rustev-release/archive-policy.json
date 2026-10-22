@@ -122,6 +122,7 @@
         "src/dataset.rs",
         "src/doc.rs",
         "src/dynamic.rs",
+        "src/eval_cases.rs",
         "src/fit.rs",
         "src/generator.rs",
         "src/lib.rs",
