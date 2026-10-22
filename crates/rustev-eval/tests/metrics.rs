@@ -236,3 +236,32 @@ impl Example for rustev_contract::run::RunRecord {
         })
     }
 }
+
+/// Spec 029, 3.2.3 and 3.2.6: why `brier` has no per-case measure yet.
+/// Spec 004 adds every class term to one running sum; per-case sums added
+/// together differ from it in the last bit on these three cases, so case
+/// measures could never reconcile with the report bit for bit.
+#[test]
+fn per_case_brier_sums_do_not_reproduce_the_running_sum() {
+    use rustev_eval::metrics::{Measure, Scored, brier, brier_term};
+    let vectors: Vec<Vec<(String, f64)>> = [0.3, 0.2, 0.6]
+        .iter()
+        .map(|a| vec![("yes".to_string(), *a), ("no".to_string(), 1.0 - a)])
+        .collect();
+    let cases: Vec<Scored<'_>> = vectors
+        .iter()
+        .map(|p| Scored {
+            case: "c",
+            probabilities: p,
+            label: "yes",
+        })
+        .collect();
+    let Measure::Value { value, .. } = brier(&cases) else {
+        panic!("brier is measured");
+    };
+    let mut per_case = 0.0f64;
+    for c in &cases {
+        per_case += brier_term(c).unwrap();
+    }
+    assert_ne!((per_case / 3.0).to_bits(), value.to_bits());
+}

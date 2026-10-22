@@ -18,6 +18,7 @@ use rustev_contract::eval_report::{
 use rustev_contract::ids::{
     ArtifactId, CalibrationId, ContentDigest, DatasetId, EvaluatorConfigId, PlanId,
 };
+use rustev_contract::judgment::OutValue;
 use rustev_contract::limits::REPLAY_V1;
 use rustev_contract::plan::{BoundCalibration, Plan, PlanExecution, PlanStepDetail};
 use rustev_contract::run::RunRecord;
@@ -31,11 +32,13 @@ use crate::compare::compare;
 use crate::config::{ConfigError, Direction, EvaluatorConfig, Gate};
 use crate::dataset::{DatasetCase, DatasetError, DatasetManifest, ModelRef};
 use crate::doc::eval_document;
+use crate::eval_cases::{self, CaseMeasure, CaseMeasures, EVAL_CASES, EvalCases};
 use crate::fit::CalibrationFit;
 use crate::metrics::{
-    self, CaseOutcome, Measure, Scored, TaskAdapter, brier, mean_log_loss, nearest_rank,
-    probabilities, reliability,
+    self, CaseOutcome, Measure, Scored, TaskAdapter, brier, log_loss_term, mean_log_loss,
+    nearest_rank, probabilities, reliability, reliability_bin,
 };
+use crate::repeat_config::TopK;
 use crate::replay::{ReplayConfig, ReplayOutcome, RetainedValue, reproduce};
 use crate::resolve::Resolver;
 
@@ -278,6 +281,70 @@ fn quantile_name(q: rustev_contract::decimal::Decimal) -> String {
 
 /// Evaluate one split of a dataset.
 pub fn evaluate(inputs: &Inputs<'_>) -> Result<Evaluated, EvalError> {
+    evaluate_inner(inputs, None).map(|(e, _)| e)
+}
+
+/// Evaluate one split and write its per-case measures (spec 029, 3.2):
+/// the same report, detail and configuration as [`evaluate`], byte for
+/// byte, with a `rustev.eval-cases/1` document bound to the report and
+/// already reconciled with it.
+pub fn evaluate_with_cases(
+    inputs: &Inputs<'_>,
+    top_k: Option<&TopK>,
+) -> Result<(Evaluated, EvalCases), EvalError> {
+    let (evaluated, cases) = evaluate_inner(inputs, Some(top_k))?;
+    let cases = EvalCases {
+        schema: EVAL_CASES.into(),
+        report: evaluated.detail.report.clone(),
+        top_k: top_k.cloned(),
+        cases: cases.unwrap_or_default(),
+    };
+    eval_cases::reconcile(&evaluated, &cases).map_err(EvalError::Reconcile)?;
+    Ok((evaluated, cases))
+}
+
+/// The first `k` candidates of a proposal's ranking or shortlist parameter.
+fn top_k_of(outcome: &CaseOutcome, top_k: &TopK) -> Option<Vec<String>> {
+    let CaseOutcome::Proposal { params, .. } = outcome else {
+        return None;
+    };
+    let k = usize::try_from(top_k.k).unwrap_or(usize::MAX);
+    match params.get(&top_k.param)? {
+        OutValue::Ranking(r) => Some(
+            r.entries
+                .iter()
+                .take(k)
+                .map(|e| e.candidate.clone())
+                .collect(),
+        ),
+        OutValue::Shortlist(s) => Some(s.ids.iter().take(k).cloned().collect()),
+        _ => None,
+    }
+}
+
+fn count_measure(hit: bool) -> CaseMeasure {
+    CaseMeasure::Count {
+        num: u64::from(hit),
+        den: 1,
+    }
+}
+
+fn mean_measure(term: Result<f64, String>) -> CaseMeasure {
+    match term {
+        Ok(num) if num.is_finite() => CaseMeasure::Mean { num, den: 1 },
+        Ok(_) => CaseMeasure::Unknown {
+            reason: "non-finite value".into(),
+        },
+        Err(reason) => CaseMeasure::Unknown { reason },
+    }
+}
+
+/// `cases` is `Some` when per-case measures are wanted, with the declared
+/// top-k parameter.
+fn evaluate_inner(
+    inputs: &Inputs<'_>,
+    cases_for: Option<Option<&TopK>>,
+) -> Result<(Evaluated, Option<Vec<CaseMeasures>>), EvalError> {
     let config = inputs.config;
     config.check().map_err(EvalError::Config)?;
     // Name and version always; in version 2 the rules too (spec 014, 3.2.2).
@@ -313,7 +380,11 @@ pub fn evaluate(inputs: &Inputs<'_>) -> Result<Evaluated, EvalError> {
     let mut plans: BTreeSet<PlanId> = BTreeSet::new();
     let mut plan_doc: Option<&Plan> = None;
     let mut details = vec![];
+    let mut case_measures: Vec<CaseMeasures> = vec![];
     for r in &results {
+        let mut measures = BTreeMap::new();
+        let mut run_digest = None;
+        let mut ranked = None;
         let (outcome, reason) = match &r.status {
             Status::Incomparable(code) => {
                 bump(&mut coverage_out, format!("incomparable:{code}"));
@@ -335,6 +406,19 @@ pub fn evaluate(inputs: &Inputs<'_>) -> Result<Evaluated, EvalError> {
             } => {
                 comparable += 1;
                 runs.push(run);
+                if cases_for.is_some() {
+                    run_digest = run.record_digest().ok();
+                    ranked = cases_for.flatten().and_then(|t| top_k_of(outcome, t));
+                    case_measures_of(
+                        &mut measures,
+                        inputs,
+                        r.case,
+                        outcome,
+                        historical.as_ref(),
+                        probabilities,
+                        run,
+                    );
+                }
                 if let Ok(id) = plan.id() {
                     plans.insert(id);
                 }
@@ -369,6 +453,19 @@ pub fn evaluate(inputs: &Inputs<'_>) -> Result<Evaluated, EvalError> {
                 (outcome.name(), None)
             }
         };
+        if cases_for.is_some() {
+            measures.insert(
+                "coverage".into(),
+                count_measure(matches!(r.status, Status::Comparable { .. })),
+            );
+            case_measures.push(CaseMeasures {
+                case: r.case.id.clone(),
+                run: run_digest,
+                outcome: outcome.clone(),
+                top_k: ranked,
+                measures,
+            });
+        }
         details.push(CaseDetail {
             case: r.case.id.clone(),
             scope: r.scope.clone(),
@@ -621,11 +718,96 @@ pub fn evaluate(inputs: &Inputs<'_>) -> Result<Evaluated, EvalError> {
         cases: details,
     };
     detail.reconcile().map_err(EvalError::Reconcile)?;
-    Ok(Evaluated {
-        report,
-        detail,
-        config: config.clone(),
-    })
+    Ok((
+        Evaluated {
+            report,
+            detail,
+            config: config.clone(),
+        },
+        cases_for.map(|_| case_measures),
+    ))
+}
+
+/// A comparable case's contributions to every case-decomposable metric of
+/// spec 004 (spec 029, 3.2.3), each computed by the term the report's own
+/// function adds for it.
+fn case_measures_of(
+    measures: &mut BTreeMap<String, CaseMeasure>,
+    inputs: &Inputs<'_>,
+    case: &DatasetCase,
+    outcome: &CaseOutcome,
+    historical: Option<&CaseOutcome>,
+    probabilities: &Result<Vec<(String, f64)>, String>,
+    run: &RunRecord,
+) {
+    let config = inputs.config;
+    let label = case.label.value();
+    let proposal = matches!(outcome, CaseOutcome::Proposal { .. });
+    measures.insert("acceptance_coverage".into(), count_measure(proposal));
+    if let CaseOutcome::Proposal { action, params, .. } = outcome {
+        measures.insert(
+            "labeled_proposal_coverage".into(),
+            count_measure(label.is_some()),
+        );
+        if let Some(l) = label {
+            measures.insert(
+                "error_among_accepted".into(),
+                count_measure(!inputs.adapter.correct(action, params, l)),
+            );
+        }
+    }
+    if let Some(h) = historical {
+        measures.insert(
+            "candidate_outcome_change".into(),
+            count_measure(h.name() != outcome.name()),
+        );
+    }
+    if let (Some(l), Ok(p)) = (label, probabilities) {
+        let scored = Scored {
+            case: &case.id,
+            probabilities: p,
+            label: l,
+        };
+        measures.insert("mean_log_loss".into(), mean_measure(log_loss_term(&scored)));
+        if let Some((i, conf, top)) = reliability_bin(p, &config.reliability_bins) {
+            let groups = std::iter::once("all").chain(
+                config
+                    .subgroups
+                    .iter()
+                    .map(String::as_str)
+                    .filter(|g| case.subgroups.iter().any(|s| s == g)),
+            );
+            for g in groups {
+                measures.insert(
+                    format!("reliability/{g}/{i}/confidence"),
+                    CaseMeasure::Mean { num: conf, den: 1 },
+                );
+                measures.insert(
+                    format!("reliability/{g}/{i}/accuracy"),
+                    count_measure(top == l),
+                );
+            }
+        }
+    }
+    // A candidate did not produce the run record: its latency is never
+    // measured here (spec 029, 3.11.2).
+    if inputs.candidate.is_none() {
+        for q in &config.latency_quantiles {
+            let service = match run.timing.elapsed_ms.checked_sub(run.timing.queued_ms) {
+                Some(v) => CaseMeasure::Sample { value: v as f64 },
+                None => CaseMeasure::Unknown {
+                    reason: "the run records more queueing than elapsed time".into(),
+                },
+            };
+            measures.insert(format!("latency_ms/{}", quantile_name(*q)), service);
+            measures.insert(
+                format!("queue_ms/{}", quantile_name(*q)),
+                CaseMeasure::Sample {
+                    value: run.timing.queued_ms as f64,
+                },
+            );
+        }
+    }
 }
 
 pub fn split_name(s: Split) -> &'static str {

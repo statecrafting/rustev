@@ -367,3 +367,38 @@ fn an_empty_cohort_has_unknown_intervals() {
     assert!(s.pooled.value().is_none());
     assert!(s.mean.value().is_none());
 }
+
+/// An unknown contribution makes every statistic over it unknown, and each
+/// resample that draws it undefined: nothing is computed without it.
+#[test]
+fn an_unknown_contribution_is_never_dropped() {
+    let m = MetricCases {
+        name: "mean_log_loss".into(),
+        form: Form::Mean,
+        cases: vec![
+            vec![
+                Some(Contribution::Mean { num: 0.5, den: 1 }),
+                Some(Contribution::Mean { num: 0.25, den: 1 }),
+            ],
+            vec![
+                Some(Contribution::Unknown),
+                Some(Contribution::Mean { num: 1.0, den: 1 }),
+            ],
+            vec![Some(Contribution::Mean { num: 0.75, den: 1 }), None],
+        ],
+    };
+    let s = run_stats(&m, 2, false).unwrap();
+    assert!(s.runs[0].value().is_none());
+    assert_eq!(s.runs[1], Figure::Known(1.25 / 2.0));
+    assert!(s.mean.value().is_none() && s.sd.value().is_none());
+    assert!(s.pooled.value().is_none());
+    let b = Bootstrap {
+        seed: "3".into(),
+        level_units: 950_000_000,
+        resamples: 1_000,
+    };
+    match &intervals(&b, "all", 2, std::slice::from_ref(&m)).unwrap()[0] {
+        Interval::Unknown { undefined, .. } => assert!(*undefined > 0 && *undefined < 1_000),
+        i => panic!("{i:?}"),
+    }
+}

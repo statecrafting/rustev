@@ -16,6 +16,7 @@ pub mod config;
 pub mod dataset;
 mod doc;
 pub mod dynamic;
+pub mod eval_cases;
 pub mod fit;
 pub mod generator;
 pub mod live;

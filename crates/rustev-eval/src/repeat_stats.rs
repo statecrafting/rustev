@@ -50,9 +50,19 @@ pub enum Form {
 /// One case's contribution to one metric in one run.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Contribution {
-    Count { num: u64, den: u64 },
-    Mean { num: f64, den: u64 },
+    Count {
+        num: u64,
+        den: u64,
+    },
+    Mean {
+        num: f64,
+        den: u64,
+    },
     Sample(f64),
+    /// A case inside the metric's denominator whose contribution is not a
+    /// finite figure (an infinite log loss, more queueing than elapsed
+    /// time): every statistic over it is unknown, never computed without it.
+    Unknown,
 }
 
 /// A metric's contributions: `cases[case][run]`, `None` where the case did
@@ -165,6 +175,7 @@ pub fn check_shape(metric: &MetricCases, runs: usize) -> Result<(), StatsError> 
                 (Form::CountRatio, Contribution::Count { .. })
                     | (Form::Mean, Contribution::Mean { .. })
                     | (Form::Sample { .. }, Contribution::Sample(_))
+                    | (_, Contribution::Unknown)
             );
             let ok = ok
                 && match x {
@@ -177,6 +188,7 @@ pub fn check_shape(metric: &MetricCases, runs: usize) -> Result<(), StatsError> 
                         num.is_finite() && (1..=MAX_DENOMINATOR).contains(den)
                     }
                     Contribution::Sample(v) => v.is_finite(),
+                    Contribution::Unknown => true,
                 };
             if !ok {
                 return Err(StatsError::Shape(format!(
@@ -193,12 +205,27 @@ pub fn check_shape(metric: &MetricCases, runs: usize) -> Result<(), StatsError> 
 /// cluster a resample draws whole.
 #[derive(Debug, Clone, PartialEq)]
 enum Cluster {
-    Count { num: u128, den: u128 },
-    Mean { num: f64, den: u128 },
+    Count {
+        num: u128,
+        den: u128,
+    },
+    Mean {
+        num: f64,
+        den: u128,
+    },
     Samples(Vec<f64>),
+    /// Some contribution is unknown.
+    Unknown,
 }
 
-fn cluster<'a>(form: &Form, xs: impl Iterator<Item = &'a Option<Contribution>>) -> Cluster {
+fn cluster<'a>(form: &Form, xs: impl Iterator<Item = &'a Option<Contribution>> + Clone) -> Cluster {
+    if xs
+        .clone()
+        .flatten()
+        .any(|x| matches!(x, Contribution::Unknown))
+    {
+        return Cluster::Unknown;
+    }
     match form {
         Form::CountRatio => {
             let (mut num, mut den) = (0u128, 0u128);
@@ -252,7 +279,10 @@ fn nearest_rank(samples: &mut [f64], q: Decimal) -> Figure {
 
 /// The statistic of a sequence of clusters, combined in sequence order:
 /// integers exactly, binary64 left to right from zero.
-fn statistic<'a>(form: &Form, clusters: impl Iterator<Item = &'a Cluster>) -> Figure {
+fn statistic<'a>(form: &Form, clusters: impl Iterator<Item = &'a Cluster> + Clone) -> Figure {
+    if clusters.clone().any(|c| matches!(c, Cluster::Unknown)) {
+        return Figure::unknown("a case's contribution is unknown");
+    }
     match form {
         Form::CountRatio => {
             let (mut num, mut den) = (0u128, 0u128);
