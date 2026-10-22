@@ -23,10 +23,16 @@ default = []
 [dependencies]
 rustev-contract.workspace = true
 rustev-core.workspace = true
+rustev-runtime.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
+tokio = { workspace = true, features = ["sync", "time", "rt"] }
 
+# The reference decisions run through the runtime with the rules backend.
+[dev-dependencies]
+rustev-backend-rules.workspace = true
+tokio = { workspace = true, features = ["sync", "time", "rt", "rt-multi-thread", "macros"] }
 
 [lints]
 workspace = true
