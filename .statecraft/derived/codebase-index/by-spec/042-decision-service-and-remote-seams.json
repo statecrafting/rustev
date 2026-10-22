@@ -42,11 +42,27 @@
         "source": "spec-edge"
       },
       {
+        "path": "integrations/rustev-node/",
+        "source": "spec-edge"
+      },
+      {
         "path": "integrations/rustev-remote-http/",
         "source": "spec-edge"
       },
       {
+        "path": "integrations/rustev-wasm/",
+        "source": "spec-edge"
+      },
+      {
         "path": "tools/rustev-boundaries/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "tools/rustev-conformance/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "tools/rustev-release/",
         "source": "spec-edge"
       }
     ],
@@ -80,6 +96,19 @@
       {
         "locations": [
           {
+            "file": "integrations/rustev-node/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-node/"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "integrations/rustev-remote-http/"
           }
         ],
@@ -93,6 +122,19 @@
       {
         "locations": [
           {
+            "file": "integrations/rustev-wasm/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-wasm/"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "tools/rustev-boundaries/"
           }
         ],
@@ -101,6 +143,32 @@
         "unit": {
           "kind": "directory",
           "path": "tools/rustev-boundaries/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "tools/rustev-conformance/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-conformance/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "tools/rustev-release/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-release/"
         }
       },
       {
@@ -173,5 +241,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "e1b69b53bf62fd77e79e25f245ce541be6c2d65e0e84d374f281864c56414d51"
+  "shardHash": "81c6fb08ae1eda13d6afd65ba7a11528d3c5da612b8aaad09527d0fbfab11c87"
 }

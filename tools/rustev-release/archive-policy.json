@@ -40,6 +40,8 @@
         "src/reason.rs",
         "src/redaction.rs",
         "src/remote.rs",
+        "src/remote_context.rs",
+        "src/remote_sink.rs",
         "src/replay.rs",
         "src/request.rs",
         "src/retention.rs",

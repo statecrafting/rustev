@@ -2,7 +2,7 @@
 id: "042-decision-service-and-remote-seams"
 title: "Decision service sidecar and remote context and sink protocols (amends 010)"
 status: approved
-implementation: pending
+implementation: in-progress
 created: "2026-10-17"
 summary: >
   An amendment of approved spec 010 (R-16), for #76 child A2 (#57). Makes
@@ -36,6 +36,10 @@ extends:
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.toml" }, nature: additive }
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.lock" }, nature: additive }
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-node/" }, nature: additive }
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-wasm/" }, nature: additive }
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "tools/rustev-conformance/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "002-decision-contract-and-pure-core"
@@ -952,6 +956,35 @@ workflows; deployment; live provider calls or spend; real-user data.
 
 Pending with implementation. Approval satisfies no acceptance item and
 approves no binding record.
+
+## Implementation record
+
+Delivered in increments, each its own pull request; nothing here claims an
+acceptance item before the increment that satisfies it.
+
+**Increment 1, remote half (contract documents).** Spec 2.2 allows the
+documents in `rustev-contract` before the `rustev-serve` binding record.
+`crates/rustev-contract/src/remote_context.rs` defines the
+`rustev.remote-context/1` documents of 3.10: describe (request and
+response: per source, fields with type, provenance class, freshness and
+staleness bound, and spec 032's evidence grade; terms with cancellation,
+idempotency window, byte maxima, invalidation and the `host_operated`
+endpoint class), fetch, cancel, invalidation and the poll-mode
+invalidations exchange, and the exchange record.
+`crates/rustev-contract/src/remote_sink.rs` defines the
+`rustev.remote-sink/1` describe and deliver documents of 3.11. Each is a
+strict serde type with its exact schema string and the bounded parser,
+and its JSON Schema is emitted through spec 027's emitter under
+`crates/rustev-contract/schema/`. Held back until spec 036 is implemented,
+as 3.10.1 and 3.10.3 state: the acquire documents with the `denied` code,
+and the source's `rustev.source/1` descriptor in describe; extension
+points mark both. No existing document, bound or canonical byte changes.
+Tests: `tests/042_remote_documents.rs` (round trips, unknown fields, wrong
+schema strings, bounds at the limit and one past). The declaration
+generator (`tools/rustev-conformance/js/gen-types.mjs`) now types a member
+schema that constrains nothing as `unknown`, not an open object, so a
+snapshot entry's `value` (here and in `rustev.snapshot/1`) admits any JSON
+value in TypeScript as the parser does.
 
 ## Decisions at approval
 
