@@ -148,5 +148,38 @@ packages; any change to `rustev-surface`'s behavior, which spec 027 owns.
 
 ## Verification
 
-Pending with implementation: spec 027's increment 3 applies this
-amendment's release-set change and records it there.
+`cargo test -p rustev-release --test manifests` checks the release-set
+file's layers and member list against the workspace and refuses each
+manifest-policy case of section 5; `make release-candidate` runs the
+archive, audit and reproducibility checks for `rustev-surface` with every
+other member. The spec stays pending on the upload order (implementation
+record).
+
+## Implementation record
+
+**2026-10-21, checked against `main` at `00a4b7c`.** Spec 027's
+increment 3 applied the release-set change. Met:
+`tools/rustev-release/release-set.json` places `rustev-surface` alone in
+layer 4 and `rustev-cli` alone in layer 5 (the facade `rustev` is layer
+6), and `tests/manifests.rs` passes on the workspace and refuses each row
+of section 5 that the manifest policy owns: a dependency on a workspace
+crate outside the release set (`a_dev_dependency_on_an_excluded_crate_fails`,
+naming both), a crate declared in another layer than its dependencies
+give (`layers_and_upload_order_follow_the_graph`, naming the declared and
+expected layers), and a member list that differs from the test's
+(`the_release_set_fixes_the_first_family`); `rustev-surface` has its
+archive allowlist in `archive-policy.json`.
+
+Not met, so this spec stays `implementation: pending`: the first
+acceptance item's "upload order following the layers", read with 3.2.5
+("within a layer, packages are ordered by name"). The file's upload order
+is topological over every dependency kind, as spec 021's record allows:
+`rustev-pkg-support-routing` and `rustev-pkg-lodging` (layer 3) upload
+after `rustev-cli` (layer 5), because their tests use the CLI and the
+registry refuses an upload whose development dependency is not yet
+public, and layer 3 does not upload by name (`rustev-runtime` comes
+before `rustev-backend-rules`, whose tests use it). Spec 021's record
+leaves that reconciliation to the owner (an ordering amendment, or
+published manifests without those development dependencies). The
+second acceptance item's archive, audit and reproducibility checks are
+`make release-candidate`'s, recorded in spec 021's implementation record.

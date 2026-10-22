@@ -466,6 +466,9 @@ is not stated by either spec. Calibration of a dynamic task family (3.7)
 needs a separately fitted artifact with its own binding; none exists, and
 none is claimed.
 
+**Owner review, 2026-10-21 (R-47).** The owner accepted the defaults
+and engineering choices in this implementation record as recorded.
+
 ## Questions settled by R-34
 
 The owner accepted each recommendation below when approving this spec.

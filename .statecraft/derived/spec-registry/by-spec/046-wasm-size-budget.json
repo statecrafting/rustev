@@ -8,7 +8,7 @@
       "027-node-and-wasm-bindings"
     ],
     "id": "046-wasm-size-budget",
-    "implementation": "pending",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-budget",
@@ -27,14 +27,15 @@
       }
     ],
     "sectionDigests": {
-      "046-the-webassembly-module-s-uncompressed-size-budget-amends-027": "a979da32204e425e34041cfd57224bdbf1dc5ce84031d6d9ebbd6b029e7eefb5",
+      "046-the-webassembly-module-s-uncompressed-size-budget-amends-027": "d91d20852d1a265ac3bbe01a2eecb96d9809265f0cad793e2c3f072161ddb837",
       "1-purpose": "910fd96d1a0a453b9f220ca442e50d0b5499e9c556eb9fabb1e9afdf64664c66",
       "2-territory": "525ccc705fc8389fd0f6e398d78a313628cd9659960e9fcfa35f58007ef21a47",
       "3-budget": "ff099577e863b93a1dc8ea230f41b777f5c69b8c71cbefb3e13c3e44cee139f4",
       "4-out-of-scope": "b84489fe874e478ea796d82329a6fb18f2f119fa8e74dec9400107f9c759db68",
       "5-observable-negative-cases": "7163828639651c30532d66cd2afe10c53240dcd7a8788a699ff30316c975c495",
       "acceptance": "6a045a4c20b18f812863520e2887cba33b05865ce4a84f74546945633a735e3e",
-      "verification": "5fa039dac8675357bff2f623720133185b2187881b757692d7a4b713246a72f2"
+      "implementation-record": "49e5b057c4d961ad23eb2df2ae072213d0bbbbcca7b8d2c6985e8d9e9d6aecde",
+      "verification": "fb21197c5bc9eebecff3cb1b16cf1361ba2336ff9a4f9a3e8bfc60fc18b9f9e8"
     },
     "sectionHeadings": [
       "046: The WebAssembly module's uncompressed size budget (amends 027)",
@@ -44,13 +45,14 @@
       "4. Out of scope",
       "5. Observable negative cases",
       "Acceptance",
-      "Verification"
+      "Verification",
+      "Implementation record"
     ],
     "specPath": "specs/046-wasm-size-budget/spec.md",
     "status": "approved",
     "summary": "A narrow amendment of approved spec 027 3.10.4. The uncompressed size budget of the optimized `rustev_wasm_bg.wasm` was declared at 2,097,152 bytes before specs 032 and 033 added their document types; the first measurement is 2,215,589 bytes, 5.6% over, while the gzip and instantiation budgets hold. This spec raises the uncompressed budget to 2,621,440 bytes (2.5 MiB) and keeps every other budget, the procedure and the gate unchanged. Ratified by the owner on 2026-10-20 (A-43).\n",
     "title": "The WebAssembly module's uncompressed size budget (amends 027)"
   },
-  "shardHash": "1f41cd08e929282bdbd7185cb6c929bbcac9105b12ac9f554e17f68c1a94a883",
+  "shardHash": "dd51dfc15a14bf0f8b6fe64e77e8d1f99a41a982a8b2d4ebc12e5af6d95228bc",
   "specVersion": "1.10.0"
 }

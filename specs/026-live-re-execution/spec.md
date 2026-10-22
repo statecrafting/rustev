@@ -431,6 +431,9 @@ item; served identity stays unknown until a run record carries it; the
 live document's later members (spec 043 3.9) are not part of this
 implementation.
 
+**Owner review, 2026-10-21 (R-47).** The owner accepted the defaults
+and engineering choices in this implementation record as recorded.
+
 ## Questions settled by R-34
 
 The owner accepted each recommendation below when approving this spec.

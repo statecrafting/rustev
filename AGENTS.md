@@ -49,9 +49,10 @@ acceptance.
 
 CI is the Statecraft setup profile `github-actions-rust` (revision 17): one
 required check, `ci-gate`, over governance, code, the AI review and the
-declared extra jobs `boundaries` and `verify`
+declared extra jobs (`ci.extra_required_jobs`) `boundaries` and `verify`
 (`.github/workflows/boundaries.yml`, `.github/workflows/verify.yml`, owned by
-spec 001). The managed files (`.github/workflows/statecraft-*.yml`,
+spec 001), `bindings` (`.github/workflows/bindings.yml`, spec 027) and
+`release-checks` (`.github/workflows/release-checks.yml`, spec 031). The managed files (`.github/workflows/statecraft-*.yml`,
 `scripts/statecraft/*`, `.statecraft/setup/*`, `.github/CODEOWNERS`) change
 only by editing `project.setup.parameters` in `.statecraft/environment.json`
 and re-rendering with `statecraft-cli init plan|apply`, never by hand. Any

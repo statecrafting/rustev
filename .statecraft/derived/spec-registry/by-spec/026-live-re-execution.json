@@ -100,7 +100,7 @@
       }
     ],
     "sectionDigests": {
-      "026-live-re-execution-with-fresh-observations": "fd15d0d14311223b905f1f9bdb369b3e5f49737d1edccf474e66f7cda346aacd",
+      "026-live-re-execution-with-fresh-observations": "37e9ea805a945c90f2e70827f57c365d81665765881015dbd78284076f95a3b7",
       "1-purpose": "363d9d4481444224b11d0843994b667f3a52c728d959b383eed10745030cdf1a",
       "2-territory-and-compatibility": "ca360b26f97bfa542e91971bc98cd7328cbb6ecfb49f94da9f6ae88e4bce76c7",
       "3-1-separate-live-entry-point": "a2710c973a30ebe1445eaf1a077934fdeaba52cbe7fe8660f11c788da4038b70",
@@ -115,7 +115,7 @@
       "4-out-of-scope": "6d9084026d70abe36e9d8053fdae36ae48034935869b70e69237e8118b6b82e9",
       "5-observable-negative-cases": "5283e337677ed1b62c98afabbdd6e3397613af6a5b8e8531c8a02a8cfd8c846e",
       "acceptance": "92aba7dea59e0261c10a3f60baedcd83d3f114050ec08cb8728f2ac521182c9a",
-      "implementation-record": "cb32ab32c56cfa89511e0702bb2966ebc17384102804c763130134d5c7a6a4de",
+      "implementation-record": "a2bf1a34678933a7174663ed03f08aa01c90e00c0d592e21a90738617f94a99b",
       "questions-settled-by-r-34": "0520fb5dca7894ad50df926b17aa85d20d025ee640c3ee00e39333f35fce3f79",
       "verification": "0d07ce9dcf8cef5b08d2fdd62b94360f1cb6bb6db21bc3519c4dd53c5c031e5b"
     },
@@ -144,6 +144,6 @@
     "summary": "A separately invoked live re-execution path that creates a new decision from a newly identified snapshot, obtains fresh host authorization for every dispatch, applies new deadlines and budgets, and records new backend, cancellation, cost, retention, and delivery observations. It may compare the new proposal with a retained historical proposal, but never reuses a historical decision identity, supplies retained backend outputs as fresh, rewrites a replay bundle, or lets offline replay contact a backend.\n",
     "title": "Live re-execution with fresh observations"
   },
-  "shardHash": "915e17b3863ca1719a8ba50f4ff72f2c94cbcc6d1c4b42a40ea5b56e980d6bcf",
+  "shardHash": "c6f64eb110337c51feb3653f5deac992f20ca963b6d30ca146e48e267440a2af",
   "specVersion": "1.10.0"
 }
