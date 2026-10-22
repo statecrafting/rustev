@@ -192,11 +192,13 @@ plan, threshold or calibration from final-test results.
 - Section 5's cases are exercised on labeled synthetic fixtures before real
   data is used, to prove the procedure refuses them; each refusal is a
   repository-local test with no real data and no network.
-- For each task qualified, one admission record and one qualification
-  record, each reviewed by the owner, with every spec 004 denominator
-  reconciling to its cohort. The records' data stays outside the
-  repository; the repository holds at most the claim sentence, digests and
-  aggregate figures, naming no host.
+- Evidence is recorded per dataset (amended 2026-10-22, D-023-1, A-46): when a
+  dataset is admitted, its admission record and qualification record are
+  reviewed by the owner, with every spec 004 denominator reconciling to its
+  cohort. Until a dataset is admitted for a task, every quality claim for
+  that task is refused (3.5), and that refusal is the delivered state. The
+  records' data stays outside the repository; the repository holds at most
+  the claim sentence, digests and aggregate figures, naming no host.
 - `make code`, declared verification, and `make gate` pass.
 
 ## Verification
@@ -311,10 +313,22 @@ Limits found, for the owner (none changes this spec's text):
 - Intervals (6.3) wait for the spec 004 amendment of #76 child E2; every
   claim states point estimates as a limit.
 
-Not done, and blocked on owner-supplied inputs: an admitted dataset per
-task (6.1), its admission and qualification records, the live or retained
-candidate runs (within R-29 and the work order's scope), and the owner's
-review of each record (acceptance item 2).
+**Owner decision D-023-1 (A-46, 2026-10-22 delivery work order).** Acceptance
+item 2 is evidence recorded per dataset rather than a precondition of
+completion. This spec's implementation is the governed procedure: its
+summary already states that approval "authorizes the procedure and its
+refusal checks, not any particular dataset", and 6.4 (OD-7) keeps every
+dataset, record and per-case detail with the host, outside this
+repository. Admitting a dataset is therefore a host act performed through
+the delivered procedure at any time, not a code change, and nothing in the
+repository could ever mark it done. Completion, a separate change made
+against this amended text, would claim exactly what is delivered: every
+unit of section 2 is written, the refusals of section 5 are tests, and
+verification passes. It would claim no quality figure: until a
+dataset is admitted for a task, 3.5 refuses every quality claim for that
+task, which is the correct, settled behavior rather than an outstanding
+work item. Each admission later adds its claim sentence, digests and
+aggregate figures here, as acceptance item 2 states.
 
 ## 6. Questions settled at approval
 
