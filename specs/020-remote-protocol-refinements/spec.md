@@ -339,6 +339,20 @@ qualification.
 
 ## Implementation record
 
+**Batch deadline correction, 2026-10-22.** The owner authorized fixing the
+runtime batch deadline race through spec 020 in the coordinating session.
+This correction enforces the existing section 3.3 dispatch budget and section
+3.4 prohibition on replenishing a total budget; it changes no normative text.
+The adapter captures one monotonic instant at batch entry and derives each
+member's deadline from its remaining budget, so preparation consumes time
+rather than extending a later member's allowance. Equal remaining budgets
+expire together; distinct remaining budgets keep distinct deadlines.
+Previously, restarting the clock for each member let a later member remain
+live when the earliest member ended the transport, incorrectly giving only
+that member a transient transport failure. A paused-clock regression checks
+preparation time, equal expiry and distinct remaining budgets. The existing
+loopback differential acceptance test remains unchanged.
+
 Delivered in increments, each its own change; nothing here claims an
 acceptance item before the increment that satisfies it. Plan:
 

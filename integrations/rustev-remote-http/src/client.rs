@@ -795,6 +795,7 @@ fn batch_refused(failure: AdapterFailure, code: RemoteCode, detail: &str) -> Bat
 /// cancellation and remote state), never filled from a sibling. A member
 /// cancelled before the first request byte is removed and reported unsent.
 async fn batch(inner: Arc<Inner>, call: BatchAttemptCall) -> BatchAttemptReport {
+    let dispatch_start = tokio::time::Instant::now();
     let Some(max) = inner.batch_max else {
         return batch_refused(
             AdapterFailure::Permanent,
@@ -838,7 +839,8 @@ async fn batch(inner: Arc<Inner>, call: BatchAttemptCall) -> BatchAttemptReport 
     let mut waiting = vec![];
     let mut members = vec![];
     for (i, m) in call.members.iter().enumerate() {
-        let budget = Budget::start(m.cx.remaining_ms);
+        // Equal remaining budgets expire together, regardless of preparation order.
+        let budget = Budget::from_start(dispatch_start, m.cx.remaining_ms);
         if call.cancel.is_raised() || budget.expired() {
             answers.push(Some(cancelled_report(
                 cancel_outcome(false, inner.remote.terms.cancellation, None),
