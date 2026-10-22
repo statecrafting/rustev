@@ -824,6 +824,51 @@ another case order, another outcome and a dropped case; the lodging top-k
 lists), `tests/metrics.rs` (the Brier counterexample below) and
 `tests/bootstrap.rs` (unknown contributions are never dropped).
 
+**Increment 3 (repeat sets).** `crates/rustev-eval/src/repeat.rs` adds
+`repeat(RepeatInputs)` and `rustev.repeat-report/1` (`RepeatReport`,
+`REPLAY_V1`, record canonical). It refuses the `live` source
+(`live-source-unavailable`), N outside 1 to 64, a run whose case measures
+do not reconcile (`reconcile`), runs that differ in dataset, split,
+evaluator configuration, plan or metric list or do not list the split's
+cases in manifest order (`mixed-runs`), a `replay` set whose runs are not
+identical (`not-reproducible`), a stability metric or override that is not
+reported, and a cohort over the bootstrap bound (`bootstrap-too-large`).
+The report names the source, repeat configuration, dataset, split and its
+fixed role (3.7.1), provenance, evaluator configuration, adapter rules,
+plan, whether the runs are candidate evaluations, each run's report,
+detail and case-measure digests with its run seed, the stable cohort, and
+per cohort (`all`, then each declared slice with its case count, stable
+case count and minimum) every metric's per-run values, `mean`, `sd`,
+`min`, `max`, `pooled`, interval and band with its basis. A slice with
+fewer stable cases than its minimum is `below_minimum` and every figure of
+it is unknown (3.6.2, 3.6.3). A metric without a per-case measure (a cost
+total, `brier`) has across-run statistics from the run reports in `all`,
+`pooled` and interval unknown (`not-case-decomposable`), and is unknown in
+slices. Latency, queue and cost metrics state their observation:
+`historical` for candidate runs, `candidate` otherwise (3.11.2). The
+case measures now also carry `cost_per_1000/observed` and `/estimated`
+(3.2.5): 1000 times the case's observed or estimated units as a mean per
+comparable case, unknown when the configuration does not declare cost
+units comparable, and the observed series unknown for a case with
+liability or an attempt of unknown charge; a candidate's cases carry none.
+A held-out repeat report records `held_out` as unknown (`no ledger
+supplied`) until increment 4 adds the ledger (I-4: never zero).
+
+Tests (`tests/reports.rs`): a three-run replay set (zero
+`deterministic_replay` band, pooled equal to the report's figure, distinct
+run seeds, the stable cohort, a total and `brier` with across-run
+statistics only, latency observed by the plan, unknown `cost_per_1000`
+without comparable units, a reported slice and a slice below its minimum,
+round trip and byte determinism); a captured set where one case loses its
+bundle in the second run (excluded from the stable cohort, a positive
+`k_sd` band), one captured run (unknown band and `sd`), differing replay
+runs refused, the `live` source refused, N of 0 and 65 refused; mixed
+baseline and candidate runs, unreconciled measures and an unreported
+stability metric refused; a candidate set with historical latency and
+cost and `interval_width` bands equal to the interval's width; with cost
+units declared comparable, known cost per 1000 for a baseline and none for
+a candidate.
+
 **Needs an owner decision (D-029-1): `brier` per-case measures.** 3.2.3
 lists `brier` as a mean, and 3.2.6 requires the measures to reproduce the
 report's value bit for bit. Spec 004 computes Brier by adding every class
@@ -868,6 +913,15 @@ Engineering choices made by the implementing agent, not by the owner:
 - A case's run record digest is the record digest of the run record the
   report measured; for a candidate, that is the historical run whose raw
   outputs the candidate reused.
+- The `all` cohort and each slice include every member case of the split,
+  each with its per-run denominators; the stable cohort only decides a
+  slice's minimum and is listed for 3.12's comparison of stable cohorts.
+- A held-out repeat set without a ledger is accepted by the library with
+  its count recorded as unknown; the CLI of 3.13.1 still requires the
+  ledger flags.
+- `cost_per_1000/*` follow 3.2.5's stricter rule (unknown unless cost
+  units are declared comparable), not spec 004's rule that only refuses
+  adding units across backends.
 
 ## Decisions at approval
 

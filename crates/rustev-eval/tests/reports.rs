@@ -7,7 +7,7 @@
 
 mod common;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use common::*;
 use rustev_contract::decimal::Decimal;
@@ -25,7 +25,11 @@ use rustev_eval::config::{
 use rustev_eval::dataset::{AdapterRef, DatasetCase, DatasetManifest, Label};
 use rustev_eval::eval_cases::{CaseMeasure, EvalCases, form_of, metric_cases, reconcile};
 use rustev_eval::metrics::TaskAdapter;
-use rustev_eval::repeat_config::TopK;
+use rustev_eval::repeat::{
+    BandDoc, BasisDoc, CohortReport, CohortStatus, FigureDoc, HeldOut, IntervalDoc, MetricReport,
+    Observation, RepeatError, RepeatInputs, RepeatReport, Run, Source, SplitRole, repeat,
+};
+use rustev_eval::repeat_config::{RepeatConfig, TopK};
 use rustev_eval::repeat_stats::Form;
 use rustev_eval::report::{
     EvalDetail, Evaluated, GateResult, Inputs, evaluate, evaluate_gate, evaluate_with_cases,
@@ -1918,4 +1922,358 @@ async fn case_measures_that_do_not_reproduce_the_report_are_refused() {
     let both = metric_cases("coverage", Form::CountRatio, &[&cases, &cases]).unwrap();
     assert_eq!(both.cases.len(), cases.cases.len());
     assert!(both.cases.iter().all(|c| c.len() == 2));
+}
+
+fn repeat_config(rule: serde_json::Value, slices: serde_json::Value) -> RepeatConfig {
+    let v = json!({
+        "schema": "rustev.repeat-config/1",
+        "bootstrap": { "method": "percentile-cluster/1",
+                       "prng": "xoshiro256starstar-splitmix64/1",
+                       "level": "0.9", "resamples": 1000, "seed": "29" },
+        "noise": { "rule": rule, "floor": "0", "overrides": {} },
+        "slices": slices,
+        "stability_metrics": ["coverage", "acceptance_coverage"],
+        "top_k": null
+    });
+    RepeatConfig::parse(v.to_string().as_bytes()).unwrap()
+}
+
+fn evaluated_with(
+    s: &SupportRun,
+    bundles: &BTreeMap<String, ReplayBundle>,
+    candidate: Option<rustev_eval::report::Candidate<'_>>,
+) -> (Evaluated, EvalCases) {
+    evaluate_with_cases(
+        &Inputs {
+            manifest: &s.manifest,
+            split: Split::FinalTest,
+            config: &s.config,
+            adapter: &Support,
+            bundles: &inputs_of(bundles),
+            resolver: &NoExternal,
+            replay: &config_for(&scope()),
+            candidate,
+        },
+        None,
+    )
+    .unwrap()
+}
+
+fn repeat_of(
+    s: &SupportRun,
+    source: Source,
+    config: &RepeatConfig,
+    sets: &[(Evaluated, EvalCases)],
+) -> Result<RepeatReport, RepeatError> {
+    let runs: Vec<Run<'_>> = sets
+        .iter()
+        .map(|(e, c)| Run {
+            evaluated: e,
+            cases: c,
+        })
+        .collect();
+    repeat(&RepeatInputs {
+        source,
+        config,
+        manifest: &s.manifest,
+        runs: &runs,
+    })
+}
+
+fn cohort<'a>(r: &'a RepeatReport, name: &str) -> &'a CohortReport {
+    r.cohorts.iter().find(|c| c.name == name).unwrap()
+}
+
+fn metric_of<'a>(c: &'a CohortReport, name: &str) -> &'a MetricReport {
+    c.metrics.iter().find(|m| m.name == name).unwrap()
+}
+
+/// Spec 029, 3.1.2, 3.5.3 and 3.6: a replay set reproduces its runs, has a
+/// zero `k_sd` band from deterministic replay, and reports every slice.
+#[tokio::test(flavor = "current_thread")]
+async fn a_replay_set_has_a_deterministic_band_and_reports_its_slices() {
+    let s = support_run().await;
+    let one = evaluated_with(&s, &s.bundles, None);
+    let config = repeat_config(
+        json!({ "k_sd": { "k": "2" } }),
+        json!([{ "name": "pro", "min_cases": 1 }, { "name": "free", "min_cases": 1000 }]),
+    );
+    let r = repeat_of(
+        &s,
+        Source::Replay,
+        &config,
+        &[one.clone(), one.clone(), one.clone()],
+    )
+    .unwrap();
+    assert_eq!(r.runs.len(), 3);
+    assert_eq!(r.split_role, SplitRole::HeldOut);
+    assert!(
+        matches!(r.held_out, Some(HeldOut::Unknown { .. })),
+        "no ledger: unknown, never zero"
+    );
+    assert_eq!(r.repeat_config, config.id().unwrap());
+    // Distinct run seeds, from the configuration's seed.
+    let seeds: BTreeSet<&str> = r.runs.iter().map(|x| x.seed.as_str()).collect();
+    assert_eq!(seeds.len(), 3);
+    let all = cohort(&r, "all");
+    assert_eq!(all.status, CohortStatus::Reported);
+    let cov = metric_of(all, "coverage");
+    let (num, den, _) = count(&one.0.detail, "coverage");
+    assert_eq!(cov.pooled, FigureDoc::Value(num as f64 / den as f64));
+    assert_eq!(cov.sd, FigureDoc::Value(0.0));
+    assert_eq!(
+        cov.band,
+        BandDoc::Value {
+            value: 0.0,
+            basis: BasisDoc::DeterministicReplay
+        }
+    );
+    assert!(matches!(cov.interval, IntervalDoc::Bounds { .. }));
+    // The stable cohort is the comparable cases.
+    assert_eq!(r.stable_cohort.len() as u64, num);
+    // A total has across-run statistics only.
+    let total = metric_of(all, "cost_unknown_attempts");
+    assert_eq!(
+        total.pooled,
+        FigureDoc::Unknown("not-case-decomposable".into())
+    );
+    assert!(
+        matches!(&total.interval, IntervalDoc::Unknown { reason, .. } if reason == "not-case-decomposable")
+    );
+    // Brier: across-run statistics only (D-029-1).
+    assert!(matches!(
+        metric_of(all, "brier").pooled,
+        FigureDoc::Unknown(_)
+    ));
+    // Latency and cost are the evaluated plan's own observations.
+    assert_eq!(
+        metric_of(all, "latency_ms/p0.5").observation,
+        Some(Observation::Candidate)
+    );
+    assert_eq!(metric_of(all, "coverage").observation, None);
+    // cost_per_1000 is unknown: the configuration does not declare units
+    // comparable, and unknown cost is never zero.
+    assert!(matches!(
+        metric_of(all, "cost_per_1000/observed").pooled,
+        FigureDoc::Unknown(_)
+    ));
+    // A slice with enough stable cases is reported with its own figures; a
+    // slice below its minimum is unknown throughout.
+    let pro = cohort(&r, "pro");
+    assert_eq!(pro.status, CohortStatus::Reported);
+    assert!(pro.cases < all.cases);
+    let free = cohort(&r, "free");
+    assert_eq!(free.status, CohortStatus::BelowMinimum);
+    assert!(
+        free.metrics
+            .iter()
+            .all(|m| m.pooled == FigureDoc::Unknown("below_minimum".into())
+                && m.band == BandDoc::Unknown("below_minimum".into()))
+    );
+    // The document round-trips and its digest is stable.
+    let bytes = r.record_canonical().unwrap();
+    let parsed = RepeatReport::parse(&bytes).unwrap();
+    assert_eq!(parsed, r);
+    assert_eq!(parsed.record_digest().unwrap(), r.record_digest().unwrap());
+    // Deterministic: the same inputs give the same bytes.
+    let again = repeat_of(
+        &s,
+        Source::Replay,
+        &config,
+        &[one.clone(), one.clone(), one],
+    )
+    .unwrap();
+    assert_eq!(again.record_canonical().unwrap(), bytes);
+}
+
+/// Spec 029, 3.1.2, 3.1.3, 3.5.2 and section 5: captured sets vary, keep
+/// per-run outcomes, and narrow the stable cohort; one captured run has an
+/// unknown `k_sd` band; replay runs that differ are refused.
+#[tokio::test(flavor = "current_thread")]
+async fn captured_sets_vary_and_differing_replays_are_refused() {
+    let s = support_run().await;
+    let full = evaluated_with(&s, &s.bundles, None);
+    let mut fewer = s.bundles.clone();
+    // A case comparable in the full run loses its bundle in the second.
+    let dropped = full
+        .1
+        .cases
+        .iter()
+        .find(|c| c.run.is_some())
+        .unwrap()
+        .case
+        .clone();
+    fewer.remove(&dropped);
+    let partial = evaluated_with(&s, &fewer, None);
+    let config = repeat_config(json!({ "k_sd": { "k": "2" } }), json!([]));
+    let r = repeat_of(
+        &s,
+        Source::Captured,
+        &config,
+        &[full.clone(), partial.clone()],
+    )
+    .unwrap();
+    assert!(!r.stable_cohort.contains(&dropped));
+    let all = cohort(&r, "all");
+    let cov = metric_of(all, "coverage");
+    assert!(
+        matches!(cov.band, BandDoc::Value { basis: BasisDoc::KSd, value } if value > 0.0),
+        "{cov:?}"
+    );
+    assert!(matches!(&cov.runs[..], [FigureDoc::Value(a), FigureDoc::Value(b)] if a > b));
+    // One captured run: the band is unknown, never zero (3.5.2).
+    let one = repeat_of(&s, Source::Captured, &config, std::slice::from_ref(&full)).unwrap();
+    let cov = metric_of(cohort(&one, "all"), "coverage");
+    assert!(matches!(&cov.band, BandDoc::Unknown(_)), "{:?}", cov.band);
+    assert!(matches!(&cov.sd, FigureDoc::Unknown(_)));
+    // Replay of the same retained bundles must reproduce: refused otherwise.
+    let err = repeat_of(&s, Source::Replay, &config, &[full.clone(), partial]).unwrap_err();
+    assert_eq!(err.code(), "not-reproducible");
+    // The live source is unavailable.
+    let err = repeat_of(&s, Source::Live, &config, std::slice::from_ref(&full)).unwrap_err();
+    assert_eq!(err, RepeatError::LiveSourceUnavailable);
+    // N outside 1 to 64.
+    assert_eq!(
+        repeat_of(&s, Source::Captured, &config, &[]).unwrap_err(),
+        RepeatError::Runs(0)
+    );
+    let many = vec![full.clone(); 65];
+    assert_eq!(
+        repeat_of(&s, Source::Captured, &config, &many).unwrap_err(),
+        RepeatError::Runs(65)
+    );
+}
+
+/// Spec 029, 3.1.3, 3.2.6, 3.3.1 and 3.11.2: mixed runs, unreconciled
+/// measures and unreported stability metrics are refused; a candidate's
+/// latency and cost are historical.
+#[tokio::test(flavor = "current_thread")]
+async fn mixed_runs_and_unreconciled_measures_are_refused() {
+    let s = support_run().await;
+    let base = evaluated_with(&s, &s.bundles, None);
+    let (sharp, cals) = candidate_with("0.5", &s.probe);
+    let cand = evaluated_with(
+        &s,
+        &s.bundles,
+        Some(rustev_eval::report::Candidate {
+            plan: &sharp,
+            calibrations: &cals,
+        }),
+    );
+    let config = repeat_config(json!("interval_width"), json!([]));
+    let err = repeat_of(&s, Source::Captured, &config, &[base.clone(), cand.clone()]).unwrap_err();
+    assert_eq!(err.code(), "mixed-runs");
+    let mut tampered = base.clone();
+    tampered.1.cases[0]
+        .measures
+        .insert("coverage".into(), CaseMeasure::Count { num: 0, den: 1 });
+    let err = repeat_of(&s, Source::Captured, &config, &[base.clone(), tampered]).unwrap_err();
+    assert_eq!(err.code(), "reconcile");
+    // A stability metric the configuration does not report is refused.
+    let mut v = serde_json::to_value(&config).unwrap();
+    v["stability_metrics"] = json!(["rubric_score"]);
+    let unreported = RepeatConfig::parse(v.to_string().as_bytes()).unwrap();
+    let err = repeat_of(
+        &s,
+        Source::Captured,
+        &unreported,
+        std::slice::from_ref(&base),
+    )
+    .unwrap_err();
+    assert_eq!(err.code(), "repeat-config");
+    // A candidate set: latency and cost observations are historical.
+    let r = repeat_of(&s, Source::Captured, &config, &[cand.clone(), cand]).unwrap();
+    assert!(r.candidate);
+    let all = cohort(&r, "all");
+    assert_eq!(
+        metric_of(all, "latency_ms/p0.95").observation,
+        Some(Observation::Historical)
+    );
+    for m in [
+        "cost_observed_units",
+        "cost_unknown_attempts",
+        "cost_liability_units",
+    ] {
+        assert_eq!(
+            metric_of(all, m).observation,
+            Some(Observation::Historical),
+            "{m}"
+        );
+    }
+    assert_eq!(metric_of(all, "error_among_accepted").observation, None);
+    assert_eq!(
+        metric_of(all, "cost_per_1000/observed").observation,
+        Some(Observation::Historical)
+    );
+    assert!(matches!(
+        metric_of(all, "cost_per_1000/observed").pooled,
+        FigureDoc::Unknown(_)
+    ));
+    // interval_width bands follow the interval.
+    let cov = metric_of(all, "coverage");
+    match (&cov.interval, &cov.band) {
+        (
+            IntervalDoc::Bounds { lower, upper },
+            BandDoc::Value {
+                value,
+                basis: BasisDoc::IntervalWidth,
+            },
+        ) => {
+            assert_eq!(*value, upper - lower)
+        }
+        (
+            IntervalDoc::Bounds { .. },
+            BandDoc::Value {
+                basis: BasisDoc::Floor,
+                ..
+            },
+        ) => {}
+        other => panic!("{other:?}"),
+    }
+}
+
+/// Spec 029, 3.2.5 and 3.11.2: with cost units declared comparable, a
+/// baseline's cases carry known cost per 1000, and a candidate's carry none
+/// even when the historical runs' costs are all known.
+#[tokio::test(flavor = "current_thread")]
+async fn cost_per_1000_is_measured_for_a_baseline_and_never_for_a_candidate() {
+    let mut s = support_run().await;
+    s.config.cost_units_comparable = true;
+    let base = evaluated_with(&s, &s.bundles, None);
+    let observed: Vec<&CaseMeasure> = base
+        .1
+        .cases
+        .iter()
+        .filter_map(|c| c.measures.get("cost_per_1000/observed"))
+        .collect();
+    assert!(!observed.is_empty());
+    assert!(
+        observed
+            .iter()
+            .any(|m| matches!(m, CaseMeasure::Mean { .. }))
+    );
+    let (sharp, cals) = candidate_with("0.5", &s.probe);
+    let cand = evaluated_with(
+        &s,
+        &s.bundles,
+        Some(rustev_eval::report::Candidate {
+            plan: &sharp,
+            calibrations: &cals,
+        }),
+    );
+    assert!(
+        cand.1
+            .cases
+            .iter()
+            .all(|c| !c.measures.keys().any(|m| m.starts_with("cost_per_1000/")))
+    );
+    let config = repeat_config(json!({ "k_sd": { "k": "2" } }), json!([]));
+    let r = repeat_of(&s, Source::Captured, &config, &[cand.clone(), cand]).unwrap();
+    let m = metric_of(cohort(&r, "all"), "cost_per_1000/observed");
+    assert_eq!(m.observation, Some(Observation::Historical));
+    assert!(matches!(m.pooled, FigureDoc::Unknown(_)), "{m:?}");
+    let r = repeat_of(&s, Source::Captured, &config, &[base.clone(), base]).unwrap();
+    let m = metric_of(cohort(&r, "all"), "cost_per_1000/estimated");
+    assert_eq!(m.observation, Some(Observation::Candidate));
+    assert!(matches!(m.pooled, FigureDoc::Value(_)), "{m:?}");
 }
