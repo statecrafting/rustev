@@ -2,7 +2,7 @@
 id: "023-real-data-quality-qualification"
 title: "Semantic quality and calibration qualification on real labeled data"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-27"
 summary: >
   The governed path from "mechanics only" to a scoped empirical quality
@@ -321,10 +321,11 @@ refusal checks, not any particular dataset", and 6.4 (OD-7) keeps every
 dataset, record and per-case detail with the host, outside this
 repository. Admitting a dataset is therefore a host act performed through
 the delivered procedure at any time, not a code change, and nothing in the
-repository could ever mark it done. Completion, a separate change made
-against this amended text, would claim exactly what is delivered: every
-unit of section 2 is written, the refusals of section 5 are tests, and
-verification passes. It would claim no quality figure: until a
+repository could ever mark it done. Completion (2026-10-22, made after
+A-46 merged, as a separate change against the amended text) claims
+exactly what is delivered: every unit of section 2 is written (#149,
+#173), the refusals of section 5 are tests, and verification passes. It
+claims no quality figure: until a
 dataset is admitted for a task, 3.5 refuses every quality claim for that
 task, which is the correct, settled behavior rather than an outstanding
 work item. Each admission later adds its claim sentence, digests and
