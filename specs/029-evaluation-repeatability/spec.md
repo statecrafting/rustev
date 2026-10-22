@@ -913,7 +913,9 @@ chain and another dataset's ledger, unknown without a ledger; baseline
 binding, round trip, name rules, a tampered report and tampered run
 seeds refused; reproducibility at a zero band, one ulp beyond it, exactly
 at a band of 0.125 and one ulp beyond, an unknown band with and without an
-exceedance, another repeat configuration).
+exceedance, another repeat configuration; configuration and split
+mismatches combined with an exceedance preserve the definite failure,
+and a split mismatch without drift remains unknown).
 
 **Needs an owner decision (D-029-1): `brier` per-case measures.** 3.2.3
 lists `brier` as a mean, and 3.2.6 requires the measures to reproduce the

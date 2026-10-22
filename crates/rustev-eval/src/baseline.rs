@@ -230,9 +230,6 @@ pub fn reproducibility(
     {
         reasons.push("the repeat set's dataset, split, evaluator configuration, repeat configuration or plan is not the baseline's".into());
     }
-    if !reasons.is_empty() {
-        return Reproducibility::Unknown { reasons };
-    }
     let mut exceedances = vec![];
     for bc in &baseline.cohorts {
         let rc = run.cohorts.iter().find(|c| c.name == bc.name);
