@@ -129,3 +129,16 @@ pub const DYNAMIC_QUESTION_V1: ParseLimits = ParseLimits {
     max_number_bytes: 40,
     allow_fractional_numbers: false,
 };
+
+/// Span lines, `rustev.trace/1` (spec 028, 3.10.1): at most 64 KiB per
+/// line. An attribute value is at most 4 096 bytes before escaping, so a
+/// string's raw length is bounded at six times that.
+pub const TRACE_V1: ParseLimits = ParseLimits {
+    max_bytes: 64 * KIB,
+    max_depth: 8,
+    max_string_bytes: 24 * KIB,
+    max_collection_len: 1024,
+    max_total_values: 20_000,
+    max_number_bytes: 40,
+    allow_fractional_numbers: true,
+};

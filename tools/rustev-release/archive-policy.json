@@ -38,6 +38,7 @@
         "src/output.rs",
         "src/plan.rs",
         "src/reason.rs",
+        "src/redaction.rs",
         "src/remote.rs",
         "src/replay.rs",
         "src/request.rs",
@@ -47,7 +48,9 @@
         "src/scope.rs",
         "src/snapshot.rs",
         "src/source.rs",
-        "src/time.rs"
+        "src/time.rs",
+        "src/trace.rs",
+        "src/trace_fields.rs"
       ],
       "max_archive_bytes": 229376,
       "max_unpacked_bytes": 458752

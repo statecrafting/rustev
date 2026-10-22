@@ -3143,6 +3143,7 @@ dependencies = [
 name = "rustev-contract"
 version = "0.1.0"
 dependencies = [
+ "hmac",
  "jsonschema",
  "schemars",
  "serde",
