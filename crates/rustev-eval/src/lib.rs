@@ -23,6 +23,7 @@ pub mod live;
 pub mod metrics;
 pub mod optimization;
 pub mod remote_evidence;
+pub mod repeat;
 pub mod repeat_config;
 pub mod repeat_stats;
 pub mod replay;

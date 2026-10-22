@@ -130,6 +130,7 @@
         "src/metrics.rs",
         "src/optimization.rs",
         "src/remote_evidence.rs",
+        "src/repeat.rs",
         "src/repeat_config.rs",
         "src/repeat_stats.rs",
         "src/replay.rs",

@@ -22,6 +22,15 @@ use crate::repeat_stats::{Contribution, Figure, Form, MetricCases, run_stats};
 use crate::report::Evaluated;
 
 pub const EVAL_CASES: &str = "rustev.eval-cases/1";
+/// The two metrics repeat reports derive (3.2.5); no run report states
+/// them, so reconciliation has nothing to compare them with.
+pub const COST_PER_1000_OBSERVED: &str = "cost_per_1000/observed";
+pub const COST_PER_1000_ESTIMATED: &str = "cost_per_1000/estimated";
+
+/// Whether `metric` is one of the derived repeat-report metrics.
+pub fn derived(metric: &str) -> bool {
+    metric == COST_PER_1000_OBSERVED || metric == COST_PER_1000_ESTIMATED
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -104,7 +113,9 @@ pub fn form_of(metric: &str) -> Option<Form> {
         | "labeled_proposal_coverage"
         | "error_among_accepted"
         | "candidate_outcome_change" => return Some(Form::CountRatio),
-        "mean_log_loss" => return Some(Form::Mean),
+        "mean_log_loss" | COST_PER_1000_OBSERVED | COST_PER_1000_ESTIMATED => {
+            return Some(Form::Mean);
+        }
         // Spec 004 adds every class term of every case to one running sum,
         // so per-case sums cannot reproduce its bits (3.2.6). Until the
         // owner decides how 3.2.3 and 3.2.6 meet for it, brier has no
@@ -224,7 +235,7 @@ pub fn reconcile(run: &Evaluated, cases: &EvalCases) -> Result<(), String> {
         if let Some(name) = c
             .measures
             .keys()
-            .find(|n| !run.report.metrics.iter().any(|m| &m.name == *n))
+            .find(|n| !derived(n) && !run.report.metrics.iter().any(|m| &m.name == *n))
         {
             return Err(format!(
                 "case {} has a measure for unreported `{name}`",
