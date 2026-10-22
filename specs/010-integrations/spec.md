@@ -2,7 +2,7 @@
 id: "010-integrations"
 title: "Optional ecosystem integrations and serving boundary"
 status: approved
-implementation: pending
+implementation: in-progress
 created: "2026-09-26"
 summary: >
   A shared boundary contract for three independently optional integration
@@ -16,13 +16,16 @@ summary: >
   evidence before implementation.
 establishes:
   - { kind: directory, path: "integrations/rustev-aicortex/", planned: true }
-  - { kind: directory, path: "integrations/rustev-rahi/", planned: true }
+  - { kind: directory, path: "integrations/rustev-rahi/" }
   - { kind: directory, path: "integrations/rustev-serve/", planned: true }
 extends:
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.toml" }, nature: additive }
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.lock" }, nature: additive }
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
   - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "tools/rustev-boundaries/" }, nature: additive }
+  # Each implemented crate is named in the release set's exclusions; none is
+  # in the release family.
+  - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "002-decision-contract-and-pure-core"
@@ -314,10 +317,68 @@ Before this spec may become implementation-complete:
 
 ## Verification
 
-Pending with implementation. The eventual implementation change
-must replace this paragraph with executable, repository-local verification
-covering the accepted subset and every negative case. Approval alone creates
-no crate or runnable acceptance target.
+Run by `make verify` (010 is in `VERIFIED_SPECS`). The implemented subset
+is `rustev-rahi` (see the implementation record); `rustev-aicortex` and
+`rustev-serve` are not implemented, because their records refuse. No step
+needs a network beyond loopback or a live service: the Rahi store runs in
+the test process.
+
+```verify:cli
+# 3.6 and the rustev-rahi record: every failure row against a scripted
+# store, and accepted, duplicate, conflict, erased and refused deliveries
+# against a single-voter Rahi 0.7.1 store in a temporary directory.
+cargo test -p rustev-rahi --locked
+cargo clippy -p rustev-rahi --all-targets --locked -- -D warnings
+# I-2, I-4: the integration builds alone, and no crate outside
+# integrations/ reaches Rahi or Aicortex.
+cargo build -p rustev-rahi --locked
+sh -c 'for p in rustev-contract rustev-core rustev-runtime rustev-eval rustev-surface rustev-cli; do t=$(cargo tree -p "$p" -e normal,build --locked --prefix none) || exit 1; if printf "%s\n" "$t" | grep -E "^(rahi|aicortex)"; then exit 1; fi; done'
+cargo run -p rustev-boundaries --locked --quiet
+# 3.1.1: no authorization type in the integration.
+sh -c 'if grep -rnE "(struct|enum|trait|type)[[:space:]]+(Permitted|Grant)([^A-Za-z0-9_]|$)" integrations/rustev-rahi; then exit 1; fi'
+```
+
+## Implementation record
+
+Implementation follows the binding records below: a crate is implemented
+only when its record passes every row (3.4.8).
+
+- Increment 1, `integrations/rustev-rahi/`: `RahiEvidenceSink` over
+  `rahi-store =0.7.1` receipts, the `rustev` migration set (one table of
+  record canonical bytes beside each receipt) and `stage_erasure`. Delivery
+  outcomes are a closed `Delivery` (accepted, duplicate, conflict,
+  rejected, unavailable, acceptance unknown) with the effect of each
+  stated; through the `EvidenceSink` seam an unknown acceptance gives no
+  answer, so the runtime's delivery timeout reports it as possibly
+  received. Receipts are `rahi:<durability>:<external_id>:<digest>` and
+  `rahi:duplicate:<external_id>:<digest>`, with durability
+  `raft-log-async` or `raft-log-synced` as the host's store configuration
+  applies, so the external record identity (3.6.2) reaches the run record
+  through the seam. A `Changed` classification whose head holds no
+  accepted digest (Rahi reports the empty string) gives a conflict with no
+  stored digest (`stored: None`), never `sha256:`. No hosting
+  adapter. Not in the release family (`tools/rustev-release/release-set.json`
+  excludes it). Section 5 rows covered: the Rahi timeout and digest
+  conflict rows, and the boundary rows through `rustev-boundaries`.
+- `tools/rustev-boundaries/`, under spec 001 3.5 as amended by R-45
+  (approved by the owner on 2026-10-21): `cargo metadata` resolves features
+  once for the whole workspace, so Rahi's graph switches on optional edges
+  of shared crates (`crypto-common` to `rand_core` to `getrandom`) that no
+  pure crate's own build takes, and the transitive rules of spec 001
+  3.4.1 and spec 027 3.14.3 reported paths that do not exist in those
+  builds. A transitive violation now stands only when the crate's own
+  resolution (`cargo tree -p <crate> -e normal,build`, every target; the
+  WebAssembly target for `rustev-wasm`) also holds a forbidden package; a
+  failure to read that graph keeps the violation. Every other rule is
+  unchanged, and the new rule has a unit test with its negative control.
+- `rustev-aicortex` is not implemented. Implementing it showed that its
+  git-revision dependency fails Rustev's own supply-chain check: the
+  release tool's manifest test (`tools/rustev-release`, spec 021 3.4 as
+  implemented) refuses any package in the workspace resolution whose
+  source is not crates.io, not only those in the release closure. Its
+  record's item 1 is amended to refuse accordingly (below), and the crate
+  stays absent (3.4.8).
+- `Makefile` (additive): `010` joins `VERIFIED_SPECS`.
 
 ## Questions settled by R-34
 
@@ -330,3 +391,116 @@ binding record remains a separate owner-review act.
    spec 020 resolves the proposed remote refinements?
 3. Which live qualification, data and deployment environments, if any, are
    authorized separately from implementation?
+
+## Binding records (section 3.4, R-44)
+
+The three records below are the section 3.4 records, with the rows of spec
+042 2.2 added to the `rustev-serve` record. The owner approved the binding
+records on 2026-10-21 in the coordinating session ("bindings approved so
+unblock 010") before their text existed. The agent then wrote them from the
+cited sources, and the owner confirmed the written text on 2026-10-21 in
+review of the change that adds it (R-44, A-45). Each record is evidence for deciding whether
+implementation may begin. It is not a readiness, compatibility or release
+claim, and it approves no live call, deployment, spend, real-user data or
+publication.
+
+Sources were read as data on 2026-10-21 and never built or run from their
+checkouts: `https://github.com/statecrafting/aicortex` at
+`6415b765e5267188b4ecf302a93869352e28cccc` (`main`) and
+`https://github.com/statecrafting/rahi` at
+`0f338f96b029cbe7b2439f288329787050962641` (`main`, the commit annotated tag
+`v0.7.1`, object `3f3859cf58d1c880258afe5a52400e7a37ad44b9`, peels to), plus
+the crates.io API and the Sigstore, rustls and distroless publications the
+rows name. A path in a row is relative to the repository the record binds.
+Each row ends in **pass**, **refuse** or **unverified**; refuse and
+unverified both block implementation (3.4.8).
+
+### `rustev-aicortex`
+
+Binding: in process, through Aicortex's host-library mode (Aicortex spec
+053). Aicortex has no network read or write surface at this revision. The
+cell mounts no product route (`apps/aicortex/src/cell.rs:55-59`), its HTTP and
+MCP specs 020 and 021 are approved with `implementation: pending`, and a
+claims surface over either is "a later extension" (spec 050, lines 300-301;
+spec 052, lines 264-265). Spec 050 D-4 (lines 341-348) selects library
+linking for the first consumer. The adapter therefore runs inside a Rahi cell
+that links Aicortex, reads through the host's `rahi_store::StoreHandle` and
+stages writes into the host's `rahi_store::TxnBuilder`. The host owns the
+only commit (Aicortex spec 053 I-3).
+
+| Item | Record | Result |
+|---|---|---|
+| 1. Upstream | Git dependency on `aicortex-types`, `aicortex-claims` and `aicortex-store` (each `version = "0.1.0"`, `publish = false`) at the immutable revision above. Nothing is on crates.io (`aicortex` and `aicortex-types` return 404 on 2026-10-21) and Aicortex spec 055 (publication) is pending (lines 33-34). Aicortex spec 053 (lines 289-291) names "one exact merged Git revision" as the downstream handoff, so a revision pin is the sanctioned way to consume it. License Apache-2.0 (`LICENSE`, `Cargo.toml:16`); no NOTICE file. Its graph pins `rahi-store`, `rahi-types` and `rahi-ledger` at `=0.6.0` (`Cargo.toml:26-34`; crates.io checksums `59f167d26959c4d7d5807fea2ea82328dcb693c50135f5e0ac58a0161c3db6a4`, `d08efc5b7a805d4610d7bfa90e7a585b6f3a70eaeebdab14a8655aad96ec7d3c`, `952f5bfbcf713c8b9f4febad833b531000868ef7153daeb1a3f6cab5c98ca8a7`) and `hiqlite-patched =0.15.0-patched.3` (`9d3586f7db4e971836ffc5982086bcfa1de0c0293492a194efd7d4ac21ff5ebf`). MSRV 1.96 (`Cargo.toml:15`), toolchain 1.96.0 (`rust-toolchain.toml:5`); Rustev builds it with its own pinned 1.98.1. Platforms: none stated; Aicortex CI runs on `ubuntu-latest`. Supply chain: its `deny.toml` (advisories `unmaintained = "all"`, crates.io sources only) under `cargo-deny-action` in CI; in Rustev, `Cargo.lock` fixes the git revision and every registry checksum. Limitation: Aicortex pins Rahi 0.6.0 and `rustev-rahi` pins 0.7.1, so one host cell cannot link both adapters until Aicortex adopts 0.7.1. Each crate builds and works alone (I-2). Rustev's own supply-chain check refuses the git source: the release tool's manifest test (`tools/rustev-release/tests/manifests.rs`, `the_workspace_passes_the_release_set`, implementing spec 021 3.4) rejects every package in the workspace resolution that is not from crates.io, so a workspace member with this dependency fails `make code` (found by building the adapter, 2026-10-21). This row passes once Aicortex publishes the crates (its spec 055) under a new record, or once the owner scopes that check to the release closure in a reviewed change to spec 021 or 031. | refuse |
+| 2. Schemas | Rust types at the revision, not a wire format: `Claim` (`crates/aicortex-types/src/claim.rs:292-315`, `deny_unknown_fields`, `CLAIM_SCHEMA_VERSION = 1` at line 32), `ClaimRecord` with `TxStamp { seq, recorded_at }` and `ValidTime` (`crates/aicortex-claims/src/history.rs:20-92`), `ProjectionCandidate`, `SlotState` and `CurrentView` (`crates/aicortex-claims/src/projection.rs:28-114`), `project` (line 416), `AsOf`, `TxBound` and `ValidBound` (`crates/aicortex-claims/src/asof.rs`), `ClaimProposal` (`crates/aicortex-types/src/claim_evidence.rs:299-316`), `SourceRef` and `Provenance` (`crates/aicortex-types/src/provenance.rs:79-241`). Compatibility: registered predicate versions are immutable (Aicortex spec 050 I-3) and every record carries its schema version (spec 011 B-11); any other revision needs a new record. Byte examples: `crates/aicortex-types/testdata/claims/*.json` (12 files). Negative fixtures: the `refuse-*` files under `crates/aicortex-gate/testdata/claims/`. The adapter's own boundary types (field bindings, the observation proposal) are Rust values validated at construction. | pass |
+| 3. Authentication | None inside Aicortex in library mode. The tenant boundary is `Scope { owner: Sub, kind }` (`crates/aicortex-types/src/scope.rs:176-182`), filtered on every statement (`crates/aicortex-store/src/claim_repo.rs:161-162`). The host supplies a resolver from Rustev's opaque principal handle to a `Scope`, and it may refuse. The adapter never derives a scope from content or a judgment (3.1.2). No TLS, endpoint or redirect exists at this seam; the store's Raft transport belongs to the host cell. | pass |
+| 4. Bounds | A read is one page of `ClaimRepo::history` per bound subject (`claim_repo.rs:421-433`; at most `MAX_CLAIM_PAGE_ROWS = 500`, refused above) under an explicit transaction bound. The adapter declares 1 to 64 field bindings and refuses a subject whose history fills the page, so a partial history is never read as complete. The whole fetch runs inside the call's remaining deadline. Dropping it after a deadline or cancellation has no effect, because a read writes nothing. A proposal stages one statement set per call and the adapter never commits, so cost, queueing and concurrency belong to the host's transaction. | pass |
+| 5. Failure mapping | Read: a store error (any `rahi_types::Error` variant), a page that fills the bound, a projection error (`projection.rs:116-127`) or a deadline ends the fetch with an error, so no decision runs on a partial snapshot. Per field: `Value` maps to one entry, `Conflicted` to one entry per distinct value (a Rustev conflict), and `Retracted` and `Absent` to a missing field. A value of a kind other than the bound one, `hostile_content` or `origin_erased` is refused and the field stays missing, with its reason. Write: invalid input is refused before staging, so nothing is staged. Staging fails only with `Error::Validation` from `ClaimProposalRepo::stage_append` (`crates/aicortex-store/src/claim_proposal_repo.rs:40`). Acceptance is the host's commit, and admission is Aicortex's gate after that; neither is the adapter's. | pass |
+| 6. Privacy | The read skips erased claim rows (`claim_repo.rs:480`); retractions project as `Retracted` and become missing fields. Aicortex gives a consumer no correction, revocation or erasure notification (the library has no push or feed, and `GET /events` belongs to its pending spec 020), so the adapter declares invalidation `none` and infers none from polling (3.5.3). The adapter logs and retains nothing. Entry `source` strings carry claim ids and revisions, never content. Erasing what a decision recorded stays the host's obligation. | pass |
+| 7. Tests | Offline: unit tests of mapping, bounds, refusals and proposal construction, and integration tests against a single-voter Rahi 0.6.0 store in a temporary directory on loopback, as Aicortex's own tests run (`crates/aicortex-store/tests/common/mod.rs`). No live qualification is authorized or claimed. | pass |
+| 8. Proposal lineage (3.5.4) | `ClaimProposal` and `Provenance` have no typed decision, plan, snapshot or outcome member. The adapter writes lineage into the open members: `SourceRef { system: "rustev", external_id: <decision id>, locator: "rustev:plan/<PlanId>/snapshot/<SnapshotId>" }` (`provenance.rs:79-90`; `SourceSystem` grammar at lines 43-56), stance `observed`, and the host-attributed observer as proposer. The proposal and claim ids derive from the decision id and the observation key, so a resubmission is the same proposal. A judgment offered as an observation is refused before staging. | pass |
+
+Result: **refuse** on item 1, so `rustev-aicortex` stays unimplemented
+(3.4.8). Every other row passes. The record first read pass on item 1; it
+was amended when the adapter, built against this record, failed the
+workspace supply-chain check named in that row.
+
+### `rustev-rahi`
+
+Binding: an in-process evidence sink over Rahi's store receipts (Rahi spec
+045, approved and complete), inside a Rahi cell the host composes. Rahi has
+no remote evidence-ingest surface. Its chassis routes are probes, metrics,
+binding, auth, session and operator surfaces
+(`crates/rahi-edge/src/probes.rs:103-116`,
+`crates/rahi-edge/src/router.rs:380-383`), and no CLI verb ingests a client
+record (`crates/rahi-cli/src/verbs.rs`). The decision ledger is not
+selected: its record's closed `Outcome` is `allow`, `deny` or `degrade`
+(`crates/rahi-ledger/src/record.rs:197-208`), the kernel's adjudication
+vocabulary, so a Rustev proposal written there would read as an
+authorization outcome (3.1.1). No hosting adapter is selected; 3.6.1 makes
+one optional. Hosting Rustev in a cell is the host's own composition through
+Rahi's `Cell` trait (`crates/rahi-cli/src/cell.rs:26-107`), and this crate adds
+nothing to it.
+
+| Item | Record | Result |
+|---|---|---|
+| 1. Upstream | crates.io `rahi-store =0.7.1` (checksum `5ffe41f10c2c64e60c807d1a6c555bf1e72d5d650c6d24dc6c4ddf666b353403`) and `rahi-types =0.7.1` (`3ed2f5ea421d3b2f6a9bf486a1af859f54b7b161d797aedab60782643b66f5bb`), the release of tag `v0.7.1` above, with `hiqlite-patched =0.15.0-patched.3` (`9d3586f7db4e971836ffc5982086bcfa1de0c0293492a194efd7d4ac21ff5ebf`). License Apache-2.0 (`LICENSE`, `Cargo.toml:14`); no NOTICE file. MSRV 1.96 (`Cargo.toml:13`). Platforms: images for `amd64` and `arm64` (`.github/workflows/image.yml:37-42`). The supported topology is N=1; N=3 has never run (`README.md:40`, `CHANGELOG.md:29-30`). Supply chain: `deny.toml` (yanked denied, crates.io sources only) under `cargo-deny` in CI (`.github/workflows/ci.yml:22-26`); in Rustev, `Cargo.lock` checksums. The resolved `serde_json` features are `default`, `std` and `raw_value` only, so Rustev's canonical numbers are unaffected. | pass |
+| 2. Schemas | Rust API: `ReceiptKey { tenant, namespace, key }` (`crates/rahi-store/src/receipt.rs:62-70`; namespace at most 256 bytes and key at most 1 KiB, lines 32-34), `ContentDigest` (lines 176-205, 64 lowercase hex), `Classification` (lines 256-283: `FirstSeen`, `Redelivered`, `Changed`, `CollisionRedelivered`, `Erased`), `Receipts::classify` (line 423, a consistent read) and `Receipts::stage_first` (line 495), the caller-owned `TxnBuilder` and `StoreHandle::txn` (`crates/rahi-store/src/store.rs:592`, one Raft entry, all or nothing), `MigrationSet` and `receipt_set` (`crates/rahi-store/src/migration_set.rs:186-231`, `receipt.rs:757`). The adapter adds one named migration set, `rustev`, version 1: one table keyed by the receipt's key digest, holding the decision id, the schema, the Rustev record digest, the record canonical bytes and the adapter's observation time, and requiring `rahi.receipts` at version 1 or later. Byte examples: the stored bytes are `rustev.run/1` or `/3` record canonical bytes, as in the existing Rustev goldens. Negative fixtures: the adapter's own tests, since Rahi ships none for receipts. Compatibility: exact `=0.7.1`. Before 1.0 a Rahi patch release may not change the consumer contract (`CHANGELOG.md:10-11`), but the receipt API is not in that contract's list (lines 3-7), so any other Rahi version needs a new record. | pass |
+| 3. Authentication | None at this seam: the host's cell owns identity (rauthy), the kernel and the store handle. The receipt `tenant` is a host-supplied opaque string, never interpreted (Rahi spec 045 B-1); the adapter takes it at construction and never derives it from content. No TLS, endpoint or redirect exists in process; the Raft transport and its secrets are the host's `StoreConfig`. | pass |
+| 4. Bounds | Record bytes are at most a configured `max_record_bytes` from 1 to 1,048,576, Rahi's per-parameter ceiling (`crates/rahi-store/src/blob.rs:48`); a larger record is refused before any write. One delivery is one consistent read and at most one transaction, plus one consistent read after a refused transaction; nothing is retried. The deadline is the runtime's delivery timeout (spec 003 3.9.4), and queueing and concurrency are the runtime's sink policy. Nothing is charged. | pass |
+| 5. Failure mapping | `FirstSeen`, then a committed transaction: `accepted`, receipt `rahi:<durability>:<external_id>:<digest>`, where `external_id` is Rahi's receipt key digest and the accepted revision (`<key digest>#1`). `Redelivered` with the same digest: `duplicate`, receipt `rahi:duplicate:<external_id>:<digest>`. `Changed` or `CollisionRedelivered` (the same decision id with another digest): `conflict`, never a duplicate. `Erased`: `rejected` (`erased`). A lost compare-and-swap (`Error::Conflict`, `receipt.rs:489`) or a constraint failure the store reports as `Error::Validation` (`receipt.rs:356-360`, Rahi spec 045 D-16) rolled the batch back, so the adapter reclassifies with one read and answers `duplicate` or `conflict`. A failed read before the transaction is `unavailable`, with nothing accepted, and so is a failed read after a refused transaction, since the store rolled that transaction back. Any other transaction error (`Upstream`, `Io`, `Stale`, `Integrity`, `Config`, `Unauthorized`, `Denied`, `NotFound`; `crates/rahi-types/src/error.rs:13-34`) is `acceptance_unknown`. The `EvidenceSink` seam reports uncertainty only by timing out (spec 003 3.9.4), so for `acceptance_unknown` the sink gives no answer and the runtime's delivery timeout reports that the sink may have received the record. That loses evidence: the store's own error (for example `Io`) does not reach the run record, which says only that no answer came within the delivery timeout, and the delivery holds its slot (a worker slot under a queued sink policy) for the full timeout. Both follow from spec 003 3.9.4's seam, not from this adapter; carrying the error would need a seam that reports uncertainty with a detail, a change to spec 003. Every other failure is an error with nothing accepted. | pass |
+| 6. Privacy | The adapter stores the record bytes the host's sink policy sends and nothing else, and logs nothing. Retention and erasure are Rahi's receipt rules (`retain_until`, tombstones and erasure; Rahi spec 045 B-20 to B-22), applied by the host. Rahi's erasure reaches only its receipt tables, so the adapter supplies one staging call that erases a decision's receipt and deletes its stored record in the host's transaction. An erased decision id is refused, never rewritten. A backup taken before an erasure still holds the rows, and backups are the host's. Durability is named exactly: a single voter syncs the Raft log asynchronously (`LogSync::ImmediateAsync`) and a cluster syncs it before acknowledging (`Immediate`), `crates/rahi-store/src/store.rs:656-668`. The host declares which from its `StoreConfig`, and the receipt states `raft-log-async` or `raft-log-synced`, nothing stronger. | pass |
+| 7. Tests | Offline: the mapping against a scripted receipt store (every row of item 5 and both negative cases of 3.6.3), and integration tests against a single-voter Rahi 0.7.1 store in a temporary directory on loopback. No live qualification is authorized or claimed. | pass |
+
+Result: **pass** on every row, so implementation may begin. The optional
+hosting adapter is not selected and is not implemented.
+
+### `rustev-serve`
+
+Binding: the `rustev.serve/1` service API and the two callback protocols of
+spec 042, over HTTP/1.1, HTTP/2 and gRPC. Unlike the two records above, the
+contract here is Rustev's own; the external parts are the server, gRPC, TLS
+and signature crates and the base image.
+
+| Item | Record | Result |
+|---|---|---|
+| 1. Upstream | HTTP: `hyper` 1.x with `server`, `http1` and `http2` (the lockfile has 1.11.1, checksum `27b501faa50e7a26c3d3560ca625132f4078a17771f4810baf70475ae48cbe43`, MIT), `hyper-util` 0.1.21 with `server-auto` for ALPN, and `h2` 0.4. gRPC: `tonic` 0.14.6 (`ac2a5518c70fa84342385732db33fb3f44bc4cc748936eb5833d2df34d6445ef`, MIT, MSRV 1.88), `tonic-prost` 0.14.6 (`50849f68853be452acf590cde0b146665b8d507b3b8af17261df47e02c209ea0`), `prost` 0.14.4 (`528ac67416ff8646872a3c02cad9cc4ee5dc9f9540c9b10771855c95cb2e5ae1`, Apache-2.0), and the generator `tonic-prost-build` 0.14.6 (`654e5643eff75d7f8c99197ce1440ed19a3474eada74c12bbac488b2cafdae27`), run at development time with its output committed (042 3.18). TLS: `rustls` 0.23.46 with the `ring` provider and `tokio-rustls` 0.26, already workspace dependencies. Ed25519: `ring` 0.17.14 (`ring::signature::ED25519`), already locked. Platforms: the binary on macOS and Linux for development, the image on `linux/amd64` and `linux/arm64` (042 3.16). | pass |
+| 2. Schemas | The documents are spec 042's (3.19.2) and exist only as its prose. None of `rustev.serve-*/1`, `rustev.plan-bundle/1`, `rustev.plan-registration/1`, `rustev.remote-context-*/1` or `rustev.remote-sink-*/1` is in `rustev-contract` at this commit, so there is no exact schema with parse bounds, no byte example and no negative fixture. Spec 042 2.2 lets those documents land before this record; until they do, this row cannot pass. | refuse |
+| 3. Authentication | Transport only (042 3.2). TLS 1.3 only, with the three `rustls` `ring` suites `TLS13_AES_256_GCM_SHA384`, `TLS13_AES_128_GCM_SHA256` and `TLS13_CHACHA20_POLY1305_SHA256` (`rustls::crypto::ring::cipher_suite`). Client certificates are required on every TCP listener, verified by `rustls::server::WebPkiClientVerifier` against configured roots, plus an optional exact subject allowlist. Unix sockets are created `0600`, or `0660` when configured, and an existing path is refused (042 3.1.2), using `tokio::net::UnixListener` and `std::os::unix::fs::PermissionsExt`. The development bearer is accepted on Unix sockets only. The principal handle passes through opaquely. No redirect is followed or issued. | pass |
+| 4. Bounds | Spec 042 states every connection, stream, byte, queue, deadline, retention and drain bound with its range (3.5.3, 3.5.4, 3.6.1, 3.7.2, 3.8.4, 3.12, 3.14). | pass |
+| 5. Failure mapping | Spec 042 3.5.1 maps every refusal to one HTTP status and one gRPC code; 3.4.3 to 3.4.5 cover decision statuses and disconnects, and 3.11.3 the sink receipts and errors. | pass |
+| 6. Privacy | Spec 042: memory-only retention within a bounded window (3.6.1), erasure applied as cache invalidation with retained responses kept until their window ends and reported (3.10.6), metrics that are not evidence (3.13.3), and secrets by file reference, excluded from the configuration digest (3.15). | pass |
+| 7. Tests | Spec 042 3.17 defines the conformance and transport-differential suites, which do not exist yet. No live qualification is authorized. | pass |
+| 042 2.2: server crates | As item 1. | pass |
+| 042 2.2: gRPC crates and generator | As item 1. | pass |
+| 042 2.2: TLS crate, mTLS, cipher suites | As items 1 and 3. | pass |
+| 042 2.2: Unix socket permissions | As item 3. | pass |
+| 042 2.2: Ed25519 crate | `ring` 0.17.14, as item 1. | pass |
+| 042 2.2: Sigstore crate, bundle media type, trusted root | Media type `application/vnd.dev.sigstore.bundle.v0.3+json` (`Bundle.media_type` in `protos/sigstore_bundle.proto` of `sigstore/protobuf-specs`). The crate is not settled. `sigstore` 0.14.0 (Apache-2.0, `a4df549c175469befae9f95dcfa52cda15b11a4a72ade1f43a36e90cd90ba88a`) enables `fulcio` and `rekor` under its `verify` feature, and both pull `reqwest` (crates.io feature table). Whether its bundle verifier runs offline against a host-supplied trusted root, as 042 3.3.5 requires, was not established from its source, and `sigstore-verify` 0.15.0 was not assessed. | unverified |
+| 042 2.2: base image | `gcr.io/distroless/cc-debian12:nonroot`, index `sha256:9dac0a79194e45a7da0158a9c6da57b217585af0786db3845d1f0ec1a0dd182f` (amd64 `sha256:777e96cf322c46bc32aca926c263624c4dc8d7cf37e2fa65ba2c7e697318ebbb`, arm64 `sha256:9ae6393649d0c55122c66fe6d4803b0d85b2d7b60b2b09b690ce80c086f40a83`), resolved from the registry on 2026-10-21. `cc` rather than `static`, because the binary links glibc. User and group 65532. | pass |
+| 042 2.2: platforms | `linux/amd64` and `linux/arm64`. | pass |
+
+Result: **refuse** on item 2 and **unverified** on the Sigstore row, so
+`rustev-serve` stays unimplemented (3.4.8). It can be reconsidered by an
+amended record the owner reviews, once spec 042's `rustev-contract`
+documents exist with their bounds and fixtures and the Sigstore crate has
+been assessed.

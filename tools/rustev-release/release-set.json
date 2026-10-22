@@ -61,6 +61,10 @@
     {
       "name": "rustev-release",
       "reason": "repository release tooling, not a product crate"
+    },
+    {
+      "name": "rustev-rahi",
+      "reason": "optional Rahi evidence sink (spec 010); not in the release family, which names no feature for it (spec 031 3.4); publish = false"
     }
   ]
 }

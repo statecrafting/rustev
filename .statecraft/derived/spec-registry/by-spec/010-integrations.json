@@ -16,8 +16,7 @@
       },
       {
         "kind": "directory",
-        "path": "integrations/rustev-rahi/",
-        "planned": true
+        "path": "integrations/rustev-rahi/"
       },
       {
         "kind": "directory",
@@ -57,10 +56,18 @@
           "kind": "directory",
           "path": "tools/rustev-boundaries/"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-public-api-and-release-family",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-release/"
+        }
       }
     ],
     "id": "010-integrations",
-    "implementation": "pending",
+    "implementation": "in-progress",
     "obligations": [
       {
         "anchor": "3-1-common-boundary",
@@ -110,7 +117,7 @@
       }
     ],
     "sectionDigests": {
-      "010-optional-ecosystem-integrations-and-serving-boundary": "3c9b4b9baf8fcc117d4972211f3c0a0f7a4e06f6c806cfbe940292e46da9a227",
+      "010-optional-ecosystem-integrations-and-serving-boundary": "08f4bee699547344caf6923d048ec921e67d1a8b138c43b4b9d84b2650b655f3",
       "1-purpose": "5b155272c9232bbb80ccff1a1334c284013fb24fbe85f5eab0c95bf12449009d",
       "2-territory-and-lifecycle": "953e4c745db493347f82ad3ad784b538b13b232b50618f845859d40cc8334bec",
       "3-1-common-boundary": "f979610cbae4f4c7a6f816a45d02a70ec9e7defb29f2ba1e1549ea117bdb70e9",
@@ -124,8 +131,13 @@
       "4-out-of-scope": "b94e4a2b9662c2fc0a7005589a9ff148f8747130beed017a00a136b59fee03fa",
       "5-observable-negative-cases": "9ef636e4c5b27c2b053cf0bfa8b87ac0d1309ec34bafa3c8fd819ae03bcf080e",
       "acceptance": "1b5fefd7df62ecb032adf6c62c2bc47fd0afffa28a4d1cf192ebf1c0683f1f2f",
-      "questions-settled-by-r-34": "9d03855a73f4458247f4366929cd07b18955edcc20205ff81cc1c6b6780d9ce9",
-      "verification": "617097493a2efddbe91eae5435dbbf78cf162d251a49b8ca5054110edc70d230"
+      "binding-records-section-3-4-r-44": "1ac6b91c1508f31de19e963a9631133a76765181bf225749d2a95c2fedcb4704",
+      "implementation-record": "17ce0a29250b502312a0ddaec43fe04f9beadbab7bd4dc2cb0c3ba8700247c3c",
+      "questions-settled-by-r-34": "01d8759b4847a8845c4901e47cbc1d1386eef2b5a81da814f120fb73d3f96ede",
+      "rustev-aicortex": "86be45b54cc8d2f37cc8d882e8eefb1db43f04bd4419fbfc4c0c52931eeb126e",
+      "rustev-rahi": "63f3b18703bf9121b5adda9547e119ec6af961bbfa0c835cb3a5f8f994e1100e",
+      "rustev-serve": "94b753a1499e972eb24c6e1cc3709f701a2dfc511c4a537da07970e951775e82",
+      "verification": "d562c5672db7d1e920f9f18833d38a90b9a6f2077db12e5a6b285ba0d3964aa1"
     },
     "sectionHeadings": [
       "010: Optional ecosystem integrations and serving boundary",
@@ -143,13 +155,18 @@
       "5. Observable negative cases",
       "Acceptance",
       "Verification",
-      "Questions settled by R-34"
+      "Implementation record",
+      "Questions settled by R-34",
+      "Binding records (section 3.4, R-44)",
+      "`rustev-aicortex`",
+      "`rustev-rahi`",
+      "`rustev-serve`"
     ],
     "specPath": "specs/010-integrations/spec.md",
     "status": "approved",
     "summary": "A shared boundary contract for three independently optional integration crates: `rustev-aicortex` adapts attributed context and observation proposals, `rustev-rahi` adapts evidence delivery and optional operational hosting, and `rustev-serve` exposes bounded registered-plan execution over an application-operated service boundary. Every integration preserves explicit identity, provenance, failure and unresolved effects; none grants authority, owns domain judgment, or makes Rustev depend on an ecosystem service. Concrete external API bindings and readiness claims require later evidence before implementation.\n",
     "title": "Optional ecosystem integrations and serving boundary"
   },
-  "shardHash": "7a34c85683ebdf14d661ee7c9a0e8a28cfc55cac05814d553f295ce72db4e7ff",
+  "shardHash": "9dd4f9a7f207bf3de033c465248d6310a51ece29e00b4fd43ada91178cccbf8e",
   "specVersion": "1.10.0"
 }

@@ -1,0 +1,11 @@
+{
+  "package": {
+    "kind": "rust-lib",
+    "name": "rustev-rahi",
+    "path": "integrations/rustev-rahi",
+    "specRef": "010-integrations",
+    "version": "0.1.0"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "92b65d7dc4fb28d4b9afc33ab40e7a4cbfce2fa5ee2b249799749c4e962ce5e3"
+}

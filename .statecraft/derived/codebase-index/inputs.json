@@ -28,7 +28,7 @@
       "contentHash": "fada641ced63180fd86bb7f57c93f61190009865963ab7aff0472d1814fe70b7"
     },
     "Makefile": {
-      "contentHash": "2a2a20808e2fd6dd6e205343b75cbe3eb7de8b50e72920a779fd974f63c1805f"
+      "contentHash": "9f663595d3c15c19db042b4f529c55977e9a52b917ac5243964cd22b1e4b8fe1"
     },
     "README.md": {
       "contentHash": "a7db75e7b6703725ffe56c47b26272ff6b2571ff1b33d5106c2f8a1780d76c5c"
@@ -55,10 +55,10 @@
       "contentHash": "072d2e398214742e99e621a17e1d7a251ecee2df58716910d13ede057bbf6d82"
     },
     "docs/backlog.md": {
-      "contentHash": "7760f24163d3e76d164233ab32487cda20a859061f9488c17dec0e13044f2645"
+      "contentHash": "5c14b09bb67eaf4879fc5b7604eed019016b4854e1ea554305a062910783bcc6"
     },
     "docs/decisions/00-founding-decisions.md": {
-      "contentHash": "7fb2227389dc5c4786ad7d6b1cf3fbef3439fc45da801091bf29ccc715f5cdbb"
+      "contentHash": "f7b7ba8692c0d60f6e37135cb82612a7c51090e1f2de552790a4174efeb4e5e5"
     },
     "docs/design/001-decision-engine-architecture.md": {
       "contentHash": "97b0ab9aefbfcce74dc39e9c00fc786d18916d48f84ac7ef4cb26acc543d2a1f"

@@ -259,8 +259,14 @@ authoritative. Reconciled on 2026-10-16 (RUSTEV-004).
 ### RUSTEV-015: Deliver optional ecosystem integrations and hosting
 
 - Type: feature.
-- State: owned by spec `010`, approved (A-15), with implementation pending;
-  each concrete binding record still needs separate owner approval (R-34).
+- State: owned by spec `010`, approved (A-15), with implementation pending.
+  The owner approved the three binding records and confirmed their
+  written text (R-44, A-45). The
+  `rustev-rahi` record passes and the crate is implemented. The
+  `rustev-aicortex` record refuses until Aicortex publishes its crates or
+  the workspace source check is scoped to the release closure. The
+  `rustev-serve` record refuses until spec `042`'s contract documents exist
+  and its Sigstore crate is assessed.
   The service part is carried by
   [#57](https://github.com/statecrafting/rustev/issues/57) (A2).
 - Task: specify and implement only evidenced needs for `rustev-aicortex`,
