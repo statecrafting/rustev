@@ -202,7 +202,8 @@ plan, threshold or calibration from final-test results.
 ## Verification
 
 The first acceptance item (section 5's refusals on labeled synthetic
-fixtures, repository-local, no real data, no network) is run here. The
+fixtures, repository-local, no real data, no network) is run here, by
+`make verify` (023 is in `VERIFIED_SPECS`, in CI's `evaluation` group). The
 second (one owner-reviewed admission and qualification record per task)
 needs an admitted dataset, which no host has offered; no existing report
 is a qualification under this spec.
@@ -286,6 +287,9 @@ calibration or usefulness claim is made or implied by anything below.
   because a new source file would change spec 021's reviewed archive list
   (`tools/rustev-release/archive-policy.json`); moving it to its own module
   is mechanical once that list may change.
+- `Makefile` and `scripts/acceptance/verify.py` (additive): `023` joins
+  `VERIFIED_SPECS` and the `evaluation` acceptance group, beside spec 004,
+  whose crate it shares.
 
 Limits found, for the owner (none changes this spec's text):
 

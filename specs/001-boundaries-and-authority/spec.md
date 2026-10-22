@@ -212,6 +212,9 @@ sh -c 'for d in crates tools; do [ -d "$d" ] || continue; if grep -rnE "(struct|
 
 ## Implementation record
 
+- 2026-10-22: Spec 023's repository-local synthetic refusal acceptance joins
+  `VERIFIED_SPECS` and the `evaluation` group in `scripts/acceptance/verify.py`
+  beside spec 004. This adds no real-data qualification claim.
 - 2026-10-22: CI declared acceptance runs in four isolated groups of whole
   specs. A checked partition covers the Makefile `VERIFIED_SPECS` list exactly
   once; all groups must succeed. Local `make verify` still runs the full list.
