@@ -3227,11 +3227,14 @@ dependencies = [
 name = "rustev-otel"
 version = "0.1.0"
 dependencies = [
+ "rustev-backend-rules",
  "rustev-contract",
  "rustev-core",
+ "rustev-runtime",
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "tokio",
 ]
 
 [[package]]
