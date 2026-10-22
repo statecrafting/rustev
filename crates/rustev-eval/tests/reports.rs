@@ -18,6 +18,9 @@ use rustev_contract::run::CoreEvidence;
 use rustev_contract::snapshot::Snapshot;
 use rustev_contract::{Document, Identified, schema};
 use rustev_eval::assemble::{AssemblyInput, Content, RetentionChoice, assemble};
+use rustev_eval::baseline::{
+    Baseline, BaselineError, Reproducibility, record as record_baseline, reproducibility,
+};
 use rustev_eval::bundle::{BundleInput, BundleLoad, LoadFailure};
 use rustev_eval::config::{
     AdapterRules, Agreement, ConfigAdapter, Direction, EvaluatorConfig, Gate, MetricFormula,
@@ -29,6 +32,7 @@ use rustev_eval::repeat::{
     BandDoc, BasisDoc, CohortReport, CohortStatus, FigureDoc, HeldOut, IntervalDoc, MetricReport,
     Observation, RepeatError, RepeatInputs, RepeatReport, Run, Source, SplitRole, repeat,
 };
+use rustev_eval::repeat::{HeldOutInput, repeat_held_out};
 use rustev_eval::repeat_config::{RepeatConfig, TopK};
 use rustev_eval::repeat_stats::Form;
 use rustev_eval::report::{
@@ -2276,4 +2280,225 @@ async fn cost_per_1000_is_measured_for_a_baseline_and_never_for_a_candidate() {
     let m = metric_of(cohort(&r, "all"), "cost_per_1000/estimated");
     assert_eq!(m.observation, Some(Observation::Candidate));
     assert!(matches!(m.pooled, FigureDoc::Value(_)), "{m:?}");
+}
+
+/// Spec 029, 3.7.3 and 3.7.4: a held-out repeat set is counted against the
+/// host's ledger; the new ledger is returned and the input never changes.
+#[tokio::test(flavor = "current_thread")]
+async fn a_held_out_repeat_set_is_counted_against_the_hosts_ledger() {
+    let s = support_run().await;
+    let one = evaluated_with(&s, &s.bundles, None);
+    let config = repeat_config(json!({ "k_sd": { "k": "2" } }), json!([]));
+    let runs = [Run {
+        evaluated: &one.0,
+        cases: &one.1,
+    }];
+    let inputs = RepeatInputs {
+        source: Source::Replay,
+        config: &config,
+        manifest: &s.manifest,
+        runs: &runs,
+    };
+    let held = |ledger, lineage: &str| HeldOutInput {
+        lineage: h(lineage),
+        ledger,
+        recorded_at_ms: 7,
+    };
+    let (r1, l1) = repeat_held_out(&inputs, &held(None, "candidate-a")).unwrap();
+    let Some(HeldOut::Counted(c1)) = &r1.held_out else {
+        panic!("{:?}", r1.held_out);
+    };
+    assert_eq!((c1.count, c1.plan_count, c1.dataset_count), (1, 1, 1));
+    assert_eq!(c1.ledger_head_before, None);
+    assert_eq!(l1.entries[0].runs, vec![r1.runs[0].report.clone()]);
+    let kept = l1.clone();
+    let (r2, l2) = repeat_held_out(&inputs, &held(Some(&l1), "candidate-a")).unwrap();
+    assert_eq!(l1, kept, "the input ledger is never modified");
+    let Some(HeldOut::Counted(c2)) = &r2.held_out else {
+        panic!();
+    };
+    assert_eq!((c2.count, c2.plan_count, c2.dataset_count), (2, 2, 2));
+    assert_eq!(c2.ledger_head_before, Some(c1.ledger_head_after.clone()));
+    let (r3, _) = repeat_held_out(&inputs, &held(Some(&l2), "candidate-b")).unwrap();
+    let Some(HeldOut::Counted(c3)) = &r3.held_out else {
+        panic!();
+    };
+    assert_eq!((c3.count, c3.plan_count, c3.dataset_count), (1, 3, 3));
+    // A broken chain or another dataset's ledger is refused.
+    let mut broken = l2.clone();
+    broken.entries[1].prev = None;
+    let err = repeat_held_out(&inputs, &held(Some(&broken), "candidate-a")).unwrap_err();
+    assert_eq!(err.code(), "holdout-ledger");
+    let other = rustev_eval::holdout::HoldoutLedger::new(
+        rustev_contract::ids::DatasetId::parse(&format!("sha256:{}", "9".repeat(64))).unwrap(),
+    );
+    let err = repeat_held_out(&inputs, &held(Some(&other), "candidate-a")).unwrap_err();
+    assert_eq!(err.code(), "holdout-ledger");
+    // Without a ledger the count is unknown, never zero.
+    let plain = repeat(&inputs).unwrap();
+    assert!(matches!(plain.held_out, Some(HeldOut::Unknown { .. })));
+}
+
+/// Spec 029, 3.8: a baseline binds the repeat set it was recorded from and
+/// refuses a report the supplied runs do not reproduce.
+#[tokio::test(flavor = "current_thread")]
+async fn a_baseline_binds_its_repeat_set() {
+    let s = support_run().await;
+    let one = evaluated_with(&s, &s.bundles, None);
+    let config = repeat_config(json!({ "k_sd": { "k": "2" } }), json!([]));
+    let runs = [
+        Run {
+            evaluated: &one.0,
+            cases: &one.1,
+        },
+        Run {
+            evaluated: &one.0,
+            cases: &one.1,
+        },
+    ];
+    let inputs = RepeatInputs {
+        source: Source::Replay,
+        config: &config,
+        manifest: &s.manifest,
+        runs: &runs,
+    };
+    let report = repeat(&inputs).unwrap();
+    let b = record_baseline("support.v1", &inputs, &report, 42).unwrap();
+    assert_eq!(b.repeat_report, report.record_digest().unwrap());
+    assert_eq!(b.runs, report.runs);
+    assert_eq!(b.n, 2);
+    assert_eq!(b.recorded_at_ms, 42);
+    assert_eq!(
+        b.evaluator_config_version,
+        rustev_eval::config::EVALUATOR_CONFIG_V2
+    );
+    assert!(matches!(b.provenance, DatasetProvenance::Synthetic { .. }));
+    assert_eq!(b.cohorts[0].metrics.len(), report.cohorts[0].metrics.len());
+    let parsed = Baseline::parse(&b.record_canonical().unwrap()).unwrap();
+    assert_eq!(parsed, b);
+    for bad in ["", "-lead", "has space", &"x".repeat(65)] {
+        assert_eq!(
+            record_baseline(bad, &inputs, &report, 42).unwrap_err(),
+            BaselineError::Name
+        );
+    }
+    record_baseline(&"x".repeat(64), &inputs, &report, 42).unwrap();
+    let mut tampered = report.clone();
+    tampered.cohorts[0].metrics[0].pooled = FigureDoc::Value(0.0);
+    assert!(matches!(
+        record_baseline("support.v1", &inputs, &tampered, 42),
+        Err(BaselineError::Binding(_))
+    ));
+    let mut seeds = report.clone();
+    seeds.runs[1].seed = "1".into();
+    assert!(record_baseline("support.v1", &inputs, &seeds, 42).is_err());
+}
+
+fn set_pooled(r: &mut RepeatReport, metric: &str, v: f64) {
+    for c in &mut r.cohorts {
+        for m in &mut c.metrics {
+            if m.name == metric {
+                m.pooled = FigureDoc::Value(v);
+            }
+        }
+    }
+}
+
+/// Spec 029, 3.9 and section 5: the reproducibility check fails on drift
+/// beyond the baseline's band and passes at exactly the band, at a zero
+/// band without drift, and is unknown on an unknown band or another
+/// configuration.
+#[tokio::test(flavor = "current_thread")]
+async fn reproducibility_holds_within_the_baselines_band() {
+    let s = support_run().await;
+    let one = evaluated_with(&s, &s.bundles, None);
+    let config = repeat_config(json!({ "k_sd": { "k": "2" } }), json!([]));
+    let runs = [Run {
+        evaluated: &one.0,
+        cases: &one.1,
+    }; 2];
+    let inputs = RepeatInputs {
+        source: Source::Replay,
+        config: &config,
+        manifest: &s.manifest,
+        runs: &runs,
+    };
+    let report = repeat(&inputs).unwrap();
+    let baseline = record_baseline("support.v1", &inputs, &report, 1).unwrap();
+    // Zero band from deterministic replay: identical sets reproduce...
+    assert_eq!(
+        reproducibility(&baseline, &report, &config),
+        Reproducibility::Reproducible
+    );
+    // ...and a one-ulp drift does not.
+    let mut drift = report.clone();
+    let FigureDoc::Value(base) = metric_of(cohort(&report, "all"), "coverage").pooled else {
+        panic!();
+    };
+    set_pooled(&mut drift, "coverage", f64::from_bits(base.to_bits() + 1));
+    let Reproducibility::NotReproducible { exceedances } =
+        reproducibility(&baseline, &drift, &config)
+    else {
+        panic!();
+    };
+    assert_eq!(exceedances.len(), 1);
+    assert_eq!(
+        (exceedances[0].metric.as_str(), exceedances[0].band),
+        ("coverage", 0.0)
+    );
+    // A band of 0.125: drift of exactly the band reproduces, beyond fails.
+    let mut wide = baseline.clone();
+    for m in &mut wide.cohorts[0].metrics {
+        if m.name == "coverage" {
+            m.pooled = FigureDoc::Value(0.5);
+            m.band = BandDoc::Value {
+                value: 0.125,
+                basis: BasisDoc::Floor,
+            };
+        }
+    }
+    let mut at_band = report.clone();
+    set_pooled(&mut at_band, "coverage", 0.625);
+    assert_eq!(
+        reproducibility(&wide, &at_band, &config),
+        Reproducibility::Reproducible
+    );
+    let mut beyond = report.clone();
+    set_pooled(
+        &mut beyond,
+        "coverage",
+        f64::from_bits(0.625f64.to_bits() + 1),
+    );
+    assert!(matches!(
+        reproducibility(&wide, &beyond, &config),
+        Reproducibility::NotReproducible { .. }
+    ));
+    // An unknown baseline band is unknown, never zero; an exceedance with
+    // another value unknown is still not reproducible.
+    let mut unknown_band = wide.clone();
+    for m in &mut unknown_band.cohorts[0].metrics {
+        if m.name == "acceptance_coverage" {
+            m.band = BandDoc::Unknown("one run".into());
+        }
+    }
+    assert!(matches!(
+        reproducibility(&unknown_band, &at_band, &config),
+        Reproducibility::Unknown { .. }
+    ));
+    assert!(matches!(
+        reproducibility(&unknown_band, &beyond, &config),
+        Reproducibility::NotReproducible { .. }
+    ));
+    // Another repeat configuration: unknown.
+    let other = repeat_config(json!({ "k_sd": { "k": "3" } }), json!([]));
+    assert!(matches!(
+        reproducibility(&baseline, &report, &other),
+        Reproducibility::Unknown { .. }
+    ));
+    let mut other_plan = report.clone();
+    other_plan.repeat_config = other.id().unwrap();
+    assert!(matches!(
+        reproducibility(&baseline, &other_plan, &config),
+        Reproducibility::Unknown { .. }
+    ));
 }

@@ -21,11 +21,13 @@ use crate::config::{AdapterRules, ConfigError};
 use crate::dataset::DatasetManifest;
 use crate::eval_cases::{self, EvalCases, derived, form_of, metric_cases};
 use crate::generator::run_seed;
+use crate::holdout::{Append, HeldOutRecord, HoldoutLedger, LedgerError};
 use crate::repeat_config::RepeatConfig;
 use crate::repeat_stats::{
     self, Band, Basis, Bootstrap, Figure, Interval, MetricCases, StatsError, across_runs, run_stats,
 };
 use crate::report::Evaluated;
+use rustev_contract::scope::Handle;
 
 pub const REPEAT_REPORT: &str = "rustev.repeat-report/1";
 
@@ -86,6 +88,10 @@ pub enum RepeatError {
     Reconcile(String),
     BootstrapTooLarge(String),
     Shape(String),
+    /// A held-out ledger refused (3.7.3).
+    Ledger(LedgerError),
+    /// A ledger supplied for a split that is not held out.
+    NotHeldOut,
 }
 
 impl RepeatError {
@@ -100,6 +106,8 @@ impl RepeatError {
             RepeatError::NotReproducible(_) => "not-reproducible",
             RepeatError::Reconcile(_) => "reconcile",
             RepeatError::BootstrapTooLarge(_) => "bootstrap-too-large",
+            RepeatError::Ledger(_) => "holdout-ledger",
+            RepeatError::NotHeldOut => "not-held-out",
         }
     }
 }
@@ -154,7 +162,11 @@ pub struct RunRef {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum HeldOut {
-    Unknown { reason: String },
+    Unknown {
+        reason: String,
+    },
+    /// Counted from the host's ledger, with the heads before and after.
+    Counted(HeldOutRecord),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -584,4 +596,49 @@ pub fn repeat(inputs: &RepeatInputs<'_>) -> Result<RepeatReport, RepeatError> {
         }),
         cohorts,
     })
+}
+
+/// The host's held-out inputs (3.7.3): its lineage handle, its ledger or
+/// the explicit statement that the ledger is new, and the time to record.
+pub struct HeldOutInput<'a> {
+    pub lineage: Handle,
+    /// None states that the ledger is new.
+    pub ledger: Option<&'a HoldoutLedger>,
+    pub recorded_at_ms: i64,
+}
+
+/// A held-out repeat report counted against the host's ledger (3.7.4):
+/// the report records the counts and heads, and the new ledger (the input
+/// with one entry appended) is returned for the host to keep. The input
+/// ledger is never modified.
+pub fn repeat_held_out(
+    inputs: &RepeatInputs<'_>,
+    held: &HeldOutInput<'_>,
+) -> Result<(RepeatReport, HoldoutLedger), RepeatError> {
+    let mut report = repeat(inputs)?;
+    if report.split_role != SplitRole::HeldOut {
+        return Err(RepeatError::NotHeldOut);
+    }
+    let fresh;
+    let ledger = match held.ledger {
+        Some(l) => l,
+        None => {
+            fresh = HoldoutLedger::new(report.dataset.clone());
+            &fresh
+        }
+    };
+    let (next, record) = ledger
+        .append(
+            &report.dataset,
+            Append {
+                lineage: held.lineage.clone(),
+                plan: report.plan.clone(),
+                repeat_config: report.repeat_config.clone(),
+                runs: report.runs.iter().map(|r| r.report.clone()).collect(),
+                recorded_at_ms: held.recorded_at_ms,
+            },
+        )
+        .map_err(RepeatError::Ledger)?;
+    report.held_out = Some(HeldOut::Counted(record));
+    Ok((report, next))
 }
