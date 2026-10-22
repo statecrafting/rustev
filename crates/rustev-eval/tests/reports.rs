@@ -2489,6 +2489,24 @@ async fn reproducibility_holds_within_the_baselines_band() {
         reproducibility(&unknown_band, &beyond, &config),
         Reproducibility::NotReproducible { .. }
     ));
+    // Binding mismatches cannot hide a definite exceedance (3.9).
+    // Preserve every exceedance, including its cohort, delta and band.
+    let expected = reproducibility(&baseline, &drift, &config);
+    let other = repeat_config(json!({ "k_sd": { "k": "3" } }), json!([]));
+    assert_eq!(reproducibility(&baseline, &drift, &other), expected);
+    let mut mismatched = drift.clone();
+    mismatched.repeat_config = other.id().unwrap();
+    assert_eq!(reproducibility(&baseline, &mismatched, &config), expected);
+    mismatched = drift.clone();
+    mismatched.split = Split::Calibration;
+    assert_ne!(mismatched.split, baseline.split);
+    assert_eq!(reproducibility(&baseline, &mismatched, &config), expected);
+    // With the drift removed, the same split mismatch remains unknown.
+    set_pooled(&mut mismatched, "coverage", base);
+    assert!(matches!(
+        reproducibility(&baseline, &mismatched, &config),
+        Reproducibility::Unknown { reasons } if !reasons.is_empty()
+    ));
     // Another repeat configuration: unknown.
     let other = repeat_config(json!({ "k_sd": { "k": "3" } }), json!([]));
     assert!(matches!(
