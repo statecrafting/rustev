@@ -12,6 +12,8 @@ pub enum Arity {
     One,
     /// Any number of times.
     Many,
+    /// A switch: no value, at most once (spec 028, 3.11.1).
+    Switch,
 }
 
 /// One command: its path, its flags and which of them are required.
@@ -116,6 +118,13 @@ pub const COMMANDS: &[CommandSpec] = &[
         path: &["calibrate", "qualify"],
         flags: flags!("calibration": One, "fit": One, "dataset": One, "split": One),
         required: &["calibration", "dataset", "split"],
+    },
+    // Spec 028, 3.11, an amendment of this spec.
+    CommandSpec {
+        path: &["trace", "tail"],
+        flags: flags!("file": One, "trace-id": One, "redaction": One, "follow": Switch,
+                      "timeout-ms": One, "text": Switch),
+        required: &["file"],
     },
 ];
 
@@ -237,6 +246,12 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Usage> {
         let Some(&(flag, arity)) = spec.flags.iter().find(|(f, _)| *f == name) else {
             return usage(format!("{} takes no flag --{name}", spec.path.join(" ")));
         };
+        if arity == Arity::Switch {
+            if values.insert(flag, vec![]).is_some() {
+                return usage(format!("--{flag} may be given once"));
+            }
+            continue;
+        }
         // A value never starts with `--`: that is the next flag, and the
         // value is missing.
         let Some(value) = rest.next().filter(|v| !v.starts_with("--")) else {
@@ -274,9 +289,12 @@ rustev: compile, inspect, run, replay and evaluate Rustev decision plans.
   rustev calibrate fit     --dataset F --config F --step ID --bundles DIR
                            --now-ms MS|system SCOPE --out DIR [--store DIR] [--host-cap-ms N]
   rustev calibrate qualify --calibration F [--fit F] --dataset F --split S
+  rustev trace tail   --file F [--trace-id HEX32] [--redaction F]
+                      [--follow [--timeout-ms N]] [--text]
 
   SCOPE: [--scope principal|tenant-only] --tenant H --context-revision H
          [--principal-scope H]   (required in principal mode, the default)
 
 Each command prints one JSON object on stdout; the exit code is its status.
+`trace tail --text` alone prints an indented tree instead.
 ";
