@@ -1069,6 +1069,40 @@ exists, the valid `why_order` entry combinations of 3.7.2 and the
 `REPLAY_V1` bound. The schema is not yet emitted for the bindings; the
 binding increment emits it. Tests: `crates/rustev-contract/tests/explanation.rs`.
 
+**Increment 2 (the explainer core, `why_outcome` and `text_origin`).**
+`crates/rustev-eval/src/explain/` adds `explain(&Evidence, &Query,
+&ExplainOptions)`. `Evidence` takes bytes, so every surface parses and
+refuses alike: record form parses the run record (any version the
+contract parses) and an optional plan, refusing a plan of another
+`PlanId` (`plan-mismatch`); bundle form checks the scope before resolving
+anything (`scope-mismatch`), resolves every item through the existing
+resolver at the caller's `now_ms`, records an unread item as `retention`
+with its availability (`digest_only` named as such) and the path of its
+digest in the bundle, and refuses a `corrupt` or `mismatched` item
+(`evidence-integrity`, naming it). Every document is held as its record
+canonical value; a fact copies the value at the path it cites, and a
+missing member is `not-in-record` unless its container's own reason
+applies (3.5.3). Derivation and lineage follow 3.5.4 and 3.5.5, the
+lineage closure reading the plan's static references through core's
+reference decoders. Redaction classes every copied value by 3.13.2 and
+applies the policy's class action through the contract's redaction
+policy; a composite value is withheld whole when a member is withheld,
+and side members other than `decision_id` and `plan_id` whose class is
+withheld are written as null. The bound of 3.3.5 keeps keyed facts and
+finds the longest prefix of list members by search over prefix lengths.
+`why_outcome` builds the facts of 3.8.1, the cause chain of 3.8.2 and the
+facets of 3.8.3; `text_origin` builds 3.9. A `rustev.judgment/2` outcome
+kind that 3.8.4 gives no answer for (`refused`, `needs_input`) is refused
+as `invalid-query` until a spec states its answer. The module is hidden
+from the documentation, and the queries later increments build are
+refused as `invalid-query`, until every query is built. Tests:
+`crates/rustev-eval/tests/explain.rs` (runtime-produced support-routing
+and lodging records and bundles: plan declarations with and without the
+plan, a handler-decided outcome's request, attempt and transition causes,
+a propagated backend failure, digest-only, corrupt, scope and plan
+refusals, a cancelled run, redaction with a byte scan for withheld values,
+text fields) and the bound's unit test.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

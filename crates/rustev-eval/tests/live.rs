@@ -624,8 +624,16 @@ fn eval_has_no_backend_runtime_or_authorizer_path() {
     // Spec 026, 3.1: comparison takes retained documents only. The
     // dependency test pins eval's normal dependencies; this pins its source.
     let src = concat!(env!("CARGO_MANIFEST_DIR"), "/src");
-    for entry in std::fs::read_dir(src).unwrap() {
-        let path = entry.unwrap().path();
+    let mut pending = vec![std::path::PathBuf::from(src)];
+    while let Some(path) = pending.pop() {
+        if path.is_dir() {
+            pending.extend(
+                std::fs::read_dir(&path)
+                    .unwrap()
+                    .map(|entry| entry.unwrap().path()),
+            );
+            continue;
+        }
         let text = std::fs::read_to_string(&path).unwrap();
         for forbidden in [
             "rustev_runtime",
