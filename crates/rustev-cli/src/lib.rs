@@ -12,6 +12,7 @@ pub mod args;
 mod calibrate;
 mod deps;
 mod eval;
+mod explain;
 mod host;
 pub mod io;
 /// Command output, shared with every host (spec 027, 3.1).
@@ -91,6 +92,7 @@ fn dispatch(p: &Parsed, cx: &Context) -> Result<Done, args::Usage> {
     }
     let r = match p.spec.path {
         ["run"] => run::run(p, cx)?,
+        ["explain", _] => explain::run(p)?,
         ["replay"] => replay::replay(p)?,
         ["eval"] if p.has("repeat-config") => repeat::eval(p)?,
         ["eval"] => eval::eval(p)?,

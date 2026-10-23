@@ -32,6 +32,41 @@ macro_rules! flags {
 
 pub const COMMANDS: &[CommandSpec] = &[
     CommandSpec {
+        path: &["explain", "why-selected"],
+        flags: flags!("record": One, "bundle": One, "plan": One, "scope": One, "tenant": One, "context-revision": One, "principal-scope": One, "now-ms": One, "store": One, "out": One, "markdown": One, "redaction": One, "item": One),
+        required: &["out", "item"],
+    },
+    CommandSpec {
+        path: &["explain", "why-excluded"],
+        flags: flags!("record": One, "bundle": One, "plan": One, "scope": One, "tenant": One, "context-revision": One, "principal-scope": One, "now-ms": One, "store": One, "out": One, "markdown": One, "redaction": One, "item": One),
+        required: &["out", "item"],
+    },
+    CommandSpec {
+        path: &["explain", "why-order"],
+        flags: flags!("record": One, "bundle": One, "plan": One, "scope": One, "tenant": One, "context-revision": One, "principal-scope": One, "now-ms": One, "store": One, "out": One, "markdown": One, "redaction": One, "a": One, "b": One),
+        required: &["out", "a", "b"],
+    },
+    CommandSpec {
+        path: &["explain", "why-outcome"],
+        flags: flags!("record": One, "bundle": One, "plan": One, "scope": One, "tenant": One, "context-revision": One, "principal-scope": One, "now-ms": One, "store": One, "out": One, "markdown": One, "redaction": One),
+        required: &["out"],
+    },
+    CommandSpec {
+        path: &["explain", "text-origin"],
+        flags: flags!("record": One, "bundle": One, "plan": One, "scope": One, "tenant": One, "context-revision": One, "principal-scope": One, "now-ms": One, "store": One, "out": One, "markdown": One, "redaction": One),
+        required: &["out"],
+    },
+    CommandSpec {
+        path: &["explain", "models"],
+        flags: flags!("record": One, "bundle": One, "plan": One, "scope": One, "tenant": One, "context-revision": One, "principal-scope": One, "now-ms": One, "store": One, "out": One, "markdown": One, "redaction": One),
+        required: &["out"],
+    },
+    CommandSpec {
+        path: &["explain", "diff"],
+        flags: flags!("record": One, "bundle": One, "plan": One, "scope": One, "tenant": One, "context-revision": One, "principal-scope": One, "now-ms": One, "store": One, "out": One, "markdown": One, "redaction": One, "other-record": One, "other-bundle": One, "other-plan": One),
+        required: &["out"],
+    },
+    CommandSpec {
         path: &["baseline", "record"],
         flags: flags!("name": One, "eval": One, "now-ms": One, "out": One),
         required: &["name", "eval", "now-ms", "out"],
@@ -356,6 +391,14 @@ rustev: compile, inspect, run, replay and evaluate Rustev decision plans.
                       [--capture-bytes N --bundle-out F --now-ms MS|system SCOPE
                        [--retain digest-only|embedded|external] [--store DIR]
                        [--lifetime-ms N] [--host-cap-ms N]]
+  rustev explain      why-selected|why-excluded --item ID EVIDENCE --out F [--markdown F] [--redaction F]
+  rustev explain      why-order --a ID --b ID EVIDENCE --out F [--markdown F] [--redaction F]
+  rustev explain      why-outcome|text-origin|models EVIDENCE --out F [--markdown F] [--redaction F]
+  rustev explain      diff EVIDENCE (--other-record F [--other-plan F]|--other-bundle F)
+                      --out F [--markdown F] [--redaction F]
+  EVIDENCE: --record F [--plan F] | --bundle F
+            Any bundle side requires --now-ms MS|system SCOPE [--store DIR], given once.
+
   rustev replay       --bundle F --now-ms MS|system SCOPE [--store DIR] [--host-cap-ms N]
   rustev eval         --dataset F --split S --config F --adapter F --bundles DIR
                       --now-ms MS|system SCOPE --out DIR [--store DIR] [--host-cap-ms N]
