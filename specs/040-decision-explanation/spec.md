@@ -2,7 +2,7 @@
 id: "040-decision-explanation"
 title: "Decision explanation API and `rustev explain` (amends 004 and 006)"
 status: approved
-implementation: pending
+implementation: in-progress
 created: "2026-10-17"
 summary: >
   An amendment of approved specs 004 and 006 (R-16), for #76 child D2.
@@ -35,6 +35,9 @@ extends:
   - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: amending }
   # Adds 040 to `make verify` when the implementation is complete.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  # Each new source file of a release member joins the reviewed archive
+  # list (spec 021, 3.5).
+  - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "002-decision-contract-and-pure-core"
@@ -1023,6 +1026,48 @@ kind.
 ## Verification
 
 Pending with implementation. Approval satisfies no acceptance item.
+
+## Implementation record
+
+Delivered in increments, each its own pull request; nothing here claims an
+acceptance item before the increment that satisfies it, and 040 joins
+`make verify` only when every item it can verify is delivered. Plan:
+
+1. The contract vocabulary (3.2, 3.3, 3.5.3, 3.17): `rustev.explanation/1`,
+   the query, the per-query answer shapes, facts, evidence paths and the
+   refusal codes, with structural validation.
+2. The explainer core in eval (3.1, 3.4, 3.5, 3.12, 3.13, 3.3.5):
+   evidence sets, facts, derivation and lineage, redaction and bounds,
+   with `why_outcome` (3.8) and `text_origin` (3.9).
+3. `models` (3.10) and `why_selected` (3.6).
+4. `why_excluded` and `why_order` (3.7).
+5. `diff` (3.11) and the Markdown rendering (3.14).
+6. `rustev explain` in the CLI (3.16, 3.17), the golden explanations and
+   the mutation seeds.
+7. The binding surface and conformance cases (3.15.2) and the facade
+   re-export (3.15.1), after spec 031 is complete; declared verification
+   and completion.
+
+**Increment 1 (the contract vocabulary).**
+`crates/rustev-contract/src/explanation.rs` defines `Explanation` under
+`rustev.explanation/1` (`REPLAY_V1`, record canonical, identified by its
+record digest, unknown fields and duplicate keys refused at every level,
+nullable members required to be present), `EXPLAINER`
+(`rustev-explain/1`), the query of 3.3.1 in its wire form with the item
+checks of 3.3.3, one answer type per query (so a `kind` such as
+`selected` or `not_available` takes the shape its query gives it, and an
+answer of another query's shape is refused at parse), `Fact` with the
+closed `Claim` vocabulary of 3.6 to 3.12, `Unavailable` with exactly the
+members of 3.5.3 (its `availability` being an unread item's state,
+`digest_only` included), `EvidencePath` (3.2: the roles, the `a.`/`b.`
+diff prefix, RFC 6901 pointers, byte order), the facet names of 3.12.1 in
+their reserved order, and `RefusalCode` (3.17). `Explanation::validate`
+checks the sides against the query, fact numbering and the 10 000 bound,
+that unavailable facts hold no value, sorted unique citations, diff-only
+side prefixes, the facet source order, that every fact the answer names
+exists, the valid `why_order` entry combinations of 3.7.2 and the
+`REPLAY_V1` bound. The schema is not yet emitted for the bindings; the
+binding increment emits it. Tests: `crates/rustev-contract/tests/explanation.rs`.
 
 ## Decisions at approval
 

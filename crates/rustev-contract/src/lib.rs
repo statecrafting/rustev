@@ -22,6 +22,7 @@ pub mod dynamic;
 pub mod eval_report;
 pub mod evidence;
 pub mod execution;
+pub mod explanation;
 pub mod grade;
 pub mod ids;
 pub mod judgment;
@@ -56,6 +57,8 @@ pub use time::{DurationMs, Timestamp};
 /// the #76 track versions and source descriptors; and by spec 019: the
 /// dynamic question documents).
 pub mod schema {
+    /// Decision explanation record canonical document (spec 040, 3.3).
+    pub const EXPLANATION: &str = "rustev.explanation/1";
     pub const DEFINITION: &str = "rustev.definition/1";
     pub const PLAN: &str = "rustev.plan/2";
     pub const BACKEND: &str = "rustev.backend/1";
