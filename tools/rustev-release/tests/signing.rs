@@ -341,3 +341,31 @@ fn names_from_the_manifest_are_refused_unless_plain() {
     f.publish(&m);
     fails(&f.verify(), "must be full object ids");
 }
+
+// Spec 031 3.11.2: workflow bytes share the signed manifest binding.
+#[test]
+fn signed_workflow_artifact_substitution_and_absence_fail() {
+    let f = Fixture::new("workflow");
+    let bytes = b"release notes";
+    let mut m = f.manifest(&f.head(), &f.tree());
+    m.artifacts
+        .push(rustev_release::manifest::WorkflowArtifact {
+            kind: "changelog".into(),
+            name: "changelog.md".into(),
+            layer: 8,
+            bytes: bytes.len() as u64,
+            sha256: rustev_release::archive::sha256_hex(bytes),
+            package: None,
+            integrity: None,
+            sbom: None,
+            slsa_build_level: None,
+        });
+    std::fs::write(f.dir.join("changelog.md"), bytes).unwrap();
+    f.publish(&m);
+    f.tag(&tag_message(&m), &f.head());
+    assert!(f.verify().is_empty());
+    std::fs::write(f.dir.join("changelog.md"), b"substitution").unwrap();
+    fails(&f.verify(), "changelog.md");
+    std::fs::remove_file(f.dir.join("changelog.md")).unwrap();
+    fails(&f.verify(), "changelog.md");
+}

@@ -105,7 +105,6 @@ fn the_release_set_fixes_the_npm_members_and_the_absences() {
     assert_eq!(
         absent,
         [
-            ("binary", "rustev"),
             ("image", "ghcr.io/statecrafting/rustev-serve"),
             ("crate", "rustev-bedrock"),
             ("crate", "rustev-backend-embed-linear"),
@@ -316,7 +315,11 @@ fn absences_carry_a_known_kind_and_a_reason_and_are_not_members() {
     s.absent[2].name = "@statecrafting/rustev-wasm".into();
     assert!(set_detail(&s).contains("both a member and absent"));
     let mut s = set();
-    let dup = s.absent[3].clone();
+    let dup = s
+        .absent
+        .first()
+        .expect("release has absent members")
+        .clone();
     s.absent.push(dup);
     assert!(set_detail(&s).contains("listed twice"));
 }

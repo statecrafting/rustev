@@ -852,6 +852,51 @@ and the audit found RUSTSEC-2026-0386 in tokio 1.53.1, repaired by its own
 change (below). The bsdtar archives and the "not yet reproducible" note of
 increment 6 are gone.
 
+**Increment 9, 2026-10-23 (the signed manifest names every artifact;
+layers 6 to 8).** Because the workflow artifacts are reproducible
+(increment 7), a rehearsal at the candidate commit yields the bytes the tag
+build must reproduce, so the owner signs them before the tag exists. The
+release manifest is `rustev.release-manifest/2` (it supersedes `/1`, which
+was never signed or published): beside every `/1` field it records each
+non-crate artifact (npm tarballs, CLI archives, every SBOM, the changelog)
+with its kind, layer, size and SHA-256, for an npm tarball its package and
+the `sha512` integrity npm records, for a tarball or archive its SBOM and
+the SLSA build level claimed (2; a level 3 claim is refused, 3.9.5), the
+registries, each reference plan's `PlanId` and whether any changed (3.7),
+and the MSRV and edition (3.6.7). `rustev-release manifest <evidence>
+[<artifacts>]` (`make release-candidate` with `RUSTEV_RELEASE_ARTIFACTS`)
+builds it and refuses a missing tarball, archive or SBOM; without
+rehearsal artifacts the manifest says so under its limitations and is not
+publishable. The prebuilt `rustev` CLI archives are release members now
+(3.1 layer 7): the release set no longer lists them as absent. The release
+workflow takes the signed manifest as its `manifest` input, checks that
+its SHA-256 is the one the signed tag's message names, and its `bind` job
+runs `verify-artifacts`, so every artifact of the tag build must equal the
+signed bytes; the `npm` job then runs `observe-crates`, which reads the
+public sparse index without a credential and refuses unless every crate of
+the manifest is visible with its checksum (layer 6 after the crate
+layers). The lifecycle now spans the family (3.1, 3.9, 3.11): the signed
+manifest is journaled before the first upload of any kind; the owner's
+instruction must name exactly the manifest's version (the first-release
+order authorizes 0.1.0 alone, 3.11.1), commit, registries and artifact
+set; each layer starts only after every artifact of the earlier layers is
+observed public with its expected checksum (crates: the index checksum;
+npm: the integrity; hosted assets: SHA-256); every attempt is journaled
+before and after, an attempt without a recorded result counts as
+ambiguous, a refusal or bytes already public under the version stop the
+run, and a rerun skips what is public with the same bytes; a stop after
+any acceptance is `partially published`, continuing needs a fresh
+instruction (3.11.4), `released` needs layer 8 and `qualified` the
+recorded fresh-consumer evidence. Fakes for npm and the hosted release
+drive each rule in `tests/family.rs`, with no network or credential.
+`rustev-release hosted-release <release-dir> <artifacts> <instruction>
+<journal>` is layer 8's real adapter: it verifies the signed release and
+the artifacts, observes layers 1 to 6 public, journals, and creates the
+hosted release for the signed tag with `gh` (whose credential it never
+reads), attaching the CLI archives, SBOMs, signed manifest, checksums,
+signatures, changelog and a journal summary, and observes each asset's
+SHA-256. Nothing here publishes.
+
 ## Decisions at approval
 
 1. **Crate and package names** (left to the implementer by #58): decided

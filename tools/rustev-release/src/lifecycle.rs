@@ -19,6 +19,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::manifest::ReleaseManifest;
 
+/// Spec 031 3.11.1: the first-release instruction authorizes exactly 0.1.0.
+/// Any other version requires a fresh owner instruction (031 3.11.4).
+pub const FIRST_RELEASE_VERSION: &str = "0.1.0";
+
 /// The named states of 3.1.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -41,6 +45,18 @@ pub struct Instruction {
     pub commit: String,
     pub registry: String,
     pub packages: Vec<String>,
+    #[serde(default)]
+    pub registries: Vec<String>,
+    #[serde(default)]
+    pub artifacts: Vec<String>,
+    #[serde(default)]
+    pub continuation: bool,
+    #[serde(default = "publish_action")]
+    pub action: String,
+}
+
+fn publish_action() -> String {
+    "publish".into()
 }
 
 /// What can happen to a release.
@@ -72,6 +88,8 @@ pub struct Lifecycle {
     pub manifest: ReleaseManifest,
     pub candidate_commit: Option<String>,
     pub instruction: Option<Instruction>,
+    pub(crate) family_observed: bool,
+    pub(crate) consumer_recorded: bool,
 }
 
 impl Lifecycle {
@@ -81,6 +99,8 @@ impl Lifecycle {
             manifest,
             candidate_commit: None,
             instruction: None,
+            family_observed: false,
+            consumer_recorded: false,
         }
     }
 
@@ -106,6 +126,15 @@ impl Lifecycle {
                     || i.commit != m.commit
                     || i.registry != m.registry
                     || i.packages != m.upload_order
+                    || i.action != "publish"
+                    || i.version != FIRST_RELEASE_VERSION
+                    || (!m.artifacts.is_empty()
+                        && (i.registries != m.registries
+                            || i.artifacts
+                                != m.artifacts
+                                    .iter()
+                                    .map(|a| a.name.clone())
+                                    .collect::<Vec<_>>()))
                 {
                     return refuse(
                         "the instruction does not name exactly this version, commit, registry and package set (I-4)"
@@ -116,14 +145,27 @@ impl Lifecycle {
                 PublicationAuthorized
             }
             (PublicationAuthorized | PartiallyPublished, Event::Observed { complete }) => {
+                if complete && !self.manifest.artifacts.is_empty() && !self.family_observed {
+                    return refuse("family layers not observed".into());
+                }
                 if complete {
                     Published
                 } else {
                     PartiallyPublished
                 }
             }
-            (Published, Event::ReleaseCreated) => Released,
-            (Released, Event::ConsumerQualified) => Qualified,
+            (Published, Event::ReleaseCreated) => {
+                if !self.manifest.artifacts.is_empty() && !self.family_observed {
+                    return refuse("layer 8 not observed".into());
+                }
+                Released
+            }
+            (Released, Event::ConsumerQualified) => {
+                if !self.manifest.artifacts.is_empty() && !self.consumer_recorded {
+                    return refuse("fresh-consumer evidence not recorded".into());
+                }
+                Qualified
+            }
             (s, e) => return refuse(format!("{e:?} does not apply in state {s:?}")),
         };
         self.state = next;
@@ -240,6 +282,19 @@ fn redacted(outcome: Upload) -> Upload {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "entry", rename_all = "snake_case")]
 pub enum Entry {
+    /// Spec 031 3.11.2: exact signed bytes, before any upload.
+    SignedManifest {
+        manifest: String,
+        signature: String,
+    },
+    /// Spec 031 3.1 layer 8: freeze the summary before uploading it.
+    Summary {
+        text: String,
+    },
+    /// Spec 031 3.9.7: immutable fresh-consumer evidence digests.
+    Qualification {
+        evidence: BTreeMap<String, String>,
+    },
     Attempt {
         package: String,
         version: String,
@@ -339,26 +394,34 @@ impl Journal {
 
     /// May `package` be uploaded now? Not after an accepted or ambiguous
     /// result unless a later query of public state found it absent.
-    fn may_attempt(&self, package: &str) -> Result<(), String> {
+    pub(crate) fn may_attempt(&self, package: &str) -> Result<(), String> {
         // Sticky states: an accepted result blocks every later upload, and
         // an ambiguous one blocks until a later query of public state found
         // the package absent; a later refusal clears neither.
         let mut accepted = false;
         let mut ambiguous = false;
+        let mut pending = false;
         for e in &self.entries {
             match e {
+                Entry::Attempt { package: p, .. } if p == package => pending = true,
                 Entry::Result {
                     package: p,
                     outcome,
-                } if p == package => match outcome {
-                    Upload::Accepted => accepted = true,
-                    Upload::Ambiguous { .. } => ambiguous = true,
-                    Upload::Refused { .. } => {}
-                },
+                } if p == package => {
+                    pending = false;
+                    match outcome {
+                        Upload::Accepted => accepted = true,
+                        Upload::Ambiguous { .. } => ambiguous = true,
+                        Upload::Refused { .. } => {}
+                    }
+                }
                 Entry::Query {
                     package: p,
                     observed: Lookup::Absent,
-                } if p == package => ambiguous = false,
+                } if p == package => {
+                    ambiguous = false;
+                    pending = false;
+                }
                 _ => {}
             }
         }
@@ -366,7 +429,7 @@ impl Journal {
             Err(format!(
                 "{package} was already accepted; never upload twice"
             ))
-        } else if ambiguous {
+        } else if ambiguous || pending {
             Err(format!(
                 "{package} has an ambiguous attempt; query public state first"
             ))
@@ -420,6 +483,31 @@ pub fn publish(
         );
     }
     let m = life.manifest.clone();
+    if let Err(e) = crate::family_lifecycle::bound(&m, journal) {
+        return stop(journal, e);
+    }
+    if !m.artifacts.is_empty() {
+        if journal
+            .entries
+            .iter()
+            .any(|e| matches!(e, Entry::Stopped { .. }))
+            && !life.instruction.as_ref().is_some_and(|i| i.continuation)
+        {
+            return stop(
+                journal,
+                "partial publication needs fresh continuation instruction".into(),
+            );
+        }
+        if m.limitations
+            .iter()
+            .any(|l| l == crate::family_artifacts::MISSING)
+        {
+            return stop(
+                journal,
+                "missing rehearsal artifacts; not publishable".into(),
+            );
+        }
+    }
     if m.packages.is_empty() {
         return stop(journal, "an empty package set publishes nothing".into());
     }
@@ -437,7 +525,7 @@ pub fn publish(
     let mut visible = 0usize;
     let observe = |life: &mut Lifecycle, visible: usize| {
         if visible > 0 {
-            mark(life, visible == m.packages.len());
+            mark(life, visible == m.packages.len() && m.artifacts.is_empty());
         }
     };
     for p in &m.packages {
@@ -604,7 +692,7 @@ pub fn publish(
                     package: p.name.clone(),
                     observed: last,
                 });
-                observe(life, visible);
+                mark(life, false);
                 return stop(
                     journal,
                     format!(

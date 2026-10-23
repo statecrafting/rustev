@@ -181,7 +181,12 @@ step dependencies.json "$release" deps
 step changelog.txt "$release" changelog "$out/changelog.md" ${PREVIOUS:-}
 # 3.8: the canonical manifest and SHA256SUMS of run a. Signing them and the
 # tag is the owner's act; nothing here signs.
-step manifest.txt "$release" manifest "$out"
+# 031 3.11.2: downloaded rehearsal bytes are optional candidate inputs.
+if [ -n "${RUSTEV_RELEASE_ARTIFACTS:-}" ]; then
+  step manifest.txt "$release" manifest "$out" "$RUSTEV_RELEASE_ARTIFACTS"
+else
+  step manifest.txt "$release" manifest "$out"
+fi
 cat "$out/compare.txt" "$out/unpacked.txt" "$out/unpacked-msrv.txt" "$out/exceptions.txt"
 # `step` stops the script on a failing audit, so reaching here means it
 # passed; every diagnostic stays in deny.txt, part of the candidate evidence.

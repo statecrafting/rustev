@@ -514,7 +514,7 @@ fn changelog_cmd(set: &ReleaseSet, out: &str, previous: Option<&str>) -> ExitCod
 }
 
 fn changelog(set: &ReleaseSet, previous: Option<&str>) -> Result<String, String> {
-    use rustev_release::changelog::{Inputs, PlanIdentity, approvals, render};
+    use rustev_release::changelog::{Inputs, approvals, render};
     if !command_line("git", &["status", "--porcelain", "--untracked-files=no"])?.is_empty() {
         return Err("the changelog is generated at a clean commit; the tree is dirty".into());
     }
@@ -568,6 +568,29 @@ fn changelog(set: &ReleaseSet, previous: Option<&str>) -> Result<String, String>
             .collect();
         commits.insert(s.id.clone(), list);
     }
+    let (msrv, edition, plan_ids) = compatibility(set, previous)?;
+    let inputs = Inputs {
+        version: set.version.clone(),
+        previous: previous.map(str::to_string),
+        commit,
+        approvals: approvals(&decisions, &after),
+        before,
+        after,
+        commits,
+        msrv,
+        edition,
+        plan_ids,
+        superseded: Vec::new(),
+    };
+    Ok(render(&inputs))
+}
+
+// Spec 031 3.6.7 and 3.7: one reader for changelog and manifest facts.
+fn compatibility(
+    set: &ReleaseSet,
+    previous: Option<&str>,
+) -> Result<(String, String, Vec<rustev_release::changelog::PlanIdentity>), String> {
+    use rustev_release::changelog::PlanIdentity;
     let meta = metadata()?;
     let first = meta
         .packages
@@ -629,23 +652,11 @@ fn changelog(set: &ReleaseSet, previous: Option<&str>) -> Result<String, String>
             after,
         });
     }
-    let inputs = Inputs {
-        version: set.version.clone(),
-        previous: previous.map(str::to_string),
-        commit,
-        approvals: approvals(&decisions, &after),
-        before,
-        after,
-        commits,
-        msrv: first
-            .rust_version
-            .clone()
-            .unwrap_or_else(|| "unknown".into()),
-        edition: first.edition.clone(),
+    Ok((
+        first.rust_version.clone().ok_or("missing MSRV")?,
+        first.edition.clone(),
         plan_ids,
-        superseded: Vec::new(),
-    };
-    Ok(render(&inputs))
+    ))
 }
 
 fn command_line(program: &str, args: &[&str]) -> Result<String, String> {
@@ -671,7 +682,7 @@ fn command_line(program: &str, args: &[&str]) -> Result<String, String> {
     Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
-fn manifest(set: &ReleaseSet, evidence_dir: &str) -> ExitCode {
+fn manifest(set: &ReleaseSet, evidence_dir: &str, artifacts_dir: Option<&str>) -> ExitCode {
     use rustev_release::archive::sha256_hex;
     use rustev_release::manifest::{Inputs, Toolchain, build, sha256sums};
     let dir = Path::new(evidence_dir);
@@ -723,7 +734,7 @@ fn manifest(set: &ReleaseSet, evidence_dir: &str) -> ExitCode {
                 std::fs::read(dir.join(&name)).map_err(|e| format!("{clause}: {name}: {e}"))?;
             evidence.insert(name, sha256_hex(&bytes));
         }
-        let m = build(
+        let mut m = build(
             set,
             &dir.join("a"),
             Inputs {
@@ -740,6 +751,33 @@ fn manifest(set: &ReleaseSet, evidence_dir: &str) -> ExitCode {
                 limitations: LIMITATIONS.iter().map(|l| l.to_string()).collect(),
             },
         )?;
+        let previous = std::env::var("PREVIOUS").ok().filter(|p| !p.is_empty());
+        let (msrv, edition, plans) = compatibility(set, previous.as_deref())?;
+        m.msrv = msrv;
+        m.edition = edition;
+        m.plan_ids = plans
+            .iter()
+            .map(|p| (p.plan.clone(), p.after.clone()))
+            .collect();
+        m.plan_ids_changed = if previous.is_none() {
+            rustev_release::manifest::PlanChanges::First("none".into())
+        } else {
+            rustev_release::manifest::PlanChanges::Changed(
+                plans
+                    .iter()
+                    .filter(|p| p.before.as_ref() != Some(&p.after))
+                    .map(|p| p.plan.clone())
+                    .collect(),
+            )
+        };
+        m.artifacts =
+            rustev_release::family_artifacts::collect(set, dir, artifacts_dir.map(Path::new))?;
+        if artifacts_dir.is_none() {
+            m.limitations
+                .push(rustev_release::family_artifacts::MISSING.into());
+        }
+        rustev_release::family_artifacts::validate(&m)?;
+        rustev_release::family_artifacts::stage(&m, dir, artifacts_dir.map(Path::new))?;
         // Both files are written in full beside their targets, then renamed
         // (each rename atomic), the manifest last: a manifest present means
         // its SHA256SUMS is complete, and an interrupted run leaves only
@@ -769,7 +807,6 @@ fn manifest(set: &ReleaseSet, evidence_dir: &str) -> ExitCode {
 /// Every limitation the first release states (3.8); the release notes
 /// repeat them.
 const LIMITATIONS: &[&str] = &[
-    "Source archives only: no prebuilt binary, container or npm package.",
     "Supported targets are those the candidate matrix tested; others are unsupported.",
     "Synthetic reference datasets and reports support no quality or calibration claim.",
     "Pre-1.0: a minor version may change any public contract (3.2).",
@@ -823,19 +860,7 @@ fn publish_cmd(dir: &str, instruction: &str, journal_path: &str) -> ExitCode {
         let top = Path::new(&top)
             .canonicalize()
             .map_err(|e| format!("{top}: {e}"))?;
-        let parent = journal_path
-            .parent()
-            .filter(|p| !p.as_os_str().is_empty())
-            .unwrap_or(Path::new("."));
-        let parent = parent
-            .canonicalize()
-            .map_err(|e| format!("{}: {e}", parent.display()))?;
-        if parent.starts_with(&top) {
-            return Err(
-                "021 3.9: the publication journal is inside the repository; it must live outside it"
-                    .into(),
-            );
-        }
+        let journal_path = rustev_release::hosted::journal_path(journal_path, &top)?;
         // The signed release: archives, manifest, checksums, tag and key bind.
         let scratch = rustev_release::repro::fresh_dir("rustev-release-signers")?;
         let signers = scratch.join("allowed_signers");
@@ -873,7 +898,7 @@ fn publish_cmd(dir: &str, instruction: &str, journal_path: &str) -> ExitCode {
         .map_err(|r| r.0)?;
         life.apply(Event::Authorized(instruction))
             .map_err(|r| r.0)?;
-        let mut journal = match std::fs::read_to_string(journal_path) {
+        let mut journal = match std::fs::read_to_string(&journal_path) {
             Ok(text) => Journal::from_lines(&text)?,
             // Only an absent journal starts empty; any other read failure
             // would discard the history the publisher resumes from.
@@ -881,6 +906,9 @@ fn publish_cmd(dir: &str, instruction: &str, journal_path: &str) -> ExitCode {
             Err(e) => return Err(format!("journal {}: {e}", journal_path.display())),
         };
         journal.file = Some(journal_path.to_path_buf());
+        let signature = std::fs::read_to_string(dir.join("release-manifest.json.sig"))
+            .map_err(|e| e.to_string())?;
+        rustev_release::family_lifecycle::bind(&m, &signature, &mut journal)?;
         let registry = CratesIo { wait_seconds: 10 };
         let account = registry.account()?;
         journal.record(Entry::Preflight {
@@ -902,7 +930,7 @@ fn publish_cmd(dir: &str, instruction: &str, journal_path: &str) -> ExitCode {
     match result {
         Ok(rustev_release::lifecycle::Outcome::Complete) => {
             println!(
-                "every package is public with its verified checksum (published, not yet released or qualified)"
+                "every crate is public with its verified checksum; family publication awaits npm and hosted layers"
             );
             ExitCode::SUCCESS
         }
@@ -913,6 +941,37 @@ fn publish_cmd(dir: &str, instruction: &str, journal_path: &str) -> ExitCode {
         Err(e) => {
             eprintln!("{e}");
             ExitCode::from(2)
+        }
+    }
+}
+
+// Spec 031 3.1 and 3.11.2: read-only gates for the release workflow.
+fn family_check(manifest: &str, artifacts: Option<&str>) -> ExitCode {
+    let result = std::fs::read(manifest)
+        .map_err(|e| e.to_string())
+        .and_then(|b| rustev_release::manifest::ReleaseManifest::parse(&b))
+        .map(|m| match artifacts {
+            Some(dir) => rustev_release::family_artifacts::verify(&m, Path::new(dir)),
+            None => rustev_release::hosted::observe_crates(
+                &m,
+                &mut rustev_release::cratesio::CratesIo { wait_seconds: 0 },
+            ),
+        });
+    verdict(result.and_then(|errors| {
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors.join("\n"))
+        }
+    }))
+}
+
+fn verdict(result: Result<(), String>) -> ExitCode {
+    match result {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(e) => {
+            eprintln!("{e}");
+            ExitCode::from(1)
         }
     }
 }
@@ -966,12 +1025,25 @@ fn main() -> ExitCode {
             ..,
         ] => artifact_cmd(&set, &args.iter().map(String::as_str).collect::<Vec<_>>()),
         ["manifests"] => manifests(&set),
+        ["verify-artifacts", manifest, artifacts] => family_check(manifest, Some(artifacts)),
+        ["observe-crates", manifest] => family_check(manifest, None),
+        ["hosted-release", dir, artifacts, instruction, journal] => {
+            verdict(rustev_release::hosted::run(
+                Path::new(dir),
+                Path::new(artifacts),
+                Path::new(instruction),
+                Path::new(journal),
+                Path::new("."),
+                &set,
+            ))
+        }
         ["archives", dir] => archives(&set, dir),
         ["compare", a, b] => compare(&set, a, b),
         ["field", name] => field(&set, name),
         ["deps"] => deps(&set),
         ["publish", dir, instruction, journal] => publish_cmd(dir, instruction, journal),
-        ["manifest", dir] => manifest(&set, dir),
+        ["manifest", dir] => manifest(&set, dir, None),
+        ["manifest", dir, artifacts] => manifest(&set, dir, Some(artifacts)),
         ["verify-release", dir] => verify_release_cmd(dir, "."),
         ["verify-release", dir, repo] => verify_release_cmd(dir, repo),
         ["exceptions", today] => exceptions(today),
@@ -981,7 +1053,7 @@ fn main() -> ExitCode {
         ["unpacked", dir, work, toolchain] => unpacked(&set, dir, work, Some(toolchain)),
         _ => {
             eprintln!(
-                "usage: rustev-release manifests | archives <dir> | compare <dir-a> <dir-b> | field <name> | unpacked <dir> <work> [<toolchain>] | deps | exceptions <YYYY-MM-DD> | changelog <out.md> [<previous tag>] | manifest <evidence-dir> | publish <release-dir> <instruction.json> <journal> | verify-release <dir> [<repo>]"
+                "usage: rustev-release manifests | archives <dir> | compare <dir-a> <dir-b> | field <name> | unpacked <dir> <work> [<toolchain>] | deps | exceptions <YYYY-MM-DD> | changelog <out.md> [<previous tag>] | manifest <evidence-dir> [<artifacts-dir>] | verify-artifacts <manifest> <artifacts-dir> | observe-crates <manifest> | hosted-release <release-dir> <artifacts-dir> <instruction.json> <journal> | publish <release-dir> <instruction.json> <journal> | verify-release <dir> [<repo>]"
             );
             ExitCode::from(2)
         }
