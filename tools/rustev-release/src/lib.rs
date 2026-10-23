@@ -1,11 +1,11 @@
 //! Release-candidate checks of spec 021 (packaging and first public release).
 //!
-//! The release set (`release-set.json`, 3.1 and section 2) fixes the eight
+//! The release set (`release-set.json`, 3.1 and section 2) fixes the
 //! package names, the family version, the dependency layers, the upload order
 //! and the exclusions. [`check_manifests`] judges the workspace's
 //! `cargo metadata --format-version 1` output against it: complete public
-//! metadata and no Cargo features (3.3), the registry restriction and the
-//! exact-family dependency closure (3.2, 3.4), and the package versus binary
+//! metadata and explicitly allowed Cargo features (031 3.2.3), the registry
+//! restriction and exact-family dependency closure (3.2, 3.4), and the package versus binary
 //! naming of the CLI (3.4).
 //!
 //! Nothing here uploads, tags, signs or reads a registry credential. A
@@ -37,11 +37,23 @@ pub struct ReleaseSet {
     pub layers: Vec<Vec<String>>,
     pub upload_order: Vec<String>,
     pub binaries: Vec<Binary>,
+    /// Spec 031 3.2.3: features authorized by a member's own spec.
+    #[serde(default)]
+    pub member_features: Vec<MemberFeatures>,
     /// Spec 031 3.1: the npm members, in the npm layer's upload order.
     pub npm: Vec<npm::NpmPackage>,
     /// Spec 031 3.1: planned members not in this release, each with why.
     pub absent: Vec<npm::Absent>,
     pub excluded: Vec<Excluded>,
+}
+
+/// Spec 031 3.2.3 and 028 3.2.3: a reviewed non-facade feature allowance.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MemberFeatures {
+    pub package: String,
+    pub features: Vec<String>,
+    pub spec: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -63,7 +75,7 @@ pub const RELEASE_SET_SCHEMA: &str = "rustev.release-set/1";
 pub const CRATES_IO_INDEX: &str = "registry+https://github.com/rust-lang/crates.io-index";
 pub const REPOSITORY: &str = "https://github.com/statecrafting/rustev";
 pub const LICENSE: &str = "Apache-2.0";
-/// The facade crate (spec 031, 3.2): the one member with Cargo features,
+/// The facade crate (spec 031, 3.2): the member with one feature per optional slice,
 /// always alone in the last crate layer (3.1).
 pub const FACADE: &str = "rustev";
 
@@ -228,7 +240,10 @@ impl fmt::Display for Violation {
                 write!(f, "021 3.3: `{name}` {field}: {detail}")
             }
             Violation::Feature { name, feature } => {
-                write!(f, "021 3.3: `{name}` declares the feature `{feature}`")
+                write!(
+                    f,
+                    "031 3.2.3: `{name}` feature `{feature}` differs from its allowance or has a nonempty default"
+                )
             }
             Violation::FacadeFeature { feature, detail } => {
                 write!(f, "031 3.2: the facade's feature `{feature}` {detail}")
@@ -315,6 +330,32 @@ pub fn check_set(set: &ReleaseSet) -> Vec<Violation> {
     let order: BTreeSet<&str> = set.upload_order.iter().map(String::as_str).collect();
     if order != seen || order.len() != set.upload_order.len() {
         bad("upload_order is not a permutation of the members".into());
+    }
+    // Spec 031 3.2.3: only a member's own spec may add features.
+    let mut allowed = BTreeSet::new();
+    for allowance in &set.member_features {
+        if allowance.package == FACADE || !seen.contains(allowance.package.as_str()) {
+            bad(format!(
+                "feature allowance for non-member or facade `{}`",
+                allowance.package
+            ));
+        }
+        if !allowed.insert(&allowance.package) {
+            bad(format!(
+                "duplicate feature allowance for `{}`",
+                allowance.package
+            ));
+        }
+        let features: BTreeSet<_> = allowance.features.iter().collect();
+        if allowance.spec.trim().is_empty()
+            || features.len() != allowance.features.len()
+            || features.iter().any(|f| f.is_empty() || *f == "default")
+        {
+            bad(format!(
+                "invalid feature allowance for `{}`",
+                allowance.package
+            ));
+        }
     }
     for e in &set.excluded {
         if seen.contains(e.name.as_str()) {
@@ -611,10 +652,33 @@ fn check_member(set: &ReleaseSet, p: &Package, rust_version: Option<&str>, v: &m
     if name == FACADE {
         check_facade_features(set, p, v);
     } else {
-        v.extend(p.features.keys().map(|f| Violation::Feature {
-            name: name.to_string(),
-            feature: f.clone(),
-        }));
+        // Spec 031 3.2.3; spec 028 3.2.3 authorizes the OTLP features.
+        let allowance = set.member_features.iter().find(|a| a.package == name);
+        let expected: BTreeSet<&str> = allowance
+            .into_iter()
+            .flat_map(|a| a.features.iter().map(String::as_str))
+            .collect();
+        let declared: BTreeSet<&str> = p
+            .features
+            .keys()
+            .map(String::as_str)
+            .filter(|f| *f != "default")
+            .collect();
+        for feature in expected.symmetric_difference(&declared) {
+            v.push(Violation::Feature {
+                name: name.to_string(),
+                feature: (*feature).to_string(),
+            });
+        }
+        if p.features
+            .get("default")
+            .is_some_and(|default| !default.is_empty() || allowance.is_none())
+        {
+            v.push(Violation::Feature {
+                name: name.to_string(),
+                feature: "default".into(),
+            });
+        }
     }
 }
 

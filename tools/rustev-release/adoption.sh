@@ -20,21 +20,23 @@ edition=$(sed -n 's/^edition = "\(.*\)"$/\1/p' "$root/Cargo.toml" | head -n 1)
 [ -n "$edition" ] || { echo "adoption: the workspace declares no edition" >&2; exit 1; }
 # `name|features|package|chosen crates|omitted crates`; the package is a
 # separate dependency of the consumer, as 3.5 says for embedded decisions.
+# Crate names are Cargo package names as Cargo.lock spells them:
+# `opentelemetry_sdk` is published with an underscore, unlike its siblings.
 subsets='
-documents|||rustev-contract rustev-core|rustev-runtime rustev-eval rustev-backend-rules rustev-remote-http tokio hyper
-embedded|runtime rules|rustev-pkg-support-routing|rustev-runtime rustev-backend-rules rustev-pkg-support-routing tokio|rustev-eval rustev-remote-http hyper
-evaluation|eval||rustev-eval|rustev-runtime rustev-backend-rules rustev-remote-http tokio hyper
-remote-http|runtime remote-http||rustev-runtime rustev-remote-http hyper tokio|rustev-eval rustev-backend-rules
-runtime|runtime||rustev-runtime tokio|rustev-eval rustev-backend-rules rustev-remote-http hyper
-rules|rules||rustev-backend-rules|rustev-runtime rustev-eval rustev-remote-http tokio hyper
-remote-http-alone|remote-http||rustev-remote-http hyper tokio|rustev-runtime rustev-eval rustev-backend-rules
+documents|||rustev-contract rustev-core|rustev-runtime rustev-eval rustev-backend-rules rustev-remote-http tokio hyper rustev-otel
+embedded|runtime rules|rustev-pkg-support-routing|rustev-runtime rustev-backend-rules rustev-pkg-support-routing tokio|rustev-eval rustev-remote-http hyper rustev-otel
+evaluation|eval||rustev-eval|rustev-runtime rustev-backend-rules rustev-remote-http tokio hyper rustev-otel
+remote-http|runtime remote-http||rustev-runtime rustev-remote-http hyper tokio|rustev-eval rustev-backend-rules rustev-otel
+runtime|runtime||rustev-runtime tokio|rustev-eval rustev-backend-rules rustev-remote-http hyper rustev-otel
+rules|rules||rustev-backend-rules|rustev-runtime rustev-eval rustev-remote-http tokio hyper rustev-otel
+remote-http-alone|remote-http||rustev-remote-http hyper tokio|rustev-runtime rustev-eval rustev-backend-rules rustev-otel
+otel|otel||rustev-otel rustev-runtime tokio|rustev-eval rustev-backend-rules rustev-remote-http hyper opentelemetry opentelemetry_sdk opentelemetry-otlp
 '
 # Subsets whose crate is not in this release (031 3.4).
 skipped='
 serve|the crate rustev-serve is not in this release (spec 010, #57)
 bedrock|the crate rustev-bedrock is not in this release (#66)
 typesafe|rustev-jev source-links sibling files and is not admitted (031 3.4)
-otel|the crate rustev-otel is not in this release (#70)
 local-embed|the local semantic backend crate is not in this release (spec 011)
 '
 want=${*:-all}

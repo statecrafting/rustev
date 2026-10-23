@@ -15,7 +15,7 @@
       "rustev-remote-http",
       "rustev-runtime"
     ],
-    ["rustev-surface"],
+    ["rustev-otel", "rustev-surface"],
     ["rustev-cli"],
     ["rustev"]
   ],
@@ -25,12 +25,16 @@
     "rustev-runtime",
     "rustev-backend-rules",
     "rustev-eval",
+    "rustev-otel",
     "rustev-remote-http",
     "rustev-surface",
     "rustev-cli",
     "rustev-pkg-support-routing",
     "rustev-pkg-lodging",
     "rustev"
+  ],
+  "member_features": [
+    { "package": "rustev-otel", "features": ["otlp", "otlp-grpc", "otlp-http"], "spec": "028 3.2.3" }
   ],
   "binaries": [{ "package": "rustev-cli", "name": "rustev" }],
   "npm": [
@@ -102,10 +106,6 @@
     {
       "name": "rustev-release",
       "reason": "repository release tooling, not a product crate"
-    },
-    {
-      "name": "rustev-otel",
-      "reason": "publish = false until the release family is extended to it (spec 028 section 2, #76 A3)"
     },
     {
       "name": "rustev-aicortex",

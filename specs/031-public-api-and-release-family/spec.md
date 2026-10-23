@@ -47,6 +47,9 @@ extends:
   # The license file `cargo package` puts in lodging's archive (021 3.5).
   - { spec: "008-reference-package-lodging", unit: { kind: file, path: "packages/rustev-pkg-lodging/LICENSE" }, nature: additive }
   - { spec: "009-remote-adapter-protocol", unit: { kind: file, path: "integrations/rustev-remote-http/Cargo.toml" }, nature: amending }
+  # Admits `rustev-otel` to the family (3.1; spec 028 section 2).
+  - { spec: "028-opentelemetry-evidence-sink", unit: { kind: file, path: "integrations/rustev-otel/Cargo.toml" }, nature: amending }
+  - { spec: "028-opentelemetry-evidence-sink", unit: { kind: file, path: "integrations/rustev-otel/LICENSE" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "002-decision-contract-and-pure-core"
@@ -825,6 +828,27 @@ change: the lock takes tokio 1.53.3, the fixed release, and the workspace
 requirement is raised to that floor so no registry consumer resolves an
 affected version. No Rustev crate constructs an `AsyncFd`; no API or
 behavior changes.
+
+**Increment 8, 2026-10-23 (`rustev-otel` joins the family).** Spec 028 is
+complete, so its crate joins the release as 3.1 admits a planned member,
+and the facade gains `otel` (3.4): `otel = ["dep:rustev-otel"]`, module
+`rustev::otel`, documented in the feature table, with a public-items test
+under the feature. `rustev-otel` takes the family metadata, `publish =
+["crates-io"]`, an `include` list of its sources and the linked `LICENSE`,
+and the workspace dependency `{ path, version = "=0.1.0" }`; it sits in the
+crate layer `cargo metadata` computes (beside `rustev-surface`, since it
+depends on `rustev-runtime`) and uploads after `rustev-backend-rules`, its
+development dependency. Its own features (`otlp`, `otlp-grpc`,
+`otlp-http`, spec 028 3.2.3) are the case 3.2.3 allows ("unless its own
+spec adds one"): the release set records each such allowance under
+`member_features` with the spec that adds it, and the policy requires a
+non-facade member's declared features to equal its allowance exactly with
+an empty `default`; a member without an allowance still declares none.
+Tests break each rule once. The archive policy lists its exact file list
+and bounds; `adoption.sh` and `release-checks.yml` run the `otel` subset
+(the facade with `otel` alone; the OpenTelemetry crates, which are
+optional in `rustev-otel`, and every other feature's crate absent).
+`rustev-serve` stays excluded until spec 042 admits it.
 
 ## Decisions at approval
 

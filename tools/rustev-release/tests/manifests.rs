@@ -84,7 +84,7 @@ fn the_release_set_fixes_the_first_family() {
                 "rustev-runtime"
             ],
             // Spec 045: the command surface the CLI depends on (spec 027).
-            vec!["rustev-surface"],
+            vec!["rustev-otel", "rustev-surface"],
             vec!["rustev-cli"],
             // Spec 031 3.1: the facade, always the last crate layer.
             vec!["rustev"],
@@ -260,7 +260,7 @@ fn a_cargo_feature_fails() {
 }
 
 #[test]
-fn the_facade_alone_may_declare_features_each_one_released_dependency() {
+fn each_facade_feature_names_one_released_dependency() {
     // Spec 031 3.2 and I-3: a feature naming a crate outside the release
     // (here `bedrock`, whose crate does not exist yet) fails.
     let mut m = metadata();
@@ -506,4 +506,90 @@ fn the_release_set_shape_is_checked() {
         only(check_manifests(&s, &metadata())),
         Violation::Unlisted { ref name } if name == "rustev-boundaries"
     ));
+}
+
+// Spec 031 3.2.3 and 028 3.2.3: the allowance is exact, with no default.
+#[test]
+fn a_missing_allowed_member_feature_fails() {
+    let mut m = metadata();
+    package(&mut m, "rustev-otel").features.remove("otlp");
+    assert!(
+        matches!(only(check_manifests(&set(), &m)), Violation::Feature { feature, .. } if feature == "otlp")
+    );
+}
+
+#[test]
+fn an_extra_member_feature_fails() {
+    let mut m = metadata();
+    package(&mut m, "rustev-otel")
+        .features
+        .insert("extra".into(), vec![]);
+    assert!(
+        matches!(only(check_manifests(&set(), &m)), Violation::Feature { feature, .. } if feature == "extra")
+    );
+}
+
+#[test]
+fn a_member_default_enabling_a_feature_fails() {
+    let mut m = metadata();
+    package(&mut m, "rustev-otel")
+        .features
+        .insert("default".into(), vec!["otlp".into()]);
+    assert!(
+        matches!(only(check_manifests(&set(), &m)), Violation::Feature { feature, .. } if feature == "default")
+    );
+}
+
+#[test]
+fn an_absent_member_default_passes() {
+    let mut m = metadata();
+    package(&mut m, "rustev-otel").features.remove("default");
+    assert!(check_manifests(&set(), &m).is_empty());
+}
+
+#[test]
+fn an_allowance_for_a_non_member_fails() {
+    let mut s = set();
+    s.member_features[0].package = "absent-member".into();
+    assert!(matches!(only(check_set(&s)), Violation::ReleaseSet { .. }));
+}
+
+#[test]
+fn invalid_allowances_fail() {
+    for case in [
+        "duplicate",
+        "facade",
+        "no-spec",
+        "duplicate-feature",
+        "default",
+    ] {
+        let mut s = set();
+        match case {
+            "duplicate" => s.member_features.push(s.member_features[0].clone()),
+            "facade" => s.member_features[0].package = "rustev".into(),
+            "no-spec" => s.member_features[0].spec.clear(),
+            "duplicate-feature" => s.member_features[0].features.push("otlp".into()),
+            "default" => s.member_features[0].features.push("default".into()),
+            _ => unreachable!(),
+        }
+        assert!(
+            matches!(only(check_set(&s)), Violation::ReleaseSet { .. }),
+            "{case}"
+        );
+    }
+}
+
+#[test]
+fn telemetry_upload_waits_for_its_development_dependency() {
+    let mut s = set();
+    s.upload_order.retain(|n| n != "rustev-otel");
+    let rules = s
+        .upload_order
+        .iter()
+        .position(|n| n == "rustev-backend-rules")
+        .unwrap();
+    s.upload_order.insert(rules, "rustev-otel".into());
+    assert!(
+        matches!(only(check_manifests(&s, &metadata())), Violation::Order { name, dependency } if name == "rustev-otel" && dependency == "rustev-backend-rules")
+    );
 }

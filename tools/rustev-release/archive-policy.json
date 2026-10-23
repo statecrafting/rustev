@@ -300,6 +300,29 @@
       "max_archive_bytes": 65536,
       "max_unpacked_bytes": 196608
     },
+    "rustev-otel": {
+      "files": [
+        ".cargo_vcs_info.json",
+        "Cargo.lock",
+        "Cargo.toml",
+        "Cargo.toml.orig",
+        "LICENSE",
+        "README.md",
+        "src/config.rs",
+        "src/context.rs",
+        "src/endpoint.rs",
+        "src/ids.rs",
+        "src/jsonl.rs",
+        "src/lib.rs",
+        "src/metrics.rs",
+        "src/otlp.rs",
+        "src/otlp_http_client.rs",
+        "src/project.rs",
+        "src/sink.rs"
+      ],
+      "max_archive_bytes": 65536,
+      "max_unpacked_bytes": 262144
+    },
     "rustev": {
       "files": [
         ".cargo_vcs_info.json",

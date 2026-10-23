@@ -27,9 +27,10 @@
 //! | `eval` | `eval` | `rustev-eval` | evaluation harness only |
 //! | `rules` | `rules` | `rustev-backend-rules` | embedded decisions |
 //! | `remote-http` | `remote_http` | `rustev-remote-http` | remote backend over HTTP |
+//! | `otel` | `otel` | `rustev-otel` | the OpenTelemetry evidence sink alone |
 //!
 //! No feature implies another. A feature absent from this version (`bedrock`,
-//! `typesafe`, `otel`, `serve`, `local-embed`) is absent because its crate is
+//! `typesafe`, `serve`, `local-embed`) is absent because its crate is
 //! not in this release.
 #![forbid(unsafe_code)]
 
@@ -47,3 +48,7 @@ pub use rustev_backend_rules as rules;
 
 #[cfg(feature = "remote-http")]
 pub use rustev_remote_http as remote_http;
+
+// Spec 031 3.4: admitted with its release-family member.
+#[cfg(feature = "otel")]
+pub use rustev_otel as otel;

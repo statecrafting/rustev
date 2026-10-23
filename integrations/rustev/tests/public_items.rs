@@ -153,3 +153,10 @@ fn every_feature_is_documented() {
         assert!(LIB.contains(&row), "the feature table lacks `{row}`");
     }
 }
+
+// Spec 031 3.4: the admitted telemetry feature exposes the member's API.
+#[cfg(feature = "otel")]
+#[test]
+fn telemetry_is_reexported() {
+    let _ = std::any::TypeId::of::<rustev::otel::OtelSink>();
+}
