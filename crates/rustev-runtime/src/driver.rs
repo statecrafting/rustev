@@ -58,6 +58,7 @@ const LIVE_BYPASS: &str =
 
 pub(crate) struct DecisionCtx<'a, 'e> {
     pub rt: &'a Inner,
+    pub observing: Option<&'a crate::progress::Observing<'a>>,
     pub plan: &'a PreparedPlan,
     pub deadline: Instant,
     pub submitted: Instant,
@@ -276,8 +277,32 @@ pub(crate) async fn run_requests(
                             },
                         );
                     }
+                    let progress = cx.observing.map(|_| crate::StepProgress {
+                        step_id: out.step.clone(),
+                        instance_ids: out.instance.clone(),
+                        outcome: match &s {
+                            Supplied::Output(_) => Ok(()),
+                            Supplied::Failed(u) => Err(u.clone()),
+                        },
+                        // Semantic derivation is assigned by the compiler, using
+                        // the same classification as core evidence. Determinism
+                        // alone does not establish exact derivation.
+                        derivation: cx
+                            .plan
+                            .compiled
+                            .plan
+                            .steps
+                            .iter()
+                            .find(|step| step.id == out.step)
+                            .expect("supplied step belongs to prepared plan")
+                            .derivation,
+                    });
                     ev.supply(&out.step, &out.instance, s)
                         .expect("the core accepts what the runtime supplies");
+                    drop(ev);
+                    if let (Some(o), Some(progress)) = (cx.observing, progress) {
+                        o.call(|o| o.step(progress));
+                    }
                 }
                 None => cancelled = true,
             }
