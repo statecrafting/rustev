@@ -70,12 +70,12 @@ for name in $("$release" field packages); do
     "https://index.crates.io/$(index_path "$name")")
   case $code in
     404)
-      echo "$name: no-baseline: no release of $name exists on crates.io; not applicable, not passed" | tee -a "$report"
+      echo "031 3.8: $name: no-baseline: no release of $name exists on crates.io; not applicable, not passed" | tee -a "$report"
       continue
       ;;
     200) ;;
     *)
-      echo "$name: the index answered HTTP $code; no verdict" >&2
+      echo "031 3.8: $name: the index answered HTTP $code; no verdict" >&2
       exit 1
       ;;
   esac
@@ -90,37 +90,79 @@ for name in $("$release" field packages); do
     process.stdout.write(vs.pop() ?? "");
   ') || {
     # An unreadable index response is no verdict, never `no-baseline`.
-    echo "$name: could not read its index response; no verdict" >&2
+    echo "031 3.8: $name: could not read its index response; no verdict" >&2
     exit 1
   }
   if [ -z "$baseline" ]; then
-    echo "$name: no-baseline: no earlier released version than $version; not applicable, not passed" | tee -a "$report"
+    echo "031 3.8: $name: no-baseline: no earlier released version than $version; not applicable, not passed" | tee -a "$report"
     continue
   fi
   cargo semver-checks check-release --package "$name" --baseline-version "$baseline"
-  echo "$name: checked against $baseline with cargo-semver-checks $PIN: pass" | tee -a "$report"
+  echo "031 3.8: $name: checked against $baseline with cargo-semver-checks $PIN: pass" | tee -a "$report"
   checked=$((checked + 1))
 done
-# The npm declaration surface (3.8): diffed against the previous release's
-# published declarations when one exists. None has been published, so each
-# package reports no-baseline; a published baseline without the diff check
-# fails rather than passing unchecked.
+# Spec 031 3.8: npm baselines are authenticated before extraction and compared
+# with the same breaking-position version rule as the Rust family.
+node tools/rustev-release/npm-api-diff.mjs --check-typescript
 for pkg in @statecrafting/rustev @statecrafting/rustev-wasm; do
-  code=$(curl -sS --max-time 60 -o /dev/null -w '%{http_code}' -A 'rustev-release (https://github.com/statecrafting/rustev)' \
-    "https://registry.npmjs.org/$(printf '%s' "$pkg" | sed 's|/|%2f|')")
+  case $pkg in
+    @statecrafting/rustev) package_dir=integrations/rustev-node ;;
+    @statecrafting/rustev-wasm) package_dir=integrations/rustev-wasm ;;
+  esac
+  body="$scratch/npm-index.json"
+  if ! code=$(curl -sS --max-time 60 -o "$body" -w '%{http_code}' -A 'rustev-release (https://github.com/statecrafting/rustev)' \
+    "https://registry.npmjs.org/$(printf '%s' "$pkg" | sed 's|/|%2f|')"); then
+    echo "031 3.8: $pkg: npm registry request failed; no verdict" >&2
+    exit 1
+  fi
   case $code in
-    404) echo "$pkg: no-baseline: no release of $pkg exists on npm; not applicable, not passed" | tee -a "$report" ;;
-    200)
-      echo "$pkg: a previous release exists on npm; its declaration diff (031 3.8) is not implemented yet, so no verdict" >&2
-      exit 1
+    404)
+      echo "031 3.8: $pkg: no-baseline: no release of $pkg exists on npm; not applicable, not passed" | tee -a "$report"
+      continue
       ;;
+    200) ;;
     *)
-      echo "$pkg: the npm registry answered HTTP $code; no verdict" >&2
+      echo "031 3.8: $pkg: the npm registry answered HTTP $code; no verdict" >&2
       exit 1
       ;;
   esac
+  baseline_file="$scratch/npm-baseline.json"
+  node tools/rustev-release/npm-api-diff.mjs --baseline "$body" "$version" "$pkg" > "$baseline_file" || {
+    echo "031 3.8: $pkg: could not read npm baseline; no verdict" >&2
+    exit 1
+  }
+  if [ ! -s "$baseline_file" ]; then
+    echo "031 3.8: $pkg: no-baseline: no earlier non-deprecated version than $version; not applicable, not passed" | tee -a "$report"
+    continue
+  fi
+  baseline=$(node -e 'process.stdout.write(require(process.argv[1]).version)' "$baseline_file")
+  tarball=$(node -e 'process.stdout.write(require(process.argv[1]).dist.tarball)' "$baseline_file")
+  if ! curl -fLsS --proto '=https' --proto-redir '=https' --max-time 60 -o "$scratch/npm.tgz" "$tarball"; then
+    echo "031 3.8: $pkg: npm tarball download failed; no verdict" >&2
+    exit 1
+  fi
+  old_dir="$scratch/$(basename "$package_dir")-$baseline"
+  node tools/rustev-release/npm-api-diff.mjs --unpack "$scratch/npm.tgz" "$baseline_file" "$old_dir" || {
+    echo "031 3.8: $pkg: npm tarball verification or extraction failed; no verdict" >&2
+    exit 1
+  }
+  diff_report="$scratch/npm-diff.json"
+  status=0
+  node tools/rustev-release/npm-api-diff.mjs "$old_dir/package" "$package_dir" > "$diff_report" || status=$?
+  case $status in
+    0|2) ;;
+    *) echo "031 3.8: $pkg: declaration comparison failed; no verdict" >&2; exit 1 ;;
+  esac
+  cat "$diff_report" >> "$report"
+  if node tools/rustev-release/npm-api-diff.mjs --version-rule "$diff_report"; then
+    echo "031 3.8: $pkg: checked against $baseline: pass" | tee -a "$report"
+  else
+    cat "$diff_report" >&2
+    echo "031 3.8: $pkg: checked against $baseline: fail" | tee -a "$report"
+    exit 1
+  fi
 done
 # The service API (`rustev.serve/1`) has no crate in this release (spec
 # 010), so it has nothing to diff.
-echo "rustev.serve/1: absent from this release; nothing to compare" | tee -a "$report"
-echo "semver: $checked crate(s) checked against a baseline; the rest are no-baseline (not applicable)"
+echo "031 3.8: rustev.serve/1: absent from this release; nothing to compare" | tee -a "$report"
+echo "031 3.8: semver: $checked crate(s) checked against a baseline; the rest are no-baseline (not applicable)"

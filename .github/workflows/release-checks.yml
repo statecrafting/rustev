@@ -93,6 +93,13 @@ jobs:
         run: |
           test -x ~/semver-tools/bin/cargo-semver-checks || cargo install --locked --root ~/semver-tools cargo-semver-checks --version 0.51.0
           echo "$HOME/semver-tools/bin" >> "$GITHUB_PATH"
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: The npm declaration diff and its tests, with the pinned TypeScript (031 3.8)
+        run: |
+          npm ci --prefix tools/rustev-conformance/js
+          node --test tools/rustev-release/npm-api-diff.test.mjs
       - name: API compatibility against the previous release (031 3.8)
         run: |
           make semver

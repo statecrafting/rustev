@@ -7,7 +7,7 @@
       "contentHash": "dc2a885b01ebb2e6cbb7bdd397a286cb621ca6e58075b732e88ce3ad6110809f"
     },
     ".github/workflows/release-checks.yml": {
-      "contentHash": "002cbac9c81731647e941e7405032d4bdb5606aa371b0fd03eef36e0d89baaef"
+      "contentHash": "a9ac649c14f48ef8ca27a9e1103c165054972d42933af930dfb2a0ea0b4d60b2"
     },
     ".github/workflows/release.yml": {
       "contentHash": "363f54d919543d64d432bd6237b39f3241f5d3bb9001b2df448bf79595d6c806"
