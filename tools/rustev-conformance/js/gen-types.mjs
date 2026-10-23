@@ -53,13 +53,41 @@ function ownDescriptions(node) {
   return out;
 }
 
+// A member schema that constrains nothing (only `description`, `title` or
+// `$comment`, as a snapshot entry's `value` does: it is decoded against the
+// input's declared type, which the schema cannot know) admits any JSON value.
+// The generator would otherwise type it as an open object; `tsType` keeps it
+// `unknown`, which is what the parser accepts.
+const annotationOnly = new Set(['description', 'title', '$comment']);
+function anyValue(node) {
+  if (Array.isArray(node)) return node.map(anyValue);
+  if (node === null || typeof node !== 'object') return node;
+  const out = {};
+  for (const [k, v] of Object.entries(node)) {
+    if (k === 'properties' && v && typeof v === 'object' && !Array.isArray(v)) {
+      out[k] = Object.fromEntries(
+        Object.entries(v).map(([name, member]) => [
+          name,
+          member && typeof member === 'object' && !Array.isArray(member) &&
+          Object.keys(member).every((key) => annotationOnly.has(key))
+            ? { ...member, tsType: 'unknown' }
+            : anyValue(member),
+        ]),
+      );
+    } else {
+      out[k] = anyValue(v);
+    }
+  }
+  return out;
+}
+
 async function generate() {
   const files = readdirSync(schemas)
     .filter((f) => f.endsWith('.schema.json'))
     .sort();
   let out = banner;
   for (const f of files) {
-    const schema = ownDescriptions(JSON.parse(readFileSync(join(schemas, f), 'utf8')));
+    const schema = anyValue(ownDescriptions(JSON.parse(readFileSync(join(schemas, f), 'utf8'))));
     const name = typeName(f);
     schema.title = name;
     const ts = await compile(schema, name, {

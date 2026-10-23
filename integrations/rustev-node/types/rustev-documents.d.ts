@@ -8354,6 +8354,393 @@ export namespace RustevRemoteCancel1Response {
 }
 export type RustevRemoteCancel1Response = RustevRemoteCancel1Response.RustevRemoteCancel1Response;
 
+export namespace RustevRemoteContextCancel1Request {
+  export interface RustevRemoteContextCancel1Request {
+    attempt_ids: string[];
+    schema: "rustev.remote-context-cancel/1";
+  }
+}
+export type RustevRemoteContextCancel1Request = RustevRemoteContextCancel1Request.RustevRemoteContextCancel1Request;
+
+export namespace RustevRemoteContextCancel1Response {
+  export type CancelAnswer = "stopped" | "unconfirmed" | "unknown_attempt";
+
+  export interface RustevRemoteContextCancel1Response {
+    answers: CancelItem[];
+    schema: "rustev.remote-context-cancel/1";
+  }
+  export interface CancelItem {
+    answer: CancelAnswer;
+    attempt_id: string;
+  }
+}
+export type RustevRemoteContextCancel1Response = RustevRemoteContextCancel1Response.RustevRemoteContextCancel1Response;
+
+export namespace RustevRemoteContextDescribe1Request {
+  export interface RustevRemoteContextDescribe1Request {
+    schema: "rustev.remote-context-describe/1";
+    versions: number[];
+  }
+}
+export type RustevRemoteContextDescribe1Request = RustevRemoteContextDescribe1Request.RustevRemoteContextDescribe1Request;
+
+export namespace RustevRemoteContextDescribe1Response {
+  export type Freshness =
+    | {
+        observation: {
+          staleness: Staleness;
+        };
+      }
+    | {
+        revision: {
+          staleness: Staleness;
+        };
+      };
+  export type Staleness =
+    | "unknown"
+    | {
+        bounded: {
+          max_age_ms: number;
+        };
+      };
+  /**
+   * The closed, ordered evidence grade. The derived order runs weakest to
+   * strongest, so `min` and `max` are the grade order of spec 032, 3.2.1.
+   */
+  export type Grade = "hint" | "estimated" | "cached" | "authoritative";
+  /**
+   * The closed set of provenance classes (spec 002, 3.7.1).
+   */
+  export type ProvenanceClass =
+    | "authenticated-app-field"
+    | "system-of-record"
+    | "user-supplied"
+    | "third-party"
+    | "attributed-claim"
+    | "model-derived";
+  /**
+   * Input value types (spec 002, 3.7.2). Every record field is required.
+   */
+  export type TypeDecl =
+    | ("bool" | "integer" | "decimal" | "timestamp")
+    | {
+        text: {
+          max_bytes: number;
+        };
+      }
+    | {
+        enum: {
+          options: string[];
+        };
+      }
+    | {
+        list: {
+          item: TypeDecl;
+          max_items: number;
+        };
+      }
+    | {
+        record: {
+          fields: FieldDecl[];
+          /**
+           * Version 2: when a decoded record is present (spec 032, 3.4.2).
+           */
+          present_when?: PresentWhen | null;
+        };
+      }
+    | {
+        nullable: {
+          type: TypeDecl;
+        };
+      }
+    | {
+        map: {
+          key_max_bytes: number;
+          max_entries: number;
+          value: TypeDecl;
+        };
+      };
+  /**
+   * A record presence predicate (spec 032, 3.4.2). Each list is non-empty;
+   * the canonical form sorts and deduplicates every field list.
+   */
+  export type PresentWhen =
+    | {
+        any_non_null: string[];
+      }
+    | {
+        all_non_null: string[];
+      }
+    | {
+        all: PresentWhen[];
+      }
+    | {
+        any: PresentWhen[];
+      };
+  /**
+   * How far the remote side supports cancellation (spec 009, 3.2.4).
+   */
+  export type CancelSupport = "none" | "best_effort" | "confirmed";
+  export type EndpointClass = "host_operated";
+  export type InvalidationSupport =
+    | ("none" | "push")
+    | {
+        poll: {
+          interval_ms: number;
+          max_lag_ms: number;
+        };
+      };
+
+  export interface RustevRemoteContextDescribe1Response {
+    schema: "rustev.remote-context-describe/1";
+    sources: HostedSource[];
+    version: number;
+  }
+  export interface HostedSource {
+    fields: ContextField[];
+    source_id: string;
+    terms: ContextTerms;
+  }
+  export interface ContextField {
+    freshness: Freshness;
+    grade?: Grade | null;
+    name: string;
+    provenance: ProvenanceClass;
+    type: TypeDecl;
+  }
+  export interface FieldDecl {
+    name: string;
+    type: TypeDecl;
+  }
+  export interface ContextTerms {
+    cancellation: CancelSupport;
+    endpoint_class: EndpointClass;
+    idempotency_window_ms: number;
+    invalidation: InvalidationSupport;
+    max_request_bytes: number;
+    max_response_bytes: number;
+  }
+}
+export type RustevRemoteContextDescribe1Response = RustevRemoteContextDescribe1Response.RustevRemoteContextDescribe1Response;
+
+export namespace RustevRemoteContextExchange1 {
+  export type ContextCode =
+    | "transport_unsent"
+    | "transport_interrupted"
+    | "rate_limited"
+    | "overloaded"
+    | "unauthorized"
+    | "capability"
+    | "malformed_request"
+    | "malformed_response"
+    | "describe_mismatch"
+    | "remote_deadline"
+    | "remote_error"
+    | "cancelled";
+  /**
+   * A transport phase with its own ceiling inside the one attempt budget
+   * (spec 020, 3.4), in the order an exchange passes through them.
+   */
+  export type TransportPhase =
+    | "resolution"
+    | "connect"
+    | "secure_handshake"
+    | "request_write"
+    | "first_response_byte"
+    | "response_body"
+    | "cancellation_ack";
+  export type ContentDigest = string;
+
+  /**
+   * Digest-only evidence, never a copy of fetched context or principal bytes.
+   */
+  export interface RustevRemoteContextExchange1 {
+    attempt_id: string;
+    code?: ContextCode | null;
+    late: boolean;
+    phases: TransportPhase[];
+    request_digest?: ContentDigest | null;
+    response_digest?: ContentDigest | null;
+    schema: "rustev.remote-context-exchange/1";
+  }
+}
+export type RustevRemoteContextExchange1 = RustevRemoteContextExchange1.RustevRemoteContextExchange1;
+
+export namespace RustevRemoteContextFetch1Request {
+  export type ContentDigest = string;
+
+  export interface RustevRemoteContextFetch1Request {
+    attempt_id: string;
+    budget_ms: number;
+    describe_digest: ContentDigest;
+    fields: string[];
+    principal: WirePrincipal;
+    schema: "rustev.remote-context-fetch/1";
+    source_id: string;
+    trace_id: string;
+    traceparent?: string | null;
+    version: number;
+  }
+  /**
+   * An opaque principal reference on the wire (spec 020, 3.6): the host's
+   * bytes as lowercase hexadecimal, the host's mapping version, and the
+   * declared scope. Rustev never interprets, authenticates, authorizes or
+   * expands it.
+   */
+  export interface WirePrincipal {
+    mapping_version: string;
+    reference: string;
+    scope: string;
+  }
+}
+export type RustevRemoteContextFetch1Request = RustevRemoteContextFetch1Request.RustevRemoteContextFetch1Request;
+
+export namespace RustevRemoteContextFetch1Response {
+  export type FetchResult =
+    | {
+        snapshot: Snapshot;
+      }
+    | {
+        failure: {
+          code: ContextCode;
+          detail: string;
+        };
+      };
+  export type Timestamp = number;
+  /**
+   * The closed, ordered evidence grade. The derived order runs weakest to
+   * strongest, so `min` and `max` are the grade order of spec 032, 3.2.1.
+   */
+  export type Grade = "hint" | "estimated" | "cached" | "authoritative";
+  /**
+   * The closed set of provenance classes (spec 002, 3.7.1).
+   */
+  export type ProvenanceClass =
+    | "authenticated-app-field"
+    | "system-of-record"
+    | "user-supplied"
+    | "third-party"
+    | "attributed-claim"
+    | "model-derived";
+  export type ContextCode =
+    | "transport_unsent"
+    | "transport_interrupted"
+    | "rate_limited"
+    | "overloaded"
+    | "unauthorized"
+    | "capability"
+    | "malformed_request"
+    | "malformed_response"
+    | "describe_mismatch"
+    | "remote_deadline"
+    | "remote_error"
+    | "cancelled";
+
+  export interface RustevRemoteContextFetch1Response {
+    result: FetchResult;
+    schema: "rustev.remote-context-fetch/1";
+  }
+  export interface Snapshot {
+    entries: Entry[];
+    schema: string;
+  }
+  export interface Entry {
+    as_of_ms: Timestamp;
+    /**
+     * The declared input name.
+     */
+    field: string;
+    /**
+     * Snapshot 2: the grade the supplier observed; it can lower a grade,
+     * never raise it (spec 032, 3.3.5).
+     */
+    grade?: Grade | null;
+    provenance: ProvenanceClass;
+    /**
+     * Which source supplied it; recorded, never trusted as authority.
+     */
+    source: string;
+    /**
+     * Decoded strictly against the input's declared type.
+     */
+    value: unknown;
+  }
+}
+export type RustevRemoteContextFetch1Response = RustevRemoteContextFetch1Response.RustevRemoteContextFetch1Response;
+
+export namespace RustevRemoteContextInvalidation1 {
+  export type InvalidationKind = "correction" | "revocation" | "erasure";
+  export type InvalidationScope =
+    | "all_scopes"
+    | {
+        principal: WirePrincipal;
+      };
+
+  export interface RustevRemoteContextInvalidation1 {
+    fields: string[];
+    kind: InvalidationKind;
+    schema: "rustev.remote-context-invalidation/1";
+    scope: InvalidationScope;
+    sequence: number;
+    source_id: string;
+  }
+  /**
+   * An opaque principal reference on the wire (spec 020, 3.6): the host's
+   * bytes as lowercase hexadecimal, the host's mapping version, and the
+   * declared scope. Rustev never interprets, authenticates, authorizes or
+   * expands it.
+   */
+  export interface WirePrincipal {
+    mapping_version: string;
+    reference: string;
+    scope: string;
+  }
+}
+export type RustevRemoteContextInvalidation1 = RustevRemoteContextInvalidation1.RustevRemoteContextInvalidation1;
+
+export namespace RustevRemoteContextInvalidations1Request {
+  export interface RustevRemoteContextInvalidations1Request {
+    schema: "rustev.remote-context-invalidations/1";
+    sequence?: number | null;
+  }
+}
+export type RustevRemoteContextInvalidations1Request = RustevRemoteContextInvalidations1Request.RustevRemoteContextInvalidations1Request;
+
+export namespace RustevRemoteContextInvalidations1Response {
+  export type InvalidationKind = "correction" | "revocation" | "erasure";
+  export type InvalidationScope =
+    | "all_scopes"
+    | {
+        principal: WirePrincipal;
+      };
+
+  export interface RustevRemoteContextInvalidations1Response {
+    items: Invalidation[];
+    schema: "rustev.remote-context-invalidations/1";
+    sequence: number;
+  }
+  export interface Invalidation {
+    fields: string[];
+    kind: InvalidationKind;
+    schema: string;
+    scope: InvalidationScope;
+    sequence: number;
+    source_id: string;
+  }
+  /**
+   * An opaque principal reference on the wire (spec 020, 3.6): the host's
+   * bytes as lowercase hexadecimal, the host's mapping version, and the
+   * declared scope. Rustev never interprets, authenticates, authorizes or
+   * expands it.
+   */
+  export interface WirePrincipal {
+    mapping_version: string;
+    reference: string;
+    scope: string;
+  }
+}
+export type RustevRemoteContextInvalidations1Response = RustevRemoteContextInvalidations1Response.RustevRemoteContextInvalidations1Response;
+
 export namespace RustevRemoteDescribe1Request {
   /**
    * The protocol major versions the client supports (spec 009, 3.10.1).
@@ -8921,6 +9308,120 @@ export namespace RustevRemoteInfer1Response {
   }
 }
 export type RustevRemoteInfer1Response = RustevRemoteInfer1Response.RustevRemoteInfer1Response;
+
+export namespace RustevRemoteSinkDeliver1Request {
+  export type Handle = string;
+  export type ContentDigest = string;
+  export type RecordSchema = "rustev.run/1" | "rustev.run/2" | "rustev.run/3";
+  /**
+   * The registration's signer observation (spec 042, 3.3.3 and 3.3.7).
+   */
+  export type Signer =
+    | "unsigned"
+    | {
+        ed25519: {
+          key_id: string;
+        };
+      }
+    | {
+        sigstore: {
+          identity: string;
+          issuer: string;
+        };
+      };
+
+  export interface RustevRemoteSinkDeliver1Request {
+    /**
+     * A non-empty delivery key, at most 256 bytes (spec 003, 3.9.2).
+     */
+    decision_id: Handle;
+    /**
+     * Exact UTF-8 canonical run-record bytes, not a re-rendered object.
+     */
+    record: string;
+    record_digest: ContentDigest;
+    record_schema: RecordSchema;
+    registration_id: ContentDigest;
+    schema: "rustev.remote-sink-deliver/1";
+    service_build: string;
+    signer: Signer;
+    traceparent?: string | null;
+    version: number;
+  }
+}
+export type RustevRemoteSinkDeliver1Request = RustevRemoteSinkDeliver1Request.RustevRemoteSinkDeliver1Request;
+
+export namespace RustevRemoteSinkDeliver1Response {
+  export type DeliveryResult =
+    | "conflict"
+    | {
+        accepted: {
+          accepted_digest: ContentDigest;
+          durability: string;
+          external_id: string;
+        };
+      }
+    | {
+        duplicate: {
+          accepted_digest: ContentDigest;
+        };
+      }
+    | {
+        rejected: {
+          code: RemoteCode;
+        };
+      };
+  export type ContentDigest = string;
+  /**
+   * The closed error taxonomy (spec 009, 3.6). Each code maps to exactly one
+   * spec 003 failure class; the mapping lives with the adapters, because the
+   * failure classes of the backend seam are not contract types.
+   */
+  export type RemoteCode =
+    | "transport_unsent"
+    | "transport_interrupted"
+    | "rate_limited"
+    | "overloaded"
+    | "unauthorized"
+    | "capability"
+    | "malformed_request"
+    | "malformed_response"
+    | "identity_mismatch"
+    | "remote_deadline"
+    | "remote_error"
+    | "cancelled";
+
+  export interface RustevRemoteSinkDeliver1Response {
+    result: DeliveryResult;
+    schema: "rustev.remote-sink-deliver/1";
+  }
+}
+export type RustevRemoteSinkDeliver1Response = RustevRemoteSinkDeliver1Response.RustevRemoteSinkDeliver1Response;
+
+export namespace RustevRemoteSinkDescribe1Request {
+  export interface RustevRemoteSinkDescribe1Request {
+    schema: "rustev.remote-sink-describe/1";
+    versions: number[];
+  }
+}
+export type RustevRemoteSinkDescribe1Request = RustevRemoteSinkDescribe1Request.RustevRemoteSinkDescribe1Request;
+
+export namespace RustevRemoteSinkDescribe1Response {
+  export type RecordSchema = "rustev.run/1" | "rustev.run/2" | "rustev.run/3";
+
+  export interface RustevRemoteSinkDescribe1Response {
+    deduplication_window_ms: number;
+    /**
+     * Sink-defined states; no durability meaning is inferred from a name.
+     */
+    durability_states: string[];
+    max_record_bytes: number;
+    record_schemas: RecordSchema[];
+    schema: "rustev.remote-sink-describe/1";
+    version: number;
+  }
+}
+export type RustevRemoteSinkDescribe1Response = RustevRemoteSinkDescribe1Response.RustevRemoteSinkDescribe1Response;
 
 export namespace RustevReplay1 {
   export type ContentDigest = string;
@@ -12312,9 +12813,7 @@ export namespace RustevSnapshot1 {
     /**
      * Decoded strictly against the input's declared type.
      */
-    value: {
-      [k: string]: unknown | undefined;
-    };
+    value: unknown;
   }
 }
 export type RustevSnapshot1 = RustevSnapshot1.RustevSnapshot1;
@@ -12360,9 +12859,7 @@ export namespace RustevSnapshot2 {
     /**
      * Decoded strictly against the input's declared type.
      */
-    value: {
-      [k: string]: unknown | undefined;
-    };
+    value: unknown;
   }
 }
 export type RustevSnapshot2 = RustevSnapshot2.RustevSnapshot2;
