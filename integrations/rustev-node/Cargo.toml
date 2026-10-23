@@ -16,8 +16,10 @@ spec = "027-node-and-wasm-bindings"
 crate-type = ["cdylib"]
 
 [dependencies]
-# 049 3.1: the one normal integration dependency allowed for this binding.
-rustev-otel = { path = "../rustev-otel" }
+# 049 3.1.4: only OTLP/HTTP is enabled for this binding. Cargo.lock does not
+# change: it already records rustev-otel's optional OTLP dependencies, and
+# `cargo metadata --locked` and `cargo build --locked` pass with this feature.
+rustev-otel = { path = "../rustev-otel", features = ["otlp-http"] }
 rustev-contract.workspace = true
 rustev-core.workspace = true
 rustev-runtime.workspace = true
