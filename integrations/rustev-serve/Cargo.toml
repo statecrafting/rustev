@@ -35,4 +35,6 @@ name = "rustev-serve"
 path = "src/main.rs"
 
 [dev-dependencies]
+# Throwaway test PKI generated at test time; no private key is committed.
+rcgen = { version = "=0.14.10", default-features = false, features = ["crypto", "ring", "pem"] }
 tokio = { workspace = true, features = ["test-util"] }

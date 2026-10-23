@@ -115,7 +115,7 @@
       }
     ],
     "sectionDigests": {
-      "010-optional-ecosystem-integrations-and-serving-boundary": "8d024573e21345a4eea42b4727308c499d2a58c207d1fe02eb8af84e0ab1fff3",
+      "010-optional-ecosystem-integrations-and-serving-boundary": "270bf279847d4fc95eb24946194431f031285c40e83535a0392afb0ac7266565",
       "1-purpose": "5b155272c9232bbb80ccff1a1334c284013fb24fbe85f5eab0c95bf12449009d",
       "2-territory-and-lifecycle": "953e4c745db493347f82ad3ad784b538b13b232b50618f845859d40cc8334bec",
       "3-1-common-boundary": "f979610cbae4f4c7a6f816a45d02a70ec9e7defb29f2ba1e1549ea117bdb70e9",
@@ -130,7 +130,7 @@
       "5-observable-negative-cases": "9ef636e4c5b27c2b053cf0bfa8b87ac0d1309ec34bafa3c8fd819ae03bcf080e",
       "acceptance": "1b5fefd7df62ecb032adf6c62c2bc47fd0afffa28a4d1cf192ebf1c0683f1f2f",
       "binding-records-section-3-4-r-44": "ef5a536c24a45ffe1aa442be9c6cde1b8052405b79936e9dd264151a1c382349",
-      "implementation-record": "ad2dcd485f730d74fb1db40a252b689ea6ab1cbc1defdeeca3677ad38ac3431c",
+      "implementation-record": "0e2c64a514df4e2a67b10e03403cb0f647aae3b3c65328b660dc4670359f6e35",
       "questions-settled-by-r-34": "01d8759b4847a8845c4901e47cbc1d1386eef2b5a81da814f120fb73d3f96ede",
       "rustev-aicortex": "7b741da26ee5609ddc850055c03f481c2b91615f0615a367a8e927279bf2ff22",
       "rustev-rahi": "63f3b18703bf9121b5adda9547e119ec6af961bbfa0c835cb3a5f8f994e1100e",
@@ -165,6 +165,6 @@
     "summary": "A shared boundary contract for three independently optional integration crates: `rustev-aicortex` adapts attributed context and observation proposals, `rustev-rahi` adapts evidence delivery and optional operational hosting, and `rustev-serve` exposes bounded registered-plan execution over an application-operated service boundary. Every integration preserves explicit identity, provenance, failure and unresolved effects; none grants authority, owns domain judgment, or makes Rustev depend on an ecosystem service. Concrete external API bindings and readiness claims require later evidence before implementation.\n",
     "title": "Optional ecosystem integrations and serving boundary"
   },
-  "shardHash": "55309e3da5cdd5a19a4c0279b2ede8c7cfd3f33d1641e1470fc9a9558ae2189e",
+  "shardHash": "45445154e7f89c1ee83008fd8125cfbf6e64007eda09d529b1042ea8f4ea9a52",
   "specVersion": "1.10.0"
 }

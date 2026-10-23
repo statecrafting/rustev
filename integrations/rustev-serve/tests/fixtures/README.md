@@ -1,8 +1,10 @@
 These are public, synthetic test fixtures, never deployment credentials.
 
-The TLS CA and leaf certificates were generated locally with OpenSSL for
-localhost, valid for ten years from generation in October 2026. The CA private
-key was discarded. The committed client and server private keys are test-only.
+TLS tests use `tests/support/mod.rs` and its `TestPki` helper to generate a
+fresh CA and localhost server and client certificates with rcgen at runtime.
+PEM files live in a unique temporary directory owned by the helper and are
+removed when it is dropped. No TLS private keys or certificates are committed.
+The `config.json` fixture uses a Unix socket and needs no TLS paths.
 
 The Sigstore artifact and v0.3 bundle are copied from sigstore-verify 0.15.0
 `test_data/bundles/cosign-v3-blob.*`. The trusted root is copied from
