@@ -231,6 +231,7 @@
         "src/lib.rs",
         "src/main.rs",
         "src/plan.rs",
+        "src/repeat.rs",
         "src/replay.rs",
         "src/run.rs",
         "src/sink.rs",

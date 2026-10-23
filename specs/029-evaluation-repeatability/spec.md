@@ -2,7 +2,7 @@
 id: "029-evaluation-repeatability"
 title: "Evaluation repeatability, baselines, diffs and selection gates (amends 004 and 006)"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-10-16"
 summary: >
   An amendment of approved specs 004 and 006 (R-16), for #76 child E2.
@@ -32,6 +32,10 @@ extends:
   - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: amending }
   # Adds 029 to `make verify` when the implementation is complete.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  # Adds 029 to CI's `evaluation` acceptance group.
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
+  # The CLI conformance cases for the new commands (spec 027 3.12).
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "tools/rustev-conformance/" }, nature: additive }
   # Each new source file of a release member joins the reviewed archive
   # list (spec 021, 3.5).
   - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
@@ -719,8 +723,25 @@ fixtures (R-04).
 
 ## Verification
 
-Pending with implementation. Approval satisfies no acceptance item, and no
-existing evaluation is a repeat set under this spec.
+Run by `make verify` (029 is in `VERIFIED_SPECS`, in CI's `evaluation`
+group). Every acceptance item is verified here except the `wasm32-wasip1`
+known-answer run, which is externally blocked until a WASI runner exists in
+CI (#76 A1) and is reported as blocked, never as passed.
+
+```verify:cli
+# 3.3 and 3.4: the bootstrap against the Python reference, bit for bit, and
+# the generator known-answer vectors.
+python3 -I crates/rustev-eval/tests/data/bootstrap/reference.py --check
+# 3.1 to 3.12 and section 5: repeat sets, measures, ledger, baselines,
+# reproducibility, diffs, comparison and selection gates, with goldens.
+cargo test -p rustev-eval --locked
+# 3.13 and 3.14: the CLI surface and exit codes, end to end.
+cargo test -p rustev-cli --locked
+cargo clippy -p rustev-eval -p rustev-cli --all-targets --locked -- -D warnings
+# Negative control: each acceptance seed must be detected.
+sh crates/rustev-eval/mutation/seeds.sh "spec 029"
+sh crates/rustev-cli/mutation/seeds.sh repeat029
+```
 
 ## Implementation record
 
@@ -954,14 +975,35 @@ Tests: `tests/comparison.rs` and `tests/selection.rs` with goldens under
 metric names at most 256 bytes, gate lists at most 1 024 entries, and
 `all_slices` with no declared slice is unknown.
 
-**Needs an owner decision (D-029-1): `brier` per-case measures.** 3.2.3
+**Increment 7 (CLI, exit codes, seeds; completion).** `crates/rustev-cli/src/repeat.rs`
+wires every command and flag of 3.13 to the library functions of
+increments 1 to 6 (no statistics in the CLI), with held-out runs requiring
+the ledger flags, documents written atomically and never over an existing
+file, and the exit codes of 3.14. Tests: `crates/rustev-cli/tests/repeat.rs`
+and `tests/eval.rs` with goldens under `tests/golden/`. The acceptance seeds
+are in `crates/rustev-eval/mutation/seeds.py` (labelled `spec 029`) and
+`crates/rustev-cli/mutation/seeds.py` (`repeat029`); each is detected. 029
+joins `VERIFIED_SPECS` and CI's `evaluation` group. Engineering choices:
+`dataset.json` is kept per repeat set, baseline files sit at the
+comparison root, candidates are processed in byte order of their names,
+and symbolic links are refused. D-029-1 is settled as option (a) (owner,
+2026-10-22): `brier` has no per-case measure and is reported from the run
+reports only, with its interval unknown.
+
+The CLI mutation harness (`crates/rustev-cli/mutation/seeds.py`) builds its
+mutated copies under `<target>/mutation-seeds` rather than the shared
+target: sharing it let the last mutant's `rustev` binary stand in for the
+real one in a later `cargo test` (cargo does not re-copy a binary it
+considers fresh), which failed spec 014's verification in CI.
+
+**Owner decision D-029-1 (settled 2026-10-22 as option (a), see increment 7): `brier` per-case measures.** 3.2.3
 lists `brier` as a mean, and 3.2.6 requires the measures to reproduce the
 report's value bit for bit. Spec 004 computes Brier by adding every class
 term of every case to one running sum, so the sum of per-case sums differs
 in the last bit for ordinary inputs (three binary cases with true-class
 probabilities 0.3, 0.2 and 0.6 already differ, `tests/metrics.rs`), and
 spec 029 may not change how spec 004
-computes a metric (section 4). Until the owner decides, `brier` has no
+computes a metric (section 4). `brier` has no
 per-case measure: it is reported from the run reports only, and its
 interval is unknown, never approximated. Options: (a) keep it so (Brier
 is not case-decomposable); (b) reconcile Brier within a stated tolerance;

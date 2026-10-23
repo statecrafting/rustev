@@ -301,6 +301,74 @@ SEEDS = [
     ),
 ]
 
+# Spec 029 Acceptance: one seed for each required library defect.
+SEEDS += [
+    (
+        "spec 029",
+        'nearest-rank quantile off by one',
+        E + 'repeat_stats.rs',
+        'Figure::Known(samples[rank - 1])',
+        'Figure::Known(samples[rank.min(samples.len() - 1)])',
+        EVAL,
+    ),
+    (
+        "spec 029",
+        'undefined resample dropped',
+        E + 'repeat_stats.rs',
+        'Figure::Unknown { .. } => undefined[m] += 1,',
+        'Figure::Unknown { .. } => {},',
+        EVAL,
+    ),
+    (
+        "spec 029",
+        'unknown band treated as zero',
+        E + 'selection.rs',
+        'BandDoc::Unknown(r) => Err(format!("{} band: {r}", m.name)),',
+        'BandDoc::Unknown(_) => Ok(0.0),',
+        EVAL,
+    ),
+    (
+        "spec 029",
+        'unknown selection qualifies',
+        E + 'selection.rs',
+        '            Verdict::Unknown { clause }',
+        '            { let _ = clause; Verdict::Qualifies }',
+        EVAL,
+    ),
+    (
+        "spec 029",
+        'diff uses only baseline band',
+        E + 'diff.rs',
+        'DiffBool::Value(d.abs() <= b.max(*r))',
+        'DiffBool::Value(d.abs() <= *b)',
+        EVAL,
+    ),
+    (
+        "spec 029",
+        'held-out count off by one',
+        E + 'holdout.rs',
+        'count: count(&|e| e.lineage == new.lineage),',
+        'count: count(&|e| e.lineage == new.lineage) - 1,',
+        EVAL,
+    ),
+    (
+        "spec 029",
+        'historical latency counted as candidate',
+        E + 'repeat.rs',
+        '        Observation::Historical',
+        '        Observation::Candidate',
+        EVAL,
+    ),
+    (
+        "spec 029",
+        'ledger chain not checked',
+        E + 'holdout.rs',
+        'if e.prev != prev {',
+        'if false && e.prev != prev {',
+        EVAL,
+    ),
+]
+
 
 def run(cmd, cwd, env, timeout=None):
     # A session of its own, so a timeout kills the test binaries too.
