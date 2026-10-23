@@ -558,15 +558,27 @@ function telemetryOptions(t) {
   if (t.key !== undefined && !(t.key?.bytes instanceof Uint8Array)) {
     throw new classes.ConfigRefused('out_of_range', { field: 'telemetry.key.bytes' });
   }
+  const exporter = t.exporter;
+  if (exporter?.caPem !== undefined && !(exporter.caPem instanceof Uint8Array)) {
+    throw new classes.ConfigRefused('out_of_range', { field: 'telemetry.exporter.caPem' });
+  }
+  const headers = exporter?.headers;
+  if (headers !== undefined && (headers === null || typeof headers !== 'object' ||
+      Array.isArray(headers) || ![Object.prototype, null].includes(Object.getPrototypeOf(headers)) ||
+      Object.values(headers).some((v) => typeof v !== 'string'))) {
+    throw new classes.ConfigRefused('out_of_range', { field: 'telemetry.exporter.headers' });
+  }
   let policy;
   if (t.policy !== undefined) {
     try { policy = bytes(t.policy); }
     catch { throw new classes.InvalidDocument('invalid_document', { field: 'telemetry.policy' }); }
   }
   return {
-    config: { ...t, policy: undefined, key: t.key === undefined ? undefined : { keyId: t.key.keyId } },
+    config: { ...t, exporter: exporter && { ...exporter, headers: undefined, caPem: undefined }, policy: undefined, key: t.key === undefined ? undefined : { keyId: t.key.keyId } },
     policy,
     key: t.key?.bytes,
+    headers,
+    caPem: exporter?.caPem,
   };
 }
 

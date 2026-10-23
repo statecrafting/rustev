@@ -125,7 +125,7 @@ for (const task of ['support', 'lodging']) {
 test('049 3.6: create refusals precede opening the file and disclose no secret', async (t) => {
   const path = temp(t);
   const cases = [
-    ...['otlp-http', 'otlp-grpc', 'unknown'].map((kind) => [{ exporter: { kind, path } }, 'out_of_range', 'telemetry.exporter.kind']),
+    ...['otlp-grpc', 'unknown'].map((kind) => [{ exporter: { kind, path } }, 'out_of_range', 'telemetry.exporter.kind']),
     [{ key: undefined }, 'digest_key_required', 'telemetry.key'],
     [{ logs: true }, 'logs_unsupported', 'telemetry.logs'],
     [{ telemetryTimeoutMs: 20_000 }, 'out_of_range', 'telemetry.telemetryTimeoutMs'],

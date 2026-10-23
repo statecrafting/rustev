@@ -53,10 +53,18 @@
           "kind": "file",
           "path": "Makefile"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "directory",
+          "path": "scripts/acceptance/"
+        }
       }
     ],
     "id": "049-opentelemetry-through-the-node-binding",
-    "implementation": "pending",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-3-composition-behind-the-host-sink",
@@ -93,7 +101,7 @@
       }
     ],
     "sectionDigests": {
-      "049-opentelemetry-export-through-the-node-binding-amends-001-010-027-and-028": "f8db2d97638d5c61d5855eff07d21907a43c8d105da98c6fb969fbd68d4f315e",
+      "049-opentelemetry-export-through-the-node-binding-amends-001-010-027-and-028": "7b83c7ac8a85ecb2aaa71ec79f990d1585e2b9f43fdc44abd9dada16f9e2d3ec",
       "1-purpose": "0b850fdfc46d4b5e8134e30bd65ac3ec00e0b7eb25bb545877f34e0715bf3675",
       "2-territory": "a304da5cb759e4fcd260b7519e78139a1ac167bb2002ed31e2c236281af74456",
       "3-1-the-boundary-exception": "abb98f7a28ee08e2d969d637771711ae8198e339d142073f016591e4851d601b",
@@ -110,8 +118,8 @@
       "5-observable-negative-cases": "5dea07dcc984f79777a7d83d1eaaa4d2564fe0fdd4bb6352069ec67c73721c2e",
       "acceptance": "b87043ae6f1a480e1eba79d79bdb368ace3919fb0aaf53019a9252a155cfdefa",
       "decisions-at-approval": "c8f8eed74f680094ebda4bffa2409792d2f93752df22728b7c3f2bba18862f98",
-      "implementation-record": "65ead64efe76eab7a1d14f766021ee81f1c6a3a2e058cad77e8d9c06b47dd7ad",
-      "verification": "9d7dda386c6a8358d52d09b7d55332b0284d54bfaaa035a1fb77370672f24b2d"
+      "implementation-record": "2be1d98d234caa759b9469da6adf5c55cb1b57006a6190e82d335c29a3d6b25a",
+      "verification": "45acebc20da02e8974a9eaff2b882f0af5e2703ef74aefe091f12bd458c1adbc"
     },
     "sectionHeadings": [
       "049: OpenTelemetry export through the Node binding (amends 001, 010, 027 and 028)",
@@ -139,6 +147,6 @@
     "summary": "A narrow amendment of approved specs 027 (Node-API binding) and 028 (OpenTelemetry evidence sink), with the boundary exception it needs in specs 001 and 010. A TypeScript host gains an optional `telemetry` option on `Engine.create`: the binding attaches spec 028's `OtelSink` behind the host's own sink of record through 028's `TeeSink`, exports to a JSONL file or over OTLP/HTTP to an allowlisted collector, wires 028's `begin` to each decision's `traceparent` and returns the trace and root span ids, registers compiled plans, forwards exchange records the host passes, reports the sink's counters in the engine's gauges and flushes on shutdown. Every value passes 028's redaction policy; the receipt, run record and judgment bytes are unchanged. `rustev-node` becomes the one integration crate, besides the facade, that may depend on another integration crate, and only on `rustev-otel`. Ratified by the owner on 2026-10-23 (A-51).\n",
     "title": "OpenTelemetry export through the Node binding (amends 001, 010, 027 and 028)"
   },
-  "shardHash": "ea9dc920b094a6abb6184957465bc3aa9a134a8c9d5e2b91323e83a2adc0c531",
+  "shardHash": "6b2ed4d8401c6b02f83e346af79fb1d653ab06458f89319a33296bf108534e40",
   "specVersion": "1.10.0"
 }
