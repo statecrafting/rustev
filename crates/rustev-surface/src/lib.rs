@@ -14,5 +14,10 @@ pub mod eval;
 pub mod host;
 pub mod out;
 pub mod plan;
+// Spec 034 3.12 to 3.14; compiled only with `parameterized` (spec 050).
+#[cfg(feature = "parameterized")]
+pub mod plan_diff;
+#[cfg(feature = "parameterized")]
+pub mod profile;
 pub mod replay;
 pub mod run;

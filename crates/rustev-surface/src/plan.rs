@@ -187,11 +187,21 @@ fn compile_definition(
     let bytes = host
         .read(def_path, DEFINITION_V1.max_bytes)
         .map_err(|e| Done::io(command, e))?;
+    compile_definition_bytes(command, host, args, rules, &bytes)
+}
+
+pub(crate) fn compile_definition_bytes(
+    command: &str,
+    host: &dyn Host,
+    args: CompileArgs<'_>,
+    rules: &mut RulesHook<'_>,
+    bytes: &[u8],
+) -> Result<Compiled, Done> {
     // As `compile_bytes`: a malformed definition is category 1, subject
     // `definition`.
     #[cfg(not(feature = "parameterized"))]
-    rustev_core::unparameterized::definition(&bytes).map_err(|r| refused(command, &r))?;
-    let def = Definition::parse(&bytes)
+    rustev_core::unparameterized::definition(bytes).map_err(|r| refused(command, &r))?;
+    let def = Definition::parse(bytes)
         .map_err(|e| refused(command, &parse_refusal("definition".into(), e.to_string())))?;
     let deps = deps::load(host, args.deps, rules).map_err(|e| dep_failed(command, e))?;
     let execution = match args.execution {
@@ -223,7 +233,11 @@ pub fn check(
     rules: &mut RulesHook<'_>,
 ) -> Res {
     let c = compile_definition(command, host, args, rules)?;
-    Ok(Done::ok(Out::new(command, "ok").set("plan_id", &c.id)))
+    Ok(checked(command, &c))
+}
+
+pub(crate) fn checked(command: &str, c: &Compiled) -> Done {
+    Done::ok(Out::new(command, "ok").set("plan_id", &c.id))
 }
 
 /// `plan compile`: the plan's canonical bytes published as `out`.
@@ -236,6 +250,10 @@ pub fn compile_cmd(
 ) -> Res {
     host.ensure_absent(out).map_err(|e| Done::io(command, e))?;
     let c = compile_definition(command, host, args, rules)?;
+    publish_compiled(command, host, &c, out)
+}
+
+pub(crate) fn publish_compiled(command: &str, host: &dyn Host, c: &Compiled, out: &str) -> Res {
     host.create(out, &c.canonical())
         .map_err(|e| Done::io(command, e))?;
     Ok(Done::ok(
@@ -281,7 +299,11 @@ pub fn show(
     deps_args: DepArgs<'_>,
     rules: &mut RulesHook<'_>,
 ) -> Res {
+    let path = plan;
     let plan = read_plan(command, host, plan)?;
+    // Without `parameterized`, `read_plan` has already refused any plan with
+    // an instantiation record (spec 050), so this returns at its first line.
+    let out = instantiation(command, path, Out::new(command, "ok"), &plan)?;
     let deps = deps::load(host, deps_args, rules).map_err(|e| dep_failed(command, e))?;
     let c = load_plan(command, &plan, &deps)?;
     let plan = &c.plan;
@@ -305,7 +327,7 @@ pub fn show(
         ),
     };
     let def = &plan.definition;
-    let out = Out::new(command, "ok")
+    let out = out
         .set("plan_id", &c.id)
         .set("compiler", &plan.compiler)
         .set("registry", &plan.registry)
@@ -368,4 +390,34 @@ fn actionability(out: Out, plan: &rustev_contract::plan::Plan) -> Out {
             "questions",
             &a.questions.iter().map(|q| &q.id).collect::<Vec<_>>(),
         )
+}
+
+/// Conservatively leave v3 plans without an instantiation record unchanged.
+fn instantiation(command: &str, path: &str, out: Out, plan: &Plan) -> Result<Out, Done> {
+    let Some(i) = &plan.instantiation else {
+        return Ok(out);
+    };
+    let version = i.template.get("version").and_then(Value::as_str);
+    let version = version
+        .filter(|v| v.parse::<rustev_contract::version::Version>().is_ok())
+        .ok_or_else(|| {
+            refused(
+                command,
+                &parse_refusal(
+                    format!("plan:{path}"),
+                    "instantiation.template.version must be a string containing a valid definition version (MAJOR.MINOR.PATCH without leading zeros or suffixes)".into(),
+                ),
+            )
+        })?;
+    Ok(out.set("plan_schema", &plan.schema).set(
+        "instantiation",
+        &json!({
+            "template_id": i.template_id, "template_version": version,
+            "variant": i.variant, "chain": i.profile,
+            "parameters": i.parameters.iter().map(|p| json!({
+                "name": p.name, "value": p.value, "source": p.source,
+                "site_count": p.sites.len(),
+            })).collect::<Vec<_>>(),
+        }),
+    ))
 }

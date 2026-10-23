@@ -90,6 +90,78 @@ fn compile_publishes_the_plan_and_show_reads_it() {
     );
 }
 
+#[cfg(feature = "parameterized")]
+#[test]
+fn show_requires_a_valid_recorded_template_version() {
+    use serde_json::{Value, json};
+
+    let original: Value = serde_json::from_slice(include_bytes!(
+        "../../rustev-core/tests/golden/parameterized.off.batch.plan.json"
+    ))
+    .unwrap();
+    let show_plan = |plan: &Value| {
+        let m = Memory::new([
+            ("plan".into(), serde_json::to_vec(plan).unwrap()),
+            ("descriptor".into(), include_bytes!("../../../tools/rustev-conformance/fixtures/runtime/synthetic-linear-head.descriptor.json").to_vec()),
+        ].into());
+        let descriptors = ["descriptor".into()];
+        show(
+            "plan show",
+            &m,
+            "plan",
+            DepArgs {
+                descriptors: &descriptors,
+                ..DepArgs::default()
+            },
+            &mut no_rules,
+        )
+    };
+    let shown = show_plan(&original).unwrap();
+    assert_eq!(shown.code, 0);
+    let output: Value = serde_json::from_slice(&shown.out.bytes()).unwrap();
+    assert_eq!(output["plan_schema"], "rustev.plan/3");
+    assert_eq!(
+        output["instantiation"]["template_version"],
+        original["instantiation"]["template"]["version"]
+    );
+
+    for version in [
+        None,
+        Some(Value::Null),
+        Some(json!(3)),
+        Some(json!("")),
+        Some(json!("1.2")),
+        Some(json!("01.2.3")),
+        Some(json!("1.2.3-beta")),
+    ] {
+        let mut plan = original.clone();
+        let template = plan["instantiation"]["template"].as_object_mut().unwrap();
+        match version {
+            None => {
+                template.remove("version");
+            }
+            Some(v) => {
+                template.insert("version".into(), v);
+            }
+        }
+        let refused = show_plan(&plan).unwrap_err();
+        assert_eq!(refused.code, 5);
+        let output: Value = serde_json::from_slice(&refused.out.bytes()).unwrap();
+        assert_eq!(output["command"], "plan show");
+        assert_eq!(output["status"], "refused");
+        assert_eq!(output["category"], 1);
+        assert_eq!(output["category_name"], "parse");
+        assert_eq!(output["subject"], "plan:plan");
+        assert!(
+            output["detail"]
+                .as_str()
+                .unwrap()
+                .contains("instantiation.template.version")
+        );
+        assert!(output.get("instantiation").is_none());
+    }
+}
+
 #[test]
 fn a_rules_program_without_a_rules_backend_is_refused() {
     let m = memory();

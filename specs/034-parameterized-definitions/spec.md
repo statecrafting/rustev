@@ -46,6 +46,13 @@ extends:
   # `rustev.plan-diff/1` and the plan's `instantiation` member.
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-node/" }, nature: additive }
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-wasm/" }, nature: additive }
+  # The CLI's profile and diff renderings live in the shared command
+  # surface, and its new goldens are conformance CLI cases (3.14). Spec 027
+  # owns both: its `establishes` lists `{ kind: directory, path:
+  # "crates/rustev-surface/" }` and `{ kind: directory, path:
+  # "tools/rustev-conformance/" }`.
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "crates/rustev-surface/" }, nature: additive }
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "tools/rustev-conformance/" }, nature: additive }
   # Adds 034 to `make verify` when the implementation is complete.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
 depends_on:
@@ -881,6 +888,12 @@ reuse the instantiation stages. A fixed parameter reports
 `profile_check.rs`, with goldens for identical plans, a binding, profile
 and variant difference, a truncated diff, and an accepted and a refused
 profile check.
+
+**Increment 5, part 1 (the command surface).** `rustev-surface`, the
+renderer every host calls, gains the profile check rendering (`profile`),
+the plan diff rendering (`plan_diff`) and the version 3 instantiation in
+`plan show` (`plan`), so the CLI of the next part only parses arguments and
+calls it.
 
 ## Decisions at approval
 
