@@ -1,0 +1,6 @@
+# Spec 031 3.9.3: the MSVC linker stamps the link time and a random PDB GUID
+# into every PE file, so two independent builds of the Windows CLI and addon
+# differ. `/Brepro` makes both a function of the inputs, and the release's
+# second build then reproduces the first byte for byte.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "link-arg=/Brepro"]

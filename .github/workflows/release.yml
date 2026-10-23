@@ -1,43 +1,66 @@
 # The release workflow of spec 031 (3.9, 3.12): builds the release's npm
-# tarballs and prebuilt CLI binaries from the owner's signed tag, and gives
-# each a keyless signature with an in-toto SLSA build provenance
-# attestation bound to this workflow, the commit and the tag (3.9.5, SLSA
-# v1.0 Build Level 2). Not rendered by the setup profile: owned by spec 031.
-# It is not a required job of ci-gate.
+# tarballs and prebuilt CLI binaries from the owner's signed tag, builds
+# each of them a second time on independent runners and requires identical
+# bytes (3.9.3), writes a CycloneDX SBOM per artifact (3.9.1), audits what
+# they contain (3.9.2), and gives each release artifact a keyless signature
+# with an in-toto SLSA build provenance attestation bound to this workflow,
+# the commit and the tag (3.9.5, SLSA v1.0 Build Level 2). Not rendered by
+# the setup profile: owned by spec 031. It is not a required job of ci-gate.
 #
-# It runs only when dispatched by hand with the tag. By default it builds,
-# attests and uploads the artifacts, and publishes nothing. The `npm` job
-# publishes, with npm provenance (3.9.6), only when dispatched with
-# `publish-npm: true` and only after the owner approves the `npm-publish`
-# Environment: publication is the owner's act under 031 3.11 and spec 021
-# 3.9. It uses npm trusted publishing (OIDC); no registry token is stored
-# or read here. Crates are uploaded by `rustev-release publish` (spec 021),
-# never by this workflow.
+# It runs only when dispatched by hand. A release run names the tag and is
+# dispatched on it (`gh workflow run release.yml --ref vX.Y.Z -f
+# tag=vX.Y.Z`); by default it builds, checks, attests and uploads the
+# artifacts, and publishes nothing. The `npm` job publishes, with npm
+# provenance (3.9.6), only when dispatched with `publish-npm: true` and only
+# after the owner approves the `npm-publish` Environment: publication is the
+# owner's act under 031 3.11 and spec 021 3.9. It uses npm trusted
+# publishing (OIDC); no registry token is stored or read here. Crates are
+# uploaded by `rustev-release publish` (spec 021), never by this workflow.
+#
+# A rehearsal (`gh workflow run release.yml --ref <branch> -f
+# rehearsal=true`) runs every build and check at the dispatched commit
+# without a tag: it attests nothing, never runs the `npm` job, and refuses
+# `publish-npm` (031 3.11). It is evidence for that commit only.
 #
 # - `tag`: the dispatched tag is the release-set file's tag, signed and
 #   verified against `tools/rustev-release/allowed_signers`, and the
-#   checkout is that tag's commit.
-# - `bindings`: spec 027's bindings workflow at the tag (every test, the
+#   checkout is that tag's commit (a rehearsal: the dispatched commit).
+# - `bindings`: spec 027's bindings workflow at that commit (every test, the
 #   budgets and the corpus), which uploads each platform's addon.
-# - `cli`: the `rustev` binary per platform of 3.13.1, smoke tested
-#   (help, and a reference plan check equal to its golden), archived and
-#   attested.
-# - `pack`: the nine npm tarballs (each platform package with its addon,
-#   the native main package, the WebAssembly package), each `package.json`
-#   with exactly its `private` guard removed (spec 027 keeps it until
-#   publication), checked by `rustev-release manifests` first; attested.
-# - `npm`: the gated publication, in the release set's npm order.
+# - `cli`: the `rustev` binary per platform of 027 3.13.1, smoke tested
+#   (help, and a reference plan check equal to its golden).
+# - `rebuild`: the second, independent build of each platform's binary and
+#   addon, on its own runners, in the same images and environments (3.9.3).
+# - `archive`: both builds' binaries archived with GNU tar in a fixed
+#   order, owner and time (3.9.3); the release's archives attested.
+# - `pack`: the nine npm tarballs, packed once from bindings' addons (the
+#   release, attested) and once from the rebuild's (3.9.3), each
+#   `package.json` with exactly its `private` guard removed (spec 027 keeps
+#   it until publication), checked by `rustev-release manifests` first.
+# - `reproducibility`: the two builds' binaries, addons, archives and
+#   tarballs compared byte for byte; any difference fails (3.9.3).
+# - `sbom`: a CycloneDX 1.5 SBOM per archive and tarball (3.9.1).
+# - `audit`: the tarballs' npm dependency closure is the family alone, and
+#   `cargo deny` passes for the crates compiled into them (3.9.2).
+# - `npm`: the gated publication, in the release set's npm order, only
+#   after every check above.
 name: release
 
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "The signed release tag, vX.Y.Z (the release-set file's tag)"
-        required: true
+        description: "The signed release tag, vX.Y.Z (the release-set file's tag); empty for a rehearsal"
+        required: false
         type: string
+        default: ""
       publish-npm:
         description: "Publish the npm tarballs (needs the owner's npm-publish Environment approval)"
+        required: false
+        type: boolean
+        default: false
+      rehearsal:
+        description: "Build and check at the dispatched commit without a tag; attests and publishes nothing"
         required: false
         type: boolean
         default: false
@@ -49,43 +72,32 @@ env:
   CARGO_TERM_COLOR: never
 
 concurrency:
-  group: release-${{ inputs.tag }}
+  group: ${{ inputs.rehearsal && format('release-rehearsal-{0}', github.ref) || format('release-{0}', inputs.tag) }}
   cancel-in-progress: false
 
 jobs:
   tag:
     name: tag
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     outputs:
       commit: ${{ steps.tag.outputs.commit }}
       version: ${{ steps.tag.outputs.version }}
+      epoch: ${{ steps.tag.outputs.epoch }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: refs/tags/${{ inputs.tag }}
+          ref: ${{ inputs.rehearsal && github.sha || format('refs/tags/{0}', inputs.tag) }}
           fetch-depth: 0
-      - name: The tag is the release set's, signed by the owner (021 3.8)
+      - name: The tag is the release set's, signed by the owner (021 3.8), or a rehearsal (031 3.11)
         id: tag
         env:
+          REHEARSAL: ${{ inputs.rehearsal }}
+          PUBLISH_NPM: ${{ inputs.publish-npm }}
           TAG: ${{ inputs.tag }}
-        run: |
-          set -eu
-          expected=$(jq -r .tag tools/rustev-release/release-set.json)
-          # Dispatched on the tag itself, so this workflow and the bindings
-          # workflow it calls are the tag's own files.
-          if [ "$GITHUB_REF" != "refs/tags/$TAG" ]; then
-            echo "031 3.12: dispatch on refs/tags/$TAG (gh workflow run release.yml --ref $TAG), not $GITHUB_REF" >&2
-            exit 1
-          fi
-          if [ "$TAG" != "$expected" ]; then
-            echo "031 3.12: dispatched tag $TAG is not the release set's $expected" >&2
-            exit 1
-          fi
-          test "$(git cat-file -t "refs/tags/$TAG")" = tag || { echo "021 3.8: $TAG is not an annotated tag" >&2; exit 1; }
-          git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile=tools/rustev-release/allowed_signers verify-tag "refs/tags/$TAG"
-          echo "commit=$(git rev-parse "refs/tags/$TAG^{commit}")" >> "$GITHUB_OUTPUT"
-          echo "version=$(jq -r .version tools/rustev-release/release-set.json)" >> "$GITHUB_OUTPUT"
+        # Dispatched on the tag itself, so this workflow and the bindings
+        # workflow it calls are the tag's own files.
+        run: sh tools/rustev-release/artifacts.sh dispatch "$REHEARSAL" "$PUBLISH_NPM" "$TAG" >> "$GITHUB_OUTPUT"
 
   bindings:
     name: bindings
@@ -103,22 +115,53 @@ jobs:
     needs: tag
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
-    permissions:
-      contents: read
-      id-token: write
-      attestations: write
     strategy:
       fail-fast: false
       matrix:
-        # The platforms and build images of spec 027 3.13.1 (bindings.yml).
-        include:
-          - { platform: linux-x64-gnu, runner: ubuntu-24.04, image: "rust:1.98.1-bookworm@sha256:93ce27a88655056a51dbdd8f5f2d7ddc071c7b0070fb288a37b5a285fc83971e" }
-          - { platform: linux-arm64-gnu, runner: ubuntu-24.04-arm, image: "rust:1.98.1-bookworm@sha256:93ce27a88655056a51dbdd8f5f2d7ddc071c7b0070fb288a37b5a285fc83971e" }
-          - { platform: linux-x64-musl, runner: ubuntu-24.04, image: "rust:1.98.1-alpine3.22@sha256:a1796ca6fa216d6727b5f61c69e4c665b120b1a4dcb969639e2f25f1ed309456" }
-          - { platform: linux-arm64-musl, runner: ubuntu-24.04-arm, image: "rust:1.98.1-alpine3.22@sha256:a1796ca6fa216d6727b5f61c69e4c665b120b1a4dcb969639e2f25f1ed309456" }
+        # The platforms and runners of spec 027 3.13.1 (bindings.yml); the
+        # build images are fixed in tools/rustev-release/artifacts.sh.
+        include: &platforms
+          - { platform: linux-x64-gnu, runner: ubuntu-24.04 }
+          - { platform: linux-arm64-gnu, runner: ubuntu-24.04-arm }
+          - { platform: linux-x64-musl, runner: ubuntu-24.04 }
+          - { platform: linux-arm64-musl, runner: ubuntu-24.04-arm }
           - { platform: darwin-arm64, runner: macos-15 }
           - { platform: darwin-x64, runner: macos-15-intel }
           - { platform: win32-x64-msvc, runner: windows-2025 }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # As in `rebuild`: no CRLF conversion on Windows, so both builds read
+      # the committed bytes (031 3.9.3).
+      - name: Check out committed bytes
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.tag.outputs.commit }}
+      - name: Build and smoke test the CLI (031 3.9.7d; 021 3.7)
+        # The CLI has no version command (spec 006), so 3.9.7d's version
+        # step is the archive name here; help and a reference plan check
+        # against the conformance suite's golden run.
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          EPOCH: ${{ needs.tag.outputs.epoch }}
+        run: sh tools/rustev-release/artifacts.sh build-native "$PLATFORM" cli dist/native "$EPOCH"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cli-raw-${{ matrix.platform }}
+          path: dist/native/cli
+          if-no-files-found: error
+
+  rebuild:
+    name: rebuild ${{ matrix.platform }}
+    needs: tag
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include: *platforms
     defaults:
       run:
         shell: bash
@@ -128,70 +171,22 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.tag.outputs.commit }}
-      - name: Build the CLI in its pinned image
-        if: ${{ !startsWith(matrix.platform, 'darwin') && !startsWith(matrix.platform, 'win32') }}
-        run: |
-          # The source date is the commit's time (021 3.7).
-          epoch=$(git log -1 --format=%ct)
-          docker run --rm -v "$PWD":/w -w /w -e SOURCE_DATE_EPOCH="$epoch" "${{ matrix.image }}" \
-            cargo build -p rustev-cli --locked --release
-          sudo chown -R "$(id -u):$(id -g)" target
-      - name: Build the CLI
-        if: startsWith(matrix.platform, 'darwin') || startsWith(matrix.platform, 'win32')
-        run: SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) cargo build -p rustev-cli --locked --release
-      - name: Smoke test and archive (031 3.9.7d)
+      - name: Build the CLI and the addon a second time (031 3.9.3)
         env:
-          VERSION: ${{ needs.tag.outputs.version }}
-        run: |
-          set -eu
-          exe=target/release/rustev
-          case "${{ matrix.platform }}" in win32-*) exe=target/release/rustev.exe ;; esac
-          run() {
-            case "${{ matrix.platform }}" in
-              *-musl) docker run --rm -v "$PWD":/w -w /w "${{ matrix.image }}" "$@" ;;
-              *) "$@" ;;
-            esac
-          }
-          # The CLI has no version command (spec 006), so 3.9.7d's version
-          # step is the archive name here; help and a reference plan check
-          # against the conformance suite's golden run.
-          run "$exe" --help > /dev/null
-          f=tools/rustev-conformance/fixtures/cli/lodging.check
-          run "$exe" plan check --definition "$f/lodging.definition.json" --rules "$f/lodging.rules.json" > dist-check.json
-          cmp dist-check.json crates/rustev-cli/tests/golden/lodging.check.json
-          name="rustev-$VERSION-${{ matrix.platform }}"
-          mkdir -p "dist/$name"
-          cp "$exe" LICENSE "dist/$name/"
-          # Fixed order, owner and times, so the archive is a function of
-          # the binary (031 3.9.3).
-          epoch=$(git log -1 --format=%ct)
-          if tar --version 2>/dev/null | grep -q 'GNU tar'; then
-            (cd dist && tar --sort=name --owner=0 --group=0 --numeric-owner --mtime="@$epoch" -cf - "$name" | gzip -9n > "$name.tar.gz")
-          else
-            # bsdtar (macOS, Windows): no fixed order or times, so these
-            # archives are not yet reproducible (031 3.9.3 stays open).
-            (cd dist && tar -cf - "$name" | gzip -9n > "$name.tar.gz")
-          fi
-          if command -v sha256sum > /dev/null; then
-            (cd dist && sha256sum "$name.tar.gz" > "$name.tar.gz.sha256")
-          else
-            (cd dist && shasum -a 256 "$name.tar.gz" > "$name.tar.gz.sha256")
-          fi
-      - name: Attest build provenance (031 3.9.5)
-        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        with:
-          subject-path: dist/rustev-*.tar.gz
+          PLATFORM: ${{ matrix.platform }}
+          EPOCH: ${{ needs.tag.outputs.epoch }}
+        run: sh tools/rustev-release/artifacts.sh build-native "$PLATFORM" rebuild dist/native "$EPOCH"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: cli-${{ matrix.platform }}
-          path: dist/rustev-*.tar.gz*
+          name: rebuild-raw-${{ matrix.platform }}
+          path: dist/native
           if-no-files-found: error
 
-  pack:
-    name: pack
-    needs: [tag, bindings]
+  archive:
+    name: archive
+    needs: [tag, cli, rebuild]
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 20
     permissions:
       contents: read
       id-token: write
@@ -200,11 +195,60 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.tag.outputs.commit }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: cli-raw-*
+          path: dist/release/raw
+          merge-multiple: true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: rebuild-raw-*
+          path: dist/rebuild-native
+          merge-multiple: true
+      - name: Archive both builds in a fixed order, owner and time (031 3.9.3)
+        env:
+          VERSION: ${{ needs.tag.outputs.version }}
+          EPOCH: ${{ needs.tag.outputs.epoch }}
+        run: |
+          set -eu
+          sh tools/rustev-release/artifacts.sh archive-cli dist/release/raw dist/release/archives "$VERSION" "$EPOCH"
+          sh tools/rustev-release/artifacts.sh archive-cli dist/rebuild-native/cli dist/rebuild/archives "$VERSION" "$EPOCH"
+      - name: Attest build provenance (031 3.9.5)
+        if: ${{ !inputs.rehearsal }}
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/release/archives/rustev-*.tar.gz
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cli
+          path: dist/release/archives
+          if-no-files-found: error
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cli-rebuild
+          path: dist/rebuild/archives
+          if-no-files-found: error
+
+  pack:
+    name: pack ${{ matrix.run }}
+    needs: [tag, bindings, rebuild]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        run: [release, rebuild]
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.tag.outputs.commit }}
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
-      - name: The npm members' manifests (031 3.1)
-        run: cargo run -p rustev-release --locked --quiet -- manifests
       - name: Install the pinned WebAssembly tools (027 3.10.2)
         run: |
           rustup target add wasm32-unknown-unknown
@@ -212,58 +256,151 @@ jobs:
           cargo install --locked --root ~/wasm-tools/wasm-opt-0.116.1 wasm-opt --version 0.116.1
           echo "$HOME/wasm-tools/wasm-bindgen-0.2.129/bin" >> "$GITHUB_PATH"
           echo "$HOME/wasm-tools/wasm-opt-0.116.1/bin" >> "$GITHUB_PATH"
-      - name: Build the WebAssembly package
-        run: |
-          cargo build -p rustev-wasm --locked --target wasm32-unknown-unknown --profile wasm
-          for t in web bundler nodejs; do
-            d=$t; [ $t = nodejs ] && d=node
-            wasm-bindgen --target $t --out-dir "integrations/rustev-wasm/$d" target/wasm32-unknown-unknown/wasm/rustev_wasm.wasm
-            wasm-opt -Oz --enable-bulk-memory --enable-nontrapping-float-to-int --enable-sign-ext --enable-mutable-globals \
-              -o "integrations/rustev-wasm/$d/rustev_wasm_bg.wasm" "integrations/rustev-wasm/$d/rustev_wasm_bg.wasm"
-            ty=module; [ $t = nodejs ] && ty=commonjs
-            printf '{ "type": "%s" }\n' $ty > "integrations/rustev-wasm/$d/package.json"
-          done
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      - name: The release's addons, from bindings
+        if: matrix.run == 'release'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: rustev-*
-          path: addons
-      - name: Stage each addon and pack the npm members in release order
+          path: dist/addons
+          merge-multiple: true
+      - name: The rebuild's addons
+        if: matrix.run == 'rebuild'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: rebuild-raw-*
+          path: dist/rebuild-native
+          merge-multiple: true
+      - name: Stage each addon and pack the npm members in release order (031 3.1, 3.9.3)
+        env:
+          RUN: ${{ matrix.run }}
+          EPOCH: ${{ needs.tag.outputs.epoch }}
         run: |
           set -eu
-          for d in addons/rustev-*; do
-            p=${d#addons/rustev-}
-            cp "$d/rustev.$p.node" "integrations/rustev-node/npm/$p/"
-          done
-          mkdir -p dist/npm
-          # The release set's npm order; each package.json loses exactly
-          # its `private` guard, and nothing else changes.
-          jq -r '.npm[].directory' tools/rustev-release/release-set.json | while read -r dir; do
-            # Under `node -e`, process.argv[1] is the first argument after the
-            # script (`node -e "console.log(process.argv[1])" x` prints x).
-            node -e '
-              const fs = require("fs"); const f = process.argv[1] + "/package.json";
-              const p = JSON.parse(fs.readFileSync(f, "utf8"));
-              if (p.private !== true) { console.error(f + ": the private guard is missing"); process.exit(1); }
-              delete p.private;
-              fs.writeFileSync(f, JSON.stringify(p, null, 2) + "\n");' "$dir"
-            (cd "$dir" && npm pack --pack-destination "$GITHUB_WORKSPACE/dist/npm" --ignore-scripts)
-          done
+          addons=dist/addons
+          if [ "$RUN" = rebuild ]; then addons=dist/rebuild-native/addons; fi
+          sh tools/rustev-release/artifacts.sh pack "$addons" dist/npm "$EPOCH"
           ls dist/npm
-          (cd dist/npm && sha256sum ./*.tgz > SHA256SUMS)
       - name: Attest build provenance (031 3.9.5)
+        if: ${{ matrix.run == 'release' && !inputs.rehearsal }}
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: dist/npm/*.tgz
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: npm
+          # Only the release run's tarballs are the ones `npm` publishes.
+          name: ${{ matrix.run == 'release' && 'npm' || 'npm-rebuild' }}
           path: dist/npm
           if-no-files-found: error
 
+  reproducibility:
+    name: reproducibility
+    needs: [tag, archive, pack]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.tag.outputs.commit }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: cli-raw-*
+          path: dist/release/raw
+          merge-multiple: true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: rustev-*
+          path: dist/release/addons
+          merge-multiple: true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: cli
+          path: dist/release/archives
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: npm
+          path: dist/release/npm
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: rebuild-raw-*
+          path: dist/rebuild-native
+          merge-multiple: true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: cli-rebuild
+          path: dist/rebuild/archives
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: npm-rebuild
+          path: dist/rebuild/npm
+      - name: Compare the two builds byte for byte (031 3.9.3)
+        run: |
+          set -eu
+          mv dist/rebuild-native/cli dist/rebuild/raw
+          mv dist/rebuild-native/addons dist/rebuild/addons
+          # A difference fails here and is explained in the report; it is
+          # never normalized away.
+          cargo run --quiet --locked -p rustev-release -- compare-artifacts dist/release dist/rebuild > artifact-reproducibility.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: artifact-reproducibility
+          path: artifact-reproducibility.json
+          if-no-files-found: ignore
+
+  sbom:
+    name: sbom
+    needs: [tag, archive, pack]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.tag.outputs.commit }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: cli
+          path: dist/sbom
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: npm
+          path: dist/sbom
+      - name: A CycloneDX SBOM per artifact (031 3.9.1)
+        env:
+          VERSION: ${{ needs.tag.outputs.version }}
+          EPOCH: ${{ needs.tag.outputs.epoch }}
+        run: |
+          set -eu
+          cargo install cargo-cyclonedx --locked --version 0.5.9
+          sh tools/rustev-release/artifacts.sh sbom dist/sbom "$VERSION" "$EPOCH"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sbom
+          path: dist/sbom/*.cdx.json
+          if-no-files-found: error
+
+  audit:
+    name: audit
+    needs: [tag, pack]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.tag.outputs.commit }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: npm
+          path: dist/npm
+      - name: The npm closure and the compiled crates' audit (031 3.9.2; 021 3.6)
+        run: |
+          set -eu
+          cargo install cargo-deny --locked --version 0.20.2
+          sh tools/rustev-release/artifacts.sh audit dist/npm
+
   npm:
     name: npm publish
-    needs: [tag, pack]
-    if: ${{ inputs.publish-npm }}
+    needs: [tag, pack, reproducibility, sbom, audit]
+    if: ${{ inputs.publish-npm && !inputs.rehearsal }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     # The owner approves this Environment for each publication (031 3.11).
