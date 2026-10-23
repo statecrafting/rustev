@@ -1,0 +1,44 @@
+{
+  "argv": [
+    "plan",
+    "check",
+    "--definition",
+    "template",
+    "--profile",
+    "bad",
+    "--descriptor",
+    "descriptor"
+  ],
+  "command": "plan check",
+  "derived": [],
+  "exit": 5,
+  "id": "parameterized.variants-compile-refused",
+  "inputs": [
+    {
+      "name": "bad",
+      "path": "tools/rustev-conformance/fixtures/cli/parameterized.variants-compile-refused/bad",
+      "sha256": "447f283c89d3cf4b903c8ea1e161a1fcfec5b08987494e829f216f250ea0a5ad"
+    },
+    {
+      "name": "descriptor",
+      "path": "tools/rustev-conformance/fixtures/cli/parameterized.variants-compile-refused/descriptor",
+      "sha256": "5d861e23090bbf7d6f47572ca7cf4bb7d8aeda054baa90ec75a316d7622f0d28"
+    },
+    {
+      "name": "template",
+      "path": "tools/rustev-conformance/fixtures/cli/parameterized.variants-compile-refused/template",
+      "sha256": "2ceaee24aed20397d46ea0091cd01c832dc4d8661b7d97da0a35224e621f9be3"
+    }
+  ],
+  "outputs": [
+    {
+      "golden": "crates/rustev-cli/tests/golden/parameterized.variants-compile-refused.json",
+      "normalize": [],
+      "sha256": "5a5e8b310cd23f43def15f1161a212ee460e547c1e4d1f32abdc30d44e918332",
+      "stream": "stdout"
+    }
+  ],
+  "surfaces": [
+    "cli"
+  ]
+}

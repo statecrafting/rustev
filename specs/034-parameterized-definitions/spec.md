@@ -895,6 +895,15 @@ the plan diff rendering (`plan_diff`) and the version 3 instantiation in
 `plan show` (`plan`), so the CLI of the next part only parses arguments and
 calls it.
 
+**Increment 5, part 2 (the CLI).** `rustev plan check|compile` take
+`--profile` (with `--profile-base`), `--definition-version` and `--variant`; `rustev plan show` shows a
+version 3 plan's instantiation; `rustev plan diff` and `rustev profile
+check` are added (3.14), each rendering through `rustev-surface`. Every
+existing CLI output keeps its bytes. Tests: `crates/rustev-cli/tests/parameterized.rs`
+with the goldens `crates/rustev-cli/tests/golden/parameterized.*`, each
+also a conformance CLI case under `tools/rustev-conformance/cases/cli/`
+with its fixtures, harvested from the CLI (`RUSTEV_HARVEST`).
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

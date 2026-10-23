@@ -1,0 +1,77 @@
+{
+  "argv": [
+    "plan",
+    "diff",
+    "--definition",
+    "template",
+    "--definition",
+    "newer",
+    "--left-profile",
+    "old-profile",
+    "--right-profile",
+    "new-profile",
+    "--left-variant",
+    "batch",
+    "--right-variant",
+    "batch",
+    "--descriptor",
+    "descriptor",
+    "--descriptor",
+    "replica",
+    "--out",
+    "diff"
+  ],
+  "command": "plan diff",
+  "derived": [],
+  "exit": 0,
+  "id": "parameterized.definitions-binding",
+  "inputs": [
+    {
+      "name": "descriptor",
+      "path": "tools/rustev-conformance/fixtures/cli/parameterized.definitions-binding/descriptor",
+      "sha256": "5d861e23090bbf7d6f47572ca7cf4bb7d8aeda054baa90ec75a316d7622f0d28"
+    },
+    {
+      "name": "new-profile",
+      "path": "tools/rustev-conformance/fixtures/cli/parameterized.definitions-binding/new-profile",
+      "sha256": "09740976db1c7e280b39892180cdd667f5813fd0a4c8d250a7aef11691be5184"
+    },
+    {
+      "name": "newer",
+      "path": "tools/rustev-conformance/fixtures/cli/parameterized.definitions-binding/newer",
+      "sha256": "8648bc6058e58caa6e4ffce306d4ad43e3c230229fd5b4dca3564066cdfdf9d5"
+    },
+    {
+      "name": "old-profile",
+      "path": "tools/rustev-conformance/fixtures/cli/parameterized.definitions-binding/old-profile",
+      "sha256": "f65f1e9988d2bcea1e2b9f6d1062b751f0d42ed7f646781bff45bc87e91a45cc"
+    },
+    {
+      "name": "replica",
+      "path": "tools/rustev-conformance/fixtures/cli/parameterized.definitions-binding/replica",
+      "sha256": "2a74aeafb211c3f6fe5b9aafae9b18cdf778fc8bb45f9518c7533d776e19a7f2"
+    },
+    {
+      "name": "template",
+      "path": "tools/rustev-conformance/fixtures/cli/parameterized.definitions-binding/template",
+      "sha256": "0717b1f361f508c06295149a38309e66443954a7845159a9ca84b71e9786bfce"
+    }
+  ],
+  "outputs": [
+    {
+      "golden": "crates/rustev-cli/tests/golden/parameterized.definitions-binding.json",
+      "normalize": [],
+      "sha256": "6ad444b055f9f678ac8e3fc7d715d3276df0b044e1ce7a99aa24e02ef0f9bcbc",
+      "stream": "stdout"
+    },
+    {
+      "file": "diff",
+      "golden": "crates/rustev-cli/tests/golden/parameterized.definitions-binding.document.json",
+      "normalize": [],
+      "sha256": "a620c75a8b5788a4b0d222546d119b051ac1c19546bf2cb8d1fad4ed4603a9be"
+    }
+  ],
+  "surfaces": [
+    "cli"
+  ]
+}

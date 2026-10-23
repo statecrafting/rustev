@@ -1,0 +1,48 @@
+{
+  "argv": [
+    "plan",
+    "compile",
+    "--definition",
+    "template",
+    "--profile",
+    "bad",
+    "--variant",
+    "batch",
+    "--descriptor",
+    "descriptor",
+    "--out",
+    "plan"
+  ],
+  "command": "plan compile",
+  "derived": [],
+  "exit": 5,
+  "id": "parameterized.compile-refused",
+  "inputs": [
+    {
+      "name": "bad",
+      "path": "tools/rustev-conformance/fixtures/cli/parameterized.compile-refused/bad",
+      "sha256": "447f283c89d3cf4b903c8ea1e161a1fcfec5b08987494e829f216f250ea0a5ad"
+    },
+    {
+      "name": "descriptor",
+      "path": "tools/rustev-conformance/fixtures/cli/parameterized.compile-refused/descriptor",
+      "sha256": "5d861e23090bbf7d6f47572ca7cf4bb7d8aeda054baa90ec75a316d7622f0d28"
+    },
+    {
+      "name": "template",
+      "path": "tools/rustev-conformance/fixtures/cli/parameterized.compile-refused/template",
+      "sha256": "2ceaee24aed20397d46ea0091cd01c832dc4d8661b7d97da0a35224e621f9be3"
+    }
+  ],
+  "outputs": [
+    {
+      "golden": "crates/rustev-cli/tests/golden/parameterized.compile-refused.json",
+      "normalize": [],
+      "sha256": "ca78b5fb42610e131cfd7953a75cb8bdbeed44b767b9e98c960d909f0ef2a1ab",
+      "stream": "stdout"
+    }
+  ],
+  "surfaces": [
+    "cli"
+  ]
+}

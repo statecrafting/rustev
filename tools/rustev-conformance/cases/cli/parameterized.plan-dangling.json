@@ -1,0 +1,44 @@
+{
+  "argv": [
+    "plan",
+    "check",
+    "--definition",
+    "template",
+    "--profile",
+    "off",
+    "--descriptor",
+    "descriptor"
+  ],
+  "command": "plan check",
+  "derived": [],
+  "exit": 5,
+  "id": "parameterized.plan-dangling",
+  "inputs": [
+    {
+      "name": "descriptor",
+      "path": "tools/rustev-conformance/fixtures/cli/parameterized.plan-dangling/descriptor",
+      "sha256": "5d861e23090bbf7d6f47572ca7cf4bb7d8aeda054baa90ec75a316d7622f0d28"
+    },
+    {
+      "name": "off",
+      "path": "tools/rustev-conformance/fixtures/cli/parameterized.plan-dangling/off",
+      "sha256": "d4a942725d43a676318a9cac901060403c3c73d9522ec8a3c072a88162e0b387"
+    },
+    {
+      "name": "template",
+      "path": "tools/rustev-conformance/fixtures/cli/parameterized.plan-dangling/template",
+      "sha256": "1994cf811111e8ce82c2e592cde4d87d8e4f32d49235f6a0a9734a43060d7d70"
+    }
+  ],
+  "outputs": [
+    {
+      "golden": "crates/rustev-cli/tests/golden/parameterized.plan-dangling.json",
+      "normalize": [],
+      "sha256": "8b72635901b127acaea2c1cf86e489d9747319946c76e8575ae38c1e0fd0ff02",
+      "stream": "stdout"
+    }
+  ],
+  "surfaces": [
+    "cli"
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "argv": [
+    "profile",
+    "check",
+    "--definition",
+    "template",
+    "--profile",
+    "off"
+  ],
+  "command": "profile check",
+  "derived": [],
+  "exit": 5,
+  "id": "parameterized.profile-dangling",
+  "inputs": [
+    {
+      "name": "off",
+      "path": "tools/rustev-conformance/fixtures/cli/parameterized.profile-dangling/off",
+      "sha256": "d4a942725d43a676318a9cac901060403c3c73d9522ec8a3c072a88162e0b387"
+    },
+    {
+      "name": "template",
+      "path": "tools/rustev-conformance/fixtures/cli/parameterized.profile-dangling/template",
+      "sha256": "1994cf811111e8ce82c2e592cde4d87d8e4f32d49235f6a0a9734a43060d7d70"
+    }
+  ],
+  "outputs": [
+    {
+      "golden": "crates/rustev-cli/tests/golden/parameterized.profile-dangling.json",
+      "normalize": [],
+      "sha256": "a8e2910ed0c01a5c767764cc64d5307928db0df0fc28085f02a5d4d1fab8836e",
+      "stream": "stdout"
+    }
+  ],
+  "surfaces": [
+    "cli"
+  ]
+}

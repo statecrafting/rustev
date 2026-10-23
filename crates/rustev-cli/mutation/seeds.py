@@ -239,8 +239,9 @@ SEEDS = [
     (
         "no-clobber",
         "compile skips the output pre-check",
-        U + "plan.rs",
-        "    host.ensure_absent(out).map_err(|e| Done::io(command, e))?;\n",
+        # The CLI compiles through the profile path (spec 034).
+        U + "profile.rs",
+        "        host.ensure_absent(out).map_err(|e| Done::io(command, e))?;\n",
         "",
         CLI_AND_SURFACE,
     ),

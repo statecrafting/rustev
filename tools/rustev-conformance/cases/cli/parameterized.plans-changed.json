@@ -1,0 +1,45 @@
+{
+  "argv": [
+    "plan",
+    "diff",
+    "--left-plan",
+    "left",
+    "--right-plan",
+    "right",
+    "--out",
+    "diff"
+  ],
+  "command": "plan diff",
+  "derived": [],
+  "exit": 0,
+  "id": "parameterized.plans-changed",
+  "inputs": [
+    {
+      "name": "left",
+      "path": "tools/rustev-conformance/fixtures/cli/parameterized.plans-changed/left",
+      "sha256": "87b3a64a2c71acdea9df8d94057c4ac261fa79cb9d2b6bb5ac62d23641347a5a"
+    },
+    {
+      "name": "right",
+      "path": "tools/rustev-conformance/fixtures/cli/parameterized.plans-changed/right",
+      "sha256": "08aa1739ae815612f4a8ad68a670b831be7305a08fef267328ad5280007149ae"
+    }
+  ],
+  "outputs": [
+    {
+      "golden": "crates/rustev-cli/tests/golden/parameterized.plans-changed.json",
+      "normalize": [],
+      "sha256": "9ba457e0bf2a9a2d9d00ab39a2aeba070f47063acc51aff5c4f4f2d9df3d69e3",
+      "stream": "stdout"
+    },
+    {
+      "file": "diff",
+      "golden": "crates/rustev-cli/tests/golden/parameterized.plans-changed.document.json",
+      "normalize": [],
+      "sha256": "288da23a971a981c6dcdeedf0869d811b3fbfd323591a7b43b36266aa13230ca"
+    }
+  ],
+  "surfaces": [
+    "cli"
+  ]
+}

@@ -66,11 +66,18 @@ pub enum VariantReport {
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct VariantRefusal {
+    /// 3.9: every instantiation refusal reports `stage: "instantiate"`;
+    /// the numbered stage (3.8.1) stays available to callers.
+    #[serde(serialize_with = "instantiate_stage")]
     pub stage: u8,
     pub code: String,
     pub subject: String,
     pub detail: String,
 }
+fn instantiate_stage<S: serde::Serializer>(_: &u8, s: S) -> Result<S::Ok, S::Error> {
+    s.serialize_str("instantiate")
+}
+
 /// Runs stages 1 to 3, and stage 4 only for a named variant. Without a
 /// profile the sole supplied definition is the sole candidate and satisfies
 /// is true (3.6.6). Unnamed variants run only substitution and pruning.

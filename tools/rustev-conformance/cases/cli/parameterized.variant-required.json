@@ -1,0 +1,32 @@
+{
+  "argv": [
+    "plan",
+    "compile",
+    "--definition",
+    "template",
+    "--out",
+    "plan"
+  ],
+  "command": "plan compile",
+  "derived": [],
+  "exit": 5,
+  "id": "parameterized.variant-required",
+  "inputs": [
+    {
+      "name": "template",
+      "path": "tools/rustev-conformance/fixtures/cli/parameterized.variant-required/template",
+      "sha256": "09a8b70bdc06bd90af540bee48d60e3c2442c1a36ca32636b66335e33785f04a"
+    }
+  ],
+  "outputs": [
+    {
+      "golden": "crates/rustev-cli/tests/golden/parameterized.variant-required.json",
+      "normalize": [],
+      "sha256": "b72ce5a61767ef323abbe44bc6612cdbdf4f65b1996f1fc224d6657b0c6f71ec",
+      "stream": "stdout"
+    }
+  ],
+  "surfaces": [
+    "cli"
+  ]
+}

@@ -60,15 +60,32 @@ pub const COMMANDS: &[CommandSpec] = &[
     },
     CommandSpec {
         path: &["plan", "check"],
-        flags: flags!("definition": One, "descriptor": Many, "rules": Many,
+        flags: flags!("definition": Many, "profile": One, "profile-base": Many,
+                      "variant": One, "definition-version": One, "descriptor": Many, "rules": Many,
                       "calibration": Many, "execution": One),
         required: &["definition"],
     },
     CommandSpec {
         path: &["plan", "compile"],
-        flags: flags!("definition": One, "descriptor": Many, "rules": Many,
+        flags: flags!("definition": Many, "profile": One, "profile-base": Many,
+                      "variant": One, "definition-version": One, "descriptor": Many, "rules": Many,
                       "calibration": Many, "execution": One, "out": One),
         required: &["definition", "out"],
+    },
+    CommandSpec {
+        path: &["profile", "check"],
+        flags: flags!("definition": Many, "profile": One, "profile-base": Many,
+                      "variant": One, "definition-version": One),
+        required: &["definition"],
+    },
+    CommandSpec {
+        path: &["plan", "diff"],
+        flags: flags!("left-plan": One, "right-plan": One, "definition": Many,
+                      "left-profile": One, "right-profile": One, "left-variant": One,
+                      "right-variant": One, "profile-base": Many, "definition-version": One,
+                      "descriptor": Many, "rules": Many, "calibration": Many,
+                      "execution": One, "out": One),
+        required: &[],
     },
     CommandSpec {
         path: &["plan", "show"],
@@ -325,6 +342,13 @@ rustev: compile, inspect, run, replay and evaluate Rustev decision plans.
 
   rustev plan check   --definition F [--descriptor F]... [--rules F]... [--calibration F]... [--execution F]
   rustev plan compile --definition F [...same...] --out F
+                      [--profile F [--definition F]... [--profile-base F]...
+                       [--definition-version X.Y.Z]] [--variant NAME] (also for check)
+  rustev profile check --definition F [--profile F] [--profile-base F]... [--variant NAME]
+                       [--definition-version X.Y.Z]
+  rustev plan diff    --left-plan F --right-plan F --out F
+  rustev plan diff    --definition F... [--left-profile F] [--right-profile F]
+                      [--left-variant NAME] [--right-variant NAME] [...compile dependencies...] --out F
   rustev plan show    --plan F [--descriptor F]... [--rules F]... [--calibration F]...
   rustev run          --plan F --rules F... [--calibration F]... --snapshot F
                       --evaluation-time MS --decision-id ID --record-out F

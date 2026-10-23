@@ -1,0 +1,37 @@
+{
+  "argv": [
+    "profile",
+    "check",
+    "--definition",
+    "template",
+    "--profile",
+    "locked"
+  ],
+  "command": "profile check",
+  "derived": [],
+  "exit": 5,
+  "id": "parameterized.profile-locked",
+  "inputs": [
+    {
+      "name": "locked",
+      "path": "tools/rustev-conformance/fixtures/cli/parameterized.profile-locked/locked",
+      "sha256": "88384aa6c8b7f1cff4c3743d659af06bdac1ddeacd2922ecd735bc61f0702da3"
+    },
+    {
+      "name": "template",
+      "path": "tools/rustev-conformance/fixtures/cli/parameterized.profile-locked/template",
+      "sha256": "09a8b70bdc06bd90af540bee48d60e3c2442c1a36ca32636b66335e33785f04a"
+    }
+  ],
+  "outputs": [
+    {
+      "golden": "crates/rustev-cli/tests/golden/parameterized.profile-locked.json",
+      "normalize": [],
+      "sha256": "2b75532cdada63eec6dc9d636ecab6b7bfe112cb62542dc6d8f14c346355d59e",
+      "stream": "stdout"
+    }
+  ],
+  "surfaces": [
+    "cli"
+  ]
+}
