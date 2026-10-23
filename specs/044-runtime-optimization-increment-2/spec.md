@@ -61,7 +61,6 @@ depends_on:
   - "013-remote-state-on-failed-attempts"
   - "017-general-runtime-optimization"
   - "020-remote-protocol-refinements"
-  - "022-jev-production-transport"
   - "023-real-data-quality-qualification"
   - "027-node-and-wasm-bindings"
   - "032-evidence-quality"
@@ -742,6 +741,18 @@ latency, cost or quality claim.
 Pending with implementation. The implementing change adds 044 to `make
 verify` with repository-local deterministic verification for every
 acceptance item. Approval satisfies no acceptance item.
+
+**Owner decision A-49 (2026-10-23): dependencies.** Spec 022 is no longer
+a declared dependency of this spec; spec 012 remains one. Only the
+production batching posture needs it: 3.8 item 4 and R-2 apply to "a
+`production` binding (spec 022)", which spec 022 defines. If this spec is
+implemented before spec 022 is complete, 3.8 item 4, R-2's construction
+check (`batch_unqualified`) and section 5's row "A production binding
+enables batching without a qualified report" move to a later increment of
+this spec made after spec 022 is complete, and this spec is not recorded
+`complete` until that increment lands. Until then no binding enables
+adapter-scoped batching in production (R-28 unchanged). Every other item,
+including stage 1 of 3.8 for the Jev adapter, is unchanged.
 
 ## Decisions at approval
 

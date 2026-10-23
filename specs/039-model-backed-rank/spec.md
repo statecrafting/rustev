@@ -51,9 +51,7 @@ depends_on:
   - "005-reference-backends"
   - "009-remote-adapter-protocol"
   - "012-jev-integration"
-  - "022-jev-production-transport"
   - "029-evaluation-repeatability"
-  - "030-bedrock-backend"
   - "031-public-api-and-release-family"
   - "032-evidence-quality"
   - "036-mid-plan-acquisition"
@@ -722,6 +720,30 @@ Pending with implementation. The implementing change adds `039` to `make
 verify` with repository-local deterministic tests for every acceptance
 item; any live Bedrock smoke result is recorded with its journal total and
 is not part of declared verification.
+
+**Owner decision A-49 (2026-10-23): dependencies.** Specs 022 and 030 are
+no longer declared dependencies of this spec; spec 012 remains one. Spec
+022 changes nothing here: 3.16 states that its production transport
+"changes nothing about" R-28's composed rankings. The Bedrock `rank`
+admission of 3.15 becomes a later increment of this spec: a change to
+`rustev-bedrock` made under spec 030 3.12 and 3.15 (as Decision 15 and
+spec 035 3.16 already frame it), only after spec 030 is complete, with
+3.15 binding it unchanged. These items move to that increment and are its
+acceptance, not acceptance of the earlier increments:
+
+- section 5's row "Bedrock binding `rank` with `structured_output: none`",
+  refused `rank_requires_structured_output` with no descriptor;
+- the acceptance item "Bedrock `rank` fixtures on both wires for the three
+  modes (3.15, 030 3.12.3), with no network";
+- the swap test, run with the rules backend and with Bedrock fixtures;
+- 3.18 item 1 for Bedrock bindings without `rank`;
+- any paid live Bedrock `rank` smoke call (Decision 18).
+
+This spec's implementation is complete when every other acceptance item
+is met, with the rules backend (3.14) and Jev composition (3.16) as the
+backends exercising it; the Bedrock increment then lands as its own
+change, as spec 035's `screen` admission does. No boundary, invariant,
+value-kind rule or refusal changes.
 
 ## Decisions at approval
 

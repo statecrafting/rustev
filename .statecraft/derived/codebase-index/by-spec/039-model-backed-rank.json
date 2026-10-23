@@ -12,9 +12,7 @@
       "005-reference-backends",
       "009-remote-adapter-protocol",
       "012-jev-integration",
-      "022-jev-production-transport",
       "029-evaluation-repeatability",
-      "030-bedrock-backend",
       "031-public-api-and-release-family",
       "032-evidence-quality",
       "036-mid-plan-acquisition",
@@ -174,5 +172,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "c6400f116e32ce9a9c7561ece640d5868cc6f5b23f55dd995be00cb4e69e5574"
+  "shardHash": "73b1ee341619735228495ceae30a9ded5fa352389c42d8a85d40d56da2ba1841"
 }
