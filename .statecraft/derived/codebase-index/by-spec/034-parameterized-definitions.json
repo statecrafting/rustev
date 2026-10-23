@@ -35,6 +35,18 @@
       {
         "path": "crates/rustev-eval/",
         "source": "spec-edge"
+      },
+      {
+        "path": "integrations/rustev-node/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "integrations/rustev-wasm/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "tools/rustev-release/",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
@@ -93,6 +105,45 @@
       {
         "locations": [
           {
+            "file": "integrations/rustev-node/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-node/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "integrations/rustev-wasm/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-wasm/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "tools/rustev-release/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-release/"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "Makefile"
           }
         ],
@@ -134,5 +185,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "7bf740ffabd2f8a52dbd8a091728151b7e1f9a04f6a5f7a476ec43a7c58ef3c6"
+  "shardHash": "68a111bfefb3ec10e9acb4891bfa78781e05f47cc3c1e3c5b925e23c0e11abfc"
 }

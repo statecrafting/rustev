@@ -1671,6 +1671,7 @@ fn compile_inner(
         sources: (!bound.sources.is_empty()).then(|| bound.sources.clone()),
         grades: (!grade_table.is_empty()).then_some(grade_table),
         actionability,
+        instantiation: None,
     };
     let id = plan.id().map_err(|e| Refusal {
         category: C::Parse,

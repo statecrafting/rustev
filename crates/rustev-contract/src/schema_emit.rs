@@ -120,6 +120,21 @@ fn run_members(version: &str) -> impl FnOnce(&mut serde_json::Value) + '_ {
     }
 }
 
+/// Instantiation belongs only to plan 3 (spec 034, 3.10.1), as enforced
+/// by `Plan::parse`, including an explicitly null member in an earlier plan.
+fn plan_members(version: &str) -> impl FnOnce(&mut serde_json::Value) + '_ {
+    move |v| {
+        if version != schema::PLAN_V3 {
+            v["properties"]
+                .as_object_mut()
+                .expect("the plan has properties")
+                .remove("instantiation")
+                .expect("the plan has an instantiation member");
+            prune_defs(v);
+        }
+    }
+}
+
 /// Removes every `$defs` entry no longer reachable from the schema's own
 /// members, so a version without a member does not describe its types.
 fn prune_defs(v: &mut serde_json::Value) {
@@ -192,10 +207,12 @@ pub fn document_schemas() -> Vec<EmittedSchema> {
         trace::{TRACE, TraceLine},
     };
     let mut out = vec![
+        emit::<crate::profile::Profile>(schema::PROFILE, None),
+        emit::<crate::plan_diff::PlanDiff>(schema::PLAN_DIFF, None),
         emit::<Definition>(schema::DEFINITION, None),
         emit::<Definition>(schema::DEFINITION_V2, None),
-        emit::<Plan>(schema::PLAN, None),
-        emit::<Plan>(schema::PLAN_V3, None),
+        emit_adjusted::<Plan>(schema::PLAN, None, plan_members(schema::PLAN)),
+        emit_adjusted::<Plan>(schema::PLAN_V3, None, plan_members(schema::PLAN_V3)),
         emit::<Snapshot>(schema::SNAPSHOT, None),
         emit::<Snapshot>(schema::SNAPSHOT_V2, None),
         emit::<EvidenceRecord>(schema::EVIDENCE, None),

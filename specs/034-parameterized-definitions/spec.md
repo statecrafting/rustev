@@ -2,7 +2,7 @@
 id: "034-parameterized-definitions"
 title: "Parameterized definitions, variants and tenant profiles (amends 002 and 006)"
 status: approved
-implementation: pending
+implementation: in-progress
 created: "2026-10-17"
 summary: >
   An amendment of approved specs 002 and 006 (R-16), for #76 child B4.
@@ -23,7 +23,7 @@ summary: >
   (`rustev.plan-diff/1`) and `rustev profile check`. A
   `rustev.definition/1` compiled without a profile still yields a
   byte-identical `rustev.plan/2` and `PlanId`. Approved (A-31);
-  implementation is pending.
+  implementation is in progress (see the implementation record).
 amends:
   - "002-decision-contract-and-pure-core"
   - "006-cli-surface"
@@ -40,6 +40,12 @@ extends:
   # Profile flags on `plan check|compile`, `plan show` for version 3,
   # `plan diff` and `profile check` (3.14).
   - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: amending }
+  # The new contract source files join the reviewed archive file list.
+  - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
+  # The generated document declarations gain `rustev.profile/1`,
+  # `rustev.plan-diff/1` and the plan's `instantiation` member.
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-node/" }, nature: additive }
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-wasm/" }, nature: additive }
   # Adds 034 to `make verify` when the implementation is complete.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
 depends_on:
@@ -90,7 +96,7 @@ obligations:
 
 Approved by the owner (A-31, 2026-10-17, under the 2026-10-16 delivery work
 order) as its own reviewable change before any code (R-16); implementation
-is pending. This spec implements #76 child B4 (#62). The approved texts of
+is in progress (see the implementation record). This spec implements #76 child B4 (#62). The approved texts of
 specs 002 and 006 are not edited; this spec records what changes, as 029
 does for 004 and 006. Approval authorizes no release or publication, no
 live provider call or spend, no real-user data, and no change to the
@@ -809,6 +815,28 @@ call or spend.
 ## Verification
 
 Pending with implementation. Approval satisfies no acceptance item.
+
+## Implementation record
+
+Delivered in increments, each its own pull request; nothing here claims an
+acceptance item before the increment that satisfies it.
+
+**Increment 1 (contract).** `rustev-contract` carries the documents and
+shapes of 3.2, 3.5, 3.6, 3.10 and 3.12. `parameter` holds the declaration
+shapes core reads out of a template (`ParameterDecl`, `ParamType`, `Lock`,
+`Bounds`, `ParamDefault`, the reference `ParamRef` and `Enabled`) and the
+bounds of 3.1.3 and 3.2.1; `Definition` itself is unchanged, because the
+instantiated definition carries none of this spec's members (3.8.4) and a
+template is handled by core as canonical JSON. `version` is the version and
+range grammar of 3.6.1 and 3.6.2. `profile` is `rustev.profile/1` under
+`DESCRIPTOR_V1`, identified by `ProfileId`, refusing a bad name, version,
+range, `extends` form or more than 256 values. `Plan` gains the optional
+`instantiation` member (3.10.1), omitted when absent, so every existing
+plan keeps its bytes and `PlanId`. `plan_diff` is `rustev.plan-diff/1`
+under `RECORD_V1` with fractional numbers refused (3.12.1). A replay
+bundle's plan item may be `rustev.plan/3` (3.11.2). The schemas and the
+generated Node and WebAssembly declarations are regenerated
+(`crates/rustev-contract/tests/parameterized_wire.rs`).
 
 ## Decisions at approval
 
