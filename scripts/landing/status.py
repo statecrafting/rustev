@@ -82,8 +82,19 @@ def review_verdict(number):
     return heads[-1] if heads else None
 
 
-def approval_reason(pr, verdict):
-    paths = [f["path"] for f in pr.get("files") or []]
+def changed_paths(number):
+    # Every page: the `files` field of `gh pr list` stops at 100 files, which
+    # could hide an authority path in a large pull request.
+    out = subprocess.run(
+        ["gh", "api", "--paginate", f"repos/{{owner}}/{{repo}}/pulls/{number}/files?per_page=100",
+         "--jq", ".[].filename"], cwd=ROOT, capture_output=True, text=True)
+    if out.returncode:
+        raise SystemExit(f"gh api files #{number}: {out.stderr.strip()}")
+    return out.stdout.split()
+
+
+def approval_reason(number, verdict):
+    paths = changed_paths(number)
     why = []
     if verdict and verdict != "no-findings":
         why.append(f"AI review: {verdict} (resolve in-PR first; approve the rerun only if they stand)")
@@ -164,7 +175,7 @@ def main():
 
     prs = gh("pr", "list", "--state", "open", "--limit", "100", "--json",
              "number,title,baseRefName,headRefName,headRefOid,autoMergeRequest,"
-             "createdAt,mergeStateStatus,statusCheckRollup,isDraft,files,url") or []
+             "createdAt,mergeStateStatus,statusCheckRollup,isDraft,url") or []
     by_head = {p["headRefName"]: p for p in prs}
     open_heads = {p["headRefOid"] for p in prs}
     waiting_runs = []
@@ -190,7 +201,7 @@ def main():
         if action == "approve":
             verdict = review_verdict(pr["number"])
             run = waiting[pr["headRefOid"]]
-            item.update(reason=approval_reason(pr, verdict), run=run["html_url"])
+            item.update(reason=approval_reason(pr["number"], verdict), run=run["html_url"])
         items.append(item)
     items.sort(key=lambda i: (RANK[i["action"]], -i["unlocks"], i["spec"], i["pr"]))
     report = {"actions": items, "metrics": metrics(prs, items, waiting_runs, open_heads, specs)}
