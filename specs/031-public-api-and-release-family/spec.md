@@ -58,10 +58,7 @@ depends_on:
   - "008-reference-package-lodging"
   - "009-remote-adapter-protocol"
   - "010-integrations"
-  - "011-semantic-backend"
   - "012-jev-integration"
-  - "021-packaging-and-first-release"
-  - "022-jev-production-transport"
 references:
   - { unit: { kind: file, path: "docs/design/001-decision-engine-architecture.md" }, role: context }
   - { unit: { kind: file, path: "docs/decisions/00-founding-decisions.md" }, role: context }
@@ -809,6 +806,14 @@ tarballs and binaries, the npm audit of 3.9.2, the SBOMs of the
 tarballs and binaries (3.9.1), the hosted release with the manifest,
 checksums, SBOMs, provenance and changelog (layer 8), and the image,
 which is absent from this release (increment 5).
+
+**Owner decision A-48 (2026-10-22): dependencies.** Specs 011, 021 and
+022 are no longer declared dependencies of this spec. A crate whose spec is
+not complete is listed under `absent` in the release set with its reason
+(increment 5) and has no facade feature (I-3), so this spec can be
+implemented and completed while those specs remain in progress. Spec 021's
+publication acts follow this spec's tooling rather than precede it. Spec
+010 remains a dependency.
 
 ## Decisions at approval
 
