@@ -196,10 +196,13 @@ def main():
     stale = [r for r in waiting_runs
              if r["event"] == "pull_request" and r["head_sha"] not in open_heads]
     if args.cancel_superseded:
-        for r in stale:
-            subprocess.run(["gh", "run", "cancel", str(r["id"])], cwd=ROOT,
-                           capture_output=True, text=True)
-        report["cancelled"] = len(stale)
+        # A run waiting on an Environment ignores a plain cancel request (it
+        # is accepted and the run stays waiting); force-cancel ends it.
+        failed = [r["id"] for r in stale if subprocess.run(
+            ["gh", "api", "-X", "POST", f"repos/{{owner}}/{{repo}}/actions/runs/{r['id']}/force-cancel"],
+            cwd=ROOT, capture_output=True, text=True).returncode]
+        report["cancelled"] = len(stale) - len(failed)
+        report["cancel_failed"] = failed
 
     if args.json:
         json.dump(report, sys.stdout, indent=2)
@@ -229,7 +232,10 @@ def main():
     if stale and not args.cancel_superseded:
         print(f"\n{len(stale)} waiting run(s) are superseded; `--cancel-superseded` cancels them.")
     elif args.cancel_superseded:
-        print(f"\ncancelled {len(stale)} superseded waiting run(s)")
+        print(f"\ncancelled {report['cancelled']} superseded waiting run(s)")
+        if report["cancel_failed"]:
+            print(f"could not cancel: {report['cancel_failed']}")
+            return 1
     return 0
 
 
