@@ -20,6 +20,9 @@ pub mod diff;
 mod doc;
 pub mod dynamic;
 pub mod eval_cases;
+// Becomes public API when all spec 040 queries are built.
+#[doc(hidden)]
+pub mod explain;
 pub mod fit;
 pub mod generator;
 pub mod holdout;
