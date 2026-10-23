@@ -32,15 +32,19 @@
       },
       {
         "kind": "directory",
+        "path": "scripts/landing/"
+      },
+      {
+        "kind": "directory",
         "path": "tools/rustev-boundaries/"
       }
     ],
     "id": "001-boundaries-and-authority",
     "implementation": "complete",
     "sectionDigests": {
-      "001-ecosystem-boundaries-proposals-versus-authority-and-product-principles": "0286b9a7d6fc4c4f9353bcfd600bf661dbf53f5f054e935fafc44f13ea1bd790",
+      "001-ecosystem-boundaries-proposals-versus-authority-and-product-principles": "d2292ac19aedd0a213a5988eb3ba64462a72b47717567df362e3c86b207b93c7",
       "1-purpose": "23d9fbfd79c7d53855467fa3936d5b3587d0827055ec39dc204addca739a071f",
-      "2-territory": "c8fb9fc390f4f7db79a2536c4cd94d241f241b4371746f469de3660691b69b0e",
+      "2-territory": "c011c575f7bd83c135b1913052b322c24e052219daaba432722e5187a695a5c7",
       "3-1-responsibilities": "9239843abb6815deae05a2316acdf2bccb66d4c1a40ba6272b5163b0714aaa28",
       "3-2-proposals-never-grants": "0690af826268cca8203d351c2016d923be5f0ff16c486e0509ea90404857917e",
       "3-3-provenance-of-rustev-outputs": "c45e4590ac64b361da4e3f576766ba47e202f6f2dff1a79893cce94d6a51ed93",
@@ -54,7 +58,7 @@
       "acceptance": "6745eef13e379ef3665bc3d6f9153896b02a987b6d493e3b6920797347a3e5f8",
       "decision-history": "c5e60fb2a1f31afb91c9d7b50cfee0123cb9d60a6c6edb74887d4cac047ae8a2",
       "engine-upgrade-record-2026-10-02": "61612c1be943f9a3f40b63cc0a1cd451a7f6718965e4731c1e316f23904310fc",
-      "implementation-record": "2ea931ab4efd91e64f89ab3992b971d325ceaba149114071beba77edc448f481",
+      "implementation-record": "38efba4c2d5fbd89212152470d0e8dd3052534c1b6219fc8ca5cf54999d1d266",
       "profile-upgrade-record-2026-10-02": "6c81fa3739f224dfdb744b86aaef78dc0d1fea39886b759607741736c9f0e027",
       "verification": "e7c72eb6207c95ccc8e643cad92aa8d980aad37cfa4195b7cc4c06e41bc33bbe"
     },
@@ -84,6 +88,6 @@
     "summary": "What Rustev owns and refuses to own within the ecosystem (spec-spine, Aicortex, Rahi, statecraft-cli, applications), the rule that Rustev produces proposals and never grants, the provenance classes of Rustev outputs, the dependency layout that keeps contracts transport-neutral and the core free of integrations, and the product principles that are the constitution's principles VI onward. Owns the workspace manifest, the Makefile and the boundary check that enforces the dependency rules.\n",
     "title": "Ecosystem boundaries, proposals versus authority, and product principles"
   },
-  "shardHash": "f7ab392b64a3d441a85808038821b3b42c98741a005fc1490f633012bee756a7",
+  "shardHash": "c4f5271399c994828d6689da721613041e2ccc3998be1ed97c72d828e29eb77b",
   "specVersion": "1.10.0"
 }

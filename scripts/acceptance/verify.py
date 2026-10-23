@@ -8,11 +8,13 @@ import sys
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
+# Balanced on measured per-spec seconds (eight runs, 2026-10-23): 004 alone
+# takes about 24 minutes, so it runs alone and the rest share three groups.
 GROUPS = {
-    "evaluation": "004 023 029".split(),
-    "cli-backends": "001 005 006 014 019 020".split(),
-    "integrations-core": "002 010 012 015 017 033".split(),
-    "runtime-evidence": "003 007 008 009 013 026 027 028 049".split(),
+    "evaluation": "004".split(),
+    "cli-backends": "001 005 006 014 029".split(),
+    "integrations-core": "002 010 012 015 017 019 020 033".split(),
+    "runtime-evidence": "003 007 008 009 013 023 026 027 028 049".split(),
 }
 
 
