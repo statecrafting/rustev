@@ -23,15 +23,17 @@ use std::{
 #[derive(Default)]
 struct Sink {
     calls: AtomicUsize,
+    records: std::sync::Mutex<Vec<rustev_contract::run::RunRecord>>,
     fail: bool,
     pause: Option<Arc<tokio::sync::Semaphore>>,
 }
 impl EvidenceSink for Sink {
     fn deliver<'a>(
         &'a self,
-        _: &'a rustev_contract::run::RunRecord,
+        record: &'a rustev_contract::run::RunRecord,
     ) -> BoxFuture<'a, Result<String, String>> {
         Box::pin(async move {
+            self.records.lock().unwrap().push(record.clone());
             self.calls.fetch_add(1, Ordering::SeqCst);
             if let Some(pause) = &self.pause {
                 pause.acquire().await.unwrap().forget();
@@ -898,6 +900,11 @@ async fn lookup_and_cancel_distinguish_queued_running_and_finished() {
 #[path = "../../../crates/rustev-runtime/tests/common/mod.rs"]
 mod runtime_fixtures;
 fn semantic_service() -> (Arc<Service>, String, Arc<runtime_fixtures::Scripted>) {
+    semantic_service_with_sink(Arc::new(Sink::default()))
+}
+fn semantic_service_with_sink(
+    sink: Arc<Sink>,
+) -> (Arc<Service>, String, Arc<runtime_fixtures::Scripted>) {
     use runtime_fixtures as f;
     use rustev_contract::Identified;
     let descriptor = f::linear_head();
@@ -913,7 +920,7 @@ fn semantic_service() -> (Arc<Service>, String, Arc<runtime_fixtures::Scripted>)
                     as Arc<dyn rustev_core::seams::DecisionBackend>,
             )]),
             contexts: BTreeMap::new(),
-            sink: Arc::new(Sink::default()),
+            sink,
             replay_scopes: BTreeMap::new(),
         },
     )
@@ -1775,4 +1782,154 @@ mod grpc_differential {
             assert_eq!(headers["grpc-status"], if fail { "13" } else { "0" });
         }
     }
+}
+
+#[tokio::test]
+async fn unregistered_plan_and_fallback_are_refused_before_backend_dispatch() {
+    let sink = Arc::new(Sink::default());
+    let (service, id, backend) = semantic_service_with_sink(sink.clone());
+    code(
+        &service
+            .decide("unknown", b"a".to_vec(), &semantic_body("unknown"), None)
+            .await,
+        RefusalCode::PlanNotRegistered,
+    );
+    let mut injected: Value = serde_json::from_slice(&semantic_body("fallback")).unwrap();
+    injected["fallback"] = json!({"backend": "other"});
+    code(
+        &service
+            .decide(
+                &id,
+                b"a".to_vec(),
+                &serde_json::to_vec(&injected).unwrap(),
+                None,
+            )
+            .await,
+        RefusalCode::InvalidDocument,
+    );
+    assert!(backend.dispatched().is_empty());
+    // Control: the registered plan and unchanged request do dispatch.
+    let client = {
+        let service = service.clone();
+        tokio::spawn(async move {
+            service
+                .decide(&id, b"a".to_vec(), &semantic_body("valid"), None)
+                .await
+        })
+    };
+    for _ in 0..3 {
+        runtime_fixtures::until(|| !backend.gated().is_empty()).await;
+        runtime_fixtures::release_all(&backend);
+    }
+    assert_eq!(client.await.unwrap().status, 200);
+    assert_eq!(backend.dispatched().len(), 3);
+    // Delivery may complete after the reply under some sink policies: wait.
+    tokio::time::timeout(
+        Duration::from_secs(10),
+        runtime_fixtures::until(|| !sink.records.lock().unwrap().is_empty()),
+    )
+    .await
+    .expect("the sink receives the record");
+    let records = sink.records.lock().unwrap();
+    assert_eq!(records.len(), 1);
+    for attempt in records[0].requests.iter().flat_map(|r| &r.attempts) {
+        assert_eq!(attempt.remote, rustev_contract::run::RemoteState::Finished);
+        assert_eq!(
+            attempt.cost.charge,
+            rustev_contract::run::Charge::Observed { units: 1 }
+        );
+    }
+}
+
+#[tokio::test]
+async fn resolved_response_preserves_proposal_and_rejects_authorization_outcome() {
+    let service = service(config_value(), Arc::new(Sink::default()));
+    let id = register(&service);
+    let reply = service
+        .decide(&id, b"a".to_vec(), &body("proposal"), None)
+        .await;
+    assert_eq!(reply.status, 200);
+    let decision = ServeDecision::parse(&reply.body).unwrap();
+    assert_eq!(decision.status, DecisionStatus::Judged);
+    let judgment = decision.judgment.unwrap().document().unwrap();
+    assert!(matches!(judgment.outcome,
+        rustev_contract::judgment::Outcome::Propose { ref action, ref params }
+        if action == "review" && params.is_empty()));
+    // Control: replacing the proposal with a grant is not a valid response.
+    let mut forged: Value = serde_json::from_slice(&reply.body).unwrap();
+    forged["judgment"]["outcome"] = json!({"grant":{"action":"review"}});
+    assert!(ServeDecision::parse(&serde_json::to_vec(&forged).unwrap()).is_err());
+}
+
+#[tokio::test]
+async fn disconnect_preserves_uncertain_remote_charge_and_delivery_record() {
+    use rustev_contract::run::{Charge, RemoteState};
+    let sink = Arc::new(Sink::default());
+    let (service, id, backend) = semantic_service_with_sink(sink.clone());
+    let client = {
+        let service = service.clone();
+        let id = id.clone();
+        tokio::spawn(async move {
+            service
+                .decide(&id, b"a".to_vec(), &semantic_body("lost"), Some(1000))
+                .await
+        })
+    };
+    runtime_fixtures::until(|| !backend.gated().is_empty()).await;
+    client.abort();
+    assert!(client.await.unwrap_err().is_cancelled());
+    assert_eq!(
+        ServeDecisionState::parse(&service.lookup(b"a", "lost").body)
+            .unwrap()
+            .state,
+        DecisionState::Running
+    );
+    code(
+        &service
+            .decide(&id, b"a".to_vec(), &semantic_body("lost"), None)
+            .await,
+        RefusalCode::DecisionInProgress,
+    );
+    // No backend answer: the original deadline ends local waiting only.
+    tokio::time::timeout(Duration::from_secs(3), async {
+        // Wait for both the retained decision and the sink's record, so the
+        // sink assertions below never race the delivery.
+        loop {
+            if ServeDecision::parse(&service.lookup(b"a", "lost").body).is_ok()
+                && !sink.records.lock().unwrap().is_empty()
+            {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    let retained = ServeDecision::parse(&service.lookup(b"a", "lost").body).unwrap();
+    assert_ne!(retained.status, DecisionStatus::Cancelled);
+    assert!(matches!(
+        retained.evidence,
+        EvidenceDisposition::Receipt { .. }
+    ));
+    {
+        let records = sink.records.lock().unwrap();
+        assert_eq!(records.len(), 1);
+        let attempts: Vec<_> = records[0]
+            .requests
+            .iter()
+            .flat_map(|r| &r.attempts)
+            .collect();
+        assert!(!attempts.is_empty());
+        for attempt in attempts {
+            assert_eq!(attempt.remote, RemoteState::PossiblyContinuing);
+            assert_eq!(attempt.cost.charge, Charge::Unknown);
+        }
+    }
+    let dispatched = backend.dispatched().len();
+    let replay = service
+        .decide(&id, b"a".to_vec(), &semantic_body("lost"), None)
+        .await;
+    assert!(ServeDecision::parse(&replay.body).unwrap().replayed);
+    assert_eq!(backend.dispatched().len(), dispatched);
+    assert_eq!(sink.calls.load(Ordering::SeqCst), 1);
 }

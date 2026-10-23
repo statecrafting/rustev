@@ -2,7 +2,7 @@
 id: "010-integrations"
 title: "Optional ecosystem integrations and serving boundary"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-09-26"
 summary: >
   A shared boundary contract for three independently optional integration
@@ -317,9 +317,10 @@ Before this spec may become implementation-complete:
 
 ## Verification
 
-Run by `make verify` (010 is in `VERIFIED_SPECS`). The implemented subset
-is `rustev-rahi` and `rustev-aicortex` (see the implementation record);
-`rustev-serve` is not implemented, because its record refuses. No step
+Run by `make verify` (010 is in `VERIFIED_SPECS`). All three crates are
+implemented under their approved records: `rustev-rahi`, `rustev-aicortex`
+and `rustev-serve` (see the implementation record; `rustev-serve`'s
+section 5 coverage is `integrations/rustev-serve/tests/COVERAGE.md`). No step
 needs a network beyond loopback or a live service: each Rahi store runs in
 the test process. Cargo fetches the pinned Aicortex revision like any
 locked dependency.
@@ -340,9 +341,17 @@ cargo test -p rustev-aicortex --locked
 cargo clippy -p rustev-aicortex --all-targets --locked -- -D warnings
 cargo build -p rustev-aicortex --locked
 sh -c 'for p in rustev-contract rustev-core rustev-runtime rustev-eval rustev-surface rustev-cli; do t=$(cargo tree -p "$p" -e normal,build --locked --prefix none) || exit 1; if printf "%s\n" "$t" | grep -E "^(rahi|aicortex)"; then exit 1; fi; done'
+# 3.7 and the rustev-serve record: the service over loopback HTTP/1.1,
+# HTTP/2 and gRPC with mutual TLS and Unix sockets, every section 5 row
+# that applies to the serving adapter (tests/COVERAGE.md; the Aicortex and
+# Rahi rows are covered by those crates' commands above).
+cargo build -p rustev-serve --no-default-features --locked
+cargo test -p rustev-serve --locked
+cargo clippy -p rustev-serve --all-targets --locked -- -D warnings
+cargo test -p rustev-boundaries --locked
 cargo run -p rustev-boundaries --locked --quiet
 # 3.1.1: no authorization type in the integration.
-sh -c 'if grep -rnE "(struct|enum|trait|type)[[:space:]]+(Permitted|Grant)([^A-Za-z0-9_]|$)" integrations/rustev-rahi integrations/rustev-aicortex; then exit 1; fi'
+sh -c 'if grep -rnE "(struct|enum|trait|type)[[:space:]]+(Permitted|Grant)([^A-Za-z0-9_]|$)" integrations/rustev-rahi integrations/rustev-aicortex integrations/rustev-serve; then exit 1; fi'
 ```
 
 ## Implementation record
@@ -437,8 +446,22 @@ refusals map to 042 3.5.1's gRPC codes with `rustev-refusal-bin`, and
 served on the same mutual-TLS listeners over HTTP/2 and calls the same
 handler layer (`src/grpc.rs`). A loopback differential test shows HTTP and
 gRPC yield byte-identical documents and digests for success, each refusal
-class, streaming and `evidence_not_delivered`. Still open: the image
-(042 3.16) and the shared conformance cases (3.17).
+class, streaming and `evidence_not_delivered`. Spec 042's own remaining work (not 010's, see the completion note):
+the image (042 3.16) and the shared conformance cases (3.17).
+
+**Completion (2026-10-22).** Every section 3.4 record has an
+owner-reviewed pass result (R-44, A-45, A-47). A-47, in
+`docs/decisions/00-founding-decisions.md` since #183: "The owner reviewed and
+approved the amended spec `010` section 3.4 `rustev-serve` binding record
+on 2026-10-22: item 2 passes ... and the Sigstore row passes ...
+`rustev-serve` may be implemented"; the record's own Result line in this
+spec says every row passes; every applicable section 5
+row has a test with offline fakes and a negative control (for
+`rustev-serve`, `tests/COVERAGE.md`); each integration builds and tests
+alone with minimum features; contract, core and the embedded workspace
+build without them and the boundary check passes; no live qualification
+was authorized or run. Spec 042's image (3.16) and shared conformance
+cases (3.17) are 042's own remaining work, not 010's.
 
 ## Questions settled by R-34
 
