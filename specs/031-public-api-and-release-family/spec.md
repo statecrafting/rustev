@@ -815,6 +815,17 @@ implemented and completed while those specs remain in progress. Spec 021's
 publication acts follow this spec's tooling rather than precede it. Spec
 010 remains a dependency.
 
+**2026-10-23, dependency repair found by the release audit (3.9.2).** A
+rehearsal of the release workflow's audit (the crates compiled into the
+CLI binaries and npm tarballs, `cargo deny` 0.20.2 with the release
+policy) reported RUSTSEC-2026-0386 (unsound: `tokio::io::unix::AsyncFd`'s
+safe constructors) against tokio 1.53.1, reached through `rustev-runtime`
+and `rustev-cli`. As spec 021 3.6 requires, the repair is its own reviewed
+change: the lock takes tokio 1.53.3, the fixed release, and the workspace
+requirement is raised to that floor so no registry consumer resolves an
+affected version. No Rustev crate constructs an `AsyncFd`; no API or
+behavior changes.
+
 ## Decisions at approval
 
 1. **Crate and package names** (left to the implementer by #58): decided

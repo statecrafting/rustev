@@ -57,8 +57,10 @@ libm = { version = "=0.2.16", default-features = false }
 # no I/O, exact-pinned so emitted schemas stay byte-identical.
 schemars = { version = "=1.2.3", default-features = false, features = ["derive", "std"] }
 # The runtime's executor (R-03); never a dependency of rustev-contract or
-# rustev-core (spec 001, 3.4.1). Added by spec 003.
-tokio = { version = "1.53", default-features = false }
+# rustev-core (spec 001, 3.4.1). Added by spec 003. The floor 1.53.3 is the
+# release fixing RUSTSEC-2026-0386 (spec 031 3.9.2), so no registry consumer
+# resolves an affected version.
+tokio = { version = "1.53.3", default-features = false }
 # The HTTP stack and TLS of the remote adapter binding (spec 009, 3.11).
 # rustls 0.23.46 is the floor: earlier releases carry RUSTSEC-2026-0346 to
 # 0349 (spec 021, 3.6 audit). webpki-roots 1.0.10 is the floor and the lock
