@@ -107,7 +107,6 @@ fn the_release_set_fixes_the_npm_members_and_the_absences() {
         [
             ("binary", "rustev"),
             ("image", "ghcr.io/statecrafting/rustev-serve"),
-            ("crate", "rustev-serve"),
             ("crate", "rustev-bedrock"),
             ("crate", "rustev-backend-embed-linear"),
         ]

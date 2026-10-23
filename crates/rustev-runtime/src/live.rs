@@ -449,7 +449,14 @@ impl Runtime {
         };
         let mut capturing = req.capture.as_ref().map(capture::Capturing::new);
         let result = self
-            .run(plan, decision, cancel, capturing.as_mut(), Some(&live))
+            .run(
+                plan,
+                decision,
+                cancel,
+                capturing.as_mut(),
+                Some(&live),
+                None,
+            )
             .await;
         let (record, delivery) = match result {
             Err(DecideError::Rejected(r)) => return Err(LiveRefusal::Rejected(r)),

@@ -1011,6 +1011,16 @@ documents: 4 MiB envelopes (10 MiB for events, 8 MiB for the shutdown
 report), 256-byte names and error text, 4 096-byte paths, endpoints and
 attempt ids, and 1 024-entry configuration lists.
 
+**Runtime progress observer (with `rustev-serve` increment 1).**
+`crates/rustev-runtime/src/progress.rs` adds `ProgressObserver` and
+`Runtime::decide_observed` (3.7.3): a synchronous callback after each
+step's result is recorded, carrying the step id, instance ids, outcome and
+the derivation class the compiled step determines, never a value. A panic
+inside it is contained and counted (`observer_panics`). `Runtime::decide`
+installs none, and every existing runtime test, golden and conformance
+case is byte-identical; `tests/progress.rs` checks events against the
+judgment for an exact and a model-backed step.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

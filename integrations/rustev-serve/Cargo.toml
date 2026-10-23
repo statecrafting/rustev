@@ -1,0 +1,38 @@
+[package]
+name = "rustev-serve"
+version = "0.1.0"
+description = "The Rustev decision service: host-registered plans served over HTTP/1.1, HTTP/2 and gRPC with mutual TLS (spec 010 3.7, spec 042)."
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[package.metadata.spec-spine]
+spec = "010-integrations"
+
+[dependencies]
+rustev-contract = { path = "../../crates/rustev-contract" }
+rustev-core = { path = "../../crates/rustev-core" }
+rustev-runtime = { path = "../../crates/rustev-runtime" }
+rustev-surface = { path = "../../crates/rustev-surface" }
+rustev-eval = { path = "../../crates/rustev-eval" }
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tokio = { workspace = true, features = ["net", "time", "rt", "rt-multi-thread", "sync", "macros", "io-util", "signal", "fs"] }
+hyper = { workspace = true, features = ["server", "client", "http1", "http2"] }
+hyper-util = { workspace = true, features = ["tokio", "server", "server-auto", "server-graceful"] }
+http-body-util.workspace = true
+rustls.workspace = true
+tokio-rustls.workspace = true
+ring.workspace = true
+sigstore-verify.workspace = true
+webpki-roots.workspace = true
+
+[[bin]]
+name = "rustev-serve"
+path = "src/main.rs"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }

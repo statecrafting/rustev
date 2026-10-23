@@ -17,7 +17,7 @@ summary: >
 establishes:
   - { kind: directory, path: "integrations/rustev-aicortex/" }
   - { kind: directory, path: "integrations/rustev-rahi/" }
-  - { kind: directory, path: "integrations/rustev-serve/", planned: true }
+  - { kind: directory, path: "integrations/rustev-serve/" }
 extends:
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.toml" }, nature: additive }
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.lock" }, nature: additive }
@@ -393,6 +393,36 @@ only when its record passes every row (3.4.8).
   owner chose to scope that rule to the release closure (spec 021 3.4,
   R-49), and the record's item 1 passes since that change.
 - `Makefile` (additive): `010` joins `VERIFIED_SPECS`.
+
+**`rustev-serve` increment 1 (2026-10-22, under the approved record,
+A-47).** `integrations/rustev-serve/` (`publish = false`) implements 3.7
+as spec 042 makes it concrete, over HTTP/1.1 and HTTP/2: TLS 1.3 with the
+record's three `ring` suites, client certificates required on TCP
+listeners, Unix sockets created `0600` (or `0660`) and never over an
+existing path (`src/transport.rs`); the transport-neutral handler layer
+(`src/service.rs`) with host-registered plans and backends only, plan
+registration verifying Ed25519 bundle signatures (`ring`) and Sigstore
+bundles offline against the host-supplied trusted root
+(`sigstore-verify`, `src/signatures.rs`), decisions, admission and the
+refusal table of 042 3.5.1, idempotency, lookup of queued, running and
+finished decisions, cancellation, server-sent progress streams fed by the
+runtime's optional observer (`src/stream.rs`), health, readiness and
+metrics (`src/health.rs`), graceful shutdown accounting, and the binary.
+Standalone sinks reuse `rustev-remote-http`'s sources by path, as
+`rustev-jev` does (spec 001 3.4.4). In `tools/rustev-release/release-set.json`
+the crate moves from `absent` (planned members, each with a `kind`) to
+`excluded` (existing workspace packages outside the family, which carry a
+name and a reason only, like every other `excluded` entry); its image stays
+`absent`. Tests: `tests/handlers.rs` and
+`tests/transport.rs` over loopback, with committed test certificates and
+Sigstore fixtures under `tests/fixtures/`. Not in this increment: the gRPC
+transport (042 3.9), the image (3.16), the shared conformance cases
+(3.17) and anything that depends on specs 034 or 036; 010 stays in
+progress until they land. Open against spec 042 (needs an amendment, not decided here): a decision
+task that panics after it started has no honest `final` event, because a
+refusal states `decision_ran: false` and there is no decision document;
+such a stream ends without `final`, and the non-streaming call answers an
+empty HTTP 500.
 
 ## Questions settled by R-34
 
