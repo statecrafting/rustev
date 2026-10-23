@@ -19,7 +19,6 @@ summary: >
 amends:
   - "031-public-api-and-release-family"
 depends_on:
-  - "021-packaging-and-first-release"
   - "027-node-and-wasm-bindings"
   - "031-public-api-and-release-family"
 references:
@@ -119,8 +118,22 @@ the lifecycle (021) are unchanged.
    image and hosted-release layers of 031 3.1 follow the last crate layer in
    their stated order; their numbers shift with the crate layers and nothing
    else about them changes.
-5. Uploads follow the layers; within a layer, packages are ordered by name
-   and are not an atomic transaction (unchanged).
+5. Uploads follow a topological order over every dependency kind among
+   the release's members, development dependencies included (amended by
+   A-50). `cargo publish` strips only a development dependency declared
+   without a version; one with a version stays in the published manifest,
+   and crates.io refuses the upload while that version is not in the
+   registry. This workspace declares every internal dependency with an
+   exact version in the root `Cargo.toml` (for example
+   `rustev-cli = { path = "crates/rustev-cli", version = "=0.1.0" }`), and
+   members take it as `rustev-cli.workspace = true`, also under
+   `[dev-dependencies]` (`rustev-pkg-support-routing`'s tests use the
+   CLI), so those development dependencies are kept. The release-set file
+   records the order; each package uploads only after every member it
+   depends on, by any kind, is observable from the registry, so a crate
+   may upload after a crate of a later layer whose library its tests use.
+   The crate layers of 3.2.1, over normal and build dependencies, are
+   unchanged, and uploads are not an atomic transaction (unchanged).
 
 ## 4. Out of scope
 
@@ -140,7 +153,8 @@ packages; any change to `rustev-surface`'s behavior, which spec 027 owns.
 ## Acceptance
 
 - The release-set file lists `rustev-surface` in layer 4 and `rustev-cli` in
-  layer 5, with the upload order following the layers; the manifest policy
+  layer 5, with the upload order topological over every dependency kind
+  (3.2.5, amended by A-50); the manifest policy
   passes on the workspace and refuses each case of section 5 in its tests.
 - `rustev-surface` has an archive allowlist and passes the archive, audit
   and reproducibility checks of the candidate.
@@ -190,3 +204,15 @@ release-candidate` at `419b664` (spec 021's record) passed with
 bounds, byte-identical across the two runs, its unpacked tests passing on
 1.98.1 and 1.88, and the audit passing. Only the upload-order item
 remains, for the owner.
+
+**Owner decision A-50 (2026-10-23): dependency and upload order.** Spec 021 is no longer a declared
+dependency of this spec: 021 is recorded complete only after the owner's
+first publication act, and that publication needs this spec's release-set
+change first, so the edge ordered them backwards. 021's approved sections
+cited here still bind. The owner chose the ordering amendment that 021's
+record left open ("an ordering amendment, or published manifests without
+those development dependencies"): 3.2.5 and the first acceptance item now
+read "topological over every dependency kind", development dependencies
+included, replacing "within a layer, packages are ordered by name". This
+act amends the text only; recording the upload-order item as met against
+the amended text, and this spec as complete, is a separate change.

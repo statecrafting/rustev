@@ -4,7 +4,6 @@
       "031-public-api-and-release-family"
     ],
     "dependsOn": [
-      "021-packaging-and-first-release",
       "027-node-and-wasm-bindings",
       "031-public-api-and-release-family"
     ],
@@ -28,5 +27,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "9191912edcc45b8fd582a44f085eace75cc3681dbb6d2fd57c75c7803790370f"
+  "shardHash": "36859bcc8690db57256bbed3ca0de43d353ff656b0271bd7f3252016ee686c45"
 }
