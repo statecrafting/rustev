@@ -237,8 +237,22 @@ fn error_taxonomy_table() {
         (429, "ThrottlingException", RateLimited),
         (429, "ModelNotReadyException", Overloaded),
         (503, "ServiceUnavailableException", Overloaded),
+        (503, "ServiceUnavailable", Overloaded),
         (529, "overloaded_error", Overloaded),
         (403, "MarketplaceAgreementPending", Unauthorized),
+        (403, "MarketplaceAgreementFailed", Unauthorized),
+        (403, "AccessDeniedException", Unauthorized),
+        (403, "InvalidClientTokenId", Unauthorized),
+        (403, "UnrecognizedClientException", Unauthorized),
+        (403, "ExpiredTokenException", Unauthorized),
+        (400, "InvalidSignatureException", Unauthorized),
+        (400, "SignatureDoesNotMatch", Unauthorized),
+        (400, "InvalidSignature", Unauthorized),
+        (400, "SignatureExpired", Unauthorized),
+        (400, "MissingAuthenticationToken", Unauthorized),
+        (400, "IncompleteSignatureException", Unauthorized),
+        (422, "OtherClientError", MalformedRequest),
+        (502, "OtherServerError", RemoteError),
         (400, "RequestExpired", Unauthorized),
         (400, "IncompleteSignature", Unauthorized),
         (404, "FTUFormNotFilled", Capability),
@@ -361,6 +375,18 @@ fn exact_policy_negative_cases_name_the_admission_failure() {
     b.residency_policy.allowed_destination_regions = AllowedDestinations::Any(Any::Any);
     b.validate().unwrap();
     assert!(p.evaluate(&b).unwrap_err().contains("policy_not_allowed"));
+    b = binding();
+    b.region = "us-east-1".into();
+    b.destination_regions = Destinations::Regions(RegionalDestinations {
+        as_of: "2026-10-16".into(),
+        regions: vec!["us-east-1".into()],
+    });
+    b.residency_policy.allowed_source_regions = vec!["us-east-1".into()];
+    b.residency_policy.allowed_destination_regions = AllowedDestinations::Any(Any::Any);
+    b.validate().unwrap();
+    p = policy();
+    p.allow[0].region = "eu-*".into();
+    assert!(p.evaluate(&b).unwrap_err().contains("policy_not_allowed"));
 }
 
 #[test]
@@ -462,4 +488,77 @@ fn every_reasoning_block_is_kept_in_order() {
     assert_eq!(kept.as_array().unwrap().len(), 2);
     assert_eq!(kept[0]["reasoningText"]["text"], "first");
     assert_eq!(kept[1]["reasoningText"]["text"], "second");
+}
+
+#[test]
+fn completion_statuses_and_tool_cardinality_on_both_wires() {
+    for wire in [Wire::Converse, Wire::Responses] {
+        let mut b = binding();
+        b.wire = wire;
+        if wire == Wire::Responses {
+            b.provider_store = json!(false);
+        }
+        let good = wire_response(wire, StructuredOutput::ToolUse, "b");
+        let (field, statuses): (&str, &[&str]) = match wire {
+            Wire::Converse => (
+                "stopReason",
+                &[
+                    "end_turn",
+                    "tool_use",
+                    "stop_sequence",
+                    "max_tokens",
+                    "guardrail_intervened",
+                    "content_filtered",
+                    "malformed_model_output",
+                    "malformed_tool_use",
+                    "model_context_window_exceeded",
+                    "unknown",
+                ],
+            ),
+            Wire::Responses => (
+                "status",
+                &[
+                    "completed",
+                    "incomplete",
+                    "failed",
+                    "cancelled",
+                    "queued",
+                    "in_progress",
+                    "unknown",
+                ],
+            ),
+        };
+        for status in statuses {
+            let mut v = good.clone();
+            v[field] = json!(status);
+            let mapped = mapping::response(&b, &serde_json::to_vec(&v).unwrap()).unwrap();
+            assert_eq!(mapped.charge, Charge::Estimated { units: 60_000 });
+            match *status {
+                "end_turn" | "tool_use" | "stop_sequence" | "completed" => {
+                    assert_eq!(mapped.output.unwrap(), RawOutput::Label("b".into()))
+                }
+                "model_context_window_exceeded" => {
+                    assert_eq!(mapped.output.unwrap_err(), RemoteCode::Capability)
+                }
+                _ => assert_eq!(mapped.output.unwrap_err(), RemoteCode::MalformedResponse),
+            }
+        }
+        for count in [0, 2] {
+            let mut v = good.clone();
+            let content = if wire == Wire::Converse {
+                &mut v["output"]["message"]["content"]
+            } else {
+                &mut v["output"]
+            };
+            *content = json!(vec![content[0].clone(); count]);
+            assert_eq!(
+                mapping::response(&b, &serde_json::to_vec(&v).unwrap())
+                    .unwrap()
+                    .output
+                    .unwrap_err(),
+                RemoteCode::MalformedResponse
+            );
+        }
+        assert!(mapping::response(&b, b"not JSON").is_err());
+    }
 }

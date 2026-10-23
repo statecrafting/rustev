@@ -23,6 +23,7 @@ pub mod policy;
 pub mod pool;
 #[path = "../../rustev-remote-http/src/principal.rs"]
 pub mod principal;
+pub mod probe;
 pub mod signing;
 #[path = "../../rustev-jev/src/spend.rs"]
 pub mod spend;

@@ -84,6 +84,11 @@ policy admission or spend headroom prevents dispatch.
 
 ## Evidence
 
+`tests/probe.rs` exercises the non-feature-gated `probe` core with loopback:
+all calls must succeed, every dispatched call is settled, and invalid limits or
+exhausted spend headroom send nothing. `tests/COVERAGE.md` maps every section 5
+case and Acceptance bullet to assertions, commands or explicit deferrals.
+
 `tests/contract.rs` covers both wires, all three operations and output modes,
 strict documents, residency/policy refusals, usage and stop/error mapping.
 `tests/loopback.rs` exercises signed requests, cancellation, budget, identity,

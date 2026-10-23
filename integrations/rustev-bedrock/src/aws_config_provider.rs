@@ -89,29 +89,8 @@ pub fn run_cli(smoke: bool) -> Result<(), String> {
         .unwrap_or_else(|_| "30000".into())
         .parse::<u64>()
         .map_err(|_| "invalid budget")?;
-    if !(if smoke { 1 } else { 2 }..=5).contains(&count)
-        || interval > 60_000
-        || !(1..=120_000).contains(&budget)
-    {
-        return Err("probe limits exceeded".into());
-    }
-    let operation = binding
-        .operations
-        .first()
-        .ok_or("no bound operation")?
-        .operation
-        .clone();
-    let options = if operation == "proposition" {
-        vec!["false", "true"]
-    } else {
-        vec!["apple", "pear"]
-    };
-    let projection = serde_json::to_vec(&serde_json::json!({
-        "operation":operation, "question":"The supplied word is apple. Choose the matching key.",
-        "options":options,"instance":{"text":"apple"},"values":{}
-    }))
-    .map_err(|_| "synthetic projection")?;
-    let unit = binding.pricing.unit_nano_usd;
+    let plan =
+        crate::probe::ProbePlan::new(smoke, count, interval, budget, "bedrock-probe".into())?;
     let journal = crate::spend::SpendJournal::open(
         value("--journal")?,
         crate::spend::BudgetKind::Testing,
@@ -132,21 +111,19 @@ pub fn run_cli(smoke: bool) -> Result<(), String> {
         .enable_all()
         .build()
         .map_err(|e| e.to_string())?;
-    runtime.block_on(async {
-        use rustev_core::seams::{DecisionBackend,AttemptCall,CallContext};
-        use rustev_contract::run::{CostBound,Charge};
-        for i in 0..count {
-            let units=match backend.cost_bound(&projection){CostBound::Estimated{units}=>units.checked_mul(unit).ok_or("cost overflow")?,_=>return Err("unknown reservation".into())};
-            let attempt=format!("bedrock-probe-{}-{i}",std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(|_|"clock")?.as_nanos());
-            let reservation=journal.reserve(&attempt,units).map_err(|e|e.to_string())?;
-            let cx=CallContext{remaining_ms:rustev_contract::time::DurationMs(budget),trace_id:String::new(),principal_handle:vec![]};
-            let report=backend.infer(AttemptCall{projection:&projection,attempt_id:&attempt,cancel:CancelSignal::new(),cx:&cx}).await;
-            let charge=match report.charge { Charge::Observed{units}=>units.checked_mul(unit).map_or(Charge::Unknown,|units|Charge::Observed{units}),Charge::Estimated{units}=>units.checked_mul(unit).map_or(Charge::Unknown,|units|Charge::Estimated{units}),Charge::Unknown=>Charge::Unknown };
-            journal.settle(reservation,charge);
-            if let Err((_,detail))=report.result { return Err(format!("not reachable: call {}: {detail}",i+1)); }
-            if i+1<count { tokio::time::sleep(std::time::Duration::from_millis(interval)).await; }
+    match runtime.block_on(crate::probe::probe(&backend, &journal, plan)) {
+        crate::probe::ProbeReport::Reachable { .. } => {
+            println!(
+                "reachable: {count} successful sequential calls; interval_ms={interval}; budget_ms={budget}; reachability only"
+            );
+            Ok(())
         }
-        println!("reachable: {count} successful sequential calls; interval_ms={interval}; budget_ms={budget}; reachability only");
-        Ok(())
-    })
+        crate::probe::ProbeReport::NotReachable { call, detail, .. } => {
+            if crate::taxonomy::code_of_detail(&detail).is_some() {
+                Err(format!("not reachable: call {call}: {detail}"))
+            } else {
+                Err(detail)
+            }
+        }
+    }
 }

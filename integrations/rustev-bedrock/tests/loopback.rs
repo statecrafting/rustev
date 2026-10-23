@@ -50,6 +50,10 @@ struct Sink(Mutex<Vec<ExchangeRecord>>);
 impl ExchangeSink for Sink {
     fn deliver(&self, r: &ExchangeRecord, retained: Option<&RetainedBytes>) -> Result<(), String> {
         assert!(retained.is_none());
+        let encoded = serde_json::to_string(r).unwrap();
+        for secret in ["HOST_TEST_KEY", "HOST_TEST_SECRET", "HOST_TEST_TOKEN"] {
+            assert!(!encoded.contains(secret), "credential in exchange record");
+        }
         self.0.lock().unwrap().push(r.clone());
         Ok(())
     }
@@ -213,6 +217,14 @@ async fn policy_replacement_and_precancel_never_obtain_credentials_or_send() {
             cx: &context(1000),
         })
         .await;
+    assert!(
+        report
+            .result
+            .as_ref()
+            .unwrap_err()
+            .1
+            .starts_with("remote:cancelled")
+    );
     assert_eq!(report.cancel, CancelAck::Stopped);
     assert_eq!(report.charge, Charge::Observed { units: 0 });
     let (_, mut policy, _) = fixture();
@@ -256,6 +268,14 @@ async fn credential_acquisition_is_inside_the_total_budget() {
         })
         .await;
     assert!(started.elapsed() < Duration::from_secs(1));
+    assert!(
+        report
+            .result
+            .as_ref()
+            .unwrap_err()
+            .1
+            .starts_with("remote:transport_unsent")
+    );
     assert_eq!(calls.load(Ordering::SeqCst), 1);
     assert_eq!(report.charge, Charge::Observed { units: 0 });
     assert_eq!(report.remote, RemoteEnd::Finished);
@@ -278,6 +298,14 @@ async fn cancellation_after_write_is_unconfirmed() {
             cx: &context(2000),
         })
         .await;
+    assert!(
+        report
+            .result
+            .as_ref()
+            .unwrap_err()
+            .1
+            .starts_with("remote:cancelled")
+    );
     assert_eq!(report.cancel, CancelAck::Unconfirmed);
     assert_eq!(report.charge, Charge::Unknown);
     assert_eq!(report.remote, RemoteEnd::PossiblyContinuing);
@@ -291,36 +319,74 @@ async fn refusals_are_unknown_and_never_retried() {
         (429, "ModelNotReadyException", "overloaded"),
         (403, "MarketplaceAgreementPending", "unauthorized"),
         (400, "RequestExpired", "unauthorized"),
+        (404, "FTUFormNotFilled", "capability"),
+        (503, "ServiceUnavailable", "overloaded"),
+        (503, "ServiceUnavailableException", "overloaded"),
+        (529, "overloaded_error", "overloaded"),
+        (400, "ValidationException", "malformed_request"),
+        (500, "InternalServerException", "remote_error"),
         (404, "ResourceNotFoundException", "capability"),
         (408, "ModelTimeoutException", "remote_deadline"),
         (424, "ModelErrorException", "remote_error"),
     ] {
-        let (url, handle, _) = server(
-            status,
-            &format!("x-amzn-ErrorType: {kind}\r\nretry-after: 50\r\n"),
-            "{}",
-            false,
-        )
-        .await;
-        let sink = Arc::new(Sink::default());
-        let (b, calls) = backend(url, sink.clone(), Duration::ZERO);
-        let report = b
-            .infer(AttemptCall {
-                projection: projection(),
-                attempt_id: "refusal",
-                cancel: CancelSignal::new(),
-                cx: &context(2000),
-            })
-            .await;
-        assert_eq!(report.charge, Charge::Unknown);
-        let detail = report.result.unwrap_err().1;
-        assert!(
-            detail.starts_with(&format!("remote:{code}: bedrock:{kind}")),
-            "{detail}"
-        );
-        assert_eq!(calls.load(Ordering::SeqCst), 1);
-        assert_eq!(sink.0.lock().unwrap()[0].retry_after.as_deref(), Some("50"));
-        handle.await.unwrap();
+        for wire in [
+            rustev_bedrock::binding::Wire::Converse,
+            rustev_bedrock::binding::Wire::Responses,
+        ] {
+            let body = serde_json::json!({"error":{"type":kind,"message":"HOST_TEST_SECRET HOST_TEST_TOKEN HOST_TEST_KEY"}}).to_string();
+            let headers = if wire == rustev_bedrock::binding::Wire::Converse {
+                format!("x-amzn-ErrorType: {kind}\r\nretry-after: 50\r\n")
+            } else {
+                "retry-after: 50\r\n".into()
+            };
+            let (url, handle, _) = server(status, &headers, &body, false).await;
+            let sink = Arc::new(Sink::default());
+            let (mut binding, policy, materials) = fixture();
+            binding.wire = wire;
+            if wire == rustev_bedrock::binding::Wire::Responses {
+                binding.provider_store = serde_json::json!(false);
+            }
+            let calls = Arc::new(AtomicUsize::new(0));
+            let b = BedrockBackend::new(
+                "errors".into(),
+                binding,
+                policy,
+                materials,
+                Config {
+                    endpoint: Some(url),
+                    sink: sink.clone(),
+                    credentials: Some(Arc::new(Credentials {
+                        calls: calls.clone(),
+                        delay: Duration::ZERO,
+                    })),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+            let report = b
+                .infer(AttemptCall {
+                    projection: projection(),
+                    attempt_id: "refusal",
+                    cancel: CancelSignal::new(),
+                    cx: &context(2000),
+                })
+                .await;
+            assert_eq!(report.charge, Charge::Unknown);
+            let (class, detail) = report.result.unwrap_err();
+            if status == 429 {
+                assert_eq!(class, rustev_core::seams::AdapterFailure::Overloaded);
+            }
+            for secret in ["HOST_TEST_KEY", "HOST_TEST_SECRET", "HOST_TEST_TOKEN"] {
+                assert!(!detail.contains(secret));
+            }
+            assert!(
+                detail.starts_with(&format!("remote:{code}: bedrock:{kind}")),
+                "{detail}"
+            );
+            assert_eq!(calls.load(Ordering::SeqCst), 1);
+            assert_eq!(sink.0.lock().unwrap()[0].retry_after.as_deref(), Some("50"));
+            handle.await.unwrap();
+        }
     }
 }
 #[test]
@@ -411,4 +477,72 @@ fn environment_credentials_do_not_enable_the_probe_without_the_feature() {
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert!(stderr.contains("requires the aws-config feature"));
     assert!(!stderr.contains("ENV_TEST"));
+}
+
+#[cfg(not(feature = "aws-config"))]
+#[test]
+fn environment_credentials_cannot_construct_a_backend_without_a_provider() {
+    // A child isolates synthetic environment values without unsafe process mutation.
+    const MARKER: &str = "BEDROCK_ENV_CHILD";
+    if std::env::var_os(MARKER).is_some() {
+        assert_eq!(std::env::var("AWS_ACCESS_KEY_ID").unwrap(), "ENV_TEST_KEY");
+        let (b, p, m) = fixture();
+        assert!(
+            BedrockBackend::new("env-test".into(), b, p, m, Config::default())
+                .err()
+                .unwrap()
+                .contains("credential_provider_required")
+        );
+        return;
+    }
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "environment_credentials_cannot_construct_a_backend_without_a_provider",
+        ])
+        .env(MARKER, "1")
+        .env("AWS_ACCESS_KEY_ID", "ENV_TEST_KEY")
+        .env("AWS_SECRET_ACCESS_KEY", "ENV_TEST_SECRET")
+        .env("AWS_SESSION_TOKEN", "ENV_TEST_TOKEN")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[tokio::test]
+async fn connection_loss_after_request_is_interrupted_and_unknown() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("http://{}", listener.local_addr().unwrap());
+    let peer = tokio::spawn(async move {
+        let (mut stream, addr) = listener.accept().await.unwrap();
+        assert!(addr.ip().is_loopback());
+        let mut buf = [0; 4096];
+        assert!(stream.read(&mut buf).await.unwrap() > 0);
+        // Close without an HTTP response, after observing request bytes.
+    });
+    let sink = Arc::new(Sink::default());
+    let (b, _) = backend(url, sink.clone(), Duration::ZERO);
+    let report = b
+        .infer(AttemptCall {
+            projection: projection(),
+            attempt_id: "lost",
+            cancel: CancelSignal::new(),
+            cx: &context(2000),
+        })
+        .await;
+    assert!(
+        report
+            .result
+            .unwrap_err()
+            .1
+            .starts_with("remote:transport_interrupted")
+    );
+    assert_eq!(report.charge, Charge::Unknown);
+    assert_eq!(report.remote, RemoteEnd::PossiblyContinuing);
+    assert!(sink.0.lock().unwrap()[0].bytes_sent);
+    peer.await.unwrap();
 }
