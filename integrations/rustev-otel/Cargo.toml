@@ -8,9 +8,13 @@ license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 readme.workspace = true
-# Spec 028, section 2: not published until spec 021's release family is
-# extended to it (#76 A3).
-publish = false
+documentation = "https://docs.rs/rustev-otel"
+keywords = ["decision-engine", "opentelemetry", "telemetry", "tracing"]
+categories = ["development-tools::debugging"]
+# Spec 031 3.1 admits this member; spec 021 3.4 restricts its registry.
+publish = ["crates-io"]
+# Spec 021 3.5: source and license only; Cargo adds the workspace README.
+include = ["/src/**/*.rs", "/LICENSE"]
 
 [package.metadata.spec-spine]
 spec = "028-opentelemetry-evidence-sink"

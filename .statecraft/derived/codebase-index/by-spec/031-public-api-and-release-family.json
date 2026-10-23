@@ -61,6 +61,14 @@
         "source": "manifest-metadata"
       },
       {
+        "path": "integrations/rustev-otel/Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "integrations/rustev-otel/LICENSE",
+        "source": "spec-edge"
+      },
+      {
         "path": "integrations/rustev-remote-http/Cargo.toml",
         "source": "spec-edge"
       },
@@ -253,6 +261,32 @@
       {
         "locations": [
           {
+            "file": "integrations/rustev-otel/Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "integrations/rustev-otel/Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "integrations/rustev-otel/LICENSE"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "integrations/rustev-otel/LICENSE"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "integrations/rustev-remote-http/Cargo.toml"
           }
         ],
@@ -346,5 +380,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "fc039b54f7c4fa550ead8900ae2f9c2b2982b6c310928f501f69b786e98dfa90"
+  "shardHash": "93b1e49832290dad7214d2dc76e496607ead9ca2c9505c8543be28e89715b8fb"
 }
