@@ -19,7 +19,9 @@ mod dynamic;
 pub mod ledger;
 mod live;
 mod optimization;
+mod progress;
 mod sink;
+pub use progress::{ProgressObserver, StepProgress};
 mod wait;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -204,6 +206,7 @@ pub(crate) struct Inner {
     queued: AtomicUsize,
     rejected: AtomicU64,
     abandoned: AtomicU64,
+    observer_panics: AtomicU64,
     /// Decision ids submitted and not yet finished, so no two live
     /// decisions share attempt ids (spec 003, 3.9.2).
     live: Mutex<BTreeSet<String>>,
@@ -327,6 +330,7 @@ impl RuntimeBuilder {
                 queued: AtomicUsize::new(0),
                 rejected: AtomicU64::new(0),
                 abandoned: AtomicU64::new(0),
+                observer_panics: AtomicU64::new(0),
                 live: Mutex::new(BTreeSet::new()),
             }),
         })
@@ -599,7 +603,24 @@ impl Runtime {
         req: DecisionRequest,
         cancel: &CancelSignal,
     ) -> Result<Decided, DecideError> {
-        self.run(plan, req, cancel, None, None).await
+        self.run(plan, req, cancel, None, None, None).await
+    }
+
+    /// Run with a value-free observer. The ordinary entry point has no callbacks.
+    pub async fn decide_observed(
+        &self,
+        plan: &PreparedPlan,
+        req: DecisionRequest,
+        cancel: &CancelSignal,
+        observer: &dyn ProgressObserver,
+    ) -> Result<Decided, DecideError> {
+        self.run(plan, req, cancel, None, None, Some(observer))
+            .await
+    }
+
+    /// Contained progress callback panics across this runtime's decisions.
+    pub fn observer_panics(&self) -> u64 {
+        self.inner.observer_panics.load(Ordering::Relaxed)
     }
 
     /// [`Runtime::decide`] with opt-in bounded capture of every supplied
@@ -623,7 +644,7 @@ impl Runtime {
         let decision_id = req.decision_id.clone();
         let mut capturing = capture::Capturing::new(capture);
         let result = self
-            .run(plan, req, cancel, Some(&mut capturing), None)
+            .run(plan, req, cancel, Some(&mut capturing), None, None)
             .await;
         let capture = match &result {
             Err(DecideError::Rejected(_)) => CaptureOutcome::NotAdmitted,
@@ -643,6 +664,7 @@ impl Runtime {
         cancel: &CancelSignal,
         capture: Option<&mut capture::Capturing<'_>>,
         live: Option<&live::LiveCtx<'_>>,
+        observer: Option<&dyn ProgressObserver>,
     ) -> Result<Decided, DecideError> {
         let i = &*self.inner;
         // The runtime waits on its own child of the caller's signal, so a
@@ -697,6 +719,13 @@ impl Runtime {
             Err(r) => return Err(reject(r)),
         };
         let queued_ms = i.clock.now().saturating_sub(submitted);
+        let observing = observer.map(|observer| progress::Observing {
+            observer,
+            panics: &i.observer_panics,
+        });
+        if let Some(o) = &observing {
+            o.call(|o| o.admitted());
+        }
 
         let ledger = Ledger::new(plan.cost);
         let ev = std::sync::Mutex::new(ev);
@@ -712,6 +741,7 @@ impl Runtime {
                 principal: &req.principal_handle,
                 ev: &ev,
                 live,
+                observing: observing.as_ref(),
             };
             driver::run_requests(&cx, capture).await
         };
@@ -724,6 +754,9 @@ impl Runtime {
             let (judgment, evidence) = ev
                 .finish(&req.decision_id)
                 .expect("every pending request was supplied");
+            if let Some(o) = &observing {
+                o.remaining(&evidence, &requests, &compiled.plan);
+            }
             (
                 Completion::Judged(Box::new(judgment)),
                 CoreEvidence::Recorded(Box::new(evidence)),
