@@ -502,6 +502,10 @@ fn extract(
             String::from_utf8_lossy(&out.stderr)
         ));
     }
+    // 031 3.9.3: artifact archives compare all paths without a crate root.
+    if root == "." {
+        return walk(into, "");
+    }
     let mut files = walk(&into.join(root), "")?;
     // Anything beside the package root is itself a violation of 3.5; its
     // files keep their content so the scan sees them too.

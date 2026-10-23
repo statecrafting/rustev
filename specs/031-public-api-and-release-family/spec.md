@@ -829,6 +829,23 @@ requirement is raised to that floor so no registry consumer resolves an
 affected version. No Rustev crate constructs an `AsyncFd`; no API or
 behavior changes.
 
+**Increment 7 part 1, 2026-10-23 (the artifact evidence commands).**
+`rustev-release` gains the commands the release workflow's reproducibility,
+SBOM and audit steps call (3.9.1 to 3.9.3); none of them publishes.
+`compare-artifacts <a> <b>` compares two artifact sets (raw binaries,
+addons, archives, npm tarballs), naming each differing file, archive entry
+or container and never normalizing one away, and prints its report
+(`rustev.artifact-reproducibility/1`); an empty set or an unreadable
+archive is a problem, not a pass. `npm-audit <dir>` fails a tarball with
+any dependency, peer or bundled dependency, install script, `node_modules`
+entry or optional dependency other than a release platform package at the
+family version. `sbom-check <artifacts> <sboms>` fails an artifact without
+its CycloneDX SBOM. `main-sbom <tarball> <epoch>` writes the deterministic
+SBOM of the native main package, which ships JavaScript and declarations
+only, naming its platform packages. Archive extraction compares every path
+when an artifact has no crate root. Part 2 wires these into the release
+workflow.
+
 **Increment 8, 2026-10-23 (`rustev-otel` joins the family).** Spec 028 is
 complete, so its crate joins the release as 3.1 admits a planned member,
 and the facade gains `otel` (3.4): `otel = ["dep:rustev-otel"]`, module
