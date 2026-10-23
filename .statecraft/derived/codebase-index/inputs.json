@@ -1,5 +1,8 @@
 {
   "inputs": {
+    ".cargo/config.toml": {
+      "contentHash": "1ccc0c5f65043cfb26e4f0988fa922da7659a3e9df023835ee37bb03d149049e"
+    },
     ".github/workflows/bindings.yml": {
       "contentHash": "7faf5fe98c9c4c73383d1f31427ff6530fe67c34eb1f56ecf78eaa24262fc05d"
     },
@@ -10,7 +13,7 @@
       "contentHash": "8be21a06b4c4b0571bc76fd80e5b8e756b8d69ba7728decc2c5c622c0d44bbdc"
     },
     ".github/workflows/release.yml": {
-      "contentHash": "363f54d919543d64d432bd6237b39f3241f5d3bb9001b2df448bf79595d6c806"
+      "contentHash": "0f7f77d4c15c0e23d23c6614589afb60fc11042ed743dd8f4c01bf65b41bbbec"
     },
     ".github/workflows/statecraft-ai-review.yml": {
       "contentHash": "1880b5380c2457b28ea8b34903d2044ae099edc53ce735874092d0be8daab94c"
@@ -112,7 +115,7 @@
       "contentHash": "85cbab11005a37eada09d774bcf825cdd527a5daccdd27353ccca5605f31763c"
     },
     "spec-spine.toml": {
-      "contentHash": "a33436d1bbf52a70796908997b27d8a6817f9f10181cb618fada044a02cd897b"
+      "contentHash": "30089ce273016801e8c4542b53ad7bcb38c5e3c59db8183035fc6ebb6d488832"
     },
     "standards/spec/constitution.md": {
       "contentHash": "010d2e3af85bb45a1208b6dc521803e99bccd7a2f1b00d08c5f5c9aacf0bd766"

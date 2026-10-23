@@ -12,6 +12,7 @@
 //! passing check is candidate evidence only (spec 021, I-1).
 
 pub mod archive;
+pub mod artifacts;
 pub mod audit;
 pub mod changelog;
 pub mod cratesio;

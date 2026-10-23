@@ -48,7 +48,7 @@
     {
       "kind": "binary",
       "name": "rustev",
-      "reason": "prebuilt CLI binaries are built and attached by the release workflow (spec 031 3.9.5, 3.12), which does not exist yet; the CLI ships as the rustev-cli crate"
+      "reason": "the release workflow builds, reproduces, audits and attests the CLI archives (spec 031 3.9, 3.12); they remain absent and are not attached until the hosted-release layer (031 3.1 layer 8) exists"
     },
     {
       "kind": "image",

@@ -75,6 +75,8 @@ extra_hashed_inputs = [
   "Cargo.toml",
   # Each published package's link to the root LICENSE (spec 021, 3.3).
   "*/*/LICENSE",
+  # Build settings every Cargo build reads (spec 031, 3.9.3).
+  ".cargo/config.toml",
 ]
 # Directories the symbol resolver and the coverage walk skip.
 resolver_exclusions = ["target", "node_modules", ".statecraft/derived", "dist", "build", ".next", ".tooling", ".bin"]

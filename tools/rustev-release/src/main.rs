@@ -917,6 +917,40 @@ fn publish_cmd(dir: &str, instruction: &str, journal_path: &str) -> ExitCode {
     }
 }
 
+// 031 3.9.1 to 3.9.3: artifact commands emit evidence and never publish.
+fn artifact_cmd(set: &ReleaseSet, args: &[&str]) -> ExitCode {
+    let result = (|| -> Result<bool, String> {
+        let problems = match args {
+            ["compare-artifacts", a, b] => {
+                let report = rustev_release::artifacts::compare(Path::new(a), Path::new(b))?;
+                println!("{}", serde_json::to_string_pretty(&report).map_err(|e| e.to_string())?);
+                report.problems
+            }
+            ["npm-audit", dir] => rustev_release::artifacts::npm_audit(set, Path::new(dir))?,
+            ["sbom-check", dir, sboms] => rustev_release::artifacts::sbom_check(Path::new(dir), Path::new(sboms))?,
+            ["main-sbom", tarball, epoch] => {
+                let epoch = epoch.parse::<u64>().map_err(|e| e.to_string())?;
+                let bom = rustev_release::artifacts::main_sbom(set, Path::new(tarball), epoch)?;
+                println!("{}", serde_json::to_string_pretty(&bom).map_err(|e| e.to_string())?);
+                vec![]
+            }
+            _ => return Err("usage: compare-artifacts <a> <b> | npm-audit <dir> | sbom-check <artifacts> <sboms> | main-sbom <tarball> <epoch>".into()),
+        };
+        for problem in &problems {
+            eprintln!("{problem}");
+        }
+        Ok(problems.is_empty())
+    })();
+    match result {
+        Ok(true) => ExitCode::SUCCESS,
+        Ok(false) => ExitCode::from(1),
+        Err(e) => {
+            eprintln!("031 3.9: {e}");
+            ExitCode::from(1)
+        }
+    }
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let set = match ReleaseSet::parse(SET.as_bytes()) {
@@ -927,6 +961,10 @@ fn main() -> ExitCode {
         }
     };
     match args.iter().map(String::as_str).collect::<Vec<_>>()[..] {
+        [
+            "compare-artifacts" | "npm-audit" | "sbom-check" | "main-sbom",
+            ..,
+        ] => artifact_cmd(&set, &args.iter().map(String::as_str).collect::<Vec<_>>()),
         ["manifests"] => manifests(&set),
         ["archives", dir] => archives(&set, dir),
         ["compare", a, b] => compare(&set, a, b),
