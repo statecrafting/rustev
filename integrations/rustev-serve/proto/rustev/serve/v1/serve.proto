@@ -1,0 +1,40 @@
+// Generated from rustev-contract operation_table. Do not edit.
+syntax = "proto3";
+package rustev.serve.v1;
+
+// Path parameters: rustev-plan-id and rustev-decision-id metadata.
+// IDs are percent-escaped UTF-8 path components.
+// Cancellation wait: rustev-wait-ms metadata. Other headers keep their names.
+// Canonical HTTP body bytes, including empty and OpenMetrics bodies.
+message Document { bytes document = 1; }
+
+service Serve {
+  // {"operation":"describe","method":"GET","route":"/v1/service","group":"decide","request_schema":"none","response_schemas":["rustev.serve-service/1"],"streaming":false,"response_format":"document"}
+  rpc Describe(Document) returns (Document);
+  // {"operation":"register","method":"PUT","route":"/v1/plans/{planId}","group":"admin","request_schema":{"some":"rustev.serve-register/1"},"response_schemas":["rustev.plan-registration/1"],"streaming":false,"response_format":"document"}
+  rpc Register(Document) returns (Document);
+  // {"operation":"registration","method":"GET","route":"/v1/plans/{planId}","group":"decide","request_schema":"none","response_schemas":["rustev.plan-registration/1"],"streaming":false,"response_format":"document"}
+  rpc Registration(Document) returns (Document);
+  // {"operation":"decide","method":"POST","route":"/v1/plans/{planId}/decisions","group":"decide","request_schema":{"some":"rustev.serve-decide/1"},"response_schemas":["rustev.serve-decision/1"],"streaming":false,"response_format":"document"}
+  rpc Decide(Document) returns (Document);
+  // {"operation":"stream","method":"POST","route":"/v1/plans/{planId}/decisions?stream=1","group":"decide","request_schema":{"some":"rustev.serve-decide/1"},"response_schemas":["rustev.serve-event/1"],"streaming":true,"response_format":"document"}
+  rpc Stream(Document) returns (stream Document);
+  // {"operation":"lookup","method":"GET","route":"/v1/decisions/{decisionId}","group":"decide","request_schema":"none","response_schemas":["rustev.serve-decision/1","rustev.serve-decision-state/1"],"streaming":false,"response_format":"document"}
+  rpc Lookup(Document) returns (Document);
+  // {"operation":"cancel","method":"POST","route":"/v1/decisions/{decisionId}/cancel","group":"decide","request_schema":"none","response_schemas":["rustev.serve-cancel/1"],"streaming":false,"response_format":"document"}
+  rpc Cancel(Document) returns (Document);
+  // {"operation":"replay","method":"POST","route":"/v1/replay","group":"decide","request_schema":{"some":"rustev.serve-replay/1"},"response_schemas":[],"streaming":false,"response_format":"surface_output"}
+  rpc Replay(Document) returns (Document);
+  // {"operation":"evaluate","method":"POST","route":"/v1/evaluate","group":"decide","request_schema":{"some":"rustev.serve-evaluate/1"},"response_schemas":[],"streaming":false,"response_format":"surface_output"}
+  rpc Evaluate(Document) returns (Document);
+  // {"operation":"explain","method":"POST","route":"/v1/explain","group":"decide","request_schema":"none","response_schemas":["rustev.explanation/1"],"streaming":false,"response_format":"explanation"}
+  rpc Explain(Document) returns (Document);
+  // {"operation":"invalidations","method":"POST","route":"/v1/context/invalidations","group":"admin","request_schema":{"some":"rustev.serve-invalidations/1"},"response_schemas":["rustev.serve-invalidations-ack/1"],"streaming":false,"response_format":"document"}
+  rpc Invalidations(Document) returns (Document);
+  // {"operation":"health","method":"GET","route":"/healthz","group":"ops","request_schema":"none","response_schemas":[],"streaming":false,"response_format":"empty"}
+  rpc Health(Document) returns (Document);
+  // {"operation":"readiness","method":"GET","route":"/readyz","group":"ops","request_schema":"none","response_schemas":["rustev.serve-readiness/1"],"streaming":false,"response_format":"document"}
+  rpc Readiness(Document) returns (Document);
+  // {"operation":"metrics","method":"GET","route":"/metrics","group":"ops","request_schema":"none","response_schemas":[],"streaming":false,"response_format":"openmetrics"}
+  rpc Metrics(Document) returns (Document);
+}

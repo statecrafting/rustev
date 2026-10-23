@@ -82,6 +82,14 @@ aws-config = { version = "1.13.0", default-features = false, features = ["rt-tok
 # root. Used only under integrations/ (spec 042 3.18).
 ring = { version = "0.17.14", default-features = false }
 sigstore-verify = { version = "=0.15.0", default-features = false, features = ["aws-lc-rs"] }
+# rustev-serve's gRPC transport (spec 042 3.9; binding record item 1). The
+# generator runs at development time and its output is committed.
+tonic = { version = "=0.14.6", default-features = false, features = ["codegen", "server"] }
+tonic-prost = { version = "=0.14.6", default-features = false }
+prost = { version = "=0.14.4", default-features = false, features = ["std", "derive"] }
+# Development-time generator only (a dev-dependency of rustev-serve); the
+# boundary check refuses the gRPC family outside integrations/ (042 3.18).
+tonic-prost-build = { version = "=0.14.6", default-features = false }
 webpki-roots = { version = "1.0.10", default-features = false }
 # The telemetry exporter family (spec 028, 3.2.3 "Dependencies",
 # and 3.12 "Dependency boundary", which forbids every `opentelemetry*`

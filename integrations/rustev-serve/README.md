@@ -1,6 +1,6 @@
 # rustev-serve
 
-Work in progress for spec 010's serving binding and spec 042 increment 1.
+Work in progress for spec 010's serving binding and spec 042 increments 1 and 2.
 This implementation is not yet a complete conforming decision service.
 Responses are proposals and evidence, never execution authorization.
 
@@ -46,6 +46,35 @@ Observer panics are contained and counted separately from decision evidence.
 Normal shutdown stops accepting connections and starts Hyper graceful shutdown
 while decisions drain and sink tickets settle. Existing streams can send their
 final event; connection flushing is bounded. A second signal skips these waits.
+
+## gRPC
+
+The same authenticated listeners route `application/grpc` requests over HTTP/2
+(ALPN `h2` on TCP) to `rustev.serve.v1.Serve`. Every protobuf message has one
+`bytes document` field; canonical document bytes pass through unchanged. Empty
+HTTP bodies remain empty, and Metrics carries the same OpenMetrics bytes.
+Methods and schema comments come from the contract operation table.
+
+Request headers retain their names as metadata. HTTP path parameters use
+`rustev-plan-id` or `rustev-decision-id`; Cancel's optional query wait uses
+`rustev-wait-ms`. IDs are percent-escaped UTF-8 path components, also for the
+`rustev-decision-id` failure metadata; `grpc::path_id` provides that encoding.
+Refusals carry their exact document in `rustev-refusal-bin` with the contract
+status code. A failed evidence delivery returns INTERNAL and its decision ID;
+Lookup returns the retained document with OK. Stream sends each canonical event,
+including its reserved final event, before terminal status trailers.
+
+The development generator uses protoc (29.3 was used) from `$PROTOC`, or `protoc` on `PATH`; without one, the test still checks the `.proto` and the stub's recorded `.proto` digest:
+
+```sh
+cargo test -p rustev-serve --locked --test grpc_generation
+RUSTEV_BLESS=1 cargo test -p rustev-serve --locked --test grpc_generation
+```
+
+The second command rewrites the checked-in proto and Rust output. There is no
+build script or generation during normal builds. Tests check both outputs for
+drift. Socket tests stay enabled; equivalent in-memory HTTP/2 tests cover the
+same framing and handler path when the environment forbids binding sockets.
 
 ## Conservative choices
 
@@ -94,13 +123,12 @@ These gaps are not claims of spec acceptance:
   configured means explicit delivery failure. Ecosystem backends and context
   clients still require host construction. OpenTelemetry startup is refused
   because no exporter feature is built.
-- gRPC, container packaging, the shared conformance suite, remote HTTP context
+- Container packaging, the shared conformance suite, remote HTTP context
   bindings, and specs 034/036 integration are intentionally outside this increment.
 
 ## Verification
 
-Run the five checks in the task brief, plus `cargo test -p rustev-runtime --locked`
-and `cargo test -p rustev-conformance --locked`. Tests cover handler refusals, signed
+Run the six checks in the increment 2 task brief. Tests cover handler refusals, signed
 registration, retention, idempotency, disconnect ownership, admission limits,
 shutdown accounting, root confinement, HTTP/1.1 and HTTP/2, and TLS authentication.
 The in-memory transport tests exercise real Hyper and rustls connections without

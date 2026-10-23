@@ -1022,6 +1022,13 @@ installs none, and every existing runtime test, golden and conformance
 case is byte-identical; `tests/progress.rs` checks events against the
 judgment for an exact and a model-backed step.
 
+**Boundary families (with `rustev-serve` increment 2).**
+`tools/rustev-boundaries/` adds the integration-only gRPC family (`tonic`,
+`tonic-build`, `tonic-prost`, `tonic-prost-build`, `prost`, `prost-build`,
+`prost-types`) and the Sigstore family (`sigstore`, `sigstore-verify`,
+`sigstore-protobuf-specs`) of 3.18; the transitive purity check of
+`rustev-contract` and `rustev-core` refuses both, with tests.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

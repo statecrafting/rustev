@@ -32,3 +32,5 @@ pub mod sinks;
 #[path = "../../rustev-remote-http/src/wire.rs"]
 #[allow(dead_code)] // shared source: this crate uses only part of it
 mod wire;
+
+pub mod grpc;

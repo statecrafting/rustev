@@ -28,6 +28,9 @@ rustls.workspace = true
 tokio-rustls.workspace = true
 ring.workspace = true
 sigstore-verify.workspace = true
+tonic.workspace = true
+tonic-prost.workspace = true
+prost.workspace = true
 webpki-roots.workspace = true
 
 [[bin]]
@@ -37,4 +40,5 @@ path = "src/main.rs"
 [dev-dependencies]
 # Throwaway test PKI generated at test time; no private key is committed.
 rcgen = { version = "=0.14.10", default-features = false, features = ["crypto", "ring", "pem"] }
+tonic-prost-build.workspace = true
 tokio = { workspace = true, features = ["test-util"] }
