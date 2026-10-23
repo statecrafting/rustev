@@ -70,12 +70,16 @@ def unlocks(plan):
 
 
 def review_verdict(number):
-    comments = gh("api", f"repos/{{owner}}/{{repo}}/issues/{number}/comments?per_page=100")
-    for c in reversed(comments or []):
-        m = re.match(r"## AI review \(([^)]+)\)", c.get("body") or "")
-        if m:
-            return m.group(1)
-    return None
+    # Oldest first and no `direction` on this endpoint: read every page and
+    # keep the last verdict header.
+    out = subprocess.run(
+        ["gh", "api", "--paginate", f"repos/{{owner}}/{{repo}}/issues/{number}/comments?per_page=100",
+         "--jq", '.[].body | select(startswith("## AI review (")) | split("\n")[0]'],
+        cwd=ROOT, capture_output=True, text=True)
+    if out.returncode:
+        raise SystemExit(f"gh api comments #{number}: {out.stderr.strip()}")
+    heads = re.findall(r"## AI review \(([^)]+)\)", out.stdout)
+    return heads[-1] if heads else None
 
 
 def approval_reason(pr, verdict):
@@ -127,11 +131,11 @@ def metrics(prs, items, waiting_runs, open_heads, specs):
     wasted = sum(1 for r in waiting_runs if r["head_sha"] in open_heads - main_heads)
     since = (NOW.date().fromordinal(NOW.date().toordinal() - 7)).isoformat()
     merged = gh("pr", "list", "--state", "merged", "--search", f"merged:>={since}",
-                "--limit", "200", "--json", "baseRefName")
+                "--limit", "200", "--json", "baseRefName") or []
     to_main = sum(1 for m in merged if m["baseRefName"] == DEFAULT)
     approved = [s for s in specs if s.get("status") == "approved"]
     rehearsal = gh("run", "list", "--workflow", "release.yml",
-                   "--limit", "10", "--json", "conclusion,status")
+                   "--limit", "10", "--json", "conclusion,status") or []
     done = [r for r in rehearsal if r["status"] == "completed"]
     return {
         "open_prs": len(prs),
@@ -160,7 +164,7 @@ def main():
 
     prs = gh("pr", "list", "--state", "open", "--limit", "100", "--json",
              "number,title,baseRefName,headRefName,headRefOid,autoMergeRequest,"
-             "createdAt,mergeStateStatus,statusCheckRollup,isDraft,files,url")
+             "createdAt,mergeStateStatus,statusCheckRollup,isDraft,files,url") or []
     by_head = {p["headRefName"]: p for p in prs}
     open_heads = {p["headRefOid"] for p in prs}
     waiting_runs = []
