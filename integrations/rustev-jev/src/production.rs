@@ -3,7 +3,6 @@
 //! production qualification and cannot enable external dispatch.
 
 use std::collections::BTreeMap;
-use std::fmt;
 use std::sync::Arc;
 
 use rustev_contract::canonical::{canonical_bytes, tagged_digest};
@@ -19,15 +18,6 @@ pub const SCHEMA: &str = "rustev.jev-binding/2";
 
 /// Supplied by the host; invoked at dispatch, never at construction.
 pub type CredentialCallback = Arc<dyn Fn() -> Result<Secret, Unresolved> + Send + Sync>;
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Unresolved(pub &'static str);
-impl fmt::Display for Unresolved {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Unresolved: {}", self.0)
-    }
-}
-impl std::error::Error for Unresolved {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -483,15 +473,4 @@ impl Qualification {
     }
 }
 
-/// A provider billing line settling one previously unknown attempt. This
-/// is supplied by the host from the provider record, never inferred from a
-/// timeout, a missing charge, or a late adapter response.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct BillingSettlement {
-    pub credential_reference: String,
-    pub provider_record: String,
-    pub period: String,
-    pub reservation: u64,
-    pub observed_units: u64,
-}
+pub use crate::spend::{BillingSettlement, Unresolved};

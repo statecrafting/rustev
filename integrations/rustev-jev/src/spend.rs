@@ -602,9 +602,8 @@ impl SpendJournal {
     pub fn reconcile_billing(
         &self,
         journal_credential_reference: &str,
-        billing: &crate::production::BillingSettlement,
-    ) -> Result<(), crate::production::Unresolved> {
-        use crate::production::Unresolved;
+        billing: &BillingSettlement,
+    ) -> Result<(), Unresolved> {
         if self.budget() != BudgetKind::Production
             || journal_credential_reference.trim().is_empty()
             || journal_credential_reference != billing.credential_reference
@@ -716,4 +715,30 @@ mod tests {
         assert_eq!(utc_month(951_782_400_000), "2000-02"); // 2000-02-29
         assert_eq!(utc_month(-1), "1969-12");
     }
+}
+
+// Kept in this file, not in `production`, because `rustev-bedrock` compiles
+// this file in by path without the Jev adapter's production module.
+/// Why a production fact, binding or billing settlement is unresolved
+/// (spec 022); `production` re-exports it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Unresolved(pub &'static str);
+impl std::fmt::Display for Unresolved {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Unresolved: {}", self.0)
+    }
+}
+impl std::error::Error for Unresolved {}
+
+/// A provider billing line settling one previously unknown attempt. This
+/// is supplied by the host from the provider record, never inferred from a
+/// timeout, a missing charge, or a late adapter response.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BillingSettlement {
+    pub credential_reference: String,
+    pub provider_record: String,
+    pub period: String,
+    pub reservation: u64,
+    pub observed_units: u64,
 }

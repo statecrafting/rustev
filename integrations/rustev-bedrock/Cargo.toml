@@ -1,0 +1,54 @@
+[package]
+name = "rustev-bedrock"
+version = "0.1.0"
+description = "A hosted decision backend over AWS Bedrock (Converse and Responses wires) under spec 009's remote adapter obligations."
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[package.metadata.spec-spine]
+spec = "030-bedrock-backend"
+
+# Spec 009's Part A machinery is compiled in from its source files (see
+# src/lib.rs), not taken as a Cargo dependency: spec 001 3.4.4 forbids any
+# crate depending on a crate under integrations/. Its dependencies are
+# therefore repeated here.
+[dependencies]
+rustev-contract = { path = "../../crates/rustev-contract" }
+rustev-core = { path = "../../crates/rustev-core" }
+rustev-runtime = { path = "../../crates/rustev-runtime" }
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tokio = { workspace = true, features = ["net", "time", "rt", "sync", "macros", "io-util"] }
+hyper = { workspace = true, features = ["client", "http1"] }
+hyper-util = { workspace = true, features = ["tokio"] }
+http-body-util.workspace = true
+rustls.workspace = true
+tokio-rustls.workspace = true
+webpki-roots.workspace = true
+aws-sigv4.workspace = true
+aws-credential-types.workspace = true
+aws-config = { workspace = true, optional = true }
+
+# The eval crate, the support-routing swap crates and a multi-threaded Tokio
+# are for the tests and the smoke harness only; hyper's server side serves
+# the loopback fake Gateway.
+[dev-dependencies]
+rustev-eval = { path = "../../crates/rustev-eval" }
+# The support-routing backend swap (spec 016 3.3): the package, spec 005's
+# rules program as the other backend, and the CLI that evaluates bundles.
+rustev-pkg-support-routing = { path = "../../packages/rustev-pkg-support-routing" }
+rustev-pkg-lodging = { path = "../../packages/rustev-pkg-lodging" }
+rustev-backend-rules = { path = "../../backends/rustev-backend-rules" }
+rustev-cli = { path = "../../crates/rustev-cli" }
+hyper = { workspace = true, features = ["client", "server", "http1"] }
+tokio = { workspace = true, features = ["net", "time", "rt", "rt-multi-thread", "sync", "macros", "io-util", "test-util"] }
+
+[lints]
+workspace = true
+
+[features]
+aws-config = ["dep:aws-config"]

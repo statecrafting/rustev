@@ -255,9 +255,22 @@ fn is_telemetry(name: &str) -> bool {
     name.starts_with(TELEMETRY_PREFIX) || TELEMETRY_NAMES.contains(&name)
 }
 
+/// Cloud SDK packages (spec 030, 3.13). Cryptographic primitives are excluded.
+fn is_cloud_sdk(name: &str) -> bool {
+    matches!(
+        name,
+        "aws-config" | "aws-credential-types" | "aws-sigv4" | "aws-types" | "aws-runtime"
+    ) || name.starts_with("aws-sdk-")
+        || name.starts_with("aws-smithy-")
+}
+
 /// Forbidden in the pure crates' graphs (spec 001 3.4.1, spec 027 3.14.2).
 fn forbidden_for_pure(name: &str) -> bool {
-    is_ecosystem(name) || is_http(name) || is_executor(name) || is_binding(name)
+    is_ecosystem(name)
+        || is_http(name)
+        || is_executor(name)
+        || is_binding(name)
+        || is_cloud_sdk(name)
 }
 
 /// Forbidden in `rustev-wasm`'s graph (spec 027, 3.14.3).
@@ -371,14 +384,20 @@ pub fn check(meta: &Metadata) -> Vec<Violation> {
                 });
             }
             if pkg.name == FACADE
-                && (is_ecosystem(&dep.name) || is_http(&dep.name) || is_binding(&dep.name))
+                && (is_ecosystem(&dep.name)
+                    || is_http(&dep.name)
+                    || is_binding(&dep.name)
+                    || is_cloud_sdk(&dep.name))
             {
                 out.insert(Violation::FacadeFamily {
                     dependency: dep.name.clone(),
                 });
             }
             if !in_integrations
-                && (is_ecosystem(&dep.name) || is_http(&dep.name) || is_binding(&dep.name))
+                && (is_ecosystem(&dep.name)
+                    || is_http(&dep.name)
+                    || is_binding(&dep.name)
+                    || is_cloud_sdk(&dep.name))
             {
                 out.insert(Violation::ForbiddenFamily {
                     krate: pkg.name.clone(),
@@ -976,6 +995,51 @@ mod tests {
                 "tokio".into()
             ],
         }));
+    }
+
+    #[test]
+    fn cloud_sdk_family_obeys_both_rules() {
+        for dep in [
+            "aws-config",
+            "aws-credential-types",
+            "aws-sigv4",
+            "aws-types",
+            "aws-runtime",
+            "aws-sdk-bedrockruntime",
+            "aws-smithy-runtime",
+        ] {
+            assert!(is_cloud_sdk(dep));
+            for kind in [None, Some("build")] {
+                let deps: &[Dep<'_>] = &[(dep, kind, None)];
+                let outside = meta(
+                    &[CONTRACT, ("rustev-x", "crates/rustev-x", deps)],
+                    &["serde", dep],
+                    &[],
+                );
+                assert!(check(&outside).contains(&Violation::ForbiddenFamily {
+                    krate: "rustev-x".into(),
+                    dependency: dep.into()
+                }));
+                let pure = meta(
+                    &[CONTRACT, CORE],
+                    &["serde", "helper", dep],
+                    &[("rustev-core", "helper", kind), ("helper", dep, kind)],
+                );
+                assert!(check(&pure).iter().any(|v|matches!(v, Violation::ForbiddenTransitive { krate, .. } if krate == "rustev-core")));
+                let integration = meta(
+                    &[
+                        CONTRACT,
+                        ("rustev-cloud", "integrations/rustev-cloud", deps),
+                    ],
+                    &["serde", dep],
+                    &[],
+                );
+                assert!(check(&integration).is_empty());
+            }
+        }
+        for dep in ["aws-lc-rs", "aws-lc-sys"] {
+            assert!(!is_cloud_sdk(dep));
+        }
     }
 
     #[test]

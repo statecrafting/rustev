@@ -73,6 +73,10 @@
   ],
   "excluded": [
     {
+      "name": "rustev-bedrock",
+      "reason": "source-links sibling integration files; live AWS stages and provider boundaries are not satisfied by a standalone archive"
+    },
+    {
       "name": "rustev-jev",
       "reason": "source-links sibling integration files; provider and qualification boundaries are not satisfied by a standalone archive"
     },

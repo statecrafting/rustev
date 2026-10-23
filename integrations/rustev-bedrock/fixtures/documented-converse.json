@@ -1,0 +1,28 @@
+{
+  "provenance": "documented-shape; synthetic; not a live recording",
+  "source": "https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_Converse.html",
+  "response": {
+    "stopReason": "tool_use",
+    "output": {
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "toolUse": {
+              "toolUseId": "synthetic-1",
+              "name": "rustev_answer",
+              "input": {
+                "choice": "b",
+                "confidence": 0.93
+              }
+            }
+          }
+        ]
+      }
+    },
+    "usage": {
+      "inputTokens": 10,
+      "outputTokens": 2
+    }
+  }
+}

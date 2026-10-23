@@ -1,0 +1,20 @@
+{
+  "provenance": "documented-shape; synthetic; not a live recording",
+  "source": "https://docs.aws.amazon.com/bedrock/latest/userguide/inference-responses-api.html",
+  "response": {
+    "status": "completed",
+    "model": "anthropic.claude-sonnet-4-20250514-v1:0",
+    "id": "synthetic-response",
+    "output": [
+      {
+        "type": "function_call",
+        "name": "rustev_answer",
+        "arguments": "{\"choice\":\"b\",\"confidence\":0.93}"
+      }
+    ],
+    "usage": {
+      "input_tokens": 10,
+      "output_tokens": 2
+    }
+  }
+}

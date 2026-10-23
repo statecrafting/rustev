@@ -1,0 +1,11 @@
+{
+  "package": {
+    "kind": "rust-lib",
+    "name": "rustev-bedrock",
+    "path": "integrations/rustev-bedrock",
+    "specRef": "030-bedrock-backend",
+    "version": "0.1.0"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "285b57d29e77d7b829d2321616a4196bf448f2a73054423fc9b66f3cfce0e502"
+}
