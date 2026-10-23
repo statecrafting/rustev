@@ -2,7 +2,7 @@
 id: "022-jev-production-transport"
 title: "Production transport and served identity for the Jev adapter (amends 012)"
 status: approved
-implementation: pending
+implementation: in-progress
 created: "2026-09-27"
 summary: >
   The separately reviewable spec 012 amendment that backlog item RUSTEV-010
@@ -271,6 +271,34 @@ A Jev wire-compatible surface (R-05). Qualifying adapter-scoped batching
 Pending with implementation. Approval authorizes the contract and the
 no-network implementation; no acceptance item is satisfied by approval or by
 the spec 012 Gateway evidence.
+
+## Implementation record
+
+**Increment 1 (stage 1, no network).** `integrations/rustev-jev/src/production.rs`
+adds the production binding (schema 2) whose artifact identity covers every
+fact of 3.4: endpoint, TLS, spec 020's seven phase ceilings (validated
+against the one remaining attempt budget), the connection fact (reuse off,
+one connection per attempt; a binding declaring reuse is refused until an
+isolation key under spec 020 3.5 is supported), retries none, dated privacy
+and cost facts, and the credential custody class. The credential value is
+obtained only at dispatch through the host's callback (3.8.1) and never
+enters identity or evidence; the adapter reads no environment variable or
+file. Also: the eligibility check of 3.1, the served-version pin and
+declared tolerance of 3.2, gateway pinning of 3.3, the monthly
+reconciliation record of 3.5 (signed difference, never rewriting the
+journal; `possibly_continuing` liability settled only from a billing line
+through `SpendJournal::reconcile_billing`), the evidence checks of 3.6 and
+the qualification gate of 3.7. Spec 012's development bindings keep their
+bytes and identities (`tests/fixtures/development-binding-v1.golden.json`).
+Stage 1 runs over loopback with the explicitly synthetic direct mapping
+(`rustev-jev-direct-synthetic/1`), never asserted to be the provider's API
+shape. Tests: `tests/production.rs`.
+
+Not done, and blocked on the owner: stages 2 and 3 of 3.7 (live calls under
+the owner's spend authority), and therefore the recorded fixtures of
+acceptance item 3 and a verified direct mapping. Until then
+`JevBackend::new_production` refuses construction (`Unresolved`), and the two
+live tests are ignored with that reason.
 
 ## Questions settled at approval
 

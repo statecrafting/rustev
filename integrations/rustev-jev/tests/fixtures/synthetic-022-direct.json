@@ -1,0 +1,210 @@
+{
+  "provenance": "SYNTHETIC spec 022 mechanics only. Not observed direct API shapes or provider evidence.",
+  "mapping": "rustev-jev-direct-synthetic/1",
+  "cases": [
+    {
+      "name": "pin-match",
+      "status": 200,
+      "response_body": {
+        "model": "jev-1.13.0",
+        "answers": {
+          "q0": {
+            "type": "boolean",
+            "probability": 0.25
+          }
+        },
+        "providerMetadata": {
+          "gateway": {
+            "routing": {
+              "originalModelId": "typesafe-ai/jev",
+              "resolvedProvider": "typesafe-ai",
+              "canonicalSlug": "typesafe-ai/jev",
+              "finalProvider": "typesafe-ai"
+            },
+            "marketCost": "0.0000042",
+            "generationId": "gen_SYNTHETIC_0001",
+            "cost": "0.000000105"
+          },
+          "typesafe": {
+            "confidence": {}
+          }
+        },
+        "usage": {
+          "inputTokens": 2500,
+          "outputTokens": 20
+        }
+      }
+    },
+    {
+      "name": "pin-mismatch",
+      "status": 200,
+      "response_body": {
+        "model": "jev-other",
+        "answers": {
+          "q0": {
+            "type": "boolean",
+            "probability": 0.25
+          }
+        },
+        "providerMetadata": {
+          "gateway": {
+            "routing": {
+              "originalModelId": "typesafe-ai/jev",
+              "resolvedProvider": "typesafe-ai",
+              "canonicalSlug": "typesafe-ai/jev",
+              "finalProvider": "typesafe-ai"
+            },
+            "marketCost": "0.0000042",
+            "generationId": "gen_SYNTHETIC_0001",
+            "cost": "0.000000105"
+          },
+          "typesafe": {
+            "confidence": {}
+          }
+        },
+        "usage": {
+          "inputTokens": 2500,
+          "outputTokens": 20
+        }
+      }
+    },
+    {
+      "name": "tolerance",
+      "status": 200,
+      "response_body": {
+        "model": "jev-other",
+        "answers": {
+          "q0": {
+            "type": "boolean",
+            "probability": 0.25
+          }
+        },
+        "providerMetadata": {
+          "gateway": {
+            "routing": {
+              "originalModelId": "typesafe-ai/jev",
+              "resolvedProvider": "typesafe-ai",
+              "canonicalSlug": "typesafe-ai/jev",
+              "finalProvider": "typesafe-ai"
+            },
+            "marketCost": "0.0000042",
+            "generationId": "gen_SYNTHETIC_0001",
+            "cost": "0.000000105"
+          },
+          "typesafe": {
+            "confidence": {}
+          }
+        },
+        "usage": {
+          "inputTokens": 2500,
+          "outputTokens": 20
+        }
+      }
+    },
+    {
+      "name": "missing-version",
+      "status": 200,
+      "response_body": {
+        "answers": {
+          "q0": {
+            "type": "boolean",
+            "probability": 0.25
+          }
+        },
+        "providerMetadata": {
+          "gateway": {
+            "routing": {
+              "originalModelId": "typesafe-ai/jev",
+              "resolvedProvider": "typesafe-ai",
+              "canonicalSlug": "typesafe-ai/jev",
+              "finalProvider": "typesafe-ai"
+            },
+            "marketCost": "0.0000042",
+            "generationId": "gen_SYNTHETIC_0001",
+            "cost": "0.000000105"
+          },
+          "typesafe": {
+            "confidence": {}
+          }
+        },
+        "usage": {
+          "inputTokens": 2500,
+          "outputTokens": 20
+        }
+      }
+    },
+    {
+      "name": "no-cost",
+      "status": 200,
+      "response_body": {
+        "model": "jev-1.13.0",
+        "answers": {
+          "q0": {
+            "type": "boolean",
+            "probability": 0.25
+          }
+        }
+      }
+    },
+    {
+      "name": "400",
+      "status": 400,
+      "response_body": {
+        "error": {
+          "type": "SYNTHETIC",
+          "message": "synthetic refusal"
+        }
+      }
+    },
+    {
+      "name": "401",
+      "status": 401,
+      "response_body": {
+        "error": {
+          "type": "SYNTHETIC",
+          "message": "synthetic refusal"
+        }
+      }
+    },
+    {
+      "name": "403",
+      "status": 403,
+      "response_body": {
+        "error": {
+          "type": "SYNTHETIC",
+          "message": "synthetic refusal"
+        }
+      }
+    },
+    {
+      "name": "429",
+      "status": 429,
+      "response_body": {
+        "error": {
+          "type": "SYNTHETIC",
+          "message": "synthetic refusal"
+        }
+      }
+    },
+    {
+      "name": "500",
+      "status": 500,
+      "response_body": {
+        "error": {
+          "type": "SYNTHETIC",
+          "message": "synthetic refusal"
+        }
+      }
+    },
+    {
+      "name": "503",
+      "status": 503,
+      "response_body": {
+        "error": {
+          "type": "SYNTHETIC",
+          "message": "synthetic refusal"
+        }
+      }
+    }
+  ]
+}

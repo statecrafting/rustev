@@ -574,6 +574,10 @@ impl SpendJournal {
     /// A later observed charge for a reservation held as liability (spec
     /// 003, 3.5.5). False when it holds none.
     pub fn reconcile(&self, seq: u64, observed_units: u64) -> bool {
+        // Production liability needs a provider billing record (spec 022).
+        if self.budget() == BudgetKind::Production {
+            return false;
+        }
         let mut s = self.lock();
         if s.res.get(&seq).map(|x| x.state) != Some(ResState::Liability) {
             return false;
@@ -589,6 +593,52 @@ impl SpendJournal {
             x.state = ResState::Observed(observed_units);
         }
         true
+    }
+
+    /// Spec 022: settle production liability only from a provider billing
+    /// line for the journal's credential and the reservation's own month.
+    /// The host must retain the billing line as evidence; no credential
+    /// value is accepted or recorded here.
+    pub fn reconcile_billing(
+        &self,
+        journal_credential_reference: &str,
+        billing: &crate::production::BillingSettlement,
+    ) -> Result<(), crate::production::Unresolved> {
+        use crate::production::Unresolved;
+        if self.budget() != BudgetKind::Production
+            || journal_credential_reference.trim().is_empty()
+            || journal_credential_reference != billing.credential_reference
+            || billing.provider_record.trim().is_empty()
+        {
+            return Err(Unresolved(
+                "billing record does not identify this production journal",
+            ));
+        }
+        let mut state = self.lock();
+        let reservation = state
+            .res
+            .get(&billing.reservation)
+            .ok_or(Unresolved("billing reservation is missing"))?;
+        if reservation.period != billing.period || reservation.state != ResState::Liability {
+            return Err(Unresolved(
+                "billing month conflicts or reservation is not liability",
+            ));
+        }
+        let line = serde_json::to_vec(&Entry::Reconcile {
+            seq: billing.reservation,
+            units: billing.observed_units,
+        })
+        .map_err(|_| Unresolved("billing settlement could not be serialized"))?;
+        if append(&mut state.file, &line).is_err() {
+            self.inner.write_failures.fetch_add(1, Ordering::SeqCst);
+            return Err(Unresolved("billing settlement could not be recorded"));
+        }
+        state
+            .res
+            .get_mut(&billing.reservation)
+            .expect("checked reservation")
+            .state = ResState::Observed(billing.observed_units);
+        Ok(())
     }
 
     /// The totals of the current period.

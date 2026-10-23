@@ -127,6 +127,7 @@ pub enum SetupError {
     /// The direct transport has no documented base; the host must give one.
     NoEndpoint,
     Timeout(TimeoutBeyondBudget),
+    Production(crate::production::Unresolved),
 }
 
 impl fmt::Display for SetupError {
@@ -136,6 +137,7 @@ impl fmt::Display for SetupError {
             SetupError::Endpoint(e) => write!(f, "{e}"),
             SetupError::NoEndpoint => write!(f, "the direct transport needs an endpoint"),
             SetupError::Timeout(e) => write!(f, "{e}"),
+            SetupError::Production(e) => write!(f, "{e}"),
         }
     }
 }
@@ -213,7 +215,9 @@ struct Exchange {
 struct Inner {
     backend_id: String,
     transport: HttpTransport,
-    path: &'static str,
+    path: String,
+    production: Option<crate::production::ProductionBinding>,
+    credential_callback: Option<crate::production::CredentialCallback>,
     binding: JevBinding,
     artifact: ArtifactId,
     descriptor: BackendDescriptor,
@@ -281,8 +285,7 @@ fn transport_code(e: &TransportError) -> (RemoteCode, String) {
             RemoteCode::TransportInterrupted,
             "the budget ran out before a complete response".into(),
         ),
-        // Unreachable while this adapter's transport keeps spec 020's phase
-        // policy disabled (its default); mapped as 3.4 says regardless.
+        // Production mechanics enable spec 020's phase policy.
         TransportError::PhaseExpired(p) => (p.code, format!("the {:?} phase ran out", p.phase)),
     }
 }
@@ -369,7 +372,9 @@ impl JevBackend {
             inner: Arc::new(Inner {
                 backend_id: config.backend_id,
                 transport,
-                path: binding.transport.path(),
+                path: binding.transport.path().to_owned(),
+                production: None,
+                credential_callback: None,
                 artifact,
                 descriptor,
                 cost: config.cost,
@@ -387,6 +392,83 @@ impl JevBackend {
                 binding,
             }),
         })
+    }
+
+    /// Production construction fails closed until the repository has a
+    /// verified direct mapping. Eligibility never grants deployment authority.
+    pub fn new_production(
+        binding: crate::production::ProductionBinding,
+        _credential: crate::production::CredentialCallback,
+        today: &str,
+        budget_ms: u64,
+    ) -> Result<Self, SetupError> {
+        binding
+            .production_eligible(today, budget_ms)
+            .map_err(SetupError::Production)?;
+        Err(SetupError::Production(crate::production::Unresolved(
+            "production mapping is not implemented without recorded stage 2 exchanges",
+        )))
+    }
+
+    /// Stage 1 only: replay the explicitly synthetic schema-1 direct shape
+    /// under schema-2 identity controls. The destination must be a loopback
+    /// IP literal. This does not implement or verify the provider's API.
+    /// The persistent testing journal is required, and no real credential
+    /// should be supplied to this synthetic peer.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_mechanics(
+        backend_id: &str,
+        binding: crate::production::ProductionBinding,
+        endpoint: &str,
+        credential: crate::production::CredentialCallback,
+        sink: Arc<dyn ExchangeSink>,
+        journal: SpendJournal,
+        today: &str,
+    ) -> Result<Self, SetupError> {
+        use crate::production::Unresolved;
+        binding
+            .check_facts(today, 5_000)
+            .map_err(SetupError::Production)?;
+        let target = Endpoint::parse(endpoint).map_err(SetupError::Endpoint)?;
+        if !target
+            .host
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|ip| ip.is_loopback())
+            || journal.budget() != crate::spend::BudgetKind::Testing
+            || binding.mapping != "rustev-jev-direct-synthetic/1"
+            || binding.decision.transport != Transport::Direct
+        {
+            return Err(SetupError::Production(Unresolved(
+                "mechanics requires loopback, a testing journal and the synthetic direct mapping",
+            )));
+        }
+        let mut config = JevConfig::new(backend_id, binding.decision.clone(), Secret::new(""));
+        config.endpoint = Some(endpoint.to_owned());
+        config.cost.input_usd_per_million = binding.facts.input_usd_per_million;
+        config.cost.output_usd_per_million = binding.facts.output_usd_per_million;
+        let mut backend = Self::new(config, sink, Some(journal))?;
+        let inner = Arc::get_mut(&mut backend.inner).expect("new instance");
+        inner.artifact = binding.artifact().map_err(SetupError::Production)?;
+        inner.descriptor.artifact = inner.artifact.clone();
+        inner.protocol = binding.mapping.clone();
+        inner.privacy.clear();
+        match &binding.facts.zero_retention_options {
+            Some(options) => inner.privacy.extend(options.clone()),
+            None => {
+                inner
+                    .privacy
+                    .insert("zero_retention".into(), "unsupported by provider".into());
+            }
+        }
+        inner
+            .privacy
+            .insert("qualification".into(), "synthetic mechanics only".into());
+        inner.path = Endpoint::parse(&binding.facts.endpoint)
+            .map_err(SetupError::Endpoint)?
+            .base_path;
+        inner.production = Some(binding);
+        inner.credential_callback = Some(credential);
+        Ok(backend)
     }
 
     pub fn binding(&self) -> &JevBinding {
@@ -780,7 +862,14 @@ async fn run_exchange(
     };
     let n = questions.len();
     let refs: Vec<&Question> = questions.iter().collect();
-    let body = request_body(&inner.binding, &ex.body_state, &refs);
+    let mut body = request_body(&inner.binding, &ex.body_state, &refs);
+    if let Some(binding) = &inner.production {
+        // Synthetic mapping only, never asserted to be a direct API shape.
+        let mut value: serde_json::Value = serde_json::from_slice(&body).expect("generated JSON");
+        value["privacy"] =
+            serde_json::to_value(&binding.facts.zero_retention_options).expect("string map");
+        body = serde_json::to_vec(&value).expect("generated JSON");
+    }
     let mut record = blank_record(&inner.protocol, inner.artifact.clone(), vec![]);
     record.privacy_requested = inner.privacy.clone();
     record.request_digest = Some(digest_bytes(&body));
@@ -816,12 +905,39 @@ async fn run_exchange(
     } else {
         net::count(inner.transport.endpoint());
         let max = inner.binding.limits.max_response_bytes as usize;
-        match inner
-            .transport
-            .post(inner.path, body.clone(), max, &budget, &ex.sent)
-            .await
-        {
+        let response = async {
+            if let Some(callback) = &inner.credential_callback {
+                let credential = callback()
+                    .map_err(|_| TransportError::Unsent("credential callback refused".into()))?;
+                let binding = inner.production.as_ref().expect("callback binding");
+                let f = &binding.facts;
+                let phases = crate::phases::TransportPhases::Enabled(f.phases.policy());
+                // Construction accepts only explicit reuse-off bindings. A fresh
+                // transport has no pool and cannot carry connections across attempts.
+                let transport = HttpTransport::new(
+                    inner.transport.endpoint().clone(),
+                    None,
+                    Some(credential),
+                    None,
+                )
+                .map_err(|_| TransportError::Unsent("invalid transport".into()))?
+                .with_phases(phases);
+                transport
+                    .post(&inner.path, body.clone(), max, &budget, &ex.sent)
+                    .await
+            } else {
+                inner
+                    .transport
+                    .post(&inner.path, body.clone(), max, &budget, &ex.sent)
+                    .await
+            }
+        }
+        .await;
+        match response {
             Err(e) => {
+                if let TransportError::PhaseExpired(expiry) = &e {
+                    record.phase_expiry = Some(*expiry);
+                }
                 live_only = matches!(e, TransportError::Expired { .. }) && budget.expired();
                 let (code, detail) = transport_code(&e);
                 all(n, code, &detail, None)
@@ -869,6 +985,14 @@ async fn run_exchange(
 /// The served identity (3.6.2): `unknown` on the Gateway transports; on
 /// the direct transport the reported model, which must equal the pin.
 fn served(inner: &Inner, reported_model: Option<&str>) -> Result<ServedIdentity, (String, String)> {
+    if let Some(binding) = &inner.production {
+        return binding.served(reported_model).map_err(|_| {
+            (
+                binding.decision.version_pin.clone().unwrap_or_default(),
+                reported_model.unwrap_or("unobservable").to_owned(),
+            )
+        });
+    }
     match (inner.binding.transport, &inner.binding.version_pin) {
         (Transport::Direct, Some(pin)) => {
             let terms = ServedTerms {
@@ -917,9 +1041,12 @@ fn read_response(
     match served(inner, answered.reported.model.as_deref()) {
         Ok(s) => record.served = s,
         Err((pinned, got)) => {
-            record.served = ServedIdentity {
-                identity: Some(got.clone()),
-                disclosure: Disclosure::Reported,
+            record.served = match answered.reported.model.as_ref() {
+                Some(model) => ServedIdentity {
+                    identity: Some(model.clone()),
+                    disclosure: Disclosure::Reported,
+                },
+                None => ServedIdentity::unknown(),
             };
             return all(
                 n,
@@ -1081,7 +1208,9 @@ fn finish(
         record.members = members;
     }
     for (o, liability) in offers {
-        if let (Some(j), Some(seq)) = (&inner.journal, liability) {
+        if inner.production.is_none()
+            && let (Some(j), Some(seq)) = (&inner.journal, liability)
+        {
             j.reconcile(seq, o.observed_units);
         }
         inner.exchanges.offer(o);
