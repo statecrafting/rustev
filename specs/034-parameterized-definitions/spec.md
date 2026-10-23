@@ -838,6 +838,22 @@ bundle's plan item may be `rustev.plan/3` (3.11.2). The schemas and the
 generated Node and WebAssembly declarations are regenerated
 (`crates/rustev-contract/tests/parameterized_wire.rs`).
 
+**Increment 2 (instantiation analysis).** `rustev-core` gains
+`instantiate`: stages 1 to 4 of 3.8 over a template held as canonical JSON.
+`declarations` checks the parameter declarations of 3.1 and 3.2, `sites`
+finds every reference site and refuses one outside the permitted kinds,
+`template` selects the base definition by the version and range rules of
+3.6 (pins, ambiguity, a range that excludes the selected version, `extends`
+chains with cycles and the depth limit), `overlay` resolves the profile
+chain, `check_variant` the variant, and `values` checks each value against its type,
+lock and bounds. Refusals are `InstantiationRefusal` with the string codes
+of 3.9, never compile categories. `tests/instantiate_analysis.rs`
+covers every code reachable by stages 1 to 4 with a passing neighbour, the
+section 5 rows those stages decide, and a version 1 definition with no
+profile and no variant analysing to no parameters and variant `none`. The
+codes of stages 5 to 8 (`dangling-reference`, `instantiation-bound`) are the
+next increment. No I/O, clock or `unsafe` is added to core.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child
