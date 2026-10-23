@@ -59,7 +59,6 @@ depends_on:
   - "017-general-runtime-optimization"
   - "020-remote-protocol-refinements"
   - "028-opentelemetry-evidence-sink"
-  - "030-bedrock-backend"
   - "032-evidence-quality"
   - "033-provenance-rules-and-actionable-outcomes"
   - "034-parameterized-definitions"
@@ -792,6 +791,16 @@ Read on 2026-10-17 from the AWS documentation named; re-confirmed at the
 | # | Fact | Source |
 |---|---|---|
 | 1 | ApplyGuardrail is `POST /guardrail/{guardrailIdentifier}/version/{guardrailVersion}/apply` on `bedrock-runtime`, body `content` (array of content blocks), `source` (`INPUT` or `OUTPUT`), optional `outputScope` (`INTERVENTIONS` or `FULL`). Response: `action` (`NONE` or `GUARDRAIL_INTERVENED`), `actionReason`, `assessments` (per policy: content, topic, word, sensitive information, contextual grounding, automated reasoning), `outputs`, `usage` with per-policy unit counts (`contentPolicyUnits`, `topicPolicyUnits`, `wordPolicyUnits`, `sensitiveInformationPolicyUnits`, `contextualGroundingPolicyUnits`, `automatedReasoningPolicyUnits` and others), `guardrailCoverage`. Errors: 403, 404, 400 quota and validation, 429, 500, 503. | https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_ApplyGuardrail.html |
+
+**Owner decision A-49 (2026-10-23): dependencies.** Spec 030 is no longer
+a declared dependency of this spec, so its core increment can be
+implemented and completed while 030 is in progress. The Bedrock admission
+of 3.16 was already "not part of this spec's core increment"; it is made
+only after spec 030 is complete, under 030 3.12 and 3.16, whose
+constraints bind it unchanged. Section 5's last row (a Bedrock binding
+with `operations: [screen]` refused `reserved_by_spec` before the
+admission lands) is acceptance of that admission change, not of the core
+increment. No other behavior, row or acceptance item of this spec moves.
 
 ## Decisions at approval
 

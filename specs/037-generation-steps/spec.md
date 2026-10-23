@@ -46,7 +46,6 @@ depends_on:
   - "003-runtime-execution-and-evidence"
   - "004-evaluation-and-replay"
   - "017-general-runtime-optimization"
-  - "030-bedrock-backend"
   - "032-evidence-quality"
   - "033-provenance-rules-and-actionable-outcomes"
   - "034-parameterized-definitions"
@@ -955,6 +954,13 @@ claims about generated text (R-04, R-37); live provider calls or spend.
 ## Verification
 
 Pending with implementation. Approval satisfies no acceptance item.
+
+**Owner decision A-49 (2026-10-23): dependencies.** Spec 030 is no longer
+a declared dependency of this spec. No behavior or acceptance item here
+needs it: provider wire mappings, "including Bedrock's (spec 030 3.12)",
+are out of scope (section 4), and admitting Bedrock's reserved `generate`
+value is its own change under 030 3.12, made only after spec 030 is
+complete.
 
 ## Decisions at approval
 
