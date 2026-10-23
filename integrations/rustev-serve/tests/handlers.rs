@@ -1376,3 +1376,403 @@ async fn standalone_remote_sink_describes_delivers_and_rejects_bad_receipts() {
         server.abort();
     }
 }
+
+mod grpc_differential {
+    use super::*;
+    use http_body_util::{BodyExt, Full};
+    use hyper::{Request, body::Bytes};
+    use hyper_util::rt::{TokioExecutor, TokioIo};
+    use prost::Message;
+    use rustev_serve::grpc::generated::Document as Envelope;
+
+    tokio::task_local! { static SOCKET: bool; }
+    async fn exchange(
+        s: Arc<Service>,
+        grpc: bool,
+        operation: Operation,
+        id: &str,
+        document: Vec<u8>,
+        principal: Option<&str>,
+    ) -> (Vec<Vec<u8>>, hyper::HeaderMap) {
+        exchange_with_wait(s, grpc, operation, id, document, principal, None).await
+    }
+    async fn exchange_with_wait(
+        s: Arc<Service>,
+        grpc: bool,
+        operation: Operation,
+        id: &str,
+        document: Vec<u8>,
+        principal: Option<&str>,
+        wait: Option<&str>,
+    ) -> (Vec<Vec<u8>>, hyper::HeaderMap) {
+        let listener = s.config.listeners.as_slice()[0].clone();
+        let (client_io, server_io): (Box<dyn Io>, Box<dyn Io>) = if SOCKET.get() {
+            let socket = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let client = tokio::net::TcpStream::connect(socket.local_addr().unwrap())
+                .await
+                .unwrap();
+            let (server, _) = socket.accept().await.unwrap();
+            (Box::new(client), Box::new(server))
+        } else {
+            let (client, server) = tokio::io::duplex(65536);
+            (Box::new(client), Box::new(server))
+        };
+        let server = tokio::spawn(async move {
+            rustev_serve::transport::serve_authenticated_connection(
+                server_io,
+                s,
+                listener,
+                None,
+                Some(true),
+            )
+            .await;
+        });
+        let (mut client, connection) =
+            hyper::client::conn::http2::handshake(TokioExecutor::new(), TokioIo::new(client_io))
+                .await
+                .unwrap();
+        let connection = tokio::spawn(connection);
+        let op = operation_table()
+            .into_iter()
+            .find(|op| op.operation == operation)
+            .unwrap();
+        let mut route = if grpc {
+            format!("/rustev.serve.v1.Serve/{operation:?}")
+        } else {
+            op.route
+                .as_str()
+                .replace("{planId}", id)
+                .replace("{decisionId}", id)
+        };
+        if !grpc && let Some(wait) = wait {
+            route.push_str(&format!("?wait_ms={wait}"));
+        }
+        let mut request = Request::builder()
+            .method(if grpc {
+                "POST"
+            } else {
+                match op.method {
+                    HttpMethod::GET => "GET",
+                    HttpMethod::PUT => "PUT",
+                    HttpMethod::POST => "POST",
+                }
+            })
+            .uri(format!("http://localhost{route}"))
+            .header(
+                "content-type",
+                if grpc {
+                    "application/grpc"
+                } else {
+                    "application/json"
+                },
+            );
+        if let Some(principal) = principal {
+            request = request.header("rustev-principal", principal);
+        }
+        if grpc && let Some(wait) = wait {
+            request = request.header("rustev-wait-ms", wait);
+        }
+        let body = if grpc {
+            request = request
+                .header("rustev-plan-id", id)
+                .header("rustev-decision-id", id)
+                .header("te", "trailers");
+            let encoded = Envelope { document }.encode_to_vec();
+            let mut framed = vec![0];
+            framed.extend_from_slice(&(encoded.len() as u32).to_be_bytes());
+            framed.extend(encoded);
+            framed
+        } else {
+            document
+        };
+        let response = client
+            .send_request(request.body(Full::new(Bytes::from(body))).unwrap())
+            .await
+            .unwrap();
+        let mut headers = response.headers().clone();
+        let collected = response.into_body().collect().await.unwrap();
+        if let Some(trailers) = collected.trailers() {
+            headers.extend(trailers.clone());
+        }
+        let bytes = collected.to_bytes();
+        let documents = if grpc {
+            let mut bytes = bytes.as_ref();
+            let mut documents = vec![];
+            while !bytes.is_empty() {
+                assert!(bytes.len() >= 5, "truncated gRPC header");
+                assert_eq!(bytes[0], 0);
+                let len = u32::from_be_bytes(bytes[1..5].try_into().unwrap()) as usize;
+                assert!(bytes.len() >= 5 + len, "truncated gRPC message");
+                documents.push(Envelope::decode(&bytes[5..5 + len]).unwrap().document);
+                bytes = &bytes[5 + len..];
+            }
+            documents
+        } else if operation == Operation::Stream
+            && headers.get("content-type").unwrap() == "text/event-stream"
+        {
+            std::str::from_utf8(&bytes)
+                .unwrap()
+                .split("\n\n")
+                .filter_map(|event| {
+                    event
+                        .split_once("data: ")
+                        .map(|(_, data)| data.as_bytes().to_vec())
+                })
+                .collect()
+        } else {
+            vec![bytes.to_vec()]
+        };
+        connection.abort();
+        server.abort();
+        (documents, headers)
+    }
+    fn compare(a: &[u8], b: &[u8]) {
+        assert_eq!(a, b);
+        assert_eq!(
+            rustev_contract::canonical::tagged_digest("transport-test", a),
+            rustev_contract::canonical::tagged_digest("transport-test", b)
+        );
+    }
+    trait Io: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send {}
+    impl<T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send> Io for T {}
+    #[tokio::test]
+    async fn loopback_documents_refusals_streams_and_evidence_failure_match() {
+        SOCKET.scope(true, cases()).await;
+    }
+    #[tokio::test]
+    async fn memory_http2_documents_refusals_streams_and_evidence_failure_match() {
+        SOCKET.scope(false, cases()).await;
+    }
+    async fn cases() {
+        let s = service(config_value(), Arc::new(Sink::default()));
+        for wait in ["", "abc", "1x"] {
+            let (http, _) = exchange_with_wait(
+                s.clone(),
+                false,
+                Operation::Cancel,
+                "missing",
+                vec![],
+                Some("YWxpY2U"),
+                Some(wait),
+            )
+            .await;
+            assert_eq!(
+                ServeRefusal::parse(&http[0]).unwrap().code,
+                RefusalCode::InvalidRequest
+            );
+            let (grpc, headers) = exchange_with_wait(
+                s.clone(),
+                true,
+                Operation::Cancel,
+                "missing",
+                vec![],
+                Some("YWxpY2U"),
+                Some(wait),
+            )
+            .await;
+            assert!(grpc.is_empty());
+            assert_eq!(headers["grpc-status"], "3");
+            let metadata = tonic::metadata::MetadataMap::from_headers(headers);
+            let refusal = metadata
+                .get_bin("rustev-refusal-bin")
+                .unwrap()
+                .to_bytes()
+                .unwrap();
+            compare(&http[0], &refusal);
+        }
+        for fail in [false, true] {
+            let s = service(
+                config_value(),
+                Arc::new(Sink {
+                    fail,
+                    ..Default::default()
+                }),
+            );
+            let id = register(&s);
+            for operation in [
+                Operation::Describe,
+                Operation::Registration,
+                Operation::Readiness,
+                Operation::Health,
+            ] {
+                let (http, _) = exchange(s.clone(), false, operation, &id, vec![], None).await;
+                let (grpc, headers) = exchange(s.clone(), true, operation, &id, vec![], None).await;
+                compare(&http[0], &grpc[0]);
+                assert_eq!(headers["grpc-status"], "0");
+            }
+            for (operation, principal, data, expected) in [
+                (
+                    Operation::Decide,
+                    None,
+                    body("missing"),
+                    RefusalCode::PrincipalInvalid,
+                ),
+                (
+                    Operation::Decide,
+                    Some("YWxpY2U"),
+                    b"{}".to_vec(),
+                    RefusalCode::InvalidDocument,
+                ),
+                (
+                    Operation::Lookup,
+                    Some("YWxpY2U"),
+                    vec![],
+                    RefusalCode::DecisionNotFound,
+                ),
+                (
+                    Operation::Explain,
+                    None,
+                    vec![],
+                    RefusalCode::EndpointUnavailable,
+                ),
+            ] {
+                let (http, _) =
+                    exchange(s.clone(), false, operation, &id, data.clone(), principal).await;
+                let (_, headers) = exchange(s.clone(), true, operation, &id, data, principal).await;
+                let metadata = tonic::metadata::MetadataMap::from_headers(headers);
+                let refusal = metadata
+                    .get_bin("rustev-refusal-bin")
+                    .unwrap()
+                    .to_bytes()
+                    .unwrap();
+                compare(&http[0], &refusal);
+                assert_eq!(ServeRefusal::parse(&refusal).unwrap().code, expected);
+            }
+            let opaque = "opaque/é%?";
+            s.decide(&id, b"alice".to_vec(), &body(opaque), None).await;
+            let encoded = rustev_serve::grpc::path_id(opaque);
+            let (http_opaque, _) = exchange(
+                s.clone(),
+                false,
+                Operation::Lookup,
+                &encoded,
+                vec![],
+                Some("YWxpY2U"),
+            )
+            .await;
+            let (grpc_opaque, _) = exchange(
+                s.clone(),
+                true,
+                Operation::Lookup,
+                &encoded,
+                vec![],
+                Some("YWxpY2U"),
+            )
+            .await;
+            compare(&http_opaque[0], &grpc_opaque[0]);
+            assert_eq!(
+                ServeDecision::parse(&grpc_opaque[0])
+                    .unwrap()
+                    .decision_id
+                    .as_str(),
+                opaque
+            );
+            if fail {
+                let (_, headers) = exchange(
+                    s.clone(),
+                    true,
+                    Operation::Decide,
+                    &id,
+                    body(opaque),
+                    Some("YWxpY2U"),
+                )
+                .await;
+                assert_eq!(headers["rustev-decision-id"], encoded);
+            }
+            // Prime retention once, then compare identical replay documents.
+            s.decide(&id, b"alice".to_vec(), &body("retained"), None)
+                .await;
+            let (http, _) = exchange(
+                s.clone(),
+                false,
+                Operation::Decide,
+                &id,
+                body("retained"),
+                Some("YWxpY2U"),
+            )
+            .await;
+            let (grpc, headers) = exchange(
+                s.clone(),
+                true,
+                Operation::Decide,
+                &id,
+                body("retained"),
+                Some("YWxpY2U"),
+            )
+            .await;
+            if fail {
+                assert!(grpc.is_empty());
+                assert_eq!(headers["grpc-status"], "13");
+                assert_eq!(headers["rustev-decision-id"], "retained");
+                let (lookup_http, _) = exchange(
+                    s.clone(),
+                    false,
+                    Operation::Lookup,
+                    "retained",
+                    vec![],
+                    Some("YWxpY2U"),
+                )
+                .await;
+                let (lookup_grpc, lookup_headers) = exchange(
+                    s.clone(),
+                    true,
+                    Operation::Lookup,
+                    "retained",
+                    vec![],
+                    Some("YWxpY2U"),
+                )
+                .await;
+                assert_eq!(lookup_headers["grpc-status"], "0");
+                compare(&lookup_http[0], &lookup_grpc[0]);
+            } else {
+                compare(&http[0], &grpc[0]);
+            }
+            let (http, _) = exchange(
+                s.clone(),
+                false,
+                Operation::Stream,
+                &id,
+                body("retained"),
+                Some("YWxpY2U"),
+            )
+            .await;
+            let (grpc, headers) = exchange(
+                s.clone(),
+                true,
+                Operation::Stream,
+                &id,
+                body("retained"),
+                Some("YWxpY2U"),
+            )
+            .await;
+            assert_eq!(http.len(), 1);
+            assert_eq!(grpc.len(), 1);
+            assert!(matches!(
+                ServeEvent::parse(&grpc[0]).unwrap().kind,
+                EventKind::Final { .. }
+            ));
+            compare(&http[0], &grpc[0]);
+
+            // A fresh streaming decision includes progress before its final event.
+            let (events, stream_headers) = exchange(
+                s.clone(),
+                true,
+                Operation::Stream,
+                &id,
+                body("fresh-stream"),
+                Some("YWxpY2U"),
+            )
+            .await;
+            assert!(events.len() > 1);
+            for (index, document) in events.iter().enumerate() {
+                let event = ServeEvent::parse(document).unwrap();
+                assert_eq!(
+                    matches!(event.kind, EventKind::Final { .. }),
+                    index == events.len() - 1
+                );
+            }
+            assert_eq!(stream_headers["grpc-status"], if fail { "13" } else { "0" });
+            assert_eq!(headers["grpc-status"], if fail { "13" } else { "0" });
+        }
+    }
+}

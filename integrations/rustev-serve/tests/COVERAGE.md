@@ -33,7 +33,7 @@ The optional runtime observer has byte-equivalence and panic-containment tests i
 | Third-party endpoint, unknown describe version | Remote sink startup rejects unknown describe versions; remote context construction remains outside this increment; readiness requires host-confirmed describe completion |
 | Invalidation gap/erasure | Remote invalidation implementation remains outside this increment; readiness degradation reporting is tested |
 | Stalled stream | `stalled_decision_stream_retains_final_and_counts_actual_step_drops`; live steps and disconnect: `http_stream_emits_admission_and_steps_before_final_and_disconnect_keeps_work` |
-| HTTP/gRPC differential | Excluded gRPC/shared conformance increment |
+| HTTP/gRPC differential | `grpc_differential` covers success, refusals, retained streaming and evidence failure/lookup over HTTP/2 in memory and loopback; `grpc::tests` checks all 31 refusal mappings. Shared family conformance remains separate. |
 | Explain unavailable | `in_memory_http1_and_http2_use_the_same_handlers` |
 | Shutdown unflushed records | `immediate_shutdown_reports_every_pending_record`, `queued_sink_policies_preserve_tickets_drops_and_shutdown_accounting` |
 | Forbidden dependency families | `make boundaries` |

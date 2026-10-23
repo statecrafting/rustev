@@ -32,6 +32,19 @@ pub const HTTP_STACKS: &[&str] = &[
     "http-body",
     "http-body-util",
 ];
+/// Integration-only protocol and signature families (spec 042, 3.18).
+pub const SERVICE_FAMILIES: &[&str] = &[
+    "tonic",
+    "tonic-build",
+    "tonic-prost",
+    "tonic-prost-build",
+    "prost",
+    "prost-build",
+    "prost-types",
+    "sigstore",
+    "sigstore-verify",
+    "sigstore-protobuf-specs",
+];
 /// Async runtime executors `rustev-contract` and `rustev-core` may not reach.
 pub const EXECUTORS: &[&str] = &[
     "tokio",
@@ -238,6 +251,10 @@ fn is_http(name: &str) -> bool {
     HTTP_STACKS.contains(&name)
 }
 
+fn is_service_family(name: &str) -> bool {
+    SERVICE_FAMILIES.contains(&name)
+}
+
 fn is_executor(name: &str) -> bool {
     EXECUTORS.contains(&name)
 }
@@ -271,6 +288,7 @@ fn forbidden_for_pure(name: &str) -> bool {
         || is_executor(name)
         || is_binding(name)
         || is_cloud_sdk(name)
+        || is_service_family(name)
 }
 
 /// Forbidden in `rustev-wasm`'s graph (spec 027, 3.14.3).
@@ -387,7 +405,8 @@ pub fn check(meta: &Metadata) -> Vec<Violation> {
                 && (is_ecosystem(&dep.name)
                     || is_http(&dep.name)
                     || is_binding(&dep.name)
-                    || is_cloud_sdk(&dep.name))
+                    || is_cloud_sdk(&dep.name)
+                    || is_service_family(&dep.name))
             {
                 out.insert(Violation::FacadeFamily {
                     dependency: dep.name.clone(),
@@ -397,7 +416,8 @@ pub fn check(meta: &Metadata) -> Vec<Violation> {
                 && (is_ecosystem(&dep.name)
                     || is_http(&dep.name)
                     || is_binding(&dep.name)
-                    || is_cloud_sdk(&dep.name))
+                    || is_cloud_sdk(&dep.name)
+                    || is_service_family(&dep.name))
             {
                 out.insert(Violation::ForbiddenFamily {
                     krate: pkg.name.clone(),
@@ -566,6 +586,61 @@ fn forbidden_path(
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn service_families_are_integration_only_and_transitively_impure() {
+        for &family in SERVICE_FAMILIES {
+            for kind in [None, Some("build")] {
+                let m = meta(
+                    &[CONTRACT, CORE],
+                    &["helper", family],
+                    &[
+                        ("rustev-core", "rustev-contract", None),
+                        ("rustev-contract", "helper", kind),
+                        ("helper", family, kind),
+                    ],
+                );
+                for krate in ["rustev-contract", "rustev-core"] {
+                    assert!(
+                        check(&m).iter().any(|v| matches!(v,
+                        Violation::ForbiddenTransitive { krate: k, path }
+                        if k == krate && path.last().unwrap() == family)),
+                        "{family}"
+                    );
+                }
+                let m = meta(
+                    &[("host", "crates/host", &[(family, kind, None)])],
+                    &[family],
+                    &[],
+                );
+                assert!(
+                    check(&m)
+                        .iter()
+                        .any(|v| matches!(v, Violation::ForbiddenFamily { .. }))
+                );
+                let m = meta(
+                    &[("host", "integrations/host", &[(family, kind, None)])],
+                    &[family],
+                    &[],
+                );
+                assert!(check(&m).is_empty());
+            }
+            // A dev-dependency is outside the transitive purity check by
+            // design (it never reaches a built artifact), but declaring one
+            // outside integrations/ is still a forbidden family.
+            let m = meta(
+                &[("host", "crates/host", &[(family, Some("dev"), None)])],
+                &[family],
+                &[],
+            );
+            assert!(
+                check(&m)
+                    .iter()
+                    .any(|v| matches!(v, Violation::ForbiddenFamily { .. })),
+                "{family} as a dev-dependency"
+            );
+        }
+    }
 
     /// `(name, kind, path)` of one declared dependency.
     type Dep<'a> = (&'a str, Option<&'a str>, Option<&'a str>);

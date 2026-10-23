@@ -132,7 +132,11 @@ pub fn bind_unix(path: &Path, mode: u32) -> Result<tokio::net::UnixListener, Str
     Ok(listener)
 }
 /// Match against the contract operation table, keeping route groups authoritative.
-pub fn route(method: &str, path: &str) -> Option<(OperationDescription, Option<String>)> {
+/// The operation a request addresses, and its decoded path id. An id with a
+/// malformed escape (`%GG`) is `Err`, so the caller answers `invalid_request`
+/// as the gRPC transport does, not `endpoint_unavailable`.
+pub type Routed = (OperationDescription, Result<Option<String>, ()>);
+pub fn route(method: &str, path: &str) -> Option<Routed> {
     for op in operation_table() {
         if op.operation == Operation::Stream {
             continue;
@@ -160,13 +164,34 @@ pub fn route(method: &str, path: &str) -> Option<(OperationDescription, Option<S
                 && !id.contains('/')
                 && id.len() <= 768
             {
-                return Some((op, Some(id.into())));
+                // An escaped `/` (`%2F`) decodes into the id, and the same id is
+                // reachable again over HTTP by escaping it the same way.
+                // A path id is a percent-escaped UTF-8 segment (RFC 3986), the
+                // same form the .proto documents for gRPC metadata, so both
+                // transports address one decoded id. The service is not yet
+                // released, so no id was stored in another form.
+                return Some((op, decode_path_id(id).map(Some).ok_or(())));
             }
         } else if path == template {
-            return Some((op, None));
+            return Some((op, Ok(None)));
         }
     }
     None
+}
+/// Percent-escaped UTF-8 path components preserve opaque decision handles.
+pub(crate) fn decode_path_id(id: &str) -> Option<String> {
+    let mut bytes = Vec::with_capacity(id.len());
+    let mut input = id.bytes();
+    while let Some(byte) = input.next() {
+        if byte == b'%' {
+            let high = (input.next()? as char).to_digit(16)?;
+            let low = (input.next()? as char).to_digit(16)?;
+            bytes.push((high * 16 + low) as u8);
+        } else {
+            bytes.push(byte);
+        }
+    }
+    String::from_utf8(bytes).ok()
 }
 /// Strict unpadded base64url. Non-canonical trailing bits are rejected.
 pub fn principal(value: &str) -> Result<Vec<u8>, RefusalCode> {
@@ -234,7 +259,14 @@ async fn request(
     rate: Arc<std::sync::Mutex<Connection>>,
     request: Request<Incoming>,
 ) -> Result<Response<http_body_util::combinators::BoxBody<Bytes, Infallible>>, Infallible> {
-    let respond = |r| Ok(response(r, &service));
+    let grpc = crate::grpc::is_grpc(&request);
+    let respond = |r: Reply| {
+        Ok(if grpc {
+            crate::grpc::refusal_response(&r.body, &service)
+        } else {
+            response(r, &service)
+        })
+    };
     {
         let mut rate = rate.lock().unwrap_or_else(|p| p.into_inner());
         if rate.started.elapsed() >= Duration::from_secs(1) {
@@ -287,8 +319,27 @@ async fn request(
     if header_bytes > listener.limits.max_header_bytes.get() as usize {
         return respond(service.refuse(RefusalCode::HeadersTooLarge));
     }
+    if grpc {
+        return Ok(crate::grpc::request(service, listener, request).await);
+    }
+    handle(service, listener, request).await
+}
+
+/// Shared validation and dispatch for both transport envelopes.
+pub(crate) async fn handle<B>(
+    service: Arc<Service>,
+    listener: Listener,
+    request: Request<B>,
+) -> Result<Response<http_body_util::combinators::BoxBody<Bytes, Infallible>>, Infallible>
+where
+    B: hyper::body::Body<Data = Bytes> + Unpin,
+{
+    let respond = |r| Ok(response(r, &service));
     let Some((op, id)) = route(request.method().as_str(), request.uri().path()) else {
         return respond(service.refuse(RefusalCode::EndpointUnavailable));
+    };
+    let Ok(id) = id else {
+        return respond(service.refuse(RefusalCode::InvalidRequest));
     };
     if !listener.groups.as_slice().contains(&op.group)
         || matches!(op.operation, Operation::Explain | Operation::Invalidations)

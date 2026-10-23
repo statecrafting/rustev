@@ -425,6 +425,21 @@ refusal states `decision_ran: false` and there is no decision document;
 such a stream ends without `final`, and the non-streaming call answers an
 empty HTTP 500.
 
+**`rustev-serve` increment 2 (2026-10-22): the gRPC transport.**
+`integrations/rustev-serve/proto/rustev/serve/v1/serve.proto` is generated
+from `rustev-contract`'s `rustev.serve/1` operation table, and the Rust
+service code from that file with `tonic-prost-build` 0.14.6 at development
+time; both are committed, and a test regenerates them and fails on drift
+(`RUSTEV_BLESS=1` rewrites them), so no build script runs. Each message is
+one `bytes document` holding the canonical JSON the HTTP body holds;
+refusals map to 042 3.5.1's gRPC codes with `rustev-refusal-bin`, and
+`evidence_not_delivered` is `INTERNAL` with `rustev-decision-id`. gRPC is
+served on the same mutual-TLS listeners over HTTP/2 and calls the same
+handler layer (`src/grpc.rs`). A loopback differential test shows HTTP and
+gRPC yield byte-identical documents and digests for success, each refusal
+class, streaming and `evidence_not_delivered`. Still open: the image
+(042 3.16) and the shared conformance cases (3.17).
+
 ## Questions settled by R-34
 
 The owner accepted the recommendations below when approving this spec. Each
