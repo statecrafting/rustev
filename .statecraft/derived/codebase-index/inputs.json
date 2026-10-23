@@ -7,7 +7,7 @@
       "contentHash": "dc2a885b01ebb2e6cbb7bdd397a286cb621ca6e58075b732e88ce3ad6110809f"
     },
     ".github/workflows/release-checks.yml": {
-      "contentHash": "8be21a06b4c4b0571bc76fd80e5b8e756b8d69ba7728decc2c5c622c0d44bbdc"
+      "contentHash": "002cbac9c81731647e941e7405032d4bdb5606aa371b0fd03eef36e0d89baaef"
     },
     ".github/workflows/release.yml": {
       "contentHash": "363f54d919543d64d432bd6237b39f3241f5d3bb9001b2df448bf79595d6c806"
@@ -28,7 +28,7 @@
       "contentHash": "50c2c6e4beea403f592a56d2a09569ec407d0aa1f3c717a5970dc7a1c2e4e918"
     },
     "Cargo.toml": {
-      "contentHash": "869559b66b3c57a8c8a7b49ce604f1850efc7c0549086bbb9bc36f17f532c56b"
+      "contentHash": "383bfcc4e9cebe03d116f307657fc72b8931c88154b7b866551c4b285bbfabb0"
     },
     "Makefile": {
       "contentHash": "8d012aad6e7aa6056f59319810efa5e950163ea2677a377fa8af6f3008aa345b"
@@ -98,6 +98,9 @@
     },
     "docs/design/discussions/README.md": {
       "contentHash": "c7df0ab376e0e837439039e52f433c68b312bea5ed89bfdd1e39a421b6ec2969"
+    },
+    "integrations/rustev-otel/LICENSE": {
+      "contentHash": "bd593de664ba50d42098c9259bcf314ccb8ba38865c45aaa8e049d8711aa22b8"
     },
     "integrations/rustev-remote-http/LICENSE": {
       "contentHash": "491bb1f843fe2e3b03b56199f2e1bcabaea41d2cd46e58f6c3cc7a9493dcaaa0"

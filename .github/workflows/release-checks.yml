@@ -27,7 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        subset: [documents, embedded, evaluation, remote-http, runtime, rules, remote-http-alone]
+        subset: [documents, embedded, evaluation, remote-http, runtime, rules, remote-http-alone, otel]
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Cache cargo registry and git
@@ -43,7 +43,7 @@ jobs:
         run: sh tools/rustev-release/adoption.sh ${{ matrix.subset }}
       - name: Subsets whose crate is not in this release
         if: matrix.subset == 'documents'
-        run: sh tools/rustev-release/adoption.sh serve bedrock typesafe otel local-embed
+        run: sh tools/rustev-release/adoption.sh serve bedrock typesafe local-embed
 
   msrv:
     name: msrv
