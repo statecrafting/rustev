@@ -7574,6 +7574,22 @@ export namespace RustevPlan3 {
    * `ungraded` is not a point of the grade order (spec 032, 3.2.3).
    */
   export type ValueGrade = "authoritative" | "cached" | "estimated" | "hint" | "ungraded";
+  export type ParameterSource =
+    | "default"
+    | {
+        profile: string;
+      };
+  export type ProfileChain =
+    | "none"
+    | {
+        chain: ProfileEntry[];
+      };
+  export type ProfileId = string;
+  export type Variant =
+    | "none"
+    | {
+        named: string;
+      };
   /**
    * `none`, or the party an author moved the outcome to and why.
    */
@@ -7693,6 +7709,11 @@ export namespace RustevPlan3 {
      * Plan 3: the static grade table (spec 032, 3.9.3).
      */
     grades?: StaticGrade[] | null;
+    /**
+     * Instantiation evidence (spec 034, 3.10.1). Present only in a
+     * `rustev.plan/3` document; absent from every earlier plan.
+     */
+    instantiation?: Instantiation | null;
     notices: Notice[];
     /**
      * Step ids in topological order, ties by declaration order.
@@ -8182,6 +8203,32 @@ export namespace RustevPlan3 {
      */
     subject: string;
   }
+  /**
+   * Instantiation evidence (spec 034, 3.10.1). Present only in a
+   * `rustev.plan/3` document; absent from every earlier plan.
+   */
+  export interface Instantiation {
+    parameters: ResolvedParameter[];
+    profile: ProfileChain;
+    template: unknown;
+    template_id: DefinitionId;
+    /**
+     * `rustev.definition/1` or `rustev.definition/2`.
+     */
+    template_schema: string;
+    variant: Variant;
+  }
+  export interface ResolvedParameter {
+    name: string;
+    sites: string[];
+    source: ParameterSource;
+    value: unknown;
+  }
+  export interface ProfileEntry {
+    id: ProfileId;
+    profile: string;
+    version: string;
+  }
   export interface Notice {
     /**
      * Judgment 2: who can act on it (spec 033, 3.5.4); omitted in version 1.
@@ -8418,6 +8465,293 @@ export namespace RustevPlanBundleSignature1 {
 }
 export type RustevPlanBundleSignature1 = RustevPlanBundleSignature1.RustevPlanBundleSignature1;
 
+export namespace RustevPlanDiff1 {
+  /**
+   * The literal `equal`, or the two differing values (spec 034, 3.12.2).
+   */
+  export type Difference2 =
+    | Equal
+    | {
+        left: string;
+        right: string;
+      };
+  export type Equal = "equal";
+  export type DefinitionId = string;
+  export type PlanId = string;
+  export type ProfileChain =
+    | "none"
+    | {
+        chain: ProfileEntry[];
+      };
+  export type ProfileId = string;
+  /**
+   * Template identity or the `none` sentinel (spec 034, 3.12.2).
+   * The identity parser accepts only `sha256:` followed by 64 lowercase hex digits.
+   * The TypeScript annotation preserves the disjoint prefix when schema patterns
+   * would otherwise become an unconstrained `string` in generated declarations.
+   */
+  export type TemplateIdentity = "none" | `sha256:${string}`;
+  export type Variant =
+    | "none"
+    | {
+        named: string;
+      };
+  /**
+   * Who can act on an outcome (3.5.2), ordered from most to least able to
+   * act on it themselves: the combination of parties is the greatest.
+   */
+  export type Party = "none" | "caller" | "host" | "upstream";
+  /**
+   * One cause of an outcome or notice (3.5.2).
+   */
+  export type Cause =
+    | "deadline"
+    | {
+        input: {
+          field: string;
+          provenance: CauseProvenance;
+        };
+      }
+    | {
+        backend: {
+          origin: Origin;
+          step: string;
+        };
+      }
+    | {
+        budget: {
+          resource: string;
+        };
+      }
+    | {
+        capability: {
+          name: string;
+        };
+      }
+    | {
+        policy: {
+          site: string;
+        };
+      };
+  /**
+   * The provenance an input cause records (3.5.2).
+   */
+  export type CauseProvenance =
+    | {
+        observed: {
+          class: ProvenanceClass;
+        };
+      }
+    | {
+        accepted: {
+          classes: ProvenanceClass[];
+        };
+      };
+  /**
+   * The closed set of provenance classes (spec 002, 3.7.1).
+   */
+  export type ProvenanceClass =
+    | "authenticated-app-field"
+    | "system-of-record"
+    | "user-supplied"
+    | "third-party"
+    | "attributed-claim"
+    | "model-derived";
+  /**
+   * Who registered a backend (3.9): `upstream` unless the host implements it.
+   */
+  export type Origin = "upstream" | "host";
+  /**
+   * `none`, or the party an author moved the outcome to and why.
+   */
+  export type Override =
+    | "none"
+    | {
+        basis: OverrideBasis;
+        reason: string;
+        to: Party;
+      };
+  /**
+   * How an override came about (3.5.2).
+   */
+  export type OverrideBasis = "declared" | "remediation";
+  /**
+   * A remediation as an action carries it: `none`, or a code and its
+   * canonical parameters (3.6.1).
+   */
+  export type Remediation =
+    | "none"
+    | {
+        code: string;
+        params: {
+          [k: string]: RemediationValue | undefined;
+        };
+      };
+  /**
+   * A scalar or list value in a remediation's parameters: the subset of
+   * `OutValue` (spec 002) a remediation can carry, in the same wire form.
+   */
+  export type RemediationValue =
+    | {
+        bool: boolean;
+      }
+    | {
+        integer: number;
+      }
+    | {
+        decimal: Decimal;
+      }
+    | {
+        text: string;
+      }
+    | {
+        enum: string;
+      }
+    | {
+        timestamp: Timestamp;
+      }
+    | {
+        duration: DurationMs;
+      }
+    | {
+        list: RemediationValue[];
+      };
+  export type Decimal = string;
+  export type Timestamp = number;
+  /**
+   * A non-negative span in milliseconds.
+   */
+  export type DurationMs = number;
+  export type NoticeKind =
+    | ("uncalibrated_threshold" | "truncation" | "fallback" | "constraints_relaxed" | "grade_downgraded" | "check_notice")
+    | "field_dropped";
+  /**
+   * The literal `equal`, or the two differing values (spec 034, 3.12.2).
+   */
+  export type Difference =
+    | Equal
+    | {
+        left: string[];
+        right: string[];
+      };
+  export type ParameterSide =
+    | Absent
+    | {
+        source: ParameterSource;
+        value: unknown;
+      };
+  export type Absent = "absent";
+  export type ParameterSource =
+    | "default"
+    | {
+        profile: string;
+      };
+
+  export interface RustevPlanDiff1 {
+    adjustments: ItemChanges;
+    bindings: BindingChange[];
+    compiler: Difference2;
+    execution: FieldChange[];
+    handlers: ItemChanges2;
+    identical: boolean;
+    inputs: ItemChanges;
+    left: PlanSide;
+    limits: FieldChange[];
+    notices: NoticeChanges;
+    order: Difference;
+    parameters: ParameterChange[];
+    registry: Difference2;
+    right: PlanSide;
+    rule_order: Difference;
+    rules: ItemChanges;
+    schema: "rustev.plan-diff/1";
+    steps: ItemChanges;
+  }
+  export interface ItemChanges {
+    added: string[];
+    changed: ChangedItem[];
+    removed: string[];
+  }
+  export interface ChangedItem {
+    key: string;
+    leaves: string[];
+    truncated: boolean;
+  }
+  export interface BindingChange {
+    fields: FieldChange[];
+    step: string;
+  }
+  export interface FieldChange {
+    field: string;
+    left: unknown;
+    right: unknown;
+  }
+  export interface ItemChanges2 {
+    added: HandlerKey[];
+    changed: ChangedItem2[];
+    removed: HandlerKey[];
+  }
+  export interface HandlerKey {
+    position: number;
+    target: string;
+  }
+  export interface ChangedItem2 {
+    key: HandlerKey;
+    leaves: string[];
+    truncated: boolean;
+  }
+  export interface PlanSide {
+    definition_id: DefinitionId;
+    plan_id: PlanId;
+    plan_schema: string;
+    profile: ProfileChain;
+    template_id: TemplateIdentity;
+    variant: Variant;
+  }
+  export interface ProfileEntry {
+    id: ProfileId;
+    profile: string;
+    version: string;
+  }
+  export interface NoticeChanges {
+    added: Notice[];
+    removed: Notice[];
+  }
+  export interface Notice {
+    /**
+     * Judgment 2: who can act on it (spec 033, 3.5.4); omitted in version 1.
+     */
+    action?: Action | null;
+    kind: NoticeKind;
+    reason: string;
+    /**
+     * The step or policy item it concerns.
+     */
+    subject: string;
+  }
+  /**
+   * Who can act on an outcome or notice, how, why, and whether retrying the
+   * same request can succeed (3.5.2). Every member is always written.
+   */
+  export interface Action {
+    addressed_to: Party;
+    /**
+     * Duplicate-free, sorted by each cause's canonical JSON bytes.
+     */
+    caused_by: Cause[];
+    computed: Party;
+    override: Override;
+    remediation: Remediation;
+    transient: boolean;
+  }
+  export interface ParameterChange {
+    left: ParameterSide;
+    name: string;
+    right: ParameterSide;
+  }
+}
+export type RustevPlanDiff1 = RustevPlanDiff1.RustevPlanDiff1;
+
 export namespace RustevPlanRegistration1 {
   export type ContentDigest = string;
   /**
@@ -8464,6 +8798,24 @@ export namespace RustevPlanRegistration1 {
   }
 }
 export type RustevPlanRegistration1 = RustevPlanRegistration1.RustevPlanRegistration1;
+
+export namespace RustevProfile1 {
+  export interface RustevProfile1 {
+    definition: ProfileDefinition;
+    extends: string;
+    profile: string;
+    schema: "rustev.profile/1";
+    values: {
+      [k: string]: unknown | undefined;
+    };
+    version: string;
+  }
+  export interface ProfileDefinition {
+    name: string;
+    version: string;
+  }
+}
+export type RustevProfile1 = RustevProfile1.RustevProfile1;
 
 export namespace RustevRedaction1 {
   /**

@@ -30,7 +30,10 @@ pub mod limits;
 pub mod live;
 pub mod optimization;
 pub mod output;
+pub mod parameter;
 pub mod plan;
+pub mod plan_diff;
+pub mod profile;
 pub mod reason;
 pub mod redaction;
 pub mod remote;
@@ -45,6 +48,7 @@ pub mod source;
 pub mod time;
 pub mod trace;
 pub mod trace_fields;
+pub mod version;
 
 pub use decimal::Decimal;
 pub use document::{Document, DocumentError, Identified};
@@ -59,6 +63,10 @@ pub use time::{DurationMs, Timestamp};
 pub mod schema {
     /// Decision explanation record canonical document (spec 040, 3.3).
     pub const EXPLANATION: &str = "rustev.explanation/1";
+    /// Profile document (spec 034, 3.5).
+    pub const PROFILE: &str = "rustev.profile/1";
+    /// Plan comparison (spec 034, 3.12).
+    pub const PLAN_DIFF: &str = "rustev.plan-diff/1";
     pub const DEFINITION: &str = "rustev.definition/1";
     pub const PLAN: &str = "rustev.plan/2";
     pub const BACKEND: &str = "rustev.backend/1";

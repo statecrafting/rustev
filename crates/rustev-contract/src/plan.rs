@@ -47,15 +47,81 @@ pub struct Plan {
     /// (spec 033, 3.1.2).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub actionability: Option<PlanActionability>,
+    /// Instantiation evidence (spec 034, 3.10.1). Present only in a
+    /// `rustev.plan/3` document; absent from every earlier plan.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub instantiation: Option<Instantiation>,
 }
 
-crate::document::versioned_document!(
-    Plan,
-    [schema::PLAN, schema::PLAN_V3],
-    "rustev.plan/2 or rustev.plan/3",
-    PLAN_V1,
-    PlanId
-);
+impl crate::Document for Plan {
+    const SCHEMA: &'static str = schema::PLAN;
+    const LIMITS: crate::bounded::ParseLimits = PLAN_V1;
+
+    fn schema(&self) -> &str {
+        &self.schema
+    }
+
+    fn parse(bytes: &[u8]) -> Result<Self, crate::DocumentError> {
+        use crate::DocumentError;
+        use crate::bounded::{ParseError, parse_bounded};
+
+        let doc: Self = parse_bounded(bytes, &Self::LIMITS).map_err(DocumentError::Parse)?;
+        if doc.schema != schema::PLAN && doc.schema != schema::PLAN_V3 {
+            return Err(DocumentError::Schema {
+                expected: "rustev.plan/2 or rustev.plan/3",
+                found: doc.schema.chars().take(80).collect(),
+            });
+        }
+        // Check presence separately because Option erases explicit null (spec
+        // 034, 3.10.1). Ignore values instead of deserializing Plan through Value:
+        // that would instantiate a second deserializer for its entire type tree.
+        if doc.schema != schema::PLAN_V3
+            && serde_json::from_slice::<PlanMemberPresence>(bytes)
+                .map_err(|e| {
+                    DocumentError::Parse(ParseError::Schema {
+                        message: e.to_string(),
+                    })
+                })?
+                .instantiation
+        {
+            return Err(DocumentError::Parse(ParseError::Schema {
+                message: "instantiation is a rustev.plan/3 member".into(),
+            }));
+        }
+        Ok(doc)
+    }
+
+    fn record_digest(&self) -> Result<crate::ids::ContentDigest, crate::canonical::CanonicalError> {
+        Ok(crate::ids::ContentDigest::from_digest(
+            crate::canonical::tagged_digest(&self.schema, &self.record_canonical()?),
+        ))
+    }
+}
+
+#[derive(Deserialize)]
+struct PlanMemberPresence {
+    #[serde(default, deserialize_with = "member_present")]
+    instantiation: bool,
+}
+
+fn member_present<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<bool, D::Error> {
+    serde::de::IgnoredAny::deserialize(deserializer).map(|_| true)
+}
+
+impl crate::Identified for Plan {
+    type Id = PlanId;
+
+    fn wrap(digest: String) -> PlanId {
+        PlanId::from_digest(digest)
+    }
+
+    fn id(&self) -> Result<PlanId, crate::canonical::CanonicalError> {
+        Ok(Self::wrap(crate::canonical::tagged_digest(
+            &self.schema,
+            &crate::Document::canonical(self)?,
+        )))
+    }
+}
 
 /// A source descriptor bound at compile time.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -165,4 +231,51 @@ pub enum BoundCalibration {
         id: CalibrationId,
         binding: CalibrationBinding,
     },
+}
+
+/// Instantiation evidence (spec 034, 3.10.1). Present only in a
+/// `rustev.plan/3` document; absent from every earlier plan.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Instantiation {
+    /// `rustev.definition/1` or `rustev.definition/2`.
+    pub template_schema: String,
+    pub template: serde_json::Value,
+    pub template_id: DefinitionId,
+    pub variant: Variant,
+    pub profile: ProfileChain,
+    pub parameters: Vec<ResolvedParameter>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum Variant {
+    None,
+    Named(String),
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum ProfileChain {
+    None,
+    Chain(Vec<ProfileEntry>),
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ProfileEntry {
+    pub profile: String,
+    pub version: String,
+    pub id: crate::ids::ProfileId,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ResolvedParameter {
+    pub name: String,
+    pub value: serde_json::Value,
+    pub source: ParameterSource,
+    pub sites: Vec<String>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum ParameterSource {
+    Default,
+    Profile(String),
 }

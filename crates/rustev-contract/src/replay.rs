@@ -280,7 +280,7 @@ impl ReplayBundle {
                 return life(location, LifetimeProblem::OutlivesBundle);
             }
             let allowed: &[&str] = match location {
-                ItemLocation::Plan => &[schema::PLAN],
+                ItemLocation::Plan => &[schema::PLAN, schema::PLAN_V3],
                 ItemLocation::Descriptor(_) => &[schema::BACKEND],
                 ItemLocation::Calibration(_) => &[schema::CALIBRATION],
                 ItemLocation::Snapshot => &[schema::SNAPSHOT],

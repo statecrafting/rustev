@@ -99,6 +99,10 @@ identity!(
     DefinitionId
 );
 identity!(
+    /// Identity of a canonical profile (spec 034, 3.5.1).
+    ProfileId
+);
+identity!(
     /// Identity of a canonical compiled plan.
     PlanId
 );
