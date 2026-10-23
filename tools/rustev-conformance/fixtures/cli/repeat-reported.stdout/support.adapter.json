@@ -1,0 +1,5 @@
+{"schema":"rustev.task-adapter/1","name":"support-routing","version":"1",
+"labels":{"values":["billing","integration_defect","account_access","other"],"prefixes":[]},
+"rules":[{"action":"route_ticket","param":"queue","select":"enum",
+"map":{"billing":"billing","billing-priority":"billing","engineering":"integration_defect","identity":"account_access"},
+"otherwise":"other"}]}

@@ -32,6 +32,33 @@ macro_rules! flags {
 
 pub const COMMANDS: &[CommandSpec] = &[
     CommandSpec {
+        path: &["baseline", "record"],
+        flags: flags!("name": One, "eval": One, "now-ms": One, "out": One),
+        required: &["name", "eval", "now-ms", "out"],
+    },
+    CommandSpec {
+        path: &["eval", "reproducibility"],
+        flags: flags!("baseline": One, "baseline-eval": One, "run": One),
+        required: &["baseline", "baseline-eval", "run"],
+    },
+    CommandSpec {
+        path: &["eval", "diff"],
+        flags: flags!("baseline": One, "baseline-eval": One, "run": One, "out": One),
+        required: &["baseline", "baseline-eval", "run", "out"],
+    },
+    CommandSpec {
+        path: &["gate", "select"],
+        flags: flags!("selection-gate": One, "baseline": One, "baseline-eval": One,
+                      "candidates": One, "out": One),
+        required: &[
+            "selection-gate",
+            "baseline",
+            "baseline-eval",
+            "candidates",
+            "out",
+        ],
+    },
+    CommandSpec {
         path: &["plan", "check"],
         flags: flags!("definition": One, "descriptor": Many, "rules": Many,
                       "calibration": Many, "execution": One),
@@ -76,11 +103,35 @@ pub const COMMANDS: &[CommandSpec] = &[
     CommandSpec {
         path: &["eval"],
         flags: flags!("dataset": One, "split": One, "config": One, "adapter": One,
-                      "bundles": One, "now-ms": One, "store": One, "host-cap-ms": One,
+                      "bundles": Many, "now-ms": One, "store": One, "host-cap-ms": One,
                       "out": One, "candidate-plan": One, "descriptor": Many,
                       "rules": Many, "calibration": Many, "scope": One, "tenant": One,
-                      "context-revision": One, "principal-scope": One),
+                      "context-revision": One, "principal-scope": One, "repeat-config": One, "repeat": One,
+                      "purpose": One, "lineage": One, "ledger": One,
+                      "ledger-new": Switch, "ledger-out": One),
         required: &[
+            "dataset",
+            "split",
+            "config",
+            "adapter",
+            "bundles",
+            "now-ms",
+            "out",
+            "tenant",
+            "context-revision",
+        ],
+    },
+    CommandSpec {
+        path: &["eval", "candidates"],
+        flags: flags!("dataset": One, "split": One, "config": One, "adapter": One,
+                      "bundles": Many, "now-ms": One, "store": One, "host-cap-ms": One,
+                      "out": One, "candidates": One, "scope": One, "tenant": One,
+                      "context-revision": One, "principal-scope": One, "repeat-config": One, "repeat": One,
+                      "purpose": One, "lineage": One, "ledger": One,
+                      "ledger-new": Switch, "ledger-out": One),
+        required: &[
+            "repeat-config",
+            "candidates",
             "dataset",
             "split",
             "config",
@@ -285,6 +336,14 @@ rustev: compile, inspect, run, replay and evaluate Rustev decision plans.
   rustev eval         --dataset F --split S --config F --adapter F --bundles DIR
                       --now-ms MS|system SCOPE --out DIR [--store DIR] [--host-cap-ms N]
                       [--candidate-plan F [--descriptor F]... [--rules F]... [--calibration F]...]
+                      [--repeat-config F [--repeat N] [--bundles DIR]...]
+                      [--purpose measurement|optimization]
+                      [--lineage H (--ledger F|--ledger-new) --ledger-out F]
+  rustev baseline record --name NAME --eval DIR --now-ms MS|system --out F
+  rustev eval reproducibility --baseline F --baseline-eval DIR --run DIR
+  rustev eval diff    --baseline F --baseline-eval DIR --run DIR --out DIR
+  rustev eval candidates --candidates DIR [...eval repeat inputs, no candidate-plan/dependencies...]
+  rustev gate select --selection-gate F --baseline F --baseline-eval DIR --candidates DIR --out F
   rustev gate         --baseline DIR --candidate DIR --gate NAME
   rustev calibrate fit     --dataset F --config F --step ID --bundles DIR
                            --now-ms MS|system SCOPE --out DIR [--store DIR] [--host-cap-ms N]

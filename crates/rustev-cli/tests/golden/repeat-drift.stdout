@@ -1,0 +1,1 @@
+{"command":"eval reproducibility","exceedances":[{"band":0.0,"cohort":"all","delta":0.125,"metric":"mean_log_loss"},{"band":0.0,"cohort":"slice","delta":0.125,"metric":"mean_log_loss"}],"status":"not_reproducible"}

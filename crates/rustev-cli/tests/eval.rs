@@ -901,3 +901,327 @@ fn a_fallback_output_is_never_fitted_as_the_primarys() {
     assert!(j["detail"].as_str().unwrap().contains("Empty"), "{j}");
     assert!(!s.exists("fit/calibration.json"));
 }
+
+fn repeat_config(s: &Scratch) {
+    // Fix synthetic input timing before evaluation, including its retained digest.
+    // Output goldens themselves are never normalized.
+    for case in support_cases() {
+        let path = format!("bundles/{}.json", case.id);
+        let mut bundle = rustev_contract::replay::ReplayBundle::parse(&s.read(&path)).unwrap();
+        if let rustev_contract::retention::Retention::Retained { bytes, digest, .. } =
+            &mut bundle.run.retention
+        {
+            let mut value: Json = serde_json::from_str(bytes).unwrap();
+            normalize_timing(&mut value);
+            let record =
+                rustev_contract::run::RunRecord::parse(&serde_json::to_vec(&value).unwrap())
+                    .unwrap();
+            let raw = record.record_canonical().unwrap();
+            *digest = rustev_contract::ids::ContentDigest::parse(
+                &rustev_contract::canonical::tagged_digest(rustev_contract::schema::RUN, &raw),
+            )
+            .unwrap();
+            *bytes = String::from_utf8(raw).unwrap();
+        }
+        s.write(&path, &bundle.canonical().unwrap());
+    }
+    s.write("repeat-config.json", json!({"schema":"rustev.repeat-config/1","bootstrap":{"method":"percentile-cluster/1","prng":"xoshiro256starstar-splitmix64/1","level":"0.95","resamples":1000,"seed":"29"},"noise":{"rule":{"k_sd":{"k":"2"}},"floor":"0","overrides":{}},"slices":[],"stability_metrics":["coverage"],"top_k":null}).to_string().as_bytes());
+}
+fn repeat_args(out: &str) -> Vec<String> {
+    let mut a = eval_args(
+        "support.dataset.json",
+        "calibration",
+        "support.config.json",
+        "support.adapter.json",
+        out,
+    );
+    a.extend(["--repeat-config", "repeat-config.json", "--repeat", "2"].map(str::to_owned));
+    a
+}
+
+#[test]
+fn repeat_eval_replay_captured_held_out_and_atomic_outputs() {
+    let s = Scratch::new("repeat-eval");
+    support_setup(&s);
+    repeat_config(&s);
+    for dir in ["a", "b", "captured", "held", "held2", "failed"] {
+        std::fs::create_dir(s.path(dir)).unwrap();
+    }
+    // Preserve the required output directory in the harvested inputs.
+    s.write("b/.keep", b"");
+    let a = repeat_args("a");
+    s.rustev_owned(&a).expect(0, "reported");
+    let out = s.rustev_owned(&repeat_args("b"));
+    let j = out.expect(0, "reported");
+    common::cli_golden("repeat-reported.stdout", &out.stdout);
+    common::cli_golden("repeat-report.json", &s.read("b/repeat.json"));
+    assert_eq!(j["n"], 2);
+    assert_eq!(j["source"], "replay");
+    for name in [
+        "dataset.json",
+        "config.json",
+        "adapter.json",
+        "repeat-config.json",
+        "repeat.json",
+        "run-0.report.json",
+        "run-0.detail.json",
+        "run-0.cases.json",
+        "run-1.report.json",
+        "run-1.detail.json",
+        "run-1.cases.json",
+    ] {
+        assert_eq!(s.read(&format!("a/{name}")), s.read(&format!("b/{name}")));
+    }
+    let mut captured = repeat_args("captured");
+    captured.extend(["--bundles", "bundles"].map(str::to_owned));
+    assert_eq!(
+        s.rustev_owned(&captured).expect(0, "reported")["source"],
+        "captured"
+    );
+    let mut held = repeat_args("held");
+    let i = held.iter().position(|x| x == "calibration").unwrap();
+    held[i] = "final_test".into();
+    held.extend(
+        [
+            "--lineage",
+            "release",
+            "--ledger-new",
+            "--ledger-out",
+            "ledger.json",
+        ]
+        .map(str::to_owned),
+    );
+    s.rustev_owned(&held).expect(0, "reported");
+    let ledger = s.read("ledger.json");
+    let mut next = held.clone();
+    let i = next.iter().position(|x| x == "held").unwrap();
+    next[i] = "held2".into();
+    let i = next.iter().position(|x| x == "--ledger-new").unwrap();
+    next.splice(i..=i, ["--ledger".into(), "ledger.json".into()]);
+    let i = next.iter().rposition(|x| x == "ledger.json").unwrap();
+    next[i] = "ledger2.json".into();
+    s.rustev_owned(&next).expect(0, "reported");
+    assert_eq!(s.read("ledger.json"), ledger);
+    let report: Json = serde_json::from_slice(&s.read("held2/repeat.json")).unwrap();
+    assert_eq!(report["held_out"]["counted"]["count"], 2);
+    let mut fail = repeat_args("failed");
+    fail.extend(["--candidate-plan", "absent"].map(str::to_owned));
+    s.write("failed/run-1.cases.json", b"keep");
+    s.rustev_owned(&fail).expect(3, "io_error");
+    assert!(!s.exists("failed/repeat.json"));
+}
+
+#[test]
+fn repeat_usage_rules_precede_every_read() {
+    let s = Scratch::new("repeat-usage");
+    let basic = repeat_args("absent");
+    let mutate = |remove: &[&str], extra: &[&str]| {
+        let mut a = basic.clone();
+        for flag in remove {
+            let i = a.iter().position(|x| x == flag).unwrap();
+            a.drain(i..i + 2);
+        }
+        a.extend(extra.iter().map(|s| s.to_string()));
+        a
+    };
+    let cases = vec![
+        mutate(
+            &["--split"],
+            &[
+                "--split",
+                "final_test",
+                "--purpose",
+                "optimization",
+                "--lineage",
+                "x",
+                "--ledger-new",
+                "--ledger-out",
+                "l",
+            ],
+        ),
+        mutate(&["--repeat-config"], &[]),
+        mutate(&["--repeat"], &[]),
+        mutate(&["--repeat"], &["--repeat", "0"]),
+        mutate(&["--repeat"], &["--repeat", "65"]),
+        mutate(&[], &["--purpose", "other"]),
+        mutate(&[], &["--ledger-new"]),
+        mutate(&["--split"], &["--split", "final_test"]),
+        mutate(
+            &["--split"],
+            &["--split", "final_test", "--purpose", "optimization"],
+        ),
+        mutate(
+            &["--split"],
+            &["--split", "final_test", "--lineage", "x", "--ledger-new"],
+        ),
+        mutate(
+            &["--split"],
+            &[
+                "--split",
+                "final_test",
+                "--lineage",
+                "",
+                "--ledger-new",
+                "--ledger-out",
+                "l",
+            ],
+        ),
+        mutate(
+            &["--split"],
+            &[
+                "--split",
+                "final_test",
+                "--lineage",
+                "x",
+                "--ledger-new",
+                "--ledger",
+                "l",
+                "--ledger-out",
+                "l2",
+            ],
+        ),
+        mutate(&[], &["--bundles", "b", "--bundles", "c"]),
+        mutate(&["--repeat-config", "--repeat"], &["--bundles", "b"]),
+        mutate(
+            &["--repeat-config", "--repeat"],
+            &["--purpose", "measurement"],
+        ),
+        mutate(&[], &["--descriptor", "absent"]),
+    ];
+    for a in cases {
+        let r = s.rustev_owned(&a);
+        assert_eq!(r.code, 2, "{a:?}: {r:?}");
+        assert!(r.stdout.is_empty());
+    }
+}
+
+#[test]
+fn repeat_candidates_publish_all_and_selection_uses_library_exit_codes() {
+    let s = Scratch::new("repeat-candidates");
+    support_setup(&s);
+    repeat_config(&s);
+    s.write("variants/z/plan.json", &s.read("support.plan.json"));
+    s.write("variants/z/rules/rules.json", &s.read("support.rules.json"));
+    s.write(
+        "variants/z/calibrations/cal.json",
+        &s.read("topic.calibration.json"),
+    );
+    s.write("comparison/.keep", b"");
+    let mut a = repeat_args("comparison");
+    a.insert(1, "candidates".into());
+    a.extend(["--candidates", "variants"].map(str::to_owned));
+    let compared = s.rustev_owned(&a);
+    compared.expect(0, "compared");
+    common::cli_golden("repeat-compared.stdout", &compared.stdout);
+    common::cli_golden(
+        "repeat-comparison.json",
+        &s.read("comparison/comparison.json"),
+    );
+    common::cli_golden("repeat-comparison.md", &s.read("comparison/comparison.md"));
+    assert!(s.exists("comparison/z/repeat.json"));
+    assert!(s.exists("comparison/comparison.md"));
+    s.rustev(&[
+        "baseline",
+        "record",
+        "--name",
+        "base",
+        "--eval",
+        "comparison",
+        "--now-ms",
+        "0",
+        "--out",
+        "baseline.json",
+    ])
+    .expect(0, "recorded");
+    for (name, metric, clause, code, status) in [
+        ("pass", "coverage", "not_worse_than", 0, "selected"),
+        ("fail", "coverage", "better_than", 11, "none_qualified"),
+        ("unknown", "latency_ms/p0.5", "better_than", 12, "unknown"),
+    ] {
+        let mut c = json!({"metric":metric,clause:"baseline"});
+        if clause == "not_worse_than" {
+            c["within"] = json!("noise");
+        }
+        s.write("gate.json",json!({"schema":"rustev.selection-gate/1","gate":"test","per":"variant","metrics":{metric:"higher_is_better"},"min_comparable_coverage":"0","min_labeled_coverage":"0","require":[c],"rank_by":[metric]}).to_string().as_bytes());
+        s.rustev(&[
+            "gate",
+            "select",
+            "--selection-gate",
+            "gate.json",
+            "--baseline",
+            "baseline.json",
+            "--baseline-eval",
+            "comparison",
+            "--candidates",
+            "comparison",
+            "--out",
+            &format!("{name}.json"),
+        ])
+        .expect(code, status);
+    }
+}
+
+#[test]
+fn repeat_refuses_invalid_documents_and_rolls_back_failed_publication() {
+    let s = Scratch::new("repeat-refusals");
+    support_setup(&s);
+    repeat_config(&s);
+    for d in ["bad", "held", "failed", "multi"] {
+        std::fs::create_dir(s.path(d)).unwrap();
+    }
+    let original = s.read("repeat-config.json");
+    s.write("repeat-config.json", b"{}");
+    s.rustev_owned(&repeat_args("bad"))
+        .expect(4, "invalid_input");
+    assert!(!s.exists("bad/repeat.json"));
+    s.write("repeat-config.json", &original);
+    let mut held = repeat_args("held");
+    let i = held.iter().position(|x| x == "calibration").unwrap();
+    held[i] = "final_test".into();
+    held.extend(
+        [
+            "--lineage",
+            "release",
+            "--ledger-new",
+            "--ledger-out",
+            "ledger.json",
+        ]
+        .map(str::to_owned),
+    );
+    s.rustev_owned(&held).expect(0, "reported");
+    let original = s.read("ledger.json");
+    let mut ledger: Json = serde_json::from_slice(&original).unwrap();
+    ledger["entries"][0]["prev"] = json!(format!("sha256:{:064x}", 1));
+    s.write("broken.json", ledger.to_string().as_bytes());
+    let mut a = held.clone();
+    let i = a.iter().position(|x| x == "held").unwrap();
+    a[i] = "failed".into();
+    let i = a.iter().position(|x| x == "--ledger-new").unwrap();
+    a.splice(i..=i, ["--ledger".into(), "broken.json".into()]);
+    let i = a.iter().rposition(|x| x == "ledger.json").unwrap();
+    a[i] = "next.json".into();
+    s.rustev_owned(&a).expect(4, "invalid_input");
+    assert!(!s.exists("failed/repeat.json"));
+    assert_eq!(s.read("ledger.json"), original);
+    let i = a.iter().position(|x| x == "broken.json").unwrap();
+    a[i] = "ledger.json".into();
+    let i = a.iter().position(|x| x == "next.json").unwrap();
+    a[i] = "missing-parent/next.json".into();
+    s.rustev_owned(&a).expect(3, "io_error");
+    assert_eq!(std::fs::read_dir(s.path("failed")).unwrap().count(), 0);
+    // A later invalid candidate leaves no candidate directory or baseline output.
+    s.write("variants/a/plan.json", &s.read("support.plan.json"));
+    s.write("variants/a/rules/rules.json", &s.read("support.rules.json"));
+    s.write(
+        "variants/a/calibrations/cal.json",
+        &s.read("topic.calibration.json"),
+    );
+    s.write("variants/z/plan.json", b"{}");
+    let mut a = repeat_args("multi");
+    a.insert(1, "candidates".into());
+    a.extend(["--candidates", "variants"].map(str::to_owned));
+    s.rustev_owned(&a).expect(4, "invalid_input");
+    assert_eq!(std::fs::read_dir(s.path("multi")).unwrap().count(), 0);
+    std::fs::create_dir(s.path("multi/a")).unwrap();
+    s.rustev_owned(&a).expect(3, "io_error");
+}

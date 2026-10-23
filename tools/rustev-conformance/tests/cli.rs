@@ -52,6 +52,8 @@ fn every_cli_case_produces_its_expected_bytes() {
     );
     let _ = std::fs::remove_dir_all(&base);
     // Every CLI golden is a case (3.12.4).
+    // Both sides count `.json` goldens only; `.md` and `.stdout` renderings are
+    // pinned by the CLI's own tests, not by conformance cases.
     let goldens =
         std::fs::read_dir(rustev_conformance::root().join("crates/rustev-cli/tests/golden"))
             .unwrap()
@@ -64,7 +66,7 @@ fn every_cli_case_produces_its_expected_bytes() {
         .cases
         .iter()
         .flat_map(|c| c.outputs.iter().map(|o| o.golden.as_str()))
-        .filter(|g| g.starts_with("crates/rustev-cli/tests/golden/"))
+        .filter(|g| g.starts_with("crates/rustev-cli/tests/golden/") && g.ends_with(".json"))
         .collect();
     assert_eq!(covered.len(), goldens, "every CLI golden is covered");
     // A `run` case pins two goldens, its printed output and the record it
@@ -92,6 +94,12 @@ fn every_case_pins_its_inputs_and_compares_its_plan_id() {
         // no declared normalization touches it, so it is compared as bytes.
         for o in &c.outputs {
             let golden = pinned(&o.golden, &o.sha256).unwrap();
+            // Repeat diff and comparison also pin their Markdown rendering.
+            // Those bytes are compared in full by the CLI runner above.
+            if o.golden.ends_with(".md") {
+                assert!(o.normalize.is_empty(), "{}", c.id);
+                continue;
+            }
             let v: serde_json::Value = serde_json::from_slice(&golden).unwrap();
             if let Some(id) = v.get("plan_id") {
                 let normalized =

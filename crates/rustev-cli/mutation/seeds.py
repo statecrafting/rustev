@@ -10,6 +10,7 @@ never modified.
 """
 
 import os
+import json
 import shutil
 import signal
 import subprocess
@@ -298,6 +299,36 @@ SEEDS = [
 ]
 
 
+# Spec 029: host decisions, in addition to the library's statistical seeds.
+SEEDS += [
+    ("no-clobber", "repeat029 compare bypasses staged publication", S + "repeat.rs",
+     '    publish_outputs(files, &[], publish).map_err(|e| Done::io(&s.command, e))',
+     '    let _ = publish; s.write(files)', CLI),
+    ("no-clobber", "repeat029 skips rollback", S + "repeat.rs",
+     '        rollback_outputs(&mut error, &placed, &temporary, &created);',
+     '        let _ = (&mut error, &placed, &temporary, &created);', CLI),
+    ("adapter correctness", "repeat029 skips candidate set verification", S + "repeat.rs",
+     '        set.verify(&s)?;\n    }\n    let br = base.runs();',
+     '        let _ = set;\n    }\n    let br = base.runs();', CLI),
+    ("exit-code mapping", "repeat029 drift uses gate failure", S + "repeat.rs",
+     "const NOT_REPRODUCIBLE: u8 = 13;", "const NOT_REPRODUCIBLE: u8 = 11;", CLI),
+    ("scope flag handling", "repeat029 allows optimization on held-out data", S + "repeat.rs",
+     'if purpose == "optimization" {', 'if purpose == "disabled" {', CLI),
+    ("scope flag handling", "repeat029 accepts unequal captured count", S + "repeat.rs",
+     'dirs > 64 || n.is_some_and(|n| n != dirs)', 'dirs > 64', CLI),
+    ("scope flag handling", "repeat029 skips ledger exclusivity", S + "repeat.rs",
+     'if p.has("ledger") == p.has("ledger-new") {', 'if false {', CLI),
+    ("no-clobber", "repeat029 skips preflight", S + "repeat.rs",
+     'io::ensure_absent(path).map_err(|e| Done::io(&self.command, e))', 'let _ = path; Ok(())', CLI),
+    ("exit-code mapping", "repeat029 selection unknown becomes success", S + "repeat.rs",
+     'let code = selection.exit_code();', 'let code = if selection.exit_code() == 12 { 0 } else { selection.exit_code() };', CLI),
+    ("adapter correctness", "repeat029 skips baseline verification", S + "repeat.rs",
+     'if set.record(s, &b.name, b.recorded_at_ms)? != b {', 'if false {', CLI),
+    ("scope flag handling", "repeat029 captured treated as replay", S + "repeat.rs",
+     'Source::Captured\n        };', 'Source::Replay\n        };', CLI),
+]
+
+
 def run(cmd, cwd, env, timeout=None):
     # A session of its own, so a timeout kills the test binaries too.
     p = subprocess.Popen(
@@ -318,7 +349,18 @@ def run(cmd, cwd, env, timeout=None):
 
 def main():
     work = tempfile.mkdtemp(prefix="rustev-cli-seeds-")
-    env = dict(os.environ, CARGO_TARGET_DIR=os.path.join(work, "target"))
+    env = dict(os.environ)
+    # Mutated copies build into a subdirectory of the checkout's configured
+    # target, never the target itself: they share the real crates' output
+    # paths (`target/debug/rustev`), and cargo does not re-copy a binary it
+    # considers fresh, so a later `cargo test` of the checkout would run the
+    # last mutant (seen in CI: a `repeat029` seed leaked into spec 014's run).
+    metadata = json.loads(subprocess.check_output(
+        ["cargo", "metadata", "--no-deps", "--format-version", "1", "--locked"], cwd=ROOT
+    ))
+    target_config = "build.target-dir=" + json.dumps(
+        os.path.join(metadata["target_directory"], "mutation-seeds")
+    )
     src = os.path.join(work, "src")
     ignore = shutil.ignore_patterns("target", ".git", ".tooling", ".bin", ".statecraft")
     shutil.copytree(ROOT, src, ignore=ignore)
@@ -330,7 +372,7 @@ def main():
     try:
         for category, name, path, old, new, packages in chosen:
             label = f"{category}: {name}"
-            base = ["cargo", "test", "--locked", "-q"] + [a for p in packages for a in ("-p", p)]
+            base = ["cargo", "--config", target_config, "test", "--locked", "-q"] + [a for p in packages for a in ("-p", p)]
             # A multi-hunk seed may name one path per hunk, for a defect
             # whose layers live in different files.
             if isinstance(old, list):

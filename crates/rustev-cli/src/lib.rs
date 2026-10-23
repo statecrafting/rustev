@@ -17,6 +17,7 @@ pub mod io;
 /// Command output, shared with every host (spec 027, 3.1).
 pub use rustev_surface::out;
 mod plan;
+mod repeat;
 mod replay;
 mod run;
 mod sink;
@@ -90,7 +91,12 @@ fn dispatch(p: &Parsed, cx: &Context) -> Result<Done, args::Usage> {
     let r = match p.spec.path {
         ["run"] => run::run(p, cx)?,
         ["replay"] => replay::replay(p)?,
+        ["eval"] if p.has("repeat-config") => repeat::eval(p)?,
         ["eval"] => eval::eval(p)?,
+        ["eval", "candidates"] => repeat::eval(p)?,
+        ["baseline", "record"] => repeat::baseline(p)?,
+        ["eval", "reproducibility"] | ["eval", "diff"] => repeat::compare(p),
+        ["gate", "select"] => repeat::select(p),
         ["gate"] => eval::gate(p)?,
         ["calibrate", "fit"] => calibrate::fit(p)?,
         ["calibrate", "qualify"] => calibrate::qualify_cmd(p)?,

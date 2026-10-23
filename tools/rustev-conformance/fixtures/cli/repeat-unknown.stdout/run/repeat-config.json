@@ -1,0 +1,1 @@
+{"bootstrap":{"level":"0.95","method":"percentile-cluster/1","prng":"xoshiro256starstar-splitmix64/1","resamples":1000,"seed":"30"},"noise":{"floor":"0","overrides":{},"rule":{"k_sd":{"k":"2"}}},"schema":"rustev.repeat-config/1","slices":[{"min_cases":1,"name":"slice"}],"stability_metrics":["mean_log_loss"],"top_k":null}

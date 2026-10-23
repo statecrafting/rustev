@@ -237,9 +237,17 @@ pub fn golden(name: &str, bytes: &[u8]) {
             derived.push(json!({ "from": name, "path": format!("{fixtures}/{rel}"),
                                  "sha256": hex(&d) }));
         }
-        // Every CLI golden runs natively too; pure commands also on
-        // WebAssembly (spec 027, 3.12.4).
-        let surfaces = if pure {
+        // Shared surface commands run natively too; pure commands also on
+        // WebAssembly (spec 027, 3.12.4). Spec 029 repeat commands are
+        // currently implemented by the CLI host.
+        let repeat = seen.args.iter().any(|a| a == "--repeat-config")
+            || matches!(
+                command_of(&seen.args).as_str(),
+                "baseline record" | "eval reproducibility" | "eval diff" | "gate select"
+            );
+        let surfaces = if repeat {
+            json!(["cli"])
+        } else if pure {
             json!(["cli", "native", "wasm"])
         } else {
             json!(["cli", "native"])

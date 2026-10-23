@@ -9,7 +9,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[2]
 GROUPS = {
-    "evaluation": "004 023".split(),
+    "evaluation": "004 023 029".split(),
     "cli-backends": "001 005 006 014 019 020".split(),
     "integrations-core": "002 010 012 015 017 033".split(),
     "runtime-evidence": "003 007 008 009 013 026 027 028".split(),

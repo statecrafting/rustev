@@ -21,6 +21,7 @@ pub fn split(p: &Parsed) -> Result<Split, Usage> {
 }
 
 pub fn eval(p: &Parsed) -> Result<Res, Usage> {
+    crate::repeat::validate(p)?;
     let split = split(p)?;
     let replay = replay_config(p)?;
     if !p.has("candidate-plan") {

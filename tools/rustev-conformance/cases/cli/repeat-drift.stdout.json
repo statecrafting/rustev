@@ -1,0 +1,114 @@
+{
+  "argv": [
+    "eval",
+    "reproducibility",
+    "--baseline",
+    "baseline.json",
+    "--baseline-eval",
+    "base",
+    "--run",
+    "run"
+  ],
+  "command": "eval reproducibility",
+  "derived": [],
+  "exit": 13,
+  "id": "repeat-drift.stdout",
+  "inputs": [
+    {
+      "name": "base/adapter.json",
+      "path": "tools/rustev-conformance/fixtures/cli/repeat-drift.stdout/base/adapter.json",
+      "sha256": "879e5ed9a5b88f2940e35e20a80173c6b7abbb7c76ccc34658f5e931c368bc13"
+    },
+    {
+      "name": "base/config.json",
+      "path": "tools/rustev-conformance/fixtures/cli/repeat-drift.stdout/base/config.json",
+      "sha256": "bc2c3e2eb75a935a0f5104cc03ea5c59b3098ab7930ff3380b4cb2cb1ea3881a"
+    },
+    {
+      "name": "base/dataset.json",
+      "path": "tools/rustev-conformance/fixtures/cli/repeat-drift.stdout/base/dataset.json",
+      "sha256": "be193a75f20e0e4906f113d201f41d1b76087617d09282c8eabbd4642f6f8529"
+    },
+    {
+      "name": "base/repeat-config.json",
+      "path": "tools/rustev-conformance/fixtures/cli/repeat-drift.stdout/base/repeat-config.json",
+      "sha256": "d3af03f7758a53d931d4635290185e83007a0c5d831b30f0f99099ad6468eb9e"
+    },
+    {
+      "name": "base/repeat.json",
+      "path": "tools/rustev-conformance/fixtures/cli/repeat-drift.stdout/base/repeat.json",
+      "sha256": "d26c998c481dcd47c0c9b68d6bbe6aa1514edbce37760ee7da24e06753f4dd9d"
+    },
+    {
+      "name": "base/run-0.cases.json",
+      "path": "tools/rustev-conformance/fixtures/cli/repeat-drift.stdout/base/run-0.cases.json",
+      "sha256": "e93e79b3de872770dcb5b18d266e0e49d32a7ad689fc9ab351688ed3394ba8b3"
+    },
+    {
+      "name": "base/run-0.detail.json",
+      "path": "tools/rustev-conformance/fixtures/cli/repeat-drift.stdout/base/run-0.detail.json",
+      "sha256": "e114bd221d0d4d5a3a6707b55f8d927290f4db41a66910305483da02dbc1fbb0"
+    },
+    {
+      "name": "base/run-0.report.json",
+      "path": "tools/rustev-conformance/fixtures/cli/repeat-drift.stdout/base/run-0.report.json",
+      "sha256": "6a3c76df8f41a9f8e48c3c09df137235b3fb8d92c3c84c1946bf1cc27b41d073"
+    },
+    {
+      "name": "baseline.json",
+      "path": "tools/rustev-conformance/fixtures/cli/repeat-drift.stdout/baseline.json",
+      "sha256": "c654cdcdb6a08f46d3fe543c00e19d75472f179b33628db716c415f41f701363"
+    },
+    {
+      "name": "run/adapter.json",
+      "path": "tools/rustev-conformance/fixtures/cli/repeat-drift.stdout/run/adapter.json",
+      "sha256": "879e5ed9a5b88f2940e35e20a80173c6b7abbb7c76ccc34658f5e931c368bc13"
+    },
+    {
+      "name": "run/config.json",
+      "path": "tools/rustev-conformance/fixtures/cli/repeat-drift.stdout/run/config.json",
+      "sha256": "bc2c3e2eb75a935a0f5104cc03ea5c59b3098ab7930ff3380b4cb2cb1ea3881a"
+    },
+    {
+      "name": "run/dataset.json",
+      "path": "tools/rustev-conformance/fixtures/cli/repeat-drift.stdout/run/dataset.json",
+      "sha256": "be193a75f20e0e4906f113d201f41d1b76087617d09282c8eabbd4642f6f8529"
+    },
+    {
+      "name": "run/repeat-config.json",
+      "path": "tools/rustev-conformance/fixtures/cli/repeat-drift.stdout/run/repeat-config.json",
+      "sha256": "d3af03f7758a53d931d4635290185e83007a0c5d831b30f0f99099ad6468eb9e"
+    },
+    {
+      "name": "run/repeat.json",
+      "path": "tools/rustev-conformance/fixtures/cli/repeat-drift.stdout/run/repeat.json",
+      "sha256": "21f2efaf838b479315f6dbdb4677e44ce814e5fe729a59fb4c528b465a6dbf3d"
+    },
+    {
+      "name": "run/run-0.cases.json",
+      "path": "tools/rustev-conformance/fixtures/cli/repeat-drift.stdout/run/run-0.cases.json",
+      "sha256": "4b3e0c6b4cf960fcda3aa35e49717114d9b5cd84b7ce2b4b038b1db8ac2dad75"
+    },
+    {
+      "name": "run/run-0.detail.json",
+      "path": "tools/rustev-conformance/fixtures/cli/repeat-drift.stdout/run/run-0.detail.json",
+      "sha256": "3fb0806e000b927eec486d6d95ae75ae8d7ae703b63e0797a4133ec351715fa9"
+    },
+    {
+      "name": "run/run-0.report.json",
+      "path": "tools/rustev-conformance/fixtures/cli/repeat-drift.stdout/run/run-0.report.json",
+      "sha256": "7f51169a54a00af68c5520cda8fb38c6112d023256b6120a95eac00301d47b3c"
+    }
+  ],
+  "outputs": [
+    {
+      "golden": "crates/rustev-cli/tests/golden/repeat-drift.stdout",
+      "normalize": [],
+      "sha256": "b96d7fc4a4a8376c7a76cb5a6f2b8e50a396bea2e323ed5f668b4ead89a01c4b",
+      "stream": "stdout"
+    }
+  ],
+  "surfaces": [
+    "cli"
+  ]
+}
