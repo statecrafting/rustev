@@ -18,7 +18,7 @@ spec = "010-integrations"
 # and the Rahi release that revision pins.
 [dependencies]
 rustev-contract.workspace = true
-rustev-core.workspace = true
+rustev-core = { workspace = true, features = ["parameterized"] }
 aicortex-types = { git = "https://github.com/statecrafting/aicortex", rev = "6415b765e5267188b4ecf302a93869352e28cccc" }
 aicortex-claims = { git = "https://github.com/statecrafting/aicortex", rev = "6415b765e5267188b4ecf302a93869352e28cccc" }
 aicortex-store = { git = "https://github.com/statecrafting/aicortex", rev = "6415b765e5267188b4ecf302a93869352e28cccc" }

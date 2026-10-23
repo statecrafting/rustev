@@ -17,7 +17,7 @@ spec = "010-integrations"
 # record names, pinned exactly; another version needs a new record.
 [dependencies]
 rustev-contract.workspace = true
-rustev-core.workspace = true
+rustev-core = { workspace = true, features = ["parameterized"] }
 rahi-store = "=0.7.1"
 rahi-types = "=0.7.1"
 

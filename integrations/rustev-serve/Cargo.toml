@@ -13,10 +13,10 @@ spec = "010-integrations"
 
 [dependencies]
 rustev-contract = { path = "../../crates/rustev-contract" }
-rustev-core = { path = "../../crates/rustev-core" }
+rustev-core = { path = "../../crates/rustev-core", features = ["parameterized"] }
 rustev-runtime = { path = "../../crates/rustev-runtime" }
-rustev-surface = { path = "../../crates/rustev-surface" }
-rustev-eval = { path = "../../crates/rustev-eval" }
+rustev-surface = { path = "../../crates/rustev-surface", features = ["parameterized"] }
+rustev-eval = { path = "../../crates/rustev-eval", features = ["parameterized"] }
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true

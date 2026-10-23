@@ -15,7 +15,7 @@ spec = "027-node-and-wasm-bindings"
 [dependencies]
 rustev-cli.workspace = true
 rustev-contract.workspace = true
-rustev-core.workspace = true
+rustev-core = { workspace = true, features = ["parameterized"] }
 rustev-runtime.workspace = true
 tokio = { workspace = true, features = ["rt", "time", "sync"] }
 serde = { workspace = true, features = ["derive"] }

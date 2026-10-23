@@ -264,3 +264,93 @@ pub mod out {
         }
     }
 }
+
+/// Adds spec 034 declarations and reference sites to a typed definition builder.
+/// `build` validates stages 1 and 2 using the same path as parsed JSON.
+#[cfg(feature = "parameterized")]
+#[derive(Debug, Clone)]
+pub struct TemplateBuilder {
+    document: serde_json::Value,
+    error: Option<String>,
+}
+#[cfg(feature = "parameterized")]
+impl TemplateBuilder {
+    pub fn new(builder: DefinitionBuilder) -> Result<Self, MissingLimits> {
+        Ok(Self::from_definition(builder.build()?))
+    }
+    pub fn from_definition(definition: Definition) -> Self {
+        let mut document = serde_json::to_value(definition).expect("definition is serializable");
+        document["schema"] = serde_json::json!(schema::DEFINITION_V2);
+        Self {
+            document,
+            error: None,
+        }
+    }
+    pub fn parameter(mut self, declaration: rustev_contract::parameter::ParameterDecl) -> Self {
+        let array = self
+            .document
+            .as_object_mut()
+            .expect("definition object")
+            .entry("parameters")
+            .or_insert_with(|| serde_json::json!([]));
+        array
+            .as_array_mut()
+            .expect("parameter array")
+            .push(serde_json::json!(declaration));
+        self
+    }
+    pub fn variants(mut self, names: &[&str]) -> Self {
+        self.document["variants"] = serde_json::json!(names);
+        self
+    }
+    pub fn only_in(self, item_pointer: &str, names: &[&str]) -> Self {
+        self.item_member(item_pointer, "only_in", serde_json::json!(names))
+    }
+    pub fn enabled(self, item_pointer: &str, enabled: rustev_contract::parameter::Enabled) -> Self {
+        self.item_member(item_pointer, "enabled", serde_json::json!(enabled))
+    }
+    fn item_member(mut self, pointer: &str, key: &str, value: serde_json::Value) -> Self {
+        if let Some(item) = self
+            .document
+            .pointer_mut(pointer)
+            .and_then(serde_json::Value::as_object_mut)
+        {
+            item.insert(key.into(), value);
+        } else if self.error.is_none() {
+            self.error = Some(format!("no item at {pointer}"));
+        }
+        self
+    }
+    /// Replace an existing JSON Pointer site with a parameter reference.
+    pub fn reference(mut self, pointer: &str, parameter: &str) -> Self {
+        if let Some(site) = self.document.pointer_mut(pointer) {
+            *site = serde_json::json!({"param": parameter});
+        } else if self.error.is_none() {
+            self.error = Some(format!("no reference site at {pointer}"));
+        }
+        self
+    }
+    pub fn build(self) -> Result<Vec<u8>, crate::instantiate::InstantiationRefusal> {
+        use crate::instantiate::{
+            InstantiationCode, InstantiationRefusal, check_declarations, parse_template,
+        };
+        let invalid = |detail: String| InstantiationRefusal {
+            stage: 1,
+            code: InstantiationCode::InvalidDefinitionDocument,
+            subject: format!(
+                "definition:{}@{}",
+                self.document["name"].as_str().unwrap_or("?"),
+                self.document["version"].as_str().unwrap_or("?")
+            ),
+            detail,
+        };
+        if let Some(e) = self.error {
+            return Err(invalid(e));
+        }
+        let bytes = rustev_contract::canonical::canonical_bytes(&self.document)
+            .map_err(|e| invalid(e.to_string()))?;
+        let template = parse_template(&bytes)?;
+        check_declarations(&template)?;
+        Ok(template.canonical)
+    }
+}

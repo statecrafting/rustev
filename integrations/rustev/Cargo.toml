@@ -40,9 +40,9 @@ otel = ["dep:rustev-otel"]
 
 [dependencies]
 rustev-contract.workspace = true
-rustev-core.workspace = true
+rustev-core = { workspace = true, features = ["parameterized"] }
 rustev-runtime = { workspace = true, optional = true }
-rustev-eval = { workspace = true, optional = true }
+rustev-eval = { workspace = true, optional = true, features = ["parameterized"] }
 rustev-backend-rules = { workspace = true, optional = true }
 rustev-remote-http = { workspace = true, optional = true }
 rustev-otel = { workspace = true, optional = true }

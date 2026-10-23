@@ -34,7 +34,10 @@
     "rustev"
   ],
   "member_features": [
-    { "package": "rustev-otel", "features": ["otlp", "otlp-grpc", "otlp-http"], "spec": "028 3.2.3" }
+    { "package": "rustev-otel", "features": ["otlp", "otlp-grpc", "otlp-http"], "spec": "028 3.2.3" },
+    { "package": "rustev-core", "features": ["parameterized"], "spec": "050 3.5" },
+    { "package": "rustev-eval", "features": ["parameterized"], "spec": "050 3.5" },
+    { "package": "rustev-surface", "features": ["parameterized"], "spec": "050 3.5" }
   ],
   "binaries": [{ "package": "rustev-cli", "name": "rustev" }],
   "npm": [

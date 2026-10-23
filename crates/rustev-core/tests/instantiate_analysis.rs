@@ -1,3 +1,5 @@
+#![cfg(feature = "parameterized")]
+
 use rustev_contract::{
     parameter::ParameterDecl,
     plan::{ParameterSource, Variant},

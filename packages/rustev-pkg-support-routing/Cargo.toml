@@ -24,12 +24,12 @@ spec = "007-support-routing-package"
 # Contract and core only (spec 007 3.3.1); `make boundaries` enforces it.
 [dependencies]
 rustev-contract.workspace = true
-rustev-core.workspace = true
+rustev-core = { workspace = true, features = ["parameterized"] }
 
 # The runtime, a backend, eval and the CLI run the package's own tests only.
 [dev-dependencies]
 rustev-runtime.workspace = true
-rustev-eval.workspace = true
+rustev-eval = { workspace = true, features = ["parameterized"] }
 rustev-cli.workspace = true
 rustev-backend-rules.workspace = true
 serde_json.workspace = true

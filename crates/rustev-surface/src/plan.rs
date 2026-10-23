@@ -153,6 +153,8 @@ pub fn read_plan(command: &str, host: &dyn Host, path: &str) -> Result<Plan, Don
     let bytes = host
         .read(path, PLAN_V1.max_bytes)
         .map_err(|e| Done::io(command, e))?;
+    #[cfg(not(feature = "parameterized"))]
+    rustev_core::unparameterized::plan_bytes(&bytes).map_err(|r| refused(command, &r))?;
     Plan::parse(&bytes).map_err(|e| {
         refused(
             command,
@@ -187,6 +189,8 @@ fn compile_definition(
         .map_err(|e| Done::io(command, e))?;
     // As `compile_bytes`: a malformed definition is category 1, subject
     // `definition`.
+    #[cfg(not(feature = "parameterized"))]
+    rustev_core::unparameterized::definition(&bytes).map_err(|r| refused(command, &r))?;
     let def = Definition::parse(&bytes)
         .map_err(|e| refused(command, &parse_refusal("definition".into(), e.to_string())))?;
     let deps = deps::load(host, args.deps, rules).map_err(|e| dep_failed(command, e))?;

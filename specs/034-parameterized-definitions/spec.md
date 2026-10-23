@@ -854,6 +854,24 @@ profile and no variant analysing to no parameters and variant `none`. The
 codes of stages 5 to 8 (`dangling-reference`, `instantiation-bound`) are the
 next increment. No I/O, clock or `unsafe` is added to core.
 
+**Increment 3 (instantiation, plan 3 emission and loading).** `instantiate`
+completes stages 5 to 7 (`emit`: substitution, pruning and emission of the
+instantiated definition, with `dangling-reference` and
+`instantiation-bound`), and `compile_profiled` runs instantiation and then
+the existing compiler, keeping the two refusal types apart (`profiled`).
+The compiler's track-construct guard in `quality` does not apply to an
+instantiated definition; it still refuses every other definition. A plan 3
+carries its instantiation record and loads without the profile documents
+(`loading`). `rustev-eval` assembles and retains plan 3 runs and replays
+them (`assemble`, `resolve`). Tests: `crates/rustev-core/tests/instantiate_compile.rs`
+with the goldens `parameterized.*` (two profiles by two variants, their
+plans and `PlanId`s), and `crates/rustev-eval/tests/instantiated_replay.rs`.
+A template golden is named `*.template.json`: core reads it as canonical
+JSON, and the contract's definition schema describes the instantiated
+definition, not the template members of 3.1; describing those members in
+the schema is open. The runtime's capture still refuses a plan 3 and is
+open for a later increment.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

@@ -24,10 +24,13 @@ spec = "027-node-and-wasm-bindings"
 
 # Spec 027, section 2: contract, core, evaluation, serde and serde_json
 # only; no runtime, executor, filesystem or HTTP stack.
+[features]
+parameterized = ["rustev-core/parameterized", "rustev-eval/parameterized"]
+
 [dependencies]
 rustev-contract.workspace = true
-rustev-core.workspace = true
-rustev-eval.workspace = true
+rustev-core = { workspace = true }
+rustev-eval = { workspace = true }
 serde.workspace = true
 serde_json = { workspace = true, features = ["raw_value"] }
 

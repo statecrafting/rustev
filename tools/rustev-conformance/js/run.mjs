@@ -169,6 +169,7 @@ const b64 = (bytes) => Buffer.from(bytes).toString('base64');
 /** A case as one call of the WebAssembly package: plain data (bytes as
  * base64), so it crosses into a browser page unchanged. */
 function wasmCall(c) {
+  if (c.refusalCall) return c.refusalCall;
   const { files, derived } = inputsOf(c);
   const a = flags(c.argv);
   // A rules program's derived descriptor stands in for it (3.10.1).
@@ -245,6 +246,16 @@ function executeWasm(glue, call) {
 
 /** A `wasmCall`'s result against its case. */
 function compareWasm(c, r) {
+  if (c.refusalCall) {
+    const out = JSON.parse(Buffer.from(r.out, 'base64').toString());
+    if (r.code !== 5 || out.category !== 1 || out.category_name !== 'parse'
+        || !out.detail?.includes(c.member) || !out.detail.includes(c.schema)
+        || !out.detail.includes('no `parameterized` feature')
+        || Object.keys(r.artifacts).length !== 0) {
+      throw new Error(`${c.id}: expected parameterized parse refusal, got ${JSON.stringify(r)} ${JSON.stringify(out)}`);
+    }
+    return;
+  }
   const fromB64 = (s) => (s === undefined ? undefined : Buffer.from(s, 'base64'));
   comparePure(c, r.code, fromB64(r.out), (name) => fromB64(r.artifacts[name]));
 }
@@ -602,6 +613,65 @@ async function nativeAdapter() {
   };
 }
 
+// Spec 050: select spec 034 cases by their inputs, without changing the
+// shared manifest or the golden bytes used by native and CLI runners.
+function parameterizedDocument(v) {
+  if (!v || typeof v !== 'object' || typeof v.schema !== 'string') return false;
+  if (v.schema?.startsWith('rustev.plan/')) return Object.hasOwn(v, 'instantiation');
+  if (!v.schema?.startsWith('rustev.definition/')) return false;
+  if (Object.hasOwn(v, 'parameters') || Object.hasOwn(v, 'variants')) return true;
+  const array = (a) => Array.isArray(a) ? a : [];
+  const has = (i, key) => i !== null && typeof i === 'object' && Object.hasOwn(i, key);
+  const items = [...array(v.steps), ...array(v.policy?.rules),
+    ...array(v.policy?.adjustments), ...array(v.policy?.on_unresolved)];
+  if (array(v.inputs).some((i) => has(i, 'only_in'))
+      || items.some((i) => has(i, 'only_in') || has(i, 'enabled'))) return true;
+  const reference = (x) => x && typeof x === 'object'
+    && ((Object.keys(x).length === 1 && typeof x.param === 'string') || Object.values(x).some(reference));
+  return reference(v);
+}
+
+function requiresParameterized(c) {
+  if ((c.argv ?? []).some((a) => ['--profile', '--variant', '--base-profile'].includes(a))) return true;
+  return [...inputsOf(c).files.values()].some((b) => {
+    let v;
+    try { v = JSON.parse(b); } catch { return false; }
+    return parameterizedDocument(v);
+  });
+}
+
+function featureOffCases(cases) {
+  const documents = cases.flatMap((c) => [...inputsOf(c).files.values()]).flatMap((b) => {
+    try { return [JSON.parse(b)]; } catch { return []; }
+  });
+  const definition = documents.find((v) => v.schema?.startsWith('rustev.definition/') && v.inputs?.length && v.steps?.length && !parameterizedDocument(v));
+  const plan = documents.find((v) => v.schema === 'rustev.plan/3' && !parameterizedDocument(v));
+  if (!definition || !plan) throw new Error('spec 050 needs existing 032/033 fixtures');
+  const result = [];
+  for (const member of ['parameters', 'variants', 'only_in', 'enabled', 'param', 'instantiation']) {
+    const document = structuredClone(member === 'instantiation' ? plan : definition);
+    if (member !== 'instantiation') document.schema = 'rustev.definition/2';
+    if (member === 'instantiation') document.instantiation = {};
+    else if (member === 'parameters' || member === 'variants') document[member] = [];
+    else if (member === 'only_in') document.inputs[0].only_in = ['test'];
+    else if (member === 'enabled') document.steps[0].enabled = true;
+    else document.limits.deadline_ms = { param: 'deadline' };
+    for (const fn of member === 'instantiation' ? ['show'] : ['check', 'compile']) {
+      result.push({
+        id: `050.${fn}.${member}`, member, schema: document.schema,
+        refusalCall: {
+          fn, inputs: [['input.json', b64(JSON.stringify(document))]],
+          args: fn === 'show' ? ['input.json', [], []]
+            : ['input.json', [], [], null, ...(fn === 'compile' ? ['out.plan.json'] : [])],
+          artifacts: ['out.plan.json'],
+        },
+      });
+    }
+  }
+  // Profile and variant arguments are not exposed by the wasm binding yet.
+  return result;
+}
+
 const manifest = JSON.parse(readFileSync(join(root, 'tools/rustev-conformance/cases/manifest.json'), 'utf8'));
 if (manifest.schema !== 'rustev.conformance-manifest/1') throw new Error('manifest schema');
 const run =
@@ -609,7 +679,13 @@ const run =
 // The Chromium adapter runs the cases that name the WebAssembly surface.
 const named = surface === 'chromium' ? 'wasm' : surface;
 let ran = 0;
-for (const c of manifest.cases.filter((c) => c.surfaces.includes(named))) {
+let selected = manifest.cases.filter((c) => c.surfaces.includes(named));
+if (named === 'wasm') {
+  const supported = selected.filter((c) => !requiresParameterized(c));
+  console.log(`conformance ${surface}: skipped ${selected.length - supported.length} parameterized case(s)`);
+  selected = [...supported, ...featureOffCases(supported)];
+}
+for (const c of selected) {
   if (process.env.RUSTEV_CONFORMANCE_TRACE) console.error(`case ${c.id}`);
   try {
     await run(c);

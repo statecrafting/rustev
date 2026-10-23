@@ -2,7 +2,7 @@
 id: "050-wasm-without-parameterized-definitions"
 title: "The WebAssembly module without parameterized definitions (amends 027)"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-24"
 summary: >
   A narrow amendment of approved spec 027. Spec 034's parameterized
@@ -194,4 +194,21 @@ cargo test -p rustev-release --locked
 
 ## Implementation record
 
-None yet.
+**Implementation, 2026-10-24 (with spec 034 increment 3).** `rustev-core`,
+`rustev-eval` and `rustev-surface` declare `parameterized` with an empty
+`default`, forwarded downward; spec 034's template validation,
+instantiation, profile resolution and `rustev.plan/3` record validation
+compile only with it. Without it, `rustev_core::unparameterized` refuses a
+definition using spec 034's members, a plan carrying an `instantiation`
+record, and the typed paths that would load one, with the parse refusal
+naming the member and the feature. Every workspace crate that depends on
+the three enables the feature, the facade on its `rustev-core` and
+`rustev-eval` dependencies; `rustev-wasm` enables it on none, which
+`cargo tree -p rustev-wasm -e features --target wasm32-unknown-unknown`
+shows. The release set's `member_features` records the allowance (3.5)
+and the archive policy lists `src/unparameterized.rs`. The WebAssembly
+conformance runner skips spec 034's cases and runs refusal cases instead.
+Measured in CI on this change: the optimized module is 782,881 bytes gzip
+(860,362 before the feature), within 786,432; `code`, `release-checks`
+(the `rustev-release` manifest checks with the allowance) and every
+`bindings` job pass.
