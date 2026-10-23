@@ -9,7 +9,7 @@ which cancels waiting runs no open pull request head still points at.
 """
 import argparse
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import re
 import statistics
@@ -120,12 +120,14 @@ def classify(pr, by_head, waiting):
             return "hazard", f"auto-merge is on while stacked on #{parent['number']}: it would merge into `{base}`, not {DEFAULT}"
         return "stacked", f"waiting for parent #{parent['number']} (governance fails by design until retargeted)"
     run = waiting.get(head)
+    if failed:
+        # An approval of a run whose checks failed is wasted: fix first.
+        also = "; an owner approval is also waiting" if run else ""
+        return "fix", "failed: " + ", ".join(failed[:4]) + (" …" if len(failed) > 4 else "") + also
     if run:
         return "approve", f"owner approval waiting {hours(age(run['created_at']))}"
     if pr["isDraft"]:
         return "draft", "draft: not yet offered for merge"
-    if failed:
-        return "fix", "failed: " + ", ".join(failed[:4]) + (" …" if len(failed) > 4 else "")
     if running:
         return "running", f"{len(running)} check(s) running"
     if pr.get("mergeStateStatus") == "BEHIND":
@@ -140,9 +142,9 @@ def metrics(prs, items, waiting_runs, open_heads, specs):
     main_heads = {p["headRefOid"] for p in prs if p["baseRefName"] == DEFAULT}
     waits = [age(r["created_at"]) for r in waiting_runs if r["head_sha"] in main_heads]
     wasted = sum(1 for r in waiting_runs if r["head_sha"] in open_heads - main_heads)
-    since = (NOW.date().fromordinal(NOW.date().toordinal() - 7)).isoformat()
+    since = (NOW - timedelta(days=7)).date().isoformat()
     merged = gh("pr", "list", "--state", "merged", "--search", f"merged:>={since}",
-                "--limit", "200", "--json", "baseRefName") or []
+                "--limit", "1000", "--json", "baseRefName") or []
     to_main = sum(1 for m in merged if m["baseRefName"] == DEFAULT)
     approved = [s for s in specs if s.get("status") == "approved"]
     rehearsal = gh("run", "list", "--workflow", "release.yml",
@@ -179,11 +181,13 @@ def main():
     by_head = {p["headRefName"]: p for p in prs}
     open_heads = {p["headRefOid"] for p in prs}
     waiting_runs = []
-    for page in range(1, 11):
+    page = 1
+    while True:
         batch = gh("api", f"repos/{{owner}}/{{repo}}/actions/runs?status=waiting&per_page=100&page={page}")
         waiting_runs += batch["workflow_runs"]
         if len(batch["workflow_runs"]) < 100:
             break
+        page += 1
     waiting = {}
     for r in sorted(waiting_runs, key=lambda r: r["created_at"]):
         waiting[r["head_sha"]] = r
@@ -222,7 +226,7 @@ def main():
     if args.json:
         json.dump(report, sys.stdout, indent=2)
         print()
-        return 0
+        return 1 if report.get("cancel_failed") else 0
     print("Next useful actions (most unblocking first):")
     n = 0
     for i in items:
