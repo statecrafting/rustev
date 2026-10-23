@@ -5,7 +5,7 @@ use rustev_contract::{
     retention::Retention,
 };
 use rustev_eval::{
-    explain::{Evidence, ExplainOptions, explain},
+    explain::{Evidence, ExplainOptions, explain, explain_diff},
     resolve::NoExternal,
 };
 use serde_json::Value;
@@ -192,5 +192,136 @@ pub fn order(a: &str, b: &str) -> Query {
     Query::WhyOrder {
         a: Item::String(a.into()),
         b: Item::String(b.into()),
+    }
+}
+
+pub async fn support_shifted(shift: bool) -> Retained {
+    let p = Probe::new(support_rules(), None, move |_, task| {
+        if shift && task == "support.topic" {
+            Behavior::Shift(0.5)
+        } else {
+            Behavior::Pass
+        }
+    });
+    let fixture = support_fixture(&[&p], &unlimited(), "1.5");
+    run_and_capture(
+        &[&p],
+        fixture,
+        decision("diff", support_snapshot("pro", &[2, 5], 0)),
+        scope(),
+    )
+    .await
+}
+pub fn check(doc: &Explanation, sources: [&Evidence<'_>; 2]) {
+    doc.validate().unwrap();
+    assert_eq!(
+        Explanation::parse(&doc.record_canonical().unwrap()).unwrap(),
+        *doc
+    );
+    let docs = sources.map(|source| {
+        let mut docs = std::collections::BTreeMap::<String, Value>::new();
+        match source {
+            Evidence::Record { record, plan } => {
+                docs.insert("record".into(), serde_json::from_slice(record).unwrap());
+                if let Some(plan) = plan {
+                    docs.insert("plan".into(), serde_json::from_slice(plan).unwrap());
+                }
+            }
+            Evidence::Bundle { bundle, .. } => {
+                let b = rustev_contract::replay::ReplayBundle::parse(bundle).unwrap();
+                docs.insert("bundle".into(), serde_json::from_slice(bundle).unwrap());
+                for (loc, item) in b.items() {
+                    if let Retention::Retained { bytes, .. } = &item.retention {
+                        let role = match loc {
+                            rustev_contract::replay::ItemLocation::Plan => "plan".into(),
+                            rustev_contract::replay::ItemLocation::Run => "record".into(),
+                            rustev_contract::replay::ItemLocation::Snapshot => "snapshot".into(),
+                            rustev_contract::replay::ItemLocation::Supply(n) => {
+                                format!("supply/{n}")
+                            }
+                            _ => continue,
+                        };
+                        docs.insert(role, serde_json::from_str(bytes).unwrap());
+                    }
+                }
+            }
+        }
+        docs
+    });
+    for f in &doc.facts {
+        for c in &f.cites {
+            let (side, rest) = c.as_str().split_once('.').unwrap();
+            let (role, _) = rest.split_once(':').unwrap();
+            assert!(
+                c.resolve(&docs[usize::from(side == "b")][role]).is_some(),
+                "{}",
+                c.as_str()
+            );
+        }
+    }
+}
+pub fn records(
+    a: &rustev_contract::run::RunRecord,
+    b: &rustev_contract::run::RunRecord,
+    plan: Option<&[u8]>,
+    options: &ExplainOptions<'_>,
+) -> Explanation {
+    let a = a.record_canonical().unwrap();
+    let b = b.record_canonical().unwrap();
+    let a = Evidence::Record { record: &a, plan };
+    let b = Evidence::Record { record: &b, plan };
+    let e = explain_diff(&a, &b, options).unwrap();
+    check(&e, [&a, &b]);
+    assert_eq!(e, explain_diff(&a, &b, options).unwrap());
+    e
+}
+pub fn bundles(
+    a: &rustev_contract::replay::ReplayBundle,
+    b: &rustev_contract::replay::ReplayBundle,
+    options: &ExplainOptions<'_>,
+) -> Explanation {
+    let ab = a.record_canonical().unwrap();
+    let bb = b.record_canonical().unwrap();
+    let a = Evidence::Bundle {
+        bundle: &ab,
+        scope: &a.scope,
+        now_ms: wall(WALL + 1),
+        resolver: &NoExternal,
+    };
+    let b = Evidence::Bundle {
+        bundle: &bb,
+        scope: &b.scope,
+        now_ms: wall(WALL + 1),
+        resolver: &NoExternal,
+    };
+    let e = explain_diff(&a, &b, options).unwrap();
+    check(&e, [&a, &b]);
+    assert_eq!(e, explain_diff(&a, &b, options).unwrap());
+    e
+}
+pub fn policy(
+    class: rustev_contract::redaction::FieldClass,
+    action: rustev_contract::redaction::Action,
+) -> rustev_contract::redaction::RedactionPolicy {
+    use rustev_contract::redaction::*;
+    RedactionPolicy {
+        schema: REDACTION.into(),
+        classes: FieldClass::ALL
+            .into_iter()
+            .map(|c| {
+                (
+                    c,
+                    if c == class {
+                        action
+                    } else if c.is_deny() {
+                        Action::Drop
+                    } else {
+                        Action::Allow
+                    },
+                )
+            })
+            .collect(),
+        fields: vec![],
+        content_events: vec![],
     }
 }
