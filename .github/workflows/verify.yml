@@ -33,6 +33,11 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     runs-on: ubuntu-latest
+    # Incremental artifacts never help a fresh runner and bloat the cache; line
+    # tables keep file:line in panics at a fraction of full debuginfo.
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
     # The runtime tests use a manual clock and never sleep on wall time, so a
     # hang is a defect; fail it instead of waiting for the platform limit.
     timeout-minutes: 45
@@ -52,8 +57,12 @@ jobs:
           else
             make tools
           fi
-      - name: Cache cargo registry, git and target
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # Restored everywhere, saved only from main: per-pull-request saves of
+      # several gigabytes evicted main's entries (10 GB repository limit), so
+      # pull requests restored nothing and paid one to four minutes to save.
+      - name: Restore cargo registry, git and target
+        id: cargo-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry
@@ -66,6 +75,15 @@ jobs:
         env:
           ACCEPTANCE_GROUP: ${{ matrix.group }}
         run: python3 scripts/acceptance/verify.py "$ACCEPTANCE_GROUP"
+      - name: Save cargo registry, git and target (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ steps.cargo-cache.outputs.cache-primary-key }}
 
   verify:
     name: verify
