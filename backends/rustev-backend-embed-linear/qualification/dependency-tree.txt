@@ -1,0 +1,657 @@
+rustev-backend-embed-linear v0.1.0 (/Users/bart/.statecraft/worktrees/rustev/011-embed-linear/backends/rustev-backend-embed-linear)
+├── sha2 v0.10.9
+│   ├── cfg-if feature "default"
+│   │   └── cfg-if v1.0.5
+│   ├── digest feature "default"
+│   │   ├── digest v0.10.7
+│   │   │   ├── subtle v2.6.1
+│   │   │   ├── block-buffer feature "default"
+│   │   │   │   └── block-buffer v0.10.4
+│   │   │   │       └── generic-array feature "default"
+│   │   │   │           └── generic-array v0.14.7
+│   │   │   │               └── typenum feature "default"
+│   │   │   │                   └── typenum v1.20.1
+│   │   │   │               [build-dependencies]
+│   │   │   │               └── version_check feature "default"
+│   │   │   │                   └── version_check v0.9.5
+│   │   │   └── crypto-common feature "default"
+│   │   │       └── crypto-common v0.1.7
+│   │   │           ├── generic-array feature "default" (*)
+│   │   │           ├── generic-array feature "more_lengths"
+│   │   │           │   └── generic-array v0.14.7 (*)
+│   │   │           └── typenum feature "default" (*)
+│   │   └── digest feature "core-api"
+│   │       ├── digest v0.10.7 (*)
+│   │       └── digest feature "block-buffer"
+│   │           └── digest v0.10.7 (*)
+│   └── cpufeatures feature "default"
+│       └── cpufeatures v0.2.17
+│           └── libc v0.2.189
+├── ort feature "api-31"
+│   ├── ort v2.0.0-rc.15
+│   │   ├── ort-sys v2.0.0-rc.15
+│   │   ├── libloading feature "default"
+│   │   │   ├── libloading v0.9.0
+│   │   │   │   └── cfg-if feature "default" (*)
+│   │   │   └── libloading feature "std"
+│   │   │       └── libloading v0.9.0 (*)
+│   │   └── smallvec feature "const_generics"
+│   │       └── smallvec v1.16.1
+│   ├── ort feature "api-30"
+│   │   ├── ort v2.0.0-rc.15 (*)
+│   │   ├── ort feature "api-29"
+│   │   │   ├── ort v2.0.0-rc.15 (*)
+│   │   │   ├── ort feature "api-28"
+│   │   │   │   ├── ort v2.0.0-rc.15 (*)
+│   │   │   │   ├── ort feature "api-27"
+│   │   │   │   │   ├── ort v2.0.0-rc.15 (*)
+│   │   │   │   │   ├── ort feature "api-26"
+│   │   │   │   │   │   ├── ort v2.0.0-rc.15 (*)
+│   │   │   │   │   │   ├── ort feature "api-25"
+│   │   │   │   │   │   │   ├── ort v2.0.0-rc.15 (*)
+│   │   │   │   │   │   │   ├── ort feature "api-24"
+│   │   │   │   │   │   │   │   ├── ort v2.0.0-rc.15 (*)
+│   │   │   │   │   │   │   │   ├── ort feature "api-23"
+│   │   │   │   │   │   │   │   │   ├── ort v2.0.0-rc.15 (*)
+│   │   │   │   │   │   │   │   │   ├── ort feature "api-22"
+│   │   │   │   │   │   │   │   │   │   ├── ort v2.0.0-rc.15 (*)
+│   │   │   │   │   │   │   │   │   │   ├── ort feature "api-21"
+│   │   │   │   │   │   │   │   │   │   │   ├── ort v2.0.0-rc.15 (*)
+│   │   │   │   │   │   │   │   │   │   │   ├── ort feature "api-20"
+│   │   │   │   │   │   │   │   │   │   │   │   ├── ort v2.0.0-rc.15 (*)
+│   │   │   │   │   │   │   │   │   │   │   │   ├── ort feature "api-19"
+│   │   │   │   │   │   │   │   │   │   │   │   │   ├── ort v2.0.0-rc.15 (*)
+│   │   │   │   │   │   │   │   │   │   │   │   │   ├── ort feature "api-18"
+│   │   │   │   │   │   │   │   │   │   │   │   │   │   ├── ort v2.0.0-rc.15 (*)
+│   │   │   │   │   │   │   │   │   │   │   │   │   │   ├── ort feature "api-17"
+│   │   │   │   │   │   │   │   │   │   │   │   │   │   │   ├── ort v2.0.0-rc.15 (*)
+│   │   │   │   │   │   │   │   │   │   │   │   │   │   │   └── ort-sys feature "api-17"
+│   │   │   │   │   │   │   │   │   │   │   │   │   │   │       └── ort-sys v2.0.0-rc.15
+│   │   │   │   │   │   │   │   │   │   │   │   │   │   └── ort-sys feature "api-18"
+│   │   │   │   │   │   │   │   │   │   │   │   │   │       ├── ort-sys v2.0.0-rc.15
+│   │   │   │   │   │   │   │   │   │   │   │   │   │       └── ort-sys feature "api-17" (*)
+│   │   │   │   │   │   │   │   │   │   │   │   │   └── ort-sys feature "api-19"
+│   │   │   │   │   │   │   │   │   │   │   │   │       ├── ort-sys v2.0.0-rc.15
+│   │   │   │   │   │   │   │   │   │   │   │   │       └── ort-sys feature "api-18" (*)
+│   │   │   │   │   │   │   │   │   │   │   │   └── ort-sys feature "api-20"
+│   │   │   │   │   │   │   │   │   │   │   │       ├── ort-sys v2.0.0-rc.15
+│   │   │   │   │   │   │   │   │   │   │   │       └── ort-sys feature "api-19" (*)
+│   │   │   │   │   │   │   │   │   │   │   └── ort-sys feature "api-21"
+│   │   │   │   │   │   │   │   │   │   │       ├── ort-sys v2.0.0-rc.15
+│   │   │   │   │   │   │   │   │   │   │       └── ort-sys feature "api-20" (*)
+│   │   │   │   │   │   │   │   │   │   └── ort-sys feature "api-22"
+│   │   │   │   │   │   │   │   │   │       ├── ort-sys v2.0.0-rc.15
+│   │   │   │   │   │   │   │   │   │       └── ort-sys feature "api-21" (*)
+│   │   │   │   │   │   │   │   │   └── ort-sys feature "api-23"
+│   │   │   │   │   │   │   │   │       ├── ort-sys v2.0.0-rc.15
+│   │   │   │   │   │   │   │   │       └── ort-sys feature "api-22" (*)
+│   │   │   │   │   │   │   │   └── ort-sys feature "api-24"
+│   │   │   │   │   │   │   │       ├── ort-sys v2.0.0-rc.15
+│   │   │   │   │   │   │   │       └── ort-sys feature "api-23" (*)
+│   │   │   │   │   │   │   └── ort-sys feature "api-25"
+│   │   │   │   │   │   │       ├── ort-sys v2.0.0-rc.15
+│   │   │   │   │   │   │       └── ort-sys feature "api-24" (*)
+│   │   │   │   │   │   └── ort-sys feature "api-26"
+│   │   │   │   │   │       ├── ort-sys v2.0.0-rc.15
+│   │   │   │   │   │       └── ort-sys feature "api-25" (*)
+│   │   │   │   │   └── ort-sys feature "api-27"
+│   │   │   │   │       ├── ort-sys v2.0.0-rc.15
+│   │   │   │   │       └── ort-sys feature "api-26" (*)
+│   │   │   │   └── ort-sys feature "api-28"
+│   │   │   │       ├── ort-sys v2.0.0-rc.15
+│   │   │   │       └── ort-sys feature "api-27" (*)
+│   │   │   └── ort-sys feature "api-29"
+│   │   │       ├── ort-sys v2.0.0-rc.15
+│   │   │       └── ort-sys feature "api-28" (*)
+│   │   └── ort-sys feature "api-30"
+│   │       ├── ort-sys v2.0.0-rc.15
+│   │       └── ort-sys feature "api-29" (*)
+│   └── ort-sys feature "api-31"
+│       ├── ort-sys v2.0.0-rc.15
+│       └── ort-sys feature "api-30" (*)
+├── ort feature "load-dynamic"
+│   ├── ort v2.0.0-rc.15 (*)
+│   ├── ort feature "preload-dylibs"
+│   │   └── ort v2.0.0-rc.15 (*)
+│   ├── ort feature "std"
+│   │   ├── ort v2.0.0-rc.15 (*)
+│   │   └── ort-sys feature "std"
+│   │       └── ort-sys v2.0.0-rc.15
+│   └── ort-sys feature "disable-linking"
+│       └── ort-sys v2.0.0-rc.15
+├── ort feature "std" (*)
+├── rustev-contract feature "default"
+│   └── rustev-contract v0.1.0 (/Users/bart/.statecraft/worktrees/rustev/011-embed-linear/crates/rustev-contract)
+│       ├── hmac v0.12.1
+│       │   ├── digest feature "default" (*)
+│       │   └── digest feature "mac"
+│       │       ├── digest v0.10.7 (*)
+│       │       └── digest feature "subtle"
+│       │           └── digest v0.10.7 (*)
+│       ├── sha2 v0.10.9 (*)
+│       ├── schemars feature "derive"
+│       │   ├── schemars v1.2.3
+│       │   │   ├── dyn-clone feature "default"
+│       │   │   │   └── dyn-clone v1.0.20
+│       │   │   ├── ref-cast feature "default"
+│       │   │   │   └── ref-cast v1.0.27
+│       │   │   │       └── ref-cast-impl feature "default"
+│       │   │   │           └── ref-cast-impl v1.0.27 (proc-macro)
+│       │   │   │               ├── proc-macro2 feature "default"
+│       │   │   │               │   ├── proc-macro2 v1.0.107
+│       │   │   │               │   │   └── unicode-ident feature "default"
+│       │   │   │               │   │       └── unicode-ident v1.0.26
+│       │   │   │               │   └── proc-macro2 feature "proc-macro"
+│       │   │   │               │       └── proc-macro2 v1.0.107 (*)
+│       │   │   │               ├── quote feature "default"
+│       │   │   │               │   ├── quote v1.0.47
+│       │   │   │               │   │   └── proc-macro2 v1.0.107 (*)
+│       │   │   │               │   └── quote feature "proc-macro"
+│       │   │   │               │       ├── quote v1.0.47 (*)
+│       │   │   │               │       └── proc-macro2 feature "proc-macro" (*)
+│       │   │   │               └── syn feature "default"
+│       │   │   │                   ├── syn v3.0.6
+│       │   │   │                   │   ├── proc-macro2 v1.0.107 (*)
+│       │   │   │                   │   ├── quote v1.0.47 (*)
+│       │   │   │                   │   └── unicode-ident feature "default" (*)
+│       │   │   │                   ├── syn feature "clone-impls"
+│       │   │   │                   │   └── syn v3.0.6 (*)
+│       │   │   │                   ├── syn feature "derive"
+│       │   │   │                   │   └── syn v3.0.6 (*)
+│       │   │   │                   ├── syn feature "parsing"
+│       │   │   │                   │   └── syn v3.0.6 (*)
+│       │   │   │                   ├── syn feature "printing"
+│       │   │   │                   │   └── syn v3.0.6 (*)
+│       │   │   │                   └── syn feature "proc-macro"
+│       │   │   │                       ├── syn v3.0.6 (*)
+│       │   │   │                       ├── proc-macro2 feature "proc-macro" (*)
+│       │   │   │                       └── quote feature "proc-macro" (*)
+│       │   │   ├── schemars_derive feature "default"
+│       │   │   │   └── schemars_derive v1.2.3 (proc-macro)
+│       │   │   │       ├── proc-macro2 feature "default" (*)
+│       │   │   │       ├── quote feature "default" (*)
+│       │   │   │       ├── syn feature "default" (*)
+│       │   │   │       └── serde_derive_internals feature "default"
+│       │   │   │           └── serde_derive_internals v0.30.0
+│       │   │   │               ├── proc-macro2 v1.0.107 (*)
+│       │   │   │               ├── quote v1.0.47 (*)
+│       │   │   │               ├── syn feature "clone-impls" (*)
+│       │   │   │               ├── syn feature "derive" (*)
+│       │   │   │               ├── syn feature "parsing" (*)
+│       │   │   │               └── syn feature "printing" (*)
+│       │   │   ├── serde feature "alloc"
+│       │   │   │   ├── serde v1.0.229
+│       │   │   │   │   ├── serde_core feature "result"
+│       │   │   │   │   │   └── serde_core v1.0.229
+│       │   │   │   │   └── serde_derive feature "default"
+│       │   │   │   │       └── serde_derive v1.0.229 (proc-macro)
+│       │   │   │   │           ├── proc-macro2 feature "proc-macro" (*)
+│       │   │   │   │           ├── quote feature "proc-macro" (*)
+│       │   │   │   │           ├── syn feature "clone-impls" (*)
+│       │   │   │   │           ├── syn feature "derive" (*)
+│       │   │   │   │           ├── syn feature "parsing" (*)
+│       │   │   │   │           ├── syn feature "printing" (*)
+│       │   │   │   │           └── syn feature "proc-macro" (*)
+│       │   │   │   └── serde_core feature "alloc"
+│       │   │   │       └── serde_core v1.0.229
+│       │   │   └── serde_json feature "alloc"
+│       │   │       ├── serde_json v1.0.151
+│       │   │       │   ├── memchr v2.8.3
+│       │   │       │   ├── serde_core v1.0.229
+│       │   │       │   ├── itoa feature "default"
+│       │   │       │   │   └── itoa v1.0.18
+│       │   │       │   └── zmij feature "default"
+│       │   │       │       └── zmij v1.0.23
+│       │   │       └── serde_core feature "alloc" (*)
+│       │   └── schemars feature "schemars_derive"
+│       │       └── schemars v1.2.3 (*)
+│       ├── schemars feature "std"
+│       │   └── schemars v1.2.3 (*)
+│       ├── serde feature "default"
+│       │   ├── serde v1.0.229 (*)
+│       │   └── serde feature "std"
+│       │       ├── serde v1.0.229 (*)
+│       │       └── serde_core feature "std"
+│       │           └── serde_core v1.0.229
+│       ├── serde feature "derive"
+│       │   ├── serde v1.0.229 (*)
+│       │   └── serde feature "serde_derive"
+│       │       └── serde v1.0.229 (*)
+│       ├── serde_json feature "default"
+│       │   ├── serde_json v1.0.151 (*)
+│       │   └── serde_json feature "std"
+│       │       ├── serde_json v1.0.151 (*)
+│       │       ├── serde_core feature "std" (*)
+│       │       └── memchr feature "std"
+│       │           ├── memchr v2.8.3
+│       │           └── memchr feature "alloc"
+│       │               └── memchr v2.8.3
+│       └── serde_json feature "float_roundtrip"
+│           └── serde_json v1.0.151 (*)
+├── serde feature "default" (*)
+├── serde feature "derive" (*)
+├── serde_json feature "default" (*)
+├── serde_json feature "float_roundtrip" (*)
+├── rustev-core feature "default"
+│   └── rustev-core v0.1.0 (/Users/bart/.statecraft/worktrees/rustev/011-embed-linear/crates/rustev-core)
+│       ├── libm v0.2.16
+│       ├── rustev-contract feature "default" (*)
+│       ├── serde feature "default" (*)
+│       ├── serde feature "derive" (*)
+│       ├── serde_json feature "default" (*)
+│       └── serde_json feature "float_roundtrip" (*)
+├── tokenizers feature "normalizers"
+│   ├── tokenizers v1.0.0-rc.3
+│   │   ├── tk-convert v0.1.0-rc.3
+│   │   │   ├── serde_json feature "default" (*)
+│   │   │   ├── bitcannon feature "default"
+│   │   │   │   └── bitcannon v0.1.0-rc.3
+│   │   │   └── thiserror feature "default"
+│   │   │       ├── thiserror v2.0.21
+│   │   │       │   └── thiserror-impl feature "default"
+│   │   │       │       └── thiserror-impl v2.0.21 (proc-macro)
+│   │   │       │           ├── proc-macro2 feature "default" (*)
+│   │   │       │           ├── quote feature "default" (*)
+│   │   │       │           └── syn feature "default" (*)
+│   │   │       └── thiserror feature "std"
+│   │   │           └── thiserror v2.0.21 (*)
+│   │   ├── tk-encode v0.1.0-rc.3
+│   │   │   ├── ptr_hash v2.1.3
+│   │   │   │   ├── rdst v0.20.14
+│   │   │   │   │   ├── arbitrary-chunks feature "default"
+│   │   │   │   │   │   └── arbitrary-chunks v0.4.1
+│   │   │   │   │   └── partition feature "default"
+│   │   │   │   │       └── partition v0.1.2
+│   │   │   │   ├── log feature "default"
+│   │   │   │   │   └── log v0.4.34
+│   │   │   │   ├── bitvec feature "default"
+│   │   │   │   │   ├── bitvec v1.1.1
+│   │   │   │   │   │   ├── funty v2.0.0
+│   │   │   │   │   │   ├── wyz v0.5.1
+│   │   │   │   │   │   │   └── tap feature "default"
+│   │   │   │   │   │   │       └── tap v1.0.1
+│   │   │   │   │   │   ├── radium feature "default"
+│   │   │   │   │   │   │   └── radium v0.7.0
+│   │   │   │   │   │   └── tap feature "default" (*)
+│   │   │   │   │   ├── bitvec feature "atomic"
+│   │   │   │   │   │   └── bitvec v1.1.1 (*)
+│   │   │   │   │   └── bitvec feature "std"
+│   │   │   │   │       ├── bitvec v1.1.1 (*)
+│   │   │   │   │       └── bitvec feature "alloc"
+│   │   │   │   │           └── bitvec v1.1.1 (*)
+│   │   │   │   ├── colored feature "default"
+│   │   │   │   │   └── colored v3.1.1
+│   │   │   │   ├── fastrand feature "default"
+│   │   │   │   │   ├── fastrand v2.5.0
+│   │   │   │   │   └── fastrand feature "std"
+│   │   │   │   │       ├── fastrand v2.5.0
+│   │   │   │   │       └── fastrand feature "alloc"
+│   │   │   │   │           └── fastrand v2.5.0
+│   │   │   │   ├── fxhash feature "default"
+│   │   │   │   │   └── fxhash v0.2.1
+│   │   │   │   │       └── byteorder feature "default"
+│   │   │   │   │           ├── byteorder v1.5.0
+│   │   │   │   │           └── byteorder feature "std"
+│   │   │   │   │               └── byteorder v1.5.0
+│   │   │   │   ├── itertools feature "default"
+│   │   │   │   │   ├── itertools v0.15.0
+│   │   │   │   │   │   └── either v1.19.0
+│   │   │   │   │   └── itertools feature "use_std"
+│   │   │   │   │       ├── itertools v0.15.0 (*)
+│   │   │   │   │       ├── itertools feature "use_alloc"
+│   │   │   │   │       │   └── itertools v0.15.0 (*)
+│   │   │   │   │       └── either feature "use_std"
+│   │   │   │   │           ├── either v1.19.0
+│   │   │   │   │           └── either feature "std"
+│   │   │   │   │               └── either v1.19.0
+│   │   │   │   ├── mem_dbg feature "default"
+│   │   │   │   │   ├── mem_dbg v0.4.4
+│   │   │   │   │   │   ├── bitflags feature "default"
+│   │   │   │   │   │   │   └── bitflags v2.13.2
+│   │   │   │   │   │   ├── hashbrown feature "default"
+│   │   │   │   │   │   │   ├── hashbrown v0.16.1
+│   │   │   │   │   │   │   │   ├── equivalent v1.0.3
+│   │   │   │   │   │   │   │   ├── foldhash v0.2.0
+│   │   │   │   │   │   │   │   └── allocator-api2 feature "alloc"
+│   │   │   │   │   │   │   │       └── allocator-api2 v0.2.21
+│   │   │   │   │   │   │   ├── hashbrown feature "allocator-api2"
+│   │   │   │   │   │   │   │   └── hashbrown v0.16.1 (*)
+│   │   │   │   │   │   │   ├── hashbrown feature "default-hasher"
+│   │   │   │   │   │   │   │   └── hashbrown v0.16.1 (*)
+│   │   │   │   │   │   │   ├── hashbrown feature "equivalent"
+│   │   │   │   │   │   │   │   └── hashbrown v0.16.1 (*)
+│   │   │   │   │   │   │   ├── hashbrown feature "inline-more"
+│   │   │   │   │   │   │   │   └── hashbrown v0.16.1 (*)
+│   │   │   │   │   │   │   └── hashbrown feature "raw-entry"
+│   │   │   │   │   │   │       └── hashbrown v0.16.1 (*)
+│   │   │   │   │   │   └── mem_dbg-derive feature "default"
+│   │   │   │   │   │       └── mem_dbg-derive v0.3.4 (proc-macro)
+│   │   │   │   │   │           ├── proc-macro2 feature "default" (*)
+│   │   │   │   │   │           ├── quote feature "default" (*)
+│   │   │   │   │   │           ├── syn feature "default"
+│   │   │   │   │   │           │   ├── syn v2.0.119
+│   │   │   │   │   │           │   │   ├── proc-macro2 v1.0.107 (*)
+│   │   │   │   │   │           │   │   ├── quote v1.0.47 (*)
+│   │   │   │   │   │           │   │   └── unicode-ident feature "default" (*)
+│   │   │   │   │   │           │   ├── syn feature "clone-impls"
+│   │   │   │   │   │           │   │   └── syn v2.0.119 (*)
+│   │   │   │   │   │           │   ├── syn feature "derive"
+│   │   │   │   │   │           │   │   └── syn v2.0.119 (*)
+│   │   │   │   │   │           │   ├── syn feature "parsing"
+│   │   │   │   │   │           │   │   └── syn v2.0.119 (*)
+│   │   │   │   │   │           │   ├── syn feature "printing"
+│   │   │   │   │   │           │   │   └── syn v2.0.119 (*)
+│   │   │   │   │   │           │   └── syn feature "proc-macro"
+│   │   │   │   │   │           │       ├── syn v2.0.119 (*)
+│   │   │   │   │   │           │       ├── proc-macro2 feature "proc-macro" (*)
+│   │   │   │   │   │           │       └── quote feature "proc-macro" (*)
+│   │   │   │   │   │           ├── syn feature "derive" (*)
+│   │   │   │   │   │           ├── syn feature "parsing" (*)
+│   │   │   │   │   │           └── syn feature "printing" (*)
+│   │   │   │   │   ├── mem_dbg feature "derive"
+│   │   │   │   │   │   ├── mem_dbg v0.4.4 (*)
+│   │   │   │   │   │   └── mem_dbg feature "mem_dbg-derive"
+│   │   │   │   │   │       └── mem_dbg v0.4.4 (*)
+│   │   │   │   │   └── mem_dbg feature "std"
+│   │   │   │   │       └── mem_dbg v0.4.4 (*)
+│   │   │   │   ├── prefetch-index feature "default"
+│   │   │   │   │   └── prefetch-index v0.2.1
+│   │   │   │   ├── rand feature "default"
+│   │   │   │   │   ├── rand v0.10.3
+│   │   │   │   │   │   ├── rand_core v0.10.1
+│   │   │   │   │   │   ├── chacha20 feature "rng"
+│   │   │   │   │   │   │   └── chacha20 v0.10.2
+│   │   │   │   │   │   │       ├── rand_core v0.10.1
+│   │   │   │   │   │   │       └── cfg-if feature "default" (*)
+│   │   │   │   │   │   └── getrandom feature "default"
+│   │   │   │   │   │       └── getrandom v0.4.3
+│   │   │   │   │   │           ├── libc v0.2.189
+│   │   │   │   │   │           ├── cfg-if feature "default" (*)
+│   │   │   │   │   │           └── rand_core feature "default"
+│   │   │   │   │   │               └── rand_core v0.10.1
+│   │   │   │   │   ├── rand feature "std"
+│   │   │   │   │   │   ├── rand v0.10.3 (*)
+│   │   │   │   │   │   ├── rand feature "alloc"
+│   │   │   │   │   │   │   └── rand v0.10.3 (*)
+│   │   │   │   │   │   └── getrandom feature "std"
+│   │   │   │   │   │       └── getrandom v0.4.3 (*)
+│   │   │   │   │   ├── rand feature "std_rng"
+│   │   │   │   │   │   └── rand v0.10.3 (*)
+│   │   │   │   │   ├── rand feature "sys_rng"
+│   │   │   │   │   │   ├── rand v0.10.3 (*)
+│   │   │   │   │   │   ├── rand feature "getrandom"
+│   │   │   │   │   │   │   └── rand v0.10.3 (*)
+│   │   │   │   │   │   └── getrandom feature "sys_rng"
+│   │   │   │   │   │       └── getrandom v0.4.3 (*)
+│   │   │   │   │   └── rand feature "thread_rng"
+│   │   │   │   │       ├── rand v0.10.3 (*)
+│   │   │   │   │       ├── rand feature "std" (*)
+│   │   │   │   │       ├── rand feature "std_rng" (*)
+│   │   │   │   │       └── rand feature "sys_rng" (*)
+│   │   │   │   ├── rand_chacha feature "default"
+│   │   │   │   │   ├── rand_chacha v0.10.0
+│   │   │   │   │   │   ├── rand_core feature "default" (*)
+│   │   │   │   │   │   └── ppv-lite86 feature "simd"
+│   │   │   │   │   │       └── ppv-lite86 v0.2.21
+│   │   │   │   │   │           ├── zerocopy feature "default"
+│   │   │   │   │   │           │   └── zerocopy v0.8.63
+│   │   │   │   │   │           └── zerocopy feature "simd"
+│   │   │   │   │   │               └── zerocopy v0.8.63
+│   │   │   │   │   └── rand_chacha feature "std"
+│   │   │   │   │       ├── rand_chacha v0.10.0 (*)
+│   │   │   │   │       └── ppv-lite86 feature "std"
+│   │   │   │   │           └── ppv-lite86 v0.2.21 (*)
+│   │   │   │   ├── tempfile feature "default"
+│   │   │   │   │   ├── tempfile v3.27.0
+│   │   │   │   │   │   ├── getrandom v0.4.3 (*)
+│   │   │   │   │   │   ├── once_cell feature "std"
+│   │   │   │   │   │   │   ├── once_cell v1.21.4
+│   │   │   │   │   │   │   └── once_cell feature "alloc"
+│   │   │   │   │   │   │       ├── once_cell v1.21.4
+│   │   │   │   │   │   │       └── once_cell feature "race"
+│   │   │   │   │   │   │           └── once_cell v1.21.4
+│   │   │   │   │   │   ├── fastrand feature "default" (*)
+│   │   │   │   │   │   ├── rustix feature "default"
+│   │   │   │   │   │   │   ├── rustix v1.1.5
+│   │   │   │   │   │   │   │   ├── bitflags v2.13.2
+│   │   │   │   │   │   │   │   ├── errno v0.3.14
+│   │   │   │   │   │   │   │   │   └── libc v0.2.189
+│   │   │   │   │   │   │   │   └── libc v0.2.189
+│   │   │   │   │   │   │   └── rustix feature "std"
+│   │   │   │   │   │   │       ├── rustix v1.1.5 (*)
+│   │   │   │   │   │   │       ├── libc feature "std"
+│   │   │   │   │   │   │       │   └── libc v0.2.189
+│   │   │   │   │   │   │       ├── bitflags feature "std"
+│   │   │   │   │   │   │       │   └── bitflags v2.13.2
+│   │   │   │   │   │   │       ├── rustix feature "alloc"
+│   │   │   │   │   │   │       │   └── rustix v1.1.5 (*)
+│   │   │   │   │   │   │       └── errno feature "std"
+│   │   │   │   │   │   │           ├── errno v0.3.14 (*)
+│   │   │   │   │   │   │           └── libc feature "std" (*)
+│   │   │   │   │   │   └── rustix feature "fs"
+│   │   │   │   │   │       └── rustix v1.1.5 (*)
+│   │   │   │   │   └── tempfile feature "getrandom"
+│   │   │   │   │       └── tempfile v3.27.0 (*)
+│   │   │   │   ├── xxhash-rust feature "default"
+│   │   │   │   │   └── xxhash-rust v0.8.19
+│   │   │   │   ├── xxhash-rust feature "xxh3"
+│   │   │   │   │   └── xxhash-rust v0.8.19
+│   │   │   │   └── xxhash-rust feature "xxh64"
+│   │   │   │       └── xxhash-rust v0.8.19
+│   │   │   ├── memchr feature "default"
+│   │   │   │   ├── memchr v2.8.3
+│   │   │   │   └── memchr feature "std" (*)
+│   │   │   ├── bitcannon feature "default" (*)
+│   │   │   ├── thiserror feature "default" (*)
+│   │   │   ├── ahash feature "default"
+│   │   │   │   ├── ahash v0.8.12
+│   │   │   │   │   ├── cfg-if feature "default" (*)
+│   │   │   │   │   ├── getrandom feature "default"
+│   │   │   │   │   │   └── getrandom v0.3.4
+│   │   │   │   │   │       ├── libc v0.2.189
+│   │   │   │   │   │       └── cfg-if feature "default" (*)
+│   │   │   │   │   ├── once_cell feature "alloc" (*)
+│   │   │   │   │   └── zerocopy feature "simd" (*)
+│   │   │   │   │   [build-dependencies]
+│   │   │   │   │   └── version_check feature "default" (*)
+│   │   │   │   ├── ahash feature "runtime-rng"
+│   │   │   │   │   ├── ahash v0.8.12 (*)
+│   │   │   │   │   └── ahash feature "getrandom"
+│   │   │   │   │       └── ahash v0.8.12 (*)
+│   │   │   │   └── ahash feature "std"
+│   │   │   │       └── ahash v0.8.12 (*)
+│   │   │   ├── dary_heap feature "default"
+│   │   │   │   └── dary_heap v0.3.9
+│   │   │   ├── fancy-regex feature "default"
+│   │   │   │   ├── fancy-regex v0.19.2
+│   │   │   │   │   ├── bit-set v0.8.0
+│   │   │   │   │   │   └── bit-vec v0.8.0
+│   │   │   │   │   ├── regex-syntax v0.8.11
+│   │   │   │   │   ├── regex-automata feature "alloc"
+│   │   │   │   │   │   └── regex-automata v0.4.18
+│   │   │   │   │   │       ├── aho-corasick v1.1.5
+│   │   │   │   │   │       │   └── memchr v2.8.3
+│   │   │   │   │   │       ├── memchr v2.8.3
+│   │   │   │   │   │       └── regex-syntax v0.8.11
+│   │   │   │   │   ├── regex-automata feature "dfa-onepass"
+│   │   │   │   │   │   ├── regex-automata v0.4.18 (*)
+│   │   │   │   │   │   └── regex-automata feature "nfa-thompson"
+│   │   │   │   │   │       ├── regex-automata v0.4.18 (*)
+│   │   │   │   │   │       └── regex-automata feature "alloc" (*)
+│   │   │   │   │   ├── regex-automata feature "dfa-search"
+│   │   │   │   │   │   └── regex-automata v0.4.18 (*)
+│   │   │   │   │   ├── regex-automata feature "hybrid"
+│   │   │   │   │   │   ├── regex-automata v0.4.18 (*)
+│   │   │   │   │   │   ├── regex-automata feature "alloc" (*)
+│   │   │   │   │   │   └── regex-automata feature "nfa-thompson" (*)
+│   │   │   │   │   ├── regex-automata feature "meta"
+│   │   │   │   │   │   ├── regex-automata v0.4.18 (*)
+│   │   │   │   │   │   ├── regex-automata feature "nfa-pikevm"
+│   │   │   │   │   │   │   ├── regex-automata v0.4.18 (*)
+│   │   │   │   │   │   │   └── regex-automata feature "nfa-thompson" (*)
+│   │   │   │   │   │   └── regex-automata feature "syntax"
+│   │   │   │   │   │       ├── regex-automata v0.4.18 (*)
+│   │   │   │   │   │       └── regex-automata feature "alloc" (*)
+│   │   │   │   │   ├── regex-automata feature "nfa"
+│   │   │   │   │   │   ├── regex-automata v0.4.18 (*)
+│   │   │   │   │   │   ├── regex-automata feature "nfa-backtrack"
+│   │   │   │   │   │   │   ├── regex-automata v0.4.18 (*)
+│   │   │   │   │   │   │   └── regex-automata feature "nfa-thompson" (*)
+│   │   │   │   │   │   ├── regex-automata feature "nfa-pikevm" (*)
+│   │   │   │   │   │   └── regex-automata feature "nfa-thompson" (*)
+│   │   │   │   │   └── regex-automata feature "syntax" (*)
+│   │   │   │   ├── fancy-regex feature "perf"
+│   │   │   │   │   ├── fancy-regex v0.19.2 (*)
+│   │   │   │   │   └── regex-automata feature "perf"
+│   │   │   │   │       ├── regex-automata v0.4.18 (*)
+│   │   │   │   │       ├── regex-automata feature "perf-inline"
+│   │   │   │   │       │   └── regex-automata v0.4.18 (*)
+│   │   │   │   │       └── regex-automata feature "perf-literal"
+│   │   │   │   │           ├── regex-automata v0.4.18 (*)
+│   │   │   │   │           ├── regex-automata feature "perf-literal-multisubstring"
+│   │   │   │   │           │   └── regex-automata v0.4.18 (*)
+│   │   │   │   │           └── regex-automata feature "perf-literal-substring"
+│   │   │   │   │               ├── regex-automata v0.4.18 (*)
+│   │   │   │   │               └── aho-corasick feature "perf-literal"
+│   │   │   │   │                   └── aho-corasick v1.1.5 (*)
+│   │   │   │   ├── fancy-regex feature "std"
+│   │   │   │   │   ├── fancy-regex v0.19.2 (*)
+│   │   │   │   │   ├── bit-set feature "std"
+│   │   │   │   │   │   ├── bit-set v0.8.0 (*)
+│   │   │   │   │   │   └── bit-vec feature "std"
+│   │   │   │   │   │       └── bit-vec v0.8.0
+│   │   │   │   │   ├── regex-automata feature "std"
+│   │   │   │   │   │   ├── regex-automata v0.4.18 (*)
+│   │   │   │   │   │   ├── memchr feature "std" (*)
+│   │   │   │   │   │   ├── regex-automata feature "alloc" (*)
+│   │   │   │   │   │   ├── aho-corasick feature "std"
+│   │   │   │   │   │   │   ├── aho-corasick v1.1.5 (*)
+│   │   │   │   │   │   │   └── memchr feature "std" (*)
+│   │   │   │   │   │   └── regex-syntax feature "std"
+│   │   │   │   │   │       └── regex-syntax v0.8.11
+│   │   │   │   │   └── regex-syntax feature "std" (*)
+│   │   │   │   ├── fancy-regex feature "unicode"
+│   │   │   │   │   ├── fancy-regex v0.19.2 (*)
+│   │   │   │   │   ├── regex-automata feature "unicode"
+│   │   │   │   │   │   ├── regex-automata v0.4.18 (*)
+│   │   │   │   │   │   ├── regex-automata feature "unicode-age"
+│   │   │   │   │   │   │   ├── regex-automata v0.4.18 (*)
+│   │   │   │   │   │   │   └── regex-syntax feature "unicode-age"
+│   │   │   │   │   │   │       └── regex-syntax v0.8.11
+│   │   │   │   │   │   ├── regex-automata feature "unicode-bool"
+│   │   │   │   │   │   │   ├── regex-automata v0.4.18 (*)
+│   │   │   │   │   │   │   └── regex-syntax feature "unicode-bool"
+│   │   │   │   │   │   │       └── regex-syntax v0.8.11
+│   │   │   │   │   │   ├── regex-automata feature "unicode-case"
+│   │   │   │   │   │   │   ├── regex-automata v0.4.18 (*)
+│   │   │   │   │   │   │   └── regex-syntax feature "unicode-case"
+│   │   │   │   │   │   │       └── regex-syntax v0.8.11
+│   │   │   │   │   │   ├── regex-automata feature "unicode-gencat"
+│   │   │   │   │   │   │   ├── regex-automata v0.4.18 (*)
+│   │   │   │   │   │   │   └── regex-syntax feature "unicode-gencat"
+│   │   │   │   │   │   │       └── regex-syntax v0.8.11
+│   │   │   │   │   │   ├── regex-automata feature "unicode-perl"
+│   │   │   │   │   │   │   ├── regex-automata v0.4.18 (*)
+│   │   │   │   │   │   │   └── regex-syntax feature "unicode-perl"
+│   │   │   │   │   │   │       └── regex-syntax v0.8.11
+│   │   │   │   │   │   ├── regex-automata feature "unicode-script"
+│   │   │   │   │   │   │   ├── regex-automata v0.4.18 (*)
+│   │   │   │   │   │   │   └── regex-syntax feature "unicode-script"
+│   │   │   │   │   │   │       └── regex-syntax v0.8.11
+│   │   │   │   │   │   ├── regex-automata feature "unicode-segment"
+│   │   │   │   │   │   │   ├── regex-automata v0.4.18 (*)
+│   │   │   │   │   │   │   └── regex-syntax feature "unicode-segment"
+│   │   │   │   │   │   │       └── regex-syntax v0.8.11
+│   │   │   │   │   │   ├── regex-automata feature "unicode-word-boundary"
+│   │   │   │   │   │   │   └── regex-automata v0.4.18 (*)
+│   │   │   │   │   │   └── regex-syntax feature "unicode"
+│   │   │   │   │   │       ├── regex-syntax v0.8.11
+│   │   │   │   │   │       ├── regex-syntax feature "unicode-age" (*)
+│   │   │   │   │   │       ├── regex-syntax feature "unicode-bool" (*)
+│   │   │   │   │   │       ├── regex-syntax feature "unicode-case" (*)
+│   │   │   │   │   │       ├── regex-syntax feature "unicode-gencat" (*)
+│   │   │   │   │   │       ├── regex-syntax feature "unicode-perl" (*)
+│   │   │   │   │   │       ├── regex-syntax feature "unicode-script" (*)
+│   │   │   │   │   │       └── regex-syntax feature "unicode-segment" (*)
+│   │   │   │   │   └── regex-syntax feature "unicode" (*)
+│   │   │   │   └── fancy-regex feature "variable-lookbehinds"
+│   │   │   │       ├── fancy-regex v0.19.2 (*)
+│   │   │   │       └── regex-automata feature "dfa-search" (*)
+│   │   │   ├── log feature "default" (*)
+│   │   │   ├── rand feature "default" (*)
+│   │   │   ├── spm_precompiled feature "default"
+│   │   │   │   └── spm_precompiled v0.1.4
+│   │   │   │       ├── serde feature "default" (*)
+│   │   │   │       ├── serde feature "derive" (*)
+│   │   │   │       ├── base64 feature "default"
+│   │   │   │       │   ├── base64 v0.13.1
+│   │   │   │       │   └── base64 feature "std"
+│   │   │   │       │       └── base64 v0.13.1
+│   │   │   │       ├── nom feature "default"
+│   │   │   │       │   ├── nom v7.1.3
+│   │   │   │       │   │   ├── memchr v2.8.3
+│   │   │   │       │   │   └── minimal-lexical v0.2.1
+│   │   │   │       │   └── nom feature "std"
+│   │   │   │       │       ├── nom v7.1.3 (*)
+│   │   │   │       │       ├── memchr feature "std" (*)
+│   │   │   │       │       ├── nom feature "alloc"
+│   │   │   │       │       │   └── nom v7.1.3 (*)
+│   │   │   │       │       └── minimal-lexical feature "std"
+│   │   │   │       │           └── minimal-lexical v0.2.1
+│   │   │   │       └── unicode-segmentation feature "default"
+│   │   │   │           └── unicode-segmentation v1.13.3
+│   │   │   ├── unicode-segmentation feature "default" (*)
+│   │   │   ├── unicode-normalization feature "default"
+│   │   │   │   ├── unicode-normalization v0.1.25
+│   │   │   │   │   ├── tinyvec feature "alloc"
+│   │   │   │   │   │   └── tinyvec v1.13.3
+│   │   │   │   │   └── tinyvec feature "default"
+│   │   │   │   │       └── tinyvec v1.13.3
+│   │   │   │   └── unicode-normalization feature "std"
+│   │   │   │       └── unicode-normalization v0.1.25 (*)
+│   │   │   ├── unicode_categories feature "default"
+│   │   │   │   └── unicode_categories v0.1.1
+│   │   │   ├── wide feature "default"
+│   │   │   │   ├── wide v1.7.1
+│   │   │   │   │   └── bytemuck feature "default"
+│   │   │   │   │       └── bytemuck v1.25.2
+│   │   │   │   └── wide feature "std"
+│   │   │   │       └── wide v1.7.1 (*)
+│   │   │   └── yada feature "default"
+│   │   │       └── yada v0.7.0
+│   │   └── tk-serialize feature "deserialize"
+│   │       └── tk-serialize v0.1.0-rc.3
+│   │           ├── tk-encode v0.1.0-rc.3 (*)
+│   │           ├── bitcannon feature "default" (*)
+│   │           ├── base64 feature "default"
+│   │           │   ├── base64 v0.22.1
+│   │           │   └── base64 feature "std"
+│   │           │       ├── base64 v0.22.1
+│   │           │       └── base64 feature "alloc"
+│   │           │           └── base64 v0.22.1
+│   │           └── hifijson feature "default"
+│   │               ├── hifijson v0.5.0
+│   │               ├── hifijson feature "alloc"
+│   │               │   └── hifijson v0.5.0
+│   │               └── hifijson feature "std"
+│   │                   └── hifijson v0.5.0
+│   └── tk-serialize feature "normalizers"
+│       ├── tk-serialize v0.1.0-rc.3 (*)
+│       └── tk-encode feature "normalizers"
+│           └── tk-encode v0.1.0-rc.3 (*)
+├── tokenizers feature "regex"
+│   ├── tokenizers v1.0.0-rc.3 (*)
+│   └── tk-serialize feature "fancy-regex"
+│       ├── tk-serialize v0.1.0-rc.3 (*)
+│       └── tk-encode feature "fancy-regex"
+│           └── tk-encode v0.1.0-rc.3 (*)
+├── tokenizers feature "serialize"
+│   ├── tokenizers v1.0.0-rc.3 (*)
+│   └── tk-serialize feature "serialize"
+│       └── tk-serialize v0.1.0-rc.3 (*)
+└── tokenizers feature "wordpiece"
+    ├── tokenizers v1.0.0-rc.3 (*)
+    └── tk-serialize feature "wordpiece"
+        ├── tk-serialize v0.1.0-rc.3 (*)
+        └── tk-encode feature "wordpiece"
+            └── tk-encode v0.1.0-rc.3 (*)
