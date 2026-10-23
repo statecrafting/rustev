@@ -40,6 +40,8 @@ fn construct(
     let answer = match query {
         Query::WhyOutcome => outcome::build(&mut b)?,
         Query::TextOrigin => text::build(&mut b)?,
+        Query::Models => models::build(&mut b)?,
+        Query::WhySelected { item } => selected::build(&mut b, item)?,
         _ => {
             return Err(ExplainError::new(
                 RefusalCode::InvalidQuery,
@@ -50,6 +52,14 @@ fn construct(
     };
     let mut side = set.side.clone();
     redact::side(&mut side, options.redaction);
+    let mut query = query.clone();
+    if let Query::WhySelected { item } = &mut query {
+        redact::item(
+            item,
+            options.redaction,
+            rustev_contract::redaction::FieldClass::Id,
+        );
+    }
     let doc = Explanation {
         schema: rustev_contract::schema::EXPLANATION.into(),
         explainer: EXPLAINER.into(),
@@ -62,7 +72,7 @@ fn construct(
         redaction: options.redaction.map(|p| Redaction {
             policy: p.policy_id(),
         }),
-        query: query.clone(),
+        query,
         answer,
         truncation: (b.total > limit).then_some(Truncation {
             total: b.total as u64,

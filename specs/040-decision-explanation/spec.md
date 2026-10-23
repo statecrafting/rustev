@@ -1103,6 +1103,19 @@ a propagated backend failure, digest-only, corrupt, scope and plan
 refusals, a cancelled run, redaction with a byte scan for withheld values,
 text fields) and the bound's unit test.
 
+**Increment 3 (`models` and `why_selected`).** `models` builds 3.10: one
+entry per model-backed attempt with its binding, the `served_identity`
+facet of 3.10.2 and 3.12.2 read from the retained value document in bundle
+form, and the cost sums of 3.10.3. `why_selected` builds 3.6 over the
+recorded parameter scopes in the traversal order of 3.6.1 (`scopes`), with
+the facets `tier`, `relaxation` and `origin` reported as not recorded. A
+step whose static references cannot be decoded takes the judgment lineage
+with `bound: "judgment"` (3.5 item 5), as in increment 2, and no partial
+closure is published. Tests: `crates/rustev-eval/tests/explain_models.rs`
+and `explain_selected.rs`, with shared fixtures under
+`tests/explain_support/`; `models` and `why_selected` leave the list of
+queries refused as `invalid-query`.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

@@ -32,6 +32,23 @@ pub(super) fn apply(
     policy: Option<&RedactionPolicy>,
     composite: bool,
 ) -> Result<Option<Truncated>, Unavailable> {
+    apply_members(value, class, policy, composite, false)
+}
+pub(super) fn apply_query(
+    value: &mut Value,
+    class: FieldClass,
+    policy: Option<&RedactionPolicy>,
+    composite: bool,
+) -> Result<Option<Truncated>, Unavailable> {
+    apply_members(value, class, policy, composite, true)
+}
+fn apply_members(
+    value: &mut Value,
+    class: FieldClass,
+    policy: Option<&RedactionPolicy>,
+    composite: bool,
+    query: bool,
+) -> Result<Option<Truncated>, Unavailable> {
     let Some(p) = policy else { return Ok(None) };
     if let Some(u) = withheld(Some(p), class) {
         return Err(u);
@@ -52,17 +69,35 @@ pub(super) fn apply(
         }
         Value::Array(a) => {
             for v in a {
-                cut = apply(v, class, Some(p), composite)?.or(cut);
+                cut = apply_members(v, class, Some(p), composite, query)?.or(cut);
             }
         }
         Value::Object(o) => {
             for (k, v) in o {
                 let c = if composite {
-                    member_class(k, class)
+                    if query {
+                        match k.as_str() {
+                            "param" | "descriptor" => FieldClass::PlanMetadata,
+                            "index" | "position" | "units" | "reserved" | "max_units" => {
+                                FieldClass::Number
+                            }
+                            "value_kind"
+                            | "mode"
+                            | "final_cost"
+                            | "within_guaranteed_cap"
+                            | "charge"
+                            | "bound" => FieldClass::Enum,
+                            // Ids (`candidate`, `attempt_id`, ...) take their
+                            // class from `member_class` below (spec 040 3.13).
+                            _ => member_class(k, class),
+                        }
+                    } else {
+                        member_class(k, class)
+                    }
                 } else {
                     class
                 };
-                cut = apply(v, c, Some(p), composite)?.or(cut);
+                cut = apply_members(v, c, Some(p), composite, query)?.or(cut);
             }
         }
         _ => {}

@@ -123,7 +123,7 @@
       }
     ],
     "sectionDigests": {
-      "040-decision-explanation-api-and-rustev-explain-amends-004-and-006": "fccca0009d3523925dce064f5e935587a3a4d39304c9c2fcb78eaa797dbf7123",
+      "040-decision-explanation-api-and-rustev-explain-amends-004-and-006": "4e8e56041f5153e4972a25325fc0c3fa00a37fb40c53fd1427347e8572f9f67a",
       "1-purpose": "3178f605b0a2932d4e581ad8c633ff1782db9a625c0ec69e558da03526bc927a",
       "2-1-binding-principles-of-76": "d791f1707bdd26a13780bb9e6a82eac6b46b01e3bf62e34139e51e3db8520028",
       "2-territory": "002d469df2936a3b3c93391c0b58d546b74da454c0a704766b79f1122b482ed3",
@@ -150,7 +150,7 @@
       "5-observable-negative-cases": "89ffe506876b76ace911d2be8a91a4c132e39a6b67402537675607301b943687",
       "acceptance": "6cbb2e96dca73ad5604a3aff61aefd165202fd96e73c84f94caafd296c4159e2",
       "decisions-at-approval": "45be7962844cae50c61c6b87c8ce29d6931bcfc3ad10e1caba6929d2c257e494",
-      "implementation-record": "6577840d14ab85b326ea1cb640c80c123211ffc75964f1c193ad3f80d9789cb7",
+      "implementation-record": "93536ed54511fd47d35419738aaa588af9f3e59bea53f51cbe209b2876e5416c",
       "verification": "060cc7e4a9cf858301d9e2879b406fcb6d29043c4eaafc1199ab616f8a9a5131"
     },
     "sectionHeadings": [
@@ -189,6 +189,6 @@
     "summary": "An amendment of approved specs 004 and 006 (R-16), for #76 child D2. A pure function over recorded evidence (a delivered `rustev.run/1` record, or a `rustev.replay/1` bundle, with the plan document when supplied) answers seven structured questions: why an item was selected, why one was excluded, why one item precedes another, why the outcome is what it is, where text came from, which models answered at what cost, and where two decisions first diverge. Answers are written as a versioned `rustev.explanation/1` document in which every fact cites the evidence path it was copied from and carries the derivation class and lineage its source records; a fact the evidence does not hold, or holds only as a digest, or that a supplied redaction policy withholds, is `not_available` with a typed reason, never a guess. Nothing is re-executed, compiled or dispatched and no model is called. Adds a deterministic Markdown rendering, `rustev explain` in the CLI, and the binding surface for the Node and WebAssembly packages and the service. No existing document, identity or CLI output changes. Approved (A-37); implementation is pending.\n",
     "title": "Decision explanation API and `rustev explain` (amends 004 and 006)"
   },
-  "shardHash": "c09e81ad371bade84af54af7752bb396cb2ca53d2ba20d330d5a6e23c535037d",
+  "shardHash": "bd2d3f7fe4bd1028d204474bd0ef9e03891b1d933c4f6504356cd839b6567c58",
   "specVersion": "1.10.0"
 }
