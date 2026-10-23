@@ -1,0 +1,22 @@
+[package]
+name = "rustev-backend-embed-linear"
+version = "0.1.0"
+description = "A local semantic decision backend: a host-provisioned frozen sentence encoder run by ONNX Runtime and a linear head (spec 011)."
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[package.metadata.spec-spine]
+spec = "011-semantic-backend"
+
+[dependencies]
+rustev-contract = { path = "../../crates/rustev-contract" }
+rustev-core = { path = "../../crates/rustev-core" }
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+# Spec 011 2: no default features; dynamic loading only; nothing downloads or links.
+ort = { version = "=2.0.0-rc.15", default-features = false, features = ["std", "load-dynamic", "api-31"] }
+tokenizers = { version = "=1.0.0-rc.3", default-features = false, features = ["serialize", "normalizers", "wordpiece", "regex"] }
