@@ -1,0 +1,58 @@
+{
+  "schema": "rustev.serve-config/1",
+  "listeners": [
+    {
+      "name": "local",
+      "groups": [
+        "decide",
+        "admin",
+        "ops"
+      ],
+      "transport": {
+        "unix": {
+          "path": "/tmp/test.sock",
+          "mode": 384,
+          "auth": "filesystem"
+        }
+      },
+      "limits": {
+        "max_header_bytes": 4096,
+        "registration_body_bytes": 16777216,
+        "other_body_bytes": 4194304,
+        "max_connections": 64,
+        "max_http2_streams": 16,
+        "requests_per_second": 10000
+      },
+      "redaction_policy": "none"
+    }
+  ],
+  "max_plans": 4096,
+  "runtime": {
+    "max_in_flight": 1,
+    "max_queued": 0,
+    "per_backend_concurrency": {}
+  },
+  "backend_bindings": {},
+  "context_sources": {},
+  "sinks": {},
+  "sink_policy": {
+    "fail_decision": {
+      "timeout_ms": 10000
+    }
+  },
+  "signing_mode": "allow_unsigned",
+  "signing_keys": {
+    "ed25519": {},
+    "sigstore": []
+  },
+  "preload_bundles": [],
+  "resolver_roots": {},
+  "idempotency_window_ms": 60000,
+  "max_retained": 16,
+  "max_retained_bytes": 67108864,
+  "stream_queue": 16,
+  "blocking_threads": 1,
+  "blocking_queue": 1,
+  "drain_ms": 100,
+  "flush_ms": 100
+}

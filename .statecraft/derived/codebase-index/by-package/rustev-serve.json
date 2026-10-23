@@ -1,0 +1,11 @@
+{
+  "package": {
+    "kind": "rust-lib-bin",
+    "name": "rustev-serve",
+    "path": "integrations/rustev-serve",
+    "specRef": "010-integrations",
+    "version": "0.1.0"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "7ca119097251f3686b91ce0d51ddcce300980cc2b80821a4a06ad3bba43f238d"
+}
