@@ -15,6 +15,7 @@ pub mod bundle;
 pub mod compare;
 pub mod config;
 pub mod dataset;
+pub mod diff;
 mod doc;
 pub mod dynamic;
 pub mod eval_cases;
@@ -31,3 +32,5 @@ pub mod repeat_stats;
 pub mod replay;
 pub mod report;
 pub mod resolve;
+
+pub use diff::{EvalDiff, diff, render_markdown};

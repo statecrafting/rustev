@@ -104,7 +104,7 @@
       }
     ],
     "sectionDigests": {
-      "029-evaluation-repeatability-baselines-diffs-and-selection-gates-amends-004-and-006": "8742e0847dceec671a42e8cb69754bb9cb22037ede657e7992f4fbfb8fbf5c50",
+      "029-evaluation-repeatability-baselines-diffs-and-selection-gates-amends-004-and-006": "fdaaaa093225c99276f25495062ba5749d39da534de95cbdc0276ce2d7a91fdd",
       "1-purpose": "d449fae2d1de8e8a8c41c542a297d8a49fb9545657b3f63561187af50711374c",
       "2-1-binding-principles-of-76": "a110d5d3149238be1c887d7b7d9b3167396c9b1fa459117127ceef54afa71fda",
       "2-territory": "11e099d675019e2d266ecf3db1769d4907561360a5ce0399b6843975b56b2516",
@@ -128,7 +128,7 @@
       "5-observable-negative-cases": "df67b3a9be6b92138b614495e64e251596c2bb618de6ed68f03e87ee7285d7e6",
       "acceptance": "76283fa6de5f0f70a192e9ff1efd4d01ef0f109a306c55a0ae769e53ae761ac9",
       "decisions-at-approval": "d0ac1a2e717a3997b1ef13e5ea47e1223510fbf8ed6dad6135d297703d49ccfb",
-      "implementation-record": "974895dc06b91dd5de9c87ee10488675d05ee93cd32d8d75c88a74d703bbf357",
+      "implementation-record": "e8fda58b3fa503355e65cd21511943aef258fc1c8e0acb16a9356e0d0b483b62",
       "verification": "9b72e8bd823b4724a77bc47812cb429c5db3a86e7ec68837c61e6fa7c500cd7f"
     },
     "sectionHeadings": [
@@ -164,6 +164,6 @@
     "summary": "An amendment of approved specs 004 and 006 (R-16), for #76 child E2. Evaluation runs each configuration N times from a declared repeat source (deterministic replay, captured historical run sets, or live runs once spec 026 is implemented), reports per metric and per slice the mean, standard deviation, minimum, maximum, a pooled estimate and a case-clustered percentile bootstrap interval computed with a named, versioned, seeded generator, and derives declared noise bands. Adds named baselines (`rustev.baseline/1`), a reproducibility check, diffs in JSON and Markdown, multi-candidate comparison, held-out accounting against a host-kept ledger file, and a declarative selection gate (`rustev.selection-gate/1`) with stated CI exit codes. Every existing document, gate and CLI output keeps its bytes. Answers spec 023's open question 3. Approved (A-25); approval authorizes no live run, provider call or spend, no quality claim, and no change to `rustev.eval-report/1` or any plan identity.\n",
     "title": "Evaluation repeatability, baselines, diffs and selection gates (amends 004 and 006)"
   },
-  "shardHash": "212799fd444128c5977372ff64bdfaf479e61f5e7bad459b8488eb26e13b9d69",
+  "shardHash": "af0ae73fb50a39b701f44d0a897e4e144429600554417e28052775a5281f9ac6",
   "specVersion": "1.10.0"
 }
