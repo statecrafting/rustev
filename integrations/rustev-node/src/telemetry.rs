@@ -4,6 +4,9 @@ use std::sync::Arc;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use rustev_contract::redaction::{DigestKey, RedactionPolicy};
+use rustev_otel::TelemetryExporter;
+use rustev_otel::endpoint::{Allowlist, EndpointError};
+use rustev_otel::otlp::{OtlpConfig, OtlpError, OtlpExporter, Protocol};
 use rustev_otel::{AckMode, AlwaysSampleOn, OtelSink, ParentSampling, RootSampling, SinkConfig};
 use rustev_runtime::{Clock, ManualClock};
 use serde_json::{Value, json};
@@ -15,14 +18,46 @@ pub struct Options {
     pub config: Value,
     pub policy: Option<Uint8Array>,
     pub key: Option<Uint8Array>,
+    pub ca_pem: Option<Uint8Array>,
+    pub headers: Option<Value>,
 }
 
 pub struct Prepared {
     config: SinkConfig,
-    path: String,
-    max_bytes: u64,
+    exporter: Exporter,
     pub require: bool,
     pub timeout_ms: u64,
+}
+
+enum Exporter {
+    Jsonl { path: String, max_bytes: u64 },
+    Otlp(OtlpConfig),
+}
+
+// 049 3.6: only names and normalized origins cross the error boundary.
+fn otlp_error(error: OtlpError, endpoint: &str) -> napi::Error {
+    match error {
+        OtlpError::Endpoint(error) => {
+            let origin = match error {
+                EndpointError::EndpointNotAllowed { origin }
+                | EndpointError::PlaintextNotLoopback { origin } => Some(origin),
+                _ => rustev_otel::endpoint::parse(endpoint)
+                    .ok()
+                    .map(|(o, _)| o.to_string()),
+            };
+            fail(
+                "ConfigRefused",
+                "endpoint_not_allowed",
+                json!({"field": "telemetry.exporter.endpoint", "origin": origin}),
+            )
+        }
+        OtlpError::Header { name } | OtlpError::DuplicateHeader { name } => fail(
+            "ConfigRefused",
+            "invalid_header",
+            json!({"field": "telemetry.exporter.headers", "name": name}),
+        ),
+        _ => refused("exporter_unavailable", "telemetry.exporter"),
+    }
 }
 
 fn refused(code: &str, field: &str) -> napi::Error {
@@ -59,17 +94,76 @@ impl Prepared {
         let ex = v
             .get("exporter")
             .ok_or_else(|| range("telemetry.exporter"))?;
-        if ex.get("kind").and_then(Value::as_str) != Some("jsonl") {
-            return Err(range("telemetry.exporter.kind"));
-        }
-        let path = string(&ex["path"], "telemetry.exporter.path")?.to_owned();
-        let max_bytes = number(
-            ex.get("maxBytes"),
-            268_435_456,
-            0,
-            9_007_199_254_740_991,
-            "telemetry.exporter.maxBytes",
-        )?;
+        let exporter = match ex.get("kind").and_then(Value::as_str) {
+            Some("jsonl") => Exporter::Jsonl {
+                path: string(&ex["path"], "telemetry.exporter.path")?.to_owned(),
+                max_bytes: number(
+                    ex.get("maxBytes"),
+                    268_435_456,
+                    0,
+                    9_007_199_254_740_991,
+                    "telemetry.exporter.maxBytes",
+                )?,
+            },
+            Some("otlp-http") => {
+                let endpoint = string(&ex["endpoint"], "telemetry.exporter.endpoint")?.to_owned();
+                let allowed_endpoints = ex["allowedEndpoints"]
+                    .as_array()
+                    .ok_or_else(|| range("telemetry.exporter.allowedEndpoints"))?
+                    .iter()
+                    .map(|v| string(v, "telemetry.exporter.allowedEndpoints").map(str::to_owned))
+                    .collect::<Result<Vec<_>>>()?;
+                // 028 3.9.2 and 049 3.2.5: refuse destinations before threads.
+                Allowlist::new(&allowed_endpoints)
+                    .and_then(|l| l.check_all(&endpoint, |v| std::env::var(v).ok()))
+                    .map_err(|e| otlp_error(OtlpError::Endpoint(e), &endpoint))?;
+                let mut headers = Vec::new();
+                if let Some(h) = &options.headers {
+                    for (name, value) in object(h, "telemetry.exporter.headers")? {
+                        headers.push((
+                            name.clone(),
+                            string(value, "telemetry.exporter.headers")?.to_owned(),
+                        ));
+                    }
+                }
+                let mut names = std::collections::BTreeSet::new();
+                for (name, value) in &headers {
+                    if !names.insert(name.to_ascii_lowercase()) {
+                        return Err(otlp_error(
+                            OtlpError::DuplicateHeader { name: name.clone() },
+                            &endpoint,
+                        ));
+                    }
+                    if name.is_empty()
+                        || !name
+                            .bytes()
+                            .all(|b| b.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&b))
+                        || !value.bytes().all(|b| b == b'\t' || (b >= 32 && b != 127))
+                    {
+                        return Err(otlp_error(
+                            OtlpError::Header { name: name.clone() },
+                            &endpoint,
+                        ));
+                    }
+                }
+                Exporter::Otlp(OtlpConfig {
+                    protocol: Protocol::HttpProtobuf,
+                    endpoint,
+                    allowed_endpoints,
+                    headers,
+                    ca_pem: options.ca_pem.map(|b| b.to_vec()),
+                    // 049 3.2.1: binding bounds where 028 states no timeout range.
+                    timeout_ms: number(
+                        ex.get("timeoutMs"),
+                        10_000,
+                        1,
+                        600_000,
+                        "telemetry.exporter.timeoutMs",
+                    )?,
+                })
+            }
+            _ => return Err(range("telemetry.exporter.kind")),
+        };
         let timeout_ms = number(
             v.get("telemetryTimeoutMs"),
             10_000,
@@ -111,7 +205,7 @@ impl Prepared {
             return Err(refused("digest_key_required", "telemetry.key"));
         }
         config.logs = boolean(v.get("logs"), config.logs, "telemetry.logs")?;
-        if config.logs {
+        if config.logs && matches!(exporter, Exporter::Jsonl { .. }) {
             return Err(refused("logs_unsupported", "telemetry.logs"));
         }
         if let Some(a) = v.get("acknowledgement") {
@@ -218,25 +312,33 @@ impl Prepared {
         }
         Ok(Self {
             config,
-            path,
-            max_bytes,
+            exporter,
             require,
             timeout_ms,
         })
     }
 
     // 049 3.2.5: a file refusal needs no worker thread.
-    pub fn open_file(&self) -> Result<Arc<rustev_otel::JsonlExporter>> {
-        rustev_otel::JsonlExporter::open(std::path::Path::new(&self.path), self.max_bytes)
-            .map(Arc::new)
-            .map_err(|_| refused("telemetry_file", "telemetry.exporter.path"))
+    pub fn open_file(&self) -> Result<Option<Arc<dyn TelemetryExporter>>> {
+        match &self.exporter {
+            Exporter::Jsonl { path, max_bytes } => {
+                rustev_otel::JsonlExporter::open(std::path::Path::new(path), *max_bytes)
+                    .map(|e| Some(Arc::new(e) as Arc<dyn TelemetryExporter>))
+                    .map_err(|_| refused("telemetry_file", "telemetry.exporter.path"))
+            }
+            Exporter::Otlp(_) => Ok(None),
+        }
+    }
+
+    pub fn takes_metrics(&self) -> bool {
+        matches!(self.exporter, Exporter::Otlp(_))
     }
 
     pub fn build(
         self,
         rt: &tokio::runtime::Runtime,
         manual: Option<ManualClock>,
-        exporter: Arc<rustev_otel::JsonlExporter>,
+        exporter: Option<Arc<dyn TelemetryExporter>>,
     ) -> Result<Arc<OtelSink>> {
         let clock: Arc<dyn rustev_otel::SinkClock> = match manual {
             Some(c) => Arc::new(ManualSinkClock(c)),
@@ -244,6 +346,13 @@ impl Prepared {
         };
         // 049 3.3.4: the worker belongs to the engine's Tokio runtime.
         let _entered = rt.enter();
+        let exporter = match (exporter, &self.exporter) {
+            (Some(e), _) => e,
+            (_, Exporter::Otlp(c)) => {
+                Arc::new(OtlpExporter::new(c).map_err(|e| otlp_error(e, &c.endpoint))?)
+            }
+            _ => return Err(refused("telemetry_file", "telemetry.exporter.path")),
+        };
         OtelSink::with_parts(
             self.config,
             exporter,

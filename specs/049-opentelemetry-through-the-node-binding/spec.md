@@ -2,7 +2,7 @@
 id: "049-opentelemetry-through-the-node-binding"
 title: "OpenTelemetry export through the Node binding (amends 001, 010, 027 and 028)"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-23"
 summary: >
   A narrow amendment of approved specs 027 (Node-API binding) and 028
@@ -33,8 +33,9 @@ extends:
   # rustev-node's dependency on rustev-otel.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.toml" }, nature: additive }
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.lock" }, nature: additive }
-  # Adds 049 to `make verify` at completion.
+  # Adds 049 to `make verify` and its CI acceptance group at completion.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "010-integrations"
@@ -412,8 +413,25 @@ to `rustev-otel`'s source or to a document, schema or golden; publication.
 
 ## Verification
 
-Pending: the `verify:cli` block is written by the implementing change, with
-`049` joining `VERIFIED_SPECS` at completion.
+Declared for `spec-spine verify 049`; 049 is in `make verify` and the
+`runtime-evidence` acceptance group, beside 027 and 028. The binding's
+behavior (sections 3.2 to 3.7 and the rows of section 5) is tested through
+the built addon by `node --test integrations/rustev-node/test/*.test.mjs`,
+which `make bindings` and the CI `bindings` job run on every native
+platform (027 3.13.1); the native addon cannot be loaded by a Rust test.
+
+```verify:cli
+# 3.1: the one allowed edge and each refused one (synthetic fixtures), and
+# the real workspace.
+cargo test -p rustev-boundaries --locked
+cargo run -p rustev-boundaries --locked --quiet
+# 3.1.4: the binding enables OTLP/HTTP and not gRPC.
+sh -c 'out=$(cargo tree -p rustev-node -e normal --prefix none --locked) || exit 1; printf "%s\n" "$out" | grep -q "^opentelemetry-otlp " || exit 1; if printf "%s\n" "$out" | grep -q "^tonic "; then echo "rustev-node reaches gRPC"; exit 1; fi'
+# 3.2 to 3.7: the binding builds and lints with the telemetry option.
+cargo clippy -p rustev-node --all-targets --locked -- -D warnings
+# 3.8.3: rustev-otel's own acceptance is unchanged.
+cargo test -p rustev-otel --locked --all-features
+```
 
 ## Implementation record
 
@@ -449,6 +467,37 @@ a snapshot canary absent, and identical evidence, judgment and receipt
 bytes with and without telemetry), a full file with and without
 `requireTelemetry`, the creation refusals with no secret in any error,
 `tracestate`, abandon after a rejection, exchanges, metrics and shutdown.
+
+**Increment 2.** `rustev-node` enables `rustev-otel`'s `otlp-http` feature
+alone (3.1.4). `exporter: { kind: 'otlp-http', ... }` builds 028's
+`OtlpExporter` with `Protocol::HttpProtobuf` on the engine's runtime; the
+allowlist (including the `OTEL_*` endpoint variables) and the header names
+and values are checked before any thread starts, so a refused destination
+is never dialed (3.2.5). `timeoutMs` is the exporter's per-request timeout:
+028 states no range for it, so the binding takes 1 to 600,000 ms with a
+default of 10,000, the range and default of 028's `export_timeout_ms`.
+Header values and CA certificates cross from JavaScript separately from
+the option JSON, like the key, and no error carries them: an endpoint
+refusal names the normalized origin only, a header refusal the name only
+(3.6). `logs: true` is accepted with OTLP; `flushTelemetryMetrics` answers
+`exported` when the exporter takes metrics and the flush succeeded. Tests
+(`test/telemetry-otlp.test.mjs`, a loopback collector in plain `node:http`):
+both reference decisions exported, with requests on `/v1/traces` (holding
+the pinned schema URL), `/v1/logs` (an unresolved decision) and
+`/v1/metrics`, no snapshot canary or header value in any body, and
+identical evidence, judgment and receipt bytes with and without telemetry;
+an endpoint outside the list (configured or through
+`OTEL_EXPORTER_OTLP_ENDPOINT`, in a child process), `localhost` in
+plaintext, user information and an empty list refused with zero
+connections; duplicate and invalid headers, a bad CA and out-of-range
+options refused with no secret in the error; a collector answering 500 or
+a 307 redirect counted as `export_failed` with the decision unchanged, or
+a `SinkFailure` carrying the record under `requireTelemetry`, the redirect
+target never dialed. Decision 2 names `h2` as a cost of gRPC, but `h2`
+already reaches the binding through `hyper`'s default features under
+OTLP/HTTP, so what gRPC would add is `tonic` and its dependencies; the
+verification checks for `tonic` alone. `049` joins `VERIFIED_SPECS` and the
+acceptance group, and the implementation is complete.
 
 ## Decisions at approval
 

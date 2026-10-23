@@ -207,9 +207,11 @@ export declare class SeamFailure extends Error {
 
 export declare function version(): string;
 
-/** 049 3.2: JSONL exporter; OTLP/HTTP joins in increment 2. */
+/** 049 3.2: Explicit JSONL or allowlisted OTLP/HTTP telemetry. */
 export interface TelemetryOptions {
-  exporter: { kind: 'jsonl'; path: string; maxBytes?: number };
+  exporter: { kind: 'jsonl'; path: string; maxBytes?: number }
+    | { kind: 'otlp-http'; endpoint: string; allowedEndpoints: string[];
+        headers?: Record<string, string>; caPem?: Uint8Array; timeoutMs?: number };
   policy?: DocumentInput;
   key?: { bytes: Uint8Array; keyId: string };
   acknowledgement?: 'accepted' | 'exported';

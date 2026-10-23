@@ -87,6 +87,7 @@ struct EngineInner {
     traces: seams::Traces,
     context: Option<Arc<seams::HostContext>>,
     telemetry: Option<Arc<rustev_otel::OtelSink>>,
+    telemetry_metrics: bool,
 }
 
 /// One engine: its runtime, its registered backends and its sink.
@@ -184,6 +185,7 @@ impl Engine {
                 .enable_all()
                 .build()
                 .map_err(|e| fail("InternalError", "internal", e.to_string()))?;
+            let telemetry_metrics = telemetry.as_ref().is_some_and(|(t, _)| t.takes_metrics());
             let telemetry = if let Some((t, exporter)) = telemetry {
                 let require_telemetry = t.require;
                 let telemetry_timeout_ms = t.timeout_ms;
@@ -208,6 +210,7 @@ impl Engine {
                     rt,
                     runtime,
                     telemetry,
+                    telemetry_metrics,
                     manual,
                     shut: AtomicBool::new(false),
                     in_flight: AtomicU64::new(0),
@@ -546,11 +549,12 @@ impl Engine {
             self.live()?;
             self.telemetry_sink()
         })?;
+        let takes_metrics = self.inner.telemetry_metrics;
         self.inner
             .rt
             .spawn(async move {
                 match t.flush_metrics().await {
-                    Ok(()) => serde_json::json!({"outcome": "not_taken"}),
+                    Ok(()) => serde_json::json!({"outcome": if takes_metrics { "exported" } else { "not_taken" }}),
                     Err(reason) => serde_json::json!({"outcome": "lost", "reason": reason}),
                 }
             })
