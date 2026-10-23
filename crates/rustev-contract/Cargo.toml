@@ -22,7 +22,7 @@ spec = "002-decision-contract-and-pure-core"
 
 [dependencies]
 serde.workspace = true
-serde_json.workspace = true
+serde_json = { workspace = true, features = ["raw_value"] }
 sha2.workspace = true
 # The keyed digest of the redaction policy (spec 028, 3.4.5): HMAC-SHA256
 # over the existing `sha2`, never a hand-written construction.

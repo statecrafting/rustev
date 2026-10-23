@@ -267,6 +267,34 @@ pub fn document_schemas() -> Vec<EmittedSchema> {
         ),
         emit::<crate::remote_sink::DeliverRequest>(crate::remote_sink::DELIVER, Some("request")),
         emit::<crate::remote_sink::DeliverResponse>(crate::remote_sink::DELIVER, Some("response")),
+        emit::<crate::serve::Serve>(crate::serve::Serve::SCHEMA, None),
+        emit::<crate::serve::ServeConfig>(crate::serve::ServeConfig::SCHEMA, None),
+        emit::<crate::serve::ServeService>(crate::serve::ServeService::SCHEMA, None),
+        emit::<crate::serve::ServeRegister>(crate::serve::ServeRegister::SCHEMA, None),
+        emit::<crate::serve::ServeDecide>(crate::serve::ServeDecide::SCHEMA, None),
+        emit::<crate::serve::ServeDecision>(crate::serve::ServeDecision::SCHEMA, None),
+        emit::<crate::serve::ServeDecisionState>(crate::serve::ServeDecisionState::SCHEMA, None),
+        emit::<crate::serve::ServeCancel>(crate::serve::ServeCancel::SCHEMA, None),
+        emit::<crate::serve::ServeEvent>(crate::serve::ServeEvent::SCHEMA, None),
+        emit::<crate::serve::ServeRefusal>(crate::serve::ServeRefusal::SCHEMA, None),
+        emit::<crate::serve::ServeReplay>(crate::serve::ServeReplay::SCHEMA, None),
+        emit::<crate::serve::ServeEvaluate>(crate::serve::ServeEvaluate::SCHEMA, None),
+        emit::<crate::serve::ServeReadiness>(crate::serve::ServeReadiness::SCHEMA, None),
+        emit::<crate::serve::ServeShutdown>(crate::serve::ServeShutdown::SCHEMA, None),
+        emit::<crate::serve::ServeInvalidations>(crate::serve::ServeInvalidations::SCHEMA, None),
+        emit::<crate::serve::ServeInvalidationsAck>(
+            crate::serve::ServeInvalidationsAck::SCHEMA,
+            None,
+        ),
+        emit::<crate::plan_bundle::PlanBundle>(crate::plan_bundle::PlanBundle::SCHEMA, None),
+        emit::<crate::plan_bundle::PlanBundleSignature>(
+            crate::plan_bundle::PlanBundleSignature::SCHEMA,
+            None,
+        ),
+        emit::<crate::plan_bundle::PlanRegistration>(
+            crate::plan_bundle::PlanRegistration::SCHEMA,
+            None,
+        ),
     ]);
     out.sort_by(|a, b| a.file.cmp(&b.file));
     out

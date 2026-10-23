@@ -8262,6 +8262,209 @@ export namespace RustevPlan3 {
 }
 export type RustevPlan3 = RustevPlan3.RustevPlan3;
 
+export namespace RustevPlanBundle1 {
+  export type Handle = string;
+  /**
+   * @minItems 0
+   * @maxItems 1024
+   */
+  export type List_EmbeddedRustevCalibration_1_0_1024 = EmbeddedRustevCalibration_1[];
+  export type CompileCommand = "plan compile";
+  /**
+   * Length is enforced in decoded UTF-8 bytes by the parser.
+   */
+  export type Text_1_4096 = string;
+  export type PlanId = string;
+  export type CompileStatus = "compiled";
+  /**
+   * Explicit absence for identity-bearing fields.
+   */
+  export type Maybe =
+    | "none"
+    | {
+        some: EmbeddedRustevExecution_1;
+      };
+
+  export interface RustevPlanBundle1 {
+    bindings: {
+      [k: string]: Handle | undefined;
+    };
+    calibrations: List_EmbeddedRustevCalibration_1_0_1024;
+    compile_report: CompileReport;
+    definition: EmbeddedRustevDefinition_1;
+    execution_policy: Maybe;
+    schema: "rustev.plan-bundle/1";
+  }
+  /**
+   * An embedded `rustev.calibration/1` document, carried as its original bytes and checked by that document's own bounded parser.
+   */
+  export interface EmbeddedRustevCalibration_1 {}
+  /**
+   * Successful output of the existing surface compile command. Output paths
+   * are report observations; they never become an endpoint in a binding.
+   */
+  export interface CompileReport {
+    command: CompileCommand;
+    out: Text_1_4096;
+    plan_id: PlanId;
+    status: CompileStatus;
+  }
+  /**
+   * An embedded `rustev.definition/1` document, carried as its original bytes and checked by that document's own bounded parser.
+   */
+  export interface EmbeddedRustevDefinition_1 {}
+  /**
+   * An embedded `rustev.execution/1` document, carried as its original bytes and checked by that document's own bounded parser.
+   */
+  export interface EmbeddedRustevExecution_1 {}
+}
+export type RustevPlanBundle1 = RustevPlanBundle1.RustevPlanBundle1;
+
+export namespace RustevPlanBundleSignature1 {
+  export type ContentDigest = string;
+  export type SignatureScheme =
+    | {
+        ed25519: {
+          key_id: Handle;
+          signature: ListUint8_64_64;
+        };
+      }
+    | {
+        sigstore: {
+          bundle: SigstoreBundle;
+        };
+      };
+  export type Handle = string;
+  /**
+   * @minItems 64
+   * @maxItems 64
+   */
+  export type ListUint8_64_64 = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+
+  export interface RustevPlanBundleSignature1 {
+    bundle_digest: ContentDigest;
+    schema: "rustev.plan-bundle-signature/1";
+    scheme: SignatureScheme;
+  }
+  /**
+   * Opaque Sigstore JSON: at most 1 MiB, depth 32, strings 256 KiB, collections 10000, total values 100000, integer tokens 40 bytes.
+   */
+  export interface SigstoreBundle {}
+}
+export type RustevPlanBundleSignature1 = RustevPlanBundleSignature1.RustevPlanBundleSignature1;
+
+export namespace RustevPlanRegistration1 {
+  export type ContentDigest = string;
+  /**
+   * Explicit absence for identity-bearing fields.
+   */
+  export type Maybe =
+    | "none"
+    | {
+        some: ExecutionPolicyId;
+      };
+  export type ExecutionPolicyId = string;
+  export type PlanId = string;
+  export type Timestamp = number;
+  export type Handle = string;
+  export type Signer =
+    | "unsigned"
+    | {
+        ed25519: {
+          key_id: Handle;
+        };
+      }
+    | {
+        sigstore: {
+          certificate_identity: Text_1_4096;
+          issuer: Text_1_4096;
+        };
+      };
+  /**
+   * Length is enforced in decoded UTF-8 bytes by the parser.
+   */
+  export type Text_1_4096 = string;
+  export type SigningMode = "require_signed" | "allow_unsigned";
+
+  export interface RustevPlanRegistration1 {
+    bundle_digest: ContentDigest;
+    configuration_digest: ContentDigest;
+    execution_policy_id: Maybe;
+    plan_id: PlanId;
+    registered_at_ms: Timestamp;
+    schema: "rustev.plan-registration/1";
+    service_build: Handle;
+    signer: Signer;
+    signing_mode: SigningMode;
+  }
+}
+export type RustevPlanRegistration1 = RustevPlanRegistration1.RustevPlanRegistration1;
+
 export namespace RustevRedaction1 {
   /**
    * What happens to a field's value on export (3.4.1).
@@ -12771,6 +12974,1314 @@ export namespace RustevRuntimeReason1 {
   }
 }
 export type RustevRuntimeReason1 = RustevRuntimeReason1.RustevRuntimeReason1;
+
+export namespace RustevServe1 {
+  /**
+   * @minItems 14
+   * @maxItems 14
+   */
+  export type List_OperationDescription_14_14 = [
+    OperationDescription,
+    OperationDescription,
+    OperationDescription,
+    OperationDescription,
+    OperationDescription,
+    OperationDescription,
+    OperationDescription,
+    OperationDescription,
+    OperationDescription,
+    OperationDescription,
+    OperationDescription,
+    OperationDescription,
+    OperationDescription,
+    OperationDescription
+  ];
+  export type RouteGroup = "decide" | "admin" | "ops";
+  export type HttpMethod = "GET" | "PUT" | "POST";
+  export type Operation =
+    | "describe"
+    | "register"
+    | "registration"
+    | "decide"
+    | "stream"
+    | "lookup"
+    | "cancel"
+    | "replay"
+    | "evaluate"
+    | "explain"
+    | "invalidations"
+    | "health"
+    | "readiness"
+    | "metrics";
+  /**
+   * Explicit absence for identity-bearing fields.
+   */
+  export type Maybe =
+    | "none"
+    | {
+        some: Text_1_128;
+      };
+  /**
+   * Length is enforced in decoded UTF-8 bytes by the parser.
+   */
+  export type Text_1_128 = string;
+  export type ResponseFormat = "document" | "surface_output" | "explanation" | "empty" | "openmetrics";
+  /**
+   * @minItems 0
+   * @maxItems 4
+   */
+  export type List_Text_1_128_0_4 =
+    | []
+    | [Text_1_128]
+    | [Text_1_128, Text_1_128]
+    | [Text_1_128, Text_1_128, Text_1_128]
+    | [Text_1_128, Text_1_128, Text_1_128, Text_1_128];
+  /**
+   * Length is enforced in decoded UTF-8 bytes by the parser.
+   */
+  export type Text_1_256 = string;
+
+  export interface RustevServe1 {
+    operations: List_OperationDescription_14_14;
+    schema: "rustev.serve/1";
+  }
+  export interface OperationDescription {
+    group: RouteGroup;
+    method: HttpMethod;
+    operation: Operation;
+    request_schema: Maybe;
+    response_format: ResponseFormat;
+    response_schemas: List_Text_1_128_0_4;
+    route: Text_1_256;
+    streaming: boolean;
+  }
+}
+export type RustevServe1 = RustevServe1.RustevServe1;
+
+export namespace RustevServeCancel1 {
+  /**
+   * Length is enforced in decoded UTF-8 bytes by the parser.
+   */
+  export type Text_1_4096 = string;
+  export type CancelAck = "not_requested" | "stopped" | "unconfirmed" | "no_answer";
+  export type RemoteState = "finished" | "stopped" | "possibly_continuing";
+  /**
+   * @minItems 0
+   * @maxItems 10000
+   */
+  export type List_AttemptCancellation_0_10000 = AttemptCancellation[];
+  export type CancelStatus = "queued" | "requested" | "already_finished";
+
+  export interface RustevServeCancel1 {
+    attempts?: List_AttemptCancellation_0_10000;
+    schema: "rustev.serve-cancel/1";
+    status: CancelStatus;
+  }
+  export interface AttemptCancellation {
+    attempt_id: Text_1_4096;
+    cancel_ack: CancelAck;
+    remote_end: RemoteState;
+  }
+}
+export type RustevServeCancel1 = RustevServeCancel1.RustevServeCancel1;
+
+export namespace RustevServeConfig1 {
+  export type BackendKind =
+    | {
+        compiled: {
+          feature: Handle;
+        };
+      }
+    | {
+        remote: {
+          endpoint: RemoteEndpoint;
+          protocol: RemoteProtocol;
+        };
+      };
+  export type Handle = string;
+  /**
+   * Length is enforced in decoded UTF-8 bytes by the parser.
+   */
+  export type Text_1_4096 = string;
+  /**
+   * Explicit absence for identity-bearing fields.
+   */
+  export type Maybe2 =
+    | "none"
+    | {
+        some: Text_1_4096;
+      };
+  export type Number_1_65536 = number;
+  export type RemoteProtocol = "rustev.remote/1" | "rustev.remote/2";
+  export type DescriptorId = string;
+  export type Number_1_4096 = number;
+  export type Number_1_64 = number;
+  export type Number_0_600000 = number;
+  export type Number_60000_86400000 = number;
+  /**
+   * @minItems 1
+   * @maxItems 64
+   */
+  export type List_Listener_1_64 = [Listener, ...Listener[]];
+  /**
+   * @minItems 1
+   * @maxItems 3
+   */
+  export type List_RouteGroup_1_3 = [RouteGroup] | [RouteGroup, RouteGroup] | [RouteGroup, RouteGroup, RouteGroup];
+  export type RouteGroup = "decide" | "admin" | "ops";
+  export type Number_4096_65536 = number;
+  export type Number_1_1024 = number;
+  export type Number_1_4194304 = number;
+  export type Number_1_16777216 = number;
+  export type Number_1_10000 = number;
+  /**
+   * Explicit absence for identity-bearing fields.
+   */
+  export type Maybe =
+    | "none"
+    | {
+        some: EmbeddedRustevRedaction_1;
+      };
+  export type ListenerTransport =
+    | {
+        tcp: {
+          address: Text_1_4096;
+          tls: Tls;
+        };
+      }
+    | {
+        unix: {
+          auth: UnixAuth;
+          mode: SocketMode;
+          path: Text_1_4096;
+        };
+      };
+  /**
+   * @minItems 1
+   * @maxItems 64
+   */
+  export type List_Text_1_4096_1_64 = [Text_1_4096, ...Text_1_4096[]];
+  /**
+   * @minItems 0
+   * @maxItems 1024
+   */
+  export type List_Text_1_4096_0_1024 = Text_1_4096[];
+  export type UnixAuth =
+    | "filesystem"
+    | {
+        development_bearer: {
+          token_file: Text_1_4096;
+        };
+      };
+  export type SocketMode = 384 | 432;
+  export type Number_1_1000000 = number;
+  export type Number_16777216_17179869184 = number;
+  /**
+   * @minItems 0
+   * @maxItems 4096
+   */
+  export type List_Text_1_4096_0_4096 = Text_1_4096[];
+  export type Number_0_65536 = number;
+  /**
+   * @minItems 0
+   * @maxItems 1024
+   */
+  export type List_SigstoreTrust_0_1024 = SigstoreTrust[];
+  export type SigningMode = "require_signed" | "allow_unsigned";
+  export type SinkPolicy =
+    | {
+        fail_decision: {
+          timeout_ms: Number_1_600000;
+        };
+      }
+    | {
+        backpressure: {
+          delivery_timeout_ms: Number_1_600000;
+          enqueue_timeout_ms: Number_1_600000;
+          max_pending: Number_1_65536;
+        };
+      }
+    | {
+        drop_counted: {
+          delivery_timeout_ms: Number_1_600000;
+          max_pending: Number_1_65536;
+        };
+      };
+  export type Number_1_600000 = number;
+  export type Sink =
+    | {
+        remote: RemoteEndpoint;
+      }
+    | {
+        opentelemetry: {
+          endpoint: RemoteEndpoint;
+          redaction: EmbeddedRustevRedaction_1;
+        };
+      };
+  export type Number_16_65536 = number;
+
+  export interface RustevServeConfig1 {
+    backend_bindings: {
+      [k: string]: BackendBinding | undefined;
+    };
+    blocking_queue: Number_1_4096;
+    blocking_threads: Number_1_64;
+    context_sources: {
+      [k: string]: RemoteEndpoint | undefined;
+    };
+    drain_ms: Number_0_600000;
+    flush_ms: Number_0_600000;
+    idempotency_window_ms: Number_60000_86400000;
+    listeners: List_Listener_1_64;
+    max_plans: Number_1_4096;
+    max_retained: Number_1_1000000;
+    max_retained_bytes: Number_16777216_17179869184;
+    preload_bundles: List_Text_1_4096_0_4096;
+    resolver_roots: {
+      [k: string]: Text_1_4096 | undefined;
+    };
+    runtime: RuntimeConfig;
+    schema: "rustev.serve-config/1";
+    signing_keys: SigningKeys;
+    signing_mode: SigningMode;
+    sink_policy: SinkPolicy;
+    sinks: {
+      [k: string]: Sink | undefined;
+    };
+    stream_queue: Number_16_65536;
+  }
+  export interface BackendBinding {
+    backend: BackendKind;
+    expected_descriptor_id: DescriptorId;
+  }
+  export interface RemoteEndpoint {
+    address: Text_1_4096;
+    credentials_file: Maybe2;
+    max_in_flight: Number_1_65536;
+    queue_capacity: Number_1_65536;
+    readiness_affecting: boolean;
+  }
+  export interface Listener {
+    groups: List_RouteGroup_1_3;
+    limits: ListenerLimits;
+    name: Handle;
+    redaction_policy: Maybe;
+    transport: ListenerTransport;
+  }
+  export interface ListenerLimits {
+    max_connections: Number_1_65536;
+    max_header_bytes: Number_4096_65536;
+    max_http2_streams: Number_1_1024;
+    other_body_bytes: Number_1_4194304;
+    registration_body_bytes: Number_1_16777216;
+    requests_per_second: Number_1_10000;
+  }
+  /**
+   * An embedded `rustev.redaction/1` document, carried as its original bytes and checked by that document's own bounded parser.
+   */
+  export interface EmbeddedRustevRedaction_1 {}
+  export interface Tls {
+    certificate_file: Text_1_4096;
+    client_ca_files: List_Text_1_4096_1_64;
+    private_key_file: Text_1_4096;
+    subject_allowlist: List_Text_1_4096_0_1024;
+  }
+  export interface RuntimeConfig {
+    max_in_flight: Number_1_65536;
+    max_queued: Number_0_65536;
+    per_backend_concurrency: {
+      [k: string]: Number_1_65536 | undefined;
+    };
+  }
+  export interface SigningKeys {
+    ed25519: {
+      [k: string]: Text_1_4096 | undefined;
+    };
+    sigstore: List_SigstoreTrust_0_1024;
+  }
+  export interface SigstoreTrust {
+    certificate_identity: Text_1_4096;
+    issuer: Text_1_4096;
+    trusted_root_file: Text_1_4096;
+  }
+}
+export type RustevServeConfig1 = RustevServeConfig1.RustevServeConfig1;
+
+export namespace RustevServeDecide1 {
+  export type Handle = string;
+  export type Timestamp = number;
+
+  /**
+   * Exactly one of `snapshot` and `context` is present; the parser refuses both or neither.
+   */
+  export interface RustevServeDecide1 {
+    context?: Context;
+    decision_id: Handle;
+    evaluation_time: Timestamp;
+    schema: "rustev.serve-decide/1";
+    snapshot?: EmbeddedRustevSnapshot_1;
+  }
+  export interface Context {
+    source: Handle;
+  }
+  /**
+   * An embedded `rustev.snapshot/1` document, carried as its original bytes and checked by that document's own bounded parser.
+   */
+  export interface EmbeddedRustevSnapshot_1 {}
+}
+export type RustevServeDecide1 = RustevServeDecide1.RustevServeDecide1;
+
+export namespace RustevServeDecision1 {
+  export type RustevServeDecision1 = {
+    configuration_digest: ContentDigest;
+    decision_id: Handle;
+    evidence: EvidenceDisposition;
+    execution_policy_id: Maybe;
+    judgment?: EmbeddedRustevJudgment_1;
+    plan_id: PlanId;
+    protocol: Protocol;
+    registration_id: ContentDigest;
+    replayed: boolean;
+    run_record?: EmbeddedRustevRun_1;
+    run_record_digest: ContentDigest;
+    schema: "rustev.serve-decision/1";
+    service_build: Handle;
+    signer: Signer;
+    status: DecisionStatus;
+  };
+  export type ContentDigest = string;
+  export type Handle = string;
+  export type EvidenceDisposition =
+    | {
+        receipt: {
+          receipt: Text_1_4096;
+        };
+      }
+    | {
+        ticket: {
+          ticket: Handle;
+        };
+      }
+    | {
+        dropped: {
+          count: Number_1_18446744073709551615;
+        };
+      }
+    | {
+        not_delivered: {
+          error: Text_0_256;
+          may_have_received: boolean;
+        };
+      };
+  /**
+   * Length is enforced in decoded UTF-8 bytes by the parser.
+   */
+  export type Text_1_4096 = string;
+  export type Number_1_18446744073709551615 = number;
+  /**
+   * Length is enforced in decoded UTF-8 bytes by the parser.
+   */
+  export type Text_0_256 = string;
+  /**
+   * Explicit absence for identity-bearing fields.
+   */
+  export type Maybe =
+    | "none"
+    | {
+        some: ExecutionPolicyId;
+      };
+  export type ExecutionPolicyId = string;
+  export type PlanId = string;
+  export type Protocol = "rustev.serve/1";
+  export type Signer =
+    | "unsigned"
+    | {
+        ed25519: {
+          key_id: Handle;
+        };
+      }
+    | {
+        sigstore: {
+          certificate_identity: Text_1_4096;
+          issuer: Text_1_4096;
+        };
+      };
+  export type DecisionStatus = "judged" | "cancelled" | "evidence_not_delivered";
+
+  /**
+   * An embedded `rustev.judgment/1` document, carried as its original bytes and checked by that document's own bounded parser.
+   */
+  export interface EmbeddedRustevJudgment_1 {}
+  /**
+   * An embedded `rustev.run/1` document, carried as its original bytes and checked by that document's own bounded parser.
+   */
+  export interface EmbeddedRustevRun_1 {}
+}
+export type RustevServeDecision1 = RustevServeDecision1.RustevServeDecision1;
+
+export namespace RustevServeDecisionState1 {
+  export type Handle = string;
+  export type PlanId = string;
+  export type DecisionState = "queued" | "running";
+
+  export interface RustevServeDecisionState1 {
+    decision_id: Handle;
+    plan_id: PlanId;
+    schema: "rustev.serve-decision-state/1";
+    state: DecisionState;
+  }
+}
+export type RustevServeDecisionState1 = RustevServeDecisionState1.RustevServeDecisionState1;
+
+export namespace RustevServeEvaluate1 {
+  /**
+   * Resolver references are prefix:relative/path, never URLs or absolute paths.
+   * Filesystem containment and scope are checked by the host resolver.
+   */
+  export type Reference = Text_1_4096;
+  /**
+   * Length is enforced in decoded UTF-8 bytes by the parser.
+   */
+  export type Text_1_4096 = string;
+  /**
+   * Explicit absence for identity-bearing fields.
+   */
+  export type Maybe2 =
+    | "none"
+    | {
+        some: Reference;
+      };
+  /**
+   * @minItems 0
+   * @maxItems 1024
+   */
+  export type List_Reference_0_1024 = Reference[];
+  /**
+   * Explicit absence for identity-bearing fields.
+   */
+  export type Maybe3 =
+    | "none"
+    | {
+        some: RepeatInputs;
+      };
+  /**
+   * @minItems 1
+   * @maxItems 64
+   */
+  export type List_RepeatRun_1_64 = [RepeatRun, ...RepeatRun[]];
+  export type RepeatSource = "replay" | "captured" | "live";
+  /**
+   * Explicit absence for identity-bearing fields.
+   */
+  export type Maybe =
+    | "none"
+    | {
+        some: Number_1_2592000000;
+      };
+  export type Number_1_2592000000 = number;
+  export type Timestamp = number;
+  /**
+   * The isolation scope of a capture, a bundle and every request identity.
+   */
+  export type Scope =
+    | {
+        context_revision: Handle;
+        mode: "tenant_only";
+        tenant: Handle;
+      }
+    | {
+        context_revision: Handle;
+        mode: "principal";
+        principal_scope: Handle;
+        tenant: Handle;
+      };
+  export type Handle = string;
+  /**
+   * A split used to fit a head or a calibration map is not a holdout afterwards.
+   */
+  export type Split = "training" | "model_selection" | "calibration" | "final_test";
+
+  export interface RustevServeEvaluate1 {
+    adapter: Reference;
+    bundles: Reference;
+    candidate_plan: Maybe2;
+    config: Reference;
+    dataset: Reference;
+    deps: EvaluationDependencies;
+    repeat: Maybe3;
+    replay: ReplayOptions;
+    schema: "rustev.serve-evaluate/1";
+    split: Split;
+  }
+  export interface EvaluationDependencies {
+    calibrations: List_Reference_0_1024;
+    descriptors: List_Reference_0_1024;
+    rules: List_Reference_0_1024;
+  }
+  export interface RepeatInputs {
+    config: Reference;
+    manifest: Reference;
+    runs: List_RepeatRun_1_64;
+    source: RepeatSource;
+  }
+  export interface RepeatRun {
+    cases: Reference;
+    evaluated: Reference;
+  }
+  export interface ReplayOptions {
+    host_cap_ms: Maybe;
+    now_ms: Timestamp;
+    scope: Scope;
+  }
+}
+export type RustevServeEvaluate1 = RustevServeEvaluate1.RustevServeEvaluate1;
+
+export namespace RustevServeEvent1 {
+  export type EventKind =
+    | "admitted"
+    | {
+        step: {
+          derivation: Derivation;
+          instance_ids: List_Handle_0_4096;
+          outcome: StepOutcome;
+          step_id: Handle;
+        };
+      }
+    | {
+        field: GeneratedField;
+      }
+    | {
+        final: {
+          events_dropped: number;
+          result: FinalResult;
+        };
+      };
+  /**
+   * Derivation classes (spec 001, 3.3; spec 002, 3.12).
+   */
+  export type Derivation = "exact-derived" | "model-derived" | "mixed-derived";
+  export type Handle = string;
+  /**
+   * @minItems 0
+   * @maxItems 4096
+   */
+  export type List_Handle_0_4096 = Handle[];
+  export type StepOutcome =
+    | "supplied"
+    | {
+        unresolved: {
+          reason: Unresolved;
+        };
+      };
+  /**
+   * The closed set of unresolved reasons (spec 002, 3.5.6). Field and fact
+   * lists are sorted and deduplicated.
+   */
+  export type Unresolved =
+    | "deadline_exceeded"
+    | {
+        missing_evidence: {
+          fields: string[];
+        };
+      }
+    | {
+        stale_evidence: {
+          fields: string[];
+        };
+      }
+    | {
+        invalid_input: {
+          detail: string;
+          fields: string[];
+        };
+      }
+    | {
+        abstained: {
+          rule: string;
+        };
+      }
+    | {
+        backend_unavailable: {
+          detail: string;
+        };
+      }
+    | {
+        invalid_backend_output: {
+          detail: string;
+        };
+      }
+    | {
+        budget_exhausted: {
+          resource: string;
+        };
+      }
+    | {
+        conflict: {
+          facts: string[];
+        };
+      }
+    | {
+        unsupported: {
+          capability: string;
+        };
+      }
+    | {
+        insufficient_grade: {
+          fields: string[];
+        };
+      };
+  /**
+   * Length is enforced in decoded UTF-8 bytes by the parser.
+   */
+  export type Text_1_4096 = string;
+  /**
+   * Length is enforced in decoded UTF-8 bytes by the parser.
+   */
+  export type GeneratedFieldName = string;
+  /**
+   * Explicit absence for identity-bearing fields.
+   */
+  export type Maybe =
+    | "none"
+    | {
+        some: Handle;
+      };
+  export type Provisional = true;
+  export type GeneratedValue =
+    | {
+        text: Text_0_16384;
+      }
+    | {
+        list: List_Text_1_64_0_64;
+      };
+  /**
+   * Length is enforced in decoded UTF-8 bytes by the parser.
+   */
+  export type Text_0_16384 = string;
+  /**
+   * @minItems 0
+   * @maxItems 64
+   */
+  export type List_Text_1_64_0_64 = GeneratedFieldName[];
+  export type FinalResult =
+    | {
+        decision: EmbeddedRustevServeDecision_1;
+      }
+    | {
+        refusal: EmbeddedRustevServeRefusal_1;
+      };
+
+  export interface RustevServeEvent1 {
+    kind: EventKind;
+    schema: "rustev.serve-event/1";
+    sequence: number;
+  }
+  /**
+   * Spec 037 field events are described now; the service must advertise
+   * their absence until generation is implemented. Values remain provisional.
+   */
+  export interface GeneratedField {
+    attempt_id: Text_1_4096;
+    field: GeneratedFieldName;
+    item: Maybe;
+    provisional: Provisional;
+    step: Handle;
+    value: GeneratedValue;
+  }
+  /**
+   * An embedded `rustev.serve-decision/1` document, carried as its original bytes and checked by that document's own bounded parser.
+   */
+  export interface EmbeddedRustevServeDecision_1 {}
+  /**
+   * An embedded `rustev.serve-refusal/1` document, carried as its original bytes and checked by that document's own bounded parser.
+   */
+  export interface EmbeddedRustevServeRefusal_1 {}
+}
+export type RustevServeEvent1 = RustevServeEvent1.RustevServeEvent1;
+
+export namespace RustevServeInvalidations1 {
+  /**
+   * @minItems 1
+   * @maxItems 4096
+   */
+  export type List_Handle_1_4096 = [Handle, ...Handle[]];
+  export type Handle = string;
+  export type InvalidationKind = "correction" | "revocation" | "erasure";
+  export type InvalidationItemSchema = "rustev.remote-context-invalidation/1";
+  export type InvalidationScope =
+    | "all_scopes"
+    | {
+        principal: ListUint8_1_1024;
+      };
+  /**
+   * @minItems 1
+   * @maxItems 1024
+   */
+  export type ListUint8_1_1024 = [number, ...number[]];
+  /**
+   * @minItems 0
+   * @maxItems 1024
+   */
+  export type List_InvalidationItem_0_1024 = InvalidationItem[];
+
+  export interface RustevServeInvalidations1 {
+    items: List_InvalidationItem_0_1024;
+    schema: "rustev.serve-invalidations/1";
+    source_id: Handle;
+  }
+  /**
+   * The embedded remote-context item wire shape. The remote lane can reuse
+   * this payload; it is not a second remote protocol implementation.
+   */
+  export interface InvalidationItem {
+    fields: List_Handle_1_4096;
+    kind: InvalidationKind;
+    schema: InvalidationItemSchema;
+    scope: InvalidationScope;
+    sequence: number;
+    source_id: Handle;
+  }
+}
+export type RustevServeInvalidations1 = RustevServeInvalidations1.RustevServeInvalidations1;
+
+export namespace RustevServeInvalidationsAck1 {
+  export interface RustevServeInvalidationsAck1 {
+    highest_sequence: number;
+    schema: "rustev.serve-invalidations-ack/1";
+  }
+}
+export type RustevServeInvalidationsAck1 = RustevServeInvalidationsAck1.RustevServeInvalidationsAck1;
+
+export namespace RustevServeReadiness1 {
+  export type Handle = string;
+  /**
+   * @minItems 0
+   * @maxItems 64
+   */
+  export type List_Handle_0_64 = Handle[];
+  export type ReadinessReason =
+    "preload_unregistered" | "describe_incomplete" | "degraded" | "invalidation_degraded" | "shutting_down";
+  /**
+   * @minItems 0
+   * @maxItems 4096
+   */
+  export type List_ReadinessFailure_0_4096 = ReadinessFailure[];
+  export type SigningMode = "require_signed" | "allow_unsigned";
+
+  export interface RustevServeReadiness1 {
+    development_bearer_listeners: List_Handle_0_64;
+    failing_items: List_ReadinessFailure_0_4096;
+    schema: "rustev.serve-readiness/1";
+    signing_mode: SigningMode;
+  }
+  export interface ReadinessFailure {
+    item: Handle;
+    reason: ReadinessReason;
+  }
+}
+export type RustevServeReadiness1 = RustevServeReadiness1.RustevServeReadiness1;
+
+export namespace RustevServeRefusal1 {
+  export type RefusalCode =
+    | "overloaded"
+    | "idempotency_window_full"
+    | "queue_deadline"
+    | "shutting_down"
+    | "not_ready"
+    | "context_unavailable"
+    | "cancelled_before_admission"
+    | "decision_id_conflict"
+    | "registration_conflict"
+    | "decision_in_progress"
+    | "registry_full"
+    | "invalid_request"
+    | "invalid_document"
+    | "principal_invalid"
+    | "invalid_trace_context"
+    | "invalid_deadline"
+    | "unauthenticated"
+    | "plan_not_registered"
+    | "decision_not_found"
+    | "endpoint_unavailable"
+    | "body_too_large"
+    | "headers_too_large"
+    | "unsupported_media_type"
+    | "compile_refused"
+    | "plan_id_mismatch"
+    | "binding_unknown"
+    | "profile_unsupported"
+    | "bundle_tampered"
+    | "signature_invalid"
+    | "signature_untrusted"
+    | "unsigned_refused";
+  /**
+   * An oversized compiler refusal is represented by its digest and byte length.
+   */
+  export type CompileRefusal =
+    | {
+        document: CompilerRefusalFields;
+      }
+    | {
+        digest: {
+          digest: ContentDigest;
+          length: Number_2049_18446744073709551615;
+        };
+      };
+  export type Number_1_17 = number;
+  /**
+   * Length is enforced in decoded UTF-8 bytes by the parser.
+   */
+  export type Text_1_2048 = string;
+  /**
+   * Length is enforced in decoded UTF-8 bytes by the parser.
+   */
+  export type Text_0_2048 = string;
+  export type Handle = string;
+  export type CompilerReason =
+    | {
+        kind: "unknown_backend";
+      }
+    | {
+        kind: "operation";
+        operation: Operation;
+      }
+    | {
+        kind: "output_kind";
+        offered: OutputKind;
+        required: RequiredKind;
+      }
+    | {
+        kind: "options";
+        max: number;
+        needed: number;
+      }
+    | {
+        kind: "input_limit";
+        max: number;
+        needed: number;
+      }
+    | {
+        kind: "determinism";
+        offered: Text_1_2048;
+        required: Text_1_2048;
+      }
+    | {
+        kind: "artifact_pin";
+        offered: ContentDigest;
+        pinned: ContentDigest;
+      };
+  /**
+   * The four semantic operations (R-05).
+   */
+  export type Operation = "classify" | "proposition" | "rubric" | "rank";
+  /**
+   * What a backend returns for an operation (design section 8.2).
+   */
+  export type OutputKind = "label" | "scores" | "distribution" | "logits";
+  /**
+   * The value kind a semantic step requires (spec 002, 3.9.3).
+   */
+  export type RequiredKind = "label" | "distribution" | "calibrated_probability" | "ordinal_distribution" | "scores";
+  export type ContentDigest = string;
+  /**
+   * @minItems 0
+   * @maxItems 1024
+   */
+  export type List_CompilerReason_0_1024 = CompilerReason[];
+  /**
+   * @minItems 0
+   * @maxItems 1024
+   */
+  export type List_CompilerShortfall_0_1024 = CompilerShortfall[];
+  export type Refused = "refused";
+  export type Number_2049_18446744073709551615 = number;
+  /**
+   * Only false is representable. A refusal never claims a decision ran.
+   */
+  export type DecisionDidNotRun = false;
+  /**
+   * Length is enforced in decoded UTF-8 bytes by the parser.
+   */
+  export type Text_0_256 = string;
+
+  export interface RustevServeRefusal1 {
+    code: RefusalCode;
+    compile_refusal?: CompileRefusal;
+    decision_ran: DecisionDidNotRun;
+    detail: Text_0_256;
+    schema: "rustev.serve-refusal/1";
+  }
+  export interface CompilerRefusalFields {
+    category: Number_1_17;
+    category_name: Text_1_2048;
+    command: Text_1_2048;
+    detail: Text_0_2048;
+    shortfalls: List_CompilerShortfall_0_1024;
+    status: Refused;
+    subject: Text_0_2048;
+  }
+  export interface CompilerShortfall {
+    backend_id: Handle;
+    reasons: List_CompilerReason_0_1024;
+  }
+}
+export type RustevServeRefusal1 = RustevServeRefusal1.RustevServeRefusal1;
+
+export namespace RustevServeRegister1 {
+  /**
+   * Explicit absence for identity-bearing fields.
+   */
+  export type Maybe =
+    | "none"
+    | {
+        some: EmbeddedRustevPlanBundleSignature_1;
+      };
+
+  export interface RustevServeRegister1 {
+    bundle: EmbeddedRustevPlanBundle_1;
+    schema: "rustev.serve-register/1";
+    signature: Maybe;
+  }
+  /**
+   * An embedded `rustev.plan-bundle/1` document, carried as its original bytes and checked by that document's own bounded parser.
+   */
+  export interface EmbeddedRustevPlanBundle_1 {}
+  /**
+   * An embedded `rustev.plan-bundle-signature/1` document, carried as its original bytes and checked by that document's own bounded parser.
+   */
+  export interface EmbeddedRustevPlanBundleSignature_1 {}
+}
+export type RustevServeRegister1 = RustevServeRegister1.RustevServeRegister1;
+
+export namespace RustevServeReplay1 {
+  export type DocumentInput =
+    | {
+        document: EmbeddedRustevReplay_1;
+      }
+    | {
+        reference: Reference;
+      };
+  /**
+   * Resolver references are prefix:relative/path, never URLs or absolute paths.
+   * Filesystem containment and scope are checked by the host resolver.
+   */
+  export type Reference = Text_1_4096;
+  /**
+   * Length is enforced in decoded UTF-8 bytes by the parser.
+   */
+  export type Text_1_4096 = string;
+  /**
+   * Explicit absence for identity-bearing fields.
+   */
+  export type Maybe =
+    | "none"
+    | {
+        some: Number_1_2592000000;
+      };
+  export type Number_1_2592000000 = number;
+  export type Timestamp = number;
+  /**
+   * The isolation scope of a capture, a bundle and every request identity.
+   */
+  export type Scope =
+    | {
+        context_revision: Handle;
+        mode: "tenant_only";
+        tenant: Handle;
+      }
+    | {
+        context_revision: Handle;
+        mode: "principal";
+        principal_scope: Handle;
+        tenant: Handle;
+      };
+  export type Handle = string;
+  export type ReplayInput =
+    | {
+        plan: DocumentInput2;
+      }
+    | {
+        snapshot: DocumentInput3;
+      }
+    | {
+        run: DocumentInput4;
+      }
+    | {
+        evidence: DocumentInput5;
+      }
+    | {
+        judgment: DocumentInput6;
+      }
+    | {
+        backend_output: DocumentInput7;
+      }
+    | {
+        execution_policy: DocumentInput8;
+      }
+    | {
+        calibration: DocumentInput9;
+      };
+  export type DocumentInput2 =
+    | {
+        document: EmbeddedRustevPlan_2;
+      }
+    | {
+        reference: Reference;
+      };
+  export type DocumentInput3 =
+    | {
+        document: EmbeddedRustevSnapshot_1;
+      }
+    | {
+        reference: Reference;
+      };
+  export type DocumentInput4 =
+    | {
+        document: EmbeddedRustevRun_1;
+      }
+    | {
+        reference: Reference;
+      };
+  export type DocumentInput5 =
+    | {
+        document: EmbeddedRustevEvidence_1;
+      }
+    | {
+        reference: Reference;
+      };
+  export type DocumentInput6 =
+    | {
+        document: EmbeddedRustevJudgment_1;
+      }
+    | {
+        reference: Reference;
+      };
+  export type DocumentInput7 =
+    | {
+        document: EmbeddedRustevBackendOutput_1;
+      }
+    | {
+        reference: Reference;
+      };
+  export type DocumentInput8 =
+    | {
+        document: EmbeddedRustevExecution_1;
+      }
+    | {
+        reference: Reference;
+      };
+  export type DocumentInput9 =
+    | {
+        document: EmbeddedRustevCalibration_1;
+      }
+    | {
+        reference: Reference;
+      };
+  /**
+   * @minItems 0
+   * @maxItems 1024
+   */
+  export type List_ReferencedInput_0_1024 = ReferencedInput[];
+
+  export interface RustevServeReplay1 {
+    bundle: DocumentInput;
+    config: ReplayOptions;
+    inputs: List_ReferencedInput_0_1024;
+    schema: "rustev.serve-replay/1";
+  }
+  /**
+   * An embedded `rustev.replay/1` document, carried as its original bytes and checked by that document's own bounded parser.
+   */
+  export interface EmbeddedRustevReplay_1 {}
+  export interface ReplayOptions {
+    host_cap_ms: Maybe;
+    now_ms: Timestamp;
+    scope: Scope;
+  }
+  /**
+   * A resolver binding for a typed embedded replay dependency.
+   */
+  export interface ReferencedInput {
+    input: ReplayInput;
+    reference: Reference;
+  }
+  /**
+   * An embedded `rustev.plan/2` document, carried as its original bytes and checked by that document's own bounded parser.
+   */
+  export interface EmbeddedRustevPlan_2 {}
+  /**
+   * An embedded `rustev.snapshot/1` document, carried as its original bytes and checked by that document's own bounded parser.
+   */
+  export interface EmbeddedRustevSnapshot_1 {}
+  /**
+   * An embedded `rustev.run/1` document, carried as its original bytes and checked by that document's own bounded parser.
+   */
+  export interface EmbeddedRustevRun_1 {}
+  /**
+   * An embedded `rustev.evidence/1` document, carried as its original bytes and checked by that document's own bounded parser.
+   */
+  export interface EmbeddedRustevEvidence_1 {}
+  /**
+   * An embedded `rustev.judgment/1` document, carried as its original bytes and checked by that document's own bounded parser.
+   */
+  export interface EmbeddedRustevJudgment_1 {}
+  /**
+   * An embedded `rustev.backend-output/1` document, carried as its original bytes and checked by that document's own bounded parser.
+   */
+  export interface EmbeddedRustevBackendOutput_1 {}
+  /**
+   * An embedded `rustev.execution/1` document, carried as its original bytes and checked by that document's own bounded parser.
+   */
+  export interface EmbeddedRustevExecution_1 {}
+  /**
+   * An embedded `rustev.calibration/1` document, carried as its original bytes and checked by that document's own bounded parser.
+   */
+  export interface EmbeddedRustevCalibration_1 {}
+}
+export type RustevServeReplay1 = RustevServeReplay1.RustevServeReplay1;
+
+export namespace RustevServeService1 {
+  /**
+   * @minItems 0
+   * @maxItems 14
+   */
+  export type List_Operation_0_14 =
+    | []
+    | [Operation]
+    | [Operation, Operation]
+    | [Operation, Operation, Operation]
+    | [Operation, Operation, Operation, Operation]
+    | [Operation, Operation, Operation, Operation, Operation]
+    | [Operation, Operation, Operation, Operation, Operation, Operation]
+    | [Operation, Operation, Operation, Operation, Operation, Operation, Operation]
+    | [Operation, Operation, Operation, Operation, Operation, Operation, Operation, Operation]
+    | [Operation, Operation, Operation, Operation, Operation, Operation, Operation, Operation, Operation]
+    | [Operation, Operation, Operation, Operation, Operation, Operation, Operation, Operation, Operation, Operation]
+    | [
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation
+      ]
+    | [
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation
+      ]
+    | [
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation
+      ]
+    | [
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation,
+        Operation
+      ];
+  export type Operation =
+    | "describe"
+    | "register"
+    | "registration"
+    | "decide"
+    | "stream"
+    | "lookup"
+    | "cancel"
+    | "replay"
+    | "evaluate"
+    | "explain"
+    | "invalidations"
+    | "health"
+    | "readiness"
+    | "metrics";
+  export type ContentDigest = string;
+  export type Handle = string;
+  /**
+   * @minItems 0
+   * @maxItems 64
+   */
+  export type List_Handle_0_64 = Handle[];
+  export type Number_60000_86400000 = number;
+  export type Protocol = "rustev.serve/1";
+  export type Retention = "memory_lost_on_restart";
+  export type SigningMode = "require_signed" | "allow_unsigned";
+
+  export interface RustevServeService1 {
+    available_endpoints: List_Operation_0_14;
+    configuration_digest: ContentDigest;
+    development_bearer_listeners: List_Handle_0_64;
+    idempotency_window_ms: Number_60000_86400000;
+    protocol: Protocol;
+    retention: Retention;
+    schema: "rustev.serve-service/1";
+    service_build: Handle;
+    signing_mode: SigningMode;
+  }
+}
+export type RustevServeService1 = RustevServeService1.RustevServeService1;
+
+export namespace RustevServeShutdown1 {
+  export type Handle = string;
+  /**
+   * @minItems 0
+   * @maxItems 10000
+   */
+  export type List_Handle_0_10000 = Handle[];
+
+  export interface RustevServeShutdown1 {
+    cancelled: number;
+    delivered: number;
+    drained: number;
+    dropped: number;
+    failed: number;
+    failed_ids: DecisionIdList;
+    schema: "rustev.serve-shutdown/1";
+    unflushed: number;
+    unflushed_ids: DecisionIdList;
+  }
+  export interface DecisionIdList {
+    ids: List_Handle_0_10000;
+    total: number;
+    truncated: boolean;
+  }
+}
+export type RustevServeShutdown1 = RustevServeShutdown1.RustevServeShutdown1;
 
 export namespace RustevSnapshot1 {
   export type Timestamp = number;

@@ -986,6 +986,31 @@ schema that constrains nothing as `unknown`, not an open object, so a
 snapshot entry's `value` (here and in `rustev.snapshot/1`) admits any JSON
 value in TypeScript as the parser does.
 
+**Increment 1, serve half (contract documents).**
+`crates/rustev-contract/src/serve.rs` defines `rustev.serve/1` with its
+operation table (3.9) and every `rustev.serve-*/1` document of 3.1 to 3.9
+and 3.13 to 3.15; `crates/rustev-contract/src/plan_bundle.rs` defines
+`rustev.plan-bundle/1`, `rustev.plan-bundle-signature/1` and
+`rustev.plan-registration/1` (3.3). Embedded documents (plan bundles and
+signatures, judgments, run records and compile refusals) are checked by
+their own bounded parsers and carried as their original bytes, so a
+service envelope never re-encodes evidence; this uses `serde_json`'s
+`raw_value` feature, which adds no dependency. Held back until specs 034
+and 036 are implemented, with extension points: parameters, variants,
+tenant profiles and profile-dependent signing (034), and mid-plan
+acquisition inputs and tiered-widening outcomes (036). Tests:
+`tests/042_serve_documents.rs`.
+
+Engineering choices made by the implementing agent where the spec states a
+bound without a value (3.5.3, 3.14), not by the owner: per listener at most
+65 536 connections; per HTTP/2 connection 1 to 1 024 concurrent streams;
+per connection 1 to 10 000 requests per second; the shutdown report lists
+at most 10 000 failed and 10 000 unflushed decision ids, in order, with
+the total and `truncated`. Other unstated sizes follow the surrounding
+documents: 4 MiB envelopes (10 MiB for events, 8 MiB for the shutdown
+report), 256-byte names and error text, 4 096-byte paths, endpoints and
+attempt ids, and 1 024-entry configuration lists.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

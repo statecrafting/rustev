@@ -105,5 +105,7 @@ pub mod schema {
     pub const DYNAMIC_OUTCOME: &str = "rustev.dynamic-outcome/1";
 }
 
+pub mod plan_bundle;
 pub mod remote_context;
 pub mod remote_sink;
+pub mod serve;
