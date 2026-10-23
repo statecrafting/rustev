@@ -74,6 +74,7 @@ pub const BINDING_FAMILIES: &[&str] = &[
 /// What `rustev-wasm`'s normal and build graph may not contain beyond the
 /// executors, HTTP stacks and Node-API families (spec 027, 3.14.3).
 pub const WASM_FORBIDDEN: &[&str] = &[
+    "rustev-otel",
     "rustev-runtime",
     "getrandom",
     "web-sys",
@@ -100,6 +101,9 @@ pub const PACKAGE_DEPENDENCIES: &[&str] = &["rustev-contract", "rustev-core"];
 /// The facade crate (spec 031, 3.2): the one crate that may depend on a
 /// crate under `integrations/`, and only optionally (3.3).
 pub const FACADE: &str = "rustev";
+
+/// 049 3.1: only this normal dependency crosses between integrations.
+pub const NODE_TELEMETRY_EDGE: (&str, &str) = ("rustev-node", "rustev-otel");
 
 /// The subset of `cargo metadata` output this check reads.
 #[derive(Debug, Deserialize)]
@@ -389,7 +393,9 @@ pub fn check(meta: &Metadata) -> Vec<Violation> {
                             detail,
                         });
                     }
-                } else {
+                } else if !((pkg.name.as_str(), dep.name.as_str()) == NODE_TELEMETRY_EDGE
+                    && dep.kind.is_none())
+                {
                     out.insert(Violation::DependsOnIntegration {
                         krate: pkg.name.clone(),
                         dependency: dep.name.clone(),
@@ -1510,6 +1516,48 @@ mod tests {
                 dependency: "hyper".into()
             }]
         );
+    }
+
+    // 049 3.1.3: the named normal edge alone, including the wasm graph.
+    #[test]
+    fn node_telemetry_exception_is_one_normal_edge() {
+        for (from, to, kind, allowed) in [
+            ("rustev-node", "rustev-otel", None, true),
+            ("rustev-node", "rustev-otel", Some("build"), false),
+            ("rustev-node", "rustev-otel", Some("dev"), false),
+            ("rustev-node", "rustev-remote-http", None, false),
+            ("rustev-serve", "rustev-otel", None, false),
+            ("host", "rustev-otel", None, false),
+            ("rustev-wasm", "rustev-otel", None, false),
+        ] {
+            let from_dir = format!("integrations/{from}");
+            let to_dir = format!("integrations/{to}");
+            let m = meta(
+                &[
+                    (from, &from_dir, &[(to, kind, Some(&to_dir))]),
+                    (to, &to_dir, &[]),
+                ],
+                &[],
+                &[(from, to, kind)],
+            );
+            let violations = check(&m);
+            assert_eq!(
+                violations.contains(&Violation::DependsOnIntegration {
+                    krate: from.into(),
+                    dependency: to.into(),
+                }),
+                !allowed,
+                "{from} -> {to} ({kind:?})"
+            );
+            if allowed {
+                assert!(violations.is_empty(), "{violations:?}");
+            }
+            if from == "rustev-wasm" {
+                assert!(violations.contains(&Violation::WasmGraph {
+                    path: vec![from.into(), to.into()],
+                }));
+            }
+        }
     }
 
     #[test]

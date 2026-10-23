@@ -278,6 +278,12 @@ class PlanHandle {
     if (options.traceparent !== undefined && !TRACEPARENT.test(options.traceparent)) {
       throw new classes.InvalidTraceContext('invalid_traceparent', { traceparent: options.traceparent });
     }
+    // 049 3.4.2: validated even when telemetry is absent.
+    if (options.tracestate !== undefined &&
+        (typeof options.tracestate !== 'string' || options.traceparent === undefined ||
+         options.tracestate.length > 512 || /[^\x20-\x7e]/.test(options.tracestate))) {
+      throw new classes.InvalidTraceContext('invalid_tracestate', { field: 'tracestate' });
+    }
     const cancel = wrap(() => natives.get(this.#engine).cancelHandle());
     running.get(this.#engine).add(cancel);
     const signal = options.signal;
@@ -292,6 +298,7 @@ class PlanHandle {
           decisionId: request.decisionId,
           snapshot: request.snapshot === undefined ? undefined : bytes(request.snapshot),
           traceparent: options.traceparent,
+          tracestate: options.tracestate,
           evaluationTimeMs: request.evaluationTimeMs,
           deadlineMs: options.deadlineMs ?? request.deadlineMs,
           principalHandle: options.principalHandle,
@@ -301,6 +308,7 @@ class PlanHandle {
       const judgment = r.judgment ?? null;
       return {
         completion: r.completion,
+        ...(r.trace == null ? {} : { trace: r.trace }),
         judgment: judgment && JSON.parse(Buffer.from(judgment).toString('utf8')),
         evidence: JSON.parse(Buffer.from(r.evidence).toString('utf8')),
         // The native layer returns the delivery as a JSON string.
@@ -363,6 +371,7 @@ class Engine {
             })),
             (options.backends ?? []).map(backendSeam),
             options.contextSource ? contextSeam(options.contextSource) : undefined,
+            telemetryOptions(options.telemetry),
           ),
         ),
     );
@@ -446,6 +455,17 @@ class Engine {
     return this.command('calibrateQualify', inputs, args);
   }
 
+  /** Bounded exchange forwarding (049 3.5.2). */
+  recordExchange(record) {
+    return wrap(() => natives.get(this).recordExchange(bytes(record)));
+  }
+
+  /** Export failures are counted outcomes (049 3.5.3). */
+  async flushTelemetryMetrics() {
+    try { return await natives.get(this).flushTelemetryMetrics(); }
+    catch (e) { throw typed(e); }
+  }
+
   advanceClock(ms) {
     return wrap(() => natives.get(this).advanceClock(ms));
   }
@@ -520,9 +540,34 @@ class Engine {
       await new Promise((r) => setTimeout(r, 5));
       remaining = natives.get(this).shutdown();
     }
+    // 049 3.5.5: telemetry receives only the remaining drain budget.
+    let telemetryUnflushed;
+    try { telemetryUnflushed = await natives.get(this).shutdownTelemetry(Math.max(0, until - Date.now())); }
+    catch (e) { throw typed(e); }
     // The late settlements discarded during this shutdown.
-    return { drained: active === 0, cancelled, lateDiscarded: lateCount() - lateBefore, stillRunning: remaining };
+    return { telemetryUnflushed, drained: active === 0, cancelled, lateDiscarded: lateCount() - lateBefore, stillRunning: remaining };
   }
+}
+
+// 049 3.2: documents and secret bytes cross separately from option JSON.
+function telemetryOptions(t) {
+  if (t === undefined) return undefined;
+  if (t === null || typeof t !== 'object' || Array.isArray(t)) {
+    throw new classes.ConfigRefused('out_of_range', { field: 'telemetry' });
+  }
+  if (t.key !== undefined && !(t.key?.bytes instanceof Uint8Array)) {
+    throw new classes.ConfigRefused('out_of_range', { field: 'telemetry.key.bytes' });
+  }
+  let policy;
+  if (t.policy !== undefined) {
+    try { policy = bytes(t.policy); }
+    catch { throw new classes.InvalidDocument('invalid_document', { field: 'telemetry.policy' }); }
+  }
+  return {
+    config: { ...t, policy: undefined, key: t.key === undefined ? undefined : { keyId: t.key.keyId } },
+    policy,
+    key: t.key?.bytes,
+  };
 }
 
 function named(inputs) {

@@ -4162,6 +4162,7 @@ dependencies = [
  "rustev-contract",
  "rustev-core",
  "rustev-eval",
+ "rustev-otel",
  "rustev-runtime",
  "rustev-surface",
  "serde_json",

@@ -77,6 +77,7 @@ export interface EngineOptions {
   backends?: DecisionBackend[];
   contextSource?: ContextSource;
   clock?: 'system' | 'manual';
+  telemetry?: TelemetryOptions;
 }
 
 export interface DecisionRequest {
@@ -88,6 +89,8 @@ export interface DecisionRequest {
 }
 
 export interface DecideOptions {
+  /** 049 3.4.2: printable ASCII, at most 512 bytes, with traceparent. */
+  tracestate?: string;
   signal?: AbortSignal;
   /** Can only tighten the plan's deadline. */
   deadlineMs?: number;
@@ -98,6 +101,7 @@ export interface DecideOptions {
 }
 
 export interface DecideResult {
+  trace?: { traceId: string; rootSpanId: string };
   completion: 'judged' | 'cancelled';
   /** The parsed judgment; null when cancelled. An unresolved outcome is a
    * value here, never an exception. */
@@ -152,12 +156,14 @@ export declare class Engine {
   gate(inputs: Record<string, DocumentInput>, args: object): Promise<CommandResult>;
   calibrateFit(inputs: Record<string, DocumentInput>, args: object): Promise<CommandResult>;
   calibrateQualify(inputs: Record<string, DocumentInput>, args: object): Promise<CommandResult>;
-  onGauges(cb: (gauges: unknown) => void | Promise<void>, options: { everyMs: number }): () => void;
+  onGauges(cb: (gauges: EngineGauges) => void | Promise<void>, options: { everyMs: number }): () => void;
   advanceClock(ms: number): void;
   clockSleepers(): number;
   clockDelays(): number[];
-  gauges(): unknown;
-  shutdown(options?: { drainMs?: number }): Promise<{ drained: boolean; cancelled: number; lateDiscarded: number; stillRunning: number }>;
+  gauges(): EngineGauges;
+  recordExchange(record: DocumentInput): void;
+  flushTelemetryMetrics(): Promise<{ outcome: 'exported' | 'not_taken' | 'lost'; reason?: string }>;
+  shutdown(options?: { drainMs?: number }): Promise<{ drained: boolean; cancelled: number; lateDiscarded: number; stillRunning: number; telemetryUnflushed: number }>;
 }
 
 export declare class RustevError extends Error {
@@ -200,3 +206,47 @@ export declare class SeamFailure extends Error {
 }
 
 export declare function version(): string;
+
+/** 049 3.2: JSONL exporter; OTLP/HTTP joins in increment 2. */
+export interface TelemetryOptions {
+  exporter: { kind: 'jsonl'; path: string; maxBytes?: number };
+  policy?: DocumentInput;
+  key?: { bytes: Uint8Array; keyId: string };
+  acknowledgement?: 'accepted' | 'exported';
+  requireTelemetry?: boolean;
+  telemetryTimeoutMs?: number;
+  sampling?: {
+    parent?: 'honor' | 'ignore';
+    root?: 'always' | 'never' | { ratioPerMillion: number };
+    alwaysSampleOn?: ('unresolved' | 'refusal' | 'fallback' | 'cancelled')[];
+  };
+  logs?: boolean;
+  bindings?: {
+    providers?: Record<string, string>;
+    usageKeys?: Record<string, { input: string; output: string }>;
+  };
+  limits?: {
+    maxQueuedSpans?: number; batchSize?: number; exportTimeoutMs?: number;
+    valueBound?: number; maxPendingContexts?: number; contextTtlMs?: number;
+    joinBuffer?: number;
+  };
+}
+
+/** 049 3.5.4: operator counters, never evidence. */
+export interface TelemetryFlow {
+  accepted: number; exported: number; lost: Record<string, number>; inFlight: number;
+}
+export interface TelemetryGauges {
+  spans: TelemetryFlow; logs: TelemetryFlow; metricExports: TelemetryFlow;
+  decisionsLost: Record<string, number>;
+  sampledOut: number; invalidTraceparent: number; tableFull: number;
+  contextExpired: number; planUnregistered: number; exchangeUnjoined: number;
+  attributesCut: number; eventsCut: number;
+}
+export interface EngineGauges {
+  inFlight: number; queued: number; rejected: number; abandoned: number;
+  backendInFlight: Record<string, number>;
+  sink: { acknowledged: number; failed: number; timedOut: number; dropped: number; queued: number; inDelivery: number };
+  seams: { name: string; queueDepth: number; refusedFull: number; lateResolutionsDiscarded: number }[];
+  telemetry?: TelemetryGauges;
+}

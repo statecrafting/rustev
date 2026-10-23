@@ -16,6 +16,8 @@ spec = "027-node-and-wasm-bindings"
 crate-type = ["cdylib"]
 
 [dependencies]
+# 049 3.1: the one normal integration dependency allowed for this binding.
+rustev-otel = { path = "../rustev-otel" }
 rustev-contract.workspace = true
 rustev-core.workspace = true
 rustev-runtime.workspace = true

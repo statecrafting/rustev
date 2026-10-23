@@ -417,7 +417,38 @@ Pending: the `verify:cli` block is written by the implementing change, with
 
 ## Implementation record
 
-Not started.
+Delivered in two increments: (1) the boundary exception, the `telemetry`
+option with the JSONL exporter, trace context, plans, exchanges, gauges,
+shutdown and declarations; (2) the OTLP/HTTP exporter, the `verify:cli`
+block and `049` in `VERIFIED_SPECS`.
+
+**Increment 1.** `tools/rustev-boundaries` names the one edge
+(`NODE_TELEMETRY_EDGE`): `rustev-node` on `rustev-otel` as a normal
+dependency passes; as a build or dev dependency, `rustev-node` on any other
+integration, and any other crate on `rustev-otel` stay
+`DependsOnIntegration`, and `rustev-otel` joins the WebAssembly graph's
+forbidden list, so `rustev-wasm` reaching it fails both rules (3.1.3, one
+fixture per case). `rustev-node` depends on `rustev-otel` by path with no
+feature (the root manifest is left to the change that adds `rustev-otel`
+to the release family). `Engine.create({ telemetry })` validates every
+field before opening the file or starting a thread, opens the JSONL file,
+builds the `OtelSink` on the engine's Tokio runtime and gives the runtime a
+`TeeSink` over the host sink (3.2, 3.3); under the manual clock the sink's
+clock is the manual clock's milliseconds anchored at Unix zero (3.3.5).
+`decide` validates `tracestate`, calls `begin` immediately before admission,
+returns `trace`, and abandons through a guard on every exit (3.4); compiled
+and loaded plans are registered (3.5.1); `recordExchange`,
+`flushTelemetryMetrics`, the `telemetry` gauges entry and
+`telemetryUnflushed` are as 3.5 states. In this increment
+`exporter.kind: 'otlp-http'` is refused as an unknown kind, and
+`flushTelemetryMetrics` answers `not_taken` or `lost`, since the JSONL
+exporter takes no metrics. Tests (`test/telemetry.test.mjs`): both
+reference decisions with the JSONL exporter (trace lines, trace ids,
+span names, shape and attribute keys against 028's default-policy goldens,
+a snapshot canary absent, and identical evidence, judgment and receipt
+bytes with and without telemetry), a full file with and without
+`requireTelemetry`, the creation refusals with no secret in any error,
+`tracestate`, abandon after a rejection, exchanges, metrics and shutdown.
 
 ## Decisions at approval
 
