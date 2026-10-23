@@ -1,0 +1,53 @@
+{
+  "mediaType": "application/vnd.dev.sigstore.trustedroot+json;version=0.1",
+  "tlogs": [
+    {
+      "baseUrl": "https://synthetic.rekor.example.invalid",
+      "hashAlgorithm": "SHA2_256",
+      "publicKey": {
+        "rawBytes": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEcuMNRxjN8y/80RH+mNE8lYg+v2ZeBB/OF7+piRlsJxwWpGC/K2dPs0sOUxv+uY+Gxf8eTU8kq3MnBAnKPY4/iw==",
+        "keyDetails": "PKIX_ECDSA_P256_SHA_256",
+        "validFor": {
+          "start": "2020-01-01T00:00:00Z"
+        }
+      },
+      "logId": {
+        "keyId": "hRjzoELatkEWnXWZSdldiVeyjcu1U0QFPWx054gxLQk="
+      }
+    }
+  ],
+  "ctlogs": [
+    {
+      "baseUrl": "https://synthetic.ct.example.invalid",
+      "hashAlgorithm": "SHA2_256",
+      "publicKey": {
+        "rawBytes": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEqs//9b7MUAAQ81q3vYfUTufFdL22Tn3v+2Zgt3/kcjX6HnOhEV0DdcVsHs0Uk6EhnoILDbP9ZsubIgXzNx66zg==",
+        "keyDetails": "PKIX_ECDSA_P256_SHA_256",
+        "validFor": {
+          "start": "2020-01-01T00:00:00Z"
+        }
+      },
+      "logId": {
+        "keyId": "HC7Y+hg3LYnFZgHw2JuNVY9iUN7vBOtzZ2VPj3h77ls="
+      }
+    }
+  ],
+  "certificateAuthorities": [
+    {
+      "subject": {
+        "commonName": "Synthetic Rustev Fulcio"
+      },
+      "uri": "https://synthetic.fulcio.example.invalid",
+      "certChain": {
+        "certificates": [
+          {
+            "rawBytes": "MIIBhzCCAS6gAwIBAgIUNkr5MkCWemnCuDg7J8kZoSvni/IwCgYIKoZIzj0EAwIwIjEgMB4GA1UEAwwXU3ludGhldGljIFJ1c3RldiBGdWxjaW8wHhcNMjYxMDIzMDYyMDMyWhcNMzYxMDIwMDYyMDMyWjAiMSAwHgYDVQQDDBdTeW50aGV0aWMgUnVzdGV2IEZ1bGNpbzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABM1LouedXkpM73K/h5CpGMWvYzZrMOFkxunqoOQzoU7h7YLpVlhOc7ntOCbLSo/HYaFCcBwjxAs+l1D0igulmxijQjBAMB0GA1UdDgQWBBSGB/tLsuovAvhtjyMiNt8BeNEePTAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAKBggqhkjOPQQDAgNHADBEAiANvrFxdxJOq/xW243XmxSZJqQBHAgrTWtnePd4mejjLwIgXHeZIxoCmJbLvWklArDGwrMCtqn0ifNnFE56N8wHv1Q="
+          }
+        ]
+      },
+      "validFor": {
+        "start": "2020-01-01T00:00:00Z"
+      }
+    }
+  ]
+}
