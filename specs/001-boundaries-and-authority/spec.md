@@ -19,6 +19,7 @@ establishes:
   - "Cargo.lock"
   - "Makefile"
   - { kind: directory, path: "scripts/acceptance/" }
+  - { kind: directory, path: "scripts/landing/" }
   - { kind: directory, path: "tools/rustev-boundaries/" }
 depends_on:
   - "000-bootstrap"
@@ -43,7 +44,9 @@ remembered.
 - The design document it normalizes.
 - The workspace manifest `Cargo.toml` and its lockfile `Cargo.lock`, the
   `Makefile`, and the boundary check `tools/rustev-boundaries/` (a
-  `publish = false` workspace member). A spec that adds a crate directory
+  `publish = false` workspace member).
+- The delivery tooling `scripts/acceptance/` (the CI acceptance partition) and
+  `scripts/landing/` (the read-only landing report). Neither is product code. A spec that adds a crate directory
   extends `Cargo.toml` and `Makefile` with an `extends` edge and claims its
   own directory.
 
@@ -211,6 +214,20 @@ sh -c 'for d in crates tools; do [ -d "$d" ] || continue; if grep -rnE "(struct|
 ```
 
 ## Implementation record
+
+- 2026-10-23: CI acceptance groups rebalanced on measured per-spec time
+  (eight runs): spec 004 alone took about 24 of the `evaluation` group's
+  36 minutes, so 004 runs alone and 023 and 029 join `runtime-evidence` and
+  `cli-backends`; 019 and 020 move to `integrations-core`. Same four groups,
+  same commands, every spec still exactly once.
+- 2026-10-23: `make landing-status` (`scripts/landing/status.py`) orders the
+  open pull requests by what they unblock and names the next action for each:
+  retarget, owner approval with its reason, failed checks, update, enable
+  auto-merge, or waiting for a parent. It also reports delivery measures
+  (approval wait, oldest blocked PR, merges to main versus intermediate
+  branches, specs complete on main, release rehearsals). Read-only except
+  `--cancel-superseded`, which cancels pull-request runs waiting on the
+  exception Environment for a head no open pull request still has.
 
 - 2026-10-22: Spec 023's repository-local synthetic refusal acceptance joins
   `VERIFIED_SPECS` and the `evaluation` group in `scripts/acceptance/verify.py`

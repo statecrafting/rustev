@@ -6,6 +6,7 @@
 #   make code     build, test, clippy, fmt and the boundary check
 #   make boundaries  the dependency rules of spec 001 section 3.4
 #   make verify   every approved spec's declared acceptance (`spec-spine verify`)
+#   make landing-status  read-only: next actions for open pull requests
 #
 # Owned by spec 001-boundaries-and-authority.
 #
@@ -18,7 +19,7 @@ CRATE_MANIFESTS := $(wildcard crates/*/Cargo.toml backends/*/Cargo.toml tools/*/
 SKIP_NOTE := no crate exists yet, so cargo has nothing to judge
 VERIFIED_SPECS := 001 002 003 004 005 006 007 008 009 010 012 013 014 015 017 019 020 023 026 027 028 029 033 049
 
-.PHONY: tools gate refresh code build test clippy fmt boundaries verify verified-specs release-candidate adoption msrv semver changelog conformance conformance-harvest bindings
+.PHONY: tools gate refresh code build test clippy fmt boundaries verify verified-specs release-candidate adoption msrv semver changelog conformance conformance-harvest bindings landing-status
 
 tools:
 	@test -n "$(SPEC_SPINE_VERSION)" || { echo "no required_version in spec-spine.toml"; exit 3; }
@@ -61,6 +62,11 @@ verified-specs:
 ## Runs code the corpus declares; deliberately not part of `gate`.
 verify:
 	@for id in $(VERIFIED_SPECS); do $(SPEC_SPINE) verify $$id || exit 1; done
+
+## Read-only: what stands between each open pull request and main, ordered
+## by what it unblocks. Needs an authenticated `gh`. ARGS=--json for machines.
+landing-status:
+	@python3 scripts/landing/status.py $(ARGS)
 
 ## Spec 021, 3.5 and 3.7: package evidence for the clean commit at HEAD.
 ## Two clean worktrees, byte comparison, archive policy and unpacked tests.
