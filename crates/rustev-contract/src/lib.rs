@@ -104,3 +104,6 @@ pub mod schema {
     pub const DYNAMIC_CAPABILITY: &str = "rustev.dynamic-capability/1";
     pub const DYNAMIC_OUTCOME: &str = "rustev.dynamic-outcome/1";
 }
+
+pub mod remote_context;
+pub mod remote_sink;

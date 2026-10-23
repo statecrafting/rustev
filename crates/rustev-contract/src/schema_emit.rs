@@ -228,6 +228,46 @@ pub fn document_schemas() -> Vec<EmittedSchema> {
         emit::<RedactionPolicy>(REDACTION, None),
         emit::<TraceLine>(TRACE, None),
     ];
+    out.extend([
+        emit::<crate::remote_context::DescribeRequest>(
+            crate::remote_context::DESCRIBE,
+            Some("request"),
+        ),
+        emit::<crate::remote_context::DescribeResponse>(
+            crate::remote_context::DESCRIBE,
+            Some("response"),
+        ),
+        emit::<crate::remote_context::FetchRequest>(crate::remote_context::FETCH, Some("request")),
+        emit::<crate::remote_context::FetchResponse>(
+            crate::remote_context::FETCH,
+            Some("response"),
+        ),
+        emit::<crate::remote_context::CancelRequest>(
+            crate::remote_context::CANCEL,
+            Some("request"),
+        ),
+        emit::<crate::remote_context::CancelResponse>(
+            crate::remote_context::CANCEL,
+            Some("response"),
+        ),
+        emit::<crate::remote_context::Invalidation>(crate::remote_context::INVALIDATION, None),
+        emit::<crate::remote_context::InvalidationsRequest>(
+            crate::remote_context::INVALIDATIONS,
+            Some("request"),
+        ),
+        emit::<crate::remote_context::InvalidationsResponse>(
+            crate::remote_context::INVALIDATIONS,
+            Some("response"),
+        ),
+        emit::<crate::remote_context::ExchangeRecord>(crate::remote_context::EXCHANGE, None),
+        emit::<crate::remote_sink::DescribeRequest>(crate::remote_sink::DESCRIBE, Some("request")),
+        emit::<crate::remote_sink::DescribeResponse>(
+            crate::remote_sink::DESCRIBE,
+            Some("response"),
+        ),
+        emit::<crate::remote_sink::DeliverRequest>(crate::remote_sink::DELIVER, Some("request")),
+        emit::<crate::remote_sink::DeliverResponse>(crate::remote_sink::DELIVER, Some("response")),
+    ]);
     out.sort_by(|a, b| a.file.cmp(&b.file));
     out
 }
