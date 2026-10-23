@@ -1,6 +1,9 @@
 #![allow(dead_code)]
 use crate::common::*;
-use rustev_contract::{Document, explanation::*, redaction::RedactionPolicy, retention::Retention};
+use rustev_contract::{
+    Document, canonical::record_canonical_bytes, explanation::*, redaction::RedactionPolicy,
+    retention::Retention,
+};
 use rustev_eval::{
     explain::{Evidence, ExplainOptions, explain},
     resolve::NoExternal,
@@ -132,5 +135,62 @@ pub fn fact(e: &Explanation, claim: Claim) -> &Fact {
 pub fn selected(item: &str) -> Query {
     Query::WhySelected {
         item: Item::String(item.into()),
+    }
+}
+
+pub const PARAMS: &str = "/core/recorded/judgment/outcome/propose/params";
+pub fn value(r: &Retained) -> Value {
+    serde_json::from_slice(&r.run.record_canonical().unwrap()).unwrap()
+}
+pub fn record_value(
+    r: &Retained,
+    v: &Value,
+    plan: bool,
+    query: Query,
+    policy: Option<&RedactionPolicy>,
+) -> Explanation {
+    let bytes = record_canonical_bytes(v).unwrap();
+    let p = r.fixture.plan().canonical().unwrap();
+    checked(
+        &Evidence::Record {
+            record: &bytes,
+            plan: plan.then_some(p.as_slice()),
+        },
+        query,
+        policy,
+        [
+            ("record".into(), v.clone()),
+            ("plan".into(), serde_json::from_slice(&p).unwrap()),
+        ]
+        .into(),
+    )
+}
+pub fn retained_bundle(r: &Retained, query: Query, unavailable: Option<&str>) -> Explanation {
+    let mut b = embedded(r);
+    let target = match unavailable {
+        Some("snapshot") => Some(&mut b.snapshot),
+        Some("record") => Some(&mut b.run),
+        _ => None,
+    };
+    if let Some(t) = target {
+        t.retention = Retention::DigestOnly {
+            digest: t.retention.digest().clone(),
+            expires_at_ms: t.retention.expires_at(),
+        };
+    }
+    bundle(&b, query)
+}
+pub fn answer(e: &Explanation) -> Value {
+    serde_json::to_value(&e.answer).unwrap()
+}
+pub fn excluded(id: &str) -> Query {
+    Query::WhyExcluded {
+        item: Item::String(id.into()),
+    }
+}
+pub fn order(a: &str, b: &str) -> Query {
+    Query::WhyOrder {
+        a: Item::String(a.into()),
+        b: Item::String(b.into()),
     }
 }

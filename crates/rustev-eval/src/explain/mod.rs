@@ -1,8 +1,10 @@
 //! Pure explanations of retained decision evidence (spec 040).
 mod bounds;
 mod evidence;
+mod excluded;
 mod facts;
 mod models;
+mod order;
 mod outcome;
 mod redact;
 mod scopes;
@@ -71,7 +73,12 @@ pub fn explain(
         .map_err(|c| ExplainError::new(c, "query", "invalid query"))?;
     if !matches!(
         query,
-        Query::WhyOutcome | Query::TextOrigin | Query::Models | Query::WhySelected { .. }
+        Query::WhyOutcome
+            | Query::TextOrigin
+            | Query::Models
+            | Query::WhySelected { .. }
+            | Query::WhyExcluded { .. }
+            | Query::WhyOrder { .. }
     ) {
         return Err(ExplainError::new(
             RefusalCode::InvalidQuery,
@@ -85,4 +92,25 @@ pub fn explain(
     }
     let evidence = evidence::Set::read(evidence)?;
     bounds::build(&evidence, query, options, bounds::Bounds::default())
+}
+
+fn dispatch(b: &mut facts::Builder<'_>, query: &Query) -> Result<Answer, ExplainError> {
+    match query {
+        Query::WhyOutcome => outcome::build(b),
+        Query::TextOrigin => text::build(b),
+        Query::Models => models::build(b),
+        Query::WhySelected { item } => selected::build(b, item),
+        Query::WhyExcluded {
+            item: Item::String(item),
+        } => excluded::build(b, item),
+        Query::WhyOrder {
+            a: Item::String(a),
+            b: Item::String(c),
+        } => order::build(b, a, c),
+        _ => Err(ExplainError::new(
+            RefusalCode::InvalidQuery,
+            "query",
+            "not yet implemented",
+        )),
+    }
 }

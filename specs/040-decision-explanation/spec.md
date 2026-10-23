@@ -1116,6 +1116,13 @@ and `explain_selected.rs`, with shared fixtures under
 `tests/explain_support/`; `models` and `why_selected` leave the list of
 queries refused as `invalid-query`.
 
+**Increment 4 (`why_excluded` and `why_order`).** `why_excluded` builds
+3.7.1 and `why_order` builds 3.7.2, each in its own module with one
+dispatch arm, reusing the scope walk of 3.6.1 (`scopes`), now shared by
+`why_selected` and both of these queries. Tests:
+`crates/rustev-eval/tests/explain_excluded.rs` and `explain_order.rs`;
+only `diff` is still refused as `invalid-query`.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child
