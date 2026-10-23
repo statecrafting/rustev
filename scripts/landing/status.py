@@ -90,7 +90,7 @@ def changed_paths(number):
          "--jq", ".[].filename"], cwd=ROOT, capture_output=True, text=True)
     if out.returncode:
         raise SystemExit(f"gh api files #{number}: {out.stderr.strip()}")
-    return out.stdout.split()
+    return out.stdout.splitlines()
 
 
 def approval_reason(number, verdict):
