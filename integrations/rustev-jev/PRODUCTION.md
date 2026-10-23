@@ -61,6 +61,5 @@ requires owner-supplied access and credentials, recorded direct request and
 response shapes, a verified mapping, data admission or the stated synthetic
 limitation, and the shared USD 5 testing cap. Production privacy decisions,
 production spend authority, and deployment approval remain separate owner acts.
-The implementation record in the spec has not been edited under this task's
-file restrictions. Spec 022 does not currently declare a verification block or
-say it joins `VERIFIED_SPECS`, so the Makefile is unchanged.
+Spec 022 declares its verification (`spec-spine verify 022`, part of
+`make verify`) and records stages 2 and 3 as externally blocked.

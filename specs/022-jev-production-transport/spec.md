@@ -21,6 +21,8 @@ amends:
   - "012-jev-integration"
 extends:
   - { spec: "012-jev-integration", unit: { kind: directory, path: "integrations/rustev-jev/" }, nature: amending }
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
 depends_on:
   - "002-decision-contract-and-pure-core"
   - "003-runtime-execution-and-evidence"
@@ -59,7 +61,8 @@ obligations:
 # 022: Production transport and served identity for the Jev adapter (amends 012)
 
 Approved by the owner (A-21, 2026-10-16, under the 2026-10-16 delivery work
-order); implementation is pending, so this is not yet a claim about code. It
+order). The no-network stage that approval authorizes is implemented (see
+the implementation record); the live stages are externally blocked. It
 is the "separately approved spec 012 amendment" that backlog item RUSTEV-010
 names, and it makes spec 012 R-3 and owner decision R-28 item 2 concrete. Spec
 012's approved text is not edited; this spec records the change (R-16).
@@ -268,9 +271,24 @@ A Jev wire-compatible surface (R-05). Qualifying adapter-scoped batching
 
 ## Verification
 
-Pending with implementation. Approval authorizes the contract and the
-no-network implementation; no acceptance item is satisfied by approval or by
-the spec 012 Gateway evidence.
+Declared for `spec-spine verify 022`; 022 is in `make verify`, in CI's
+`integrations-core` acceptance group beside spec 012, whose crate it shares.
+Approval authorizes the contract and the no-network implementation; no
+acceptance item is satisfied by approval or by the spec 012 Gateway
+evidence. The two live tests are ignored and never run here.
+
+```verify:cli
+# 3.1 to 3.7 stage 1, 3.8 and section 5: eligibility, facts, pin and
+# tolerance, error codes, cost, reconciliation, evidence, plan preparation,
+# over loopback only (the tests assert no external host is reached).
+cargo test -p rustev-jev --test production --locked
+# Spec 012's development bindings keep their bytes and identities.
+cargo test -p rustev-jev --locked
+# 3.8.1: the adapter reads no environment variable for a credential.
+sh -c 'if grep -rnE "std::env|env::var|env!\(|option_env!" integrations/rustev-jev/src; then exit 1; fi'
+cargo run -p rustev-boundaries --locked --quiet
+cargo clippy -p rustev-jev --all-targets --locked -- -D warnings
+```
 
 ## Implementation record
 
@@ -299,6 +317,50 @@ the owner's spend authority), and therefore the recorded fixtures of
 acceptance item 3 and a verified direct mapping. Until then
 `JevBackend::new_production` refuses construction (`Unresolved`), and the two
 live tests are ignored with that reason.
+
+**Closure (2026-10-23).** Declared verification added (section
+Verification); 022 joins `VERIFIED_SPECS` and the `integrations-core`
+acceptance group. `implementation` stays `in-progress`: the no-network
+stage is delivered, but the Acceptance section also requires fixtures
+recorded from the direct API and stages 2 and 3 recorded with their
+spend, and those are externally blocked (below). Acceptance, item by
+item:
+
+- Stage 1 over loopback with zero external calls: `tests/production.rs`
+  (`assert_loopback_only`, `direct_fixture_matrix_records_each_served_identity`).
+- Section 5 negative cases: Gateway without accepted pinning and missing
+  privacy terms (`missing_stale_conflicting_and_invalid_facts_refuse_construction`,
+  `gateway_documentation_or_claimed_observations_cannot_enable_unverified_mapping`);
+  other and absent versions (`pinned_mismatched_missing_malformed_and_tolerated_versions`);
+  development fallback (`production_preparation_refuses_a_development_gateway_fallback`);
+  Gateway evidence cited for another identity
+  (`development_evidence_and_changed_bindings_require_requalification`);
+  signed billing difference (`billing_differences_are_signed_and_do_not_rewrite_the_journal`).
+- Fixtures for success, mismatch, declared tolerance, HTTP 400, 401, 403,
+  429, 500 and 503, and a response without cost: covered over the
+  synthetic mapping and spec 012's recorded Gateway exchanges
+  (`http_failures_and_no_cost_are_local_fixtures`,
+  `tests/fixtures/synthetic-022-direct.json`). Fixtures recorded from the
+  direct API are externally blocked (below).
+- Served identity on every attempt and the mismatch path: the pin and
+  matrix tests above.
+- Screening (3.8.4): not applicable as built. Spec 035's seam is not
+  delivered, the core exposes no `screen` operation, and the adapter
+  declares no screening capability; the item applies when it does.
+- No credential from environment or file: the host callback is the only
+  path (`callback_failure_is_unsent_and_journal_cap_precedes_callback`),
+  and the declared verification refuses any environment read in the
+  crate's sources.
+
+Externally blocked, never reported as passed: stage 2 (live smoke on the
+direct API, which yields the recorded direct-API fixtures and a verified
+mapping) and stage 3 (qualification of a production binding). Both need
+an owner-provided direct-API credential and spend under R-29's USD 5
+testing cap; neither ran, and no money was spent. Until they run,
+`JevBackend::new_production` refuses construction, so no binding is
+production-eligible. Delivering them needs a new mapping version and its
+recorded fixtures, which change the binding identity (3.6.2). 022 becomes
+`complete` only when both are recorded here with their spend.
 
 ## Questions settled at approval
 
