@@ -1002,6 +1002,13 @@ second file, determinism, the version rule, and the native package against
 itself. The service API has no member in this release (`rustev-serve` is
 excluded until spec 042 admits it), so it has nothing to diff.
 
+**Increment 9 part 3, 2026-10-24 (the family lifecycle's tests).**
+`tools/rustev-release/tests/family.rs` drives each rule with the fakes,
+with no network or credential: the signed manifest before any upload, the
+instruction's exact registries and artifacts, layer gating, ambiguity and
+spent versions at each layer, continuation, the hosted adapter's journal
+path, and the manifest's artifact rules.
+
 ## Decisions at approval
 
 1. **Crate and package names** (left to the implementer by #58): decided
