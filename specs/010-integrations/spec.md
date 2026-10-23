@@ -414,9 +414,9 @@ the crate moves from `absent` (planned members, each with a `kind`) to
 `excluded` (existing workspace packages outside the family, which carry a
 name and a reason only, like every other `excluded` entry); its image stays
 `absent`. Tests: `tests/handlers.rs` and
-`tests/transport.rs` over loopback, with committed test certificates and
-Sigstore fixtures under `tests/fixtures/` (delivered in the change after
-the sources, so each stays reviewable). Not in this increment: the gRPC
+`tests/transport.rs` over loopback, with test certificates generated at run time (`rcgen`, no key committed) and
+Sigstore fixtures under `tests/fixtures/` (the tests and fixtures land
+as their own change after the sources). Not in this increment: the gRPC
 transport (042 3.9), the image (3.16), the shared conformance cases
 (3.17) and anything that depends on specs 034 or 036; 010 stays in
 progress until they land. Open against spec 042 (needs an amendment, not decided here): a decision
