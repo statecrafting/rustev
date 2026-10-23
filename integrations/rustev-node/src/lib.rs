@@ -12,6 +12,7 @@
 
 mod errors;
 mod seams;
+mod telemetry;
 
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
@@ -25,7 +26,7 @@ use rustev_contract::definition::Definition;
 use rustev_contract::descriptor::BackendDescriptor;
 use rustev_contract::snapshot::Snapshot;
 use rustev_contract::time::Timestamp;
-use rustev_core::seams::CancelSignal;
+use rustev_core::seams::{CancelSignal, DecisionBackend, EvidenceSink};
 use rustev_runtime::{
     Clock, Completion, DecideError, DecisionRequest, Delivery, ManualClock, PreparedPlan,
     Rejection, Runtime, RuntimeConfig, SinkPolicy, TokioClock,
@@ -85,6 +86,7 @@ struct EngineInner {
     seams: Vec<Arc<seams::SeamStats>>,
     traces: seams::Traces,
     context: Option<Arc<seams::HostContext>>,
+    telemetry: Option<Arc<rustev_otel::OtelSink>>,
 }
 
 /// One engine: its runtime, its registered backends and its sink.
@@ -103,10 +105,14 @@ impl Engine {
         rules: Vec<RulesRegistration>,
         backends: Vec<seams::BackendSeam>,
         context_source: Option<seams::ContextSeam>,
+        telemetry: Option<telemetry::Options>,
     ) -> Result<Engine> {
         guard(|| {
             let workers = range("workerThreads", config.worker_threads, 1, 64)?;
             let blocking = range("blockingThreads", config.blocking_threads, 1, 512)?;
+            let telemetry = telemetry
+                .map(|t| telemetry::Prepared::parse(t, config.sink_timeout_ms))
+                .transpose()?;
             let traces: seams::Traces = Default::default();
             let sink = seams::HostSink::new(sink, traces.clone())?;
             let mut stats = vec![sink.stats.clone()];
@@ -133,39 +139,75 @@ impl Engine {
                     ));
                 }
             };
-            let mut b = Runtime::builder(
-                clock,
-                Arc::new(sink),
-                RuntimeConfig {
-                    max_in_flight: config.max_in_flight as usize,
-                    max_queued: config.max_queued as usize,
-                    max_parallel_requests: config.max_parallel_requests as usize,
-                    sink: SinkPolicy::FailDecision {
-                        timeout_ms: u64::from(config.sink_timeout_ms),
-                    },
-                },
-            );
+            let mut registrations: Vec<(Arc<dyn DecisionBackend>, usize)> = vec![];
             for r in rules {
                 let backend = rustev_backend_rules::RulesBackend::from_bytes(&r.program)
                     .map_err(|e| fail("InvalidDocument", "invalid_document", e.to_string()))?;
-                b = b.backend(Arc::new(backend), r.max_concurrency as usize);
+                registrations.push((Arc::new(backend), r.max_concurrency as usize));
             }
             for h in host_backends {
                 stats.push(h.stats.clone());
                 let max = h.max_concurrency;
-                b = b.backend(Arc::new(h), max);
+                registrations.push((Arc::new(h), max));
             }
-            let runtime = b.build().map_err(errors::config_error)?;
+            let build_runtime = |sink: Arc<dyn EvidenceSink>| {
+                let mut b = Runtime::builder(
+                    clock.clone(),
+                    sink,
+                    RuntimeConfig {
+                        max_in_flight: config.max_in_flight as usize,
+                        max_queued: config.max_queued as usize,
+                        max_parallel_requests: config.max_parallel_requests as usize,
+                        sink: SinkPolicy::FailDecision {
+                            timeout_ms: u64::from(config.sink_timeout_ms),
+                        },
+                    },
+                );
+                for (backend, max) in &registrations {
+                    b = b.backend(backend.clone(), *max);
+                }
+                b.build().map_err(errors::config_error)
+            };
+            let sink: Arc<dyn EvidenceSink> = Arc::new(sink);
+            // 049 3.2.5: validate runtime registration before threads or files.
+            // FailDecision starts no worker; reuse this runtime without telemetry.
+            let mut runtime = Arc::new(build_runtime(sink.clone())?);
+            let telemetry = telemetry
+                .map(|t| {
+                    let exporter = t.open_file()?;
+                    Ok::<_, napi::Error>((t, exporter))
+                })
+                .transpose()?;
             let rt = tokio::runtime::Builder::new_multi_thread()
                 .worker_threads(workers)
                 .max_blocking_threads(blocking)
                 .enable_all()
                 .build()
                 .map_err(|e| fail("InternalError", "internal", e.to_string()))?;
+            let telemetry = if let Some((t, exporter)) = telemetry {
+                let require_telemetry = t.require;
+                let telemetry_timeout_ms = t.timeout_ms;
+                let telemetry = t.build(&rt, manual.clone(), exporter)?;
+                runtime = Arc::new(build_runtime(Arc::new(rustev_otel::TeeSink {
+                    primary: sink,
+                    telemetry: telemetry.clone(),
+                    require_telemetry,
+                    telemetry_timeout_ms,
+                }))?);
+                // 049 3.3.4: weak observation avoids a runtime/sink cycle.
+                let observed = Arc::downgrade(&runtime);
+                telemetry.observe_runtime(move || {
+                    observed.upgrade().map(|r| r.gauges()).unwrap_or_default()
+                });
+                Some(telemetry)
+            } else {
+                None
+            };
             Ok(Engine {
                 inner: Arc::new(EngineInner {
                     rt,
-                    runtime: Arc::new(runtime),
+                    runtime,
+                    telemetry,
                     manual,
                     shut: AtomicBool::new(false),
                     in_flight: AtomicU64::new(0),
@@ -227,6 +269,10 @@ impl Engine {
                 .collect::<std::result::Result<Vec<_>, _>>()
                 .map_err(|e| fail("InvalidDocument", "invalid_document", e.to_string()))?;
             let compiled = rustev_core::compile(&def, &ds, &cs).map_err(errors::refusal)?;
+            // 049 3.5.1: register every compiled or loaded plan.
+            if let Some(t) = &self.inner.telemetry {
+                t.register_plan(&compiled.plan);
+            }
             let raw = compiled.canonical();
             let plan_id = compiled.id.to_string();
             let prepared = self
@@ -288,6 +334,10 @@ impl Engine {
                     serde_json::json!({ "detail": e.to_string() }),
                 )
             })?;
+            // 049 3.5.1: register every compiled or loaded plan.
+            if let Some(t) = &self.inner.telemetry {
+                t.register_plan(&compiled.plan);
+            }
             let raw = compiled.canonical();
             let plan_id = compiled.id.to_string();
             let prepared = self
@@ -443,7 +493,7 @@ impl Engine {
     #[napi]
     pub fn gauges(&self) -> serde_json::Value {
         let g = self.inner.runtime.gauges();
-        serde_json::json!({
+        let mut view = serde_json::json!({
             "inFlight": g.in_flight,
             "queued": g.queued,
             "rejected": g.rejected,
@@ -453,7 +503,83 @@ impl Engine {
                       "timedOut": g.sink.timed_out, "dropped": g.sink.dropped,
                       "queued": g.sink.queued, "inDelivery": g.sink.in_delivery },
             "seams": self.inner.seams.iter().map(|s| s.json()).collect::<Vec<_>>(),
+        });
+        if let Some(t) = &self.inner.telemetry {
+            view["telemetry"] = telemetry::stats(t.stats());
+        }
+        view
+    }
+
+    /// Forward a bounded exchange document (049 3.5.2).
+    #[napi]
+    pub fn record_exchange(&self, record: Uint8Array) -> Result<()> {
+        guard(|| {
+            self.live()?;
+            let t = self.telemetry_sink()?;
+            let record =
+                rustev_contract::remote::ExchangeRecord::parse_checked(&record).map_err(|_| {
+                    fail(
+                        "InvalidDocument",
+                        "invalid_document",
+                        serde_json::json!({"field": "record"}),
+                    )
+                })?;
+            t.record_exchange(&record);
+            Ok(())
         })
+    }
+
+    fn telemetry_sink(&self) -> Result<Arc<rustev_otel::OtelSink>> {
+        self.inner.telemetry.clone().ok_or_else(|| {
+            fail(
+                "ConfigRefused",
+                "telemetry_not_configured",
+                serde_json::json!({"field": "telemetry"}),
+            )
+        })
+    }
+
+    /// 049 3.5.3: JSONL takes no metrics; failures are outcomes.
+    #[napi]
+    pub async fn flush_telemetry_metrics(&self) -> Result<serde_json::Value> {
+        let t = guard(|| {
+            self.live()?;
+            self.telemetry_sink()
+        })?;
+        self.inner
+            .rt
+            .spawn(async move {
+                match t.flush_metrics().await {
+                    Ok(()) => serde_json::json!({"outcome": "not_taken"}),
+                    Err(reason) => serde_json::json!({"outcome": "lost", "reason": reason}),
+                }
+            })
+            .await
+            .map_err(|_| fail("InternalError", "internal", "telemetry task failed"))
+    }
+
+    /// 049 3.5.5: called after decisions drain, with the remaining budget.
+    #[napi]
+    pub async fn shutdown_telemetry(&self, remaining_ms: u32) -> Result<f64> {
+        let Some(t) = self.inner.telemetry.clone() else {
+            return Ok(0.0);
+        };
+        self.inner
+            .rt
+            .spawn(async move {
+                let count = |t: &rustev_otel::OtelSink| {
+                    t.stats()
+                        .decisions_lost
+                        .get("shutdown_unflushed")
+                        .copied()
+                        .unwrap_or(0)
+                };
+                let before = count(&t);
+                t.shutdown(u64::from(remaining_ms)).await;
+                count(&t).saturating_sub(before) as f64
+            })
+            .await
+            .map_err(|_| fail("InternalError", "internal", "telemetry task failed"))
     }
 
     /// Stop admission at once; in-flight decisions run on (the JavaScript
@@ -520,6 +646,8 @@ pub struct Request {
     pub snapshot: Option<Uint8Array>,
     /// A W3C Trace Context version 00 header (3.8).
     pub traceparent: Option<String>,
+    /// Printable ASCII, at most 512 bytes, with a parent (049 3.4.2).
+    pub tracestate: Option<String>,
     pub evaluation_time_ms: f64,
     pub deadline_ms: Option<f64>,
     pub principal_handle: Option<Uint8Array>,
@@ -594,6 +722,17 @@ impl PlanHandle {
                 serde_json::json!({ "traceparent": t }),
             ));
         }
+        if let Some(t) = &request.tracestate
+            && (request.traceparent.is_none()
+                || t.len() > 512
+                || !t.bytes().all(|b| (0x20..=0x7e).contains(&b)))
+        {
+            return Err(fail(
+                "InvalidTraceContext",
+                "invalid_tracestate",
+                serde_json::json!({"field": "tracestate"}),
+            ));
+        }
         // No snapshot: the context source's, fetched once before admission
         // (3.7); neither: refused before admission, nothing defaulted.
         let snapshot_bytes = match (&request.snapshot, &self.engine.context) {
@@ -666,11 +805,34 @@ impl PlanHandle {
         let runtime = self.engine.runtime.clone();
         let plan = self.plan.clone();
         let signal = cancel.signal.clone();
+        let telemetry = self.engine.telemetry.clone();
         let task = self.engine.rt.spawn(async move {
             let _counted = counted;
+            // 049 3.4: begin immediately before admission; abandon on every exit.
+            let (begun, _context) = guard(|| {
+                Ok(if let Some(t) = telemetry {
+                    let context = telemetry::ContextGuard(t.clone(), req.decision_id.clone());
+                    let begun = t
+                        .begin(
+                            &req.decision_id,
+                            request.traceparent.as_deref(),
+                            request.tracestate.as_deref(),
+                        )
+                        .ok();
+                    (begun, Some(context))
+                } else {
+                    (None, None)
+                })
+            })?;
             let r = runtime.decide(&plan, req, &signal).await;
             drop(trace);
-            decided(r)
+            guard(|| {
+                let mut result = decided(r)?;
+                result.trace = begun.map(
+                    |b| serde_json::json!({"traceId": b.trace_id, "rootSpanId": b.root_span_id}),
+                );
+                Ok(result)
+            })
         });
         task.await
             .map_err(|e| fail("InternalError", "internal", e.to_string()))?
@@ -762,6 +924,7 @@ pub struct DecideResult {
     pub evidence: Uint8Array,
     /// The sink's outcome, as its JSON.
     pub delivery: String,
+    pub trace: Option<serde_json::Value>,
 }
 
 /// The result of a decision, or its typed error (3.4.1).
@@ -792,6 +955,7 @@ fn decided(r: std::result::Result<rustev_runtime::Decided, DecideError>) -> Resu
                 judgment,
                 evidence: Uint8Array::new(bytes(d.record.record_canonical())?),
                 delivery: delivery.to_string(),
+                trace: None,
             })
         }
         Err(DecideError::Rejected(r)) => Err(match r {
