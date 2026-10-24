@@ -215,6 +215,14 @@ sh -c 'for d in crates tools; do [ -d "$d" ] || continue; if grep -rnE "(struct|
 
 ## Implementation record
 
+- 2026-10-24: `make landing-status` orders each action class by cost of
+  delay (1, plus the specs a spec unblocks, plus its place in the owner's
+  release order: 031 4, 034 3, 035 and 036 2), then by age. It lists the
+  approved specs being built with their open PRs, most costly first, and
+  marks one in progress with no open PR as stalled. It caps speculative work
+  (at most 4 stacked PRs and stacks 2 deep): past the cap it names the PRs
+  to land before anything new is opened on a stack. It also counts PRs
+  failing only the AI review, which usually means the reviewer is failing.
 - 2026-10-24: `make landing-status` reads the default branch's merge queue.
   A pull request in the queue is `merging` with its position and state, or
   `fix` when its merge group failed, instead of "enable auto-merge" (GitHub

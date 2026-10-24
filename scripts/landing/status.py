@@ -28,6 +28,13 @@ NOW = datetime.now(timezone.utc)
 RANK = {"retarget": 0, "approve": 1, "fix": 2, "update": 3, "auto-merge": 4,
         "hazard": 5, "running": 6, "merging": 7, "stacked": 8, "draft": 9}
 QUIET = ("running", "merging", "stacked", "draft")
+# The owner's release order (2026-10-24): 031, then 034, then 035 and 036.
+# A spec on it costs more to delay than its unlock count alone says.
+RELEASE_WEIGHT = {"031": 4, "034": 3, "035": 2, "036": 2}
+# A cap on speculative work: PRs stacked on unmerged PRs. Past it, land the
+# bottom of a stack before opening anything above it.
+MAX_STACK_DEPTH = 2
+MAX_STACKED = 4
 
 
 def gh(*args):
@@ -67,6 +74,42 @@ def unlocks(plan):
                 reach(nxt, seen)
         return seen
     return {spec: len(reach(spec, set())) for spec in direct}
+
+
+def cost_of_delay(spec, weight):
+    """Value lost per hour a spec's PR waits: itself, what it unblocks, and
+    its place in the release order."""
+    return 1 + weight.get(spec, 0) + RELEASE_WEIGHT.get(spec, 0)
+
+
+def stack_depth(pr, by_head):
+    """How many unmerged PRs lie beneath this one (0 when it targets main),
+    and the PR at the bottom of its stack."""
+    depth, bottom, seen = 0, pr, set()
+    while bottom["baseRefName"] != DEFAULT and bottom["baseRefName"] in by_head:
+        if bottom["number"] in seen:
+            break
+        seen.add(bottom["number"])
+        bottom = by_head[bottom["baseRefName"]]
+        depth += 1
+    return depth, bottom
+
+
+def finishing(specs, items, weight):
+    """Approved specs being built (in progress, or pending with an open PR),
+    most costly to leave unfinished first, with their open PRs; one in
+    progress with none is stalled."""
+    rows = []
+    for s in specs:
+        spec = s["id"][:3]
+        prs = [i["pr"] for i in items if i["spec"] == spec]
+        if s.get("status") != "approved" or s.get("implementation") not in ("in-progress", "pending"):
+            continue
+        if s.get("implementation") == "pending" and not prs:
+            continue
+        rows.append({"spec": s["id"], "cod": cost_of_delay(spec, weight), "prs": prs})
+    rows.sort(key=lambda r: (-r["cod"], r["spec"]))
+    return rows
 
 
 def review_verdict(number):
@@ -177,6 +220,10 @@ def metrics(prs, items, waiting_runs, open_heads, specs):
         "stacked_waiting_runs (approving is wasted)": wasted,
         "superseded_waiting_runs": sum(1 for r in waiting_runs
                                        if r["event"] == "pull_request" and r["head_sha"] not in open_heads),
+        # Several PRs failing only the AI review at once is usually the
+        # reviewer, not the code: read one job log before fixing anything.
+        "ai_review_failed_prs": sum(1 for i in items if i["action"] == "fix"
+                                    and i["detail"].startswith("failed: ai-review / review")),
         "merged_to_main_7d": to_main,
         "merged_to_intermediate_7d": len(merged) - to_main,
         "specs_complete_on_main": sum(1 for s in approved if s.get("implementation") == "complete"),
@@ -217,16 +264,25 @@ def main():
     for pr in prs:
         action, detail = classify(pr, by_head, waiting, queued)
         spec = (re.search(r"\((\d{3})", pr["title"]) or [None, "---"])[1]
+        depth, bottom = stack_depth(pr, by_head)
         item = {"pr": pr["number"], "spec": spec, "unlocks": weight.get(spec, 0),
-                "action": action, "detail": detail, "base": pr["baseRefName"],
+                "cod": cost_of_delay(spec, weight), "depth": depth,
+                "bottom": bottom["number"], "action": action, "detail": detail, "base": pr["baseRefName"],
                 "created": pr["createdAt"], "title": pr["title"], "url": pr["url"]}
         if action == "approve":
             verdict = review_verdict(pr["number"])
             run = waiting[pr["headRefOid"]]
             item.update(reason=approval_reason(pr["number"], verdict), run=run["html_url"])
         items.append(item)
-    items.sort(key=lambda i: (RANK[i["action"]], -i["unlocks"], i["spec"], i["pr"]))
-    report = {"actions": items, "metrics": metrics(prs, items, waiting_runs, open_heads, specs)}
+    # Within an action class, the costliest delay first, then the oldest.
+    items.sort(key=lambda i: (RANK[i["action"]], -i["cod"], i["created"], i["pr"]))
+    stacked = [i for i in items if i["depth"] > 0]
+    over = sorted({i["bottom"] for i in stacked if i["depth"] > MAX_STACK_DEPTH})
+    report = {"actions": items, "finishing": finishing(specs, items, weight),
+              "speculative": {"stacked": len(stacked), "cap": MAX_STACKED,
+                              "max_depth": max((i["depth"] for i in items), default=0),
+                              "depth_cap": MAX_STACK_DEPTH, "land_first": over},
+              "metrics": metrics(prs, items, waiting_runs, open_heads, specs)}
 
     # Only pull-request runs: a release dispatch waiting on its own
     # Environment is never superseded by a pull request.
@@ -245,19 +301,30 @@ def main():
         json.dump(report, sys.stdout, indent=2)
         print()
         return 1 if report.get("cancel_failed") else 0
-    print("Next useful actions (most unblocking first):")
+    print("Next useful actions (by action, then costliest delay):")
     n = 0
     for i in items:
         if i["action"] in QUIET:
             continue
         n += 1
-        print(f"{n:3}. #{i['pr']} [{i['spec']}, unlocks {i['unlocks']}] {i['action']}: {i['detail']}")
+        print(f"{n:3}. #{i['pr']} [{i['spec']}, unlocks {i['unlocks']}, cost of delay {i['cod']}/h] {i['action']}: {i['detail']}")
     if not n:
         print("  (nothing actionable: every PR is running, merging or waiting on a parent)")
     print("\nIn flight:")
     for i in items:
         if i["action"] in QUIET:
             print(f"     #{i['pr']} [{i['spec']}] {i['detail']}")
+    print("\nFinish first (approved specs in progress, costliest delay first):")
+    for r in report["finishing"]:
+        prs = ", ".join(f"#{n}" for n in r["prs"]) or "no open PR: stalled"
+        print(f"     {r['spec']} (cost of delay {r['cod']}/h): {prs}")
+    sp = report["speculative"]
+    print(f"\nSpeculative work: {sp['stacked']} stacked PR(s) (cap {sp['cap']}), "
+          f"deepest stack {sp['max_depth']} (cap {sp['depth_cap']})")
+    if sp["stacked"] > sp["cap"] or sp["land_first"]:
+        bottoms = ", ".join(f"#{n}" for n in sp["land_first"])
+        print("     over the cap: open nothing new on a stack"
+              + (f"; land {bottoms} first" if bottoms else ""))
     queue = [i for i in items if i["action"] == "approve"]
     if queue:
         print("\nApproval queue (statecraft-review-exception):")
