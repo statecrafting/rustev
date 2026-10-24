@@ -1,0 +1,1 @@
+{"code":"variant-required","command":"plan compile","detail":"a declared variant is required","stage":"instantiate","status":"refused","subject":"definition:parameterized@2.1.0"}

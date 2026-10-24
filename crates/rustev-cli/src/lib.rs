@@ -85,6 +85,7 @@ fn usage_exit(u: args::Usage) -> Exit {
 }
 
 fn dispatch(p: &Parsed, cx: &Context) -> Result<Done, args::Usage> {
+    plan::validate(p)?;
     if let Err(e) = deps::check_counts(p) {
         return Ok(Done::io(&p.name(), e));
     }
@@ -103,6 +104,8 @@ fn dispatch(p: &Parsed, cx: &Context) -> Result<Done, args::Usage> {
         ["plan", "check"] => plan::check(p),
         ["plan", "compile"] => plan::compile_cmd(p),
         ["plan", "show"] => plan::show(p),
+        ["plan", "diff"] => plan::diff(p),
+        ["profile", "check"] => plan::profile(p),
         _ => return args::usage(format!("{} is not implemented yet", p.name())),
     };
     Ok(r.unwrap_or_else(|d| d))

@@ -1,0 +1,37 @@
+{
+  "argv": [
+    "plan",
+    "show",
+    "--plan",
+    "plan",
+    "--descriptor",
+    "descriptor"
+  ],
+  "command": "plan show",
+  "derived": [],
+  "exit": 0,
+  "id": "parameterized.show",
+  "inputs": [
+    {
+      "name": "descriptor",
+      "path": "tools/rustev-conformance/fixtures/cli/parameterized.show/descriptor",
+      "sha256": "5d861e23090bbf7d6f47572ca7cf4bb7d8aeda054baa90ec75a316d7622f0d28"
+    },
+    {
+      "name": "plan",
+      "path": "tools/rustev-conformance/fixtures/cli/parameterized.show/plan",
+      "sha256": "87b3a64a2c71acdea9df8d94057c4ac261fa79cb9d2b6bb5ac62d23641347a5a"
+    }
+  ],
+  "outputs": [
+    {
+      "golden": "crates/rustev-cli/tests/golden/parameterized.show.json",
+      "normalize": [],
+      "sha256": "821f80e7b250a467f4a80515d2a5d17e8f70a6c72c8634cd1447cc1f3f5660e5",
+      "stream": "stdout"
+    }
+  ],
+  "surfaces": [
+    "cli"
+  ]
+}

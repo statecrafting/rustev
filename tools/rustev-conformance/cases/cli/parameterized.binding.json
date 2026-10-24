@@ -1,0 +1,45 @@
+{
+  "argv": [
+    "plan",
+    "diff",
+    "--left-plan",
+    "left",
+    "--right-plan",
+    "right",
+    "--out",
+    "diff"
+  ],
+  "command": "plan diff",
+  "derived": [],
+  "exit": 0,
+  "id": "parameterized.binding",
+  "inputs": [
+    {
+      "name": "left",
+      "path": "tools/rustev-conformance/fixtures/cli/parameterized.binding/left",
+      "sha256": "87b3a64a2c71acdea9df8d94057c4ac261fa79cb9d2b6bb5ac62d23641347a5a"
+    },
+    {
+      "name": "right",
+      "path": "tools/rustev-conformance/fixtures/cli/parameterized.binding/right",
+      "sha256": "26a965459f0faa56f1d9d2e3d2b175ed701c6a50af8c2bc6e67438226844113d"
+    }
+  ],
+  "outputs": [
+    {
+      "golden": "crates/rustev-cli/tests/golden/parameterized.binding.json",
+      "normalize": [],
+      "sha256": "fd614d49fb59b833e131eca619534cfde54d212a346c5dca2774840425549564",
+      "stream": "stdout"
+    },
+    {
+      "file": "diff",
+      "golden": "crates/rustev-cli/tests/golden/parameterized.binding.document.json",
+      "normalize": [],
+      "sha256": "f94a90725c995248f98d304bc010c82fc9ab7985bba20f790889d09061c1ea76"
+    }
+  ],
+  "surfaces": [
+    "cli"
+  ]
+}

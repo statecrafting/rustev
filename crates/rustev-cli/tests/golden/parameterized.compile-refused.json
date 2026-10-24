@@ -1,0 +1,1 @@
+{"category":11,"category_name":"invalid_definition","command":"plan compile","detail":"negative weight for \"preference\"","parameters":["threshold"],"shortfalls":[],"stage":"compile","status":"refused","subject":"step:ranking"}

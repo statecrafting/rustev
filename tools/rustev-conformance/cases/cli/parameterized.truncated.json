@@ -1,0 +1,45 @@
+{
+  "argv": [
+    "plan",
+    "diff",
+    "--left-plan",
+    "left",
+    "--right-plan",
+    "right",
+    "--out",
+    "diff"
+  ],
+  "command": "plan diff",
+  "derived": [],
+  "exit": 0,
+  "id": "parameterized.truncated",
+  "inputs": [
+    {
+      "name": "left",
+      "path": "tools/rustev-conformance/fixtures/cli/parameterized.truncated/left",
+      "sha256": "9ae815457d97947418fdd6a4e95c9246c44b4d706e3cebe6d70199f3dbd38db6"
+    },
+    {
+      "name": "right",
+      "path": "tools/rustev-conformance/fixtures/cli/parameterized.truncated/right",
+      "sha256": "fb297389b066999f58b5cfa531e0d9974cd889d0f04ee18336163c6e75fd792e"
+    }
+  ],
+  "outputs": [
+    {
+      "golden": "crates/rustev-cli/tests/golden/parameterized.truncated.json",
+      "normalize": [],
+      "sha256": "554c3f15b303acfe9a4a28e80a6f4c2ec716c0236114f9e00354b1c6760fb790",
+      "stream": "stdout"
+    },
+    {
+      "file": "diff",
+      "golden": "crates/rustev-cli/tests/golden/parameterized.truncated.document.json",
+      "normalize": [],
+      "sha256": "911eb6020c26fdb39424c8725ccc730d68c1dca831182f603f38db2d5015bd9b"
+    }
+  ],
+  "surfaces": [
+    "cli"
+  ]
+}

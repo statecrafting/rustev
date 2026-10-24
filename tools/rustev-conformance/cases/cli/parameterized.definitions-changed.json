@@ -1,0 +1,63 @@
+{
+  "argv": [
+    "plan",
+    "diff",
+    "--definition",
+    "template",
+    "--left-profile",
+    "on",
+    "--right-profile",
+    "off",
+    "--left-variant",
+    "interactive",
+    "--right-variant",
+    "interactive",
+    "--descriptor",
+    "descriptor",
+    "--out",
+    "diff"
+  ],
+  "command": "plan diff",
+  "derived": [],
+  "exit": 0,
+  "id": "parameterized.definitions-changed",
+  "inputs": [
+    {
+      "name": "descriptor",
+      "path": "tools/rustev-conformance/fixtures/cli/parameterized.definitions-changed/descriptor",
+      "sha256": "5d861e23090bbf7d6f47572ca7cf4bb7d8aeda054baa90ec75a316d7622f0d28"
+    },
+    {
+      "name": "off",
+      "path": "tools/rustev-conformance/fixtures/cli/parameterized.definitions-changed/off",
+      "sha256": "d4a942725d43a676318a9cac901060403c3c73d9522ec8a3c072a88162e0b387"
+    },
+    {
+      "name": "on",
+      "path": "tools/rustev-conformance/fixtures/cli/parameterized.definitions-changed/on",
+      "sha256": "ad1570bb139e5e815618ecc1ad0b8e267c65fb9d12ea2d96eb59e3eca2986506"
+    },
+    {
+      "name": "template",
+      "path": "tools/rustev-conformance/fixtures/cli/parameterized.definitions-changed/template",
+      "sha256": "09a8b70bdc06bd90af540bee48d60e3c2442c1a36ca32636b66335e33785f04a"
+    }
+  ],
+  "outputs": [
+    {
+      "golden": "crates/rustev-cli/tests/golden/parameterized.definitions-changed.json",
+      "normalize": [],
+      "sha256": "9ba457e0bf2a9a2d9d00ab39a2aeba070f47063acc51aff5c4f4f2d9df3d69e3",
+      "stream": "stdout"
+    },
+    {
+      "file": "diff",
+      "golden": "crates/rustev-cli/tests/golden/parameterized.definitions-changed.document.json",
+      "normalize": [],
+      "sha256": "288da23a971a981c6dcdeedf0869d811b3fbfd323591a7b43b36266aa13230ca"
+    }
+  ],
+  "surfaces": [
+    "cli"
+  ]
+}

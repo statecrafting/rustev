@@ -92,7 +92,18 @@ pub fn before(dir: &Path, args: &[&str]) {
         .iter()
         .position(|a| a.starts_with('-'))
         .unwrap_or(args.len());
-    for a in &args[first_flag..] {
+    for (index, a) in args.iter().enumerate().skip(first_flag) {
+        // Variant selectors are names, even when a same-named file exists.
+        // Check the flag for this occurrence: a plan path may use that same
+        // value elsewhere in the invocation and must still be harvested.
+        if index > 0
+            && matches!(
+                args[index - 1],
+                "--variant" | "--left-variant" | "--right-variant"
+            )
+        {
+            continue;
+        }
         // Every existing path an argument names is an input, an `--out`
         // that already exists included: the no-clobber cases need it there
         // for the CLI to refuse it.
@@ -245,7 +256,10 @@ pub fn golden(name: &str, bytes: &[u8]) {
                 command_of(&seen.args).as_str(),
                 "baseline record" | "eval reproducibility" | "eval diff" | "gate select"
             );
-        let surfaces = if repeat {
+        // Spec 034 increment 5 exposes parameterized commands only through
+        // the CLI; binding exposure belongs to a later increment.
+        let parameterized = name.starts_with("parameterized.");
+        let surfaces = if repeat || parameterized {
             json!(["cli"])
         } else if pure {
             json!(["cli", "native", "wasm"])
