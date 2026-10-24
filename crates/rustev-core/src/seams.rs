@@ -12,6 +12,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 use std::task::{Context, Poll, Waker};
 
+use rustev_contract::acquisition::AcquisitionRequest;
 use rustev_contract::descriptor::BackendDescriptor;
 use rustev_contract::dynamic::{DynamicCapability, DynamicOutcome, DynamicRawOutput, TemplateRef};
 use rustev_contract::eval_report::EvalReport;
@@ -19,6 +20,7 @@ use rustev_contract::output::RawOutput;
 use rustev_contract::remote::ServedIdentity;
 use rustev_contract::run::{Charge, CostBound, CostModel, RunRecord};
 use rustev_contract::snapshot::Snapshot;
+use rustev_contract::source::SourceDescriptor;
 use rustev_contract::time::DurationMs;
 
 /// A boxed future, so the traits stay object-safe without an executor.
@@ -391,4 +393,38 @@ mod tests {
         let late = parent.child();
         assert!(late.is_raised(), "a child of a raised signal starts raised");
     }
+}
+
+/// An acquisition adapter. Dispatch belongs to the caller, never to the core.
+/// Its future uses only std and has no executor or runtime dependency.
+pub trait AcquisitionSource: Send + Sync {
+    fn descriptor(&self) -> &SourceDescriptor;
+    fn cost_bound(&self, request: &AcquisitionRequest) -> CostBound;
+    fn acquire<'a>(&'a self, call: AcquireCall<'a>) -> BoxFuture<'a, AcquireReport>;
+}
+
+/// One acquisition attempt, with the core's canonical request and identity.
+pub struct AcquireCall<'a> {
+    pub operation: &'a str,
+    pub request: &'a rustev_contract::acquisition::AcquisitionRequest,
+    pub request_id: &'a rustev_contract::ids::AcquisitionRequestId,
+    pub attempt_id: &'a str,
+    pub cancel: CancelSignal,
+    pub cx: &'a CallContext,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AcquisitionFailure {
+    Transient,
+    Overloaded,
+    Permanent,
+    Denied,
+}
+
+/// Raw page bytes are always validated by the core before becoming values.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AcquireReport {
+    pub result: Result<Vec<u8>, (AcquisitionFailure, String)>,
+    pub charge: Charge,
+    pub cancel: CancelAck,
 }

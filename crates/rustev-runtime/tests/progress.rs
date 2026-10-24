@@ -60,6 +60,7 @@ async fn observer_and_panicking_observer_leave_record_and_judgment_bytes_identic
                 assert_eq!(events[0].outcome, Ok(()));
                 assert_eq!(events[0].derivation, *derivation);
             }
+            StepStatus::Skipped { .. } => panic!("fixture is not skipped"),
             StepStatus::Unresolved(reason) => assert_eq!(events[0].outcome, Err(reason.clone())),
         }
     }

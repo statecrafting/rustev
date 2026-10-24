@@ -4736,6 +4736,11 @@ export namespace RustevEvidence2 {
       }
     | {
         unresolved: Unresolved;
+      }
+    | {
+        skipped: {
+          guard: string;
+        };
       };
 
   export interface RustevEvidence2 {
@@ -15844,6 +15849,11 @@ export namespace RustevRun3 {
       }
     | {
         unresolved: Unresolved;
+      }
+    | {
+        skipped: {
+          guard: string;
+        };
       };
   export type FinalCost = "known" | "includes_estimates" | "unknown";
   export type CostMode = "unlimited" | "hard" | "estimated";

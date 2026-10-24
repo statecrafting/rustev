@@ -21,6 +21,7 @@ use std::collections::{BTreeMap, BTreeSet};
 #[derive(Debug, Clone)]
 pub(crate) struct Acquisition {
     pub ty: Ty,
+    pub operations: Vec<Operation>,
     pub plan: PlanAcquisition,
     pub tree: Ceil,
     pub reads: Vec<Read>,
@@ -598,6 +599,7 @@ pub(crate) fn compile(
         outcomes.push(Outcome::InsufficientGrade);
     }
     Ok(Acquisition {
+        operations: bound.iter().map(|(_, o)| (*o).clone()).collect(),
         ty: record(value_fields),
         tree,
         reads,

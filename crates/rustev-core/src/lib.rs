@@ -42,7 +42,9 @@ pub use compile::{
     Category, Compiled, LoadError, Refusal, compile, compile_bytes, compile_with,
     compile_with_sources, compile_with_templates,
 };
-pub use evaluate::{Evaluation, FailureContext, RequestIdentityError, SemanticRequest, Supplied};
+pub use evaluate::{
+    Evaluation, FailureContext, PendingAcquisition, RequestIdentityError, SemanticRequest, Supplied,
+};
 
 #[cfg(feature = "parameterized")]
 pub use instantiate::{ProfiledRefusal, compile_profiled, compile_profiled_with, instantiate};

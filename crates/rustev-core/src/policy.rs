@@ -22,6 +22,9 @@ pub(crate) enum Seen<'a> {
 
 /// What the policy can look up.
 pub(crate) trait View {
+    fn skipped(&self, _r: &str) -> bool {
+        false
+    }
     /// `Ok(value)`, or the unresolved reason, for `input:`/`step:` refs.
     fn get(&self, r: &str) -> Result<Seen<'_>, Unresolved>;
     fn scope(&self) -> Scope<'_>;
@@ -118,7 +121,9 @@ impl<V: View> Run<'_, V> {
                 }
                 for r in &refs {
                     self.read(r);
-                    self.view.get(r)?;
+                    if !self.view.skipped(r) {
+                        self.view.get(r)?;
+                    }
                 }
                 eval_predicate(p, &self.view.scope())
                     .map_err(|f| Unresolved::invalid([], format!("{f:?}")))?
@@ -251,6 +256,41 @@ pub(crate) fn evaluate<V: View>(policy: &PolicyDecl, view: &V) -> PolicyResult {
     let mut handled: BTreeSet<&str> = BTreeSet::new();
     for (i, h) in policy.on_unresolved.iter().enumerate() {
         if handled.contains(h.target.as_str()) {
+            continue;
+        }
+        if view.skipped(&h.target) {
+            let matches = match &h.reasons {
+                ReasonSet::Any => true,
+                ReasonSet::Only(v) => v.contains(&rustev_contract::definition::ReasonKind::Skipped),
+            };
+            if !matches {
+                continue;
+            }
+            handled.insert(&h.target);
+            run.read(&h.target);
+            trace.push(format!("on_unresolved[{i}]"));
+            match &h.action {
+                HandlerAction::AsUnmet => {
+                    run.unmet.insert(h.target.clone());
+                }
+                HandlerAction::Escalate { reason } => {
+                    return decided(
+                        Outcome::Escalate {
+                            reason: reason.clone(),
+                        },
+                        run,
+                        trace,
+                        format!("handler:{i}"),
+                        Some(i),
+                    );
+                }
+                HandlerAction::Propagate
+                | HandlerAction::PropagateWith { .. }
+                | HandlerAction::NeedsInput { .. } => {
+                    // Unreachable for compiled policies: spec 036, 3.8.3
+                    // refuses these actions when they cover a skipped value.
+                }
+            }
             continue;
         }
         let Err(u) = view.get(&h.target) else {

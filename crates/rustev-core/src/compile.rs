@@ -1532,21 +1532,28 @@ fn compile_generation(
                             &env,
                         )
                         .map_err(km)?,
-                        Ref::Step(n) => match &step_tys[&n] {
-                            StepTy::Exact(
-                                Ty::Filtered { .. } | Ty::Shortlist { .. } | Ty::Ranking { .. },
-                            ) => {
+                        Ref::Step(n) => {
+                            let base = if v2 { crate::expr::split_step(&n).0 } else { n };
+                            match step_tys.get(&base) {
+                                Some(StepTy::Semantic(..)) => {
+                                    return Err(km(format!(
+                                        "{r} is semantic; only exact values are projected"
+                                    )));
+                                }
+                                Some(StepTy::Exact(_)) => {}
+                                None => return Err(km(format!("{r} is not a declared step"))),
+                            }
+                            let t = crate::expr::ref_ty(r, &env).map_err(km)?;
+                            if matches!(
+                                t,
+                                Ty::Filtered { .. } | Ty::Shortlist { .. } | Ty::Ranking { .. }
+                            ) {
                                 return Err(km(format!(
                                     "{r} is a filter, shortlist or ranking summary; project its ids through for_each instead"
                                 )));
                             }
-                            StepTy::Exact(t) => t.clone(),
-                            StepTy::Semantic(..) => {
-                                return Err(km(format!(
-                                    "{r} is semantic; only exact values are projected"
-                                )));
-                            }
-                        },
+                            t
+                        }
                         _ => return Err(km(format!("{r} cannot be projected"))),
                     };
                     value_bytes = value_bytes
@@ -2607,7 +2614,10 @@ fn possible_reasons(
 }
 
 // Presence probes consume the existence of a value, not a skipped value.
-fn predicate_value_refs(p: &rustev_contract::definition::Predicate, out: &mut Vec<String>) {
+pub(crate) fn predicate_value_refs(
+    p: &rustev_contract::definition::Predicate,
+    out: &mut Vec<String>,
+) {
     use rustev_contract::definition::Predicate as P;
     match p {
         P::Present(_) | P::IsConstructed { .. } => {}
@@ -2624,7 +2634,7 @@ fn condition_value_refs(c: &Cond, out: &mut Vec<String>) {
         c => condition_refs(c, out),
     }
 }
-fn probe_only(args: &OpArgs, target: &str) -> bool {
+pub(crate) fn probe_only(args: &OpArgs, target: &str) -> bool {
     if let OpArgs::Compare(c) = args {
         let mut values = vec![];
         predicate_value_refs(&c.predicate, &mut values);
@@ -2726,8 +2736,10 @@ fn check_policy(
             ReasonSet::Any => ReasonKind::ALL.into_iter().collect(),
             ReasonSet::Only(v) => v.iter().copied().collect(),
         };
-        if h.action == HandlerAction::Propagate
-            && set.contains(&ReasonKind::Skipped)
+        if !matches!(
+            h.action,
+            HandlerAction::AsUnmet | HandlerAction::Escalate { .. }
+        ) && set.contains(&ReasonKind::Skipped)
             && reasons
                 .get(&h.target)
                 .is_some_and(|r| r.contains(&ReasonKind::Skipped))
