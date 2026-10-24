@@ -225,7 +225,7 @@ async fn retention_corruption_scope_and_plan_mismatch() {
     assert_eq!(err.code, RefusalCode::PlanMismatch);
 }
 #[tokio::test]
-async fn cancelled_redacted_and_unimplemented() {
+async fn cancelled_and_redacted() {
     let mut r = support(true).await;
     let p = RedactionPolicy {
         schema: rustev_contract::redaction::REDACTION.into(),
@@ -265,18 +265,6 @@ async fn cancelled_redacted_and_unimplemented() {
             Availability::NotAvailable(Unavailable::NotProduced {})
         ));
     }
-    let bytes = r.run.record_canonical().unwrap();
-    let e = explain(
-        &Evidence::Record {
-            record: &bytes,
-            plan: None,
-        },
-        &Query::Diff,
-        &ExplainOptions::default(),
-    )
-    .unwrap_err();
-    assert_eq!(e.code, RefusalCode::InvalidQuery);
-    assert_eq!(e.detail, "not yet implemented");
 }
 
 #[tokio::test]

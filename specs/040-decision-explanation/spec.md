@@ -1123,6 +1123,18 @@ dispatch arm, reusing the scope walk of 3.6.1 (`scopes`), now shared by
 `crates/rustev-eval/tests/explain_excluded.rs` and `explain_order.rs`;
 only `diff` is still refused as `invalid-query`.
 
+**Increment 5 (`diff` and the Markdown rendering).** `explain_diff(a, b,
+options)` builds 3.11: the comparison order, the mixed form, the first
+divergence, follows-from, the 10 000 difference cap and the `withheld`
+answer under a policy that withholds `enum` values. `explain` with
+`Query::Diff` over a single evidence set is refused as `invalid-query`,
+directing the caller to `explain_diff`; no query is refused any longer for
+being unbuilt. `render_markdown` builds 3.14 for every query, escaping
+pipes and backticks. Tests: `crates/rustev-eval/tests/explain_diff.rs` and
+`explain_render.rs`, the latter over runtime-produced records for each
+query. The `explain` module stays hidden from the documentation until the
+CLI increment publishes the surface.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

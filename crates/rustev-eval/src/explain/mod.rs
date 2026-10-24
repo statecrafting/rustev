@@ -1,5 +1,9 @@
 //! Pure explanations of retained decision evidence (spec 040).
 mod bounds;
+mod diff;
+mod render;
+pub use diff::explain_diff;
+pub use render::render_markdown;
 mod evidence;
 mod excluded;
 mod facts;
@@ -71,20 +75,8 @@ pub fn explain(
     query
         .validate()
         .map_err(|c| ExplainError::new(c, "query", "invalid query"))?;
-    if !matches!(
-        query,
-        Query::WhyOutcome
-            | Query::TextOrigin
-            | Query::Models
-            | Query::WhySelected { .. }
-            | Query::WhyExcluded { .. }
-            | Query::WhyOrder { .. }
-    ) {
-        return Err(ExplainError::new(
-            RefusalCode::InvalidQuery,
-            "query",
-            "not yet implemented",
-        ));
+    if matches!(query, Query::Diff) {
+        return Err(diff_requires_pair());
     }
     if let Some(p) = options.redaction {
         p.validate()
@@ -107,10 +99,21 @@ fn dispatch(b: &mut facts::Builder<'_>, query: &Query) -> Result<Answer, Explain
             a: Item::String(a),
             b: Item::String(c),
         } => order::build(b, a, c),
-        _ => Err(ExplainError::new(
+        Query::Diff => Err(diff_requires_pair()),
+        // `WhySelected { item }` above takes every item kind, withheld ones
+        // included, so only these two remain.
+        Query::WhyExcluded { .. } | Query::WhyOrder { .. } => Err(ExplainError::new(
             RefusalCode::InvalidQuery,
             "query",
-            "not yet implemented",
+            "query items must be strings",
         )),
     }
+}
+
+fn diff_requires_pair() -> ExplainError {
+    ExplainError::new(
+        RefusalCode::InvalidQuery,
+        "query",
+        "use explain_diff with two evidence sets",
+    )
 }
