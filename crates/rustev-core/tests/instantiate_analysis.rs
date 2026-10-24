@@ -461,3 +461,43 @@ fn enabled_and_distribution_sites_and_canonical_identity() {
             .contains("/threshold")
     );
 }
+
+#[test]
+fn base_profile_values_obey_locks_and_bounds_before_leaf_overrides() {
+    let mut t = template();
+    let mut leaf = profile();
+    leaf["extends"] = json!("base@1.0.0");
+    let mut base = profile();
+    base["profile"] = json!("base");
+    base["values"]["pool_target"] = json!(20);
+    t["parameters"][0]["lock"] = json!("fixed");
+    t["parameters"][0]["bounds"] = json!("none");
+    let e = code(
+        run(from_ref(&t), Some(&leaf), from_ref(&base), None, None),
+        C::ParameterLocked,
+    );
+    assert_eq!(e.subject, "parameter:pool_target");
+    assert!(e.detail.contains("base@1.0.0"));
+    base["values"] = json!({});
+    assert!(run(from_ref(&t), Some(&leaf), from_ref(&base), None, None).is_ok());
+
+    t = template();
+    leaf["values"]["pool_target"] = json!(20);
+    base["values"]["pool_target"] = json!(101);
+    let e = code(
+        run(from_ref(&t), Some(&leaf), from_ref(&base), None, None),
+        C::ParameterOutOfBounds,
+    );
+    assert_eq!(e.subject, "parameter:pool_target");
+    assert!(e.detail.contains("base@1.0.0"));
+    assert!(e.detail.contains("101") && e.detail.contains("range"));
+    for bound in [5, 100] {
+        base["values"]["pool_target"] = json!(bound);
+        let a = run(from_ref(&t), Some(&leaf), from_ref(&base), None, None).unwrap();
+        assert_eq!(a.overlay.parameters[0].value, 20);
+        assert_eq!(
+            a.overlay.parameters[0].source,
+            ParameterSource::Profile("tenant@1.0.0".into())
+        );
+    }
+}

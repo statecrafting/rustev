@@ -96,10 +96,18 @@
           "kind": "file",
           "path": "Makefile"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "directory",
+          "path": "scripts/acceptance/"
+        }
       }
     ],
     "id": "034-parameterized-definitions",
-    "implementation": "in-progress",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-16-compatibility",
@@ -161,7 +169,7 @@
       }
     ],
     "sectionDigests": {
-      "034-parameterized-definitions-variants-and-tenant-profiles-amends-002-and-006": "465bc2aa60914d983e533375fae56d4bae1247ca145266a3f65aafbc5036d38c",
+      "034-parameterized-definitions-variants-and-tenant-profiles-amends-002-and-006": "5e4026b85029e151ca77559adbd984a3e8c704451627e4201e14a28e6e368495",
       "1-purpose": "1c3a052dbd44ba981a61697cb87182d71dd6bb7eaca6c4362a742ec4646e758c",
       "2-1-binding-principles-of-76": "2725fc5219e46e9bd5aff780d154d73d4013331b6e54de815042b3342c0fa7c6",
       "2-territory": "98e384c797512d8ba38bf9dd4e4261c2612256bbfd819d13c1279d5d184cc092",
@@ -186,8 +194,8 @@
       "5-observable-negative-cases": "989f9393d2ebb460fba9dfed121bce550c1e6267d51e7e9d68ae1e406c78995f",
       "acceptance": "c43b86e8b2312d28bbaff2c36e31a17f73e5c8d96d0c67716b9d4a21bfcfef5e",
       "decisions-at-approval": "62d87ad3999a43fc2673a960637bd611882e7240fd634eefd5c15450c2705789",
-      "implementation-record": "b640f03c635efa08020ba6cf79ca40116d8904482e419a534a91a5c393652eea",
-      "verification": "6e61bbb2da8f0e1230017b5ef77eee5017c5c64738e47dd456866f21530b6a26"
+      "implementation-record": "c7621314895b40d65e005563aaff39cf3543b23ca1f0b50d9b6fe45e88d88e0b",
+      "verification": "3c96f0711f22565161f0105faa8b076ebfc56725cdf69376abb29af81d45f1dc"
     },
     "sectionHeadings": [
       "034: Parameterized definitions, variants and tenant profiles (amends 002 and 006)",
@@ -220,9 +228,9 @@
     ],
     "specPath": "specs/034-parameterized-definitions/spec.md",
     "status": "approved",
-    "summary": "An amendment of approved specs 002 and 006 (R-16), for #76 child B4. A definition may declare, as optional members this spec adds to the #76 track version `rustev.definition/2` (introduced by spec 032), typed, bounded parameters with lock levels (`fixed`, `bounded`, `free`), reference them from a closed set of literal positions, declare named variants and scope inputs, steps, handlers, rules and adjustments to them. A versioned profile document (`rustev.profile/1`) binds parameter values, may extend one other profile, and names its definition by a version range. Instantiation, a pure phase before compilation, resolves the range against the supplied definitions, resolves the overlay chain, checks every lock and bound, substitutes values and prunes the variant, yielding a definition without parameterization that the compiler compiles into a `rustev.plan/3` (the #76 track version, introduced by spec 032, to which this spec adds the optional member `instantiation`) whose `PlanId` binds the template, the variant, the profile chain and every resolved value. Adds `rustev plan diff` (`rustev.plan-diff/1`) and `rustev profile check`. A `rustev.definition/1` compiled without a profile still yields a byte-identical `rustev.plan/2` and `PlanId`. Approved (A-31); implementation is in progress (see the implementation record).\n",
+    "summary": "An amendment of approved specs 002 and 006 (R-16), for #76 child B4. A definition may declare, as optional members this spec adds to the #76 track version `rustev.definition/2` (introduced by spec 032), typed, bounded parameters with lock levels (`fixed`, `bounded`, `free`), reference them from a closed set of literal positions, declare named variants and scope inputs, steps, handlers, rules and adjustments to them. A versioned profile document (`rustev.profile/1`) binds parameter values, may extend one other profile, and names its definition by a version range. Instantiation, a pure phase before compilation, resolves the range against the supplied definitions, resolves the overlay chain, checks every lock and bound, substitutes values and prunes the variant, yielding a definition without parameterization that the compiler compiles into a `rustev.plan/3` (the #76 track version, introduced by spec 032, to which this spec adds the optional member `instantiation`) whose `PlanId` binds the template, the variant, the profile chain and every resolved value. Adds `rustev plan diff` (`rustev.plan-diff/1`) and `rustev profile check`. A `rustev.definition/1` compiled without a profile still yields a byte-identical `rustev.plan/2` and `PlanId`. Approved (A-31); implementation is complete (see the implementation record).\n",
     "title": "Parameterized definitions, variants and tenant profiles (amends 002 and 006)"
   },
-  "shardHash": "23c139c542e9acdfa9301a7fb540e04dd8fd16ad7224b37579a799275c9f73e4",
+  "shardHash": "1aba8424a419c21943b450bdf0d6ed1aff2aef5795b7d5f9e59a5d8fec019833",
   "specVersion": "1.10.0"
 }
