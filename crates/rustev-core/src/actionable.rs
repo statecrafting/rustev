@@ -357,6 +357,11 @@ pub(crate) fn structure(
     taken_ids: &BTreeSet<String>,
 ) -> Result<(), Refusal> {
     let names = Names { def, inputs };
+    if let Some(screening) = &def.screening {
+        for entry in &screening.entries {
+            names.address(&format!("screening:{}", entry.id), &entry.address)?;
+        }
+    }
     let policy = &def.policy;
     for (n, h) in policy.on_unresolved.iter().enumerate() {
         let subject = handler_subject(n);

@@ -58,6 +58,11 @@ extends:
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-wasm/" }, nature: additive }
   # The OpenTelemetry projection's exhaustive match over request results.
   - { spec: "028-opentelemetry-evidence-sink", unit: { kind: directory, path: "integrations/rustev-otel/" }, nature: additive }
+  # The CLI refusal goldens for 18 and 19 join the shared conformance
+  # suite as harvested cases.
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "tools/rustev-conformance/" }, nature: additive }
+  # The command surface's category names and shortfalls (3.5.6).
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "crates/rustev-surface/" }, nature: additive }
   # A new contract source file joins rustev-contract's reviewed archive list.
   - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
   # Adds 035 to `make verify` when the implementation is complete.
@@ -860,6 +865,31 @@ are declared for the new members. Core and runtime produce none of these
 yet: core's actionability maps `screen_unavailable` to no cause until the
 consequence increment gives it the `backend{step, origin}` cause of
 3.9.1. Records without screening keep their bytes (3.18.1, 3.18.4).
+
+**Increment 2 (2026-10-24): lowering and compile checks.** A
+`rustev.definition/2` whose only #76-track construct is `screening` is
+admitted. Each entry field lowers, in declaration order, to the
+`proposition` step `screen:<entry id>:<field index>` of 3.5.1, bound
+explicitly to the entry's screener, list fields fanning out over the
+generated id-list step `screen:<entry id>:<field index>:items`; the
+projection is exactly the 3.5.1 envelope with `values: {"text": ...}`, so
+equal texts give byte-equal projections. `screen_verdict` is satisfied
+only by a `screen` output on a lowered step. Model steps that can read a
+screened value depend on its screening step, and every reader of a list
+with a `drop_item` entry depends on all of that list's screening steps
+(3.5.2). New refusal categories 18 `invalid_screening` and 19
+`unscreened_text` (3.5.3, 3.5.5, 3.5.6), with the per-operator table of
+copied text pinned in a test; an override naming `caller` is spec 033's
+category 17 (3.5.7); screener shortfalls are category 5 (3.5.4); the
+worst-case text units and the lowered requests are budgeted under
+category 7 (3.12.2, 3.5.8). `rustev.plan/3` carries the `screening` member
+(3.5.8). Tests: `crates/rustev-core/tests/screening_compile.rs` with the
+lowering, plan and projection goldens, core and CLI refusal goldens for 18
+and 19 (`crates/rustev-cli/tests/screening.rs`). Both reference plans'
+`PlanId`s and every existing golden are unchanged. The serve refusal's
+category bound rises to 19, and `src/compile/screening.rs` joins
+rustev-core's archive list, and the two refusal goldens join the shared
+conformance suite as harvested CLI cases.
 
 ## Facts relied on
 

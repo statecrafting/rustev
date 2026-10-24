@@ -672,7 +672,7 @@ impl<'de> Deserialize<'de> for CompilerRefusal {
 struct CompilerRefusalFields {
     command: Text<1, 2048>,
     status: Refused,
-    category: Number<1, 17>,
+    category: Number<1, 19>,
     category_name: Text<1, 2048>,
     subject: Text<0, 2048>,
     detail: Text<0, 2048>,
@@ -716,6 +716,13 @@ enum CompilerReason {
         pinned: ContentDigest,
         offered: ContentDigest,
     },
+    // Screener shortfalls (spec 035, 3.5.4), as rustev-surface emits them.
+    ScreenProfile,
+    ScreenTextLimit {
+        max: u64,
+        needed: u64,
+    },
+    ScreenInputExcess,
 }
 impl JsonSchema for CompilerRefusal {
     fn schema_name() -> Cow<'static, str> {

@@ -38,6 +38,8 @@ use crate::quality;
 use crate::sem::SemKind;
 use crate::value::{Ty, Value};
 
+pub(crate) mod screening;
+
 /// The compiler identity recorded in every plan.
 pub const COMPILER: &str = concat!("rustev-core/", env!("CARGO_PKG_VERSION"));
 
@@ -71,12 +73,22 @@ pub enum Category {
     /// A declaration would address the caller where the caller cannot act
     /// (spec 033, 3.8.2; phases b and h2).
     CallerCannotAct = 17,
+    /// Invalid screening declaration (spec 035, 3.5.3).
+    InvalidScreening = 18,
+    /// A model projection carries uncovered untrusted text (spec 035, 3.5.5).
+    UnscreenedText = 19,
 }
 
 /// Why one candidate backend cannot serve a step.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ShortfallReason {
     UnknownBackend,
+    ScreenProfile,
+    ScreenTextLimit {
+        max: u64,
+        needed: u64,
+    },
+    ScreenInputExcess,
     Operation(Operation),
     OutputKind {
         offered: OutputKind,
@@ -530,7 +542,7 @@ fn satisfies(output: OutputKind, required: RequiredKind) -> bool {
     use OutputKind as O;
     use RequiredKind as R;
     match required {
-        R::ScreenVerdict => false,
+        R::ScreenVerdict => output == O::Screen,
         R::Label => output == O::Label,
         R::Distribution | R::CalibratedProbability | R::OrdinalDistribution => {
             matches!(output, O::Distribution | O::Logits)
@@ -542,8 +554,8 @@ fn satisfies(output: OutputKind, required: RequiredKind) -> bool {
 fn sem_kind(op: Operation, required: RequiredKind) -> SemKind {
     match (op, required) {
         (Operation::Rubric, RequiredKind::Label) => SemKind::Ordinal(false),
-        // Authored uses are refused before kind analysis. Only future screening
-        // lowering may legitimately introduce this kind; this is a total placeholder.
+        // Screening values are opaque to authored consumers. Verdict evaluation
+        // is supplied by spec 035's consequence increment.
         (_, RequiredKind::ScreenVerdict) => SemKind::Label,
         (_, RequiredKind::Label) => SemKind::Label,
         (_, RequiredKind::Distribution) => SemKind::Distribution,
@@ -572,7 +584,10 @@ pub(crate) fn check_candidate(
     if supports.is_empty() {
         reasons.push(ShortfallReason::Operation(d.operation));
     }
-    let chosen = supports.iter().find(|o| satisfies(o.output, required));
+    let chosen = supports.iter().find(|o| {
+        satisfies(o.output, required)
+            && (required != RequiredKind::ScreenVerdict || d.operation == Operation::Proposition)
+    });
     match (chosen, supports.first()) {
         (None, Some(o)) => reasons.push(ShortfallReason::OutputKind {
             offered: o.output,
@@ -1115,6 +1130,12 @@ pub(crate) fn compile_instantiated(
         crate::actionable::structure(def, &inputs, &taken)?;
     }
 
+    let authored = def;
+    let screens = screening::validate(def)?;
+    let lowered = screening::lower(def, &screens, &mut decoded);
+    let def = &lowered;
+    let ids: Vec<String> = def.steps.iter().map(|s| s.id.clone()).collect();
+
     // (c) Resolve operators and calibrations.
     let calibration_ids: Vec<(CalibrationId, &CalibrationArtifact)> = calibrations
         .iter()
@@ -1219,6 +1240,7 @@ pub(crate) fn compile_instantiated(
         refs.retain(|r| seen.insert(r.clone()));
         deps.insert(s.id.clone(), refs);
     }
+    screening::dependencies(authored, &screens, &decoded, &mut deps);
     let order = topo_order(&ids, &deps)?;
 
     // (e) Types, in topological order.
@@ -1332,6 +1354,19 @@ pub(crate) fn compile_instantiated(
                 let mut value_bytes = 0u64;
                 for r in &d.project {
                     let t = match Ref::parse(r).map_err(km)? {
+                        Ref::Bind(b) if d.requires == RequiredKind::ScreenVerdict => {
+                            let (bind, field) = b
+                                .split_once('/')
+                                .ok_or_else(|| km("invalid lowered field".into()))?;
+                            match bind_items.get(bind) {
+                                Some(Ty::Record(fields)) => fields
+                                    .iter()
+                                    .find(|(name, _)| name == field)
+                                    .map(|(_, ty)| ty.clone())
+                                    .ok_or_else(|| km("unknown lowered field".into()))?,
+                                _ => return Err(km("invalid lowered item".into())),
+                            }
+                        }
                         Ref::Bind(b) => bind_items.get(&b).cloned().ok_or_else(|| {
                             km(format!("bind {b:?} has no item source to project"))
                         })?,
@@ -1373,6 +1408,10 @@ pub(crate) fn compile_instantiated(
                     .saturating_add(candidate_bytes)
                     .saturating_add(instance_bytes)
                     .saturating_add(value_bytes);
+                let bound = screens
+                    .iter()
+                    .find(|f| &f.step == id)
+                    .map_or(bound, |f| screening::projection_bound(f.max_bytes));
                 projection_bounds.insert(id.clone(), bound);
                 max_requests.insert(id.clone(), requests);
                 let kind = sem_kind(d.operation, d.requires);
@@ -1390,6 +1429,8 @@ pub(crate) fn compile_instantiated(
             }
         }
     }
+
+    screening::coverage(authored, &screens, &decoded)?;
 
     // (e) continued: spec 033's checks and remediation parameters (3.8.1).
     crate::actionable::types(def, &input_tys, v2)?;
@@ -1533,7 +1574,14 @@ pub(crate) fn compile_instantiated(
             |required: RequiredKind| -> (Option<(&BackendDescriptor, OutputKind)>, Vec<Shortfall>) {
                 let mut shortfalls = Vec::new();
                 for b in &candidates {
-                    match check_candidate(d, b, required, options_needed, bound) {
+                    match screening::candidate(
+                        screens.iter().find(|f| f.step == s.id),
+                        d,
+                        b,
+                        required,
+                        options_needed,
+                        bound,
+                    ) {
                         Ok(o) => return (Some((*b, o)), vec![]),
                         Err(reasons) => shortfalls.push(Shortfall {
                             backend_id: b.backend_id.clone(),
@@ -1666,6 +1714,7 @@ pub(crate) fn compile_instantiated(
     };
 
     // (g) Budget.
+    screening::budget(authored, &screens, descriptors)?;
     let mut total: u64 = 0;
     for s in &def.steps {
         if let Some(PlanStepDetail::Semantic(b)) = details.get(&s.id) {
@@ -1733,7 +1782,7 @@ pub(crate) fn compile_instantiated(
     } else {
         schema::EXACT_REGISTRY
     };
-    let definition_id = def.id().map_err(|e| Refusal {
+    let definition_id = authored.id().map_err(|e| Refusal {
         category: C::Parse,
         subject: "definition".into(),
         detail: e.to_string(),
@@ -1744,7 +1793,7 @@ pub(crate) fn compile_instantiated(
         compiler: COMPILER.into(),
         registry: registry.into(),
         definition_id,
-        definition: def.clone(),
+        definition: authored.clone(),
         order: order.clone(),
         steps: def
             .steps
@@ -1761,7 +1810,7 @@ pub(crate) fn compile_instantiated(
         grades: (!grade_table.is_empty()).then_some(grade_table),
         actionability,
         instantiation: None,
-        screening: None,
+        screening: screening::plan(authored, &screens, &details),
     };
     let id = plan.id().map_err(|e| Refusal {
         category: C::Parse,
