@@ -936,6 +936,22 @@ basis `cache_hit` (3.11). Tests: `crates/rustev-runtime/tests/screening.rs`
 under the manual clock and scripted backends, with a canary text absent
 from every run record.
 
+**Increment 5 (2026-10-24): remote isolation.** The remote client never
+sends a `rustev.remote-infer/1` request with more than one item to a
+backend whose descriptor has a screening operation declaring
+`isolation: per_item`, whatever its shared-state terms or coalescing
+window: it offers no batch capability for that backend and refuses a
+multi-member batch call with `capability`, a per-backend rule stricter
+than 3.15.3's per-item one, because the batch seam does not say which
+operation each member targets. The server fails every item of a
+multi-item request to such a backend with `capability` before calling it
+(3.15.2, 3.15.3). The descriptor carries the `screen` profile and `isolation`
+through `rustev.remote-describe/1`, a profile changed after setup is
+`identity_mismatch`, and a `screen` output round-trips as a `RawOutput`
+(3.15.1, 3.15.4). With increment 4 this completes 3.10.1 for spec 009
+shared-state terms. Tests over loopback:
+`integrations/rustev-remote-http/tests/screening.rs`.
+
 ## Facts relied on
 
 Read on 2026-10-17 from the AWS documentation named; re-confirmed at the

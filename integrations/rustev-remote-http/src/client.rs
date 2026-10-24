@@ -19,7 +19,7 @@ use std::time::Duration;
 
 use rustev_contract::canonical::canonical_value_bytes;
 use rustev_contract::definition::{Determinism, Operation};
-use rustev_contract::descriptor::{BackendDescriptor, OutputKind};
+use rustev_contract::descriptor::{BackendDescriptor, Isolation, OutputKind};
 use rustev_contract::ids::{ArtifactId, DescriptorId};
 use rustev_contract::limits::REMOTE_V1;
 use rustev_contract::output::RawOutput;
@@ -749,10 +749,21 @@ impl DecisionBackend for RemoteClient {
 
     /// Offered only when the binding enables runtime-planned batches and the
     /// negotiated terms declare shared-state batching (spec 020, 3.3).
+    /// Any per-item operation disables batching for the entire backend
+    /// (spec 035, 3.15.3); the projected operation must also be declared.
     /// Equal compatibility means the same binding and the same shared state
     /// (`instance` and `values`), which is what one request may carry.
     fn batch_capability(&self, projection: &[u8]) -> Option<BatchCapability> {
         self.inner.batch_max?;
+        if self
+            .inner
+            .descriptor
+            .operations
+            .iter()
+            .any(|o| o.screen.is_some() && o.isolation == Some(Isolation::PerItem))
+        {
+            return None;
+        }
         let head =
             rustev_contract::bounded::parse_bounded::<ProjectionHead>(projection, &REMOTE_V1)
                 .ok()?;
@@ -809,6 +820,21 @@ async fn batch(inner: Arc<Inner>, call: BatchAttemptCall) -> BatchAttemptReport 
             AdapterFailure::Permanent,
             RemoteCode::Capability,
             "the batch exceeds the negotiated bound",
+        );
+    }
+    // Apply the backend-wide server rule even when callers bypass
+    // batch_capability (spec 035, 3.15.3).
+    if call.members.len() > 1
+        && inner
+            .descriptor
+            .operations
+            .iter()
+            .any(|o| o.screen.is_some() && o.isolation == Some(Isolation::PerItem))
+    {
+        return batch_refused(
+            AdapterFailure::Permanent,
+            RemoteCode::Capability,
+            "per-item capabilities cannot be dispatched in a batch",
         );
     }
     // One exchange carries one principal reference.
@@ -1079,12 +1105,11 @@ fn prepare(
             "the projection is not JSON",
         ));
     };
-    let Some(kind) = inner
+    let Some(capability) = inner
         .descriptor
         .operations
         .iter()
         .find(|o| o.operation == head.operation)
-        .map(|o| o.output)
     else {
         return Err(unsent_failure(
             RemoteCode::Capability,
@@ -1097,12 +1122,13 @@ fn prepare(
         "principal": principal.as_ref().map(|p| p.evidence().digest),
     }))
     .ok()
-    .map(|b| digest_bytes(&b));
+    .map(|b| digest_bytes(&b))
+    .filter(|_| capability.isolation != Some(Isolation::PerItem));
     let (tx, rx) = oneshot::channel();
     let member = Member {
         attempt_id: attempt_id.to_string(),
         projection: text,
-        kind,
+        kind: capability.output,
         budget,
         status: Status::Waiting,
         tx: Some(tx),
