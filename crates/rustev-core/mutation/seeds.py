@@ -1,6 +1,6 @@
 """Seeded defects in evidence quality (spec 032) and in provenance-conditional
-rules and actionable outcomes (spec 033): each spec's acceptance names seeds
-in the core mutation harness.
+rules and actionable outcomes (spec 033), and parameterized definitions
+(spec 034): each spec's acceptance names seeds in the core mutation harness.
 
 Each seed rewrites exact text in a copy of the workspace, must still compile,
 and must make the named tests fail. The script exits non-zero if a seed's
@@ -131,6 +131,57 @@ SEEDS = [
         "U::BackendUnavailable { .. } | U::DeadlineExceeded => true,",
         "U::BackendUnavailable { .. } | U::DeadlineExceeded | U::InvalidInput { .. } => true,",
         ACT,
+    ),
+    # Spec 034. These tests require the opt-in parameterized feature.
+    (
+        "a lock not checked on a base profile",
+        CORE + "instantiate/overlay.rs",
+        "if d.lock == Lock::Fixed {",
+        "if i == 0 && d.lock == Lock::Fixed {",
+        ["--features", "parameterized", "--test", "instantiate_analysis"],
+    ),
+    (
+        "an inclusive bound made exclusive",
+        CORE + "instantiate/values.rs",
+        "compare(ty, v, hi).is_none_or(|o| o.is_gt())",
+        "compare(ty, v, hi).is_none_or(|o| o.is_ge())",
+        ["--features", "parameterized", "--test", "instantiate_analysis"],
+    ),
+    (
+        "highest version replaced by first supplied",
+        CORE + "instantiate/template.rs",
+        ".max_by(|a, b| a.version.cmp(&b.version))",
+        ".next()",
+        ["--features", "parameterized", "--test", "instantiate_analysis"],
+    ),
+    (
+        "the pin entered into identity",
+        CORE + "instantiate/profiled.rs",
+        "    let bytes = compiled.canonical();",
+        "    if let Some(pin) = pin {\n        compiled.plan.compiler.push_str(pin);\n    }\n    let bytes = compiled.canonical();",
+        ["--features", "parameterized", "--test", "instantiate_compile"],
+    ),
+    (
+        "a dangling reference pruned silently",
+        CORE + "instantiate/emit.rs",
+        "                return Err(refusal(\n                    6,\n                    InstantiationCode::DanglingReference,\n                    &original.subject,\n                    format!(\"removed {base} in variant {variant}\"),\n                ));",
+        "                let _ = (original, variant);\n                let (parent, index) = item.pointer.rsplit_once('/').unwrap();\n                doc.pointer_mut(parent).and_then(Value::as_array_mut).unwrap()\n                    .remove(index.parse::<usize>().unwrap());\n                let definition = serde_json::from_value(doc)\n                    .map_err(|e| bad_doc(e.to_string()))?;\n                return Ok((definition, parameters, pruned));",
+        ["--features", "parameterized", "--test", "instantiate_compile"],
+    ),
+    (
+        "a handler kept for a pruned target",
+        CORE + "instantiate/emit.rs",
+        "if item.subject.starts_with(\"handler:\")",
+        "if false && item.subject.starts_with(\"handler:\")",
+        ["--features", "parameterized", "--test", "instantiate_compile"],
+    ),
+    (
+        "a value source dropped from the plan",
+        # Omit the wire source itself, not a substitute default source.
+        "crates/rustev-contract/src/plan.rs",
+        "    pub source: ParameterSource,",
+        "    #[serde(skip_serializing)]\n    pub source: ParameterSource,",
+        ["--features", "parameterized", "--test", "instantiate_compile"],
     ),
 ]
 

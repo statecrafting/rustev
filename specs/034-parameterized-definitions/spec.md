@@ -2,7 +2,7 @@
 id: "034-parameterized-definitions"
 title: "Parameterized definitions, variants and tenant profiles (amends 002 and 006)"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-10-17"
 summary: >
   An amendment of approved specs 002 and 006 (R-16), for #76 child B4.
@@ -23,7 +23,7 @@ summary: >
   (`rustev.plan-diff/1`) and `rustev profile check`. A
   `rustev.definition/1` compiled without a profile still yields a
   byte-identical `rustev.plan/2` and `PlanId`. Approved (A-31);
-  implementation is in progress (see the implementation record).
+  implementation is complete (see the implementation record).
 amends:
   - "002-decision-contract-and-pure-core"
   - "006-cli-surface"
@@ -53,8 +53,9 @@ extends:
   # "tools/rustev-conformance/" }`.
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "crates/rustev-surface/" }, nature: additive }
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "tools/rustev-conformance/" }, nature: additive }
-  # Adds 034 to `make verify` when the implementation is complete.
+  # Adds 034 to `make verify` and its CI acceptance group at completion.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "002-decision-contract-and-pure-core"
@@ -821,7 +822,33 @@ call or spend.
 
 ## Verification
 
-Pending with implementation. Approval satisfies no acceptance item.
+Declared for `spec-spine verify 034`; 034 is in `make verify` and the
+`integrations-core` acceptance group, beside 033. The spec's code in
+`rustev-core` and `rustev-eval` is behind the opt-in `parameterized`
+feature (spec 050), so those commands enable it.
+
+```verify:cli
+# 3.1, 3.2, 3.5, 3.6, 3.10 and 3.12: documents, versions and wire forms.
+cargo test -p rustev-contract --locked --test parameterized_wire
+# 3.1 to 3.10: instantiation, every refusal code of 3.9 with a passing
+# neighbour, plan 3 emission, identity and loading; 3.12 and 3.13: plan
+# diff and profile check.
+cargo test -p rustev-core --locked --features parameterized --test instantiate_analysis --test instantiate_compile --test plan_diff --test profile_check
+# 3.11: a version 3 plan assembles and replays through a bundle.
+cargo test -p rustev-eval --locked --features parameterized --test instantiated_replay
+# 3.14: the CLI commands and their goldens.
+cargo test -p rustev-cli --locked --test parameterized
+# Partial adoption: every existing golden is unchanged.
+cargo test -p rustev-core --locked
+cargo test -p rustev-cli --locked
+# Negative control: the seeded defects of the Acceptance section are each
+# detected.
+sh crates/rustev-core/mutation/seeds.sh "a lock not checked on a base profile" "an inclusive bound made exclusive" "highest version replaced by first supplied" "the pin entered into identity" "a dangling reference pruned silently" "a handler kept for a pruned target" "a value source dropped from the plan"
+```
+
+The runtime's capture of a version 3 plan is refused by spec 032's guard
+until spec 004 admits it (032 3.11.3); this spec changes no runtime code
+(section 2), so that refusal is not one of its acceptance items.
 
 ## Implementation record
 
@@ -903,6 +930,19 @@ existing CLI output keeps its bytes. Tests: `crates/rustev-cli/tests/parameteriz
 with the goldens `crates/rustev-cli/tests/golden/parameterized.*`, each
 also a conformance CLI case under `tools/rustev-conformance/cases/cli/`
 with its fixtures, harvested from the CLI (`RUSTEV_HARVEST`).
+
+**Increment 6, 2026-10-24 (the mutation seeds; complete).** The core
+mutation harness (`crates/rustev-core/mutation/seeds.py`) seeds the seven
+defects of the Acceptance section: a lock not checked on a base profile, an
+inclusive bound made exclusive, highest version replaced by first supplied,
+the pin entered into identity, a dangling reference pruned silently, a
+handler kept for a pruned target and a value source dropped from the plan.
+Each is detected. The lock seed needed a test of its own:
+`base_profile_values_obey_locks_and_bounds_before_leaf_overrides` in
+`tests/instantiate_analysis.rs` refuses a fixed or out-of-range value set
+on a base profile even when the leaf overrides it. The `verify:cli` block
+is declared, `034` joins `VERIFIED_SPECS` and the `integrations-core`
+acceptance group, and the implementation is complete.
 
 ## Decisions at approval
 
