@@ -42,3 +42,13 @@ pub use evaluate::{Evaluation, FailureContext, RequestIdentityError, SemanticReq
 
 #[cfg(feature = "parameterized")]
 pub use instantiate::{ProfiledRefusal, compile_profiled, compile_profiled_with, instantiate};
+
+// Spec 034 3.12 and 3.13; compiled only with `parameterized` (spec 050).
+#[cfg(feature = "parameterized")]
+pub mod plan_diff;
+#[cfg(feature = "parameterized")]
+pub mod profile_check;
+#[cfg(feature = "parameterized")]
+pub use plan_diff::plan_diff;
+#[cfg(feature = "parameterized")]
+pub use profile_check::{ProfileReport, profile_check};

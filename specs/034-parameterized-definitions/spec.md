@@ -872,6 +872,16 @@ definition, not the template members of 3.1; describing those members in
 the schema is open. The runtime's capture still refuses a plan 3 and is
 open for a later increment.
 
+**Increment 4 (plan diff and profile check).** `rustev-core` gains
+`plan_diff`, which compares two plans as documents without recompiling
+them and emits `rustev.plan-diff/1` (3.12), and `profile_check`, which
+inspects a profile against its template without compiling (3.13); both
+reuse the instantiation stages. A fixed parameter reports
+`changeable: null`. Tests: `crates/rustev-core/tests/plan_diff.rs` and
+`profile_check.rs`, with goldens for identical plans, a binding, profile
+and variant difference, a truncated diff, and an accepted and a refused
+profile check.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

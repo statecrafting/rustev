@@ -13,7 +13,7 @@ use std::collections::BTreeSet;
 
 /// Removed item identities, in template document order. Handler indices always
 /// refer to the template, never the compacted instantiated arrays.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize)]
 pub struct Pruned {
     pub inputs: Vec<String>,
     pub steps: Vec<String>,
@@ -71,6 +71,47 @@ fn substitute(kind: SiteKind, ty: &ParamType, value: &Value) -> Value {
     }
 }
 pub(super) fn emit(a: Analysis) -> Result<Instantiated, InstantiationRefusal> {
+    let (definition, parameters, pruned) = substitute_prune(&a)?;
+    let t = &a.selection.template;
+    let bad_doc = |e: String| {
+        refusal(
+            7,
+            InstantiationCode::InvalidDefinitionDocument,
+            t.subject(),
+            e,
+        )
+    };
+    let bytes = definition.canonical().map_err(|e| bad_doc(e.to_string()))?;
+    if bytes.len() > DEFINITION_V1.max_bytes {
+        return Err(bound(7, &t.subject(), "DEFINITION_V1", bytes.len()));
+    }
+    let definition = Definition::parse(&bytes).map_err(|e| bad_doc(e.to_string()))?;
+    Ok(Instantiated {
+        definition,
+        pruned,
+        instantiation: Instantiation {
+            template_schema: t.schema.clone(),
+            template: t.json.clone(),
+            template_id: t.id.clone(),
+            variant: a.variant,
+            profile: if a.overlay.chain.is_empty() {
+                ProfileChain::None
+            } else {
+                ProfileChain::Chain(a.overlay.chain)
+            },
+            parameters,
+        },
+    })
+}
+
+/// Stages 5 and 6 only, without emission bounds or compilation.
+pub(crate) fn prune_analysis(a: &Analysis) -> Result<Pruned, InstantiationRefusal> {
+    substitute_prune(a).map(|(_, _, pruned)| pruned)
+}
+
+fn substitute_prune(
+    a: &Analysis,
+) -> Result<(Definition, Vec<ResolvedParameter>, Pruned), InstantiationRefusal> {
     let t = &a.selection.template;
     let mut doc = t.json.clone();
     let items = sites::items(&doc);
@@ -207,28 +248,9 @@ pub(super) fn emit(a: Analysis) -> Result<Instantiated, InstantiationRefusal> {
             }
         }
     }
-    let bytes = definition.canonical().map_err(|e| bad_doc(e.to_string()))?;
-    if bytes.len() > DEFINITION_V1.max_bytes {
-        return Err(bound(7, &t.subject(), "DEFINITION_V1", bytes.len()));
-    }
-    let definition = Definition::parse(&bytes).map_err(|e| bad_doc(e.to_string()))?;
-    Ok(Instantiated {
-        definition,
-        pruned,
-        instantiation: Instantiation {
-            template_schema: t.schema.clone(),
-            template: t.json.clone(),
-            template_id: t.id.clone(),
-            variant: a.variant,
-            profile: if a.overlay.chain.is_empty() {
-                ProfileChain::None
-            } else {
-                ProfileChain::Chain(a.overlay.chain)
-            },
-            parameters,
-        },
-    })
+    Ok((definition, parameters, pruned))
 }
+
 pub(super) fn bound(stage: u8, subject: &str, name: &str, bytes: usize) -> InstantiationRefusal {
     refusal(
         stage,

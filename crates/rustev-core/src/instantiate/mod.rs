@@ -3,6 +3,7 @@ mod declarations;
 mod emit;
 mod loading;
 mod profiled;
+pub(crate) use emit::prune_analysis;
 pub use emit::{Instantiated, Pruned, instantiate};
 pub(crate) use loading::validate_record;
 pub use profiled::{
