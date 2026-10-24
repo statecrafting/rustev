@@ -108,6 +108,10 @@
         "src/quality.rs",
         "src/seams.rs",
         "src/sem.rs",
+        "src/template/check.rs",
+        "src/template/mod.rs",
+        "src/template/parse.rs",
+        "src/template/render.rs",
         "src/unparameterized.rs",
         "src/value.rs"
       ],

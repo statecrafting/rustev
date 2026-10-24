@@ -51,7 +51,7 @@ extends:
   - { spec: "005-reference-backends", unit: { kind: directory, path: "backends/rustev-backend-rules/" }, nature: additive }
   - { spec: "012-jev-integration", unit: { kind: directory, path: "integrations/rustev-jev/" }, nature: additive }
   - { spec: "009-remote-adapter-protocol", unit: { kind: directory, path: "integrations/rustev-remote-http/" }, nature: additive }
-  # New contract source files join rustev-contract's reviewed archive list.
+  # New contract and core source files join their reviewed archive lists.
   - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
@@ -970,9 +970,30 @@ Pending with implementation. Approval satisfies no acceptance item.
 
 ## Implementation record
 
-Increment 1 (the template languages as a pure core module) is delivered
-on its own branch from `main`; the record of the increment plan is kept
-with it.
+Planned increments, each a separately reviewed pull request: (1) the
+prompt and backstop template languages as a pure core module, built on
+`main` while specs 035 and 036 land; (2) the contract vocabulary: the
+envelope, the `generate` declaration, plan, evidence and text result
+members; (3) compilation, isolation and the `generate` lowering; (4)
+requests, validation, repair, ownership and per-field origin in the core;
+(5) the runtime generation stage, streaming and caching; (6) evidence,
+capture, replay and metrics; (7) seeds, declared verification and closure.
+
+**Increment 1 (2026-10-24): the template languages.**
+`crates/rustev-core/src/template/` (`parse.rs`, `check.rs`, `render.rs`)
+implements the prompt template rules of 3.3 and the logic-less backstop
+language of 3.4 as a self-contained module, not yet wired into
+compilation: grammar, nesting and roots, typed parse errors, static type
+and derivation checks, escaping and raw restrictions, helpers for every
+locale, output bounds, required fields and truncation, canonical source
+digests, and deterministic rendering. Decisions within the spec: authored
+source bytes, including comments and whitespace, are identity input;
+prompt helpers use the `und` locale and prompt text keeps LF; version
+syntax is three decimal components without leading zeros; static schema
+nesting is capped at 64; required HTML truncation conservatively refuses a
+possibly empty leading entity fragment. Tests:
+`crates/rustev-core/tests/template.rs`, including the spec's examples and
+1,500 bounded generated inputs that never panic.
 
 **Increment 2, part 1 (2026-10-24): generate declarations and plan
 bindings.** `crates/rustev-contract/src/generation.rs` adds the bounded
