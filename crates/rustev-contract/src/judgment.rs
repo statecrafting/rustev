@@ -199,11 +199,18 @@ pub enum Unresolved {
     InsufficientGrade {
         fields: Vec<String>,
     },
+    /// Unscreened fields a model step would read (spec 035, 3.9.1).
+    ScreenUnavailable {
+        #[serde(deserialize_with = "crate::screening::unavailable_fields")]
+        #[schemars(length(min = 1))]
+        fields: Vec<String>,
+    },
 }
 
 impl Unresolved {
     pub fn kind(&self) -> ReasonKind {
         match self {
+            Unresolved::ScreenUnavailable { .. } => ReasonKind::ScreenUnavailable,
             Unresolved::MissingEvidence { .. } => ReasonKind::MissingEvidence,
             Unresolved::StaleEvidence { .. } => ReasonKind::StaleEvidence,
             Unresolved::InvalidInput { .. } => ReasonKind::InvalidInput,
@@ -247,6 +254,13 @@ impl Unresolved {
         }
     }
 
+    /// `screen_unavailable` with sorted, deduplicated field references.
+    pub fn screen_unavailable<I: IntoIterator<Item = String>>(fields: I) -> Self {
+        Unresolved::ScreenUnavailable {
+            fields: sorted(fields),
+        }
+    }
+
     /// `conflict` with sorted, deduplicated facts.
     pub fn conflict<I: IntoIterator<Item = String>>(facts: I) -> Self {
         Unresolved::Conflict {
@@ -265,6 +279,9 @@ fn sorted<I: IntoIterator<Item = String>>(items: I) -> Vec<String> {
 impl fmt::Display for Unresolved {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Unresolved::ScreenUnavailable { fields } => {
+                write!(f, "screen_unavailable{{{}}}", fields.join(","))
+            }
             Unresolved::MissingEvidence { fields } => {
                 write!(f, "missing_evidence{{{}}}", fields.join(","))
             }
@@ -331,6 +348,14 @@ pub struct Notice {
     /// Judgment 2: who can act on it (spec 033, 3.5.4); omitted in version 1.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub action: Option<Action>,
+    /// Entry, field, consequence and item ids only (spec 035, 3.6.4).
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::screening::present"
+    )]
+    #[schemars(with = "crate::screening::ScreeningNotice")]
+    pub screening: Option<crate::screening::ScreeningNotice>,
 }
 
 #[derive(
@@ -346,6 +371,7 @@ pub enum NoticeKind {
     ConstraintsRelaxed,
     GradeDowngraded,
     CheckNotice,
+    Screening,
 }
 
 /// A value placed in a proposal's parameters.
@@ -417,6 +443,7 @@ pub struct RankEntry {
 impl ReasonKind {
     pub fn name(self) -> &'static str {
         match self {
+            ReasonKind::ScreenUnavailable => "screen_unavailable",
             ReasonKind::MissingEvidence => "missing_evidence",
             ReasonKind::StaleEvidence => "stale_evidence",
             ReasonKind::InvalidInput => "invalid_input",

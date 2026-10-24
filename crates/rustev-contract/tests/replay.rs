@@ -551,6 +551,7 @@ mod supplied_from {
         transitions: Vec<Transition>,
     ) -> RequestRecord {
         RequestRecord {
+            screen: None,
             step: "s".into(),
             instance: vec![],
             result,

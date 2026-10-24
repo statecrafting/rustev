@@ -92,6 +92,17 @@ const RUN_V2_MEMBERS: [&str; 2] = ["remote_evidence", "remote_evidence_truncated
 
 fn run_members(version: &str) -> impl FnOnce(&mut serde_json::Value) + '_ {
     move |v| {
+        if version != schema::RUN_V3 {
+            v["$defs"]["RequestRecord"]["properties"]
+                .as_object_mut()
+                .unwrap()
+                .remove("screen");
+            v["$defs"]["RequestResult"]["oneOf"]
+                .as_array_mut()
+                .unwrap()
+                .retain(|variant| variant["const"] != "withdrawn");
+            prune_defs(v);
+        }
         if version == schema::RUN_V2 {
             // The list is required and never null: `null` reads as absent,
             // which the parser refuses in version 2.
@@ -220,7 +231,10 @@ pub fn document_schemas() -> Vec<EmittedSchema> {
         emit_adjusted::<Plan>(schema::PLAN_V3, None, plan_members(schema::PLAN_V3)),
         emit::<Snapshot>(schema::SNAPSHOT, None),
         emit::<Snapshot>(schema::SNAPSHOT_V2, None),
-        emit::<EvidenceRecord>(schema::EVIDENCE, None),
+        emit_adjusted::<EvidenceRecord>(schema::EVIDENCE, None, |v| {
+            v["properties"].as_object_mut().unwrap().remove("screening");
+            prune_defs(v);
+        }),
         emit::<EvidenceRecord>(schema::EVIDENCE_V2, None),
         emit_adjusted::<RunRecord>(schema::RUN, None, run_members(schema::RUN)),
         emit_adjusted::<RunRecord>(schema::RUN_V2, None, run_members(schema::RUN_V2)),
