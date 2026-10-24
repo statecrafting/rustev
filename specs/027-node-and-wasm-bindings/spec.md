@@ -1171,6 +1171,14 @@ against their schemas in their own contract tests.
 - 2026-10-24 (CI only, no claim of this spec changes): `bindings.yml` caches as spec
   001's record of this date says. The wasm and node jobs restore everywhere and save on a push to main. Workspace crates' artifacts are
   dropped before saving, because Cargo rebuilds them after any checkout.
+- 2026-10-24: a late settlement is counted however it races the runtime
+  (3.6.4). The seam task counted one only when its send failed, so a reply
+  that arrived after the deadline ended the attempt, but before the runtime
+  dropped the attempt's future, was discarded uncounted. The reply future now
+  closes its channel on drop and counts a reply left unread, so each
+  discarded settlement is counted exactly once. This was the cause of the
+  intermittent `bindings / node 20` failure of "a host backend resolving
+  after the deadline is discarded and counted" in the merge queue.
 
 ## Decisions at approval
 
