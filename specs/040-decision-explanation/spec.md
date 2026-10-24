@@ -1150,6 +1150,10 @@ asks: a fence longer than any backtick run inside it and, in a table cell,
 `\|`, with no HTML entity (an entity in a code span displays as typed);
 prose outside code spans keeps its entity escaping.
 
+**Increment 6 fixtures, part 2.** The remaining `lodging` goldens under
+`crates/rustev-cli/tests/golden/explain/`: the record, bundle and plan
+inputs and their explanations, the text-origin case and the cut case.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child
