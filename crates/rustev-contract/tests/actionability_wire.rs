@@ -177,6 +177,7 @@ fn refused_and_needs_input_round_trip() {
 #[test]
 fn a_version_1_notice_keeps_its_bytes() {
     let n = Notice {
+        screening: None,
         kind: NoticeKind::Fallback,
         subject: "step:x".into(),
         reason: "r".into(),

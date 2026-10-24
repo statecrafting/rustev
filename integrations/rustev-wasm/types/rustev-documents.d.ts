@@ -579,6 +579,7 @@ export namespace RustevDefinition1 {
         | "deadline_exceeded"
         | "conflict"
         | "unsupported"
+        | "screen_unavailable"
       )
     | "insufficient_grade";
   /**
@@ -1457,6 +1458,7 @@ export namespace RustevDefinition2 {
         | "deadline_exceeded"
         | "conflict"
         | "unsupported"
+        | "screen_unavailable"
       )
     | "insufficient_grade";
   /**
@@ -2805,6 +2807,14 @@ export namespace RustevEvidence1 {
         insufficient_grade: {
           fields: string[];
         };
+      }
+    | {
+        screen_unavailable: {
+          /**
+           * @minItems 1
+           */
+          fields: [string, ...string[]];
+        };
       };
   export type DefinitionId = string;
   export type Timestamp = number;
@@ -3045,8 +3055,18 @@ export namespace RustevEvidence1 {
    */
   export type DurationMs = number;
   export type NoticeKind =
-    | ("uncalibrated_threshold" | "truncation" | "fallback" | "constraints_relaxed" | "grade_downgraded" | "check_notice")
+    | (
+        | "uncalibrated_threshold"
+        | "truncation"
+        | "fallback"
+        | "constraints_relaxed"
+        | "grade_downgraded"
+        | "check_notice"
+        | "screening"
+      )
     | "field_dropped";
+  export type ScreenConsequence =
+    "none" | "refuse" | "drop_field" | "drop_text" | "drop_item" | "fail_closed" | "skip_generation" | "fail_open";
   /**
    * A judgment's outcome. Version 1 uses `Propose`, `Escalate` and
    * `Unresolved`; version 2 (spec 033, 3.5.1) replaces `Unresolved` with
@@ -3304,6 +3324,10 @@ export namespace RustevEvidence1 {
     kind: NoticeKind;
     reason: string;
     /**
+     * Entry, field, consequence and item ids only (spec 035, 3.6.4).
+     */
+    screening?: ScreeningNotice;
+    /**
      * The step or policy item it concerns.
      */
     subject: string;
@@ -3322,6 +3346,15 @@ export namespace RustevEvidence1 {
     override: Override;
     remediation: Remediation;
     transient: boolean;
+  }
+  /**
+   * Details of a screening notice. Never includes screened text.
+   */
+  export interface ScreeningNotice {
+    consequence: ScreenConsequence;
+    entry: string;
+    field: string;
+    items: string[];
   }
   /**
    * The result of `filter_with_reasons@1`.
@@ -3577,6 +3610,14 @@ export namespace RustevEvidence2 {
         insufficient_grade: {
           fields: string[];
         };
+      }
+    | {
+        screen_unavailable: {
+          /**
+           * @minItems 1
+           */
+          fields: [string, ...string[]];
+        };
       };
   export type DefinitionId = string;
   export type Timestamp = number;
@@ -3817,8 +3858,18 @@ export namespace RustevEvidence2 {
    */
   export type DurationMs = number;
   export type NoticeKind =
-    | ("uncalibrated_threshold" | "truncation" | "fallback" | "constraints_relaxed" | "grade_downgraded" | "check_notice")
+    | (
+        | "uncalibrated_threshold"
+        | "truncation"
+        | "fallback"
+        | "constraints_relaxed"
+        | "grade_downgraded"
+        | "check_notice"
+        | "screening"
+      )
     | "field_dropped";
+  export type ScreenConsequence =
+    "none" | "refuse" | "drop_field" | "drop_text" | "drop_item" | "fail_closed" | "skip_generation" | "fail_open";
   /**
    * A judgment's outcome. Version 1 uses `Propose`, `Escalate` and
    * `Unresolved`; version 2 (spec 033, 3.5.1) replaces `Unresolved` with
@@ -3904,6 +3955,15 @@ export namespace RustevEvidence2 {
   export type ContentDigest = string;
   export type PlanId = string;
   export type SnapshotId = string;
+  export type ArtifactId = string;
+  export type DescriptorId = string;
+  export type ScreenVerdict =
+    | ("pass" | "blocked" | "empty")
+    | {
+        unavailable: {
+          reason: Unresolved;
+        };
+      };
   export type CheckReason =
     | "true"
     | {
@@ -3960,6 +4020,12 @@ export namespace RustevEvidence2 {
     judgment: Judgment;
     plan_id: PlanId;
     schema: "rustev.evidence/2";
+    /**
+     * One record per screened value, in lowered-step and item order.
+     *
+     * @minItems 1
+     */
+    screening?: [ScreeningEvidence, ...ScreeningEvidence[]];
     snapshot_id: SnapshotId;
     steps: StepEvidence[];
   }
@@ -4076,6 +4142,10 @@ export namespace RustevEvidence2 {
     kind: NoticeKind;
     reason: string;
     /**
+     * Entry, field, consequence and item ids only (spec 035, 3.6.4).
+     */
+    screening?: ScreeningNotice;
+    /**
      * The step or policy item it concerns.
      */
     subject: string;
@@ -4094,6 +4164,15 @@ export namespace RustevEvidence2 {
     override: Override;
     remediation: Remediation;
     transient: boolean;
+  }
+  /**
+   * Details of a screening notice. Never includes screened text.
+   */
+  export interface ScreeningNotice {
+    consequence: ScreenConsequence;
+    entry: string;
+    field: string;
+    items: string[];
   }
   /**
    * The result of `filter_with_reasons@1`.
@@ -4181,6 +4260,25 @@ export namespace RustevEvidence2 {
      * 1 to 1024 bytes of UTF-8, carried byte-identical; no interpolation.
      */
     text: string;
+  }
+  /**
+   * One screened value's evidence, in lowered-step and item order.
+   */
+  export interface ScreeningEvidence {
+    artifact: ArtifactId;
+    backend_id: string;
+    categories: string[];
+    consequence: ScreenConsequence;
+    descriptor: DescriptorId;
+    entry: string;
+    field: string;
+    /**
+     * Null means this field is not a list item.
+     */
+    item?: string | null;
+    step: string;
+    text_digest: ContentDigest;
+    verdict: ScreenVerdict;
   }
   export interface StepEvidence {
     /**
@@ -4980,8 +5078,18 @@ export namespace RustevJudgment1 {
    */
   export type DurationMs = number;
   export type NoticeKind =
-    | ("uncalibrated_threshold" | "truncation" | "fallback" | "constraints_relaxed" | "grade_downgraded" | "check_notice")
+    | (
+        | "uncalibrated_threshold"
+        | "truncation"
+        | "fallback"
+        | "constraints_relaxed"
+        | "grade_downgraded"
+        | "check_notice"
+        | "screening"
+      )
     | "field_dropped";
+  export type ScreenConsequence =
+    "none" | "refuse" | "drop_field" | "drop_text" | "drop_item" | "fail_closed" | "skip_generation" | "fail_open";
   /**
    * A judgment's outcome. Version 1 uses `Propose`, `Escalate` and
    * `Unresolved`; version 2 (spec 033, 3.5.1) replaces `Unresolved` with
@@ -5120,6 +5228,14 @@ export namespace RustevJudgment1 {
         insufficient_grade: {
           fields: string[];
         };
+      }
+    | {
+        screen_unavailable: {
+          /**
+           * @minItems 1
+           */
+          fields: [string, ...string[]];
+        };
       };
   export type ContentDigest = string;
   export type PlanId = string;
@@ -5157,6 +5273,10 @@ export namespace RustevJudgment1 {
     kind: NoticeKind;
     reason: string;
     /**
+     * Entry, field, consequence and item ids only (spec 035, 3.6.4).
+     */
+    screening?: ScreeningNotice;
+    /**
      * The step or policy item it concerns.
      */
     subject: string;
@@ -5175,6 +5295,15 @@ export namespace RustevJudgment1 {
     override: Override;
     remediation: Remediation;
     transient: boolean;
+  }
+  /**
+   * Details of a screening notice. Never includes screened text.
+   */
+  export interface ScreeningNotice {
+    consequence: ScreenConsequence;
+    entry: string;
+    field: string;
+    items: string[];
   }
   /**
    * The result of `filter_with_reasons@1`.
@@ -5398,8 +5527,18 @@ export namespace RustevJudgment2 {
    */
   export type DurationMs = number;
   export type NoticeKind =
-    | ("uncalibrated_threshold" | "truncation" | "fallback" | "constraints_relaxed" | "grade_downgraded" | "check_notice")
+    | (
+        | "uncalibrated_threshold"
+        | "truncation"
+        | "fallback"
+        | "constraints_relaxed"
+        | "grade_downgraded"
+        | "check_notice"
+        | "screening"
+      )
     | "field_dropped";
+  export type ScreenConsequence =
+    "none" | "refuse" | "drop_field" | "drop_text" | "drop_item" | "fail_closed" | "skip_generation" | "fail_open";
   /**
    * A judgment's outcome. Version 1 uses `Propose`, `Escalate` and
    * `Unresolved`; version 2 (spec 033, 3.5.1) replaces `Unresolved` with
@@ -5538,6 +5677,14 @@ export namespace RustevJudgment2 {
         insufficient_grade: {
           fields: string[];
         };
+      }
+    | {
+        screen_unavailable: {
+          /**
+           * @minItems 1
+           */
+          fields: [string, ...string[]];
+        };
       };
   export type ContentDigest = string;
   export type PlanId = string;
@@ -5575,6 +5722,10 @@ export namespace RustevJudgment2 {
     kind: NoticeKind;
     reason: string;
     /**
+     * Entry, field, consequence and item ids only (spec 035, 3.6.4).
+     */
+    screening?: ScreeningNotice;
+    /**
      * The step or policy item it concerns.
      */
     subject: string;
@@ -5593,6 +5744,15 @@ export namespace RustevJudgment2 {
     override: Override;
     remediation: Remediation;
     transient: boolean;
+  }
+  /**
+   * Details of a screening notice. Never includes screened text.
+   */
+  export interface ScreeningNotice {
+    consequence: ScreenConsequence;
+    entry: string;
+    field: string;
+    items: string[];
   }
   /**
    * The result of `filter_with_reasons@1`.
@@ -6632,6 +6792,7 @@ export namespace RustevPlan2 {
         | "deadline_exceeded"
         | "conflict"
         | "unsupported"
+        | "screen_unavailable"
       )
     | "insufficient_grade";
   /**
@@ -6862,8 +7023,18 @@ export namespace RustevPlan2 {
    */
   export type DurationMs = number;
   export type NoticeKind =
-    | ("uncalibrated_threshold" | "truncation" | "fallback" | "constraints_relaxed" | "grade_downgraded" | "check_notice")
+    | (
+        | "uncalibrated_threshold"
+        | "truncation"
+        | "fallback"
+        | "constraints_relaxed"
+        | "grade_downgraded"
+        | "check_notice"
+        | "screening"
+      )
     | "field_dropped";
+  export type ScreenConsequence =
+    "none" | "refuse" | "drop_field" | "drop_text" | "drop_item" | "fail_closed" | "skip_generation" | "fail_open";
   export type SourceId = string;
   /**
    * Derivation classes (spec 001, 3.3; spec 002, 3.12).
@@ -7452,6 +7623,10 @@ export namespace RustevPlan2 {
     kind: NoticeKind;
     reason: string;
     /**
+     * Entry, field, consequence and item ids only (spec 035, 3.6.4).
+     */
+    screening?: ScreeningNotice;
+    /**
      * The step or policy item it concerns.
      */
     subject: string;
@@ -7470,6 +7645,15 @@ export namespace RustevPlan2 {
     override: Override;
     remediation: Remediation;
     transient: boolean;
+  }
+  /**
+   * Details of a screening notice. Never includes screened text.
+   */
+  export interface ScreeningNotice {
+    consequence: ScreenConsequence;
+    entry: string;
+    field: string;
+    items: string[];
   }
   /**
    * A source descriptor bound at compile time.
@@ -7999,6 +8183,7 @@ export namespace RustevPlan3 {
         | "deadline_exceeded"
         | "conflict"
         | "unsupported"
+        | "screen_unavailable"
       )
     | "insufficient_grade";
   /**
@@ -8245,8 +8430,18 @@ export namespace RustevPlan3 {
    */
   export type DurationMs = number;
   export type NoticeKind =
-    | ("uncalibrated_threshold" | "truncation" | "fallback" | "constraints_relaxed" | "grade_downgraded" | "check_notice")
+    | (
+        | "uncalibrated_threshold"
+        | "truncation"
+        | "fallback"
+        | "constraints_relaxed"
+        | "grade_downgraded"
+        | "check_notice"
+        | "screening"
+      )
     | "field_dropped";
+  export type ScreenConsequence =
+    "none" | "refuse" | "drop_field" | "drop_text" | "drop_item" | "fail_closed" | "skip_generation" | "fail_open";
   export type SourceId = string;
   /**
    * Derivation classes (spec 001, 3.3; spec 002, 3.12).
@@ -8870,6 +9065,10 @@ export namespace RustevPlan3 {
     kind: NoticeKind;
     reason: string;
     /**
+     * Entry, field, consequence and item ids only (spec 035, 3.6.4).
+     */
+    screening?: ScreeningNotice;
+    /**
      * The step or policy item it concerns.
      */
     subject: string;
@@ -8888,6 +9087,15 @@ export namespace RustevPlan3 {
     override: Override;
     remediation: Remediation;
     transient: boolean;
+  }
+  /**
+   * Details of a screening notice. Never includes screened text.
+   */
+  export interface ScreeningNotice {
+    consequence: ScreenConsequence;
+    entry: string;
+    field: string;
+    items: string[];
   }
   /**
    * Plan 3 retains the canonical block and each lowered step's binding.
@@ -9278,8 +9486,18 @@ export namespace RustevPlanDiff1 {
    */
   export type DurationMs = number;
   export type NoticeKind =
-    | ("uncalibrated_threshold" | "truncation" | "fallback" | "constraints_relaxed" | "grade_downgraded" | "check_notice")
+    | (
+        | "uncalibrated_threshold"
+        | "truncation"
+        | "fallback"
+        | "constraints_relaxed"
+        | "grade_downgraded"
+        | "check_notice"
+        | "screening"
+      )
     | "field_dropped";
+  export type ScreenConsequence =
+    "none" | "refuse" | "drop_field" | "drop_text" | "drop_item" | "fail_closed" | "skip_generation" | "fail_open";
   /**
    * The literal `equal`, or the two differing values (spec 034, 3.12.2).
    */
@@ -9380,6 +9598,10 @@ export namespace RustevPlanDiff1 {
     kind: NoticeKind;
     reason: string;
     /**
+     * Entry, field, consequence and item ids only (spec 035, 3.6.4).
+     */
+    screening?: ScreeningNotice;
+    /**
      * The step or policy item it concerns.
      */
     subject: string;
@@ -9398,6 +9620,15 @@ export namespace RustevPlanDiff1 {
     override: Override;
     remediation: Remediation;
     transient: boolean;
+  }
+  /**
+   * Details of a screening notice. Never includes screened text.
+   */
+  export interface ScreeningNotice {
+    consequence: ScreenConsequence;
+    entry: string;
+    field: string;
+    items: string[];
   }
   export interface ParameterChange {
     left: ParameterSide;
@@ -10950,6 +11181,14 @@ export namespace RustevRun1 {
         insufficient_grade: {
           fields: string[];
         };
+      }
+    | {
+        screen_unavailable: {
+          /**
+           * @minItems 1
+           */
+          fields: [string, ...string[]];
+        };
       };
   export type DefinitionId = string;
   export type Timestamp = number;
@@ -11190,8 +11429,18 @@ export namespace RustevRun1 {
    */
   export type DurationMs = number;
   export type NoticeKind =
-    | ("uncalibrated_threshold" | "truncation" | "fallback" | "constraints_relaxed" | "grade_downgraded" | "check_notice")
+    | (
+        | "uncalibrated_threshold"
+        | "truncation"
+        | "fallback"
+        | "constraints_relaxed"
+        | "grade_downgraded"
+        | "check_notice"
+        | "screening"
+      )
     | "field_dropped";
+  export type ScreenConsequence =
+    "none" | "refuse" | "drop_field" | "drop_text" | "drop_item" | "fail_closed" | "skip_generation" | "fail_open";
   /**
    * A judgment's outcome. Version 1 uses `Propose`, `Escalate` and
    * `Unresolved`; version 2 (spec 033, 3.5.1) replaces `Unresolved` with
@@ -11277,6 +11526,15 @@ export namespace RustevRun1 {
   export type ContentDigest = string;
   export type PlanId = string;
   export type SnapshotId = string;
+  export type ArtifactId = string;
+  export type DescriptorId = string;
+  export type ScreenVerdict =
+    | ("pass" | "blocked" | "empty")
+    | {
+        unavailable: {
+          reason: Unresolved;
+        };
+      };
   export type CheckReason =
     | "true"
     | {
@@ -11324,7 +11582,6 @@ export namespace RustevRun1 {
         declared: ExecutionPolicyId;
       };
   export type ExecutionPolicyId = string;
-  export type ArtifactId = string;
   /**
    * What is known about cancelling an attempt (spec 003, 3.7.3).
    */
@@ -11451,6 +11708,12 @@ export namespace RustevRun1 {
     judgment: Judgment;
     plan_id: PlanId;
     schema: string;
+    /**
+     * One record per screened value, in lowered-step and item order.
+     *
+     * @minItems 1
+     */
+    screening?: [ScreeningEvidence, ...ScreeningEvidence[]];
     snapshot_id: SnapshotId;
     steps: StepEvidence[];
   }
@@ -11567,6 +11830,10 @@ export namespace RustevRun1 {
     kind: NoticeKind;
     reason: string;
     /**
+     * Entry, field, consequence and item ids only (spec 035, 3.6.4).
+     */
+    screening?: ScreeningNotice;
+    /**
      * The step or policy item it concerns.
      */
     subject: string;
@@ -11585,6 +11852,15 @@ export namespace RustevRun1 {
     override: Override;
     remediation: Remediation;
     transient: boolean;
+  }
+  /**
+   * Details of a screening notice. Never includes screened text.
+   */
+  export interface ScreeningNotice {
+    consequence: ScreenConsequence;
+    entry: string;
+    field: string;
+    items: string[];
   }
   /**
    * The result of `filter_with_reasons@1`.
@@ -11672,6 +11948,25 @@ export namespace RustevRun1 {
      * 1 to 1024 bytes of UTF-8, carried byte-identical; no interpolation.
      */
     text: string;
+  }
+  /**
+   * One screened value's evidence, in lowered-step and item order.
+   */
+  export interface ScreeningEvidence {
+    artifact: ArtifactId;
+    backend_id: string;
+    categories: string[];
+    consequence: ScreenConsequence;
+    descriptor: DescriptorId;
+    entry: string;
+    field: string;
+    /**
+     * Null means this field is not a list item.
+     */
+    item?: string | null;
+    step: string;
+    text_digest: ContentDigest;
+    verdict: ScreenVerdict;
   }
   export interface StepEvidence {
     /**
@@ -11939,6 +12234,14 @@ export namespace RustevRun2 {
         insufficient_grade: {
           fields: string[];
         };
+      }
+    | {
+        screen_unavailable: {
+          /**
+           * @minItems 1
+           */
+          fields: [string, ...string[]];
+        };
       };
   export type DefinitionId = string;
   export type Timestamp = number;
@@ -12179,8 +12482,18 @@ export namespace RustevRun2 {
    */
   export type DurationMs = number;
   export type NoticeKind =
-    | ("uncalibrated_threshold" | "truncation" | "fallback" | "constraints_relaxed" | "grade_downgraded" | "check_notice")
+    | (
+        | "uncalibrated_threshold"
+        | "truncation"
+        | "fallback"
+        | "constraints_relaxed"
+        | "grade_downgraded"
+        | "check_notice"
+        | "screening"
+      )
     | "field_dropped";
+  export type ScreenConsequence =
+    "none" | "refuse" | "drop_field" | "drop_text" | "drop_item" | "fail_closed" | "skip_generation" | "fail_open";
   /**
    * A judgment's outcome. Version 1 uses `Propose`, `Escalate` and
    * `Unresolved`; version 2 (spec 033, 3.5.1) replaces `Unresolved` with
@@ -12266,6 +12579,15 @@ export namespace RustevRun2 {
   export type ContentDigest = string;
   export type PlanId = string;
   export type SnapshotId = string;
+  export type ArtifactId = string;
+  export type DescriptorId = string;
+  export type ScreenVerdict =
+    | ("pass" | "blocked" | "empty")
+    | {
+        unavailable: {
+          reason: Unresolved;
+        };
+      };
   export type CheckReason =
     | "true"
     | {
@@ -12313,7 +12635,6 @@ export namespace RustevRun2 {
         declared: ExecutionPolicyId;
       };
   export type ExecutionPolicyId = string;
-  export type ArtifactId = string;
   /**
    * How the attempt's charge was established.
    */
@@ -12511,6 +12832,12 @@ export namespace RustevRun2 {
     judgment: Judgment;
     plan_id: PlanId;
     schema: string;
+    /**
+     * One record per screened value, in lowered-step and item order.
+     *
+     * @minItems 1
+     */
+    screening?: [ScreeningEvidence, ...ScreeningEvidence[]];
     snapshot_id: SnapshotId;
     steps: StepEvidence[];
   }
@@ -12627,6 +12954,10 @@ export namespace RustevRun2 {
     kind: NoticeKind;
     reason: string;
     /**
+     * Entry, field, consequence and item ids only (spec 035, 3.6.4).
+     */
+    screening?: ScreeningNotice;
+    /**
      * The step or policy item it concerns.
      */
     subject: string;
@@ -12645,6 +12976,15 @@ export namespace RustevRun2 {
     override: Override;
     remediation: Remediation;
     transient: boolean;
+  }
+  /**
+   * Details of a screening notice. Never includes screened text.
+   */
+  export interface ScreeningNotice {
+    consequence: ScreenConsequence;
+    entry: string;
+    field: string;
+    items: string[];
   }
   /**
    * The result of `filter_with_reasons@1`.
@@ -12732,6 +13072,25 @@ export namespace RustevRun2 {
      * 1 to 1024 bytes of UTF-8, carried byte-identical; no interpolation.
      */
     text: string;
+  }
+  /**
+   * One screened value's evidence, in lowered-step and item order.
+   */
+  export interface ScreeningEvidence {
+    artifact: ArtifactId;
+    backend_id: string;
+    categories: string[];
+    consequence: ScreenConsequence;
+    descriptor: DescriptorId;
+    entry: string;
+    field: string;
+    /**
+     * Null means this field is not a list item.
+     */
+    item?: string | null;
+    step: string;
+    text_digest: ContentDigest;
+    verdict: ScreenVerdict;
   }
   export interface StepEvidence {
     /**
@@ -13057,6 +13416,14 @@ export namespace RustevRun3 {
         insufficient_grade: {
           fields: string[];
         };
+      }
+    | {
+        screen_unavailable: {
+          /**
+           * @minItems 1
+           */
+          fields: [string, ...string[]];
+        };
       };
   export type DefinitionId = string;
   export type Timestamp = number;
@@ -13297,8 +13664,18 @@ export namespace RustevRun3 {
    */
   export type DurationMs = number;
   export type NoticeKind =
-    | ("uncalibrated_threshold" | "truncation" | "fallback" | "constraints_relaxed" | "grade_downgraded" | "check_notice")
+    | (
+        | "uncalibrated_threshold"
+        | "truncation"
+        | "fallback"
+        | "constraints_relaxed"
+        | "grade_downgraded"
+        | "check_notice"
+        | "screening"
+      )
     | "field_dropped";
+  export type ScreenConsequence =
+    "none" | "refuse" | "drop_field" | "drop_text" | "drop_item" | "fail_closed" | "skip_generation" | "fail_open";
   /**
    * A judgment's outcome. Version 1 uses `Propose`, `Escalate` and
    * `Unresolved`; version 2 (spec 033, 3.5.1) replaces `Unresolved` with
@@ -13384,6 +13761,15 @@ export namespace RustevRun3 {
   export type ContentDigest = string;
   export type PlanId = string;
   export type SnapshotId = string;
+  export type ArtifactId = string;
+  export type DescriptorId = string;
+  export type ScreenVerdict =
+    | ("pass" | "blocked" | "empty")
+    | {
+        unavailable: {
+          reason: Unresolved;
+        };
+      };
   export type CheckReason =
     | "true"
     | {
@@ -13431,7 +13817,6 @@ export namespace RustevRun3 {
         declared: ExecutionPolicyId;
       };
   export type ExecutionPolicyId = string;
-  export type ArtifactId = string;
   /**
    * What is known about cancelling an attempt (spec 003, 3.7.3).
    */
@@ -13501,7 +13886,16 @@ export namespace RustevRun3 {
     | {
         failed: Unresolved;
       }
-    | "not_supplied";
+    | "not_supplied"
+    | "withdrawn";
+  export type ScreenCache =
+    | ("miss" | "disabled")
+    | {
+        hit: {
+          source_attempt: string;
+        };
+      };
+  export type ScreenUnitBasis = "reported" | "computed" | "cache_hit";
   export type Transition =
     | {
         retry: {
@@ -13558,6 +13952,12 @@ export namespace RustevRun3 {
     judgment: Judgment;
     plan_id: PlanId;
     schema: string;
+    /**
+     * One record per screened value, in lowered-step and item order.
+     *
+     * @minItems 1
+     */
+    screening?: [ScreeningEvidence, ...ScreeningEvidence[]];
     snapshot_id: SnapshotId;
     steps: StepEvidence[];
   }
@@ -13674,6 +14074,10 @@ export namespace RustevRun3 {
     kind: NoticeKind;
     reason: string;
     /**
+     * Entry, field, consequence and item ids only (spec 035, 3.6.4).
+     */
+    screening?: ScreeningNotice;
+    /**
      * The step or policy item it concerns.
      */
     subject: string;
@@ -13692,6 +14096,15 @@ export namespace RustevRun3 {
     override: Override;
     remediation: Remediation;
     transient: boolean;
+  }
+  /**
+   * Details of a screening notice. Never includes screened text.
+   */
+  export interface ScreeningNotice {
+    consequence: ScreenConsequence;
+    entry: string;
+    field: string;
+    items: string[];
   }
   /**
    * The result of `filter_with_reasons@1`.
@@ -13779,6 +14192,25 @@ export namespace RustevRun3 {
      * 1 to 1024 bytes of UTF-8, carried byte-identical; no interpolation.
      */
     text: string;
+  }
+  /**
+   * One screened value's evidence, in lowered-step and item order.
+   */
+  export interface ScreeningEvidence {
+    artifact: ArtifactId;
+    backend_id: string;
+    categories: string[];
+    consequence: ScreenConsequence;
+    descriptor: DescriptorId;
+    entry: string;
+    field: string;
+    /**
+     * Null means this field is not a list item.
+     */
+    item?: string | null;
+    step: string;
+    text_digest: ContentDigest;
+    verdict: ScreenVerdict;
   }
   export interface StepEvidence {
     /**
@@ -13881,6 +14313,10 @@ export namespace RustevRun3 {
      */
     optimization?: OptimizationRecord | null;
     result: RequestResult;
+    /**
+     * Screening cache and text-unit observations (spec 035, 3.13.2).
+     */
+    screen?: ScreenRequest;
     step: string;
     transitions: Transition[];
   }
@@ -13932,6 +14368,23 @@ export namespace RustevRun3 {
      * its own; replay takes it as the output's origin.
      */
     source_attempt_id?: string | null;
+  }
+  export interface ScreenRequest {
+    cache: ScreenCache;
+    units: ScreenChargedUnits;
+  }
+  export interface ScreenChargedUnits {
+    basis: ScreenUnitBasis;
+    /**
+     * Present only for a reported charge above its computed bound.
+     * Mirrors the cost ledger's bound-violation observation (3.12.3).
+     */
+    bound_violation?: ScreenUnitBoundViolation;
+    charged: number;
+  }
+  export interface ScreenUnitBoundViolation {
+    computed: number;
+    reported: number;
   }
   /**
    * Monotonic milliseconds from submission; never wall-clock time.
@@ -14001,6 +14454,14 @@ export namespace RustevRuntimeReason1 {
     | {
         insufficient_grade: {
           fields: string[];
+        };
+      }
+    | {
+        screen_unavailable: {
+          /**
+           * @minItems 1
+           */
+          fields: [string, ...string[]];
         };
       };
 
@@ -14664,6 +15125,14 @@ export namespace RustevServeEvent1 {
     | {
         insufficient_grade: {
           fields: string[];
+        };
+      }
+    | {
+        screen_unavailable: {
+          /**
+           * @minItems 1
+           */
+          fields: [string, ...string[]];
         };
       };
   /**

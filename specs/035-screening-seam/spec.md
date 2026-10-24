@@ -56,6 +56,8 @@ extends:
   - { spec: "030-bedrock-backend", unit: { kind: directory, path: "integrations/rustev-bedrock/" }, nature: additive }
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-node/" }, nature: additive }
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-wasm/" }, nature: additive }
+  # The OpenTelemetry projection's exhaustive match over request results.
+  - { spec: "028-opentelemetry-evidence-sink", unit: { kind: directory, path: "integrations/rustev-otel/" }, nature: additive }
   # A new contract source file joins rustev-contract's reviewed archive list.
   - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
   # Adds 035 to `make verify` when the implementation is complete.
@@ -840,6 +842,24 @@ core increment admits screening, a `rustev.definition/2` that uses
 `screening` and no construct of spec 032 or 033 is refused by the existing
 version check. `screening.rs` joins rustev-contract's reviewed archive
 list in `tools/rustev-release/archive-policy.json`.
+
+**Increment 1, part 3 (2026-10-24): judgment, evidence and run record
+members.** `Unresolved` gains `screen_unavailable{fields}`, its fields
+sorted, unique and non-empty (3.9.1), with the `screen_unavailable`
+reason kind; `NoticeKind` gains `screening`, whose notice names the
+entry, field and consequence and lists item ids, never text (3.6.4). The
+screening refusal uses spec 033's refusal and action forms with the
+reserved check `screen:<entry id>` and remediation `screen_blocked`
+(3.7.1), and the withheld marker is the exact value
+`{"withheld":"screen_blocked"}` (3.8.1). `rustev.evidence/2` gains the
+optional `screening` list of 3.13.1 with the `rustev.screen-text/1`
+digest, and a `rustev.run/3` request record gains `screen{cache, units}`,
+a `withdrawn` result and a unit bound violation (3.12.3, 3.13.2); each is
+refused in an earlier document version. The redaction classes of 3.13.3
+are declared for the new members. Core and runtime produce none of these
+yet: core's actionability maps `screen_unavailable` to no cause until the
+consequence increment gives it the `backend{step, origin}` cause of
+3.9.1. Records without screening keep their bytes (3.18.1, 3.18.4).
 
 ## Facts relied on
 

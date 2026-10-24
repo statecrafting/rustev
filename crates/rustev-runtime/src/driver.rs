@@ -432,6 +432,7 @@ fn cache_lookup(cx: &DecisionCtx<'_, '_>, req: &SemanticRequest) -> CacheLookup 
                     instance: req.instance.clone(),
                     supplied: Some(Supplied::Output(hit.output)),
                     record: RequestRecord {
+                        screen: None,
                         step: req.step.clone(),
                         instance: req.instance.clone(),
                         result: RequestResult::Output { target: hit.target },
@@ -1252,6 +1253,7 @@ impl Builder<'_> {
             instance: self.req.instance.clone(),
             supplied,
             record: RequestRecord {
+                screen: None,
                 step: self.req.step.clone(),
                 instance: self.req.instance.clone(),
                 result,
