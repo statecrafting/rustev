@@ -936,6 +936,26 @@ own refusal, distinct from an ambiguous one, until public state is
 queried. Part 1b-ii adds the family lifecycle that writes these entries.
 Nothing here publishes.
 
+**Increment 9 part 1b-ii, 2026-10-23 (the family lifecycle).**
+`observe-crates <manifest>` reads the public sparse index without a
+credential and refuses unless every crate of the manifest is visible with
+its checksum. The lifecycle now spans the family (3.1, 3.9, 3.11): the
+signed manifest is journaled before the first upload of any kind; the
+owner's instruction must name exactly the manifest's version (the
+first-release order authorizes 0.1.0 alone, 3.11.1), commit, registries
+and artifact set; each layer starts only after every artifact of the
+earlier layers is observed public with its expected checksum (crates: the
+index checksum; npm: the integrity; hosted assets: SHA-256); every attempt
+is journaled before and after, an attempt without a recorded result counts
+as ambiguous, a refusal or bytes already public under the version stop the
+run, and a rerun skips what is public with the same bytes; a stop after
+any acceptance is `partially published`, continuing needs a fresh
+instruction (3.11.4), `released` needs layer 8 and `qualified` the
+recorded fresh-consumer evidence. Fakes for npm and the hosted release
+(`FamilyRegistry`) drive each rule, with no network or credential; their
+tests follow in their own change. Part 2 wires the workflow and adds layer
+8's adapter. Nothing here publishes.
+
 **Increment 10, 2026-10-23 (the npm declaration check of 3.8).**
 `tools/rustev-release/npm-api-diff.mjs` compares two versions of an npm
 package's declaration surface with the TypeScript compiler API, pinned at

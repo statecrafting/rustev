@@ -495,6 +495,12 @@ pub fn publish(
         );
     }
     let m = life.manifest.clone();
+    // A journal that binds no manifest is not yet this release's record:
+    // the refusal leaves it untouched, so a later bind starts clean rather
+    // than behind a `Stopped` entry that would demand a continuation.
+    if let Err(reason) = crate::family_lifecycle::bound(&m, journal) {
+        return Outcome::Stopped { reason };
+    }
     if !m.artifacts.is_empty() {
         if journal
             .entries
