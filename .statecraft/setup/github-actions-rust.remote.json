@@ -38,10 +38,16 @@
       }
     ]
   },
+  "mergeQueue": {
+    "allEntriesMustPass": true,
+    "buildConcurrency": 5,
+    "mergeMethod": "squash",
+    "required": true
+  },
   "profile": {
     "id": "github-actions-rust",
-    "identity": "fe0e763c8f217652df7975e429a8eb2c762657abc33344ef79f6d4e18733e7a6",
-    "revision": 17
+    "identity": "54b47e9bce67921d21a4916e8267fd56a3cef846ef1fa1c79354c4f77b2e6925",
+    "revision": 18
   },
   "requiredChecks": [
     {
