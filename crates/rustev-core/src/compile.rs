@@ -77,6 +77,8 @@ pub enum Category {
     InvalidScreening = 18,
     /// A model projection carries uncovered untrusted text (spec 035, 3.5.5).
     UnscreenedText = 19,
+    InvalidAcquisition = 20,
+    SourceMapping = 21,
 }
 
 /// Why one candidate backend cannot serve a step.
@@ -161,6 +163,7 @@ fn refuse<T>(
 /// What the compiler knows about each step, kept for evaluation.
 #[derive(Debug, Clone)]
 pub(crate) enum StepInfo {
+    Acquisition(Box<crate::acquisition::Acquisition>),
     Exact {
         args: OpArgs,
         ty: Ty,
@@ -774,6 +777,21 @@ pub(crate) fn compile_instantiated(
         }
     }
 
+    if def
+        .limits
+        .acquisition
+        .as_ref()
+        .is_some_and(|b| !(1..=4096).contains(&b.max_calls))
+    {
+        return refuse(C::Parse, "limits", "acquisition.max_calls outside 1..=4096");
+    }
+    if !v2 && def.limits.acquisition.is_some() {
+        return refuse(
+            C::InvalidDefinition,
+            "limits",
+            "requires-definition-2: acquisition budget",
+        );
+    }
     // Screening is a definition 2 construct (spec 035, section 2).
     if !v2 && def.screening.is_some() {
         return refuse(
@@ -799,17 +817,16 @@ pub(crate) fn compile_instantiated(
     // and the `acquisitions` member (3.10). A version 2 definition compiles
     // only to `rustev.plan/3` (3.10.4), never to `rustev.plan/2`.
     for s in &def.steps {
-        if matches!(s.body, StepBody::Acquire(_) | StepBody::Widen(_)) {
+        if !v2 && matches!(s.body, StepBody::Acquire(_) | StepBody::Widen(_)) {
             return refuse(
                 C::InvalidDefinition,
                 format!("step:{}", s.id),
-                if v2 {
-                    "acquisition-not-compiled"
-                } else {
-                    "requires-definition-2"
-                },
+                "requires-definition-2",
             );
         }
+    }
+    for s in &def.steps {
+        crate::acquisition::structure(&s.id, &s.body)?;
     }
     if !v2
         && def.policy.on_unresolved.iter().any(|h| {
@@ -937,7 +954,9 @@ pub(crate) fn compile_instantiated(
             // Refused above outside plan 3, whose own structure is checked by
             // `quality::structure`; here only the references are resolved.
             StepBody::Acquire(_) | StepBody::Widen(_) => {
-                unreachable!("acquisition refused in structure")
+                for r in crate::acquisition::refs(&s.body) {
+                    known(&r).or_else(|e| inv(subject.clone(), e))?;
+                }
             }
             StepBody::Corroborate(c) => {
                 let mut refs = vec![c.claim.clone()];
@@ -1188,7 +1207,7 @@ pub(crate) fn compile_instantiated(
         let subject = format!("step:{}", s.id);
         match &s.body {
             StepBody::Acquire(_) | StepBody::Widen(_) => {
-                unreachable!("acquisition refused in structure")
+                crate::acquisition::resolve(&s.id, &s.body, sources)?;
             }
             StepBody::Corroborate(_) => {}
             StepBody::Exact(e) => {
@@ -1239,7 +1258,7 @@ pub(crate) fn compile_instantiated(
 
     // (c) continued: bind every source a graded input names (spec 032,
     // 3.3.4). A version 1 definition binds none.
-    let bound = if v2 {
+    let mut bound = if v2 {
         quality::bind_sources(def, sources)?
     } else {
         quality::Bound::default()
@@ -1249,9 +1268,7 @@ pub(crate) fn compile_instantiated(
     let mut deps: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for s in &def.steps {
         let mut refs: Vec<String> = match &s.body {
-            StepBody::Acquire(_) | StepBody::Widen(_) => {
-                unreachable!("acquisition refused in structure")
-            }
+            StepBody::Acquire(_) | StepBody::Widen(_) => crate::acquisition::refs(&s.body),
             StepBody::Corroborate(c) => corroborate_refs(c),
             StepBody::Exact(_) => decoded[&s.id].refs(),
             StepBody::Semantic(d) => {
@@ -1296,6 +1313,7 @@ pub(crate) fn compile_instantiated(
     let mut max_requests: BTreeMap<String, u64> = BTreeMap::new();
     let by_id: BTreeMap<&str, &rustev_contract::definition::StepDecl> =
         def.steps.iter().map(|s| (s.id.as_str(), s)).collect();
+    let mut acquisition_derivations = BTreeMap::new();
     for id in &order {
         let s = by_id[id.as_str()];
         let subject = format!("step:{id}");
@@ -1313,7 +1331,16 @@ pub(crate) fn compile_instantiated(
         };
         match &s.body {
             StepBody::Acquire(_) | StepBody::Widen(_) => {
-                unreachable!("acquisition refused in structure")
+                let a = crate::acquisition::compile(
+                    id,
+                    &s.body,
+                    sources,
+                    &env,
+                    &acquisition_derivations,
+                    def,
+                )?;
+                step_tys.insert(id.clone(), StepTy::Exact(a.ty.clone()));
+                infos.insert(id.clone(), StepInfo::Acquisition(Box::new(a)));
             }
             StepBody::Corroborate(c) => {
                 // The step's value is the claim (spec 032, 3.7.5).
@@ -1473,6 +1500,13 @@ pub(crate) fn compile_instantiated(
                 );
             }
         }
+        acquisition_derivations = static_derivations(
+            def,
+            &inputs,
+            &order[..=order.iter().position(|x| x == id).unwrap()],
+            &deps,
+            &infos,
+        );
     }
 
     screening::coverage(authored, &screens, &decoded)?;
@@ -1494,6 +1528,7 @@ pub(crate) fn compile_instantiated(
         }
         for id in &order {
             let tree = match &infos[id] {
+                StepInfo::Acquisition(a) => a.tree.clone(),
                 StepInfo::Exact { args, .. } => quality::step_tree(args, &trees),
                 StepInfo::Semantic { decl, .. } => quality::semantic_tree(decl, &trees),
                 StepInfo::Corroborate { decl, .. } => quality::corroborate_tree(decl, &trees),
@@ -1503,6 +1538,10 @@ pub(crate) fn compile_instantiated(
         for s in &def.steps {
             let subject = format!("step:{}", s.id);
             let found = match &infos[&s.id] {
+                StepInfo::Acquisition(a) => a
+                    .reads
+                    .iter()
+                    .find_map(|r| quality::requirement_refusal(&subject, r, &trees)),
                 StepInfo::Exact { args, .. } => quality::op_reads(args)
                     .iter()
                     .filter(|r| r.gate || r.require.is_some())
@@ -1526,7 +1565,11 @@ pub(crate) fn compile_instantiated(
                 return Err(r);
             }
         }
-        if !bound.inputs.is_empty() {
+        if !bound.inputs.is_empty()
+            || infos
+                .values()
+                .any(|i| matches!(i, StepInfo::Acquisition(_)))
+        {
             for name in inputs.keys() {
                 let key = format!("input:{name}");
                 trees[&key].walk(&key, &mut grade_table);
@@ -1561,7 +1604,15 @@ pub(crate) fn compile_instantiated(
                 continue;
             }
             StepBody::Acquire(_) | StepBody::Widen(_) => {
-                unreachable!("acquisition refused in structure")
+                details.insert(
+                    s.id.clone(),
+                    if matches!(s.body, StepBody::Acquire(_)) {
+                        PlanStepDetail::Acquire
+                    } else {
+                        PlanStepDetail::Widen
+                    },
+                );
+                continue;
             }
             StepBody::Corroborate(_) => {
                 details.insert(s.id.clone(), PlanStepDetail::Corroborate);
@@ -1763,6 +1814,7 @@ pub(crate) fn compile_instantiated(
 
     // (g) Budget.
     screening::budget(authored, &screens, descriptors)?;
+    crate::acquisition::budget(def, sources, execution)?;
     let mut total: u64 = 0;
     for s in &def.steps {
         if let Some(PlanStepDetail::Semantic(b)) = details.get(&s.id) {
@@ -1836,8 +1888,38 @@ pub(crate) fn compile_instantiated(
         detail: e.to_string(),
         shortfalls: vec![],
     })?;
+    let acquisitions: Vec<_> = def
+        .steps
+        .iter()
+        .filter_map(|s| match &infos[&s.id] {
+            StepInfo::Acquisition(a) => {
+                use rustev_contract::acquisition_record::AcquisitionPossibleOutcome as O;
+                let mut plan = a.plan.clone();
+                for (reason, outcome) in [
+                    (ReasonKind::Skipped, O::Skipped),
+                    (ReasonKind::InsufficientGrade, O::InsufficientGrade),
+                ] {
+                    if reasons[&format!("step:{}", s.id)].contains(&reason)
+                        && !plan.outcomes.contains(&outcome)
+                    {
+                        plan.outcomes.push(outcome);
+                    }
+                }
+                Some(plan)
+            }
+            _ => None,
+        })
+        .collect();
+    for a in &acquisitions {
+        for b in &a.sources {
+            if !bound.sources.iter().any(|s| s.name == b.source.name) {
+                bound.sources.push(b.source.clone());
+            }
+        }
+    }
+    bound.sources.sort_by(|a, b| a.name.cmp(&b.name));
     let plan = Plan {
-        acquisitions: None,
+        acquisitions: (!acquisitions.is_empty()).then_some(acquisitions),
         schema: if v2 { schema::PLAN_V3 } else { schema::PLAN }.into(),
         compiler: COMPILER.into(),
         registry: registry.into(),
@@ -1992,7 +2074,11 @@ fn extend_reasons_v2(
                 }
                 if !matches!(args, OpArgs::FieldPresence(_)) {
                     for d in &deps[id] {
-                        add.extend(reasons.get(d).cloned().unwrap_or_default());
+                        let mut inherited = reasons.get(d).cloned().unwrap_or_default();
+                        if probe_only(args, d) {
+                            inherited.remove(&K::Skipped);
+                        }
+                        add.extend(inherited);
                     }
                 }
             }
@@ -2016,7 +2102,7 @@ fn extend_reasons_v2(
                     rustev_contract::definition::OnContradiction::TreatAsHint => {}
                 }
             }
-            StepInfo::Semantic { .. } => {
+            StepInfo::Acquisition(_) | StepInfo::Semantic { .. } => {
                 for d in &deps[id] {
                     add.extend(reasons.get(d).cloned().unwrap_or_default());
                 }
@@ -2331,6 +2417,23 @@ fn possible_reasons(
     for id in order {
         let mut r = BTreeSet::new();
         match (&infos[id], &details[id]) {
+            (StepInfo::Acquisition(a), _) => {
+                r.extend([
+                    K::MissingEvidence,
+                    K::StaleEvidence,
+                    K::InvalidInput,
+                    K::BackendUnavailable,
+                    K::InvalidBackendOutput,
+                    K::BudgetExhausted,
+                    K::DeadlineExceeded,
+                ]);
+                if a.plan.outcomes.contains(
+                    &rustev_contract::acquisition_record::AcquisitionPossibleOutcome::Skipped,
+                ) {
+                    r.insert(K::Skipped);
+                }
+                if a.plan.outcomes.contains(&rustev_contract::acquisition_record::AcquisitionPossibleOutcome::InsufficientGrade) { r.insert(K::InsufficientGrade); }
+            }
             (_, PlanStepDetail::Unsupported { .. }) => {
                 r.insert(K::Unsupported);
             }
@@ -2349,7 +2452,11 @@ fn possible_reasons(
                     }
                 } else {
                     for d in args.refs() {
-                        r.extend(out.get(&d).cloned().unwrap_or_default());
+                        let mut inherited = out.get(&d).cloned().unwrap_or_default();
+                        if probe_only(args, &d) {
+                            inherited.remove(&K::Skipped);
+                        }
+                        r.extend(inherited);
                     }
                 }
                 r.extend(args.own_reasons());
@@ -2389,6 +2496,33 @@ fn possible_reasons(
         out.insert(format!("step:{id}"), r);
     }
     out
+}
+
+// Presence probes consume the existence of a value, not a skipped value.
+fn predicate_value_refs(p: &rustev_contract::definition::Predicate, out: &mut Vec<String>) {
+    use rustev_contract::definition::Predicate as P;
+    match p {
+        P::Present(_) | P::IsConstructed { .. } => {}
+        P::All(ps) | P::Any(ps) => ps.iter().for_each(|p| predicate_value_refs(p, out)),
+        P::Not(p) => predicate_value_refs(p, out),
+        p => crate::expr::predicate_refs(p, out),
+    }
+}
+fn condition_value_refs(c: &Cond, out: &mut Vec<String>) {
+    match c {
+        Cond::Exact(p) => predicate_value_refs(p, out),
+        Cond::All(cs) | Cond::Any(cs) => cs.iter().for_each(|c| condition_value_refs(c, out)),
+        Cond::Not(c) => condition_value_refs(c, out),
+        c => condition_refs(c, out),
+    }
+}
+fn probe_only(args: &OpArgs, target: &str) -> bool {
+    if let OpArgs::Compare(c) = args {
+        let mut values = vec![];
+        predicate_value_refs(&c.predicate, &mut values);
+        return !values.iter().any(|r| crate::expr::base_ref_v2(r) == target);
+    }
+    false
 }
 
 /// Refs a condition reads, with whether each read is under a `not`.
@@ -2484,28 +2618,52 @@ fn check_policy(
             ReasonSet::Any => ReasonKind::ALL.into_iter().collect(),
             ReasonSet::Only(v) => v.iter().copied().collect(),
         };
+        if h.action == HandlerAction::Propagate
+            && set.contains(&ReasonKind::Skipped)
+            && reasons
+                .get(&h.target)
+                .is_some_and(|r| r.contains(&ReasonKind::Skipped))
+        {
+            return refuse(
+                C::UnhandledUnresolved,
+                &h.target,
+                "skipped_not_propagatable",
+            );
+        }
         if h.action == HandlerAction::AsUnmet {
             unmet.insert(&h.target);
         }
         covered.entry(&h.target).or_default().extend(set);
     }
-    let mut reads: Vec<(String, String, bool)> = Vec::new();
+    let mut reads: Vec<(String, String, bool, bool)> = Vec::new();
     for (subject, cond, outcome) in &items {
         let mut r = Vec::new();
         cond_reads(cond, false, &mut r);
+        let mut values = vec![];
+        condition_value_refs(cond, &mut values);
         reads.extend(
             r.into_iter()
                 .filter(|(x, _)| x.starts_with("input:") || x.starts_with("step:"))
-                .map(|(x, neg)| (subject.clone(), base(&x), neg)),
+                .map(|(x, neg)| {
+                    let target = base(&x);
+                    let probe = !values.iter().any(|v| base(v) == target);
+                    (subject.clone(), target, neg, probe)
+                }),
         );
         if let Some(o) = outcome {
             let mut refs = Vec::new();
             outcome_refs(o, &mut refs);
-            reads.extend(refs.into_iter().map(|x| (subject.clone(), base(&x), false)));
+            reads.extend(
+                refs.into_iter()
+                    .map(|x| (subject.clone(), base(&x), false, false)),
+            );
         }
     }
-    for (subject, target, negated) in &reads {
-        let possible = reasons.get(target).cloned().unwrap_or_default();
+    for (subject, target, negated, probe) in &reads {
+        let mut possible = reasons.get(target).cloned().unwrap_or_default();
+        if *probe {
+            possible.remove(&ReasonKind::Skipped);
+        }
         let have = covered.get(target.as_str()).cloned().unwrap_or_default();
         let missing: Vec<&str> = possible.difference(&have).map(|k| k.name()).collect();
         if !missing.is_empty() {
@@ -2660,6 +2818,10 @@ fn static_derivations(
         .collect();
     let mut out: BTreeMap<String, Derivation> = BTreeMap::new();
     for id in order {
+        if let Some(StepInfo::Acquisition(a)) = infos.get(id) {
+            out.insert(id.clone(), a.plan.derivation);
+            continue;
+        }
         if semantic.contains(id.as_str()) {
             out.insert(id.clone(), Derivation::ModelDerived);
             continue;

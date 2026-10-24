@@ -901,7 +901,10 @@ fn step_attributes(
                 PlanMetadata,
                 s.backend_id.as_str().into(),
             ),
-            PlanStepDetail::Unsupported { .. } | PlanStepDetail::Corroborate => {}
+            PlanStepDetail::Unsupported { .. }
+            | PlanStepDetail::Corroborate
+            | PlanStepDetail::Acquire
+            | PlanStepDetail::Widen => {}
         }
     }
     if let Some(s) = se {

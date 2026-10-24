@@ -224,3 +224,27 @@ fn all_existing_definition_goldens_keep_bytes_and_identity() {
     }
     assert!(count >= 2);
 }
+
+#[test]
+fn acquisition_budget_and_plan_details_roundtrip_canonically() {
+    use rustev_contract::acquisition_step::AcquisitionBudget;
+    use rustev_contract::plan::PlanStepDetail;
+    let budget = json!({"max_calls":4096,"max_items":100,"max_bytes":2048});
+    let parsed: AcquisitionBudget = serde_json::from_value(budget.clone()).unwrap();
+    assert_eq!(serde_json::to_value(parsed).unwrap(), budget);
+    for n in [0, 4097] {
+        let mut bad = budget.clone();
+        bad["max_calls"] = json!(n);
+        assert!(serde_json::from_value::<AcquisitionBudget>(bad).is_err());
+    }
+    for (wire, detail) in [
+        (json!("acquire"), PlanStepDetail::Acquire),
+        (json!("widen"), PlanStepDetail::Widen),
+    ] {
+        assert_eq!(
+            serde_json::from_value::<PlanStepDetail>(wire.clone()).unwrap(),
+            detail
+        );
+        assert_eq!(serde_json::to_value(detail).unwrap(), wire);
+    }
+}

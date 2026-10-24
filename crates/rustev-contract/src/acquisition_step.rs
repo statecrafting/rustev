@@ -281,3 +281,26 @@ impl<'de> Deserialize<'de> for Widen {
         })
     }
 }
+
+/// Plan-wide acquisition ceilings (spec 036, 3.9.4).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AcquisitionBudget {
+    #[serde(deserialize_with = "budget_calls")]
+    #[schemars(range(min = 1, max = 4096))]
+    pub max_calls: u64,
+    // Spec 036, 3.9.4: zero items or bytes is valid on the wire; exceeding
+    // either ceiling with the steps' sums is a category 7 compile refusal.
+    pub max_items: u64,
+    pub max_bytes: u64,
+}
+
+fn budget_calls<'de, D: Deserializer<'de>>(d: D) -> Result<u64, D::Error> {
+    let n = u64::deserialize(d)?;
+    if !(1..=4096).contains(&n) {
+        return Err(serde::de::Error::custom(
+            "acquisition.max_calls outside 1..=4096",
+        ));
+    }
+    Ok(n)
+}

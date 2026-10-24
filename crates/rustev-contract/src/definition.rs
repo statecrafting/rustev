@@ -428,6 +428,14 @@ pub enum Fallback {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct LimitsDecl {
+    /// Spec 036 acquisition ceilings, omitted when unused.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::screening::present"
+    )]
+    #[schemars(with = "crate::acquisition_step::AcquisitionBudget")]
+    pub acquisition: Option<crate::acquisition_step::AcquisitionBudget>,
     pub max_semantic_requests: u64,
     pub on_excess: ExcessPolicy,
     pub max_projection_bytes: u64,

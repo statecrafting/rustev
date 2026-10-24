@@ -10,6 +10,7 @@
 //! `unsafe`.
 #![forbid(unsafe_code)]
 
+mod acquisition;
 mod actionable;
 pub mod builder;
 pub mod calibrate;

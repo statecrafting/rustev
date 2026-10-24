@@ -766,7 +766,12 @@ fn resolve(r: &str, item_base: Option<(&str, &[String])>) -> Option<(String, Vec
     }
 }
 
-fn expr_reads(e: &Expr, item: Option<(&str, &[String])>, gate: bool, out: &mut Vec<Read>) {
+pub(crate) fn expr_reads(
+    e: &Expr,
+    item: Option<(&str, &[String])>,
+    gate: bool,
+    out: &mut Vec<Read>,
+) {
     let mut push = |r: &str, require: Option<GradeRequirement>| {
         if let Some((base, path)) = resolve(r, item) {
             out.push(Read {
@@ -1347,6 +1352,7 @@ pub(crate) fn evidence_bound(
             crate::compile::StepInfo::Exact { ty, .. }
             | crate::compile::StepInfo::Corroborate { ty, .. } => ty_nodes(ty),
             crate::compile::StepInfo::Semantic { .. } => 1,
+            crate::compile::StepInfo::Acquisition(a) => ty_nodes(&a.ty),
         });
     }
     let values = nodes.saturating_mul(VALUES_PER_META);

@@ -36,6 +36,8 @@ pub fn category_name(c: Category) -> &'static str {
         Category::CallerCannotAct => "caller_cannot_act",
         Category::InvalidScreening => "invalid_screening",
         Category::UnscreenedText => "unscreened_text",
+        Category::InvalidAcquisition => "invalid_acquisition",
+        Category::SourceMapping => "source_mapping",
     }
 }
 
@@ -294,6 +296,8 @@ fn step_json(step: &rustev_contract::plan::PlanStep) -> Value {
             json!({"kind": "unsupported", "capability": capability})
         }
         PlanStepDetail::Corroborate => json!({"kind": "corroborate"}),
+        PlanStepDetail::Acquire => json!({"kind": "acquire"}),
+        PlanStepDetail::Widen => json!({"kind": "widen"}),
     };
     json!({"id": step.id, "derivation": step.derivation, "detail": detail})
 }

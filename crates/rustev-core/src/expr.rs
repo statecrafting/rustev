@@ -242,10 +242,13 @@ pub fn predicate_structure(p: &Predicate) -> Result<(), String> {
             }
             expr_structure(value)
         }
-        Predicate::IsConstructed { .. } => Err("acquisition-not-compiled".into()),
+        Predicate::IsConstructed { reference } => Ref::parse(reference).map(|_| ()),
         Predicate::Present(r) => match Ref::parse(r)? {
+            Ref::Step(s) if !s.contains('/') => Ok(()),
             Ref::Input(_, p) if p.is_empty() => Ok(()),
-            _ => Err(format!("present() takes an input reference, not {r:?}")),
+            _ => Err(format!(
+                "present() takes an input or a bare step reference, not {r:?}"
+            )),
         },
         Predicate::MemberRef { value, set } => {
             expr_structure(value)?;
@@ -462,8 +465,9 @@ pub fn type_predicate(p: &Predicate, env: &TyEnv<'_>) -> Result<(), String> {
                 Err(format!("member set does not match {}", t.name()))
             }
         }
-        Predicate::IsConstructed { .. } => Err("acquisition-not-compiled".into()),
+        Predicate::IsConstructed { reference } => ref_ty(reference, env).map(|_| ()),
         Predicate::Present(r) => match Ref::parse(r)? {
+            Ref::Step(s) if env.v2 && !s.contains('/') => ref_ty(r, env).map(|_| ()),
             Ref::Input(n, p) if p.is_empty() && env.inputs.contains_key(&n) => Ok(()),
             _ => Err(format!("present() of unknown input {r:?}")),
         },
