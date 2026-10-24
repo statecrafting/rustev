@@ -530,7 +530,7 @@ async fn a_tee_keeps_the_primary_receipt_and_counts_or_fails_telemetry() {
         telemetry_timeout_ms: 1_000,
     };
     let mut bad = record("support");
-    bad.schema = "rustev.run/3".into();
+    bad.schema = "rustev.run/4".into();
     assert!(tee.deliver(&bad).await.is_ok());
     assert_eq!(
         otel.stats().decisions_lost.get(loss::PROJECTION_UNKNOWN),
@@ -999,4 +999,148 @@ fn construction_outside_a_runtime_is_refused() {
         OtelSink::new(config(), TestExporter::new(Behavior::Succeed)).unwrap_err(),
         ConfigError::NoRuntime
     );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn screening_metrics_count_values_and_charged_units_without_content() {
+    use rustev_contract::redaction::{Action, FieldClass};
+    use rustev_contract::screening::*;
+    use rustev_otel::metrics::Points;
+
+    const CANARY: &str = "SCREENED-PRIVATE-TEXT";
+    let digest = screen_text_digest(CANARY);
+    let mut rec = record("support");
+    rec.schema = rustev_contract::schema::RUN_V3.into();
+    let CoreEvidence::Recorded(e) = &mut rec.core else {
+        panic!()
+    };
+    e.schema = rustev_contract::schema::EVIDENCE_V2.into();
+    e.judgment.schema = rustev_contract::schema::JUDGMENT_V2.into();
+    e.judgment.outcome = Outcome::Refused {
+        refusals: vec![],
+        addressed_to: rustev_contract::actionability::Party::Upstream,
+    };
+    e.screening = Some(
+        [
+            ScreenVerdict::Pass,
+            ScreenVerdict::Blocked,
+            ScreenVerdict::Unavailable {
+                reason: Unresolved::InvalidBackendOutput {
+                    detail: CANARY.into(),
+                },
+            },
+            ScreenVerdict::Empty,
+            ScreenVerdict::Pass,
+        ]
+        .into_iter()
+        .map(|verdict| ScreeningEvidence {
+            entry: "catalogue".into(),
+            field: "input:candidates[]/description".into(),
+            item: Some(CANARY.into()),
+            text_digest: digest.clone(),
+            verdict,
+            categories: vec!["blocked-category".into()],
+            consequence: ScreenConsequence::None,
+            backend_id: "screener".into(),
+            artifact: serde_json::from_value(serde_json::json!(format!(
+                "sha256:{}",
+                "b".repeat(64)
+            )))
+            .unwrap(),
+            descriptor: serde_json::from_value(serde_json::json!(format!(
+                "sha256:{}",
+                "c".repeat(64)
+            )))
+            .unwrap(),
+            step: "screen:catalogue:0".into(),
+        })
+        .collect(),
+    );
+    assert!(rec.requests.len() >= 3);
+    for (r, (charged, basis)) in rec.requests.iter_mut().zip([
+        (7, ScreenUnitBasis::Reported),
+        (3, ScreenUnitBasis::Computed),
+        (0, ScreenUnitBasis::CacheHit),
+    ]) {
+        r.screen = Some(ScreenRequest {
+            cache: ScreenCache::Disabled,
+            units: ScreenChargedUnits {
+                computed: Some(3),
+                reported: None,
+                charged,
+                basis,
+                bound_violation: None,
+            },
+        });
+    }
+    for redact in [false, true] {
+        let mut c = config();
+        c.sampling.root = RootSampling::Never;
+        // Even an allow-all policy must not expose content or digests as dimensions.
+        if !redact {
+            c.policy = allow_all(&[]);
+        }
+        if redact {
+            c.policy.classes.insert(FieldClass::Enum, Action::Drop);
+            c.policy
+                .classes
+                .insert(FieldClass::PlanMetadata, Action::Digest);
+        }
+        let s = sink(c, TestExporter::new(Behavior::Succeed));
+        s.deliver(&rec).await.unwrap();
+        let m = s.metrics();
+        assert_eq!(m.counter_total(name::SCREENING), 5);
+        if redact {
+            assert_eq!(m.counter(name::SCREENING, &[]), 5);
+        } else {
+            for (verdict, count) in [
+                ("pass", 2),
+                ("blocked", 1),
+                ("unavailable", 1),
+                ("empty", 1),
+            ] {
+                assert_eq!(
+                    m.counter(
+                        name::SCREENING,
+                        &[
+                            ("rustev.plan.id", rec.plan_id.as_str()),
+                            ("rustev.screening.entry", "catalogue"),
+                            ("rustev.screening.verdict", verdict),
+                        ]
+                    ),
+                    count
+                );
+            }
+        }
+        let Points::Histogram(points) = &m.instruments[name::SCREENING_UNITS] else {
+            panic!()
+        };
+        assert_eq!(points.len(), 1);
+        let (attrs, h) = points.first_key_value().unwrap();
+        assert_eq!(attrs.len(), usize::from(!redact));
+        assert_eq!((h.count, h.sum, h.min, h.max), (1, 10.0, 10.0, 10.0));
+        let text = format!("{m:?}");
+        for forbidden in [
+            CANARY,
+            digest.as_str(),
+            "hmac-sha256",
+            "blocked-category",
+            "screener",
+        ] {
+            assert!(!text.contains(forbidden), "{forbidden}: {text}");
+        }
+        // A screening decision with no dispatched requests still records zero units.
+        let mut empty = rec.clone();
+        empty.requests.clear();
+        s.deliver(&empty).await.unwrap();
+        let m = s.metrics();
+        let Points::Histogram(points) = &m.instruments[name::SCREENING_UNITS] else {
+            panic!()
+        };
+        let h = points.values().next().unwrap();
+        assert_eq!((h.count, h.sum, h.min), (2, 10.0, 0.0));
+    }
+    let s = sink(config(), TestExporter::new(Behavior::Succeed));
+    s.deliver(&record("support")).await.unwrap();
+    assert!(!s.metrics().instruments.contains_key(name::SCREENING_UNITS));
 }

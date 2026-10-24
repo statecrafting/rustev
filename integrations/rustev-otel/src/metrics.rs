@@ -11,6 +11,8 @@ use rustev_contract::redaction::{Action, FieldClass, RedactionPolicy};
 
 /// Instrument names.
 pub mod name {
+    pub const SCREENING: &str = "rustev.screening";
+    pub const SCREENING_UNITS: &str = "rustev.screening.units";
     pub const DECISIONS: &str = "rustev.decisions";
     pub const UNRESOLVED: &str = "rustev.unresolved";
     pub const FALLBACKS: &str = "rustev.fallbacks";

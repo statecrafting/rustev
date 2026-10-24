@@ -201,7 +201,7 @@ fn canaries_in_default_deny_and_digest_slots_never_appear_raw() {
 #[test]
 fn a_record_it_does_not_know_is_projection_unknown() {
     let mut rec = record("support");
-    rec.schema = "rustev.run/3".into();
+    rec.schema = "rustev.run/4".into();
     let redactor = Redactor::new(RedactionPolicy::default(), Some(test_key())).unwrap();
     let none = BTreeMap::new();
     let b = Bindings::default();
@@ -340,4 +340,43 @@ fn the_jsonl_exporter_appends_privately_and_stops_at_its_bound() {
     let x = JsonlExporter::open(&path, one * 2 + 1).unwrap();
     assert_eq!(x.export(&lines), Err(JsonlError::FileFull));
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn screening_units_survive_missing_core_evidence_and_accept_plan_v3() {
+    use rustev_contract::schema;
+    use rustev_contract::screening::{
+        ScreenCache, ScreenChargedUnits, ScreenRequest, ScreenUnitBasis,
+    };
+
+    let mut rec = record("support");
+    rec.schema = schema::RUN_V3.into();
+    rec.core = CoreEvidence::NotProduced;
+    rec.requests[0].screen = Some(ScreenRequest {
+        cache: ScreenCache::Miss,
+        units: ScreenChargedUnits {
+            computed: Some(5),
+            reported: Some(2),
+            charged: 2,
+            basis: ScreenUnitBasis::Reported,
+            bound_violation: None,
+        },
+    });
+    let mut p = plan("support");
+    p.schema = schema::PLAN_V3.into();
+    let projected = project_golden(
+        &rec,
+        Some(&p),
+        &BTreeMap::new(),
+        &Bindings::default(),
+        RedactionPolicy::default(),
+    );
+    assert!(projected.facts.screening.is_empty());
+    assert_eq!(projected.facts.screening_units, Some(2));
+    assert_eq!(
+        default_project(&record("support"), true)
+            .facts
+            .screening_units,
+        None
+    );
 }

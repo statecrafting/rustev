@@ -952,6 +952,21 @@ through `rustev.remote-describe/1`, a profile changed after setup is
 shared-state terms. Tests over loopback:
 `integrations/rustev-remote-http/tests/screening.rs`.
 
+**Increment 6 (2026-10-24): metrics and mutation seeds.** The
+OpenTelemetry projection emits the reserved counter `rustev.screening`
+with `rustev.screening.verdict`, `rustev.screening.entry` and
+`rustev.plan.id`, and the histogram `rustev.screening.units` of charged
+units per decision, from `enum` and `plan-metadata` classes only, with
+no screened text or digest in any attribute (3.14). The seven seeds of the
+Acceptance (unavailable treated as pass, marker omitted, a `per_item`
+request batched, scope dropped from the cache key, `caller` allowed on
+third-party text, refusal evaluated after handlers, units counted from
+characters) are registered under `spec 035` in
+`crates/rustev-eval/mutation/seeds.py` and are each detected by the tests
+of increments 2 to 5 (7 of 7, run with the `spec 035` filter). `spec 035`
+joins the harness's `OWN_RUNS`, so spec 004's unfiltered run leaves these
+seeds to 035's own verification instead of running them twice.
+
 ## Facts relied on
 
 Read on 2026-10-17 from the AWS documentation named; re-confirmed at the

@@ -40,7 +40,7 @@ REQUIRED = [
 # run them a second time in CI; `seeds.sh "spec 023"`, `live-comparison` and
 # `"spec 029"` still run and require every one. A spec whose acceptance
 # starts filtering its own seeds joins this list.
-OWN_RUNS = ("spec 023", "live-comparison", "spec 029", "spec 040")
+OWN_RUNS = ("spec 023", "live-comparison", "spec 029", "spec 040", "spec 035")
 # Generous: a new test binary can wait on the OS before it starts.
 TEST_TIMEOUT_S = 1800
 
@@ -385,6 +385,45 @@ SEEDS += [
     ("spec 040", 'explain040-observation-first', E + 'explain/diff.rs', 'Claim::ObservationDifference => self.observations.push(id),', 'Claim::ObservationDifference => { self.why = Some(Divergence::OutcomeChanged); self.differences.insert(0, id); self.total += 1; },', EVAL),
     ("spec 040", 'explain040-withheld-rendered', E + 'explain/render.rs', 'Availability::NotAvailable(u) => unavailable(u),', 'Availability::NotAvailable(u) => { let _ = u; json(&f.value) },', EVAL),
     ("spec 040", 'explain040-plan-mismatch', E + 'explain/evidence.rs', 'if record.as_ref().is_some_and(|r| r.plan_id != id) {', 'if false && record.as_ref().is_some_and(|r| r.plan_id != id) {', EVAL),
+]
+
+
+# Spec 035: screening acceptance defects, run by the affected crates' tests.
+SEEDS += [
+    ("spec 035", "unavailable treated as pass", C + "evaluate.rs",
+     """Err(reason) => (
+                ScreenVerdict::Unavailable {
+                    reason: reason.clone(),
+                },
+                vec![],
+                match entry.on_unavailable {
+                    OnUnavailable::FailClosed => ScreenConsequence::FailClosed,
+                    OnUnavailable::SkipGeneration => ScreenConsequence::SkipGeneration,
+                    OnUnavailable::FailOpen => ScreenConsequence::FailOpen,
+                },
+            ),""",
+     "Err(_) => (ScreenVerdict::Pass, vec![], ScreenConsequence::None),",
+     ["rustev-core"]),
+    ("spec 035", "withheld marker omitted so text leaks", C + "evaluate.rs",
+     "return rustev_contract::screening::withheld_screen_blocked();",
+     "return self.value.clone();", ["rustev-core"]),
+    ("spec 035", "per_item request batched", R + "driver.rs",
+     ".any(|op| op.screen.is_some() && op.isolation == Some(Isolation::PerItem))",
+     ".any(|op| op.screen.is_some() && op.isolation == Some(Isolation::PerItem) && false)",
+     ["rustev-runtime"]),
+    ("spec 035", "scope dropped from cache key", R + "optimization.rs",
+     "part(&mut material, p.principal);", "part(&mut material, b\"\");",
+     ["rustev-runtime"]),
+    ("spec 035", "caller override allowed on third-party text", C + "actionable.rs",
+     "if o.to == Party::Caller {", "if false && o.to == Party::Caller {",
+     ["rustev-core"]),
+    ("spec 035", "refusal evaluated after handlers", C + "evaluate.rs",
+     "let (outcome, reads, trace, site, handler) = if !self.screen_refusals.is_empty() {",
+     "let (outcome, reads, trace, site, handler) = if !self.screen_refusals.is_empty() && !matches!(policy::evaluate(&compiled.plan.definition.policy, &self).outcome, Outcome::Propose { .. } | Outcome::Escalate { .. }) {",
+     ["rustev-core"]),
+    ("spec 035", "units counted from characters instead of UTF-8 bytes", R + "driver.rs",
+     ".map(|s| s.len() as u64)", ".map(|s| s.chars().count() as u64)",
+     ["rustev-runtime"]),
 ]
 
 
