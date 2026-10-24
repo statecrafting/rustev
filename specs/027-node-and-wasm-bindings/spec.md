@@ -1168,6 +1168,10 @@ committed `.jsonl` file, so the span-line goldens of `rustev-otel` are
 validated against `rustev.trace/1`; the other five documents are checked
 against their schemas in their own contract tests.
 
+- 2026-10-24 (CI only, no claim of this spec changes): `bindings.yml` caches as spec
+  001's record of this date says. The wasm and node jobs restore everywhere and save on a push to main. Workspace crates' artifacts are
+  dropped before saving, because Cargo rebuilds them after any checkout.
+
 ## Decisions at approval
 
 1. **npm package names and scope** (left to the implementer by #56; decided

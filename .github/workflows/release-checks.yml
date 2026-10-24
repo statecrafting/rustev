@@ -30,8 +30,12 @@ jobs:
         subset: [documents, embedded, evaluation, remote-http, runtime, rules, remote-http-alone, otel]
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - name: Cache cargo registry and git
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # Restored everywhere, saved only from main (as in verify.yml): saves
+      # from pull requests and merge-queue branches, which nothing else can
+      # read, evicted main's entries from the 10 GB repository limit.
+      - name: Restore cargo registry and git
+        id: cargo-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry
@@ -44,6 +48,14 @@ jobs:
       - name: Subsets whose crate is not in this release
         if: matrix.subset == 'documents'
         run: sh tools/rustev-release/adoption.sh serve bedrock typesafe local-embed
+      - name: Save the cache (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ steps.cargo-cache.outputs.cache-primary-key }}
 
   msrv:
     name: msrv
@@ -51,13 +63,18 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - name: Cache cargo registry, git and target
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # Restored everywhere, saved only from main (as in verify.yml): saves
+      # from pull requests and merge-queue branches, which nothing else can
+      # read, evicted main's entries from the 10 GB repository limit.
+      # Registry and git only: the MSRV target directory was 4 GB, the largest
+      # entry, and this job is off the critical path.
+      - name: Restore cargo registry and git
+        id: cargo-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            target
           key: msrv-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'Cargo.toml') }}
           restore-keys: |
             msrv-${{ runner.os }}-
@@ -67,6 +84,14 @@ jobs:
           rustup toolchain install "$msrv" --profile minimal
       - name: Release members at the MSRV (031 3.6.7)
         run: make msrv
+      - name: Save the cache (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ steps.cargo-cache.outputs.cache-primary-key }}
 
   semver:
     name: semver
@@ -74,8 +99,12 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - name: Cache cargo registry, git and target
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # Restored everywhere, saved only from main (as in verify.yml): saves
+      # from pull requests and merge-queue branches, which nothing else can
+      # read, evicted main's entries from the 10 GB repository limit.
+      - name: Restore cargo registry, git and target
+        id: cargo-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry
@@ -110,6 +139,21 @@ jobs:
             echo
             sed 's/^/- /' target/semver.txt
           } >> "$GITHUB_STEP_SUMMARY"
+      # Cargo fingerprints workspace sources by mtime, which a fresh checkout
+      # resets, so workspace crates always rebuild: their artifacts are dead
+      # weight in the cache. Only dependencies are kept.
+      - name: Drop workspace artifacts before saving (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        run: cargo metadata --format-version 1 --no-deps | jq -r '.packages[].name' | sed 's/^/-p /' | xargs -r cargo clean
+      - name: Save the cache (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ steps.cargo-cache.outputs.cache-primary-key }}
       - name: Upload the report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

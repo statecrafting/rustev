@@ -179,7 +179,7 @@
       }
     ],
     "sectionDigests": {
-      "027-node-api-binding-and-webassembly-build": "de1d53f217f2c61174eb0a7c836cae7cdbb3f58d40bc44d2b8c9dde022f46163",
+      "027-node-api-binding-and-webassembly-build": "1848fa365d423417d8021841a0e683407589a2ab93d5090cac413f30ee2872db",
       "1-purpose": "8248211a41b85b51d1bfae9bc8fdbc1c3e326401ca9a926d748c532ffe36120d",
       "2-territory": "01c60a7d58cbc5c98a9af18fab1fc80ce6caa06e9bd86e299bd7fd0a54c7cf33",
       "3-1-surfaces-and-crates": "2edf806df6ee8344f0f4a1ded63a0cae7c800f18fd15075656c0519f104a72bc",
@@ -202,7 +202,7 @@
       "5-observable-negative-cases": "ee56c10e4a806e990283b1ac16005970128ba627473abc36bef812ee50a4d971",
       "acceptance": "ede76f03d4516dab9362c7e567698c16b1ac066490b717b68e0adf3fa27a6482",
       "decisions-at-approval": "19951ed3bcdf1fb4be7400ba6a13c8772ae82231ec28253c8e7c7e07bdfbb42f",
-      "implementation-record": "7cf3252a64d160aced6951fbdb8f43607abc612b3fedfbcbcc704020ceedbad4",
+      "implementation-record": "7b4d326e17090ad7171a7d5b69e46c44a95ac5b52143618de78ae255bdf1cf1f",
       "verification": "7750ba7aa6555acfd0d2c31a2041faaf8d97be744ed3130ecc91b0ffc98961c5"
     },
     "sectionHeadings": [
@@ -237,6 +237,6 @@
     "summary": "Approved (A-23). Two host surfaces over the existing engine: `rustev-node`, a napi-rs Node-API binding through which a TypeScript service compiles plans, runs decisions, replays and evaluates in-process and implements Rustev's seams in TypeScript as explicit composition (R-38); and `rustev-wasm`, a wasm-bindgen build of the pure crates for browsers, edge runtimes and tooling. Documents cross as the contract's canonical JSON, TypeScript types are generated from JSON Schema emitted by `rustev-contract`, command rendering moves into one pure crate shared by every surface, and every surface (CLI, native binding, WebAssembly, later HTTP and gRPC) runs one shared conformance suite. Approval does not authorize npm or crates.io publication, name reservation, a release, a live provider call, spend, or a claim that cross-target floating point agrees beyond what the parity suite measures.\n",
     "title": "Node-API binding and WebAssembly build"
   },
-  "shardHash": "d2959400188a19642bbfa63c64f4e6b7cd6f95f6b73dda7a04ec48280e53af08",
+  "shardHash": "8beb36a5235e556aea6bd5014a7210eac2df2af10e4db642fdb2d0ab7a65c2e5",
   "specVersion": "1.10.0"
 }

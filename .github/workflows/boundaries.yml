@@ -16,8 +16,12 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - name: Cache cargo registry, git and target
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # Restored everywhere, saved only from main (as in verify.yml): saves
+      # from pull requests and merge-queue branches, which nothing else can
+      # read, evicted main's entries from the 10 GB repository limit.
+      - name: Restore cargo registry, git and target
+        id: cargo-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry
@@ -28,3 +32,18 @@ jobs:
             boundaries-${{ runner.os }}-
       - name: Dependency boundaries
         run: make boundaries
+      # Cargo fingerprints workspace sources by mtime, which a fresh checkout
+      # resets, so workspace crates always rebuild: their artifacts are dead
+      # weight in the cache. Only dependencies are kept.
+      - name: Drop workspace artifacts before saving (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        run: cargo metadata --format-version 1 --no-deps | jq -r '.packages[].name' | sed 's/^/-p /' | xargs -r cargo clean
+      - name: Save the cache (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ steps.cargo-cache.outputs.cache-primary-key }}
