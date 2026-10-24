@@ -125,6 +125,10 @@ fn authorized(dir: &std::path::Path) -> (Lifecycle, BTreeMap<String, Vec<u8>>) {
         commit: m.commit.clone(),
         registry: m.registry.clone(),
         packages: m.upload_order.clone(),
+        registries: m.registries.clone(),
+        artifacts: vec![],
+        continuation: false,
+        action: "publish".into(),
     }))
     .unwrap();
     (l, archives)

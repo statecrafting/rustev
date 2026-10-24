@@ -60,6 +60,10 @@ fn instruction(m: &ReleaseManifest) -> Instruction {
         commit: m.commit.clone(),
         registry: m.registry.clone(),
         packages: m.upload_order.clone(),
+        registries: m.registries.clone(),
+        artifacts: vec![],
+        continuation: false,
+        action: "publish".into(),
     }
 }
 
@@ -233,8 +237,8 @@ fn an_accepted_upload_that_never_appears_stops() {
     assert_eq!(reg.uploads.len(), 1, "the next layer never starts");
     assert_eq!(
         l.state,
-        State::PublicationAuthorized,
-        "nothing is confirmed public"
+        State::PartiallyPublished,
+        "acceptance makes this a partial publication even before visibility"
     );
 }
 
