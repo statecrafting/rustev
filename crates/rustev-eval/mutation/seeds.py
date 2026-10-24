@@ -458,7 +458,11 @@ def main():
                     if not queue:
                         return
                     i, seed = queue.pop(0)
-                line, failure = try_seed(seed, src, env)
+                try:
+                    line, failure = try_seed(seed, src, env)
+                except Exception as e:  # a crash is never a detection
+                    label = f"{seed[0]}: {seed[1]}"
+                    line, failure = f"BROKEN   {label}: {e!r}", f"{label}: the harness failed: {e!r}"
                 with lock:
                     results[i] = failure
                     print(line, flush=True)
@@ -469,6 +473,9 @@ def main():
         for t in threads:
             t.join()
         failures = [results[i] for i in sorted(results) if results[i]]
+        # Every seed must have a verdict: one without is never counted detected.
+        failures += [f"{chosen[i][0]}: {chosen[i][1]}: no verdict was recorded"
+                     for i in range(len(chosen)) if i not in results]
     finally:
         shutil.rmtree(work, ignore_errors=True)
     full = not sys.argv[1:]
