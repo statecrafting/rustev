@@ -521,6 +521,13 @@ sh crates/rustev-eval/mutation/seeds.sh
 
 ## Implementation record
 
+- 2026-10-24: the unfiltered seed run (this spec's negative control) leaves
+  out the seeds another spec's acceptance runs under its own filter: spec
+  023's (`seeds.sh "spec 023"`), spec 026's (`live-comparison`) and spec
+  029's (`"spec 029"`), 18 of 47. Each still runs, once, in its own spec's
+  acceptance, and section 6's categories, with spec 014's and 015's, are all
+  still required here. The owner chose this on 2026-10-24 for CI time: those
+  seeds had run twice in every CI run.
 - 2026-10-24: the negative control runs its seeds on parallel workers, each
   on its own copy of the tree and target directory (`SEEDS_JOBS`, default
   half the cores, at most 4). The seeds, their anchors, the required

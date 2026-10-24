@@ -33,9 +33,14 @@ REQUIRED = [
     "split leakage",
     "unusable bundles",
     "adapter rules",
-    # Spec 023, section 5: the qualification procedure's refusals.
-    "qualification refusals",
 ]
+# Seeds another spec's acceptance runs under its own filter: spec 023's
+# (labelled "spec 023"), spec 026's (`live-comparison`) and spec 029's. The
+# unfiltered run, spec 004's negative control, leaves them out rather than
+# run them a second time in CI; `seeds.sh "spec 023"`, `live-comparison` and
+# `"spec 029"` still run and require every one. A spec whose acceptance
+# starts filtering its own seeds joins this list.
+OWN_RUNS = ("spec 023", "live-comparison", "spec 029")
 # Generous: a new test binary can wait on the OS before it starts.
 TEST_TIMEOUT_S = 1800
 
@@ -435,7 +440,10 @@ def try_seed(seed, src, env):
 
 
 def main():
-    chosen = [x for x in SEEDS if not sys.argv[1:] or any(a in x[1] or a in x[0] for a in sys.argv[1:])]
+    if sys.argv[1:]:
+        chosen = [x for x in SEEDS if any(a in x[1] or a in x[0] for a in sys.argv[1:])]
+    else:
+        chosen = [x for x in SEEDS if not any(o in x[0] or o in x[1] for o in OWN_RUNS)]
     if not chosen:
         print("seeds: no seed matches the filter")
         sys.exit(1)
@@ -491,7 +499,7 @@ def main():
     finally:
         shutil.rmtree(work, ignore_errors=True)
     full = not sys.argv[1:]
-    missing = [c for c in REQUIRED if full and not any(x[0] == c for x in SEEDS)]
+    missing = [c for c in REQUIRED if full and not any(x[0] == c for x in chosen)]
     print(f"seeds: {len(chosen) - len(failures)}/{len(chosen)} detected ({n} worker(s))")
     for c in missing:
         print(f"  no seed covers the required category {c!r}")
