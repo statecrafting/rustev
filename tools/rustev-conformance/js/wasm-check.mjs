@@ -51,9 +51,10 @@ const gluePath = resolve(pkg, 'web/rustev_wasm.js');
 const bytes = readFileSync(wasmPath);
 
 const BUDGET = {
-  gzip_bytes: 786_432,
-  // Spec 046 (A-43) raised it from 2,097,152 bytes, amending 027 3.10.4.
-  raw_bytes: 2_621_440,
+  // Spec 051 (A-53) raised both, amending 027 3.10.4: gzip from 786,432
+  // bytes, raw from spec 046's 2,621,440 (itself from 2,097,152).
+  gzip_bytes: 1_048_576,
+  raw_bytes: 3_145_728,
   node_median_ms: 50,
   chromium_median_ms: 100,
 };
