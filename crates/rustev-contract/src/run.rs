@@ -85,6 +85,14 @@ impl RunRecord {
     /// Whether the version-specific members fit the schema: the remote
     /// evidence list exactly in `rustev.run/2`, within its bounds.
     pub fn check_version_members(&self) -> Result<(), RunVersionError> {
+        if self.schema != schema::RUN_V3
+            && self
+                .requests
+                .iter()
+                .any(|r| r.screen.is_some() || r.result == RequestResult::Withdrawn)
+        {
+            return Err(RunVersionError::Members("screening requires rustev.run/3"));
+        }
         let v2 = self.schema == schema::RUN_V2;
         match &self.remote_evidence {
             None if v2 => Err(RunVersionError::Members(
@@ -363,6 +371,14 @@ pub struct RequestRecord {
     /// Absent for unoptimized execution, preserving existing record bytes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub optimization: Option<OptimizationRecord>,
+    /// Screening cache and text-unit observations (spec 035, 3.13.2).
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::screening::present"
+    )]
+    #[schemars(with = "crate::screening::ScreenRequest")]
+    pub screen: Option<crate::screening::ScreenRequest>,
 }
 
 /// Where a supplied value came from (spec 004, 3.2).
@@ -386,7 +402,7 @@ impl RequestRecord {
     /// supplied. The one derivation runtime capture and replay both use.
     pub fn supplied_from(&self) -> Option<SuppliedFrom<'_>> {
         match &self.result {
-            RequestResult::NotSupplied => None,
+            RequestResult::NotSupplied | RequestResult::Withdrawn => None,
             RequestResult::Output { target } => Some(SuppliedFrom {
                 target: *target,
                 attempt: self.attempts.last(),
@@ -429,6 +445,8 @@ pub enum RequestResult {
     Failed(Unresolved),
     /// Nothing was supplied: the decision was cancelled first.
     NotSupplied,
+    /// Not dispatched because a screening refusal decided the outcome.
+    Withdrawn,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]

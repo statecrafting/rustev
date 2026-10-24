@@ -30,14 +30,32 @@ pub struct EvidenceRecord {
     /// (spec 033, 3.4.8).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub checks: Option<Vec<CheckRecord>>,
+    /// One record per screened value, in lowered-step and item order.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::screening::evidence_list"
+    )]
+    #[schemars(with = "Vec<crate::screening::ScreeningEvidence>", length(min = 1))]
+    pub screening: Option<Vec<crate::screening::ScreeningEvidence>>,
 }
 
 crate::document::versioned_document!(
     EvidenceRecord,
     [schema::EVIDENCE, schema::EVIDENCE_V2],
     "rustev.evidence/1 or rustev.evidence/2",
-    RECORD_V1
+    RECORD_V1,
+    check = EvidenceRecord::screening_version
 );
+
+impl EvidenceRecord {
+    fn screening_version(&self) -> Result<(), String> {
+        if self.screening.is_some() && self.schema != schema::EVIDENCE_V2 {
+            return Err("screening requires rustev.evidence/2".into());
+        }
+        Ok(())
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]

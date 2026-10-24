@@ -274,6 +274,7 @@ fn events_are_capped_at_128_per_span_and_values_at_the_bound() {
         let ev = evidence(&mut rec);
         ev.judgment.notices = (0..200)
             .map(|i| Notice {
+                screening: None,
                 kind: NoticeKind::Truncation,
                 subject: format!("s{i}"),
                 reason: "r".into(),

@@ -462,3 +462,297 @@ fn screening_schemas_describe_optional_nonnullable_members() {
         }
     }
 }
+
+fn run_fixture(name: &str) -> Value {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join(format!("../rustev-cli/tests/golden/{name}.record.json"));
+    serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap()
+}
+
+fn screen_evidence() -> Value {
+    json!({"entry":"catalogue", "field":"input:candidates[]/description", "item":"i-1",
+        "text_digest":rustev_contract::screening::screen_text_digest("synthetic"),
+        "verdict":"blocked", "categories":["injection"], "consequence":"drop_text",
+        "backend_id":"screen-test", "artifact":descriptor()["artifact"],
+        "descriptor":parse(&descriptor()).unwrap().id().unwrap(), "step":"screen:catalogue:0"})
+}
+
+#[test]
+fn screen_unavailable_requires_sorted_unique_nonempty_field_references() {
+    use rustev_contract::judgment::Unresolved;
+    let fields = vec![
+        "input:z".to_string(),
+        "input:a".into(),
+        "input:z".into(),
+        "input:é".into(),
+    ];
+    let u = Unresolved::screen_unavailable(fields);
+    let expected = json!({"screen_unavailable":{"fields":["input:a","input:z","input:é"]}});
+    assert_eq!(serde_json::to_value(&u).unwrap(), expected);
+    assert_eq!(serde_json::from_value::<Unresolved>(expected).unwrap(), u);
+    assert_eq!(u.kind().name(), "screen_unavailable");
+    for fields in [
+        json!([]),
+        json!(["input:b", "input:a"]),
+        json!(["input:a", "input:a"]),
+        json!(["step:x"]),
+        json!([""]),
+        json!(null),
+    ] {
+        assert!(
+            serde_json::from_value::<Unresolved>(json!({"screen_unavailable":{"fields":fields}}))
+                .is_err()
+        );
+    }
+}
+
+#[test]
+fn screening_refusal_and_notice_reuse_judgment_two_actions() {
+    use rustev_contract::{actionability::Remediation, judgment::Judgment};
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../rustev-core/tests/golden");
+    let mut v: Value = serde_json::from_slice(
+        &std::fs::read(dir.join("actionability.trip-refused.judgment.json")).unwrap(),
+    )
+    .unwrap();
+    let refusal = &mut v["outcome"]["refused"]["refusals"][0];
+    refusal["check"] = json!("screen:catalogue");
+    refusal["action"]["remediation"] =
+        serde_json::to_value(Remediation::code("screen_blocked")).unwrap();
+    refusal["action"]["transient"] = json!(false);
+    let action = refusal["action"].clone();
+    v["notices"] = json!([{"kind":"screening", "subject":"catalogue", "reason":"drop_item",
+        "action":action, "screening":{"entry":"catalogue", "field":"input:candidates[]/description",
+        "consequence":"drop_item", "items":["i-1","i-2"]}}]);
+    for subject in ["input:request.text", "input:candidates[i-1]/description"] {
+        v["outcome"]["refused"]["refusals"][0]["subject"] = json!(subject);
+        let bytes = canonical_value_bytes(&v).unwrap();
+        assert_eq!(Judgment::parse(&bytes).unwrap().canonical().unwrap(), bytes);
+        assert_eq!(
+            v["outcome"]["refused"]["refusals"][0]["action"]["remediation"],
+            json!({"code":"screen_blocked","params":{}})
+        );
+    }
+    v["notices"][0]["screening"] = Value::Null;
+    assert!(Judgment::parse(&serde_json::to_vec(&v).unwrap()).is_err());
+}
+
+#[test]
+fn withheld_projection_and_screen_text_digest_have_exact_bytes() {
+    use rustev_contract::screening::{
+        SCREEN_TEXT_TAG, screen_text_digest, withheld_screen_blocked,
+    };
+    assert_eq!(
+        canonical_value_bytes(&withheld_screen_blocked()).unwrap(),
+        br#"{"withheld":"screen_blocked"}"#
+    );
+    let text = "é\nsynthetic";
+    assert_eq!(
+        screen_text_digest(text).as_str(),
+        tagged_digest(SCREEN_TEXT_TAG, text.as_bytes())
+    );
+    assert_ne!(
+        screen_text_digest(text).as_str(),
+        tagged_digest(SCREEN_TEXT_TAG, &serde_json::to_vec(text).unwrap())
+    );
+}
+
+#[test]
+fn screening_evidence_round_trips_verdicts_consequences_and_refuses_empty_or_null() {
+    use rustev_contract::evidence::EvidenceRecord;
+    let mut v = run_fixture("support")["core"]["recorded"].clone();
+    v["schema"] = json!("rustev.evidence/2");
+    for verdict in [
+        json!("pass"),
+        json!("blocked"),
+        json!("empty"),
+        json!({"unavailable":{"reason":{"backend_unavailable":{"detail":"offline"}}}}),
+    ] {
+        for consequence in [
+            "none",
+            "refuse",
+            "drop_field",
+            "drop_text",
+            "drop_item",
+            "fail_closed",
+            "skip_generation",
+            "fail_open",
+        ] {
+            v["screening"] = json!([screen_evidence()]);
+            v["screening"][0]["verdict"] = verdict.clone();
+            v["screening"][0]["consequence"] = json!(consequence);
+            v["screening"][0]["item"] = Value::Null;
+            let bytes = canonical_value_bytes(&v).unwrap();
+            assert_eq!(
+                EvidenceRecord::parse(&bytes).unwrap().canonical().unwrap(),
+                bytes
+            );
+        }
+    }
+    for bad in [Value::Null, json!([]), json!({})] {
+        v["screening"] = bad;
+        assert!(EvidenceRecord::parse(&serde_json::to_vec(&v).unwrap()).is_err());
+    }
+    v["screening"] = json!([screen_evidence()]);
+    v["schema"] = json!("rustev.evidence/1");
+    assert!(EvidenceRecord::parse(&serde_json::to_vec(&v).unwrap()).is_err());
+}
+
+#[test]
+fn screening_run_cache_units_withdrawal_and_bound_violation_round_trip() {
+    use rustev_contract::run::RunRecord;
+    let mut v = run_fixture("support");
+    v["schema"] = json!("rustev.run/3");
+    v["core"]["recorded"]["schema"] = json!("rustev.evidence/2");
+    for cache in [
+        json!({"hit":{"source_attempt":"earlier/screen/1"}}),
+        json!("miss"),
+        json!("disabled"),
+    ] {
+        for basis in ["reported", "computed", "cache_hit"] {
+            v["requests"][0]["screen"] =
+                json!({"cache":cache, "units":{"charged":0,"basis":basis}});
+            let bytes = canonical_value_bytes(&v).unwrap();
+            assert_eq!(
+                RunRecord::parse(&bytes).unwrap().canonical().unwrap(),
+                bytes
+            );
+        }
+    }
+    v["requests"][0]["screen"] = json!({"cache":"miss", "units":{"charged":3,"basis":"reported",
+        "bound_violation":{"computed":2,"reported":3}}});
+    let bytes = canonical_value_bytes(&v).unwrap();
+    assert_eq!(
+        RunRecord::parse(&bytes).unwrap().canonical().unwrap(),
+        bytes
+    );
+    for bad in [
+        json!(null),
+        json!({}),
+        json!({"cache":"unknown","units":{"charged":0,"basis":"computed"}}),
+        json!({"cache":"miss","units":{"charged":-1,"basis":"computed"}}),
+    ] {
+        v["requests"][0]["screen"] = bad;
+        assert!(RunRecord::parse(&serde_json::to_vec(&v).unwrap()).is_err());
+    }
+    v["requests"][0].as_object_mut().unwrap().remove("screen");
+    v["requests"][0]["result"] = json!("withdrawn");
+    v["requests"][0]["attempts"] = json!([]);
+    let bytes = canonical_value_bytes(&v).unwrap();
+    let r = RunRecord::parse(&bytes).unwrap();
+    assert_eq!(r.canonical().unwrap(), bytes);
+    assert!(r.requests[0].supplied_from().is_none());
+    v["schema"] = json!("rustev.run/1");
+    assert!(RunRecord::parse(&serde_json::to_vec(&v).unwrap()).is_err());
+}
+
+#[test]
+fn both_reference_records_without_screening_keep_all_document_bytes() {
+    use rustev_contract::{evidence::EvidenceRecord, judgment::Judgment, run::RunRecord};
+    for name in ["support", "lodging"] {
+        let old = run_fixture(name);
+        for track in [false, true] {
+            let mut v = old.clone();
+            if track {
+                v["schema"] = json!("rustev.run/3");
+                v["core"]["recorded"]["schema"] = json!("rustev.evidence/2");
+                v["core"]["recorded"]["judgment"]["schema"] = json!("rustev.judgment/2");
+            }
+            let bytes = rustev_contract::canonical::record_canonical_bytes(&v).unwrap();
+            assert_eq!(
+                RunRecord::parse(&bytes)
+                    .unwrap()
+                    .record_canonical()
+                    .unwrap(),
+                bytes
+            );
+            let bytes =
+                rustev_contract::canonical::record_canonical_bytes(&v["core"]["recorded"]).unwrap();
+            assert_eq!(
+                EvidenceRecord::parse(&bytes)
+                    .unwrap()
+                    .record_canonical()
+                    .unwrap(),
+                bytes
+            );
+            let bytes = rustev_contract::canonical::record_canonical_bytes(
+                &v["core"]["recorded"]["judgment"],
+            )
+            .unwrap();
+            assert_eq!(
+                Judgment::parse(&bytes).unwrap().record_canonical().unwrap(),
+                bytes
+            );
+        }
+    }
+}
+
+#[test]
+fn screening_redaction_catalogue_classifies_content_and_metadata() {
+    use rustev_contract::{
+        redaction::FieldClass::*,
+        trace_fields::{ClassRule, lookup},
+    };
+    for (field, class) in [
+        ("text_digest", ContentDigest),
+        ("entry", PlanMetadata),
+        ("field", PlanMetadata),
+        ("item", Id),
+        ("items", Id),
+        ("verdict", Enum),
+        ("categories", Enum),
+        ("consequence", Enum),
+        ("source_attempt", Id),
+        ("units.charged", Number),
+    ] {
+        assert_eq!(
+            lookup(&format!("rustev.screening.{field}")).unwrap().rule,
+            ClassRule::Class(class)
+        );
+    }
+}
+
+#[test]
+fn screening_record_schemas_match_optional_members_and_versions() {
+    let schemas = rustev_contract::schema_emit::document_schemas();
+    for (file, version, run) in [
+        ("rustev.evidence-1.schema.json", "rustev.evidence/1", false),
+        ("rustev.evidence-2.schema.json", "rustev.evidence/2", false),
+        ("rustev.run-1.schema.json", "rustev.run/1", true),
+        ("rustev.run-3.schema.json", "rustev.run/3", true),
+    ] {
+        let schema: Value =
+            serde_json::from_slice(&schemas.iter().find(|s| s.file == file).unwrap().bytes)
+                .unwrap();
+        let validator = jsonschema::validator_for(&schema).unwrap();
+        let fixture = run_fixture("support");
+        let mut v = if run {
+            fixture
+        } else {
+            fixture["core"]["recorded"].clone()
+        };
+        v["schema"] = json!(version);
+        assert!(validator.is_valid(&v), "{file}: absent");
+        let path = if run {
+            "/requests/0/screen"
+        } else {
+            "/screening"
+        };
+        let value = if run {
+            json!({"cache":"disabled","units":{"charged":1,"basis":"computed"}})
+        } else {
+            json!([screen_evidence()])
+        };
+        if run {
+            v["requests"][0]["screen"] = value;
+        } else {
+            v["screening"] = value;
+        }
+        assert_eq!(
+            validator.is_valid(&v),
+            !version.ends_with("/1"),
+            "{file}: present"
+        );
+        *v.pointer_mut(path).unwrap() = Value::Null;
+        assert!(!validator.is_valid(&v), "{file}: null");
+    }
+}

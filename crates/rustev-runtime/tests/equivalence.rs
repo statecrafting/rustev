@@ -93,7 +93,7 @@ fn direct(
                     outputs[&format!("{}|{}", p.step, p.instance.join(","))].clone(),
                 ),
                 RequestResult::Failed(u) => Supplied::Failed(u.clone()),
-                RequestResult::NotSupplied => unreachable!(),
+                RequestResult::NotSupplied | RequestResult::Withdrawn => unreachable!(),
             };
             ev.supply(&p.step, &p.instance, s).unwrap();
         }

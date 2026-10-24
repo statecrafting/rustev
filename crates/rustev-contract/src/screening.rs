@@ -200,3 +200,153 @@ fn field_reference<'de, D: serde::Deserializer<'de>>(d: D) -> Result<String, D::
     }
     Ok(s)
 }
+
+/// The domain of a digest of screened UTF-8 bytes (spec 035, 3.13.1).
+pub const SCREEN_TEXT_TAG: &str = "rustev.screen-text/1";
+
+pub fn screen_text_digest(text: &str) -> crate::ids::ContentDigest {
+    crate::ids::ContentDigest::from_digest(crate::canonical::tagged_digest(
+        SCREEN_TEXT_TAG,
+        text.as_bytes(),
+    ))
+}
+
+/// Projection members are JSON values, not a contract value enum.
+pub fn withheld_screen_blocked() -> serde_json::Value {
+    serde_json::json!({"withheld": "screen_blocked"})
+}
+
+/// Details of a screening notice. Never includes screened text.
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
+pub struct ScreeningNotice {
+    #[serde(deserialize_with = "name")]
+    pub entry: String,
+    #[serde(deserialize_with = "field_reference")]
+    pub field: String,
+    pub consequence: ScreenConsequence,
+    pub items: Vec<String>,
+}
+
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum ScreenConsequence {
+    None,
+    Refuse,
+    DropField,
+    DropText,
+    DropItem,
+    FailClosed,
+    SkipGeneration,
+    FailOpen,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum ScreenVerdict {
+    Pass,
+    Blocked,
+    Unavailable { reason: crate::judgment::Unresolved },
+    Empty,
+}
+
+/// One screened value's evidence, in lowered-step and item order.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ScreeningEvidence {
+    #[serde(deserialize_with = "name")]
+    pub entry: String,
+    #[serde(deserialize_with = "field_reference")]
+    pub field: String,
+    /// Null means this field is not a list item.
+    pub item: Option<String>,
+    pub text_digest: crate::ids::ContentDigest,
+    pub verdict: ScreenVerdict,
+    pub categories: Vec<String>,
+    pub consequence: ScreenConsequence,
+    #[serde(deserialize_with = "name")]
+    pub backend_id: String,
+    pub artifact: ArtifactId,
+    pub descriptor: DescriptorId,
+    #[serde(deserialize_with = "nonempty")]
+    pub step: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ScreenRequest {
+    pub cache: ScreenCache,
+    pub units: ScreenChargedUnits,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum ScreenCache {
+    Hit { source_attempt: String },
+    Miss,
+    Disabled,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ScreenChargedUnits {
+    pub charged: u64,
+    pub basis: ScreenUnitBasis,
+    /// Present only for a reported charge above its computed bound.
+    /// Mirrors the cost ledger's bound-violation observation (3.12.3).
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "present"
+    )]
+    #[schemars(with = "ScreenUnitBoundViolation")]
+    pub bound_violation: Option<ScreenUnitBoundViolation>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ScreenUnitBasis {
+    Reported,
+    Computed,
+    CacheHit,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ScreenUnitBoundViolation {
+    pub computed: u64,
+    pub reported: u64,
+}
+
+pub(crate) fn unavailable_fields<'de, D: serde::Deserializer<'de>>(
+    d: D,
+) -> Result<Vec<String>, D::Error> {
+    let fields = Vec::<String>::deserialize(d)?;
+    if fields.is_empty()
+        || !fields.iter().all(|s| reference(s))
+        || fields
+            .windows(2)
+            .any(|w| w[0].as_bytes() >= w[1].as_bytes())
+    {
+        return Err(serde::de::Error::custom(
+            "screen_unavailable fields must be nonempty, valid, sorted and unique",
+        ));
+    }
+    Ok(fields)
+}
+
+pub(crate) fn evidence_list<'de, D: serde::Deserializer<'de>>(
+    d: D,
+) -> Result<Option<Vec<ScreeningEvidence>>, D::Error> {
+    let entries = Vec::<ScreeningEvidence>::deserialize(d)?;
+    if entries.is_empty() {
+        return Err(serde::de::Error::custom(
+            "screening evidence must be nonempty",
+        ));
+    }
+    Ok(Some(entries))
+}
