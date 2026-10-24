@@ -1,0 +1,70 @@
+{
+  "record": {
+    "amends": [
+      "027-node-and-wasm-bindings"
+    ],
+    "created": "2026-10-24",
+    "dependsOn": [
+      "027-node-and-wasm-bindings",
+      "046-wasm-size-budget",
+      "050-wasm-without-parameterized-definitions"
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "027-node-and-wasm-bindings",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-conformance/"
+        }
+      }
+    ],
+    "id": "051-wasm-gzip-and-raw-budget",
+    "implementation": "complete",
+    "obligations": [
+      {
+        "anchor": "3-budget",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "The optimized rustev_wasm_bg.wasm is at most 3,145,728 bytes uncompressed and at most 1,048,576 bytes under gzip level 9, measured in CI as spec 027 3.10.6 defines; exceeding either fails the bindings job."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "051-the-webassembly-module-s-gzip-and-uncompressed-budgets-for-the-76-track-amends-027": "34631f2accb5f4a9af8d8d13a7c481b4e2405da289d0ed32a1f261f890349b5b",
+      "1-purpose": "88e81ee2d45d5f7473f77ad509d150ee3a69b3ec3cc077e2162afebe22e48dc4",
+      "2-territory": "3961df80d6964e56a462cb749b1a18317db41952b312aafc3308f6a05ee94c10",
+      "3-budget": "0a4947bcf1e6bdbd6163220e7cbd2888808efaf648dccfdac60564ba88e8e454",
+      "4-out-of-scope": "47ce18a8cb64cac2b12009f70ca21dff4db67c62b18758bbd4e32bc6c6514daf",
+      "5-observable-negative-cases": "021d9bf29be582fb0f42bfe847c73e6139d1cd485973c78a6d15227a7ff79106",
+      "acceptance": "5308a5abbf6993af59f91513bbfcd59cf28985886278c6b11e2c416157c60be7",
+      "implementation-record": "59f39f08906b36caa601200773f2735c7a8c227afd5db05fe0669a6782c7068e",
+      "verification": "3df316bbd80854e78a10b4d47914567d47259a4dff18217b52459ab4932b6511"
+    },
+    "sectionHeadings": [
+      "051: The WebAssembly module's gzip and uncompressed budgets for the #76 track (amends 027)",
+      "1. Purpose",
+      "2. Territory",
+      "3. Budget",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Implementation record"
+    ],
+    "specPath": "specs/051-wasm-gzip-and-raw-budget/spec.md",
+    "status": "approved",
+    "summary": "A narrow amendment of approved spec 027 3.10.4, after specs 046 and 050. Spec 046 kept the gzip budget of 786,432 bytes on purpose so that the next #76 specs adding document types would meet it first, and spec 050 kept it by leaving spec 034's code out of the WebAssembly module. Spec 035's first contract increment then measured 789,931 bytes gzip, 3,499 over, from screening's descriptor, output and required-kind types alone; every remaining #76 contract increment adds document types the module must parse. This spec raises the gzip budget to 1,048,576 bytes (1 MiB) and the uncompressed budget to 3,145,728 bytes (3 MiB), and keeps the instantiation budgets, the procedure, the gate and spec 050's exclusion. Ratified by the owner on 2026-10-24 (A-53).\n",
+    "title": "The WebAssembly module's gzip and uncompressed budgets for the #76 track (amends 027)"
+  },
+  "shardHash": "5c6cda459e18015687d16c72b4df195bb9b0ecd0d88779828b612d115a55fe9a",
+  "specVersion": "1.10.0"
+}
