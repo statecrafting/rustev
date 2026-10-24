@@ -238,6 +238,8 @@
         "src/lib.rs",
         "src/out.rs",
         "src/plan.rs",
+        "src/plan_diff.rs",
+        "src/profile.rs",
         "src/replay.rs",
         "src/run.rs"
       ],
