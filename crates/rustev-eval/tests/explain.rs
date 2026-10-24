@@ -267,11 +267,7 @@ async fn cancelled_redacted_and_unimplemented() {
     }
     let bytes = r.run.record_canonical().unwrap();
     for q in [
-        Query::Models,
         Query::Diff,
-        Query::WhySelected {
-            item: Item::String("x".into()),
-        },
         Query::WhyExcluded {
             item: Item::String("x".into()),
         },

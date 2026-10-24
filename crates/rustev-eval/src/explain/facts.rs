@@ -119,6 +119,36 @@ impl Builder<'_> {
         }
         self.put(f)
     }
+    // Projections and integer aggregates cite each recorded source they read.
+    pub fn derived(
+        &mut self,
+        claim: Claim,
+        mut value: Value,
+        mut cites: Vec<EvidencePath>,
+        class: FieldClass,
+        composite: bool,
+    ) -> Result<FactId, ExplainError> {
+        cites.sort();
+        cites.dedup();
+        let (availability, truncated) =
+            match redact::apply_query(&mut value, class, self.policy, composite) {
+                Ok(t) => (Availability::Available, t),
+                Err(u) => {
+                    value = Value::Null;
+                    (Availability::NotAvailable(u), None)
+                }
+            };
+        self.put(Fact {
+            id: String::new(),
+            claim,
+            value,
+            availability,
+            derivation: None,
+            lineage: None,
+            truncated,
+            cites,
+        })
+    }
     pub fn judgment(
         &mut self,
         claim: Claim,

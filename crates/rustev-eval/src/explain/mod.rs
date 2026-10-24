@@ -2,8 +2,11 @@
 mod bounds;
 mod evidence;
 mod facts;
+mod models;
 mod outcome;
 mod redact;
+mod scopes;
+mod selected;
 mod text;
 
 use crate::resolve::Resolver;
@@ -66,7 +69,10 @@ pub fn explain(
     query
         .validate()
         .map_err(|c| ExplainError::new(c, "query", "invalid query"))?;
-    if !matches!(query, Query::WhyOutcome | Query::TextOrigin) {
+    if !matches!(
+        query,
+        Query::WhyOutcome | Query::TextOrigin | Query::Models | Query::WhySelected { .. }
+    ) {
         return Err(ExplainError::new(
             RefusalCode::InvalidQuery,
             "query",
