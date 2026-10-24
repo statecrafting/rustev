@@ -1,5 +1,7 @@
 //! Pure staged acquisition evaluation. A caller supplies pages in request order.
 use super::*;
+#[path = "widening_eval.rs"]
+pub(super) mod widening;
 use rustev_contract::Document;
 use rustev_contract::acquisition::{
     AcquisitionPage, AcquisitionRequest, NextPage, RequestPage, RequestValue, validate_page,
@@ -41,7 +43,12 @@ impl Evaluation<'_> {
             .info
             .step_ids
             .iter()
-            .filter_map(|id| self.acquisitions.get(id)?.pending.clone())
+            .filter_map(|id| {
+                self.acquisitions
+                    .get(id)
+                    .and_then(|s| s.pending.clone())
+                    .or_else(|| self.widenings.get(id).and_then(|s| s.pending.clone()))
+            })
             .collect()
     }
 
@@ -51,7 +58,12 @@ impl Evaluation<'_> {
             .info
             .step_ids
             .iter()
-            .filter_map(|id| self.acquisitions.get(id).map(|s| s.evidence.clone()))
+            .filter_map(|id| {
+                self.acquisitions
+                    .get(id)
+                    .map(|s| s.evidence.clone())
+                    .or_else(|| self.widenings.get(id).map(|s| s.evidence.clone()))
+            })
             .collect();
         (!records.is_empty()).then_some(records)
     }
@@ -120,6 +132,18 @@ impl Evaluation<'_> {
     }
 
     pub(super) fn start_acquisition(&mut self, id: &str, a: &crate::acquisition::Acquisition) {
+        if let Some(StepBody::Widen(w)) = self
+            .compiled
+            .plan
+            .definition
+            .steps
+            .iter()
+            .find(|s| s.id == id)
+            .map(|s| &s.body)
+        {
+            self.start_widening(id, w, a);
+            return;
+        }
         let Some(StepBody::Acquire(decl)) = self
             .compiled
             .plan
@@ -318,6 +342,9 @@ impl Evaluation<'_> {
         page_index: u32,
         bytes: &[u8],
     ) -> Result<(), SupplyError> {
+        if self.widenings.contains_key(step) {
+            return self.supply_widening_page(step, tier_index, page_index, bytes);
+        }
         let pending = self
             .acquisitions
             .get(step)
@@ -517,6 +544,9 @@ impl Evaluation<'_> {
         page_index: u32,
         reason: Unresolved,
     ) -> Result<(), SupplyError> {
+        if self.widenings.contains_key(step) {
+            return self.supply_widening_failure(step, tier_index, page_index, reason);
+        }
         let state = self
             .acquisitions
             .get(step)

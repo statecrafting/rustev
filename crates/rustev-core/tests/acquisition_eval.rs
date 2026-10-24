@@ -771,3 +771,550 @@ fn skipped_projection_issues_no_semantic_request() {
     let projection: Value = serde_json::from_slice(&pending[0].projection).unwrap();
     assert_eq!(projection["values"]["step:lookup/items"], json!([{"id":1}]));
 }
+
+fn widening_definition() -> Definition {
+    let mut d = definition();
+    let limits = serde_json::to_value(&acquisition(&mut d).limits).unwrap();
+    d.steps = vec![serde_json::from_value(json!({"id":"pool","body":{"widen":{
+        "item":{"fields":[{"name":"id","type":"integer"}]},
+        "sources":[{"source":"catalog","operation":"search","map":{"id":"id"}}],
+        "base_request":{"q":{"lit":{"text":"protected"}},"optional":{"lit":{"integer":7}}},
+        "groups":{"scope":["q"],"preferences":["optional"]},"protected":["scope"],
+        "tiers":[{"name":"specific","source_index":0,"request_patch":{},"when":"always","relax":[]},
+                 {"name":"broad","source_index":0,"request_patch":{},"when":"always","relax":["preferences"]}],
+        "max_tiers":2,"dedupe_key":"id","order":"tier_then_source_rank",
+        "stop":{"unique_at_least":{"lit":{"integer":2}}},"on_tier_failure":"continue","limits":limits
+    }}})).unwrap()];
+    d
+}
+fn widening(d: &mut Definition) -> &mut rustev_contract::acquisition_step::Widen {
+    let StepBody::Widen(w) = &mut d.steps[0].body else {
+        panic!()
+    };
+    w
+}
+fn protected_request(e: &Evaluation<'_>, tier: u32, page: u32) {
+    use rustev_contract::acquisition::RequestValue;
+    let p = &e.pending_acquisitions()[0];
+    assert_eq!((p.tier_index, p.page_index), (tier, page));
+    assert_eq!(
+        p.request.fields[0],
+        RequestValue::Set {
+            value: json!("protected")
+        }
+    );
+    assert_eq!(
+        p.request.fields[1],
+        if tier == 0 {
+            RequestValue::Set { value: json!(7) }
+        } else {
+            RequestValue::Unset
+        }
+    );
+}
+
+#[test]
+fn widening_specific_first_empty_broad_and_guard_skip() {
+    use rustev_contract::acquisition_record::TierOutcome;
+    for case in 0..3 {
+        let mut d = widening_definition();
+        if case == 2 {
+            widening(&mut d).tiers[0].when = serde_json::from_value(json!({"cmp":{"left":{"lit":{"integer":1}},"op":"eq","right":{"lit":{"integer":2}}}})).unwrap();
+        }
+        let c = compile(&d);
+        let mut e = start(&c);
+        if case != 2 {
+            protected_request(&e, 0, 0);
+            let p = page(
+                &e,
+                "pool",
+                if case == 0 { &[1, 2] } else { &[] },
+                json!("none"),
+            );
+            supply(&mut e, "pool", p);
+        }
+        if case != 0 {
+            protected_request(&e, 1, 0);
+            let p = page(&e, "pool", &[3], json!({"offset":{"integer":1}}));
+            supply(&mut e, "pool", p);
+            protected_request(&e, 1, 1);
+            let p = page(&e, "pool", &[4], json!("none"));
+            supply(&mut e, "pool", p);
+        }
+        assert!(e.pending_acquisitions().is_empty());
+        let v = e.exact_value("pool").unwrap().to_json();
+        assert_eq!(v["stopped_by"], "stop_condition");
+        let (_, ev) = e.finish("specific_first").unwrap();
+        let a = &ev.acquisitions.unwrap()[0];
+        assert_eq!(
+            a.tiers[0].outcome,
+            match case {
+                0 => TierOutcome::Ok,
+                1 => TierOutcome::Empty,
+                _ => TierOutcome::Skipped,
+            }
+        );
+        assert_eq!(
+            a.tiers[1].outcome,
+            if case == 0 {
+                TierOutcome::NotNeeded
+            } else {
+                TierOutcome::Ok
+            }
+        );
+        for item in &a.items {
+            let origin = item.origin.as_ref().unwrap();
+            assert_eq!(origin.tier, if case == 0 { "specific" } else { "broad" });
+            assert_eq!(origin.relaxation, if case == 0 { 0 } else { 1 });
+            assert_eq!(origin.source, "catalog");
+        }
+    }
+}
+
+#[test]
+fn widening_source_maps_duplicates_and_declared_order() {
+    let mut other = source();
+    other.name = "other".into();
+    other.operations.as_mut().unwrap()[0].item[0].name = "other_id".into();
+    for reverse in [false, true] {
+        let mut d = widening_definition();
+        let w = widening(&mut d);
+        w.sources.push(
+            serde_json::from_value(
+                json!({"source":"other","operation":"search","map":{"id":"other_id"}}),
+            )
+            .unwrap(),
+        );
+        w.tiers[1].source_index = 1;
+        w.stop = serde_json::from_value(json!({"unique_at_least":{"lit":{"integer":3}}})).unwrap();
+        if reverse {
+            w.tiers.reverse();
+        }
+        let c = compile_with_sources(&d, &[], &[], &[other.clone(), source()], None).unwrap();
+        let mut e = start(&c);
+        for tier in 0..2 {
+            let pending = &e.pending_acquisitions()[0];
+            assert_eq!(pending.tier_index, tier);
+            let is_other = pending.source == "other";
+            assert_eq!(is_other, (tier == 1) != reverse);
+            assert_eq!(
+                pending.request.fields[0],
+                rustev_contract::acquisition::RequestValue::Set {
+                    value: json!("protected")
+                }
+            );
+            let ids = if is_other { [1, 3] } else { [1, 2] };
+            let items: Vec<_> = ids
+                .iter()
+                .map(|id| {
+                    if is_other {
+                        json!({"other_id":id})
+                    } else {
+                        json!({"id":id})
+                    }
+                })
+                .collect();
+            let p = json!({"schema":"rustev.acquisition-page/1","request":pending.request_id,"as_of_ms":900,"items":items,"next":"none"});
+            supply(&mut e, "pool", p);
+        }
+        let v = e.exact_value("pool").unwrap().to_json();
+        assert_eq!(
+            v["items"][0]["origin"]["source"],
+            if reverse { "other" } else { "catalog" }
+        );
+        assert_eq!(v["items"][1]["item"]["id"], if reverse { 3 } else { 2 });
+        assert_eq!(v["items"][2]["item"]["id"], if reverse { 2 } else { 3 });
+        let (_, ev) = e.finish("maps").unwrap();
+        let a = &ev.acquisitions.unwrap()[0];
+        assert_eq!(a.tiers[1].duplicates, 1);
+        assert_eq!(a.tiers[1].unique_items_added, 1);
+        assert_eq!(a.items[2].origin.as_ref().unwrap().rank, 1);
+    }
+}
+
+#[test]
+fn widening_failed_tier_rolls_back_pages_and_duplicate_counts() {
+    use rustev_contract::acquisition_record::{AcquisitionOutcome, TierOutcome};
+    for (stop_on_failure, fills) in [(false, true), (false, false), (true, false)] {
+        let mut d = widening_definition();
+        if stop_on_failure {
+            widening(&mut d).on_tier_failure =
+                rustev_contract::acquisition_step::OnTierFailure::Stop;
+        }
+        let c = compile(&d);
+        let mut e = start(&c);
+        let p = page(&e, "pool", &[1, 1], json!({"offset":{"integer":2}}));
+        supply(&mut e, "pool", p);
+        protected_request(&e, 0, 1);
+        e.supply_acquisition_failure("pool", 0, 1, Unresolved::DeadlineExceeded)
+            .unwrap();
+        if !stop_on_failure {
+            protected_request(&e, 1, 0);
+            let p = page(
+                &e,
+                "pool",
+                if fills { &[1, 2] } else { &[1] },
+                json!("none"),
+            );
+            supply(&mut e, "pool", p);
+        }
+        let (j, ev) = e.finish("rollback").unwrap();
+        let a = &ev.acquisitions.unwrap()[0];
+        assert_eq!(a.tiers[0].items_received, 2);
+        assert_eq!(a.tiers[0].unique_items_added, 0);
+        assert_eq!(a.tiers[0].duplicates, 0);
+        assert!(a.tiers[0].pages.iter().all(|p| p.unique_items_added == 0));
+        assert_eq!(
+            a.tiers[0].outcome,
+            TierOutcome::Failed {
+                reason: Unresolved::DeadlineExceeded
+            }
+        );
+        assert!(
+            a.items
+                .iter()
+                .all(|i| i.origin.as_ref().unwrap().tier == "broad")
+        );
+        if fills {
+            assert_eq!(a.outcome, AcquisitionOutcome::Resolved);
+            assert!(j.notices.iter().any(|n| n.kind
+                == rustev_contract::judgment::NoticeKind::Fallback
+                && n.reason.contains("specific")));
+        } else {
+            assert_eq!(
+                a.outcome,
+                AcquisitionOutcome::Unresolved(Unresolved::DeadlineExceeded)
+            );
+        }
+    }
+}
+
+#[test]
+fn widening_limits_empty_and_all_skipped() {
+    for case in 0..4 {
+        let mut d = widening_definition();
+        let w = widening(&mut d);
+        w.stop = rustev_contract::acquisition_step::WidenStop::None;
+        if case == 0 {
+            w.limits.max_items = 1;
+        }
+        if case == 1 {
+            w.limits.max_pages = 1;
+        }
+        if case == 3 {
+            for tier in &mut w.tiers {
+                tier.when = serde_json::from_value(json!({"cmp":{"left":{"lit":{"integer":1}},"op":"eq","right":{"lit":{"integer":2}}}})).unwrap();
+            }
+        }
+        let c = compile(&d);
+        let mut e = start(&c);
+        while !e.pending_acquisitions().is_empty() {
+            let p = page(
+                &e,
+                "pool",
+                if case < 2 { &[1, 2] } else { &[] },
+                if case == 1 {
+                    json!({"offset":{"integer":2}})
+                } else {
+                    json!("none")
+                },
+            );
+            supply(&mut e, "pool", p);
+        }
+        if case != 3 {
+            let v = e.exact_value("pool").unwrap().to_json();
+            assert_eq!(
+                v["stopped_by"],
+                if case == 0 {
+                    "item_limit"
+                } else {
+                    "tiers_exhausted"
+                }
+            );
+            assert_eq!(v["truncated"], if case == 0 { 1 } else { 0 });
+        }
+        let (j, ev) = e.finish("limits").unwrap();
+        if case == 0 {
+            assert!(
+                j.notices
+                    .iter()
+                    .any(|n| n.kind == rustev_contract::judgment::NoticeKind::Truncation)
+            );
+        }
+        if case == 3 {
+            assert!(matches!(ev.steps[0].status, StepStatus::Skipped { .. }));
+        }
+    }
+}
+
+#[test]
+fn widening_independent_supply_permutations_are_identical() {
+    let mut d = widening_definition();
+    let template = d.steps[0].clone();
+    d.steps = ["a", "b", "c"]
+        .into_iter()
+        .map(|id| {
+            let mut s = template.clone();
+            s.id = id.into();
+            s
+        })
+        .collect();
+    d.limits.acquisition = Some(
+        serde_json::from_value(json!({"max_calls":12,"max_items":30,"max_bytes":32768})).unwrap(),
+    );
+    let c = compile(&d);
+    fn interleave(prefix: Vec<usize>, counts: [usize; 3], out: &mut Vec<Vec<usize>>) {
+        if counts == [2; 3] {
+            out.push(prefix);
+            return;
+        }
+        for i in 0..3 {
+            if counts[i] < 2 {
+                let mut p = prefix.clone();
+                p.push(i);
+                let mut n = counts;
+                n[i] += 1;
+                interleave(p, n, out);
+            }
+        }
+    }
+    let mut orders = vec![];
+    interleave(vec![], [0; 3], &mut orders);
+    assert_eq!(orders.len(), 90);
+    let mut baseline = None;
+    for order in orders {
+        let mut e = start(&c);
+        for i in order {
+            let id = ["a", "b", "c"][i];
+            let tier = e
+                .pending_acquisitions()
+                .iter()
+                .find(|p| p.step == id)
+                .unwrap()
+                .tier_index;
+            let p = page(&e, id, if tier == 0 { &[] } else { &[1, 2] }, json!("none"));
+            supply(&mut e, id, p);
+        }
+        let (j, ev) = e.finish("interleaved").unwrap();
+        let bytes = (j.canonical().unwrap(), ev.canonical().unwrap());
+        if let Some(expected) = &baseline {
+            assert_eq!(&bytes, expected);
+        } else {
+            baseline = Some(bytes);
+        }
+    }
+}
+
+#[test]
+fn widening_skipped_reads_failed_reads_and_request_patches() {
+    use rustev_contract::acquisition_record::TierOutcome;
+    for guard_read in [false, true] {
+        for skipped in [false, true] {
+            let mut d = widening_definition();
+            let w = widening(&mut d);
+            if guard_read {
+                w.tiers[0].when = serde_json::from_value(json!({"cmp":{"left":{"ref":"step:prior/truncated"},"op":"eq","right":{"lit":{"integer":0}}}})).unwrap();
+            } else {
+                w.tiers[0].request_patch.insert(
+                    "optional".into(),
+                    serde_json::from_value(json!({"ref":"step:prior/truncated"})).unwrap(),
+                );
+            }
+            let mut prior = definition().steps.remove(0);
+            prior.id = "prior".into();
+            if skipped {
+                let StepBody::Acquire(a) = &mut prior.body else {
+                    panic!()
+                };
+                a.when = serde_json::from_value(json!({"cmp":{"left":{"lit":{"integer":1}},"op":"eq","right":{"lit":{"integer":2}}}})).unwrap();
+            }
+            d.steps.insert(0, prior);
+            let c = compile(&d);
+            let mut e = start(&c);
+            if !skipped {
+                e.supply_acquisition_failure("prior", 0, 0, Unresolved::DeadlineExceeded)
+                    .unwrap();
+            }
+            protected_request(&e, 1, 0);
+            let p = page(&e, "pool", &[1, 2], json!("none"));
+            supply(&mut e, "pool", p);
+            let (_, ev) = e.finish("reads").unwrap();
+            let a = &ev.acquisitions.unwrap()[1];
+            assert_eq!(
+                a.tiers[0].outcome,
+                if skipped {
+                    TierOutcome::Skipped
+                } else {
+                    TierOutcome::Failed {
+                        reason: Unresolved::DeadlineExceeded,
+                    }
+                }
+            );
+            assert!(a.tiers[0].pages.is_empty());
+        }
+    }
+    // A tier's patch must not leak into the following tier's base request.
+    let mut d = widening_definition();
+    let w = widening(&mut d);
+    w.tiers[0].request_patch.insert(
+        "optional".into(),
+        serde_json::from_value(json!({"lit":{"integer":99}})).unwrap(),
+    );
+    w.tiers[1].relax.clear();
+    let c = compile(&d);
+    let mut e = start(&c);
+    assert_eq!(
+        e.pending_acquisitions()[0].request.fields[1],
+        rustev_contract::acquisition::RequestValue::Set { value: json!(99) }
+    );
+    let p = page(&e, "pool", &[], json!("none"));
+    supply(&mut e, "pool", p);
+    assert_eq!(
+        e.pending_acquisitions()[0].request.fields[1],
+        rustev_contract::acquisition::RequestValue::Set { value: json!(7) }
+    );
+    let p = page(&e, "pool", &[1, 2], json!("none"));
+    supply(&mut e, "pool", p);
+    assert!(e.finish("patch").is_ok());
+}
+
+#[test]
+fn widening_freshness_checks_only_mapped_fields_and_retains_failure_pages() {
+    use rustev_contract::acquisition::Freshness;
+    use rustev_contract::acquisition_record::TierOutcome;
+    for mapped_stale in [false, true] {
+        let mut src = source();
+        let op = &mut src.operations.as_mut().unwrap()[0];
+        let mut extra = op.item[0].clone();
+        extra.name = "unmapped".into();
+        extra.freshness = Freshness::MaxAgeMs { value: 1 };
+        op.item.push(extra);
+        if mapped_stale {
+            op.item[0].freshness = Freshness::MaxAgeMs { value: 1 };
+        }
+        let c = compile_with_sources(&widening_definition(), &[], &[], &[src], None).unwrap();
+        let mut e = start(&c);
+        while !e.pending_acquisitions().is_empty() {
+            let mut p = page(&e, "pool", &[1, 2], json!("none"));
+            for item in p["items"].as_array_mut().unwrap() {
+                item["unmapped"] = json!(0);
+            }
+            supply(&mut e, "pool", p);
+        }
+        let (_, ev) = e.finish("freshness").unwrap();
+        let a = &ev.acquisitions.unwrap()[0];
+        if mapped_stale {
+            assert_eq!(
+                a.tiers[0].outcome,
+                TierOutcome::Failed {
+                    reason: Unresolved::stale(["pool/id".into()])
+                }
+            );
+            assert_eq!(a.tiers[0].items_received, 2);
+            assert!(a.items.is_empty());
+        } else {
+            assert_eq!(a.items.len(), 2);
+        }
+    }
+}
+
+#[test]
+fn widening_rejects_wrong_coordinates_and_preserves_first_failure() {
+    use rustev_contract::acquisition_record::{AcquisitionOutcome, PageDigest, TierOutcome};
+    let c = compile(&widening_definition());
+    let mut e = start(&c);
+    let p = page(&e, "pool", &[1], json!("none"));
+    let bytes = serde_json::to_vec(&p).unwrap();
+    assert!(e.supply_page("pool", 1, 0, &bytes).is_err());
+    assert!(
+        e.supply_acquisition_failure("pool", 0, 1, Unresolved::DeadlineExceeded)
+            .is_err()
+    );
+    for reason in [
+        Unresolved::missing(["wrong".into()]),
+        Unresolved::invalid([], "bad"),
+        Unresolved::BackendUnavailable {
+            detail: "source:catalogue".into(),
+        },
+    ] {
+        assert!(e.supply_acquisition_failure("pool", 0, 0, reason).is_err());
+    }
+    e.supply_acquisition_failure("pool", 0, 0, Unresolved::DeadlineExceeded)
+        .unwrap();
+    assert!(e.supply_page("pool", 0, 0, &bytes).is_err());
+    e.supply_page("pool", 1, 0, b"invalid page").unwrap();
+    let (_, ev) = e.finish("failures").unwrap();
+    let a = &ev.acquisitions.unwrap()[0];
+    assert_eq!(
+        a.outcome,
+        AcquisitionOutcome::Unresolved(Unresolved::DeadlineExceeded)
+    );
+    assert!(matches!(
+        a.tiers[1].outcome,
+        TierOutcome::Failed {
+            reason: Unresolved::InvalidBackendOutput { .. }
+        }
+    ));
+    assert!(
+        a.tiers
+            .iter()
+            .all(|t| t.pages[0].digest == PageDigest::None)
+    );
+}
+
+#[test]
+fn widening_marks_only_requests_that_read_constructed_values() {
+    let mut d = widening_definition();
+    // A constructed request field is allowed outside the protected groups.
+    let mut src = source();
+    src.operations.as_mut().unwrap()[0].request.push(
+        serde_json::from_value(
+            json!({"name":"key","type":{"text":{"max_bytes":512}},"required":false}),
+        )
+        .unwrap(),
+    );
+    widening(&mut d).tiers[0].request_patch.insert(
+        "key".into(),
+        serde_json::from_value(json!({"ref":"step:key"})).unwrap(),
+    );
+    d.steps.insert(0, exact("key", "compose_key", json!({"parts":[{"value":{"lit":{"text":"a"}},"normalize":"exact"},{"value":{"lit":{"text":"b"}},"normalize":"exact"}],"separator":":"})));
+    let c = compile_with_sources(&d, &[], &[], &[src], None).unwrap();
+    let mut e = start(&c);
+    let p = page(&e, "pool", &[], json!("none"));
+    supply(&mut e, "pool", p);
+    let p = page(&e, "pool", &[1, 2], json!("none"));
+    supply(&mut e, "pool", p);
+    let v = e.exact_value("pool").unwrap().to_json();
+    assert_eq!(v["request_constructed"], true);
+    let (_, ev) = e.finish("constructed").unwrap();
+    let a = &ev.acquisitions.unwrap()[0];
+    assert!(a.request_constructed);
+    assert!(a.tiers[0].request_constructed);
+    assert!(!a.tiers[1].request_constructed);
+}
+
+#[test]
+fn widening_truncation_is_visible_even_when_an_earlier_failure_prevents_resolution() {
+    use rustev_contract::acquisition_record::{AcquisitionOutcome, AcquisitionStop};
+    let mut d = widening_definition();
+    widening(&mut d).limits.max_items = 1;
+    let c = compile(&d);
+    let mut e = start(&c);
+    e.supply_acquisition_failure("pool", 0, 0, Unresolved::DeadlineExceeded)
+        .unwrap();
+    let p = page(&e, "pool", &[1, 2], json!("none"));
+    supply(&mut e, "pool", p);
+    let (j, ev) = e.finish("truncated_failure").unwrap();
+    let a = &ev.acquisitions.unwrap()[0];
+    assert_eq!(
+        a.outcome,
+        AcquisitionOutcome::Unresolved(Unresolved::DeadlineExceeded)
+    );
+    assert_eq!(a.stopped_by, AcquisitionStop::ItemLimit);
+    assert_eq!(a.truncated, 1);
+    assert!(
+        j.notices
+            .iter()
+            .any(|n| n.kind == rustev_contract::judgment::NoticeKind::Truncation)
+    );
+}

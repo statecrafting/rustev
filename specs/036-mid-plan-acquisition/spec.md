@@ -1065,6 +1065,22 @@ Tests: `crates/rustev-core/tests/acquisition_eval.rs`, including
 byte-identical judgments and evidence across all 90 valid supply
 interleavings of three two-page acquisitions.
 
+**Increment 2, part 3 (2026-10-24): widening evaluation.**
+`crates/rustev-core/src/widening_eval.rs` evaluates `widen` steps
+(3.5.3 to 3.5.8): tiers strictly in declared order, one at a time, a tier
+skipped by a false guard or a skipped read and failed by an unresolved
+read under `on_tier_failure`; every request built from the base request
+and the tier's patch with each protected field exactly as the base
+request computes it; relaxation and source switching through each
+source's field map; pooling by `dedupe_key` with duplicates counted and
+the first occurrence kept, `tier_then_source_rank` order, the
+`unique_at_least` stop with later tiers `not_needed`; pooled item origins
+and per-tier outcomes in evidence (3.14). Tests in
+`crates/rustev-core/tests/acquisition_eval.rs`: specific-first widening
+(specific succeeds and broad is `not_needed`, specific empty and broad
+fills, specific skipped), protected fields asserted on every request,
+two-source pooling, and supply-order independence.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

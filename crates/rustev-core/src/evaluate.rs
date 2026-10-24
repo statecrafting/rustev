@@ -55,7 +55,7 @@ use crate::value::{Value, decode};
 /// Why evaluation could not start.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StartError {
-    /// Widening evaluation is not yet available in this increment.
+    /// Reserved compatibility error for unavailable acquisition evaluators.
     AcquisitionNotAvailable,
     GenerationNotAvailable,
     /// The snapshot's `schema` is not `rustev.snapshot/1`.
@@ -188,6 +188,7 @@ pub struct Evaluation<'c> {
     constructed: BTreeSet<String>,
     skipped: BTreeMap<String, String>,
     acquisitions: BTreeMap<String, acquisition_eval::State>,
+    widenings: BTreeMap<String, acquisition_eval::widening::State>,
     compiled: &'c Compiled,
     now: Timestamp,
     snapshot_id: SnapshotId,
@@ -446,15 +447,6 @@ impl<'c> Evaluation<'c> {
         snapshot: &Snapshot,
         now: Timestamp,
     ) -> Result<Self, StartError> {
-        if compiled
-            .plan
-            .definition
-            .steps
-            .iter()
-            .any(|s| matches!(s.body, rustev_contract::definition::StepBody::Widen(_)))
-        {
-            return Err(StartError::AcquisitionNotAvailable);
-        }
         // A plan 3 accepts a snapshot 1 or 2, a plan 2 only a snapshot 1,
         // so a grade claim is never silently dropped (spec 032, 3.1.4).
         let v2 = compiled.info.v2;
@@ -493,6 +485,7 @@ impl<'c> Evaluation<'c> {
             constructed: BTreeSet::new(),
             skipped: BTreeMap::new(),
             acquisitions: BTreeMap::new(),
+            widenings: BTreeMap::new(),
             compiled,
             now,
             snapshot_id,
@@ -1620,6 +1613,7 @@ impl<'c> Evaluation<'c> {
                     || self.semantic.contains_key(id)
                     || self.skipped.contains_key(id)
                     || self.acquisitions.contains_key(id)
+                    || self.widenings.contains_key(id)
                 {
                     continue;
                 }
