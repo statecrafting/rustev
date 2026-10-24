@@ -96,6 +96,10 @@ fn run_members(version: &str) -> impl FnOnce(&mut serde_json::Value) + '_ {
             v["$defs"]["EvidenceRecord"]["properties"]
                 .as_object_mut()
                 .unwrap()
+                .remove("generation");
+            v["$defs"]["EvidenceRecord"]["properties"]
+                .as_object_mut()
+                .unwrap()
                 .remove("acquisitions");
             v["$defs"]["StepEvidence"]["properties"]
                 .as_object_mut()
@@ -243,6 +247,7 @@ pub fn document_schemas() -> Vec<EmittedSchema> {
     };
     let mut out = vec![
         emit::<crate::explanation::Explanation>(schema::EXPLANATION, None),
+        emit::<crate::generation_result::TextResult>(schema::TEXT_RESULT, None),
         emit::<crate::generation::PromptTemplate>(schema::PROMPT_TEMPLATE, None),
         emit::<crate::profile::Profile>(schema::PROFILE, None),
         emit::<crate::plan_diff::PlanDiff>(schema::PLAN_DIFF, None),
@@ -254,6 +259,10 @@ pub fn document_schemas() -> Vec<EmittedSchema> {
         emit::<Snapshot>(schema::SNAPSHOT_V2, None),
         emit_adjusted::<EvidenceRecord>(schema::EVIDENCE, None, |v| {
             v["properties"].as_object_mut().unwrap().remove("screening");
+            v["properties"]
+                .as_object_mut()
+                .unwrap()
+                .remove("generation");
             v["properties"]
                 .as_object_mut()
                 .unwrap()

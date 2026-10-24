@@ -23,6 +23,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "backends/rustev-backend-rules/",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rustev-cli/",
         "source": "spec-edge"
       },
@@ -47,11 +51,19 @@
         "source": "spec-edge"
       },
       {
+        "path": "integrations/rustev-jev/",
+        "source": "spec-edge"
+      },
+      {
         "path": "integrations/rustev-node/",
         "source": "spec-edge"
       },
       {
         "path": "integrations/rustev-otel/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "integrations/rustev-remote-http/",
         "source": "spec-edge"
       },
       {
@@ -64,6 +76,19 @@
       }
     ],
     "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "backends/rustev-backend-rules/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "backends/rustev-backend-rules/"
+        }
+      },
       {
         "locations": [
           {
@@ -145,6 +170,19 @@
       {
         "locations": [
           {
+            "file": "integrations/rustev-jev/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-jev/"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "integrations/rustev-node/"
           }
         ],
@@ -166,6 +204,19 @@
         "unit": {
           "kind": "directory",
           "path": "integrations/rustev-otel/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "integrations/rustev-remote-http/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-remote-http/"
         }
       },
       {
@@ -238,5 +289,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "30ff8bb2914cf7c117f189ff7e06a2856b63c63397cc93c0d51638258da7c8d9"
+  "shardHash": "5f5310a437a39117d48ba994451d638dc255a1b20fb466881b7388cdf5152765"
 }

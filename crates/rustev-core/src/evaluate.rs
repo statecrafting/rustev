@@ -1082,7 +1082,7 @@ impl<'c> Evaluation<'c> {
             // The exact bytes, never a lossy repair.
             projection: String::from_utf8(req.projection.clone())
                 .map_err(|_| RequestIdentityError::ProjectionNotUtf8 { step: step.into() })?,
-            output: b.output,
+            output: b.output.clone(),
             requires: b.requires,
             normalization: b.normalization,
         })
@@ -1219,6 +1219,9 @@ impl<'c> Evaluation<'c> {
         };
         let tol = self.compiled.plan.definition.limits.distribution_tolerance;
         let offered = match raw {
+            RawOutput::TextRecord(_) => {
+                return Err(bad("text_record is not a decision value".into()));
+            }
             RawOutput::Screen { .. } => OutputKind::Screen,
             RawOutput::Label(_) => OutputKind::Label,
             RawOutput::Distribution(_) => OutputKind::Distribution,
@@ -2745,6 +2748,7 @@ impl<'c> Evaluation<'c> {
                 .collect()
         });
         let evidence = EvidenceRecord {
+            generation: None,
             acquisitions: None,
             screening: screening.filter(|entries: &Vec<ScreeningEvidence>| !entries.is_empty()),
             schema: if v2 {

@@ -47,6 +47,10 @@ extends:
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-node/" }, nature: additive }
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-wasm/" }, nature: additive }
   - { spec: "028-opentelemetry-evidence-sink", unit: { kind: directory, path: "integrations/rustev-otel/" }, nature: additive }
+  # Clones and unsupported-kind arms where `OutputKind` stops being `Copy`.
+  - { spec: "005-reference-backends", unit: { kind: directory, path: "backends/rustev-backend-rules/" }, nature: additive }
+  - { spec: "012-jev-integration", unit: { kind: directory, path: "integrations/rustev-jev/" }, nature: additive }
+  - { spec: "009-remote-adapter-protocol", unit: { kind: directory, path: "integrations/rustev-remote-http/" }, nature: additive }
   # New contract source files join rustev-contract's reviewed archive list.
   - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
 depends_on:
@@ -985,6 +989,17 @@ without these members keep their bytes and identities
 (`tests/generation_wire.rs`, `crates/rustev-core/tests/generation_compile.rs`).
 Remaining for part 2: the text result and per-field origins (3.10), the
 evidence members (3.15) and the backend capability additions (3.7, 3.17).
+
+**Increment 2, part 2 (2026-10-24): text result, origins, evidence and
+capability.** `crates/rustev-contract/src/generation_result.rs` adds the
+text-record output and required kind of 3.7, the descriptor capability of
+3.17, the text result with per-field origin (`generated`, `repaired`,
+`backstop{reason}`), lineage and counts of 3.10, and the digest-only
+`rustev.evidence/2` generation members of 3.15, each appended last and
+omitted when unused, with redaction classes. `OutputKind` is no longer
+`Copy`, because its text-record variant carries a language list; the
+clones this needs elsewhere change no behavior. Documents without these
+members keep their bytes and identities (`tests/generation_wire.rs`).
 
 **Owner decision A-49 (2026-10-23): dependencies.** Spec 030 is no longer
 a declared dependency of this spec. No behavior or acceptance item here

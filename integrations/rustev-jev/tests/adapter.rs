@@ -37,7 +37,7 @@ async fn the_descriptor_declares_three_distribution_operations_and_no_rank() {
     let ops: Vec<_> = d
         .operations
         .iter()
-        .map(|o| (o.operation, o.output, o.max_options))
+        .map(|o| (o.operation, o.output.clone(), o.max_options))
         .collect();
     assert_eq!(
         ops,

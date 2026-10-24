@@ -35,6 +35,7 @@ pub enum RawOutput {
         categories: Vec<String>,
         units: ScreenUnits,
     },
+    TextRecord(BTreeMap<String, TextValue>),
 }
 
 /// A screener's reported text units, distinct from runtime computed charges.
@@ -43,4 +44,12 @@ pub enum RawOutput {
 pub enum ScreenUnits {
     Reported { n: u64 },
     NotReported,
+}
+
+/// A generated field before plan-dependent validation (spec 037, 3.7).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum TextValue {
+    Text(String),
+    List(Vec<String>),
 }

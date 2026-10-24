@@ -676,13 +676,15 @@ struct ProjectionHead {
     values: serde_json::Value,
 }
 
-fn output_kind_of(o: &RawOutput) -> OutputKind {
+fn output_kind_of(o: &RawOutput) -> Option<OutputKind> {
     match o {
-        RawOutput::Screen { .. } => OutputKind::Screen,
-        RawOutput::Label(_) => OutputKind::Label,
-        RawOutput::Distribution(_) => OutputKind::Distribution,
-        RawOutput::Logits(_) => OutputKind::Logits,
-        RawOutput::Scores(_) => OutputKind::Scores,
+        // The remote generation mapping is not defined by spec 037.
+        RawOutput::TextRecord(_) => None,
+        RawOutput::Screen { .. } => Some(OutputKind::Screen),
+        RawOutput::Label(_) => Some(OutputKind::Label),
+        RawOutput::Distribution(_) => Some(OutputKind::Distribution),
+        RawOutput::Logits(_) => Some(OutputKind::Logits),
+        RawOutput::Scores(_) => Some(OutputKind::Scores),
     }
 }
 
@@ -1128,7 +1130,7 @@ fn prepare(
     let member = Member {
         attempt_id: attempt_id.to_string(),
         projection: text,
-        kind: capability.output,
+        kind: capability.output.clone(),
         budget,
         status: Status::Waiting,
         tx: Some(tx),
@@ -1487,7 +1489,7 @@ async fn run_exchange(
                 projection: m.projection.clone(),
             })
             .collect();
-        let kinds: Vec<OutputKind> = st.members.iter().map(|m| m.kind).collect();
+        let kinds: Vec<OutputKind> = st.members.iter().map(|m| m.kind.clone()).collect();
         (items, kinds, budget)
     };
     let terms = &inner.remote.terms;
@@ -1738,14 +1740,16 @@ fn read_response(
             let Some(a) = resp.items.iter().find(|a| a.attempt_id == item.attempt_id) else {
                 return d;
             };
-            let declared = Some(*kind);
+            let declared = Some(kind.clone());
             d.outcome = match &a.result {
-                ItemResult::Output(o) if Some(output_kind_of(o)) == declared => Ok(o.clone()),
+                ItemResult::Output(o) if output_kind_of(o) == declared => Ok(o.clone()),
                 ItemResult::Output(o) => Err((
                     RemoteCode::MalformedResponse,
                     format!(
-                        "a {:?} answer where {:?} is declared",
-                        output_kind_of(o),
+                        "a {} answer where {:?} is declared",
+                        output_kind_of(o)
+                            .map(|kind| format!("{kind:?}"))
+                            .unwrap_or_else(|| "TextRecord".into()),
                         declared
                     ),
                 )),
@@ -1977,7 +1981,7 @@ pub fn map_retained(body: &[u8], attempt_id: &str, declared: OutputKind) -> Opti
         return None;
     }
     match &one.result {
-        ItemResult::Output(o) if output_kind_of(o) == declared => Some(o.clone()),
+        ItemResult::Output(o) if output_kind_of(o).as_ref() == Some(&declared) => Some(o.clone()),
         _ => None,
     }
 }

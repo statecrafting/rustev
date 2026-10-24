@@ -539,6 +539,7 @@ fn kind_valid_for(op: Operation, required: RequiredKind) -> bool {
         ),
         Operation::Rubric => matches!(required, R::Label | R::OrdinalDistribution),
         Operation::Rank => matches!(required, R::Scores),
+        Operation::Generate => false,
     }
 }
 
@@ -547,6 +548,7 @@ fn satisfies(output: OutputKind, required: RequiredKind) -> bool {
     use RequiredKind as R;
     match required {
         R::ScreenVerdict => output == O::Screen,
+        R::TextRecord => false,
         R::Label => output == O::Label,
         R::Distribution | R::CalibratedProbability | R::OrdinalDistribution => {
             matches!(output, O::Distribution | O::Logits)
@@ -558,9 +560,10 @@ fn satisfies(output: OutputKind, required: RequiredKind) -> bool {
 fn sem_kind(op: Operation, required: RequiredKind) -> SemKind {
     match (op, required) {
         (Operation::Rubric, RequiredKind::Label) => SemKind::Ordinal(false),
-        // Screening values are opaque to authored consumers. Verdict evaluation
-        // is supplied by spec 035's consequence increment.
-        (_, RequiredKind::ScreenVerdict) => SemKind::Label,
+        // Screening values are opaque to authored consumers; verdict
+        // evaluation is spec 035's. A text record is refused before kind
+        // analysis, so its arm is a total placeholder.
+        (_, RequiredKind::ScreenVerdict | RequiredKind::TextRecord) => SemKind::Label,
         (_, RequiredKind::Label) => SemKind::Label,
         (_, RequiredKind::Distribution) => SemKind::Distribution,
         (_, RequiredKind::CalibratedProbability) => SemKind::Calibrated,
@@ -589,12 +592,12 @@ pub(crate) fn check_candidate(
         reasons.push(ShortfallReason::Operation(d.operation));
     }
     let chosen = supports.iter().find(|o| {
-        satisfies(o.output, required)
+        satisfies(o.output.clone(), required)
             && (required != RequiredKind::ScreenVerdict || d.operation == Operation::Proposition)
     });
     match (chosen, supports.first()) {
         (None, Some(o)) => reasons.push(ShortfallReason::OutputKind {
-            offered: o.output,
+            offered: o.output.clone(),
             required,
         }),
         (Some(o), _) if o.max_options < options_needed => reasons.push(ShortfallReason::Options {
@@ -624,7 +627,7 @@ pub(crate) fn check_candidate(
         });
     }
     match chosen {
-        Some(o) if reasons.is_empty() => Ok(o.output),
+        Some(o) if reasons.is_empty() => Ok(o.output.clone()),
         _ => Err(reasons),
     }
 }
@@ -1805,7 +1808,7 @@ pub(crate) fn compile_instantiated(
             }
             _ => BoundCalibration::None,
         };
-        let normalization = match (output, requires) {
+        let normalization = match (&output, requires) {
             (
                 OutputKind::Logits,
                 RequiredKind::Distribution | RequiredKind::OrdinalDistribution,

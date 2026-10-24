@@ -59,7 +59,7 @@ pub enum FieldClass {
     AuthenticatedAppField,
     SystemOfRecord,
     ModelDerived,
-    /// Text produced by a model step (reserved until #76 B5 and B6).
+    /// Text carried by generation results (spec 037).
     GeneratedText,
     /// Free text written at run time by an adapter, the runtime or the core.
     FreeTextDetail,

@@ -363,7 +363,7 @@ fn the_reference_programs_disclose_only_logits_for_their_operations() {
         .descriptor()
         .operations
         .iter()
-        .map(|o| (o.operation, o.output, o.max_options))
+        .map(|o| (o.operation, o.output.clone(), o.max_options))
         .collect();
     use rustev_contract::descriptor::OutputKind::Logits;
     assert_eq!(
