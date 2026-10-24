@@ -105,7 +105,17 @@ def approval_reason(number, verdict):
     return ", ".join(why) or "see the run"
 
 
-def classify(pr, by_head, waiting):
+def merge_queue():
+    """Pull request number -> queue entry for the default branch's merge queue."""
+    query = ("query($owner:String!,$repo:String!,$branch:String!){repository(owner:$owner,name:$repo)"
+             "{mergeQueue(branch:$branch){entries(first:100){nodes{position state pullRequest{number}}}}}}")
+    data = gh("api", "graphql", "-f", f"query={query}", "-F", "owner={owner}",
+              "-F", "repo={repo}", "-f", f"branch={DEFAULT}")
+    queue = (data["data"]["repository"] or {}).get("mergeQueue") or {}
+    return {e["pullRequest"]["number"]: e for e in queue.get("entries", {}).get("nodes", [])}
+
+
+def classify(pr, by_head, waiting, queued):
     base, head = pr["baseRefName"], pr["headRefOid"]
     checks = pr.get("statusCheckRollup") or []
     failed = [c["name"] for c in checks
@@ -119,6 +129,13 @@ def classify(pr, by_head, waiting):
         if auto:
             return "hazard", f"auto-merge is on while stacked on #{parent['number']}: it would merge into `{base}`, not {DEFAULT}"
         return "stacked", f"waiting for parent #{parent['number']} (governance fails by design until retargeted)"
+    entry = queued.get(pr["number"])
+    if entry:
+        # In the queue the pull request's own checks are settled; the merge
+        # group's run decides, and an armed auto-merge reads as unset.
+        if entry["state"] == "UNMERGEABLE":
+            return "fix", f"merge queue entry {entry['position']} is unmergeable: its merge group failed"
+        return "merging", f"in the merge queue (position {entry['position']}, {entry['state'].lower()})"
     run = waiting.get(head)
     if failed:
         # An approval of a run whose checks failed is wasted: fix first.
@@ -194,10 +211,11 @@ def main():
     plan = spine("registry", "plan", "--json")
     specs = spine("registry", "list", "--json")["items"]
     weight = unlocks(plan)
+    queued = merge_queue()
 
     items = []
     for pr in prs:
-        action, detail = classify(pr, by_head, waiting)
+        action, detail = classify(pr, by_head, waiting, queued)
         spec = (re.search(r"\((\d{3})", pr["title"]) or [None, "---"])[1]
         item = {"pr": pr["number"], "spec": spec, "unlocks": weight.get(spec, 0),
                 "action": action, "detail": detail, "base": pr["baseRefName"],
