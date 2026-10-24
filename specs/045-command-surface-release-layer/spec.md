@@ -2,7 +2,7 @@
 id: "045-command-surface-release-layer"
 title: "The command surface in the release family (amends 031)"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-20"
 summary: >
   A narrow amendment of approved spec 031 (itself amending spec 021). Spec
@@ -18,6 +18,9 @@ summary: >
   record of membership. Ratified by the owner on 2026-10-20 (A-42).
 amends:
   - "031-public-api-and-release-family"
+extends:
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
 depends_on:
   - "027-node-and-wasm-bindings"
   - "031-public-api-and-release-family"
@@ -166,8 +169,15 @@ packages; any change to `rustev-surface`'s behavior, which spec 027 owns.
 file's layers and member list against the workspace and refuses each
 manifest-policy case of section 5; `make release-candidate` runs the
 archive, audit and reproducibility checks for `rustev-surface` with every
-other member. The spec stays pending on the upload order (implementation
-record).
+other member, recorded in spec 021's implementation record and not
+rerun here. 045 is in `make verify` and in CI's `integrations-core`
+acceptance group.
+
+```verify:cli
+# 3.1, 3.2 and section 5's manifest-policy rows: layers, membership and
+# the upload order, topological over every dependency kind (3.2.5).
+cargo test -p rustev-release --test manifests --locked
+```
 
 ## Implementation record
 
@@ -216,3 +226,19 @@ read "topological over every dependency kind", development dependencies
 included, replacing "within a layer, packages are ordered by name". This
 act amends the text only; recording the upload-order item as met against
 the amended text, and this spec as complete, is a separate change.
+
+**Closure (2026-10-24, checked against `main` at `7357049`).** The
+upload-order item is met against the text as amended by A-50.
+`tools/rustev-release/release-set.json` uploads `rustev-pkg-support-routing`
+and `rustev-pkg-lodging` after `rustev-cli`, whose library their tests use,
+and the facade `rustev` last. The manifest policy refuses an upload order
+that puts a member before any member it depends on, by any kind:
+`layers_and_upload_order_follow_the_graph` moves
+`rustev-pkg-support-routing` ahead of `rustev-cli` (a development
+dependency) and expects an `Order` violation naming both, and
+`telemetry_upload_waits_for_its_development_dependency` moves `rustev-otel`
+ahead of `rustev-backend-rules`, its development dependency, with the same
+result. With the archive, audit and reproducibility item met on
+2026-10-22, every acceptance item is met, and `implementation` is
+`complete`. Declared verification added (section Verification); 045 joins
+`VERIFIED_SPECS` and the `integrations-core` acceptance group.
