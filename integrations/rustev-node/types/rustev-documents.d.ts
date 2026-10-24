@@ -7,6 +7,69 @@
 // (a party the parser accepts but a definition may not name, for example).
 // A document of these types can still be refused by `compile`.
 
+export namespace RustevAcquisitionPage1 {
+  export type Timestamp = number;
+  export type NextPage =
+    | "none"
+    | {
+        cursor: {
+          text: string;
+        };
+      }
+    | {
+        offset: {
+          integer: number;
+        };
+      };
+  export type AcquisitionRequestId = string;
+
+  export interface RustevAcquisitionPage1 {
+    as_of_ms: Timestamp;
+    items: {
+      [k: string]: unknown | undefined;
+    }[];
+    next: NextPage;
+    request: AcquisitionRequestId;
+    schema: "rustev.acquisition-page/1";
+  }
+}
+export type RustevAcquisitionPage1 = RustevAcquisitionPage1.RustevAcquisitionPage1;
+
+export namespace RustevAcquisitionRequest1 {
+  export type RequestValue =
+    | "unset"
+    | {
+        set: {
+          value: unknown;
+        };
+      };
+  export type RequestPage =
+    | "first"
+    | {
+        cursor: {
+          text: string;
+        };
+      }
+    | {
+        offset: {
+          integer: number;
+        };
+      };
+  export type SourceId = string;
+
+  export interface RustevAcquisitionRequest1 {
+    /**
+     * @maxItems 32
+     */
+    fields: RequestValue[];
+    operation: string;
+    page: RequestPage;
+    schema: "rustev.acquisition-request/1";
+    source: SourceId;
+  }
+}
+export type RustevAcquisitionRequest1 = RustevAcquisitionRequest1.RustevAcquisitionRequest1;
+
 export namespace RustevBackend1 {
   export type ArtifactId = string;
   /**
@@ -15907,6 +15970,99 @@ export namespace RustevSource1 {
     | "third-party"
     | "attributed-claim"
     | "model-derived";
+  export type Cache =
+    | "not_cacheable"
+    | {
+        cacheable: {
+          max_ttl_ms: number;
+        };
+      };
+  export type Cancellation = "acknowledges" | "none";
+  /**
+   * Static acquisition disclosure. Existing `CostModel::Bounded` carries no
+   * maximum, while `CostBound::Estimated` requires units, so neither has
+   * this document's wire shape.
+   */
+  export type OperationCost =
+    | ("estimated" | "unknown")
+    | {
+        bounded: {
+          max_units: number;
+        };
+      };
+  export type Freshness =
+    | "not_required"
+    | {
+        max_age_ms: {
+          value: number;
+        };
+      };
+  /**
+   * Input value types (spec 002, 3.7.2). Every record field is required.
+   */
+  export type TypeDecl =
+    | ("bool" | "integer" | "decimal" | "timestamp")
+    | {
+        text: {
+          max_bytes: number;
+        };
+      }
+    | {
+        enum: {
+          options: string[];
+        };
+      }
+    | {
+        list: {
+          item: TypeDecl;
+          max_items: number;
+        };
+      }
+    | {
+        record: {
+          fields: FieldDecl[];
+          /**
+           * Version 2: when a decoded record is present (spec 032, 3.4.2).
+           */
+          present_when?: PresentWhen | null;
+        };
+      }
+    | {
+        nullable: {
+          type: TypeDecl;
+        };
+      }
+    | {
+        map: {
+          key_max_bytes: number;
+          max_entries: number;
+          value: TypeDecl;
+        };
+      };
+  /**
+   * A record presence predicate (spec 032, 3.4.2). Each list is non-empty;
+   * the canonical form sorts and deduplicates every field list.
+   */
+  export type PresentWhen =
+    | {
+        any_non_null: string[];
+      }
+    | {
+        all_non_null: string[];
+      }
+    | {
+        all: PresentWhen[];
+      }
+    | {
+        any: PresentWhen[];
+      };
+  export type Paging =
+    | ("none" | "offset")
+    | {
+        cursor: {
+          max_cursor_bytes: number;
+        };
+      };
 
   export interface RustevSource1 {
     /**
@@ -15919,6 +16075,13 @@ export namespace RustevSource1 {
      * `source`.
      */
     name: string;
+    /**
+     * Acquisition operations (spec 036, 3.2), omitted when absent.
+     *
+     * @minItems 1
+     * @maxItems 64
+     */
+    operations?: [Operation, ...Operation[]];
     schema: "rustev.source/1";
     /**
      * `MAJOR.MINOR.PATCH`.
@@ -15950,6 +16113,43 @@ export namespace RustevSource1 {
      */
     path: string;
     reliability: Reliability;
+  }
+  export interface Operation {
+    cache: Cache;
+    cancellation: Cancellation;
+    cost: OperationCost;
+    idempotent: boolean;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    item: [ItemField, ...ItemField[]];
+    max_page_bytes: number;
+    max_page_items: number;
+    max_request_bytes: number;
+    name: string;
+    paging: Paging;
+    /**
+     * @maxItems 32
+     */
+    request: RequestField[];
+  }
+  export interface ItemField {
+    freshness: Freshness;
+    max_grade: Grade;
+    name: string;
+    provenance: ProvenanceClass;
+    reliability: Reliability;
+    type: TypeDecl;
+  }
+  export interface FieldDecl {
+    name: string;
+    type: TypeDecl;
+  }
+  export interface RequestField {
+    name: string;
+    required: boolean;
+    type: TypeDecl;
   }
 }
 export type RustevSource1 = RustevSource1.RustevSource1;

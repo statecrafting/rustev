@@ -2,7 +2,7 @@
 id: "036-mid-plan-acquisition"
 title: "Mid-plan context acquisition and tiered widening (amends 002, 003 and 004)"
 status: approved
-implementation: pending
+implementation: in-progress
 created: "2026-10-17"
 summary: >
   An amendment of approved specs 002, 003 and 004 (R-16), for #76 child B1
@@ -26,7 +26,7 @@ summary: >
   decision to capture and replay, lifting spec 032's interim
   `capture_unsupported` refusal. Plans that use no #76 construct keep
   byte-identical documents and `PlanId`s. Approved (A-33); implementation
-  is pending.
+  is in progress.
 amends:
   - "002-decision-contract-and-pure-core"
   - "003-runtime-execution-and-evidence"
@@ -46,6 +46,11 @@ extends:
   # The synthetic widening and corroboration reference definitions and
   # their goldens (Acceptance).
   - { spec: "008-reference-package-lodging", unit: { kind: directory, path: "packages/rustev-pkg-lodging/" }, nature: additive }
+  # Regenerated document types of the bindings; no behavior.
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-node/" }, nature: additive }
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-wasm/" }, nature: additive }
+  # New contract source files join rustev-contract's reviewed archive list.
+  - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
   # Adds 036 to `make verify` when the implementation is complete.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
 depends_on:
@@ -942,6 +947,32 @@ decision-result cache (#76 F1); quality claims (R-04, R-37).
 ## Verification
 
 Pending with implementation. Approval satisfies no acceptance item.
+
+## Implementation record
+
+Planned increments, each a separately reviewed pull request: (1) the
+contract vocabulary: source operations and the request and page documents;
+the `acquire` and `widen` definition members, `compose_key@1`, `skipped`
+and the refusal categories; the plan, evidence, run 3 and replay 2
+members; (2) core compilation, budgets and staged evaluation with the
+`AcquisitionSource` seam (3.4 to 3.12); (3) runtime dispatch (3.13); (4)
+capture and offline replay (3.15); (5) the lodging package's reference
+definitions and acceptance goldens, mutation seeds, declared verification
+and closure.
+
+**Increment 1, part 1 (2026-10-24): source operations, requests and
+pages.** `rustev.source/1` gains the optional `operations` member of 3.2:
+1 to 64 uniquely named operations with their request fields, item record
+(type, provenance, grade ceiling, reliability, freshness), page bounds,
+paging kind, cost, idempotence and cache terms, refused at parse outside
+their bounds; a `known_unreliable` item field's ceiling is `hint`. A
+descriptor without operations keeps its bytes and `SourceId` (3.16.3).
+New documents `rustev.acquisition-request/1`, identified as
+`AcquisitionRequestId` with no decision, step, tier, attempt, timing or
+scope member (3.3.1, 3.3.2), and `rustev.acquisition-page/1` (3.3.3), with
+a pure page validator for each rule of 3.3.4
+(`crates/rustev-contract/src/acquisition.rs`,
+`tests/acquisition_wire.rs`). Nothing produces or consumes them yet.
 
 ## Decisions at approval
 

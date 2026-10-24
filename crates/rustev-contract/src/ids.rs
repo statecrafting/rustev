@@ -124,6 +124,10 @@ identity!(
     SourceId
 );
 identity!(
+    /// Identity of an acquisition request (spec 036, 3.3).
+    AcquisitionRequestId
+);
+identity!(
     /// Identity of a canonical execution policy (spec 003, 3.2.2).
     ExecutionPolicyId
 );

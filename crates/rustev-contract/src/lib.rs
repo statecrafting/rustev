@@ -10,6 +10,7 @@
 //! bytes from a transport, and bounding that buffer, is the caller's job.
 #![forbid(unsafe_code)]
 
+pub mod acquisition;
 pub mod actionability;
 pub mod bounded;
 pub mod calibration;
@@ -106,6 +107,10 @@ pub mod schema {
     pub const EXACT_REGISTRY_V2: &str = "rustev.exact/2";
     /// Judgments of plans with `actionability` (spec 033, 3.1.3).
     pub const JUDGMENT_V2: &str = "rustev.judgment/2";
+    /// Acquisition request identity document (spec 036, 3.3.1).
+    pub const ACQUISITION_REQUEST: &str = "rustev.acquisition-request/1";
+    /// Acquisition response page (spec 036, 3.3.3).
+    pub const ACQUISITION_PAGE: &str = "rustev.acquisition-page/1";
     /// Context source descriptors (spec 032, 3.3.1).
     pub const SOURCE: &str = "rustev.source/1";
     /// Live re-execution evidence (spec 026, 3.6).

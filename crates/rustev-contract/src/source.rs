@@ -24,6 +24,14 @@ pub struct SourceDescriptor {
     /// 3.1.2).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub facts: Option<Vec<Fact>>,
+    /// Acquisition operations (spec 036, 3.2), omitted when absent.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::acquisition::operations"
+    )]
+    #[schemars(with = "Vec<crate::acquisition::Operation>", length(min = 1, max = 64))]
+    pub operations: Option<Vec<crate::acquisition::Operation>>,
 }
 
 crate::document::document!(SourceDescriptor, schema::SOURCE, DESCRIPTOR_V1, SourceId);
