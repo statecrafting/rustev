@@ -923,6 +923,19 @@ previous release's tag. `verify-artifacts <manifest> <artifacts>` requires
 every artifact to equal the signed bytes. Part 1b adds the family
 lifecycle. Nothing here publishes.
 
+**Increment 9 part 1b-i, 2026-10-23 (the journal's family entries).**
+The publication journal gains the entries the family lifecycle records:
+the signed manifest with its signature before any upload (3.11.2), the
+frozen hosted-release summary (layer 8), and the fresh-consumer
+qualification digests (3.9.7). The owner's instruction names its action,
+registries, artifact set and whether it continues an earlier run, and the
+first-release instruction authorizes exactly 0.1.0 (3.11.1); any other
+version needs a fresh instruction (3.11.4). An attempt journaled without
+a recorded result now blocks a further attempt for that package with its
+own refusal, distinct from an ambiguous one, until public state is
+queried. Part 1b-ii adds the family lifecycle that writes these entries.
+Nothing here publishes.
+
 **Increment 10, 2026-10-23 (the npm declaration check of 3.8).**
 `tools/rustev-release/npm-api-diff.mjs` compares two versions of an npm
 package's declaration surface with the TypeScript compiler API, pinned at
