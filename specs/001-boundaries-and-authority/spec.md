@@ -215,6 +215,10 @@ sh -c 'for d in crates tools; do [ -d "$d" ] || continue; if grep -rnE "(struct|
 
 ## Implementation record
 
+- 2026-10-24: `make landing-status` reads the default branch's merge queue.
+  A pull request in the queue is `merging` with its position and state, or
+  `fix` when its merge group failed, instead of "enable auto-merge" (GitHub
+  reports no auto-merge request for a queued pull request).
 - 2026-10-23: CI acceptance groups rebalanced on measured per-spec time
   (eight runs): spec 004 alone took about 24 of the `evaluation` group's
   36 minutes, so 004 runs alone and 023 and 029 join `runtime-evidence` and
