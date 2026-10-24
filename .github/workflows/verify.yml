@@ -46,11 +46,17 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
-      - name: Cache the pinned spec-spine
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # The managed preflight job, which gates this one, saves the pinned
+      # binary under this key on every ref; restoring it here avoids four
+      # jobs racing to save their own copy and a 2-minute install on a miss.
+      - name: Read the spec-spine pin
+        id: pin
+        run: sh scripts/statecraft/gate.sh pin >> "$GITHUB_OUTPUT"
+      - name: Restore the pinned spec-spine
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: .bin
-          key: spec-spine-${{ runner.os }}-${{ hashFiles('spec-spine.toml') }}
+          path: .bin/spec-spine
+          key: spec-spine-${{ steps.pin.outputs.version }}-${{ runner.os }}-${{ runner.arch }}
       - name: Install the pinned spec-spine
         run: |
           if test -x .bin/spec-spine && .bin/spec-spine --version; then
@@ -77,6 +83,12 @@ jobs:
         env:
           ACCEPTANCE_GROUP: ${{ matrix.group }}
         run: python3 scripts/acceptance/verify.py "$ACCEPTANCE_GROUP"
+      # Cargo fingerprints workspace sources by mtime, which a fresh checkout
+      # resets, so workspace crates always rebuild: their artifacts are dead
+      # weight in the cache. Only dependencies are kept.
+      - name: Drop workspace artifacts before saving (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        run: cargo metadata --format-version 1 --no-deps | jq -r '.packages[].name' | sed 's/^/-p /' | xargs cargo clean
       - name: Save cargo registry, git and target (main only)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

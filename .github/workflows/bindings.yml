@@ -37,8 +37,12 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
-      - name: Cache cargo registry, git, target and the pinned WebAssembly tools
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # Restored everywhere, saved only from main (as in verify.yml): saves
+      # from pull requests and merge-queue branches, which nothing else can
+      # read, evicted main's entries from the 10 GB repository limit.
+      - name: Restore cargo registry, git, target and the pinned WebAssembly tools
+        id: cargo-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry
@@ -64,6 +68,22 @@ jobs:
           sudo node_modules/.bin/playwright-core install-deps chromium-headless-shell
       - name: Bindings (make bindings)
         run: make bindings
+      # Cargo fingerprints workspace sources by mtime, which a fresh checkout
+      # resets, so workspace crates always rebuild: their artifacts are dead
+      # weight in the cache. Only dependencies are kept.
+      - name: Drop workspace artifacts before saving (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        run: cargo metadata --format-version 1 --no-deps | jq -r '.packages[].name' | sed 's/^/-p /' | xargs cargo clean
+      - name: Save the cache (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/wasm-tools
+            target
+          key: ${{ steps.cargo-cache.outputs.cache-primary-key }}
       - name: Upload the measurement document and corpus results (027 3.10.6, 3.11.3)
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -89,8 +109,12 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ matrix.node }}
-      - name: Cache cargo registry, git and target
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # Restored everywhere, saved only from main (as in verify.yml): saves
+      # from pull requests and merge-queue branches, which nothing else can
+      # read, evicted main's entries from the 10 GB repository limit.
+      - name: Restore cargo registry, git and target
+        id: cargo-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry
@@ -105,6 +129,21 @@ jobs:
           node tools/rustev-conformance/js/copy-addon.mjs target integrations/rustev-node
           node --test integrations/rustev-node/test/*.test.mjs
           node tools/rustev-conformance/js/run.mjs native integrations/rustev-node
+      # Cargo fingerprints workspace sources by mtime, which a fresh checkout
+      # resets, so workspace crates always rebuild: their artifacts are dead
+      # weight in the cache. Only dependencies are kept.
+      - name: Drop workspace artifacts before saving (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        run: cargo metadata --format-version 1 --no-deps | jq -r '.packages[].name' | sed 's/^/-p /' | xargs cargo clean
+      - name: Save the cache (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ steps.cargo-cache.outputs.cache-primary-key }}
 
   native:
     name: native ${{ matrix.platform }}

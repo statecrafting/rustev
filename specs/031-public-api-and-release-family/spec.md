@@ -1009,6 +1009,12 @@ instruction's exact registries and artifacts, layer gating, ambiguity and
 spent versions at each layer, continuation, the hosted adapter's journal
 path, and the manifest's artifact rules.
 
+**2026-10-24, CI only (no claim of this spec changes).** `release-checks.yml`
+caches as spec 001's record of this date says: adoption and semver restore
+everywhere and save on a push to main, msrv caches registry and git only (its
+target was 4 GB), and workspace crates' artifacts are dropped before saving,
+because Cargo rebuilds them after any checkout.
+
 ## Decisions at approval
 
 1. **Crate and package names** (left to the implementer by #58): decided

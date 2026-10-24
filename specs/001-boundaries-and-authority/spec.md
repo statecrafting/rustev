@@ -227,6 +227,16 @@ sh -c 'for d in crates tools; do [ -d "$d" ] || continue; if grep -rnE "(struct|
   A pull request in the queue is `merging` with its position and state, or
   `fix` when its merge group failed, instead of "enable auto-merge" (GitHub
   reports no auto-merge request for a queued pull request).
+- 2026-10-24: CI caches are restored on every run and saved only by a push
+  to main in every hand-owned workflow (`verify.yml`, `boundaries.yml`, and
+  spec 027's `bindings.yml` and spec 031's `release-checks.yml`, which no
+  claim of theirs covers). Measured over 25 runs: saves from merge-queue and
+  pull-request branches, which nothing else can read, kept main's entries
+  evicted (`code` restored 1 time in 19, verify 20 in 76). Before saving,
+  workspace crates' artifacts are dropped (Cargo rebuilds them after any
+  checkout), the MSRV job keeps only registry and git (its target was 4 GB),
+  and verify restores the preflight job's spec-spine binary instead of
+  racing four saves of its own.
 - 2026-10-23: CI acceptance groups rebalanced on measured per-spec time
   (eight runs): spec 004 alone took about 24 of the `evaluation` group's
   36 minutes, so 004 runs alone and 023 and 029 join `runtime-evidence` and
