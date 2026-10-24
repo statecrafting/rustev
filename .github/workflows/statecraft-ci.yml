@@ -1,5 +1,5 @@
-# Rendered by Statecraft from profile github-actions-rust revision 18
-# (identity 54b47e9bce67921d21a4916e8267fd56a3cef846ef1fa1c79354c4f77b2e6925). A managed file and a member of this
+# Rendered by Statecraft from profile github-actions-rust revision 19
+# (identity d71264912245926abe9fff1daa2563b30c2bd7cd084d3837e23c3fd66028e9cd). A managed file and a member of this
 # repository's authority set: an edit here changes the gate that judges every
 # pull request, and `statecraft doctor` names it. The policy the aggregate gate
 # enforces is .statecraft/setup/github-actions-rust.json, read at the base.
@@ -332,6 +332,13 @@ jobs:
             cargo-${{ runner.os }}-
       - name: Build, test, clippy, fmt
         run: sh "${STATECRAFT_GATE:?}" code
+      # Revision 19 (spec 060): Cargo fingerprints a path dependency by its
+      # sources' modification times, which a fresh checkout resets, so the
+      # workspace's own artifacts are rebuilt in every run. Only the
+      # dependencies are worth their space under the repository's limit.
+      - name: Drop the workspace's own artifacts (default branch only)
+        if: github.event_name == 'push' && steps.cargo-cache.outputs.cache-hit != 'true'
+        run: cargo metadata --format-version 1 --no-deps | jq -r '.packages[].name' | sed 's/^/-p /' | xargs -r cargo clean
       - name: Save cargo registry, git and target (default branch only)
         if: github.event_name == 'push' && steps.cargo-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
