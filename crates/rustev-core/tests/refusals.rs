@@ -55,6 +55,24 @@ fn the_reference_definitions_compile() {
 }
 
 #[test]
+fn authored_screen_verdict_is_category_11_and_names_the_step() {
+    for version in [schema::DEFINITION, schema::DEFINITION_V2] {
+        let mut def = support_routing();
+        def.schema = version.into();
+        semantic_mut(&mut def, "explicit_deadline").requires = RequiredKind::ScreenVerdict;
+        let bytes = def.canonical().unwrap();
+        for refusal in [
+            compile(&def, &descriptors(), &cal()).unwrap_err(),
+            compile_bytes(&bytes, &descriptors(), &cal()).unwrap_err(),
+        ] {
+            assert_eq!(refusal.category, Category::InvalidDefinition);
+            assert_eq!(refusal.subject, "step:explicit_deadline");
+            assert!(refusal.detail.contains("screen_verdict"));
+        }
+    }
+}
+
+#[test]
 fn category_1_parse() {
     let good = support_routing().canonical().unwrap();
     assert!(compile_bytes(&good, &descriptors(), &cal()).is_ok());

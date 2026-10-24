@@ -678,6 +678,7 @@ struct ProjectionHead {
 
 fn output_kind_of(o: &RawOutput) -> OutputKind {
     match o {
+        RawOutput::Screen { .. } => OutputKind::Screen,
         RawOutput::Label(_) => OutputKind::Label,
         RawOutput::Distribution(_) => OutputKind::Distribution,
         RawOutput::Logits(_) => OutputKind::Logits,

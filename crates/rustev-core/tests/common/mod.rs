@@ -62,6 +62,8 @@ pub fn strings(v: &[&str]) -> Vec<String> {
 
 pub fn support(op: Operation, output: OutputKind, max: u64) -> OperationSupport {
     OperationSupport {
+        isolation: None,
+        screen: None,
         operation: op,
         output,
         max_options: max,

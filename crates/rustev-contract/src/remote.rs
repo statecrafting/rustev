@@ -911,6 +911,8 @@ mod tests {
             backend_id: "synthetic-remote".into(),
             artifact: ArtifactId::parse(A).unwrap(),
             operations: vec![OperationSupport {
+                isolation: None,
+                screen: None,
                 operation: Operation::Classify,
                 output: OutputKind::Distribution,
                 max_options: 8,

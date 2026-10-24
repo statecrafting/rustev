@@ -133,6 +133,8 @@ fn derive_descriptor(
             .map(|t| t.options.len() as u64)
             .max()
             .map(|max_options| OperationSupport {
+                isolation: None,
+                screen: None,
                 operation: op,
                 output: OutputKind::Logits,
                 max_options,
