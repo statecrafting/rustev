@@ -853,25 +853,6 @@ fn verify_release_cmd(dir: &str, repo: &str) -> ExitCode {
     }
 }
 
-fn journal_path(path: &Path, repo: &Path) -> Result<std::path::PathBuf, String> {
-    let repo = repo.canonicalize().map_err(|e| e.to_string())?;
-    let parent = path
-        .parent()
-        .filter(|p| !p.as_os_str().is_empty())
-        .unwrap_or(Path::new("."))
-        .canonicalize()
-        .map_err(|e| e.to_string())?;
-    let resolved = if path.exists() {
-        path.canonicalize().map_err(|e| e.to_string())?
-    } else {
-        parent.join(path.file_name().ok_or("missing journal filename")?)
-    };
-    if resolved.starts_with(repo) {
-        return Err("publication journal is inside the repository".into());
-    }
-    Ok(resolved)
-}
-
 fn publish_cmd(dir: &str, instruction: &str, journal_path: &str) -> ExitCode {
     use rustev_release::cratesio::CratesIo;
     use rustev_release::lifecycle::{
@@ -887,7 +868,7 @@ fn publish_cmd(dir: &str, instruction: &str, journal_path: &str) -> ExitCode {
         let top = Path::new(&top)
             .canonicalize()
             .map_err(|e| format!("{top}: {e}"))?;
-        let journal_path = self::journal_path(journal_path, &top)?;
+        let journal_path = rustev_release::hosted::journal_path(journal_path, &top)?;
         // The signed release: archives, manifest, checksums, tag and key bind.
         let scratch = rustev_release::repro::fresh_dir("rustev-release-signers")?;
         let signers = scratch.join("allowed_signers");
@@ -974,26 +955,6 @@ fn publish_cmd(dir: &str, instruction: &str, journal_path: &str) -> ExitCode {
     }
 }
 
-fn observe_crates(
-    m: &rustev_release::manifest::ReleaseManifest,
-    registry: &mut dyn rustev_release::lifecycle::Registry,
-) -> Vec<String> {
-    use rustev_release::lifecycle::Lookup;
-    m.packages
-        .iter()
-        .filter_map(|p| match registry.lookup(&p.name, &m.version) {
-            Lookup::Visible { checksum } if checksum == p.sha256 => None,
-            Lookup::Visible { .. } => Some(format!("{}: checksum mismatch", p.name)),
-            Lookup::Absent => Some(format!("{}: missing", p.name)),
-            Lookup::Unknown { detail } => Some(format!(
-                "{}: unknown ({})",
-                p.name,
-                rustev_release::lifecycle::redact(&detail)
-            )),
-        })
-        .collect()
-}
-
 // Spec 031 3.1 and 3.11.2: read-only gates for the release workflow.
 fn family_check(manifest: &str, artifacts: Option<&str>) -> ExitCode {
     let result = std::fs::read(manifest)
@@ -1001,7 +962,7 @@ fn family_check(manifest: &str, artifacts: Option<&str>) -> ExitCode {
         .and_then(|b| rustev_release::manifest::ReleaseManifest::parse(&b))
         .map(|m| match artifacts {
             Some(dir) => rustev_release::family_artifacts::verify(&m, Path::new(dir)),
-            None => observe_crates(
+            None => rustev_release::hosted::observe_crates(
                 &m,
                 &mut rustev_release::cratesio::CratesIo { wait_seconds: 0 },
             ),
@@ -1076,6 +1037,16 @@ fn main() -> ExitCode {
         ["manifests"] => manifests(&set),
         ["verify-artifacts", manifest, artifacts] => family_check(manifest, Some(artifacts)),
         ["observe-crates", manifest] => family_check(manifest, None),
+        ["hosted-release", dir, artifacts, instruction, journal] => {
+            verdict(rustev_release::hosted::run(
+                Path::new(dir),
+                Path::new(artifacts),
+                Path::new(instruction),
+                Path::new(journal),
+                Path::new("."),
+                &set,
+            ))
+        }
         ["archives", dir] => archives(&set, dir),
         ["compare", a, b] => compare(&set, a, b),
         ["field", name] => field(&set, name),
@@ -1092,7 +1063,7 @@ fn main() -> ExitCode {
         ["unpacked", dir, work, toolchain] => unpacked(&set, dir, work, Some(toolchain)),
         _ => {
             eprintln!(
-                "usage: rustev-release manifests | archives <dir> | compare <dir-a> <dir-b> | field <name> | unpacked <dir> <work> [<toolchain>] | deps | exceptions <YYYY-MM-DD> | changelog <out.md> [<previous tag>] | manifest <evidence-dir> [<artifacts-dir>] (PREVIOUS=<tag> after the first release) | verify-artifacts <manifest> <artifacts-dir> | observe-crates <manifest> | publish <release-dir> <instruction.json> <journal> | verify-release <dir> [<repo>]"
+                "usage: rustev-release manifests | archives <dir> | compare <dir-a> <dir-b> | field <name> | unpacked <dir> <work> [<toolchain>] | deps | exceptions <YYYY-MM-DD> | changelog <out.md> [<previous tag>] | manifest <evidence-dir> [<artifacts-dir>] (PREVIOUS=<tag> after the first release) | verify-artifacts <manifest> <artifacts-dir> | observe-crates <manifest> | hosted-release <release-dir> <artifacts-dir> <instruction.json> <journal> | publish <release-dir> <instruction.json> <journal> | verify-release <dir> [<repo>]"
             );
             ExitCode::from(2)
         }

@@ -53,11 +53,6 @@
   ],
   "absent": [
     {
-      "kind": "binary",
-      "name": "rustev",
-      "reason": "the release workflow builds, reproduces, audits and attests the CLI archives (spec 031 3.9, 3.12); they remain absent and are not attached until the hosted-release layer (031 3.1 layer 8) exists"
-    },
-    {
       "kind": "image",
       "name": "ghcr.io/statecrafting/rustev-serve",
       "reason": "the rustev-serve crate exists but is not released, and the image definition (spec 042 3.16) is not written yet"

@@ -215,7 +215,7 @@ pub struct CratesIo {
 
 fn curl() -> Command {
     let mut c = Command::new("curl");
-    c.args(["-sS", "--max-time", "120", "-A", USER_AGENT]);
+    c.args(["-q", "-sS", "--max-time", "120", "-A", USER_AGENT]);
     c
 }
 
@@ -349,6 +349,11 @@ impl Registry for CratesIo {
                 };
             }
         };
+        if !o.status.success() {
+            return Lookup::Unknown {
+                detail: "index transport failed".into(),
+            };
+        }
         let text = String::from_utf8_lossy(&o.stdout).into_owned();
         let (body, code) = text.rsplit_once('\n').unwrap_or(("", &text));
         match code.trim() {

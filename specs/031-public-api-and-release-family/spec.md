@@ -956,6 +956,22 @@ recorded fresh-consumer evidence. Fakes for npm and the hosted release
 tests follow in their own change. Part 2 wires the workflow and adds layer
 8's adapter. Nothing here publishes.
 
+**Increment 9 part 2, 2026-10-23 (layers 6 to 8 in the workflow).**
+`make release-candidate` passes `RUSTEV_RELEASE_ARTIFACTS` to `manifest`.
+The prebuilt `rustev` CLI archives are release members now (3.1 layer 7):
+the release set no longer lists them as absent. The release workflow
+takes the signed manifest as its `manifest` input, checks that its SHA-256
+is the one the signed tag's message names, and its `bind` job runs
+`verify-artifacts`, so every artifact of the tag build must equal the
+signed bytes; the `npm` job then runs `observe-crates` (layer 6 after the
+crate layers). `rustev-release hosted-release <release-dir> <artifacts>
+<instruction> <journal>` is layer 8's real adapter: it verifies the signed
+release and the artifacts, observes layers 1 to 6 public, journals, and
+creates the hosted release for the signed tag with `gh` (whose credential
+it never reads), attaching the CLI archives, SBOMs, signed manifest,
+checksums, signatures, changelog and a journal summary, and observes each
+asset's SHA-256. Nothing here publishes.
+
 **Increment 10, 2026-10-23 (the npm declaration check of 3.8).**
 `tools/rustev-release/npm-api-diff.mjs` compares two versions of an npm
 package's declaration surface with the TypeScript compiler API, pinned at
