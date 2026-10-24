@@ -904,6 +904,25 @@ and bounds; `adoption.sh` and `release-checks.yml` run the `otel` subset
 optional in `rustev-otel`, and every other feature's crate absent).
 `rustev-serve` stays excluded until spec 042 admits it.
 
+**Increment 9 part 1a, 2026-10-23 (the signed manifest names every
+artifact).** Because the workflow artifacts are reproducible (increment
+7), a rehearsal at the candidate commit yields the bytes the tag build
+must reproduce, so the owner signs them before the tag exists. The release
+manifest is `rustev.release-manifest/2` (it supersedes `/1`, which was
+never signed or published): beside every `/1` field it records each
+non-crate artifact (npm tarballs, CLI archives, every SBOM, the changelog)
+with its kind, layer, size and SHA-256, for an npm tarball its package and
+the `sha512` integrity npm records, for a tarball or archive its SBOM and
+the SLSA build level claimed (2; a level 3 claim is refused, 3.9.5), the
+registries, each reference plan's `PlanId` and whether any changed (3.7),
+and the MSRV and edition (3.6.7). `rustev-release manifest <evidence>
+[<artifacts>]` builds it and refuses a missing tarball, archive or SBOM;
+without rehearsal artifacts the manifest says so under its limitations and
+is not publishable; after the first release it requires `PREVIOUS`, the
+previous release's tag. `verify-artifacts <manifest> <artifacts>` requires
+every artifact to equal the signed bytes. Part 1b adds the family
+lifecycle. Nothing here publishes.
+
 **Increment 10, 2026-10-23 (the npm declaration check of 3.8).**
 `tools/rustev-release/npm-api-diff.mjs` compares two versions of an npm
 package's declaration surface with the TypeScript compiler API, pinned at

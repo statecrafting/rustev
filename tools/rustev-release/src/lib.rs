@@ -16,6 +16,7 @@ pub mod artifacts;
 pub mod audit;
 pub mod changelog;
 pub mod cratesio;
+pub mod family_artifacts;
 pub mod lifecycle;
 pub mod manifest;
 pub mod npm;

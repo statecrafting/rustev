@@ -21,7 +21,8 @@ use serde::{Deserialize, Serialize};
 use crate::ReleaseSet;
 use crate::archive::sha256_hex;
 
-pub const MANIFEST_SCHEMA: &str = "rustev.release-manifest/1";
+// Spec 031 3.11.2: no /1 manifest was ever signed or published; no /1 reader remains.
+pub const MANIFEST_SCHEMA: &str = "rustev.release-manifest/2";
 /// The SSH signature namespace of the manifest and `SHA256SUMS`.
 pub const NAMESPACE: &str = "rustev-release";
 /// The documented owner signing identity, as `allowed_signers` names it.
@@ -42,11 +43,44 @@ pub struct ReleaseManifest {
     pub layers: Vec<Vec<String>>,
     pub upload_order: Vec<String>,
     pub packages: Vec<PackageArtifact>,
+    pub artifacts: Vec<WorkflowArtifact>,
+    pub registries: Vec<String>,
+    pub plan_ids: BTreeMap<String, String>,
+    pub plan_ids_changed: PlanChanges,
+    pub msrv: String,
+    pub edition: String,
     pub toolchain: Toolchain,
     pub source_date_epoch: u64,
     /// SHA-256 of each evidence file of the candidate run, by file name.
     pub evidence: BTreeMap<String, String>,
     pub limitations: Vec<String>,
+}
+
+/// Spec 031 3.7: a first release has no comparison baseline.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum PlanChanges {
+    First(String),
+    Changed(Vec<String>),
+}
+
+/// Spec 031 3.1 and 3.9.5: workflow artifacts bound before the tag build.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkflowArtifact {
+    pub kind: String,
+    pub name: String,
+    pub layer: u8,
+    pub bytes: u64,
+    pub sha256: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub package: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub integrity: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sbom: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub slsa_build_level: Option<u8>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -88,6 +122,7 @@ impl ReleaseManifest {
         if m.canonical() != bytes {
             return Err("the manifest is not in canonical form".into());
         }
+        crate::family_artifacts::validate(&m)?;
         Ok(m)
     }
 }
@@ -127,6 +162,17 @@ pub fn build(set: &ReleaseSet, crates: &Path, inputs: Inputs) -> Result<ReleaseM
         layers: set.layers.clone(),
         upload_order: set.upload_order.clone(),
         packages,
+        artifacts: Vec::new(),
+        registries: vec![
+            set.registry.clone(),
+            "https://registry.npmjs.org".into(),
+            crate::REPOSITORY.to_string() + "/releases",
+            "ghcr.io/statecrafting".into(),
+        ],
+        plan_ids: BTreeMap::new(),
+        plan_ids_changed: PlanChanges::First("none".into()),
+        msrv: String::new(),
+        edition: String::new(),
         toolchain: inputs.toolchain,
         source_date_epoch: inputs.source_date_epoch,
         evidence: inputs.evidence,
@@ -139,6 +185,11 @@ pub fn sha256sums(m: &ReleaseManifest) -> String {
     m.packages
         .iter()
         .map(|p| format!("{}  {}\n", p.sha256, p.crate_file))
+        .chain(
+            m.artifacts
+                .iter()
+                .map(|a| format!("{}  {}\n", a.sha256, a.name)),
+        )
         .collect()
 }
 
@@ -317,6 +368,12 @@ pub fn verify_release(
                     ));
                 }
             }
+        }
+    }
+    for a in &m.artifacts {
+        match read(&a.name) {
+            Ok(bytes) if bytes.len() as u64 == a.bytes && sha256_hex(&bytes) == a.sha256 => {}
+            _ => v.push(format!("031 3.11.2: {} missing or differs", a.name)),
         }
     }
     let tag_ref = format!("refs/tags/{}", m.tag);
