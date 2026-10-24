@@ -521,6 +521,11 @@ sh crates/rustev-eval/mutation/seeds.sh
 
 ## Implementation record
 
+- 2026-10-24: the negative control runs its seeds on parallel workers, each
+  on its own copy of the tree and target directory (`SEEDS_JOBS`, default
+  half the cores, at most 4). The seeds, their anchors, the required
+  categories and the verdicts are unchanged. In CI the control was 26 of the
+  `evaluation` group's 28 minutes at about 40 s a seed, one at a time.
 - 2026-09-23: approved contract and amendments only. No replay, capture,
   metrics or fitting implementation is claimed. Review against current
   source found and addressed missing plan-loading dependencies, missing

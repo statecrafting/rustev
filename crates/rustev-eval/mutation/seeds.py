@@ -15,6 +15,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import threading
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 E = "crates/rustev-eval/src/"
@@ -388,49 +389,91 @@ def run(cmd, cwd, env, timeout=None):
         return "timeout"
 
 
+def jobs():
+    # Workers, each on its own copy of the tree and target directory. One
+    # seed's rebuild and test run leave cores idle (a single crate's front
+    # end is serial), so two seeds at a time on a 4-core runner overlap
+    # compile and test. SEEDS_JOBS overrides the default.
+    if os.environ.get("SEEDS_JOBS"):
+        return max(1, int(os.environ["SEEDS_JOBS"]))
+    return max(1, min(4, (os.cpu_count() or 2) // 2))
+
+
+def try_seed(seed, src, env):
+    """The verdict line and the failure (None when detected) of one seed."""
+    category, name, path, old, new, packages = seed
+    label = f"{category}: {name}"
+    base = ["cargo", "test", "--locked", "-q"] + [a for p in packages for a in ("-p", p)]
+    f = os.path.join(src, path)
+    original = open(f, encoding="utf-8").read()
+    if original.count(old) != 1:
+        return f"BROKEN   {label}: anchor", f"{label}: anchor found {original.count(old)} times in {path}"
+    open(f, "w", encoding="utf-8").write(original.replace(old, new))
+    try:
+        if run(base + ["--no-run"], src, env) != 0:
+            return f"BROKEN   {label}: does not compile", f"{label}: the seeded tree does not compile"
+        rc = run(base, src, env, TEST_TIMEOUT_S)
+        if rc == 0:
+            return f"SURVIVED {label}", f"{label}: survived (the tests passed with the defect)"
+        if rc == "timeout":
+            return f"TIMEOUT  {label}", f"{label}: inconclusive (the tests did not finish)"
+        return f"DETECTED {label}", None
+    finally:
+        open(f, "w", encoding="utf-8").write(original)
+
+
 def main():
-    work = tempfile.mkdtemp(prefix="rustev-eval-seeds-")
-    env = dict(os.environ, CARGO_TARGET_DIR=os.path.join(work, "target"))
-    src = os.path.join(work, "src")
-    ignore = shutil.ignore_patterns("target", ".git", ".tooling", ".bin", ".statecraft")
-    shutil.copytree(ROOT, src, ignore=ignore)
-    failures = []
     chosen = [x for x in SEEDS if not sys.argv[1:] or any(a in x[1] or a in x[0] for a in sys.argv[1:])]
     if not chosen:
         print("seeds: no seed matches the filter")
         sys.exit(1)
+    work = tempfile.mkdtemp(prefix="rustev-eval-seeds-")
+    ignore = shutil.ignore_patterns("target", ".git", ".tooling", ".bin", ".statecraft")
+    n = min(jobs(), len(chosen))
+    trees = []
+    for i in range(n):
+        src = os.path.join(work, f"src{i}")
+        shutil.copytree(ROOT, src, ignore=ignore)
+        trees.append((src, dict(os.environ, CARGO_TARGET_DIR=os.path.join(work, f"target{i}"))))
+    failures = []
     try:
-        for category, name, path, old, new, packages in chosen:
-            label = f"{category}: {name}"
-            base = ["cargo", "test", "--locked", "-q"] + [a for p in packages for a in ("-p", p)]
-            f = os.path.join(src, path)
-            original = open(f, encoding="utf-8").read()
-            if original.count(old) != 1:
-                failures.append(f"{label}: anchor found {original.count(old)} times in {path}")
-                print(f"BROKEN   {label}: anchor", flush=True)
-                continue
-            open(f, "w", encoding="utf-8").write(original.replace(old, new))
-            try:
-                if run(base + ["--no-run"], src, env) != 0:
-                    failures.append(f"{label}: the seeded tree does not compile")
-                    print(f"BROKEN   {label}: does not compile", flush=True)
-                    continue
-                rc = run(base, src, env, TEST_TIMEOUT_S)
-                if rc == 0:
-                    failures.append(f"{label}: survived (the tests passed with the defect)")
-                    print(f"SURVIVED {label}", flush=True)
-                elif rc == "timeout":
-                    failures.append(f"{label}: inconclusive (the tests did not finish)")
-                    print(f"TIMEOUT  {label}", flush=True)
-                else:
-                    print(f"DETECTED {label}", flush=True)
-            finally:
-                open(f, "w", encoding="utf-8").write(original)
+        if n > 1:
+            # Build the unseeded tree once, then give every worker a copy of
+            # that target directory instead of n concurrent cold builds.
+            # Cargo keys artifacts on the source path, so the copies stay
+            # valid only for the dependencies; each worker rebuilds the
+            # workspace crates on its first seed.
+            src, env = trees[0]
+            packages = sorted({p for x in chosen for p in x[5]})
+            run(["cargo", "test", "--locked", "-q", "--no-run"] + [a for p in packages for a in ("-p", p)], src, env)
+            for _, other in trees[1:]:
+                shutil.copytree(env["CARGO_TARGET_DIR"], other["CARGO_TARGET_DIR"], symlinks=True)
+        queue = list(enumerate(chosen))
+        results = {}
+        lock = threading.Lock()
+
+        def worker(src, env):
+            while True:
+                with lock:
+                    if not queue:
+                        return
+                    i, seed = queue.pop(0)
+                line, failure = try_seed(seed, src, env)
+                with lock:
+                    results[i] = failure
+                    print(line, flush=True)
+
+        threads = [threading.Thread(target=worker, args=tree) for tree in trees]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        failures = [results[i] for i in sorted(results) if results[i]]
     finally:
         shutil.rmtree(work, ignore_errors=True)
     full = not sys.argv[1:]
     missing = [c for c in REQUIRED if full and not any(x[0] == c for x in SEEDS)]
-    print(f"seeds: {len(chosen) - len(failures)}/{len(chosen)} detected")
+    print(f"seeds: {len(chosen) - len(failures)}/{len(chosen)} detected ({n} worker(s))")
     for c in missing:
         print(f"  no seed covers the required category {c!r}")
     if failures or missing:
