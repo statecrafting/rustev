@@ -187,3 +187,278 @@ fn reference_definitions_and_plans_keep_bytes_and_ids() {
         );
     }
 }
+
+fn screening() -> Value {
+    json!({"max_text_units":600,"entries":[
+        {"id":"caller_text","fields":["input:request.text"],"item_id":"none",
+         "screener":"input-screen","on_block":"refuse","address":"computed",
+         "on_unavailable":"fail_closed"},
+        {"id":"behaviour","fields":["input:request.behaviour_text"],"item_id":"none",
+         "screener":"input-screen","on_block":"drop_field","address":"computed",
+         "on_unavailable":"fail_closed"},
+        {"id":"catalogue","fields":["input:candidates[]/description"],"item_id":{"field":"id"},
+         "screener":"catalogue-screen","on_block":"drop_text","address":"computed",
+         "on_unavailable":"skip_generation"}
+    ]})
+}
+
+fn reference_document(kind: &str) -> Value {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../rustev-core/tests/golden");
+    serde_json::from_slice(
+        &std::fs::read(dir.join(format!("support-routing.{kind}.json"))).unwrap(),
+    )
+    .unwrap()
+}
+
+#[test]
+fn screening_definition_example_round_trip_and_identity() {
+    use rustev_contract::definition::Definition;
+    let mut v = reference_document("definition");
+    v["schema"] = json!("rustev.definition/2");
+    let absent = Definition::parse(&serde_json::to_vec(&v).unwrap()).unwrap();
+    v["screening"] = screening();
+    let d = Definition::parse(&serde_json::to_vec(&v).unwrap()).unwrap();
+    assert_eq!(d.canonical().unwrap(), canonical_value_bytes(&v).unwrap());
+    assert_ne!(absent.id().unwrap(), d.id().unwrap());
+    for (key, value) in [
+        ("fields", json!(["input:request/text"])),
+        ("on_block", json!("drop_item")),
+        ("on_unavailable", json!("fail_open")),
+        ("address", json!({"to":"host", "reason":"host_review"})),
+        ("address", json!({"to":"upstream", "reason":"review"})),
+        ("address", json!({"to":"none", "reason":"review"})),
+        // Refused at compile as `caller_cannot_act` (3.5.7), not at parse.
+        ("address", json!({"to":"caller", "reason":"review"})),
+    ] {
+        let mut changed = v.clone();
+        changed["screening"]["entries"][0][key] = value;
+        let d = Definition::parse(&serde_json::to_vec(&changed).unwrap()).unwrap();
+        assert_eq!(
+            d.canonical().unwrap(),
+            canonical_value_bytes(&changed).unwrap()
+        );
+    }
+}
+
+#[test]
+fn screening_local_shape_refusals() {
+    use rustev_contract::screening::Screening;
+    let refuses = |v: Value| {
+        assert!(
+            serde_json::from_value::<Screening>(v.clone()).is_err(),
+            "{v}"
+        )
+    };
+    for value in [json!(null), json!({}), json!([]), json!("")] {
+        refuses(value);
+    }
+    for value in [json!(0), json!(-1), json!(1.5), json!(null), json!("600")] {
+        let mut v = screening();
+        v["max_text_units"] = value;
+        refuses(v);
+    }
+    for value in [
+        json!([]),
+        json!(vec![screening()["entries"][0].clone(); 33]),
+        json!(null),
+    ] {
+        let mut v = screening();
+        v["entries"] = value;
+        refuses(v);
+    }
+    for (key, value) in [
+        ("id", json!("")),
+        ("id", json!("has:colon")),
+        ("id", json!("has space")),
+        ("screener", json!("")),
+        ("item_id", json!({"field":""})),
+        ("item_id", json!({})),
+        ("item_id", json!("")),
+        ("on_block", json!("")),
+        ("on_unavailable", json!("")),
+        ("address", json!("")),
+        ("address", json!({"to":"host","reason":""})),
+        ("address", json!({"to":"host"})),
+        ("fields", json!([])),
+        ("fields", json!(vec!["input:x"; 33])),
+    ] {
+        let mut v = screening();
+        v["entries"][0][key] = value;
+        refuses(v);
+    }
+    for field in [
+        "",
+        "step:x",
+        "input:",
+        "input:/x",
+        "input:x/",
+        "input:x[]",
+        "input:x[]/",
+        "input:x/y/z",
+        "input:x[y]/z",
+        "input:x/y[]",
+        "input:x y",
+        "input:x:y",
+    ] {
+        let mut v = screening();
+        v["entries"][0]["fields"] = json!([field]);
+        refuses(v);
+    }
+    for key in [
+        "id",
+        "fields",
+        "item_id",
+        "screener",
+        "on_block",
+        "address",
+        "on_unavailable",
+    ] {
+        let mut v = screening();
+        v["entries"][0].as_object_mut().unwrap().remove(key);
+        refuses(v);
+        let mut v = screening();
+        v["entries"][0][key] = Value::Null;
+        refuses(v);
+    }
+    for key in ["max_text_units", "entries"] {
+        let mut v = screening();
+        v.as_object_mut().unwrap().remove(key);
+        refuses(v);
+    }
+    for path in ["", "/entries/0", "/entries/2/item_id"] {
+        let mut v = screening();
+        v.pointer_mut(path).unwrap()["extra"] = json!(true);
+        refuses(v);
+    }
+    // Boundary values pass. Cross-entry uniqueness, consequence fit and
+    // fail_open are deliberately deferred to core's later increment.
+    let mut v = screening();
+    v["max_text_units"] = json!(u64::MAX);
+    v["entries"] = json!(vec![v["entries"][0].clone(); 32]);
+    v["entries"][0]["fields"] = json!(vec!["input:x"; 32]);
+    v["entries"][0]["on_unavailable"] = json!("fail_open");
+    assert!(serde_json::from_value::<Screening>(v).is_ok());
+}
+
+#[test]
+fn screening_plan_round_trip_and_binding_identity() {
+    use rustev_contract::plan::Plan;
+    let mut v = reference_document("plan");
+    v["schema"] = json!("rustev.plan/3");
+    let absent = Plan::parse(&serde_json::to_vec(&v).unwrap()).unwrap();
+    v["screening"] = json!({"screening":screening(), "steps":[{
+        "step":"screen:caller_text:0", "entry":"caller_text", "field":"input:request.text",
+        "binding":{"backend_id":"input-screen", "artifact":descriptor()["artifact"],
+        "descriptor":parse(&descriptor()).unwrap().id().unwrap()}, "consequence":"refuse"}]});
+    let p = Plan::parse(&serde_json::to_vec(&v).unwrap()).unwrap();
+    assert_eq!(p.canonical().unwrap(), canonical_value_bytes(&v).unwrap());
+    assert_ne!(p.id().unwrap(), absent.id().unwrap());
+    for path in [
+        "/screening",
+        "/screening/steps/0",
+        "/screening/steps/0/binding",
+    ] {
+        let keys: Vec<_> = v
+            .pointer(path)
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
+        for key in keys {
+            let mut changed = v.clone();
+            changed
+                .pointer_mut(path)
+                .unwrap()
+                .as_object_mut()
+                .unwrap()
+                .remove(&key);
+            assert!(
+                Plan::parse(&serde_json::to_vec(&changed).unwrap()).is_err(),
+                "{path}/{key}"
+            );
+        }
+    }
+    for path in [
+        "/screening/steps/0/step",
+        "/screening/steps/0/entry",
+        "/screening/steps/0/field",
+        "/screening/steps/0/binding/backend_id",
+    ] {
+        let mut changed = v.clone();
+        *changed.pointer_mut(path).unwrap() = json!("");
+        assert!(Plan::parse(&serde_json::to_vec(&changed).unwrap()).is_err());
+    }
+    let mut changed = v.clone();
+    changed["screening"]["steps"][0]["binding"]["backend_id"] = json!("another-screener");
+    assert_ne!(
+        p.id().unwrap(),
+        Plan::parse(&serde_json::to_vec(&changed).unwrap())
+            .unwrap()
+            .id()
+            .unwrap()
+    );
+    let mut earlier = v.clone();
+    earlier["schema"] = json!("rustev.plan/2");
+    assert!(Plan::parse(&serde_json::to_vec(&earlier).unwrap()).is_err());
+    v["screening"]["steps"] = json!([]);
+    assert!(Plan::parse(&serde_json::to_vec(&v).unwrap()).is_err());
+}
+
+#[test]
+fn unused_screening_preserves_track_bytes_and_ids_and_null_is_refused() {
+    use rustev_contract::{definition::Definition, plan::Plan};
+    let mut d = reference_document("definition");
+    d["schema"] = json!("rustev.definition/2");
+    let old = canonical_value_bytes(&d).unwrap();
+    let parsed = Definition::parse(&old).unwrap();
+    assert!(parsed.screening.is_none());
+    assert_eq!(parsed.canonical().unwrap(), old);
+    assert_eq!(
+        parsed.id().unwrap().as_str(),
+        tagged_digest("rustev.definition/2", &old)
+    );
+    d["screening"] = Value::Null;
+    assert!(Definition::parse(&serde_json::to_vec(&d).unwrap()).is_err());
+    let mut p = reference_document("plan");
+    p["schema"] = json!("rustev.plan/3");
+    p["definition"]["schema"] = json!("rustev.definition/2");
+    let old = canonical_value_bytes(&p).unwrap();
+    let parsed = Plan::parse(&old).unwrap();
+    assert!(parsed.screening.is_none());
+    assert_eq!(parsed.canonical().unwrap(), old);
+    assert_eq!(
+        parsed.id().unwrap().as_str(),
+        tagged_digest("rustev.plan/3", &old)
+    );
+    p["screening"] = Value::Null;
+    assert!(Plan::parse(&serde_json::to_vec(&p).unwrap()).is_err());
+}
+
+#[test]
+fn screening_schemas_describe_optional_nonnullable_members() {
+    let schemas = rustev_contract::schema_emit::document_schemas();
+    for (kind, version, file) in [
+        (
+            "definition",
+            "rustev.definition/2",
+            "rustev.definition-2.schema.json",
+        ),
+        ("plan", "rustev.plan/3", "rustev.plan-3.schema.json"),
+    ] {
+        let schema: Value =
+            serde_json::from_slice(&schemas.iter().find(|s| s.file == file).unwrap().bytes)
+                .unwrap();
+        let validator = jsonschema::validator_for(&schema).unwrap();
+        let mut v = reference_document(kind);
+        v["schema"] = json!(version);
+        assert!(validator.is_valid(&v));
+        v["screening"] = Value::Null;
+        assert!(!validator.is_valid(&v));
+        if kind == "definition" {
+            v["screening"] = screening();
+            assert!(validator.is_valid(&v));
+        }
+    }
+}

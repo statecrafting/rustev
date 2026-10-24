@@ -38,6 +38,14 @@ pub struct Definition {
     /// (spec 033, 3.1.1); omitted when unused.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub actionability: Option<Actionability>,
+    /// Optional screening contract (spec 035); omitted when unused.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::screening::present"
+    )]
+    #[schemars(with = "crate::screening::Screening")]
+    pub screening: Option<crate::screening::Screening>,
 }
 
 crate::document::versioned_document!(
