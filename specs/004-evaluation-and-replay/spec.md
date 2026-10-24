@@ -521,6 +521,10 @@ sh crates/rustev-eval/mutation/seeds.sh
 
 ## Implementation record
 
+- 2026-10-24: the parallel seed run checks its warm build. A warm build that
+  fails or writes nothing is shown, and each worker builds cold instead of
+  the run stopping on a missing target directory before any seed (seen with
+  spec 035's seeds on a developer machine). Seeds and verdicts are unchanged.
 - 2026-10-24: the unfiltered seed run (this spec's negative control) leaves
   out the seeds another spec's acceptance runs under its own filter: spec
   023's (`seeds.sh "spec 023"`), spec 026's (`live-comparison`) and spec
