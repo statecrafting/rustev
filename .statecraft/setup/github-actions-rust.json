@@ -75,52 +75,65 @@
       [
         "scripts/check-authored-content.sh"
       ]
+    ],
+    "preflight": [
+      [
+        ".bin/spec-spine",
+        "check",
+        "--fail-on-warn"
+      ],
+      [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ]
     ]
   },
   "files": [
     {
-      "digest": "e6a65e25a654d27de7992aa21c6fdfc0472affc3f91571e80a4558179a76b3da",
+      "digest": "3f9cbc07e333372c5fca454dc2280dc3b6571dc80a6961bab189144514416b63",
       "path": ".github/workflows/statecraft-ci.yml",
       "role": "workflow"
     },
     {
-      "digest": "061ede83b139e4e2626bab53dfdbc3f0e650f951d39264846da2944a9d1e5a71",
+      "digest": "525b9009e1d344ce687dae6ba2ef02f24ad0ec68ad27563c4db724826ad88e1a",
       "path": ".github/workflows/statecraft-ai-review.yml",
       "role": "workflow"
     },
     {
-      "digest": "7c05aa153a73f66e248d64913e1d292ca5de314bd396795ade8ac730faecaafe",
+      "digest": "6d06b8fe214d1721773dac050a10e44fe6cf8811b63c3c4b1cc2c4354273efb4",
       "path": "scripts/statecraft/install-spec-spine.sh",
       "role": "script"
     },
     {
-      "digest": "9d5ef19713f715481a77493eccab58c9122bd643fbdb3b5a8e58d015e9b99fb6",
+      "digest": "f4bcaf7cce35029c037eb83e43509ab5c8408519aef8ff0d0f852fd3ad581077",
       "path": "scripts/statecraft/gate.sh",
       "role": "script"
     },
     {
-      "digest": "ad34b47fc85ab8f950b5d6f525544b49bd9a677d1cc6d7d413ba5eb01b09c3e2",
+      "digest": "ea09e9f54f03f566dd93e495a0f7387d5466c0eeb02d2620d581e5d956bf16e2",
       "path": "scripts/statecraft/ci-gate.sh",
       "role": "script"
     },
     {
-      "digest": "9757ac56f148f7645d747b40b9892858f57c999b50a279c1ae591df3df2f9403",
+      "digest": "b9022108780ca4f58aa606875f340ca2170e248923503d1e67c6810cfc3da04a",
       "path": "scripts/statecraft/ai-review.sh",
       "role": "script"
     },
     {
-      "digest": "a987af5a89b8df7b8f53360245e2c6c20f4c5d3a6eff1e2a35400635f8c5886c",
+      "digest": "0d3f253ce4f25407df2ae53e63b2759716e65dd02b4b872685144e0c709213d8",
       "path": ".github/CODEOWNERS",
       "role": "codeowners"
     },
     {
-      "digest": "19fb2e419eb95f672627a210167588a7e029efdfa43ff30644e29ec75a6027c4",
+      "digest": "bb099c3b6f775c9e81d3c9c9a445eb19c76e7be7268f84a654ae005bb6b7757b",
       "path": ".statecraft/setup/github-actions-rust.remote.json",
       "role": "remote-state"
     }
   ],
   "id": "github-actions-rust",
-  "identity": "fe0e763c8f217652df7975e429a8eb2c762657abc33344ef79f6d4e18733e7a6",
+  "identity": "54b47e9bce67921d21a4916e8267fd56a3cef846ef1fa1c79354c4f77b2e6925",
   "jobs": {
     "ai-review": {
       "merge_group": "recorded-review",
@@ -155,6 +168,13 @@
       "required": true
     },
     "governance": {
+      "merge_group": "required",
+      "optional": false,
+      "pull_request": "required",
+      "push": "required",
+      "required": true
+    },
+    "preflight": {
       "merge_group": "required",
       "optional": false,
       "pull_request": "required",
@@ -227,6 +247,14 @@
     "gate_each_commit": true,
     "max_calls": 4,
     "release_branch_pattern": "release/*",
+    "remote": {
+      "mergeQueue": {
+        "allEntriesMustPass": true,
+        "buildConcurrency": 5,
+        "mergeMethod": "squash",
+        "required": true
+      }
+    },
     "require_default_base": true,
     "require_ratified": true,
     "require_signed_commits": true
@@ -260,6 +288,7 @@
     "revision 15: an exact consented spec-spine pin move is reviewed with its initialization plan, and the managed installer reads that adopted pin; this changes no required remote check or branch-protection authority (spec 033)",
     "revision 16: the profile renders .statecraft/setup/github-actions-rust.remote.json (schema statecraft/remote-desired-state/1), a canonical desired-state document of what this profile expects of the remote: required checks with their App, the extra required jobs and their aggregation by ci-gate, code-owner review and the governed paths CODEOWNERS covers, the merge queue (remote.merge_queue), the exception Environment and its reviewers (remote.exception_reviewers), workflow-token defaults, secret names, and repository custom properties (remote.custom_properties). An omitted field is no claim. `doctor --remote` compares every field read-only and reports each as matching, drifted, unavailable, unauthorized, unsupported or unverified; this product never applies it, and an owner-operated applier outside this product needs its own authorization (spec 012)",
     "revision 17: the AI review reads governance documents as Git blobs at the base commit (AGENTS.md, .statecraft/AGENTS.md, standards/spec/constitution.md, standards/spec/contract.md by default, absent ones recorded as absent) plus review.context_paths, at most 32 literal repository-relative paths read from the policy at the base, never from the candidate; the documents must fit a quarter of review.context_tokens whole or the review refuses with 2 before any provider call, every call's whole input must fit three quarters of it, the diff budget is what remains (at most half), and the evidence records each document's blob, digest and length and each call's budget (spec 041)",
+    "revision 18: a newer push to a pull request cancels the work of that pull request's older statecraft-ci run, job by job: every job but review-exception and ci-gate has a concurrency group of its pull request and job, because a run waiting on the owner exception is never cancelled by a group and would hold a workflow-level one (spec 059), while a push to the default branch and each merge-queue entry keep groups of their own run; a preflight job (the pull request's base, the committed artifacts' freshness, and cargo fmt for a Rust code selection) runs before code and every declared extra job, which need it, so a stacked pull request skips them unless it carries the label statecraft:stacked-ci; every preflight check also runs in governance or code, and a base gate.sh without the verb judges nothing; the code job restores the cargo cache on every event and saves it only on a push to the default branch, with incremental compilation off and line-table debuginfo (specs 058 and 059)",
     "a repository that already runs these checks by hand keeps them by setting governance.enforce_coverage (index coverage --fail-on-untraced), governance.authored_content (the script's path; absent or not executable refuses), governance.authored_content_text (the title, the body and every commit message), governance.gate_each_commit (each commit's tree passes the gate and cargo fmt) and governance.require_signed_commits (each commit verified as signed by GitHub) (revision 4)"
   ],
   "review": {
@@ -291,5 +320,5 @@
     "tool": "claude-code",
     "tool_version": "2.1.116"
   },
-  "revision": 17
+  "revision": 18
 }

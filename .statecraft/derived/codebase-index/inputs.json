@@ -16,10 +16,10 @@
       "contentHash": "0f7f77d4c15c0e23d23c6614589afb60fc11042ed743dd8f4c01bf65b41bbbec"
     },
     ".github/workflows/statecraft-ai-review.yml": {
-      "contentHash": "1880b5380c2457b28ea8b34903d2044ae099edc53ce735874092d0be8daab94c"
+      "contentHash": "a15d84325933c0155ea875173b88845768b4ad9f45f6d7c29d08d71d88a54d06"
     },
     ".github/workflows/statecraft-ci.yml": {
-      "contentHash": "a809bbfdf6252bf2ecf010ab529f87303fed0851473f9f57b7e4dc9805d7ac94"
+      "contentHash": "4ae055c763a10fa0e5ead7de54442e9567486fdc92257272bd882f96ae5d24f0"
     },
     ".github/workflows/verify.yml": {
       "contentHash": "4f74a17a606e1144a3742fe982b87d7e16183e3562b19e6d1f0e7b97466b2f62"
@@ -28,7 +28,7 @@
       "contentHash": "218b76a5e1c09226bf9d0f4b5fd2f5ef13c7d8419386e4ca3907b422f50e1bef"
     },
     "AGENTS.md": {
-      "contentHash": "50c2c6e4beea403f592a56d2a09569ec407d0aa1f3c717a5970dc7a1c2e4e918"
+      "contentHash": "2323122ac0e3abf30206e74039638ef40994c9596d54fbafa2dcb520d43a4110"
     },
     "Cargo.toml": {
       "contentHash": "383bfcc4e9cebe03d116f307657fc72b8931c88154b7b866551c4b285bbfabb0"

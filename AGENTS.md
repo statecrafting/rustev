@@ -47,8 +47,8 @@ acceptance.
 
 ## Continuous integration
 
-CI is the Statecraft setup profile `github-actions-rust` (revision 17): one
-required check, `ci-gate`, over governance, code, the AI review and the
+CI is the Statecraft setup profile `github-actions-rust` (revision 18): one
+required check, `ci-gate`, over governance, preflight, code, the AI review and the
 declared extra jobs (`ci.extra_required_jobs`) `boundaries` and `verify`
 (`.github/workflows/boundaries.yml`, `.github/workflows/verify.yml`, owned by
 spec 001), `bindings` (`.github/workflows/bindings.yml`, spec 027) and
@@ -58,4 +58,17 @@ only by editing `project.setup.parameters` in `.statecraft/environment.json`
 and re-rendering with `statecraft-cli init plan|apply`, never by hand. Any
 change under `.github/workflows/` or `scripts/statecraft/`, and to
 `scripts/check-authored-content.sh`, needs the owner's approval of the
-`statecraft-review-exception` Environment once.
+`statecraft-review-exception` Environment once. A spec number in a rendered
+file's revision notes (for example "(specs 058 and 059)" in
+`.statecraft/setup/github-actions-rust.json`) names a statecraft-cli spec, the
+product that renders the profile, never a spec in this corpus.
+
+`main` requires a merge queue (squash, all entries green); arm auto-merge only
+on a pull request that targets `main`, and never use the Update branch button
+(the queue tests each entry against the latest `main`). A newer push cancels
+the jobs of a pull request's older run; a run left waiting on the owner
+exception is cleaned up by `make landing-status ARGS=--cancel-superseded`. A
+stacked pull request runs governance, preflight and the AI review only; add
+the label `statecraft:stacked-ci` before pushing to get the full matrix as
+early feedback (its base is still refused). `make landing-status` orders the
+open pull requests by what they unblock and names each one's next action.
