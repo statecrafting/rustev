@@ -51,6 +51,14 @@ pub struct Plan {
     /// `rustev.plan/3` document; absent from every earlier plan.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub instantiation: Option<Instantiation>,
+    /// Optional screening contract (spec 035); omitted when unused.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::screening::present"
+    )]
+    #[schemars(with = "crate::screening::PlanScreening")]
+    pub screening: Option<crate::screening::PlanScreening>,
 }
 
 impl crate::Document for Plan {
@@ -71,6 +79,11 @@ impl crate::Document for Plan {
                 expected: "rustev.plan/2 or rustev.plan/3",
                 found: doc.schema.chars().take(80).collect(),
             });
+        }
+        if doc.schema != schema::PLAN_V3 && doc.screening.is_some() {
+            return Err(DocumentError::Parse(ParseError::Schema {
+                message: "screening is a rustev.plan/3 member".into(),
+            }));
         }
         // Check presence separately because Option erases explicit null (spec
         // 034, 3.10.1). Ignore values instead of deserializing Plan through Value:
