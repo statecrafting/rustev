@@ -38,6 +38,17 @@ pub struct EvidenceRecord {
     )]
     #[schemars(with = "Vec<crate::screening::ScreeningEvidence>", length(min = 1))]
     pub screening: Option<Vec<crate::screening::ScreeningEvidence>>,
+    /// Spec 036: omitted when the plan has no acquisition step.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::acquisition_record::list"
+    )]
+    #[schemars(
+        with = "Vec<crate::acquisition_record::AcquisitionEvidence>",
+        length(min = 1, max = 4096)
+    )]
+    pub acquisitions: Option<Vec<crate::acquisition_record::AcquisitionEvidence>>,
 }
 
 crate::document::versioned_document!(
@@ -50,6 +61,11 @@ crate::document::versioned_document!(
 
 impl EvidenceRecord {
     fn screening_version(&self) -> Result<(), String> {
+        if self.schema != schema::EVIDENCE_V2
+            && (self.acquisitions.is_some() || self.steps.iter().any(|s| s.constructed))
+        {
+            return Err("acquisitions and constructed require rustev.evidence/2".into());
+        }
         if self.screening.is_some() && self.schema != schema::EVIDENCE_V2 {
             return Err("screening requires rustev.evidence/2".into());
         }
@@ -151,6 +167,14 @@ pub enum InputStatus {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct StepEvidence {
+    /// Present only for a value derived from a constructed key (036, 3.7.4).
+    #[serde(
+        default,
+        skip_serializing_if = "std::ops::Not::not",
+        deserialize_with = "crate::acquisition_record::constructed"
+    )]
+    #[schemars(schema_with = "crate::acquisition_record::constructed_schema")]
+    pub constructed: bool,
     pub step: String,
     pub instance: Vec<String>,
     pub status: StepStatus,
@@ -277,6 +301,7 @@ impl StepEvidence {
     /// A version 1 step record: no evidence 2 member.
     pub fn new(step: String, instance: Vec<String>, status: StepStatus) -> Self {
         StepEvidence {
+            constructed: false,
             step,
             instance,
             status,

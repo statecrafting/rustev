@@ -195,6 +195,8 @@ fn supply(sequence: u64, step: &str) -> SupplyEntry {
 fn bundle() -> ReplayBundle {
     let exp = CREATED + 7 * DAY;
     ReplayBundle {
+        sources: None,
+        acquisition_pages: None,
         schema: schema::REPLAY.into(),
         decision_id: "d".into(),
         scope: Scope::principal(h("t"), h("r"), h("p")),
@@ -303,7 +305,7 @@ fn bundle_lifetime_boundaries_are_exact() {
 #[test]
 fn bundle_structure_is_checked() {
     let mut b = bundle();
-    b.schema = "rustev.replay/2".into();
+    b.schema = "rustev.replay/3".into();
     assert!(matches!(b.check(None), Err(BundleError::Schema(_))));
     let mut b = bundle();
     b.decision_id = String::new();

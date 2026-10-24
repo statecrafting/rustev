@@ -51,9 +51,44 @@ pub struct ReplayBundle {
     pub capture: CaptureStatus,
     /// In actual supply order.
     pub supplies: Vec<SupplyEntry>,
+    /// Replay 2: the source descriptors bound by the retained plan.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::acquisition_record::list"
+    )]
+    #[schemars(with = "Vec<RetentionItem>", length(min = 1, max = 4096))]
+    pub sources: Option<Vec<RetentionItem>>,
+    /// Replay 2: captured pages share the semantic supply sequence.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::acquisition_record::list"
+    )]
+    #[schemars(with = "Vec<AcquisitionSupply>", length(min = 1, max = 4096))]
+    pub acquisition_pages: Option<Vec<AcquisitionSupply>>,
 }
 
-crate::document::document!(ReplayBundle, schema::REPLAY, REPLAY_V1);
+crate::document::versioned_document!(
+    ReplayBundle,
+    [schema::REPLAY, schema::REPLAY_V2],
+    "rustev.replay/1 or rustev.replay/2",
+    REPLAY_V1,
+    check = ReplayBundle::parsed_members
+);
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AcquisitionSupply {
+    pub sequence: u64,
+    pub step: String,
+    pub tier: u32,
+    pub page: u32,
+    pub request: crate::ids::AcquisitionRequestId,
+    pub attempt_id: Option<String>,
+    /// An acquisition page or runtime reason, subject to retention.
+    pub value: RetentionItem,
+}
 
 /// Whether every supplied value was captured. Only `complete` reproduces.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -112,11 +147,15 @@ pub enum ItemLocation {
     Snapshot,
     Run,
     Supply(usize),
+    Source(usize),
+    AcquisitionPage(usize),
 }
 
 impl fmt::Display for ItemLocation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            ItemLocation::Source(i) => write!(f, "sources[{i}]"),
+            ItemLocation::AcquisitionPage(i) => write!(f, "acquisition_pages[{i}]"),
             ItemLocation::Bundle => f.write_str("bundle"),
             ItemLocation::Plan => f.write_str("plan"),
             ItemLocation::Descriptor(i) => write!(f, "descriptors[{i}]"),
@@ -209,6 +248,17 @@ impl fmt::Display for BundleError {
 impl std::error::Error for BundleError {}
 
 impl ReplayBundle {
+    fn parsed_members(&self) -> Result<(), String> {
+        // Preserve replay 1 parsing; its existing structural check remains explicit.
+        if self.schema == schema::REPLAY {
+            if self.sources.is_some() || self.acquisition_pages.is_some() {
+                return Err("acquisition members require rustev.replay/2".into());
+            }
+            return Ok(());
+        }
+        self.check(None).map_err(|e| e.to_string())
+    }
+
     /// Every retention item with its location, in document order.
     pub fn items(&self) -> Vec<(ItemLocation, &RetentionItem)> {
         let mut v = vec![(ItemLocation::Plan, &self.plan)];
@@ -232,6 +282,22 @@ impl ReplayBundle {
                 .enumerate()
                 .map(|(i, s)| (ItemLocation::Supply(i), &s.value)),
         );
+        if let Some(sources) = &self.sources {
+            v.extend(
+                sources
+                    .iter()
+                    .enumerate()
+                    .map(|(i, s)| (ItemLocation::Source(i), s)),
+            );
+        }
+        if let Some(pages) = &self.acquisition_pages {
+            v.extend(
+                pages
+                    .iter()
+                    .enumerate()
+                    .map(|(i, p)| (ItemLocation::AcquisitionPage(i), &p.value)),
+            );
+        }
         v
     }
 
@@ -242,8 +308,16 @@ impl ReplayBundle {
     /// snapshot identities, and the supply sequence. Applies to a typed
     /// bundle as well as a parsed one.
     pub fn check(&self, host_cap_ms: Option<u64>) -> Result<(), BundleError> {
-        if self.schema != schema::REPLAY {
+        if self.schema != schema::REPLAY && self.schema != schema::REPLAY_V2 {
             return Err(BundleError::Schema(self.schema.chars().take(80).collect()));
+        }
+        let v2 = self.schema == schema::REPLAY_V2;
+        if (!v2 && (self.sources.is_some() || self.acquisition_pages.is_some()))
+            || (v2 && self.sources.is_none())
+        {
+            return Err(BundleError::Role {
+                location: ItemLocation::Bundle,
+            });
         }
         if self.decision_id.is_empty() || self.decision_id.len() > 256 {
             return Err(BundleError::DecisionId);
@@ -266,6 +340,11 @@ impl ReplayBundle {
             ("descriptors", self.descriptors.len()),
             ("calibrations", self.calibrations.len()),
             ("supplies", self.supplies.len()),
+            ("sources", self.sources.as_ref().map_or(0, Vec::len)),
+            (
+                "acquisition_pages",
+                self.acquisition_pages.as_ref().map_or(0, Vec::len),
+            ),
         ] {
             if count > MAX_BUNDLE_ITEMS {
                 return Err(BundleError::TooMany { what, count });
@@ -280,6 +359,13 @@ impl ReplayBundle {
                 return life(location, LifetimeProblem::OutlivesBundle);
             }
             let allowed: &[&str] = match location {
+                ItemLocation::Plan if v2 => &[schema::PLAN_V3],
+                ItemLocation::Snapshot if v2 => &[schema::SNAPSHOT, schema::SNAPSHOT_V2],
+                ItemLocation::Run if v2 => &[schema::RUN_V3],
+                ItemLocation::Source(_) => &[schema::SOURCE],
+                ItemLocation::AcquisitionPage(_) => {
+                    &[schema::ACQUISITION_PAGE, schema::RUNTIME_REASON]
+                }
                 ItemLocation::Plan => &[schema::PLAN, schema::PLAN_V3],
                 ItemLocation::Descriptor(_) => &[schema::BACKEND],
                 ItemLocation::Calibration(_) => &[schema::CALIBRATION],
@@ -307,18 +393,49 @@ impl ReplayBundle {
         if matches!(
             self.capture,
             CaptureStatus::Disabled | CaptureStatus::LimitExceeded
-        ) && !self.supplies.is_empty()
+        ) && (!self.supplies.is_empty()
+            || self
+                .acquisition_pages
+                .as_ref()
+                .is_some_and(|p| !p.is_empty()))
         {
             return Err(BundleError::SuppliesWithoutCapture);
         }
+        if v2
+            && (self
+                .supplies
+                .windows(2)
+                .any(|w| w[0].sequence >= w[1].sequence)
+                || self
+                    .acquisition_pages
+                    .as_ref()
+                    .is_some_and(|pages| pages.windows(2).any(|w| w[0].sequence >= w[1].sequence)))
+        {
+            return Err(BundleError::Sequence { index: 0 });
+        }
+        let mut sequence = BTreeSet::new();
+        let mut page_keys = BTreeSet::new();
+        if let Some(pages) = &self.acquisition_pages {
+            for (i, p) in pages.iter().enumerate() {
+                if !sequence.insert(p.sequence) {
+                    return Err(BundleError::Sequence { index: i });
+                }
+                if !page_keys.insert((&p.step, p.tier, p.page)) {
+                    return Err(BundleError::DuplicateSupply { index: i });
+                }
+            }
+        }
         let mut keys = BTreeSet::new();
         for (i, s) in self.supplies.iter().enumerate() {
-            if s.sequence != i as u64 {
+            if (!v2 && s.sequence != i as u64) || !sequence.insert(s.sequence) {
                 return Err(BundleError::Sequence { index: i });
             }
             if !keys.insert((&s.step, &s.instance)) {
                 return Err(BundleError::DuplicateSupply { index: i });
             }
+        }
+        if sequence.iter().copied().ne(0..sequence.len() as u64) {
+            return Err(BundleError::Sequence { index: 0 });
         }
         Ok(())
     }

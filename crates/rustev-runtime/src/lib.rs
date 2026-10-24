@@ -774,6 +774,7 @@ impl Runtime {
             (None, false)
         };
         let mut record = RunRecord {
+            acquisitions: None,
             // A plan 3 decision's record holds evidence 2 (spec 032, 3.10.3).
             schema: if plan_3 {
                 schema::RUN_V3

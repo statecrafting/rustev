@@ -3175,6 +3175,11 @@ export namespace RustevEvidence1 {
    * How a value's metadata came about (spec 032, 3.2.2).
    */
   export type Basis =
+    | {
+        acquired: {
+          step: string;
+        };
+      }
     | "declared"
     | "computed"
     | {
@@ -3838,35 +3843,52 @@ export namespace RustevEvidence1 {
 export type RustevEvidence1 = RustevEvidence1.RustevEvidence1;
 
 export namespace RustevEvidence2 {
+  export type ContentDigest = string;
   /**
-   * A check's status in evidence 2 (3.4.8).
+   * The oldest as-of among contributing graded values, or `none`.
    */
-  export type CheckStatus =
-    | "passed"
+  export type AsOf =
+    | "none"
     | {
-        failed: {
-          class: ProvenanceClass;
-          /**
-           * The consequence kind applied.
-           */
-          consequence: string;
+        ms: Timestamp;
+      };
+  export type Timestamp = number;
+  /**
+   * How a value's metadata came about (spec 032, 3.2.2).
+   */
+  export type Basis =
+    | {
+        acquired: {
+          step: string;
+        };
+      }
+    | "declared"
+    | "computed"
+    | {
+        corroborated: {
+          step: string;
         };
       }
     | {
-        not_evaluated: {
-          reason: Unresolved;
+        merged: {
+          side: MergeSide;
+          step: string;
         };
       }
     | {
-        unevaluable: {
-          reason: Unresolved;
-        };
-      }
-    | {
-        relaxed: {
-          by: string;
+        resolved: {
+          input: string;
         };
       };
+  /**
+   * Which side of a merge a field came from (spec 032, 3.6.3).
+   */
+  export type MergeSide = "base" | "overlay";
+  /**
+   * A value's grade, or `ungraded` when no graded value contributed.
+   * `ungraded` is not a point of the grade order (spec 032, 3.2.3).
+   */
+  export type ValueGrade = "authoritative" | "cached" | "estimated" | "hint" | "ungraded";
   /**
    * The closed set of provenance classes (spec 002, 3.7.1).
    */
@@ -3877,6 +3899,17 @@ export namespace RustevEvidence2 {
     | "third-party"
     | "attributed-claim"
     | "model-derived";
+  export type AcquisitionKind = "acquire" | "widen";
+  export type AcquisitionOutcome =
+    | "resolved"
+    | {
+        skipped: {
+          guard: string;
+        };
+      }
+    | {
+        unresolved: Unresolved;
+      };
   /**
    * The closed set of unresolved reasons (spec 002, 3.5.6). Field and fact
    * lists are sorted and deduplicated.
@@ -3942,13 +3975,51 @@ export namespace RustevEvidence2 {
           fields: [string, ...string[]];
         };
       };
-  export type DefinitionId = string;
-  export type Timestamp = number;
+  export type AcquisitionStop =
+    "none" | "exhausted" | "stop_condition" | "page_limit" | "item_limit" | "tiers_exhausted" | "tier_failure";
+  export type TierOutcome =
+    | ("ok" | "empty" | "skipped" | "not_needed")
+    | {
+        failed: {
+          reason: Unresolved;
+        };
+      };
+  export type PageDigest =
+    | "none"
+    | {
+        sha256: ContentDigest;
+      };
+  export type AcquisitionRequestId = string;
   /**
-   * A value's grade, or `ungraded` when no graded value contributed.
-   * `ungraded` is not a point of the grade order (spec 032, 3.2.3).
+   * A check's status in evidence 2 (3.4.8).
    */
-  export type ValueGrade = "authoritative" | "cached" | "estimated" | "hint" | "ungraded";
+  export type CheckStatus =
+    | "passed"
+    | {
+        failed: {
+          class: ProvenanceClass;
+          /**
+           * The consequence kind applied.
+           */
+          consequence: string;
+        };
+      }
+    | {
+        not_evaluated: {
+          reason: Unresolved;
+        };
+      }
+    | {
+        unevaluable: {
+          reason: Unresolved;
+        };
+      }
+    | {
+        relaxed: {
+          by: string;
+        };
+      };
+  export type DefinitionId = string;
   /**
    * The closed, ordered evidence grade. The derived order runs weakest to
    * strongest, so `min` and `max` are the grade order of spec 032, 3.2.1.
@@ -3966,40 +4037,6 @@ export namespace RustevEvidence2 {
           reason: string;
         };
       };
-  /**
-   * The oldest as-of among contributing graded values, or `none`.
-   */
-  export type AsOf =
-    | "none"
-    | {
-        ms: Timestamp;
-      };
-  /**
-   * How a value's metadata came about (spec 032, 3.2.2).
-   */
-  export type Basis =
-    | "declared"
-    | "computed"
-    | {
-        corroborated: {
-          step: string;
-        };
-      }
-    | {
-        merged: {
-          side: MergeSide;
-          step: string;
-        };
-      }
-    | {
-        resolved: {
-          input: string;
-        };
-      };
-  /**
-   * Which side of a merge a field came from (spec 032, 3.6.3).
-   */
-  export type MergeSide = "base" | "overlay";
   /**
    * A value's presence status. Key existence alone is never presence.
    */
@@ -4275,7 +4312,6 @@ export namespace RustevEvidence2 {
    * named `reason` or `action`, so the two forms never overlap.
    */
   export type UnresolvedWire = ActionableUnresolved | Unresolved;
-  export type ContentDigest = string;
   export type PlanId = string;
   export type SnapshotId = string;
   export type ArtifactId = string;
@@ -4329,6 +4365,13 @@ export namespace RustevEvidence2 {
 
   export interface RustevEvidence2 {
     /**
+     * Spec 036: omitted when the plan has no acquisition step.
+     *
+     * @minItems 1
+     * @maxItems 4096
+     */
+    acquisitions?: [AcquisitionEvidence, ...AcquisitionEvidence[]];
+    /**
      * Evidence 2 with `actionability`: every check, in declaration order
      * (spec 033, 3.4.8).
      */
@@ -4351,6 +4394,89 @@ export namespace RustevEvidence2 {
     screening?: [ScreeningEvidence, ...ScreeningEvidence[]];
     snapshot_id: SnapshotId;
     steps: StepEvidence[];
+  }
+  export interface AcquisitionEvidence {
+    items: AcquiredItemEvidence[];
+    kind: AcquisitionKind;
+    outcome: AcquisitionOutcome;
+    request_constructed: boolean;
+    step: string;
+    stopped_by: AcquisitionStop;
+    /**
+     * @minItems 1
+     * @maxItems 8
+     */
+    tiers:
+      | [TierEvidence]
+      | [TierEvidence, TierEvidence]
+      | [TierEvidence, TierEvidence, TierEvidence]
+      | [TierEvidence, TierEvidence, TierEvidence, TierEvidence]
+      | [TierEvidence, TierEvidence, TierEvidence, TierEvidence, TierEvidence]
+      | [TierEvidence, TierEvidence, TierEvidence, TierEvidence, TierEvidence, TierEvidence]
+      | [TierEvidence, TierEvidence, TierEvidence, TierEvidence, TierEvidence, TierEvidence, TierEvidence]
+      | [TierEvidence, TierEvidence, TierEvidence, TierEvidence, TierEvidence, TierEvidence, TierEvidence, TierEvidence];
+    truncated: number;
+  }
+  export interface AcquiredItemEvidence {
+    digest: ContentDigest;
+    meta: ValueMeta;
+    origin?: ItemOrigin;
+  }
+  /**
+   * Value metadata (spec 032, 3.2.2): carried by every input and step value
+   * of a plan 3 evaluation. A record carries one per field, a list one per
+   * item and a map one per entry, in the optional members.
+   */
+  export interface ValueMeta {
+    as_of_ms: AsOf;
+    basis: Basis;
+    entries?: {
+      [k: string]: ValueMeta | undefined;
+    } | null;
+    fields?: {
+      [k: string]: ValueMeta | undefined;
+    } | null;
+    grade: ValueGrade;
+    items?: ValueMeta[] | null;
+    /**
+     * Sorted, duplicate-free.
+     */
+    provenance: ProvenanceClass[];
+    /**
+     * Sorted, duplicate-free source names.
+     */
+    sources: string[];
+  }
+  export interface ItemOrigin {
+    as_of_ms: Timestamp;
+    operation: string;
+    page: number;
+    rank: number;
+    relaxation: number;
+    source: string;
+    tier: string;
+    tier_index: number;
+  }
+  export interface TierEvidence {
+    duplicates: number;
+    items_received: number;
+    name: string;
+    operation: string;
+    outcome: TierOutcome;
+    /**
+     * @maxItems 64
+     */
+    pages: PageEvidence[];
+    relaxation: number;
+    request_constructed: boolean;
+    source: string;
+    unique_items_added: number;
+  }
+  export interface PageEvidence {
+    digest: PageDigest;
+    items: number;
+    request: AcquisitionRequestId;
+    unique_items_added: number;
   }
   /**
    * One check's evidence record (3.4.8).
@@ -4400,31 +4526,6 @@ export namespace RustevEvidence2 {
     effective: ValueGrade;
     provenance: ProvenanceClass;
     source: string;
-  }
-  /**
-   * Value metadata (spec 032, 3.2.2): carried by every input and step value
-   * of a plan 3 evaluation. A record carries one per field, a list one per
-   * item and a map one per entry, in the optional members.
-   */
-  export interface ValueMeta {
-    as_of_ms: AsOf;
-    basis: Basis;
-    entries?: {
-      [k: string]: ValueMeta | undefined;
-    } | null;
-    fields?: {
-      [k: string]: ValueMeta | undefined;
-    } | null;
-    grade: ValueGrade;
-    items?: ValueMeta[] | null;
-    /**
-     * Sorted, duplicate-free.
-     */
-    provenance: ProvenanceClass[];
-    /**
-     * Sorted, duplicate-free source names.
-     */
-    sources: string[];
   }
   /**
    * The rule applied to a disagreement and what it chose.
@@ -4604,6 +4705,10 @@ export namespace RustevEvidence2 {
     verdict: ScreenVerdict;
   }
   export interface StepEvidence {
+    /**
+     * Present only for a value derived from a constructed key (036, 3.7.4).
+     */
+    constructed?: true;
     /**
      * Evidence 2, `corroborate` (spec 032, 3.7.6).
      */
@@ -8141,6 +8246,23 @@ export type RustevPlan2 = RustevPlan2.RustevPlan2;
 
 export namespace RustevPlan3 {
   /**
+   * Derivation classes (spec 001, 3.3; spec 002, 3.12).
+   */
+  export type Derivation = "exact-derived" | "model-derived" | "mixed-derived";
+  export type AcquisitionKind = "acquire" | "widen";
+  export type AcquisitionPossibleOutcome =
+    | "resolved"
+    | "skipped"
+    | "missing_evidence"
+    | "stale_evidence"
+    | "invalid_input"
+    | "backend_unavailable"
+    | "invalid_backend_output"
+    | "budget_exhausted"
+    | "deadline_exceeded"
+    | "insufficient_grade";
+  export type SourceId = string;
+  /**
    * One cause of an outcome or notice (3.5.2).
    */
   export type Cause =
@@ -8901,11 +9023,6 @@ export namespace RustevPlan3 {
     | "field_dropped";
   export type ScreenConsequence =
     "none" | "refuse" | "drop_field" | "drop_text" | "drop_item" | "fail_closed" | "skip_generation" | "fail_open";
-  export type SourceId = string;
-  /**
-   * Derivation classes (spec 001, 3.3; spec 002, 3.12).
-   */
-  export type Derivation = "exact-derived" | "model-derived" | "mixed-derived";
   export type PlanStepDetail =
     | {
         exact: {
@@ -8938,6 +9055,13 @@ export namespace RustevPlan3 {
   export type Normalization = "none" | "softmax/1";
 
   export interface RustevPlan3 {
+    /**
+     * Spec 036: omitted when the plan has no acquisition step.
+     *
+     * @minItems 1
+     * @maxItems 4096
+     */
+    acquisitions?: [PlanAcquisition, ...PlanAcquisition[]];
     /**
      * Plan 3: present exactly when the definition has `actionability`
      * (spec 033, 3.1.2).
@@ -8986,6 +9110,106 @@ export namespace RustevPlan3 {
      * One entry per step, in declaration order.
      */
     steps: PlanStep[];
+  }
+  export interface PlanAcquisition {
+    derivation: Derivation;
+    kind: AcquisitionKind;
+    max_calls: number;
+    /**
+     * @maxItems 10
+     */
+    outcomes:
+      | []
+      | [AcquisitionPossibleOutcome]
+      | [AcquisitionPossibleOutcome, AcquisitionPossibleOutcome]
+      | [AcquisitionPossibleOutcome, AcquisitionPossibleOutcome, AcquisitionPossibleOutcome]
+      | [AcquisitionPossibleOutcome, AcquisitionPossibleOutcome, AcquisitionPossibleOutcome, AcquisitionPossibleOutcome]
+      | [
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome
+        ]
+      | [
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome
+        ]
+      | [
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome
+        ]
+      | [
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome
+        ]
+      | [
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome
+        ]
+      | [
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome,
+          AcquisitionPossibleOutcome
+        ];
+    /**
+     * @minItems 1
+     * @maxItems 4
+     */
+    sources:
+      | [AcquisitionBinding]
+      | [AcquisitionBinding, AcquisitionBinding]
+      | [AcquisitionBinding, AcquisitionBinding, AcquisitionBinding]
+      | [AcquisitionBinding, AcquisitionBinding, AcquisitionBinding, AcquisitionBinding];
+    step: string;
+  }
+  export interface AcquisitionBinding {
+    /**
+     * Pool field to response field; empty for an acquisition without mapping.
+     */
+    map: {
+      [k: string]: string | undefined;
+    };
+    operation: string;
+    source: BoundSource;
+    unmapped: string[];
+  }
+  /**
+   * A source descriptor bound at compile time.
+   */
+  export interface BoundSource {
+    id: SourceId;
+    name: string;
+    version: string;
   }
   /**
    * The plan 3 member: the static causes and party of every check branch
@@ -9657,14 +9881,6 @@ export namespace RustevPlan3 {
     artifact: ArtifactId;
     backend_id: string;
     descriptor: DescriptorId;
-  }
-  /**
-   * A source descriptor bound at compile time.
-   */
-  export interface BoundSource {
-    id: SourceId;
-    name: string;
-    version: string;
   }
   export interface PlanStep {
     /**
@@ -11565,6 +11781,167 @@ export namespace RustevReplay1 {
 }
 export type RustevReplay1 = RustevReplay1.RustevReplay1;
 
+export namespace RustevReplay2 {
+  export type AcquisitionRequestId = string;
+  export type ContentDigest = string;
+  /**
+   * How the bytes were kept. Every mode has an expiry.
+   */
+  export type Retention =
+    | {
+        retained: {
+          bytes: string;
+          digest: ContentDigest;
+          expires_at_ms: Timestamp;
+        };
+      }
+    | {
+        external: {
+          digest: ContentDigest;
+          expires_at_ms: Timestamp;
+          reference: string;
+        };
+      }
+    | {
+        digest_only: {
+          digest: ContentDigest;
+          expires_at_ms: Timestamp;
+        };
+      };
+  export type Timestamp = number;
+  /**
+   * Whether every supplied value was captured. Only `complete` reproduces.
+   */
+  export type CaptureStatus = ("complete" | "disabled" | "cancelled" | "abandoned") | "limit_exceeded";
+  export type PlanId = string;
+  /**
+   * The isolation scope of a capture, a bundle and every request identity.
+   */
+  export type Scope =
+    | {
+        context_revision: Handle;
+        mode: "tenant_only";
+        tenant: Handle;
+      }
+    | {
+        context_revision: Handle;
+        mode: "principal";
+        principal_scope: Handle;
+        tenant: Handle;
+      };
+  export type Handle = string;
+  export type SnapshotId = string;
+  export type RequestId = string;
+
+  export interface RustevReplay2 {
+    /**
+     * Replay 2: captured pages share the semantic supply sequence.
+     *
+     * @minItems 1
+     * @maxItems 4096
+     */
+    acquisition_pages?: [AcquisitionSupply, ...AcquisitionSupply[]];
+    /**
+     * Every calibration artifact the plan binds.
+     */
+    calibrations: RetentionItem[];
+    capture: CaptureStatus;
+    /**
+     * Host wall-clock times; copying a bundle resets neither.
+     */
+    created_at_ms: Timestamp;
+    decision_id: string;
+    /**
+     * Every descriptor the plan's bindings name.
+     */
+    descriptors: RetentionItem[];
+    /**
+     * The domain time the decision was evaluated at.
+     */
+    evaluation_time_ms: Timestamp;
+    expires_at_ms: Timestamp;
+    plan: RetentionItem;
+    plan_id: PlanId;
+    /**
+     * The delivered `rustev.run/1` record; the expected judgment is in it.
+     */
+    run: RetentionItem;
+    schema: "rustev.replay/2";
+    scope: Scope;
+    snapshot: RetentionItem;
+    snapshot_id: SnapshotId;
+    /**
+     * Replay 2: the source descriptors bound by the retained plan.
+     *
+     * @minItems 1
+     * @maxItems 4096
+     */
+    sources: [RetentionItem, ...RetentionItem[]];
+    /**
+     * In actual supply order.
+     */
+    supplies: SupplyEntry[];
+  }
+  export interface AcquisitionSupply {
+    attempt_id?: string | null;
+    page: number;
+    request: AcquisitionRequestId;
+    sequence: number;
+    step: string;
+    tier: number;
+    /**
+     * An acquisition page or runtime reason, subject to retention.
+     */
+    value: RetentionItem;
+  }
+  /**
+   * One retained document, as the host declares it.
+   */
+  export interface RetentionItem {
+    /**
+     * The schema string the document must carry.
+     */
+    document_schema: string;
+    /**
+     * The document's identity, where its schema defines one.
+     */
+    identity?: ContentDigest | null;
+    retention: Retention;
+  }
+  /**
+   * One value successfully supplied to the core.
+   */
+  export interface SupplyEntry {
+    /**
+     * The attempt that produced the value (spec 004, 3.2); none when
+     * nothing was dispatched or a retry or fallback followed the last one.
+     */
+    attempt_id?: string | null;
+    instance: string[];
+    /**
+     * The identity of the request for the producing target (spec 004, 3.2);
+     * the document is recomputed from the retained plan and snapshot.
+     */
+    request: RequestId;
+    /**
+     * Actual `supply` order, contiguous from 0.
+     */
+    sequence: number;
+    step: string;
+    /**
+     * The target the value came from (0 is the primary, then declared
+     * fallbacks): the producing target of an output; for a failure, the `to`
+     * of the last fallback transition, else 0.
+     */
+    target: number;
+    /**
+     * A `rustev.backend-output/1` or `rustev.runtime-reason/1` document.
+     */
+    value: RetentionItem;
+  }
+}
+export type RustevReplay2 = RustevReplay2.RustevReplay2;
+
 export namespace RustevRequest1 {
   export type ArtifactId = string;
   export type DescriptorId = string;
@@ -11765,6 +12142,11 @@ export namespace RustevRun1 {
    * How a value's metadata came about (spec 032, 3.2.2).
    */
   export type Basis =
+    | {
+        acquired: {
+          step: string;
+        };
+      }
     | "declared"
     | "computed"
     | {
@@ -12818,6 +13200,11 @@ export namespace RustevRun2 {
    * How a value's metadata came about (spec 032, 3.2.2).
    */
   export type Basis =
+    | {
+        acquired: {
+          step: string;
+        };
+      }
     | "declared"
     | "computed"
     | {
@@ -13855,50 +14242,72 @@ export namespace RustevRun2 {
 export type RustevRun2 = RustevRun2.RustevRun2;
 
 export namespace RustevRun3 {
-  export type CoreEvidence =
-    | "not_produced"
-    | {
-        recorded: EvidenceRecord;
-      };
   /**
-   * A check's status in evidence 2 (3.4.8).
+   * What is known about cancelling an attempt (spec 003, 3.7.3).
    */
-  export type CheckStatus =
-    | "passed"
+  export type Cancellation =
+    | "not_requested"
     | {
-        failed: {
-          class: ProvenanceClass;
-          /**
-           * The consequence kind applied.
-           */
-          consequence: string;
+        requested: {
+          answer: CancelAnswer;
+        };
+      };
+  export type CancelAnswer = "stopped" | "unconfirmed" | "not_observed";
+  /**
+   * A backend's per-call cost disclosure, before dispatch.
+   */
+  export type CostBound =
+    | "unknown"
+    | {
+        bounded: {
+          max_units: number;
         };
       }
     | {
-        not_evaluated: {
-          reason: Unresolved;
-        };
-      }
-    | {
-        unevaluable: {
-          reason: Unresolved;
-        };
-      }
-    | {
-        relaxed: {
-          by: string;
+        estimated: {
+          units: number;
         };
       };
   /**
-   * The closed set of provenance classes (spec 002, 3.7.1).
+   * What an attempt cost, as far as is known when it ends.
    */
-  export type ProvenanceClass =
-    | "authenticated-app-field"
-    | "system-of-record"
-    | "user-supplied"
-    | "third-party"
-    | "attributed-claim"
-    | "model-derived";
+  export type Charge =
+    | "unknown"
+    | {
+        observed: {
+          units: number;
+        };
+      }
+    | {
+        estimated: {
+          units: number;
+        };
+      };
+  export type AcquisitionAttemptEnd =
+    | "page"
+    | "invalid_page"
+    | "transient"
+    | "overloaded"
+    | "permanent"
+    | "denied"
+    | "timed_out"
+    | "adapter_fault"
+    | "deadline"
+    | "cancelled";
+  export type RemoteState = "finished" | "stopped" | "possibly_continuing";
+  export type AcquisitionCache =
+    | ("none" | "stored")
+    | {
+        hit: {
+          age_ms: number;
+        };
+      };
+  export type AcquisitionRequestId = string;
+  export type AcquisitionResult =
+    | ("page" | "not_supplied")
+    | {
+        failed: Unresolved;
+      };
   /**
    * The closed set of unresolved reasons (spec 002, 3.5.6). Field and fact
    * lists are sorted and deduplicated.
@@ -13964,30 +14373,12 @@ export namespace RustevRun3 {
           fields: [string, ...string[]];
         };
       };
-  export type DefinitionId = string;
-  export type Timestamp = number;
-  /**
-   * A value's grade, or `ungraded` when no graded value contributed.
-   * `ungraded` is not a point of the grade order (spec 032, 3.2.3).
-   */
-  export type ValueGrade = "authoritative" | "cached" | "estimated" | "hint" | "ungraded";
-  /**
-   * The closed, ordered evidence grade. The derived order runs weakest to
-   * strongest, so `min` and `max` are the grade order of spec 032, 3.2.1.
-   */
-  export type Grade = "hint" | "estimated" | "cached" | "authoritative";
-  export type Disposition =
-    | ("used" | "outvoted")
+  export type CoreEvidence =
+    | "not_produced"
     | {
-        ignored: {
-          reason: string;
-        };
-      }
-    | {
-        rejected: {
-          reason: string;
-        };
+        recorded: EvidenceRecord;
       };
+  export type ContentDigest = string;
   /**
    * The oldest as-of among contributing graded values, or `none`.
    */
@@ -13996,10 +14387,16 @@ export namespace RustevRun3 {
     | {
         ms: Timestamp;
       };
+  export type Timestamp = number;
   /**
    * How a value's metadata came about (spec 032, 3.2.2).
    */
   export type Basis =
+    | {
+        acquired: {
+          step: string;
+        };
+      }
     | "declared"
     | "computed"
     | {
@@ -14022,6 +14419,93 @@ export namespace RustevRun3 {
    * Which side of a merge a field came from (spec 032, 3.6.3).
    */
   export type MergeSide = "base" | "overlay";
+  /**
+   * A value's grade, or `ungraded` when no graded value contributed.
+   * `ungraded` is not a point of the grade order (spec 032, 3.2.3).
+   */
+  export type ValueGrade = "authoritative" | "cached" | "estimated" | "hint" | "ungraded";
+  /**
+   * The closed set of provenance classes (spec 002, 3.7.1).
+   */
+  export type ProvenanceClass =
+    | "authenticated-app-field"
+    | "system-of-record"
+    | "user-supplied"
+    | "third-party"
+    | "attributed-claim"
+    | "model-derived";
+  export type AcquisitionKind = "acquire" | "widen";
+  export type AcquisitionOutcome =
+    | "resolved"
+    | {
+        skipped: {
+          guard: string;
+        };
+      }
+    | {
+        unresolved: Unresolved;
+      };
+  export type AcquisitionStop =
+    "none" | "exhausted" | "stop_condition" | "page_limit" | "item_limit" | "tiers_exhausted" | "tier_failure";
+  export type TierOutcome =
+    | ("ok" | "empty" | "skipped" | "not_needed")
+    | {
+        failed: {
+          reason: Unresolved;
+        };
+      };
+  export type PageDigest =
+    | "none"
+    | {
+        sha256: ContentDigest;
+      };
+  /**
+   * A check's status in evidence 2 (3.4.8).
+   */
+  export type CheckStatus =
+    | "passed"
+    | {
+        failed: {
+          class: ProvenanceClass;
+          /**
+           * The consequence kind applied.
+           */
+          consequence: string;
+        };
+      }
+    | {
+        not_evaluated: {
+          reason: Unresolved;
+        };
+      }
+    | {
+        unevaluable: {
+          reason: Unresolved;
+        };
+      }
+    | {
+        relaxed: {
+          by: string;
+        };
+      };
+  export type DefinitionId = string;
+  /**
+   * The closed, ordered evidence grade. The derived order runs weakest to
+   * strongest, so `min` and `max` are the grade order of spec 032, 3.2.1.
+   */
+  export type Grade = "hint" | "estimated" | "cached" | "authoritative";
+  export type Disposition =
+    | ("used" | "outvoted")
+    | {
+        ignored: {
+          reason: string;
+        };
+      }
+    | {
+        rejected: {
+          reason: string;
+        };
+      };
   /**
    * A value's presence status. Key existence alone is never presence.
    */
@@ -14297,7 +14781,6 @@ export namespace RustevRun3 {
    * named `reason` or `action`, so the two forms never overlap.
    */
   export type UnresolvedWire = ActionableUnresolved | Unresolved;
-  export type ContentDigest = string;
   export type PlanId = string;
   export type SnapshotId = string;
   export type ArtifactId = string;
@@ -14356,47 +14839,6 @@ export namespace RustevRun3 {
         declared: ExecutionPolicyId;
       };
   export type ExecutionPolicyId = string;
-  /**
-   * What is known about cancelling an attempt (spec 003, 3.7.3).
-   */
-  export type Cancellation =
-    | "not_requested"
-    | {
-        requested: {
-          answer: CancelAnswer;
-        };
-      };
-  export type CancelAnswer = "stopped" | "unconfirmed" | "not_observed";
-  /**
-   * A backend's per-call cost disclosure, before dispatch.
-   */
-  export type CostBound =
-    | "unknown"
-    | {
-        bounded: {
-          max_units: number;
-        };
-      }
-    | {
-        estimated: {
-          units: number;
-        };
-      };
-  /**
-   * What an attempt cost, as far as is known when it ends.
-   */
-  export type Charge =
-    | "unknown"
-    | {
-        observed: {
-          units: number;
-        };
-      }
-    | {
-        estimated: {
-          units: number;
-        };
-      };
   export type AttemptEnd =
     | "output"
     | {
@@ -14413,7 +14855,6 @@ export namespace RustevRun3 {
    * or a fallback trigger.
    */
   export type FailureClass = "invalid_output" | "transient" | "overloaded" | "permanent" | "timed_out" | "adapter_fault";
-  export type RemoteState = "finished" | "stopped" | "possibly_continuing";
   export type OptimizationMechanism = "independent" | "batch" | "memory_cache";
   export type OptimizationOutcome = "bypassed" | "miss" | "hit" | "batched" | "refused";
   export type RequestResult =
@@ -14459,6 +14900,13 @@ export namespace RustevRun3 {
   export type Termination = "judged" | "cancelled";
 
   export interface RustevRun3 {
+    /**
+     * Spec 036: omitted when the plan has no acquisition step.
+     *
+     * @minItems 1
+     * @maxItems 4096
+     */
+    acquisitions?: [AcquisitionRecord, ...AcquisitionRecord[]];
     core: CoreEvidence;
     cost: CostSummary;
     /**
@@ -14475,7 +14923,76 @@ export namespace RustevRun3 {
     termination: Termination;
     timing: Timing;
   }
+  export interface AcquisitionRecord {
+    /**
+     * @maxItems 8
+     */
+    attempts:
+      | []
+      | [AcquisitionAttempt]
+      | [AcquisitionAttempt, AcquisitionAttempt]
+      | [AcquisitionAttempt, AcquisitionAttempt, AcquisitionAttempt]
+      | [AcquisitionAttempt, AcquisitionAttempt, AcquisitionAttempt, AcquisitionAttempt]
+      | [AcquisitionAttempt, AcquisitionAttempt, AcquisitionAttempt, AcquisitionAttempt, AcquisitionAttempt]
+      | [
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt
+        ]
+      | [
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt
+        ]
+      | [
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt
+        ];
+    cache: AcquisitionCache;
+    page: number;
+    request: AcquisitionRequestId;
+    result: AcquisitionResult;
+    step: string;
+    tier: number;
+  }
+  export interface AcquisitionAttempt {
+    /**
+     * Escaped decision/step/tier,page/ordinal (spec 036, 3.14.2).
+     */
+    attempt_id: string;
+    cancellation: Cancellation;
+    cost: AttemptCost;
+    dispatched_ms: number;
+    end: AcquisitionAttemptEnd;
+    ended_ms: number;
+    remote: RemoteState;
+  }
+  export interface AttemptCost {
+    bound: CostBound;
+    charge: Charge;
+    reserved: number;
+  }
   export interface EvidenceRecord {
+    /**
+     * Spec 036: omitted when the plan has no acquisition step.
+     *
+     * @minItems 1
+     * @maxItems 4096
+     */
+    acquisitions?: [AcquisitionEvidence, ...AcquisitionEvidence[]];
     /**
      * Evidence 2 with `actionability`: every check, in declaration order
      * (spec 033, 3.4.8).
@@ -14499,6 +15016,89 @@ export namespace RustevRun3 {
     screening?: [ScreeningEvidence, ...ScreeningEvidence[]];
     snapshot_id: SnapshotId;
     steps: StepEvidence[];
+  }
+  export interface AcquisitionEvidence {
+    items: AcquiredItemEvidence[];
+    kind: AcquisitionKind;
+    outcome: AcquisitionOutcome;
+    request_constructed: boolean;
+    step: string;
+    stopped_by: AcquisitionStop;
+    /**
+     * @minItems 1
+     * @maxItems 8
+     */
+    tiers:
+      | [TierEvidence]
+      | [TierEvidence, TierEvidence]
+      | [TierEvidence, TierEvidence, TierEvidence]
+      | [TierEvidence, TierEvidence, TierEvidence, TierEvidence]
+      | [TierEvidence, TierEvidence, TierEvidence, TierEvidence, TierEvidence]
+      | [TierEvidence, TierEvidence, TierEvidence, TierEvidence, TierEvidence, TierEvidence]
+      | [TierEvidence, TierEvidence, TierEvidence, TierEvidence, TierEvidence, TierEvidence, TierEvidence]
+      | [TierEvidence, TierEvidence, TierEvidence, TierEvidence, TierEvidence, TierEvidence, TierEvidence, TierEvidence];
+    truncated: number;
+  }
+  export interface AcquiredItemEvidence {
+    digest: ContentDigest;
+    meta: ValueMeta;
+    origin?: ItemOrigin;
+  }
+  /**
+   * Value metadata (spec 032, 3.2.2): carried by every input and step value
+   * of a plan 3 evaluation. A record carries one per field, a list one per
+   * item and a map one per entry, in the optional members.
+   */
+  export interface ValueMeta {
+    as_of_ms: AsOf;
+    basis: Basis;
+    entries?: {
+      [k: string]: ValueMeta | undefined;
+    } | null;
+    fields?: {
+      [k: string]: ValueMeta | undefined;
+    } | null;
+    grade: ValueGrade;
+    items?: ValueMeta[] | null;
+    /**
+     * Sorted, duplicate-free.
+     */
+    provenance: ProvenanceClass[];
+    /**
+     * Sorted, duplicate-free source names.
+     */
+    sources: string[];
+  }
+  export interface ItemOrigin {
+    as_of_ms: Timestamp;
+    operation: string;
+    page: number;
+    rank: number;
+    relaxation: number;
+    source: string;
+    tier: string;
+    tier_index: number;
+  }
+  export interface TierEvidence {
+    duplicates: number;
+    items_received: number;
+    name: string;
+    operation: string;
+    outcome: TierOutcome;
+    /**
+     * @maxItems 64
+     */
+    pages: PageEvidence[];
+    relaxation: number;
+    request_constructed: boolean;
+    source: string;
+    unique_items_added: number;
+  }
+  export interface PageEvidence {
+    digest: PageDigest;
+    items: number;
+    request: AcquisitionRequestId;
+    unique_items_added: number;
   }
   /**
    * One check's evidence record (3.4.8).
@@ -14548,31 +15148,6 @@ export namespace RustevRun3 {
     effective: ValueGrade;
     provenance: ProvenanceClass;
     source: string;
-  }
-  /**
-   * Value metadata (spec 032, 3.2.2): carried by every input and step value
-   * of a plan 3 evaluation. A record carries one per field, a list one per
-   * item and a map one per entry, in the optional members.
-   */
-  export interface ValueMeta {
-    as_of_ms: AsOf;
-    basis: Basis;
-    entries?: {
-      [k: string]: ValueMeta | undefined;
-    } | null;
-    fields?: {
-      [k: string]: ValueMeta | undefined;
-    } | null;
-    grade: ValueGrade;
-    items?: ValueMeta[] | null;
-    /**
-     * Sorted, duplicate-free.
-     */
-    provenance: ProvenanceClass[];
-    /**
-     * Sorted, duplicate-free source names.
-     */
-    sources: string[];
   }
   /**
    * The rule applied to a disagreement and what it chose.
@@ -14753,6 +15328,10 @@ export namespace RustevRun3 {
   }
   export interface StepEvidence {
     /**
+     * Present only for a value derived from a constructed key (036, 3.7.4).
+     */
+    constructed?: true;
+    /**
      * Evidence 2, `corroborate` (spec 032, 3.7.6).
      */
     corroboration?: Corroboration | null;
@@ -14874,11 +15453,6 @@ export namespace RustevRun3 {
     ended_ms: number;
     remote: RemoteState;
     target: number;
-  }
-  export interface AttemptCost {
-    bound: CostBound;
-    charge: Charge;
-    reserved: number;
   }
   /**
    * Per-logical-request runtime observations. Secret key material and cached

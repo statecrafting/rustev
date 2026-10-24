@@ -997,6 +997,22 @@ compilation refuses them with `invalid_definition` detail
 these members keep their bytes and identities
 (`crates/rustev-contract/tests/acquisition_steps.rs`).
 
+**Increment 1, part 3 (2026-10-24): plan, evidence, run and replay
+members.** `rustev.plan/3` gains the optional `acquisitions` member of 3.10
+(each acquisition and widening with its bound source descriptors and
+mapped response fields); `rustev.evidence/2` the acquisition and widening
+evidence of 3.14, with per-tier outcomes including `skipped`, `failed`,
+`empty` and `not_needed`, pooled item origins and the `constructed` marker;
+and `rustev.run/3` the per-page and per-attempt records of 3.13 and 3.14,
+each omitted when unused and refused in earlier versions
+(`crates/rustev-contract/src/acquisition_record.rs`). `rustev.replay/2`
+(3.15) is introduced as a document version that retains source
+descriptors and captured pages keyed by request identity;
+`rustev.replay/1` keeps its bytes and meaning (3.16.1), and capture and
+replay behavior land with their increment. Redaction classes are declared
+for the new members. Documents without them keep their bytes and
+identities (`tests/acquisition_records.rs`).
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child
