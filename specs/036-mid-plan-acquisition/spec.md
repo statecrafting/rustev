@@ -49,6 +49,10 @@ extends:
   # Regenerated document types of the bindings; no behavior.
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-node/" }, nature: additive }
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-wasm/" }, nature: additive }
+  # Exhaustive matches over the new step bodies, predicate and reason only.
+  - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: additive }
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "crates/rustev-surface/" }, nature: additive }
+  - { spec: "028-opentelemetry-evidence-sink", unit: { kind: directory, path: "integrations/rustev-otel/" }, nature: additive }
   # New contract source files join rustev-contract's reviewed archive list.
   - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
   # Adds 036 to `make verify` when the implementation is complete.
@@ -973,6 +977,25 @@ scope member (3.3.1, 3.3.2), and `rustev.acquisition-page/1` (3.3.3), with
 a pure page validator for each rule of 3.3.4
 (`crates/rustev-contract/src/acquisition.rs`,
 `tests/acquisition_wire.rs`). Nothing produces or consumes them yet.
+
+**Increment 1, part 2 (2026-10-24): the `acquire` and `widen` definition
+members.** `rustev.definition/2` gains the `acquire` (3.4.1, 3.4.2) and
+`widen` (3.5, with the paging limits of 3.6) step bodies
+(`crates/rustev-contract/src/acquisition_step.rs`), checked at parse for
+what is local to the document: bounds, closed enums, `retry_on` empty
+exactly when `max_attempts` is 1, tiers, groups, protected groups and
+source maps. The predicate `is_constructed{ref}` (3.7.4) and the handler
+reason `skipped` (3.8.1, 3.8.3) join the vocabulary; `compose_key@1`'s
+arguments travel as the registry's untyped operator arguments, so its
+checks land with the core increment. Either step body in a
+`rustev.definition/1` is refused at compile, category 11, detail
+`requires-definition-2`, and a `rustev.definition/2` using only them is
+admitted to the version check; until the core increment compiles them,
+compilation refuses them with `invalid_definition` detail
+`acquisition-not-compiled`, as it refuses `is_constructed`
+(`crates/rustev-core/tests/acquisition_structure.rs`). Definitions without
+these members keep their bytes and identities
+(`crates/rustev-contract/tests/acquisition_steps.rs`).
 
 ## Decisions at approval
 

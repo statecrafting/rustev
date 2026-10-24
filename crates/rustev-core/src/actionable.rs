@@ -816,7 +816,7 @@ fn static_reason_causes(
             name: target.strip_prefix("step:").unwrap_or(target).to_string(),
         }],
         K::ScreenUnavailable => Vec::new(),
-        K::Abstained => vec![Cause::Policy { site: site.into() }],
+        K::Abstained | K::Skipped => vec![Cause::Policy { site: site.into() }],
     }
 }
 

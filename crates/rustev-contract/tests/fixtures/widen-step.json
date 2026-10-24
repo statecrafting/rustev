@@ -1,0 +1,126 @@
+{
+  "id": "pool",
+  "body": {
+    "widen": {
+      "item": {
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "text": {
+                "max_bytes": 64
+              }
+            }
+          },
+          {
+            "name": "price",
+            "type": "decimal"
+          }
+        ]
+      },
+      "sources": [
+        {
+          "source": "tenant_catalogue",
+          "operation": "search",
+          "map": {
+            "id": "listing_id",
+            "price": "total"
+          }
+        },
+        {
+          "source": "shared_catalogue",
+          "operation": "search",
+          "map": {
+            "id": "id",
+            "price": "price"
+          }
+        }
+      ],
+      "base_request": {
+        "dates": {
+          "ref": "input:trip.dates"
+        },
+        "party_size": {
+          "ref": "input:trip.party_size"
+        },
+        "amenities_optional": {
+          "ref": "input:trip.nice_to_have"
+        }
+      },
+      "groups": {
+        "dates": [
+          "dates"
+        ],
+        "party_size": [
+          "party_size"
+        ],
+        "optional_amenities": [
+          "amenities_optional"
+        ]
+      },
+      "protected": [
+        "dates",
+        "party_size"
+      ],
+      "tiers": [
+        {
+          "name": "specific",
+          "source_index": 0,
+          "request_patch": {
+            "area": {
+              "ref": "step:specific_key"
+            }
+          },
+          "when": {
+            "present": "step:specific_key"
+          },
+          "relax": []
+        },
+        {
+          "name": "broad",
+          "source_index": 0,
+          "request_patch": {
+            "area": {
+              "ref": "input:trip.area"
+            }
+          },
+          "when": "always",
+          "relax": []
+        },
+        {
+          "name": "broad_shared_relaxed",
+          "source_index": 1,
+          "request_patch": {
+            "area": {
+              "ref": "input:trip.area"
+            }
+          },
+          "when": "always",
+          "relax": [
+            "optional_amenities"
+          ]
+        }
+      ],
+      "max_tiers": 8,
+      "dedupe_key": "id",
+      "order": "tier_then_source_rank",
+      "stop": {
+        "unique_at_least": {
+          "ref": "input:pool_target"
+        }
+      },
+      "on_tier_failure": "continue",
+      "limits": {
+        "max_pages": 2,
+        "max_items": 200,
+        "deadline_share": "0.3",
+        "max_attempts": 2,
+        "retry_on": [
+          "transient"
+        ],
+        "delay": "none",
+        "as_of_skew_ms": 5000
+      }
+    }
+  }
+}

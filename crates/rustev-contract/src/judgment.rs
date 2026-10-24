@@ -444,6 +444,7 @@ impl ReasonKind {
     pub fn name(self) -> &'static str {
         match self {
             ReasonKind::ScreenUnavailable => "screen_unavailable",
+            ReasonKind::Skipped => "skipped",
             ReasonKind::MissingEvidence => "missing_evidence",
             ReasonKind::StaleEvidence => "stale_evidence",
             ReasonKind::InvalidInput => "invalid_input",

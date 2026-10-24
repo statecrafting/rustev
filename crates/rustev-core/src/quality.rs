@@ -84,7 +84,7 @@ pub(crate) fn uses_track_construct(def: &Definition, decoded: &BTreeMap<String, 
         .iter()
         .any(|i| i.evidence.is_some() || i.on_disagreement.is_some() || type_v2(&i.ty))
         || def.steps.iter().any(|s| match &s.body {
-            StepBody::Corroborate(_) => true,
+            StepBody::Corroborate(_) | StepBody::Acquire(_) | StepBody::Widen(_) => true,
             StepBody::Exact(_) => decoded.get(&s.id).is_some_and(OpArgs::uses_v2),
             StepBody::Semantic(_) => false,
         })
@@ -289,7 +289,7 @@ fn predicate_mins(p: &Predicate, out: &mut Vec<Grade>) {
         Predicate::Member { value, .. } | Predicate::MemberRef { value, .. } => {
             requirement_mins(value, out)
         }
-        Predicate::Present(_) => {}
+        Predicate::Present(_) | Predicate::IsConstructed { .. } => {}
     }
 }
 
@@ -377,6 +377,7 @@ pub(crate) fn structure_with_origin(
                     ));
                 }
             }
+            StepBody::Acquire(_) | StepBody::Widen(_) => {}
             StepBody::Corroborate(c) => corroborate_structure(c, &subject)?,
             StepBody::Semantic(_) => {}
         }
@@ -826,7 +827,7 @@ pub(crate) fn predicate_reads(
             expr_reads(value, item, gate, out);
             expr_reads(&Expr::Ref(set.clone()), item, gate, out);
         }
-        Predicate::Present(r) => {
+        Predicate::Present(r) | Predicate::IsConstructed { reference: r } => {
             if let Some((base, path)) = resolve(r, item) {
                 out.push(Read {
                     base,

@@ -1,0 +1,35 @@
+{
+  "id": "subareas",
+  "body": {
+    "acquire": {
+      "source": "geo",
+      "operation": "list_subareas",
+      "request": {
+        "parent": {
+          "ref": "step:resolved_parent/id"
+        }
+      },
+      "when": {
+        "present": "step:resolved_parent"
+      },
+      "limits": {
+        "max_pages": 1,
+        "max_items": 200,
+        "deadline_share": "0.1",
+        "max_attempts": 2,
+        "retry_on": [
+          "transient",
+          "timed_out"
+        ],
+        "delay": {
+          "fixed": {
+            "ms": 50
+          }
+        },
+        "as_of_skew_ms": 5000
+      },
+      "stop": "none",
+      "on_failure": "unresolved"
+    }
+  }
+}

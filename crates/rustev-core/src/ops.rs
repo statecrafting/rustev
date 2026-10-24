@@ -410,7 +410,7 @@ fn has_fx_pred(p: &Predicate) -> bool {
         Predicate::All(ps) | Predicate::Any(ps) => ps.iter().any(has_fx_pred),
         Predicate::Not(p) => has_fx_pred(p),
         Predicate::Member { value, .. } | Predicate::MemberRef { value, .. } => has_fx_expr(value),
-        Predicate::Present(_) => false,
+        Predicate::Present(_) | Predicate::IsConstructed { .. } => false,
     }
 }
 
