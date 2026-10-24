@@ -144,13 +144,14 @@ fn every_entry_reaches_the_journal_file_as_it_is_recorded() {
         file: Some(path.clone()),
         ..Default::default()
     };
+    rustev_release::family_lifecycle::bind(&l.manifest, "fixture signature", &mut j).unwrap();
     assert_eq!(
         publish(&mut l, &a, &mut FakeRegistry::default(), &mut j),
         Outcome::Complete
     );
     let on_disk = Journal::from_lines(&std::fs::read_to_string(&path).unwrap()).unwrap();
     assert_eq!(on_disk.entries, j.entries);
-    assert!(matches!(on_disk.entries[0], Entry::Attempt { .. }));
+    assert!(matches!(on_disk.entries[0], Entry::SignedManifest { .. }));
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -194,6 +195,7 @@ fn unknown_public_state_is_never_taken_for_absence() {
     let (mut l, a) = authorized(&dir.join("crates"));
     let mut reg = Unreachable(FakeRegistry::default());
     let mut j = Journal::default();
+    rustev_release::family_lifecycle::bind(&l.manifest, "fixture signature", &mut j).unwrap();
     assert!(
         matches!(publish(&mut l, &a, &mut reg, &mut j), Outcome::Stopped { ref reason } if reason.contains("unknown"))
     );

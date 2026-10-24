@@ -84,12 +84,19 @@ fn authorized() -> (Lifecycle, BTreeMap<String, Vec<u8>>) {
     (l, a)
 }
 
+// Spec 031 3.11.2: fake signatures still bind exact manifest bytes.
+fn signed_journal(m: &ReleaseManifest) -> Journal {
+    let mut j = Journal::default();
+    rustev_release::family_lifecycle::bind(m, "fixture signature", &mut j).unwrap();
+    j
+}
+
 #[test]
 fn every_transition_in_order_reaches_qualified() {
     let (mut l, a) = authorized();
     assert_eq!(l.state, State::PublicationAuthorized);
     let mut reg = FakeRegistry::default();
-    let mut j = Journal::default();
+    let mut j = signed_journal(&l.manifest);
     assert_eq!(publish(&mut l, &a, &mut reg, &mut j), Outcome::Complete);
     assert_eq!(l.state, State::Published);
     assert!(
@@ -150,7 +157,7 @@ fn local_packaging_before_authorization_uploads_nothing() {
     })
     .unwrap();
     let mut reg = FakeRegistry::default();
-    let mut j = Journal::default();
+    let mut j = signed_journal(&l.manifest);
     assert!(matches!(
         publish(&mut l, &a, &mut reg, &mut j),
         Outcome::Stopped { .. }
@@ -190,7 +197,7 @@ fn each_upload_waits_for_visibility_with_the_expected_checksum() {
         lag: 3,
         ..Default::default()
     };
-    let mut j = Journal::default();
+    let mut j = signed_journal(&l.manifest);
     assert_eq!(publish(&mut l, &a, &mut reg, &mut j), Outcome::Complete);
     assert_eq!(
         reg.now,
@@ -200,7 +207,7 @@ fn each_upload_waits_for_visibility_with_the_expected_checksum() {
     // Journal: attempt before result, then the observed checksum.
     let first = &l.manifest.packages[0];
     assert_eq!(
-        &j.entries[..3],
+        &j.entries[1..4],
         &[
             Entry::Attempt {
                 package: first.name.clone(),
@@ -230,7 +237,7 @@ fn an_accepted_upload_that_never_appears_stops() {
         lag: u64::from(VISIBILITY_POLLS) + 5,
         ..Default::default()
     };
-    let mut j = Journal::default();
+    let mut j = signed_journal(&l.manifest);
     assert!(
         matches!(publish(&mut l, &a, &mut reg, &mut j), Outcome::Stopped { ref reason } if reason.contains("not visible"))
     );
@@ -253,7 +260,7 @@ fn a_refusal_stops_and_records_it() {
             reason: "name taken".into(),
         },
     );
-    let mut j = Journal::default();
+    let mut j = signed_journal(&l.manifest);
     assert!(matches!(
         publish(&mut l, &a, &mut reg, &mut j),
         Outcome::Stopped { .. }
@@ -275,7 +282,7 @@ fn four_public_and_the_fifth_failing_is_partially_published() {
             reason: "server error".into(),
         },
     );
-    let mut j = Journal::default();
+    let mut j = signed_journal(&l.manifest);
     assert!(matches!(
         publish(&mut l, &a, &mut reg, &mut j),
         Outcome::Stopped { .. }
@@ -304,7 +311,7 @@ fn an_ambiguous_upload_queries_public_state_records_it_and_stops() {
         if accepted {
             reg.ambiguous_accepts.push(second.clone());
         }
-        let mut j = Journal::default();
+        let mut j = signed_journal(&l.manifest);
         assert!(matches!(
             publish(&mut l, &a, &mut reg, &mut j),
             Outcome::Stopped { .. }
@@ -345,7 +352,7 @@ fn an_ambiguous_upload_queries_public_state_records_it_and_stops() {
 fn an_ambiguous_attempt_without_a_later_absent_query_blocks_a_retry() {
     let (mut l, a) = authorized();
     let first = l.manifest.upload_order[0].clone();
-    let mut j = Journal::default();
+    let mut j = signed_journal(&l.manifest);
     j.entries.push(Entry::Result {
         package: first,
         outcome: Upload::Ambiguous {
@@ -376,7 +383,7 @@ fn a_rerun_skips_public_packages_and_never_reuses_a_version() {
             reason: "transient".into(),
         },
     );
-    let mut j = Journal::default();
+    let mut j = signed_journal(&l.manifest);
     publish(&mut l, &a, &mut reg, &mut j);
     reg.script.clear();
     assert_eq!(publish(&mut l, &a, &mut reg, &mut j), Outcome::Complete);
@@ -392,7 +399,7 @@ fn a_rerun_skips_public_packages_and_never_reuses_a_version() {
     let first = l2.manifest.packages[0].clone();
     a2.insert(first.crate_file.clone(), b"a rebuilt archive".to_vec());
     let mut reg2 = FakeRegistry::default();
-    let mut j2 = Journal::default();
+    let mut j2 = signed_journal(&l2.manifest);
     assert!(
         matches!(publish(&mut l2, &a2, &mut reg2, &mut j2), Outcome::Stopped { ref reason } if reason.contains("never upload a rebuild"))
     );
@@ -404,7 +411,7 @@ fn a_rerun_skips_public_packages_and_never_reuses_a_version() {
         (first.name.clone(), l3.manifest.version.clone()),
         (sha256_hex(b"someone else's bytes"), 0),
     );
-    let mut j3 = Journal::default();
+    let mut j3 = signed_journal(&l3.manifest);
     assert!(
         matches!(publish(&mut l3, &a3, &mut reg3, &mut j3), Outcome::Stopped { ref reason } if reason.contains("the version is spent"))
     );
@@ -416,12 +423,8 @@ fn a_consumer_failure_is_never_qualified() {
     // Section 4 rows 8 and 9: only the consumer event qualifies, and only
     // after the release exists.
     let (mut l, a) = authorized();
-    publish(
-        &mut l,
-        &a,
-        &mut FakeRegistry::default(),
-        &mut Journal::default(),
-    );
+    let mut j = signed_journal(&l.manifest);
+    publish(&mut l, &a, &mut FakeRegistry::default(), &mut j);
     assert!(l.apply(Event::ConsumerQualified).is_err(), "no release yet");
     l.apply(Event::ReleaseCreated).unwrap();
     assert_eq!(l.state, State::Released);
@@ -447,7 +450,7 @@ impl rustev_release::lifecycle::Registry for Corrupting {
 fn a_first_package_public_with_other_bytes_is_partially_published() {
     let (mut l, a) = authorized();
     let mut reg = Corrupting(FakeRegistry::default());
-    let mut j = Journal::default();
+    let mut j = signed_journal(&l.manifest);
     assert!(
         matches!(publish(&mut l, &a, &mut reg, &mut j), Outcome::Stopped { ref reason } if reason.contains("different checksum"))
     );
@@ -465,7 +468,7 @@ fn registry_text_is_redacted_before_the_journal() {
     let leaked = format!("bad token cio{}", "A".repeat(32));
     let first = l.manifest.upload_order[0].clone();
     reg.script.insert(first, Upload::Refused { reason: leaked });
-    let mut j = Journal::default();
+    let mut j = signed_journal(&l.manifest);
     publish(&mut l, &a, &mut reg, &mut j);
     let lines = j.to_lines();
     assert!(!lines.contains(&"A".repeat(32)), "{lines}");
@@ -485,7 +488,7 @@ fn redaction_keeps_the_structure_around_a_credential() {
 fn a_later_refusal_never_clears_an_ambiguous_attempt() {
     let (mut l, a) = authorized();
     let first = l.manifest.upload_order[0].clone();
-    let mut j = Journal::default();
+    let mut j = signed_journal(&l.manifest);
     for outcome in [
         Upload::Ambiguous {
             detail: "lost".into(),
@@ -547,7 +550,7 @@ fn a_journal_write_failure_is_the_one_stop_entry() {
     std::fs::create_dir_all(&dir).unwrap();
     let mut j = Journal {
         file: Some(dir.clone()),
-        ..Journal::default()
+        ..signed_journal(&l.manifest)
     };
     let out = publish(&mut l, &a, &mut reg, &mut j);
     std::fs::remove_dir_all(&dir).unwrap();

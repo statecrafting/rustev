@@ -258,7 +258,7 @@
       }
     ],
     "sectionDigests": {
-      "031-public-api-facade-compatibility-policy-and-release-family-amends-021": "cb6d0911f05bc8b824ae9ef624bf5c77d794b9673a7063d6327482ce0f1ce1de",
+      "031-public-api-facade-compatibility-policy-and-release-family-amends-021": "10bf3944bd27927c7d7ec9a35c00d2831539d61c94d5061a445e17057f471f00",
       "1-purpose": "53645ebab7cc475ba8fc536cdce04fddf0d0569614ce5f6bbc533989bffb8d61",
       "2-1-current-state-observed-2026-10-16": "a1a51aac02a5730ea5c747f68e58ad678b70c55c2145338cdabd173aa38a24ab",
       "2-2-what-changes": "5d90fff50199ede2dcf9ab7a4e4373b3a53495aaabd045cf1bec9dd718e7d456",
@@ -282,7 +282,7 @@
       "5-observable-negative-cases": "3b087c351903622ff440c3ddd139f3f991cc0ecc6ef0dd616e533ce932657060",
       "acceptance": "5248842f5b83e47172353e94ec868d3d34afeb2b4d9e0b205ce1fbe7f280a4c6",
       "decisions-at-approval": "2528f31a1a63416de80bfc31f78caf08d3b487baf2e3a70d834909cd9c978001",
-      "implementation-record": "6d245caabbb4dd923e2a527652584fe74755263b9968d2f788df4a8f67949a64",
+      "implementation-record": "05d21986e4d8eea78395220f7898b091417c1458cc0f9e65122d9bb13e42f56c",
       "verification": "170a9fee422adb915e1ae9092ac37fb6111a95a946616dc45ab0c1136bc66fda"
     },
     "sectionHeadings": [
@@ -318,6 +318,6 @@
     "summary": "Amends spec 021 so the first public release becomes a release family: the existing eight crates plus `rustev-pkg-lodging`, a facade crate `rustev` with no default features and one optional feature per adoptable slice, further integration crates as each lands, native and WebAssembly npm packages, a multi-arch service container image and prebuilt CLI binaries. Fixes one compatibility policy for every public surface (Rust API, documents, protocols, npm packages, service API, PlanId, MSRV), a supply chain of CycloneDX SBOMs, `cargo deny`, reproducible package checks, signed tags, signed artifacts with stated SLSA build provenance and npm provenance, a changelog generated from the governed corpus, and `cargo semver-checks` against the previous release. Narrowly amends spec 001 3.4.4, spec 010 I-2 and spec 008 for the facade and lodging. Approved (A-27) under R-39. Approval authorizes implementation and candidate evidence; publication of the first release is authorized only by the conditional owner act quoted in section 3.11, and no other release, yank, repair version, workflow change without the owner's environment approval, or availability claim is authorized.\n",
     "title": "Public API facade, compatibility policy and release family (amends 021)"
   },
-  "shardHash": "ebc2acf3ddeb5f19f04588373f0a5a1c0cc6985593b773f0b0dc32544fa3af17",
+  "shardHash": "7a925d95ea1696d00b47b37041c1e0a795fe8d3096ec7429bb4d6534660aefd2",
   "specVersion": "1.10.0"
 }
