@@ -266,28 +266,17 @@ async fn cancelled_redacted_and_unimplemented() {
         ));
     }
     let bytes = r.run.record_canonical().unwrap();
-    for q in [
-        Query::Diff,
-        Query::WhyExcluded {
-            item: Item::String("x".into()),
+    let e = explain(
+        &Evidence::Record {
+            record: &bytes,
+            plan: None,
         },
-        Query::WhyOrder {
-            a: Item::String("x".into()),
-            b: Item::String("y".into()),
-        },
-    ] {
-        let e = explain(
-            &Evidence::Record {
-                record: &bytes,
-                plan: None,
-            },
-            &q,
-            &ExplainOptions::default(),
-        )
-        .unwrap_err();
-        assert_eq!(e.code, RefusalCode::InvalidQuery);
-        assert_eq!(e.detail, "not yet implemented");
-    }
+        &Query::Diff,
+        &ExplainOptions::default(),
+    )
+    .unwrap_err();
+    assert_eq!(e.code, RefusalCode::InvalidQuery);
+    assert_eq!(e.detail, "not yet implemented");
 }
 
 #[tokio::test]

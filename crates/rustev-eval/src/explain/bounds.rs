@@ -37,28 +37,29 @@ fn construct(
         bytes: 0,
         bounds,
     };
-    let answer = match query {
-        Query::WhyOutcome => outcome::build(&mut b)?,
-        Query::TextOrigin => text::build(&mut b)?,
-        Query::Models => models::build(&mut b)?,
-        Query::WhySelected { item } => selected::build(&mut b, item)?,
-        _ => {
-            return Err(ExplainError::new(
-                RefusalCode::InvalidQuery,
-                "query",
-                "not yet implemented",
-            ));
-        }
-    };
+    let answer = dispatch(&mut b, query)?;
     let mut side = set.side.clone();
     redact::side(&mut side, options.redaction);
     let mut query = query.clone();
-    if let Query::WhySelected { item } = &mut query {
-        redact::item(
+    match &mut query {
+        Query::WhySelected { item } | Query::WhyExcluded { item } => redact::item(
             item,
             options.redaction,
             rustev_contract::redaction::FieldClass::Id,
-        );
+        ),
+        Query::WhyOrder { a, b } => {
+            redact::item(
+                a,
+                options.redaction,
+                rustev_contract::redaction::FieldClass::Id,
+            );
+            redact::item(
+                b,
+                options.redaction,
+                rustev_contract::redaction::FieldClass::Id,
+            );
+        }
+        _ => {}
     }
     let doc = Explanation {
         schema: rustev_contract::schema::EXPLANATION.into(),
