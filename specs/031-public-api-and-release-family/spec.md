@@ -31,6 +31,8 @@ establishes:
   - { kind: directory, path: "integrations/rustev/" }
   # Written by spec 021 increment 1 (021 extends it; 2.2 below).
   - { kind: directory, path: "tools/rustev-release/" }
+  # Linker settings that make the Windows artifacts reproducible (3.9.3).
+  - { kind: file, path: ".cargo/config.toml" }
 extends:
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.toml" }, nature: amending }
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.lock" }, nature: amending }
@@ -845,6 +847,41 @@ SBOM of the native main package, which ships JavaScript and declarations
 only, naming its platform packages. Archive extraction compares every path
 when an artifact has no crate root. Part 2 wires these into the release
 workflow.
+
+**Increment 7 part 2, 2026-10-23 (reproducible, audited workflow
+artifacts with SBOMs).** The release workflow builds every npm tarball and CLI binary
+twice and requires identical bytes (3.9.3): a `rebuild` job on its own
+runners repeats each platform's CLI build and addon build in the same
+images and environments (the CLI as the `cli` job builds it, at the
+commit's source date; the addon exactly as spec 027's bindings workflow
+builds it), the CLI archives of both builds are written on Linux with GNU
+tar in a fixed order, owner, mode and time and `gzip -n`, the nine npm
+tarballs are packed once from the bindings workflow's addons and once from
+the rebuild's (each with its own WebAssembly build), and `rustev-release
+compare-artifacts` compares the two sets (raw binaries, addons, archives,
+tarballs), naming each differing file, archive entry or container and
+never normalizing one away; its report (`rustev.artifact-reproducibility/1`)
+is a workflow artifact. Each archive and tarball gets a CycloneDX 1.5 SBOM
+(3.9.1): `cargo-cyclonedx` 0.5.9 at the source date for the crate compiled
+into it and its target (`rustev-cli`, `rustev-node`, `rustev-wasm`), and
+for the native main package, which ships JavaScript and declarations only,
+a deterministic document naming its platform packages; `sbom-check` fails
+an artifact without one (section 5). The audit (3.9.2) is `npm-audit`,
+which fails a tarball with any dependency, peer or bundled dependency,
+install script, `node_modules` entry or optional dependency other than a
+release platform package at the family version, so the npm closure is the
+family alone, and `cargo deny` 0.20.2 with the release policy over the
+crates compiled into the binaries and tarballs. The steps are
+`tools/rustev-release/artifacts.sh`. A rehearsal mode (`rehearsal: true`)
+runs all of it at a branch's commit without a tag, attesting and
+publishing nothing (3.11); it is how this increment was exercised.
+Rehearsal at this change's first head: every Linux and macOS binary,
+addon, archive and tarball reproduced; the Windows binary and addon did
+not, because the MSVC linker stamps the link time and a random PDB GUID,
+so `.cargo/config.toml` passes `/Brepro` for `x86_64-pc-windows-msvc`;
+and the audit found RUSTSEC-2026-0386 in tokio 1.53.1, repaired by its own
+change (the 2026-10-23 dependency repair entry). The bsdtar archives and the "not yet reproducible" note of
+increment 6 are gone.
 
 **Increment 8, 2026-10-23 (`rustev-otel` joins the family).** Spec 028 is
 complete, so its crate joins the release as 3.1 admits a planned member,
