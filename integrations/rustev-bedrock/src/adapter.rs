@@ -87,6 +87,8 @@ impl BedrockBackend {
                 .operations
                 .iter()
                 .map(|o| OperationSupport {
+                    isolation: None,
+                    screen: None,
                     operation: match o.operation.as_str() {
                         "classify" => Operation::Classify,
                         "proposition" => Operation::Proposition,

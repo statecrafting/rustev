@@ -21,7 +21,7 @@ export namespace RustevBackend1 {
   /**
    * What a backend returns for an operation (design section 8.2).
    */
-  export type OutputKind = "label" | "scores" | "distribution" | "logits";
+  export type OutputKind = "label" | "scores" | "distribution" | "logits" | "screen";
 
   export interface RustevBackend1 {
     artifact: ArtifactId;
@@ -40,11 +40,22 @@ export namespace RustevBackend1 {
   }
   export interface OperationSupport {
     /**
+     * Shared isolation has no wire member. An explicit value is always per-item.
+     */
+    isolation?: "per_item";
+    /**
      * The most options, levels or candidates one request may carry.
      */
     max_options: number;
     operation: Operation;
     output: OutputKind;
+    screen?: ScreenProfile;
+  }
+  export interface ScreenProfile {
+    categories: string[];
+    max_text_bytes: number;
+    policy_version: string;
+    text_unit_bytes: number;
   }
 }
 export type RustevBackend1 = RustevBackend1.RustevBackend1;
@@ -71,6 +82,23 @@ export namespace RustevBackendOutput1 {
     | {
         scores: {
           [k: string]: number | undefined;
+        };
+      }
+    | {
+        screen: {
+          blocked: boolean;
+          categories: string[];
+          units: ScreenUnits;
+        };
+      };
+  /**
+   * A screener's reported text units, distinct from runtime computed charges.
+   */
+  export type ScreenUnits =
+    | "not_reported"
+    | {
+        reported: {
+          n: number;
         };
       };
 
@@ -633,7 +661,8 @@ export namespace RustevDefinition1 {
   /**
    * The value kind a semantic step requires (spec 002, 3.9.3).
    */
-  export type RequiredKind = "label" | "distribution" | "calibrated_probability" | "ordinal_distribution" | "scores";
+  export type RequiredKind =
+    "label" | "distribution" | "calibrated_probability" | "ordinal_distribution" | "scores" | "screen_verdict";
   export type ItemSource =
     | "none"
     | {
@@ -1473,7 +1502,8 @@ export namespace RustevDefinition2 {
   /**
    * The value kind a semantic step requires (spec 002, 3.9.3).
    */
-  export type RequiredKind = "label" | "distribution" | "calibrated_probability" | "ordinal_distribution" | "scores";
+  export type RequiredKind =
+    "label" | "distribution" | "calibrated_probability" | "ordinal_distribution" | "scores" | "screen_verdict";
   export type ItemSource =
     | "none"
     | {
@@ -6161,7 +6191,8 @@ export namespace RustevPlan2 {
   /**
    * The value kind a semantic step requires (spec 002, 3.9.3).
    */
-  export type RequiredKind = "label" | "distribution" | "calibrated_probability" | "ordinal_distribution" | "scores";
+  export type RequiredKind =
+    "label" | "distribution" | "calibrated_probability" | "ordinal_distribution" | "scores" | "screen_verdict";
   export type ItemSource =
     | "none"
     | {
@@ -6187,7 +6218,7 @@ export namespace RustevPlan2 {
   /**
    * What a backend returns for an operation (design section 8.2).
    */
-  export type OutputKind = "label" | "scores" | "distribution" | "logits";
+  export type OutputKind = "label" | "scores" | "distribution" | "logits" | "screen";
   export type ExecutionPolicyId = string;
   /**
    * The cost budget of one decision, in integer units the deployment chooses
@@ -7490,7 +7521,8 @@ export namespace RustevPlan3 {
   /**
    * The value kind a semantic step requires (spec 002, 3.9.3).
    */
-  export type RequiredKind = "label" | "distribution" | "calibrated_probability" | "ordinal_distribution" | "scores";
+  export type RequiredKind =
+    "label" | "distribution" | "calibrated_probability" | "ordinal_distribution" | "scores" | "screen_verdict";
   export type ItemSource =
     | "none"
     | {
@@ -7516,7 +7548,7 @@ export namespace RustevPlan3 {
   /**
    * What a backend returns for an operation (design section 8.2).
    */
-  export type OutputKind = "label" | "scores" | "distribution" | "logits";
+  export type OutputKind = "label" | "scores" | "distribution" | "logits" | "screen";
   export type ExecutionPolicyId = string;
   /**
    * The cost budget of one decision, in integer units the deployment chooses
@@ -9321,7 +9353,7 @@ export namespace RustevRemoteDescribe1Response {
   /**
    * What a backend returns for an operation (design section 8.2).
    */
-  export type OutputKind = "label" | "scores" | "distribution" | "logits";
+  export type OutputKind = "label" | "scores" | "distribution" | "logits" | "screen";
   export type DescriptorId = string;
   /**
    * Shared-state batching support (spec 009, 3.10.4).
@@ -9388,11 +9420,22 @@ export namespace RustevRemoteDescribe1Response {
   }
   export interface OperationSupport {
     /**
+     * Shared isolation has no wire member. An explicit value is always per-item.
+     */
+    isolation?: "per_item";
+    /**
      * The most options, levels or candidates one request may carry.
      */
     max_options: number;
     operation: Operation;
     output: OutputKind;
+    screen?: ScreenProfile;
+  }
+  export interface ScreenProfile {
+    categories: string[];
+    max_text_bytes: number;
+    policy_version: string;
+    text_unit_bytes: number;
   }
   /**
    * Terms negotiated beside the descriptor (spec 009, 3.2.4). The runtime
@@ -9798,6 +9841,23 @@ export namespace RustevRemoteInfer1Response {
         scores: {
           [k: string]: number | undefined;
         };
+      }
+    | {
+        screen: {
+          blocked: boolean;
+          categories: string[];
+          units: ScreenUnits;
+        };
+      };
+  /**
+   * A screener's reported text units, distinct from runtime computed charges.
+   */
+  export type ScreenUnits =
+    | "not_reported"
+    | {
+        reported: {
+          n: number;
+        };
       };
   /**
    * The closed error taxonomy (spec 009, 3.6). Each code maps to exactly one
@@ -10119,11 +10179,12 @@ export namespace RustevRequest1 {
   /**
    * What a backend returns for an operation (design section 8.2).
    */
-  export type OutputKind = "label" | "scores" | "distribution" | "logits";
+  export type OutputKind = "label" | "scores" | "distribution" | "logits" | "screen";
   /**
    * The value kind a semantic step requires (spec 002, 3.9.3).
    */
-  export type RequiredKind = "label" | "distribution" | "calibrated_probability" | "ordinal_distribution" | "scores";
+  export type RequiredKind =
+    "label" | "distribution" | "calibrated_probability" | "ordinal_distribution" | "scores" | "screen_verdict";
   /**
    * The isolation scope of a capture, a bundle and every request identity.
    */
@@ -14229,11 +14290,12 @@ export namespace RustevServeRefusal1 {
   /**
    * What a backend returns for an operation (design section 8.2).
    */
-  export type OutputKind = "label" | "scores" | "distribution" | "logits";
+  export type OutputKind = "label" | "scores" | "distribution" | "logits" | "screen";
   /**
    * The value kind a semantic step requires (spec 002, 3.9.3).
    */
-  export type RequiredKind = "label" | "distribution" | "calibrated_probability" | "ordinal_distribution" | "scores";
+  export type RequiredKind =
+    "label" | "distribution" | "calibrated_probability" | "ordinal_distribution" | "scores" | "screen_verdict";
   export type ContentDigest = string;
   /**
    * @minItems 0

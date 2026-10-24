@@ -322,6 +322,8 @@ impl JevBackend {
         .map_err(SetupError::Endpoint)?;
         let artifact = binding.artifact().map_err(SetupError::Binding)?;
         let dist = |operation, max_options| OperationSupport {
+            isolation: None,
+            screen: None,
             operation,
             output: OutputKind::Distribution,
             max_options,
