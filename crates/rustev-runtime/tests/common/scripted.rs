@@ -38,6 +38,8 @@ pub enum OnCancel {
     Unconfirmed,
     /// Never answer.
     Ignore,
+    /// Return a late screening output after observing cancellation.
+    LateScreen,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -80,6 +82,8 @@ pub struct Scripted {
     principals: Mutex<Vec<Vec<u8>>>,
     gates: Mutex<BTreeMap<String, oneshot::Sender<Answer>>>,
     batch_enabled: Mutex<bool>,
+    text_counts: Mutex<Vec<usize>>,
+    batch_dispatch: Mutex<bool>,
     batch_omit_task: Mutex<Option<String>>,
     /// Per-task cost bounds that override `bound`.
     task_bounds: Mutex<BTreeMap<String, CostBound>>,
@@ -102,6 +106,8 @@ impl Scripted {
             principals: Mutex::new(vec![]),
             gates: Mutex::new(BTreeMap::new()),
             batch_enabled: Mutex::new(false),
+            text_counts: Mutex::new(vec![]),
+            batch_dispatch: Mutex::new(false),
             batch_omit_task: Mutex::new(None),
             task_bounds: Mutex::new(BTreeMap::new()),
         })
@@ -128,6 +134,14 @@ impl Scripted {
         self
     }
 
+    /// Spec 020-style compatibility: equal projected shared state only.
+    /// Transport is deliberately absent from this scripted fixture.
+    pub fn with_batch_dispatch(self: Arc<Self>) -> Arc<Self> {
+        *self.batch_enabled.lock().unwrap() = true;
+        *self.batch_dispatch.lock().unwrap() = true;
+        self
+    }
+
     pub fn with_batch_omitting(self: Arc<Self>, task: &str) -> Arc<Self> {
         *self.batch_enabled.lock().unwrap() = true;
         *self.batch_omit_task.lock().unwrap() = Some(task.into());
@@ -141,6 +155,10 @@ impl Scripted {
 
     pub fn principals(&self) -> Vec<Vec<u8>> {
         self.principals.lock().unwrap().clone()
+    }
+
+    pub fn text_counts(&self) -> Vec<usize> {
+        self.text_counts.lock().unwrap().clone()
     }
 
     pub fn events(&self) -> Vec<Event> {
@@ -232,15 +250,30 @@ impl DecisionBackend for Handle {
     fn infer<'a>(&'a self, call: AttemptCall<'a>) -> BoxFuture<'a, AttemptReport> {
         let s = self.0.clone();
         let id = call.attempt_id.to_string();
+        s.text_counts
+            .lock()
+            .unwrap()
+            .push(text_count(call.projection));
         s.push(Event::Dispatched(id.clone()));
         let answer = s.call(&id, call.projection, &call.cx.principal_handle);
         answer_future(s, id, call.cancel.clone(), answer)
     }
 
-    fn batch_capability(&self, _projection: &[u8]) -> Option<BatchCapability> {
+    fn batch_capability(&self, projection: &[u8]) -> Option<BatchCapability> {
         let enabled = *self.0.batch_enabled.lock().unwrap();
         enabled.then(|| BatchCapability {
-            compatibility: "scripted-general-batch/1".into(),
+            compatibility: if *self.0.batch_dispatch.lock().unwrap() {
+                let p: Json = serde_json::from_slice(projection).unwrap();
+                rustev_contract::canonical::tagged_digest(
+                    "scripted-batch-dispatch/1",
+                    &serde_json::to_vec(
+                        &serde_json::json!({"instance":p["instance"],"values":p["values"]}),
+                    )
+                    .unwrap(),
+                )
+            } else {
+                "scripted-general-batch/1".into()
+            },
             work_units: 1,
         })
     }
@@ -254,6 +287,10 @@ impl DecisionBackend for Handle {
             .iter()
             .map(|member| member.attempt_id.clone())
             .collect::<Vec<_>>();
+        s.text_counts
+            .lock()
+            .unwrap()
+            .push(call.members.iter().map(|m| text_count(&m.projection)).sum());
         s.push(Event::BatchDispatched(call.batch_id, ids));
         let omit = s.batch_omit_task.lock().unwrap().clone();
         let mut members = Vec::new();
@@ -408,6 +445,22 @@ fn answer_future(
                                     remote: *s.remote.lock().unwrap(),
                                 };
                             }
+                            OnCancel::LateScreen => {
+                                watch.armed = false;
+                                s.push(Event::Finished(id.clone()));
+                                return AttemptReport {
+                                    result: Ok(RawOutput::Screen {
+                                        blocked: true,
+                                        categories: vec!["injection".into()],
+                                        units: rustev_contract::output::ScreenUnits::Reported {
+                                            n: 7,
+                                        },
+                                    }),
+                                    charge: Charge::Observed { units: 2 },
+                                    cancel: CancelAck::Unconfirmed,
+                                    remote: RemoteEnd::Finished,
+                                };
+                            }
                             OnCancel::Ignore => std::future::pending::<Answer>().await,
                         }
                     }
@@ -491,4 +544,9 @@ impl EvidenceSink for SinkHandle {
             }
         })
     }
+}
+
+fn text_count(projection: &[u8]) -> usize {
+    let p: Json = serde_json::from_slice(projection).unwrap();
+    usize::from(p["values"]["text"].is_string())
 }

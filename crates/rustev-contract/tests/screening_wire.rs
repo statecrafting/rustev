@@ -666,7 +666,7 @@ fn screening_run_cache_units_withdrawal_and_bound_violation_round_trip() {
             );
         }
     }
-    v["requests"][0]["screen"] = json!({"cache":"miss", "units":{"charged":3,"basis":"reported",
+    v["requests"][0]["screen"] = json!({"cache":"miss", "units":{"computed":2,"reported":3,"charged":3,"basis":"reported",
         "bound_violation":{"computed":2,"reported":3}}});
     let bytes = canonical_value_bytes(&v).unwrap();
     assert_eq!(
@@ -802,5 +802,25 @@ fn screening_record_schemas_match_optional_members_and_versions() {
         );
         *v.pointer_mut(path).unwrap() = Value::Null;
         assert!(!validator.is_valid(&v), "{file}: null");
+    }
+}
+
+#[test]
+fn screening_unit_counts_round_trip_without_changing_absent_forms() {
+    use rustev_contract::screening::ScreenChargedUnits;
+    for v in [
+        json!({"computed":2,"charged":2,"basis":"computed"}),
+        json!({"computed":2,"reported":1,"charged":1,"basis":"reported"}),
+        json!({"charged":0,"basis":"cache_hit"}),
+    ] {
+        let parsed: ScreenChargedUnits = serde_json::from_value(v.clone()).unwrap();
+        assert_eq!(serde_json::to_value(parsed).unwrap(), v);
+    }
+    for field in ["computed", "reported"] {
+        for bad in [json!(null), json!(-1), json!("2")] {
+            let mut v = json!({"computed":2,"charged":2,"basis":"computed"});
+            v[field] = bad;
+            assert!(serde_json::from_value::<ScreenChargedUnits>(v).is_err());
+        }
     }
 }
