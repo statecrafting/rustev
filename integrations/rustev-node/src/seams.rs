@@ -29,6 +29,58 @@ use rustev_core::seams::{
 
 use crate::errors::fail;
 
+/// A host call's reply as the runtime awaits it. The spawned task counts a
+/// late settlement when its send fails, which covers only a reply that
+/// arrives after this is dropped. A reply that arrived first but was never
+/// read, because the runtime finished the attempt and dropped it a moment
+/// later, is counted here on drop, so every discarded settlement is counted
+/// exactly once (3.6.4).
+struct Reply<T> {
+    rx: Option<tokio::sync::oneshot::Receiver<T>>,
+    stats: Arc<SeamStats>,
+}
+
+impl<T> Reply<T> {
+    fn new(rx: tokio::sync::oneshot::Receiver<T>, stats: Arc<SeamStats>) -> Self {
+        Reply {
+            rx: Some(rx),
+            stats,
+        }
+    }
+}
+
+impl<T> std::future::Future for Reply<T> {
+    type Output = std::result::Result<T, tokio::sync::oneshot::error::RecvError>;
+
+    fn poll(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        let rx = self
+            .rx
+            .as_mut()
+            .expect("a reply is not polled after it is read");
+        let r = std::task::ready!(std::pin::Pin::new(rx).poll(cx));
+        self.rx = None;
+        std::task::Poll::Ready(r)
+    }
+}
+
+impl<T> Drop for Reply<T> {
+    fn drop(&mut self) {
+        if let Some(mut rx) = self.rx.take() {
+            // Closed first, so a send racing this drop fails and is counted
+            // by the task, or lands before and is counted here: never both.
+            rx.close();
+            if rx.try_recv().is_ok() {
+                self.stats
+                    .late_resolutions_discarded
+                    .fetch_add(1, Ordering::SeqCst);
+            }
+        }
+    }
+}
+
 /// Each running decision's W3C `traceparent`, by decision id (3.8): passed
 /// to every host seam call of that decision, never into a record.
 pub type Traces = Arc<std::sync::Mutex<std::collections::HashMap<String, String>>>;
@@ -166,6 +218,7 @@ impl EvidenceSink for HostSink {
         let (tx, rx) = tokio::sync::oneshot::channel();
         let deliver = self.deliver.clone();
         let stats = self.stats.clone();
+        let rx = Reply::new(rx, self.stats.clone());
         tokio::spawn(async move {
             let r = match deliver.call_async_catch(call).await {
                 Ok(p) => p.await.map_err(|e| why(&e)),
@@ -350,7 +403,8 @@ impl DecisionBackend for HostBackend {
             principal_handle: Uint8Array::new(call.cx.principal_handle.clone()),
             traceparent: trace_of(&self.traces, &call.cx.trace_id),
         };
-        let (tx, mut rx) = tokio::sync::oneshot::channel();
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        let mut rx = Reply::new(rx, self.stats.clone());
         let infer = self.infer.clone();
         let stats = self.stats.clone();
         tokio::spawn(async move {
@@ -443,6 +497,7 @@ impl HostContext {
         let (tx, rx) = tokio::sync::oneshot::channel();
         let fetch = self.fetch.clone();
         let stats = self.stats.clone();
+        let rx = Reply::new(rx, self.stats.clone());
         tokio::spawn(async move {
             let r = match fetch.call_async_catch(call).await {
                 Ok(p) => p.await.map(|b| b.to_vec()).map_err(|e| why(&e)),
