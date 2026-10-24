@@ -13,18 +13,37 @@ fn escape(s: &str) -> String {
         .replace('\n', "&#10;")
         .replace('\r', "&#13;")
 }
+// A code span shows its content literally, so entities would display as
+// typed; only what ends the span or the cell is handled: a fence longer
+// than any backtick run inside, and in a table `\|`, which GFM unescapes
+// inside a code span. Canonical JSON holds no raw line break.
+fn code(s: &str, table: bool) -> String {
+    let s = if table {
+        s.replace('|', "\\|")
+    } else {
+        s.to_string()
+    };
+    let run = s.split(|c| c != '`').map(str::len).max().unwrap_or(0);
+    let fence = "`".repeat(run + 1);
+    let pad = if s.starts_with('`') || s.ends_with('`') {
+        " "
+    } else {
+        ""
+    };
+    format!("{fence}{pad}{s}{pad}{fence}")
+}
 fn json(v: &Value) -> String {
+    span(v, true)
+}
+fn span(v: &Value, table: bool) -> String {
     let bytes = rustev_contract::canonical::record_canonical_bytes(v).unwrap_or_default();
     let text = String::from_utf8(bytes).unwrap_or_default();
     let mut end = text.len().min(256);
     while !text.is_char_boundary(end) {
         end -= 1;
     }
-    format!(
-        "`{}{}`",
-        escape(&text[..end]),
-        if end < text.len() { "..." } else { "" }
-    )
+    let cut = if end < text.len() { "..." } else { "" };
+    code(&format!("{}{cut}", &text[..end]), table)
 }
 fn encoded<T: serde::Serialize>(v: &T) -> String {
     json(&serde_json::to_value(v).unwrap_or(Value::Null))
@@ -123,7 +142,10 @@ fn answer(a: &Answer) -> &'static str {
 pub fn render_markdown(doc: &Explanation) -> String {
     let mut out = format!(
         "# Explanation: {}\n\n| Side | Form | Decision | Plan | Capture |\n| --- | --- | --- | --- | --- |\n",
-        encoded(&doc.query)
+        span(
+            &serde_json::to_value(&doc.query).unwrap_or(Value::Null),
+            false
+        )
     );
     for s in &doc.sides {
         writeln!(

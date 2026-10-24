@@ -1135,6 +1135,21 @@ pipes and backticks. Tests: `crates/rustev-eval/tests/explain_diff.rs` and
 query. The `explain` module stays hidden from the documentation until the
 CLI increment publishes the surface.
 
+**Increment 6 fixtures, part 1.** The committed inputs (records, bundles, plans,
+redaction policies) and the golden `*.explanation.json` and
+`*.explanation.md` files under `crates/rustev-cli/tests/golden/explain/`,
+produced by the runtime and the explainer and frozen with timing
+normalized as the other CLI goldens are. They land ahead of the CLI so
+the CLI's review sees code, not data; nothing reads them until the next
+increment. Part 1 holds every fixture except the `lodging` goldens outside
+the tie-break case, which part 2 adds, so each part fits one review.
+The edited `changed.*` inputs and the `input-changed` goldens land with
+the CLI, beside the harvest that derives them.
+`render_markdown` now writes a value's code span literally, as 3.14.3
+asks: a fence longer than any backtick run inside it and, in a table cell,
+`\|`, with no HTML entity (an entity in a code span displays as typed);
+prose outside code spans keeps its entity escaping.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

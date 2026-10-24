@@ -150,7 +150,10 @@ fn unavailable_reasons_policy_cut_and_utf8_display_cut() {
     doc.truncation = Some(Truncation { total: 2 });
     doc.validate().unwrap();
     let text = render_markdown(&doc);
-    assert!(text.contains("a&#124;&#96;b"));
+    // A code span shows its content literally: a longer fence around the
+    // backtick, `\|` for the table cell, and no entity anywhere.
+    assert!(text.contains(r#"``"a\|`b\nc"``"#));
+    assert!(!text.contains("&#"));
     assert!(text.contains(&format!(" (truncated by policy {} to 8 bytes)", id('b'))));
     assert!(text.contains("truncated: 1 of 2 facts"));
 }
