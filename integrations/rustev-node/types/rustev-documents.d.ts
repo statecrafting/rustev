@@ -695,6 +695,9 @@ export namespace RustevDefinition1 {
       }
     | {
         corroborate: CorroborateDecl;
+      }
+    | {
+        generate: Generate;
       };
   /**
    * The delay before retry `n` (1-based). No jitter.
@@ -795,6 +798,73 @@ export namespace RustevDefinition1 {
   export type OnFalse = "contradicts" | "no_evidence";
   export type CorroborationMode = "all" | "any";
   export type OnContradiction = "conflict" | "treat_as_hint" | "abstain";
+  export type Escape = "text" | "html";
+  export type BackstopField =
+    | {
+        text: string;
+      }
+    | {
+        list: string[];
+      };
+  export type Overflow = "refuse" | "truncate";
+  export type ModelForEach = "none" | ModelList;
+  export type ModelBound =
+    | {
+        literal: number;
+      }
+    | {
+        param: string;
+      };
+  export type Language = string | ParamRef;
+  export type CostLimit =
+    | "none"
+    | {
+        units: {
+          n: number;
+        };
+      };
+  export type ModelBound2 =
+    | {
+        literal: number;
+      }
+    | {
+        param: string;
+      };
+  export type GeneratedType =
+    | {
+        text: {
+          lines: Lines;
+          max_bytes: number;
+        };
+      }
+    | {
+        list: {
+          max_items: number;
+          vocabulary: string;
+        };
+      };
+  export type Lines = "single" | "multi";
+  export type ScreenInput = "untrusted_fields";
+  export type ScreenOutput =
+    | "none"
+    | {
+        screener: {
+          backend: BackendReq;
+        };
+      };
+  export type PromptTemplateId = string;
+  export type TemplateBinding =
+    | {
+        literal: Literal;
+      }
+    | ParamRef
+    | string;
+  export type Vocabulary = string[] | ParamRef;
+  export type GenerateWhen =
+    | "any_propose"
+    | {
+        actions: string[];
+      };
 
   /**
    * A versioned, authored description of a recurring decision.
@@ -1234,6 +1304,72 @@ export namespace RustevDefinition1 {
   export interface Check {
     on_false: OnFalse;
     predicate: Predicate;
+  }
+  export interface Generate {
+    backend: BackendReq;
+    backstop: Backstop;
+    carry: string[];
+    for_each: ModelForEach;
+    language: Language;
+    limits: ModelLimits;
+    output: OutputSchema;
+    projection: string[];
+    repair: Repair;
+    screen: GenerateScreen;
+    template: TemplateRef;
+    vocabularies: {
+      [k: string]: Vocabulary | undefined;
+    };
+    when: GenerateWhen;
+  }
+  export interface Backstop {
+    escape: Escape;
+    fields: {
+      [k: string]: BackstopField | undefined;
+    };
+    locale: string;
+    overflow: Overflow;
+  }
+  export interface ModelList {
+    bind: string;
+    items: ItemSource;
+    max_items: ModelBound;
+    over: string;
+  }
+  /**
+   * Exactly one member (spec 034, 3.3.1).
+   */
+  export interface ParamRef {
+    param: string;
+  }
+  export interface ModelLimits {
+    concurrency: number;
+    deadline_share: Decimal;
+    max_cost_units: CostLimit;
+    per_item_deadline_ms: ModelBound2;
+  }
+  export interface OutputSchema {
+    fields: GeneratedField[];
+  }
+  export interface GeneratedField {
+    name: string;
+    required: boolean;
+    type: GeneratedType;
+  }
+  export interface Repair {
+    max_attempts: number;
+    only_missing_fields: boolean;
+  }
+  export interface GenerateScreen {
+    input: ScreenInput;
+    output: ScreenOutput;
+  }
+  export interface TemplateRef {
+    digest: PromptTemplateId;
+    id: string;
+    params: {
+      [k: string]: TemplateBinding | undefined;
+    };
   }
 }
 export type RustevDefinition1 = RustevDefinition1.RustevDefinition1;
@@ -1716,6 +1852,9 @@ export namespace RustevDefinition2 {
       }
     | {
         corroborate: CorroborateDecl;
+      }
+    | {
+        generate: Generate;
       };
   /**
    * The delay before retry `n` (1-based). No jitter.
@@ -1816,6 +1955,73 @@ export namespace RustevDefinition2 {
   export type OnFalse = "contradicts" | "no_evidence";
   export type CorroborationMode = "all" | "any";
   export type OnContradiction = "conflict" | "treat_as_hint" | "abstain";
+  export type Escape = "text" | "html";
+  export type BackstopField =
+    | {
+        text: string;
+      }
+    | {
+        list: string[];
+      };
+  export type Overflow = "refuse" | "truncate";
+  export type ModelForEach = "none" | ModelList;
+  export type ModelBound =
+    | {
+        literal: number;
+      }
+    | {
+        param: string;
+      };
+  export type Language = string | ParamRef;
+  export type CostLimit =
+    | "none"
+    | {
+        units: {
+          n: number;
+        };
+      };
+  export type ModelBound2 =
+    | {
+        literal: number;
+      }
+    | {
+        param: string;
+      };
+  export type GeneratedType =
+    | {
+        text: {
+          lines: Lines;
+          max_bytes: number;
+        };
+      }
+    | {
+        list: {
+          max_items: number;
+          vocabulary: string;
+        };
+      };
+  export type Lines = "single" | "multi";
+  export type ScreenInput = "untrusted_fields";
+  export type ScreenOutput =
+    | "none"
+    | {
+        screener: {
+          backend: BackendReq;
+        };
+      };
+  export type PromptTemplateId = string;
+  export type TemplateBinding =
+    | {
+        literal: Literal;
+      }
+    | ParamRef
+    | string;
+  export type Vocabulary = string[] | ParamRef;
+  export type GenerateWhen =
+    | "any_propose"
+    | {
+        actions: string[];
+      };
 
   /**
    * A versioned, authored description of a recurring decision.
@@ -2255,6 +2461,72 @@ export namespace RustevDefinition2 {
   export interface Check {
     on_false: OnFalse;
     predicate: Predicate;
+  }
+  export interface Generate {
+    backend: BackendReq;
+    backstop: Backstop;
+    carry: string[];
+    for_each: ModelForEach;
+    language: Language;
+    limits: ModelLimits;
+    output: OutputSchema;
+    projection: string[];
+    repair: Repair;
+    screen: GenerateScreen;
+    template: TemplateRef;
+    vocabularies: {
+      [k: string]: Vocabulary | undefined;
+    };
+    when: GenerateWhen;
+  }
+  export interface Backstop {
+    escape: Escape;
+    fields: {
+      [k: string]: BackstopField | undefined;
+    };
+    locale: string;
+    overflow: Overflow;
+  }
+  export interface ModelList {
+    bind: string;
+    items: ItemSource;
+    max_items: ModelBound;
+    over: string;
+  }
+  /**
+   * Exactly one member (spec 034, 3.3.1).
+   */
+  export interface ParamRef {
+    param: string;
+  }
+  export interface ModelLimits {
+    concurrency: number;
+    deadline_share: Decimal;
+    max_cost_units: CostLimit;
+    per_item_deadline_ms: ModelBound2;
+  }
+  export interface OutputSchema {
+    fields: GeneratedField[];
+  }
+  export interface GeneratedField {
+    name: string;
+    required: boolean;
+    type: GeneratedType;
+  }
+  export interface Repair {
+    max_attempts: number;
+    only_missing_fields: boolean;
+  }
+  export interface GenerateScreen {
+    input: ScreenInput;
+    output: ScreenOutput;
+  }
+  export interface TemplateRef {
+    digest: PromptTemplateId;
+    id: string;
+    params: {
+      [k: string]: TemplateBinding | undefined;
+    };
   }
 }
 export type RustevDefinition2 = RustevDefinition2.RustevDefinition2;
@@ -7297,6 +7569,9 @@ export namespace RustevPlan2 {
       }
     | {
         corroborate: CorroborateDecl;
+      }
+    | {
+        generate: Generate;
       };
   /**
    * The delay before retry `n` (1-based). No jitter.
@@ -7397,6 +7672,73 @@ export namespace RustevPlan2 {
   export type OnFalse = "contradicts" | "no_evidence";
   export type CorroborationMode = "all" | "any";
   export type OnContradiction = "conflict" | "treat_as_hint" | "abstain";
+  export type Escape = "text" | "html";
+  export type BackstopField =
+    | {
+        text: string;
+      }
+    | {
+        list: string[];
+      };
+  export type Overflow = "refuse" | "truncate";
+  export type ModelForEach = "none" | ModelList;
+  export type ModelBound =
+    | {
+        literal: number;
+      }
+    | {
+        param: string;
+      };
+  export type Language = string | ParamRef;
+  export type CostLimit =
+    | "none"
+    | {
+        units: {
+          n: number;
+        };
+      };
+  export type ModelBound2 =
+    | {
+        literal: number;
+      }
+    | {
+        param: string;
+      };
+  export type GeneratedType =
+    | {
+        text: {
+          lines: Lines;
+          max_bytes: number;
+        };
+      }
+    | {
+        list: {
+          max_items: number;
+          vocabulary: string;
+        };
+      };
+  export type Lines = "single" | "multi";
+  export type ScreenInput = "untrusted_fields";
+  export type ScreenOutput =
+    | "none"
+    | {
+        screener: {
+          backend: BackendReq;
+        };
+      };
+  export type PromptTemplateId = string;
+  export type TemplateBinding =
+    | {
+        literal: Literal;
+      }
+    | ParamRef
+    | string;
+  export type Vocabulary = string[] | ParamRef;
+  export type GenerateWhen =
+    | "any_propose"
+    | {
+        actions: string[];
+      };
   export type DefinitionId = string;
   export type PlanExecution =
     | "none"
@@ -8063,6 +8405,72 @@ export namespace RustevPlan2 {
   export interface Check {
     on_false: OnFalse;
     predicate: Predicate;
+  }
+  export interface Generate {
+    backend: BackendReq;
+    backstop: Backstop;
+    carry: string[];
+    for_each: ModelForEach;
+    language: Language;
+    limits: ModelLimits;
+    output: OutputSchema;
+    projection: string[];
+    repair: Repair;
+    screen: GenerateScreen;
+    template: TemplateRef;
+    vocabularies: {
+      [k: string]: Vocabulary | undefined;
+    };
+    when: GenerateWhen;
+  }
+  export interface Backstop {
+    escape: Escape;
+    fields: {
+      [k: string]: BackstopField | undefined;
+    };
+    locale: string;
+    overflow: Overflow;
+  }
+  export interface ModelList {
+    bind: string;
+    items: ItemSource;
+    max_items: ModelBound;
+    over: string;
+  }
+  /**
+   * Exactly one member (spec 034, 3.3.1).
+   */
+  export interface ParamRef {
+    param: string;
+  }
+  export interface ModelLimits {
+    concurrency: number;
+    deadline_share: Decimal;
+    max_cost_units: CostLimit;
+    per_item_deadline_ms: ModelBound2;
+  }
+  export interface OutputSchema {
+    fields: GeneratedField[];
+  }
+  export interface GeneratedField {
+    name: string;
+    required: boolean;
+    type: GeneratedType;
+  }
+  export interface Repair {
+    max_attempts: number;
+    only_missing_fields: boolean;
+  }
+  export interface GenerateScreen {
+    input: ScreenInput;
+    output: ScreenOutput;
+  }
+  export interface TemplateRef {
+    digest: PromptTemplateId;
+    id: string;
+    params: {
+      [k: string]: TemplateBinding | undefined;
+    };
   }
   export interface DeclaredExecution {
     /**
@@ -8827,6 +9235,9 @@ export namespace RustevPlan3 {
       }
     | {
         corroborate: CorroborateDecl;
+      }
+    | {
+        generate: Generate;
       };
   /**
    * The delay before retry `n` (1-based). No jitter.
@@ -8927,6 +9338,73 @@ export namespace RustevPlan3 {
   export type OnFalse = "contradicts" | "no_evidence";
   export type CorroborationMode = "all" | "any";
   export type OnContradiction = "conflict" | "treat_as_hint" | "abstain";
+  export type Escape = "text" | "html";
+  export type BackstopField =
+    | {
+        text: string;
+      }
+    | {
+        list: string[];
+      };
+  export type Overflow = "refuse" | "truncate";
+  export type ModelForEach = "none" | ModelList;
+  export type ModelBound =
+    | {
+        literal: number;
+      }
+    | {
+        param: string;
+      };
+  export type Language = string | ParamRef;
+  export type CostLimit =
+    | "none"
+    | {
+        units: {
+          n: number;
+        };
+      };
+  export type ModelBound2 =
+    | {
+        literal: number;
+      }
+    | {
+        param: string;
+      };
+  export type GeneratedType =
+    | {
+        text: {
+          lines: Lines;
+          max_bytes: number;
+        };
+      }
+    | {
+        list: {
+          max_items: number;
+          vocabulary: string;
+        };
+      };
+  export type Lines = "single" | "multi";
+  export type ScreenInput = "untrusted_fields";
+  export type ScreenOutput =
+    | "none"
+    | {
+        screener: {
+          backend: BackendReq;
+        };
+      };
+  export type PromptTemplateId = string;
+  export type TemplateBinding =
+    | {
+        literal: Literal;
+      }
+    | ParamRef
+    | string;
+  export type Vocabulary = string[] | ParamRef;
+  export type GenerateWhen =
+    | "any_propose"
+    | {
+        actions: string[];
+      };
   export type DefinitionId = string;
   export type PlanExecution =
     | "none"
@@ -9078,7 +9556,10 @@ export namespace RustevPlan3 {
           capability: string;
         };
       }
-    | "corroborate";
+    | "corroborate"
+    | {
+        generate: GenerateBinding;
+      };
   export type BoundCalibration =
     | "none"
     | {
@@ -9093,6 +9574,18 @@ export namespace RustevPlan3 {
    */
   export type CalibrationMethod = "temperature/1";
   export type Normalization = "none" | "softmax/1";
+  export type PromptParamType =
+    | ("bool" | "integer" | "decimal")
+    | {
+        text: {
+          max_bytes: number;
+        };
+      }
+    | {
+        enum: {
+          options: string[];
+        };
+      };
 
   export interface RustevPlan3 {
     /**
@@ -9721,6 +10214,72 @@ export namespace RustevPlan3 {
     on_false: OnFalse;
     predicate: Predicate;
   }
+  export interface Generate {
+    backend: BackendReq;
+    backstop: Backstop;
+    carry: string[];
+    for_each: ModelForEach;
+    language: Language;
+    limits: ModelLimits;
+    output: OutputSchema;
+    projection: string[];
+    repair: Repair;
+    screen: GenerateScreen;
+    template: TemplateRef;
+    vocabularies: {
+      [k: string]: Vocabulary | undefined;
+    };
+    when: GenerateWhen;
+  }
+  export interface Backstop {
+    escape: Escape;
+    fields: {
+      [k: string]: BackstopField | undefined;
+    };
+    locale: string;
+    overflow: Overflow;
+  }
+  export interface ModelList {
+    bind: string;
+    items: ItemSource;
+    max_items: ModelBound;
+    over: string;
+  }
+  /**
+   * Exactly one member (spec 034, 3.3.1).
+   */
+  export interface ParamRef {
+    param: string;
+  }
+  export interface ModelLimits {
+    concurrency: number;
+    deadline_share: Decimal;
+    max_cost_units: CostLimit;
+    per_item_deadline_ms: ModelBound2;
+  }
+  export interface OutputSchema {
+    fields: GeneratedField[];
+  }
+  export interface GeneratedField {
+    name: string;
+    required: boolean;
+    type: GeneratedType;
+  }
+  export interface Repair {
+    max_attempts: number;
+    only_missing_fields: boolean;
+  }
+  export interface GenerateScreen {
+    input: ScreenInput;
+    output: ScreenOutput;
+  }
+  export interface TemplateRef {
+    digest: PromptTemplateId;
+    id: string;
+    params: {
+      [k: string]: TemplateBinding | undefined;
+    };
+  }
   export interface DeclaredExecution {
     /**
      * Every runtime fallback target, by step in policy order, then position.
@@ -9975,6 +10534,32 @@ export namespace RustevPlan3 {
      */
     question: string;
     task: string;
+  }
+  export interface GenerateBinding {
+    artifact: ArtifactId;
+    backend_id: string;
+    descriptor: DescriptorId;
+    helpers_version: string;
+    max_items: number;
+    output: OutputSchema;
+    template: PromptTemplate;
+    template_id: PromptTemplateId;
+    vocabularies: {
+      [k: string]: string[] | undefined;
+    };
+    worst_case_projection_bytes: number;
+    worst_case_requests: number;
+  }
+  export interface PromptTemplate {
+    id: string;
+    instructions: string;
+    params: PromptParam[];
+    schema: string;
+    version: string;
+  }
+  export interface PromptParam {
+    name: string;
+    type: PromptParamType;
   }
 }
 export type RustevPlan3 = RustevPlan3.RustevPlan3;
@@ -10509,6 +11094,34 @@ export namespace RustevProfile1 {
   }
 }
 export type RustevProfile1 = RustevProfile1.RustevProfile1;
+
+export namespace RustevPromptTemplate1 {
+  export type PromptParamType =
+    | ("bool" | "integer" | "decimal")
+    | {
+        text: {
+          max_bytes: number;
+        };
+      }
+    | {
+        enum: {
+          options: string[];
+        };
+      };
+
+  export interface RustevPromptTemplate1 {
+    id: string;
+    instructions: string;
+    params: PromptParam[];
+    schema: "rustev.prompt-template/1";
+    version: string;
+  }
+  export interface PromptParam {
+    name: string;
+    type: PromptParamType;
+  }
+}
+export type RustevPromptTemplate1 = RustevPromptTemplate1.RustevPromptTemplate1;
 
 export namespace RustevRedaction1 {
   /**

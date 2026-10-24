@@ -32,6 +32,7 @@
         "src/evidence.rs",
         "src/execution.rs",
         "src/explanation.rs",
+        "src/generation.rs",
         "src/grade.rs",
         "src/ids.rs",
         "src/judgment.rs",

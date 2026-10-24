@@ -2,7 +2,7 @@
 id: "037-generation-steps"
 title: "Generation steps with deterministic backstops and per-field origin (amends 002, 003 and 004)"
 status: approved
-implementation: pending
+implementation: in-progress
 created: "2026-10-17"
 summary: >
   An amendment of approved specs 002, 003 and 004 (R-16), for #76 child B5
@@ -20,7 +20,7 @@ summary: >
   add to the shared #76 versions `rustev.definition/2`, `rustev.plan/3`
   and `rustev.evidence/2`; plans without any #76 construct keep
   byte-identical identities and documents. Approved
-  (A-34); implementation is pending; approval authorizes no live provider
+  (A-34); implementation is in progress; approval authorizes no live provider
   call, spend, release or real-user data.
 amends:
   - "002-decision-contract-and-pure-core"
@@ -40,6 +40,15 @@ extends:
   - { spec: "004-evaluation-and-replay", unit: { kind: directory, path: "crates/rustev-eval/" }, nature: amending }
   # Adds 037 to `make verify` when the implementation is complete.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  # Exhaustive matches over the new step body and kinds, and regenerated
+  # document types of the bindings; no behavior.
+  - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: additive }
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "crates/rustev-surface/" }, nature: additive }
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-node/" }, nature: additive }
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-wasm/" }, nature: additive }
+  - { spec: "028-opentelemetry-evidence-sink", unit: { kind: directory, path: "integrations/rustev-otel/" }, nature: additive }
+  # New contract source files join rustev-contract's reviewed archive list.
+  - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "002-decision-contract-and-pure-core"
@@ -954,6 +963,28 @@ claims about generated text (R-04, R-37); live provider calls or spend.
 ## Verification
 
 Pending with implementation. Approval satisfies no acceptance item.
+
+## Implementation record
+
+Increment 1 (the template languages as a pure core module) is delivered
+on its own branch from `main`; the record of the increment plan is kept
+with it.
+
+**Increment 2, part 1 (2026-10-24): generate declarations and plan
+bindings.** `crates/rustev-contract/src/generation.rs` adds the bounded
+model step envelope of 3.1 and the `generate` step declaration of 3.2 to
+`rustev.definition/2`, with the prompt and backstop templates carried as
+their authored source (the template module validates them), document-local
+parse checks, the prompt template document and its identity (3.3.4,
+3.3.5), and the plan bindings for generate steps in `rustev.plan/3`.
+A `generate` step in a `rustev.definition/1` is refused, category 11
+`requires-definition-2`; a `rustev.definition/2` using only it passes the
+version check, and compilation refuses it with `invalid_definition`
+detail `generation-not-compiled` until the compile increment. Documents
+without these members keep their bytes and identities
+(`tests/generation_wire.rs`, `crates/rustev-core/tests/generation_compile.rs`).
+Remaining for part 2: the text result and per-field origins (3.10), the
+evidence members (3.15) and the backend capability additions (3.7, 3.17).
 
 **Owner decision A-49 (2026-10-23): dependencies.** Spec 030 is no longer
 a declared dependency of this spec. No behavior or acceptance item here

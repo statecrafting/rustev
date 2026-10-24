@@ -148,6 +148,9 @@ fn run_members(version: &str) -> impl FnOnce(&mut serde_json::Value) + '_ {
 fn plan_members(version: &str) -> impl FnOnce(&mut serde_json::Value) + '_ {
     move |v| {
         if version != schema::PLAN_V3 {
+            if let Some(variants) = v["$defs"]["PlanStepDetail"]["oneOf"].as_array_mut() {
+                variants.retain(|v| v["properties"].get("generate").is_none());
+            }
             v["properties"]
                 .as_object_mut()
                 .unwrap()
@@ -240,6 +243,7 @@ pub fn document_schemas() -> Vec<EmittedSchema> {
     };
     let mut out = vec![
         emit::<crate::explanation::Explanation>(schema::EXPLANATION, None),
+        emit::<crate::generation::PromptTemplate>(schema::PROMPT_TEMPLATE, None),
         emit::<crate::profile::Profile>(schema::PROFILE, None),
         emit::<crate::plan_diff::PlanDiff>(schema::PLAN_DIFF, None),
         emit::<Definition>(schema::DEFINITION, None),
