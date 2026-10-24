@@ -97,7 +97,7 @@
       "role": "workflow"
     },
     {
-      "digest": "06a2a122c8d9b597cef64c0720889aa2c34f53573efecbe2343d8e1d39eaca83",
+      "digest": "0dcc100ff4f99a1b88a60c9ae84bedd2ed970fa364e9da0bf2f9839df0b6bfd9",
       "path": ".github/workflows/statecraft-ai-review.yml",
       "role": "workflow"
     },
@@ -226,7 +226,8 @@
       ".statecraft/derived",
       "crates/rustev-contract/schema",
       "integrations/rustev-node/types",
-      "integrations/rustev-wasm/types"
+      "integrations/rustev-wasm/types",
+      "tools/rustev-conformance/cases"
     ],
     "extra_required_jobs": [
       {
