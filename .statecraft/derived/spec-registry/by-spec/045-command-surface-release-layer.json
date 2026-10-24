@@ -8,8 +8,26 @@
       "027-node-and-wasm-bindings",
       "031-public-api-and-release-family"
     ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "directory",
+          "path": "scripts/acceptance/"
+        }
+      }
+    ],
     "id": "045-command-surface-release-layer",
-    "implementation": "pending",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-1-membership",
@@ -34,7 +52,7 @@
       }
     ],
     "sectionDigests": {
-      "045-the-command-surface-in-the-release-family-amends-031": "4df2a5cd2f1139015018276063040093b19c86369f0d0d690bd2a7056033abd3",
+      "045-the-command-surface-in-the-release-family-amends-031": "60ad545aae923c17a3111fa953d6c5577eef1b51ca21032debf025e22d0541d3",
       "1-purpose": "e51613373cad11d1d6b59afac13b846d346ae0704cf8d1e3242f4fb28d328cc3",
       "2-territory": "04be079fe1004445065fd3df22ffc30e4f5984132d1444aa930a80d03d1ced7f",
       "3-1-membership": "c53cc0541f4fe54aeb037abbaa092aa090c3df5251f54818df44d43f08f29024",
@@ -43,8 +61,8 @@
       "4-out-of-scope": "9a6267ccffbbb1f9949398dc28958e8bb96796f030c9be98b8965a8c5d722769",
       "5-observable-negative-cases": "40ede3961bc0459e815e77b82e22d81f38fc8a1172a8280a94cfddc6a4975e5c",
       "acceptance": "c40169dbcaa8fe2b979c655b4d5b6d60b2acb333b45389d47de10632ddfbaa63",
-      "implementation-record": "19f478cd359e647661799d81a8930a278d5c5a3ccd7c1c5932234dddcf9bcf72",
-      "verification": "e9d423c50246cd7eaa7fa5e24a23b8287bf30260d855bfae599114e508eb6f49"
+      "implementation-record": "e5d4457fe44db2e39b7039060031cac1e4b43a24aeffc2d64ac10071dfb9c2e3",
+      "verification": "52cd921f673c14ecf15e6ca930579b08a54d59d7117215f56069c624840a4c6d"
     },
     "sectionHeadings": [
       "045: The command surface in the release family (amends 031)",
@@ -64,6 +82,6 @@
     "summary": "A narrow amendment of approved spec 031 (itself amending spec 021). Spec 027 adds `rustev-surface`, the pure command renderer every host calls, and requires the CLI to call it instead of its own copy. The CLI is a published release member, so its new dependency must be published first, in a crate layer of its own: 031 3.1's layer table has no slot between `rustev-eval` and the CLI. This spec adds `rustev-surface` to the release family, states the crate layers as the topological levels the release policy already computes from `cargo metadata`, admits a crate that a release member depends on once the crate exists and passes its checks, and keeps the release-set test's member list as the deliberate, reviewed record of membership. Ratified by the owner on 2026-10-20 (A-42).\n",
     "title": "The command surface in the release family (amends 031)"
   },
-  "shardHash": "36859bcc8690db57256bbed3ca0de43d353ff656b0271bd7f3252016ee686c45",
+  "shardHash": "cf3ff312a846472c66bffd0437f00d3db6875ec9c4ad0d466c6ce99f20789835",
   "specVersion": "1.10.0"
 }
