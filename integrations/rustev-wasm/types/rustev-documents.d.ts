@@ -607,6 +607,9 @@ export namespace RustevDefinition1 {
           questions: string[];
         };
       };
+  export type ScreeningItemId = "none" | ScreeningItemField;
+  export type OnBlock = "refuse" | "drop_field" | "drop_text" | "drop_item";
+  export type OnUnavailable = "fail_closed" | "skip_generation" | "fail_open";
   export type StepBody =
     | {
         exact: ExactDecl;
@@ -694,6 +697,10 @@ export namespace RustevDefinition1 {
     package: string;
     policy: PolicyDecl;
     schema: "rustev.definition/1";
+    /**
+     * Optional screening contract (spec 035); omitted when unused.
+     */
+    screening?: Screening;
     steps: StepDecl[];
     /**
      * `MAJOR.MINOR.PATCH`, each without leading zeros.
@@ -890,6 +897,36 @@ export namespace RustevDefinition1 {
   export interface ParamDecl {
     name: string;
     value: ParamSource;
+  }
+  /**
+   * The canonical definition screening block.
+   */
+  export interface Screening {
+    /**
+     * @minItems 1
+     * @maxItems 32
+     */
+    entries: [ScreeningEntry, ...ScreeningEntry[]];
+    max_text_units: number;
+  }
+  /**
+   * An authored entry. Every member is required, including explicit policies.
+   */
+  export interface ScreeningEntry {
+    address: Address;
+    /**
+     * @minItems 1
+     * @maxItems 32
+     */
+    fields: [string, ...string[]];
+    id: string;
+    item_id: ScreeningItemId;
+    on_block: OnBlock;
+    on_unavailable: OnUnavailable;
+    screener: string;
+  }
+  export interface ScreeningItemField {
+    field: string;
   }
   /**
    * One step of the plan graph.
@@ -1448,6 +1485,9 @@ export namespace RustevDefinition2 {
           questions: string[];
         };
       };
+  export type ScreeningItemId = "none" | ScreeningItemField;
+  export type OnBlock = "refuse" | "drop_field" | "drop_text" | "drop_item";
+  export type OnUnavailable = "fail_closed" | "skip_generation" | "fail_open";
   export type StepBody =
     | {
         exact: ExactDecl;
@@ -1535,6 +1575,10 @@ export namespace RustevDefinition2 {
     package: string;
     policy: PolicyDecl;
     schema: "rustev.definition/2";
+    /**
+     * Optional screening contract (spec 035); omitted when unused.
+     */
+    screening?: Screening;
     steps: StepDecl[];
     /**
      * `MAJOR.MINOR.PATCH`, each without leading zeros.
@@ -1731,6 +1775,36 @@ export namespace RustevDefinition2 {
   export interface ParamDecl {
     name: string;
     value: ParamSource;
+  }
+  /**
+   * The canonical definition screening block.
+   */
+  export interface Screening {
+    /**
+     * @minItems 1
+     * @maxItems 32
+     */
+    entries: [ScreeningEntry, ...ScreeningEntry[]];
+    max_text_units: number;
+  }
+  /**
+   * An authored entry. Every member is required, including explicit policies.
+   */
+  export interface ScreeningEntry {
+    address: Address;
+    /**
+     * @minItems 1
+     * @maxItems 32
+     */
+    fields: [string, ...string[]];
+    id: string;
+    item_id: ScreeningItemId;
+    on_block: OnBlock;
+    on_unavailable: OnUnavailable;
+    screener: string;
+  }
+  export interface ScreeningItemField {
+    field: string;
   }
   /**
    * One step of the plan graph.
@@ -6137,6 +6211,9 @@ export namespace RustevPlan2 {
           questions: string[];
         };
       };
+  export type ScreeningItemId = "none" | ScreeningItemField;
+  export type OnBlock = "refuse" | "drop_field" | "drop_text" | "drop_item";
+  export type OnUnavailable = "fail_closed" | "skip_generation" | "fail_open";
   export type StepBody =
     | {
         exact: ExactDecl;
@@ -6461,6 +6538,10 @@ export namespace RustevPlan2 {
     package: string;
     policy: PolicyDecl;
     schema: string;
+    /**
+     * Optional screening contract (spec 035); omitted when unused.
+     */
+    screening?: Screening;
     steps: StepDecl[];
     /**
      * `MAJOR.MINOR.PATCH`, each without leading zeros.
@@ -6657,6 +6738,36 @@ export namespace RustevPlan2 {
   export interface ParamDecl {
     name: string;
     value: ParamSource;
+  }
+  /**
+   * The canonical definition screening block.
+   */
+  export interface Screening {
+    /**
+     * @minItems 1
+     * @maxItems 32
+     */
+    entries: [ScreeningEntry, ...ScreeningEntry[]];
+    max_text_units: number;
+  }
+  /**
+   * An authored entry. Every member is required, including explicit policies.
+   */
+  export interface ScreeningEntry {
+    address: Address;
+    /**
+     * @minItems 1
+     * @maxItems 32
+     */
+    fields: [string, ...string[]];
+    id: string;
+    item_id: ScreeningItemId;
+    on_block: OnBlock;
+    on_unavailable: OnUnavailable;
+    screener: string;
+  }
+  export interface ScreeningItemField {
+    field: string;
   }
   /**
    * One step of the plan graph.
@@ -7467,6 +7578,9 @@ export namespace RustevPlan3 {
           questions: string[];
         };
       };
+  export type ScreeningItemId = "none" | ScreeningItemField;
+  export type OnBlock = "refuse" | "drop_field" | "drop_text" | "drop_item";
+  export type OnUnavailable = "fail_closed" | "skip_generation" | "fail_open";
   export type StepBody =
     | {
         exact: ExactDecl;
@@ -7758,6 +7872,10 @@ export namespace RustevPlan3 {
     registry: string;
     schema: "rustev.plan/3";
     /**
+     * Optional screening contract (spec 035); omitted when unused.
+     */
+    screening?: PlanScreening;
+    /**
      * Plan 3: every bound source, in name order (spec 032, 3.3.4).
      */
     sources?: BoundSource[] | null;
@@ -7812,6 +7930,10 @@ export namespace RustevPlan3 {
     package: string;
     policy: PolicyDecl;
     schema: string;
+    /**
+     * Optional screening contract (spec 035); omitted when unused.
+     */
+    screening?: Screening;
     steps: StepDecl[];
     /**
      * `MAJOR.MINOR.PATCH`, each without leading zeros.
@@ -8008,6 +8130,36 @@ export namespace RustevPlan3 {
   export interface ParamDecl {
     name: string;
     value: ParamSource;
+  }
+  /**
+   * The canonical definition screening block.
+   */
+  export interface Screening {
+    /**
+     * @minItems 1
+     * @maxItems 32
+     */
+    entries: [ScreeningEntry, ...ScreeningEntry[]];
+    max_text_units: number;
+  }
+  /**
+   * An authored entry. Every member is required, including explicit policies.
+   */
+  export interface ScreeningEntry {
+    address: Address;
+    /**
+     * @minItems 1
+     * @maxItems 32
+     */
+    fields: [string, ...string[]];
+    id: string;
+    item_id: ScreeningItemId;
+    on_block: OnBlock;
+    on_unavailable: OnUnavailable;
+    screener: string;
+  }
+  export interface ScreeningItemField {
+    field: string;
   }
   /**
    * One step of the plan graph.
@@ -8287,6 +8439,28 @@ export namespace RustevPlan3 {
     override: Override;
     remediation: Remediation;
     transient: boolean;
+  }
+  /**
+   * Plan 3 retains the canonical block and each lowered step's binding.
+   */
+  export interface PlanScreening {
+    screening: Screening;
+    /**
+     * @minItems 1
+     */
+    steps: [ScreeningStep, ...ScreeningStep[]];
+  }
+  export interface ScreeningStep {
+    binding: ScreenerBinding;
+    consequence: OnBlock;
+    entry: string;
+    field: string;
+    step: string;
+  }
+  export interface ScreenerBinding {
+    artifact: ArtifactId;
+    backend_id: string;
+    descriptor: DescriptorId;
   }
   /**
    * A source descriptor bound at compile time.

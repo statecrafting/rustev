@@ -758,6 +758,14 @@ pub(crate) fn compile_instantiated(
         }
     }
 
+    // Screening is a definition 2 construct (spec 035, section 2).
+    if !v2 && def.screening.is_some() {
+        return refuse(
+            C::InvalidDefinition,
+            "screening",
+            "requires-definition-2: screening needs rustev.definition/2",
+        );
+    }
     // (b) Structure. Authored screening verdicts are reserved (spec 035, 3.3.2).
     for s in &def.steps {
         if let StepBody::Semantic(d) = &s.body
@@ -1750,6 +1758,7 @@ pub(crate) fn compile_instantiated(
         grades: (!grade_table.is_empty()).then_some(grade_table),
         actionability,
         instantiation: None,
+        screening: None,
     };
     let id = plan.id().map_err(|e| Refusal {
         category: C::Parse,

@@ -152,3 +152,22 @@ fn a_version_2_definition_passes_the_version_gate() {
     );
     assert!(!detail.starts_with("requires-definition-2"), "{detail}");
 }
+
+#[test]
+fn screening_requires_definition_2_at_structure() {
+    let mut def = support_routing();
+    def.screening = Some(
+        serde_json::from_value(serde_json::json!({
+            "max_text_units": 600,
+            "entries": [{"id":"caller_text", "fields":["input:request.text"],
+                "item_id":"none", "screener":"input-screen", "on_block":"refuse",
+                "address":"computed", "on_unavailable":"fail_closed"}]
+        }))
+        .unwrap(),
+    );
+    requires_v2(&def, "screening");
+    // Removing the new member preserves the existing compilation path.
+    def.screening = None;
+    let compiled = compile(&def, &descriptors(), &[topic_calibration("1.5")]).unwrap();
+    assert!(compiled.plan.screening.is_none());
+}
