@@ -1086,6 +1086,7 @@ impl<'c> Evaluation<'c> {
         };
         let tol = self.compiled.plan.definition.limits.distribution_tolerance;
         let offered = match raw {
+            RawOutput::Screen { .. } => OutputKind::Screen,
             RawOutput::Label(_) => OutputKind::Label,
             RawOutput::Distribution(_) => OutputKind::Distribution,
             RawOutput::Logits(_) => OutputKind::Logits,
