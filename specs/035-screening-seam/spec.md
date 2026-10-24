@@ -2,7 +2,7 @@
 id: "035-screening-seam"
 title: "Untrusted-text screening seam (amends 002, 003 and 009)"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-10-17"
 summary: >
   An amendment of approved specs 002, 003 and 009, for #76 child B7 (#65).
@@ -30,7 +30,7 @@ summary: >
   `rustev.plan/3`, `rustev.evidence/2`, `rustev.judgment/2`,
   `rustev.run/3`); definitions, descriptors and plans that use no #76
   construct keep byte-identical identities. Approved (A-32);
-  implementation is in progress.
+  implementation is complete.
 amends:
   - "002-decision-contract-and-pure-core"
   - "003-runtime-execution-and-evidence"
@@ -67,6 +67,7 @@ extends:
   - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
   # Adds 035 to `make verify` when the implementation is complete.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "002-decision-contract-and-pure-core"
@@ -797,7 +798,27 @@ exhaustive matches; quality claims (R-04, R-37).
 
 ## Verification
 
-Pending with implementation. Approval satisfies no acceptance item.
+Declared for `spec-spine verify 035`; 035 is in `make verify` and in CI's
+`integrations-core` acceptance group.
+
+```verify:cli
+# 3.2 to 3.4, 3.13, 3.18: the contract vocabulary and unchanged bytes.
+cargo test -p rustev-contract --locked --test screening_wire
+# 3.5: lowering, compile checks, categories 18 and 19, budgets.
+cargo test -p rustev-core --locked --test screening_compile
+# 3.6 to 3.9, 3.13.1: verdicts, consequences, refusals, marker, evidence.
+cargo test -p rustev-core --locked --test screening_eval
+# 3.7.3, 3.10 to 3.12, 3.13.2: isolation, withdrawal, units, cache.
+cargo test -p rustev-runtime --locked --test screening
+# 3.15: remote client and server isolation over loopback.
+cargo test -p rustev-remote-http --locked --test screening
+# 3.14: metrics, no text or digest in any attribute.
+cargo test -p rustev-otel --locked
+# Golden refusals 18 and 19 through the binary.
+cargo test -p rustev-cli --locked --test screening
+# The Acceptance's seven seeds, each detected.
+sh crates/rustev-eval/mutation/seeds.sh "spec 035"
+```
 
 ## Implementation record
 
@@ -966,6 +987,42 @@ characters) are registered under `spec 035` in
 of increments 2 to 5 (7 of 7, run with the `spec 035` filter). `spec 035`
 joins the harness's `OWN_RUNS`, so spec 004's unfiltered run leaves these
 seeds to 035's own verification instead of running them twice.
+
+**Closure (2026-10-24).** Declared verification added (section
+Verification); 035 joins `VERIFIED_SPECS` and the `integrations-core`
+acceptance group. Acceptance, item by item:
+
+- Blocked caller text refuses with a caller-addressed `refused` outcome,
+  and blocked third-party text is withheld by the marker
+  (`screening_eval.rs`). The generation backstop is B5's acceptance and
+  applies when B5 lands.
+- A `per_item` screener receives one text per call under spec 017
+  batching, spec 020 batch dispatch (`rustev-runtime/tests/screening.rs`)
+  and spec 009 shared-state terms (`rustev-remote-http/tests/screening.rs`).
+- An outage under `fail_closed` puts no unscreened text in any projection
+  (`screening_eval.rs`, asserted against every pending projection).
+- `invalid_screening` and `unscreened_text` refusals with golden fixtures
+  (`screening_compile.rs`, `rustev-cli/tests/screening.rs`).
+- Lowering goldens for the plan, step order, bindings and projection bytes
+  of a three-entry definition (`screening_compile.rs`).
+- Evidence and run record goldens and assertions for each verdict,
+  consequence and `on_unavailable`, empty text, cache hit and withdrawal,
+  with a canary text absent everywhere (`screening_eval.rs`,
+  `rustev-runtime/tests/screening.rs`).
+- Remote client and server isolation over loopback
+  (`rustev-remote-http/tests/screening.rs`).
+- Every row of section 5 has a test, except its last row, which owner
+  decision A-49 moved to the Bedrock admission of 3.16 (made after spec
+  030 completes, not part of this spec's core increment).
+- Compatibility: every existing golden and both reference `PlanId`s are
+  byte-identical (`screening_wire.rs` and the compile tests); the three
+  OpenTelemetry trace goldens record the new redaction policy identity
+  that increment 1 part 3's classes produce, and nothing else in them
+  changes.
+- The seven mutation seeds are each detected (`seeds.sh "spec 035"`).
+- `make code`, declared verification and `make gate` pass.
+
+Every acceptance item holds, so `implementation` is `complete`.
 
 ## Facts relied on
 

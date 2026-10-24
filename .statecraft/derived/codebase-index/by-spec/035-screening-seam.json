@@ -75,6 +75,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "scripts/acceptance/",
+        "source": "spec-edge"
+      },
+      {
         "path": "tools/rustev-conformance/",
         "source": "spec-edge"
       },
@@ -256,6 +260,19 @@
       {
         "locations": [
           {
+            "file": "scripts/acceptance/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "scripts/acceptance/"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "tools/rustev-conformance/"
           }
         ],
@@ -323,5 +340,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "82769aee67e09b25d1efcb0f129e85cdba3b83423d8d626ed26c2e2bacab0ba4"
+  "shardHash": "f1011280a16176153d59b9c7a5244a283917687d8b1fa81949a85009dab37097"
 }
