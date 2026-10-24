@@ -42,8 +42,14 @@
 # - `sbom`: a CycloneDX 1.5 SBOM per archive and tarball (3.9.1).
 # - `audit`: the tarballs' npm dependency closure is the family alone, and
 #   `cargo deny` passes for the crates compiled into them (3.9.2).
+# - `bind`: given the signed release manifest (the `manifest` input, whose
+#   SHA-256 the signed tag's message names), every artifact this run built
+#   must equal the manifest's bytes (031 3.9.3, 3.11.2): the tag build
+#   reproduces what the owner signed.
 # - `npm`: the gated publication, in the release set's npm order, only
-#   after every check above.
+#   after every check above, the binding to the signed manifest, and every
+#   crate of the manifest observed public with its checksum (3.1: layer 6
+#   starts after the crate layers).
 name: release
 
 on:
@@ -64,6 +70,11 @@ on:
         required: false
         type: boolean
         default: false
+      manifest:
+        description: "The signed release manifest's exact bytes (rustev.release-manifest/2); required to publish"
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -98,6 +109,19 @@ jobs:
         # Dispatched on the tag itself, so this workflow and the bindings
         # workflow it calls are the tag's own files.
         run: sh tools/rustev-release/artifacts.sh dispatch "$REHEARSAL" "$PUBLISH_NPM" "$TAG" >> "$GITHUB_OUTPUT"
+      - name: The manifest is the one the signed tag names (031 3.11.2)
+        if: ${{ !inputs.rehearsal && (inputs.publish-npm || inputs.manifest != '') }}
+        env:
+          TAG: ${{ inputs.tag }}
+          MANIFEST: ${{ inputs.manifest }}
+        run: |
+          set -eu
+          test -n "$MANIFEST" || { echo "031 3.11.2: publishing needs the signed release manifest (input manifest)" >&2; exit 1; }
+          printf %s "$MANIFEST" > "$RUNNER_TEMP/release-manifest.json"
+          got=$(sha256sum "$RUNNER_TEMP/release-manifest.json" | cut -d' ' -f1)
+          want=$(git tag -l --format='%(contents)' "$TAG" | sed -n 's/^release-manifest-sha256: //p')
+          test -n "$want" || { echo "021 3.8: the tag message names no release-manifest-sha256" >&2; exit 1; }
+          test "$got" = "$want" || { echo "031 3.11.2: the manifest's SHA-256 $got is not the tag's $want" >&2; exit 1; }
 
   bindings:
     name: bindings
@@ -397,9 +421,39 @@ jobs:
           cargo install cargo-deny --locked --version 0.20.2
           sh tools/rustev-release/artifacts.sh audit dist/npm
 
+  bind:
+    name: bind
+    needs: [tag, archive, pack, sbom]
+    if: ${{ !inputs.rehearsal && inputs.manifest != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.tag.outputs.commit }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: cli
+          path: dist/artifacts/cli
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: npm
+          path: dist/artifacts/npm
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: sbom
+          path: dist/artifacts/sbom
+      - name: Every artifact equals the signed manifest's bytes (031 3.9.3, 3.11.2)
+        env:
+          MANIFEST: ${{ inputs.manifest }}
+        run: |
+          set -eu
+          printf %s "$MANIFEST" > "$RUNNER_TEMP/release-manifest.json"
+          cargo run --quiet --locked -p rustev-release -- verify-artifacts "$RUNNER_TEMP/release-manifest.json" dist/artifacts
+
   npm:
     name: npm publish
-    needs: [tag, pack, reproducibility, sbom, audit]
+    needs: [tag, pack, reproducibility, sbom, audit, bind]
     if: ${{ inputs.publish-npm && !inputs.rehearsal }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -434,6 +488,13 @@ jobs:
         with:
           name: npm
           path: dist/npm
+      - name: Every crate layer is public with its expected checksum (031 3.1)
+        env:
+          MANIFEST: ${{ inputs.manifest }}
+        run: |
+          set -eu
+          printf %s "$MANIFEST" > "$RUNNER_TEMP/release-manifest.json"
+          cargo run --quiet --locked -p rustev-release -- observe-crates "$RUNNER_TEMP/release-manifest.json"
       - name: Publish with npm provenance, in the release set's order (031 3.9.6)
         env:
           VERSION: ${{ needs.tag.outputs.version }}
