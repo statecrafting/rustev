@@ -207,6 +207,7 @@ pub fn document_schemas() -> Vec<EmittedSchema> {
         trace::{TRACE, TraceLine},
     };
     let mut out = vec![
+        emit::<crate::explanation::Explanation>(schema::EXPLANATION, None),
         emit::<crate::profile::Profile>(schema::PROFILE, None),
         emit::<crate::plan_diff::PlanDiff>(schema::PLAN_DIFF, None),
         emit::<Definition>(schema::DEFINITION, None),

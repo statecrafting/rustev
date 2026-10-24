@@ -1,0 +1,54 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "bundle": "escalated.bundle.json"
+      },
+      "options": {
+        "nowMs": 1800000000001,
+        "scope": {
+          "context_revision": "rev-1",
+          "mode": "principal",
+          "principal_scope": "scope-p",
+          "tenant": "tenant-a"
+        }
+      },
+      "query": {
+        "why_selected": {
+          "item": "c-1"
+        }
+      }
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.escalated-bundle-why-selected",
+  "inputs": [
+    {
+      "name": "escalated.bundle.json",
+      "path": "crates/rustev-cli/tests/golden/explain/escalated.bundle.json",
+      "sha256": "dec62909ca87e09ebea270fb7c57970ae60405c108a7abcf65d53e3efe7bbf3f"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/escalated-bundle-why-selected.explanation.json",
+      "normalize": [],
+      "sha256": "8c28cb9863325ac8f3973068f8545976ea8ec4aca8b8119c217275a847877445"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/escalated-bundle-why-selected.explanation.md",
+      "normalize": [],
+      "sha256": "abb2806d4783b8d5340038990e8bdad21998ae783e59ed199a22489734d974f1"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

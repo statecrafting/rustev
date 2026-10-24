@@ -1,0 +1,52 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "plan": "lodging.plan.json",
+        "record": "lodging.record.json"
+      },
+      "options": {},
+      "query": {
+        "why_excluded": {
+          "item": "c-excluded"
+        }
+      }
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.lodging-plan-why-excluded",
+  "inputs": [
+    {
+      "name": "lodging.plan.json",
+      "path": "crates/rustev-cli/tests/golden/explain/lodging.plan.json",
+      "sha256": "5dbcd61c59fe7c8a9c5d1e6fac1a8430f33d98bffaf22090f2a86b05fcf44ae2"
+    },
+    {
+      "name": "lodging.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/lodging.record.json",
+      "sha256": "87660f1cdb3af42b740b03359a38cac80edee25a2635409f545fc54a5cfb007b"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/lodging-plan-why-excluded.explanation.json",
+      "normalize": [],
+      "sha256": "d7836729e53dec215116f563819e30c691f12eb1b1b3a53123fd424f136098a7"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/lodging-plan-why-excluded.explanation.md",
+      "normalize": [],
+      "sha256": "bad642d67011f14caab6928e3647e17d50428a974da43c12c39d24bcda639d10"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

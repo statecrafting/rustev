@@ -1,0 +1,42 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "record": "unresolved.record.json"
+      },
+      "options": {},
+      "query": "models"
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.unresolved-record-models",
+  "inputs": [
+    {
+      "name": "unresolved.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/unresolved.record.json",
+      "sha256": "c66e3d7235cfaf4b5f3b7a9b8d42c0943055ed21ec8718dc8a6bac88449ea52d"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/unresolved-record-models.explanation.json",
+      "normalize": [],
+      "sha256": "e1711186a8b7f6a21ef6f9316ca62a42db7eed7e5c4ba6ed213fda55d3c79625"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/unresolved-record-models.explanation.md",
+      "normalize": [],
+      "sha256": "12c3b7377c6430ad852ec569a9e934556a942cf6511ebfd7d68508eed63fe5ee"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

@@ -128,6 +128,7 @@ export interface CommandResult {
 }
 
 export declare class Engine {
+  explain(evidence: ExplainEvidence, query: ExplainQuery, options?: ExplainOptions): Promise<ExplainResult>;
   static create(options: EngineOptions): Promise<Engine>;
   /** Compile a definition, or load a compiled `plan`, and prepare it:
    * exactly one of the two, or `InvalidDocument`. */
@@ -252,3 +253,18 @@ export interface EngineGauges {
   seams: { name: string; queueDepth: number; refusedFull: number; lateResolutionsDiscarded: number }[];
   telemetry?: TelemetryGauges;
 }
+
+/** Retained bytes, parsed by the shared explanation surface. */
+export type ExplainEvidence = { record: Uint8Array; plan?: Uint8Array } | { bundle: Uint8Array };
+export type ExplainQuery = { why_selected: { item: string } } | { why_excluded: { item: string } }
+  | { why_order: { a: string; b: string } } | 'why_outcome' | 'text_origin' | 'models'
+  | { diff: { other: ExplainEvidence } };
+export interface ExplainOptions {
+  nowMs?: number;
+  scope?: { mode: 'principal'; tenant: string; context_revision: string; principal_scope: string }
+    | { mode: 'tenant_only'; tenant: string; context_revision: string };
+  resolve?: (reference: string, maxBytes: number) => Uint8Array | null;
+  redaction?: Uint8Array;
+}
+export interface ExplainResult { explanation: Uint8Array; markdown: string }
+export declare class InvalidInput extends RustevError {}

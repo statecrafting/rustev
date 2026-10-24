@@ -1,0 +1,50 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "bundle": "escalated.bundle.json"
+      },
+      "options": {
+        "nowMs": 1800000000001,
+        "scope": {
+          "context_revision": "rev-1",
+          "mode": "principal",
+          "principal_scope": "scope-p",
+          "tenant": "tenant-a"
+        }
+      },
+      "query": "text_origin"
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.escalated-bundle-text-origin",
+  "inputs": [
+    {
+      "name": "escalated.bundle.json",
+      "path": "crates/rustev-cli/tests/golden/explain/escalated.bundle.json",
+      "sha256": "dec62909ca87e09ebea270fb7c57970ae60405c108a7abcf65d53e3efe7bbf3f"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/escalated-bundle-text-origin.explanation.json",
+      "normalize": [],
+      "sha256": "1d854fe15673bfeba673c58816ddec98a7564fefb8a15b0096c0005162e16480"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/escalated-bundle-text-origin.explanation.md",
+      "normalize": [],
+      "sha256": "92b3fd28dbba3d7fd267ff9e23437ff9f86d58b1d7c7cf67c030de5683db2f11"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

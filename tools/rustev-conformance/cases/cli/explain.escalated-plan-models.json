@@ -1,0 +1,48 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "plan": "escalated.plan.json",
+        "record": "escalated.record.json"
+      },
+      "options": {},
+      "query": "models"
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.escalated-plan-models",
+  "inputs": [
+    {
+      "name": "escalated.plan.json",
+      "path": "crates/rustev-cli/tests/golden/explain/escalated.plan.json",
+      "sha256": "b34b1c7bd242f7390be07dcef2b412587e2fb732266f71f11f472277e426e651"
+    },
+    {
+      "name": "escalated.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/escalated.record.json",
+      "sha256": "46cad42bad608ec21b51beb3dfc764b14a035926d1a027673f7c81436ed9f620"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/escalated-plan-models.explanation.json",
+      "normalize": [],
+      "sha256": "6b961eac641598b12086b250a12ac21c1d34a6a6e0dad2ebd1522f3135390381"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/escalated-plan-models.explanation.md",
+      "normalize": [],
+      "sha256": "169381d4eb5f4a4d59e1265931b843710d0491816bf2d6ce3503832c02af8d64"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

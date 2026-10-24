@@ -1,0 +1,56 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "bundle": "escalated.bundle.json"
+      },
+      "options": {
+        "nowMs": 1800000000001,
+        "scope": {
+          "context_revision": "rev-1",
+          "mode": "principal",
+          "principal_scope": "scope-p",
+          "tenant": "tenant-a"
+        }
+      },
+      "query": {
+        "diff": {
+          "other": {
+            "bundle": "escalated.bundle.json"
+          }
+        }
+      }
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.escalated-bundle-diff",
+  "inputs": [
+    {
+      "name": "escalated.bundle.json",
+      "path": "crates/rustev-cli/tests/golden/explain/escalated.bundle.json",
+      "sha256": "dec62909ca87e09ebea270fb7c57970ae60405c108a7abcf65d53e3efe7bbf3f"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/escalated-bundle-diff.explanation.json",
+      "normalize": [],
+      "sha256": "2cb84ab7daba76be1e3188403da22dbe90a0453a0859ead2fc3e6c22a59df221"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/escalated-bundle-diff.explanation.md",
+      "normalize": [],
+      "sha256": "2b9a2b82ed214df02869d364210fc7b9f10055bb0deb619e27430eb5e134a290"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

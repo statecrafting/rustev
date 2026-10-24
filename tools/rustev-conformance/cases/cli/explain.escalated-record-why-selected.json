@@ -1,0 +1,46 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "record": "escalated.record.json"
+      },
+      "options": {},
+      "query": {
+        "why_selected": {
+          "item": "c-1"
+        }
+      }
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.escalated-record-why-selected",
+  "inputs": [
+    {
+      "name": "escalated.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/escalated.record.json",
+      "sha256": "46cad42bad608ec21b51beb3dfc764b14a035926d1a027673f7c81436ed9f620"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/escalated-record-why-selected.explanation.json",
+      "normalize": [],
+      "sha256": "8e32602c3886e34b683c5aa2454d7fa83132d14029747fc25e39776978ea04d0"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/escalated-record-why-selected.explanation.md",
+      "normalize": [],
+      "sha256": "1ac3b765729024301b2c2b8f5e8173ba35511159aa66cd157dc94f77f538bbc3"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "record": "unresolved.record.json"
+      },
+      "options": {},
+      "query": "why_outcome"
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.unresolved-record-why-outcome",
+  "inputs": [
+    {
+      "name": "unresolved.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/unresolved.record.json",
+      "sha256": "c66e3d7235cfaf4b5f3b7a9b8d42c0943055ed21ec8718dc8a6bac88449ea52d"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/unresolved-record-why-outcome.explanation.json",
+      "normalize": [],
+      "sha256": "6f66e202a1e50399c1f6edc9219b123cc05e97d7e4b1e734b228798e996f9916"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/unresolved-record-why-outcome.explanation.md",
+      "normalize": [],
+      "sha256": "9b40f057322ba1e2f18eefd55b9db40358add6881a272c9009b3b721b3fca089"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

@@ -15,16 +15,16 @@
   "sideEffects": false,
   "exports": {
     "./web": {
-      "types": "./web/rustev_wasm.d.ts",
-      "import": "./web/rustev_wasm.js"
+      "types": "./web/index.d.ts",
+      "import": "./web/index.js"
     },
     "./bundler": {
-      "types": "./bundler/rustev_wasm.d.ts",
-      "import": "./bundler/rustev_wasm.js"
+      "types": "./bundler/index.d.ts",
+      "import": "./bundler/index.js"
     },
     "./node": {
-      "types": "./node/rustev_wasm.d.ts",
-      "require": "./node/rustev_wasm.js"
+      "types": "./node/index.d.ts",
+      "require": "./node/index.js"
     },
     "./documents": {
       "types": "./types/rustev-documents.d.ts"

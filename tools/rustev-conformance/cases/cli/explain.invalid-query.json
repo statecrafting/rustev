@@ -1,0 +1,41 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "record": "support.record.json"
+      },
+      "options": {},
+      "query": {
+        "why_order": {
+          "a": "c-1",
+          "b": "c-1"
+        }
+      }
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": "invalid-query",
+    "resolve": false
+  },
+  "id": "explain.invalid-query",
+  "inputs": [
+    {
+      "name": "support.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/support.record.json",
+      "sha256": "1dc22cd447708b158c2bbdef366aa0d58c37e97daa677ede5045939c9f375236"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "error",
+      "golden": "tools/rustev-conformance/expected/explain/invalid-query.json",
+      "normalize": [],
+      "sha256": "f156f5bbe28879d2b671887bcea5a7c80e48c5d62166e2ff59f6b3e28d124fb5"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

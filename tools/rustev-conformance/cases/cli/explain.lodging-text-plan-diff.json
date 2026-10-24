@@ -1,0 +1,55 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "plan": "lodging-text.plan.json",
+        "record": "lodging-text.record.json"
+      },
+      "options": {},
+      "query": {
+        "diff": {
+          "other": {
+            "plan": "lodging-text.plan.json",
+            "record": "lodging-text.record.json"
+          }
+        }
+      }
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.lodging-text-plan-diff",
+  "inputs": [
+    {
+      "name": "lodging-text.plan.json",
+      "path": "crates/rustev-cli/tests/golden/explain/lodging-text.plan.json",
+      "sha256": "908084c3e87fd6a07d18dfe95d97884cac0f432eb11a07e3f710335785edf5f4"
+    },
+    {
+      "name": "lodging-text.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/lodging-text.record.json",
+      "sha256": "81400c168b538316913b73eb303c16590bfe32011b8a43cbc7e8f99a4e98be17"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/lodging-text-plan-diff.explanation.json",
+      "normalize": [],
+      "sha256": "450a94a2d51f540d82447e9eb5f4c19160e117fd87f4660e09f2d4e442f07c6f"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/lodging-text-plan-diff.explanation.md",
+      "normalize": [],
+      "sha256": "7b3a235ec3e90639475c426d0029b758c5497d711097c7e03721e9e44efb960c"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

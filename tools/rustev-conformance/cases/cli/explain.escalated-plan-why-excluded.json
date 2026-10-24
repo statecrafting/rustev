@@ -1,0 +1,52 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "plan": "escalated.plan.json",
+        "record": "escalated.record.json"
+      },
+      "options": {},
+      "query": {
+        "why_excluded": {
+          "item": "c-excluded"
+        }
+      }
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.escalated-plan-why-excluded",
+  "inputs": [
+    {
+      "name": "escalated.plan.json",
+      "path": "crates/rustev-cli/tests/golden/explain/escalated.plan.json",
+      "sha256": "b34b1c7bd242f7390be07dcef2b412587e2fb732266f71f11f472277e426e651"
+    },
+    {
+      "name": "escalated.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/escalated.record.json",
+      "sha256": "46cad42bad608ec21b51beb3dfc764b14a035926d1a027673f7c81436ed9f620"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/escalated-plan-why-excluded.explanation.json",
+      "normalize": [],
+      "sha256": "8e1345ce93bc3ce484f93607b62cc5f8627dc0c0f969b9df6db8dc5d732dfd03"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/escalated-plan-why-excluded.explanation.md",
+      "normalize": [],
+      "sha256": "62ab81b0a2d4737d824ccc6cc02e67dd12af46fa4265e83b9450bd9bef08db17"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

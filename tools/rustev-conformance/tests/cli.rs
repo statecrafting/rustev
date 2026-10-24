@@ -66,7 +66,10 @@ fn every_cli_case_produces_its_expected_bytes() {
         .cases
         .iter()
         .flat_map(|c| c.outputs.iter().map(|o| o.golden.as_str()))
-        .filter(|g| g.starts_with("crates/rustev-cli/tests/golden/") && g.ends_with(".json"))
+        .filter(|g| {
+            g.strip_prefix("crates/rustev-cli/tests/golden/")
+                .is_some_and(|name| !name.contains('/') && name.ends_with(".json"))
+        })
         .collect();
     assert_eq!(covered.len(), goldens, "every CLI golden is covered");
     // A `run` case pins two goldens, its printed output and the record it

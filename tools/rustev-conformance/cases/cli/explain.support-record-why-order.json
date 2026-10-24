@@ -1,0 +1,47 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "record": "support.record.json"
+      },
+      "options": {},
+      "query": {
+        "why_order": {
+          "a": "c-1",
+          "b": "c-2"
+        }
+      }
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.support-record-why-order",
+  "inputs": [
+    {
+      "name": "support.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/support.record.json",
+      "sha256": "1dc22cd447708b158c2bbdef366aa0d58c37e97daa677ede5045939c9f375236"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/support-record-why-order.explanation.json",
+      "normalize": [],
+      "sha256": "1146f38f91e76aac01a299024e177967394745f76c5c2756df3863897c6351bc"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/support-record-why-order.explanation.md",
+      "normalize": [],
+      "sha256": "4c0e40f48cb03a36e707704de9a18d080730a554b9908dc75a1476384eda0a33"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

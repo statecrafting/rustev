@@ -1,0 +1,54 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "bundle": "unresolved.bundle.json"
+      },
+      "options": {
+        "nowMs": 1800000000001,
+        "scope": {
+          "context_revision": "rev-1",
+          "mode": "principal",
+          "principal_scope": "scope-p",
+          "tenant": "tenant-a"
+        }
+      },
+      "query": {
+        "why_excluded": {
+          "item": "c-excluded"
+        }
+      }
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.unresolved-bundle-why-excluded",
+  "inputs": [
+    {
+      "name": "unresolved.bundle.json",
+      "path": "crates/rustev-cli/tests/golden/explain/unresolved.bundle.json",
+      "sha256": "93ec09c8ff0b2ff75a7e893bef6c543000a3f9bd823235a93f9f59163f5752a4"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/unresolved-bundle-why-excluded.explanation.json",
+      "normalize": [],
+      "sha256": "9107aafb3398b016ed6963ae52b6d81384d42f3d74b67fe6fb4dc3cae6308823"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/unresolved-bundle-why-excluded.explanation.md",
+      "normalize": [],
+      "sha256": "610676b33c44e80d1ed7fc2403f674023fd4ef7f52f970bcbe9e42270a96d33b"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

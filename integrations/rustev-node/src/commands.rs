@@ -7,7 +7,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use napi::Result;
-use napi::bindgen_prelude::Uint8Array;
+use napi::bindgen_prelude::{FnArgs, Uint8Array};
 use rustev_contract::scope::Scope;
 use rustev_contract::time::Timestamp;
 use rustev_core::seams::DecisionBackend;
@@ -215,5 +215,70 @@ pub fn run(name: &str, inputs: BTreeMap<String, Vec<u8>>, a: &Json) -> Result<Co
         code: u32::from(done.code),
         out: Uint8Array::new(done.out.bytes()),
         artifacts,
+    })
+}
+
+// napi registration is absent in lib tests; these private-module exports have
+// no Rust caller there. Keep the allowances limited to that configuration.
+/// A synchronous host resolver, called only while explaining retained bundles.
+#[cfg_attr(test, allow(dead_code))]
+type ResolveCallback<'a> =
+    napi::bindgen_prelude::Function<'a, FnArgs<(String, u32)>, Option<Uint8Array>>;
+#[cfg_attr(test, allow(dead_code))]
+struct ExplainResolver<'a>(ResolveCallback<'a>);
+impl Resolver for ExplainResolver<'_> {
+    fn resolve(&self, reference: &str, max_bytes: usize) -> Resolution {
+        // `maxBytes` is a hint to the host and saturates rather than wraps;
+        // the guard below compares the returned length with `max_bytes` as a
+        // `usize`, so the bound itself is never truncated.
+        let hint = u32::try_from(max_bytes).unwrap_or(u32::MAX);
+        match self.0.call((reference.into(), hint).into()) {
+            // Up to `max_bytes` plus one byte is passed on on purpose: the
+            // library classes an item past its budget as `oversized`, exactly
+            // as for the CLI's store, which reads one byte past the maximum
+            // (the WebAssembly resolver does the same); anything longer is
+            // inaccessible.
+            Ok(Some(bytes)) if bytes.len() <= max_bytes.saturating_add(1) => {
+                Resolution::Bytes(bytes.to_vec())
+            }
+            Ok(None) => Resolution::Missing,
+            _ => Resolution::Inaccessible,
+        }
+    }
+}
+
+#[cfg_attr(test, allow(dead_code))]
+#[napi_derive::napi(object)]
+pub struct ExplainResult {
+    pub explanation: Uint8Array,
+    pub markdown: String,
+}
+
+#[cfg_attr(test, allow(dead_code))]
+#[napi_derive::napi]
+pub fn explain(
+    inputs: HashMap<String, Uint8Array>,
+    args: Json,
+    resolve: Option<ResolveCallback<'_>>,
+) -> Result<ExplainResult> {
+    crate::errors::guard(|| {
+        let files = inputs.into_iter().map(|(k, v)| (k, v.to_vec())).collect();
+        let resolver = resolve.map(ExplainResolver);
+        let result = rustev_surface::explain::explain(
+            &files,
+            &args,
+            resolver.as_ref().map(|r| r as &dyn Resolver),
+        )
+        .map_err(|e| {
+            fail(
+                "InvalidInput",
+                e.code.as_str(),
+                serde_json::json!({"subject": e.subject, "detail": e.detail}),
+            )
+        })?;
+        Ok(ExplainResult {
+            explanation: Uint8Array::new(result.explanation),
+            markdown: result.markdown,
+        })
     })
 }

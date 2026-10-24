@@ -1,0 +1,42 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "plan": "lodging.plan.json",
+        "record": "support.record.json"
+      },
+      "options": {},
+      "query": "models"
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": "plan-mismatch",
+    "resolve": false
+  },
+  "id": "explain.plan-mismatch",
+  "inputs": [
+    {
+      "name": "lodging.plan.json",
+      "path": "crates/rustev-cli/tests/golden/explain/lodging.plan.json",
+      "sha256": "5dbcd61c59fe7c8a9c5d1e6fac1a8430f33d98bffaf22090f2a86b05fcf44ae2"
+    },
+    {
+      "name": "support.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/support.record.json",
+      "sha256": "1dc22cd447708b158c2bbdef366aa0d58c37e97daa677ede5045939c9f375236"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "error",
+      "golden": "tools/rustev-conformance/expected/explain/plan-mismatch.json",
+      "normalize": [],
+      "sha256": "b903c8592cd9207c27987d1648947ff8b1671cc7dde601a662fc86dcb59d2fba"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "plan": "unresolved.plan.json",
+        "record": "unresolved.record.json"
+      },
+      "options": {},
+      "query": "models"
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.unresolved-plan-models",
+  "inputs": [
+    {
+      "name": "unresolved.plan.json",
+      "path": "crates/rustev-cli/tests/golden/explain/unresolved.plan.json",
+      "sha256": "35b083ec6c0ece3694f3aaf17a76ae919ba7b13cd02c67b6dedf9b1219cfa323"
+    },
+    {
+      "name": "unresolved.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/unresolved.record.json",
+      "sha256": "c66e3d7235cfaf4b5f3b7a9b8d42c0943055ed21ec8718dc8a6bac88449ea52d"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/unresolved-plan-models.explanation.json",
+      "normalize": [],
+      "sha256": "1bb3322f1dd3ce48c060348f217ed646b626e28b0dc34a6226c73d6350e90c49"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/unresolved-plan-models.explanation.md",
+      "normalize": [],
+      "sha256": "95582e4711243576883bba0cdc69ec93b78756b5ef387aeaf8979a02c058d925"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

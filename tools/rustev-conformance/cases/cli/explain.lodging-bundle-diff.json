@@ -1,0 +1,56 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "bundle": "lodging.bundle.json"
+      },
+      "options": {
+        "nowMs": 1800000000001,
+        "scope": {
+          "context_revision": "rev-1",
+          "mode": "principal",
+          "principal_scope": "scope-p",
+          "tenant": "tenant-a"
+        }
+      },
+      "query": {
+        "diff": {
+          "other": {
+            "bundle": "lodging.bundle.json"
+          }
+        }
+      }
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.lodging-bundle-diff",
+  "inputs": [
+    {
+      "name": "lodging.bundle.json",
+      "path": "crates/rustev-cli/tests/golden/explain/lodging.bundle.json",
+      "sha256": "2c08f234176a4ad91e99da1aaaeaa466a8c534141d899e79384577d30b8af13e"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/lodging-bundle-diff.explanation.json",
+      "normalize": [],
+      "sha256": "8fa176f97e3d580cad90455e5cc5a109d9d3cfecf2dd34d989b2c6c4cd6323c9"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/lodging-bundle-diff.explanation.md",
+      "normalize": [],
+      "sha256": "bc194a7562ed3ff88a28ddd38796b122d6b5b6a2c86c7ac99f0ddb6504aa8f8e"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

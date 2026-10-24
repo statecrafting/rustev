@@ -45,6 +45,9 @@ pub struct Case {
     pub mirrors: Option<String>,
     #[serde(default)]
     pub runtime: Option<serde_json::Value>,
+    /// A retained explanation call, compared byte for byte.
+    #[serde(default)]
+    pub explain: Option<serde_json::Value>,
     /// For each rules program the case reads, the descriptor the CLI derives
     /// from it, for surfaces without a rules backend (WebAssembly).
     #[serde(default)]

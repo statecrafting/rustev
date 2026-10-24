@@ -1,0 +1,65 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "plan": "support.plan.json",
+        "record": "support.record.json"
+      },
+      "options": {},
+      "query": {
+        "diff": {
+          "other": {
+            "plan": "changed.plan.json",
+            "record": "changed.record.json"
+          }
+        }
+      }
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.input-changed",
+  "inputs": [
+    {
+      "name": "changed.plan.json",
+      "path": "crates/rustev-cli/tests/golden/explain/changed.plan.json",
+      "sha256": "b34b1c7bd242f7390be07dcef2b412587e2fb732266f71f11f472277e426e651"
+    },
+    {
+      "name": "changed.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/changed.record.json",
+      "sha256": "7c5f213feb5af47e2a4a8b5ece5f7dbc429c5f5f1fc0f5e64ef08b1ff597dd5c"
+    },
+    {
+      "name": "support.plan.json",
+      "path": "crates/rustev-cli/tests/golden/explain/support.plan.json",
+      "sha256": "b34b1c7bd242f7390be07dcef2b412587e2fb732266f71f11f472277e426e651"
+    },
+    {
+      "name": "support.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/support.record.json",
+      "sha256": "1dc22cd447708b158c2bbdef366aa0d58c37e97daa677ede5045939c9f375236"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/input-changed.explanation.json",
+      "normalize": [],
+      "sha256": "6fe7b35e87f4b9a515c1a294288d2cde89a4508dac12a671a57bdab3ada05735"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/input-changed.explanation.md",
+      "normalize": [],
+      "sha256": "fee4d7dd2ccc5d04713934b8bbd4932b7f2ff91a6705422c39616fb7f14a4e41"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}
