@@ -1,0 +1,47 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "record": "lodging-text.record.json"
+      },
+      "options": {},
+      "query": {
+        "why_order": {
+          "a": "c-1",
+          "b": "c-2"
+        }
+      }
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.lodging-text-record-why-order",
+  "inputs": [
+    {
+      "name": "lodging-text.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/lodging-text.record.json",
+      "sha256": "81400c168b538316913b73eb303c16590bfe32011b8a43cbc7e8f99a4e98be17"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/lodging-text-record-why-order.explanation.json",
+      "normalize": [],
+      "sha256": "93d519dcd53d45bc953b21afc578ec4f63129d28e38c7bb5098a14903e30ffe8"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/lodging-text-record-why-order.explanation.md",
+      "normalize": [],
+      "sha256": "328db9e607a1cbd37293eb2262ad4e117c4157ff68e78d24040aa0d2099e2fca"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

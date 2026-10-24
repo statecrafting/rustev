@@ -1,0 +1,50 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "bundle": "unresolved.bundle.json"
+      },
+      "options": {
+        "nowMs": 1800000000001,
+        "scope": {
+          "context_revision": "rev-1",
+          "mode": "principal",
+          "principal_scope": "scope-p",
+          "tenant": "tenant-a"
+        }
+      },
+      "query": "models"
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.unresolved-bundle-models",
+  "inputs": [
+    {
+      "name": "unresolved.bundle.json",
+      "path": "crates/rustev-cli/tests/golden/explain/unresolved.bundle.json",
+      "sha256": "93ec09c8ff0b2ff75a7e893bef6c543000a3f9bd823235a93f9f59163f5752a4"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/unresolved-bundle-models.explanation.json",
+      "normalize": [],
+      "sha256": "71317df935ab5ab7fa8ad3fe1c2be0b0265ba9fcd33f199392beb5c875818e1b"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/unresolved-bundle-models.explanation.md",
+      "normalize": [],
+      "sha256": "dc2ffc99bfc072ea750829e5b9b85212f6af450d56b36f4794b17436df594c6b"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

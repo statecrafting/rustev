@@ -9,6 +9,9 @@
 //! them, and gets a [`CommandResult`]: the CLI's exit code, its output
 //! object's bytes, and the artifacts the command published, by name.
 
+mod explain;
+pub use explain::Engine;
+
 use std::collections::BTreeMap;
 
 use rustev_contract::Document;

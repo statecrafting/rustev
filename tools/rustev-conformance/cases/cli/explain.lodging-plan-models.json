@@ -1,0 +1,48 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "plan": "lodging.plan.json",
+        "record": "lodging.record.json"
+      },
+      "options": {},
+      "query": "models"
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.lodging-plan-models",
+  "inputs": [
+    {
+      "name": "lodging.plan.json",
+      "path": "crates/rustev-cli/tests/golden/explain/lodging.plan.json",
+      "sha256": "5dbcd61c59fe7c8a9c5d1e6fac1a8430f33d98bffaf22090f2a86b05fcf44ae2"
+    },
+    {
+      "name": "lodging.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/lodging.record.json",
+      "sha256": "87660f1cdb3af42b740b03359a38cac80edee25a2635409f545fc54a5cfb007b"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/lodging-plan-models.explanation.json",
+      "normalize": [],
+      "sha256": "df03750cb9efef2f9c7712825b53e79b34ed0bb7eeef5c0f00d29d15e5dd8778"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/lodging-plan-models.explanation.md",
+      "normalize": [],
+      "sha256": "220470f0d41f2f22b4e3e811c6e1ff8d8a47ba97c7fb7594d7b58efc80f83609"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

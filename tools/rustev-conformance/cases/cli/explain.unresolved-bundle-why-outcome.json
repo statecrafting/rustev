@@ -1,0 +1,50 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "bundle": "unresolved.bundle.json"
+      },
+      "options": {
+        "nowMs": 1800000000001,
+        "scope": {
+          "context_revision": "rev-1",
+          "mode": "principal",
+          "principal_scope": "scope-p",
+          "tenant": "tenant-a"
+        }
+      },
+      "query": "why_outcome"
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.unresolved-bundle-why-outcome",
+  "inputs": [
+    {
+      "name": "unresolved.bundle.json",
+      "path": "crates/rustev-cli/tests/golden/explain/unresolved.bundle.json",
+      "sha256": "93ec09c8ff0b2ff75a7e893bef6c543000a3f9bd823235a93f9f59163f5752a4"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/unresolved-bundle-why-outcome.explanation.json",
+      "normalize": [],
+      "sha256": "9f744d5ce1b48f983e058f214ad054f3ec9b82a2c50c998b77c438e91c9524e9"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/unresolved-bundle-why-outcome.explanation.md",
+      "normalize": [],
+      "sha256": "5602c74dcb1361fb68b2353c7fc9fe2f59ed9a423d67a44f7fda193129dc3854"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

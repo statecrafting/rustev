@@ -1,0 +1,48 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "plan": "escalated.plan.json",
+        "record": "escalated.record.json"
+      },
+      "options": {},
+      "query": "text_origin"
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.escalated-plan-text-origin",
+  "inputs": [
+    {
+      "name": "escalated.plan.json",
+      "path": "crates/rustev-cli/tests/golden/explain/escalated.plan.json",
+      "sha256": "b34b1c7bd242f7390be07dcef2b412587e2fb732266f71f11f472277e426e651"
+    },
+    {
+      "name": "escalated.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/escalated.record.json",
+      "sha256": "46cad42bad608ec21b51beb3dfc764b14a035926d1a027673f7c81436ed9f620"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/escalated-plan-text-origin.explanation.json",
+      "normalize": [],
+      "sha256": "1db2089b3d8924481730b54a1c2e0b4e2682ea06ad3bd3f3a2e0b6f02e95e758"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/escalated-plan-text-origin.explanation.md",
+      "normalize": [],
+      "sha256": "af7a1ad6025e1cf3979072630a8de13bb387943f90d99fa71514c4e90b3eaa64"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

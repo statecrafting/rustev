@@ -1,0 +1,46 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "record": "lodging-text.record.json"
+      },
+      "options": {},
+      "query": {
+        "why_excluded": {
+          "item": "c-excluded"
+        }
+      }
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.lodging-text-record-why-excluded",
+  "inputs": [
+    {
+      "name": "lodging-text.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/lodging-text.record.json",
+      "sha256": "81400c168b538316913b73eb303c16590bfe32011b8a43cbc7e8f99a4e98be17"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/lodging-text-record-why-excluded.explanation.json",
+      "normalize": [],
+      "sha256": "fb51eb13b30edfb0c5ad5205c2f23450419e46ba451609153fa89ad8627cfc82"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/lodging-text-record-why-excluded.explanation.md",
+      "normalize": [],
+      "sha256": "311d487c50a20bb5f50b06c4f22d66bc11025a80c95ab385bf76fc54d612f28b"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

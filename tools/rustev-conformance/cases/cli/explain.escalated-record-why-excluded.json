@@ -1,0 +1,46 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "record": "escalated.record.json"
+      },
+      "options": {},
+      "query": {
+        "why_excluded": {
+          "item": "c-excluded"
+        }
+      }
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.escalated-record-why-excluded",
+  "inputs": [
+    {
+      "name": "escalated.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/escalated.record.json",
+      "sha256": "46cad42bad608ec21b51beb3dfc764b14a035926d1a027673f7c81436ed9f620"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/escalated-record-why-excluded.explanation.json",
+      "normalize": [],
+      "sha256": "0d1ddfd8ca69037251f87e0ed69639eaed540f8eabfb42663a8bf71d17566d43"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/escalated-record-why-excluded.explanation.md",
+      "normalize": [],
+      "sha256": "62ab81b0a2d4737d824ccc6cc02e67dd12af46fa4265e83b9450bd9bef08db17"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "record": "support.record.json"
+      },
+      "options": {
+        "nowMs": 1800000000001
+      },
+      "query": {
+        "diff": {
+          "other": {
+            "bundle": "support.bundle.json"
+          }
+        }
+      }
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": "invalid-options",
+    "resolve": true
+  },
+  "id": "explain.bundle-b-missing-scope",
+  "inputs": [
+    {
+      "name": "support.bundle.json",
+      "path": "crates/rustev-cli/tests/golden/explain/support.bundle.json",
+      "sha256": "a343bedf8914fa19aad089069ac8edce83d80e217f827d360e913f8c9c2811ea"
+    },
+    {
+      "name": "support.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/support.record.json",
+      "sha256": "1dc22cd447708b158c2bbdef366aa0d58c37e97daa677ede5045939c9f375236"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "error",
+      "golden": "tools/rustev-conformance/expected/explain/bundle-b-missing-scope.json",
+      "normalize": [],
+      "sha256": "ea12da306258b9606ccc3232459995fc45f4b4674a955e3b6f91b16e1eb868d7"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

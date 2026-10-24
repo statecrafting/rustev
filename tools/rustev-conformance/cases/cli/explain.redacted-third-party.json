@@ -1,0 +1,60 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "plan": "lodging.plan.json",
+        "record": "lodging.record.json"
+      },
+      "options": {
+        "redaction": "third-party.policy.json"
+      },
+      "query": {
+        "why_order": {
+          "a": "c-1",
+          "b": "c-2"
+        }
+      }
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.redacted-third-party",
+  "inputs": [
+    {
+      "name": "lodging.plan.json",
+      "path": "crates/rustev-cli/tests/golden/explain/lodging.plan.json",
+      "sha256": "5dbcd61c59fe7c8a9c5d1e6fac1a8430f33d98bffaf22090f2a86b05fcf44ae2"
+    },
+    {
+      "name": "lodging.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/lodging.record.json",
+      "sha256": "87660f1cdb3af42b740b03359a38cac80edee25a2635409f545fc54a5cfb007b"
+    },
+    {
+      "name": "third-party.policy.json",
+      "path": "crates/rustev-cli/tests/golden/explain/third-party.policy.json",
+      "sha256": "966adc6d95869be5aad76ae5f9530c0c685a7b690a9c6cf37e714b82b0659058"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/redacted-third-party.explanation.json",
+      "normalize": [],
+      "sha256": "e3ff7b9d21baa09bc83668a85b011cdb08658ca847d55b21c07be39c4121b34c"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/redacted-third-party.explanation.md",
+      "normalize": [],
+      "sha256": "60b1674973656e268f371078776ba602cc0cd04fd118b03b7f5113f67f4502e0"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

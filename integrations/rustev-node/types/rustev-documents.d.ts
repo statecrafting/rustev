@@ -4295,6 +4295,455 @@ export namespace RustevExecution1 {
 }
 export type RustevExecution1 = RustevExecution1.RustevExecution1;
 
+export namespace RustevExplanation1 {
+  export type Answer =
+    SelectedAnswer | ExcludedAnswer | OrderAnswer | OutcomeAnswer | TextAnswer | ModelsAnswer | DiffAnswer;
+  export type SelectedAnswer =
+    | {
+        kind: "not_available";
+        outcome: string;
+      }
+    | {
+        kind: "no_proposal";
+        outcome: string;
+      }
+    | {
+        kind: "not_selected";
+        see: SeeExcluded;
+      }
+    | {
+        adjustments: string;
+        facets: string[];
+        judgment_derivation: string;
+        judgment_lineage: string;
+        kind: "selected";
+        proposing_rule: string;
+        scopes: SelectedScope[];
+      };
+  export type SeeExcluded = "why_excluded";
+  export type ValueKind = "filtered" | "shortlist" | "ranking";
+  export type ExcludedAnswer =
+    | {
+        kind: "not_available";
+        outcome: string;
+      }
+    | {
+        kind: "no_proposal";
+        outcome: string;
+      }
+    | {
+        cuts: Cut[];
+        facets: string[];
+        kind: "excluded";
+        scopes: ExcludedScope[];
+        selected_in: string[];
+      }
+    | {
+        cuts: Cut[];
+        facets: string[];
+        kind: "cut";
+        selected_in: string[];
+      }
+    | {
+        kind: "selected";
+        see: SeeSelected;
+      }
+    | {
+        facets: string[];
+        kind: "not_in_pool";
+        pool: string;
+      }
+    | {
+        facets: string[];
+        kind: "unknown";
+        pool: string;
+      };
+  export type SeeSelected = "why_selected";
+  export type OrderAnswer =
+    | {
+        kind: "not_available";
+        outcome: string;
+      }
+    | {
+        kind: "ordered";
+        scopes: OrderingScope[];
+      }
+    | ((
+        | {
+            reason: "different-scope";
+          }
+        | {
+            items: Item[];
+            reason: "not-ranked";
+          }
+      ) & {
+        kind: "incomparable";
+      });
+  export type OrderingScope = DisagreeingScope | OrderScope;
+  export type OrderBy = "score" | "tie_break" | "position";
+  export type ComparisonBy = "score" | "tie_break";
+  export type Item = string | Withheld;
+  export type Unavailable =
+    | {
+        facet?: Facet | null;
+        reason: "not-recorded";
+      }
+    | {
+        reason: "plan-not-supplied";
+      }
+    | {
+        availability: ItemAvailability;
+        item: EvidencePath;
+        reason: "retention";
+      }
+    | {
+        reason: "not-produced";
+      }
+    | {
+        action: WithholdingAction;
+        field_class: FieldClass;
+        policy: RedactionPolicyId;
+        reason: "redacted";
+      }
+    | {
+        reason: "not-in-record";
+      };
+  export type Facet =
+    | "tier"
+    | "relaxation"
+    | "presence"
+    | "addressed_to"
+    | "remediation"
+    | "caused_by"
+    | "field_origin"
+    | "origin"
+    | "served_identity";
+  export type ItemAvailability = "missing" | "expired" | "erased" | "inaccessible" | "digest_only";
+  /**
+   * A validated evidence path, ordered by the bytes of its complete wire string (3.2).
+   */
+  export type EvidencePath = string;
+  export type WithholdingAction = "drop" | "digest";
+  /**
+   * Field classes (3.3.1). Every exportable field belongs to exactly one.
+   */
+  export type FieldClass =
+    | (
+        | "user-supplied"
+        | "third-party"
+        | "attributed-claim"
+        | "authenticated-app-field"
+        | "system-of-record"
+        | "model-derived"
+      )
+    | "generated-text"
+    | "free-text-detail"
+    | "id"
+    | "content-digest"
+    | "enum"
+    | "number"
+    | "plan-metadata"
+    | "model-identity";
+  export type RedactionPolicyId = string;
+  export type OutcomeAnswer =
+    | {
+        kind: "not_available";
+        outcome: string;
+      }
+    | {
+        adjustments: string;
+        causes: string[];
+        facets: string[];
+        judgment_derivation: string;
+        judgment_lineage: string;
+        kind: "proposed";
+        matched: string;
+        notices: string;
+        outcome: string;
+        termination: string;
+      }
+    | {
+        adjustments: string;
+        causes: string[];
+        facets: string[];
+        judgment_derivation: string;
+        judgment_lineage: string;
+        kind: "escalated";
+        matched: string;
+        notices: string;
+        outcome: string;
+        termination: string;
+      }
+    | {
+        adjustments: string;
+        causes: string[];
+        facets: string[];
+        judgment_derivation: string;
+        judgment_lineage: string;
+        kind: "unresolved";
+        matched: string;
+        notices: string;
+        outcome: string;
+        termination: string;
+      };
+  export type TextAnswer =
+    | {
+        kind: "not_available";
+        outcome: string;
+      }
+    | {
+        fields: TextField[];
+        kind: "text_fields";
+      }
+    | {
+        kind: "no_text";
+      };
+  export type ModelsAnswer =
+    | {
+        kind: "not_available";
+        record: string;
+      }
+    | {
+        cost_summary: string;
+        kind: "no_model_calls";
+      }
+    | {
+        backends: ModelBackend[];
+        cost_summary: string;
+        kind: "models";
+        requests: ModelRequest[];
+      };
+  export type DiffAnswer =
+    | {
+        kind: "identical";
+        not_compared: string[];
+        observations: string[];
+      }
+    | {
+        differences: string[];
+        first: string;
+        kind: "diverged";
+        not_compared: string[];
+        observations: string[];
+        total: number;
+        truncated: number;
+        why: Divergence;
+      }
+    | {
+        kind: "withheld";
+        redacted: Unavailable;
+      };
+  export type Divergence =
+    | "plan-changed"
+    | "snapshot-changed"
+    | "evaluation-time-changed"
+    | "input-changed"
+    | "backend-output-changed"
+    | "backend-changed"
+    | "request-result-changed"
+    | "step-changed"
+    | "outcome-changed";
+  export type Availability =
+    | "available"
+    | {
+        not_available: Unavailable;
+      };
+  export type Claim =
+    | "membership"
+    | "rank_position"
+    | "score"
+    | "components"
+    | "weights"
+    | "operator"
+    | "shortlist_position"
+    | "ordering_key"
+    | "filters_passed"
+    | "proposing_rule"
+    | "adjustments"
+    | "judgment_derivation"
+    | "judgment_lineage"
+    | "exclusion"
+    | "rule_declaration"
+    | "cut_by_k"
+    | "pool"
+    | "position_a"
+    | "position_b"
+    | "score_a"
+    | "score_b"
+    | "components_a"
+    | "components_b"
+    | "order_by"
+    | "consistent"
+    | "outcome"
+    | "matched"
+    | "notices"
+    | "termination"
+    | "cause"
+    | "text_field"
+    | "request"
+    | "attempt"
+    | "transitions"
+    | "cost_summary"
+    | "backend_cost"
+    | "record"
+    | "difference"
+    | "observation_difference"
+    | "output_not_compared"
+    | "tier"
+    | "relaxation"
+    | "presence"
+    | "addressed_to"
+    | "remediation"
+    | "caused_by"
+    | "field_origin"
+    | "origin"
+    | "served_identity";
+  export type DerivationBound = "exact" | "judgment";
+  /**
+   * Derivation classes (spec 001, 3.3; spec 002, 3.12).
+   */
+  export type Derivation = "exact-derived" | "model-derived" | "mixed-derived";
+  export type LineageBound = "exact" | "judgment" | "plan";
+  export type Query =
+    | ("why_outcome" | "text_origin" | "models" | "diff")
+    | {
+        why_selected: {
+          item: Item;
+        };
+      }
+    | {
+        why_excluded: {
+          item: Item;
+        };
+      }
+    | {
+        why_order: {
+          a: Item;
+          b: Item;
+        };
+      };
+  export type ContentDigest = string;
+  /**
+   * Whether every supplied value was captured. Only `complete` reproduces.
+   */
+  export type CaptureStatus = ("complete" | "disabled" | "cancelled" | "abandoned") | "limit_exceeded";
+  export type EvidenceForm = "record" | "bundle";
+  export type SideName = "a" | "b";
+  export type PlanId = string;
+  export type DigestRef = DigestValue | Withheld;
+
+  /**
+   * The record canonical explanation document (spec 040, 3.3).
+   */
+  export interface RustevExplanation1 {
+    answer: Answer;
+    explainer: string;
+    facet_sources: FacetSource[];
+    facts: Fact[];
+    query: Query;
+    redaction?: Redaction | null;
+    schema: "rustev.explanation/1";
+    sides: Side[];
+    truncation?: Truncation | null;
+  }
+  export interface SelectedScope {
+    facts: string[];
+    param: string;
+    value_kind: ValueKind;
+  }
+  export interface Cut {
+    cut_by_k: string;
+    param: string;
+  }
+  export interface ExcludedScope {
+    exclusion: string;
+    param: string;
+    rule_declaration: string;
+    value_kind: ValueKind;
+  }
+  export interface DisagreeingScope {
+    by: OrderBy;
+    consistent: boolean;
+    disagrees_with: ComparisonBy;
+    facts: string[];
+    first?: Item | null;
+    param: string;
+  }
+  export interface Withheld {
+    not_available: Unavailable;
+  }
+  export interface OrderScope {
+    by: OrderBy;
+    consistent?: boolean | null;
+    facts: string[];
+    first?: Item | null;
+    param: string;
+  }
+  export interface TextField {
+    field_origin: string;
+    text_field: string;
+  }
+  export interface ModelBackend {
+    attempts: string[];
+    backend: Item;
+    backend_cost: string;
+    served_identity: string;
+  }
+  export interface ModelRequest {
+    attempts: string[];
+    request: string;
+    transitions: string;
+  }
+  export interface FacetSource {
+    name: Facet;
+    path: string;
+    spec: string;
+  }
+  export interface Fact {
+    availability: Availability;
+    cites: EvidencePath[];
+    claim: Claim;
+    derivation?: FactDerivation | null;
+    id: string;
+    lineage?: FactLineage | null;
+    truncated?: Truncated | null;
+    value: unknown;
+  }
+  export interface FactDerivation {
+    bound: DerivationBound;
+    class: Derivation;
+  }
+  export interface FactLineage {
+    bound: LineageBound;
+    inputs: string[];
+    steps: string[];
+  }
+  export interface Truncated {
+    bytes: number;
+    policy: RedactionPolicyId;
+  }
+  export interface Redaction {
+    policy: RedactionPolicyId;
+  }
+  export interface Side {
+    bundle?: ContentDigest | null;
+    capture?: CaptureStatus | null;
+    decision_id: Item;
+    form: EvidenceForm;
+    name: SideName;
+    plan?: PlanId | null;
+    plan_id: Item;
+    record: DigestRef;
+  }
+  export interface DigestValue {
+    digest: ContentDigest;
+  }
+  export interface Truncation {
+    total: number;
+  }
+}
+export type RustevExplanation1 = RustevExplanation1.RustevExplanation1;
+
 export namespace RustevJudgment1 {
   /**
    * Derivation classes (spec 001, 3.3; spec 002, 3.12).

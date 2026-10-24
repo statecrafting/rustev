@@ -260,10 +260,65 @@ function compareWasm(c, r) {
   comparePure(c, r.code, fromB64(r.out), (name) => fromB64(r.artifacts[name]));
 }
 
+// Self-contained so Chromium runs the identical engine API and error checks.
+async function executeExplain(engine, call, errors) {
+  const bytes = (s) => Uint8Array.from(atob(s), (ch) => ch.charCodeAt(0));
+  const base64 = (u8) => {
+    let s = '';
+    for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode(...u8.subarray(i, i + 0x8000));
+    return btoa(s);
+  };
+  const files = Object.fromEntries(call.inputs.map(([n, b]) => [n, bytes(b)]));
+  const pack = (e) => Object.fromEntries(Object.entries(e).map(([k, n]) => [k, files[n]]));
+  const a = call.explain.args;
+  const q = a.query?.diff ? { diff: { other: pack(a.query.diff.other) } } : a.query;
+  const options = { ...a.options };
+  if (options.redaction) options.redaction = files[options.redaction];
+  let calls = 0;
+  if (call.explain.resolve) options.resolve = () => { calls++; throw new Error('unexpected resolver call'); };
+  try {
+    const r = await engine.explain(pack(a.evidence), q, options);
+    if (call.explain.refusal) throw new Error('expected InvalidInput');
+    if (call.explain.probeResolve) {
+      const bundle = JSON.parse(new TextDecoder().decode(files[a.evidence.bundle]));
+      const retained = bundle.run?.retention?.retained;
+      if (!retained) throw new Error(`probeResolve needs a bundle with a retained run record`);
+      bundle.run.retention = { external: { reference: 'host-record', digest: retained.digest, expires_at_ms: retained.expires_at_ms } };
+      // Retention::Retained embeds JSON UTF-8, unlike call.inputs transport base64.
+      const source = new TextEncoder().encode(retained.bytes);
+      let resolved = 0;
+      const external = await engine.explain({ bundle: new TextEncoder().encode(JSON.stringify(bundle)) }, q, {
+        ...options,
+        resolve: (reference, maxBytes) => {
+          if (reference !== 'host-record' || maxBytes < source.length) throw new Error('resolver arguments');
+          resolved++;
+          return source;
+        },
+      });
+      const doc = JSON.parse(new TextDecoder().decode(external.explanation));
+      const original = JSON.parse(new TextDecoder().decode(r.explanation));
+      if (resolved !== 1 || JSON.stringify(doc.facts) !== JSON.stringify(original.facts)) throw new Error('resolver lost evidence');
+    }
+    return { code: 0, out: '', artifacts: { explanation: base64(r.explanation), markdown: base64(new TextEncoder().encode(r.markdown)) } };
+  } catch (e) {
+    if (!call.explain.refusal || e.name !== 'InvalidInput' || e.code !== call.explain.refusal || calls !== 0) throw e;
+    if (!(e instanceof errors.InvalidInput) || !(e instanceof errors.RustevError) || !Object.hasOwn(e, 'detail')) {
+      throw new Error('explain refusal must be an exported InvalidInput with detail');
+    }
+    const error = JSON.stringify({ class: e.name, code: e.code }, null, 2) + '\n';
+    return { code: 0, out: '', artifacts: { error: base64(new TextEncoder().encode(error)) } };
+  }
+}
+function explainCall(c) {
+  if (c.explain.comparison !== 'bytes') throw new Error('explain must compare bytes');
+  return { explain: c.explain, inputs: [...inputsOf(c).files].map(([n, b]) => [n, b.toString('base64')]) };
+}
+
 async function wasmAdapter() {
-  const glue = await import(pathToFileURL(resolve(pkg, 'web/rustev_wasm.js')).href);
+  const glue = await import(pathToFileURL(resolve(pkg, 'web/index.js')).href);
   glue.initSync({ module: readFileSync(resolve(pkg, 'web/rustev_wasm_bg.wasm')) });
-  return async (c) => compareWasm(c, executeWasm(glue, wasmCall(c)));
+  const engine = new glue.Engine();
+  return async (c) => compareWasm(c, c.explain ? await executeExplain(engine, explainCall(c), glue) : executeWasm(glue, wasmCall(c)));
 }
 
 /** The same calls in headless Chromium (3.11.3, 3.13.3): one page holds the
@@ -273,12 +328,15 @@ async function chromiumAdapter() {
   const server = await serve(pkg);
   const { browser, page } = await open(server.origin);
   await page.evaluate(async () => {
-    const glue = await import('/web/rustev_wasm.js');
+    const glue = await import('/web/index.js');
     glue.initSync({ module: new Uint8Array(await (await fetch('/web/rustev_wasm_bg.wasm')).arrayBuffer()) });
     globalThis.rustevGlue = glue;
   });
   await page.addScriptTag({ content: `globalThis.executeWasm = ${executeWasm.toString()};` });
-  const adapter = async (c) => compareWasm(c, await page.evaluate((call) => globalThis.executeWasm(globalThis.rustevGlue, call), wasmCall(c)));
+  await page.addScriptTag({ content: `globalThis.executeExplain = ${executeExplain.toString()}; globalThis.explainEngine = new globalThis.rustevGlue.Engine();` });
+  const adapter = async (c) => compareWasm(c, c.explain
+    ? await page.evaluate((call) => globalThis.executeExplain(globalThis.explainEngine, call, globalThis.rustevGlue), explainCall(c))
+    : await page.evaluate((call) => globalThis.executeWasm(globalThis.rustevGlue, call), wasmCall(c)));
   adapter.close = async () => {
     await browser.close();
     server.close();
@@ -605,6 +663,7 @@ async function nativeAdapter() {
   }
 
   return async (c) => {
+    if (c.explain) return compareWasm(c, await executeExplain(pure, explainCall(c), rustev));
     const { files, derived } = inputsOf(c);
     if (c.runtime) return runtimeCase(c, files);
     const a = flags(c.argv);
@@ -632,6 +691,7 @@ function parameterizedDocument(v) {
 }
 
 function requiresParameterized(c) {
+  if (c.explain) return false;
   if ((c.argv ?? []).some((a) => ['--profile', '--variant', '--base-profile'].includes(a))) return true;
   return [...inputsOf(c).files.values()].some((b) => {
     let v;

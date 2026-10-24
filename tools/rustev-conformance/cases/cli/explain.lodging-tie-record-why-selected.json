@@ -1,0 +1,46 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "record": "lodging-tie.record.json"
+      },
+      "options": {},
+      "query": {
+        "why_selected": {
+          "item": "c-1"
+        }
+      }
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.lodging-tie-record-why-selected",
+  "inputs": [
+    {
+      "name": "lodging-tie.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/lodging-tie.record.json",
+      "sha256": "299659396fe408996f4aebd519fd7d3717baaf33a7f35732b4f35b7075524f16"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/lodging-tie-record-why-selected.explanation.json",
+      "normalize": [],
+      "sha256": "5e4a26240b773284058f9364ddecd34ebea00fda6260412459846f195aeb7098"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/lodging-tie-record-why-selected.explanation.md",
+      "normalize": [],
+      "sha256": "0e7523b955f95b71cf9f3322768f598114b032e8eaf26e98387b8f653472fbbb"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

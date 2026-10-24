@@ -1,0 +1,54 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "bundle": "lodging-text.bundle.json"
+      },
+      "options": {
+        "nowMs": 1800000000001,
+        "scope": {
+          "context_revision": "rev-1",
+          "mode": "principal",
+          "principal_scope": "scope-p",
+          "tenant": "tenant-a"
+        }
+      },
+      "query": {
+        "why_selected": {
+          "item": "c-1"
+        }
+      }
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.lodging-text-bundle-why-selected",
+  "inputs": [
+    {
+      "name": "lodging-text.bundle.json",
+      "path": "crates/rustev-cli/tests/golden/explain/lodging-text.bundle.json",
+      "sha256": "db7dad24917898329406dd928f90b2249ad1448f44250d56aaa8b11c9fa51f85"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/lodging-text-bundle-why-selected.explanation.json",
+      "normalize": [],
+      "sha256": "a5bb5e490f3391623003746cf137e42e63b3214a002a4e630b30fce27d7590b8"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/lodging-text-bundle-why-selected.explanation.md",
+      "normalize": [],
+      "sha256": "6e3848bfca553f829c1f1adfc58ab8768120d5e8d86fd23b8ba0a4f70490d406"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

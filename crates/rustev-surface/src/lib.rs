@@ -11,6 +11,7 @@ pub mod adapter;
 pub mod calibrate;
 pub mod deps;
 pub mod eval;
+pub mod explain;
 pub mod host;
 pub mod out;
 pub mod plan;

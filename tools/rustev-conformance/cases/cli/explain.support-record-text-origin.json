@@ -1,0 +1,42 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "record": "support.record.json"
+      },
+      "options": {},
+      "query": "text_origin"
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.support-record-text-origin",
+  "inputs": [
+    {
+      "name": "support.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/support.record.json",
+      "sha256": "1dc22cd447708b158c2bbdef366aa0d58c37e97daa677ede5045939c9f375236"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/support-record-text-origin.explanation.json",
+      "normalize": [],
+      "sha256": "95783f512d942e6b66517ffe9f73b31db2e4850a98a4b481a09007c40fbfcc5c"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/support-record-text-origin.explanation.md",
+      "normalize": [],
+      "sha256": "794e42364ac9615d4b9279229f5abeedcb62615c16967dcecb4a31709d8696d3"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

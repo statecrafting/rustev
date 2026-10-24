@@ -1,0 +1,46 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "record": "unresolved.record.json"
+      },
+      "options": {},
+      "query": {
+        "why_excluded": {
+          "item": "c-excluded"
+        }
+      }
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.unresolved-record-why-excluded",
+  "inputs": [
+    {
+      "name": "unresolved.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/unresolved.record.json",
+      "sha256": "c66e3d7235cfaf4b5f3b7a9b8d42c0943055ed21ec8718dc8a6bac88449ea52d"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/unresolved-record-why-excluded.explanation.json",
+      "normalize": [],
+      "sha256": "778917c2ce5ffef73dc7c9425a58c31405789b6cdfa86e1b5f5999b19d14ef06"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/unresolved-record-why-excluded.explanation.md",
+      "normalize": [],
+      "sha256": "4bb89b5fba16c190ce8b572e28d0e948bd4df8342d9f361fd0eb59305dad6b49"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

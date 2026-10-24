@@ -1,0 +1,48 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "record": "escalated.record.json"
+      },
+      "options": {},
+      "query": {
+        "diff": {
+          "other": {
+            "record": "escalated.record.json"
+          }
+        }
+      }
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.escalated-record-diff",
+  "inputs": [
+    {
+      "name": "escalated.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/escalated.record.json",
+      "sha256": "46cad42bad608ec21b51beb3dfc764b14a035926d1a027673f7c81436ed9f620"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/escalated-record-diff.explanation.json",
+      "normalize": [],
+      "sha256": "8dc6d6eefca7f0322c7e1198ebb70dccfcd303f347b74ce500e16ce427ad4a1f"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/escalated-record-diff.explanation.md",
+      "normalize": [],
+      "sha256": "5dd7aaa8da220288d2a05dd248ef82079251ec3b3fefd1da9f00ebf3208cfe0b"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

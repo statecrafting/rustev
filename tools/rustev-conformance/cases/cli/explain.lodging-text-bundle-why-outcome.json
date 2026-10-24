@@ -1,0 +1,50 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "bundle": "lodging-text.bundle.json"
+      },
+      "options": {
+        "nowMs": 1800000000001,
+        "scope": {
+          "context_revision": "rev-1",
+          "mode": "principal",
+          "principal_scope": "scope-p",
+          "tenant": "tenant-a"
+        }
+      },
+      "query": "why_outcome"
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.lodging-text-bundle-why-outcome",
+  "inputs": [
+    {
+      "name": "lodging-text.bundle.json",
+      "path": "crates/rustev-cli/tests/golden/explain/lodging-text.bundle.json",
+      "sha256": "db7dad24917898329406dd928f90b2249ad1448f44250d56aaa8b11c9fa51f85"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/lodging-text-bundle-why-outcome.explanation.json",
+      "normalize": [],
+      "sha256": "4f31fcc0d46c6fa7dce8c168bf988ec1babcbc1485ed2c9cf12c68836fa950ad"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/lodging-text-bundle-why-outcome.explanation.md",
+      "normalize": [],
+      "sha256": "a2c1aea9ab6c1bb4a460c46aa0066cd6817dbbd5fd8c5de62b92522100032ab1"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

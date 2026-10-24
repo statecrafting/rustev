@@ -149,6 +149,9 @@ bindings:
 	  printf '{ "type": "%s" }\n' $$ty > "$(BINDINGS_OUT)/rustev-wasm/$$d/package.json"; \
 	done
 	cp -R integrations/rustev-wasm/package.json integrations/rustev-wasm/types "$(BINDINGS_OUT)/rustev-wasm/"
+	node tools/rustev-conformance/js/wrap-wasm.mjs "$(BINDINGS_OUT)/rustev-wasm"
+	node --test tools/rustev-conformance/js/wrap-wasm.test.mjs
+	tools/rustev-conformance/js/node_modules/.bin/tsc --noEmit --strict --lib es2022,dom,esnext.disposable "$(BINDINGS_OUT)/rustev-wasm/web/index.d.ts" "$(BINDINGS_OUT)/rustev-wasm/bundler/index.d.ts" "$(BINDINGS_OUT)/rustev-wasm/node/index.d.ts"
 	node tools/rustev-conformance/js/gen-types.mjs --check
 	tools/rustev-conformance/js/node_modules/.bin/tsc --noEmit --strict integrations/rustev-wasm/types/rustev-documents.d.ts
 	node tools/rustev-conformance/js/chromium.mjs time "$(BINDINGS_OUT)/rustev-wasm" "$(BINDINGS_OUT)/chromium-time.json" > "$(BINDINGS_OUT)/chromium-median"

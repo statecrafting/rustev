@@ -1,0 +1,61 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "bundle": "support.bundle.json"
+      },
+      "options": {
+        "nowMs": 1800000000001,
+        "scope": {
+          "context_revision": "rev-1",
+          "mode": "principal",
+          "principal_scope": "scope-p",
+          "tenant": "tenant-a"
+        }
+      },
+      "query": {
+        "diff": {
+          "other": {
+            "bundle": "shifted.bundle.json"
+          }
+        }
+      }
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.backend-changed",
+  "inputs": [
+    {
+      "name": "shifted.bundle.json",
+      "path": "crates/rustev-cli/tests/golden/explain/shifted.bundle.json",
+      "sha256": "e1b01b01aaf245813fd8ae0b02a2685c60072490fbc3bf3ef3acd58c950ad4b3"
+    },
+    {
+      "name": "support.bundle.json",
+      "path": "crates/rustev-cli/tests/golden/explain/support.bundle.json",
+      "sha256": "a343bedf8914fa19aad089069ac8edce83d80e217f827d360e913f8c9c2811ea"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/backend-changed.explanation.json",
+      "normalize": [],
+      "sha256": "a602806e458255c44029721162c3f1d2e86b2ed52ae172b72e5fdfbd3ad2a988"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/backend-changed.explanation.md",
+      "normalize": [],
+      "sha256": "e5e71a3b7a2cfd6f9bb05b764ec07598f1d12ef28ef2fc82a41752d6143e607a"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

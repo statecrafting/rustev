@@ -33,7 +33,14 @@ extends:
   - { spec: "004-evaluation-and-replay", unit: { kind: directory, path: "crates/rustev-eval/" }, nature: amending }
   # `rustev explain` and its exit statuses (3.16, 3.17).
   - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: amending }
-  # Adds 040 to `make verify` when the implementation is complete.
+  # `engine.explain` through the command surface, both packages and the
+  # shared conformance suite (3.15.2).
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "crates/rustev-surface/" }, nature: additive }
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-node/" }, nature: additive }
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-wasm/" }, nature: additive }
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "tools/rustev-conformance/" }, nature: additive }
+  # Adds 040 to `make verify` when the implementation is complete; the
+  # bindings recipe stages the WebAssembly package's error classes.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
   # Each new source file of a release member joins the reviewed archive
   # list (spec 021, 3.5).
@@ -1170,6 +1177,21 @@ output: the harvest in `tests/explain.rs` edits `support.record.json`'s
 as recorded, so the two documents differ in exactly those members. Those
 inputs and goldens land here, beside the harvest. Mutation seeds for the
 CLI and the explainer are added to their harnesses.
+
+**Increment 7 (2026-10-24): `explain` through the bindings.** Spec 027 is
+complete, so 3.15.2 is no longer externally blocked. `rustev-surface`
+gains an `explain` command over `rustev_eval::explain::{explain,
+explain_diff, render_markdown}`, and both packages expose
+`engine.explain(evidence, query, { nowMs?, scope?, resolve?, redaction?
+})` resolving to `{ explanation, markdown }`, with the CLI's option rules
+(3.16.2, 3.16.4) and refusals raised as the exported `InvalidInput`
+subclass of `RustevError` carrying the 3.17 refusal code, in the
+WebAssembly package as in Node (027 3.4.4). The diff form records the
+query as `"diff"` with the other evidence as side b. The shared
+conformance suite gains every explain golden of the Acceptance as cases
+for both packages with comparison `bytes`, plus the option refusals,
+generated from `tools/rustev-conformance/tests/explain.rs`; the Node suite
+passes them (186 cases). The WebAssembly run is CI's `bindings` job.
 
 ## Decisions at approval
 

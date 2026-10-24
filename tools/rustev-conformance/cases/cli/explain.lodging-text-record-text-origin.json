@@ -1,0 +1,42 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "record": "lodging-text.record.json"
+      },
+      "options": {},
+      "query": "text_origin"
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.lodging-text-record-text-origin",
+  "inputs": [
+    {
+      "name": "lodging-text.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/lodging-text.record.json",
+      "sha256": "81400c168b538316913b73eb303c16590bfe32011b8a43cbc7e8f99a4e98be17"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/lodging-text-record-text-origin.explanation.json",
+      "normalize": [],
+      "sha256": "0ce12e649df66c6e1141c378bd6a0e7a3544e56e65f7c07095711c18bfd30bd7"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/lodging-text-record-text-origin.explanation.md",
+      "normalize": [],
+      "sha256": "20bbd108ee4cfecb870773dc729cab49be8451157c51cd114ac7d9239cdfad9f"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

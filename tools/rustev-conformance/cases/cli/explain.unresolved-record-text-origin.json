@@ -1,0 +1,42 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "record": "unresolved.record.json"
+      },
+      "options": {},
+      "query": "text_origin"
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.unresolved-record-text-origin",
+  "inputs": [
+    {
+      "name": "unresolved.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/unresolved.record.json",
+      "sha256": "c66e3d7235cfaf4b5f3b7a9b8d42c0943055ed21ec8718dc8a6bac88449ea52d"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/unresolved-record-text-origin.explanation.json",
+      "normalize": [],
+      "sha256": "b9d3fd417f4a6f14e6ab85c0e1428b6a5cb5d10dabf719eca2963b429168729b"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/unresolved-record-text-origin.explanation.md",
+      "normalize": [],
+      "sha256": "ec000e1deaeefb36073f6442c21bdcc2e7e6df44d713a387c6d2169055b5c3e5"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

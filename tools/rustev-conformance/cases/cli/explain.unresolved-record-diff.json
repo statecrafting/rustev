@@ -1,0 +1,48 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "record": "unresolved.record.json"
+      },
+      "options": {},
+      "query": {
+        "diff": {
+          "other": {
+            "record": "unresolved.record.json"
+          }
+        }
+      }
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.unresolved-record-diff",
+  "inputs": [
+    {
+      "name": "unresolved.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/unresolved.record.json",
+      "sha256": "c66e3d7235cfaf4b5f3b7a9b8d42c0943055ed21ec8718dc8a6bac88449ea52d"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/unresolved-record-diff.explanation.json",
+      "normalize": [],
+      "sha256": "b5aa9a2ed6f33e87fa4207070c055f0f16a9ac042a03f82b55d998d546d796f9"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/unresolved-record-diff.explanation.md",
+      "normalize": [],
+      "sha256": "98a575b92705b9be203c7d8b216bc07b3a640891965c320bf5c70b8bf691de45"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

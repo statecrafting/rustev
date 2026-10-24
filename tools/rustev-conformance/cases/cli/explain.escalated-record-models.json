@@ -1,0 +1,42 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "record": "escalated.record.json"
+      },
+      "options": {},
+      "query": "models"
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.escalated-record-models",
+  "inputs": [
+    {
+      "name": "escalated.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/escalated.record.json",
+      "sha256": "46cad42bad608ec21b51beb3dfc764b14a035926d1a027673f7c81436ed9f620"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/escalated-record-models.explanation.json",
+      "normalize": [],
+      "sha256": "883c58037b6d84fe9e386a1ab3a7123111db801f59787b7c0969f37d5ddbc7eb"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/escalated-record-models.explanation.md",
+      "normalize": [],
+      "sha256": "eaa3dfa64a734f0dd2849c99e80d886fca1696ad43fc50b6aa78bfb4fc48dfd7"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

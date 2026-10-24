@@ -1,0 +1,52 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "plan": "support.plan.json",
+        "record": "support.record.json"
+      },
+      "options": {},
+      "query": {
+        "why_excluded": {
+          "item": "c-excluded"
+        }
+      }
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.support-plan-why-excluded",
+  "inputs": [
+    {
+      "name": "support.plan.json",
+      "path": "crates/rustev-cli/tests/golden/explain/support.plan.json",
+      "sha256": "b34b1c7bd242f7390be07dcef2b412587e2fb732266f71f11f472277e426e651"
+    },
+    {
+      "name": "support.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/support.record.json",
+      "sha256": "1dc22cd447708b158c2bbdef366aa0d58c37e97daa677ede5045939c9f375236"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/support-plan-why-excluded.explanation.json",
+      "normalize": [],
+      "sha256": "b1571474e92bb77194e54c18af900340da5a741f2a468e2180fc62e84f3930d4"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/support-plan-why-excluded.explanation.md",
+      "normalize": [],
+      "sha256": "d4808c547deed317c07c39522ecfbad43deaace49b594e04b1de04e18ef96bce"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

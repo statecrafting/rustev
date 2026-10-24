@@ -35,6 +35,22 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rustev-surface/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "integrations/rustev-node/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "integrations/rustev-wasm/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "tools/rustev-conformance/",
+        "source": "spec-edge"
+      },
+      {
         "path": "tools/rustev-release/",
         "source": "spec-edge"
       }
@@ -77,6 +93,58 @@
         "unit": {
           "kind": "directory",
           "path": "crates/rustev-eval/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-surface/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-surface/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "integrations/rustev-node/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-node/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "integrations/rustev-wasm/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-wasm/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "tools/rustev-conformance/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-conformance/"
         }
       },
       {
@@ -136,5 +204,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "ab336ca15fd4d997085d20c227339404f2ed8801aa23401ff4fe550201af485b"
+  "shardHash": "7fb7efa80d3a032c586010e7ba1ae369b6164591f29799298eb2bd45cd94661a"
 }

@@ -45,6 +45,38 @@
       },
       {
         "nature": "additive",
+        "spec": "027-node-and-wasm-bindings",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-surface/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "027-node-and-wasm-bindings",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-node/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "027-node-and-wasm-bindings",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-wasm/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "027-node-and-wasm-bindings",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-conformance/"
+        }
+      },
+      {
+        "nature": "additive",
         "spec": "001-boundaries-and-authority",
         "unit": {
           "kind": "file",
@@ -123,7 +155,7 @@
       }
     ],
     "sectionDigests": {
-      "040-decision-explanation-api-and-rustev-explain-amends-004-and-006": "1660d7693d81a61532649d1ec25d9e3bd2283c05fef9ffc2bd2efc3ff6489cea",
+      "040-decision-explanation-api-and-rustev-explain-amends-004-and-006": "cf9d49216db6398616d45621ea7cb3d107cca53079ff789fa3590cc2902f4ffb",
       "1-purpose": "3178f605b0a2932d4e581ad8c633ff1782db9a625c0ec69e558da03526bc927a",
       "2-1-binding-principles-of-76": "d791f1707bdd26a13780bb9e6a82eac6b46b01e3bf62e34139e51e3db8520028",
       "2-territory": "002d469df2936a3b3c93391c0b58d546b74da454c0a704766b79f1122b482ed3",
@@ -150,7 +182,7 @@
       "5-observable-negative-cases": "89ffe506876b76ace911d2be8a91a4c132e39a6b67402537675607301b943687",
       "acceptance": "6cbb2e96dca73ad5604a3aff61aefd165202fd96e73c84f94caafd296c4159e2",
       "decisions-at-approval": "45be7962844cae50c61c6b87c8ce29d6931bcfc3ad10e1caba6929d2c257e494",
-      "implementation-record": "68316aea6a0fcbe97a7877851fceb3160663a6ebdc27b1488fe8fe3cb0c5a2a1",
+      "implementation-record": "dd67b9eab035d0bcdffdc7d1832030f577062eee7cb461e40aa17a00d6af3ce0",
       "verification": "060cc7e4a9cf858301d9e2879b406fcb6d29043c4eaafc1199ab616f8a9a5131"
     },
     "sectionHeadings": [
@@ -189,6 +221,6 @@
     "summary": "An amendment of approved specs 004 and 006 (R-16), for #76 child D2. A pure function over recorded evidence (a delivered `rustev.run/1` record, or a `rustev.replay/1` bundle, with the plan document when supplied) answers seven structured questions: why an item was selected, why one was excluded, why one item precedes another, why the outcome is what it is, where text came from, which models answered at what cost, and where two decisions first diverge. Answers are written as a versioned `rustev.explanation/1` document in which every fact cites the evidence path it was copied from and carries the derivation class and lineage its source records; a fact the evidence does not hold, or holds only as a digest, or that a supplied redaction policy withholds, is `not_available` with a typed reason, never a guess. Nothing is re-executed, compiled or dispatched and no model is called. Adds a deterministic Markdown rendering, `rustev explain` in the CLI, and the binding surface for the Node and WebAssembly packages and the service. No existing document, identity or CLI output changes. Approved (A-37); implementation is pending.\n",
     "title": "Decision explanation API and `rustev explain` (amends 004 and 006)"
   },
-  "shardHash": "ab336ca15fd4d997085d20c227339404f2ed8801aa23401ff4fe550201af485b",
+  "shardHash": "7fb7efa80d3a032c586010e7ba1ae369b6164591f29799298eb2bd45cd94661a",
   "specVersion": "1.10.0"
 }

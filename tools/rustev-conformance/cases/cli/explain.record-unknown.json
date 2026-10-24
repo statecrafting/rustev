@@ -1,0 +1,38 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "record": "support.record.json"
+      },
+      "options": {
+        "hostCapMs": 1
+      },
+      "query": "models"
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": "invalid-options",
+    "resolve": false
+  },
+  "id": "explain.record-unknown",
+  "inputs": [
+    {
+      "name": "support.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/support.record.json",
+      "sha256": "1dc22cd447708b158c2bbdef366aa0d58c37e97daa677ede5045939c9f375236"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "error",
+      "golden": "tools/rustev-conformance/expected/explain/record-unknown.json",
+      "normalize": [],
+      "sha256": "ea12da306258b9606ccc3232459995fc45f4b4674a955e3b6f91b16e1eb868d7"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

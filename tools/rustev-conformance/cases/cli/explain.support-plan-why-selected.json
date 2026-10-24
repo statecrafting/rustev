@@ -1,0 +1,52 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "plan": "support.plan.json",
+        "record": "support.record.json"
+      },
+      "options": {},
+      "query": {
+        "why_selected": {
+          "item": "c-1"
+        }
+      }
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.support-plan-why-selected",
+  "inputs": [
+    {
+      "name": "support.plan.json",
+      "path": "crates/rustev-cli/tests/golden/explain/support.plan.json",
+      "sha256": "b34b1c7bd242f7390be07dcef2b412587e2fb732266f71f11f472277e426e651"
+    },
+    {
+      "name": "support.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/support.record.json",
+      "sha256": "1dc22cd447708b158c2bbdef366aa0d58c37e97daa677ede5045939c9f375236"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/support-plan-why-selected.explanation.json",
+      "normalize": [],
+      "sha256": "6c2b53fa8a5e6d9c35846b0dfd900b2db8b6af5b223790f6856cc8506fbd06d4"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/support-plan-why-selected.explanation.md",
+      "normalize": [],
+      "sha256": "748ea89a1f038c12c577eeff254f8e33273c7849dc2d46b8122ae01d45b4c18e"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

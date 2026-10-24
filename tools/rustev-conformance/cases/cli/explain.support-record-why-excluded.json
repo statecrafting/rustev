@@ -1,0 +1,46 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "record": "support.record.json"
+      },
+      "options": {},
+      "query": {
+        "why_excluded": {
+          "item": "c-excluded"
+        }
+      }
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.support-record-why-excluded",
+  "inputs": [
+    {
+      "name": "support.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/support.record.json",
+      "sha256": "1dc22cd447708b158c2bbdef366aa0d58c37e97daa677ede5045939c9f375236"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/support-record-why-excluded.explanation.json",
+      "normalize": [],
+      "sha256": "06326d0d99802cb4c4bdb958e733b803f2b9ac1bde28fb51adece15062236657"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/support-record-why-excluded.explanation.md",
+      "normalize": [],
+      "sha256": "d4808c547deed317c07c39522ecfbad43deaace49b594e04b1de04e18ef96bce"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

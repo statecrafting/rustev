@@ -21,6 +21,7 @@ const classes = {};
 for (const name of [
   'CompileRefusal',
   'InvalidDocument',
+  'InvalidInput',
   'ConfigRefused',
   'PlanPrepareRefused',
   'AdmissionRejected',
@@ -453,6 +454,28 @@ class Engine {
   }
   calibrateQualify(inputs, args) {
     return this.command('calibrateQualify', inputs, args);
+  }
+
+  /** Explain retained evidence without executing a decision (040 3.15.2). */
+  async explain(evidence, query, options = {}) {
+    const inputs = {};
+    const put = (name, value) => {
+      if (!(value instanceof Uint8Array)) throw new classes.InvalidInput('invalid-options', { field: name });
+      inputs[name] = value;
+      return name;
+    };
+    const pack = (e, prefix) => {
+      if (!e || typeof e !== 'object' || Array.isArray(e)) throw new classes.InvalidInput('invalid-options', { field: prefix });
+      return Object.fromEntries(Object.entries(e).map(([k, v]) => [k, put(`${prefix}.${k}`, v)]));
+    };
+    if (!options || typeof options !== 'object' || Array.isArray(options)) throw new classes.InvalidInput('invalid-options', 'options must be an object');
+    const { resolve, ...opts } = options;
+    for (const key of Object.keys(opts)) if (opts[key] === undefined) opts[key] = null;
+    if (Object.hasOwn(options, 'resolve') && typeof resolve !== 'function') throw new classes.InvalidInput('invalid-options', { field: 'resolve' });
+    if (Object.hasOwn(opts, 'redaction')) opts.redaction = put('redaction', opts.redaction);
+    const q = query && typeof query === 'object' && Object.hasOwn(query, 'diff')
+      ? { ...query, diff: { ...query.diff, other: pack(query.diff?.other, 'b') } } : query;
+    return wrap(() => native.explain(inputs, { evidence: pack(evidence, 'a'), query: q, options: opts }, resolve));
   }
 
   /** Bounded exchange forwarding (049 3.5.2). */

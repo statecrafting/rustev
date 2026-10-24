@@ -1,0 +1,55 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "record": "support.record.json"
+      },
+      "options": {
+        "scope": {
+          "context_revision": "rev-1",
+          "mode": "principal",
+          "principal_scope": "scope-p",
+          "tenant": "tenant-a"
+        }
+      },
+      "query": {
+        "diff": {
+          "other": {
+            "plan": "support.plan.json",
+            "record": "support.record.json"
+          }
+        }
+      }
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": "invalid-options",
+    "resolve": false
+  },
+  "id": "explain.diff-record-scope",
+  "inputs": [
+    {
+      "name": "support.plan.json",
+      "path": "crates/rustev-cli/tests/golden/explain/support.plan.json",
+      "sha256": "b34b1c7bd242f7390be07dcef2b412587e2fb732266f71f11f472277e426e651"
+    },
+    {
+      "name": "support.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/support.record.json",
+      "sha256": "1dc22cd447708b158c2bbdef366aa0d58c37e97daa677ede5045939c9f375236"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "error",
+      "golden": "tools/rustev-conformance/expected/explain/diff-record-scope.json",
+      "normalize": [],
+      "sha256": "ea12da306258b9606ccc3232459995fc45f4b4674a955e3b6f91b16e1eb868d7"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}

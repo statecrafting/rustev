@@ -1,0 +1,48 @@
+{
+  "command": "explain",
+  "explain": {
+    "args": {
+      "evidence": {
+        "record": "lodging-text.record.json"
+      },
+      "options": {},
+      "query": {
+        "diff": {
+          "other": {
+            "record": "lodging-text.record.json"
+          }
+        }
+      }
+    },
+    "comparison": "bytes",
+    "probeResolve": false,
+    "refusal": null,
+    "resolve": false
+  },
+  "id": "explain.lodging-text-record-diff",
+  "inputs": [
+    {
+      "name": "lodging-text.record.json",
+      "path": "crates/rustev-cli/tests/golden/explain/lodging-text.record.json",
+      "sha256": "81400c168b538316913b73eb303c16590bfe32011b8a43cbc7e8f99a4e98be17"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "explanation",
+      "golden": "crates/rustev-cli/tests/golden/explain/lodging-text-record-diff.explanation.json",
+      "normalize": [],
+      "sha256": "b610fa364665bb7a5d92a9f316e54251560d647ed9fb3a50063ca9f2d5e321f4"
+    },
+    {
+      "file": "markdown",
+      "golden": "crates/rustev-cli/tests/golden/explain/lodging-text-record-diff.explanation.md",
+      "normalize": [],
+      "sha256": "7b3a235ec3e90639475c426d0029b758c5497d711097c7e03721e9e44efb960c"
+    }
+  ],
+  "surfaces": [
+    "native",
+    "wasm"
+  ]
+}
