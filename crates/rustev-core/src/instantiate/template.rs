@@ -73,6 +73,26 @@ pub fn parse_template(bytes: &[u8]) -> Result<Template, InstantiationRefusal> {
     }
     let encoded = canonical_bytes(&plain).map_err(|e| err(e.to_string()))?;
     let def = Definition::parse(&encoded).map_err(|e| err(e.to_string()))?;
+    if !has_members && def.schema == rustev_contract::schema::DEFINITION_V2 {
+        let decoded = def
+            .steps
+            .iter()
+            .filter_map(|s| {
+                if let rustev_contract::definition::StepBody::Exact(e) = &s.body {
+                    crate::ops::decode_v2(&e.op, e.version, &e.args)
+                        .and_then(Result::ok)
+                        .map(|a| (s.id.clone(), a))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        if !crate::quality::uses_track_construct(&def, &decoded) {
+            return Err(err(
+                "use_definition_1: supplied version 2 template uses no #76 construct".into(),
+            ));
+        }
+    }
     let version = def
         .version
         .parse::<Version>()

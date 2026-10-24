@@ -139,7 +139,7 @@ pub fn assemble(
         })?;
     let binding = |what| Err(AssemblyError::Binding { what });
     // A `rustev.run/2` record enters the bundle as its deterministic
-    // version 1 projection (spec 020, 3.2); bundles hold version 1 records.
+    // version 1 projection (spec 020, 3.2). Plan 3 keeps its version 3 record.
     let projected;
     let run = if input.run.schema == schema::RUN_V2 {
         projected = input.run.project_v1().map_err(|_| AssemblyError::Binding {
@@ -242,7 +242,7 @@ pub fn assemble(
 
     let plan = item(
         ItemLocation::Plan,
-        schema::PLAN,
+        input.plan.schema(),
         bytes_of(input.plan, ItemLocation::Plan)?,
         true,
     );
@@ -264,7 +264,7 @@ pub fn assemble(
     );
     let run_item = item(
         ItemLocation::Run,
-        schema::RUN,
+        run.schema(),
         bytes_of(run, ItemLocation::Run)?,
         false,
     );

@@ -1,6 +1,13 @@
-//! Pure template analysis, spec 034 stages 1 through 4. No substitution or
-//! compilation occurs here. Stage functions are exposed for profile checking.
+//! Pure instantiation and compilation of parameterized definitions (spec 034).
 mod declarations;
+mod emit;
+mod loading;
+mod profiled;
+pub use emit::{Instantiated, Pruned, instantiate};
+pub(crate) use loading::validate_record;
+pub use profiled::{
+    ProfiledRefusal, compile_profiled, compile_profiled_with, parameters_for_subject,
+};
 mod overlay;
 mod sites;
 mod template;

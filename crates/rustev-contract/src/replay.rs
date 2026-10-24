@@ -284,7 +284,7 @@ impl ReplayBundle {
                 ItemLocation::Descriptor(_) => &[schema::BACKEND],
                 ItemLocation::Calibration(_) => &[schema::CALIBRATION],
                 ItemLocation::Snapshot => &[schema::SNAPSHOT],
-                ItemLocation::Run => &[schema::RUN],
+                ItemLocation::Run => &[schema::RUN, schema::RUN_V3],
                 ItemLocation::Supply(_) => &[schema::BACKEND_OUTPUT, schema::RUNTIME_REASON],
                 ItemLocation::Bundle => &[],
             };

@@ -261,6 +261,10 @@ impl Compiled {
         calibrations: &[CalibrationArtifact],
         sources: &[SourceDescriptor],
     ) -> Result<Compiled, LoadError> {
+        #[cfg(not(feature = "parameterized"))]
+        crate::unparameterized::plan(plan).map_err(|refusal| LoadError::PlanMismatch {
+            refusal: Some(refusal),
+        })?;
         // A plan 2 records `rustev.exact/1`; a plan 3 the lowest registry it
         // needs (spec 032, 3.1.3).
         let registry_known = plan.registry == schema::EXACT_REGISTRY
@@ -388,15 +392,50 @@ fn recompile(
         PlanExecution::None => None,
         PlanExecution::Declared(d) => Some(&d.policy),
     };
-    let c = compile_inner(
+    #[cfg(not(feature = "parameterized"))]
+    crate::unparameterized::plan(plan).map_err(Recompiled::Refused)?;
+    #[cfg(feature = "parameterized")]
+    if let Some(record) = &plan.instantiation {
+        crate::instantiate::validate_record(plan, record).map_err(|detail| {
+            Recompiled::Refused(Refusal {
+                category: Category::Parse,
+                subject: "plan".into(),
+                detail,
+                shortfalls: vec![],
+            })
+        })?;
+    }
+    let mut c = compile_instantiated(
         &plan.definition,
         descriptors,
         calibrations,
         sources,
         execution,
+        plan.instantiation.is_some(),
     )
     .map_err(Recompiled::Refused)?;
+    #[cfg(feature = "parameterized")]
+    {
+        c.plan.instantiation = plan.instantiation.clone();
+    }
+    c.id = c.plan.id().map_err(|e| {
+        Recompiled::Refused(Refusal {
+            category: Category::Parse,
+            subject: "plan".into(),
+            detail: e.to_string(),
+            shortfalls: vec![],
+        })
+    })?;
     if plan.canonical().ok() != Some(c.canonical()) {
+        #[cfg(feature = "parameterized")]
+        if plan.instantiation.is_some() {
+            return Err(Recompiled::Refused(Refusal {
+                category: Category::Parse,
+                subject: "plan".into(),
+                detail: "instantiated plan differs from its recompilation".into(),
+                shortfalls: vec![],
+            }));
+        }
         return Err(Recompiled::Differs);
     }
     Ok(c)
@@ -408,6 +447,8 @@ pub fn compile_bytes(
     descriptors: &[BackendDescriptor],
     calibrations: &[CalibrationArtifact],
 ) -> Result<Compiled, Refusal> {
+    #[cfg(not(feature = "parameterized"))]
+    crate::unparameterized::definition(bytes)?;
     let def = Definition::parse(bytes).map_err(|e| Refusal {
         category: Category::Parse,
         subject: "definition".into(),
@@ -565,7 +606,7 @@ pub(crate) fn check_candidate(
     }
 }
 
-fn condition_refs(c: &Cond, out: &mut Vec<String>) {
+pub(crate) fn condition_refs(c: &Cond, out: &mut Vec<String>) {
     match c {
         Cond::Always => {}
         Cond::TopLabel { step, .. }
@@ -580,7 +621,7 @@ fn condition_refs(c: &Cond, out: &mut Vec<String>) {
     }
 }
 
-fn outcome_refs(o: &OutcomeDecl, out: &mut Vec<String>) {
+pub(crate) fn outcome_refs(o: &OutcomeDecl, out: &mut Vec<String>) {
     match o {
         OutcomeDecl::Propose { params, .. } => {
             for p in params {
@@ -643,11 +684,25 @@ fn compile_inner(
     sources: &[SourceDescriptor],
     execution: Option<&ExecutionPolicy>,
 ) -> Result<Compiled, Refusal> {
+    compile_instantiated(def, descriptors, calibrations, sources, execution, false)
+}
+
+/// Only the supplied-template version guard differs for an instantiated definition.
+pub(crate) fn compile_instantiated(
+    def: &Definition,
+    descriptors: &[BackendDescriptor],
+    calibrations: &[CalibrationArtifact],
+    sources: &[SourceDescriptor],
+    execution: Option<&ExecutionPolicy>,
+    #[cfg_attr(not(feature = "parameterized"), allow(unused_variables))] instantiated: bool,
+) -> Result<Compiled, Refusal> {
     use Category as C;
 
     // (a) Parse and bound: schema, and decoding of registered operators'
     // arguments. Unknown operators are left to phase (c). A version 2
     // definition compiles only to plan 3 (spec 032, 3.1.3).
+    #[cfg(not(feature = "parameterized"))]
+    crate::unparameterized::typed_definition(def)?;
     let v2 = def.schema == schema::DEFINITION_V2;
     if def.schema != schema::DEFINITION && !v2 {
         return refuse(
@@ -715,6 +770,13 @@ fn compile_inner(
     // 032 other than an operator outside `rustev.exact/1`, which phase (c)
     // refuses as before (spec 032, 3.1.3).
     if v2 {
+        #[cfg(feature = "parameterized")]
+        if instantiated {
+            quality::structure_with_origin(def, &decoded, true)?;
+        } else {
+            quality::structure(def, &decoded)?;
+        }
+        #[cfg(not(feature = "parameterized"))]
         quality::structure(def, &decoded)?;
     } else if let Some((subject, construct)) = first_v2_construct(def, &decoded) {
         return refuse(

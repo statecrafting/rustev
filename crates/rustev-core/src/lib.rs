@@ -19,6 +19,7 @@ pub mod evaluate;
 pub(crate) mod execution;
 pub mod expr;
 pub(crate) mod grading;
+#[cfg(feature = "parameterized")]
 pub mod instantiate;
 pub mod kinds;
 pub mod math;
@@ -27,6 +28,7 @@ pub(crate) mod policy;
 pub(crate) mod quality;
 pub mod seams;
 pub mod sem;
+pub mod unparameterized;
 pub mod value;
 
 /// The computed party of causes (spec 033, 3.5.2) and whether retrying an
@@ -37,3 +39,6 @@ pub use compile::{
     compile_with_sources,
 };
 pub use evaluate::{Evaluation, FailureContext, RequestIdentityError, SemanticRequest, Supplied};
+
+#[cfg(feature = "parameterized")]
+pub use instantiate::{ProfiledRefusal, compile_profiled, compile_profiled_with, instantiate};

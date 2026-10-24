@@ -27,12 +27,12 @@ spec = "008-reference-package-lodging"
 # Contract and core only (spec 008 section 2); `make boundaries` enforces it.
 [dependencies]
 rustev-contract.workspace = true
-rustev-core.workspace = true
+rustev-core = { workspace = true, features = ["parameterized"] }
 
 # The runtime, a backend, eval and the CLI run the package's own tests only.
 [dev-dependencies]
 rustev-runtime.workspace = true
-rustev-eval.workspace = true
+rustev-eval = { workspace = true, features = ["parameterized"] }
 rustev-cli.workspace = true
 rustev-backend-rules.workspace = true
 serde_json.workspace = true

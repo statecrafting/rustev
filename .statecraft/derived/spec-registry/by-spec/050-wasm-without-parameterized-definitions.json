@@ -181,7 +181,7 @@
       }
     ],
     "id": "050-wasm-without-parameterized-definitions",
-    "implementation": "pending",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-behavior",
@@ -212,14 +212,14 @@
       }
     ],
     "sectionDigests": {
-      "050-the-webassembly-module-without-parameterized-definitions-amends-027": "3eacbde1708c353d7cc48cfd951fe170b3c7f505b310104b9b9d8e57e1e86756",
+      "050-the-webassembly-module-without-parameterized-definitions-amends-027": "4977a2e1438cb29785bf7d962e58d69992f7873d82c5f49f0a60368a95f8b17b",
       "1-purpose": "7912127702945326c585a4daf930d0f618c8aeed544bbb4888649adc20ed061f",
       "2-territory": "e8880c3ae8f134a39a48e7997b7fa791c05baa311677a8572c05e57e99eefe93",
       "3-behavior": "ed9b0950692562c83e0c0bc735c05f61094a7cff4b9c224d2ef58452ba5c6245",
       "4-out-of-scope": "fcd54421e7d4af2c7a514d754e27a7a03c31dc538460b62d5404959260f6339b",
       "5-observable-negative-cases": "570a89fd4dd8025356b0aa6874271eb7ee84776c5815cf1080e19e39586e0c5f",
       "acceptance": "833c529070ac7dd7210050f7fdb4c3b22bcdc2a4940e2fa46e31b91e0d6f43e0",
-      "implementation-record": "3ec1f550f77df41421c85dea7087438add8226155f0bfedec8c3c98297c6daf3",
+      "implementation-record": "83c8d2f7268a574240678267c6672f0d94626cf5b2b614787ece795262682afb",
       "verification": "9a0efc99230f69714b4e6bbeeb5a712e53c41fdc3e227a749922da4c77b0e2d9"
     },
     "sectionHeadings": [
@@ -238,6 +238,6 @@
     "summary": "A narrow amendment of approved spec 027. Spec 034's parameterized definitions (rustev.definition/2 templates, profiles, instantiation and rustev.plan/3 instantiation records) put the optimized rustev_wasm_bg.wasm over spec 027's gzip budget, which spec 046 kept on purpose so that such a cost shows: 860,362 bytes against 786,432 at spec 034 increment 3. Spec 034 leaves exposing its functions through WebAssembly to spec 027. This spec keeps the budget and keeps spec 034's code out of the WebAssembly module: rustev-core, rustev-eval and rustev-surface gain an opt-in cargo feature `parameterized` (spec 031 keeps every release crate's `default` empty) that every workspace consumer but rustev-wasm enables, and the WebAssembly binding refuses a definition that uses spec 034's members and a plan that carries an instantiation record with a typed refusal; version 2 definitions and version 3 plans of specs 032 and 033 are unchanged. The Node binding, the CLI and every other surface keep the feature. Ratified by the owner on 2026-10-24 (A-52); the feature made opt-in the same day, before merge, by the owner's decision (A-52).\n",
     "title": "The WebAssembly module without parameterized definitions (amends 027)"
   },
-  "shardHash": "2f6fe85898a7aaa50751deb2e5304bc3618b127b2f90c200ece99ab782bf51a9",
+  "shardHash": "935d22f92692c9947284512eecf44f408224533d79be47d2760bfb2ae63e472e",
   "specVersion": "1.10.0"
 }

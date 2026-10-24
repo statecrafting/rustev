@@ -17,7 +17,7 @@ spec = "012-jev-integration"
 # therefore repeated here.
 [dependencies]
 rustev-contract = { path = "../../crates/rustev-contract" }
-rustev-core = { path = "../../crates/rustev-core" }
+rustev-core = { path = "../../crates/rustev-core", features = ["parameterized"] }
 rustev-runtime = { path = "../../crates/rustev-runtime" }
 serde.workspace = true
 serde_json.workspace = true
@@ -34,7 +34,7 @@ webpki-roots.workspace = true
 # are for the tests and the smoke harness only; hyper's server side serves
 # the loopback fake Gateway.
 [dev-dependencies]
-rustev-eval = { path = "../../crates/rustev-eval" }
+rustev-eval = { path = "../../crates/rustev-eval", features = ["parameterized"] }
 # The support-routing backend swap (spec 016 3.3): the package, spec 005's
 # rules program as the other backend, and the CLI that evaluates bundles.
 rustev-pkg-support-routing = { path = "../../packages/rustev-pkg-support-routing" }

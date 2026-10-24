@@ -16,7 +16,7 @@ use rustev_contract::canonical::tagged_digest;
 use rustev_contract::replay::MAX_RESOLVED_BYTES;
 use rustev_contract::retention::{Availability, Retention, RetentionItem};
 use rustev_contract::time::Timestamp;
-use rustev_contract::{Document, DocumentError};
+use rustev_contract::{Document, DocumentError, schema};
 
 /// What a host returns for an external reference.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -132,7 +132,11 @@ where
     if tagged_digest(&item.document_schema, bytes) != item.retention.digest().as_str() {
         return fail(Availability::Corrupt);
     }
-    if item.document_schema != T::SCHEMA {
+    let version_3 = matches!(
+        (T::SCHEMA, item.document_schema.as_str()),
+        (schema::PLAN, schema::PLAN_V3) | (schema::RUN, schema::RUN_V3)
+    );
+    if item.document_schema != T::SCHEMA && !version_3 {
         return fail(Availability::Mismatched);
     }
     let doc = match T::parse(bytes) {
@@ -156,6 +160,9 @@ where
         }
         Err(_) => return fail(Availability::Mismatched),
     };
+    if matches!(T::SCHEMA, schema::PLAN | schema::RUN) && doc.schema() != item.document_schema {
+        return fail(Availability::Mismatched);
+    }
     // Exactly the record canonical form, so the digest names the document.
     match doc.record_canonical() {
         Ok(c) if c == bytes => {}

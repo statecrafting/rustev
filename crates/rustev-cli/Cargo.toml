@@ -31,10 +31,10 @@ path = "src/main.rs"
 # ecosystem crate and no argument-parsing crate (spec 006, 2).
 [dependencies]
 rustev-contract.workspace = true
-rustev-core.workspace = true
+rustev-core = { workspace = true, features = ["parameterized"] }
 rustev-runtime.workspace = true
-rustev-eval.workspace = true
-rustev-surface.workspace = true
+rustev-eval = { workspace = true, features = ["parameterized"] }
+rustev-surface = { workspace = true, features = ["parameterized"] }
 rustev-backend-rules.workspace = true
 serde.workspace = true
 serde_json = { workspace = true, features = ["raw_value"] }

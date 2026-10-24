@@ -22,7 +22,7 @@ spec = "003-runtime-execution-and-evidence"
 
 [dependencies]
 rustev-contract.workspace = true
-rustev-core.workspace = true
+rustev-core = { workspace = true, features = ["parameterized"] }
 tokio = { workspace = true, features = ["sync", "time", "rt"] }
 
 [dev-dependencies]

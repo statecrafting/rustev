@@ -22,7 +22,7 @@ spec = "005-reference-backends"
 
 [dependencies]
 rustev-contract.workspace = true
-rustev-core.workspace = true
+rustev-core = { workspace = true, features = ["parameterized"] }
 serde.workspace = true
 serde_json.workspace = true
 

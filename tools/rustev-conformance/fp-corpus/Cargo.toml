@@ -18,7 +18,7 @@ spec = "027-node-and-wasm-bindings"
 crate-type = ["rlib", "cdylib"]
 
 [dependencies]
-rustev-core.workspace = true
+rustev-core = { workspace = true, features = ["parameterized"] }
 sha2.workspace = true
 
 # The module's exports need `#[unsafe(no_mangle)]` (an export name is an

@@ -318,7 +318,15 @@ pub(crate) fn structure(
     def: &Definition,
     decoded: &BTreeMap<String, OpArgs>,
 ) -> Result<(), Refusal> {
-    if !uses_track_construct(def, decoded) {
+    structure_with_origin(def, decoded, false)
+}
+
+pub(crate) fn structure_with_origin(
+    def: &Definition,
+    decoded: &BTreeMap<String, OpArgs>,
+    instantiated: bool,
+) -> Result<(), Refusal> {
+    if !instantiated && !uses_track_construct(def, decoded) {
         return Err(invalid(
             "definition",
             format!(

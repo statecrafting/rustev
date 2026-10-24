@@ -21,10 +21,10 @@ crate-type = ["cdylib"]
 # `cargo metadata --locked` and `cargo build --locked` pass with this feature.
 rustev-otel = { path = "../rustev-otel", features = ["otlp-http"] }
 rustev-contract.workspace = true
-rustev-core.workspace = true
+rustev-core = { workspace = true, features = ["parameterized"] }
 rustev-runtime.workspace = true
-rustev-eval.workspace = true
-rustev-surface.workspace = true
+rustev-eval = { workspace = true, features = ["parameterized"] }
+rustev-surface = { workspace = true, features = ["parameterized"] }
 rustev-backend-rules.workspace = true
 serde_json.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "time", "sync"] }

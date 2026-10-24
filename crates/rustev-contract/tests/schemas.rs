@@ -87,6 +87,10 @@ fn committed_documents() -> Vec<(PathBuf, serde_json::Value)> {
                     stack.push(p);
                 }
             } else if name.ends_with(".json")
+                // A spec 034 template (`*.template.json`) is read by core as
+                // canonical JSON, never by the definition parser, so the
+                // definition schema does not describe it.
+                && !name.ends_with(".template.json")
                 && p.components().any(|c| c.as_os_str() == "tests")
                 && let Ok(b) = std::fs::read(&p)
                 && let Ok(v) = serde_json::from_slice::<serde_json::Value>(&b)
