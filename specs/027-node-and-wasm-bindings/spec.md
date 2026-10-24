@@ -1179,6 +1179,11 @@ against their schemas in their own contract tests.
   discarded settlement is counted exactly once. This was the cause of the
   intermittent `bindings / node 20` failure of "a host backend resolving
   after the deadline is discarded and counted" in the merge queue.
+- 2026-10-24: "a host backend resolving after the deadline is discarded and
+  counted" failed once more in CI (`bindings / node 24`, merge-queue run
+  40141751495) after the fix above, so a second path leaves the late
+  settlement uncounted. The test now reports every gauge when its last wait
+  times out, to identify that path; its assertion is unchanged.
 
 ## Decisions at approval
 
