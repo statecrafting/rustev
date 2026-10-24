@@ -1154,6 +1154,23 @@ prose outside code spans keeps its entity escaping.
 `crates/rustev-cli/tests/golden/explain/`: the record, bundle and plan
 inputs and their explanations, the text-origin case and the cut case.
 
+**Increment 6 (`rustev explain`).** The CLI gains `rustev explain` with
+one subcommand per query (3.16): it reads a record (with an optional plan)
+or a bundle, applies an optional redaction policy, and writes the
+explanation and its Markdown rendering atomically without overwriting an
+existing file, with the exit codes and refusal codes of 3.16. The
+`explain` module of `rustev-eval` is now public API. Tests:
+`crates/rustev-cli/tests/explain.rs` against the increment 6 fixtures
+(every query in record and bundle form, and the negative cases); the
+`backend-output-changed` difference is covered with bundles, since a live
+record carries no raw backend output. The `input-changed` difference
+compares `support` with `changed.record.json`, which is not a runtime
+output: the harvest in `tests/explain.rs` edits `support.record.json`'s
+`ticket.message` input and `topic` step to unresolved and leaves the rest
+as recorded, so the two documents differ in exactly those members. Those
+inputs and goldens land here, beside the harvest. Mutation seeds for the
+CLI and the explainer are added to their harnesses.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

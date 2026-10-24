@@ -371,6 +371,18 @@ SEEDS += [
 ]
 
 
+# Spec 040: explanation acceptance defects.
+SEEDS += [
+    ("spec 040", 'explain040-first-reason', E + 'explain/excluded.rs', 'let first = v["reasons"].as_array().and_then(|a| a.first());', 'let first = v["reasons"].as_array().and_then(|a| a.last());', EVAL),
+    ("spec 040", 'explain040-tie-descending', E + 'explain/order.rs', 'a.as_bytes() < c.as_bytes()', 'a.as_bytes() > c.as_bytes()', EVAL),
+    ("spec 040", 'explain040-judgment-exact', E + 'explain/facts.rs', '                class,\n                bound: DerivationBound::Judgment,', '                class: { let _ = class; Derivation::ExactDerived },\n                bound: DerivationBound::Judgment,', EVAL),
+    ("spec 040", 'explain040-unknown-zero', E + 'explain/models.rs', 'group.unknown.checked_add(1)', 'group.unknown.checked_add(0)', EVAL),
+    ("spec 040", 'explain040-observation-first', E + 'explain/diff.rs', 'Claim::ObservationDifference => self.observations.push(id),', 'Claim::ObservationDifference => { self.why = Some(Divergence::OutcomeChanged); self.differences.insert(0, id); self.total += 1; },', EVAL),
+    ("spec 040", 'explain040-withheld-rendered', E + 'explain/render.rs', 'Availability::NotAvailable(u) => unavailable(u),', 'Availability::NotAvailable(u) => { let _ = u; json(&f.value) },', EVAL),
+    ("spec 040", 'explain040-plan-mismatch', E + 'explain/evidence.rs', 'if record.as_ref().is_some_and(|r| r.plan_id != id) {', 'if false && record.as_ref().is_some_and(|r| r.plan_id != id) {', EVAL),
+]
+
+
 def run(cmd, cwd, env, timeout=None):
     # A session of its own, so a timeout kills the test binaries too.
     p = subprocess.Popen(

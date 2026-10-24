@@ -330,6 +330,13 @@ SEEDS += [
 ]
 
 
+# Spec 040: a forbidden plan must fail as usage before reading evidence.
+SEEDS += [
+    ("spec 040", "explain040-bundle-plan-accepted", S + "explain.rs",
+     'if p.has(bundle) {', 'if false && p.has(bundle) {', CLI),
+]
+
+
 def run(cmd, cwd, env, timeout=None):
     # A session of its own, so a timeout kills the test binaries too.
     p = subprocess.Popen(

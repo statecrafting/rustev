@@ -260,6 +260,7 @@
         "src/calibrate.rs",
         "src/deps.rs",
         "src/eval.rs",
+        "src/explain.rs",
         "src/host.rs",
         "src/io.rs",
         "src/lib.rs",
