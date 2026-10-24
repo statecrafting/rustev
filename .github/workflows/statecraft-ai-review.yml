@@ -59,7 +59,7 @@ jobs:
           CONTEXT_TOKENS: '200000'
           MAX_CALLS: '4'
           DELETION_CAP: '20000'
-          EXCLUDE: '.statecraft/derived crates/rustev-contract/schema integrations/rustev-node/types integrations/rustev-wasm/types'
+          EXCLUDE: '.statecraft/derived crates/rustev-contract/schema integrations/rustev-node/types integrations/rustev-wasm/types tools/rustev-conformance/cases'
           RELEASE_PATTERN: 'release/*'
           CLAUDE_CLI_VERSION: '2.1.116'
           PROFILE_IDENTITY: 'd71264912245926abe9fff1daa2563b30c2bd7cd084d3837e23c3fd66028e9cd'
