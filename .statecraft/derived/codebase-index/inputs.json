@@ -16,7 +16,7 @@
       "contentHash": "cd7c752abfea832f92577bad29cdc8f674b5c376b86d8f7532ce5164123e9587"
     },
     ".github/workflows/statecraft-ai-review.yml": {
-      "contentHash": "9fffbc4f142cf08741a39ff2d635ec2a350a10f124c2b6000c75959f3e310269"
+      "contentHash": "08bbf772e71970df6e1fabd36ffd620511fd012337783c0d8b95cde603c248db"
     },
     ".github/workflows/statecraft-ci.yml": {
       "contentHash": "bede732e7b06486451c7c08844bce094b37405bf5879cb5f2a50dc1d7615bc3f"
@@ -28,7 +28,7 @@
       "contentHash": "218b76a5e1c09226bf9d0f4b5fd2f5ef13c7d8419386e4ca3907b422f50e1bef"
     },
     "AGENTS.md": {
-      "contentHash": "9a55e579bb2b710e10de876bd5e8682d8cdced0093facb9bcf72b8ae40e5a5b1"
+      "contentHash": "131f61f7fd856a7e622cfbf218927a72f1649670caa8bea3950ed0923683c45f"
     },
     "Cargo.toml": {
       "contentHash": "383bfcc4e9cebe03d116f307657fc72b8931c88154b7b866551c4b285bbfabb0"
