@@ -1,0 +1,91 @@
+{
+  "record": {
+    "amends": [
+      "031-public-api-and-release-family"
+    ],
+    "created": "2026-10-25",
+    "dependsOn": [
+      "021-packaging-and-first-release",
+      "031-public-api-and-release-family"
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "031-public-api-and-release-family",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-release/"
+        }
+      }
+    ],
+    "id": "053-signed-release-candidates",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-4-what-a-candidate-never-does",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "A release candidate is never published to crates.io, the npm registry or a container registry: `rustev-release publish` and the release workflow's `npm` job refuse a candidate tag or version before any upload."
+      },
+      {
+        "anchor": "3-2-the-candidate-tag",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "A candidate run accepts only an annotated `vX.Y.Z-rc.N` tag that verifies against `tools/rustev-release/allowed_signers`, whose `X.Y.Z` is the release set's version, whose N is a positive integer without leading zeros, and whose commit is reachable from `main`; any other tag is refused before a build."
+      },
+      {
+        "anchor": "3-3-the-candidate-run",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "A candidate run performs every build and check of a release run (spec 031 3.9), requires the dispatched manifest's SHA-256 to equal the tag's `release-manifest-sha256:`, binds its artifacts to that manifest, and only then creates one GitHub pre-release of this repository holding exactly those artifacts, their checksums, SBOMs, the manifest and its signature."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "053-signed-release-candidates-published-only-as-github-pre-releases-amends-031": "2dc6d4abd82cfb87d91cafd8ca8c5eda6968c4e574beb3f20eb30d9c87a06576",
+      "1-purpose": "934039f41fce8a3c166d25066e53a28ef32eb44da3dc1db39d5d67d52b8963f9",
+      "2-territory": "d9f52a8747314b5fde8e314f21ac5cef52453479145705574107755f6d377953",
+      "3-1-the-integration-rehearsal-branch": "bdb8f25d4a081cca2cd13007650f7c978903ba50e71b87f22d6addd970ace236",
+      "3-2-the-candidate-tag": "bfc3f1db8845f2ac606819b42c5141356cd9d8775704553fb45821e5b6465133",
+      "3-3-the-candidate-run": "ab1fcb0101ba13025d76fcbc2e3fa7fc48efbf90fc5b2eebe2f7cfe07e3be7a7",
+      "3-4-what-a-candidate-never-does": "dcd4227bd87f9722095b3d3d5fe5d275b9ed9c4061f500cc5e20aa993ff36958",
+      "3-5-consumption": "5abb9dad49cccf2f7d7acb378569abf444c9de00ec6c903062b59335401a4a06",
+      "3-release-candidates": "cdaabd2a464ce3adb033f1c69265b302efbc81398007a6a1f7b41b1a1233f489",
+      "4-out-of-scope": "c0d2f53da159cbc886481fcbc38b115cd8ad84f0d2be8d05fc5f44c889d50af9",
+      "5-observable-negative-cases": "01fc98e408fdead09ebaa5bacbc9282ce637f8ae27635f8ef9101b5b71824241",
+      "acceptance": "e95aeca407e983ff63fbd24c3b6506d5f812d08982200ff55af9b7374addf47b",
+      "decisions-at-approval": "e4a88a2e9e369a6cef7ba7685a9a4d48cca2f401f268e0fa22d3618d470db8cb",
+      "verification": "2d4249db7b3cc907afdf699db7fe8d4ae48ae16b03248b917cd27eab2527e43c"
+    },
+    "sectionHeadings": [
+      "053: Signed release candidates published only as GitHub pre-releases (amends 031)",
+      "1. Purpose",
+      "2. Territory",
+      "3. Release candidates",
+      "3.1 The integration rehearsal branch",
+      "3.2 The candidate tag",
+      "3.3 The candidate run",
+      "3.4 What a candidate never does",
+      "3.5 Consumption",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Decisions at approval"
+    ],
+    "specPath": "specs/053-signed-release-candidates/spec.md",
+    "status": "approved",
+    "summary": "A narrow amendment of approved spec 031 (3.9, 3.11, 3.12). It adds a release candidate: an owner-signed annotated tag `vX.Y.Z-rc.N` on a commit of `main`, built and checked by the release workflow exactly as a release is, and published only as a GitHub pre-release of this repository. A candidate never reaches crates.io, the npm registry or the container registry, never consumes spec 031 3.11's first-release authority, and is the identity a downstream consumer such as traveler (`statecrafting/tm`) pins with a Cargo git dependency. An integration rehearsal branch, `release/next`, is where each candidate commit is rehearsed before the owner signs it. Ratified by the owner on 2026-10-25 (A-55).\n",
+    "title": "Signed release candidates published only as GitHub pre-releases (amends 031)"
+  },
+  "shardHash": "2c3dc5cea616c52f56b9e1c9fa4b1099e38eed3f5c7a5280ff7fe2d80e7bf0c8",
+  "specVersion": "1.10.0"
+}
