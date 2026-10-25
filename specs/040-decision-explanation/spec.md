@@ -2,7 +2,7 @@
 id: "040-decision-explanation"
 title: "Decision explanation API and `rustev explain` (amends 004 and 006)"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-10-17"
 summary: >
   An amendment of approved specs 004 and 006 (R-16), for #76 child D2.
@@ -42,6 +42,7 @@ extends:
   # Adds 040 to `make verify` when the implementation is complete; the
   # bindings recipe stages the WebAssembly package's error classes.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
   # Each new source file of a release member joins the reviewed archive
   # list (spec 021, 3.5).
   - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
@@ -1032,7 +1033,24 @@ kind.
 
 ## Verification
 
-Pending with implementation. Approval satisfies no acceptance item.
+Declared for `spec-spine verify 040`; 040 is in `make verify` and in CI's
+`integrations-core` acceptance group.
+
+```verify:cli
+# 3.4 to 3.14: the explainer, every query, diff, rendering, redaction,
+# derivation bounds and the property test over generated records.
+cargo test -p rustev-eval --locked --test explain --test explain_models --test explain_selected --test explain_excluded --test explain_order --test explain_diff --test explain_render
+# 3.16, 3.17: `rustev explain` against the golden fixtures, every row of
+# section 5 that is a CLI row, through the binary.
+cargo test -p rustev-cli --locked --test explain
+# 3.15.2: `engine.explain` through the command surface and the shared
+# conformance cases.
+cargo test -p rustev-surface --locked --test explain
+cargo test -p rustev-conformance --locked
+# The Acceptance's seeds in the eval and CLI mutation harnesses.
+sh crates/rustev-eval/mutation/seeds.sh "spec 040"
+sh crates/rustev-cli/mutation/seeds.sh explain040
+```
 
 ## Implementation record
 
@@ -1192,6 +1210,35 @@ conformance suite gains every explain golden of the Acceptance as cases
 for both packages with comparison `bytes`, plus the option refusals,
 generated from `tools/rustev-conformance/tests/explain.rs`; the Node suite
 passes them (186 cases). The WebAssembly run is CI's `bindings` job.
+
+**Closure (2026-10-24).** Declared verification added (section
+Verification); 040 joins `VERIFIED_SPECS` and the `integrations-core`
+acceptance group, and `spec 040` joins the eval harness's `OWN_RUNS` so
+its seeds run once, under 040's own verification. Acceptance, item by
+item:
+
+- Golden explanations for both reference plans, every query, record form
+  with and without the plan and bundle form, including the excluded
+  candidate, ranking tie, truncated shortlist, backend-failure and
+  escalation fixtures (`crates/rustev-cli/tests/explain.rs` against
+  `tests/golden/explain/`).
+- `diff` identifies `backend-output-changed` and `input-changed` with the
+  step difference following from the input (`explain_diff.rs`,
+  `rustev-cli/tests/explain.rs`).
+- Redaction renders `not available: redacted by policy` and a byte scan
+  finds no withheld value (`explain.rs`).
+- The property test over generated records (`explain.rs`), the derivation
+  bounds (`explain_models.rs`, `explain_selected.rs`) and purity through the
+  eval purity tests with scripted seams.
+- Every row of section 5 has a test, CLI rows through the binary.
+- Compatibility: every existing golden is byte-identical.
+- The seeds of the Acceptance are each detected in the eval and CLI
+  harnesses.
+- Binding conformance cases of 3.15.2 pass on the native and WebAssembly
+  packages (increment 7, CI `bindings` job).
+- `make code`, declared verification and `make gate` pass.
+
+Every acceptance item holds, so `implementation` is `complete`.
 
 ## Decisions at approval
 
