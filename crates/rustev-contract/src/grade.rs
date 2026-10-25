@@ -165,6 +165,10 @@ pub enum MergeSide {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Basis {
+    /// An item supplied by an acquisition source (spec 036, 3.4.6).
+    Acquired {
+        step: String,
+    },
     /// An input.
     Declared,
     /// An exact step or the policy.

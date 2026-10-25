@@ -93,6 +93,18 @@ const RUN_V2_MEMBERS: [&str; 2] = ["remote_evidence", "remote_evidence_truncated
 fn run_members(version: &str) -> impl FnOnce(&mut serde_json::Value) + '_ {
     move |v| {
         if version != schema::RUN_V3 {
+            v["$defs"]["EvidenceRecord"]["properties"]
+                .as_object_mut()
+                .unwrap()
+                .remove("acquisitions");
+            v["$defs"]["StepEvidence"]["properties"]
+                .as_object_mut()
+                .unwrap()
+                .remove("constructed");
+            v["properties"]
+                .as_object_mut()
+                .unwrap()
+                .remove("acquisitions");
             v["$defs"]["RequestRecord"]["properties"]
                 .as_object_mut()
                 .unwrap()
@@ -136,6 +148,10 @@ fn run_members(version: &str) -> impl FnOnce(&mut serde_json::Value) + '_ {
 fn plan_members(version: &str) -> impl FnOnce(&mut serde_json::Value) + '_ {
     move |v| {
         if version != schema::PLAN_V3 {
+            v["properties"]
+                .as_object_mut()
+                .unwrap()
+                .remove("acquisitions");
             v["properties"]
                 .as_object_mut()
                 .expect("the plan has properties")
@@ -234,6 +250,14 @@ pub fn document_schemas() -> Vec<EmittedSchema> {
         emit::<Snapshot>(schema::SNAPSHOT_V2, None),
         emit_adjusted::<EvidenceRecord>(schema::EVIDENCE, None, |v| {
             v["properties"].as_object_mut().unwrap().remove("screening");
+            v["properties"]
+                .as_object_mut()
+                .unwrap()
+                .remove("acquisitions");
+            v["$defs"]["StepEvidence"]["properties"]
+                .as_object_mut()
+                .unwrap()
+                .remove("constructed");
             prune_defs(v);
         }),
         emit::<EvidenceRecord>(schema::EVIDENCE_V2, None),
@@ -247,7 +271,15 @@ pub fn document_schemas() -> Vec<EmittedSchema> {
         emit::<BackendOutputDoc>(schema::BACKEND_OUTPUT, None),
         emit::<EvalReport>(schema::EVAL_REPORT, None),
         emit::<ExecutionPolicy>(schema::EXECUTION, None),
-        emit::<ReplayBundle>(schema::REPLAY, None),
+        emit_adjusted::<ReplayBundle>(schema::REPLAY, None, |v| {
+            for key in ["sources", "acquisition_pages"] {
+                v["properties"].as_object_mut().unwrap().remove(key);
+            }
+            prune_defs(v);
+        }),
+        emit_adjusted::<ReplayBundle>(schema::REPLAY_V2, None, |v| {
+            v["required"].as_array_mut().unwrap().push("sources".into());
+        }),
         emit::<RequestDoc>(schema::REQUEST, None),
         emit::<RuntimeReasonDoc>(schema::RUNTIME_REASON, None),
         emit::<crate::acquisition::AcquisitionRequest>(schema::ACQUISITION_REQUEST, None),

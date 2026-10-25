@@ -59,6 +59,17 @@ pub struct Plan {
     )]
     #[schemars(with = "crate::screening::PlanScreening")]
     pub screening: Option<crate::screening::PlanScreening>,
+    /// Spec 036: omitted when the plan has no acquisition step.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::acquisition_record::list"
+    )]
+    #[schemars(
+        with = "Vec<crate::acquisition_record::PlanAcquisition>",
+        length(min = 1, max = 4096)
+    )]
+    pub acquisitions: Option<Vec<crate::acquisition_record::PlanAcquisition>>,
 }
 
 impl crate::Document for Plan {
@@ -79,6 +90,11 @@ impl crate::Document for Plan {
                 expected: "rustev.plan/2 or rustev.plan/3",
                 found: doc.schema.chars().take(80).collect(),
             });
+        }
+        if doc.schema != schema::PLAN_V3 && doc.acquisitions.is_some() {
+            return Err(DocumentError::Parse(ParseError::Schema {
+                message: "acquisitions require rustev.plan/3".into(),
+            }));
         }
         if doc.schema != schema::PLAN_V3 && doc.screening.is_some() {
             return Err(DocumentError::Parse(ParseError::Schema {

@@ -244,6 +244,7 @@ fn a_run_record_parses_under_record_limits() {
         CostMode, CostSummary, FinalCost, RecordedExecution, RunRecord, Termination, Timing,
     };
     let record = RunRecord {
+        acquisitions: None,
         schema: "rustev.run/1".into(),
         decision_id: "d-1".into(),
         plan_id: rustev_contract::ids::PlanId::parse(

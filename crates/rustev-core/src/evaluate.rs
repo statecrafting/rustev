@@ -2059,6 +2059,7 @@ impl<'c> Evaluation<'c> {
             }
         }
         let evidence = EvidenceRecord {
+            acquisitions: None,
             screening: None,
             schema: if v2 {
                 schema::EVIDENCE_V2

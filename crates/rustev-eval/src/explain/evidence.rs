@@ -72,6 +72,11 @@ impl Set {
                 let mut plan = None;
                 for (loc, item) in b.items() {
                     let (name, pointer) = match loc {
+                        ItemLocation::Source(i) => (format!("source-{i}"), format!("/sources/{i}")),
+                        ItemLocation::AcquisitionPage(i) => (
+                            format!("acquisition-page-{i}"),
+                            format!("/acquisition_pages/{i}/value"),
+                        ),
                         ItemLocation::Plan => ("plan".into(), "/plan".into()),
                         ItemLocation::Run => ("record".into(), "/run".into()),
                         ItemLocation::Snapshot => ("snapshot".into(), "/snapshot".into()),
@@ -256,4 +261,80 @@ fn unavailable(
         item: EvidencePath::parse(&path).map_err(|e| ExplainError::parse(name, e))?,
         availability,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rustev_contract::scope::{Handle, Scope};
+    use serde_json::json;
+
+    #[test]
+    fn page_and_supply_retention_paths_resolve_in_bundle() {
+        let digest = format!("sha256:{}", "a".repeat(64));
+        let item = |schema: &str| {
+            json!({
+                "document_schema": schema,
+                "identity": null,
+                "retention": {"digest_only": {
+                    "digest": digest, "expires_at_ms": 1000
+                }}
+            })
+        };
+        let scope = Scope::tenant_only(
+            Handle::new("tenant").unwrap(),
+            Handle::new("revision").unwrap(),
+        );
+        let bundle = json!({
+            "schema": "rustev.replay/2", "decision_id": "d", "scope": scope,
+            "created_at_ms": 100, "expires_at_ms": 1000, "evaluation_time_ms": 99,
+            "plan_id": digest, "plan": item("rustev.plan/3"),
+            "descriptors": [], "calibrations": [],
+            "sources": [item("rustev.source/1")],
+            "snapshot_id": digest, "snapshot": item("rustev.snapshot/2"),
+            "run": item("rustev.run/3"), "capture": "complete",
+            "acquisition_pages": [{
+                "sequence": 0, "step": "pool", "tier": 0, "page": 0,
+                "request": digest, "attempt_id": null,
+                "value": item("rustev.acquisition-page/1")
+            }],
+            "supplies": [{
+                "sequence": 1, "step": "semantic", "instance": [],
+                "request": digest, "attempt_id": null, "target": 0,
+                "value": item("rustev.backend-output/1")
+            }]
+        });
+        let bytes = serde_json::to_vec(&bundle).unwrap();
+        let parsed = ReplayBundle::parse(&bytes).unwrap();
+        let set = Set::read(&Evidence::Bundle {
+            bundle: &bytes,
+            scope: &scope,
+            now_ms: rustev_contract::time::Timestamp::from_ms(101).unwrap(),
+            resolver: &crate::resolve::NoExternal,
+        })
+        .unwrap();
+        for (location, retained) in parsed.items() {
+            let role = match location {
+                ItemLocation::AcquisitionPage(i) => format!("acquisition-page-{i}"),
+                ItemLocation::Supply(i) => format!("supply/{i}"),
+                _ => continue,
+            };
+            let Unavailable::Retention { item, availability } = &set.absent[&role] else {
+                panic!("expected retention unavailability for {role}");
+            };
+            assert_eq!(*availability, ItemAvailability::DigestOnly);
+            assert_eq!(item.resolve(&bundle), Some(&json!(digest)));
+            let pointer = item
+                .as_str()
+                .strip_prefix("bundle:")
+                .unwrap()
+                .strip_suffix("/retention/digest_only/digest")
+                .unwrap();
+            assert_eq!(
+                bundle.pointer(pointer),
+                Some(&serde_json::to_value(retained).unwrap()),
+                "{role} must address the retention item"
+            );
+        }
+    }
 }

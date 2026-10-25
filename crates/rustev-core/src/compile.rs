@@ -1836,6 +1836,7 @@ pub(crate) fn compile_instantiated(
         shortfalls: vec![],
     })?;
     let plan = Plan {
+        acquisitions: None,
         schema: if v2 { schema::PLAN_V3 } else { schema::PLAN }.into(),
         compiler: COMPILER.into(),
         registry: registry.into(),

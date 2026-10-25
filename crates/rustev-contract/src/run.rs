@@ -39,6 +39,17 @@ pub struct RunRecord {
     /// `rustev.run/2` only: remote attempts beyond the bound have no entry.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub remote_evidence_truncated: bool,
+    /// Spec 036: omitted when the plan has no acquisition step.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::acquisition_record::list"
+    )]
+    #[schemars(
+        with = "Vec<crate::acquisition_record::AcquisitionRecord>",
+        length(min = 1, max = 4096)
+    )]
+    pub acquisitions: Option<Vec<crate::acquisition_record::AcquisitionRecord>>,
 }
 
 // `rustev.run/3` is `rustev.run/1` with its core member holding
@@ -93,6 +104,16 @@ impl RunRecord {
         {
             return Err(RunVersionError::Members("screening requires rustev.run/3"));
         }
+        if let Some(pages) = &self.acquisitions {
+            if self.schema != schema::RUN_V3 {
+                return Err(RunVersionError::Members(
+                    "acquisitions require rustev.run/3",
+                ));
+            }
+            if pages.iter().map(|p| p.attempts.len()).sum::<usize>() > 4096 {
+                return Err(RunVersionError::Members("too many acquisition attempts"));
+            }
+        }
         let v2 = self.schema == schema::RUN_V2;
         match &self.remote_evidence {
             None if v2 => Err(RunVersionError::Members(
@@ -119,6 +140,13 @@ impl RunRecord {
     /// 1 or 3 record with them, or a version 2 record without the list, is
     /// refused when read, not only when projected.
     fn parsed_members_fit(&self) -> Result<(), String> {
+        if let CoreEvidence::Recorded(e) = &self.core
+            && (self.schema != schema::RUN_V3 || e.schema != schema::EVIDENCE_V2)
+            && (e.acquisitions.is_some() || e.steps.iter().any(|s| s.constructed))
+        {
+            return Err("acquisition evidence requires rustev.evidence/2".into());
+        }
+
         self.check_version_members().map_err(|e| e.to_string())
     }
 

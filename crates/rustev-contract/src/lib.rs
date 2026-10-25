@@ -11,6 +11,7 @@
 #![forbid(unsafe_code)]
 
 pub mod acquisition;
+pub mod acquisition_record;
 pub mod acquisition_step;
 pub mod actionability;
 pub mod bounded;
@@ -89,6 +90,7 @@ pub mod schema {
     /// Replay bundles, request identities and retained runtime reasons
     /// (spec 004, 3.2 and 3.4).
     pub const REPLAY: &str = "rustev.replay/1";
+    pub const REPLAY_V2: &str = "rustev.replay/2";
     pub const REQUEST: &str = "rustev.request/1";
     pub const RUNTIME_REASON: &str = "rustev.runtime-reason/1";
     /// The `rustev.remote/1` protocol documents and the exchange record

@@ -305,6 +305,8 @@ pub fn assemble(
     }
     let scope = input.scope.clone();
     let bundle = ReplayBundle {
+        sources: None,
+        acquisition_pages: None,
         schema: schema::REPLAY.into(),
         decision_id: run.decision_id.clone(),
         scope,
