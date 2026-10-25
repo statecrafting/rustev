@@ -465,9 +465,20 @@ def main():
             # workspace crates on its first seed.
             src, env = trees[0]
             packages = sorted({p for x in chosen for p in x[5]})
-            run(["cargo", "test", "--locked", "-q", "--no-run"] + [a for p in packages for a in ("-p", p)], src, env)
-            for _, other in trees[1:]:
-                shutil.copytree(env["CARGO_TARGET_DIR"], other["CARGO_TARGET_DIR"], symlinks=True)
+            warm = subprocess.run(
+                ["cargo", "test", "--locked", "-q", "--no-run"] + [a for p in packages for a in ("-p", p)],
+                cwd=src, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+            )
+            if warm.returncode != 0 or not os.path.isdir(env["CARGO_TARGET_DIR"]):
+                # Only a speed-up: each worker builds cold on its first seed
+                # instead, and a tree that truly does not compile is still
+                # reported per seed. The failure is shown, never swallowed.
+                # Both streams, merged in order: cargo's diagnostics and anything else.
+                tail = "\n".join((warm.stdout or "").strip().splitlines()[-20:])
+                print(f"seeds: the warm build failed (exit {warm.returncode}); each worker builds cold\n{tail}", flush=True)
+            else:
+                for _, other in trees[1:]:
+                    shutil.copytree(env["CARGO_TARGET_DIR"], other["CARGO_TARGET_DIR"], symlinks=True)
         queue = list(enumerate(chosen))
         results = {}
         lock = threading.Lock()
