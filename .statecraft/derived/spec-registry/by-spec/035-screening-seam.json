@@ -146,10 +146,18 @@
           "kind": "file",
           "path": "Makefile"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "directory",
+          "path": "scripts/acceptance/"
+        }
       }
     ],
     "id": "035-screening-seam",
-    "implementation": "in-progress",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-8-withheld-values-in-projections",
@@ -211,7 +219,7 @@
       }
     ],
     "sectionDigests": {
-      "035-untrusted-text-screening-seam-amends-002-003-and-009": "de8638f7b4161cc1b2081b753a1348d1bfba3cff3b01a4cdc8f1f6c0428c9924",
+      "035-untrusted-text-screening-seam-amends-002-003-and-009": "a74551aa62e4cfe01db752ef87e054ea8e4de96c8350bd66b62adce7029d1f73",
       "1-purpose": "b55f92ecbb9ed3b5a29fc31d21c08319053a3ec820d01a5108e68659cb82860a",
       "2-1-binding-principles-of-76": "9826edf89a9ccf289c81a45ebc975bf82443f7a8f9cffda17a2942c3403efc7d",
       "2-territory": "32c0fe06608ad4ee2076ea56e8dbd695594a4e0b7e1b7c7a633748dad4e76d21",
@@ -239,8 +247,8 @@
       "acceptance": "f47b9c395480eea127c60bdafe4d220c8c2984c10dbd6c09c72a9a9683cad19c",
       "decisions-at-approval": "d4258072b38094ef047ded0a4a4398fd64c5a67d35ba2b20a0c9fd5717b2831e",
       "facts-relied-on": "f770d42ca292aed0dc2a8ecbf6a20b99e87743e3733d235d13523958a11cd661",
-      "implementation-record": "2b4ef0e34cc983b741aa2b4e0e1a49fdf556c7eab8bf9becc003091d6164f74d",
-      "verification": "df328559770eb1e6e5c780723ae4a62420522f09302091be2f2a35b6e5f59ea2"
+      "implementation-record": "24323937ac58e7d6e2e45ce744ad8122a8839e155b70ed5b9a7691ac625491b2",
+      "verification": "e08afabd330ca9d4edbc457d3776b784e85bd090a566aa8c31cd081e647c33e9"
     },
     "sectionHeadings": [
       "035: Untrusted-text screening seam (amends 002, 003 and 009)",
@@ -276,9 +284,9 @@
     ],
     "specPath": "specs/035-screening-seam/spec.md",
     "status": "approved",
-    "summary": "An amendment of approved specs 002, 003 and 009, for #76 child B7 (#65). A definition may declare a `screening` block that names untrusted text fields (caller text, third-party text, list item text), the screener backend that judges each one, a consequence on block (`refuse`, `drop_field`, `drop_text`, `drop_item`) and a consequence when the screener is unavailable (`fail_closed`, `skip_generation`, `fail_open`). The block compiles down to ordinary `proposition` steps, one text value per request, plus consequence rules evaluated before the selection policy; a screener is an ordinary backend that declares a `screen` profile (categories, maximum text bytes, text unit size) and uses the general per-capability `isolation: per_item` member this spec introduces. In a definition that declares screening, the compiler refuses a model step that reads unscreened untrusted text. A blocked value under `refuse` yields spec 033's `refused` outcome with its computed addressing. Adds a `screen_unavailable` unresolved reason, an explicit withheld marker in projections, per-value screening evidence with digests only, text-unit budgets, verdict caching through spec 017's cache, the reserved `rustev.screening` metric of spec 028, a per-item isolation rule for spec 009 remote adapters, and the mapping constraints for spec 030's reserved Bedrock screening values. New members go into the shared #76 track versions (`rustev.definition/2`, `rustev.plan/3`, `rustev.evidence/2`, `rustev.judgment/2`, `rustev.run/3`); definitions, descriptors and plans that use no #76 construct keep byte-identical identities. Approved (A-32); implementation is in progress.\n",
+    "summary": "An amendment of approved specs 002, 003 and 009, for #76 child B7 (#65). A definition may declare a `screening` block that names untrusted text fields (caller text, third-party text, list item text), the screener backend that judges each one, a consequence on block (`refuse`, `drop_field`, `drop_text`, `drop_item`) and a consequence when the screener is unavailable (`fail_closed`, `skip_generation`, `fail_open`). The block compiles down to ordinary `proposition` steps, one text value per request, plus consequence rules evaluated before the selection policy; a screener is an ordinary backend that declares a `screen` profile (categories, maximum text bytes, text unit size) and uses the general per-capability `isolation: per_item` member this spec introduces. In a definition that declares screening, the compiler refuses a model step that reads unscreened untrusted text. A blocked value under `refuse` yields spec 033's `refused` outcome with its computed addressing. Adds a `screen_unavailable` unresolved reason, an explicit withheld marker in projections, per-value screening evidence with digests only, text-unit budgets, verdict caching through spec 017's cache, the reserved `rustev.screening` metric of spec 028, a per-item isolation rule for spec 009 remote adapters, and the mapping constraints for spec 030's reserved Bedrock screening values. New members go into the shared #76 track versions (`rustev.definition/2`, `rustev.plan/3`, `rustev.evidence/2`, `rustev.judgment/2`, `rustev.run/3`); definitions, descriptors and plans that use no #76 construct keep byte-identical identities. Approved (A-32); implementation is complete.\n",
     "title": "Untrusted-text screening seam (amends 002, 003 and 009)"
   },
-  "shardHash": "82769aee67e09b25d1efcb0f129e85cdba3b83423d8d626ed26c2e2bacab0ba4",
+  "shardHash": "f1011280a16176153d59b9c7a5244a283917687d8b1fa81949a85009dab37097",
   "specVersion": "1.10.0"
 }
