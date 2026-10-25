@@ -376,6 +376,7 @@ fn operation_name(op: Operation) -> &'static str {
         Operation::Proposition => "proposition",
         Operation::Rubric => "rubric",
         Operation::Rank => "rank",
+        Operation::Generate => "generate",
     }
 }
 

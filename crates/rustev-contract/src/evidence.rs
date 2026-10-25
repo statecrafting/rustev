@@ -49,6 +49,17 @@ pub struct EvidenceRecord {
         length(min = 1, max = 4096)
     )]
     pub acquisitions: Option<Vec<crate::acquisition_record::AcquisitionEvidence>>,
+    /// Spec 037: digest-only field slots, omitted without generate steps.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::generation_result::evidence"
+    )]
+    #[schemars(
+        with = "Vec<crate::generation_result::GenerationEvidence>",
+        length(min = 1, max = 8)
+    )]
+    pub generation: Option<Vec<crate::generation_result::GenerationEvidence>>,
 }
 
 crate::document::versioned_document!(
@@ -65,6 +76,9 @@ impl EvidenceRecord {
             && (self.acquisitions.is_some() || self.steps.iter().any(|s| s.constructed))
         {
             return Err("acquisitions and constructed require rustev.evidence/2".into());
+        }
+        if self.generation.is_some() && self.schema != schema::EVIDENCE_V2 {
+            return Err("generation requires rustev.evidence/2".into());
         }
         if self.screening.is_some() && self.schema != schema::EVIDENCE_V2 {
             return Err("screening requires rustev.evidence/2".into());

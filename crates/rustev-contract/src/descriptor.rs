@@ -42,6 +42,24 @@ pub struct OperationSupport {
 
 /// What a backend returns for an operation (design section 8.2).
 #[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum OutputKind {
+    Label,
+    Scores,
+    Distribution,
+    Logits,
+    Screen,
+    TextRecord {
+        structure: TextStructure,
+        max_output_bytes: u64,
+        languages: Vec<String>,
+        streaming: bool,
+    },
+}
+
+#[derive(
     Debug,
     Clone,
     Copy,
@@ -55,12 +73,10 @@ pub struct OperationSupport {
     schemars::JsonSchema,
 )]
 #[serde(rename_all = "snake_case")]
-pub enum OutputKind {
-    Label,
-    Scores,
-    Distribution,
-    Logits,
-    Screen,
+pub enum TextStructure {
+    JsonSchema,
+    ToolCall,
+    Grammar,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -139,6 +155,29 @@ impl TryFrom<OperationSupportWire> for OperationSupport {
         {
             return Err("invalid proposition screen profile".into());
         }
+        if let OutputKind::TextRecord {
+            max_output_bytes,
+            languages,
+            ..
+        } = &w.output
+        {
+            if w.operation != Operation::Generate
+                || *max_output_bytes == 0
+                || w.max_options == 0
+                || languages.is_empty()
+                || languages.iter().any(|s| !language_tag(s))
+                || languages
+                    .iter()
+                    .map(|s| s.to_ascii_lowercase())
+                    .collect::<std::collections::BTreeSet<_>>()
+                    .len()
+                    != languages.len()
+            {
+                return Err("invalid generate text_record capability".into());
+            }
+        } else if w.operation == Operation::Generate {
+            return Err("generate requires text_record output".into());
+        }
         Ok(Self {
             operation: w.operation,
             output: w.output,
@@ -156,4 +195,94 @@ impl OperationSupport {
             && self.output == OutputKind::Screen
             && self.screen.is_some()
     }
+}
+
+// Syntactic language tags, including private-use and grandfathered tags.
+// Registry membership is deliberately not a parse-time network dependency.
+fn language_tag(s: &str) -> bool {
+    let lower = s.to_ascii_lowercase();
+    if [
+        "en-gb-oed",
+        "i-ami",
+        "i-bnn",
+        "i-default",
+        "i-enochian",
+        "i-hak",
+        "i-klingon",
+        "i-lux",
+        "i-mingo",
+        "i-navajo",
+        "i-pwn",
+        "i-tao",
+        "i-tay",
+        "i-tsu",
+        "sgn-be-fr",
+        "sgn-be-nl",
+        "sgn-ch-de",
+    ]
+    .contains(&lower.as_str())
+    {
+        return true;
+    }
+    let parts: Vec<_> = lower.split('-').collect();
+    let alpha = |p: &str| p.bytes().all(|b| b.is_ascii_alphabetic());
+    let alnum = |p: &str| p.bytes().all(|b| b.is_ascii_alphanumeric());
+    if parts
+        .iter()
+        .any(|p| p.is_empty() || p.len() > 8 || !alnum(p))
+    {
+        return false;
+    }
+    if parts[0] == "x" {
+        return parts.len() > 1;
+    }
+    if !(2..=8).contains(&parts[0].len()) || !alpha(parts[0]) {
+        return false;
+    }
+    let mut i = 1;
+    if parts[0].len() <= 3 {
+        for _ in 0..3 {
+            if i < parts.len() && parts[i].len() == 3 && alpha(parts[i]) {
+                i += 1;
+            } else {
+                break;
+            }
+        }
+    }
+    if i < parts.len() && parts[i].len() == 4 && alpha(parts[i]) {
+        i += 1;
+    }
+    if i < parts.len()
+        && ((parts[i].len() == 2 && alpha(parts[i]))
+            || (parts[i].len() == 3 && parts[i].bytes().all(|b| b.is_ascii_digit())))
+    {
+        i += 1;
+    }
+    let mut variants = std::collections::BTreeSet::new();
+    while i < parts.len()
+        && (parts[i].len() >= 5 || (parts[i].len() == 4 && parts[i].as_bytes()[0].is_ascii_digit()))
+    {
+        if !variants.insert(parts[i]) {
+            return false;
+        }
+        i += 1;
+    }
+    let mut extensions = std::collections::BTreeSet::new();
+    while i < parts.len() && parts[i].len() == 1 && parts[i] != "x" {
+        if !extensions.insert(parts[i]) {
+            return false;
+        }
+        i += 1;
+        let start = i;
+        while i < parts.len() && parts[i].len() >= 2 {
+            i += 1;
+        }
+        if start == i {
+            return false;
+        }
+    }
+    if i < parts.len() && parts[i] == "x" {
+        return i + 1 < parts.len();
+    }
+    i == parts.len()
 }

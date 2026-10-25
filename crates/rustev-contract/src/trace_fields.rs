@@ -71,8 +71,7 @@ pub struct CatalogueField {
     pub rule: ClassRule,
     /// A template: matches `name` followed by one non-empty segment.
     pub template: bool,
-    /// A GenAI content field (3.5.7). None exists until #76 B5 or B6 adds
-    /// content to the records.
+    /// A GenAI content field (3.5.7), requiring an explicit content policy.
     pub content: bool,
 }
 
@@ -192,12 +191,41 @@ pub const CATALOGUE: &[CatalogueField] = &[
     f("rustev.excluded.reasons", PM),
     f("rustev.execution.policy_id", PM),
     f("rustev.fallbacks.kind", E),
+    f("rustev.generation.attempt", ID),
     f("rustev.generation.backend_id", PM),
+    f("rustev.generation.byte_length", N),
+    CatalogueField {
+        name: "rustev.generation.context",
+        rule: ClassRule::Lineage,
+        template: false,
+        content: true,
+    },
+    f("rustev.generation.context_digest", CD),
+    f("rustev.generation.counts", N),
+    f("rustev.generation.derivation", E),
     f("rustev.generation.field", PM),
     f("rustev.generation.helpers_version", PM),
+    f("rustev.generation.item", ID),
     f("rustev.generation.max_items", N),
+    f("rustev.generation.notice", E),
+    f("rustev.generation.origin", E),
+    f("rustev.generation.original_decision_id", ID),
+    f("rustev.generation.projection", PM),
+    f("rustev.generation.reason", E),
+    f("rustev.generation.source", E),
+    f("rustev.generation.state", E),
+    f("rustev.generation.step", PM),
     f("rustev.generation.template_id", CD),
     f("rustev.generation.template_name", PM),
+    f("rustev.generation.text_origin", E),
+    f("rustev.generation.truncated", E),
+    CatalogueField {
+        name: "rustev.generation.value",
+        rule: ClassRule::Class(FieldClass::GeneratedText),
+        template: false,
+        content: true,
+    },
+    f("rustev.generation.value_digest", CD),
     f("rustev.generation.worst_case_projection_bytes", N),
     f("rustev.generation.worst_case_requests", N),
     f("rustev.input.as_of_ms", N),
@@ -370,8 +398,15 @@ mod tests {
     }
 
     #[test]
-    fn no_content_field_exists_yet() {
-        assert!(CATALOGUE.iter().all(|e| !e.content));
+    fn generation_content_is_explicit() {
+        assert_eq!(
+            CATALOGUE
+                .iter()
+                .filter(|e| e.content)
+                .map(|e| e.name)
+                .collect::<Vec<_>>(),
+            vec!["rustev.generation.context", "rustev.generation.value"]
+        );
     }
 
     #[test]

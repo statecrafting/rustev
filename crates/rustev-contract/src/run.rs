@@ -141,6 +141,12 @@ impl RunRecord {
     /// refused when read, not only when projected.
     fn parsed_members_fit(&self) -> Result<(), String> {
         if let CoreEvidence::Recorded(e) = &self.core
+            && e.generation.is_some()
+            && (self.schema != schema::RUN_V3 || e.schema != schema::EVIDENCE_V2)
+        {
+            return Err("generation evidence requires rustev.run/3 and rustev.evidence/2".into());
+        }
+        if let CoreEvidence::Recorded(e) = &self.core
             && (self.schema != schema::RUN_V3 || e.schema != schema::EVIDENCE_V2)
             && (e.acquisitions.is_some() || e.steps.iter().any(|s| s.constructed))
         {

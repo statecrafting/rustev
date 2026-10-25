@@ -80,11 +80,21 @@ export namespace RustevBackend1 {
   /**
    * The four semantic operations (R-05).
    */
-  export type Operation = "classify" | "proposition" | "rubric" | "rank";
+  export type Operation = "classify" | "proposition" | "rubric" | "rank" | "generate";
   /**
    * What a backend returns for an operation (design section 8.2).
    */
-  export type OutputKind = "label" | "scores" | "distribution" | "logits" | "screen";
+  export type OutputKind =
+    | ("label" | "scores" | "distribution" | "logits" | "screen")
+    | {
+        text_record: {
+          languages: string[];
+          max_output_bytes: number;
+          streaming: boolean;
+          structure: TextStructure;
+        };
+      };
+  export type TextStructure = "json_schema" | "tool_call" | "grammar";
 
   export interface RustevBackend1 {
     artifact: ArtifactId;
@@ -153,6 +163,11 @@ export namespace RustevBackendOutput1 {
           categories: string[];
           units: ScreenUnits;
         };
+      }
+    | {
+        text_record: {
+          [k: string]: TextValue | undefined;
+        };
       };
   /**
    * A screener's reported text units, distinct from runtime computed charges.
@@ -163,6 +178,16 @@ export namespace RustevBackendOutput1 {
         reported: {
           n: number;
         };
+      };
+  /**
+   * A generated field before plan-dependent validation (spec 037, 3.7).
+   */
+  export type TextValue =
+    | {
+        text: string;
+      }
+    | {
+        list: string[];
       };
 
   export interface RustevBackendOutput1 {
@@ -782,7 +807,13 @@ export namespace RustevDefinition1 {
    * The value kind a semantic step requires (spec 002, 3.9.3).
    */
   export type RequiredKind =
-    "label" | "distribution" | "calibrated_probability" | "ordinal_distribution" | "scores" | "screen_verdict";
+    | "label"
+    | "distribution"
+    | "calibrated_probability"
+    | "ordinal_distribution"
+    | "scores"
+    | "screen_verdict"
+    | "text_record";
   export type ItemSource =
     | "none"
     | {
@@ -794,7 +825,7 @@ export namespace RustevDefinition1 {
   /**
    * The four semantic operations (R-05).
    */
-  export type Operation = "classify" | "proposition" | "rubric" | "rank";
+  export type Operation = "classify" | "proposition" | "rubric" | "rank" | "generate";
   export type OnFalse = "contradicts" | "no_evidence";
   export type CorroborationMode = "all" | "any";
   export type OnContradiction = "conflict" | "treat_as_hint" | "abstain";
@@ -1939,7 +1970,13 @@ export namespace RustevDefinition2 {
    * The value kind a semantic step requires (spec 002, 3.9.3).
    */
   export type RequiredKind =
-    "label" | "distribution" | "calibrated_probability" | "ordinal_distribution" | "scores" | "screen_verdict";
+    | "label"
+    | "distribution"
+    | "calibrated_probability"
+    | "ordinal_distribution"
+    | "scores"
+    | "screen_verdict"
+    | "text_record";
   export type ItemSource =
     | "none"
     | {
@@ -1951,7 +1988,7 @@ export namespace RustevDefinition2 {
   /**
    * The four semantic operations (R-05).
    */
-  export type Operation = "classify" | "proposition" | "rubric" | "rank";
+  export type Operation = "classify" | "proposition" | "rubric" | "rank" | "generate";
   export type OnFalse = "contradicts" | "no_evidence";
   export type CorroborationMode = "all" | "any";
   export type OnContradiction = "conflict" | "treat_as_hint" | "abstain";
@@ -4316,6 +4353,47 @@ export namespace RustevEvidence2 {
         };
       };
   export type DefinitionId = string;
+  export type FieldOrigin =
+    | ("generated" | "repaired")
+    | {
+        backstop: {
+          reason: TextReason;
+        };
+      }
+    | {
+        absent: {
+          reason: TextReason;
+        };
+      };
+  export type TextReason =
+    | "screen_blocked"
+    | "screen_unavailable"
+    | "deadline"
+    | "retries_exhausted"
+    | "invalid_output"
+    | "backend_unavailable"
+    | "budget_exhausted"
+    | "not_attempted";
+  export type TextSource =
+    | "fresh"
+    | {
+        served_from_cache: {
+          original_decision_id: string;
+        };
+      };
+  export type GenerationState =
+    | "ran"
+    | {
+        skipped: {
+          reason: GenerationSkipReason;
+        };
+      };
+  export type GenerationSkipReason =
+    | "outcome_not_matched"
+    | {
+        source_unresolved: Unresolved;
+      };
+  export type TextOrigin = "none" | "generated" | "backstop" | "partial";
   /**
    * The closed, ordered evidence grade. The derived order runs weakest to
    * strongest, so `min` and `max` are the grade order of spec 032, 3.2.1.
@@ -4678,6 +4756,45 @@ export namespace RustevEvidence2 {
     decision_id: string;
     definition_id: DefinitionId;
     evaluation_time_ms: Timestamp;
+    /**
+     * Spec 037: digest-only field slots, omitted without generate steps.
+     *
+     * @minItems 1
+     * @maxItems 8
+     */
+    generation?:
+      | [GenerationEvidence]
+      | [GenerationEvidence, GenerationEvidence]
+      | [GenerationEvidence, GenerationEvidence, GenerationEvidence]
+      | [GenerationEvidence, GenerationEvidence, GenerationEvidence, GenerationEvidence]
+      | [GenerationEvidence, GenerationEvidence, GenerationEvidence, GenerationEvidence, GenerationEvidence]
+      | [
+          GenerationEvidence,
+          GenerationEvidence,
+          GenerationEvidence,
+          GenerationEvidence,
+          GenerationEvidence,
+          GenerationEvidence
+        ]
+      | [
+          GenerationEvidence,
+          GenerationEvidence,
+          GenerationEvidence,
+          GenerationEvidence,
+          GenerationEvidence,
+          GenerationEvidence,
+          GenerationEvidence
+        ]
+      | [
+          GenerationEvidence,
+          GenerationEvidence,
+          GenerationEvidence,
+          GenerationEvidence,
+          GenerationEvidence,
+          GenerationEvidence,
+          GenerationEvidence,
+          GenerationEvidence
+        ];
     inputs: InputEvidence[];
     judgment: Judgment;
     plan_id: PlanId;
@@ -4781,6 +4898,48 @@ export namespace RustevEvidence2 {
     check: string;
     status: CheckStatus;
     subject: string;
+  }
+  export interface GenerationEvidence {
+    counts: TextCounts;
+    items: GenerationItemEvidence[];
+    state: GenerationState;
+    step: string;
+    text_origin: TextOrigin;
+  }
+  export interface TextCounts {
+    absent: number;
+    backstop: number;
+    generated: number;
+    reasons: {
+      backend_unavailable?: number;
+      budget_exhausted?: number;
+      deadline?: number;
+      invalid_output?: number;
+      not_attempted?: number;
+      retries_exhausted?: number;
+      screen_blocked?: number;
+      screen_unavailable?: number;
+    };
+    repaired: number;
+  }
+  export interface GenerationItemEvidence {
+    context: {
+      [k: string]: ContentDigest | undefined;
+    };
+    generated: {
+      [k: string]: TextFieldEvidence | undefined;
+    };
+    id: string[];
+  }
+  export interface TextFieldEvidence {
+    /**
+     * Absent slots have neither a byte length nor a value digest.
+     */
+    byte_length?: number;
+    origin: FieldOrigin;
+    source: TextSource;
+    truncated: boolean;
+    value_digest?: ContentDigest;
   }
   export interface InputEvidence {
     /**
@@ -7656,7 +7815,13 @@ export namespace RustevPlan2 {
    * The value kind a semantic step requires (spec 002, 3.9.3).
    */
   export type RequiredKind =
-    "label" | "distribution" | "calibrated_probability" | "ordinal_distribution" | "scores" | "screen_verdict";
+    | "label"
+    | "distribution"
+    | "calibrated_probability"
+    | "ordinal_distribution"
+    | "scores"
+    | "screen_verdict"
+    | "text_record";
   export type ItemSource =
     | "none"
     | {
@@ -7668,7 +7833,7 @@ export namespace RustevPlan2 {
   /**
    * The four semantic operations (R-05).
    */
-  export type Operation = "classify" | "proposition" | "rubric" | "rank";
+  export type Operation = "classify" | "proposition" | "rubric" | "rank" | "generate";
   export type OnFalse = "contradicts" | "no_evidence";
   export type CorroborationMode = "all" | "any";
   export type OnContradiction = "conflict" | "treat_as_hint" | "abstain";
@@ -7749,7 +7914,17 @@ export namespace RustevPlan2 {
   /**
    * What a backend returns for an operation (design section 8.2).
    */
-  export type OutputKind = "label" | "scores" | "distribution" | "logits" | "screen";
+  export type OutputKind =
+    | ("label" | "scores" | "distribution" | "logits" | "screen")
+    | {
+        text_record: {
+          languages: string[];
+          max_output_bytes: number;
+          streaming: boolean;
+          structure: TextStructure;
+        };
+      };
+  export type TextStructure = "json_schema" | "tool_call" | "grammar";
   export type ExecutionPolicyId = string;
   /**
    * The cost budget of one decision, in integer units the deployment chooses
@@ -9322,7 +9497,13 @@ export namespace RustevPlan3 {
    * The value kind a semantic step requires (spec 002, 3.9.3).
    */
   export type RequiredKind =
-    "label" | "distribution" | "calibrated_probability" | "ordinal_distribution" | "scores" | "screen_verdict";
+    | "label"
+    | "distribution"
+    | "calibrated_probability"
+    | "ordinal_distribution"
+    | "scores"
+    | "screen_verdict"
+    | "text_record";
   export type ItemSource =
     | "none"
     | {
@@ -9334,7 +9515,7 @@ export namespace RustevPlan3 {
   /**
    * The four semantic operations (R-05).
    */
-  export type Operation = "classify" | "proposition" | "rubric" | "rank";
+  export type Operation = "classify" | "proposition" | "rubric" | "rank" | "generate";
   export type OnFalse = "contradicts" | "no_evidence";
   export type CorroborationMode = "all" | "any";
   export type OnContradiction = "conflict" | "treat_as_hint" | "abstain";
@@ -9415,7 +9596,17 @@ export namespace RustevPlan3 {
   /**
    * What a backend returns for an operation (design section 8.2).
    */
-  export type OutputKind = "label" | "scores" | "distribution" | "logits" | "screen";
+  export type OutputKind =
+    | ("label" | "scores" | "distribution" | "logits" | "screen")
+    | {
+        text_record: {
+          languages: string[];
+          max_output_bytes: number;
+          streaming: boolean;
+          structure: TextStructure;
+        };
+      };
+  export type TextStructure = "json_schema" | "tool_call" | "grammar";
   export type ExecutionPolicyId = string;
   /**
    * The cost budget of one decision, in integer units the deployment chooses
@@ -11623,11 +11814,21 @@ export namespace RustevRemoteDescribe1Response {
   /**
    * The four semantic operations (R-05).
    */
-  export type Operation = "classify" | "proposition" | "rubric" | "rank";
+  export type Operation = "classify" | "proposition" | "rubric" | "rank" | "generate";
   /**
    * What a backend returns for an operation (design section 8.2).
    */
-  export type OutputKind = "label" | "scores" | "distribution" | "logits" | "screen";
+  export type OutputKind =
+    | ("label" | "scores" | "distribution" | "logits" | "screen")
+    | {
+        text_record: {
+          languages: string[];
+          max_output_bytes: number;
+          streaming: boolean;
+          structure: TextStructure;
+        };
+      };
+  export type TextStructure = "json_schema" | "tool_call" | "grammar";
   export type DescriptorId = string;
   /**
    * Shared-state batching support (spec 009, 3.10.4).
@@ -12122,6 +12323,11 @@ export namespace RustevRemoteInfer1Response {
           categories: string[];
           units: ScreenUnits;
         };
+      }
+    | {
+        text_record: {
+          [k: string]: TextValue | undefined;
+        };
       };
   /**
    * A screener's reported text units, distinct from runtime computed charges.
@@ -12132,6 +12338,16 @@ export namespace RustevRemoteInfer1Response {
         reported: {
           n: number;
         };
+      };
+  /**
+   * A generated field before plan-dependent validation (spec 037, 3.7).
+   */
+  export type TextValue =
+    | {
+        text: string;
+      }
+    | {
+        list: string[];
       };
   /**
    * The closed error taxonomy (spec 009, 3.6). Each code maps to exactly one
@@ -12614,12 +12830,28 @@ export namespace RustevRequest1 {
   /**
    * What a backend returns for an operation (design section 8.2).
    */
-  export type OutputKind = "label" | "scores" | "distribution" | "logits" | "screen";
+  export type OutputKind =
+    | ("label" | "scores" | "distribution" | "logits" | "screen")
+    | {
+        text_record: {
+          languages: string[];
+          max_output_bytes: number;
+          streaming: boolean;
+          structure: TextStructure;
+        };
+      };
+  export type TextStructure = "json_schema" | "tool_call" | "grammar";
   /**
    * The value kind a semantic step requires (spec 002, 3.9.3).
    */
   export type RequiredKind =
-    "label" | "distribution" | "calibrated_probability" | "ordinal_distribution" | "scores" | "screen_verdict";
+    | "label"
+    | "distribution"
+    | "calibrated_probability"
+    | "ordinal_distribution"
+    | "scores"
+    | "screen_verdict"
+    | "text_record";
   /**
    * The isolation scope of a capture, a bundle and every request identity.
    */
@@ -15154,6 +15386,47 @@ export namespace RustevRun3 {
         };
       };
   export type DefinitionId = string;
+  export type FieldOrigin =
+    | ("generated" | "repaired")
+    | {
+        backstop: {
+          reason: TextReason;
+        };
+      }
+    | {
+        absent: {
+          reason: TextReason;
+        };
+      };
+  export type TextReason =
+    | "screen_blocked"
+    | "screen_unavailable"
+    | "deadline"
+    | "retries_exhausted"
+    | "invalid_output"
+    | "backend_unavailable"
+    | "budget_exhausted"
+    | "not_attempted";
+  export type TextSource =
+    | "fresh"
+    | {
+        served_from_cache: {
+          original_decision_id: string;
+        };
+      };
+  export type GenerationState =
+    | "ran"
+    | {
+        skipped: {
+          reason: GenerationSkipReason;
+        };
+      };
+  export type GenerationSkipReason =
+    | "outcome_not_matched"
+    | {
+        source_unresolved: Unresolved;
+      };
+  export type TextOrigin = "none" | "generated" | "backstop" | "partial";
   /**
    * The closed, ordered evidence grade. The derived order runs weakest to
    * strongest, so `min` and `max` are the grade order of spec 032, 3.2.1.
@@ -15669,6 +15942,45 @@ export namespace RustevRun3 {
     decision_id: string;
     definition_id: DefinitionId;
     evaluation_time_ms: Timestamp;
+    /**
+     * Spec 037: digest-only field slots, omitted without generate steps.
+     *
+     * @minItems 1
+     * @maxItems 8
+     */
+    generation?:
+      | [GenerationEvidence]
+      | [GenerationEvidence, GenerationEvidence]
+      | [GenerationEvidence, GenerationEvidence, GenerationEvidence]
+      | [GenerationEvidence, GenerationEvidence, GenerationEvidence, GenerationEvidence]
+      | [GenerationEvidence, GenerationEvidence, GenerationEvidence, GenerationEvidence, GenerationEvidence]
+      | [
+          GenerationEvidence,
+          GenerationEvidence,
+          GenerationEvidence,
+          GenerationEvidence,
+          GenerationEvidence,
+          GenerationEvidence
+        ]
+      | [
+          GenerationEvidence,
+          GenerationEvidence,
+          GenerationEvidence,
+          GenerationEvidence,
+          GenerationEvidence,
+          GenerationEvidence,
+          GenerationEvidence
+        ]
+      | [
+          GenerationEvidence,
+          GenerationEvidence,
+          GenerationEvidence,
+          GenerationEvidence,
+          GenerationEvidence,
+          GenerationEvidence,
+          GenerationEvidence,
+          GenerationEvidence
+        ];
     inputs: InputEvidence[];
     judgment: Judgment;
     plan_id: PlanId;
@@ -15772,6 +16084,48 @@ export namespace RustevRun3 {
     check: string;
     status: CheckStatus;
     subject: string;
+  }
+  export interface GenerationEvidence {
+    counts: TextCounts;
+    items: GenerationItemEvidence[];
+    state: GenerationState;
+    step: string;
+    text_origin: TextOrigin;
+  }
+  export interface TextCounts {
+    absent: number;
+    backstop: number;
+    generated: number;
+    reasons: {
+      backend_unavailable?: number;
+      budget_exhausted?: number;
+      deadline?: number;
+      invalid_output?: number;
+      not_attempted?: number;
+      retries_exhausted?: number;
+      screen_blocked?: number;
+      screen_unavailable?: number;
+    };
+    repaired: number;
+  }
+  export interface GenerationItemEvidence {
+    context: {
+      [k: string]: ContentDigest | undefined;
+    };
+    generated: {
+      [k: string]: TextFieldEvidence | undefined;
+    };
+    id: string[];
+  }
+  export interface TextFieldEvidence {
+    /**
+     * Absent slots have neither a byte length nor a value digest.
+     */
+    byte_length?: number;
+    origin: FieldOrigin;
+    source: TextSource;
+    truncated: boolean;
+    value_digest?: ContentDigest;
   }
   export interface InputEvidence {
     /**
@@ -17177,16 +17531,32 @@ export namespace RustevServeRefusal1 {
   /**
    * The four semantic operations (R-05).
    */
-  export type Operation = "classify" | "proposition" | "rubric" | "rank";
+  export type Operation = "classify" | "proposition" | "rubric" | "rank" | "generate";
   /**
    * What a backend returns for an operation (design section 8.2).
    */
-  export type OutputKind = "label" | "scores" | "distribution" | "logits" | "screen";
+  export type OutputKind =
+    | ("label" | "scores" | "distribution" | "logits" | "screen")
+    | {
+        text_record: {
+          languages: string[];
+          max_output_bytes: number;
+          streaming: boolean;
+          structure: TextStructure;
+        };
+      };
+  export type TextStructure = "json_schema" | "tool_call" | "grammar";
   /**
    * The value kind a semantic step requires (spec 002, 3.9.3).
    */
   export type RequiredKind =
-    "label" | "distribution" | "calibrated_probability" | "ordinal_distribution" | "scores" | "screen_verdict";
+    | "label"
+    | "distribution"
+    | "calibrated_probability"
+    | "ordinal_distribution"
+    | "scores"
+    | "screen_verdict"
+    | "text_record";
   export type ContentDigest = string;
   /**
    * @minItems 0
@@ -17889,6 +18259,323 @@ export namespace RustevSource1 {
   }
 }
 export type RustevSource1 = RustevSource1.RustevSource1;
+
+export namespace RustevTextResult1 {
+  export type TextNoticeKind = "ownership_violation" | "ownership_restored" | "backstop_truncated";
+  export type PlanId = string;
+  /**
+   * Derivation classes (spec 001, 3.3; spec 002, 3.12).
+   */
+  export type Derivation = "exact-derived" | "model-derived" | "mixed-derived";
+  /**
+   * A value placed in a proposal's parameters.
+   */
+  export type OutValue =
+    | {
+        bool: boolean;
+      }
+    | {
+        integer: number;
+      }
+    | {
+        decimal: Decimal;
+      }
+    | {
+        text: string;
+      }
+    | {
+        enum: string;
+      }
+    | {
+        timestamp: Timestamp;
+      }
+    | {
+        duration: DurationMs;
+      }
+    | "none"
+    | {
+        list: OutValue[];
+      }
+    | {
+        record: {
+          [k: string]: OutValue | undefined;
+        };
+      }
+    | {
+        filtered: Filtered;
+      }
+    | {
+        shortlist: Shortlist;
+      }
+    | {
+        ranking: Ranking;
+      };
+  export type Decimal = string;
+  export type Timestamp = number;
+  /**
+   * A non-negative span in milliseconds.
+   */
+  export type DurationMs = number;
+  /**
+   * The lineage of the value, separate from cache delivery provenance.
+   */
+  export type TextLineage =
+    | {
+        model: {
+          attempt: string;
+          projection: string[];
+          step: string;
+          template: PromptTemplateId;
+        };
+      }
+    | {
+        backstop: {
+          paths: string[];
+        };
+      };
+  export type PromptTemplateId = string;
+  export type FieldOrigin =
+    | ("generated" | "repaired")
+    | {
+        backstop: {
+          reason: TextReason;
+        };
+      }
+    | {
+        absent: {
+          reason: TextReason;
+        };
+      };
+  export type TextReason =
+    | "screen_blocked"
+    | "screen_unavailable"
+    | "deadline"
+    | "retries_exhausted"
+    | "invalid_output"
+    | "backend_unavailable"
+    | "budget_exhausted"
+    | "not_attempted";
+  export type TextSource =
+    | "fresh"
+    | {
+        served_from_cache: {
+          original_decision_id: string;
+        };
+      };
+  /**
+   * A generated field before plan-dependent validation (spec 037, 3.7).
+   */
+  export type TextValue =
+    | {
+        text: string;
+      }
+    | {
+        list: string[];
+      };
+  export type GenerationState =
+    | "ran"
+    | {
+        skipped: {
+          reason: GenerationSkipReason;
+        };
+      };
+  export type GenerationSkipReason =
+    | "outcome_not_matched"
+    | {
+        source_unresolved: Unresolved;
+      };
+  /**
+   * The closed set of unresolved reasons (spec 002, 3.5.6). Field and fact
+   * lists are sorted and deduplicated.
+   */
+  export type Unresolved =
+    | "deadline_exceeded"
+    | {
+        missing_evidence: {
+          fields: string[];
+        };
+      }
+    | {
+        stale_evidence: {
+          fields: string[];
+        };
+      }
+    | {
+        invalid_input: {
+          detail: string;
+          fields: string[];
+        };
+      }
+    | {
+        abstained: {
+          rule: string;
+        };
+      }
+    | {
+        backend_unavailable: {
+          detail: string;
+        };
+      }
+    | {
+        invalid_backend_output: {
+          detail: string;
+        };
+      }
+    | {
+        budget_exhausted: {
+          resource: string;
+        };
+      }
+    | {
+        conflict: {
+          facts: string[];
+        };
+      }
+    | {
+        unsupported: {
+          capability: string;
+        };
+      }
+    | {
+        insufficient_grade: {
+          fields: string[];
+        };
+      }
+    | {
+        screen_unavailable: {
+          /**
+           * @minItems 1
+           */
+          fields: [string, ...string[]];
+        };
+      };
+  export type TextOrigin = "none" | "generated" | "backstop" | "partial";
+
+  export interface RustevTextResult1 {
+    counts: TextCounts;
+    decision_id: string;
+    notices: TextNotice[];
+    plan_id: PlanId;
+    schema: "rustev.text-result/1";
+    steps: TextStep[];
+    text_origin: TextOrigin;
+  }
+  export interface TextCounts {
+    absent: number;
+    backstop: number;
+    generated: number;
+    reasons: {
+      backend_unavailable?: number;
+      budget_exhausted?: number;
+      deadline?: number;
+      invalid_output?: number;
+      not_attempted?: number;
+      retries_exhausted?: number;
+      screen_blocked?: number;
+      screen_unavailable?: number;
+    };
+    repaired: number;
+  }
+  export interface TextNotice {
+    field: string;
+    instance: string[];
+    kind: TextNoticeKind;
+    step: string;
+  }
+  export interface TextStep {
+    counts: TextCounts;
+    items: TextItem[];
+    /**
+     * The item list inherits the judgment's lineage.
+     */
+    lineage: Lineage;
+    state: GenerationState;
+    step: string;
+    text_origin: TextOrigin;
+  }
+  export interface TextItem {
+    context: {
+      [k: string]: ContextValue | undefined;
+    };
+    generated: {
+      [k: string]: TextField | undefined;
+    };
+    /**
+     * Empty for the single record; otherwise the ordered item instance.
+     */
+    id: string[];
+  }
+  export interface ContextValue {
+    derivation: Derivation;
+    lineage: Lineage;
+    value: OutValue;
+  }
+  /**
+   * What a value was computed from: input fields and steps, sorted.
+   */
+  export interface Lineage {
+    inputs: string[];
+    steps: string[];
+  }
+  /**
+   * The result of `filter_with_reasons@1`.
+   */
+  export interface Filtered {
+    /**
+     * How many items each rule excluded.
+     */
+    counts: {
+      [k: string]: number | undefined;
+    };
+    eligible: string[];
+    excluded: Excluded[];
+  }
+  export interface Excluded {
+    id: string;
+    reasons: string[];
+  }
+  /**
+   * The result of `top_k@1`.
+   */
+  export interface Shortlist {
+    excluded: Excluded[];
+    ids: string[];
+    /**
+     * Eligible ids not kept because of `k`.
+     */
+    truncated: number;
+  }
+  /**
+   * A `RankPosition` in wire form: an order, not a probability of being best.
+   */
+  export interface Ranking {
+    entries: RankEntry[];
+    /**
+     * Candidates left out because a component was unresolved.
+     */
+    excluded: Excluded[];
+  }
+  export interface RankEntry {
+    candidate: string;
+    components: {
+      [k: string]: number | undefined;
+    };
+    /**
+     * 1-based.
+     */
+    position: number;
+    score: number;
+  }
+  export interface TextField {
+    derivation?: Derivation;
+    lineage?: TextLineage;
+    origin: FieldOrigin;
+    source: TextSource;
+    truncated: boolean;
+    value?: TextValue;
+  }
+}
+export type RustevTextResult1 = RustevTextResult1.RustevTextResult1;
 
 export namespace RustevTrace1 {
   /**
