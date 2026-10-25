@@ -51,7 +51,8 @@ fn target_parts(
             StepBody::Exact(_)
             | StepBody::Corroborate(_)
             | StepBody::Acquire(_)
-            | StepBody::Widen(_) => None,
+            | StepBody::Widen(_)
+            | StepBody::Generate(_) => None,
         })?;
     Some((binding, decl.task.clone(), decl.options.clone()))
 }

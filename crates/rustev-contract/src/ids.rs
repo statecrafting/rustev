@@ -204,3 +204,8 @@ mod tests {
         assert!(serde_json::from_str::<DatasetId>("\"sha256:xyz\"").is_err());
     }
 }
+
+identity!(
+    /// Identity of an authored prompt template (spec 037).
+    PromptTemplateId
+);

@@ -31,6 +31,7 @@ pub struct Definition {
     pub version: String,
     pub package: String,
     pub inputs: Vec<InputDecl>,
+    #[serde(deserialize_with = "crate::generation::steps")]
     pub steps: Vec<StepDecl>,
     pub policy: PolicyDecl,
     pub limits: LimitsDecl,
@@ -201,6 +202,7 @@ pub enum StepBody {
     Semantic(SemanticDecl),
     /// Version 2: the only way a grade rises (spec 032, 3.7).
     Corroborate(CorroborateDecl),
+    Generate(Box<crate::generation::Generate>),
 }
 
 /// A corroboration step (spec 032, 3.7.1).

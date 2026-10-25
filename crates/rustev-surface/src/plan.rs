@@ -295,6 +295,7 @@ fn step_json(step: &rustev_contract::plan::PlanStep) -> Value {
         PlanStepDetail::Unsupported { capability } => {
             json!({"kind": "unsupported", "capability": capability})
         }
+        PlanStepDetail::Generate(_) => json!({"kind": "generate"}),
         PlanStepDetail::Corroborate => json!({"kind": "corroborate"}),
         PlanStepDetail::Acquire => json!({"kind": "acquire"}),
         PlanStepDetail::Widen => json!({"kind": "widen"}),

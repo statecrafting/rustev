@@ -817,7 +817,12 @@ pub(crate) fn compile_instantiated(
     // and the `acquisitions` member (3.10). A version 2 definition compiles
     // only to `rustev.plan/3` (3.10.4), never to `rustev.plan/2`.
     for s in &def.steps {
-        if !v2 && matches!(s.body, StepBody::Acquire(_) | StepBody::Widen(_)) {
+        if !v2
+            && matches!(
+                s.body,
+                StepBody::Acquire(_) | StepBody::Widen(_) | StepBody::Generate(_)
+            )
+        {
             return refuse(
                 C::InvalidDefinition,
                 format!("step:{}", s.id),
@@ -873,6 +878,16 @@ pub(crate) fn compile_instantiated(
                 schema::DEFINITION_V2
             ),
         );
+    }
+    // Spec 037 contract increment: compilation is deliberately unavailable.
+    for s in &def.steps {
+        if matches!(s.body, StepBody::Generate(_)) {
+            return refuse(
+                C::InvalidDefinition,
+                format!("step:{}", s.id),
+                "generation-not-compiled",
+            );
+        }
     }
     // Supplied backend ids must be unique.
     let mut backend_ids = BTreeSet::new();
@@ -939,7 +954,8 @@ pub(crate) fn compile_instantiated(
             StepBody::Exact(_)
             | StepBody::Corroborate(_)
             | StepBody::Acquire(_)
-            | StepBody::Widen(_) => None,
+            | StepBody::Widen(_)
+            | StepBody::Generate(_) => None,
         })
         .collect();
     for (i, s) in def.steps.iter().enumerate() {
@@ -951,6 +967,13 @@ pub(crate) fn compile_instantiated(
             )?;
         }
         match &s.body {
+            StepBody::Generate(_) => {
+                return refuse(
+                    C::InvalidDefinition,
+                    format!("step:{}", s.id),
+                    "generation-not-compiled",
+                );
+            }
             // Refused above outside plan 3, whose own structure is checked by
             // `quality::structure`; here only the references are resolved.
             StepBody::Acquire(_) | StepBody::Widen(_) => {
@@ -1206,6 +1229,13 @@ pub(crate) fn compile_instantiated(
     for s in &def.steps {
         let subject = format!("step:{}", s.id);
         match &s.body {
+            StepBody::Generate(_) => {
+                return refuse(
+                    C::InvalidDefinition,
+                    format!("step:{}", s.id),
+                    "generation-not-compiled",
+                );
+            }
             StepBody::Acquire(_) | StepBody::Widen(_) => {
                 crate::acquisition::resolve(&s.id, &s.body, sources)?;
             }
@@ -1268,6 +1298,7 @@ pub(crate) fn compile_instantiated(
     let mut deps: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for s in &def.steps {
         let mut refs: Vec<String> = match &s.body {
+            StepBody::Generate(_) => Vec::new(),
             StepBody::Acquire(_) | StepBody::Widen(_) => crate::acquisition::refs(&s.body),
             StepBody::Corroborate(c) => corroborate_refs(c),
             StepBody::Exact(_) => decoded[&s.id].refs(),
@@ -1330,6 +1361,13 @@ pub(crate) fn compile_instantiated(
             shortfalls: vec![],
         };
         match &s.body {
+            StepBody::Generate(_) => {
+                return refuse(
+                    C::InvalidDefinition,
+                    format!("step:{}", s.id),
+                    "generation-not-compiled",
+                );
+            }
             StepBody::Acquire(_) | StepBody::Widen(_) => {
                 let a = crate::acquisition::compile(
                     id,
@@ -1592,6 +1630,13 @@ pub(crate) fn compile_instantiated(
     for s in &def.steps {
         let subject = format!("step:{}", s.id);
         let d = match &s.body {
+            StepBody::Generate(_) => {
+                return refuse(
+                    C::InvalidDefinition,
+                    format!("step:{}", s.id),
+                    "generation-not-compiled",
+                );
+            }
             StepBody::Semantic(d) => d,
             StepBody::Exact(e) => {
                 details.insert(
@@ -2173,6 +2218,7 @@ fn first_v2_construct(
     for s in &def.steps {
         let subject = format!("step:{}", s.id);
         match &s.body {
+            StepBody::Generate(_) => return Some((subject, "a generate step")),
             StepBody::Acquire(_) | StepBody::Widen(_) => {
                 return Some((subject, "an acquisition step"));
             }

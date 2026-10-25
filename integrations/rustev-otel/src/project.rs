@@ -323,6 +323,7 @@ impl Ctx<'_> {
         match self.step_body(step) {
             Some(StepBody::Acquire(_)) => Err(unknown(format!("step kind acquire ({step})"))),
             Some(StepBody::Widen(_)) => Err(unknown(format!("step kind widen ({step})"))),
+            Some(StepBody::Generate(_)) => Err(unknown(format!("step kind generate ({step})"))),
             Some(StepBody::Exact(_)) => Ok("exact".into()),
             Some(StepBody::Semantic(s)) => Ok(operation_name(s.operation).into()),
             Some(StepBody::Corroborate(_)) => {
@@ -904,7 +905,8 @@ fn step_attributes(
             PlanStepDetail::Unsupported { .. }
             | PlanStepDetail::Corroborate
             | PlanStepDetail::Acquire
-            | PlanStepDetail::Widen => {}
+            | PlanStepDetail::Widen
+            | PlanStepDetail::Generate(_) => {}
         }
     }
     if let Some(s) = se {

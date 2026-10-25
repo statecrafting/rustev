@@ -1,0 +1,117 @@
+{
+  "id": "item_text",
+  "body": {
+    "generate": {
+      "when": {
+        "actions": [
+          "recommend"
+        ]
+      },
+      "for_each": {
+        "over": "proposal:selected",
+        "bind": "item",
+        "items": {
+          "list": {
+            "list": "input:candidates",
+            "id_field": "id"
+          }
+        },
+        "max_items": {
+          "literal": 4
+        }
+      },
+      "template": {
+        "id": "item-text",
+        "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "params": {
+          "style": "input:text_style"
+        }
+      },
+      "language": "en-GB",
+      "projection": [
+        "bind:item/name",
+        "bind:item/summary_facts",
+        "input:preferences"
+      ],
+      "carry": [
+        "bind:item/name",
+        "bind:item/price"
+      ],
+      "vocabularies": {
+        "tag_vocabulary": [
+          "quiet",
+          "central",
+          "family"
+        ]
+      },
+      "output": {
+        "fields": [
+          {
+            "name": "headline",
+            "type": {
+              "text": {
+                "max_bytes": 120,
+                "lines": "single"
+              }
+            },
+            "required": true
+          },
+          {
+            "name": "why",
+            "type": {
+              "text": {
+                "max_bytes": 400,
+                "lines": "multi"
+              }
+            },
+            "required": true
+          },
+          {
+            "name": "tags",
+            "type": {
+              "list": {
+                "vocabulary": "tag_vocabulary",
+                "max_items": 4
+              }
+            },
+            "required": false
+          }
+        ]
+      },
+      "backstop": {
+        "locale": "en-GB",
+        "escape": "text",
+        "overflow": "refuse",
+        "fields": {
+          "headline": {
+            "text": "Option: {{item.name}}"
+          },
+          "why": {
+            "text": "{{#item.matches_required}}Matches your required features.{{/item.matches_required}}{{^item.matches_required}}A well-reviewed option nearby.{{/item.matches_required}}"
+          }
+        }
+      },
+      "repair": {
+        "max_attempts": 1,
+        "only_missing_fields": true
+      },
+      "screen": {
+        "input": "untrusted_fields",
+        "output": "none"
+      },
+      "limits": {
+        "deadline_share": "0.4",
+        "per_item_deadline_ms": {
+          "literal": 1500
+        },
+        "concurrency": 4,
+        "max_cost_units": "none"
+      },
+      "backend": {
+        "min_determinism": "unspecified",
+        "artifact": "any",
+        "binding": "auto"
+      }
+    }
+  }
+}

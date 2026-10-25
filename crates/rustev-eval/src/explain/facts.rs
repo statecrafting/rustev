@@ -326,7 +326,7 @@ pub(super) fn closure(plan: &rustev_contract::plan::Plan, root: &str) -> Option<
             continue;
         };
         let refs = match &decl.body {
-            StepBody::Acquire(_) | StepBody::Widen(_) => return None,
+            StepBody::Acquire(_) | StepBody::Widen(_) | StepBody::Generate(_) => return None,
             // Spec 040, 3.5 item 5: undecodable closure uses judgment lineage, never a partial closure.
             StepBody::Exact(e) => rustev_core::ops::decode_v2(&e.op, e.version, &e.args)?
                 .ok()?

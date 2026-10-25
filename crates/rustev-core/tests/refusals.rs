@@ -35,7 +35,8 @@ fn semantic_mut<'a>(
         StepBody::Exact(_)
         | StepBody::Corroborate(_)
         | StepBody::Acquire(_)
-        | StepBody::Widen(_) => panic!("{id} is not semantic"),
+        | StepBody::Widen(_)
+        | StepBody::Generate(_) => panic!("{id} is not semantic"),
     }
 }
 
