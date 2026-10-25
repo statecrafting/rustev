@@ -73,6 +73,17 @@ pub enum BatchChargeAllocation {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct MemoryCachePolicy {
+    /// Opt in to eligible acquisition pages (spec 036, 3.13.7).
+    /// Absence disables reuse; true is the only explicit wire value.
+    #[serde(
+        default,
+        skip_serializing_if = "std::ops::Not::not",
+        deserialize_with = "acquisition_pages"
+    )]
+    // Despite its name, constructed_schema emits only a literal-true boolean
+    // schema, matching this opt-in field's wire contract too.
+    #[schemars(schema_with = "crate::acquisition_record::constructed_schema")]
+    pub acquisition_pages: bool,
     pub max_bytes: u64,
     pub max_entries: u64,
     pub max_entry_bytes: u64,
@@ -148,4 +159,13 @@ impl OptimizationRecord {
             _ => {}
         }
     }
+}
+
+fn acquisition_pages<'de, D: serde::Deserializer<'de>>(d: D) -> Result<bool, D::Error> {
+    if !bool::deserialize(d)? {
+        return Err(serde::de::Error::custom(
+            "omit acquisition_pages when disabled",
+        ));
+    }
+    Ok(true)
 }

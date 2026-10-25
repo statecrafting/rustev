@@ -141,9 +141,30 @@ pub(crate) enum CacheRefusal {
 }
 
 #[derive(Debug, Clone)]
+enum CachedValue {
+    Semantic(RawOutput),
+    Page(Vec<u8>),
+}
+
+struct StoredWrite {
+    output: CachedValue,
+    source_attempt_id: String,
+    target: u32,
+    captured_generation: u64,
+    now: Instant,
+}
+
+pub(crate) struct PageWrite {
+    pub bytes: Vec<u8>,
+    pub attempt: String,
+    pub generation: u64,
+    pub now: Instant,
+}
+
+#[derive(Debug, Clone)]
 struct Entry {
     key: RequestKey,
-    output: RawOutput,
+    output: CachedValue,
     source_attempt_id: String,
     target: u32,
     entry_id: String,
@@ -246,7 +267,7 @@ impl Optimizer {
         self.lock().get(namespace).map_or(0, |ns| ns.generation)
     }
 
-    pub(crate) fn lookup(&self, key: &RequestKey, now: Instant) -> Result<CachedOutput, CacheMiss> {
+    fn lookup_entry(&self, key: &RequestKey, now: Instant) -> Result<Entry, CacheMiss> {
         let mut namespaces = self.lock();
         let Some(ns) = namespaces.get_mut(&key.namespace) else {
             return Err(CacheMiss::Absent);
@@ -261,14 +282,53 @@ impl Optimizer {
             ns.remove(&key.id);
             return Err(CacheMiss::Expired);
         }
+        Ok(entry.clone())
+    }
+
+    pub(crate) fn lookup(&self, key: &RequestKey, now: Instant) -> Result<CachedOutput, CacheMiss> {
+        let e = self.lookup_entry(key, now)?;
+        let CachedValue::Semantic(output) = e.output else {
+            return Err(CacheMiss::Collision);
+        };
         Ok(CachedOutput {
-            output: entry.output.clone(),
-            source_attempt_id: entry.source_attempt_id.clone(),
-            target: entry.target,
-            entry_id: entry.entry_id.clone(),
-            age_ms: now.saturating_sub(entry.created),
-            generation: entry.generation,
+            output,
+            source_attempt_id: e.source_attempt_id,
+            target: e.target,
+            entry_id: e.entry_id,
+            age_ms: now.saturating_sub(e.created),
+            generation: e.generation,
         })
+    }
+
+    pub(crate) fn lookup_page(
+        &self,
+        key: &RequestKey,
+        now: Instant,
+    ) -> Result<(Vec<u8>, u64), CacheMiss> {
+        let e = self.lookup_entry(key, now)?;
+        let CachedValue::Page(bytes) = e.output else {
+            return Err(CacheMiss::Collision);
+        };
+        Ok((bytes, now.saturating_sub(e.created)))
+    }
+
+    pub(crate) fn insert_page(
+        &self,
+        policy: &MemoryCachePolicy,
+        key: RequestKey,
+        page: PageWrite,
+    ) -> Result<CacheAdmission, CacheRefusal> {
+        self.insert_value(
+            policy,
+            key,
+            StoredWrite {
+                source_attempt_id: page.attempt,
+                target: 0,
+                captured_generation: page.generation,
+                now: page.now,
+                output: CachedValue::Page(page.bytes),
+            },
+        )
     }
 
     pub(crate) fn insert(
@@ -277,8 +337,31 @@ impl Optimizer {
         key: RequestKey,
         write: CacheWrite,
     ) -> Result<CacheAdmission, CacheRefusal> {
-        let output_bytes =
-            record_canonical_bytes(&write.output).map_err(|_| CacheRefusal::Uncanonical)?;
+        self.insert_value(
+            policy,
+            key,
+            StoredWrite {
+                output: CachedValue::Semantic(write.output),
+                source_attempt_id: write.source_attempt_id,
+                target: write.target,
+                captured_generation: write.captured_generation,
+                now: write.now,
+            },
+        )
+    }
+
+    fn insert_value(
+        &self,
+        policy: &MemoryCachePolicy,
+        key: RequestKey,
+        write: StoredWrite,
+    ) -> Result<CacheAdmission, CacheRefusal> {
+        let output_bytes = match &write.output {
+            CachedValue::Semantic(output) => {
+                record_canonical_bytes(output).map_err(|_| CacheRefusal::Uncanonical)?
+            }
+            CachedValue::Page(bytes) => bytes.clone(),
+        };
         let bytes = key
             .material
             .len()
@@ -426,6 +509,34 @@ impl Optimizer {
     }
 }
 
+/// Acquisition identity and complete authorized scope, in the versioned cache namespace.
+pub(crate) fn acquisition_key(
+    plan: &PlanId,
+    policy: &OptimizationPolicy,
+    principal: &[u8],
+    request: &rustev_core::evaluate::PendingAcquisition,
+) -> RequestKey {
+    let mut material = Vec::new();
+    part(&mut material, b"acquisition-page");
+    part(&mut material, &policy.key_schema_version.to_be_bytes());
+    // Like `request_key`, bind the runtime version to prevent reuse across
+    // implementations (spec 017, Implementation record: complete memory-cache
+    // key). Spec 036 3.13.7 uses that versioned key scheme.
+    part(&mut material, env!("CARGO_PKG_VERSION").as_bytes());
+    // `AcquisitionRequestId` is the identity of the whole
+    // `rustev.acquisition-request/1` document, which names its `operation`
+    // (spec 036 3.3.1), so two operations never share a key.
+    part(&mut material, request.request_id.as_str().as_bytes());
+    part(&mut material, request.request.source.as_str().as_bytes());
+    part(&mut material, principal);
+    RequestKey {
+        id: tagged_digest(KEY_TAG, &material),
+        material,
+        scope_id: scope_id(principal),
+        namespace: namespace(plan, policy),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
@@ -455,6 +566,7 @@ mod tests {
 
     fn memory(max_bytes: u64, max_entries: u64, entry: u64, scope: u64) -> MemoryCachePolicy {
         MemoryCachePolicy {
+            acquisition_pages: false,
             max_bytes,
             max_entries,
             max_entry_bytes: entry,

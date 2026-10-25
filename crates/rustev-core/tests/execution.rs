@@ -592,6 +592,7 @@ fn optimized() -> ExecutionPolicy {
             allocation: BatchChargeAllocation::EvenRemainderByMemberIndex,
         }),
         memory_cache: Some(MemoryCachePolicy {
+            acquisition_pages: false,
             max_bytes: 8_192,
             max_entries: 8,
             max_entry_bytes: 1_024,
@@ -732,5 +733,48 @@ fn plan_identity_follows_the_optimization_policy() {
     assert_eq!(
         with_policy.canonical(),
         accepted(&with_policy.execution_policy()).canonical()
+    );
+}
+
+#[test]
+fn acquisition_cache_opt_in_changes_plan_identity_and_keeps_cache_validation() {
+    let mut p = optimized();
+    let before = compile_with(
+        &support_routing(),
+        &descriptors_with_fallbacks(),
+        &cal(),
+        &p,
+    )
+    .unwrap();
+    p.optimization
+        .as_mut()
+        .unwrap()
+        .memory_cache
+        .as_mut()
+        .unwrap()
+        .acquisition_pages = true;
+    let after = compile_with(
+        &support_routing(),
+        &descriptors_with_fallbacks(),
+        &cal(),
+        &p,
+    )
+    .unwrap();
+    assert_ne!(before.id, after.id);
+    p.optimization
+        .as_mut()
+        .unwrap()
+        .memory_cache
+        .as_mut()
+        .unwrap()
+        .ttl_ms = 0;
+    assert!(
+        compile_with(
+            &support_routing(),
+            &descriptors_with_fallbacks(),
+            &cal(),
+            &p
+        )
+        .is_err()
     );
 }

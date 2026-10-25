@@ -120,6 +120,27 @@ pub(crate) fn validate(
             | (Some(StepBody::Generate(_)), Some(PlanStepDetail::Generate(_))) => {
                 (decl.unwrap(), details.get(&sp.step).unwrap())
             }
+            (Some(StepBody::Acquire(_)), Some(PlanStepDetail::Acquire))
+            | (Some(StepBody::Widen(_)), Some(PlanStepDetail::Widen)) => {
+                if !seen.insert(sp.step.as_str()) {
+                    return refuse(subject, "a step has at most one execution entry");
+                }
+                if sp.attempt_timeout == AttemptTimeout::Ms(0) {
+                    return refuse(subject, "an attempt timeout of 0 admits nothing");
+                }
+                // Acquisition retry and tier selection belong to spec 036's
+                // step limits; only the existing attempt timeout applies here.
+                if sp.retry != rustev_contract::execution::RetryPolicy::none()
+                    || !sp.fallback.backends.is_empty()
+                    || !sp.fallback.on.is_empty()
+                {
+                    return refuse(
+                        subject,
+                        "acquisition retries and sources are declared in the step",
+                    );
+                }
+                continue;
+            }
             _ => return refuse(subject, "the step is not bound"),
         };
         if !seen.insert(sp.step.as_str()) {

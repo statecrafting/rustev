@@ -12,6 +12,7 @@
 //! the queued sink policies (spec 003, 3.4.3).
 #![forbid(unsafe_code)]
 
+mod acquisition;
 mod capture;
 pub mod clock;
 mod driver;
@@ -78,15 +79,19 @@ pub enum ConfigError {
     /// A bound that must be positive is 0.
     Zero(&'static str),
     DuplicateBackend(String),
+    InvalidSource(String),
 }
 
 /// Why a plan cannot run on this runtime (spec 003, 3.5.3 and 3.6.5).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PrepareError {
+    SourceBinding(String),
     /// The plan binds a backend id that is not registered.
     MissingBackend(String),
     /// The registered backend's descriptor is not the one the plan bound.
-    DescriptorMismatch { backend_id: String },
+    DescriptorMismatch {
+        backend_id: String,
+    },
     /// A hard budget, and a reachable backend without enforceable bounds.
     HardBudgetUnenforceable {
         backend_id: String,
@@ -94,7 +99,9 @@ pub enum PrepareError {
     },
     /// A plan 3 and an evidence sink that does not accept `rustev.run/3`
     /// (spec 032, 3.11.2).
-    SinkVersionUnsupported { schema: &'static str },
+    SinkVersionUnsupported {
+        schema: &'static str,
+    },
 }
 
 /// Why a decision was not admitted (spec 003, 3.4.1). Nothing was dispatched
@@ -197,6 +204,7 @@ pub(crate) struct Inner {
     pub clock: Arc<dyn Clock>,
     pub config: RuntimeConfig,
     pub backends: BTreeMap<String, Registered>,
+    pub sources: BTreeMap<String, acquisition::RegisteredSource>,
     pub sink: Arc<dyn EvidenceSink>,
     pub queue: Option<mpsc::Sender<Job>>,
     pub stats: Arc<Stats>,
@@ -226,9 +234,20 @@ pub struct RuntimeBuilder {
         rustev_contract::actionability::Origin,
     )>,
     shared: Option<Arc<Ledger>>,
+    sources: Vec<(Arc<dyn rustev_core::seams::AcquisitionSource>, usize)>,
 }
 
 impl RuntimeBuilder {
+    /// Install a source by its spec 032 descriptor with a per-source attempt bound.
+    pub fn acquisition_source(
+        mut self,
+        source: Arc<dyn rustev_core::seams::AcquisitionSource>,
+        max_concurrency: usize,
+    ) -> Self {
+        self.sources.push((source, max_concurrency));
+        self
+    }
+
     /// Register a backend with its own attempt concurrency limit.
     pub fn backend(mut self, backend: Arc<dyn DecisionBackend>, max_concurrency: usize) -> Self {
         self.backends.push((
@@ -290,6 +309,30 @@ impl RuntimeBuilder {
                 return Err(ConfigError::DuplicateBackend(id));
             }
         }
+        let mut sources = BTreeMap::new();
+        for (source, max) in self.sources {
+            if max == 0 {
+                return Err(ConfigError::Zero("source max_concurrency"));
+            }
+            let descriptor = source.descriptor().clone();
+            if descriptor.id().is_err() {
+                return Err(ConfigError::InvalidSource(descriptor.name));
+            }
+            let name = descriptor.name.clone();
+            if sources
+                .insert(
+                    name.clone(),
+                    acquisition::RegisteredSource {
+                        source,
+                        descriptor,
+                        permits: Arc::new(Semaphore::new(max)),
+                    },
+                )
+                .is_some()
+            {
+                return Err(ConfigError::InvalidSource(name));
+            }
+        }
         let stats = Arc::new(Stats::default());
         let queue = match c.sink {
             SinkPolicy::FailDecision { .. } => None,
@@ -321,6 +364,7 @@ impl RuntimeBuilder {
                 clock: self.clock,
                 config: c,
                 backends,
+                sources,
                 sink: self.sink,
                 queue,
                 stats,
@@ -420,6 +464,7 @@ impl Runtime {
             sink,
             config,
             backends: vec![],
+            sources: vec![],
             shared: None,
         }
     }
@@ -487,6 +532,44 @@ impl Runtime {
             }
             Ok(r.clone())
         };
+        // Fact-only sources describe snapshot evidence and need no runtime adapter.
+        for binding in compiled
+            .plan
+            .acquisitions
+            .iter()
+            .flatten()
+            .flat_map(|a| &a.sources)
+        {
+            let Some(source) = self.inner.sources.get(&binding.source.name) else {
+                return Err(PrepareError::SourceBinding(binding.source.name.clone()));
+            };
+            if source.descriptor.id().ok().as_ref() != Some(&binding.source.id) {
+                return Err(PrepareError::SourceBinding(binding.source.name.clone()));
+            }
+            let op = source
+                .descriptor
+                .operations
+                .iter()
+                .flatten()
+                .find(|o| o.name == binding.operation);
+            let hard = matches!(cost, CostPolicy::Hard { .. })
+                || self
+                    .inner
+                    .shared
+                    .as_ref()
+                    .is_some_and(|l| l.mode() == CostMode::Hard);
+            if op.is_none()
+                || (hard
+                    && !op.is_some_and(|o| {
+                        matches!(
+                            o.cost,
+                            rustev_contract::acquisition::OperationCost::Bounded { .. }
+                        )
+                    }))
+            {
+                return Err(PrepareError::SourceBinding(binding.source.name.clone()));
+            }
+        }
         let mut steps = BTreeMap::new();
         for s in &compiled.plan.steps {
             let PlanStepDetail::Semantic(b) = &s.detail else {
@@ -729,7 +812,7 @@ impl Runtime {
 
         let ledger = Ledger::new(plan.cost);
         let ev = std::sync::Mutex::new(ev);
-        let (requests, cancelled) = {
+        let (requests, acquisitions, cancelled) = {
             let cx = driver::DecisionCtx {
                 rt: i,
                 plan,
@@ -739,6 +822,7 @@ impl Runtime {
                 ledger: &ledger,
                 decision_id: &req.decision_id,
                 principal: &req.principal_handle,
+                evaluation_time: req.evaluation_time,
                 ev: &ev,
                 live,
                 observing: observing.as_ref(),
@@ -774,7 +858,7 @@ impl Runtime {
             (None, false)
         };
         let mut record = RunRecord {
-            acquisitions: None,
+            acquisitions: (!acquisitions.is_empty()).then_some(acquisitions),
             // A plan 3 decision's record holds evidence 2 (spec 032, 3.10.3).
             schema: if plan_3 {
                 schema::RUN_V3

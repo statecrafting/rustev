@@ -43,6 +43,11 @@ pub fn refusal(r: Refusal) -> Error {
 
 pub fn config_error(e: ConfigError) -> Error {
     match e {
+        ConfigError::InvalidSource(source) => fail(
+            "ConfigRefused",
+            "invalid_source",
+            serde_json::json!({ "source": source }),
+        ),
         ConfigError::Zero(field) => fail(
             "ConfigRefused",
             "zero_bound",
@@ -58,6 +63,11 @@ pub fn config_error(e: ConfigError) -> Error {
 
 pub fn prepare_error(e: PrepareError) -> Error {
     match e {
+        PrepareError::SourceBinding(source) => fail(
+            "PlanPrepareRefused",
+            "source_binding",
+            serde_json::json!({ "source": source }),
+        ),
         PrepareError::MissingBackend(id) => fail(
             "PlanPrepareRefused",
             "missing_backend",

@@ -758,6 +758,7 @@ async fn live_requests_bypass_the_memory_cache_and_batches() {
         expiry: ExpiryBasis::InjectedRuntimeTime,
         batch: None,
         memory_cache: Some(MemoryCachePolicy {
+            acquisition_pages: false,
             max_bytes: 100_000,
             max_entries: 16,
             max_entry_bytes: 100_000,
