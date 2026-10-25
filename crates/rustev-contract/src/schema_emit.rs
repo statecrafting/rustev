@@ -250,6 +250,8 @@ pub fn document_schemas() -> Vec<EmittedSchema> {
         emit::<ReplayBundle>(schema::REPLAY, None),
         emit::<RequestDoc>(schema::REQUEST, None),
         emit::<RuntimeReasonDoc>(schema::RUNTIME_REASON, None),
+        emit::<crate::acquisition::AcquisitionRequest>(schema::ACQUISITION_REQUEST, None),
+        emit::<crate::acquisition::AcquisitionPage>(schema::ACQUISITION_PAGE, None),
         emit::<SourceDescriptor>(schema::SOURCE, None),
         emit::<remote::DescribeRequest>(schema::REMOTE_DESCRIBE, Some("request")),
         emit::<remote::DescribeResponse>(schema::REMOTE_DESCRIBE, Some("response")),
