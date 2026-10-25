@@ -864,6 +864,48 @@ impl OtelSink {
                 .done(),
             1,
         );
+        for (entry, verdict) in &f.screening {
+            m.add(
+                name::SCREENING,
+                AttrSet::new(p)
+                    .with(
+                        "rustev.screening.verdict",
+                        "rustev.screening.verdict",
+                        FieldClass::Enum,
+                        verdict,
+                    )
+                    .with(
+                        "rustev.screening.entry",
+                        "rustev.screening.entry",
+                        FieldClass::PlanMetadata,
+                        entry,
+                    )
+                    .with(
+                        "rustev.plan.id",
+                        "rustev.plan.id",
+                        FieldClass::PlanMetadata,
+                        &f.plan_id,
+                    )
+                    .done(),
+                1,
+            );
+        }
+        if let Some(units) = f.screening_units {
+            record(
+                &mut m,
+                &*s.exporter,
+                name::SCREENING_UNITS,
+                AttrSet::new(p)
+                    .with(
+                        "rustev.plan.id",
+                        "rustev.plan.id",
+                        FieldClass::PlanMetadata,
+                        &f.plan_id,
+                    )
+                    .done(),
+                units as f64,
+            );
+        }
         if let Some(r) = &f.outcome_unresolved_reason {
             m.add(
                 name::UNRESOLVED,

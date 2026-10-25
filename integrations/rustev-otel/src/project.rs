@@ -136,6 +136,10 @@ pub struct Facts {
     /// Observed plus estimated cost units.
     pub cost_units: u64,
     pub attempts: Vec<AttemptFacts>,
+    /// Entry and closed verdict name, never screened content or its digest.
+    pub screening: Vec<(String, String)>,
+    /// Total charged units, present for decisions with screening.
+    pub screening_units: Option<u64>,
 }
 
 /// One attempt, for metrics and logs.
@@ -427,12 +431,14 @@ pub fn project(
     ids: &mut dyn IdSource,
 ) -> Result<Projected, ProjectionUnknown> {
     let rec = input.record;
-    if rec.schema != schema::RUN {
+    if ![schema::RUN, schema::RUN_V2, schema::RUN_V3].contains(&rec.schema.as_str()) {
         return Err(unknown(format!("run record {}", rec.schema)));
     }
     let evidence = match &rec.core {
         CoreEvidence::Recorded(ev) => {
-            if ev.schema != schema::EVIDENCE || ev.judgment.schema != schema::JUDGMENT {
+            if ![schema::EVIDENCE, schema::EVIDENCE_V2].contains(&ev.schema.as_str())
+                || ![schema::JUDGMENT, schema::JUDGMENT_V2].contains(&ev.judgment.schema.as_str())
+            {
                 return Err(unknown(format!(
                     "{} with {}",
                     ev.schema, ev.judgment.schema
@@ -445,13 +451,13 @@ pub fn project(
     if let Some(ev) = evidence
         && matches!(
             ev.judgment.outcome,
-            Outcome::Refused { .. } | Outcome::NeedsInput(_) | Outcome::UnresolvedAction { .. }
+            Outcome::NeedsInput(_) | Outcome::UnresolvedAction { .. }
         )
     {
         return Err(unknown("judgment outcome of a later spec"));
     }
     if let Some(p) = input.plan
-        && p.schema != schema::PLAN
+        && ![schema::PLAN, schema::PLAN_V3].contains(&p.schema.as_str())
     {
         return Err(unknown(format!("plan {}", p.schema)));
     }
@@ -475,6 +481,33 @@ pub fn project(
         cost_units: rec.cost.observed.saturating_add(rec.cost.estimated),
         ..Facts::default()
     };
+
+    if let Some(entries) = evidence.and_then(|e| e.screening.as_ref()) {
+        use rustev_contract::screening::ScreenVerdict;
+        facts.screening = entries
+            .iter()
+            .map(|e| {
+                let verdict = match e.verdict {
+                    ScreenVerdict::Pass => "pass",
+                    ScreenVerdict::Blocked => "blocked",
+                    ScreenVerdict::Unavailable { .. } => "unavailable",
+                    ScreenVerdict::Empty => "empty",
+                };
+                (e.entry.clone(), verdict.into())
+            })
+            .collect();
+    }
+    if evidence.is_some_and(|e| e.screening.is_some())
+        || input.plan.is_some_and(|p| p.screening.is_some())
+        || rec.requests.iter().any(|r| r.screen.is_some())
+    {
+        facts.screening_units = Some(
+            rec.requests
+                .iter()
+                .filter_map(|r| r.screen.as_ref())
+                .fold(0u64, |sum, r| sum.saturating_add(r.units.charged)),
+        );
+    }
 
     // The root.
     let mut root = Draft {
@@ -791,10 +824,11 @@ fn root_attributes(
                     }
                     "unresolved"
                 }
-                // Refused by `project` before any span is built.
-                Outcome::Refused { .. }
-                | Outcome::NeedsInput(_)
-                | Outcome::UnresolvedAction { .. } => "unknown",
+                Outcome::Refused { .. } => "refused",
+                // `project` returns before any span is built for
+                // `NeedsInput` and `UnresolvedAction` (the early check above),
+                // so this arm is never reached; `Refused` has its own arm.
+                Outcome::NeedsInput(_) | Outcome::UnresolvedAction { .. } => "unknown",
             };
             facts.outcome = outcome.into();
             b.put("rustev.outcome", Enum, outcome.into());
