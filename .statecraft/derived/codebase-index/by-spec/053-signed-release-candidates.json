@@ -1,0 +1,49 @@
+{
+  "mapping": {
+    "amends": [
+      "031-public-api-and-release-family"
+    ],
+    "dependsOn": [
+      "021-packaging-and-first-release",
+      "031-public-api-and-release-family"
+    ],
+    "implementingPaths": [
+      {
+        "path": "tools/rustev-release/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "tools/rustev-release/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-release/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/decisions/00-founding-decisions.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "specId": "053-signed-release-candidates",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "2c3dc5cea616c52f56b9e1c9fa4b1099e38eed3f5c7a5280ff7fe2d80e7bf0c8"
+}
