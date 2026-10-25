@@ -117,6 +117,9 @@ test('a host backend resolving after the deadline is discarded and counted', asy
   });
   const d = p.decide(request('d1', { deadlineMs: 50 }));
   await until(() => late !== undefined);
+  // The plan's other two steps run beside the topic; until the runtime has
+  // read their answers, the deadline would discard and count them too.
+  await until(() => Object.values(e.gauges().backendInFlight)[0] === 1);
   e.advanceClock(50);
   const r = await d;
   const topic = r.evidence.requests.find((q) => q.step === 'topic');
