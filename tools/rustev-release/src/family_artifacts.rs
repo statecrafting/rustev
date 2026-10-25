@@ -52,6 +52,18 @@ pub fn plain(name: &str) -> bool {
 
 /// Spec 031 3.9.5: level 3 needs an isolated workflow that does not exist.
 pub fn validate(m: &ReleaseManifest) -> Result<(), String> {
+    let candidate = crate::candidate::is_candidate_version(&m.version);
+    if candidate {
+        let set = ReleaseSet::parse(include_bytes!("../release-set.json"))?;
+        let c = crate::candidate::parse(&m.tag, &set.version)?;
+        if c.version != m.version || !m.packages.is_empty() {
+            return Err(
+                "053 3.2.3: candidate packages must be empty and version must match tag".into(),
+            );
+        }
+    } else if m.packages.is_empty() {
+        return Err("031 3.11.2: release packages must not be empty".into());
+    }
     if m.registries
         != [
             m.registry.clone(),
@@ -82,7 +94,10 @@ pub fn validate(m: &ReleaseManifest) -> Result<(), String> {
             "npm" => 6,
             "binary" => 7,
             "sbom" | "changelog" => 8,
-            "image" => return Err("container image is absent from this release".into()),
+            "image" => return Err(
+                "031 3.9.5; 053 3.4.2: no container image is released or carried by a candidate"
+                    .into(),
+            ),
             _ => return Err(format!("unknown artifact kind {}", a.kind)),
         };
         if a.layer != layer {
@@ -159,11 +174,18 @@ pub fn collect(
 ) -> Result<Vec<WorkflowArtifact>, String> {
     let mut result = Vec::new();
     let mut rest = Vec::new();
+    // 053 3.1.3: candidates use rehearsal SBOMs, not crate packaging or
+    // release changelog evidence. Candidate notes state their limitations.
+    let candidate = crate::candidate::is_candidate_version(&set.version);
+    if candidate && rehearsal.is_none() {
+        return Err("053 3.1.3: candidate requires rehearsal artifacts".into());
+    }
     for name in set
         .upload_order
         .iter()
         .map(|n| format!("sbom-{n}.cdx.json"))
         .chain(["changelog.md".into()])
+        .filter(|_| !candidate)
     {
         let b = std::fs::read(evidence.join(&name)).map_err(|e| format!("{name}: {e}"))?;
         rest.push(artifact(

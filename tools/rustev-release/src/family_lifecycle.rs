@@ -192,6 +192,7 @@ pub fn publish(
     registry: &mut dyn FamilyRegistry,
     j: &mut Journal,
 ) -> Result<(), String> {
+    crate::candidate::refuse_publication(&life.manifest)?;
     let result = run(life, files, registry, j);
     // A failure after the whole family was freshly observed public (3.1)
     // leaves the release published, never partially published.

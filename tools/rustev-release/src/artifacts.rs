@@ -172,6 +172,16 @@ fn audit_manifest(set: &ReleaseSet, p: &Value) -> Vec<String> {
     if !p.is_object() {
         errors.push("package.json is not an object".into());
     }
+    // Every tarball carries the dispatched version: a release's is the
+    // committed `X.Y.Z` (the `manifests` check refuses any other committed
+    // version, so no placeholder reaches here), a candidate's the
+    // `X.Y.Z-rc.N` that `pack` writes (053 3.2.3).
+    if p["version"] != set.version {
+        errors.push(format!(
+            "031 3.9.2; 053 3.2.3: package version must be {}",
+            set.version
+        ));
+    }
     for key in [
         "dependencies",
         "peerDependencies",

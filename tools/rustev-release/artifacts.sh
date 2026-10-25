@@ -6,7 +6,15 @@ fail() { echo "031 3.9: $*" >&2; exit 1; }
 release() { cargo run --quiet --locked -p rustev-release -- "$@"; }
 platforms='darwin-arm64 darwin-x64 linux-arm64-gnu linux-arm64-musl linux-x64-gnu linux-x64-musl win32-x64-msvc'
 epoch_check() { case "$1" in ''|*[!0-9]*) fail 'source epoch must be unsigned seconds' ;; esac; }
-version_check() { test "$1" = "$(release field version)" || fail 'version differs from release-set.json'; }
+# The script runs under `set -eu`; the explicit `fail` keeps the refusal
+# independent of how a caller composes the call.
+version_check() {
+  test "$1" = "$(release field version)" || release candidate-version "v$1" >/dev/null ||
+    fail '053 3.2.2: version is neither release-set.json'"'"'s nor a candidate of it'
+}
+artifact_release() {
+  case "${version:-}" in *-rc.*) release --candidate "v$version" "$@" ;; *) release "$@" ;; esac
+}
 triple() {
   case "$1" in
     darwin-arm64) echo aarch64-apple-darwin ;;
@@ -24,19 +32,35 @@ case "${1:-}" in
     # 031 3.11, 3.12; 021 3.8: rehearsal is never publication authority.
     test "$#" = 4 || fail 'dispatch <rehearsal> <publish-npm> <tag>'
     rehearsal=$2 publish=$3 tag=$4
+    candidate=false
+    case "$tag" in *-rc.*) candidate=true; test "$publish" != true || fail '053 3.4.2: a candidate is never published to npm' ;; esac
     case "$rehearsal:$publish" in true:true) fail '031 3.11: rehearsal cannot publish npm' ;; true:false|false:true|false:false) ;; *) fail 'dispatch booleans must be true or false' ;; esac
+    version=$(release field version)
+    if [ "$candidate" = true ]; then version=$(release candidate-version "$tag"); fi
     if [ "$rehearsal" = true ]; then
+      test -z "$tag" || test "$candidate" = true || fail '053 3.2.4: rehearsal tag must be a candidate'
       commit=$(git rev-parse "${GITHUB_SHA:?}^{commit}")
+      if [ "$candidate" = true ]; then
+        git merge-base --is-ancestor "$commit" refs/remotes/origin/main || fail '053 3.1.1: rehearsal commit is not reachable from main'
+        if git show-ref --verify --quiet "refs/tags/$tag"; then
+          test "$(git cat-file -t "refs/tags/$tag")" = tag || fail '021 3.8: annotated tag required'
+          git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile=tools/rustev-release/allowed_signers verify-tag "refs/tags/$tag" || fail '021 3.8: tag signature does not verify'
+          test "$(git rev-parse "refs/tags/$tag^{commit}")" = "$commit" || fail '053 3.2.4: candidate differs from rehearsal commit'
+        fi
+      fi
     else
       expected=$(jq -er .tag tools/rustev-release/release-set.json)
-      test "$tag" = "$expected" || fail '031 3.12: tag differs from release set'
+      test "$candidate" = true || test "$tag" = "$expected" || fail '031 3.12: tag differs from release set'
       test "${GITHUB_REF:?}" = "refs/tags/$tag" || fail '031 3.12: dispatch must use the release tag ref'
       test "$(git cat-file -t "refs/tags/$tag")" = tag || fail '021 3.8: annotated tag required'
-      git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile=tools/rustev-release/allowed_signers verify-tag "refs/tags/$tag"
+      git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile=tools/rustev-release/allowed_signers verify-tag "refs/tags/$tag" || fail '021 3.8: tag signature does not verify'
       commit=$(git rev-parse "refs/tags/$tag^{commit}")
+      if [ "$candidate" = true ]; then
+        git merge-base --is-ancestor "$commit" refs/remotes/origin/main || fail '053 3.2.4: candidate commit is not reachable from main'
+      fi
     fi
     test "$(git rev-parse HEAD)" = "$commit" || fail '031 3.12: checkout differs from dispatched commit'
-    printf 'commit=%s\nversion=%s\nepoch=%s\n' "$commit" "$(release field version)" "$(git log -1 --format=%ct "$commit")"
+    printf 'commit=%s\nversion=%s\nepoch=%s\ncandidate=%s\n' "$commit" "$version" "$(git log -1 --format=%ct "$commit")" "$candidate"
     ;;
   archive-cli)
     # 031 3.9.3: raw inputs <bin-dir>/<platform>/rustev[.exe], all seven required.
@@ -114,7 +138,9 @@ case "${1:-}" in
     ;;
   pack)
     # 031 3.9.3: call separately on fresh release/rebuild checkouts and addon sets.
-    test "$#" = 4 || fail 'pack <flat-addon-dir> <out-dir> <epoch>'
+    test "$#" = 4 || test "$#" = 5 || fail 'pack <flat-addon-dir> <out-dir> <epoch> [<version>]'
+    version=${5:-}
+    test -z "$version" || version_check "$version"
     addons=$2 out=$3 SOURCE_DATE_EPOCH=$4
     export SOURCE_DATE_EPOCH
     epoch_check "$SOURCE_DATE_EPOCH"
@@ -141,11 +167,19 @@ case "${1:-}" in
         const p = JSON.parse(fs.readFileSync(f, "utf8"));
         if (p.private !== true) throw Error("031 3.1: missing private guard: " + f);
         delete p.private;
-        fs.writeFileSync(f, JSON.stringify(p, null, 2) + "\n");' "$dir"
+        const version = process.argv[2];
+        if (version.includes("-rc.")) {
+          const members = new Set(JSON.parse(fs.readFileSync("tools/rustev-release/release-set.json", "utf8")).npm.map(p => p.name));
+          p.version = version;
+          for (const name of Object.keys(p.optionalDependencies || {})) {
+            if (members.has(name)) p.optionalDependencies[name] = version;
+          }
+        }
+        fs.writeFileSync(f, JSON.stringify(p, null, 2) + "\n");' "$dir" "$version"
       (cd "$dir" && npm pack --pack-destination "$out" --ignore-scripts)
     done
     (cd "$out" && sha256sum ./*.tgz > SHA256SUMS)
-    release npm-audit "$out"
+    artifact_release npm-audit "$out"
     ;;
   sbom)
     # 031 3.9.1: all 16 release archives reside directly in out-dir.
@@ -173,13 +207,15 @@ case "${1:-}" in
     cargo cyclonedx --manifest-path integrations/rustev-wasm/Cargo.toml --format json --spec-version 1.5 --all --target wasm32-unknown-unknown
     cp integrations/rustev-wasm/rustev-wasm.cdx.json "$out/$artifact.cdx.json"
     artifact="rustev-rustev-$version.tgz"
-    release main-sbom "$out/$artifact" "$SOURCE_DATE_EPOCH" > "$out/$artifact.cdx.json"
-    release sbom-check "$out" "$out"
+    artifact_release main-sbom "$out/$artifact" "$SOURCE_DATE_EPOCH" > "$out/$artifact.cdx.json"
+    artifact_release sbom-check "$out" "$out"
     ;;
   audit)
     # 031 3.9.2; 021 3.6: union of three runtime/build graphs, policy excludes dev.
-    test "$#" = 2 || fail 'audit <npm-dir>'
-    release npm-audit "$2"
+    test "$#" = 2 || test "$#" = 3 || fail 'audit <npm-dir> [<version>]'
+    version=${3:-}
+    test -z "$version" || version_check "$version"
+    artifact_release npm-audit "$2"
     test "$(cargo deny --version)" = 'cargo-deny 0.20.2' || fail 'cargo-deny 0.20.2 required: cargo install cargo-deny --locked --version 0.20.2'
     failed=0
     for manifest in crates/rustev-cli/Cargo.toml integrations/rustev-node/Cargo.toml integrations/rustev-wasm/Cargo.toml; do
@@ -188,5 +224,18 @@ case "${1:-}" in
     test "$failed" = 0 || fail '021 3.6: dependency audit failed; policy changes require separate review'
     release exceptions "$(date -u +%Y-%m-%d)"
     ;;
-  *) fail 'expected dispatch, build-native, archive-cli, pack, sbom or audit' ;;
+  tag-manifest)
+    test "$#" = 3 || fail 'tag-manifest <tag> <manifest-file>'
+    test -s "$3" || fail '053 3.3.1: a candidate run needs the signed manifest'
+    message=$(git for-each-ref --format='%(contents)' "refs/tags/$2")
+    digest=$(printf '%s\n' "$message" | sed -n 's/^release-manifest-sha256: //p')
+    test -n "$digest" || fail '021 3.8: tag message needs release-manifest-sha256:'
+    actual=$(sha256sum "$3"); actual=${actual%% *}
+    test "$actual" = "$digest" || fail '053 3.3.1; 031 3.11.2: manifest digest differs from tag'
+    ;;
+  npm-guard)
+    test "$#" = 2 || fail 'npm-guard <tag>'
+    case "$2" in *-rc.*) fail '053 3.4.2: a candidate is never published to npm' ;; esac
+    ;;
+  *) fail 'expected dispatch, build-native, archive-cli, pack, sbom, audit, tag-manifest or npm-guard' ;;
 esac

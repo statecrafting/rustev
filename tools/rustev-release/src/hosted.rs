@@ -236,6 +236,10 @@ pub fn run(
     set: &crate::ReleaseSet,
 ) -> Result<(), String> {
     use crate::lifecycle::{Event, Instruction, Journal, Lifecycle};
+    // 053 3.4.2: a candidate is refused before any journal or upload.
+    crate::candidate::publication_manifest(
+        &std::fs::read(dir.join("release-manifest.json")).map_err(|e| e.to_string())?,
+    )?;
     let journal = journal_path(journal, repo)?;
     let scratch = crate::repro::fresh_dir("rustev-hosted-release")?;
     let signers = scratch.join("allowed_signers");

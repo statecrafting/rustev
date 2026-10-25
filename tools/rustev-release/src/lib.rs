@@ -14,6 +14,7 @@
 pub mod archive;
 pub mod artifacts;
 pub mod audit;
+pub mod candidate;
 pub mod changelog;
 pub mod cratesio;
 pub mod family_artifacts;
@@ -22,6 +23,7 @@ pub mod hosted;
 pub mod lifecycle;
 pub mod manifest;
 pub mod npm;
+pub mod prerelease;
 pub mod repro;
 
 use std::collections::{BTreeMap, BTreeSet};

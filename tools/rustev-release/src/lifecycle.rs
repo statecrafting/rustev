@@ -472,6 +472,9 @@ pub fn publish(
     registry: &mut dyn Registry,
     journal: &mut Journal,
 ) -> Outcome {
+    if let Err(reason) = crate::candidate::refuse_publication(&life.manifest) {
+        return Outcome::Stopped { reason };
+    }
     // A journal whose write failed already ends with that failure as its
     // one `Stopped` entry; a later stop reports its reason without a second.
     let stop = |journal: &mut Journal, reason: String| {
