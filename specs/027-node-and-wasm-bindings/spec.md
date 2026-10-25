@@ -1184,6 +1184,19 @@ against their schemas in their own contract tests.
   40141751495) after the fix above, so a second path leaves the late
   settlement uncounted. The test now reports every gauge when its last wait
   times out, to identify that path; its assertion is unchanged.
+- 2026-10-24: known limitation 1 holds almost always, not always. The seam
+  forwards an abort to the host while the runtime is still deciding to stop
+  the attempt, before its single poll for an answer (spec 003, 3.7.3). When
+  the host's rejection crosses threads inside that window (a preempted
+  runtime thread is enough), the poll sees it and the record carries the
+  host's answer, `unconfirmed` with possibly continuing work, as section 5's
+  row states for Rust backends. A 50 ms pause after the forward reproduces
+  it every time; CI saw it twice (run 40141364705, `bindings / node 20`, and
+  run 40145919898 on `main`). Both records are honest: the test "aborting
+  after dispatch records the honest answer" now accepts `not_observed` or
+  `unconfirmed` and still requires possibly continuing work. The owner's
+  ruling R-47 stands; this note corrects only how often its first departure
+  applies.
 
 ## Decisions at approval
 

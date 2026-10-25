@@ -194,8 +194,9 @@ test('the deadline passing while queued is DeadlineExceeded with no record', asy
 
 test('aborting after dispatch records the honest answer: possibly continuing', async () => {
   // The runtime polls a cancelled attempt once for its answer (spec 003,
-  // 3.7.3); a host seam answers across threads, so its answer is never
-  // observed then and the work stays possibly continuing.
+  // 3.7.3); a host seam answers across threads, so its answer is usually
+  // not observed then, and observed (`unconfirmed`) only when it crosses
+  // before that poll. Either way the work stays possibly continuing.
   const controller = new AbortController();
   let dispatched = 0;
   const { p } = await engine({
@@ -214,7 +215,9 @@ test('aborting after dispatch records the honest answer: possibly continuing', a
   assert.equal(r.completion, 'cancelled');
   for (const a of attempts(r)) {
     assert.equal(a.remote, 'possibly_continuing');
-    assert.deepEqual(a.cancellation, { requested: { answer: 'not_observed' } });
+    const answer = a.cancellation.requested?.answer;
+    assert.ok(['not_observed', 'unconfirmed'].includes(answer), JSON.stringify(a.cancellation));
+    assert.deepEqual(a.cancellation, { requested: { answer } });
   }
 });
 
