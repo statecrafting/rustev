@@ -793,6 +793,35 @@ pub(crate) fn compile_instantiated(
             );
         }
     }
+    // Spec 036: no plan holds an `acquire` or `widen` step until the core
+    // increment compiles them; that increment adds their plan step detail
+    // and the `acquisitions` member (3.10). A version 2 definition compiles
+    // only to `rustev.plan/3` (3.10.4), never to `rustev.plan/2`.
+    for s in &def.steps {
+        if matches!(s.body, StepBody::Acquire(_) | StepBody::Widen(_)) {
+            return refuse(
+                C::InvalidDefinition,
+                format!("step:{}", s.id),
+                if v2 {
+                    "acquisition-not-compiled"
+                } else {
+                    "requires-definition-2"
+                },
+            );
+        }
+    }
+    if !v2
+        && def.policy.on_unresolved.iter().any(|h| {
+            matches!(&h.reasons,
+        ReasonSet::Only(rs) if rs.contains(&ReasonKind::Skipped))
+        })
+    {
+        return refuse(
+            C::InvalidDefinition,
+            "policy",
+            "requires-definition-2: skipped",
+        );
+    }
     // A construct of spec 033 needs a version 2 definition
     // (spec 033, 3.1.1); its own structure is checked after the policy's.
     if !v2 && let Some((subject, construct)) = crate::actionable::first_construct(def) {
@@ -889,7 +918,10 @@ pub(crate) fn compile_instantiated(
         .iter()
         .filter_map(|s| match &s.body {
             StepBody::Semantic(d) => Some((s.id.as_str(), &d.options)),
-            StepBody::Exact(_) | StepBody::Corroborate(_) => None,
+            StepBody::Exact(_)
+            | StepBody::Corroborate(_)
+            | StepBody::Acquire(_)
+            | StepBody::Widen(_) => None,
         })
         .collect();
     for (i, s) in def.steps.iter().enumerate() {
@@ -903,6 +935,9 @@ pub(crate) fn compile_instantiated(
         match &s.body {
             // Refused above outside plan 3, whose own structure is checked by
             // `quality::structure`; here only the references are resolved.
+            StepBody::Acquire(_) | StepBody::Widen(_) => {
+                unreachable!("acquisition refused in structure")
+            }
             StepBody::Corroborate(c) => {
                 let mut refs = vec![c.claim.clone()];
                 c.by.iter()
@@ -1151,6 +1186,9 @@ pub(crate) fn compile_instantiated(
     for s in &def.steps {
         let subject = format!("step:{}", s.id);
         match &s.body {
+            StepBody::Acquire(_) | StepBody::Widen(_) => {
+                unreachable!("acquisition refused in structure")
+            }
             StepBody::Corroborate(_) => {}
             StepBody::Exact(e) => {
                 let (registered, registry) = if v2 {
@@ -1210,6 +1248,9 @@ pub(crate) fn compile_instantiated(
     let mut deps: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for s in &def.steps {
         let mut refs: Vec<String> = match &s.body {
+            StepBody::Acquire(_) | StepBody::Widen(_) => {
+                unreachable!("acquisition refused in structure")
+            }
             StepBody::Corroborate(c) => corroborate_refs(c),
             StepBody::Exact(_) => decoded[&s.id].refs(),
             StepBody::Semantic(d) => {
@@ -1270,6 +1311,9 @@ pub(crate) fn compile_instantiated(
             shortfalls: vec![],
         };
         match &s.body {
+            StepBody::Acquire(_) | StepBody::Widen(_) => {
+                unreachable!("acquisition refused in structure")
+            }
             StepBody::Corroborate(c) => {
                 // The step's value is the claim (spec 032, 3.7.5).
                 let ty = crate::expr::ref_ty(&c.claim, &env).map_err(km)?;
@@ -1514,6 +1558,9 @@ pub(crate) fn compile_instantiated(
                     },
                 );
                 continue;
+            }
+            StepBody::Acquire(_) | StepBody::Widen(_) => {
+                unreachable!("acquisition refused in structure")
             }
             StepBody::Corroborate(_) => {
                 details.insert(s.id.clone(), PlanStepDetail::Corroborate);
@@ -1842,6 +1889,7 @@ fn uses_exact_v2(def: &Definition, decoded: &BTreeMap<String, OpArgs>) -> bool {
         .values()
         .any(|a| matches!(a, OpArgs::JoinKeyed(_) | OpArgs::MergeFields(_)) || a.uses_v2())
         || def.steps.iter().any(|s| match &s.body {
+            StepBody::Acquire(_) | StepBody::Widen(_) => true,
             StepBody::Corroborate(c) => {
                 c.by.iter()
                     .any(|k| crate::expr::predicate_uses_v2(&k.predicate))
@@ -2028,6 +2076,9 @@ fn first_v2_construct(
     for s in &def.steps {
         let subject = format!("step:{}", s.id);
         match &s.body {
+            StepBody::Acquire(_) | StepBody::Widen(_) => {
+                return Some((subject, "an acquisition step"));
+            }
             StepBody::Corroborate(_) => return Some((subject, "a corroborate step")),
             StepBody::Exact(_) => {
                 if decoded.get(&s.id).is_some_and(OpArgs::uses_v2) {

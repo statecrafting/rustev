@@ -11,6 +11,7 @@
 #![forbid(unsafe_code)]
 
 pub mod acquisition;
+pub mod acquisition_step;
 pub mod actionability;
 pub mod bounded;
 pub mod calibration;

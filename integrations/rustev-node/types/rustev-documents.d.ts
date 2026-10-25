@@ -362,6 +362,11 @@ export namespace RustevDefinition1 {
         present: string;
       }
     | {
+        is_constructed: {
+          ref: string;
+        };
+      }
+    | {
         member_ref: {
           set: string;
           value: Expr;
@@ -644,7 +649,8 @@ export namespace RustevDefinition1 {
         | "unsupported"
         | "screen_unavailable"
       )
-    | "insufficient_grade";
+    | "insufficient_grade"
+    | "skipped";
   /**
    * What a matching rule proposes. Never a grant (spec 001, 3.2).
    */
@@ -676,6 +682,12 @@ export namespace RustevDefinition1 {
   export type OnUnavailable = "fail_closed" | "skip_generation" | "fail_open";
   export type StepBody =
     | {
+        acquire: Acquire;
+      }
+    | {
+        widen: Widen;
+      }
+    | {
         exact: ExactDecl;
       }
     | {
@@ -683,6 +695,44 @@ export namespace RustevDefinition1 {
       }
     | {
         corroborate: CorroborateDecl;
+      };
+  /**
+   * The delay before retry `n` (1-based). No jitter.
+   */
+  export type Delay =
+    | "none"
+    | {
+        fixed: {
+          ms: number;
+        };
+      }
+    | {
+        exponential: {
+          initial_ms: number;
+          max_ms: number;
+        };
+      };
+  /**
+   * How a dispatched attempt failed (spec 003, 3.6.1). Deadline and
+   * cancellation are not classes: they end a request, and are never retried
+   * or a fallback trigger.
+   */
+  export type FailureClass = "invalid_output" | "transient" | "overloaded" | "permanent" | "timed_out" | "adapter_fault";
+  export type OnFailure = "unresolved";
+  export type AcquireStop =
+    | "none"
+    | {
+        items_at_least: {
+          count: Expr;
+        };
+      };
+  export type Guard = "always" | Predicate;
+  export type OnTierFailure = "continue" | "stop";
+  export type PoolOrder = "tier_then_source_rank";
+  export type WidenStop =
+    | "none"
+    | {
+        unique_at_least: Expr;
       };
   export type ArtifactPin =
     | "any"
@@ -999,6 +1049,86 @@ export namespace RustevDefinition1 {
     body: StepBody;
     id: string;
   }
+  export interface Acquire {
+    limits: AcquisitionLimits;
+    on_failure: OnFailure;
+    operation: string;
+    request: {
+      [k: string]: Expr | undefined;
+    };
+    source: string;
+    stop: AcquireStop;
+    when: Guard;
+  }
+  export interface AcquisitionLimits {
+    as_of_skew_ms: number;
+    deadline_share: Decimal;
+    delay: Delay;
+    max_attempts: number;
+    max_items: number;
+    max_pages: number;
+    retry_on: FailureClass[];
+  }
+  export interface Widen {
+    base_request: {
+      [k: string]: Expr | undefined;
+    };
+    dedupe_key: string;
+    groups: {
+      [k: string]: string[] | undefined;
+    };
+    item: PoolItem;
+    limits: AcquisitionLimits;
+    max_tiers: number;
+    on_tier_failure: OnTierFailure;
+    order: PoolOrder;
+    protected: string[];
+    /**
+     * @minItems 1
+     * @maxItems 4
+     */
+    sources:
+      | [WidenSource]
+      | [WidenSource, WidenSource]
+      | [WidenSource, WidenSource, WidenSource]
+      | [WidenSource, WidenSource, WidenSource, WidenSource];
+    stop: WidenStop;
+    /**
+     * @minItems 1
+     * @maxItems 8
+     */
+    tiers:
+      | [Tier]
+      | [Tier, Tier]
+      | [Tier, Tier, Tier]
+      | [Tier, Tier, Tier, Tier]
+      | [Tier, Tier, Tier, Tier, Tier]
+      | [Tier, Tier, Tier, Tier, Tier, Tier]
+      | [Tier, Tier, Tier, Tier, Tier, Tier, Tier]
+      | [Tier, Tier, Tier, Tier, Tier, Tier, Tier, Tier];
+  }
+  export interface PoolItem {
+    /**
+     * @minItems 1
+     */
+    fields: [FieldDecl, ...FieldDecl[]];
+  }
+  export interface WidenSource {
+    map: {
+      [k: string]: string | undefined;
+    };
+    operation: string;
+    source: string;
+  }
+  export interface Tier {
+    name: string;
+    relax: string[];
+    request_patch: {
+      [k: string]: Expr | undefined;
+    };
+    source_index: number;
+    when: Guard;
+  }
   /**
    * An exact step: a registry operator, its version and its arguments. The
    * arguments are decoded against the operator's own schema by the compiler,
@@ -1239,6 +1369,11 @@ export namespace RustevDefinition2 {
       }
     | {
         present: string;
+      }
+    | {
+        is_constructed: {
+          ref: string;
+        };
       }
     | {
         member_ref: {
@@ -1523,7 +1658,8 @@ export namespace RustevDefinition2 {
         | "unsupported"
         | "screen_unavailable"
       )
-    | "insufficient_grade";
+    | "insufficient_grade"
+    | "skipped";
   /**
    * What a matching rule proposes. Never a grant (spec 001, 3.2).
    */
@@ -1555,6 +1691,12 @@ export namespace RustevDefinition2 {
   export type OnUnavailable = "fail_closed" | "skip_generation" | "fail_open";
   export type StepBody =
     | {
+        acquire: Acquire;
+      }
+    | {
+        widen: Widen;
+      }
+    | {
         exact: ExactDecl;
       }
     | {
@@ -1562,6 +1704,44 @@ export namespace RustevDefinition2 {
       }
     | {
         corroborate: CorroborateDecl;
+      };
+  /**
+   * The delay before retry `n` (1-based). No jitter.
+   */
+  export type Delay =
+    | "none"
+    | {
+        fixed: {
+          ms: number;
+        };
+      }
+    | {
+        exponential: {
+          initial_ms: number;
+          max_ms: number;
+        };
+      };
+  /**
+   * How a dispatched attempt failed (spec 003, 3.6.1). Deadline and
+   * cancellation are not classes: they end a request, and are never retried
+   * or a fallback trigger.
+   */
+  export type FailureClass = "invalid_output" | "transient" | "overloaded" | "permanent" | "timed_out" | "adapter_fault";
+  export type OnFailure = "unresolved";
+  export type AcquireStop =
+    | "none"
+    | {
+        items_at_least: {
+          count: Expr;
+        };
+      };
+  export type Guard = "always" | Predicate;
+  export type OnTierFailure = "continue" | "stop";
+  export type PoolOrder = "tier_then_source_rank";
+  export type WidenStop =
+    | "none"
+    | {
+        unique_at_least: Expr;
       };
   export type ArtifactPin =
     | "any"
@@ -1877,6 +2057,86 @@ export namespace RustevDefinition2 {
   export interface StepDecl {
     body: StepBody;
     id: string;
+  }
+  export interface Acquire {
+    limits: AcquisitionLimits;
+    on_failure: OnFailure;
+    operation: string;
+    request: {
+      [k: string]: Expr | undefined;
+    };
+    source: string;
+    stop: AcquireStop;
+    when: Guard;
+  }
+  export interface AcquisitionLimits {
+    as_of_skew_ms: number;
+    deadline_share: Decimal;
+    delay: Delay;
+    max_attempts: number;
+    max_items: number;
+    max_pages: number;
+    retry_on: FailureClass[];
+  }
+  export interface Widen {
+    base_request: {
+      [k: string]: Expr | undefined;
+    };
+    dedupe_key: string;
+    groups: {
+      [k: string]: string[] | undefined;
+    };
+    item: PoolItem;
+    limits: AcquisitionLimits;
+    max_tiers: number;
+    on_tier_failure: OnTierFailure;
+    order: PoolOrder;
+    protected: string[];
+    /**
+     * @minItems 1
+     * @maxItems 4
+     */
+    sources:
+      | [WidenSource]
+      | [WidenSource, WidenSource]
+      | [WidenSource, WidenSource, WidenSource]
+      | [WidenSource, WidenSource, WidenSource, WidenSource];
+    stop: WidenStop;
+    /**
+     * @minItems 1
+     * @maxItems 8
+     */
+    tiers:
+      | [Tier]
+      | [Tier, Tier]
+      | [Tier, Tier, Tier]
+      | [Tier, Tier, Tier, Tier]
+      | [Tier, Tier, Tier, Tier, Tier]
+      | [Tier, Tier, Tier, Tier, Tier, Tier]
+      | [Tier, Tier, Tier, Tier, Tier, Tier, Tier]
+      | [Tier, Tier, Tier, Tier, Tier, Tier, Tier, Tier];
+  }
+  export interface PoolItem {
+    /**
+     * @minItems 1
+     */
+    fields: [FieldDecl, ...FieldDecl[]];
+  }
+  export interface WidenSource {
+    map: {
+      [k: string]: string | undefined;
+    };
+    operation: string;
+    source: string;
+  }
+  export interface Tier {
+    name: string;
+    relax: string[];
+    request_patch: {
+      [k: string]: Expr | undefined;
+    };
+    source_index: number;
+    when: Guard;
   }
   /**
    * An exact step: a registry operator, its version and its arguments. The
@@ -6575,6 +6835,11 @@ export namespace RustevPlan2 {
         present: string;
       }
     | {
+        is_constructed: {
+          ref: string;
+        };
+      }
+    | {
         member_ref: {
           set: string;
           value: Expr;
@@ -6857,7 +7122,8 @@ export namespace RustevPlan2 {
         | "unsupported"
         | "screen_unavailable"
       )
-    | "insufficient_grade";
+    | "insufficient_grade"
+    | "skipped";
   /**
    * What a matching rule proposes. Never a grant (spec 001, 3.2).
    */
@@ -6889,6 +7155,12 @@ export namespace RustevPlan2 {
   export type OnUnavailable = "fail_closed" | "skip_generation" | "fail_open";
   export type StepBody =
     | {
+        acquire: Acquire;
+      }
+    | {
+        widen: Widen;
+      }
+    | {
         exact: ExactDecl;
       }
     | {
@@ -6896,6 +7168,44 @@ export namespace RustevPlan2 {
       }
     | {
         corroborate: CorroborateDecl;
+      };
+  /**
+   * The delay before retry `n` (1-based). No jitter.
+   */
+  export type Delay =
+    | "none"
+    | {
+        fixed: {
+          ms: number;
+        };
+      }
+    | {
+        exponential: {
+          initial_ms: number;
+          max_ms: number;
+        };
+      };
+  /**
+   * How a dispatched attempt failed (spec 003, 3.6.1). Deadline and
+   * cancellation are not classes: they end a request, and are never retried
+   * or a fallback trigger.
+   */
+  export type FailureClass = "invalid_output" | "transient" | "overloaded" | "permanent" | "timed_out" | "adapter_fault";
+  export type OnFailure = "unresolved";
+  export type AcquireStop =
+    | "none"
+    | {
+        items_at_least: {
+          count: Expr;
+        };
+      };
+  export type Guard = "always" | Predicate;
+  export type OnTierFailure = "continue" | "stop";
+  export type PoolOrder = "tier_then_source_rank";
+  export type WidenStop =
+    | "none"
+    | {
+        unique_at_least: Expr;
       };
   export type ArtifactPin =
     | "any"
@@ -6998,28 +7308,6 @@ export namespace RustevPlan2 {
     | "none"
     | {
         ms: number;
-      };
-  /**
-   * How a dispatched attempt failed (spec 003, 3.6.1). Deadline and
-   * cancellation are not classes: they end a request, and are never retried
-   * or a fallback trigger.
-   */
-  export type FailureClass = "invalid_output" | "transient" | "overloaded" | "permanent" | "timed_out" | "adapter_fault";
-  /**
-   * The delay before retry `n` (1-based). No jitter.
-   */
-  export type Delay =
-    | "none"
-    | {
-        fixed: {
-          ms: number;
-        };
-      }
-    | {
-        exponential: {
-          initial_ms: number;
-          max_ms: number;
-        };
       };
   /**
    * A value's grade, or `ungraded` when no graded value contributed.
@@ -7458,6 +7746,86 @@ export namespace RustevPlan2 {
   export interface StepDecl {
     body: StepBody;
     id: string;
+  }
+  export interface Acquire {
+    limits: AcquisitionLimits;
+    on_failure: OnFailure;
+    operation: string;
+    request: {
+      [k: string]: Expr | undefined;
+    };
+    source: string;
+    stop: AcquireStop;
+    when: Guard;
+  }
+  export interface AcquisitionLimits {
+    as_of_skew_ms: number;
+    deadline_share: Decimal;
+    delay: Delay;
+    max_attempts: number;
+    max_items: number;
+    max_pages: number;
+    retry_on: FailureClass[];
+  }
+  export interface Widen {
+    base_request: {
+      [k: string]: Expr | undefined;
+    };
+    dedupe_key: string;
+    groups: {
+      [k: string]: string[] | undefined;
+    };
+    item: PoolItem;
+    limits: AcquisitionLimits;
+    max_tiers: number;
+    on_tier_failure: OnTierFailure;
+    order: PoolOrder;
+    protected: string[];
+    /**
+     * @minItems 1
+     * @maxItems 4
+     */
+    sources:
+      | [WidenSource]
+      | [WidenSource, WidenSource]
+      | [WidenSource, WidenSource, WidenSource]
+      | [WidenSource, WidenSource, WidenSource, WidenSource];
+    stop: WidenStop;
+    /**
+     * @minItems 1
+     * @maxItems 8
+     */
+    tiers:
+      | [Tier]
+      | [Tier, Tier]
+      | [Tier, Tier, Tier]
+      | [Tier, Tier, Tier, Tier]
+      | [Tier, Tier, Tier, Tier, Tier]
+      | [Tier, Tier, Tier, Tier, Tier, Tier]
+      | [Tier, Tier, Tier, Tier, Tier, Tier, Tier]
+      | [Tier, Tier, Tier, Tier, Tier, Tier, Tier, Tier];
+  }
+  export interface PoolItem {
+    /**
+     * @minItems 1
+     */
+    fields: [FieldDecl, ...FieldDecl[]];
+  }
+  export interface WidenSource {
+    map: {
+      [k: string]: string | undefined;
+    };
+    operation: string;
+    source: string;
+  }
+  export interface Tier {
+    name: string;
+    relax: string[];
+    request_patch: {
+      [k: string]: Expr | undefined;
+    };
+    source_index: number;
+    when: Guard;
   }
   /**
    * An exact step: a registry operator, its version and its arguments. The
@@ -7966,6 +8334,11 @@ export namespace RustevPlan3 {
         present: string;
       }
     | {
+        is_constructed: {
+          ref: string;
+        };
+      }
+    | {
         member_ref: {
           set: string;
           value: Expr;
@@ -8248,7 +8621,8 @@ export namespace RustevPlan3 {
         | "unsupported"
         | "screen_unavailable"
       )
-    | "insufficient_grade";
+    | "insufficient_grade"
+    | "skipped";
   /**
    * What a matching rule proposes. Never a grant (spec 001, 3.2).
    */
@@ -8280,6 +8654,12 @@ export namespace RustevPlan3 {
   export type OnUnavailable = "fail_closed" | "skip_generation" | "fail_open";
   export type StepBody =
     | {
+        acquire: Acquire;
+      }
+    | {
+        widen: Widen;
+      }
+    | {
         exact: ExactDecl;
       }
     | {
@@ -8287,6 +8667,44 @@ export namespace RustevPlan3 {
       }
     | {
         corroborate: CorroborateDecl;
+      };
+  /**
+   * The delay before retry `n` (1-based). No jitter.
+   */
+  export type Delay =
+    | "none"
+    | {
+        fixed: {
+          ms: number;
+        };
+      }
+    | {
+        exponential: {
+          initial_ms: number;
+          max_ms: number;
+        };
+      };
+  /**
+   * How a dispatched attempt failed (spec 003, 3.6.1). Deadline and
+   * cancellation are not classes: they end a request, and are never retried
+   * or a fallback trigger.
+   */
+  export type FailureClass = "invalid_output" | "transient" | "overloaded" | "permanent" | "timed_out" | "adapter_fault";
+  export type OnFailure = "unresolved";
+  export type AcquireStop =
+    | "none"
+    | {
+        items_at_least: {
+          count: Expr;
+        };
+      };
+  export type Guard = "always" | Predicate;
+  export type OnTierFailure = "continue" | "stop";
+  export type PoolOrder = "tier_then_source_rank";
+  export type WidenStop =
+    | "none"
+    | {
+        unique_at_least: Expr;
       };
   export type ArtifactPin =
     | "any"
@@ -8389,28 +8807,6 @@ export namespace RustevPlan3 {
     | "none"
     | {
         ms: number;
-      };
-  /**
-   * How a dispatched attempt failed (spec 003, 3.6.1). Deadline and
-   * cancellation are not classes: they end a request, and are never retried
-   * or a fallback trigger.
-   */
-  export type FailureClass = "invalid_output" | "transient" | "overloaded" | "permanent" | "timed_out" | "adapter_fault";
-  /**
-   * The delay before retry `n` (1-based). No jitter.
-   */
-  export type Delay =
-    | "none"
-    | {
-        fixed: {
-          ms: number;
-        };
-      }
-    | {
-        exponential: {
-          initial_ms: number;
-          max_ms: number;
-        };
       };
   /**
    * A value's grade, or `ungraded` when no graded value contributed.
@@ -8874,6 +9270,86 @@ export namespace RustevPlan3 {
   export interface StepDecl {
     body: StepBody;
     id: string;
+  }
+  export interface Acquire {
+    limits: AcquisitionLimits;
+    on_failure: OnFailure;
+    operation: string;
+    request: {
+      [k: string]: Expr | undefined;
+    };
+    source: string;
+    stop: AcquireStop;
+    when: Guard;
+  }
+  export interface AcquisitionLimits {
+    as_of_skew_ms: number;
+    deadline_share: Decimal;
+    delay: Delay;
+    max_attempts: number;
+    max_items: number;
+    max_pages: number;
+    retry_on: FailureClass[];
+  }
+  export interface Widen {
+    base_request: {
+      [k: string]: Expr | undefined;
+    };
+    dedupe_key: string;
+    groups: {
+      [k: string]: string[] | undefined;
+    };
+    item: PoolItem;
+    limits: AcquisitionLimits;
+    max_tiers: number;
+    on_tier_failure: OnTierFailure;
+    order: PoolOrder;
+    protected: string[];
+    /**
+     * @minItems 1
+     * @maxItems 4
+     */
+    sources:
+      | [WidenSource]
+      | [WidenSource, WidenSource]
+      | [WidenSource, WidenSource, WidenSource]
+      | [WidenSource, WidenSource, WidenSource, WidenSource];
+    stop: WidenStop;
+    /**
+     * @minItems 1
+     * @maxItems 8
+     */
+    tiers:
+      | [Tier]
+      | [Tier, Tier]
+      | [Tier, Tier, Tier]
+      | [Tier, Tier, Tier, Tier]
+      | [Tier, Tier, Tier, Tier, Tier]
+      | [Tier, Tier, Tier, Tier, Tier, Tier]
+      | [Tier, Tier, Tier, Tier, Tier, Tier, Tier]
+      | [Tier, Tier, Tier, Tier, Tier, Tier, Tier, Tier];
+  }
+  export interface PoolItem {
+    /**
+     * @minItems 1
+     */
+    fields: [FieldDecl, ...FieldDecl[]];
+  }
+  export interface WidenSource {
+    map: {
+      [k: string]: string | undefined;
+    };
+    operation: string;
+    source: string;
+  }
+  export interface Tier {
+    name: string;
+    relax: string[];
+    request_patch: {
+      [k: string]: Expr | undefined;
+    };
+    source_index: number;
+    when: Guard;
   }
   /**
    * An exact step: a registry operator, its version and its arguments. The

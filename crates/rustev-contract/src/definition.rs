@@ -195,6 +195,8 @@ pub struct StepDecl {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum StepBody {
+    Acquire(crate::acquisition_step::Acquire),
+    Widen(crate::acquisition_step::Widen),
     Exact(ExactDecl),
     Semantic(SemanticDecl),
     /// Version 2: the only way a grade rises (spec 032, 3.7).
@@ -552,6 +554,11 @@ pub enum Predicate {
     },
     /// True when the named input resolved (`input:<name>`).
     Present(String),
+    /// Registry 2: whether the referenced value was constructed (spec 036).
+    IsConstructed {
+        #[serde(rename = "ref")]
+        reference: String,
+    },
     /// Registry `rustev.exact/2`: true when the value is a member of the
     /// list, or the keys of the map, `set` references (spec 032, 3.7.2).
     MemberRef {
@@ -615,10 +622,12 @@ pub enum ReasonKind {
     /// Present but below a required grade (spec 032, 3.9.4).
     InsufficientGrade,
     ScreenUnavailable,
+    /// A declared skipped path, distinct from an unresolved failure.
+    Skipped,
 }
 
 impl ReasonKind {
-    pub const ALL: [ReasonKind; 12] = [
+    pub const ALL: [ReasonKind; 13] = [
         ReasonKind::MissingEvidence,
         ReasonKind::StaleEvidence,
         ReasonKind::InvalidInput,
@@ -631,6 +640,7 @@ impl ReasonKind {
         ReasonKind::Unsupported,
         ReasonKind::InsufficientGrade,
         ReasonKind::ScreenUnavailable,
+        ReasonKind::Skipped,
     ];
 }
 

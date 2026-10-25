@@ -76,6 +76,30 @@
       },
       {
         "nature": "additive",
+        "spec": "006-cli-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-cli/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "027-node-and-wasm-bindings",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-surface/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "028-opentelemetry-evidence-sink",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-otel/"
+        }
+      },
+      {
+        "nature": "additive",
         "spec": "031-public-api-and-release-family",
         "unit": {
           "kind": "directory",
@@ -154,7 +178,7 @@
       }
     ],
     "sectionDigests": {
-      "036-mid-plan-context-acquisition-and-tiered-widening-amends-002-003-and-004": "1f35a969a2c77064eedffe3a0697c67e68d3b846dfe64b68d42093a24603f6d9",
+      "036-mid-plan-context-acquisition-and-tiered-widening-amends-002-003-and-004": "2eda77851e4c17b9ee8202365897374ff50bd8904f5561c33fded118e21dad5f",
       "1-purpose": "5f4083dcf506f001c722d1559490954eefda6c0f4d165ded1ce82b74e9f7080e",
       "2-1-binding-principles-of-76": "74cdc41bd77da3dc5d7d5cad0318c24c60c7c65da25249d0b7ccebcef90e638b",
       "2-territory": "7bb46b0fedbdcd774748e9a7a569aaac1aa1b3ee828d689539892160fef3690d",
@@ -179,7 +203,7 @@
       "5-observable-negative-cases": "99e86f2e426d34ebd081d98971f7e51bacec7751293d14a830e70ab7552d80ae",
       "acceptance": "f95098ed80de067bc5375290dcddd0b815edd557d0f486fd3f89127f17b01cf5",
       "decisions-at-approval": "d284535728f3f6bb7231bd174cf11e34aa404c4532bdcf08a3352858602c04c5",
-      "implementation-record": "a61b3ecc6925b7656558cb3156e340fa481a68e0610080863e7a4ce6e58ea8bf",
+      "implementation-record": "dcaa55a254ce5341772821c69405c2eb22f0b1301f1b45ad7141c61f3919fb9b",
       "verification": "ac006f1e2308300a1ebbc0c2ba5b45bd7f9d0c56ea898d34424a7448565534ed"
     },
     "sectionHeadings": [
@@ -216,6 +240,6 @@
     "summary": "An amendment of approved specs 002, 003 and 004 (R-16), for #76 child B1 under owner decision R-40 (OD-3 of #76). A plan may declare bounded acquisition steps that ask a host-implemented acquisition source for more context between steps, with requests built only from exact values and literals, and a tiered widening construct that tries a finite, declared list of increasingly broad requests (optionally across sources) until a stop condition holds, never relaxing protected constraints. Paging is bounded by pages, items and a stop condition. Adds acquisition operations to spec 032's source descriptor (`rustev.source/1`), acquisition request and page documents, the `compose_key@1` operator, a typed `skipped` outcome, compile-time call, item, byte, deadline and cost budgets, and the in-process `AcquisitionSource` seam a later remote protocol (#76 A2) carries. Every page is recorded and captured by request identity; offline replay never dispatches and an uncaptured request is `missing_evidence`. Adds to the #76 track versions introduced by spec 032 (source 1, definition 2, plan 3, evidence 2, run 3, exact 2), introduces the track version `rustev.replay/2`, and admits every plan 3 decision to capture and replay, lifting spec 032's interim `capture_unsupported` refusal. Plans that use no #76 construct keep byte-identical documents and `PlanId`s. Approved (A-33); implementation is in progress.\n",
     "title": "Mid-plan context acquisition and tiered widening (amends 002, 003 and 004)"
   },
-  "shardHash": "829166836d910fd7f80396e003028e1bca5c9feb78dc2c329faab8aeb95685c3",
+  "shardHash": "65f3ac047330848814986d77ae8e466149f3494d39f4b9c3ed12e19cb66d882b",
   "specVersion": "1.10.0"
 }

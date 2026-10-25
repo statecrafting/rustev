@@ -150,7 +150,7 @@ pub fn predicate_refs(p: &Predicate, out: &mut Vec<String>) {
         Predicate::All(ps) | Predicate::Any(ps) => ps.iter().for_each(|p| predicate_refs(p, out)),
         Predicate::Not(p) => predicate_refs(p, out),
         Predicate::Member { value, .. } => expr_refs(value, out),
-        Predicate::Present(r) => out.push(r.clone()),
+        Predicate::Present(r) | Predicate::IsConstructed { reference: r } => out.push(r.clone()),
         Predicate::MemberRef { value, set } => {
             expr_refs(value, out);
             out.push(set.clone());
@@ -180,7 +180,7 @@ pub fn expr_uses_v2(e: &Expr) -> bool {
 /// Whether a predicate uses a construct of `rustev.exact/2`.
 pub fn predicate_uses_v2(p: &Predicate) -> bool {
     match p {
-        Predicate::MemberRef { .. } => true,
+        Predicate::MemberRef { .. } | Predicate::IsConstructed { .. } => true,
         Predicate::Cmp { left, right, .. } => expr_uses_v2(left) || expr_uses_v2(right),
         Predicate::All(ps) | Predicate::Any(ps) => ps.iter().any(predicate_uses_v2),
         Predicate::Not(p) => predicate_uses_v2(p),
@@ -242,6 +242,7 @@ pub fn predicate_structure(p: &Predicate) -> Result<(), String> {
             }
             expr_structure(value)
         }
+        Predicate::IsConstructed { .. } => Err("acquisition-not-compiled".into()),
         Predicate::Present(r) => match Ref::parse(r)? {
             Ref::Input(_, p) if p.is_empty() => Ok(()),
             _ => Err(format!("present() takes an input reference, not {r:?}")),
@@ -461,6 +462,7 @@ pub fn type_predicate(p: &Predicate, env: &TyEnv<'_>) -> Result<(), String> {
                 Err(format!("member set does not match {}", t.name()))
             }
         }
+        Predicate::IsConstructed { .. } => Err("acquisition-not-compiled".into()),
         Predicate::Present(r) => match Ref::parse(r)? {
             Ref::Input(n, p) if p.is_empty() && env.inputs.contains_key(&n) => Ok(()),
             _ => Err(format!("present() of unknown input {r:?}")),
@@ -773,6 +775,7 @@ pub fn eval_predicate(p: &Predicate, s: &Scope<'_>) -> Result<bool, Fault> {
             let v = eval_expr(value, s)?;
             Ok(set.iter().any(|l| Value::from_literal(l) == v))
         }
+        Predicate::IsConstructed { .. } => Err(Fault::Invalid("acquisition-not-compiled".into())),
         Predicate::Present(r) => Ok(r
             .strip_prefix("input:")
             .is_some_and(|n| s.present.contains(n))),

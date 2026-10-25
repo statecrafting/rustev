@@ -321,6 +321,8 @@ impl Ctx<'_> {
             return Ok("unknown".into());
         }
         match self.step_body(step) {
+            Some(StepBody::Acquire(_)) => Err(unknown(format!("step kind acquire ({step})"))),
+            Some(StepBody::Widen(_)) => Err(unknown(format!("step kind widen ({step})"))),
             Some(StepBody::Exact(_)) => Ok("exact".into()),
             Some(StepBody::Semantic(s)) => Ok(operation_name(s.operation).into()),
             Some(StepBody::Corroborate(_)) => {
