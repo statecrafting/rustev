@@ -30,4 +30,17 @@ pub enum RawOutput {
     Distribution(BTreeMap<String, f64>),
     Logits(BTreeMap<String, f64>),
     Scores(BTreeMap<String, f64>),
+    Screen {
+        blocked: bool,
+        categories: Vec<String>,
+        units: ScreenUnits,
+    },
+}
+
+/// A screener's reported text units, distinct from runtime computed charges.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum ScreenUnits {
+    Reported { n: u64 },
+    NotReported,
 }

@@ -291,6 +291,7 @@ pub enum RequiredKind {
     CalibratedProbability,
     OrdinalDistribution,
     Scores,
+    ScreenVerdict,
 }
 
 /// A question answered by a decision backend.

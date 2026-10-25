@@ -2,7 +2,7 @@
 id: "035-screening-seam"
 title: "Untrusted-text screening seam (amends 002, 003 and 009)"
 status: approved
-implementation: pending
+implementation: in-progress
 created: "2026-10-17"
 summary: >
   An amendment of approved specs 002, 003 and 009, for #76 child B7 (#65).
@@ -30,7 +30,7 @@ summary: >
   `rustev.plan/3`, `rustev.evidence/2`, `rustev.judgment/2`,
   `rustev.run/3`); definitions, descriptors and plans that use no #76
   construct keep byte-identical identities. Approved (A-32);
-  implementation is pending.
+  implementation is in progress.
 amends:
   - "002-decision-contract-and-pure-core"
   - "003-runtime-execution-and-evidence"
@@ -49,6 +49,13 @@ extends:
   # Exhaustive matches over the new outcome and output variants only.
   - { spec: "004-evaluation-and-replay", unit: { kind: directory, path: "crates/rustev-eval/" }, nature: additive }
   - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: additive }
+  # Absent-member initializers where a struct literal names every field,
+  # and the regenerated document types of the bindings; no behavior.
+  - { spec: "005-reference-backends", unit: { kind: directory, path: "backends/rustev-backend-rules/" }, nature: additive }
+  - { spec: "012-jev-integration", unit: { kind: directory, path: "integrations/rustev-jev/" }, nature: additive }
+  - { spec: "030-bedrock-backend", unit: { kind: directory, path: "integrations/rustev-bedrock/" }, nature: additive }
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-node/" }, nature: additive }
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-wasm/" }, nature: additive }
   # Adds 035 to `make verify` when the implementation is complete.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
 depends_on:
@@ -782,6 +789,35 @@ exhaustive matches; quality claims (R-04, R-37).
 ## Verification
 
 Pending with implementation. Approval satisfies no acceptance item.
+
+## Implementation record
+
+Planned increments, each a separately reviewed pull request: (1) the
+contract vocabulary, in three parts (descriptor, output and required
+kind; the definition and plan `screening` members; the judgment,
+evidence and run record members); (2) core lowering and the compile
+checks of 3.5; (3) core verdicts, consequences, refusals, the withheld
+marker and evidence (3.6 to 3.9, 3.13); (4) runtime isolation,
+withdrawal, text units and the verdict cache (3.7.3, 3.10 to 3.12);
+(5) remote isolation (3.15); (6) metrics, mutation seeds, declared
+verification and closure.
+
+**Increment 1, part 1 (2026-10-24): descriptor, output and required
+kind.** `OperationSupport` gains the optional `isolation` (`per_item`;
+`shared` is the omitted default) and `screen` profile members (3.2.1,
+3.2.2), validated at parse: `output: screen` requires exactly a `screen`
+profile, only on `proposition`, with a non-empty `policy_version`, 1 to
+64 sorted unique non-empty categories and positive byte bounds; an
+explicit `null` is refused, so each meaning has one form. `OutputKind`
+gains `screen`, `RawOutput` gains `screen{blocked, categories, units}`
+with `units` `reported{n}` or `not_reported` (3.3.1), and
+`RequiredKind` gains `screen_verdict`, satisfied by no authored output;
+an authored step requiring it is refused at compile, category 11 (3.3.2).
+New variants are last in their enums. Descriptors, definitions and plans
+that use none of them keep their bytes and identities
+(`crates/rustev-contract/tests/screening_wire.rs`, 3.18.1). Elsewhere
+only absent-member initializers and regenerated schemas and binding
+types change.
 
 ## Facts relied on
 

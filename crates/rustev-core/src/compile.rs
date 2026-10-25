@@ -530,6 +530,7 @@ fn satisfies(output: OutputKind, required: RequiredKind) -> bool {
     use OutputKind as O;
     use RequiredKind as R;
     match required {
+        R::ScreenVerdict => false,
         R::Label => output == O::Label,
         R::Distribution | R::CalibratedProbability | R::OrdinalDistribution => {
             matches!(output, O::Distribution | O::Logits)
@@ -541,6 +542,9 @@ fn satisfies(output: OutputKind, required: RequiredKind) -> bool {
 fn sem_kind(op: Operation, required: RequiredKind) -> SemKind {
     match (op, required) {
         (Operation::Rubric, RequiredKind::Label) => SemKind::Ordinal(false),
+        // Authored uses are refused before kind analysis. Only future screening
+        // lowering may legitimately introduce this kind; this is a total placeholder.
+        (_, RequiredKind::ScreenVerdict) => SemKind::Label,
         (_, RequiredKind::Label) => SemKind::Label,
         (_, RequiredKind::Distribution) => SemKind::Distribution,
         (_, RequiredKind::CalibratedProbability) => SemKind::Calibrated,
@@ -754,7 +758,19 @@ pub(crate) fn compile_instantiated(
         }
     }
 
-    // (b) Structure. A construct of spec 033 needs a version 2 definition
+    // (b) Structure. Authored screening verdicts are reserved (spec 035, 3.3.2).
+    for s in &def.steps {
+        if let StepBody::Semantic(d) = &s.body
+            && d.requires == RequiredKind::ScreenVerdict
+        {
+            return refuse(
+                C::InvalidDefinition,
+                format!("step:{}", s.id),
+                "screen_verdict is reserved for lowered screening steps",
+            );
+        }
+    }
+    // A construct of spec 033 needs a version 2 definition
     // (spec 033, 3.1.1); its own structure is checked after the policy's.
     if !v2 && let Some((subject, construct)) = crate::actionable::first_construct(def) {
         return refuse(
