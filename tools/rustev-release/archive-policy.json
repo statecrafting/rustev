@@ -89,6 +89,7 @@
         "src/execution.rs",
         "src/expr.rs",
         "src/generation.rs",
+        "src/generation_eval.rs",
         "src/grading.rs",
         "src/instantiate/declarations.rs",
         "src/instantiate/emit.rs",

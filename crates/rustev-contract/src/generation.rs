@@ -373,3 +373,77 @@ fn object<'de, D: Deserializer<'de>, T: serde::de::DeserializeOwned>(d: D) -> Re
     }
     serde_json::from_value(v).map_err(serde::de::Error::custom)
 }
+
+/// The record carried by the generate operation (spec 037, 3.7).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct GenerateRequest {
+    pub schema: String,
+    pub step: String,
+    pub instance: Vec<String>,
+    pub template: String,
+    pub template_id: PromptTemplateId,
+    pub instructions: String,
+    pub language: String,
+    pub projection: BTreeMap<String, serde_json::Value>,
+    pub output: OutputSchema,
+    pub vocabularies: BTreeMap<String, Vec<String>>,
+    pub repair: RepairRequest,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum RepairRequest {
+    None,
+    // Variant-level `untagged` (serde 1.0.181 and later; the lockfile has
+    // 1.0.229): `none` stays a tagged string and `Round` is the flat
+    // `{"round", "fields"}` object, as `ModelForEach::List` does.
+    // Serde applies the enum's `deny_unknown_fields` to this untagged
+    // struct variant too; extra keys are rejected, not silently dropped.
+    #[serde(untagged)]
+    Round {
+        round: u64,
+        fields: Vec<RepairField>,
+    },
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RepairField {
+    pub name: String,
+    pub reason: FieldInvalid,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum FieldInvalid {
+    Missing,
+    WrongType,
+    Empty,
+    TooLong,
+    ControlCharacter,
+    NotInVocabulary,
+    DuplicateItem,
+    TooManyItems,
+}
+crate::document::document!(
+    GenerateRequest,
+    crate::schema::GENERATE_REQUEST,
+    crate::limits::RECORD_V1
+);
+
+#[cfg(test)]
+mod tests {
+    use super::RepairRequest;
+    use serde_json::json;
+
+    #[test]
+    fn repair_round_rejects_unknown_fields() {
+        let round = json!({"round": 1, "fields": []});
+        let parsed: RepairRequest = serde_json::from_value(round.clone()).unwrap();
+        assert!(matches!(parsed, RepairRequest::Round { round: 1, .. }));
+        assert_eq!(serde_json::to_value(parsed).unwrap(), round);
+
+        let mut extra = round;
+        extra["unexpected"] = json!(true);
+        assert!(serde_json::from_str::<RepairRequest>(&extra.to_string()).is_err());
+        assert!(serde_json::from_value::<RepairRequest>(extra).is_err());
+    }
+}

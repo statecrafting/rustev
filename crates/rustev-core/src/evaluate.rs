@@ -439,14 +439,6 @@ impl<'c> Evaluation<'c> {
         snapshot: &Snapshot,
         now: Timestamp,
     ) -> Result<Self, StartError> {
-        if compiled
-            .info
-            .steps
-            .values()
-            .any(|s| matches!(s, StepInfo::Generate))
-        {
-            return Err(StartError::GenerationNotAvailable);
-        }
         if compiled.plan.acquisitions.is_some() {
             return Err(StartError::AcquisitionNotAvailable);
         }
@@ -1607,7 +1599,10 @@ impl<'c> Evaluation<'c> {
         loop {
             let mut progressed = false;
             for id in &info.order {
-                if self.exact.contains_key(id) || self.semantic.contains_key(id) {
+                if matches!(info.steps.get(id), Some(StepInfo::Generate))
+                    || self.exact.contains_key(id)
+                    || self.semantic.contains_key(id)
+                {
                     continue;
                 }
                 let deps = &info.deps[id];
@@ -2526,7 +2521,46 @@ impl<'c> Evaluation<'c> {
     }
 
     /// Finish: evaluate the policy and build the judgment and evidence.
-    pub fn finish(mut self, decision_id: &str) -> Result<(Judgment, EvidenceRecord), NotReady> {
+    pub fn finish(self, decision_id: &str) -> Result<(Judgment, EvidenceRecord), NotReady> {
+        if !self.compiled.info.generation.is_empty() {
+            return Err(NotReady {
+                pending: self.pending.len().max(1),
+            });
+        }
+        self.finish_decision(decision_id)
+    }
+
+    /// Freeze the decision and enter the pure generation stage. Its `pending`
+    /// requests are separate from decision requests and can never affect policy.
+    pub fn begin_generation(
+        self,
+        decision_id: &str,
+    ) -> Result<
+        crate::generation_eval::GenerationEvaluation<'c>,
+        crate::generation_eval::GenerationError,
+    > {
+        let compiled = self.compiled;
+        let issued = self.issued;
+        let inputs = self.input_values.clone();
+        let exact = self.exact_values.clone();
+        let lineage = self.lineage.clone();
+        let (judgment, evidence) = self
+            .finish_decision(decision_id)
+            .map_err(crate::generation_eval::GenerationError::NotReady)?;
+        crate::generation_eval::GenerationEvaluation::start(
+            compiled,
+            judgment,
+            evidence,
+            (inputs, exact),
+            lineage,
+            issued,
+        )
+    }
+
+    fn finish_decision(
+        mut self,
+        decision_id: &str,
+    ) -> Result<(Judgment, EvidenceRecord), NotReady> {
         if !self.pending.is_empty() {
             return Err(NotReady {
                 pending: self.pending.len(),

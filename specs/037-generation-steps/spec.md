@@ -1043,6 +1043,20 @@ generate steps is refused at compile for now. Tests:
 `crates/rustev-core/tests/generation_compile.rs` with plan and refusal
 goldens.
 
+**Increment 4 (2026-10-24): requests, validation, repair, ownership and
+origins in the core.** `crates/rustev-core/src/generation_eval.rs` builds
+one generation request per selected item with the rendered prompt
+(`rustev.generate-request/1`, 3.7) and exposes them as pending requests;
+supplied outputs are validated against the field schema (3.7), repaired
+within the declared bound (3.8), checked for ownership (3.9), and every
+missing, invalid, unrepaired or withheld required field takes its
+rendered backstop with `backstop{reason}` (3.4, 3.10). The text result
+carries per-field origins, lineage and counts (3.10); generated text
+never reaches a decision input (3.6), and evidence holds digests only
+(3.15). Tests: `crates/rustev-core/tests/generation_eval.rs` (12 scripted
+tests: failures, repair, ownership, budgets, determinism, judgment
+isolation).
+
 **Owner decision A-49 (2026-10-23): dependencies.** Spec 030 is no longer
 a declared dependency of this spec. No behavior or acceptance item here
 needs it: provider wire mappings, "including Bedrock's (spec 030 3.12)",

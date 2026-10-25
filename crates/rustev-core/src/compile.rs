@@ -196,6 +196,7 @@ pub(crate) enum StepInfo {
 #[derive(Debug, Clone)]
 pub(crate) struct Info {
     pub screen_categories: BTreeMap<String, Vec<String>>,
+    pub generation: BTreeMap<String, crate::generation::Checked>,
     pub inputs: BTreeMap<String, (Ty, InputDecl)>,
     /// Declaration order.
     pub step_ids: Vec<String>,
@@ -1594,7 +1595,7 @@ fn compile_generation(
     }
 
     screening::coverage(authored, &screens, &decoded)?;
-    let generated = crate::generation::type_check(
+    let mut generated = crate::generation::type_check(
         def,
         &prompts,
         &input_tys,
@@ -1689,6 +1690,9 @@ fn compile_generation(
         let d = match &s.body {
             StepBody::Generate(g) => {
                 let binding = crate::generation::bind(&s.id, g, &generated[&s.id], &sorted)?;
+                if let Some(checked) = generated.get_mut(&s.id) {
+                    checked.binding = binding.clone();
+                }
                 details.insert(s.id.clone(), PlanStepDetail::Generate(Box::new(binding)));
                 continue;
             }
@@ -2062,6 +2066,7 @@ fn compile_generation(
                         .map(|p| (d.backend_id.clone(), p.categories.clone()))
                 })
                 .collect(),
+            generation: generated,
             inputs,
             step_ids: ids,
             steps: infos,
