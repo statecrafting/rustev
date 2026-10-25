@@ -442,6 +442,7 @@ pub fn builder(params: &Params) -> DefinitionBuilder {
             ),
         )
         .limits(LimitsDecl {
+            acquisition: None,
             max_semantic_requests: params.max_semantic_requests,
             on_excess: ExcessPolicy::TruncateVisible,
             max_projection_bytes: 65_536,

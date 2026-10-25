@@ -964,6 +964,10 @@ export namespace RustevDefinition1 {
    */
   export interface LimitsDecl {
     /**
+     * Spec 036 acquisition ceilings, omitted when unused.
+     */
+    acquisition?: AcquisitionBudget;
+    /**
      * Recorded for the runtime; not enforced by the pure core.
      */
     deadline_ms: number;
@@ -974,6 +978,14 @@ export namespace RustevDefinition1 {
     max_projection_bytes: number;
     max_semantic_requests: number;
     on_excess: ExcessPolicy;
+  }
+  /**
+   * Plan-wide acquisition ceilings (spec 036, 3.9.4).
+   */
+  export interface AcquisitionBudget {
+    max_bytes: number;
+    max_calls: number;
+    max_items: number;
   }
   /**
    * The selection policy (spec 002, 3.11).
@@ -1973,6 +1985,10 @@ export namespace RustevDefinition2 {
    */
   export interface LimitsDecl {
     /**
+     * Spec 036 acquisition ceilings, omitted when unused.
+     */
+    acquisition?: AcquisitionBudget;
+    /**
      * Recorded for the runtime; not enforced by the pure core.
      */
     deadline_ms: number;
@@ -1983,6 +1999,14 @@ export namespace RustevDefinition2 {
     max_projection_bytes: number;
     max_semantic_requests: number;
     on_excess: ExcessPolicy;
+  }
+  /**
+   * Plan-wide acquisition ceilings (spec 036, 3.9.4).
+   */
+  export interface AcquisitionBudget {
+    max_bytes: number;
+    max_calls: number;
+    max_items: number;
   }
   /**
    * The selection policy (spec 002, 3.11).
@@ -7497,6 +7521,8 @@ export namespace RustevPlan2 {
    */
   export type Derivation = "exact-derived" | "model-derived" | "mixed-derived";
   export type PlanStepDetail =
+    | "acquire"
+    | "widen"
     | {
         exact: {
           op: string;
@@ -7767,6 +7793,10 @@ export namespace RustevPlan2 {
    */
   export interface LimitsDecl {
     /**
+     * Spec 036 acquisition ceilings, omitted when unused.
+     */
+    acquisition?: AcquisitionBudget;
+    /**
      * Recorded for the runtime; not enforced by the pure core.
      */
     deadline_ms: number;
@@ -7777,6 +7807,14 @@ export namespace RustevPlan2 {
     max_projection_bytes: number;
     max_semantic_requests: number;
     on_excess: ExcessPolicy;
+  }
+  /**
+   * Plan-wide acquisition ceilings (spec 036, 3.9.4).
+   */
+  export interface AcquisitionBudget {
+    max_bytes: number;
+    max_calls: number;
+    max_items: number;
   }
   /**
    * The selection policy (spec 002, 3.11).
@@ -9024,6 +9062,8 @@ export namespace RustevPlan3 {
   export type ScreenConsequence =
     "none" | "refuse" | "drop_field" | "drop_text" | "drop_item" | "fail_closed" | "skip_generation" | "fail_open";
   export type PlanStepDetail =
+    | "acquire"
+    | "widen"
     | {
         exact: {
           op: string;
@@ -9410,6 +9450,10 @@ export namespace RustevPlan3 {
    */
   export interface LimitsDecl {
     /**
+     * Spec 036 acquisition ceilings, omitted when unused.
+     */
+    acquisition?: AcquisitionBudget;
+    /**
      * Recorded for the runtime; not enforced by the pure core.
      */
     deadline_ms: number;
@@ -9420,6 +9464,14 @@ export namespace RustevPlan3 {
     max_projection_bytes: number;
     max_semantic_requests: number;
     on_excess: ExcessPolicy;
+  }
+  /**
+   * Plan-wide acquisition ceilings (spec 036, 3.9.4).
+   */
+  export interface AcquisitionBudget {
+    max_bytes: number;
+    max_calls: number;
+    max_items: number;
   }
   /**
    * The selection policy (spec 002, 3.11).
@@ -16455,7 +16507,7 @@ export namespace RustevServeRefusal1 {
           length: Number_2049_18446744073709551615;
         };
       };
-  export type Number_1_19 = number;
+  export type Number_1_21 = number;
   /**
    * Length is enforced in decoded UTF-8 bytes by the parser.
    */
@@ -16552,7 +16604,7 @@ export namespace RustevServeRefusal1 {
     schema: "rustev.serve-refusal/1";
   }
   export interface CompilerRefusalFields {
-    category: Number_1_19;
+    category: Number_1_21;
     category_name: Text_1_2048;
     command: Text_1_2048;
     detail: Text_0_2048;

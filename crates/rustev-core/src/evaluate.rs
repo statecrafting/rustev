@@ -51,6 +51,8 @@ use crate::value::{Value, decode};
 /// Why evaluation could not start.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StartError {
+    /// Acquisition compilation is available; staged evaluation is a later increment.
+    AcquisitionNotAvailable,
     /// The snapshot's `schema` is not `rustev.snapshot/1`.
     Schema(String),
     /// An entry names a field the definition does not declare.
@@ -62,6 +64,9 @@ pub enum StartError {
 impl fmt::Display for StartError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            StartError::AcquisitionNotAvailable => {
+                write!(f, "staged acquisition evaluation is not available")
+            }
             StartError::Schema(s) => write!(f, "snapshot schema {s:?}"),
             StartError::UndeclaredField(s) => {
                 write!(f, "snapshot entry for undeclared field {s:?}")
@@ -430,6 +435,9 @@ impl<'c> Evaluation<'c> {
         snapshot: &Snapshot,
         now: Timestamp,
     ) -> Result<Self, StartError> {
+        if compiled.plan.acquisitions.is_some() {
+            return Err(StartError::AcquisitionNotAvailable);
+        }
         // A plan 3 accepts a snapshot 1 or 2, a plan 2 only a snapshot 1,
         // so a grade claim is never silently dropped (spec 032, 3.1.4).
         let v2 = compiled.info.v2;
@@ -1595,6 +1603,9 @@ impl<'c> Evaluation<'c> {
                 let key = format!("step:{id}");
                 let lineage = self.lineage_of(deps);
                 match &info.steps[id] {
+                    StepInfo::Acquisition(_) => {
+                        unreachable!("acquisition evaluation refused at start")
+                    }
                     StepInfo::Exact { args, .. } => {
                         let derivation = combine(deps.iter().map(|d| {
                             self.derivation
@@ -2011,7 +2022,9 @@ impl<'c> Evaluation<'c> {
                     k.clone(),
                     decl.for_each.iter().map(|f| f.bind.clone()).collect(),
                 )),
-                StepInfo::Exact { .. } | StepInfo::Corroborate { .. } => None,
+                StepInfo::Exact { .. }
+                | StepInfo::Corroborate { .. }
+                | StepInfo::Acquisition(_) => None,
             })
             .collect();
         let cx = OpContext {

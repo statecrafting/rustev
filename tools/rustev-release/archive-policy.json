@@ -76,6 +76,7 @@
         "Cargo.toml.orig",
         "LICENSE",
         "README.md",
+        "src/acquisition.rs",
         "src/actionable.rs",
         "src/builder.rs",
         "src/calibrate.rs",

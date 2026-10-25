@@ -225,6 +225,7 @@ pub fn semantic(
 
 pub fn limits(max_requests: u64) -> LimitsDecl {
     LimitsDecl {
+        acquisition: None,
         max_semantic_requests: max_requests,
         on_excess: ExcessPolicy::Refuse,
         max_projection_bytes: 65_536,

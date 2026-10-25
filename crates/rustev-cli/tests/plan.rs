@@ -550,3 +550,19 @@ fn a_fifo_is_refused_without_blocking() {
         .unwrap();
     assert!(out.contains("regular file"), "{out}");
 }
+
+#[test]
+fn protected_acquisition_group_is_category_20() {
+    let s = Scratch::new("acquisition-protected");
+    let plan: serde_json::Value = serde_json::from_str(include_str!(
+        "../../rustev-core/tests/golden/acquisition-widen.plan.json"
+    ))
+    .unwrap();
+    let mut definition = plan["definition"].clone();
+    definition["steps"][0]["body"]["widen"]["tiers"][1]["relax"] = serde_json::json!(["query"]);
+    s.write("definition.json", &serde_json::to_vec(&definition).unwrap());
+    let r = s.rustev(&["plan", "check", "--definition", "definition.json"]);
+    let j = r.expect(5, "refused");
+    assert_eq!(j["category"], 20);
+    cli_golden("refusal-20.json", &r.stdout);
+}

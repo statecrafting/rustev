@@ -672,7 +672,10 @@ impl<'de> Deserialize<'de> for CompilerRefusal {
 struct CompilerRefusalFields {
     command: Text<1, 2048>,
     status: Refused,
-    category: Number<1, 19>,
+    // Category numbers are fixed by the specs: 18 and 19 are spec 035's
+    // screening categories, 20 and 21 are spec 036 3.9.3's. This is a wire
+    // range check only; nothing here converts the number to a `Category`.
+    category: Number<1, 21>,
     category_name: Text<1, 2048>,
     subject: Text<0, 2048>,
     detail: Text<0, 2048>,

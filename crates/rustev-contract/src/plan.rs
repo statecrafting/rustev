@@ -212,6 +212,10 @@ pub struct PlanStep {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum PlanStepDetail {
+    /// Bound acquisition details are in the plan acquisitions table.
+    Acquire,
+    /// Bound widening details are in the plan acquisitions table.
+    Widen,
     Exact {
         op: String,
         version: u32,

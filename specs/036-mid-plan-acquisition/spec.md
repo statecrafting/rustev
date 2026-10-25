@@ -53,6 +53,14 @@ extends:
   - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: additive }
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "crates/rustev-surface/" }, nature: additive }
   - { spec: "028-opentelemetry-evidence-sink", unit: { kind: directory, path: "integrations/rustev-otel/" }, nature: additive }
+  # Default acquisition budget members in shared fixtures and the
+  # reference package's definition builder; no behavior. The lodging
+  # package's builder is covered by the spec 008 edge above.
+  - { spec: "010-integrations", unit: { kind: directory, path: "integrations/rustev-serve/" }, nature: additive }
+  - { spec: "007-support-routing-package", unit: { kind: directory, path: "packages/rustev-pkg-support-routing/" }, nature: additive }
+  # The CLI refusal golden for 20 joins the shared conformance suite as a
+  # harvested case.
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "tools/rustev-conformance/" }, nature: additive }
   # New contract source files join rustev-contract's reviewed archive list.
   - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
   # Adds 036 to `make verify` when the implementation is complete.
@@ -1012,6 +1020,25 @@ descriptors and captured pages keyed by request identity;
 replay behavior land with their increment. Redaction classes are declared
 for the new members. Documents without them keep their bytes and
 identities (`tests/acquisition_records.rs`).
+
+**Increment 2, part 1 (2026-10-24): compiling acquisitions.** The
+temporary `acquisition-not-compiled` refusal is gone: `acquire`, `widen`
+and `is_constructed` compile (`crates/rustev-core/src/acquisition.rs`).
+New refusal categories 20 `invalid_acquisition` and 21 `source_mapping`
+(3.9.3), with the protected-group rules of 3.5.4, re-check under their
+own category what parse already refuses on wire documents; category 8
+covers `skipped` handlers, including `skipped_not_propagatable` (3.8.3);
+category 7 refuses each budget ceiling of 3.9.4 (calls, items, bytes,
+deadline share, hard cost). The plan records bound sources in spec 032's
+`sources` member, fills `acquisitions` (3.10.1) and gains plan step
+details for `acquire` and `widen`; `LimitsDecl` gains the optional
+`acquisition` budget. Tests: `crates/rustev-core/tests/acquisition_compile.rs`
+with refusal goldens for 20 and 21 (and a CLI golden for 20, harvested
+into the shared conformance suite), budget
+goldens, and plan goldens for a guarded acquire and a two-source
+widening. Remaining for part 2: `compose_key@1` (3.7) and the CLI golden
+for category 21, which needs source descriptors supplied to the CLI's
+compile.
 
 ## Decisions at approval
 

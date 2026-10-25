@@ -72,6 +72,7 @@ fn bundle(name: &str) -> (String, Value) {
             },
         )
         .limits(LimitsDecl {
+            acquisition: None,
             max_semantic_requests: 0,
             on_excess: ExcessPolicy::Refuse,
             max_projection_bytes: 1024,
