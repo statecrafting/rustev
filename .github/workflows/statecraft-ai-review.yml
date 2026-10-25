@@ -1,5 +1,5 @@
-# Rendered by Statecraft from profile github-actions-rust revision 19
-# (identity d71264912245926abe9fff1daa2563b30c2bd7cd084d3837e23c3fd66028e9cd). A managed file and a member of this
+# Rendered by Statecraft from profile github-actions-rust revision 20
+# (identity 90804dbe62b2b1c1515d42c39cd9d75b851c7c5bcf91d892e23db7cd6ebfc4c2). A managed file and a member of this
 # repository's authority set. Called by statecraft-ci.yml only; it declares
 # the two credentials it may use by name (revision 8: the API key when set,
 # else the OAuth token) and is never given `secrets: inherit`.
@@ -27,7 +27,7 @@ jobs:
   review:
     name: review
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     permissions:
       contents: read
       pull-requests: write
@@ -62,7 +62,7 @@ jobs:
           EXCLUDE: '.statecraft/derived crates/rustev-contract/schema integrations/rustev-node/types integrations/rustev-wasm/types tools/rustev-conformance/cases'
           RELEASE_PATTERN: 'release/*'
           CLAUDE_CLI_VERSION: '2.1.116'
-          PROFILE_IDENTITY: 'd71264912245926abe9fff1daa2563b30c2bd7cd084d3837e23c3fd66028e9cd'
+          PROFILE_IDENTITY: '90804dbe62b2b1c1515d42c39cd9d75b851c7c5bcf91d892e23db7cd6ebfc4c2'
         run: |
           script="${RUNNER_TEMP}/statecraft-ai-review.sh"
           # Revision 12: only a readable base without the script is the
