@@ -804,6 +804,10 @@ fn static_reason_causes(
         | K::InvalidInput
         | K::Conflict
         | K::InsufficientGrade => input_causes(),
+        // The static table is a plan fact: a backend's origin is a
+        // registration fact (spec 033 3.9.1) the plan cannot see, so every
+        // static backend cause carries the default `upstream`. The dynamic
+        // path (evaluate.rs) replaces it with the registered origin.
         K::BackendUnavailable | K::InvalidBackendOutput => vec![Cause::Backend {
             step: target.strip_prefix("step:").unwrap_or(target).to_string(),
             origin: Origin::Upstream,
@@ -815,7 +819,23 @@ fn static_reason_causes(
         K::Unsupported => vec![Cause::Capability {
             name: target.strip_prefix("step:").unwrap_or(target).to_string(),
         }],
-        K::ScreenUnavailable => Vec::new(),
+        K::ScreenUnavailable => deps
+            .get(target.strip_prefix("step:").unwrap_or(target))
+            .into_iter()
+            .flatten()
+            .filter_map(|r| {
+                r.strip_prefix("step:screen:").map(|_| Cause::Backend {
+                    step: r.trim_start_matches("step:").into(),
+                    // Static causes are plan facts. A screener's origin is a
+                    // registration fact (spec 033 3.9.1) the plan cannot
+                    // see, so the static table carries the default
+                    // `upstream`, exactly as every static backend cause does;
+                    // evaluation (evaluate.rs) replaces it with the
+                    // screener's registered origin for the actual outage.
+                    origin: Origin::Upstream,
+                })
+            })
+            .collect(),
         K::Abstained | K::Skipped => vec![Cause::Policy { site: site.into() }],
     }
 }

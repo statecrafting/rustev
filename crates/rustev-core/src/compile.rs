@@ -181,6 +181,7 @@ pub(crate) enum StepInfo {
 
 #[derive(Debug, Clone)]
 pub(crate) struct Info {
+    pub screen_categories: BTreeMap<String, Vec<String>>,
     pub inputs: BTreeMap<String, (Ty, InputDecl)>,
     /// Declaration order.
     pub step_ids: Vec<String>,
@@ -1870,6 +1871,15 @@ pub(crate) fn compile_instantiated(
         plan,
         id,
         info: Info {
+            screen_categories: descriptors
+                .iter()
+                .filter_map(|d| {
+                    d.operations
+                        .iter()
+                        .find_map(|op| op.screen.as_ref())
+                        .map(|p| (d.backend_id.clone(), p.categories.clone()))
+                })
+                .collect(),
             inputs,
             step_ids: ids,
             steps: infos,

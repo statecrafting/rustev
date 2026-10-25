@@ -29,6 +29,9 @@ use rustev_contract::output::{BackendOutputDoc, RawOutput};
 use rustev_contract::plan::{PlanExecution, PlanStepDetail};
 use rustev_contract::request::RequestDoc;
 use rustev_contract::scope::Scope as ReplayScope;
+use rustev_contract::screening::{
+    OnBlock, OnUnavailable, ScreenConsequence, ScreenVerdict, ScreeningEvidence, ScreeningItemId,
+};
 use rustev_contract::snapshot::{Entry, Snapshot};
 use rustev_contract::time::Timestamp;
 use rustev_contract::{Identified, schema};
@@ -183,6 +186,9 @@ pub struct Evaluation<'c> {
     lineage: BTreeMap<String, Lineage>,
     pending: BTreeMap<(String, Vec<String>), SemanticRequest>,
     issued: u64,
+    screening: BTreeMap<(String, Vec<String>), ScreeningEvidence>,
+    screen_refusals: Vec<rustev_contract::actionability::Refusal>,
+    screen_inputs: BTreeMap<String, Value>,
     notices: Vec<Notice>,
     /// Plan 3 (spec 032): the value metadata of every input and step that
     /// has a value.
@@ -207,6 +213,95 @@ struct StepQuality {
     join: Option<Vec<JoinEvidence>>,
     merge: Option<Vec<MergeEvidence>>,
     corroboration: Option<Corroboration>,
+}
+
+// Projection trees retain positions through exact copies. Screening changes
+// rendering only; operators and policy continue to see the original values.
+#[derive(Clone)]
+struct ModelNode {
+    value: Json,
+    children: BTreeMap<String, ModelNode>,
+    screen: Option<ScreeningEvidence>,
+}
+impl ModelNode {
+    fn plain(value: Json) -> Self {
+        let children = match &value {
+            Json::Object(m) => m
+                .iter()
+                .map(|(k, v)| (k.clone(), Self::plain(v.clone())))
+                .collect(),
+            Json::Array(a) => a
+                .iter()
+                .enumerate()
+                .map(|(i, v)| (i.to_string(), Self::plain(v.clone())))
+                .collect(),
+            _ => BTreeMap::new(),
+        };
+        Self {
+            value,
+            children,
+            screen: None,
+        }
+    }
+    fn render(&self, unavailable: &mut BTreeSet<String>) -> Json {
+        if let Some(e) = &self.screen {
+            match e.consequence {
+                ScreenConsequence::DropField | ScreenConsequence::DropText => {
+                    return rustev_contract::screening::withheld_screen_blocked();
+                }
+                ScreenConsequence::FailClosed | ScreenConsequence::SkipGeneration => {
+                    unavailable.insert(e.field.clone());
+                }
+                _ => {}
+            }
+        }
+        match &self.value {
+            Json::Object(_) => Json::Object(
+                self.children
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.render(unavailable)))
+                    .collect(),
+            ),
+            Json::Array(a) => Json::Array(
+                (0..a.len())
+                    .map(|i| {
+                        // plain creates every indexed child; overlays replace
+                        // children but never remove them. Use a checked lookup
+                        // even though input cannot violate this invariant.
+                        self.children
+                            .get(&i.to_string())
+                            .map(|child| child.render(unavailable))
+                            .unwrap_or(Json::Null)
+                    })
+                    .collect(),
+            ),
+            other => other.clone(),
+        }
+    }
+    fn field(&self, path: &str) -> Option<&Self> {
+        path.split('/').try_fold(self, |v, f| v.children.get(f))
+    }
+    fn elements(&self) -> Vec<&Self> {
+        match &self.value {
+            Json::Array(a) => (0..a.len())
+                .filter_map(|i| self.children.get(&i.to_string()))
+                .collect(),
+            _ => self.children.values().collect(),
+        }
+    }
+    fn matching(&self, value: &Json) -> Option<&Self> {
+        (&self.value == value).then_some(self)
+    }
+    fn copied(value: Json, sources: &[Self]) -> Self {
+        if let Some(source) = sources.iter().find_map(|s| s.matching(&value)) {
+            return source.clone();
+        }
+        let mut result = Self::plain(value);
+        for child in result.children.values_mut() {
+            *child = Self::copied(child.value.clone(), sources);
+        }
+        result
+    }
 }
 
 fn validate_input(
@@ -384,6 +479,9 @@ impl<'c> Evaluation<'c> {
             lineage: BTreeMap::new(),
             pending: BTreeMap::new(),
             issued: 0,
+            screening: BTreeMap::new(),
+            screen_refusals: Vec::new(),
+            screen_inputs: BTreeMap::new(),
             notices: compiled.plan.notices.clone(),
             metas: BTreeMap::new(),
             input_quality: BTreeMap::new(),
@@ -455,6 +553,7 @@ impl<'c> Evaluation<'c> {
         if compiled.plan.actionability.is_some() {
             ev.run_checks();
         }
+        ev.screen_inputs = ev.input_values.clone();
         if ev.checks.terminal.is_none() {
             ev.advance();
         }
@@ -725,7 +824,21 @@ impl<'c> Evaluation<'c> {
                 .into_iter()
                 .map(|f| self.input_cause(&f))
                 .collect(),
-            Unresolved::ScreenUnavailable { .. } => Vec::new(),
+            Unresolved::ScreenUnavailable { fields } => self
+                .screening
+                .iter()
+                .filter(|(_, e)| {
+                    fields.contains(&e.field)
+                        && matches!(e.verdict, ScreenVerdict::Unavailable { .. })
+                })
+                .map(|(key, e)| Cause::Backend {
+                    step: e.step.clone(),
+                    origin: self
+                        .failures
+                        .get(key)
+                        .map_or(Origin::Upstream, |c| c.origin),
+                })
+                .collect(),
             Unresolved::Abstained { rule } => vec![Cause::Policy {
                 site: if site.starts_with("check:") {
                     site.into()
@@ -1061,10 +1174,15 @@ impl<'c> Evaluation<'c> {
         instance: Vec<String>,
         value: Result<SemValue, Unresolved>,
     ) -> Result<(), SupplyError> {
+        self.record_screen(step, &instance, &value);
         if let Some(SemState::Instances { values, .. }) = self.semantic.get_mut(step) {
             values.insert(instance, value);
         }
-        self.advance();
+        if self.screen_refusals.is_empty() {
+            self.advance();
+        } else {
+            self.pending.clear();
+        }
         Ok(())
     }
 
@@ -1101,6 +1219,32 @@ impl<'c> Evaluation<'c> {
         }
         let e = |k: crate::kinds::KindError| bad(k.0);
         match (b.requires, raw) {
+            (
+                RequiredKind::ScreenVerdict,
+                RawOutput::Screen {
+                    blocked,
+                    categories,
+                    ..
+                },
+            ) => {
+                // Compilation rejects a screener without a profile (category 5).
+                // Still reject inconsistent metadata without panicking.
+                let Some(declared) = self.compiled.info.screen_categories.get(&b.backend_id) else {
+                    return Err(bad("screening backend has no screen profile".into()));
+                };
+                let unique: BTreeSet<_> = categories.iter().collect();
+                if unique.len() != categories.len()
+                    || categories.iter().any(|c| !declared.contains(c))
+                {
+                    return Err(bad("invalid screening categories".into()));
+                }
+                let mut categories = categories.clone();
+                categories.sort();
+                Ok(SemValue::Screen {
+                    blocked: *blocked,
+                    categories,
+                })
+            }
             (RequiredKind::Label, RawOutput::Label(l)) => {
                 let label = SelectedLabel::new(&decl.options, l).map_err(e)?;
                 Ok(if decl.operation == Operation::Rubric {
@@ -1167,6 +1311,187 @@ impl<'c> Evaluation<'c> {
             }
             _ => Err(bad("output does not match the required kind".into())),
         }
+    }
+
+    fn is_screen_ref(&self, reference: &str) -> bool {
+        self.compiled.plan.screening.as_ref().is_some_and(|p| {
+            p.steps
+                .iter()
+                .any(|s| reference == format!("step:{}", s.step))
+        })
+    }
+
+    fn record_screen(&mut self, step: &str, key: &[String], value: &Result<SemValue, Unresolved>) {
+        use rustev_contract::actionability::{Refusal, Remediation};
+        use rustev_contract::screening::{ScreeningNotice, screen_text_digest};
+        let Some(plan) = &self.compiled.plan.screening else {
+            // This hook also receives ordinary semantic steps with no screening.
+            return;
+        };
+        let Some(s) = plan.steps.iter().find(|s| s.step == step) else {
+            // This hook also receives ordinary semantic steps with no screening.
+            return;
+        };
+        if self.screening.contains_key(&(step.into(), key.to_vec())) {
+            // Empty results are recorded twice; their consequence already exists.
+            return;
+        }
+        let Some(entry) = plan.screening.entries.iter().find(|e| e.id == s.entry) else {
+            // Lowering creates each step from its entry; evaluation never removes
+            // entries. This cannot occur in a compiler-produced plan.
+            return;
+        };
+        let projection = match self.compiled.info.steps.get(step) {
+            Some(StepInfo::Semantic { decl, .. }) => {
+                crate::compile::screening::request_projection(decl, key, &self.screen_inputs)
+                    .ok()
+                    .and_then(|bytes| serde_json::from_slice::<Json>(&bytes).ok())
+            }
+            _ => None,
+        };
+        let text = projection
+            .as_ref()
+            .and_then(|p| p.get("values"))
+            .and_then(|v| v.get("text"))
+            .and_then(Json::as_str);
+        let invalid = Err(Unresolved::InvalidBackendOutput {
+            detail: "invalid screening projection or verdict".into(),
+        });
+        let value = if text.is_none()
+            || !matches!(
+                value,
+                Ok(SemValue::Screen { .. } | SemValue::ScreenEmpty) | Err(_)
+            ) {
+            &invalid
+        } else {
+            value
+        };
+        let (verdict, categories, consequence) = match value {
+            Ok(SemValue::ScreenEmpty) => (ScreenVerdict::Empty, vec![], ScreenConsequence::None),
+            Ok(SemValue::Screen {
+                blocked: false,
+                categories,
+            }) => (
+                ScreenVerdict::Pass,
+                categories.clone(),
+                ScreenConsequence::None,
+            ),
+            Ok(SemValue::Screen {
+                blocked: true,
+                categories,
+            }) => (
+                ScreenVerdict::Blocked,
+                categories.clone(),
+                match entry.on_block {
+                    OnBlock::Refuse => ScreenConsequence::Refuse,
+                    OnBlock::DropField => ScreenConsequence::DropField,
+                    OnBlock::DropText => ScreenConsequence::DropText,
+                    OnBlock::DropItem => ScreenConsequence::DropItem,
+                },
+            ),
+            Err(reason) => (
+                ScreenVerdict::Unavailable {
+                    reason: reason.clone(),
+                },
+                vec![],
+                match entry.on_unavailable {
+                    OnUnavailable::FailClosed => ScreenConsequence::FailClosed,
+                    OnUnavailable::SkipGeneration => ScreenConsequence::SkipGeneration,
+                    OnUnavailable::FailOpen => ScreenConsequence::FailOpen,
+                },
+            ),
+            // Non-screen values are normalized to `invalid` above.
+            _ => (
+                ScreenVerdict::Unavailable {
+                    reason: Unresolved::InvalidBackendOutput {
+                        detail: "not a screening verdict".into(),
+                    },
+                },
+                vec![],
+                ScreenConsequence::FailClosed,
+            ),
+        };
+        let name = s
+            .field
+            .trim_start_matches("input:")
+            .split('/')
+            .next()
+            .unwrap_or_default()
+            .trim_end_matches("[]");
+        if consequence == ScreenConsequence::Refuse {
+            let subject = key.first().map_or_else(
+                || s.field.clone(),
+                |id| s.field.replace("[]", &format!("[{id}]")),
+            );
+            let action = crate::actionable::action(
+                vec![self.input_cause(name)],
+                crate::actionable::ActionInputs {
+                    caller_controlled: &self.caller_controlled(),
+                    address: &entry.address,
+                    declared: None,
+                    computed: Remediation::with("screen_blocked", []),
+                    transient: false,
+                },
+            );
+            self.screen_refusals.push(Refusal {
+                check: format!("screen:{}", entry.id),
+                subject,
+                action,
+            });
+        }
+        // compile::screening::validate requires a text or enum item_id field;
+        // validate_input decodes snapshots against that type before evaluation.
+        // Earlier drops can remove an item, but cannot change this shape.
+        if consequence == ScreenConsequence::DropItem
+            && let (ScreeningItemId::Field(field), Some(Value::List(items))) =
+                (&entry.item_id, self.input_values.get_mut(name))
+        {
+            items.retain(|v| !matches!(v, Value::Record(m) if matches!(m.get(&field.field), Some(Value::Text(id) | Value::Enum(id)) if key.first() == Some(id))));
+        }
+        if consequence != ScreenConsequence::None {
+            if let Some(n) = self.notices.iter_mut().find(|n| {
+                n.screening.as_ref().is_some_and(|n| {
+                    n.entry == entry.id && n.field == s.field && n.consequence == consequence
+                })
+            }) {
+                if let Some(notice) = n.screening.as_mut() {
+                    notice.items.extend(key.iter().cloned());
+                    notice.items.sort();
+                    notice.items.dedup();
+                }
+            } else {
+                self.notices.push(Notice {
+                    kind: NoticeKind::Screening,
+                    subject: s.field.clone(),
+                    reason: "screening consequence".into(),
+                    action: None,
+                    screening: Some(ScreeningNotice {
+                        entry: entry.id.clone(),
+                        field: s.field.clone(),
+                        consequence,
+                        items: key.to_vec(),
+                    }),
+                });
+            }
+        }
+        self.screening.insert(
+            (step.into(), key.to_vec()),
+            ScreeningEvidence {
+                entry: entry.id.clone(),
+                field: s.field.clone(),
+                item: key.first().cloned(),
+                // A malformed projection has no text to hash. The empty digest
+                // is accompanied by an invalid-output verdict, never `empty`.
+                text_digest: screen_text_digest(text.unwrap_or_default()),
+                verdict,
+                categories,
+                consequence,
+                backend_id: s.binding.backend_id.clone(),
+                artifact: s.binding.artifact.clone(),
+                descriptor: s.binding.descriptor.clone(),
+                step: step.into(),
+            },
+        );
     }
 
     fn rank_candidates(&self, decl: &rustev_contract::definition::SemanticDecl) -> Vec<String> {
@@ -1275,7 +1600,12 @@ impl<'c> Evaluation<'c> {
                         let unresolved = if matches!(args, OpArgs::FieldPresence(_)) {
                             None
                         } else {
-                            merge(deps.iter().filter_map(|d| self.status(d).err()).collect())
+                            merge(
+                                deps.iter()
+                                    .filter(|d| !self.is_screen_ref(d))
+                                    .filter_map(|d| self.status(d).err())
+                                    .collect(),
+                            )
                         };
                         let result = match unresolved {
                             Some(u) => Err(u),
@@ -1708,7 +2038,12 @@ impl<'c> Evaluation<'c> {
                 capability: capability.clone(),
             });
         }
-        if let Some(u) = merge(deps.iter().filter_map(|d| self.status(d).err()).collect()) {
+        if let Some(u) = merge(
+            deps.iter()
+                .filter(|d| !self.is_screen_ref(d))
+                .filter_map(|d| self.status(d).err())
+                .collect(),
+        ) {
             return SemState::Unresolved(u);
         }
         let Some(StepInfo::Semantic {
@@ -1752,6 +2087,16 @@ impl<'c> Evaluation<'c> {
                     continue;
                 }
             };
+            if decl.requires == RequiredKind::ScreenVerdict {
+                let empty = serde_json::from_slice::<Json>(&projection)
+                    .is_ok_and(|envelope| envelope["values"]["text"] == "");
+                if empty {
+                    let value = Ok(SemValue::ScreenEmpty);
+                    self.record_screen(id, &key, &value);
+                    values.insert(key, value);
+                    continue;
+                }
+            }
             if projection.len() as u64 > binding.max_projection_bytes {
                 // The compiler's bound is an upper bound; exceeding it is a
                 // defect, reported rather than dispatched.
@@ -1793,7 +2138,214 @@ impl<'c> Evaluation<'c> {
                 action: None,
             });
         }
+        for (key, value) in &values {
+            self.record_screen(id, key, value);
+        }
         SemState::Instances { values, expected }
+    }
+
+    fn model_node(&self, reference: &str) -> ModelNode {
+        let (base, path) = reference
+            .split_once('/')
+            .map_or((reference, None), |(b, p)| (b, Some(p)));
+        let mut node = if let Some(name) = base.strip_prefix("input:") {
+            let mut node = ModelNode::plain(
+                self.input_values
+                    .get(name)
+                    .map(Value::to_json)
+                    .unwrap_or(Json::Null),
+            );
+            for e in self.screening.values() {
+                let (input, field) = e
+                    .field
+                    .trim_start_matches("input:")
+                    .split_once('/')
+                    .map_or((e.field.trim_start_matches("input:"), None), |(i, f)| {
+                        (i, Some(f))
+                    });
+                if input.trim_end_matches("[]") != name {
+                    continue;
+                }
+                let target = if let Some(item) = &e.item {
+                    let Some(plan) = self.compiled.plan.screening.as_ref() else {
+                        // Evidence is inserted only by record_screen with this plan.
+                        continue;
+                    };
+                    let Some(entry) = plan.screening.entries.iter().find(|s| s.id == e.entry)
+                    else {
+                        // record_screen copies an existing entry id; entries are immutable.
+                        continue;
+                    };
+                    let ScreeningItemId::Field(id) = &entry.item_id else {
+                        // Lowering creates item keys only for list entries, whose
+                        // item_id field is required by compilation.
+                        continue;
+                    };
+                    node.children
+                        .values_mut()
+                        .find(|v| v.value.get(&id.field).and_then(Json::as_str) == Some(item))
+                } else {
+                    Some(&mut node)
+                };
+                // A missing item was already removed by drop_item. A missing
+                // field cannot contain text to expose: validated records have
+                // their declared fields and consequences never remove fields.
+                if let Some(target) = target {
+                    let target = match field {
+                        Some(f) => target.children.get_mut(f),
+                        None => Some(target),
+                    };
+                    if let Some(target) = target {
+                        target.screen = Some(e.clone());
+                    }
+                }
+            }
+            node
+        } else if let Some(id) = base.strip_prefix("step:") {
+            let output = self
+                .exact_values
+                .get(id)
+                .map(Value::to_json)
+                .unwrap_or(Json::Null);
+            match self.compiled.info.steps.get(id) {
+                Some(StepInfo::Corroborate { decl, .. }) => self.model_node(&decl.claim),
+                Some(StepInfo::Exact { args, .. }) => {
+                    let sources: Vec<ModelNode> = match args {
+                        OpArgs::WindowFilter(a) => self
+                            .model_node(&a.list)
+                            .elements()
+                            .into_iter()
+                            .cloned()
+                            .collect(),
+                        OpArgs::Extremum(a) => self
+                            .model_node(&a.list)
+                            .elements()
+                            .into_iter()
+                            .filter_map(|n| n.field(&a.field).cloned())
+                            .collect(),
+                        OpArgs::FilterWithReasons(a) => self
+                            .model_node(&a.list)
+                            .elements()
+                            .into_iter()
+                            .filter_map(|n| n.field(&a.id_field).cloned())
+                            .collect(),
+                        OpArgs::TopK(a) => self
+                            .model_node(&a.list)
+                            .elements()
+                            .into_iter()
+                            .filter_map(|n| n.field(&a.id_field).cloned())
+                            .collect(),
+                        OpArgs::WeightedRank(a) => vec![self.model_node(&a.candidates)],
+                        OpArgs::JoinKeyed(a) => {
+                            let left = self.model_node(&a.left);
+                            let right = self.model_node(&a.right);
+                            let mut node = ModelNode::plain(output);
+                            for (index, target) in &mut node.children {
+                                if let Some(source) = left.children.get(index) {
+                                    let key = source.children.get(&a.key).unwrap_or(source);
+                                    if key.value == target.value["id"] {
+                                        target.children.insert("id".into(), key.clone());
+                                    }
+                                }
+                                if let Some(id) = target.value["id"].as_str()
+                                    && let Some(source) = right.children.get(id)
+                                {
+                                    target.children.insert("match".into(), source.clone());
+                                }
+                            }
+                            return match path {
+                                Some(p) => node
+                                    .field(p)
+                                    .cloned()
+                                    .unwrap_or_else(|| ModelNode::plain(Json::Null)),
+                                None => node,
+                            };
+                        }
+                        OpArgs::MergeFields(a) => {
+                            // The merge record identifies the selected side per field;
+                            // equal text on the other side must not affect withholding.
+                            let mut node = ModelNode::plain(output);
+                            let base = self.model_node(&a.base);
+                            let overlay = self.model_node(&a.overlay);
+                            if let Some(records) =
+                                self.step_quality.get(id).and_then(|q| q.merge.as_ref())
+                            {
+                                for r in records {
+                                    if let rustev_contract::evidence::MergedField::Taken {
+                                        side,
+                                        ..
+                                    } = r.result
+                                    {
+                                        let source = match side {
+                                            rustev_contract::grade::MergeSide::Base => &base,
+                                            rustev_contract::grade::MergeSide::Overlay => &overlay,
+                                        };
+                                        let (source, target) = if r.item.is_empty() {
+                                            (Some(source), Some(&mut node))
+                                        } else {
+                                            (
+                                                overlay.children.iter().find(|(_, n)| n.value["id"].as_str() == Some(&r.item))
+                                                    .and_then(|(i, _)| source.children.get(i))
+                                                    .and_then(|n| if side == rustev_contract::grade::MergeSide::Overlay { n.children.get("match") } else { Some(n) }),
+                                                overlay.children.iter().find(|(_, n)| n.value["id"].as_str() == Some(&r.item))
+                                                    .and_then(|(i, _)| node.children.get_mut(i)),
+                                            )
+                                        };
+                                        if let (Some(source), Some(target)) = (source, target)
+                                            && let Some(field) = source.children.get(&r.field)
+                                        {
+                                            target.children.insert(r.field.clone(), field.clone());
+                                        }
+                                    }
+                                }
+                            }
+                            return match path {
+                                Some(p) => node
+                                    .field(p)
+                                    .cloned()
+                                    .unwrap_or_else(|| ModelNode::plain(Json::Null)),
+                                None => node,
+                            };
+                        }
+                        OpArgs::CountWhere(_)
+                        | OpArgs::TimestampDiff(_)
+                        | OpArgs::Compare(_)
+                        | OpArgs::Arith(_)
+                        | OpArgs::FxConvert(_)
+                        | OpArgs::MemberOf(_)
+                        | OpArgs::FieldPresence(_) => vec![],
+                    };
+                    if matches!(args, OpArgs::FilterWithReasons(_) | OpArgs::TopK(_)) {
+                        let mut node = ModelNode::plain(output);
+                        for name in ["eligible", "ids"] {
+                            if let Some(ids) = node.children.get_mut(name) {
+                                *ids = ModelNode::copied(ids.value.clone(), &sources);
+                            }
+                        }
+                        if let Some(excluded) = node.children.get_mut("excluded") {
+                            for item in excluded.children.values_mut() {
+                                if let Some(id) = item.children.get_mut("id") {
+                                    *id = ModelNode::copied(id.value.clone(), &sources);
+                                }
+                            }
+                        }
+                        node
+                    } else {
+                        ModelNode::copied(output, &sources)
+                    }
+                }
+                _ => ModelNode::plain(output),
+            }
+        } else {
+            ModelNode::plain(Json::Null)
+        };
+        if let Some(path) = path {
+            node = node
+                .field(path)
+                .cloned()
+                .unwrap_or_else(|| ModelNode::plain(Json::Null));
+        }
+        node
     }
 
     fn projection(
@@ -1803,7 +2355,86 @@ impl<'c> Evaluation<'c> {
         candidates: &[String],
     ) -> Result<Vec<u8>, Unresolved> {
         if decl.requires == rustev_contract::definition::RequiredKind::ScreenVerdict {
-            return crate::compile::screening::request_projection(decl, key, &self.input_values);
+            return crate::compile::screening::request_projection(decl, key, &self.screen_inputs);
+        }
+        if self.compiled.plan.screening.is_none() {
+            return self.legacy_projection(decl, key, candidates);
+        }
+        let mut values = Map::new();
+        let mut instance = Map::new();
+        let mut unavailable = BTreeSet::new();
+        for (f, id) in decl.for_each.iter().zip(key) {
+            instance.insert(f.bind.clone(), Json::String(id.clone()));
+        }
+        for r in &decl.project {
+            let node = if let Some(bind) = r.strip_prefix("bind:") {
+                match decl.for_each.iter().zip(key).find(|(f, _)| f.bind == bind) {
+                    Some((f, id)) => match &f.items {
+                        ItemSource::List { list, id_field } => self
+                            .model_node(list)
+                            .children
+                            .values()
+                            .find(|n| n.value.get(id_field).and_then(Json::as_str) == Some(id))
+                            .cloned()
+                            .ok_or_else(|| {
+                                Unresolved::invalid(
+                                    [list.clone()],
+                                    format!("no item with id {id:?}"),
+                                )
+                            })?,
+                        ItemSource::None => ModelNode::plain(Json::Null),
+                    },
+                    None => ModelNode::plain(Json::Null),
+                }
+            } else {
+                self.model_node(r)
+            };
+            values.insert(r.clone(), node.render(&mut unavailable));
+        }
+        // Id lists and candidates also carry text, even when not explicitly projected.
+        for (f, id) in decl.for_each.iter().zip(key) {
+            let ids = self.model_node(&f.over);
+            let ids = ids
+                .children
+                .get("eligible")
+                .or_else(|| ids.children.get("ids"))
+                .unwrap_or(&ids);
+            for n in ids
+                .elements()
+                .into_iter()
+                .filter(|n| n.value.as_str() == Some(id))
+            {
+                n.render(&mut unavailable);
+            }
+        }
+        if let Candidates::From(r) = &decl.candidates {
+            self.model_node(r).render(&mut unavailable);
+        }
+        if !unavailable.is_empty() {
+            return Err(Unresolved::ScreenUnavailable {
+                fields: unavailable.into_iter().collect(),
+            });
+        }
+        let envelope = json!({
+            "candidates": candidates,
+            "instance": instance,
+            "operation": decl.operation,
+            "options": decl.options,
+            "question": decl.question,
+            "task": decl.task,
+            "values": values,
+        });
+        canonical_value_bytes(&envelope).map_err(|e| Unresolved::invalid([], e.to_string()))
+    }
+
+    fn legacy_projection(
+        &self,
+        decl: &rustev_contract::definition::SemanticDecl,
+        key: &[String],
+        candidates: &[String],
+    ) -> Result<Vec<u8>, Unresolved> {
+        if decl.requires == rustev_contract::definition::RequiredKind::ScreenVerdict {
+            return crate::compile::screening::request_projection(decl, key, &self.screen_inputs);
         }
         let mut values = Map::new();
         let mut instance = Map::new();
@@ -1867,75 +2498,96 @@ impl<'c> Evaluation<'c> {
         }
         let compiled = self.compiled;
         let v2 = compiled.info.v2;
-        let actionable = compiled.plan.actionability.is_some();
+        let actionable = compiled.plan.actionability.is_some() || compiled.plan.screening.is_some();
         // A terminal check decides without the policy (spec 033, 3.4.6).
-        let (outcome, reads, trace, site, handler) = match self.checks.terminal.clone() {
-            Some(t) => {
-                use crate::actionable::Terminal;
-                let (outcome, trace) = match &t {
-                    Terminal::Refused => (
-                        Outcome::Refused {
-                            refusals: vec![],
-                            addressed_to: Party::None,
-                        },
-                        self.checks
-                            .refusals
-                            .iter()
-                            .map(|r| format!("check:{}", r.check))
-                            .collect(),
-                    ),
-                    Terminal::Abstain { check } => (
-                        Outcome::Unresolved(Unresolved::Abstained {
-                            rule: check.clone(),
-                        }),
-                        vec![format!("check:{check}")],
-                    ),
-                    Terminal::Escalate { check, reason } => (
-                        Outcome::Escalate {
-                            reason: reason.clone(),
-                        },
-                        vec![format!("check:{check}")],
-                    ),
-                };
-                let site = trace.first().cloned();
-                (
-                    outcome,
-                    self.checks.deciding_reads.clone(),
-                    trace,
-                    site,
-                    None,
-                )
-            }
-            None => {
-                if v2 {
-                    // A policy read below its requirement makes the input or
-                    // step it reads unresolved for the policy, so its handlers
-                    // apply (spec 032, 3.9.1 and 3.9.4).
-                    let mut failures = BTreeMap::new();
-                    for (_, c) in quality::policy_conds(&compiled.plan.definition) {
-                        let mut reads = Vec::new();
-                        quality::cond_reads(c, &mut reads);
-                        for r in &reads {
-                            if failures.contains_key(&r.base) || self.status(&r.base).is_err() {
-                                continue;
-                            }
-                            let ceiling = quality::read_ceiling(r, &compiled.info.trees);
-                            let meta = grading::read_meta(r, &self.metas);
-                            if let Err(u) = grading::check_read(r, &ceiling, &meta, self.now) {
-                                failures.insert(r.base.clone(), u);
+        let (outcome, reads, trace, site, handler) = if !self.screen_refusals.is_empty() {
+            let refusals = self.screen_refusals.clone();
+            let addressed_to = Party::combine(refusals.iter().map(|r| r.action.addressed_to));
+            let reads = self
+                .screening
+                .values()
+                .filter(|e| e.consequence == ScreenConsequence::Refuse)
+                .map(|e| format!("step:{}", e.step))
+                .collect();
+            (
+                Outcome::Refused {
+                    refusals,
+                    addressed_to,
+                },
+                reads,
+                vec!["screening".into()],
+                None,
+                None,
+            )
+        } else {
+            match self.checks.terminal.clone() {
+                Some(t) => {
+                    use crate::actionable::Terminal;
+                    let (outcome, trace) = match &t {
+                        Terminal::Refused => (
+                            Outcome::Refused {
+                                refusals: vec![],
+                                addressed_to: Party::None,
+                            },
+                            self.checks
+                                .refusals
+                                .iter()
+                                .map(|r| format!("check:{}", r.check))
+                                .collect(),
+                        ),
+                        Terminal::Abstain { check } => (
+                            Outcome::Unresolved(Unresolved::Abstained {
+                                rule: check.clone(),
+                            }),
+                            vec![format!("check:{check}")],
+                        ),
+                        Terminal::Escalate { check, reason } => (
+                            Outcome::Escalate {
+                                reason: reason.clone(),
+                            },
+                            vec![format!("check:{check}")],
+                        ),
+                    };
+                    let site = trace.first().cloned();
+                    (
+                        outcome,
+                        self.checks.deciding_reads.clone(),
+                        trace,
+                        site,
+                        None,
+                    )
+                }
+                None => {
+                    if v2 {
+                        // A policy read below its requirement makes the input or
+                        // step it reads unresolved for the policy, so its handlers
+                        // apply (spec 032, 3.9.1 and 3.9.4).
+                        let mut failures = BTreeMap::new();
+                        for (_, c) in quality::policy_conds(&compiled.plan.definition) {
+                            let mut reads = Vec::new();
+                            quality::cond_reads(c, &mut reads);
+                            for r in &reads {
+                                if failures.contains_key(&r.base) || self.status(&r.base).is_err() {
+                                    continue;
+                                }
+                                let ceiling = quality::read_ceiling(r, &compiled.info.trees);
+                                let meta = grading::read_meta(r, &self.metas);
+                                if let Err(u) = grading::check_read(r, &ceiling, &meta, self.now) {
+                                    failures.insert(r.base.clone(), u);
+                                }
                             }
                         }
+                        self.policy_failures = failures;
                     }
-                    self.policy_failures = failures;
+                    let result = policy::evaluate(&compiled.plan.definition.policy, &self);
+                    (
+                        result.outcome,
+                        result.reads,
+                        result.trace,
+                        result.site,
+                        result.handler,
+                    )
                 }
-                let result = policy::evaluate(&compiled.plan.definition.policy, &self);
-                (
-                    result.outcome,
-                    result.reads,
-                    result.trace,
-                    result.site,
-                    result.handler,
-                )
             }
         };
         let derivation = if reads.is_empty() {
@@ -2027,7 +2679,11 @@ impl<'c> Evaluation<'c> {
                             k.clone(),
                             match v {
                                 Ok(_) => StepStatus::Resolved {
-                                    kind: kind.name().into(),
+                                    kind: if self.is_screen_ref(&format!("step:{id}")) {
+                                        "screen_verdict".into()
+                                    } else {
+                                        kind.name().into()
+                                    },
                                     derivation,
                                 },
                                 Err(u) => StepStatus::Unresolved(u.clone()),
@@ -2058,9 +2714,20 @@ impl<'c> Evaluation<'c> {
                 }
             }
         }
+        let screening = compiled.plan.screening.as_ref().map(|p| {
+            p.steps
+                .iter()
+                .flat_map(|s| {
+                    self.screening
+                        .iter()
+                        .filter(|((id, _), _)| id == &s.step)
+                        .map(|(_, e)| e.clone())
+                })
+                .collect()
+        });
         let evidence = EvidenceRecord {
             acquisitions: None,
-            screening: None,
+            screening: screening.filter(|entries: &Vec<ScreeningEvidence>| !entries.is_empty()),
             schema: if v2 {
                 schema::EVIDENCE_V2
             } else {
@@ -2075,7 +2742,11 @@ impl<'c> Evaluation<'c> {
             inputs,
             steps,
             judgment: judgment.clone(),
-            checks: actionable.then(|| self.checks.records.clone()),
+            checks: compiled
+                .plan
+                .actionability
+                .is_some()
+                .then(|| self.checks.records.clone()),
         };
         Ok((judgment, evidence))
     }
@@ -2167,6 +2838,7 @@ impl<'c> Evaluation<'c> {
         use rustev_contract::actionability::{Action, Cause, Override, Refusal, Remediation};
         let cc = self.caller_controlled();
         match outcome {
+            outcome @ Outcome::Refused { .. } if !self.screen_refusals.is_empty() => outcome,
             Outcome::Refused { .. } => {
                 let refusals: Vec<Refusal> = self
                     .checks
@@ -2415,6 +3087,170 @@ impl View for Evaluation<'_> {
             present: &self.present,
             item: None,
             v2: self.compiled.info.v2,
+        }
+    }
+}
+
+#[cfg(test)]
+mod screening_hardening_tests {
+    use super::*;
+    use rustev_contract::definition::{Definition, StepBody, StepDecl};
+    use rustev_contract::descriptor::{
+        BackendDescriptor, InputExcess, InputLimit, OperationSupport, ScreenProfile,
+    };
+    use rustev_contract::output::ScreenUnits;
+    use rustev_contract::{Document, schema};
+    use serde_json::json;
+
+    // Synthetic fixtures. Corruption below is deliberately internal: callers
+    // cannot mutate Info or the accepted screening inputs of an evaluation.
+    fn fixture() -> (Compiled, Snapshot, Timestamp) {
+        let mut d =
+            Definition::parse(include_bytes!("../tests/golden/screening.definition.json")).unwrap();
+        let backend = BackendDescriptor {
+            schema: schema::BACKEND.into(),
+            backend_id: "screen".into(),
+            artifact: rustev_contract::ids::ArtifactId::parse(&format!(
+                "sha256:{}",
+                "b".repeat(64)
+            ))
+            .unwrap(),
+            operations: vec![
+                OperationSupport {
+                    operation: Operation::Proposition,
+                    output: OutputKind::Screen,
+                    max_options: 2,
+                    isolation: None,
+                    screen: Some(ScreenProfile {
+                        policy_version: "synthetic/1".into(),
+                        categories: vec![],
+                        max_text_bytes: 48,
+                        text_unit_bytes: 16,
+                    }),
+                },
+                OperationSupport {
+                    operation: Operation::Classify,
+                    output: OutputKind::Label,
+                    max_options: 2,
+                    isolation: None,
+                    screen: None,
+                },
+            ],
+            input_limit: InputLimit {
+                max_bytes: 65536,
+                on_excess: InputExcess::Refuse,
+            },
+            determinism: rustev_contract::definition::Determinism::Bitwise,
+        };
+        let c = crate::compile(&d, std::slice::from_ref(&backend), &[]).unwrap();
+        let StepInfo::Semantic { decl, .. } = c.info.steps.get("screen:caller_text:0").unwrap()
+        else {
+            panic!("screen step")
+        };
+        let mut model = decl.clone();
+        model.operation = Operation::Classify;
+        model.requires = RequiredKind::Label;
+        model.project = vec!["input:request".into()];
+        d.steps.push(StepDecl {
+            id: "model".into(),
+            body: StepBody::Semantic(*model),
+        });
+        let c = crate::compile(&d, &[backend], &[]).unwrap();
+        let now = Timestamp::from_ms(1_790_164_800_000).unwrap();
+        let snapshot = Snapshot {
+            schema: schema::SNAPSHOT.into(),
+            entries: vec![
+                Entry {
+                    field: "request".into(),
+                    value: json!({"text":"unsafe text","behaviour_text":""}),
+                    provenance: ProvenanceClass::UserSupplied,
+                    as_of_ms: now,
+                    source: "synthetic".into(),
+                    grade: None,
+                },
+                Entry {
+                    field: "candidates".into(),
+                    value: json!([]),
+                    provenance: ProvenanceClass::ThirdParty,
+                    as_of_ms: now,
+                    source: "synthetic".into(),
+                    grade: None,
+                },
+            ],
+        };
+        (c, snapshot, now)
+    }
+
+    fn assert_unavailable(ev: Evaluation<'_>) {
+        assert!(ev.pending().is_empty());
+        assert_eq!(
+            ev.status_of("step:model"),
+            Err(Unresolved::ScreenUnavailable {
+                fields: vec!["input:request/text".into()]
+            })
+        );
+        let (judgment, evidence) = ev.finish("corrupted-screen").unwrap();
+        assert!(!matches!(judgment.outcome, Outcome::Refused { .. }));
+        let entry = evidence
+            .screening
+            .unwrap()
+            .into_iter()
+            .find(|e| e.entry == "caller_text")
+            .unwrap();
+        assert!(matches!(
+            entry.verdict,
+            ScreenVerdict::Unavailable {
+                reason: Unresolved::InvalidBackendOutput { .. }
+            }
+        ));
+        assert_eq!(entry.consequence, ScreenConsequence::FailClosed);
+    }
+
+    fn blocked() -> Supplied {
+        Supplied::Output(RawOutput::Screen {
+            blocked: true,
+            categories: vec![],
+            units: ScreenUnits::NotReported,
+        })
+    }
+
+    #[test]
+    fn legacy_screen_projection_preserves_original_inputs() {
+        let (c, snapshot, now) = fixture();
+        let mut ev = Evaluation::start(&c, &snapshot, now).unwrap();
+        let StepInfo::Semantic { decl, .. } = c.info.steps.get("screen:caller_text:0").unwrap()
+        else {
+            panic!("screen step")
+        };
+        let original = ev.legacy_projection(decl, &[], &[]).unwrap();
+        ev.input_values.remove("request");
+        assert_eq!(ev.legacy_projection(decl, &[], &[]).unwrap(), original);
+    }
+
+    #[test]
+    fn missing_profile_is_invalid_output_without_panicking() {
+        let (mut c, snapshot, now) = fixture();
+        c.info.screen_categories.clear();
+        let mut ev = Evaluation::start(&c, &snapshot, now).unwrap();
+        ev.supply("screen:caller_text:0", &[], blocked()).unwrap();
+        assert_unavailable(ev);
+    }
+
+    #[test]
+    fn corrupted_projection_cannot_bypass_refusing_entry() {
+        for non_string in [false, true] {
+            let (c, snapshot, now) = fixture();
+            let mut ev = Evaluation::start(&c, &snapshot, now).unwrap();
+            let Some(Value::Record(fields)) = ev.screen_inputs.get_mut("request") else {
+                panic!("request record")
+            };
+            if non_string {
+                fields.insert("text".into(), Value::List(vec![]));
+            } else {
+                fields.remove("text");
+            }
+            ev.supply("screen:caller_text:0", &[], blocked()).unwrap();
+            assert_unavailable(ev);
         }
     }
 }

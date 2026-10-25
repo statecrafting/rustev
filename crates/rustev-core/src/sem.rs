@@ -37,6 +37,13 @@ impl SemKind {
 /// One validated semantic value.
 #[derive(Debug, Clone, PartialEq)]
 pub enum SemValue {
+    /// Opaque screening result, never an authored label.
+    Screen {
+        blocked: bool,
+        categories: Vec<String>,
+    },
+    /// Empty text requires no backend call.
+    ScreenEmpty,
     Label(SelectedLabel),
     Distribution(Distribution),
     Calibrated(CalibratedProbability),
@@ -61,7 +68,7 @@ impl SemValue {
             SemValue::Distribution(d) => Some((d.top().0.to_string(), Some(d.top().1))),
             SemValue::Calibrated(c) => Some((c.top().0.to_string(), Some(c.top().1))),
             SemValue::Ordinal(o) => Some((o.top().to_string(), None)),
-            SemValue::Scores(_) => None,
+            SemValue::Scores(_) | SemValue::Screen { .. } | SemValue::ScreenEmpty => None,
         }
     }
 }

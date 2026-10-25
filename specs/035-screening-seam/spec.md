@@ -891,6 +891,29 @@ category bound rises to 19, and `src/compile/screening.rs` joins
 rustev-core's archive list, and the two refusal goldens join the shared
 conformance suite as harvested CLI cases.
 
+**Increment 3 (2026-10-24): verdicts, consequences and evidence in the
+core.** Staged evaluation turns each supplied screening output into a
+verdict (3.6.1): `pass`, `blocked{categories}`, `unavailable{reason}`
+(including an undeclared or duplicated category, which is
+`invalid_backend_output`) or `empty` with no request. A blocked value
+under `refuse` decides spec 033's `refused` outcome at the first such
+verdict in supply order, with one refusal per blocked value already known
+and the action computed from the value's input cause, before the policy's
+handlers; checks terminal at `start` win (3.7). After that `pending()`
+lists no request of the decision. `drop_item` removes the item for every
+consumer, and `drop_text` and `drop_field` write the exact marker
+`{"withheld":"screen_blocked"}` into model projections while exact steps
+read the value (3.6.2, 3.8.1), each with a `screening` notice. Under
+`fail_closed` and `skip_generation` the reading model instances resolve as
+`screen_unavailable{fields}` with spec 033's `backend{step, origin}` cause;
+`fail_open` reads the value with a notice; an unavailable value under
+`refuse` does not refuse (3.9). `rustev.evidence/2` carries one screening
+entry per screened value with the text digest only (3.13.1). Tests:
+`crates/rustev-core/tests/screening_eval.rs` with evidence goldens for
+each verdict, consequence and unavailability policy, a canary text
+asserted absent, and replay of the supply order reproducing the judgment
+bytes. Runtime withdrawal and cancellation are increment 4.
+
 ## Facts relied on
 
 Read on 2026-10-17 from the AWS documentation named; re-confirmed at the
