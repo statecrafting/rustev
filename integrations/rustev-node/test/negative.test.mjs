@@ -327,11 +327,11 @@ test('a missing platform package is a typed error naming it; nothing is download
   // in every ancestor's node_modules); if one did, this fails, not passes.
   const from = createRequire(join(dir, 'index.js'));
   for (const name of ['darwin-arm64', 'darwin-x64', 'linux-x64-gnu', 'linux-x64-musl', 'linux-arm64-gnu', 'linux-arm64-musl', 'win32-x64-msvc']) {
-    assert.throws(() => from.resolve(`@statecrafting/rustev-${name}`), /Cannot find module/);
+    assert.throws(() => from.resolve(`@rustev/rustev-${name}`), /Cannot find module/);
   }
   assert.throws(
     () => require(join(dir, 'index.js')),
-    (err) => err.name === 'PlatformPackageMissing' && /@statecrafting\/rustev-/.test(JSON.stringify(err.detail)),
+    (err) => err.name === 'PlatformPackageMissing' && /@rustev\/rustev-/.test(JSON.stringify(err.detail)),
   );
 });
 

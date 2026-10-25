@@ -116,7 +116,7 @@ function load() {
       throw new classes.InternalError('local_build_unloadable', { path: local, reason: String(e) });
     }
   }
-  const pkg = `@statecrafting/rustev-${name}`;
+  const pkg = `@rustev/rustev-${name}`;
   // Absent is one failure, decided by resolution alone; installed but not
   // loadable (corrupt, built for another ABI, or missing a dependency) is
   // another, and is named as such.

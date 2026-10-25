@@ -32,7 +32,7 @@ fn fixture() -> (
     );
     write(&evidence.join("changelog.md"), b"release notes");
     let artifacts = root.join("artifacts");
-    let mut names = vec![("npm", "statecrafting-rustev-wasm-0.1.0.tgz".to_string())];
+    let mut names = vec![("npm", "rustev-rustev-wasm-0.1.0.tgz".to_string())];
     // Spec 031 3.1: the release includes all seven native CLI platforms.
     for p in fa::PLATFORMS {
         names.push(("cli", format!("rustev-0.1.0-{p}.tar.gz")));
@@ -207,7 +207,7 @@ fn every_expected_tarball_and_binary_is_required_and_absence_is_enforced() {
     let artifacts = fa::collect(&set, &root.join("evidence"), Some(&dir)).unwrap();
     assert!(artifacts.iter().all(|a| a.kind != "binary"));
     let (root, set, _, _) = fixture();
-    std::fs::remove_file(root.join("artifacts/npm/statecrafting-rustev-wasm-0.1.0.tgz")).unwrap();
+    std::fs::remove_file(root.join("artifacts/npm/rustev-rustev-wasm-0.1.0.tgz")).unwrap();
     assert!(
         fa::collect(&set, &root.join("evidence"), Some(&root.join("artifacts")))
             .unwrap_err()

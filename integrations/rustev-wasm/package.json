@@ -1,5 +1,5 @@
 {
-  "name": "@statecrafting/rustev-wasm",
+  "name": "@rustev/rustev-wasm",
   "version": "0.1.0",
   "private": true,
   "description": "Rustev's pure commands as a WebAssembly module: check, compile, show, offline replay, evaluation, gates and calibration.",

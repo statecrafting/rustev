@@ -153,7 +153,7 @@ fn npm_audit_accepts_family_and_rejects_each_dependency_rule() {
     tar(
         &dir,
         "platform.tgz",
-        &json!({"name":"@statecrafting/rustev-darwin-arm64","version":"0.1.0"}),
+        &json!({"name":"@rustev/rustev-darwin-arm64","version":"0.1.0"}),
         Some(("package/addon.node", "binary")),
     );
     assert!(npm_audit(&set, &dir).unwrap().is_empty());
@@ -186,9 +186,9 @@ fn npm_audit_accepts_family_and_rejects_each_dependency_rule() {
     }
     for (name, version) in [
         ("external", "0.1.0"),
-        ("@statecrafting/rustev", "0.1.0"),
-        ("@statecrafting/rustev-wasm", "0.1.0"),
-        ("@statecrafting/rustev-darwin-arm64", "^0.1.0"),
+        ("@rustev/rustev", "0.1.0"),
+        ("@rustev/rustev-wasm", "0.1.0"),
+        ("@rustev/rustev-darwin-arm64", "^0.1.0"),
     ] {
         let p = json!({"optionalDependencies":{name:version}});
         tar(&dir, "bad.tgz", &p, None);
@@ -227,7 +227,7 @@ fn main_sbom_is_deterministic_and_names_every_platform() {
     assert_eq!(a["metadata"]["timestamp"], "2023-11-14T22:13:20Z");
     assert_eq!(
         a["metadata"]["component"]["purl"],
-        "pkg:npm/%40statecrafting/rustev@0.1.0"
+        "pkg:npm/%40rustev/rustev@0.1.0"
     );
     let components = a["components"].as_array().unwrap();
     assert_eq!(components.len(), 7);

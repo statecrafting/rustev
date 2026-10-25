@@ -29,8 +29,9 @@ pub fn observe_crates(m: &ReleaseManifest, registry: &mut dyn Registry) -> Vec<S
 
 /// Spec 031 3.1: npm dist.integrity is the public visibility checksum.
 pub fn npm_lookup(name: &str, version: &str) -> Lookup {
-    if !name.starts_with("@statecrafting/")
-        || !crate::family_artifacts::plain(&name[15..])
+    if !name
+        .strip_prefix(crate::npm::SCOPE)
+        .is_some_and(crate::family_artifacts::plain)
         || !crate::family_artifacts::plain(version)
     {
         return Lookup::Unknown {

@@ -104,7 +104,7 @@ pub fn validate(m: &ReleaseManifest) -> Result<(), String> {
             && (a
                 .package
                 .as_ref()
-                .is_none_or(|p| !p.starts_with("@statecrafting/") || !plain(&p[15..]))
+                .is_none_or(|p| !p.strip_prefix(crate::npm::SCOPE).is_some_and(plain))
                 || a.integrity
                     .as_ref()
                     .is_none_or(|i| !i.starts_with("sha512-")))

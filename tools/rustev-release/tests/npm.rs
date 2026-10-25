@@ -74,15 +74,15 @@ fn the_release_set_fixes_the_npm_members_and_the_absences() {
     assert_eq!(
         npm,
         [
-            "@statecrafting/rustev-darwin-arm64",
-            "@statecrafting/rustev-darwin-x64",
-            "@statecrafting/rustev-linux-arm64-gnu",
-            "@statecrafting/rustev-linux-arm64-musl",
-            "@statecrafting/rustev-linux-x64-gnu",
-            "@statecrafting/rustev-linux-x64-musl",
-            "@statecrafting/rustev-win32-x64-msvc",
-            "@statecrafting/rustev",
-            "@statecrafting/rustev-wasm",
+            "@rustev/rustev-darwin-arm64",
+            "@rustev/rustev-darwin-x64",
+            "@rustev/rustev-linux-arm64-gnu",
+            "@rustev/rustev-linux-arm64-musl",
+            "@rustev/rustev-linux-x64-gnu",
+            "@rustev/rustev-linux-x64-musl",
+            "@rustev/rustev-win32-x64-msvc",
+            "@rustev/rustev",
+            "@rustev/rustev-wasm",
         ]
     );
     // Every platform package on disk is a member, and no other.
@@ -90,7 +90,7 @@ fn the_release_set_fixes_the_npm_members_and_the_absences() {
         .unwrap()
         .map(|e| {
             format!(
-                "@statecrafting/rustev-{}",
+                "@rustev/rustev-{}",
                 e.unwrap().file_name().to_string_lossy()
             )
         })
@@ -118,10 +118,7 @@ fn a_version_outside_the_family_fails() {
     let v = judge(&set(), LINUX, |d| d["version"] = "0.1.1".into());
     assert_eq!(
         field_of(v),
-        (
-            "@statecrafting/rustev-linux-x64-gnu".into(),
-            "version".into()
-        )
+        ("@rustev/rustev-linux-x64-gnu".into(), "version".into())
     );
 }
 
@@ -146,10 +143,7 @@ fn a_member_without_the_private_guard_fails() {
     let v = judge(&set(), MAIN, |d| {
         d.as_object_mut().unwrap().remove("private");
     });
-    assert_eq!(
-        field_of(v),
-        ("@statecrafting/rustev".into(), "private".into())
-    );
+    assert_eq!(field_of(v), ("@rustev/rustev".into(), "private".into()));
 }
 
 #[test]
@@ -166,17 +160,16 @@ fn the_main_package_names_exactly_the_platform_packages_at_the_family_version() 
         d["optionalDependencies"]
             .as_object_mut()
             .unwrap()
-            .remove("@statecrafting/rustev-darwin-x64");
+            .remove("@rustev/rustev-darwin-x64");
     });
     assert_eq!(field_of(v).1, "optionalDependencies");
     let v = judge(&set(), MAIN, |d| {
-        d["optionalDependencies"]["@statecrafting/rustev-darwin-x64"] = "^0.1.0".into()
+        d["optionalDependencies"]["@rustev/rustev-darwin-x64"] = "^0.1.0".into()
     });
     assert_eq!(field_of(v).1, "optionalDependencies");
     // A platform the set does not ship is refused too.
     let mut s = set();
-    s.npm
-        .retain(|p| p.name != "@statecrafting/rustev-darwin-x64");
+    s.npm.retain(|p| p.name != "@rustev/rustev-darwin-x64");
     let v = judge(&s, "", |_| {});
     assert_eq!(field_of(v).1, "optionalDependencies");
 }
@@ -211,7 +204,7 @@ fn an_unreadable_manifest_fails() {
         }
     });
     assert!(
-        matches!(only(v), NpmViolation::Unreadable { ref name, .. } if name == "@statecrafting/rustev-wasm")
+        matches!(only(v), NpmViolation::Unreadable { ref name, .. } if name == "@rustev/rustev-wasm")
     );
 }
 
@@ -279,7 +272,7 @@ fn the_npm_list_shape_is_checked() {
     });
     assert!(set_detail_of(v).contains("is built from"));
     let mut s = set();
-    s.npm[0].name = "@statecrafting/rustev-../../etc".into();
+    s.npm[0].name = "@rustev/rustev-../../etc".into();
     s.npm[0].directory = "integrations/rustev-node/npm/../../etc".into();
     let v = check_npm(&s, |p| {
         assert!(!p.contains(".."), "read {p}");
@@ -312,7 +305,7 @@ fn absences_carry_a_known_kind_and_a_reason_and_are_not_members() {
     assert!(set_detail(&s).contains("both a member and absent"));
     let mut s = set();
     s.absent[2].kind = "npm".into();
-    s.absent[2].name = "@statecrafting/rustev-wasm".into();
+    s.absent[2].name = "@rustev/rustev-wasm".into();
     assert!(set_detail(&s).contains("both a member and absent"));
     let mut s = set();
     let dup = s

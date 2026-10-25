@@ -18,12 +18,12 @@ use serde_json::Value;
 use crate::{LICENSE, REPOSITORY, ReleaseSet};
 
 /// The npm scope of every member (spec 031, Decision 1).
-pub const SCOPE: &str = "@statecrafting/";
+pub const SCOPE: &str = "@rustev/";
 /// The native main package; its per-platform packages are
-/// `@statecrafting/rustev-<platform>` under `integrations/rustev-node/npm/`.
-pub const NATIVE_MAIN: &str = "@statecrafting/rustev";
+/// `@rustev/rustev-<platform>` under `integrations/rustev-node/npm/`.
+pub const NATIVE_MAIN: &str = "@rustev/rustev";
 /// The WebAssembly package.
-pub const WASM: &str = "@statecrafting/rustev-wasm";
+pub const WASM: &str = "@rustev/rustev-wasm";
 /// The artifact kinds of spec 031 3.1 an absence may name.
 pub const ABSENT_KINDS: &[&str] = &["crate", "npm", "binary", "image"];
 

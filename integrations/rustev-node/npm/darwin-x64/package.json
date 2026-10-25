@@ -1,8 +1,8 @@
 {
-  "name": "@statecrafting/rustev-darwin-x64",
+  "name": "@rustev/rustev-darwin-x64",
   "version": "0.1.0",
   "private": true,
-  "description": "Rustev's Node-API addon for darwin-x64; installed through @statecrafting/rustev, never directly.",
+  "description": "Rustev's Node-API addon for darwin-x64; installed through @rustev/rustev, never directly.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
