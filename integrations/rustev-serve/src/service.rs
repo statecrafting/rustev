@@ -624,25 +624,9 @@ impl Service {
                 progress,
             )
             .await;
-        let (record, completion, delivery) = match outcome {
-            Ok(d) => (d.record, d.completion, Ok(d.delivery)),
-            Err(DecideError::EvidenceNotDelivered { record, failure }) => {
-                let completion = match &record.core {
-                    rustev_contract::run::CoreEvidence::Recorded(core) => {
-                        Completion::Judged(Box::new(core.judgment.clone()))
-                    }
-                    rustev_contract::run::CoreEvidence::NotProduced => Completion::Cancelled,
-                };
-                (record, completion, Err(failure))
-            }
-            Err(DecideError::Rejected(e)) => {
-                return self.refuse(match e {
-                    Rejection::Overloaded => RefusalCode::Overloaded,
-                    Rejection::QueueDeadline => RefusalCode::QueueDeadline,
-                    Rejection::Cancelled => RefusalCode::CancelledBeforeAdmission,
-                    Rejection::InvalidRequest(_) => RefusalCode::InvalidRequest,
-                });
-            }
+        let (record, completion, delivery) = match runtime_outcome(outcome) {
+            Ok(parts) => parts,
+            Err(code) => return self.refuse(code),
         };
         let record_bytes = record.record_canonical().unwrap();
         let record_digest = digest_id(tagged_digest(record.schema(), &record_bytes));
@@ -1129,5 +1113,66 @@ fn note_failure(state: &mut State, id: &str) {
     state.failed_total = state.failed_total.saturating_add(1);
     if state.failed_ids.len() < 10000 {
         state.failed_ids.push(Handle::new(id).unwrap());
+    }
+}
+
+type RuntimeOutcome = (
+    Arc<rustev_contract::run::RunRecord>,
+    Completion,
+    Result<Delivery, rustev_runtime::DeliveryFailure>,
+);
+
+fn runtime_outcome(
+    outcome: Result<rustev_runtime::Decided, DecideError>,
+) -> Result<RuntimeOutcome, RefusalCode> {
+    match outcome {
+        Ok(d) => Ok((d.record, d.completion, Ok(d.delivery))),
+        Err(DecideError::EvidenceNotDelivered { record, failure }) => {
+            let completion = match &record.core {
+                rustev_contract::run::CoreEvidence::Recorded(core) => {
+                    Completion::Judged(Box::new(core.judgment.clone()))
+                }
+                rustev_contract::run::CoreEvidence::NotProduced => Completion::Cancelled,
+            };
+            Ok((record, completion, Err(failure)))
+        }
+        // Spec 042's `internal_error` row maps the invariant failure in spec 037 3.12.6.
+        Err(DecideError::GenerationFailed(_)) => Err(RefusalCode::InternalError),
+        Err(DecideError::Rejected(e)) => Err(match e {
+            Rejection::Overloaded => RefusalCode::Overloaded,
+            Rejection::QueueDeadline => RefusalCode::QueueDeadline,
+            Rejection::Cancelled => RefusalCode::CancelledBeforeAdmission,
+            Rejection::InvalidRequest(_) => RefusalCode::InvalidRequest,
+        }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generation_failure_is_internal_error_without_detail_or_decision() {
+        let outcome = Err(DecideError::GenerationFailed(
+            "private invariant detail".into(),
+        ));
+        let code = runtime_outcome(outcome).unwrap_err();
+        assert_eq!(code, RefusalCode::InternalError);
+        assert_eq!(code.grpc_code(), GrpcCode::Internal);
+        assert_eq!(serde_json::to_value(code.grpc_code()).unwrap(), "INTERNAL");
+        let reply = Reply::refusal(code);
+        assert_eq!(reply.status, 500);
+        let refusal = ServeRefusal::parse(&reply.body).unwrap();
+        assert_eq!(refusal.code, RefusalCode::InternalError);
+        assert_eq!(refusal.detail.as_str(), "");
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&reply.body).unwrap(),
+            serde_json::json!({
+                "schema": "rustev.serve-refusal/1",
+                "code": "internal_error",
+                "detail": "",
+                "decision_ran": false
+            })
+        );
     }
 }

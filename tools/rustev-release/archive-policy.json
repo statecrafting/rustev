@@ -143,6 +143,7 @@
         "src/clock.rs",
         "src/driver.rs",
         "src/dynamic.rs",
+        "src/generation.rs",
         "src/ledger.rs",
         "src/lib.rs",
         "src/live.rs",

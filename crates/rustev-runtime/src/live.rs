@@ -99,8 +99,9 @@ pub struct LiveRequest {
     pub historical: Option<HistoricalLink>,
 }
 
-/// Why a live re-execution was refused before admission. Nothing was
-/// presented to the authorizer, dispatched or spent.
+/// Why a live re-execution was refused or failed. Except for
+/// `GenerationFailed`, nothing was presented to the authorizer, dispatched
+/// or spent.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LiveRefusal {
     /// The decision id is the historical decision's.
@@ -122,6 +123,9 @@ pub enum LiveRefusal {
     },
     /// The runtime's own admission refusal (spec 003, 3.4.1).
     Rejected(Rejection),
+    /// A pure generation invariant failed: no text result and no record.
+    /// This is a runtime failure, not a request defect.
+    GenerationFailed(String),
 }
 
 impl fmt::Display for LiveRefusal {
@@ -144,6 +148,7 @@ impl fmt::Display for LiveRefusal {
                 "the plan can propose {worst_case} attempts; a live document records at most {max}"
             ),
             LiveRefusal::Rejected(r) => write!(f, "not admitted: {r:?}"),
+            LiveRefusal::GenerationFailed(detail) => write!(f, "generation failed: {detail}"),
         }
     }
 }
@@ -452,6 +457,9 @@ impl Runtime {
             )
             .await;
         let (record, delivery) = match result {
+            Err(DecideError::GenerationFailed(detail)) => {
+                return Err(LiveRefusal::GenerationFailed(detail));
+            }
             Err(DecideError::Rejected(r)) => return Err(LiveRefusal::Rejected(r)),
             Ok(Decided {
                 record, delivery, ..

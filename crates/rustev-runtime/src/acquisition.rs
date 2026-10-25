@@ -59,7 +59,7 @@ impl Queue {
                 let close = *self
                     .windows
                     .entry(r.step.clone())
-                    .or_insert_with(|| cx.deadline.min(cx.now().saturating_add(width)));
+                    .or_insert_with(|| cx.deadline().min(cx.now().saturating_add(width)));
                 self.waiting.push_back((r, close));
             }
         }

@@ -71,12 +71,20 @@ pub(crate) struct DecisionCtx<'a, 'e> {
     pub decision_id: &'a str,
     pub principal: &'a [u8],
     pub evaluation_time: rustev_contract::Timestamp,
-    pub ev: &'a Mutex<Evaluation<'e>>,
+    pub ev: Option<&'a Mutex<Evaluation<'e>>>,
+    pub generation: Option<&'a Mutex<rustev_core::generation_eval::GenerationEvaluation<'e>>>,
+    pub step_ledger: Option<&'a Ledger>,
+    pub item_clock: Option<&'a crate::generation::ItemClock>,
     /// Present only on the live re-execution path (spec 026).
     pub live: Option<&'a LiveCtx<'a>>,
 }
 
 impl<'e> DecisionCtx<'_, 'e> {
+    pub(crate) fn deadline(&self) -> Instant {
+        self.item_clock
+            .map_or(self.deadline, |i| i.deadline(self.deadline))
+    }
+
     pub(crate) fn now(&self) -> Instant {
         self.rt.clock.now()
     }
@@ -86,20 +94,50 @@ impl<'e> DecisionCtx<'_, 'e> {
     }
 
     pub(crate) fn ev(&self) -> std::sync::MutexGuard<'_, Evaluation<'e>> {
-        self.ev.lock().unwrap_or_else(|e| e.into_inner())
+        match self.ev {
+            Some(ev) => ev.lock().unwrap_or_else(|e| e.into_inner()),
+            None => unreachable!("decision-only operation in generation stage"),
+        }
     }
 
-    /// Reserve in the decision ledger, then the shared one; all or nothing.
+    /// Spec 035 3.9 refusal state; the generation stage has no decision
+    /// evaluation, so it never withdraws on a screening refusal.
+    pub(crate) fn screening_refused(&self) -> bool {
+        self.ev.is_some_and(|ev| {
+            ev.lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .screening_refused()
+        })
+    }
+
+    /// Reserve step, decision and shared ledgers in that order; all or nothing.
     pub(crate) fn reserve(&self, bound: CostBound) -> Result<u64, Refused> {
         let units = self.ledger.units_for(bound)?;
         if let Some(shared) = &self.rt.shared {
             shared.units_for(bound)?;
         }
-        self.ledger.reserve(units)?;
+        if let Some(step) = self.step_ledger {
+            // Spec 037 3.12.4: the step ledger is hard or unlimited. Modes
+            // change which disclosures are accepted, never the units of an
+            // accepted bound (spec 003 3.5.3). Keep its admission check even
+            // when the decision ledger accepts a weaker disclosure.
+            let step_units = step.units_for(bound)?;
+            debug_assert_eq!(step_units, units);
+            step.reserve(units)?;
+        }
+        if let Err(e) = self.ledger.reserve(units) {
+            if let Some(step) = self.step_ledger {
+                step.release(units);
+            }
+            return Err(e);
+        }
         if let Some(shared) = &self.rt.shared
             && let Err(e) = shared.reserve(units)
         {
             self.ledger.release(units);
+            if let Some(step) = self.step_ledger {
+                step.release(units);
+            }
             return Err(e);
         }
         Ok(units)
@@ -108,6 +146,9 @@ impl<'e> DecisionCtx<'_, 'e> {
     /// Release a reservation that was never dispatched.
     pub(crate) fn release(&self, units: u64) {
         self.ledger.release(units);
+        if let Some(step) = self.step_ledger {
+            step.release(units);
+        }
         if let Some(shared) = &self.rt.shared {
             shared.release(units);
         }
@@ -115,7 +156,11 @@ impl<'e> DecisionCtx<'_, 'e> {
 
     pub(crate) fn hold(&self, attempt_id: &str, units: u64, bounded: bool) -> Held<'_> {
         Held {
-            ledgers: [Some(self.ledger), self.rt.shared.as_deref()],
+            ledgers: [
+                Some(self.ledger),
+                self.rt.shared.as_deref(),
+                self.step_ledger,
+            ],
             attempt_id: attempt_id.to_string(),
             units,
             bounded,
@@ -133,7 +178,7 @@ impl<'e> DecisionCtx<'_, 'e> {
 /// possibly charged attempt is never refunded because its local future ended
 /// (spec 003, 3.4.5 and 3.5.4).
 pub(crate) struct Held<'l> {
-    ledgers: [Option<&'l Ledger>; 2],
+    ledgers: [Option<&'l Ledger>; 3],
     attempt_id: String,
     units: u64,
     bounded: bool,
@@ -160,10 +205,10 @@ impl Drop for Held<'_> {
 }
 
 pub(crate) struct RequestOutcome {
-    step: String,
-    instance: Vec<String>,
-    supplied: Option<Supplied>,
-    record: RequestRecord,
+    pub(crate) step: String,
+    pub(crate) instance: Vec<String>,
+    pub(crate) supplied: Option<Supplied>,
+    pub(crate) record: RequestRecord,
     /// Where a validated output may be cached: the request's key and the
     /// namespace generation captured before it ran.
     cache: Option<(RequestKey, u64)>,
@@ -214,7 +259,7 @@ pub(crate) async fn run_requests(
                 waiting.push_back(r);
             }
         }
-        if cx.ev().screening_refused() {
+        if cx.screening_refused() {
             withdrawal.raise();
             for req in waiting.drain(..) {
                 let slot = seen[&(req.step.clone(), req.instance.clone())];
@@ -323,7 +368,7 @@ pub(crate) async fn run_requests(
         };
         for out in outs {
             let mut out = out;
-            if cx.ev().screening_refused() {
+            if cx.screening_refused() {
                 out.supplied = None;
                 out.record.result = if out.record.attempts.is_empty() {
                     RequestResult::Withdrawn
@@ -386,7 +431,7 @@ pub(crate) async fn run_requests(
                         o.call(|o| o.step(progress));
                     }
                 }
-                None => cancelled |= !cx.ev().screening_refused(),
+                None => cancelled |= !cx.screening_refused(),
             }
             let slot = seen[&(out.step.clone(), out.instance.clone())];
             records[slot] = Some(out.record);
@@ -932,7 +977,7 @@ async fn drive_batch(
             })
             .collect();
     }
-    if cx.now() >= cx.deadline {
+    if cx.now() >= cx.deadline() {
         return candidates
             .iter()
             .map(|c| {
@@ -987,7 +1032,7 @@ async fn drive_batch(
     };
     let permits = target.registered.permits.clone();
     let mut acquire = Box::pin(permits.acquire_owned());
-    let mut timer = cx.rt.clock.sleep_until(cx.deadline);
+    let mut timer = cx.rt.clock.sleep_until(cx.deadline());
     let permit = match race(&mut acquire, cx.cancel, &mut timer).await {
         Raced::Done(Ok(permit)) => permit,
         Raced::Done(Err(_)) => {
@@ -1021,7 +1066,7 @@ async fn drive_batch(
     // Disclosure and the permit wait took time: check again, right before
     // dispatch, so a member that expired or was cancelled meanwhile is
     // removed without dispatch.
-    if cx.now() >= cx.deadline {
+    if cx.now() >= cx.deadline() {
         release_all(&admitted);
         outcomes.extend(admitted.iter().map(|(c, ..)| {
             c.unsent(cx, "batch member deadline before send")
@@ -1085,7 +1130,7 @@ async fn drive_batch(
     );
     let batch_signal = cx.cancel.child();
     let call_cx = CallContext {
-        remaining_ms: DurationMs(cx.deadline.saturating_sub(now)),
+        remaining_ms: DurationMs(cx.deadline().saturating_sub(now)),
         trace_id: cx.decision_id.to_string(),
         principal_handle: cx.principal.to_vec(),
     };
@@ -1124,7 +1169,7 @@ async fn drive_batch(
         }
     };
     let mut work = CatchUnwind::new(work);
-    let mut timer = cx.rt.clock.sleep_until(cx.deadline);
+    let mut timer = cx.rt.clock.sleep_until(cx.deadline());
     let end = match race(&mut work, cx.cancel, &mut timer).await {
         Raced::Done(Ok(report)) => BatchEnd::Report(report),
         Raced::Done(Err(panic)) => BatchEnd::Panicked(format!("adapter panicked: {panic}")),
@@ -1140,7 +1185,7 @@ async fn drive_batch(
                 member.signal.raise();
             }
             match poll_once(&mut work).await {
-                Some(Ok(report)) if cx.ev().screening_refused() => BatchEnd::Report(report),
+                Some(Ok(report)) if cx.screening_refused() => BatchEnd::Report(report),
                 Some(Ok(report)) => {
                     let (cancellation, remote, charge) = answered(report.cancel, report.charge);
                     BatchEnd::Stopped(why, cancellation, remote, charge)
@@ -1418,34 +1463,46 @@ fn judge_end(
     Result<RawOutput, Option<(FailureClass, String)>>,
 ) {
     match end {
-        Ended::Output(out) if cx.ev().screening_refused() => (AttemptEnd::Output, Ok(out)),
-        Ended::Output(out) => match cx.ev().check_output(&req.step, &req.instance, &out) {
-            Ok(Ok(())) => (AttemptEnd::Output, Ok(out)),
-            Ok(Err(u)) => {
-                let d = if is_screen(cx, &req.step) {
-                    "invalid screening output".into()
-                } else {
-                    cut(&u.to_string(), DETAIL_BYTES)
-                };
-                (
-                    AttemptEnd::Failed {
-                        class: FailureClass::InvalidOutput,
-                        detail: d.clone(),
-                    },
-                    Err(Some((FailureClass::InvalidOutput, d))),
-                )
+        Ended::Output(out) if cx.screening_refused() => (AttemptEnd::Output, Ok(out)),
+        Ended::Output(out) => {
+            let checked = if let Some(g) = cx.generation {
+                // Accepted records with invalid fields enter the core's repair path.
+                g.lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .check_attempt_output(&req.step, &req.instance, &out)
+            } else {
+                cx.ev().check_output(&req.step, &req.instance, &out)
+            };
+            // Both paths classify validation Unresolved as InvalidOutput;
+            // FailureClass has no Unresolved variant. Preserve the reason below.
+            match checked {
+                Ok(Ok(())) => (AttemptEnd::Output, Ok(out)),
+                Ok(Err(u)) => {
+                    let d = if is_screen(cx, &req.step) {
+                        "invalid screening output".into()
+                    } else {
+                        cut(&u.to_string(), DETAIL_BYTES)
+                    };
+                    (
+                        AttemptEnd::Failed {
+                            class: FailureClass::InvalidOutput,
+                            detail: d.clone(),
+                        },
+                        Err(Some((FailureClass::InvalidOutput, d))),
+                    )
+                }
+                Err(e) => {
+                    let d = cut(&e.to_string(), DETAIL_BYTES);
+                    (
+                        AttemptEnd::Failed {
+                            class: FailureClass::InvalidOutput,
+                            detail: d.clone(),
+                        },
+                        Err(Some((FailureClass::InvalidOutput, d))),
+                    )
+                }
             }
-            Err(e) => {
-                let d = cut(&e.to_string(), DETAIL_BYTES);
-                (
-                    AttemptEnd::Failed {
-                        class: FailureClass::InvalidOutput,
-                        detail: d.clone(),
-                    },
-                    Err(Some((FailureClass::InvalidOutput, d))),
-                )
-            }
-        },
+        }
         Ended::Failed(class, detail) => {
             let d = if is_screen(cx, &req.step) {
                 format!("screening {}", class.name())
@@ -1528,7 +1585,7 @@ async fn pause(cx: &DecisionCtx<'_, '_>, at: Instant) -> bool {
     .await
 }
 
-async fn drive(
+pub(crate) async fn drive(
     cx: &DecisionCtx<'_, '_>,
     req: SemanticRequest,
     key: Option<RequestKey>,
@@ -1573,12 +1630,12 @@ async fn drive(
             if cx.cancel.is_raised() {
                 return b.cancelled();
             }
-            if cx.now() >= cx.deadline {
+            if cx.now() >= cx.deadline() {
                 return b.stop("deadline", Unresolved::DeadlineExceeded);
             }
             let permits = target.registered.permits.clone();
             let mut acquire = Box::pin(permits.acquire_owned());
-            let mut timer = cx.rt.clock.sleep_until(cx.deadline);
+            let mut timer = cx.rt.clock.sleep_until(cx.deadline());
             let permit = match race(&mut acquire, cx.cancel, &mut timer).await {
                 Raced::Done(Ok(p)) => p,
                 Raced::Done(Err(_)) => {
@@ -1591,7 +1648,10 @@ async fn drive(
                 Raced::Expired => return b.stop("deadline", Unresolved::DeadlineExceeded),
             };
             drop(acquire);
-            if cx.now() >= cx.deadline {
+            if let Some(item) = cx.item_clock {
+                item.start(cx.now());
+            }
+            if cx.now() >= cx.deadline() {
                 return b.stop("deadline", Unresolved::DeadlineExceeded);
             }
             if cx.cancel.is_raised() {
@@ -1631,7 +1691,7 @@ async fn drive(
             };
 
             // Disclosure is adapter code: check again, right before dispatch.
-            if cx.now() >= cx.deadline {
+            if cx.now() >= cx.deadline() {
                 cx.release(reserved);
                 return b.stop("deadline", Unresolved::DeadlineExceeded);
             }
@@ -1684,7 +1744,7 @@ async fn drive(
                     );
                 }
                 // The host's answer is adapter-like code: check again.
-                if cx.now() >= cx.deadline {
+                if cx.now() >= cx.deadline() {
                     cx.release(reserved);
                     return b.stop("deadline", Unresolved::DeadlineExceeded);
                 }
@@ -1744,7 +1804,7 @@ async fn drive(
             {
                 let delay = step.retry.delay.before_retry(tries);
                 let at = cx.now().saturating_add(delay);
-                if at < cx.deadline {
+                if at < cx.deadline() {
                     b.transitions.push(Transition::Retry {
                         after: n,
                         class,
@@ -1790,7 +1850,7 @@ async fn attempt(
     let now = cx.now();
     let dispatched_ms = now.saturating_sub(cx.submitted);
     let call_cx = CallContext {
-        remaining_ms: DurationMs(cx.deadline.saturating_sub(now)),
+        remaining_ms: DurationMs(cx.deadline().saturating_sub(now)),
         trace_id: cx.decision_id.to_string(),
         principal_handle: cx.principal.to_vec(),
     };
@@ -1824,8 +1884,8 @@ async fn attempt(
     };
     let mut work = CatchUnwind::new(work);
     let limit = match timeout {
-        AttemptTimeout::None => cx.deadline,
-        AttemptTimeout::Ms(ms) => cx.deadline.min(now.saturating_add(ms)),
+        AttemptTimeout::None => cx.deadline(),
+        AttemptTimeout::Ms(ms) => cx.deadline().min(now.saturating_add(ms)),
     };
     let mut timer = cx.rt.clock.sleep_until(limit);
     let raced = race(&mut work, cx.cancel, &mut timer).await;
@@ -1884,7 +1944,7 @@ async fn attempt(
             );
         }
         Raced::Cancelled => (Ended::Cancelled, ()),
-        Raced::Expired if cx.now() >= cx.deadline => (Ended::Deadline, ()),
+        Raced::Expired if cx.now() >= cx.deadline() => (Ended::Deadline, ()),
         Raced::Expired => (
             Ended::Failed(
                 FailureClass::TimedOut,
@@ -1899,7 +1959,7 @@ async fn attempt(
     signal.raise();
     let (cancellation, remote, charge) = match poll_once(&mut work).await {
         Some(Ok(report)) => {
-            if cx.ev().screening_refused()
+            if cx.screening_refused()
                 && let Ok(output) = report.result
             {
                 why = Ended::Output(output);

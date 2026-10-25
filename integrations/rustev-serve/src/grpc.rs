@@ -41,6 +41,7 @@ fn status(document: &[u8]) -> Status {
             GrpcCode::InvalidArgument => Code::InvalidArgument,
             GrpcCode::Unauthenticated => Code::Unauthenticated,
             GrpcCode::NotFound => Code::NotFound,
+            GrpcCode::Internal => Code::Internal,
         };
         let mut status = Status::new(code, "request refused");
         status.metadata_mut().insert_bin(
@@ -555,6 +556,7 @@ mod tests {
             (SignatureInvalid, 422, Code::FailedPrecondition),
             (SignatureUntrusted, 422, Code::FailedPrecondition),
             (UnsignedRefused, 422, Code::FailedPrecondition),
+            (InternalError, 500, Code::Internal),
         ]
     }
     async fn differential<

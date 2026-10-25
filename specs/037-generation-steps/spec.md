@@ -51,6 +51,8 @@ extends:
   - { spec: "005-reference-backends", unit: { kind: directory, path: "backends/rustev-backend-rules/" }, nature: additive }
   - { spec: "012-jev-integration", unit: { kind: directory, path: "integrations/rustev-jev/" }, nature: additive }
   - { spec: "009-remote-adapter-protocol", unit: { kind: directory, path: "integrations/rustev-remote-http/" }, nature: additive }
+  # Match arms for the generation stage in the service.
+  - { spec: "010-integrations", unit: { kind: directory, path: "integrations/rustev-serve/" }, nature: additive }
   # The CLI refusal goldens for 22 to 24 join the shared conformance suite.
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "tools/rustev-conformance/" }, nature: additive }
   # New contract and core source files join their reviewed archive lists.
@@ -1056,6 +1058,18 @@ never reaches a decision input (3.6), and evidence holds digests only
 (3.15). Tests: `crates/rustev-core/tests/generation_eval.rs` (12 scripted
 tests: failures, repair, ownership, budgets, determinism, judgment
 isolation).
+
+**Increment 5, part 1 (2026-10-26): the runtime generation stage.**
+`crates/rustev-runtime/src/generation.rs` dispatches the core's pending
+generation requests after selection (3.12) through the existing retry,
+fallback, deadline, cost and cancellation machinery, with repair round
+trips and step costs. Tests: `crates/rustev-runtime/tests/generation.rs`
+(11, manual clock, scripted backends). A generation invariant failure has
+no run-record termination (3.12.6): the runtime returns
+`GenerationFailed`, the live API `LiveRefusal::GenerationFailed`, and the
+decision service refuses with spec 042's `internal_error` (500, gRPC
+`INTERNAL`; owner decision 2026-10-26), never a request refusal.
+Streaming (3.13) and caching (3.14) follow in part 2.
 
 **Owner decision A-49 (2026-10-23): dependencies.** Spec 030 is no longer
 a declared dependency of this spec. No behavior or acceptance item here

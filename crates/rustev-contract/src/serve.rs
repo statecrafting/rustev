@@ -563,6 +563,7 @@ pub enum RefusalCode {
     SignatureInvalid,
     SignatureUntrusted,
     UnsignedRefused,
+    InternalError,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -575,6 +576,7 @@ pub enum GrpcCode {
     InvalidArgument,
     Unauthenticated,
     NotFound,
+    Internal,
 }
 impl RefusalCode {
     pub fn http_status(self) -> u16 {
@@ -595,6 +597,7 @@ impl RefusalCode {
             BodyTooLarge => 413,
             HeadersTooLarge => 431,
             UnsupportedMediaType => 415,
+            InternalError => 500,
             _ => 422,
         }
     }
@@ -611,6 +614,7 @@ impl RefusalCode {
             | InvalidDeadline | UnsupportedMediaType => GrpcCode::InvalidArgument,
             Unauthenticated => GrpcCode::Unauthenticated,
             PlanNotRegistered | DecisionNotFound | EndpointUnavailable => GrpcCode::NotFound,
+            InternalError => GrpcCode::Internal,
             _ => GrpcCode::FailedPrecondition,
         }
     }

@@ -417,6 +417,7 @@ may be implemented before that record; `rustev-serve` may not.
    | `headers_too_large` | 431 | `RESOURCE_EXHAUSTED` | 3.5.3 |
    | `unsupported_media_type` | 415 | `INVALID_ARGUMENT` | 3.1.3 |
    | `compile_refused`, `plan_id_mismatch`, `binding_unknown`, `profile_unsupported`, `bundle_tampered`, `signature_invalid`, `signature_untrusted`, `unsigned_refused` | 422 | `FAILED_PRECONDITION` | 3.3 |
+   | `internal_error` | 500 | `INTERNAL` | A runtime invariant failure with no run-record termination (spec 037 3.12.6, a generation invariant); no decision record and no `detail` beyond the code |
 
    Each code has exactly one HTTP status and one gRPC code, while several
    codes may share either, as the three 503 codes and `context_unavailable`
