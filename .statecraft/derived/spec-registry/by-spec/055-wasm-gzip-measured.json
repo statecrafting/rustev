@@ -1,0 +1,69 @@
+{
+  "record": {
+    "amends": [
+      "027-node-and-wasm-bindings"
+    ],
+    "created": "2026-10-25",
+    "dependsOn": [
+      "027-node-and-wasm-bindings",
+      "052-wasm-budget-for-specs-035-to-037"
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "027-node-and-wasm-bindings",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-conformance/"
+        }
+      }
+    ],
+    "id": "055-wasm-gzip-measured",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-measurement",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "The optimized rustev_wasm_bg.wasm's gzip level 9 size is measured and recorded in the measurement document on every run and gates nothing; its uncompressed size stays gated at 4,718,592 bytes."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "055-the-webassembly-module-s-gzip-size-is-recorded-not-gated-amends-027": "66b07d182645c67348089486af208c4ac830b9fe17f709f6e8eef17154339a9d",
+      "1-purpose": "c5bc3a2bf893144f2812b2290ad930070eba3cfe2b9ed8c319b0552f786764c4",
+      "2-territory": "e3eb0f1a832a5da92f3b6c9a2c13df722af3b85bcd14f2e07b9efa1961b0de13",
+      "3-measurement": "20e706cf89cd5713923fecb4ea5c91f71417442f78bc23d9129cd7e12d75a96f",
+      "4-out-of-scope": "253394e631742d2ad2fa4cf53149d0645d2bea93136ff6065c51ba202e3e5dae",
+      "5-observable-negative-cases": "98ad3277338fc94c51cdf7fede181e540cc4e2724b6d7a3942fd73a2d14da842",
+      "acceptance": "c5bb57f54588df7163c38b1061644f7e5086b526cd3cb014a80155ec0b788d02",
+      "decisions-for-ratification": "aab0910c2ff2414845c9d87dd4f3fa11f7941bbb39eddcaf0ec8194e5209b717",
+      "verification": "a572e582682e647dc70ce55f659ddc41dd3f6cf253b5e29367538f55a0c74511"
+    },
+    "sectionHeadings": [
+      "055: The WebAssembly module's gzip size is recorded, not gated (amends 027)",
+      "1. Purpose",
+      "2. Territory",
+      "3. Measurement",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Decisions for ratification"
+    ],
+    "specPath": "specs/055-wasm-gzip-measured/spec.md",
+    "status": "draft",
+    "summary": "A draft amendment of approved spec 027 3.10.4, after specs 046, 050, 051 and 052, proposed for the owner's ratification. As the #76 track added document types, the gzip budget was met four times: specs 046 and 050 kept it, and specs 051 and 052 raised it, and the last time it stopped every open chain at once. This spec keeps measuring and recording the optimized module's gzip size (level 9) on every run, as the Brotli size already is, and removes it from the gated budget. The uncompressed budget of 4,718,592 bytes (spec 052), the instantiation budgets, the procedure and spec 050's exclusion are unchanged.\n",
+    "title": "The WebAssembly module's gzip size is recorded, not gated (amends 027)"
+  },
+  "shardHash": "077fc96e61a816d5283b979e04a4199eda4e26975fb77b5df45e6743a5699a4f",
+  "specVersion": "1.10.0"
+}
