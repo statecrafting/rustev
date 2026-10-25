@@ -204,7 +204,7 @@ pub(crate) async fn run_requests(
     let mut acquiring: Vec<crate::acquisition::Driving<'_>> = Vec::new();
     loop {
         pages.list(cx);
-        cancelled |= pages.expire_waiting(cx);
+        cancelled |= pages.expire_waiting(cx, capture.as_deref_mut());
         pages.list(cx);
         for r in cx.ev().pending() {
             let key = (r.step.clone(), r.instance.clone());
@@ -309,7 +309,7 @@ pub(crate) async fn run_requests(
             Ready::QueuedExpiry => continue,
             Ready::Acquisition(idx, out) => {
                 drop(acquiring.swap_remove(idx));
-                cancelled |= pages.supply(cx, out);
+                cancelled |= pages.supply(cx, out, capture.as_deref_mut());
                 continue;
             }
             Ready::Batch(idx, outs) => {
@@ -337,30 +337,23 @@ pub(crate) async fn run_requests(
             match out.supplied {
                 Some(s) => {
                     let mut ev = cx.ev();
-                    if let Some(c) = capture.as_deref_mut() {
-                        c.record(&ev, cx.plan, &out.record, &s);
-                    }
-                    // The request is pending until this call, and the runtime
-                    // supplies only outputs and the four runtime reasons; a
-                    // refusal is a defect, not a runtime condition.
-                    // A failure carries its backend's registered origin and
-                    // declared determinism (spec 033, 3.9.2): the last
-                    // attempt's backend served it.
-                    if let rustev_core::Supplied::Failed(_) = &s
-                        && let Some(r) = out
-                            .record
+                    let failure_context = if matches!(&s, rustev_core::Supplied::Failed(_)) {
+                        out.record
                             .attempts
                             .last()
                             .and_then(|a| cx.rt.backends.get(&a.backend_id))
-                    {
-                        ev.note_failure(
-                            &out.step,
-                            &out.instance,
-                            rustev_core::FailureContext {
+                            .map(|r| rustev_core::FailureContext {
                                 origin: r.origin,
                                 determinism: r.backend.descriptor().determinism,
-                            },
-                        );
+                            })
+                    } else {
+                        None
+                    };
+                    if let Some(c) = capture.as_deref_mut() {
+                        c.record(&ev, cx.plan, &out.record, &s, failure_context);
+                    }
+                    if let Some(context) = failure_context {
+                        ev.note_failure(&out.step, &out.instance, context);
                     }
                     let progress = cx.observing.map(|_| crate::StepProgress {
                         step_id: out.step.clone(),

@@ -10,19 +10,24 @@
 
 use std::collections::BTreeMap;
 
-use rustev_contract::Identified;
+use crate::acquisition_replay::{MissingAcquisition, PageValue};
 use rustev_contract::canonical::record_canonical_bytes;
 use rustev_contract::ids::RequestId;
 use rustev_contract::judgment::Judgment;
 use rustev_contract::output::RawOutput;
+use rustev_contract::{Document, Identified};
 use rustev_core::Compiled;
 use rustev_core::evaluate::{Evaluation, Supplied};
 
 use crate::replay::{Reproduced, RetainedValue};
 
 /// Why a candidate cannot be compared on this case.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum CandidateIncomparable {
+    AcquisitionNotCaptured {
+        missing: Vec<MissingAcquisition>,
+        judgment: Box<Judgment>,
+    },
     /// The candidate refuses the case's snapshot at its evaluation time.
     SnapshotRefused { detail: String },
     /// No retained output was produced under this request's identity.
@@ -39,6 +44,7 @@ pub enum CandidateIncomparable {
 impl CandidateIncomparable {
     pub fn code(&self) -> &'static str {
         match self {
+            CandidateIncomparable::AcquisitionNotCaptured { .. } => "acquisition-not-captured",
             CandidateIncomparable::SnapshotRefused { .. } => "snapshot-refused",
             CandidateIncomparable::RequestMismatch { .. } => "request-mismatch",
             CandidateIncomparable::HistoricalRuntimeFailure { .. } => "historical-runtime-failure",
@@ -75,9 +81,68 @@ pub fn compare(case: &Reproduced, candidate: &Compiled) -> Result<Compared, Cand
         })?;
     let mut reused = 0;
     let mut supplied = vec![];
+    let mut missing = vec![];
     loop {
+        let pages = ev.pending_acquisitions();
+        let had_pages = !pages.is_empty();
+        for p in pages {
+            let outputs: Vec<_> = case
+                .pages
+                .iter()
+                .filter_map(|(id, v)| match v {
+                    PageValue::Page(page) if id == &p.request_id => Some(page),
+                    _ => None,
+                })
+                .collect();
+            if let Some(first) = outputs.first() {
+                let bytes =
+                    first
+                        .record_canonical()
+                        .map_err(|_| CandidateIncomparable::OutputRefused {
+                            step: p.step.clone(),
+                            instance: vec![],
+                        })?;
+                if outputs
+                    .iter()
+                    .any(|v| v.record_canonical().ok().as_ref() != Some(&bytes))
+                {
+                    return Err(CandidateIncomparable::AmbiguousOutput {
+                        step: p.step,
+                        instance: vec![],
+                    });
+                }
+                ev.supply_page(&p.step, p.tier_index, p.page_index, &bytes)
+                    .map_err(|_| CandidateIncomparable::OutputRefused {
+                        step: p.step.clone(),
+                        instance: vec![],
+                    })?;
+                reused += 1;
+            } else {
+                ev.supply_acquisition_failure(
+                    &p.step,
+                    p.tier_index,
+                    p.page_index,
+                    rustev_contract::judgment::Unresolved::MissingEvidence {
+                        fields: vec![p.step.clone()],
+                    },
+                )
+                .map_err(|_| CandidateIncomparable::OutputRefused {
+                    step: p.step.clone(),
+                    instance: vec![],
+                })?;
+                missing.push(MissingAcquisition {
+                    step: p.step,
+                    tier: p.tier_index,
+                    page: p.page_index,
+                    request: p.request_id,
+                });
+            }
+        }
         let pending = ev.pending();
         if pending.is_empty() {
+            if had_pages {
+                continue;
+            }
             break;
         }
         for r in pending {
@@ -122,6 +187,12 @@ pub fn compare(case: &Reproduced, candidate: &Compiled) -> Result<Compared, Cand
     let (candidate, _) = ev
         .finish(&case.decision_id)
         .expect("every pending request was supplied");
+    if !missing.is_empty() {
+        return Err(CandidateIncomparable::AcquisitionNotCaptured {
+            missing,
+            judgment: Box::new(candidate),
+        });
+    }
     Ok(Compared {
         historical: case.judgment.clone(),
         candidate,

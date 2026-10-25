@@ -1,5 +1,5 @@
 //! A plan 3 at the runtime (spec 032, 3.11): preparation needs a sink that
-//! accepts `rustev.run/3`, and capture refuses it before admission.
+//! accepts `rustev.run/3`, and capture admits it.
 
 mod common;
 
@@ -12,7 +12,7 @@ use rustev_contract::run::RunRecord;
 use rustev_contract::schema;
 use rustev_contract::scope::{Handle, Scope};
 use rustev_core::seams::{BoxFuture, CancelSignal, EvidenceSink};
-use rustev_runtime::{CaptureConfig, CaptureConfigError, ManualClock, PrepareError, Runtime};
+use rustev_runtime::{CaptureConfig, CaptureOutcome, ManualClock, PrepareError, Runtime};
 use serde_json::json;
 
 /// A sink that counts deliveries and accepts `rustev.run/3` when told to.
@@ -94,7 +94,7 @@ async fn a_plan_3_needs_a_sink_that_accepts_run_3() {
 }
 
 #[tokio::test(flavor = "current_thread")]
-async fn capture_refuses_a_plan_3_before_admission() {
+async fn capture_admits_a_plan_3() {
     let sink = Arc::new(Sink {
         v3: true,
         delivered: AtomicUsize::new(0),
@@ -105,14 +105,20 @@ async fn capture_refuses_a_plan_3_before_admission() {
         scope: Scope::principal(h("tenant-a"), h("rev-1"), h("scope-p")),
         max_bytes: 1_024,
     };
+    let mut req = request("d1");
+    req.snapshot = <rustev_contract::snapshot::Snapshot as rustev_contract::Document>::parse(
+        json!({"schema": schema::SNAPSHOT_V2, "entries": []})
+            .to_string()
+            .as_bytes(),
+    )
+    .unwrap();
     let r = rt
-        .decide_with_capture(&plan, request("d1"), &CancelSignal::default(), &config)
+        .decide_with_capture(&plan, req, &CancelSignal::default(), &config)
         .await;
-    assert!(matches!(
-        r,
-        Err(CaptureConfigError::CaptureUnsupported { plan_schema }) if plan_schema == schema::PLAN_V3
-    ));
-    assert_eq!(sink.delivered.load(Ordering::SeqCst), 0, "no run record");
+    let r = r.unwrap();
+    assert!(r.result.is_ok(), "{:?}", r.result);
+    assert!(matches!(r.capture, CaptureOutcome::Captured(_)));
+    assert_eq!(sink.delivered.load(Ordering::SeqCst), 1);
 }
 
 #[tokio::test(flavor = "current_thread")]

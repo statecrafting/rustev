@@ -288,7 +288,6 @@ fn replay_2_roles_shared_sequence_retention_bounds_and_versions() {
         ("/run/document_schema", json!("rustev.run/1")),
         ("/snapshot/document_schema", json!("rustev.snapshot/3")),
         ("/acquisition_pages", Value::Null),
-        ("/acquisition_pages", json!([])),
         (
             "/acquisition_pages",
             json!(vec![bundle()["acquisition_pages"][0].clone(); 4097]),
@@ -310,7 +309,7 @@ fn replay_2_roles_shared_sequence_retention_bounds_and_versions() {
     }
     let mut bad = v.clone();
     bad.as_object_mut().unwrap().remove("sources");
-    refuses::<ReplayBundle>(&bad);
+    round::<ReplayBundle>(&bad);
     let mut reordered = v.clone();
     let mut second = reordered["acquisition_pages"][0].clone();
     second["sequence"] = json!(2);
@@ -465,4 +464,49 @@ fn skipped_is_distinct_and_evidence_two_only() {
     round::<EvidenceRecord>(&v);
     v["schema"] = json!("rustev.evidence/1");
     refuses::<EvidenceRecord>(&v);
+}
+
+#[test]
+fn replay_two_allows_capture_gaps_but_one_still_requires_contiguity() {
+    let mut v = bundle();
+    v["scope"] = serde_json::to_value(rustev_contract::scope::Scope::tenant_only(
+        rustev_contract::scope::Handle::new("t").unwrap(),
+        rustev_contract::scope::Handle::new("r").unwrap(),
+    ))
+    .unwrap();
+    v["acquisition_pages"][0]["sequence"] = json!(4);
+    round::<ReplayBundle>(&v).check(None).unwrap();
+    v["acquisition_pages"] = json!([]);
+    round::<ReplayBundle>(&v).check(None).unwrap();
+    let mut v = fixture("../rustev-cli/tests/golden/explain/lodging-tie.bundle.json");
+    let original = round::<ReplayBundle>(&v);
+    original.check(None).unwrap();
+    v["supplies"][0]["sequence"] = json!(4);
+    let parsed = ReplayBundle::parse(&serde_json::to_vec(&v).unwrap()).unwrap();
+    assert!(matches!(
+        parsed.check(None),
+        Err(rustev_contract::replay::BundleError::Sequence { .. })
+    ));
+}
+
+#[test]
+fn failure_context_is_optional_and_replay_two_only() {
+    let mut v = bundle();
+    v["scope"] = serde_json::to_value(rustev_contract::scope::Scope::tenant_only(
+        rustev_contract::scope::Handle::new("t").unwrap(),
+        rustev_contract::scope::Handle::new("r").unwrap(),
+    ))
+    .unwrap();
+    v["supplies"] = json!([{"sequence":1,"step":"semantic","instance":[],"request":digest(),"attempt_id":null,"target":0,
+        "value":item("rustev.runtime-reason/1"),"failure_context":{"origin":"host","determinism":"bitwise"}}]);
+    round::<ReplayBundle>(&v).check(None).unwrap();
+    let mut bad = v.clone();
+    bad["supplies"][0]["failure_context"] = Value::Null;
+    refuses::<ReplayBundle>(&bad);
+    let mut bad = v.clone();
+    bad["supplies"][0]["value"] = item("rustev.backend-output/1");
+    refuses::<ReplayBundle>(&bad);
+    let mut old = fixture("../rustev-cli/tests/golden/explain/lodging-tie.bundle.json");
+    old["supplies"][0]["failure_context"] = v["supplies"][0]["failure_context"].clone();
+    refuses::<ReplayBundle>(&old);
 }

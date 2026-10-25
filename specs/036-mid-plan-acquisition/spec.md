@@ -1100,6 +1100,23 @@ recorded with its age (3.13.7). Tests:
 `crates/rustev-runtime/tests/acquisition.rs` under the manual clock with
 scripted sources, and `crates/rustev-contract/tests/acquisition_cache.rs`.
 
+**Increment 4 (2026-10-24): capture and offline replay.** Every page is
+captured by request identity in the decision's shared supply order, and
+`rustev.replay/2` bundles admit every plan 3 decision, lifting spec 032's
+interim `capture_unsupported` refusal (3.15,
+`crates/rustev-eval/src/acquisition_replay.rs`). Offline replay supplies
+captured pages in recorded order and never dispatches; an uncaptured
+request is `missing_evidence` for its step and the comparison is
+`incomparable{acquisition-not-captured}`, with the judgment kept for
+inspection. A plan 2 decision's bundle stays byte-identical
+`rustev.replay/1`. Replay 2 validation admits gaps in the supply sequence
+(ordering and uniqueness still checked), an absent `sources` member and
+an empty page list, so a removed page reaches evaluation; replay 1
+validation is unchanged. Tests: `crates/rustev-eval/tests/acquisition_replay.rs`
+(a paged decision reproduced byte-identically with zero source calls, a
+removed page, a spec 032 plan 3 decision with `rustev.snapshot/2`, a
+`rustev.judgment/2` decision, replay 1 compatibility).
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

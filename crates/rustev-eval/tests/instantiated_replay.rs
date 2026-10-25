@@ -91,6 +91,7 @@ fn instantiated_plan_assembles_and_replays_without_inference() {
             snapshot,
             run,
             capture: Capture {
+                acquisition_pages: vec![],
                 decision_id: "instantiated-replay".into(),
                 scope: scope(),
                 status: CaptureStatus::Complete,

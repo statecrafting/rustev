@@ -17,8 +17,8 @@ use rustev_contract::ids::ContentDigest;
 use rustev_contract::limits::REPLAY_V1;
 use rustev_contract::plan::Plan;
 use rustev_contract::replay::{
-    BundleError, Capture, CaptureStatus, CapturedValue, ItemLocation, MAX_BUNDLE_ITEMS,
-    MAX_RESOLVED_BYTES, ReplayBundle, SupplyEntry,
+    AcquisitionSupply, BundleError, Capture, CaptureStatus, CapturedPage, CapturedValue,
+    ItemLocation, MAX_BUNDLE_ITEMS, MAX_RESOLVED_BYTES, ReplayBundle, SupplyEntry,
 };
 use rustev_contract::retention::{
     DEFAULT_METADATA_LIFETIME_MS, MAX_BUNDLE_LIFETIME_MS, Retention, RetentionItem,
@@ -122,6 +122,15 @@ pub fn assemble(
     input: &AssemblyInput<'_>,
     choice: &RetentionChoice<'_>,
 ) -> Result<ReplayBundle, AssemblyError> {
+    assemble_with_sources(input, choice, &[])
+}
+
+/// Assemble a plan 3 bundle with its retained source descriptors.
+pub fn assemble_with_sources(
+    input: &AssemblyInput<'_>,
+    choice: &RetentionChoice<'_>,
+    sources: &[rustev_contract::source::SourceDescriptor],
+) -> Result<ReplayBundle, AssemblyError> {
     let cap = choice
         .host_cap_ms
         .map_or(MAX_BUNDLE_LIFETIME_MS, |c| c.min(MAX_BUNDLE_LIFETIME_MS));
@@ -195,7 +204,7 @@ pub fn assemble(
             return binding("a complete capture of a run without a judgment");
         }
     }
-    Compiled::load_checked(input.plan, input.descriptors, input.calibrations)
+    Compiled::load_checked_with_sources(input.plan, input.descriptors, input.calibrations, sources)
         .map_err(|e: LoadError| AssemblyError::Plan(e.to_string()))?;
 
     // Every byte replay would resolve, embedded or external, counts.
@@ -258,7 +267,7 @@ pub fn assemble(
     }
     let snapshot = item(
         ItemLocation::Snapshot,
-        schema::SNAPSHOT,
+        input.snapshot.schema(),
         bytes_of(input.snapshot, ItemLocation::Snapshot)?,
         true,
     );
@@ -285,6 +294,7 @@ pub fn assemble(
             CapturedValue::Reason(r) => item(at, schema::RUNTIME_REASON, bytes_of(r, at)?, false),
         };
         supplies.push(SupplyEntry {
+            failure_context: s.failure_context,
             step: s.step.clone(),
             instance: s.instance.clone(),
             request: s.request.clone(),
@@ -293,6 +303,43 @@ pub fn assemble(
             target: s.target,
             value,
         });
+    }
+    let mut retained_sources = vec![];
+    for (i, source) in sources.iter().enumerate() {
+        let at = ItemLocation::Source(i);
+        retained_sources.push(item(at, schema::SOURCE, bytes_of(source, at)?, true));
+    }
+    let mut pages = vec![];
+    for (i, p) in input
+        .capture
+        .into_iter()
+        .flat_map(|c| &c.acquisition_pages)
+        .enumerate()
+    {
+        let at = ItemLocation::AcquisitionPage(i);
+        let value = match &p.value {
+            CapturedPage::Page(p) => item(at, schema::ACQUISITION_PAGE, bytes_of(p, at)?, false),
+            CapturedPage::Reason(r) => item(at, schema::RUNTIME_REASON, bytes_of(r, at)?, false),
+        };
+        pages.push(AcquisitionSupply {
+            sequence: p.sequence,
+            step: p.step.clone(),
+            tier: p.tier,
+            page: p.page,
+            request: p.request.clone(),
+            attempt_id: p.attempt_id.clone(),
+            value,
+        });
+    }
+    let max_pages = input
+        .plan
+        .definition
+        .limits
+        .acquisition
+        .as_ref()
+        .map_or(0, |l| l.max_calls);
+    if pages.len() as u64 > max_pages {
+        return binding("capture pages beyond the plan's call bound");
     }
     if let Some(location) = not_utf8 {
         return Err(AssemblyError::NotCanonical { location });
@@ -305,9 +352,14 @@ pub fn assemble(
     }
     let scope = input.scope.clone();
     let bundle = ReplayBundle {
-        sources: None,
-        acquisition_pages: None,
-        schema: schema::REPLAY.into(),
+        sources: (!retained_sources.is_empty()).then_some(retained_sources),
+        acquisition_pages: input.plan.acquisitions.is_some().then_some(pages),
+        schema: if input.plan.schema == schema::PLAN_V3 {
+            schema::REPLAY_V2
+        } else {
+            schema::REPLAY
+        }
+        .into(),
         decision_id: run.decision_id.clone(),
         scope,
         created_at_ms: input.created_at_ms,
