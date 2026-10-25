@@ -15494,6 +15494,16 @@ export namespace RustevRun3 {
      */
     bound_violation?: ScreenUnitBoundViolation;
     charged: number;
+    /**
+     * Sum of computed bounds for dispatched attempts. Absent when no
+     * attempt was dispatched (including cache hits and withdrawal).
+     */
+    computed?: number;
+    /**
+     * Sum of reported units, when any attempt reported units. Charges for
+     * attempts without a report still use their computed bound.
+     */
+    reported?: number;
   }
   export interface ScreenUnitBoundViolation {
     computed: number;

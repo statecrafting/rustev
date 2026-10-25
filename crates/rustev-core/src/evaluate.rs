@@ -997,6 +997,12 @@ impl<'c> Evaluation<'c> {
         self.now
     }
 
+    /// Whether a screening refusal has decided this evaluation. Runtime
+    /// drivers use this read-only hook to withdraw and cancel remaining work.
+    pub fn screening_refused(&self) -> bool {
+        !self.screen_refusals.is_empty()
+    }
+
     /// Pending semantic requests, in step order then instance order.
     pub fn pending(&self) -> Vec<SemanticRequest> {
         let rank: BTreeMap<&str, usize> = self

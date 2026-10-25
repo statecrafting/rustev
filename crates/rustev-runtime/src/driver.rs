@@ -21,6 +21,7 @@ use std::task::Poll;
 
 use rustev_contract::Identified;
 use rustev_contract::canonical::tagged_digest;
+use rustev_contract::descriptor::Isolation;
 use rustev_contract::execution::{AttemptTimeout, FailureClass};
 use rustev_contract::judgment::Unresolved;
 use rustev_contract::live::AttemptRole;
@@ -28,17 +29,19 @@ use rustev_contract::optimization::{
     OptimizationAdmission, OptimizationMechanism, OptimizationOutcome, OptimizationPolicy,
     OptimizationRecord,
 };
-use rustev_contract::output::RawOutput;
+use rustev_contract::output::{RawOutput, ScreenUnits};
 use rustev_contract::run::{
     AttemptCost, AttemptEnd, AttemptRecord, CancelAnswer, Cancellation, Charge, CostBound,
     RemoteState, RequestRecord, RequestResult, Transition,
 };
+use rustev_contract::screening::{
+    ScreenCache, ScreenChargedUnits, ScreenRequest, ScreenUnitBasis, ScreenUnitBoundViolation,
+};
 use rustev_contract::time::DurationMs;
 use rustev_core::evaluate::{Evaluation, SemanticRequest, Supplied};
 use rustev_core::seams::{
-    AdapterFailure, AttemptCall, AttemptReport, BatchAttemptCall, BatchAttemptReport,
-    BatchCapability, BatchMemberCall, BatchMemberReport, CallContext, CancelAck, CancelSignal,
-    RemoteEnd,
+    AdapterFailure, AttemptCall, BatchAttemptCall, BatchAttemptReport, BatchCapability,
+    BatchMemberCall, BatchMemberReport, CallContext, CancelAck, CancelSignal, RemoteEnd,
 };
 
 use crate::capture::Capturing;
@@ -56,6 +59,7 @@ pub(crate) const DETAIL_BYTES: usize = 256;
 const LIVE_BYPASS: &str =
     "live re-execution observes fresh backend work: memory cache and general batching bypassed";
 
+#[derive(Clone)]
 pub(crate) struct DecisionCtx<'a, 'e> {
     pub rt: &'a Inner,
     pub observing: Option<&'a crate::progress::Observing<'a>>,
@@ -175,6 +179,13 @@ pub(crate) async fn run_requests(
     cx: &DecisionCtx<'_, '_>,
     mut capture: Option<&mut Capturing<'_>>,
 ) -> (Vec<RequestRecord>, bool) {
+    // A refusal cancels this decision's work without raising the caller's signal.
+    let withdrawal = cx.cancel.child();
+    let local = DecisionCtx {
+        cancel: &withdrawal,
+        ..cx.clone()
+    };
+    let cx = &local;
     let mut seen: BTreeMap<(String, Vec<String>), usize> = BTreeMap::new();
     let mut records: Vec<Option<RequestRecord>> = Vec::new();
     let mut waiting: VecDeque<SemanticRequest> = VecDeque::new();
@@ -190,6 +201,26 @@ pub(crate) async fn run_requests(
                 v.insert(records.len());
                 records.push(None);
                 waiting.push_back(r);
+            }
+        }
+        if cx.ev().screening_refused() {
+            withdrawal.raise();
+            for req in waiting.drain(..) {
+                let slot = seen[&(req.step.clone(), req.instance.clone())];
+                records[slot] = Some(RequestRecord {
+                    // A withdrawn request never reached the cache, so no
+                    // lookup happened: `disabled`, never `miss` (3.13.2).
+                    screen: screen_record(cx, &req).map(|mut s| {
+                        s.cache = ScreenCache::Disabled;
+                        s
+                    }),
+                    step: req.step,
+                    instance: req.instance,
+                    result: RequestResult::Withdrawn,
+                    attempts: vec![],
+                    transitions: vec![],
+                    optimization: None,
+                });
             }
         }
         let batched: usize = batches.iter().map(|(members, _)| members).sum();
@@ -248,6 +279,16 @@ pub(crate) async fn run_requests(
         };
         for out in outs {
             let mut out = out;
+            if cx.ev().screening_refused() {
+                out.supplied = None;
+                out.record.result = if out.record.attempts.is_empty() {
+                    RequestResult::Withdrawn
+                } else {
+                    RequestResult::NotSupplied
+                };
+            }
+            // Even discarded results retain optimization charge attribution;
+            // absent supplied output prevents cache admission.
             admit_to_cache(cx, &mut out);
             match out.supplied {
                 Some(s) => {
@@ -299,18 +340,112 @@ pub(crate) async fn run_requests(
                     });
                     ev.supply(&out.step, &out.instance, s)
                         .expect("the core accepts what the runtime supplies");
+                    let refused = ev.screening_refused();
                     drop(ev);
+                    if refused {
+                        withdrawal.raise();
+                    }
                     if let (Some(o), Some(progress)) = (cx.observing, progress) {
                         o.call(|o| o.step(progress));
                     }
                 }
-                None => cancelled = true,
+                None => cancelled |= !cx.ev().screening_refused(),
             }
             let slot = seen[&(out.step.clone(), out.instance.clone())];
             records[slot] = Some(out.record);
         }
     }
     (records.into_iter().flatten().collect(), cancelled)
+}
+
+/// Screening identity comes from the lowered plan, never a name prefix.
+fn is_screen(cx: &DecisionCtx<'_, '_>, step: &str) -> bool {
+    cx.plan
+        .compiled
+        .plan
+        .screening
+        .as_ref()
+        .is_some_and(|p| p.steps.iter().any(|s| s.step == step))
+}
+
+fn screen_record(cx: &DecisionCtx<'_, '_>, req: &SemanticRequest) -> Option<ScreenRequest> {
+    is_screen(cx, &req.step).then(|| ScreenRequest {
+        cache: if cx.live.is_none() && cx.optimization().is_some_and(|p| p.memory_cache.is_some()) {
+            ScreenCache::Miss
+        } else {
+            ScreenCache::Disabled
+        },
+        units: ScreenChargedUnits {
+            computed: None,
+            reported: None,
+            charged: 0,
+            basis: ScreenUnitBasis::Computed,
+            bound_violation: None,
+        },
+    })
+}
+
+/// Account every dispatched attempt, including invalid and cancelled outputs.
+/// No text enters a run record. Retry charges add rather than replacing earlier work.
+fn record_units(
+    cx: &DecisionCtx<'_, '_>,
+    req: &SemanticRequest,
+    target: &Target,
+    end: &Ended,
+    screen: &mut Option<ScreenRequest>,
+) {
+    let Some(screen) = screen else { return };
+    let Some(profile) = target
+        .registered
+        .backend
+        .descriptor()
+        .operations
+        .iter()
+        .find_map(|op| op.screen.as_ref())
+    else {
+        return;
+    };
+    let bytes = serde_json::from_slice::<serde_json::Value>(&req.projection)
+        .ok()
+        .and_then(|p| {
+            p.get("values")?
+                .get("text")?
+                .as_str()
+                .map(|s| s.len() as u64)
+        });
+    let Some(bytes) = bytes else { return };
+    let Some(computed) = bytes
+        .checked_div(profile.text_unit_bytes)
+        .map(|q| q + u64::from(bytes % profile.text_unit_bytes != 0))
+    else {
+        return;
+    };
+    let reported = match end {
+        Ended::Output(RawOutput::Screen {
+            units: ScreenUnits::Reported { n },
+            ..
+        }) => Some(*n),
+        _ => None,
+    };
+    let units = &mut screen.units;
+    units.computed = Some(units.computed.unwrap_or(0).saturating_add(computed));
+    units.charged = units.charged.saturating_add(reported.unwrap_or(computed));
+    if let Some(n) = reported {
+        units.reported = Some(units.reported.unwrap_or(0).saturating_add(n));
+        units.basis = ScreenUnitBasis::Reported;
+        if n > computed {
+            let violation = units
+                .bound_violation
+                .get_or_insert(ScreenUnitBoundViolation {
+                    computed: 0,
+                    reported: 0,
+                });
+            violation.computed = violation.computed.saturating_add(computed);
+            violation.reported = violation.reported.saturating_add(n);
+        }
+    }
+    // Keep the context explicit: this accounting is confined to lowered requests.
+    debug_assert!(is_screen(cx, &req.step));
 }
 
 // ---------------------------------------------------------------------------
@@ -409,8 +544,18 @@ fn cache_lookup(cx: &DecisionCtx<'_, '_>, req: &SemanticRequest) -> CacheLookup 
         principal: cx.principal,
         backend_artifact: &target.artifact,
         backend_descriptor: &descriptor,
-        step: &req.step,
-        instance: &req.instance,
+        // Lowered screening semantics and target are bound by the plan and
+        // descriptor; its projection deliberately excludes item identity.
+        step: if is_screen(cx, &req.step) {
+            ""
+        } else {
+            &req.step
+        },
+        instance: if is_screen(cx, &req.step) {
+            &[]
+        } else {
+            &req.instance
+        },
         projection: &req.projection,
     });
     let generation = cx.rt.optimizer.generation(&key.namespace);
@@ -425,14 +570,20 @@ fn cache_lookup(cx: &DecisionCtx<'_, '_>, req: &SemanticRequest) -> CacheLookup 
                     vec![],
                 );
                 o.entry_id = Some(hit.entry_id);
-                o.source_attempt_id = Some(hit.source_attempt_id);
+                o.source_attempt_id = Some(hit.source_attempt_id.clone());
                 o.age_ms = hit.age_ms;
                 return CacheLookup::Done(Box::new(RequestOutcome {
                     step: req.step.clone(),
                     instance: req.instance.clone(),
                     supplied: Some(Supplied::Output(hit.output)),
                     record: RequestRecord {
-                        screen: None,
+                        screen: screen_record(cx, req).map(|mut screen| {
+                            screen.cache = ScreenCache::Hit {
+                                source_attempt: hit.source_attempt_id,
+                            };
+                            screen.units.basis = ScreenUnitBasis::CacheHit;
+                            screen
+                        }),
                         step: req.step.clone(),
                         instance: req.instance.clone(),
                         result: RequestResult::Output { target: hit.target },
@@ -448,6 +599,7 @@ fn cache_lookup(cx: &DecisionCtx<'_, '_>, req: &SemanticRequest) -> CacheLookup 
         Err(CacheMiss::Collision) if policy.admission == OptimizationAdmission::Refuse => {
             let detail = cache_miss_detail(CacheMiss::Collision);
             let b = Builder {
+                screen: screen_record(cx, req),
                 req,
                 attempts: vec![],
                 transitions: vec![],
@@ -559,6 +711,7 @@ impl BatchCandidate {
         let mut diagnostics = self.diagnostics.clone();
         diagnostics.push(why.into());
         Builder {
+            screen: screen_record(cx, &self.req),
             req: &self.req,
             attempts: vec![],
             transitions: vec![],
@@ -599,6 +752,17 @@ fn batch_capability(cx: &DecisionCtx<'_, '_>, req: &SemanticRequest) -> Option<B
         return None;
     }
     let target = &step.targets[0];
+    if is_screen(cx, &req.step)
+        && target
+            .registered
+            .backend
+            .descriptor()
+            .operations
+            .iter()
+            .any(|op| op.screen.is_some() && op.isolation == Some(Isolation::PerItem))
+    {
+        return None;
+    }
     let capability = catch_unwind(AssertUnwindSafe(|| {
         target.registered.backend.batch_capability(&req.projection)
     }))
@@ -934,17 +1098,21 @@ async fn drive_batch(
             for member in &members {
                 member.signal.raise();
             }
-            let (cancellation, remote, charge) = match poll_once(&mut work).await {
-                Some(Ok(report)) => answered(report.cancel, report.charge),
-                Some(Err(_)) | None => (
+            match poll_once(&mut work).await {
+                Some(Ok(report)) if cx.ev().screening_refused() => BatchEnd::Report(report),
+                Some(Ok(report)) => {
+                    let (cancellation, remote, charge) = answered(report.cancel, report.charge);
+                    BatchEnd::Stopped(why, cancellation, remote, charge)
+                }
+                Some(Err(_)) | None => BatchEnd::Stopped(
+                    why,
                     Cancellation::Requested {
                         answer: CancelAnswer::NotObserved,
                     },
                     RemoteState::PossiblyContinuing,
                     Charge::Unknown,
                 ),
-            };
-            BatchEnd::Stopped(why, cancellation, remote, charge)
+            }
         }
     };
     drop(work);
@@ -1059,6 +1227,14 @@ fn conclude_batch(
             },
         };
         let req = &member.candidate.req;
+        let mut screen = screen_record(cx, req);
+        record_units(
+            cx,
+            req,
+            &cx.plan.steps[&req.step].targets[0],
+            &ended,
+            &mut screen,
+        );
         let (record_end, next) = judge_end(cx, req, ended);
         let member_charge = match charge {
             Charge::Observed { .. } => Charge::Observed {
@@ -1087,6 +1263,7 @@ fn conclude_batch(
             o.shared_liability_units = total_reserved;
         }
         let mut b = Builder {
+            screen,
             req,
             attempts: vec![AttemptRecord {
                 attempt_id: member.attempt_id.clone(),
@@ -1200,10 +1377,15 @@ fn judge_end(
     Result<RawOutput, Option<(FailureClass, String)>>,
 ) {
     match end {
+        Ended::Output(out) if cx.ev().screening_refused() => (AttemptEnd::Output, Ok(out)),
         Ended::Output(out) => match cx.ev().check_output(&req.step, &req.instance, &out) {
             Ok(Ok(())) => (AttemptEnd::Output, Ok(out)),
             Ok(Err(u)) => {
-                let d = cut(&u.to_string(), DETAIL_BYTES);
+                let d = if is_screen(cx, &req.step) {
+                    "invalid screening output".into()
+                } else {
+                    cut(&u.to_string(), DETAIL_BYTES)
+                };
                 (
                     AttemptEnd::Failed {
                         class: FailureClass::InvalidOutput,
@@ -1224,7 +1406,11 @@ fn judge_end(
             }
         },
         Ended::Failed(class, detail) => {
-            let d = cut(&detail, DETAIL_BYTES);
+            let d = if is_screen(cx, &req.step) {
+                format!("screening {}", class.name())
+            } else {
+                cut(&detail, DETAIL_BYTES)
+            };
             (
                 AttemptEnd::Failed {
                     class,
@@ -1239,6 +1425,7 @@ fn judge_end(
 }
 
 struct Builder<'c> {
+    screen: Option<ScreenRequest>,
     req: &'c SemanticRequest,
     attempts: Vec<AttemptRecord>,
     transitions: Vec<Transition>,
@@ -1253,7 +1440,7 @@ impl Builder<'_> {
             instance: self.req.instance.clone(),
             supplied,
             record: RequestRecord {
-                screen: None,
+                screen: self.screen,
                 step: self.req.step.clone(),
                 instance: self.req.instance.clone(),
                 result,
@@ -1325,6 +1512,7 @@ async fn drive(
         o
     });
     let mut b = Builder {
+        screen: screen_record(cx, &req),
         req: &req,
         attempts: vec![],
         transitions: vec![],
@@ -1474,6 +1662,7 @@ async fn drive(
             drop(permit);
             held.settle(charge);
 
+            record_units(cx, &req, target, &end, &mut b.screen);
             let (record_end, next) = judge_end(cx, &req, end);
             b.attempts.push(AttemptRecord {
                 attempt_id,
@@ -1599,7 +1788,7 @@ async fn attempt(
     };
     let mut timer = cx.rt.clock.sleep_until(limit);
     let raced = race(&mut work, cx.cancel, &mut timer).await;
-    let (why, report) = match raced {
+    let (mut why, report) = match raced {
         // The adapter saw the caller's cancellation (propagated to its
         // child signal) and answered it: that is a cancellation, not an
         // adapter failure.
@@ -1668,7 +1857,14 @@ async fn attempt(
     // then stop waiting. Dropping the future never counts as a remote stop.
     signal.raise();
     let (cancellation, remote, charge) = match poll_once(&mut work).await {
-        Some(Ok(AttemptReport { cancel, charge, .. })) => answered(cancel, charge),
+        Some(Ok(report)) => {
+            if cx.ev().screening_refused()
+                && let Ok(output) = report.result
+            {
+                why = Ended::Output(output);
+            }
+            answered(report.cancel, report.charge)
+        }
         Some(Err(_)) | None => (
             Cancellation::Requested {
                 answer: CancelAnswer::NotObserved,

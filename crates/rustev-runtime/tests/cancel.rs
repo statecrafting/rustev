@@ -184,3 +184,32 @@ async fn a_long_lived_caller_signal_holds_nothing_after_decisions_end() {
     }
     assert_eq!(shutdown.registered(), 0);
 }
+
+#[tokio::test(flavor = "current_thread")]
+async fn a_long_lived_caller_signal_holds_nothing_after_queued_decisions_end() {
+    let head = gate_all(linear_head());
+    let rig = rig(config(1, 1, 3), &[(head.clone(), 8)]);
+    let plan = Arc::new(rig.rt.prepare(support_compiled(None)).unwrap());
+    let shutdown = CancelSignal::new();
+    for i in 0..20 {
+        let blocker = start(&rig, &plan, &format!("blocker{i}"), &shutdown);
+        until(|| head.gated().len() == 3).await;
+        let queued = start(&rig, &plan, &format!("queued{i}"), &shutdown);
+        // Admission waits on the decision-level signal before run_requests
+        // creates its withdrawal child. Keep the caller signal unraised so
+        // cancellation cannot clear a leaked admission waker for us.
+        until(|| rig.rt.gauges().queued == 1).await;
+        settle().await;
+        assert_eq!(head.dispatched().len(), (i * 2 + 1) * 3);
+
+        assert_eq!(release_all(&head), 3);
+        decided(done(blocker).await);
+        until(|| head.gated().len() == 3).await;
+        assert_eq!(release_all(&head), 3);
+        decided(done(queued).await);
+
+        assert_eq!(rig.rt.gauges().queued, 0);
+        assert_eq!(rig.rt.gauges().in_flight, 0);
+        assert_eq!(shutdown.registered(), 0, "after decision pair {i}");
+    }
+}

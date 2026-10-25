@@ -311,6 +311,24 @@ pub enum ScreenCache {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ScreenChargedUnits {
+    /// Sum of computed bounds for dispatched attempts. Absent when no
+    /// attempt was dispatched (including cache hits and withdrawal).
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "present"
+    )]
+    #[schemars(with = "u64")]
+    pub computed: Option<u64>,
+    /// Sum of reported units, when any attempt reported units. Charges for
+    /// attempts without a report still use their computed bound.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "present"
+    )]
+    #[schemars(with = "u64")]
+    pub reported: Option<u64>,
     pub charged: u64,
     pub basis: ScreenUnitBasis,
     /// Present only for a reported charge above its computed bound.

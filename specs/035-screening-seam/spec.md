@@ -914,6 +914,28 @@ each verdict, consequence and unavailability policy, a canary text
 asserted absent, and replay of the supply order reproducing the judgment
 bytes. Runtime withdrawal and cancellation are increment 4.
 
+**Increment 4 (2026-10-24): runtime isolation, withdrawal, units and the
+verdict cache.** A screening request bound to a capability declaring
+`isolation: per_item` is dispatched alone, never in a spec 017 general
+batch or a spec 020 batch dispatch whatever `batch_capability` answers;
+`shared` screeners batch under spec 017 3.3 as before (3.10.1, 3.10.2).
+The remote adapter's own coalescing into spec 009 shared-state exchanges
+is 3.15.2, increment 5, so the 3.10.1 acceptance item for shared-state
+terms completes there. After a screening refusal, undispatched requests
+are recorded `withdrawn` and never dispatched, in-flight attempts are
+cancelled keeping their charges and liabilities, and a late output is
+recorded but never supplied (3.7.3). Each dispatched screening request
+records its computed units and the backend's reported units, charges the
+reported value when present, and records a reported value above the
+computed bound as a unit bound violation (3.12.3); `ScreenChargedUnits`
+gains the `computed` and optional `reported` counts that 3.12.3 asks to be
+recorded, omitted when no attempt was dispatched. Spec 017's memory cache
+holds validated `screen` outputs only, keyed by the full request identity
+with its scope; a hit records its source attempt and charges 0 units with
+basis `cache_hit` (3.11). Tests: `crates/rustev-runtime/tests/screening.rs`
+under the manual clock and scripted backends, with a canary text absent
+from every run record.
+
 ## Facts relied on
 
 Read on 2026-10-17 from the AWS documentation named; re-confirmed at the
