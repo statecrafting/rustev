@@ -51,10 +51,9 @@ const gluePath = resolve(pkg, 'web/rustev_wasm.js');
 const bytes = readFileSync(wasmPath);
 
 const BUDGET = {
-  // Spec 052 (A-54) raised both, amending 027 3.10.4: gzip from spec 051's
-  // 1,048,576 bytes, raw from spec 051's 3,145,728 (earlier budgets: specs
-  // 046 and 051).
-  gzip_bytes: 1_572_864,
+  // Spec 052 (A-54) raised raw from spec 051's 3,145,728 bytes, amending
+  // 027 3.10.4 (earlier budgets: specs 046 and 051). Spec 055 (A-57) took
+  // gzip out of the gated budget: it is measured and recorded, as Brotli is.
   raw_bytes: 4_718_592,
   node_median_ms: 50,
   chromium_median_ms: 100,
@@ -84,9 +83,13 @@ const sizes = {
     params: { [constants.BROTLI_PARAM_QUALITY]: 11 },
   }).length,
 };
-for (const k of ['raw_bytes', 'gzip_bytes']) {
-  if (sizes[k] > BUDGET[k]) {
-    failures.push(`027 3.10.4: ${k} ${sizes[k]} exceeds its budget of ${BUDGET[k]}`);
+if (sizes.raw_bytes > BUDGET.raw_bytes) {
+  failures.push(`027 3.10.4: raw_bytes ${sizes.raw_bytes} exceeds its budget of ${BUDGET.raw_bytes}`);
+}
+// 055 3: gzip gates nothing, but the measurement is required.
+for (const k of ['gzip_bytes', 'brotli_bytes']) {
+  if (!Number.isInteger(sizes[k]) || sizes[k] <= 0) {
+    failures.push(`055 3: ${k} was not measured`);
   }
 }
 

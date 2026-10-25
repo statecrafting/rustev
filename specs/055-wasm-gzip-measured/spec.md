@@ -1,19 +1,20 @@
 ---
 id: "055-wasm-gzip-measured"
 title: "The WebAssembly module's gzip size is recorded, not gated (amends 027)"
-status: draft
-implementation: pending
+status: approved
+implementation: complete
 created: "2026-10-25"
 summary: >
-  A draft amendment of approved spec 027 3.10.4, after specs 046, 050, 051
-  and 052, proposed for the owner's ratification. As the #76 track added
+  A narrow amendment of approved spec 027 3.10.4, after specs 046, 050, 051
+  and 052. As the #76 track added
   document types, the gzip budget was met four times: specs 046 and 050
   kept it, and specs 051 and 052 raised it, and the last time it stopped
   every open chain at once. This spec keeps measuring and recording
   the optimized module's gzip size (level 9) on every run, as the Brotli
   size already is, and removes it from the gated budget. The uncompressed
   budget of 4,718,592 bytes (spec 052), the instantiation budgets, the
-  procedure and spec 050's exclusion are unchanged.
+  procedure and spec 050's exclusion are unchanged. Ratified by the owner
+  on 2026-10-25 (A-57).
 amends:
   - "027-node-and-wasm-bindings"
 extends:
@@ -33,7 +34,7 @@ obligations:
 
 # 055: The WebAssembly module's gzip size is recorded, not gated (amends 027)
 
-Draft: a proposal for the owner's ratification, not a claim about code.
+Approved: ratified by the owner on 2026-10-25 (decision A-57).
 The approved texts of specs 027, 046, 050, 051 and 052 are not edited; this
 spec records what changes in 027 3.10.4 after 052.
 
@@ -97,8 +98,20 @@ the native package.
 `make bindings` runs `wasm-check.mjs`; the CI `bindings` job (a required
 job of `ci-gate`) runs it on every pull request and push to `main`.
 
-## Decisions for ratification
+## Decisions at approval
 
-1. **No gzip ceiling at all.** Proposed: none. The alternative is a
-   generous ceiling (for example 4 MiB) that only catches a runaway
-   module; the uncompressed gate already does that.
+Ratified as proposed (A-57):
+
+1. **No gzip ceiling at all.** The gzip size is recorded and gates nothing;
+   a runaway module is caught by the uncompressed gate.
+
+## Implementation record
+
+**2026-10-25.** `tools/rustev-conformance/js/wasm-check.mjs` drops
+`gzip_bytes` from `BUDGET`, so the measurement document's `budgets` no
+longer lists a gzip budget, and gates only `raw_bytes` among the sizes, at
+4,718,592. It still measures `gzip_bytes` and `brotli_bytes` on every run
+and fails the run when either was not measured (section 5's third case).
+This change's own `bindings` run is the first measurement under the new
+rule. Both acceptance items hold at this change, so `implementation` is
+`complete`.

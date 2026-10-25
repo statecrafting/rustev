@@ -42,8 +42,8 @@
       }
     ],
     "specId": "055-wasm-gzip-measured",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "077fc96e61a816d5283b979e04a4199eda4e26975fb77b5df45e6743a5699a4f"
+  "shardHash": "9085ee876d001f34c4d59eba36955fee0053956050cf3ff97b25343d64360f02"
 }
