@@ -725,6 +725,7 @@ impl<'c> Evaluation<'c> {
                 .into_iter()
                 .map(|f| self.input_cause(&f))
                 .collect(),
+            Unresolved::ScreenUnavailable { .. } => Vec::new(),
             Unresolved::Abstained { rule } => vec![Cause::Policy {
                 site: if site.starts_with("check:") {
                     site.into()
@@ -1785,6 +1786,7 @@ impl<'c> Evaluation<'c> {
         }
         if truncated > 0 {
             self.notices.push(Notice {
+                screening: None,
                 kind: NoticeKind::Truncation,
                 subject: format!("step:{id}"),
                 reason: format!("{truncated} request(s) not issued: max_semantic_requests reached"),
@@ -2054,6 +2056,7 @@ impl<'c> Evaluation<'c> {
             }
         }
         let evidence = EvidenceRecord {
+            screening: None,
             schema: if v2 {
                 schema::EVIDENCE_V2
             } else {
@@ -2112,7 +2115,8 @@ impl<'c> Evaluation<'c> {
                     NoticeKind::FieldDropped
                     | NoticeKind::ConstraintsRelaxed
                     | NoticeKind::GradeDowngraded
-                    | NoticeKind::CheckNotice => return n,
+                    | NoticeKind::CheckNotice
+                    | NoticeKind::Screening => return n,
                 };
                 n.action = Some(crate::actionable::action(
                     causes,
@@ -2129,6 +2133,7 @@ impl<'c> Evaluation<'c> {
             .collect();
         for p in &self.checks.notices {
             out.push(Notice {
+                screening: None,
                 kind: p.kind,
                 subject: p.subject.clone(),
                 reason: p.reason.clone(),

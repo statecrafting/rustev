@@ -1560,6 +1560,7 @@ pub(crate) fn compile_instantiated(
             (None, Fallback::Unsupported) => {
                 let capability = format!("{:?}:{:?}", d.operation, d.requires).to_lowercase();
                 notices.push(Notice {
+                    screening: None,
                     kind: NoticeKind::Fallback,
                     subject: subject.clone(),
                     reason: format!("unsupported: {capability}"),
@@ -1571,6 +1572,7 @@ pub(crate) fn compile_instantiated(
             (None, Fallback::Kind { requires, reason }) => match evaluate(*requires) {
                 (Some((b, o)), _) => {
                     notices.push(Notice {
+                        screening: None,
                         kind: NoticeKind::Fallback,
                         subject: subject.clone(),
                         reason: reason.clone(),
@@ -1693,6 +1695,7 @@ pub(crate) fn compile_instantiated(
                 );
             }
             ExcessPolicy::TruncateVisible => notices.push(Notice {
+                screening: None,
                 kind: NoticeKind::Truncation,
                 subject: "limits".into(),
                 reason: format!(
@@ -2461,6 +2464,7 @@ fn check_cond(
             SemKind::Distribution => match u {
                 UncalibratedThreshold::Declared { reason } => {
                     notices.push(Notice {
+                        screening: None,
                         kind: NoticeKind::UncalibratedThreshold,
                         subject: subject.to_string(),
                         reason: reason.clone(),

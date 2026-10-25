@@ -614,10 +614,11 @@ pub enum ReasonKind {
     Unsupported,
     /// Present but below a required grade (spec 032, 3.9.4).
     InsufficientGrade,
+    ScreenUnavailable,
 }
 
 impl ReasonKind {
-    pub const ALL: [ReasonKind; 11] = [
+    pub const ALL: [ReasonKind; 12] = [
         ReasonKind::MissingEvidence,
         ReasonKind::StaleEvidence,
         ReasonKind::InvalidInput,
@@ -629,6 +630,7 @@ impl ReasonKind {
         ReasonKind::Conflict,
         ReasonKind::Unsupported,
         ReasonKind::InsufficientGrade,
+        ReasonKind::ScreenUnavailable,
     ];
 }
 

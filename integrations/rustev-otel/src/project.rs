@@ -924,6 +924,7 @@ fn step_attributes(
                 b.put("rustev.step.target", Number, num(u64::from(*target)));
             }
             RequestResult::Failed(_) => b.put("rustev.step.result", Enum, "failed".into()),
+            RequestResult::Withdrawn => {}
             RequestResult::NotSupplied => b.put("rustev.step.result", Enum, "not_supplied".into()),
         }
         if let Some(o) = &r.optimization {

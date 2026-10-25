@@ -810,6 +810,7 @@ fn static_reason_causes(
         K::Unsupported => vec![Cause::Capability {
             name: target.strip_prefix("step:").unwrap_or(target).to_string(),
         }],
+        K::ScreenUnavailable => Vec::new(),
         K::Abstained => vec![Cause::Policy { site: site.into() }],
     }
 }
@@ -1215,7 +1216,7 @@ pub(crate) fn computed_remediation(
                 RemediationValue::Text(capability.clone()),
             )],
         ),
-        U::Abstained { .. } => Remediation::None,
+        U::ScreenUnavailable { .. } | U::Abstained { .. } => Remediation::None,
     }
 }
 
