@@ -521,6 +521,12 @@ sh crates/rustev-eval/mutation/seeds.sh
 
 ## Implementation record
 
+- 2026-10-24: the leave-out rule below is general. A spec whose acceptance
+  runs its own seed filter joins `OWN_RUNS` in `crates/rustev-eval/mutation/seeds.py`
+  when that acceptance lands, and the negative control leaves those seeds
+  out; the list there, not this record, is the current set. Spec 040 joined
+  it with its completion (#264), so the control leaves out 25 of 47 seeds.
+  Section 6's required categories are unchanged and still checked here.
 - 2026-10-24: the parallel seed run checks its warm build. A warm build that
   fails or writes nothing is shown, and each worker builds cold instead of
   the run stopping on a missing target directory before any seed (seen with
