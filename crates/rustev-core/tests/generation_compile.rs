@@ -528,3 +528,27 @@ fn backend_binding_ids_are_literals_even_when_they_resemble_step_references() {
         assert_eq!(binding.backend_id, backend_id);
     }
 }
+
+#[test]
+fn semantic_step_cannot_supply_a_backstop_path() {
+    let (mut d, p, b) = fixture();
+    d.steps.push(StepDecl {
+        id: "model".into(),
+        body: StepBody::Semantic(common::semantic(
+            Operation::Classify,
+            "label",
+            "Choose",
+            &["a", "b"],
+            RequiredKind::Label,
+            &[],
+        )),
+    });
+    d.policy.on_unresolved.push(serde_json::from_value(json!({"target":"step:model","reasons":"any","action":{"escalate":{"reason":"missing"}}})).unwrap());
+    let source = "Answer: {{step.model}}";
+    edit(&mut d, |g| {
+        g["backstop"]["fields"]["headline"] = json!({"text":source});
+    });
+    let refusal = run(&d, &p, &b).unwrap_err();
+    assert_eq!(refusal.category, C::Template, "{refusal:?}");
+    assert!(refusal.detail.contains("NotExact"), "{refusal:?}");
+}

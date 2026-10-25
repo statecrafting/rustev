@@ -18,6 +18,8 @@ pub mod clock;
 mod driver;
 mod dynamic;
 mod generation;
+#[cfg(test)]
+mod generation_acceptance;
 pub use generation::{GenerationEvent, GenerationStream};
 pub mod ledger;
 mod live;
@@ -723,13 +725,33 @@ impl Runtime {
         cancel: &CancelSignal,
         capture: &CaptureConfig,
     ) -> Result<CapturedDecision, CaptureConfigError> {
+        self.decide_capturing(plan, req, cancel, capture, None)
+            .await
+    }
+
+    async fn decide_capturing(
+        &self,
+        plan: &PreparedPlan,
+        req: DecisionRequest,
+        cancel: &CancelSignal,
+        capture: &CaptureConfig,
+        streaming: Option<&generation::Streaming>,
+    ) -> Result<CapturedDecision, CaptureConfigError> {
         // Spec 036, 3.15.1 admits every plan 3 decision; generation capture
         // (spec 037, 3.15.3) shares the acquisition and semantic supply order.
         capture.check()?;
         let decision_id = req.decision_id.clone();
         let mut capturing = capture::Capturing::new(capture);
         let result = self
-            .run(plan, req, cancel, Some(&mut capturing), None, None, None)
+            .run(
+                plan,
+                req,
+                cancel,
+                Some(&mut capturing),
+                None,
+                None,
+                streaming,
+            )
             .await;
         let capture = match &result {
             Err(DecideError::Rejected(_) | DecideError::GenerationFailed(_)) => {

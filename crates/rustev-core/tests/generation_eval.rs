@@ -451,6 +451,22 @@ fn selected_items_render_context_and_backstops_in_list_order_and_restore_ownersh
             .begin_generation("d")
             .unwrap()
     };
+    let mut ownership = run();
+    give(
+        &mut ownership,
+        Supplied::Output(RawOutput::TextRecord(BTreeMap::from([(
+            "price".into(),
+            TextValue::Text("999".into()),
+        )]))),
+    );
+    let (_, _, owned) = ownership.finish().unwrap();
+    assert!(
+        owned
+            .unwrap()
+            .notices
+            .iter()
+            .any(|n| n.kind == TextNoticeKind::OwnershipViolation && n.field == "price")
+    );
     let mut s = run();
     let request = s.pending().remove(0).document;
     assert_eq!(request.instance, vec!["b"]);
@@ -478,6 +494,13 @@ fn selected_items_render_context_and_backstops_in_list_order_and_restore_ownersh
             paths: vec!["item.name".into()]
         })
     );
+    assert_eq!(
+        item.generated["tags"].origin,
+        FieldOrigin::Absent {
+            reason: TextReason::NotAttempted
+        }
+    );
+    assert_eq!(t.counts.reasons[&TextReason::NotAttempted], 3);
     assert_eq!(item.context["price"].lineage.inputs, vec!["candidates"]);
     let source = e.generation.as_ref().unwrap()[0].items[0].context["price"].clone();
     t.steps[0].items[0].context.get_mut("price").unwrap().value =
@@ -632,4 +655,30 @@ fn repair_respects_remaining_request_budget() {
             reason: TextReason::BudgetExhausted
         }
     );
+}
+
+#[test]
+fn truncating_backstop_records_utf8_boundary_and_notice() {
+    let (mut d, p, b) = fixture();
+    change(&mut d, |g| {
+        g["repair"]["max_attempts"] = json!(0);
+        g["output"]["fields"][0]["type"]["text"]["max_bytes"] = json!(9);
+        g["backstop"]["overflow"] = json!("truncate");
+        g["backstop"]["fields"]["headline"] = json!({"text":"éééééé"});
+    });
+    let c = compile(&d, &p, &b);
+    let mut s = stage(&c);
+    give(&mut s, output("oversized-field", "Valid"));
+    let (_, e, t) = s.finish().unwrap();
+    let t = t.unwrap();
+    assert_eq!(
+        t.steps[0].items[0].generated["headline"].value,
+        Some(TextValue::Text("éééé".into()))
+    );
+    assert!(
+        t.notices
+            .iter()
+            .any(|n| n.kind == TextNoticeKind::BackstopTruncated && n.field == "headline")
+    );
+    assert_eq!(e.generation.unwrap()[0].notices, t.notices);
 }

@@ -9,6 +9,7 @@ not finish: a timeout is inconclusive, not a detection. The working tree is
 never modified.
 """
 
+import argparse
 import os
 import shutil
 import signal
@@ -40,7 +41,7 @@ REQUIRED = [
 # run them a second time in CI; `seeds.sh "spec 023"`, `live-comparison` and
 # `"spec 029"` still run and require every one. A spec whose acceptance
 # starts filtering its own seeds joins this list.
-OWN_RUNS = ("spec 023", "live-comparison", "spec 029", "spec 040", "spec 035", "spec 036")
+OWN_RUNS = ("spec 023", "live-comparison", "spec 029", "spec 040", "spec 035", "spec 036", "spec 037")
 # Generous: a new test binary can wait on the OS before it starts.
 TEST_TIMEOUT_S = 1800
 
@@ -523,6 +524,75 @@ SEEDS += [
     ),
 ]
 
+# Spec 037 Acceptance: run in the harness of the affected crate.
+SEEDS += [
+    (
+        "spec 037",
+        'missing required backstop accepted',
+        'crates/rustev-core/src/generation.rs',
+        'if f.required && !g.backstop.fields.contains_key(&f.name) {',
+        'if false && f.required && !g.backstop.fields.contains_key(&f.name) {',
+        ['rustev-core'],
+    ),
+    (
+        "spec 037",
+        'model-derived backstop path accepted',
+        'crates/rustev-core/src/template/check.rs',
+        '_ => Err(Error::NotExact(p.into())),',
+        '_ => Ok(()),',
+        ['rustev-core'],
+    ),
+    (
+        "spec 037",
+        'generated value readable by a rule',
+        'crates/rustev-core/src/generation.rs',
+        'return Err(error(C::ModelOutputFlow, "policy", r));',
+        'let _ = r;',
+        ['rustev-core'],
+    ),
+    (
+        "spec 037",
+        'origin dropped on cache hit',
+        'crates/rustev-core/src/generation_eval.rs',
+        'field.source = TextSource::ServedFromCache {',
+        'field.origin = FieldOrigin::Generated;\n                    field.source = TextSource::ServedFromCache {',
+        ['rustev-runtime'],
+    ),
+    (
+        "spec 037",
+        'repair overwrites a valid field',
+        'crates/rustev-core/src/generation_eval.rs',
+        'if item.result.generated.contains_key(&field.name) {',
+        'if false && item.result.generated.contains_key(&field.name) {',
+        ['rustev-core'],
+    ),
+    (
+        "spec 037",
+        'superseded event missing',
+        'crates/rustev-runtime/src/generation.rs',
+        'if !same {',
+        'if false && !same {',
+        ['rustev-runtime'],
+    ),
+    (
+        "spec 037",
+        'carried mutation not restored',
+        'crates/rustev-core/src/generation_eval.rs',
+        'item.context = source.result.context.clone();',
+        'let _ = &source.result.context;',
+        ['rustev-core'],
+    ),
+    (
+        "spec 037",
+        'retries exhausted and backend unavailable swapped',
+        'crates/rustev-core/src/generation_eval.rs',
+        'Unresolved::BackendUnavailable { .. } if attempts >= 2 => TextReason::RetriesExhausted,\n        Unresolved::BackendUnavailable { .. } => TextReason::BackendUnavailable,',
+        'Unresolved::BackendUnavailable { .. } if attempts >= 2 => TextReason::BackendUnavailable,\n        Unresolved::BackendUnavailable { .. } => TextReason::RetriesExhausted,',
+        ['rustev-runtime'],
+    ),
+]
+
+
 def run(cmd, cwd, env, timeout=None):
     # A session of its own, so a timeout kills the test binaries too.
     p = subprocess.Popen(
@@ -575,13 +645,27 @@ def try_seed(seed, src, env):
 
 
 def main():
-    if sys.argv[1:]:
-        chosen = [x for x in SEEDS if any(a in x[1] or a in x[0] for a in sys.argv[1:])]
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--check-anchors", action="store_true",
+                        help="check each selected anchor occurs exactly once, without mutations")
+    parser.add_argument("filters", nargs="*", help="seed category or name substrings")
+    args = parser.parse_args()
+    if args.filters:
+        chosen = [x for x in SEEDS if any(a in x[1] or a in x[0] for a in args.filters)]
     else:
         chosen = [x for x in SEEDS if not any(o in x[0] or o in x[1] for o in OWN_RUNS)]
     if not chosen:
         print("seeds: no seed matches the filter")
         sys.exit(1)
+    if args.check_anchors:
+        failures = 0
+        for category, name, path, old, _, _ in chosen:
+            with open(os.path.join(ROOT, path), encoding="utf-8") as source:
+                count = source.read().count(old)
+            failures += count != 1
+            print(f"{'OK' if count == 1 else 'BROKEN'} {category}: {name}: anchor found {count} time(s)")
+        print(f"anchors: {len(chosen) - failures}/{len(chosen)} matched exactly once")
+        sys.exit(1 if failures else 0)
     work = tempfile.mkdtemp(prefix="rustev-eval-seeds-")
     ignore = shutil.ignore_patterns("target", ".git", ".tooling", ".bin", ".statecraft")
     n = min(jobs(), len(chosen))
@@ -644,7 +728,7 @@ def main():
                      for i in range(len(chosen)) if i not in results]
     finally:
         shutil.rmtree(work, ignore_errors=True)
-    full = not sys.argv[1:]
+    full = not args.filters
     missing = [c for c in REQUIRED if full and not any(x[0] == c for x in chosen)]
     print(f"seeds: {len(chosen) - len(failures)}/{len(chosen)} detected ({n} worker(s))")
     for c in missing:

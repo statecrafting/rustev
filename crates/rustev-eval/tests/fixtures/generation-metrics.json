@@ -1,0 +1,344 @@
+[
+  {
+    "name": "text/field_slots",
+    "value": {
+      "measured": {
+        "value": 12.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/origin/generated",
+    "value": {
+      "measured": {
+        "value": 7.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/origin/repaired",
+    "value": {
+      "measured": {
+        "value": 1.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/origin/backstop",
+    "value": {
+      "measured": {
+        "value": 2.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/origin/absent",
+    "value": {
+      "measured": {
+        "value": 2.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/served_from_cache",
+    "value": {
+      "measured": {
+        "value": 3.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/text_origin/none",
+    "value": {
+      "measured": {
+        "value": 1.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/text_origin/generated",
+    "value": {
+      "measured": {
+        "value": 2.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/text_origin/backstop",
+    "value": {
+      "measured": {
+        "value": 1.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/text_origin/partial",
+    "value": {
+      "measured": {
+        "value": 1.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/reason/screen_blocked",
+    "value": {
+      "measured": {
+        "value": 0.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/reason/screen_unavailable",
+    "value": {
+      "measured": {
+        "value": 0.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/reason/deadline",
+    "value": {
+      "measured": {
+        "value": 0.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/reason/retries_exhausted",
+    "value": {
+      "measured": {
+        "value": 0.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/reason/invalid_output",
+    "value": {
+      "measured": {
+        "value": 4.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/reason/backend_unavailable",
+    "value": {
+      "measured": {
+        "value": 0.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/reason/budget_exhausted",
+    "value": {
+      "measured": {
+        "value": 0.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/reason/not_attempted",
+    "value": {
+      "measured": {
+        "value": 0.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/backstop_rate",
+    "value": {
+      "measured": {
+        "value": 0.3333333333333333,
+        "n": 12
+      }
+    }
+  },
+  {
+    "name": "text/step/item_text/field_slots",
+    "value": {
+      "measured": {
+        "value": 12.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/step/item_text/origin/generated",
+    "value": {
+      "measured": {
+        "value": 7.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/step/item_text/origin/repaired",
+    "value": {
+      "measured": {
+        "value": 1.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/step/item_text/origin/backstop",
+    "value": {
+      "measured": {
+        "value": 2.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/step/item_text/origin/absent",
+    "value": {
+      "measured": {
+        "value": 2.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/step/item_text/served_from_cache",
+    "value": {
+      "measured": {
+        "value": 3.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/step/item_text/text_origin/none",
+    "value": {
+      "measured": {
+        "value": 1.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/step/item_text/text_origin/generated",
+    "value": {
+      "measured": {
+        "value": 2.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/step/item_text/text_origin/backstop",
+    "value": {
+      "measured": {
+        "value": 1.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/step/item_text/text_origin/partial",
+    "value": {
+      "measured": {
+        "value": 1.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/step/item_text/reason/screen_blocked",
+    "value": {
+      "measured": {
+        "value": 0.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/step/item_text/reason/screen_unavailable",
+    "value": {
+      "measured": {
+        "value": 0.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/step/item_text/reason/deadline",
+    "value": {
+      "measured": {
+        "value": 0.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/step/item_text/reason/retries_exhausted",
+    "value": {
+      "measured": {
+        "value": 0.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/step/item_text/reason/invalid_output",
+    "value": {
+      "measured": {
+        "value": 4.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/step/item_text/reason/backend_unavailable",
+    "value": {
+      "measured": {
+        "value": 0.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/step/item_text/reason/budget_exhausted",
+    "value": {
+      "measured": {
+        "value": 0.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/step/item_text/reason/not_attempted",
+    "value": {
+      "measured": {
+        "value": 0.0,
+        "n": 5
+      }
+    }
+  },
+  {
+    "name": "text/step/item_text/backstop_rate",
+    "value": {
+      "measured": {
+        "value": 0.3333333333333333,
+        "n": 12
+      }
+    }
+  }
+]
