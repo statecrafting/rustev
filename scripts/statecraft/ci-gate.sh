@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Rendered by Statecraft from profile github-actions-rust revision 19.
+# Rendered by Statecraft from profile github-actions-rust revision 20.
 # The aggregate gate. It passes only when every job the TRUSTED policy names
 # as required ended the way its event requires:
 #

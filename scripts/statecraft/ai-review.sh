@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Rendered by Statecraft from profile github-actions-rust revision 19.
+# Rendered by Statecraft from profile github-actions-rust revision 20.
 # The AI review: subject, invocation, classification and the evidence record.
 #
 # Contributor content is data. The diff and the context reach the reviewer on
@@ -44,6 +44,10 @@ RELEASE_PATTERN="${RELEASE_PATTERN:-}"
 TMPD="${AI_REVIEW_TMP:-${RUNNER_TEMP:-/tmp}}"
 EVIDENCE_DIR="${EVIDENCE_DIR:-$TMPD/statecraft-evidence}"
 GITHUB_OUTPUT="${GITHUB_OUTPUT:-/dev/null}"
+STALL_SECONDS=180
+if [[ "${AI_REVIEW_STALL_SECONDS:-}" =~ ^[0-9]+$ ]] && [[ "${AI_REVIEW_STALL_SECONDS}" =~ [1-9] ]]; then
+  STALL_SECONDS=$(( 10#${AI_REVIEW_STALL_SECONDS} ))
+fi
 started="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 credential_class=none
 # The review's shape (revision 12), in the evidence once it is measured.
@@ -521,14 +525,47 @@ echo '[]' > "$TMPD/merged-findings.json"
 g=1
 while [ "$g" -le "$calls" ]; do
   cp "$TMPD/review-input-${g}.txt" "$TMPD/review-input.txt"
-  rm -rf "$review_cwd" "$review_home"
-  mkdir -p "$review_cwd" "$review_home"
-  rc=0
-  ( cd "$review_cwd" && HOME="$review_home" claude -p "$PROMPT" --output-format text ) \
-    < "$TMPD/review-input.txt" > "$TMPD/group-review.md" 2> "$TMPD/review.err" || rc=$?
+  attempt=1
+  while :; do
+    rm -rf "$review_cwd" "$review_home"
+    mkdir -p "$review_cwd" "$review_home"
+    events="$TMPD/review-events-${g}-${attempt}.jsonl"
+    : > "$events"
+    rc=0
+    stalled=false
+    # exec makes the PID we supervise the reviewer itself.
+    ( cd "$review_cwd" && HOME="$review_home" exec claude -p "$PROMPT" --output-format stream-json --verbose --include-partial-messages ) \
+      < "$TMPD/review-input.txt" > "$events" 2> "$TMPD/review.err" &
+    reviewer_pid=$!
+    last_size=0
+    last_event=$SECONDS
+    while kill -0 "$reviewer_pid" 2> /dev/null; do
+      size="$(wc -c < "$events")"
+      if [ "$size" -gt "$last_size" ]; then
+        last_size="$size"
+        last_event=$SECONDS
+      elif [ $(( SECONDS - last_event )) -ge "$STALL_SECONDS" ]; then
+        stalled=true
+        kill -TERM "$reviewer_pid" 2> /dev/null || true
+        stopped_at=$SECONDS
+        while kill -0 "$reviewer_pid" 2> /dev/null && [ $(( SECONDS - stopped_at )) -lt 10 ]; do
+          sleep 1
+        done
+        kill -KILL "$reviewer_pid" 2> /dev/null || true
+        break
+      fi
+      sleep 1
+    done
+    wait "$reviewer_pid" || rc=$?
+    if [ "$stalled" = false ]; then break; fi
+    if [ "$attempt" -eq 2 ]; then
+      skip transient "the reviewer call stalled twice (no event for ${STALL_SECONDS} seconds)" "$diff_digest"
+    fi
+    attempt=2
+  done
 
   if [ "$rc" -ne 0 ]; then
-    err="$(cat "$TMPD/review.err" "$TMPD/group-review.md" 2>/dev/null || true)"
+    err="$(cat "$TMPD/review.err" "$events" 2>/dev/null || true)"
     printf 'claude exited %s; captured output follows:\n%s\n' "$rc" "$err" >&2
     REFUSAL_RE="api error:[[:space:]]*(401|402|403)"
     REFUSAL_RE="${REFUSAL_RE}|[\"']type[\"'][[:space:]]*:[[:space:]]*[\"'](authentication_error|permission_error)[\"']"
@@ -553,6 +590,10 @@ while [ "$g" -le "$calls" ]; do
     fi
     refuse "the reviewer failed (exit ${rc}) with no recognized transient signal; an unclassified failure is not a review"
   fi
+
+  # Ignore non-JSON lines and use only the final result event's text.
+  jq -Rrs '[split("\n")[] | fromjson? | objects | select(.type == "result")] | last | .result | if type == "string" then . else "" end' \
+    "$events" > "$TMPD/group-review.md"
 
   if [ -z "$(tr -d '[:space:]' < "$TMPD/group-review.md")" ]; then
     refuse "the reviewer exited 0 and wrote nothing"

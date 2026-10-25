@@ -92,48 +92,48 @@
   },
   "files": [
     {
-      "digest": "62cbe875ea4523d7da74895ae7f701725490d307a5bae97bfcff1f78565bfb2f",
+      "digest": "3fa843630f4fca3a0b6fc6035835afbc163e24b9b90d704d5fdaf0580ee32b19",
       "path": ".github/workflows/statecraft-ci.yml",
       "role": "workflow"
     },
     {
-      "digest": "0dcc100ff4f99a1b88a60c9ae84bedd2ed970fa364e9da0bf2f9839df0b6bfd9",
+      "digest": "5ed9c4c25c1f77f5d8529f2ac4337164f2f5d7d144459123d616a7f435675c6c",
       "path": ".github/workflows/statecraft-ai-review.yml",
       "role": "workflow"
     },
     {
-      "digest": "229a48f7c297a38e96a52bc9e47a2704bd906eca54b2c90977c09d20a874835f",
+      "digest": "ab1c540063fb900a88ab3e7fa6d9b7dd994ed4c68e76035c48e83bb215d187b6",
       "path": "scripts/statecraft/install-spec-spine.sh",
       "role": "script"
     },
     {
-      "digest": "a16adc25f9e0b8ef9e1d8ff7fbb67d637f196ec040d85d5eeef8cccea671913c",
+      "digest": "87f52e663a8361e9eab94dfac1b2611c49e9720a5f7af7d64eae670d65eaa72b",
       "path": "scripts/statecraft/gate.sh",
       "role": "script"
     },
     {
-      "digest": "68d5b1a988a1bfbdec3da86d0d72759c7b7eee85af64442aae6a3a2b01bbf895",
+      "digest": "9740fe90b45ccb319289f9da184c2305625d02a1009a58ee73ea1087ba1435cc",
       "path": "scripts/statecraft/ci-gate.sh",
       "role": "script"
     },
     {
-      "digest": "574809af172ee4e327be70228ebdd9015bfa11668f5fcaf0df04d07dd4eb75ee",
+      "digest": "32c38ec65f29045c5a91c03abd8d44a8e46b11faf546dd3650ff9e90fd539660",
       "path": "scripts/statecraft/ai-review.sh",
       "role": "script"
     },
     {
-      "digest": "62ebfa58557677857cb26b37e80e20d79341b6ae82aecd6b2b09ddea2eafafa1",
+      "digest": "e887bb653e6b1e67de3a198513ccc59f749af21722e5adc214d01e946a5d69c8",
       "path": ".github/CODEOWNERS",
       "role": "codeowners"
     },
     {
-      "digest": "821fd8883bb23d59e0de7ee49f6a72c9f2bf8ea0edab2c41d3c31c115ca30596",
+      "digest": "77060b751c80f977b5fad9ee026b97d6ff9062aa813b8416d5ec7616fac859a7",
       "path": ".statecraft/setup/github-actions-rust.remote.json",
       "role": "remote-state"
     }
   ],
   "id": "github-actions-rust",
-  "identity": "d71264912245926abe9fff1daa2563b30c2bd7cd084d3837e23c3fd66028e9cd",
+  "identity": "90804dbe62b2b1c1515d42c39cd9d75b851c7c5bcf91d892e23db7cd6ebfc4c2",
   "jobs": {
     "ai-review": {
       "merge_group": "recorded-review",
@@ -294,6 +294,7 @@
     "revision 17: the AI review reads governance documents as Git blobs at the base commit (AGENTS.md, .statecraft/AGENTS.md, standards/spec/constitution.md, standards/spec/contract.md by default, absent ones recorded as absent) plus review.context_paths, at most 32 literal repository-relative paths read from the policy at the base, never from the candidate; the documents must fit a quarter of review.context_tokens whole or the review refuses with 2 before any provider call, every call's whole input must fit three quarters of it, the diff budget is what remains (at most half), and the evidence records each document's blob, digest and length and each call's budget (spec 041)",
     "revision 18: a newer push to a pull request cancels the work of that pull request's older statecraft-ci run, job by job: every job but review-exception and ci-gate has a concurrency group of its pull request and job, because a run waiting on the owner exception is never cancelled by a group and would hold a workflow-level one (spec 059), while a push to the default branch and each merge-queue entry keep groups of their own run; a preflight job (the pull request's base, the committed artifacts' freshness, and cargo fmt for a Rust code selection) runs before code and every declared extra job, which need it, so a stacked pull request skips them unless it carries the label statecraft:stacked-ci; every preflight check also runs in governance or code, and a base gate.sh without the verb judges nothing; the code job restores the cargo cache on every event and saves it only on a push to the default branch, with incremental compilation off and line-table debuginfo (specs 058 and 059)",
     "revision 19: a blocked ci-gate reports failed jobs of its own run attempt, their first failed step and at most five error lines each in the step summary and as at most ten annotations; this is best effort, never changes the verdict or exit code, and fences or escapes candidate text; before saving the code job cache, the job drops workspace artifacts on the same default-branch condition (spec 060)",
+    "revision 20: reviewer calls stream partial events; 180 seconds of silence stops a call and retries it once with fresh cwd and home, a second stall skips as transient, and the review job allows 20 minutes (spec 061)",
     "a repository that already runs these checks by hand keeps them by setting governance.enforce_coverage (index coverage --fail-on-untraced), governance.authored_content (the script's path; absent or not executable refuses), governance.authored_content_text (the title, the body and every commit message), governance.gate_each_commit (each commit's tree passes the gate and cargo fmt) and governance.require_signed_commits (each commit verified as signed by GitHub) (revision 4)"
   ],
   "review": {
@@ -325,5 +326,5 @@
     "tool": "claude-code",
     "tool_version": "2.1.116"
   },
-  "revision": 19
+  "revision": 20
 }
