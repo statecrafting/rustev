@@ -122,7 +122,13 @@ test('a host backend resolving after the deadline is discarded and counted', asy
   const topic = r.evidence.requests.find((q) => q.step === 'topic');
   assert.deepEqual(topic.result, { failed: 'deadline_exceeded' });
   late();
-  await until(() => backendGauge(e).lateResolutionsDiscarded === 1);
+  // On a timeout, say what the seam saw: an intermittent CI failure here
+  // (2026-10-24, after the fix for one race) needs the counts to diagnose.
+  try {
+    await until(() => backendGauge(e).lateResolutionsDiscarded === 1);
+  } catch (err) {
+    throw new Error(`${err.message}; gauges: ${JSON.stringify(e.gauges())}`);
+  }
 });
 
 test('a plain Error is permanent with an unknown charge and possibly continuing work', async () => {
