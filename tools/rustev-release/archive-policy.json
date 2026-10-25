@@ -53,6 +53,7 @@
         "src/run.rs",
         "src/schema_emit.rs",
         "src/scope.rs",
+        "src/screening.rs",
         "src/serve.rs",
         "src/snapshot.rs",
         "src/source.rs",

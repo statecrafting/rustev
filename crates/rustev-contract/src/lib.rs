@@ -43,6 +43,7 @@ pub mod retention;
 pub mod run;
 pub mod schema_emit;
 pub mod scope;
+pub mod screening;
 pub mod snapshot;
 pub mod source;
 pub mod time;

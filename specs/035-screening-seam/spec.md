@@ -56,6 +56,8 @@ extends:
   - { spec: "030-bedrock-backend", unit: { kind: directory, path: "integrations/rustev-bedrock/" }, nature: additive }
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-node/" }, nature: additive }
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-wasm/" }, nature: additive }
+  # A new contract source file joins rustev-contract's reviewed archive list.
+  - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
   # Adds 035 to `make verify` when the implementation is complete.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
 depends_on:
@@ -818,6 +820,26 @@ that use none of them keep their bytes and identities
 (`crates/rustev-contract/tests/screening_wire.rs`, 3.18.1). Elsewhere
 only absent-member initializers and regenerated schemas and binding
 types change.
+
+**Increment 1, part 2 (2026-10-24): the definition and plan `screening`
+members.** `rustev.definition/2` gains the optional `screening` block of
+3.4 (`crates/rustev-contract/src/screening.rs`), checked at parse only for
+what is local to the document: `max_text_units` positive, 1 to 32 entries
+and 1 to 32 field references each, reference syntax, non-empty names, and
+an override `address` with a non-empty reason. An override naming
+`caller` parses, because compilation refuses it as spec 033's
+`caller_cannot_act` (3.5.7). A `screening` member in a
+`rustev.definition/1` is refused at compile, category 11, detail
+`requires-definition-2`, as spec 033's constructs are. `rustev.plan/3`
+gains the optional `screening` member of 3.5.8 (the canonical block and
+each lowered step's entry, field, screener binding and consequence),
+refused in an earlier plan version; compilation does not fill it yet.
+Both members are omitted when absent and refused when explicitly `null`,
+and documents without them keep their bytes and identities. Until the
+core increment admits screening, a `rustev.definition/2` that uses
+`screening` and no construct of spec 032 or 033 is refused by the existing
+version check. `screening.rs` joins rustev-contract's reviewed archive
+list in `tools/rustev-release/archive-policy.json`.
 
 ## Facts relied on
 

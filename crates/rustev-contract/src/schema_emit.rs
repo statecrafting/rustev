@@ -130,6 +130,11 @@ fn plan_members(version: &str) -> impl FnOnce(&mut serde_json::Value) + '_ {
                 .expect("the plan has properties")
                 .remove("instantiation")
                 .expect("the plan has an instantiation member");
+            v["properties"]
+                .as_object_mut()
+                .unwrap()
+                .remove("screening")
+                .expect("the plan has a screening member");
             prune_defs(v);
         }
     }

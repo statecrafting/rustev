@@ -136,6 +136,7 @@ impl DefinitionBuilder {
             policy: self.policy,
             limits: self.limits.ok_or(MissingLimits)?,
             actionability: None,
+            screening: None,
         })
     }
 }
