@@ -88,9 +88,11 @@ impl AcquisitionSource for Source {
         };
         let ambiguous = serde_json::to_value(&call.request.fields).unwrap()
             == json!([{"set":{"value":"ambiguous"}}]);
+        let oversized = serde_json::to_value(&call.request.fields).unwrap()
+            == json!([{"set":{"value":"oversized"}}]);
         Box::pin(async move {
             let next = if matches!(call.request.page, RequestPage::First) {
-                json!({"offset":{"integer":1}})
+                json!({"offset":{"integer":if oversized { 3 } else { 1 }}})
             } else {
                 json!("none")
             };
@@ -99,7 +101,7 @@ impl AcquisitionSource for Source {
                     Err((AcquisitionFailure::Denied, "denied".into()))
                 } else {
                     Ok(serde_json::to_vec(&json!({"schema":"rustev.acquisition-page/1","request":call.request_id,
-                        "as_of_ms":NOW-10,"items":[{"id":if ambiguous { ordinal } else if matches!(call.request.page, RequestPage::First) { 1 } else { 2 }}],"next":next})).unwrap())
+                        "as_of_ms":NOW-10,"items":if oversized { json!([{"id":1},{"id":2},{"id":3}]) } else { json!([{"id":if ambiguous { ordinal } else if matches!(call.request.page, RequestPage::First) { 1 } else { 2 }}]) },"next":next})).unwrap())
                 },
                 charge: Charge::Observed { units: 1 },
                 cancel: CancelAck::NotRequested,
@@ -527,4 +529,56 @@ async fn removing_all_pages_still_finishes_with_missing_evidence() {
             .contains("missing_evidence")
     );
     assert_eq!(c.source.calls.lock().unwrap().len(), 7);
+}
+
+#[tokio::test]
+async fn paging_stop_reasons_and_truncation_reproduce_without_dispatch() {
+    for (pages, items, stop, oversized, reason, truncated) in [
+        (2, 8, json!("none"), false, "exhausted", 0),
+        (
+            2,
+            8,
+            json!({"items_at_least":{"count":{"lit":{"integer":1}}}}),
+            false,
+            "stop_condition",
+            0,
+        ),
+        (1, 8, json!("none"), false, "page_limit", 0),
+        (2, 2, json!("none"), true, "item_limit", 1),
+    ] {
+        let mut d = definition();
+        let StepBody::Acquire(a) = &mut d.steps[0].body else {
+            panic!()
+        };
+        a.limits.max_pages = pages;
+        a.limits.max_items = items;
+        a.stop = serde_json::from_value(stop).unwrap();
+        if oversized {
+            a.request.insert(
+                "q".into(),
+                serde_json::from_value(json!({"lit":{"text":"oversized"}})).unwrap(),
+            );
+        }
+        let c = capture(d, empty_snapshot(), false, 1_000_000).await;
+        let calls = c.source.calls.lock().unwrap().len();
+        let r = reproduced(replay(&c.bundle));
+        let CoreEvidence::Recorded(e) = &r.run().core else {
+            panic!()
+        };
+        let a = e
+            .acquisitions
+            .as_ref()
+            .unwrap()
+            .iter()
+            .find(|a| a.step == "lookup0")
+            .unwrap();
+        assert_eq!(serde_json::to_value(a.stopped_by).unwrap(), json!(reason));
+        assert_eq!(a.truncated, truncated);
+        assert_eq!(r.judgment().notices.len(), truncated as usize);
+        assert_eq!(
+            r.judgment().record_canonical().unwrap(),
+            e.judgment.record_canonical().unwrap()
+        );
+        assert_eq!(c.source.calls.lock().unwrap().len(), calls);
+    }
 }

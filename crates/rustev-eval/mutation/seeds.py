@@ -40,7 +40,7 @@ REQUIRED = [
 # run them a second time in CI; `seeds.sh "spec 023"`, `live-comparison` and
 # `"spec 029"` still run and require every one. A spec whose acceptance
 # starts filtering its own seeds joins this list.
-OWN_RUNS = ("spec 023", "live-comparison", "spec 029", "spec 040", "spec 035")
+OWN_RUNS = ("spec 023", "live-comparison", "spec 029", "spec 040", "spec 035", "spec 036")
 # Generous: a new test binary can wait on the OS before it starts.
 TEST_TIMEOUT_S = 1800
 
@@ -426,6 +426,102 @@ SEEDS += [
      ["rustev-runtime"]),
 ]
 
+
+# Spec 036: each seed runs the crate that owns the affected acceptance.
+SEEDS += [
+    (
+        'spec 036',
+        'a protected field patched',
+        'crates/rustev-core/src/acquisition.rs',
+        'if w.groups[g].iter().any(|f| t.request_patch.contains_key(f)) {',
+        'if false && w.groups[g].iter().any(|f| t.request_patch.contains_key(f)) {',
+        ['rustev-core'],
+    ),
+    (
+        'spec 036',
+        'a skipped value treated as empty',
+        'crates/rustev-core/src/acquisition_eval.rs',
+        'self.skipped.insert(id.into(), guard.clone());',
+        'self.exact.insert(id.into(), Ok(Value::List(vec![])));',
+        ['rustev-core'],
+    ),
+    (
+        'spec 036',
+        'a retry on denied',
+        'crates/rustev-runtime/src/acquisition.rs',
+        """AcquisitionAttemptEnd::Denied => (
+                None,""",
+        """AcquisitionAttemptEnd::Denied => (
+                Some(FailureClass::Transient),""",
+        ['rustev-runtime'],
+    ),
+    (
+        'spec 036',
+        'a truncation without notice',
+        'crates/rustev-core/src/widening_eval.rs',
+        'if s.evidence.truncated > 0 {',
+        'if false && s.evidence.truncated > 0 {',
+        ['rustev-core'],
+    ),
+    (
+        'spec 036',
+        'tier order reversed',
+        'crates/rustev-core/src/widening_eval.rs',
+        'decl: decl.clone(),',
+        'decl: { let mut reversed = decl.clone(); reversed.tiers.reverse(); reversed },',
+        ['rustev-core'],
+    ),
+    (
+        'spec 036',
+        'an uncaptured page dispatched in replay',
+        'crates/rustev-eval/src/acquisition_replay.rs',
+        """        ev.supply_acquisition_failure(
+            &p.step,
+            p.tier_index,
+            p.page_index,
+            Unresolved::MissingEvidence {
+                fields: vec![p.step.clone()],
+            },
+        )""",
+        """        // Seed only: an offline miss incorrectly dispatches to a synthetic source.
+        // This source does no I/O; dispatch itself violates replay's contract.
+        use rustev_core::seams::*;
+        struct Fallback;
+        impl AcquisitionSource for Fallback {
+            fn descriptor(&self) -> &rustev_contract::source::SourceDescriptor {
+                unreachable!("the seed dispatches directly")
+            }
+            fn cost_bound(&self, _: &rustev_contract::acquisition::AcquisitionRequest)
+                -> rustev_contract::run::CostBound {
+                rustev_contract::run::CostBound::Bounded { max_units: 0 }
+            }
+            fn acquire<'a>(&'a self, call: AcquireCall<'a>) -> BoxFuture<'a, AcquireReport> {
+                Box::pin(async move { AcquireReport {
+                    result: Ok(serde_json::to_vec(&serde_json::json!({
+                        "schema":"rustev.acquisition-page/1", "request":call.request_id,
+                        "as_of_ms":0, "items":[], "next":"none"
+                    })).unwrap()),
+                    charge: rustev_contract::run::Charge::Observed { units: 0 },
+                    cancel: CancelAck::NotRequested,
+                } })
+            }
+        }
+        let cx = CallContext {
+            remaining_ms: rustev_contract::time::DurationMs(1),
+            trace_id: "seed".into(), principal_handle: vec![],
+        };
+        let source = Fallback;
+        let mut work = source.acquire(AcquireCall {
+            operation: &p.request.operation, request: &p.request, request_id: &p.request_id,
+            attempt_id: "seed", cancel: CancelSignal::new(), cx: &cx,
+        });
+        let mut task = std::task::Context::from_waker(std::task::Waker::noop());
+        let std::task::Poll::Ready(report) = work.as_mut().poll(&mut task) else { unreachable!() };
+        drop(work);
+        ev.supply_page(&p.step, p.tier_index, p.page_index, &report.result.unwrap())""",
+        ['rustev-eval'],
+    ),
+]
 
 def run(cmd, cwd, env, timeout=None):
     # A session of its own, so a timeout kills the test binaries too.

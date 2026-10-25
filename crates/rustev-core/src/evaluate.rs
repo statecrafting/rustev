@@ -3193,6 +3193,16 @@ impl View for Evaluation<'_> {
             if base != r && base.starts_with("step:") {
                 self.status(&base)?;
                 let (id, path) = crate::expr::split_step(r.trim_start_matches("step:"));
+                if path.iter().any(|p| p == "*") {
+                    return crate::expr::eval_ref(r, &self.scope())
+                        .map(Seen::Projected)
+                        .map_err(|f| match f {
+                            crate::expr::Fault::Absent(p) | crate::expr::Fault::Missing(p) => {
+                                Unresolved::missing([p])
+                            }
+                            other => Unresolved::invalid([], format!("{other:?}")),
+                        });
+                }
                 let mut v = self
                     .exact_values
                     .get(&id)
