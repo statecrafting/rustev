@@ -79,6 +79,9 @@ pub enum Category {
     UnscreenedText = 19,
     InvalidAcquisition = 20,
     SourceMapping = 21,
+    InvalidGeneration = 22,
+    Template = 23,
+    ModelOutputFlow = 24,
 }
 
 /// Why one candidate backend cannot serve a step.
@@ -111,6 +114,13 @@ pub enum ShortfallReason {
     ArtifactPin {
         pinned: String,
         offered: String,
+    },
+    OutputLimit {
+        max: u64,
+        needed: u64,
+    },
+    Language {
+        required: String,
     },
 }
 
@@ -163,6 +173,7 @@ fn refuse<T>(
 /// What the compiler knows about each step, kept for evaluation.
 #[derive(Debug, Clone)]
 pub(crate) enum StepInfo {
+    Generate,
     Acquisition(Box<crate::acquisition::Acquisition>),
     Exact {
         args: OpArgs,
@@ -299,6 +310,9 @@ impl Compiled {
             calibrations.iter().filter_map(|c| c.id().ok()).collect();
         let mut needed: Vec<(String, &DescriptorId)> = vec![];
         for step in &plan.steps {
+            if let PlanStepDetail::Generate(b) = &step.detail {
+                needed.push((b.backend_id.clone(), &b.descriptor));
+            }
             if let PlanStepDetail::Semantic(b) = &step.detail {
                 needed.push((b.backend_id.clone(), &b.descriptor));
                 if let BoundCalibration::Bound { id, .. } = &b.calibration
@@ -421,13 +435,22 @@ fn recompile(
             })
         })?;
     }
-    let mut c = compile_instantiated(
+    let templates: Vec<_> = plan
+        .steps
+        .iter()
+        .filter_map(|s| match &s.detail {
+            PlanStepDetail::Generate(g) => Some(g.template.clone()),
+            _ => None,
+        })
+        .collect();
+    let mut c = compile_generation(
         &plan.definition,
         descriptors,
         calibrations,
         sources,
         execution,
         plan.instantiation.is_some(),
+        &templates,
     )
     .map_err(Recompiled::Refused)?;
     #[cfg(feature = "parameterized")]
@@ -722,6 +745,48 @@ pub(crate) fn compile_instantiated(
     execution: Option<&ExecutionPolicy>,
     #[cfg_attr(not(feature = "parameterized"), allow(unused_variables))] instantiated: bool,
 ) -> Result<Compiled, Refusal> {
+    compile_generation(
+        def,
+        descriptors,
+        calibrations,
+        sources,
+        execution,
+        instantiated,
+        &[],
+    )
+}
+
+/// Compile generation with supplied prompt documents, alongside ordinary dependencies.
+pub fn compile_with_templates(
+    def: &Definition,
+    descriptors: &[BackendDescriptor],
+    calibrations: &[CalibrationArtifact],
+    sources: &[SourceDescriptor],
+    execution: Option<&ExecutionPolicy>,
+    templates: &[rustev_contract::generation::PromptTemplate],
+) -> Result<Compiled, Refusal> {
+    compile_generation(
+        def,
+        descriptors,
+        calibrations,
+        sources,
+        execution,
+        false,
+        templates,
+    )
+}
+
+fn compile_generation(
+    def: &Definition,
+    descriptors: &[BackendDescriptor],
+    calibrations: &[CalibrationArtifact],
+    sources: &[SourceDescriptor],
+    execution: Option<&ExecutionPolicy>,
+    instantiated: bool,
+    templates: &[rustev_contract::generation::PromptTemplate],
+) -> Result<Compiled, Refusal> {
+    #[cfg(not(feature = "parameterized"))]
+    let _ = instantiated;
     use Category as C;
 
     // (a) Parse and bound: schema, and decoding of registered operators'
@@ -882,16 +947,8 @@ pub(crate) fn compile_instantiated(
             ),
         );
     }
-    // Spec 037 contract increment: compilation is deliberately unavailable.
-    for s in &def.steps {
-        if matches!(s.body, StepBody::Generate(_)) {
-            return refuse(
-                C::InvalidDefinition,
-                format!("step:{}", s.id),
-                "generation-not-compiled",
-            );
-        }
-    }
+    crate::generation::isolation(def, execution)?;
+    crate::generation::structure(def)?;
     // Supplied backend ids must be unique.
     let mut backend_ids = BTreeSet::new();
     for d in descriptors {
@@ -970,13 +1027,7 @@ pub(crate) fn compile_instantiated(
             )?;
         }
         match &s.body {
-            StepBody::Generate(_) => {
-                return refuse(
-                    C::InvalidDefinition,
-                    format!("step:{}", s.id),
-                    "generation-not-compiled",
-                );
-            }
+            StepBody::Generate(_) => {}
             // Refused above outside plan 3, whose own structure is checked by
             // `quality::structure`; here only the references are resolved.
             StepBody::Acquire(_) | StepBody::Widen(_) => {
@@ -1232,13 +1283,7 @@ pub(crate) fn compile_instantiated(
     for s in &def.steps {
         let subject = format!("step:{}", s.id);
         match &s.body {
-            StepBody::Generate(_) => {
-                return refuse(
-                    C::InvalidDefinition,
-                    format!("step:{}", s.id),
-                    "generation-not-compiled",
-                );
-            }
+            StepBody::Generate(_) => {}
             StepBody::Acquire(_) | StepBody::Widen(_) => {
                 crate::acquisition::resolve(&s.id, &s.body, sources)?;
             }
@@ -1289,6 +1334,8 @@ pub(crate) fn compile_instantiated(
         }
     }
 
+    let prompts = crate::generation::resolve(def, templates)?;
+
     // (c) continued: bind every source a graded input names (spec 032,
     // 3.3.4). A version 1 definition binds none.
     let mut bound = if v2 {
@@ -1301,7 +1348,7 @@ pub(crate) fn compile_instantiated(
     let mut deps: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for s in &def.steps {
         let mut refs: Vec<String> = match &s.body {
-            StepBody::Generate(_) => Vec::new(),
+            StepBody::Generate(g) => crate::generation::dependencies(g, def),
             StepBody::Acquire(_) | StepBody::Widen(_) => crate::acquisition::refs(&s.body),
             StepBody::Corroborate(c) => corroborate_refs(c),
             StepBody::Exact(_) => decoded[&s.id].refs(),
@@ -1365,11 +1412,7 @@ pub(crate) fn compile_instantiated(
         };
         match &s.body {
             StepBody::Generate(_) => {
-                return refuse(
-                    C::InvalidDefinition,
-                    format!("step:{}", s.id),
-                    "generation-not-compiled",
-                );
+                infos.insert(id.clone(), StepInfo::Generate);
             }
             StepBody::Acquire(_) | StepBody::Widen(_) => {
                 let a = crate::acquisition::compile(
@@ -1551,6 +1594,14 @@ pub(crate) fn compile_instantiated(
     }
 
     screening::coverage(authored, &screens, &decoded)?;
+    let generated = crate::generation::type_check(
+        def,
+        &prompts,
+        &input_tys,
+        &step_tys,
+        &acquisition_derivations,
+        &deps,
+    )?;
 
     // (e) continued: spec 033's checks and remediation parameters (3.8.1).
     crate::actionable::types(def, &input_tys, v2)?;
@@ -1569,6 +1620,9 @@ pub(crate) fn compile_instantiated(
         }
         for id in &order {
             let tree = match &infos[id] {
+                StepInfo::Generate => {
+                    quality::Ceil::leaf(rustev_contract::grade::ValueGrade::Ungraded, false)
+                }
                 StepInfo::Acquisition(a) => a.tree.clone(),
                 StepInfo::Exact { args, .. } => quality::step_tree(args, &trees),
                 StepInfo::Semantic { decl, .. } => quality::semantic_tree(decl, &trees),
@@ -1590,7 +1644,7 @@ pub(crate) fn compile_instantiated(
                 StepInfo::Corroborate { decl, .. } => {
                     quality::corroborate_refusal(&subject, decl, &trees)
                 }
-                StepInfo::Semantic { .. } => None,
+                StepInfo::Generate | StepInfo::Semantic { .. } => None,
             };
             if let Some(r) = found {
                 return Err(r);
@@ -1633,12 +1687,10 @@ pub(crate) fn compile_instantiated(
     for s in &def.steps {
         let subject = format!("step:{}", s.id);
         let d = match &s.body {
-            StepBody::Generate(_) => {
-                return refuse(
-                    C::InvalidDefinition,
-                    format!("step:{}", s.id),
-                    "generation-not-compiled",
-                );
+            StepBody::Generate(g) => {
+                let binding = crate::generation::bind(&s.id, g, &generated[&s.id], &sorted)?;
+                details.insert(s.id.clone(), PlanStepDetail::Generate(Box::new(binding)));
+                continue;
             }
             StepBody::Semantic(d) => d,
             StepBody::Exact(e) => {
@@ -1863,7 +1915,7 @@ pub(crate) fn compile_instantiated(
     // (g) Budget.
     screening::budget(authored, &screens, descriptors)?;
     crate::acquisition::budget(def, sources, execution)?;
-    let mut total: u64 = 0;
+    let mut total: u64 = crate::generation::budget(def, &details)?;
     for s in &def.steps {
         if let Some(PlanStepDetail::Semantic(b)) = details.get(&s.id) {
             total = total.saturating_add(b.max_requests);
@@ -2150,6 +2202,7 @@ fn extend_reasons_v2(
                     rustev_contract::definition::OnContradiction::TreatAsHint => {}
                 }
             }
+            StepInfo::Generate => {}
             StepInfo::Acquisition(_) | StepInfo::Semantic { .. } => {
                 for d in &deps[id] {
                     add.extend(reasons.get(d).cloned().unwrap_or_default());
@@ -2466,6 +2519,7 @@ fn possible_reasons(
     for id in order {
         let mut r = BTreeSet::new();
         match (&infos[id], &details[id]) {
+            (StepInfo::Generate, _) => {}
             (StepInfo::Acquisition(a), _) => {
                 r.extend([
                     K::MissingEvidence,
@@ -2862,7 +2916,7 @@ fn static_derivations(
     let semantic: BTreeSet<&str> = def
         .steps
         .iter()
-        .filter(|s| matches!(s.body, StepBody::Semantic(_)))
+        .filter(|s| matches!(s.body, StepBody::Semantic(_) | StepBody::Generate(_)))
         .map(|s| s.id.as_str())
         .collect();
     let mut out: BTreeMap<String, Derivation> = BTreeMap::new();

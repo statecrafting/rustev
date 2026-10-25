@@ -9867,6 +9867,102 @@
     },
     {
       "argv": [
+        "plan",
+        "check",
+        "--definition",
+        "definition.json"
+      ],
+      "command": "plan check",
+      "derived": [],
+      "exit": 5,
+      "id": "refusal-22",
+      "inputs": [
+        {
+          "name": "definition.json",
+          "path": "tools/rustev-conformance/fixtures/cli/refusal-22/definition.json",
+          "sha256": "4b2cec2ca35f80f6864c34ba12377d0642f72eaabce783cd78d8773ca835cc60"
+        }
+      ],
+      "outputs": [
+        {
+          "golden": "crates/rustev-cli/tests/golden/refusal-22.json",
+          "normalize": [],
+          "sha256": "83de4fa1797ae0aa3db01c972964fcf55d770483949031652d5c32fcb0669442",
+          "stream": "stdout"
+        }
+      ],
+      "surfaces": [
+        "cli",
+        "native",
+        "wasm"
+      ]
+    },
+    {
+      "argv": [
+        "plan",
+        "check",
+        "--definition",
+        "definition.json"
+      ],
+      "command": "plan check",
+      "derived": [],
+      "exit": 5,
+      "id": "refusal-23",
+      "inputs": [
+        {
+          "name": "definition.json",
+          "path": "tools/rustev-conformance/fixtures/cli/refusal-23/definition.json",
+          "sha256": "99ed67753f30484e3ec7d4ab78988d4b17e1b18bfc813bcf4633974b3d345e68"
+        }
+      ],
+      "outputs": [
+        {
+          "golden": "crates/rustev-cli/tests/golden/refusal-23.json",
+          "normalize": [],
+          "sha256": "3fc087e9920e92c85054cc0430b35c8aded94c5fa4923043cc6c89968eebb832",
+          "stream": "stdout"
+        }
+      ],
+      "surfaces": [
+        "cli",
+        "native",
+        "wasm"
+      ]
+    },
+    {
+      "argv": [
+        "plan",
+        "check",
+        "--definition",
+        "definition.json"
+      ],
+      "command": "plan check",
+      "derived": [],
+      "exit": 5,
+      "id": "refusal-24",
+      "inputs": [
+        {
+          "name": "definition.json",
+          "path": "tools/rustev-conformance/fixtures/cli/refusal-24/definition.json",
+          "sha256": "e6d30aa28331449e0b336bd9f3b5892295f473b8b851146ab293580e8ebbe11f"
+        }
+      ],
+      "outputs": [
+        {
+          "golden": "crates/rustev-cli/tests/golden/refusal-24.json",
+          "normalize": [],
+          "sha256": "934546a846774f06be0197d8ff78bc36eaca815057f39bd7e695eccc3d312852",
+          "stream": "stdout"
+        }
+      ],
+      "surfaces": [
+        "cli",
+        "native",
+        "wasm"
+      ]
+    },
+    {
+      "argv": [
         "eval",
         "candidates",
         "--dataset",

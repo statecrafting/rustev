@@ -1,0 +1,1 @@
+{"category":24,"category_name":"model_output_flow","command":"plan check","detail":"generated value step:item_text is not readable","shortfalls":[],"status":"refused","subject":"step:item_text"}
