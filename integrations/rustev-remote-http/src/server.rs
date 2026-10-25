@@ -539,6 +539,24 @@ async fn run_items(
             "the hosted descriptor or artifact differs from the negotiated one",
         ));
     }
+    // Spec 035 3.15.3 is per backend, not per item: "A request with more
+    // than one item for a backend whose screening capability declares
+    // `isolation: per_item` fails every item with `capability` before the
+    // backend is called." The client's guard (3.15.2) is per item because it
+    // decides what to coalesce; the server refuses any multi-item request to
+    // such a backend.
+    if req.items.len() > 1
+        && descriptor.operations.iter().any(|o| {
+            o.screen.is_some()
+                && o.isolation == Some(rustev_contract::descriptor::Isolation::PerItem)
+        })
+    {
+        return Ok(refused_all(
+            req,
+            RemoteCode::Capability,
+            "the screening capability requires per-item isolation",
+        ));
+    }
     let max_items = match state.config.batching {
         Batching::None => 1,
         Batching::SharedState { max_items } => (max_items as usize).min(MAX_ITEMS),
