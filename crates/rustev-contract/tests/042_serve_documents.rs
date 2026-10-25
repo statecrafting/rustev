@@ -393,6 +393,22 @@ fn configuration_maps_and_listeners_are_bounded() {
 }
 
 #[test]
+fn compiler_refusal_carries_screener_shortfalls() {
+    // Spec 035, 3.5.4: the shortfall kinds rustev-surface emits for a screener.
+    let compiler = json!({"command":"plan compile","status":"refused","category":5,
+        "category_name":"no_capable_backend","subject":"step:screen:caller_text:0","detail":"no capable backend",
+        "shortfalls":[{"backend_id":"input-screen","reasons":[
+            {"kind":"screen_profile"},
+            {"kind":"screen_text_limit","max":64,"needed":128},
+            {"kind":"screen_input_excess"}]}]});
+    let mut v = refusal();
+    v["code"] = json!("compile_refused");
+    v["compile_refusal"] = json!({"document": compiler});
+    let r = parse::<ServeRefusal>(&v);
+    assert!(r.is_ok(), "{:?}", r.err());
+}
+
+#[test]
 fn compiler_refusal_preserves_bytes_and_enforces_two_kib() {
     let compiler = json!({"command":"plan compile","status":"refused","category":1,"category_name":"parse","subject":"input","detail":"bad","shortfalls":[]}).to_string();
     for n in [2048, 2049] {

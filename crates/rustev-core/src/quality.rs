@@ -91,6 +91,7 @@ pub(crate) fn uses_track_construct(def: &Definition, decoded: &BTreeMap<String, 
         || policy_conds(def).any(|(_, c)| cond_uses_v2(c))
         // Spec 033's constructs are #76 track constructs too.
         || crate::actionable::first_construct(def).is_some()
+        || def.screening.is_some()
 }
 
 fn cond_uses_v2(c: &Cond) -> bool {

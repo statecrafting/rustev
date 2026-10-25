@@ -34,11 +34,18 @@ pub fn category_name(c: Category) -> &'static str {
         // Spec 033, 3.11.1: printed like every category.
         Category::UncoveredProvenance => "uncovered_provenance",
         Category::CallerCannotAct => "caller_cannot_act",
+        Category::InvalidScreening => "invalid_screening",
+        Category::UnscreenedText => "unscreened_text",
     }
 }
 
 fn reason_json(r: &ShortfallReason) -> Value {
     match r {
+        ShortfallReason::ScreenProfile => json!({"kind": "screen_profile"}),
+        ShortfallReason::ScreenTextLimit { max, needed } => {
+            json!({"kind": "screen_text_limit", "max": max, "needed": needed})
+        }
+        ShortfallReason::ScreenInputExcess => json!({"kind": "screen_input_excess"}),
         ShortfallReason::UnknownBackend => json!({"kind": "unknown_backend"}),
         ShortfallReason::Operation(op) => json!({"kind": "operation", "operation": op}),
         ShortfallReason::OutputKind { offered, required } => {

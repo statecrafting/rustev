@@ -1802,6 +1802,9 @@ impl<'c> Evaluation<'c> {
         key: &[String],
         candidates: &[String],
     ) -> Result<Vec<u8>, Unresolved> {
+        if decl.requires == rustev_contract::definition::RequiredKind::ScreenVerdict {
+            return crate::compile::screening::request_projection(decl, key, &self.input_values);
+        }
         let mut values = Map::new();
         let mut instance = Map::new();
         for (f, id) in decl.for_each.iter().zip(key) {

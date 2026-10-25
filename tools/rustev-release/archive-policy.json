@@ -77,6 +77,7 @@
         "src/builder.rs",
         "src/calibrate.rs",
         "src/compile.rs",
+        "src/compile/screening.rs",
         "src/dynamic.rs",
         "src/evaluate.rs",
         "src/execution.rs",

@@ -47,6 +47,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rustev-surface/",
+        "source": "spec-edge"
+      },
+      {
         "path": "integrations/rustev-bedrock/",
         "source": "spec-edge"
       },
@@ -68,6 +72,10 @@
       },
       {
         "path": "integrations/rustev-wasm/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "tools/rustev-conformance/",
         "source": "spec-edge"
       },
       {
@@ -157,6 +165,19 @@
       {
         "locations": [
           {
+            "file": "crates/rustev-surface/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-surface/"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "integrations/rustev-bedrock/"
           }
         ],
@@ -235,6 +256,19 @@
       {
         "locations": [
           {
+            "file": "tools/rustev-conformance/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-conformance/"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "tools/rustev-release/"
           }
         ],
@@ -289,5 +323,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "94105e70457eac9377876b65d24b7a442b462ada90ea5a686934734a7449d9f6"
+  "shardHash": "2d13cd969b3cea9d3b406a29c8d728eea52029ae1ee9cf636f12217666226fbb"
 }

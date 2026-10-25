@@ -1,0 +1,1 @@
+{"category":18,"category_name":"invalid_screening","command":"plan check","detail":"fail_open on caller-supplied text","shortfalls":[],"status":"refused","subject":"screening:caller_text"}

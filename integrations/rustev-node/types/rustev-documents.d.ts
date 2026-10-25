@@ -15332,7 +15332,7 @@ export namespace RustevServeRefusal1 {
           length: Number_2049_18446744073709551615;
         };
       };
-  export type Number_1_17 = number;
+  export type Number_1_19 = number;
   /**
    * Length is enforced in decoded UTF-8 bytes by the parser.
    */
@@ -15374,6 +15374,17 @@ export namespace RustevServeRefusal1 {
         kind: "artifact_pin";
         offered: ContentDigest;
         pinned: ContentDigest;
+      }
+    | {
+        kind: "screen_profile";
+      }
+    | {
+        kind: "screen_text_limit";
+        max: number;
+        needed: number;
+      }
+    | {
+        kind: "screen_input_excess";
       };
   /**
    * The four semantic operations (R-05).
@@ -15418,7 +15429,7 @@ export namespace RustevServeRefusal1 {
     schema: "rustev.serve-refusal/1";
   }
   export interface CompilerRefusalFields {
-    category: Number_1_17;
+    category: Number_1_19;
     category_name: Text_1_2048;
     command: Text_1_2048;
     detail: Text_0_2048;
