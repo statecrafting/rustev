@@ -723,6 +723,8 @@ impl Runtime {
         cancel: &CancelSignal,
         capture: &CaptureConfig,
     ) -> Result<CapturedDecision, CaptureConfigError> {
+        // Spec 036, 3.15.1 admits every plan 3 decision; generation capture
+        // (spec 037, 3.15.3) shares the acquisition and semantic supply order.
         capture.check()?;
         let decision_id = req.decision_id.clone();
         let mut capturing = capture::Capturing::new(capture);
@@ -773,7 +775,7 @@ impl Runtime {
         plan: &PreparedPlan,
         req: DecisionRequest,
         cancel: &CancelSignal,
-        capture: Option<&mut capture::Capturing<'_>>,
+        mut capture: Option<&mut capture::Capturing<'_>>,
         live: Option<&live::LiveCtx<'_>>,
         observer: Option<&dyn ProgressObserver>,
         streaming: Option<&generation::Streaming>,
@@ -867,7 +869,7 @@ impl Runtime {
                 live,
                 observing: observing.as_ref(),
             };
-            driver::run_requests(&cx, capture).await
+            driver::run_requests(&cx, capture.as_deref_mut()).await
         };
         let ev = ev.into_inner().unwrap_or_else(|e| e.into_inner());
         let stage_cx = generation::StageContext {
@@ -901,7 +903,7 @@ impl Runtime {
             // backend failures resolve through backstops and still deliver evidence
             // (037 3.10.2, 3.12.7, 3.15.2); they do not take this error path.
             let (generation_requests, pending_writes, was_cancelled) =
-                generation::run(&stage_cx, &stage)
+                generation::run(&stage_cx, &stage, capture)
                     .await
                     .map_err(|e| DecideError::GenerationFailed(e.to_string()))?;
             requests.extend(generation_requests);

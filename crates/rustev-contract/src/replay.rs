@@ -329,6 +329,7 @@ impl ReplayBundle {
             return Err(BundleError::Schema(self.schema.chars().take(80).collect()));
         }
         let v2 = self.schema == schema::REPLAY_V2;
+        // Replay 2 permits absent sources and pages, including source-free plans.
         if !v2 && (self.sources.is_some() || self.acquisition_pages.is_some()) {
             return Err(BundleError::Role {
                 location: ItemLocation::Bundle,

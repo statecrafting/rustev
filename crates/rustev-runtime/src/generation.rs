@@ -378,6 +378,7 @@ type Running<'a> = Pin<Box<dyn Future<Output = Result<Finished, GenerationError>
 pub(crate) async fn run(
     cx: &StageContext<'_>,
     stage: &Mutex<GenerationEvaluation<'_>>,
+    mut capture: Option<&mut crate::capture::Capturing<'_>>,
 ) -> Result<(Vec<RequestRecord>, Vec<PendingWrite>, bool), GenerationError> {
     let start = cx.rt.clock.now();
     let mut budgets = BTreeMap::new();
@@ -490,6 +491,9 @@ pub(crate) async fn run(
                     )
                 });
             let mut g = stage.lock().unwrap_or_else(|e| e.into_inner());
+            if let Some(c) = capture.as_deref_mut() {
+                c.record_generation(&g, cx.plan, &out.record, &supplied);
+            }
             g.supply_attempt(
                 &out.step,
                 &out.instance,

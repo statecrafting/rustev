@@ -249,6 +249,9 @@ fn plan_parts(plan: &Plan) -> (Vec<ArtifactId>, Vec<CalibrationId>) {
     let mut artifacts = BTreeSet::new();
     let mut calibrations = BTreeSet::new();
     for s in &plan.steps {
+        if let PlanStepDetail::Generate(b) = &s.detail {
+            artifacts.insert(b.artifact.clone());
+        }
         if let PlanStepDetail::Semantic(b) = &s.detail {
             artifacts.insert(b.artifact.clone());
             if let BoundCalibration::Bound { id, .. } = &b.calibration {
@@ -635,6 +638,11 @@ fn evaluate_inner(
             count(cost.unknown_attempts),
         ));
         ms.push(metric("cost_liability_units", count(cost.liability_units)));
+    }
+    // Candidate comparison does not execute generation; historical text is
+    // never attributed to a candidate plan.
+    if inputs.candidate.is_none() {
+        ms.extend(metrics::generation(&runs));
     }
     let declared: BTreeSet<&str> = config.metrics.iter().map(|m| m.name.as_str()).collect();
     for m in &ms {

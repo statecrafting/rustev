@@ -118,7 +118,18 @@ impl<'a> Capturing<'a> {
         if self.exceeded {
             return;
         }
-        let mut entry = self.entry(ev, plan, record, supplied);
+        let request = record.supplied_from().and_then(|from| {
+            ev.request_document(
+                &record.step,
+                &record.instance,
+                from.target,
+                &self.config.scope,
+            )
+            .ok()?
+            .id()
+            .ok()
+        });
+        let mut entry = request.and_then(|request| self.entry(request, plan, record, supplied));
         if let Some((entry, _)) = &mut entry
             && plan.compiled.plan.schema == schema::PLAN_V3
         {
@@ -128,6 +139,33 @@ impl<'a> Capturing<'a> {
                     determinism: c.determinism,
                 });
         }
+        self.push(entry);
+    }
+
+    /// Capture generation before supplying it, including a cache hit's origin.
+    pub fn record_generation(
+        &mut self,
+        stage: &rustev_core::generation_eval::GenerationEvaluation<'_>,
+        plan: &PreparedPlan,
+        record: &RequestRecord,
+        supplied: &Supplied,
+    ) {
+        if self.exceeded {
+            return;
+        }
+        let request = record.supplied_from().and_then(|from| {
+            stage
+                .request_document(
+                    &record.step,
+                    &record.instance,
+                    from.target,
+                    &self.config.scope,
+                )
+                .ok()?
+                .id()
+                .ok()
+        });
+        let entry = request.and_then(|request| self.entry(request, plan, record, supplied));
         self.push(entry);
     }
 
@@ -159,21 +197,12 @@ impl<'a> Capturing<'a> {
 
     fn entry(
         &self,
-        ev: &Evaluation<'_>,
+        request: rustev_contract::ids::RequestId,
         plan: &PreparedPlan,
         record: &RequestRecord,
         supplied: &Supplied,
     ) -> Option<(CapturedSupply, u64)> {
         let from = record.supplied_from()?;
-        let doc = ev
-            .request_document(
-                &record.step,
-                &record.instance,
-                from.target,
-                &self.config.scope,
-            )
-            .ok()?;
-        let request = doc.id().ok()?;
         let (value, len) = match supplied {
             Supplied::Output(raw) => {
                 let artifact = plan

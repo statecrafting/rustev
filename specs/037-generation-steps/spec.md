@@ -1081,6 +1081,22 @@ identities and the authorized scope, preserving per-field origins and the
 cached source in every copy; a template change invalidates. Tests:
 `crates/rustev-runtime/tests/generation.rs` grows to 20.
 
+**Increment 6 (2026-10-24): evidence, capture, replay and metrics.**
+Generation outputs are captured into `rustev.replay/2` with their
+per-field origins and digest-only evidence, through the runtime's
+capture hooks; offline replay supplies the captured outputs and never
+dispatches, an uncaptured output is handled as 3.15 states, and evidence
+tampering is detected (3.15). Replay 2 admits a generation-only bundle
+without source descriptors. The evaluation metrics of 3.16 are computed
+in `crates/rustev-eval/src/metrics.rs` and reported. Tests:
+`crates/rustev-eval/tests/generation_replay.rs` (ten: byte-identical
+offline replay with zero backend calls, cached origins, origins kept
+through repair, a backstop, an absent value and a cached invalid output,
+missing outputs,
+an unrecorded origin, tampering, a captured runtime failure, retries,
+multiple steps, every metric, and the report's text metrics and
+generation artifact).
+
 **Owner decision A-49 (2026-10-23): dependencies.** Spec 030 is no longer
 a declared dependency of this spec. No behavior or acceptance item here
 needs it: provider wire mappings, "including Bedrock's (spec 030 3.12)",
