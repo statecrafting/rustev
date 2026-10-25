@@ -1197,6 +1197,16 @@ against their schemas in their own contract tests.
   `unconfirmed` and still requires possibly continuing work. The owner's
   ruling R-47 stands; this note corrects only how often its first departure
   applies.
+- 2026-10-25: the second path that left a late settlement uncounted
+  (2026-10-24 above) was in the test, not the seam. The support
+  plan's three semantic steps run in parallel, and the test advanced the
+  clock past the deadline as soon as the topic call was held, while the other
+  two steps' answers could still be crossing threads. The deadline then
+  discarded and counted those too, so the count went past 1 and the wait for
+  exactly 1 timed out. A 20 ms pause before the seam task's send reproduces
+  it every time (`lateResolutionsDiscarded: 3`). The test now waits until the
+  runtime holds only the topic attempt before it advances the clock; its
+  assertion is unchanged, and the seam's counting was already correct.
 
 ## Decisions at approval
 
