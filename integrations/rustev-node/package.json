@@ -1,5 +1,5 @@
 {
-  "name": "@statecrafting/rustev",
+  "name": "@rustev/rustev",
   "version": "0.1.0",
   "private": true,
   "description": "Rustev's Node-API binding: compile plans, run decisions, replay and evaluate in-process, with host-implemented seams.",
@@ -25,12 +25,12 @@
   },
   "files": ["index.js", "index.d.ts", "types"],
   "optionalDependencies": {
-    "@statecrafting/rustev-linux-x64-gnu": "0.1.0",
-    "@statecrafting/rustev-linux-x64-musl": "0.1.0",
-    "@statecrafting/rustev-linux-arm64-gnu": "0.1.0",
-    "@statecrafting/rustev-linux-arm64-musl": "0.1.0",
-    "@statecrafting/rustev-darwin-arm64": "0.1.0",
-    "@statecrafting/rustev-darwin-x64": "0.1.0",
-    "@statecrafting/rustev-win32-x64-msvc": "0.1.0"
+    "@rustev/rustev-linux-x64-gnu": "0.1.0",
+    "@rustev/rustev-linux-x64-musl": "0.1.0",
+    "@rustev/rustev-linux-arm64-gnu": "0.1.0",
+    "@rustev/rustev-linux-arm64-musl": "0.1.0",
+    "@rustev/rustev-darwin-arm64": "0.1.0",
+    "@rustev/rustev-darwin-x64": "0.1.0",
+    "@rustev/rustev-win32-x64-msvc": "0.1.0"
   }
 }

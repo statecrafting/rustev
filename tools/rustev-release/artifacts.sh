@@ -161,18 +161,18 @@ case "${1:-}" in
       for crate in rustev-cli rustev-node; do
         case "$crate" in
           rustev-cli) dir=crates/rustev-cli; artifact="rustev-$version-$p.tar.gz" ;;
-          rustev-node) dir=integrations/rustev-node; artifact="statecrafting-rustev-$p-$version.tgz" ;;
+          rustev-node) dir=integrations/rustev-node; artifact="rustev-rustev-$p-$version.tgz" ;;
         esac
         test -f "$out/$artifact" || fail "missing artifact $artifact"
         cargo cyclonedx --manifest-path "$dir/Cargo.toml" --format json --spec-version 1.5 --all --target "$target"
         cp "$dir/$crate.cdx.json" "$out/$artifact.cdx.json"
       done
     done
-    artifact="statecrafting-rustev-wasm-$version.tgz"
+    artifact="rustev-rustev-wasm-$version.tgz"
     test -f "$out/$artifact" || fail "missing artifact $artifact"
     cargo cyclonedx --manifest-path integrations/rustev-wasm/Cargo.toml --format json --spec-version 1.5 --all --target wasm32-unknown-unknown
     cp integrations/rustev-wasm/rustev-wasm.cdx.json "$out/$artifact.cdx.json"
-    artifact="statecrafting-rustev-$version.tgz"
+    artifact="rustev-rustev-$version.tgz"
     release main-sbom "$out/$artifact" "$SOURCE_DATE_EPOCH" > "$out/$artifact.cdx.json"
     release sbom-check "$out" "$out"
     ;;

@@ -305,7 +305,7 @@ pub fn main_sbom(set: &ReleaseSet, tarball: &Path, epoch: u64) -> Result<Value, 
     if !errors.is_empty() {
         return Err(errors.join("; "));
     }
-    if p["name"] != "@statecrafting/rustev" || p["version"] != set.version {
+    if p["name"] != "@rustev/rustev" || p["version"] != set.version {
         return Err("main package identity differs from release set".into());
     }
     let optional = p["optionalDependencies"]
@@ -328,7 +328,7 @@ pub fn main_sbom(set: &ReleaseSet, tarball: &Path, epoch: u64) -> Result<Value, 
     );
     Ok(
         json!({"bomFormat":"CycloneDX", "specVersion":"1.5", "version":1,
-        "metadata":{"timestamp":timestamp, "component":component("@statecrafting/rustev")},
+        "metadata":{"timestamp":timestamp, "component":component("@rustev/rustev")},
         "components":optional.keys().map(|n| component(n)).collect::<Vec<_>>() }),
     )
 }

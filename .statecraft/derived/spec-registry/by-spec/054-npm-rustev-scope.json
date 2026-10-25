@@ -1,0 +1,102 @@
+{
+  "record": {
+    "amends": [
+      "027-node-and-wasm-bindings",
+      "031-public-api-and-release-family"
+    ],
+    "created": "2026-10-25",
+    "dependsOn": [
+      "027-node-and-wasm-bindings",
+      "031-public-api-and-release-family"
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "027-node-and-wasm-bindings",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-node/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "027-node-and-wasm-bindings",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-wasm/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "027-node-and-wasm-bindings",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-conformance/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "031-public-api-and-release-family",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-release/"
+        }
+      }
+    ],
+    "id": "054-npm-rustev-scope",
+    "implementation": "complete",
+    "obligations": [
+      {
+        "anchor": "3-names",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "Every npm package of the release family is named under the `@rustev/` scope, and the release tooling refuses a package outside it."
+      },
+      {
+        "anchor": "3-names",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "The native package is `@rustev/rustev`, each platform package is `@rustev/rustev-<platform>` for the platforms of spec 027 3.13.1, and the WebAssembly package is `@rustev/rustev-wasm`; no `@statecrafting/` name remains in a package manifest, the native loader, the release tooling or their tests."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "054-the-npm-packages-move-to-the-owner-s-rustev-scope-amends-027-and-031": "c2ece08057bdf0266c937134ada9536d727ebc8600527b95d51fd988cafcbb0b",
+      "1-purpose": "6448ff958fe1800e7e4d7387fbd14a4389804d4aafe08f2cd6af208cd09b64ac",
+      "2-territory": "04667a6ebd3f903c74af603df27b6da354087d685ef15ac5f9500abe1a5aa680",
+      "3-names": "773a521c21aff5736ed87020fe83a102ecee9a1d8788941ef288b2e81bad20fb",
+      "4-out-of-scope": "16db7649bc4d8a3734dafd35ff0a0a78be2e2102d10f8837c91fa5cf0283be72",
+      "5-observable-negative-cases": "0cc67b0802463831d33fbb090e2bcebe4dff771894044e2ddfa5ed25f227f547",
+      "acceptance": "940a42cbd397292fcf3bbeaecff81c129492ee9b1dd1483eab3628e3daef8c54",
+      "decisions-at-approval": "730290ab8e757b3ae2c32d40ad52572956426a86325636450a851ff356f21e8f",
+      "implementation-record": "3dc5fc0994de1327fe36b7d822ff359c72a9921c40cd5c3f0447a24352a1df4a",
+      "verification": "14f9e12db1381116c95e91f44e5b192b25a54c2f68900477dce3555e20f92afd"
+    },
+    "sectionHeadings": [
+      "054: The npm packages move to the owner's @rustev scope (amends 027 and 031)",
+      "1. Purpose",
+      "2. Territory",
+      "3. Names",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Decisions at approval",
+      "Implementation record"
+    ],
+    "specPath": "specs/054-npm-rustev-scope/spec.md",
+    "status": "approved",
+    "summary": "A narrow amendment of approved specs 027 and 031. Both specs named the npm packages under the `@statecrafting` scope and recorded that whether that scope could be used was not established. The owner publishes Rustev under the npm organization `rustev` (2026-10-25). This spec moves every npm package from `@statecrafting/` to `@rustev/` and changes nothing else: the native package `@rustev/rustev`, its platform packages `@rustev/rustev-<platform>`, and the WebAssembly package `@rustev/rustev-wasm`. No API, export, crate name, container image or GitHub location changes. Ratified by the owner on 2026-10-25 (A-56).\n",
+    "title": "The npm packages move to the owner's @rustev scope (amends 027 and 031)"
+  },
+  "shardHash": "7407260235ec2399e9089c2e04af93f963c3c51ee352e2cb2ba3d81dd08776c4",
+  "specVersion": "1.10.0"
+}

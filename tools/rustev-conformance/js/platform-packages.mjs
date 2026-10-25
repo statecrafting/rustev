@@ -28,7 +28,7 @@ const nodePkg = resolve(here, '../../../integrations/rustev-node');
 const npmDir = join(nodePkg, 'npm');
 const read = (p) => JSON.parse(readFileSync(p, 'utf8'));
 const main = read(join(nodePkg, 'package.json'));
-const PREFIX = '@statecrafting/rustev-';
+const PREFIX = '@rustev/rustev-';
 // npm's lifecycle scripts that run when a package is installed (3.13.2:
 // no install-time code). A platform package has no script at all.
 const INSTALL_SCRIPTS = ['preinstall', 'install', 'postinstall', 'prepare'];

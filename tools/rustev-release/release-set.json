@@ -41,15 +41,15 @@
   ],
   "binaries": [{ "package": "rustev-cli", "name": "rustev" }],
   "npm": [
-    { "name": "@statecrafting/rustev-darwin-arm64", "directory": "integrations/rustev-node/npm/darwin-arm64" },
-    { "name": "@statecrafting/rustev-darwin-x64", "directory": "integrations/rustev-node/npm/darwin-x64" },
-    { "name": "@statecrafting/rustev-linux-arm64-gnu", "directory": "integrations/rustev-node/npm/linux-arm64-gnu" },
-    { "name": "@statecrafting/rustev-linux-arm64-musl", "directory": "integrations/rustev-node/npm/linux-arm64-musl" },
-    { "name": "@statecrafting/rustev-linux-x64-gnu", "directory": "integrations/rustev-node/npm/linux-x64-gnu" },
-    { "name": "@statecrafting/rustev-linux-x64-musl", "directory": "integrations/rustev-node/npm/linux-x64-musl" },
-    { "name": "@statecrafting/rustev-win32-x64-msvc", "directory": "integrations/rustev-node/npm/win32-x64-msvc" },
-    { "name": "@statecrafting/rustev", "directory": "integrations/rustev-node" },
-    { "name": "@statecrafting/rustev-wasm", "directory": "integrations/rustev-wasm" }
+    { "name": "@rustev/rustev-darwin-arm64", "directory": "integrations/rustev-node/npm/darwin-arm64" },
+    { "name": "@rustev/rustev-darwin-x64", "directory": "integrations/rustev-node/npm/darwin-x64" },
+    { "name": "@rustev/rustev-linux-arm64-gnu", "directory": "integrations/rustev-node/npm/linux-arm64-gnu" },
+    { "name": "@rustev/rustev-linux-arm64-musl", "directory": "integrations/rustev-node/npm/linux-arm64-musl" },
+    { "name": "@rustev/rustev-linux-x64-gnu", "directory": "integrations/rustev-node/npm/linux-x64-gnu" },
+    { "name": "@rustev/rustev-linux-x64-musl", "directory": "integrations/rustev-node/npm/linux-x64-musl" },
+    { "name": "@rustev/rustev-win32-x64-msvc", "directory": "integrations/rustev-node/npm/win32-x64-msvc" },
+    { "name": "@rustev/rustev", "directory": "integrations/rustev-node" },
+    { "name": "@rustev/rustev-wasm", "directory": "integrations/rustev-wasm" }
   ],
   "absent": [
     {

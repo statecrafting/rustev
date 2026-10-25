@@ -104,10 +104,10 @@ done
 # Spec 031 3.8: npm baselines are authenticated before extraction and compared
 # with the same breaking-position version rule as the Rust family.
 node tools/rustev-release/npm-api-diff.mjs --check-typescript
-for pkg in @statecrafting/rustev @statecrafting/rustev-wasm; do
+for pkg in @rustev/rustev @rustev/rustev-wasm; do
   case $pkg in
-    @statecrafting/rustev) package_dir=integrations/rustev-node ;;
-    @statecrafting/rustev-wasm) package_dir=integrations/rustev-wasm ;;
+    @rustev/rustev) package_dir=integrations/rustev-node ;;
+    @rustev/rustev-wasm) package_dir=integrations/rustev-wasm ;;
   esac
   body="$scratch/npm-index.json"
   if ! code=$(curl -sS --max-time 60 -o "$body" -w '%{http_code}' -A 'rustev-release (https://github.com/statecrafting/rustev)' \
