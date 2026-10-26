@@ -83,15 +83,15 @@
       }
     ],
     "sectionDigests": {
-      "056-release-0-1-1-a-cli-version-command-declared-consumer-examples-and-the-fresh-consumer-qualification-amends-006-007-and-031": "c0a61f0c6283887882cd213bdcaedbf57546ff2f3d5fab57b7feeeea4e20fb1f",
+      "056-release-0-1-1-a-cli-version-command-declared-consumer-examples-and-the-fresh-consumer-qualification-amends-006-007-and-031": "a6f041de469e263846129867076d211417b9e52ad5b676f798421c6828b5aa12",
       "1-purpose": "e666644f03c77644b46a2bd02ace58cdbd73be6d7e4397624b05524b8f5f68ef",
       "2-territory": "f0d9409479a8856c8cf8bb9c47564cc3f811195271d0f801c984d9401905e37c",
       "3-1-the-version-command": "aa334437072a5f0fb26d0c09fdad49b79ec84864250b19b0079b1941b4d3ac76",
       "3-2-the-declared-example": "5653a59411b0267e80d5ae82fa4aeaab0b5c97597a860c83b6ac23591617a55e",
-      "3-3-the-qualification-harness": "3696830941f285f1a48d776fc1f25eab4c3acc2223a25388468921875a494c86",
+      "3-3-the-qualification-harness": "032fc0ca45f1c3c89723f03d43b89ffc982f24c4f9667396067d42d0fa86195d",
       "3-4-authority-for-a-later-release": "8b749f859f3f8022f73ed30ca56650bc348149831aa2e8f218fea53749fc3b79",
       "3-5-version-0-1-1": "b993b11fe95025e5f9ba9e91a63dd4c6ecb0d17d3818d88b3cbd3eda75363d54",
-      "3-behavior": "551be025943bc26ba87995b789f2a079ff0abb38e600143d6f4e64b98d7d0521",
+      "3-behavior": "6cff1a1ad90244038a0853cd7d11fef9984f92cc8270e1b5f247584b76101e25",
       "4-observable-negative-cases": "97baa1caaa78680821459648a3f9c88298293d0a924d5b1ba0fbc031bc910882",
       "acceptance": "dddc5bc8513d366c9308b532359861464f1be6b13fcab9f8a8eabb4c0b2c1051",
       "implementation-record": "915e017c90e6e2415c57aa0c336f8114252242da615571c1a6105ac7a22e591a",
@@ -117,6 +117,6 @@
     "summary": "A narrow amendment of approved specs 006, 007 and 031, written after `v0.1.0` was published to crates.io, npm and GitHub on 2026-10-26 but could not be qualified (021 3.10, 031 3.9.7). The CLI has no version command; the support-routing package declares no runnable offline example (its SYNTHETIC rules program is a test fixture of the rules backend); no harness runs the registry-only consumer across the platform matrix; and the npm packages carry no provenance. This spec adds `rustev version`, ships the package's SYNTHETIC example as package data, adds the qualification harness and its workflow, and defines how the owner authorizes a release after `0.1.0`, so that `0.1.1` is published through the existing pipeline with npm provenance and qualified.\n",
     "title": "Release 0.1.1: a CLI version command, declared consumer examples and the fresh-consumer qualification (amends 006, 007 and 031)"
   },
-  "shardHash": "dd17cc7922f827603872953cf1b97e6074690c49646b14518916736cca04532c",
+  "shardHash": "107b819f718df4ea6ba30e3b844df35dc55efcca179e553024946ec3cfd92786",
   "specVersion": "1.10.0"
 }

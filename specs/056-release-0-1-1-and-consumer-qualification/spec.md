@@ -167,6 +167,12 @@ files. `rustev-release qualify <release-dir> <evidence-dir> <instruction>
 A qualification is evidence for the registry state and matrix it ran on,
 never a permanent availability claim (021 3.10).
 
+`qualify.yml` is a non-managed workflow file added as 031 3.12 says, like
+`release.yml` and `release-checks.yml`. No `extends` entry names it:
+spec-spine counts `.github/workflows/**/*` among the repository's global
+hashed inputs (`extra_hashed_inputs` in `spec-spine.toml`), not as units a
+spec owns, and no spec claims either of those workflows.
+
 ### 3.4 Authority for a later release
 
 031 3.11.1 authorizes `0.1.0` only, and the publisher refuses any other
