@@ -67,6 +67,7 @@ fn substitute(kind: SiteKind, ty: &ParamType, value: &Value) -> Value {
             )
         }
         SiteKind::Artifact => json!({"pinned": value}),
+        SiteKind::PromptLiteral => json!({"literal": literal(ty, value)}),
         _ => value.clone(),
     }
 }

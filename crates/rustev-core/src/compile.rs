@@ -454,7 +454,7 @@ fn recompile(
         sources,
         execution,
         plan.instantiation.is_some(),
-        &templates,
+        (&templates, &[]),
     )
     .map_err(Recompiled::Refused)?;
     #[cfg(feature = "parameterized")]
@@ -758,7 +758,7 @@ pub(crate) fn compile_instantiated(
         sources,
         execution,
         instantiated,
-        &[],
+        (&[], &[]),
     )
 }
 
@@ -778,7 +778,29 @@ pub fn compile_with_templates(
         sources,
         execution,
         false,
-        templates,
+        (templates, &[]),
+    )
+}
+
+/// Check extraction with supplied fallback programs and prompt documents.
+/// Extraction still refuses before plan emission in this compilation increment.
+pub fn compile_with_extraction_documents(
+    def: &Definition,
+    descriptors: &[BackendDescriptor],
+    calibrations: &[CalibrationArtifact],
+    sources: &[SourceDescriptor],
+    execution: Option<&ExecutionPolicy>,
+    templates: &[rustev_contract::generation::PromptTemplate],
+    programs: &[rustev_contract::extraction_documents::ExtractRules],
+) -> Result<Compiled, Refusal> {
+    compile_generation(
+        def,
+        descriptors,
+        calibrations,
+        sources,
+        execution,
+        false,
+        (templates, programs),
     )
 }
 
@@ -789,11 +811,15 @@ fn compile_generation(
     sources: &[SourceDescriptor],
     execution: Option<&ExecutionPolicy>,
     instantiated: bool,
-    templates: &[rustev_contract::generation::PromptTemplate],
+    documents: (
+        &[rustev_contract::generation::PromptTemplate],
+        &[rustev_contract::extraction_documents::ExtractRules],
+    ),
 ) -> Result<Compiled, Refusal> {
     #[cfg(not(feature = "parameterized"))]
     let _ = instantiated;
     use Category as C;
+    let (templates, programs) = documents;
 
     // (a) Parse and bound: schema, and decoding of registered operators'
     // arguments. Unknown operators are left to phase (c). A version 2
@@ -910,16 +936,21 @@ fn compile_generation(
             );
         }
     }
-    for s in &def.steps {
-        if matches!(
-            s.body,
-            StepBody::Extract(_) | StepBody::AcceptModelDerived(_)
-        ) {
-            return refuse(
-                C::InvalidDefinition,
-                format!("step:{}", s.id),
-                "extraction-not-compiled",
-            );
+    // Acceptance-only definitions retain the contract increment's refusal.
+    // With extraction present, finish its structural checks first.
+    if !def
+        .steps
+        .iter()
+        .any(|s| matches!(s.body, StepBody::Extract(_)))
+    {
+        for s in &def.steps {
+            if matches!(s.body, StepBody::AcceptModelDerived(_)) {
+                return refuse(
+                    C::InvalidDefinition,
+                    format!("step:{}", s.id),
+                    "extraction-not-compiled",
+                );
+            }
         }
     }
     for s in &def.steps {
@@ -982,6 +1013,7 @@ fn compile_generation(
     }
     crate::generation::isolation(def, execution)?;
     crate::generation::structure(def)?;
+    crate::extraction_compile::structure(def)?;
     // Supplied backend ids must be unique.
     let mut backend_ids = BTreeSet::new();
     for d in descriptors {
@@ -1044,7 +1076,7 @@ fn compile_generation(
         .iter()
         .filter_map(|s| match &s.body {
             StepBody::Extract(_) | StepBody::AcceptModelDerived(_) => {
-                // Refused earlier by extraction-not-compiled.
+                // Extraction and acceptance are checked separately before plan emission.
                 None
             }
             StepBody::Rank(_) | StepBody::Select(_) => None,
@@ -1066,7 +1098,7 @@ fn compile_generation(
         }
         match &s.body {
             StepBody::Extract(_) | StepBody::AcceptModelDerived(_) => {
-                // Refused earlier by extraction-not-compiled.
+                // Extraction and acceptance are checked separately before plan emission.
             }
             StepBody::Rank(_) | StepBody::Select(_) => {
                 return refuse(
@@ -1332,7 +1364,7 @@ fn compile_generation(
         let subject = format!("step:{}", s.id);
         match &s.body {
             StepBody::Extract(_) | StepBody::AcceptModelDerived(_) => {
-                // Refused earlier by extraction-not-compiled.
+                // Extraction and acceptance are checked separately before plan emission.
             }
             StepBody::Rank(_) | StepBody::Select(_) => {
                 return refuse(
@@ -1393,6 +1425,7 @@ fn compile_generation(
     }
 
     let prompts = crate::generation::resolve(def, templates)?;
+    crate::extraction_compile::resolve(def, programs)?;
 
     // (c) continued: bind every source a graded input names (spec 032,
     // 3.3.4). A version 1 definition binds none.
@@ -1406,10 +1439,16 @@ fn compile_generation(
     let mut deps: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for s in &def.steps {
         let mut refs: Vec<String> = match &s.body {
-            StepBody::Extract(_) | StepBody::AcceptModelDerived(_) => {
-                // Refused earlier by extraction-not-compiled.
-                Vec::new()
-            }
+            StepBody::Extract(e) => e
+                .projection
+                .iter()
+                .cloned()
+                .chain(e.template.params.values().filter_map(|b| match b {
+                    rustev_contract::generation::TemplateBinding::Reference(r) => Some(r.clone()),
+                    _ => None,
+                }))
+                .collect(),
+            StepBody::AcceptModelDerived(a) => vec![a.field.clone()],
             StepBody::Rank(_) | StepBody::Select(_) => {
                 return refuse(
                     C::InvalidDefinition,
@@ -1457,6 +1496,7 @@ fn compile_generation(
         .iter()
         .map(|(k, (t, _))| (k.clone(), t.clone()))
         .collect();
+    crate::extraction_compile::types(def, &input_tys)?;
     let mut step_tys: BTreeMap<String, StepTy> = BTreeMap::new();
     let mut infos: BTreeMap<String, StepInfo> = BTreeMap::new();
     let mut projection_bounds: BTreeMap<String, u64> = BTreeMap::new();
@@ -1481,7 +1521,7 @@ fn compile_generation(
         };
         match &s.body {
             StepBody::Extract(_) | StepBody::AcceptModelDerived(_) => {
-                // Refused earlier by extraction-not-compiled.
+                // Extraction and acceptance are checked separately before plan emission.
             }
             StepBody::Rank(_) | StepBody::Select(_) => {
                 return refuse(
@@ -1679,6 +1719,26 @@ fn compile_generation(
         );
     }
 
+    crate::extraction_compile::templates(
+        def,
+        &prompts,
+        &input_tys,
+        &step_tys,
+        &acquisition_derivations,
+    )?;
+    crate::extraction_compile::budget(def, &input_tys, execution)?;
+    for s in &def.steps {
+        if matches!(
+            s.body,
+            StepBody::Extract(_) | StepBody::AcceptModelDerived(_)
+        ) {
+            return refuse(
+                C::InvalidDefinition,
+                format!("step:{}", s.id),
+                "extraction-not-compiled",
+            );
+        }
+    }
     screening::coverage(authored, &screens, &decoded)?;
     let mut generated = crate::generation::type_check(
         def,
@@ -1774,7 +1834,7 @@ fn compile_generation(
         let subject = format!("step:{}", s.id);
         let d = match &s.body {
             StepBody::Extract(_) | StepBody::AcceptModelDerived(_) => {
-                // Refused earlier by extraction-not-compiled.
+                // Extraction and acceptance are checked separately before plan emission.
                 continue;
             }
             StepBody::Rank(_) | StepBody::Select(_) => {

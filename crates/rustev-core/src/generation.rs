@@ -279,13 +279,15 @@ pub(crate) fn resolve(
     let mut out = BTreeMap::new();
     let mut distinct = BTreeSet::new();
     for s in &def.steps {
-        let StepBody::Generate(g) = &s.body else {
-            continue;
+        let template = match &s.body {
+            StepBody::Generate(g) => &g.template,
+            StepBody::Extract(e) => &e.template,
+            _ => continue,
         };
-        let candidates: Vec<_> = supplied.iter().filter(|t| t.id == g.template.id).collect();
+        let candidates: Vec<_> = supplied.iter().filter(|t| t.id == template.id).collect();
         let Some(p) = candidates
             .iter()
-            .find(|p| p.id().ok().as_ref() == Some(&g.template.digest))
+            .find(|p| p.id().ok().as_ref() == Some(&template.digest))
         else {
             return Err(error(
                 C::Template,
@@ -308,7 +310,7 @@ pub(crate) fn resolve(
         if p.schema != schema::PROMPT_TEMPLATE {
             return Err(error(C::Template, &s.id, "wrong template schema"));
         }
-        distinct.insert(g.template.digest.clone());
+        distinct.insert(template.digest.clone());
         if distinct.len() > 16 {
             return Err(error(
                 C::InvalidGeneration,
@@ -316,10 +318,10 @@ pub(crate) fn resolve(
                 "more than sixteen templates",
             ));
         }
-        if p.params.len() != g.template.params.len()
+        if p.params.len() != template.params.len()
             || p.params
                 .iter()
-                .any(|p| !g.template.params.contains_key(&p.name))
+                .any(|p| !template.params.contains_key(&p.name))
         {
             return Err(error(
                 C::Template,
@@ -363,7 +365,7 @@ pub(crate) fn dependencies(g: &Generate, def: &Definition) -> Vec<String> {
     refs
 }
 
-fn field(ty: &Ty, class: t::Class) -> Option<t::Field> {
+pub(crate) fn field(ty: &Ty, class: t::Class) -> Option<t::Field> {
     let kind = match ty {
         Ty::Bool => t::Type::Bool,
         Ty::Integer => t::Type::Integer,
@@ -430,7 +432,7 @@ fn reference(r: &str, roots: &t::Schema) -> Result<t::Field, String> {
     };
     path(f, &rest)
 }
-fn param_type(p: &PromptParamType) -> t::Type {
+pub(crate) fn param_type(p: &PromptParamType) -> t::Type {
     match p {
         PromptParamType::Bool => t::Type::Bool,
         PromptParamType::Integer => t::Type::Integer,
