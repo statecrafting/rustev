@@ -69,6 +69,23 @@ if [ "$(cargo cyclonedx --version 2>/dev/null)" != "cargo-cyclonedx-cyclonedx $c
   echo "031 3.9.1: the SBOMs need cargo-cyclonedx $cyclonedx_pin (cargo install cargo-cyclonedx --version $cyclonedx_pin --locked)" >&2
   exit 1
 fi
+# `cargo package` verifies each member against its siblings' packaged
+# sources, extracted to <cargo home>/registry/src/<index>/<name>-<version>.
+# Cargo skips extracting into a directory that exists and fingerprints
+# registry crates by name and version only, so a run at a later commit
+# would verify against an earlier commit's sources and compiled members.
+# Both go first: the extracted sources, and the shared target's artifacts
+# of exactly these members (`<name>-<16 hex>` units; `rustev` alone must
+# not match `rustev-release`, the checker just built).
+for p in $packages; do
+  u=$(printf %s "$p" | tr - _)
+  rm -rf "${CARGO_HOME:-$HOME/.cargo}"/registry/src/*/"$p-$version"
+  find "$target/debug/.fingerprint" "$target/debug/build" -maxdepth 1 \
+    -name "$p-????????????????" -exec rm -rf {} + 2>/dev/null || true
+  find "$target/debug/deps" -maxdepth 1 \
+    \( -name "lib$u-????????????????.*" -o -name "$u-????????????????*" \) \
+    -exec rm -f {} + 2>/dev/null || true
+done
 for run in a b; do
   wt="$worktrees/candidate-$run-$commit"
   git worktree add --detach --quiet "$wt" "$commit"

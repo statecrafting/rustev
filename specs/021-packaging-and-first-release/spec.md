@@ -769,3 +769,22 @@ token before each upload and once each name is visible, journaling an
 `tests/lifecycle.rs` covers a missing or malformed account, a name owned
 by another account (nothing uploaded), an upload made as another account
 (partially published after one package) and unreadable owners.
+
+**Crate publication, 2026-10-26, `v0.1.0` at `9dbf8e0`.** The publisher
+built at `3335220` (#291; the tool is not a release member, and
+`verify-release` checks the signed tag, not the checkout) uploaded the
+exact signed archives. crates.io accepts a burst of five new crates, then
+one about every ten minutes: the first run published five and stopped
+`partially published` on an HTTP 429 refusal at `rustev-otel`, and each
+later run under a `continuation` instruction published one more until all
+twelve were public with their manifest checksums (`observe-crates`), each
+owned by the instruction's account `bartekus`. A refusal is retried only
+after its window; no accepted or ambiguous upload was repeated.
+
+**Candidate caches, 2026-10-26.** `candidate.sh` now removes, before
+packaging, each member's extracted sources under the Cargo registry and
+its compiled units in the shared target. Cargo reuses both by name and
+version alone, so the `0829dfa` candidate verified `rustev-core` against
+an earlier commit's `rustev-contract` and failed with E0599 until they
+were removed by hand.
+
