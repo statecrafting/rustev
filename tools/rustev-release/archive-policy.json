@@ -115,6 +115,8 @@
         "src/policy.rs",
         "src/profile_check.rs",
         "src/quality.rs",
+        "src/ranking/mod.rs",
+        "src/ranking/permute.rs",
         "src/seams.rs",
         "src/sem.rs",
         "src/template/check.rs",

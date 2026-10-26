@@ -30,6 +30,7 @@ pub mod math;
 pub mod ops;
 pub(crate) mod policy;
 pub(crate) mod quality;
+pub mod ranking;
 pub mod seams;
 pub mod sem;
 pub mod template;
