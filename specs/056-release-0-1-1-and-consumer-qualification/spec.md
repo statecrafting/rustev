@@ -177,10 +177,14 @@ A qualification is evidence for the registry state and matrix it ran on,
 never a permanent availability claim (021 3.10).
 
 `qualify.yml` is a non-managed workflow file added as 031 3.12 says, like
-`release.yml` and `release-checks.yml`. No `extends` entry names it:
-spec-spine counts `.github/workflows/**/*` among the repository's global
-hashed inputs (`extra_hashed_inputs` in `spec-spine.toml`), not as units a
-spec owns, and no spec claims either of those workflows.
+`release.yml` and `release-checks.yml`, and this spec owns it the way
+spec 031 owns those two: in its text (031 3.12; `AGENTS.md` names
+`release-checks.yml` as spec 031's), not through an `extends` entry. No
+spec's frontmatter names a workflow file as a unit, because spec-spine
+counts `.github/workflows/**/*` among the repository's global hashed
+inputs (`extra_hashed_inputs` in `spec-spine.toml`). `qualify.yml` is
+dispatched after publication and is not a required check, so it is not
+added to `ci.extra_required_jobs`.
 
 ### 3.4 Authority for a later release
 
