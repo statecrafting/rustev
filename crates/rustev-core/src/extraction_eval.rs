@@ -1,4 +1,4 @@
-//! Decision-stage extraction. Runtime owns dispatch and screening.
+//! Decision-stage extraction and acceptance. Runtime owns dispatch and screening.
 use super::*;
 use crate::extraction_validate::{self, ValidatedField};
 use crate::template as t;
@@ -11,7 +11,10 @@ use rustev_contract::generation::TemplateBinding;
 pub(super) struct State {
     pub requests: BTreeMap<String, ExtractRequest>,
     pub evidence: BTreeMap<String, ExtractionEvidence>,
+    pub acceptance: BTreeMap<String, AcceptanceEvidence>,
     pub producers: Producers,
+    origins: BTreeMap<String, AcceptedOrigin>,
+    distributions: BTreeMap<String, FieldDistribution>,
 }
 
 impl Evaluation<'_> {
@@ -326,10 +329,10 @@ impl Evaluation<'_> {
         let produced = fields.is_some();
         let mut fields = fields.unwrap_or_else(|| {
             let reason = match &outcome {
-                ExtractionRequestOutcome::Failed { reason } => AbsenceReason::RequestFailed {
-                    reason: reason.clone(),
-                },
-                ExtractionRequestOutcome::Withheld { reason } => reason.clone(),
+                ExtractionRequestOutcome::Failed { reason } => {
+                    AbsenceReason::RequestFailed { reason: *reason }
+                }
+                ExtractionRequestOutcome::Withheld { reason } => *reason,
                 ExtractionRequestOutcome::Succeeded => unreachable!(),
             };
             b.schema
@@ -340,9 +343,7 @@ impl Evaluation<'_> {
                     evidence: ExtractionFieldEvidence::new(
                         f.name.clone(),
                         &f.ty,
-                        ExtractionOrigin::Absent {
-                            reason: reason.clone(),
-                        },
+                        ExtractionOrigin::Absent { reason },
                         None,
                         None,
                         None,
@@ -420,6 +421,9 @@ impl Evaluation<'_> {
         let mut values = BTreeMap::new();
         for field in &fields {
             let path = format!("step:{id}/{}", field.evidence.name);
+            self.extraction
+                .distributions
+                .insert(path.clone(), field.evidence.distribution.clone());
             let reads = fallback_reads
                 .get(&field.evidence.name)
                 .unwrap_or(&b.projection)
@@ -466,5 +470,347 @@ impl Evaluation<'_> {
                 fields: fields.into_iter().map(|f| f.evidence).collect(),
             },
         );
+    }
+
+    pub(super) fn eval_accept(&mut self, id: &str, a: &AcceptModelDerived) {
+        let base = crate::expr::base_ref_v2(&a.field);
+        let field = if let Some(input) = base.strip_prefix("input:") {
+            input
+        } else {
+            a.field.trim_start_matches("step:")
+        };
+        let source = self.status(&base);
+        let read = self.value_and_meta(&a.field);
+        let extracted = a
+            .field
+            .strip_prefix("step:")
+            .and_then(|p| p.split_once('/'))
+            .and_then(|(step, name)| {
+                self.extraction
+                    .evidence
+                    .get(step)?
+                    .fields
+                    .iter()
+                    .find(|f| f.name == name)
+            })
+            .cloned();
+        let derivation = self
+            .derivation
+            .get(&a.field)
+            .or_else(|| self.derivation.get(&base))
+            .copied()
+            .unwrap_or(Derivation::ExactDerived);
+        let origin = extracted
+            .as_ref()
+            .and_then(|f| match f.origin {
+                ExtractionOrigin::Extracted => Some(AcceptedOrigin::Extracted),
+                ExtractionOrigin::Fallback => Some(AcceptedOrigin::Fallback),
+                ExtractionOrigin::Absent { .. } => None,
+            })
+            .or_else(|| {
+                a.field.starts_with("input:").then(|| {
+                    if self
+                        .observed
+                        .get(base.trim_start_matches("input:"))
+                        .is_some_and(|p| p == &[ProvenanceClass::ModelDerived])
+                    {
+                        AcceptedOrigin::HostExtracted {
+                            producer: self
+                                .extraction
+                                .producers
+                                .get(base.trim_start_matches("input:"))
+                                .cloned(),
+                        }
+                    } else {
+                        AcceptedOrigin::Supplied
+                    }
+                })
+            });
+        let passed = origin == Some(AcceptedOrigin::Supplied);
+        let mut validation = AcceptanceValidation::NotApplied;
+        let mut cause = extracted.as_ref().and_then(|f| match &f.origin {
+            ExtractionOrigin::Absent { reason } => Some(AcceptanceFailure::Absence(*reason)),
+            _ => None,
+        });
+        if read.is_err() && cause.is_none() {
+            cause = Some(AcceptanceFailure::Absence(AbsenceReason::Missing));
+        }
+        if source.is_ok() && read.is_ok() && !passed {
+            if let Validation::Predicate(p) = &a.validate {
+                match crate::expr::eval_predicate(p, &self.scope()) {
+                    Ok(true) => validation = AcceptanceValidation::Passed,
+                    Ok(false) => {
+                        validation = AcceptanceValidation::Failed;
+                        cause = Some(AcceptanceFailure::ValidationFailed);
+                    }
+                    Err(_) => {
+                        validation = AcceptanceValidation::Fault(Unresolved::invalid(
+                            [field.into()],
+                            "acceptance validation fault",
+                        ));
+                        cause = Some(AcceptanceFailure::ValidationFault);
+                    }
+                }
+            }
+            if cause.is_none()
+                && let MinMass::Threshold(m) = &a.min_mass
+            {
+                cause = match self.accept_mass(a, m) {
+                    Some(mass) if mass >= m.at_least.to_f64_nearest() => None,
+                    Some(_) => Some(AcceptanceFailure::MinMassNotMet),
+                    None => Some(AcceptanceFailure::DistributionAbsent),
+                };
+            }
+        }
+        let value_read = read.as_ref().ok().map(|(v, _)| {
+            let digest = rustev_contract::generation_result::generation_value_digest(&v.to_json())
+                .expect("validated core value");
+            // Text and composite input reads are digest-only. Extraction fields
+            // reuse the validator's already retention-filtered representation.
+            let ty = a
+                .field
+                .strip_prefix("step:")
+                .and_then(|p| p.split_once('/'))
+                .and_then(|(s, n)| {
+                    self.extract_binding(s)
+                        .schema
+                        .fields
+                        .iter()
+                        .find(|f| f.name == n)
+                        .map(|f| f.ty.clone())
+                })
+                .unwrap_or_else(|| match v {
+                    Value::Bool(_) => ExtractionType::Bool {},
+                    Value::Integer(n) => ExtractionType::Integer { bounds: [*n, *n] },
+                    Value::Decimal(n) => ExtractionType::Decimal(DecimalBounds {
+                        bounds: [n.to_string(), n.to_string()],
+                        scale: 9,
+                    }),
+                    Value::Enum(_) => ExtractionType::Enum {
+                        vocabulary: String::new(),
+                    },
+                    _ => ExtractionType::Text { max_bytes: 4096 },
+                });
+            let value = extracted
+                .as_ref()
+                .and_then(|f| f.value().cloned())
+                .or_else(|| Some(v.to_json()));
+            AcceptanceRead::new(&ty, digest, value)
+        });
+        let (result, outcome) = if let Err(u) = source {
+            (Err(u), AcceptanceOutcome::Unresolved)
+        } else if let Some(cause) = cause {
+            match &a.on_fail {
+                OnFail::DropField { notice } => {
+                    use rustev_contract::actionability::{
+                        Address, Cause, CauseProvenance, Remediation,
+                    };
+                    self.notices.push(Notice {
+                        screening: None,
+                        kind: NoticeKind::FieldDropped,
+                        subject: id.into(),
+                        reason: notice.clone(),
+                        action: Some(crate::actionable::action(
+                            vec![Cause::Input {
+                                field: field.into(),
+                                provenance: CauseProvenance::Observed {
+                                    class: ProvenanceClass::ModelDerived,
+                                },
+                            }],
+                            crate::actionable::ActionInputs {
+                                caller_controlled: &self.caller_controlled(),
+                                address: &Address::Computed,
+                                declared: None,
+                                computed: Remediation::None,
+                                transient: false,
+                            },
+                        )),
+                    });
+                    (
+                        Ok(Value::Absent(crate::value::Absence {
+                            reason: rustev_contract::grade::AbsentReason::AcceptanceFailed {
+                                cause,
+                            },
+                            predicate: None,
+                        })),
+                        AcceptanceOutcome::Dropped { cause },
+                    )
+                }
+                OnFail::Unresolved => {
+                    let u = if matches!(cause, AcceptanceFailure::Absence(_)) {
+                        Unresolved::missing([field.into()])
+                    } else {
+                        Unresolved::invalid(
+                            [field.into()],
+                            serde_json::to_string(&cause).expect("acceptance cause"),
+                        )
+                    };
+                    (Err(u), AcceptanceOutcome::Unresolved)
+                }
+            }
+        } else {
+            (
+                read.as_ref().map(|(v, _)| v.clone()).map_err(Clone::clone),
+                if passed {
+                    AcceptanceOutcome::PassedThrough
+                } else {
+                    AcceptanceOutcome::Accepted
+                },
+            )
+        };
+        let key = format!("step:{id}");
+        if let Ok(v) = &result {
+            self.exact_values.insert(id.into(), v.clone());
+            if !matches!(v, Value::Null | Value::Absent(_))
+                && let Some(origin) = &origin
+            {
+                self.extraction.origins.insert(key.clone(), origin.clone());
+            }
+        }
+        if let Ok((_, meta)) = read {
+            self.metas.insert(
+                key.clone(),
+                Meta {
+                    node: meta.grade,
+                    whole: meta,
+                },
+            );
+        }
+        self.derivation.insert(key, derivation);
+        self.exact.insert(id.into(), result);
+        self.extraction.acceptance.insert(
+            id.into(),
+            AcceptanceEvidence {
+                step: id.into(),
+                field: a.field.clone(),
+                value_read,
+                origin,
+                outcome,
+                validation,
+            },
+        );
+    }
+
+    fn accept_mass(&mut self, a: &AcceptModelDerived, threshold: &MassThreshold) -> Option<f64> {
+        let (step, name) = a.field.strip_prefix("step:")?.split_once('/')?;
+        let binding = self.extract_binding(step).clone();
+        let ty = &binding.schema.fields.iter().find(|f| f.name == name)?.ty;
+        let options = match ty {
+            ExtractionType::Bool {} => vec!["false".into(), "true".into()],
+            ExtractionType::Enum { vocabulary } => {
+                self.extraction_vocabularies(step).get(vocabulary)?.clone()
+            }
+            _ => return None,
+        };
+        let field = self
+            .extraction
+            .evidence
+            .get_mut(step)?
+            .fields
+            .iter_mut()
+            .find(|f| f.name == name)?;
+        let FieldDistribution::Masses(masses) = self.extraction.distributions.get(&a.field)? else {
+            return None;
+        };
+        let index = options.iter().position(|o| *o == threshold.option)?;
+        match &threshold.basis {
+            MassBasis::UncalibratedThreshold(_) => masses.get(index).copied(),
+            MassBasis::Calibration(cid) => {
+                let artifact = self
+                    .compiled
+                    .info
+                    .extraction_calibrations
+                    .iter()
+                    .find(|c| c.id().is_ok_and(|id| id.to_string() == *cid))?;
+                let id = artifact.id().ok()?;
+                let map = options
+                    .iter()
+                    .cloned()
+                    .zip(masses.iter().copied())
+                    .collect();
+                let calibrated = calibrate::apply(
+                    artifact,
+                    &id,
+                    &BindingCheck {
+                        artifact: &binding.artifact,
+                        task: &format!("{}@{}", binding.template.id, binding.template_id),
+                        question: &format!("{step}/{name}"),
+                        options: &options,
+                    },
+                    CalibrationInput::Distribution(&map),
+                    self.compiled.plan.definition.limits.distribution_tolerance,
+                )
+                .ok()?;
+                let mass = calibrated.mass(&threshold.option);
+                field.distribution = FieldDistribution::Masses(calibrated.masses().to_vec());
+                field.calibration = ExtractionCalibration::Applied(id);
+                mass
+            }
+        }
+    }
+
+    pub(super) fn attribute_outcome(&self, mut outcome: Outcome, trace: &[String]) -> Outcome {
+        use rustev_contract::definition::{OutcomeDecl, ParamSource};
+        if let Outcome::Propose { params, .. } = &mut outcome {
+            for rule in &self.compiled.plan.definition.policy.rules {
+                if !trace.contains(&format!("rule:{}", rule.id)) {
+                    continue;
+                }
+                let OutcomeDecl::Propose {
+                    params: declared, ..
+                } = &rule.then
+                else {
+                    continue;
+                };
+                for p in declared {
+                    let ParamSource::Ref(r) = &p.value else {
+                        continue;
+                    };
+                    let base = crate::expr::base_ref_v2(r);
+                    let origin = self.extraction.origins.get(&base).cloned().or_else(|| {
+                        let name = base.strip_prefix("input:")?;
+                        if self.extraction.evidence.is_empty()
+                            && self.extraction.acceptance.is_empty()
+                        {
+                            return None;
+                        }
+                        self.checks
+                            .records
+                            .iter()
+                            .any(|c| {
+                                c.subject == name
+                                    && matches!(
+                                        c.status,
+                                        rustev_contract::actionability::CheckStatus::Passed
+                                    )
+                            })
+                            .then(|| {
+                                if self
+                                    .observed
+                                    .get(name)
+                                    .is_some_and(|p| p == &[ProvenanceClass::ModelDerived])
+                                {
+                                    AcceptedOrigin::HostExtracted {
+                                        producer: self.extraction.producers.get(name).cloned(),
+                                    }
+                                } else {
+                                    AcceptedOrigin::Supplied
+                                }
+                            })
+                    });
+                    let Some(origin) = origin else {
+                        continue;
+                    };
+                    if let Some(value) = params.get_mut(&p.name) {
+                        *value = OutValue::Attributed {
+                            value: Box::new(value.clone()),
+                            derivation: self.derivation[&base],
+                            origin: origin.clone(),
+                        };
+                    }
+                }
+            }
+        }
+        outcome
     }
 }

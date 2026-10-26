@@ -1126,6 +1126,23 @@ by `crates/rustev-core/tests/golden/extraction.evidence.json` and
 `extraction.judgment.json`. A plan with an accept step is refused at
 evaluation until part a2 (`crates/rustev-core/tests/extraction_compile.rs`).
 
+**Increment 6, part a2 (2026-10-26): evaluation of accept steps.** An
+`accept_model_derived` step reads its field, applies `validate` and
+`min_mass`, and ends `accepted`, `passed_through`, `dropped{cause}` with
+its declared notice, or `unresolved` (3.8); an accepted value keeps its
+derivation, origin and producer lineage and feeds the exact consumers the
+gate admits. The evidence 2 `acceptance` member and the judgment 2
+`attributed` encoding of accepted proposal parameters are filled from
+evaluation (3.12.2, 3.12.3), and an accepted field whose value is
+`insufficient` can raise a declared needs-input question (3.13). The
+golden evidence and judgment now include the accept step of 3.8.1. A
+`drop_field` failure leaves the step's value absent with
+`acceptance_failed{cause}` (3.8.4), an additive variant of spec 032's
+absence reason. A mixed-derived accepted value (a fallback field reading
+a model-derived source) is not reachable yet, because a model-derived text
+projection is refused at compile until spec 035 screening is integrated
+(3.11.4); its lineage test comes with the runtime increment.
+
 ## Decisions at approval
 
 Each is decided within this spec under the work order, inside the binding

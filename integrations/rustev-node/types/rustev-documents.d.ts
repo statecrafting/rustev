@@ -4011,11 +4011,48 @@ export namespace RustevEvidence1 {
    * Why a value is absent (spec 032, 3.4.3 and 3.6.2).
    */
   export type AbsentReason =
-    | "predicate_failed"
-    | "overlay_missing"
-    | "base_missing"
-    | "overlay_missing_base_below_grade"
-    | "overlay_and_base_missing";
+    | (
+        | "predicate_failed"
+        | "overlay_missing"
+        | "base_missing"
+        | "overlay_missing_base_below_grade"
+        | "overlay_and_base_missing"
+      )
+    | {
+        acceptance_failed: {
+          cause: AcceptanceFailure;
+        };
+      };
+  export type AcceptanceFailure =
+    | ("validation_failed" | "validation_fault" | "min_mass_not_met" | "distribution_absent")
+    | {
+        absence: AbsenceReason;
+      };
+  export type AbsenceReason =
+    | (
+        | "missing"
+        | "wrong_type"
+        | "too_long"
+        | "control_character"
+        | "not_in_vocabulary"
+        | "duplicate_item"
+        | "too_many_items"
+        | "out_of_bounds"
+        | "invalid_date"
+        | "vocabulary_unavailable"
+        | "source_unavailable"
+        | "screen_blocked"
+        | "screen_unavailable"
+        | "fallback_no_match"
+        | "fallback_invalid"
+      )
+    | {
+        request_failed: {
+          reason: RequestFailure;
+        };
+      };
+  export type RequestFailure =
+    "backend_unavailable" | "invalid_backend_output" | "deadline_exceeded" | "budget_exhausted" | "cancelled";
   /**
    * The conflict rule applied (spec 032, 3.8.1); the source order of
    * `prefer` and `treat_as_hint` is the plan's.
@@ -5044,11 +5081,18 @@ export namespace RustevEvidence2 {
    * Why a value is absent (spec 032, 3.4.3 and 3.6.2).
    */
   export type AbsentReason =
-    | "predicate_failed"
-    | "overlay_missing"
-    | "base_missing"
-    | "overlay_missing_base_below_grade"
-    | "overlay_and_base_missing";
+    | (
+        | "predicate_failed"
+        | "overlay_missing"
+        | "base_missing"
+        | "overlay_missing_base_below_grade"
+        | "overlay_and_base_missing"
+      )
+    | {
+        acceptance_failed: {
+          cause: AcceptanceFailure;
+        };
+      };
   /**
    * The conflict rule applied (spec 032, 3.8.1); the source order of
    * `prefer` and `treat_as_hint` is the plan's.
@@ -14980,11 +15024,48 @@ export namespace RustevRun1 {
    * Why a value is absent (spec 032, 3.4.3 and 3.6.2).
    */
   export type AbsentReason =
-    | "predicate_failed"
-    | "overlay_missing"
-    | "base_missing"
-    | "overlay_missing_base_below_grade"
-    | "overlay_and_base_missing";
+    | (
+        | "predicate_failed"
+        | "overlay_missing"
+        | "base_missing"
+        | "overlay_missing_base_below_grade"
+        | "overlay_and_base_missing"
+      )
+    | {
+        acceptance_failed: {
+          cause: AcceptanceFailure;
+        };
+      };
+  export type AcceptanceFailure =
+    | ("validation_failed" | "validation_fault" | "min_mass_not_met" | "distribution_absent")
+    | {
+        absence: AbsenceReason;
+      };
+  export type AbsenceReason =
+    | (
+        | "missing"
+        | "wrong_type"
+        | "too_long"
+        | "control_character"
+        | "not_in_vocabulary"
+        | "duplicate_item"
+        | "too_many_items"
+        | "out_of_bounds"
+        | "invalid_date"
+        | "vocabulary_unavailable"
+        | "source_unavailable"
+        | "screen_blocked"
+        | "screen_unavailable"
+        | "fallback_no_match"
+        | "fallback_invalid"
+      )
+    | {
+        request_failed: {
+          reason: RequestFailure;
+        };
+      };
+  export type RequestFailure =
+    "backend_unavailable" | "invalid_backend_output" | "deadline_exceeded" | "budget_exhausted" | "cancelled";
   /**
    * The conflict rule applied (spec 032, 3.8.1); the source order of
    * `prefer` and `treat_as_hint` is the plan's.
@@ -16098,11 +16179,48 @@ export namespace RustevRun2 {
    * Why a value is absent (spec 032, 3.4.3 and 3.6.2).
    */
   export type AbsentReason =
-    | "predicate_failed"
-    | "overlay_missing"
-    | "base_missing"
-    | "overlay_missing_base_below_grade"
-    | "overlay_and_base_missing";
+    | (
+        | "predicate_failed"
+        | "overlay_missing"
+        | "base_missing"
+        | "overlay_missing_base_below_grade"
+        | "overlay_and_base_missing"
+      )
+    | {
+        acceptance_failed: {
+          cause: AcceptanceFailure;
+        };
+      };
+  export type AcceptanceFailure =
+    | ("validation_failed" | "validation_fault" | "min_mass_not_met" | "distribution_absent")
+    | {
+        absence: AbsenceReason;
+      };
+  export type AbsenceReason =
+    | (
+        | "missing"
+        | "wrong_type"
+        | "too_long"
+        | "control_character"
+        | "not_in_vocabulary"
+        | "duplicate_item"
+        | "too_many_items"
+        | "out_of_bounds"
+        | "invalid_date"
+        | "vocabulary_unavailable"
+        | "source_unavailable"
+        | "screen_blocked"
+        | "screen_unavailable"
+        | "fallback_no_match"
+        | "fallback_invalid"
+      )
+    | {
+        request_failed: {
+          reason: RequestFailure;
+        };
+      };
+  export type RequestFailure =
+    "backend_unavailable" | "invalid_backend_output" | "deadline_exceeded" | "budget_exhausted" | "cancelled";
   /**
    * The conflict rule applied (spec 032, 3.8.1); the source order of
    * `prefer` and `treat_as_hint` is the plan's.
@@ -17575,11 +17693,18 @@ export namespace RustevRun3 {
    * Why a value is absent (spec 032, 3.4.3 and 3.6.2).
    */
   export type AbsentReason =
-    | "predicate_failed"
-    | "overlay_missing"
-    | "base_missing"
-    | "overlay_missing_base_below_grade"
-    | "overlay_and_base_missing";
+    | (
+        | "predicate_failed"
+        | "overlay_missing"
+        | "base_missing"
+        | "overlay_missing_base_below_grade"
+        | "overlay_and_base_missing"
+      )
+    | {
+        acceptance_failed: {
+          cause: AcceptanceFailure;
+        };
+      };
   /**
    * The conflict rule applied (spec 032, 3.8.1); the source order of
    * `prefer` and `treat_as_hint` is the plan's.

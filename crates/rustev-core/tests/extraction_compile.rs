@@ -1100,7 +1100,7 @@ fn acceptance_example_golden_and_member_identity() {
             .id,
         c.id
     );
-    assert!(matches!(
+    assert!(
         rustev_core::Evaluation::start(
             &c,
             &rustev_contract::snapshot::Snapshot {
@@ -1108,9 +1108,9 @@ fn acceptance_example_golden_and_member_identity() {
                 entries: vec![]
             },
             common::ts(common::NOW)
-        ),
-        Err(rustev_core::evaluate::StartError::AcceptanceNotAvailable)
-    ));
+        )
+        .is_ok()
+    );
     let path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden/acceptance.plan.json");
     if std::env::var_os("RUSTEV_BLESS").is_some() {

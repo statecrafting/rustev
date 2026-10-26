@@ -132,9 +132,7 @@ fn no_coercion_and_all_scalar_absence_reasons() {
         let result = check(ty.clone(), value.clone());
         assert_eq!(
             result.evidence.origin,
-            ExtractionOrigin::Absent {
-                reason: reason.clone()
-            },
+            ExtractionOrigin::Absent { reason },
             "{ty:?} {value}"
         );
         absent(&result, reason);
@@ -262,7 +260,7 @@ fn lists_follow_all_five_ordered_checks() {
         r.evidence
             .rejected
             .iter()
-            .map(|r| r.reason.clone())
+            .map(|r| r.reason)
             .collect::<Vec<_>>(),
         vec![R::TooLong, R::ControlCharacter, R::WrongType]
     );

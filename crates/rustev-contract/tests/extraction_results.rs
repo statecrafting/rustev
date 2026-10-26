@@ -388,3 +388,40 @@ fn extraction_binding_members_affect_plan_identity() {
         );
     }
 }
+
+#[test]
+fn acceptance_failed_presence_wire_keeps_typed_causes() {
+    use rustev_contract::{
+        extraction::AbsenceReason,
+        grade::{AbsentReason, Presence},
+    };
+    for (cause, encoded) in [
+        (
+            AcceptanceFailure::Absence(AbsenceReason::Missing),
+            json!({"absence":"missing"}),
+        ),
+        (
+            AcceptanceFailure::ValidationFailed,
+            json!("validation_failed"),
+        ),
+        (
+            AcceptanceFailure::ValidationFault,
+            json!("validation_fault"),
+        ),
+        (AcceptanceFailure::MinMassNotMet, json!("min_mass_not_met")),
+        (
+            AcceptanceFailure::DistributionAbsent,
+            json!("distribution_absent"),
+        ),
+    ] {
+        let presence = Presence::Absent {
+            reason: AbsentReason::AcceptanceFailed { cause },
+            predicate: None,
+        };
+        let encoded = json!({"absent":{"reason":{"acceptance_failed":{"cause":encoded}}}});
+        assert_eq!(serde_json::to_value(&presence).unwrap(), encoded);
+        assert_eq!(wire::<Presence>(encoded), presence);
+    }
+    wire::<AbsentReason>(json!("predicate_failed"));
+    wire::<AbsenceReason>(json!("missing"));
+}

@@ -321,11 +321,15 @@ pub enum AbsentReason {
     BaseMissing,
     OverlayMissingBaseBelowGrade,
     OverlayAndBaseMissing,
+    AcceptanceFailed {
+        cause: crate::extraction_results::AcceptanceFailure,
+    },
 }
 
 impl AbsentReason {
     pub fn name(self) -> &'static str {
         match self {
+            AbsentReason::AcceptanceFailed { .. } => "acceptance_failed",
             AbsentReason::PredicateFailed => "predicate_failed",
             AbsentReason::OverlayMissing => "overlay_missing",
             AbsentReason::BaseMissing => "base_missing",
