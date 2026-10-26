@@ -82,6 +82,9 @@ pub enum Category {
     InvalidGeneration = 22,
     Template = 23,
     ModelOutputFlow = 24,
+    InvalidExtraction = 25,
+    InvalidAcceptance = 26,
+    UnacceptedModelValue = 27,
 }
 
 /// Why one candidate backend cannot serve a step.

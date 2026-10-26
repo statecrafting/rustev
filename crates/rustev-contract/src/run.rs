@@ -140,6 +140,17 @@ impl RunRecord {
     /// 1 or 3 record with them, or a version 2 record without the list, is
     /// refused when read, not only when projected.
     fn parsed_members_fit(&self) -> Result<(), String> {
+        if let CoreEvidence::Recorded(e) = &self.core {
+            e.screening_version()?;
+            if self.schema != schema::RUN_V3
+                && (e.extraction.is_some()
+                    || e.acceptance.is_some()
+                    || e.inputs.iter().any(|i| i.producer.is_some())
+                    || e.judgment.lineage.producers.is_some())
+            {
+                return Err("extraction evidence requires rustev.run/3".into());
+            }
+        }
         if let CoreEvidence::Recorded(e) = &self.core
             && e.generation.is_some()
             && (self.schema != schema::RUN_V3 || e.schema != schema::EVIDENCE_V2)

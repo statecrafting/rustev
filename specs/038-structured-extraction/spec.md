@@ -1010,6 +1010,23 @@ compilation and validation. Existing request, descriptor and output
 documents keep their bytes and identities
 (`crates/rustev-contract/tests/extraction_documents.rs`).
 
+**Increment 2, part b (2026-10-26): plan details, evidence and judgment
+members and the refusal categories.** `crates/rustev-contract/src/extraction_results.rs`
+adds the `rustev.plan/3` step details of both kinds (3.14), the
+`rustev.evidence/2` members `extraction` and `acceptance` (3.12.1, 3.12.2)
+with lineage `producers` (3.5.4), and the `attributed` parameter encoding
+of `rustev.judgment/2` with its four origins (3.12.3); the existing
+`field_dropped` notice and the `fallback` notice's `capability` cause
+carry 3.8.4 and 3.12.3 unchanged. Evidence lists exactly the members
+3.12.1 names: a field entry's value is built only through a constructor
+that takes the declared field type and keeps the value for `bool`,
+`integer`, `decimal`, `date`, `enum` and lists of `enum`, and the digest
+alone for `text` fields and items (R-19). The categories
+`invalid_extraction`, `invalid_acceptance` and `unaccepted_model_value`
+take 25 to 27 in that order (spec 039 3.12); nothing produces them until
+the compile increment. Documents without these members keep their bytes
+and identities (`crates/rustev-contract/tests/extraction_results.rs`).
+
 ## Decisions at approval
 
 Each is decided within this spec under the work order, inside the binding

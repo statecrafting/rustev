@@ -946,7 +946,9 @@ fn step_attributes(
             | PlanStepDetail::Corroborate
             | PlanStepDetail::Acquire
             | PlanStepDetail::Widen
-            | PlanStepDetail::Generate(_) => {}
+            | PlanStepDetail::Generate(_)
+            | PlanStepDetail::Extract(_)
+            | PlanStepDetail::AcceptModelDerived(_) => {}
         }
     }
     if let Some(s) = se {

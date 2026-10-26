@@ -770,6 +770,11 @@ fn reference<'a>(r: &str, roots: &'a BTreeMap<String, Value>) -> Result<&'a Valu
 }
 fn from_out(v: &OutValue) -> Result<Value, GenerationError> {
     Ok(match v {
+        OutValue::Attributed { .. } => {
+            return Err(GenerationError::InvalidState(
+                "attributed values are not evaluated in this increment".into(),
+            ));
+        }
         OutValue::Bool(v) => Value::Bool(*v),
         OutValue::Integer(v) => Value::Integer(*v),
         OutValue::Decimal(v) => Value::Decimal(*v),
@@ -916,6 +921,7 @@ fn make_items(
             };
             let base = crate::expr::base_ref_v2(source);
             let l = lineage.get(&base).cloned().unwrap_or_else(|| Lineage {
+                producers: None,
                 inputs: base
                     .strip_prefix("input:")
                     .map(String::from)

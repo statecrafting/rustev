@@ -93,6 +93,7 @@ const RUN_V2_MEMBERS: [&str; 2] = ["remote_evidence", "remote_evidence_truncated
 fn run_members(version: &str) -> impl FnOnce(&mut serde_json::Value) + '_ {
     move |v| {
         if version != schema::RUN_V3 {
+            extraction_v1(v, "/$defs/EvidenceRecord/properties");
             v["$defs"]["EvidenceRecord"]["properties"]
                 .as_object_mut()
                 .unwrap()
@@ -157,7 +158,11 @@ fn plan_members(version: &str) -> impl FnOnce(&mut serde_json::Value) + '_ {
     move |v| {
         if version != schema::PLAN_V3 {
             if let Some(variants) = v["$defs"]["PlanStepDetail"]["oneOf"].as_array_mut() {
-                variants.retain(|v| v["properties"].get("generate").is_none());
+                variants.retain(|v| {
+                    ["generate", "extract", "accept_model_derived"]
+                        .iter()
+                        .all(|key| v["properties"].get(*key).is_none())
+                });
             }
             v["properties"]
                 .as_object_mut()
@@ -175,6 +180,25 @@ fn plan_members(version: &str) -> impl FnOnce(&mut serde_json::Value) + '_ {
                 .expect("the plan has a screening member");
             prune_defs(v);
         }
+    }
+}
+
+/// Keep spec 038 members out of version 1 result schemas.
+fn extraction_v1(v: &mut serde_json::Value, evidence_properties: &str) {
+    if let Some(props) = v
+        .pointer_mut(evidence_properties)
+        .and_then(|p| p.as_object_mut())
+    {
+        props.remove("extraction");
+        props.remove("acceptance");
+    }
+    for (ty, member) in [("Lineage", "producers"), ("InputEvidence", "producer")] {
+        if let Some(props) = v["$defs"][ty]["properties"].as_object_mut() {
+            props.remove(member);
+        }
+    }
+    if let Some(variants) = v["$defs"]["OutValue"]["oneOf"].as_array_mut() {
+        variants.retain(|v| v["properties"].get("attributed").is_none());
     }
 }
 
@@ -265,6 +289,7 @@ pub fn document_schemas() -> Vec<EmittedSchema> {
         emit::<Snapshot>(schema::SNAPSHOT, None),
         emit::<Snapshot>(schema::SNAPSHOT_V2, None),
         emit_adjusted::<EvidenceRecord>(schema::EVIDENCE, None, |v| {
+            extraction_v1(v, "/properties");
             v["properties"].as_object_mut().unwrap().remove("screening");
             v["properties"]
                 .as_object_mut()
@@ -288,7 +313,10 @@ pub fn document_schemas() -> Vec<EmittedSchema> {
         emit_adjusted::<RunRecord>(schema::RUN, None, run_members(schema::RUN)),
         emit_adjusted::<RunRecord>(schema::RUN_V2, None, run_members(schema::RUN_V2)),
         emit_adjusted::<RunRecord>(schema::RUN_V3, None, run_members(schema::RUN_V3)),
-        emit::<Judgment>(schema::JUDGMENT, None),
+        emit_adjusted::<Judgment>(schema::JUDGMENT, None, |v| {
+            extraction_v1(v, "/properties");
+            prune_defs(v);
+        }),
         emit::<Judgment>(schema::JUDGMENT_V2, None),
         emit::<BackendDescriptor>(schema::BACKEND, None),
         emit::<CalibrationArtifact>(schema::CALIBRATION, None),

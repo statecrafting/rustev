@@ -92,13 +92,17 @@ impl crate::Document for Plan {
             });
         }
         if doc.schema != schema::PLAN_V3
-            && doc
-                .steps
-                .iter()
-                .any(|s| matches!(s.detail, PlanStepDetail::Generate(_)))
+            && doc.steps.iter().any(|s| {
+                matches!(
+                    s.detail,
+                    PlanStepDetail::Generate(_)
+                        | PlanStepDetail::Extract(_)
+                        | PlanStepDetail::AcceptModelDerived(_)
+                )
+            })
         {
             return Err(DocumentError::Parse(ParseError::Schema {
-                message: "generate requires rustev.plan/3".into(),
+                message: "model step details require rustev.plan/3".into(),
             }));
         }
         if doc.schema != schema::PLAN_V3 && doc.acquisitions.is_some() {
@@ -238,6 +242,8 @@ pub enum PlanStepDetail {
     /// Plan 3: a corroboration step (spec 032, 3.7).
     Corroborate,
     Generate(Box<crate::generation::GenerateBinding>),
+    Extract(Box<crate::extraction_results::ExtractBinding>),
+    AcceptModelDerived(Box<crate::extraction::AcceptModelDerived>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]

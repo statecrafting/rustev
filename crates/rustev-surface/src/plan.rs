@@ -39,6 +39,9 @@ pub fn category_name(c: Category) -> &'static str {
         Category::InvalidAcquisition => "invalid_acquisition",
         Category::SourceMapping => "source_mapping",
         Category::InvalidGeneration => "invalid_generation",
+        Category::InvalidExtraction => "invalid_extraction",
+        Category::InvalidAcceptance => "invalid_acceptance",
+        Category::UnacceptedModelValue => "unaccepted_model_value",
         Category::Template => "template",
         Category::ModelOutputFlow => "model_output_flow",
     }
@@ -306,6 +309,8 @@ fn step_json(step: &rustev_contract::plan::PlanStep) -> Value {
         PlanStepDetail::Corroborate => json!({"kind": "corroborate"}),
         PlanStepDetail::Acquire => json!({"kind": "acquire"}),
         PlanStepDetail::Widen => json!({"kind": "widen"}),
+        PlanStepDetail::Extract(_) => json!({"kind": "extract"}),
+        PlanStepDetail::AcceptModelDerived(_) => json!({"kind": "accept_model_derived"}),
     };
     json!({"id": step.id, "derivation": step.derivation, "detail": detail})
 }
