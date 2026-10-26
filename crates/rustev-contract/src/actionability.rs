@@ -374,6 +374,19 @@ pub enum Cause {
     Policy {
         site: String,
     },
+    #[serde(untagged)]
+    CapabilityStep {
+        capability: CapabilityStep,
+    },
+}
+
+/// A fallback field identifies the extraction step (spec 038, 3.12.3).
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
+pub struct CapabilityStep {
+    pub step: String,
 }
 
 /// How an override came about (3.5.2).

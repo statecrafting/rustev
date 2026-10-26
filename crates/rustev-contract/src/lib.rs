@@ -28,6 +28,7 @@ pub mod execution;
 pub mod explanation;
 pub mod extraction;
 pub mod extraction_documents;
+pub mod extraction_results;
 pub mod generation;
 pub mod generation_result;
 pub mod grade;

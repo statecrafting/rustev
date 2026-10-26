@@ -60,6 +60,18 @@ pub struct EvidenceRecord {
         length(min = 1, max = 8)
     )]
     pub generation: Option<Vec<crate::generation_result::GenerationEvidence>>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::screening::present"
+    )]
+    pub extraction: Option<Vec<crate::extraction_results::ExtractionEvidence>>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::screening::present"
+    )]
+    pub acceptance: Option<Vec<crate::extraction_results::AcceptanceEvidence>>,
 }
 
 crate::document::versioned_document!(
@@ -71,7 +83,16 @@ crate::document::versioned_document!(
 );
 
 impl EvidenceRecord {
-    fn screening_version(&self) -> Result<(), String> {
+    pub(crate) fn screening_version(&self) -> Result<(), String> {
+        self.judgment.extraction_version()?;
+        if self.schema != schema::EVIDENCE_V2
+            && (self.extraction.is_some()
+                || self.acceptance.is_some()
+                || self.inputs.iter().any(|i| i.producer.is_some())
+                || self.judgment.lineage.producers.is_some())
+        {
+            return Err("extraction, acceptance and producers require rustev.evidence/2".into());
+        }
         if self.schema != schema::EVIDENCE_V2
             && (self.acquisitions.is_some()
                 || self
@@ -114,6 +135,12 @@ pub struct InputEvidence {
     /// entry digest, source and provenance stay recorded (spec 033, 3.4.8).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dropped: Option<DroppedBy>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::screening::present"
+    )]
+    pub producer: Option<crate::snapshot::Producer>,
 }
 
 /// Which check dropped an input (spec 033, 3.4.8).

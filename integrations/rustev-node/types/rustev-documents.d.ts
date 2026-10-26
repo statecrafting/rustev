@@ -3916,6 +3916,9 @@ export namespace RustevEvidence1 {
         policy: {
           site: string;
         };
+      }
+    | {
+        capability: CapabilityStep;
       };
   /**
    * The provenance an input cause records (3.5.2).
@@ -4289,6 +4292,12 @@ export namespace RustevEvidence1 {
     transient: boolean;
   }
   /**
+   * A fallback field identifies the extraction step (spec 038, 3.12.3).
+   */
+  export interface CapabilityStep {
+    step: string;
+  }
+  /**
    * Details of a screening notice. Never includes screened text.
    */
   export interface ScreeningNotice {
@@ -4456,72 +4465,58 @@ export namespace RustevEvidence1 {
 export type RustevEvidence1 = RustevEvidence1.RustevEvidence1;
 
 export namespace RustevEvidence2 {
-  export type ContentDigest = string;
-  /**
-   * The oldest as-of among contributing graded values, or `none`.
-   */
-  export type AsOf =
-    | "none"
+  export type AcceptedOrigin =
+    | ("supplied" | "extracted" | "fallback")
     | {
-        ms: Timestamp;
+        host_extracted: {
+          producer?: Producer | null;
+        };
       };
+  export type ArtifactId = string;
   export type Timestamp = number;
-  /**
-   * How a value's metadata came about (spec 032, 3.2.2).
-   */
-  export type Basis =
+  export type TemplateDigest = "none" | PromptTemplateId;
+  export type PromptTemplateId = string;
+  export type AcceptanceOutcome =
+    | ("accepted" | "passed_through" | "unresolved")
     | {
-        acquired: {
-          step: string;
-        };
-      }
-    | "declared"
-    | "computed"
-    | {
-        corroborated: {
-          step: string;
-        };
-      }
-    | {
-        merged: {
-          side: MergeSide;
-          step: string;
-        };
-      }
-    | {
-        resolved: {
-          input: string;
+        dropped: {
+          cause: AcceptanceFailure;
         };
       };
-  /**
-   * Which side of a merge a field came from (spec 032, 3.6.3).
-   */
-  export type MergeSide = "base" | "overlay";
-  /**
-   * A value's grade, or `ungraded` when no graded value contributed.
-   * `ungraded` is not a point of the grade order (spec 032, 3.2.3).
-   */
-  export type ValueGrade = "authoritative" | "cached" | "estimated" | "hint" | "ungraded";
-  /**
-   * The closed set of provenance classes (spec 002, 3.7.1).
-   */
-  export type ProvenanceClass =
-    | "authenticated-app-field"
-    | "system-of-record"
-    | "user-supplied"
-    | "third-party"
-    | "attributed-claim"
-    | "model-derived";
-  export type AcquisitionKind = "acquire" | "widen";
-  export type AcquisitionOutcome =
-    | "resolved"
+  export type AcceptanceFailure =
+    | ("validation_failed" | "validation_fault" | "min_mass_not_met" | "distribution_absent")
     | {
-        skipped: {
-          guard: string;
+        absence: AbsenceReason;
+      };
+  export type AbsenceReason =
+    | (
+        | "missing"
+        | "wrong_type"
+        | "too_long"
+        | "control_character"
+        | "not_in_vocabulary"
+        | "duplicate_item"
+        | "too_many_items"
+        | "out_of_bounds"
+        | "invalid_date"
+        | "vocabulary_unavailable"
+        | "source_unavailable"
+        | "screen_blocked"
+        | "screen_unavailable"
+        | "fallback_no_match"
+        | "fallback_invalid"
+      )
+    | {
+        request_failed: {
+          reason: RequestFailure;
         };
-      }
+      };
+  export type RequestFailure =
+    "backend_unavailable" | "invalid_backend_output" | "deadline_exceeded" | "budget_exhausted" | "cancelled";
+  export type AcceptanceValidation =
+    | ("not_applied" | "passed" | "failed")
     | {
-        unresolved: Unresolved;
+        fault: Unresolved;
       };
   /**
    * The closed set of unresolved reasons (spec 002, 3.5.6). Field and fact
@@ -4588,6 +4583,72 @@ export namespace RustevEvidence2 {
           fields: [string, ...string[]];
         };
       };
+  export type ContentDigest = string;
+  /**
+   * The oldest as-of among contributing graded values, or `none`.
+   */
+  export type AsOf =
+    | "none"
+    | {
+        ms: Timestamp;
+      };
+  /**
+   * How a value's metadata came about (spec 032, 3.2.2).
+   */
+  export type Basis =
+    | {
+        acquired: {
+          step: string;
+        };
+      }
+    | "declared"
+    | "computed"
+    | {
+        corroborated: {
+          step: string;
+        };
+      }
+    | {
+        merged: {
+          side: MergeSide;
+          step: string;
+        };
+      }
+    | {
+        resolved: {
+          input: string;
+        };
+      };
+  /**
+   * Which side of a merge a field came from (spec 032, 3.6.3).
+   */
+  export type MergeSide = "base" | "overlay";
+  /**
+   * A value's grade, or `ungraded` when no graded value contributed.
+   * `ungraded` is not a point of the grade order (spec 032, 3.2.3).
+   */
+  export type ValueGrade = "authoritative" | "cached" | "estimated" | "hint" | "ungraded";
+  /**
+   * The closed set of provenance classes (spec 002, 3.7.1).
+   */
+  export type ProvenanceClass =
+    | "authenticated-app-field"
+    | "system-of-record"
+    | "user-supplied"
+    | "third-party"
+    | "attributed-claim"
+    | "model-derived";
+  export type AcquisitionKind = "acquire" | "widen";
+  export type AcquisitionOutcome =
+    | "resolved"
+    | {
+        skipped: {
+          guard: string;
+        };
+      }
+    | {
+        unresolved: Unresolved;
+      };
   export type AcquisitionStop =
     "none" | "exhausted" | "stop_condition" | "page_limit" | "item_limit" | "tiers_exhausted" | "tier_failure";
   export type TierOutcome =
@@ -4633,6 +4694,50 @@ export namespace RustevEvidence2 {
         };
       };
   export type DefinitionId = string;
+  export type FallbackIdentity =
+    | "none"
+    | {
+        identity: ContentDigest;
+      };
+  export type ExtractionCalibration =
+    | "none"
+    | {
+        applied: CalibrationId;
+      };
+  export type CalibrationId = string;
+  /**
+   * Derivation classes (spec 001, 3.3; spec 002, 3.12).
+   */
+  export type Derivation = "exact-derived" | "model-derived" | "mixed-derived";
+  export type FieldDistribution =
+    | {
+        masses: number[];
+      }
+    | {
+        absent: {
+          reason: DistributionAbsence;
+        };
+      };
+  export type DistributionAbsence = "incomplete_logprobs" | "not_returned";
+  export type ExtractionOrigin =
+    | ("extracted" | "fallback")
+    | {
+        absent: {
+          reason: AbsenceReason;
+        };
+      };
+  export type ExtractionRequestOutcome =
+    | "succeeded"
+    | {
+        failed: {
+          reason: RequestFailure;
+        };
+      }
+    | {
+        withheld: {
+          reason: AbsenceReason;
+        };
+      };
   export type FieldOrigin =
     | ("generated" | "repaired")
     | {
@@ -4754,10 +4859,6 @@ export namespace RustevEvidence2 {
         unresolved: Unresolved;
       };
   /**
-   * Derivation classes (spec 001, 3.3; spec 002, 3.12).
-   */
-  export type Derivation = "exact-derived" | "model-derived" | "mixed-derived";
-  /**
    * Who can act on an outcome (3.5.2), ordered from most to least able to
    * act on it themselves: the combination of parties is the greatest.
    */
@@ -4793,6 +4894,9 @@ export namespace RustevEvidence2 {
         policy: {
           site: string;
         };
+      }
+    | {
+        capability: CapabilityStep;
       };
   /**
    * The provenance an input cause records (3.5.2).
@@ -4924,6 +5028,13 @@ export namespace RustevEvidence2 {
    */
   export type OutValue =
     | {
+        attributed: {
+          derivation: Derivation;
+          origin: AcceptedOrigin;
+          value: OutValue;
+        };
+      }
+    | {
         bool: boolean;
       }
     | {
@@ -4969,7 +5080,6 @@ export namespace RustevEvidence2 {
   export type UnresolvedWire = ActionableUnresolved | Unresolved;
   export type PlanId = string;
   export type SnapshotId = string;
-  export type ArtifactId = string;
   export type DescriptorId = string;
   export type ScreenVerdict =
     | ("pass" | "blocked" | "empty")
@@ -5024,6 +5134,7 @@ export namespace RustevEvidence2 {
       };
 
   export interface RustevEvidence2 {
+    acceptance?: AcceptanceEvidence[] | null;
     /**
      * Spec 036: omitted when the plan has no acquisition step.
      *
@@ -5042,6 +5153,7 @@ export namespace RustevEvidence2 {
     decision_id: string;
     definition_id: DefinitionId;
     evaluation_time_ms: Timestamp;
+    extraction?: ExtractionEvidence[] | null;
     /**
      * Spec 037: digest-only field slots, omitted without generate steps.
      *
@@ -5093,6 +5205,29 @@ export namespace RustevEvidence2 {
     screening?: [ScreeningEvidence, ...ScreeningEvidence[]];
     snapshot_id: SnapshotId;
     steps: StepEvidence[];
+  }
+  export interface AcceptanceEvidence {
+    field: string;
+    origin?: AcceptedOrigin | null;
+    outcome: AcceptanceOutcome;
+    step: string;
+    validation: AcceptanceValidation;
+    /**
+     * The value read, subject to the same retention rule as extraction evidence.
+     */
+    value_read?: AcceptanceRead | null;
+  }
+  export interface Producer {
+    artifact_id: ArtifactId;
+    produced_at_ms: Timestamp;
+    template_digest: TemplateDigest;
+  }
+  /**
+   * A read can be supplied by a host without claiming an extraction-step origin.
+   */
+  export interface AcceptanceRead {
+    value?: unknown;
+    value_digest: ContentDigest;
   }
   export interface AcquisitionEvidence {
     items: AcquiredItemEvidence[];
@@ -5185,6 +5320,50 @@ export namespace RustevEvidence2 {
     status: CheckStatus;
     subject: string;
   }
+  export interface ExtractionEvidence {
+    artifact: ArtifactId;
+    fallback: FallbackIdentity;
+    fields: ExtractionFieldEvidence[];
+    request_outcome: ExtractionRequestOutcome;
+    schema_digest: ContentDigest;
+    step: string;
+    template_id: PromptTemplateId;
+  }
+  /**
+   * Field evidence members follow spec 038, 3.12.1.
+   * Core must construct evidence with `new` to enforce digest-only text retention (R-19).
+   */
+  export interface ExtractionFieldEvidence {
+    calibration: ExtractionCalibration;
+    derivation?: Derivation | null;
+    distribution: FieldDistribution;
+    /**
+     * Present list items in returned order, retaining their original indices.
+     */
+    items: ExtractionItemEvidence[];
+    name: string;
+    origin: ExtractionOrigin;
+    provider_reported?: string | null;
+    rejected: RejectedExtractionItem[];
+    /**
+     * A failing record subfield, when applicable.
+     */
+    subfield?: string | null;
+    value?: unknown;
+    value_digest?: ContentDigest | null;
+  }
+  export interface ExtractionItemEvidence {
+    calibration: ExtractionCalibration;
+    distribution: FieldDistribution;
+    index: number;
+    value?: unknown;
+    value_digest: ContentDigest;
+  }
+  export interface RejectedExtractionItem {
+    index: number;
+    reason: AbsenceReason;
+    value_digest: ContentDigest;
+  }
   export interface GenerationEvidence {
     counts: TextCounts;
     items: GenerationItemEvidence[];
@@ -5250,6 +5429,7 @@ export namespace RustevEvidence2 {
      */
     meta?: ValueMeta | null;
     presence?: Presence | null;
+    producer?: Producer | null;
     /**
      * Evidence 2: how a disagreement was resolved (spec 032, 3.8.4).
      */
@@ -5304,6 +5484,9 @@ export namespace RustevEvidence2 {
    */
   export interface Lineage {
     inputs: string[];
+    producers?: {
+      [k: string]: Producer | undefined;
+    } | null;
     steps: string[];
   }
   export interface Notice {
@@ -5336,6 +5519,12 @@ export namespace RustevEvidence2 {
     override: Override;
     remediation: Remediation;
     transient: boolean;
+  }
+  /**
+   * A fallback field identifies the extraction step (spec 038, 3.12.3).
+   */
+  export interface CapabilityStep {
+    step: string;
   }
   /**
    * Details of a screening notice. Never includes screened text.
@@ -6386,6 +6575,9 @@ export namespace RustevJudgment1 {
         policy: {
           site: string;
         };
+      }
+    | {
+        capability: CapabilityStep;
       };
   /**
    * The provenance an input cause records (3.5.2).
@@ -6695,6 +6887,12 @@ export namespace RustevJudgment1 {
     transient: boolean;
   }
   /**
+   * A fallback field identifies the extraction step (spec 038, 3.12.3).
+   */
+  export interface CapabilityStep {
+    step: string;
+  }
+  /**
    * Details of a screening notice. Never includes screened text.
    */
   export interface ScreeningNotice {
@@ -6799,6 +6997,9 @@ export namespace RustevJudgment2 {
    */
   export type Derivation = "exact-derived" | "model-derived" | "mixed-derived";
   export type Timestamp = number;
+  export type ArtifactId = string;
+  export type TemplateDigest = "none" | PromptTemplateId;
+  export type PromptTemplateId = string;
   /**
    * Who can act on an outcome (3.5.2), ordered from most to least able to
    * act on it themselves: the combination of parties is the greatest.
@@ -6835,6 +7036,9 @@ export namespace RustevJudgment2 {
         policy: {
           site: string;
         };
+      }
+    | {
+        capability: CapabilityStep;
       };
   /**
    * The provenance an input cause records (3.5.2).
@@ -6976,6 +7180,13 @@ export namespace RustevJudgment2 {
    */
   export type OutValue =
     | {
+        attributed: {
+          derivation: Derivation;
+          origin: AcceptedOrigin;
+          value: OutValue;
+        };
+      }
+    | {
         bool: boolean;
       }
     | {
@@ -7013,6 +7224,13 @@ export namespace RustevJudgment2 {
       }
     | {
         ranking: Ranking;
+      };
+  export type AcceptedOrigin =
+    | ("supplied" | "extracted" | "fallback")
+    | {
+        host_extracted: {
+          producer?: Producer | null;
+        };
       };
   /**
    * Version 2's `{reason, action}` is tried first; no version 1 reason is
@@ -7110,7 +7328,15 @@ export namespace RustevJudgment2 {
    */
   export interface Lineage {
     inputs: string[];
+    producers?: {
+      [k: string]: Producer | undefined;
+    } | null;
     steps: string[];
+  }
+  export interface Producer {
+    artifact_id: ArtifactId;
+    produced_at_ms: Timestamp;
+    template_digest: TemplateDigest;
   }
   export interface Notice {
     /**
@@ -7142,6 +7368,12 @@ export namespace RustevJudgment2 {
     override: Override;
     remediation: Remediation;
     transient: boolean;
+  }
+  /**
+   * A fallback field identifies the extraction step (spec 038, 3.12.3).
+   */
+  export interface CapabilityStep {
+    step: string;
   }
   /**
    * Details of a screening notice. Never includes screened text.
@@ -7747,6 +7979,9 @@ export namespace RustevPlan2 {
         policy: {
           site: string;
         };
+      }
+    | {
+        capability: CapabilityStep;
       };
   /**
    * The provenance an input cause records (3.5.2).
@@ -8734,6 +8969,12 @@ export namespace RustevPlan2 {
     party: Party;
   }
   /**
+   * A fallback field identifies the extraction step (spec 038, 3.12.3).
+   */
+  export interface CapabilityStep {
+    step: string;
+  }
+  /**
    * A policy site that can produce an action (`rule:<id>`, `handler:<n>`).
    */
   export interface StaticSite {
@@ -9567,6 +9808,9 @@ export namespace RustevPlan3 {
         policy: {
           site: string;
         };
+      }
+    | {
+        capability: CapabilityStep;
       };
   /**
    * The provenance an input cause records (3.5.2).
@@ -10487,6 +10731,12 @@ export namespace RustevPlan3 {
     | "corroborate"
     | {
         generate: GenerateBinding;
+      }
+    | {
+        extract: ExtractBinding;
+      }
+    | {
+        accept_model_derived: AcceptModelDerived;
       };
   export type BoundCalibration =
     | "none"
@@ -10513,6 +10763,68 @@ export namespace RustevPlan3 {
         enum: {
           options: string[];
         };
+      };
+  export type BoundExtractionFallback =
+    | "none"
+    | {
+        bound: {
+          fill: Fill;
+          identity: ContentDigest;
+          program: ExtractRules;
+        };
+      };
+  export type ContentDigest = string;
+  export type ExtractionValue =
+    | {
+        literal: unknown;
+      }
+    | {
+        integer_after: {
+          max_digits: number;
+          source: string;
+          terms: string[];
+        };
+      }
+    | {
+        date_iso: {
+          occurrence: number;
+          source: string;
+        };
+      }
+    | {
+        record: {
+          [k: string]: ExtractionValue | undefined;
+        };
+      };
+  export type ExtractionCondition =
+    | "always"
+    | {
+        contains_any: {
+          source: string;
+          terms: string[];
+        };
+      }
+    | {
+        contains_all: {
+          source: string;
+          terms: string[];
+        };
+      }
+    | {
+        all: ExtractionCondition[];
+      }
+    | {
+        any: ExtractionCondition[];
+      }
+    | {
+        not: ExtractionCondition;
+      };
+  export type ResolvedVocabulary =
+    | {
+        options: string[];
+      }
+    | {
+        input: string;
       };
 
   export interface RustevPlan3 {
@@ -10694,6 +11006,12 @@ export namespace RustevPlan3 {
     classes: ProvenanceClass[];
     consequence: string;
     party: Party;
+  }
+  /**
+   * A fallback field identifies the extraction step (spec 038, 3.12.3).
+   */
+  export interface CapabilityStep {
+    step: string;
   }
   /**
    * A policy site that can produce an action (`rule:<id>`, `handler:<n>`).
@@ -11543,6 +11861,45 @@ export namespace RustevPlan3 {
     name: string;
     type: PromptParamType;
   }
+  export interface ExtractBinding {
+    artifact: ArtifactId;
+    backend_id: string;
+    descriptor: DescriptorId;
+    distributions: Distributions;
+    fallback: BoundExtractionFallback;
+    limits: ExtractionLimits;
+    output: OutputKind;
+    projection: string[];
+    schema: ExtractionSchema;
+    schema_digest: ContentDigest;
+    template: PromptTemplate;
+    template_binding: TemplateRef;
+    template_id: PromptTemplateId;
+    vocabularies: {
+      [k: string]: ResolvedVocabulary | undefined;
+    };
+    worst_case_request_bytes: number;
+  }
+  export interface ExtractRules {
+    fields: FieldRules[];
+    name: string;
+    schema: string;
+    sources: ExtractionSource[];
+    version: string;
+  }
+  export interface FieldRules {
+    field: string;
+    rules: ExtractionRule[];
+  }
+  export interface ExtractionRule {
+    name: string;
+    then: ExtractionValue;
+    when: ExtractionCondition;
+  }
+  export interface ExtractionSource {
+    name: string;
+    ref: string;
+  }
 }
 export type RustevPlan3 = RustevPlan3.RustevPlan3;
 
@@ -11769,6 +12126,9 @@ export namespace RustevPlanDiff1 {
         policy: {
           site: string;
         };
+      }
+    | {
+        capability: CapabilityStep;
       };
   /**
    * The provenance an input cause records (3.5.2).
@@ -11994,6 +12354,12 @@ export namespace RustevPlanDiff1 {
     override: Override;
     remediation: Remediation;
     transient: boolean;
+  }
+  /**
+   * A fallback field identifies the extraction step (spec 038, 3.12.3).
+   */
+  export interface CapabilityStep {
+    step: string;
   }
   /**
    * Details of a screening notice. Never includes screened text.
@@ -14024,6 +14390,9 @@ export namespace RustevRun1 {
         policy: {
           site: string;
         };
+      }
+    | {
+        capability: CapabilityStep;
       };
   /**
    * The provenance an input cause records (3.5.2).
@@ -14527,6 +14896,12 @@ export namespace RustevRun1 {
     override: Override;
     remediation: Remediation;
     transient: boolean;
+  }
+  /**
+   * A fallback field identifies the extraction step (spec 038, 3.12.3).
+   */
+  export interface CapabilityStep {
+    step: string;
   }
   /**
    * Details of a screening notice. Never includes screened text.
@@ -15082,6 +15457,9 @@ export namespace RustevRun2 {
         policy: {
           site: string;
         };
+      }
+    | {
+        capability: CapabilityStep;
       };
   /**
    * The provenance an input cause records (3.5.2).
@@ -15658,6 +16036,12 @@ export namespace RustevRun2 {
     transient: boolean;
   }
   /**
+   * A fallback field identifies the extraction step (spec 038, 3.12.3).
+   */
+  export interface CapabilityStep {
+    step: string;
+  }
+  /**
    * Details of a screening notice. Never includes screened text.
    */
   export interface ScreeningNotice {
@@ -16132,6 +16516,59 @@ export namespace RustevRun3 {
     | {
         recorded: EvidenceRecord;
       };
+  export type AcceptedOrigin =
+    | ("supplied" | "extracted" | "fallback")
+    | {
+        host_extracted: {
+          producer?: Producer | null;
+        };
+      };
+  export type ArtifactId = string;
+  export type Timestamp = number;
+  export type TemplateDigest = "none" | PromptTemplateId;
+  export type PromptTemplateId = string;
+  export type AcceptanceOutcome =
+    | ("accepted" | "passed_through" | "unresolved")
+    | {
+        dropped: {
+          cause: AcceptanceFailure;
+        };
+      };
+  export type AcceptanceFailure =
+    | ("validation_failed" | "validation_fault" | "min_mass_not_met" | "distribution_absent")
+    | {
+        absence: AbsenceReason;
+      };
+  export type AbsenceReason =
+    | (
+        | "missing"
+        | "wrong_type"
+        | "too_long"
+        | "control_character"
+        | "not_in_vocabulary"
+        | "duplicate_item"
+        | "too_many_items"
+        | "out_of_bounds"
+        | "invalid_date"
+        | "vocabulary_unavailable"
+        | "source_unavailable"
+        | "screen_blocked"
+        | "screen_unavailable"
+        | "fallback_no_match"
+        | "fallback_invalid"
+      )
+    | {
+        request_failed: {
+          reason: RequestFailure;
+        };
+      };
+  export type RequestFailure =
+    "backend_unavailable" | "invalid_backend_output" | "deadline_exceeded" | "budget_exhausted" | "cancelled";
+  export type AcceptanceValidation =
+    | ("not_applied" | "passed" | "failed")
+    | {
+        fault: Unresolved;
+      };
   export type ContentDigest = string;
   /**
    * The oldest as-of among contributing graded values, or `none`.
@@ -16141,7 +16578,6 @@ export namespace RustevRun3 {
     | {
         ms: Timestamp;
       };
-  export type Timestamp = number;
   /**
    * How a value's metadata came about (spec 032, 3.2.2).
    */
@@ -16243,6 +16679,50 @@ export namespace RustevRun3 {
         };
       };
   export type DefinitionId = string;
+  export type FallbackIdentity =
+    | "none"
+    | {
+        identity: ContentDigest;
+      };
+  export type ExtractionCalibration =
+    | "none"
+    | {
+        applied: CalibrationId;
+      };
+  export type CalibrationId = string;
+  /**
+   * Derivation classes (spec 001, 3.3; spec 002, 3.12).
+   */
+  export type Derivation = "exact-derived" | "model-derived" | "mixed-derived";
+  export type FieldDistribution =
+    | {
+        masses: number[];
+      }
+    | {
+        absent: {
+          reason: DistributionAbsence;
+        };
+      };
+  export type DistributionAbsence = "incomplete_logprobs" | "not_returned";
+  export type ExtractionOrigin =
+    | ("extracted" | "fallback")
+    | {
+        absent: {
+          reason: AbsenceReason;
+        };
+      };
+  export type ExtractionRequestOutcome =
+    | "succeeded"
+    | {
+        failed: {
+          reason: RequestFailure;
+        };
+      }
+    | {
+        withheld: {
+          reason: AbsenceReason;
+        };
+      };
   export type FieldOrigin =
     | ("generated" | "repaired")
     | {
@@ -16364,10 +16844,6 @@ export namespace RustevRun3 {
         unresolved: Unresolved;
       };
   /**
-   * Derivation classes (spec 001, 3.3; spec 002, 3.12).
-   */
-  export type Derivation = "exact-derived" | "model-derived" | "mixed-derived";
-  /**
    * Who can act on an outcome (3.5.2), ordered from most to least able to
    * act on it themselves: the combination of parties is the greatest.
    */
@@ -16403,6 +16879,9 @@ export namespace RustevRun3 {
         policy: {
           site: string;
         };
+      }
+    | {
+        capability: CapabilityStep;
       };
   /**
    * The provenance an input cause records (3.5.2).
@@ -16534,6 +17013,13 @@ export namespace RustevRun3 {
    */
   export type OutValue =
     | {
+        attributed: {
+          derivation: Derivation;
+          origin: AcceptedOrigin;
+          value: OutValue;
+        };
+      }
+    | {
         bool: boolean;
       }
     | {
@@ -16579,7 +17065,6 @@ export namespace RustevRun3 {
   export type UnresolvedWire = ActionableUnresolved | Unresolved;
   export type PlanId = string;
   export type SnapshotId = string;
-  export type ArtifactId = string;
   export type DescriptorId = string;
   export type ScreenVerdict =
     | ("pass" | "blocked" | "empty")
@@ -16787,6 +17272,7 @@ export namespace RustevRun3 {
     reserved: number;
   }
   export interface EvidenceRecord {
+    acceptance?: AcceptanceEvidence[] | null;
     /**
      * Spec 036: omitted when the plan has no acquisition step.
      *
@@ -16805,6 +17291,7 @@ export namespace RustevRun3 {
     decision_id: string;
     definition_id: DefinitionId;
     evaluation_time_ms: Timestamp;
+    extraction?: ExtractionEvidence[] | null;
     /**
      * Spec 037: digest-only field slots, omitted without generate steps.
      *
@@ -16856,6 +17343,29 @@ export namespace RustevRun3 {
     screening?: [ScreeningEvidence, ...ScreeningEvidence[]];
     snapshot_id: SnapshotId;
     steps: StepEvidence[];
+  }
+  export interface AcceptanceEvidence {
+    field: string;
+    origin?: AcceptedOrigin | null;
+    outcome: AcceptanceOutcome;
+    step: string;
+    validation: AcceptanceValidation;
+    /**
+     * The value read, subject to the same retention rule as extraction evidence.
+     */
+    value_read?: AcceptanceRead | null;
+  }
+  export interface Producer {
+    artifact_id: ArtifactId;
+    produced_at_ms: Timestamp;
+    template_digest: TemplateDigest;
+  }
+  /**
+   * A read can be supplied by a host without claiming an extraction-step origin.
+   */
+  export interface AcceptanceRead {
+    value?: unknown;
+    value_digest: ContentDigest;
   }
   export interface AcquisitionEvidence {
     items: AcquiredItemEvidence[];
@@ -16948,6 +17458,50 @@ export namespace RustevRun3 {
     status: CheckStatus;
     subject: string;
   }
+  export interface ExtractionEvidence {
+    artifact: ArtifactId;
+    fallback: FallbackIdentity;
+    fields: ExtractionFieldEvidence[];
+    request_outcome: ExtractionRequestOutcome;
+    schema_digest: ContentDigest;
+    step: string;
+    template_id: PromptTemplateId;
+  }
+  /**
+   * Field evidence members follow spec 038, 3.12.1.
+   * Core must construct evidence with `new` to enforce digest-only text retention (R-19).
+   */
+  export interface ExtractionFieldEvidence {
+    calibration: ExtractionCalibration;
+    derivation?: Derivation | null;
+    distribution: FieldDistribution;
+    /**
+     * Present list items in returned order, retaining their original indices.
+     */
+    items: ExtractionItemEvidence[];
+    name: string;
+    origin: ExtractionOrigin;
+    provider_reported?: string | null;
+    rejected: RejectedExtractionItem[];
+    /**
+     * A failing record subfield, when applicable.
+     */
+    subfield?: string | null;
+    value?: unknown;
+    value_digest?: ContentDigest | null;
+  }
+  export interface ExtractionItemEvidence {
+    calibration: ExtractionCalibration;
+    distribution: FieldDistribution;
+    index: number;
+    value?: unknown;
+    value_digest: ContentDigest;
+  }
+  export interface RejectedExtractionItem {
+    index: number;
+    reason: AbsenceReason;
+    value_digest: ContentDigest;
+  }
   export interface GenerationEvidence {
     counts: TextCounts;
     items: GenerationItemEvidence[];
@@ -17013,6 +17567,7 @@ export namespace RustevRun3 {
      */
     meta?: ValueMeta | null;
     presence?: Presence | null;
+    producer?: Producer | null;
     /**
      * Evidence 2: how a disagreement was resolved (spec 032, 3.8.4).
      */
@@ -17067,6 +17622,9 @@ export namespace RustevRun3 {
    */
   export interface Lineage {
     inputs: string[];
+    producers?: {
+      [k: string]: Producer | undefined;
+    } | null;
     steps: string[];
   }
   export interface Notice {
@@ -17099,6 +17657,12 @@ export namespace RustevRun3 {
     override: Override;
     remediation: Remediation;
     transient: boolean;
+  }
+  /**
+   * A fallback field identifies the extraction step (spec 038, 3.12.3).
+   */
+  export interface CapabilityStep {
+    step: string;
   }
   /**
    * Details of a screening notice. Never includes screened text.
@@ -19170,10 +19734,21 @@ export namespace RustevTextResult1 {
    * Derivation classes (spec 001, 3.3; spec 002, 3.12).
    */
   export type Derivation = "exact-derived" | "model-derived" | "mixed-derived";
+  export type ArtifactId = string;
+  export type Timestamp = number;
+  export type TemplateDigest = "none" | PromptTemplateId;
+  export type PromptTemplateId = string;
   /**
    * A value placed in a proposal's parameters.
    */
   export type OutValue =
+    | {
+        attributed: {
+          derivation: Derivation;
+          origin: AcceptedOrigin;
+          value: OutValue;
+        };
+      }
     | {
         bool: boolean;
       }
@@ -19213,8 +19788,14 @@ export namespace RustevTextResult1 {
     | {
         ranking: Ranking;
       };
+  export type AcceptedOrigin =
+    | ("supplied" | "extracted" | "fallback")
+    | {
+        host_extracted: {
+          producer?: Producer | null;
+        };
+      };
   export type Decimal = string;
-  export type Timestamp = number;
   /**
    * A non-negative span in milliseconds.
    */
@@ -19236,7 +19817,6 @@ export namespace RustevTextResult1 {
           paths: string[];
         };
       };
-  export type PromptTemplateId = string;
   export type FieldOrigin =
     | ("generated" | "repaired")
     | {
@@ -19418,7 +19998,15 @@ export namespace RustevTextResult1 {
    */
   export interface Lineage {
     inputs: string[];
+    producers?: {
+      [k: string]: Producer | undefined;
+    } | null;
     steps: string[];
+  }
+  export interface Producer {
+    artifact_id: ArtifactId;
+    produced_at_ms: Timestamp;
+    template_digest: TemplateDigest;
   }
   /**
    * The result of `filter_with_reasons@1`.

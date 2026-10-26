@@ -576,6 +576,7 @@ impl<'c> Evaluation<'c> {
             ev.lineage.insert(
                 key,
                 Lineage {
+                    producers: None,
                     inputs: vec![name.clone()],
                     steps: vec![],
                 },
@@ -1613,6 +1614,7 @@ impl<'c> Evaluation<'c> {
             }
         }
         Lineage {
+            producers: None,
             inputs: inputs.into_iter().collect(),
             steps: steps.into_iter().collect(),
         }
@@ -1807,6 +1809,7 @@ impl<'c> Evaluation<'c> {
         self.lineage.insert(
             key,
             Lineage {
+                producers: None,
                 inputs: vec![name.to_string()],
                 steps: vec![],
             },
@@ -2780,6 +2783,7 @@ impl<'c> Evaluation<'c> {
             .map(|(k, v)| {
                 let q = self.input_quality.get(k).cloned().unwrap_or_default();
                 InputEvidence {
+                    producer: None,
                     field: k.clone(),
                     status: v.clone(),
                     meta: q.meta.map(|m| m.whole),
@@ -2896,6 +2900,8 @@ impl<'c> Evaluation<'c> {
         });
         let evidence = EvidenceRecord {
             generation: None,
+            extraction: None,
+            acceptance: None,
             acquisitions: self.acquisition_evidence(),
             screening: screening.filter(|entries: &Vec<ScreeningEvidence>| !entries.is_empty()),
             schema: if v2 {

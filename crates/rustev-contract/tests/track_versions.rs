@@ -136,6 +136,7 @@ fn a_source_descriptor_parses_and_is_identified() {
 fn plan_evidence_and_run_versions_parse_without_the_new_members() {
     // Existing records parse unchanged and write no evidence 2 member.
     let input = InputEvidence {
+        producer: None,
         field: "x".into(),
         status: InputStatus::Unresolved(rustev_contract::judgment::Unresolved::missing([
             "x".to_string()

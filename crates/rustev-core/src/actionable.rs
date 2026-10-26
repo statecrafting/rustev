@@ -114,7 +114,10 @@ pub(crate) fn cause_party(cause: &Cause, caller_controlled: &[ProvenanceClass]) 
             Origin::Upstream => Party::Upstream,
             Origin::Host => Party::Host,
         },
-        Cause::Budget { .. } | Cause::Deadline | Cause::Capability { .. } => Party::Host,
+        Cause::Budget { .. }
+        | Cause::Deadline
+        | Cause::Capability { .. }
+        | Cause::CapabilityStep { .. } => Party::Host,
         Cause::Policy { .. } => Party::None,
     }
 }

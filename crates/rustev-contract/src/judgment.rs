@@ -38,8 +38,29 @@ crate::document::versioned_document!(
     Judgment,
     [schema::JUDGMENT, schema::JUDGMENT_V2],
     "rustev.judgment/1 or rustev.judgment/2",
-    RECORD_V1
+    RECORD_V1,
+    check = Judgment::extraction_version
 );
+
+impl Judgment {
+    pub(crate) fn extraction_version(&self) -> Result<(), String> {
+        fn attributed(v: &OutValue) -> bool {
+            match v {
+                OutValue::Attributed { .. } => true,
+                OutValue::List(items) => items.iter().any(attributed),
+                OutValue::Record(fields) => fields.values().any(attributed),
+                _ => false,
+            }
+        }
+        if self.schema != schema::JUDGMENT_V2
+            && (self.lineage.producers.is_some()
+                || matches!(&self.outcome, Outcome::Propose { params, .. } if params.values().any(attributed)))
+        {
+            return Err("attributed values and producers require rustev.judgment/2".into());
+        }
+        Ok(())
+    }
+}
 
 /// A judgment's outcome. Version 1 uses `Propose`, `Escalate` and
 /// `Unresolved`; version 2 (spec 033, 3.5.1) replaces `Unresolved` with
@@ -334,6 +355,12 @@ pub enum Derivation {
 pub struct Lineage {
     pub inputs: Vec<String>,
     pub steps: Vec<String>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::screening::present"
+    )]
+    pub producers: Option<crate::extraction_results::Producers>,
 }
 
 #[derive(
@@ -378,6 +405,11 @@ pub enum NoticeKind {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum OutValue {
+    Attributed {
+        value: Box<OutValue>,
+        derivation: Derivation,
+        origin: crate::extraction_results::AcceptedOrigin,
+    },
     Bool(bool),
     Integer(i64),
     Decimal(Decimal),
