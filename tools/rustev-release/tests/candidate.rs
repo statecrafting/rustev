@@ -207,10 +207,8 @@ fn workflow_write_permissions_are_confined() {
             assert_eq!(job, "prerelease");
         }
     }
-    // At most one: the `prerelease` job that holds it is added with the
-    // workflow's candidate run (053 increment 2), which tightens this to
-    // exactly one.
-    assert!(writes <= 1);
+    // Exactly one: the `prerelease` job holds it and no other job does.
+    assert_eq!(writes, 1);
 }
 
 #[test]

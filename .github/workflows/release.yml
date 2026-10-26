@@ -22,6 +22,18 @@
 # without a tag: it attests nothing, never runs the `npm` job, and refuses
 # `publish-npm` (031 3.11). It is evidence for that commit only.
 #
+# A release candidate (spec 053) is dispatched on the owner's signed
+# annotated tag `vX.Y.Z-rc.N` (`gh workflow run release.yml --ref
+# vX.Y.Z-rc.N -f tag=vX.Y.Z-rc.N -f manifest=... -f manifest-signature=...`).
+# It runs every build and check of a release, binds the artifacts to the
+# candidate manifest the tag names, and then `prerelease` creates one GitHub
+# pre-release of this repository. It never publishes to npm, crates.io or a
+# container registry: `tag` refuses `publish-npm`, `npm` refuses a candidate
+# tag, and no job is granted the packages write permission (053 3.4). Its
+# rehearsal is dispatched on `release/next` with `rehearsal=true` and the
+# candidate's tag name, so it builds the bytes the candidate must reproduce
+# (053 3.1).
+#
 # - `tag`: the dispatched tag is the release-set file's tag, signed and
 #   verified against `tools/rustev-release/allowed_signers`, and the
 #   checkout is that tag's commit (a rehearsal: the dispatched commit).
@@ -46,6 +58,9 @@
 #   SHA-256 the signed tag's message names), every artifact this run built
 #   must equal the manifest's bytes (031 3.9.3, 3.11.2): the tag build
 #   reproduces what the owner signed.
+# - `prerelease`: a candidate only, after every check and `bind`: the one
+#   GitHub pre-release, created once and never replaced (053 3.3); the only
+#   job granted write access to contents.
 # - `npm`: the gated publication, in the release set's npm order, only
 #   after every check above, the binding to the signed manifest, and every
 #   crate of the manifest observed public with its checksum (3.1: layer 6
@@ -56,7 +71,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "The signed release tag, vX.Y.Z (the release-set file's tag); empty for a rehearsal"
+        description: "The signed release tag vX.Y.Z or candidate tag vX.Y.Z-rc.N; for a rehearsal, empty or the candidate to rehearse"
         required: false
         type: string
         default: ""
@@ -71,7 +86,12 @@ on:
         type: boolean
         default: false
       manifest:
-        description: "The signed release manifest's exact bytes (rustev.release-manifest/2); required to publish"
+        description: "The signed release manifest's exact bytes (rustev.release-manifest/2); required to publish and for a candidate"
+        required: false
+        type: string
+        default: ""
+      manifest-signature:
+        description: "The manifest's detached SSH signature (release-manifest.json.sig); required for a candidate"
         required: false
         type: string
         default: ""
@@ -95,6 +115,7 @@ jobs:
       commit: ${{ steps.tag.outputs.commit }}
       version: ${{ steps.tag.outputs.version }}
       epoch: ${{ steps.tag.outputs.epoch }}
+      candidate: ${{ steps.tag.outputs.candidate }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -110,7 +131,7 @@ jobs:
         # workflow it calls are the tag's own files.
         run: sh tools/rustev-release/artifacts.sh dispatch "$REHEARSAL" "$PUBLISH_NPM" "$TAG" >> "$GITHUB_OUTPUT"
       - name: The manifest is the one the signed tag names (031 3.11.2)
-        if: ${{ !inputs.rehearsal && (inputs.publish-npm || inputs.manifest != '') }}
+        if: ${{ !inputs.rehearsal && steps.tag.outputs.candidate != 'true' && (inputs.publish-npm || inputs.manifest != '') }}
         env:
           TAG: ${{ inputs.tag }}
           MANIFEST: ${{ inputs.manifest }}
@@ -122,6 +143,22 @@ jobs:
           want=$(git tag -l --format='%(contents)' "$TAG" | sed -n 's/^release-manifest-sha256: //p')
           test -n "$want" || { echo "021 3.8: the tag message names no release-manifest-sha256" >&2; exit 1; }
           test "$got" = "$want" || { echo "031 3.11.2: the manifest's SHA-256 $got is not the tag's $want" >&2; exit 1; }
+      - name: The candidate manifest is the one the signed tag names, for its commit (053 3.3.1)
+        if: ${{ !inputs.rehearsal && steps.tag.outputs.candidate == 'true' }}
+        env:
+          TAG: ${{ inputs.tag }}
+          COMMIT: ${{ steps.tag.outputs.commit }}
+          MANIFEST: ${{ inputs.manifest }}
+          SIGNATURE: ${{ inputs.manifest-signature }}
+        run: |
+          set -eu
+          printf %s "$MANIFEST" > "$RUNNER_TEMP/release-manifest.json"
+          sh tools/rustev-release/artifacts.sh tag-manifest "$TAG" "$RUNNER_TEMP/release-manifest.json"
+          cargo run --quiet --locked -p rustev-release -- candidate-manifest "$RUNNER_TEMP/release-manifest.json" "$TAG" "$COMMIT"
+          test -n "$SIGNATURE" || { echo "053 3.3.3: the pre-release holds the manifest's detached signature; a candidate run needs it" >&2; exit 1; }
+          printf '%s\n' "$SIGNATURE" > "$RUNNER_TEMP/release-manifest.json.sig"
+          ssh-keygen -Y verify -f tools/rustev-release/allowed_signers -I 7887446+bartekus@users.noreply.github.com \
+            -n rustev-release -s "$RUNNER_TEMP/release-manifest.json.sig" < "$RUNNER_TEMP/release-manifest.json"
 
   bindings:
     name: bindings
@@ -298,11 +335,13 @@ jobs:
         env:
           RUN: ${{ matrix.run }}
           EPOCH: ${{ needs.tag.outputs.epoch }}
+          VERSION: ${{ needs.tag.outputs.version }}
         run: |
           set -eu
           addons=dist/addons
           if [ "$RUN" = rebuild ]; then addons=dist/rebuild-native/addons; fi
-          sh tools/rustev-release/artifacts.sh pack "$addons" dist/npm "$EPOCH"
+          # A candidate's tarballs carry X.Y.Z-rc.N (053 3.2.3).
+          sh tools/rustev-release/artifacts.sh pack "$addons" dist/npm "$EPOCH" "$VERSION"
           ls dist/npm
       - name: Attest build provenance (031 3.9.5)
         if: ${{ matrix.run == 'release' && !inputs.rehearsal }}
@@ -416,10 +455,12 @@ jobs:
           name: npm
           path: dist/npm
       - name: The npm closure and the compiled crates' audit (031 3.9.2; 021 3.6)
+        env:
+          VERSION: ${{ needs.tag.outputs.version }}
         run: |
           set -eu
           cargo install cargo-deny --locked --version 0.20.2
-          sh tools/rustev-release/artifacts.sh audit dist/npm
+          sh tools/rustev-release/artifacts.sh audit dist/npm "$VERSION"
 
   bind:
     name: bind
@@ -466,6 +507,10 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.tag.outputs.commit }}
+      - name: A candidate is never published to npm (053 3.4.2)
+        env:
+          TAG: ${{ inputs.tag }}
+        run: sh tools/rustev-release/artifacts.sh npm-guard "$TAG"
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
@@ -508,3 +553,43 @@ jobs:
             # refusal; any refusal stops the run (021 3.9: no blind retry).
             npm publish "$file" --provenance --access public
           done
+
+  prerelease:
+    name: prerelease
+    needs: [tag, archive, pack, reproducibility, sbom, audit, bind]
+    if: ${{ !inputs.rehearsal && needs.tag.outputs.candidate == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    # The owner's signed candidate tag is the authority (053, decision 1):
+    # no Environment, because a pre-release is not registry publication.
+    # The only job of this workflow that may write contents (053 3.3.3).
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+          fetch-depth: 0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: cli
+          path: dist/artifacts/cli
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: npm
+          path: dist/artifacts/npm
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: sbom
+          path: dist/artifacts/sbom
+      - name: Create the pre-release once; a rerun with identical assets uploads nothing (053 3.3.3, 3.3.4)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          MANIFEST: ${{ inputs.manifest }}
+          SIGNATURE: ${{ inputs.manifest-signature }}
+        run: |
+          set -eu
+          printf %s "$MANIFEST" > "$RUNNER_TEMP/release-manifest.json"
+          printf '%s\n' "$SIGNATURE" > "$RUNNER_TEMP/release-manifest.json.sig"
+          cargo run --quiet --locked -p rustev-release -- prerelease "$TAG" "$RUNNER_TEMP/release-manifest.json" "$RUNNER_TEMP/release-manifest.json.sig" dist/artifacts

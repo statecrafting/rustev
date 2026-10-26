@@ -221,6 +221,21 @@ replaces an asset (3.3.3, 3.3.4). The tests in
 and `family.rs` cover the tooling rows of section 5, and a workflow test
 refuses any job requesting the packages write permission.
 
+**Increment 2 (2026-10-25): the candidate run.** In
+`.github/workflows/release.yml` the `tag` job outputs `candidate` and,
+for a candidate, runs `tag-manifest`, `candidate-manifest` (version, tag
+and commit) all before any build (3.3.1), and verifies the
+manifest's signature against `allowed_signers`, since the pre-release
+holds it (3.3.3). `pack` and `audit` build
+and check the candidate-versioned tarballs (3.2.3). The `npm` job runs
+`npm-guard` first (3.4.2). The new `prerelease` job runs only for a
+candidate, after `archive` and `pack` (whose artifacts it uploads),
+`reproducibility`, `sbom`, `audit` and `bind`, and is
+the only job granted write access to contents; it waits for no
+Environment (decision 1) and creates the pre-release through
+`rustev-release prerelease` (3.3.3, 3.3.4). The input
+`manifest-signature` carries the manifest's detached signature.
+
 ## Decisions at approval
 
 Ratified as proposed (A-55):
