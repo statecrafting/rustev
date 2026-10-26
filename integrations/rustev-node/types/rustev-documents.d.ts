@@ -80,12 +80,20 @@ export namespace RustevBackend1 {
   /**
    * The four semantic operations (R-05).
    */
-  export type Operation = "classify" | "proposition" | "rubric" | "rank" | "generate";
+  export type Operation = "classify" | "proposition" | "rubric" | "rank" | "generate" | "extract";
   /**
    * What a backend returns for an operation (design section 8.2).
    */
   export type OutputKind =
     | ("label" | "scores" | "distribution" | "logits" | "screen")
+    | {
+        typed_record: {
+          max_options: number;
+          max_output_bytes: number;
+          option_logprobs: boolean;
+          structure: TextStructure;
+        };
+      }
     | {
         text_record: {
           languages: string[];
@@ -168,6 +176,17 @@ export namespace RustevBackendOutput1 {
         text_record: {
           [k: string]: TextValue | undefined;
         };
+      }
+    | {
+        typed_record: {
+          fields: {
+            [k: string]: unknown | undefined;
+          };
+          logprobs: FieldLogprobs[];
+          provider_reported: {
+            [k: string]: string | undefined;
+          };
+        };
       };
   /**
    * A screener's reported text units, distinct from runtime computed charges.
@@ -189,6 +208,7 @@ export namespace RustevBackendOutput1 {
     | {
         list: string[];
       };
+  export type LogprobItem = "none" | number;
 
   export interface RustevBackendOutput1 {
     /**
@@ -199,6 +219,16 @@ export namespace RustevBackendOutput1 {
     output: RawOutput;
     schema: "rustev.backend-output/1";
     step: string;
+  }
+  /**
+   * Backend option log-probabilities; field eligibility is checked by the core.
+   */
+  export interface FieldLogprobs {
+    field: string;
+    item: LogprobItem;
+    values: {
+      [k: string]: number | undefined;
+    };
   }
 }
 export type RustevBackendOutput1 = RustevBackendOutput1.RustevBackendOutput1;
@@ -819,7 +849,8 @@ export namespace RustevDefinition1 {
     | "ordinal_distribution"
     | "scores"
     | "screen_verdict"
-    | "text_record";
+    | "text_record"
+    | "typed_record";
   export type ItemSource =
     | "none"
     | {
@@ -831,7 +862,7 @@ export namespace RustevDefinition1 {
   /**
    * The four semantic operations (R-05).
    */
-  export type Operation = "classify" | "proposition" | "rubric" | "rank" | "generate";
+  export type Operation = "classify" | "proposition" | "rubric" | "rank" | "generate" | "extract";
   export type OnFalse = "contradicts" | "no_evidence";
   export type CorroborationMode = "all" | "any";
   export type OnContradiction = "conflict" | "treat_as_hint" | "abstain";
@@ -2106,7 +2137,8 @@ export namespace RustevDefinition2 {
     | "ordinal_distribution"
     | "scores"
     | "screen_verdict"
-    | "text_record";
+    | "text_record"
+    | "typed_record";
   export type ItemSource =
     | "none"
     | {
@@ -2118,7 +2150,7 @@ export namespace RustevDefinition2 {
   /**
    * The four semantic operations (R-05).
    */
-  export type Operation = "classify" | "proposition" | "rubric" | "rank" | "generate";
+  export type Operation = "classify" | "proposition" | "rubric" | "rank" | "generate" | "extract";
   export type OnFalse = "contradicts" | "no_evidence";
   export type CorroborationMode = "all" | "any";
   export type OnContradiction = "conflict" | "treat_as_hint" | "abstain";
@@ -6095,6 +6127,156 @@ export namespace RustevExplanation1 {
 }
 export type RustevExplanation1 = RustevExplanation1.RustevExplanation1;
 
+export namespace RustevExtractRequest1 {
+  export type ExtractionType =
+    | {
+        bool: {};
+      }
+    | {
+        integer: {
+          /**
+           * @minItems 2
+           * @maxItems 2
+           */
+          bounds: [number, number];
+        };
+      }
+    | {
+        decimal: DecimalBounds;
+      }
+    | {
+        text: {
+          max_bytes: number;
+        };
+      }
+    | {
+        date: {};
+      }
+    | {
+        enum: {
+          vocabulary: string;
+        };
+      }
+    | {
+        list: {
+          item: ExtractionType;
+          max_items: number;
+        };
+      }
+    | {
+        record: {
+          fields: ExtractionField[];
+        };
+      };
+  export type ContentDigest = string;
+  export type PromptTemplateId = string;
+
+  /**
+   * Rendered extraction input. Vocabulary arrays preserve declared option order.
+   */
+  export interface RustevExtractRequest1 {
+    instructions: string;
+    output: ExtractionSchema;
+    projection: {
+      [k: string]: unknown | undefined;
+    };
+    schema: "rustev.extract-request/1";
+    schema_digest: ContentDigest;
+    step: string;
+    template: string;
+    template_id: PromptTemplateId;
+    vocabularies: {
+      [k: string]: string[] | undefined;
+    };
+  }
+  export interface ExtractionSchema {
+    fields: ExtractionField[];
+  }
+  export interface ExtractionField {
+    name: string;
+    type: ExtractionType;
+  }
+  export interface DecimalBounds {
+    /**
+     * @minItems 2
+     * @maxItems 2
+     */
+    bounds: [string, string];
+    scale: number;
+  }
+}
+export type RustevExtractRequest1 = RustevExtractRequest1.RustevExtractRequest1;
+
+export namespace RustevExtractRules1 {
+  export type ExtractionValue =
+    | {
+        literal: unknown;
+      }
+    | {
+        integer_after: {
+          max_digits: number;
+          source: string;
+          terms: string[];
+        };
+      }
+    | {
+        date_iso: {
+          occurrence: number;
+          source: string;
+        };
+      }
+    | {
+        record: {
+          [k: string]: ExtractionValue | undefined;
+        };
+      };
+  export type ExtractionCondition =
+    | "always"
+    | {
+        contains_any: {
+          source: string;
+          terms: string[];
+        };
+      }
+    | {
+        contains_all: {
+          source: string;
+          terms: string[];
+        };
+      }
+    | {
+        all: ExtractionCondition[];
+      }
+    | {
+        any: ExtractionCondition[];
+      }
+    | {
+        not: ExtractionCondition;
+      };
+
+  export interface RustevExtractRules1 {
+    fields: FieldRules[];
+    name: string;
+    schema: "rustev.extract-rules/1";
+    sources: ExtractionSource[];
+    version: string;
+  }
+  export interface FieldRules {
+    field: string;
+    rules: ExtractionRule[];
+  }
+  export interface ExtractionRule {
+    name: string;
+    then: ExtractionValue;
+    when: ExtractionCondition;
+  }
+  export interface ExtractionSource {
+    name: string;
+    ref: string;
+  }
+}
+export type RustevExtractRules1 = RustevExtractRules1.RustevExtractRules1;
+
 export namespace RustevGenerateRequest1 {
   export type GeneratedType =
     | {
@@ -8160,7 +8342,8 @@ export namespace RustevPlan2 {
     | "ordinal_distribution"
     | "scores"
     | "screen_verdict"
-    | "text_record";
+    | "text_record"
+    | "typed_record";
   export type ItemSource =
     | "none"
     | {
@@ -8172,7 +8355,7 @@ export namespace RustevPlan2 {
   /**
    * The four semantic operations (R-05).
    */
-  export type Operation = "classify" | "proposition" | "rubric" | "rank" | "generate";
+  export type Operation = "classify" | "proposition" | "rubric" | "rank" | "generate" | "extract";
   export type OnFalse = "contradicts" | "no_evidence";
   export type CorroborationMode = "all" | "any";
   export type OnContradiction = "conflict" | "treat_as_hint" | "abstain";
@@ -8324,6 +8507,14 @@ export namespace RustevPlan2 {
    */
   export type OutputKind =
     | ("label" | "scores" | "distribution" | "logits" | "screen")
+    | {
+        typed_record: {
+          max_options: number;
+          max_output_bytes: number;
+          option_logprobs: boolean;
+          structure: TextStructure;
+        };
+      }
     | {
         text_record: {
           languages: string[];
@@ -9971,7 +10162,8 @@ export namespace RustevPlan3 {
     | "ordinal_distribution"
     | "scores"
     | "screen_verdict"
-    | "text_record";
+    | "text_record"
+    | "typed_record";
   export type ItemSource =
     | "none"
     | {
@@ -9983,7 +10175,7 @@ export namespace RustevPlan3 {
   /**
    * The four semantic operations (R-05).
    */
-  export type Operation = "classify" | "proposition" | "rubric" | "rank" | "generate";
+  export type Operation = "classify" | "proposition" | "rubric" | "rank" | "generate" | "extract";
   export type OnFalse = "contradicts" | "no_evidence";
   export type CorroborationMode = "all" | "any";
   export type OnContradiction = "conflict" | "treat_as_hint" | "abstain";
@@ -10135,6 +10327,14 @@ export namespace RustevPlan3 {
    */
   export type OutputKind =
     | ("label" | "scores" | "distribution" | "logits" | "screen")
+    | {
+        typed_record: {
+          max_options: number;
+          max_output_bytes: number;
+          option_logprobs: boolean;
+          structure: TextStructure;
+        };
+      }
     | {
         text_record: {
           languages: string[];
@@ -12417,12 +12617,20 @@ export namespace RustevRemoteDescribe1Response {
   /**
    * The four semantic operations (R-05).
    */
-  export type Operation = "classify" | "proposition" | "rubric" | "rank" | "generate";
+  export type Operation = "classify" | "proposition" | "rubric" | "rank" | "generate" | "extract";
   /**
    * What a backend returns for an operation (design section 8.2).
    */
   export type OutputKind =
     | ("label" | "scores" | "distribution" | "logits" | "screen")
+    | {
+        typed_record: {
+          max_options: number;
+          max_output_bytes: number;
+          option_logprobs: boolean;
+          structure: TextStructure;
+        };
+      }
     | {
         text_record: {
           languages: string[];
@@ -12931,6 +13139,17 @@ export namespace RustevRemoteInfer1Response {
         text_record: {
           [k: string]: TextValue | undefined;
         };
+      }
+    | {
+        typed_record: {
+          fields: {
+            [k: string]: unknown | undefined;
+          };
+          logprobs: FieldLogprobs[];
+          provider_reported: {
+            [k: string]: string | undefined;
+          };
+        };
       };
   /**
    * A screener's reported text units, distinct from runtime computed charges.
@@ -12952,6 +13171,7 @@ export namespace RustevRemoteInfer1Response {
     | {
         list: string[];
       };
+  export type LogprobItem = "none" | number;
   /**
    * The closed error taxonomy (spec 009, 3.6). Each code maps to exactly one
    * spec 003 failure class; the mapping lives with the adapters, because the
@@ -13006,6 +13226,16 @@ export namespace RustevRemoteInfer1Response {
   export interface ItemAnswer {
     attempt_id: string;
     result: ItemResult;
+  }
+  /**
+   * Backend option log-probabilities; field eligibility is checked by the core.
+   */
+  export interface FieldLogprobs {
+    field: string;
+    item: LogprobItem;
+    values: {
+      [k: string]: number | undefined;
+    };
   }
   /**
    * A served identity as recorded (spec 009, 3.7).
@@ -13436,6 +13666,14 @@ export namespace RustevRequest1 {
   export type OutputKind =
     | ("label" | "scores" | "distribution" | "logits" | "screen")
     | {
+        typed_record: {
+          max_options: number;
+          max_output_bytes: number;
+          option_logprobs: boolean;
+          structure: TextStructure;
+        };
+      }
+    | {
         text_record: {
           languages: string[];
           max_output_bytes: number;
@@ -13454,7 +13692,8 @@ export namespace RustevRequest1 {
     | "ordinal_distribution"
     | "scores"
     | "screen_verdict"
-    | "text_record";
+    | "text_record"
+    | "typed_record";
   /**
    * The isolation scope of a capture, a bundle and every request identity.
    */
@@ -18147,12 +18386,20 @@ export namespace RustevServeRefusal1 {
   /**
    * The four semantic operations (R-05).
    */
-  export type Operation = "classify" | "proposition" | "rubric" | "rank" | "generate";
+  export type Operation = "classify" | "proposition" | "rubric" | "rank" | "generate" | "extract";
   /**
    * What a backend returns for an operation (design section 8.2).
    */
   export type OutputKind =
     | ("label" | "scores" | "distribution" | "logits" | "screen")
+    | {
+        typed_record: {
+          max_options: number;
+          max_output_bytes: number;
+          option_logprobs: boolean;
+          structure: TextStructure;
+        };
+      }
     | {
         text_record: {
           languages: string[];
@@ -18172,7 +18419,8 @@ export namespace RustevServeRefusal1 {
     | "ordinal_distribution"
     | "scores"
     | "screen_verdict"
-    | "text_record";
+    | "text_record"
+    | "typed_record";
   export type ContentDigest = string;
   /**
    * @minItems 0

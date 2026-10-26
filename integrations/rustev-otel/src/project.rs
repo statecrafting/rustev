@@ -381,6 +381,7 @@ fn operation_name(op: Operation) -> &'static str {
         Operation::Rubric => "rubric",
         Operation::Rank => "rank",
         Operation::Generate => "generate",
+        Operation::Extract => "extract",
     }
 }
 

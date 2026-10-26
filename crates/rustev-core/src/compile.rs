@@ -563,7 +563,7 @@ fn kind_valid_for(op: Operation, required: RequiredKind) -> bool {
         ),
         Operation::Rubric => matches!(required, R::Label | R::OrdinalDistribution),
         Operation::Rank => matches!(required, R::Scores),
-        Operation::Generate => false,
+        Operation::Generate | Operation::Extract => false,
     }
 }
 
@@ -572,7 +572,7 @@ fn satisfies(output: OutputKind, required: RequiredKind) -> bool {
     use RequiredKind as R;
     match required {
         R::ScreenVerdict => output == O::Screen,
-        R::TextRecord => false,
+        R::TextRecord | R::TypedRecord => false,
         R::Label => output == O::Label,
         R::Distribution | R::CalibratedProbability | R::OrdinalDistribution => {
             matches!(output, O::Distribution | O::Logits)
@@ -587,7 +587,9 @@ fn sem_kind(op: Operation, required: RequiredKind) -> SemKind {
         // Screening values are opaque to authored consumers; verdict
         // evaluation is spec 035's. A text record is refused before kind
         // analysis, so its arm is a total placeholder.
-        (_, RequiredKind::ScreenVerdict | RequiredKind::TextRecord) => SemKind::Label,
+        (_, RequiredKind::ScreenVerdict | RequiredKind::TextRecord | RequiredKind::TypedRecord) => {
+            SemKind::Label
+        }
         (_, RequiredKind::Label) => SemKind::Label,
         (_, RequiredKind::Distribution) => SemKind::Distribution,
         (_, RequiredKind::CalibratedProbability) => SemKind::Calibrated,

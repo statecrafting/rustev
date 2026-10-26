@@ -51,6 +51,14 @@ pub enum OutputKind {
     Distribution,
     Logits,
     Screen,
+    TypedRecord {
+        structure: TextStructure,
+        #[serde(deserialize_with = "crate::generation::bound::<_, { u64::MAX }>")]
+        max_output_bytes: u64,
+        #[serde(deserialize_with = "crate::generation::bound::<_, 32>")]
+        max_options: u64,
+        option_logprobs: bool,
+    },
     TextRecord {
         structure: TextStructure,
         max_output_bytes: u64,
@@ -177,6 +185,10 @@ impl TryFrom<OperationSupportWire> for OperationSupport {
             }
         } else if w.operation == Operation::Generate {
             return Err("generate requires text_record output".into());
+        }
+        if matches!(w.output, OutputKind::TypedRecord { .. }) != (w.operation == Operation::Extract)
+        {
+            return Err("extract requires typed_record output exclusively".into());
         }
         Ok(Self {
             operation: w.operation,

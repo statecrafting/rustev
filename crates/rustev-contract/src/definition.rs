@@ -283,6 +283,7 @@ pub enum Operation {
     Rubric,
     Rank,
     Generate,
+    Extract,
 }
 
 /// The value kind a semantic step requires (spec 002, 3.9.3).
@@ -308,6 +309,7 @@ pub enum RequiredKind {
     Scores,
     ScreenVerdict,
     TextRecord,
+    TypedRecord,
 }
 
 /// A question answered by a decision backend.

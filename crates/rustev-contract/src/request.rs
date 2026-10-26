@@ -37,3 +37,26 @@ pub struct RequestDoc {
 }
 
 crate::document::document!(RequestDoc, schema::REQUEST, REQUEST_V1, RequestId);
+
+/// Extraction follows generation's operation envelope inside `projection`.
+/// It leaves all existing request documents and their identities unchanged.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
+pub enum ExtractionRequestOperation {
+    Extract {
+        plan_id: crate::ids::PlanId,
+        request: crate::extraction_documents::ExtractRequest,
+    },
+}
+
+impl ExtractionRequestOperation {
+    /// The exact UTF-8 canonical bytes to store in `RequestDoc::projection`.
+    pub fn projection(&self) -> Result<String, crate::canonical::CanonicalError> {
+        // Canonical JSON is UTF-8 by construction.
+        String::from_utf8(crate::canonical::canonical_bytes(self)?).map_err(|e| {
+            crate::canonical::CanonicalError::Serialize {
+                message: e.to_string(),
+            }
+        })
+    }
+}

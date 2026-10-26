@@ -133,6 +133,7 @@ pub fn check_options(operation: Operation, options: &[String]) -> Result<Questio
         Operation::Rubric => Err(format!("rubric with {n} levels; 2 to 10 are supported")),
         Operation::Rank => Err("rank is not declared".into()),
         Operation::Generate => Err("generate is not declared".into()),
+        Operation::Extract => Err("extract is not declared".into()),
     }
 }
 

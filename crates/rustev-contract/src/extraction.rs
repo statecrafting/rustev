@@ -336,7 +336,7 @@ fn valid_ref(s: &str, prefix: &str, min: usize, max: usize) -> bool {
                 .all(|p| !p.is_empty() && !p.contains(':') && !p.chars().any(char::is_whitespace))
     })
 }
-fn input_ref<'de, D: Deserializer<'de>>(d: D) -> Result<String, D::Error> {
+pub(crate) fn input_ref<'de, D: Deserializer<'de>>(d: D) -> Result<String, D::Error> {
     let v = String::deserialize(d)?;
     if !valid_ref(&v, "input:", 1, 2) {
         return Err(serde::de::Error::custom("invalid input reference"));
