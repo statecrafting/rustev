@@ -460,8 +460,9 @@ async fn a_pinned_direct_transport_checks_the_reported_version() {
     let rec = &sink.until_records(1).await[0];
     assert_eq!(rec.served.identity.as_deref(), Some("jev-1.14.0"));
     assert_eq!(rec.served.disclosure, Disclosure::Reported);
-    // The direct request names the pin and carries no Gateway options
-    // (unverified shape, 3.2).
+    // The direct request goes to `/v1/systemone`, names the pin and
+    // carries no Gateway options (3.2).
+    assert_eq!(g.seen()[0].path, "/v1/systemone");
     let sent = g.seen()[0].json();
     assert_eq!(sent["model"], "jev-1.13.0");
     assert!(sent.get("providerOptions").is_none());
