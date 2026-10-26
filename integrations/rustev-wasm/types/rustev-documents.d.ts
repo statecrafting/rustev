@@ -103,6 +103,9 @@ export namespace RustevBackend1 {
         };
       };
   export type TextStructure = "json_schema" | "tool_call" | "grammar";
+  export type ListwisePartial = "possible" | "never";
+  export type ListwiseScores = "never" | "always" | "optional";
+  export type RankingMode = "listwise" | "pointwise" | "pairwise";
 
   export interface RustevBackend1 {
     artifact: ArtifactId;
@@ -110,6 +113,10 @@ export namespace RustevBackend1 {
     determinism: Determinism;
     input_limit: InputLimit;
     operations: OperationSupport[];
+    /**
+     * Optional ranking capability; omission preserves existing identities.
+     */
+    ranking?: Ranking;
     schema: "rustev.backend/1";
   }
   export interface InputLimit {
@@ -137,6 +144,15 @@ export namespace RustevBackend1 {
     max_text_bytes: number;
     policy_version: string;
     text_unit_bytes: number;
+  }
+  /**
+   * Ranking capability (spec 039, 3.3).
+   */
+  export interface Ranking {
+    listwise_partial: ListwisePartial;
+    listwise_scores: ListwiseScores;
+    max_candidates: number;
+    modes: RankingMode[];
   }
 }
 export type RustevBackend1 = RustevBackend1.RustevBackend1;
@@ -759,6 +775,12 @@ export namespace RustevDefinition1 {
       }
     | {
         accept_model_derived: AcceptModelDerived;
+      }
+    | {
+        rank: Rank;
+      }
+    | {
+        select: Select;
       };
   /**
    * The delay before retry `n` (1-based). No jitter.
@@ -1002,6 +1024,47 @@ export namespace RustevDefinition1 {
     | {
         predicate: Predicate;
       };
+  export type Bias =
+    | "none"
+    | {
+        shuffle: {
+          seed: string;
+        };
+      }
+    | {
+        permutation_average: {
+          orders: number;
+          seed: string;
+        };
+      };
+  export type RankFallback = "none" | "unsupported";
+  export type RankMode =
+    | "pointwise"
+    | {
+        listwise: {
+          scores: RankScores;
+        };
+      }
+    | {
+        pairwise: {
+          max_comparisons: number;
+          schedule: PairwiseSchedule;
+        };
+      };
+  export type RankScores = "none" | "optional" | "required";
+  export type PairwiseSchedule = "round_robin@1" | "merge_sort@1";
+  export type TieBreak =
+    | "id_ascending"
+    | {
+        order_of: string;
+      };
+  export type Backfill =
+    | "none"
+    | {
+        exclude_selected: boolean;
+        from: string;
+      };
+  export type BackendFailure = "backfill_all" | "propagate";
 
   /**
    * A versioned, authored description of a recurring decision.
@@ -1557,6 +1620,25 @@ export namespace RustevDefinition1 {
     basis: MassBasis;
     option: string;
   }
+  export interface Rank {
+    backend: BackendReq;
+    bias: Bias;
+    bind: string;
+    candidates: string;
+    fallback: RankFallback;
+    items: ItemSource;
+    mode: RankMode;
+    project: string[];
+    question: string;
+    task: string;
+    tie_break: TieBreak;
+  }
+  export interface Select {
+    backfill: Backfill;
+    from: string;
+    k: number;
+    on_backend_failure: BackendFailure;
+  }
 }
 export type RustevDefinition1 = RustevDefinition1.RustevDefinition1;
 
@@ -2047,6 +2129,12 @@ export namespace RustevDefinition2 {
       }
     | {
         accept_model_derived: AcceptModelDerived;
+      }
+    | {
+        rank: Rank;
+      }
+    | {
+        select: Select;
       };
   /**
    * The delay before retry `n` (1-based). No jitter.
@@ -2290,6 +2378,47 @@ export namespace RustevDefinition2 {
     | {
         predicate: Predicate;
       };
+  export type Bias =
+    | "none"
+    | {
+        shuffle: {
+          seed: string;
+        };
+      }
+    | {
+        permutation_average: {
+          orders: number;
+          seed: string;
+        };
+      };
+  export type RankFallback = "none" | "unsupported";
+  export type RankMode =
+    | "pointwise"
+    | {
+        listwise: {
+          scores: RankScores;
+        };
+      }
+    | {
+        pairwise: {
+          max_comparisons: number;
+          schedule: PairwiseSchedule;
+        };
+      };
+  export type RankScores = "none" | "optional" | "required";
+  export type PairwiseSchedule = "round_robin@1" | "merge_sort@1";
+  export type TieBreak =
+    | "id_ascending"
+    | {
+        order_of: string;
+      };
+  export type Backfill =
+    | "none"
+    | {
+        exclude_selected: boolean;
+        from: string;
+      };
+  export type BackendFailure = "backfill_all" | "propagate";
 
   /**
    * A versioned, authored description of a recurring decision.
@@ -2844,6 +2973,25 @@ export namespace RustevDefinition2 {
     at_least: Decimal;
     basis: MassBasis;
     option: string;
+  }
+  export interface Rank {
+    backend: BackendReq;
+    bias: Bias;
+    bind: string;
+    candidates: string;
+    fallback: RankFallback;
+    items: ItemSource;
+    mode: RankMode;
+    project: string[];
+    question: string;
+    task: string;
+    tie_break: TieBreak;
+  }
+  export interface Select {
+    backfill: Backfill;
+    from: string;
+    k: number;
+    on_backend_failure: BackendFailure;
   }
 }
 export type RustevDefinition2 = RustevDefinition2.RustevDefinition2;
@@ -8487,6 +8635,12 @@ export namespace RustevPlan2 {
       }
     | {
         accept_model_derived: AcceptModelDerived;
+      }
+    | {
+        rank: Rank;
+      }
+    | {
+        select: Select;
       };
   /**
    * The delay before retry `n` (1-based). No jitter.
@@ -8730,6 +8884,47 @@ export namespace RustevPlan2 {
     | {
         predicate: Predicate;
       };
+  export type Bias =
+    | "none"
+    | {
+        shuffle: {
+          seed: string;
+        };
+      }
+    | {
+        permutation_average: {
+          orders: number;
+          seed: string;
+        };
+      };
+  export type RankFallback = "none" | "unsupported";
+  export type RankMode =
+    | "pointwise"
+    | {
+        listwise: {
+          scores: RankScores;
+        };
+      }
+    | {
+        pairwise: {
+          max_comparisons: number;
+          schedule: PairwiseSchedule;
+        };
+      };
+  export type RankScores = "none" | "optional" | "required";
+  export type PairwiseSchedule = "round_robin@1" | "merge_sort@1";
+  export type TieBreak =
+    | "id_ascending"
+    | {
+        order_of: string;
+      };
+  export type Backfill =
+    | "none"
+    | {
+        exclude_selected: boolean;
+        from: string;
+      };
+  export type BackendFailure = "backfill_all" | "propagate";
   export type DefinitionId = string;
   export type PlanExecution =
     | "none"
@@ -9536,6 +9731,25 @@ export namespace RustevPlan2 {
     basis: MassBasis;
     option: string;
   }
+  export interface Rank {
+    backend: BackendReq;
+    bias: Bias;
+    bind: string;
+    candidates: string;
+    fallback: RankFallback;
+    items: ItemSource;
+    mode: RankMode;
+    project: string[];
+    question: string;
+    task: string;
+    tie_break: TieBreak;
+  }
+  export interface Select {
+    backfill: Backfill;
+    from: string;
+    k: number;
+    on_backend_failure: BackendFailure;
+  }
   export interface DeclaredExecution {
     /**
      * Every runtime fallback target, by step in policy order, then position.
@@ -10316,6 +10530,12 @@ export namespace RustevPlan3 {
       }
     | {
         accept_model_derived: AcceptModelDerived;
+      }
+    | {
+        rank: Rank;
+      }
+    | {
+        select: Select;
       };
   /**
    * The delay before retry `n` (1-based). No jitter.
@@ -10559,6 +10779,47 @@ export namespace RustevPlan3 {
     | {
         predicate: Predicate;
       };
+  export type Bias =
+    | "none"
+    | {
+        shuffle: {
+          seed: string;
+        };
+      }
+    | {
+        permutation_average: {
+          orders: number;
+          seed: string;
+        };
+      };
+  export type RankFallback = "none" | "unsupported";
+  export type RankMode =
+    | "pointwise"
+    | {
+        listwise: {
+          scores: RankScores;
+        };
+      }
+    | {
+        pairwise: {
+          max_comparisons: number;
+          schedule: PairwiseSchedule;
+        };
+      };
+  export type RankScores = "none" | "optional" | "required";
+  export type PairwiseSchedule = "round_robin@1" | "merge_sort@1";
+  export type TieBreak =
+    | "id_ascending"
+    | {
+        order_of: string;
+      };
+  export type Backfill =
+    | "none"
+    | {
+        exclude_selected: boolean;
+        from: string;
+      };
+  export type BackendFailure = "backfill_all" | "propagate";
   export type DefinitionId = string;
   export type PlanExecution =
     | "none"
@@ -11574,6 +11835,25 @@ export namespace RustevPlan3 {
     at_least: Decimal;
     basis: MassBasis;
     option: string;
+  }
+  export interface Rank {
+    backend: BackendReq;
+    bias: Bias;
+    bind: string;
+    candidates: string;
+    fallback: RankFallback;
+    items: ItemSource;
+    mode: RankMode;
+    project: string[];
+    question: string;
+    task: string;
+    tie_break: TieBreak;
+  }
+  export interface Select {
+    backfill: Backfill;
+    from: string;
+    k: number;
+    on_backend_failure: BackendFailure;
   }
   export interface DeclaredExecution {
     /**
@@ -13006,6 +13286,9 @@ export namespace RustevRemoteDescribe1Response {
         };
       };
   export type TextStructure = "json_schema" | "tool_call" | "grammar";
+  export type ListwisePartial = "possible" | "never";
+  export type ListwiseScores = "never" | "always" | "optional";
+  export type RankingMode = "listwise" | "pointwise" | "pairwise";
   export type DescriptorId = string;
   /**
    * Shared-state batching support (spec 009, 3.10.4).
@@ -13061,6 +13344,10 @@ export namespace RustevRemoteDescribe1Response {
     determinism: Determinism;
     input_limit: InputLimit;
     operations: OperationSupport[];
+    /**
+     * Optional ranking capability; omission preserves existing identities.
+     */
+    ranking?: Ranking;
     schema: string;
   }
   export interface InputLimit {
@@ -13088,6 +13375,15 @@ export namespace RustevRemoteDescribe1Response {
     max_text_bytes: number;
     policy_version: string;
     text_unit_bytes: number;
+  }
+  /**
+   * Ranking capability (spec 039, 3.3).
+   */
+  export interface Ranking {
+    listwise_partial: ListwisePartial;
+    listwise_scores: ListwiseScores;
+    max_candidates: number;
+    modes: RankingMode[];
   }
   /**
    * Terms negotiated beside the descriptor (spec 009, 3.2.4). The runtime

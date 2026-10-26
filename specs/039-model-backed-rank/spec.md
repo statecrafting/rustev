@@ -2,7 +2,7 @@
 id: "039-model-backed-rank"
 title: "Model-backed rank and deterministic backfill (amends 002 and 005)"
 status: approved
-implementation: pending
+implementation: in-progress
 created: "2026-10-17"
 summary: >
   An amendment of approved specs 002 and 005 (R-16), for #76 child C2.
@@ -23,7 +23,7 @@ summary: >
   reserved `rank` value under 030 3.12. Jev (specs 012 and 022) keeps
   R-28: rankings over Jev answers stay composed in plans and feed `select`
   unchanged. Plans that use none of this keep byte-identical identities.
-  Approved (A-36); implementation is pending.
+  Approved (A-36); implementation is in progress.
 amends:
   - "002-decision-contract-and-pure-core"
   - "005-reference-backends"
@@ -43,6 +43,16 @@ extends:
   - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: additive }
   # Adds 039 to `make verify` when the implementation is complete.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  # Exhaustive matches and `ranking: None` initializers for the new step
+  # kinds and descriptor member; regenerated binding types.
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "crates/rustev-surface/" }, nature: additive }
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-node/" }, nature: additive }
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-wasm/" }, nature: additive }
+  - { spec: "028-opentelemetry-evidence-sink", unit: { kind: directory, path: "integrations/rustev-otel/" }, nature: additive }
+  - { spec: "030-bedrock-backend", unit: { kind: directory, path: "integrations/rustev-bedrock/" }, nature: additive }
+  - { spec: "012-jev-integration", unit: { kind: directory, path: "integrations/rustev-jev/" }, nature: additive }
+  # The new source file in the published contract crate's archive list.
+  - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "002-decision-contract-and-pure-core"
@@ -99,7 +109,7 @@ obligations:
 
 Approved by the owner (A-36, 2026-10-17, under the 2026-10-16 delivery work
 order) as its own reviewable change before any code (R-16); implementation
-is pending. It implements #76 child C2 (#67). The approved texts of specs
+is in progress. It implements #76 child C2 (#67). The approved texts of specs
 002 and 005 are not edited; this spec records what changes. Spec 030's
 reserved `rank` value is admitted under 030 3.12, which anticipates exactly
 this change, so 030 is not amended. Approval authorizes paid Bedrock smoke
@@ -744,6 +754,33 @@ is met, with the rules backend (3.14) and Jev composition (3.16) as the
 backends exercising it; the Bedrock increment then lands as its own
 change, as spec 035's `screen` admission does. No boundary, invariant,
 value-kind rule or refusal changes.
+
+## Implementation record
+
+Planned increments, each a separately reviewed pull request: (1) the
+contract vocabulary: the `rank` and `select` declarations and the
+descriptor `ranking` member; (2) the remaining contract members: the plan 3
+details of 3.2.4 and 3.10.6, the `ranking` backend output, the `selection`
+parameter, the evidence entries of 3.13 and category 28; (3) requests,
+schedules and `rustev.permute/1` in the core; (4) the model ranking value,
+`select` and backfill; (5) compilation and refusals; (6) the rules backend
+and Bedrock; (7) Jev composition, declared verification and closure.
+
+**Increment 1 (2026-10-26): the contract vocabulary.**
+`crates/rustev-contract/src/ranking.rs` adds the `rank` step body of 3.2.1
+and the `select` step body of 3.10.1, reusing the item source and backend
+requirement types, with the document-local refusals of 3.12's category 11
+row that need no other step (ranges of `k`, `max_comparisons` and
+`orders`, bias on pointwise, `orders` other than 2 for pairwise, seeds,
+`exclude_selected: false`, `backfill_all` without a backfill, kind
+fallbacks). Both kinds are version 2 constructs: in a
+`rustev.definition/1` they are refused, category 11
+`requires-definition-2`; in a `rustev.definition/2` compilation refuses
+them with `invalid_definition` detail `ranking-not-compiled` until the
+compile increment. `rustev.backend/1` gains the optional `ranking` member
+of 3.3, omitted when absent. Existing definitions, descriptors and plans
+keep their bytes, `DescriptorId`s and `PlanId`s
+(`crates/rustev-contract/tests/ranking_wire.rs`).
 
 ## Decisions at approval
 

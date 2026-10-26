@@ -1000,6 +1000,7 @@ mod tests {
         };
         let plan = serde_json::from_str(include_str!("testdata/generation.plan.json")).unwrap();
         let backend = BackendDescriptor {
+            ranking: None,
             schema: schema::BACKEND.into(),
             backend_id: "synthetic-linear-head".into(),
             artifact: rustev_contract::ids::ArtifactId::parse(&format!(

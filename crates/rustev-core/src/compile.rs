@@ -899,6 +899,8 @@ fn compile_generation(
                     | StepBody::Generate(_)
                     | StepBody::Extract(_)
                     | StepBody::AcceptModelDerived(_)
+                    | StepBody::Rank(_)
+                    | StepBody::Select(_)
             )
         {
             return refuse(
@@ -917,6 +919,15 @@ fn compile_generation(
                 C::InvalidDefinition,
                 format!("step:{}", s.id),
                 "extraction-not-compiled",
+            );
+        }
+    }
+    for s in &def.steps {
+        if matches!(s.body, StepBody::Rank(_) | StepBody::Select(_)) {
+            return refuse(
+                C::InvalidDefinition,
+                format!("step:{}", s.id),
+                "ranking-not-compiled",
             );
         }
     }
@@ -1036,6 +1047,7 @@ fn compile_generation(
                 // Refused earlier by extraction-not-compiled.
                 None
             }
+            StepBody::Rank(_) | StepBody::Select(_) => None,
             StepBody::Semantic(d) => Some((s.id.as_str(), &d.options)),
             StepBody::Exact(_)
             | StepBody::Corroborate(_)
@@ -1055,6 +1067,13 @@ fn compile_generation(
         match &s.body {
             StepBody::Extract(_) | StepBody::AcceptModelDerived(_) => {
                 // Refused earlier by extraction-not-compiled.
+            }
+            StepBody::Rank(_) | StepBody::Select(_) => {
+                return refuse(
+                    C::InvalidDefinition,
+                    format!("step:{}", s.id),
+                    "ranking-not-compiled",
+                );
             }
             StepBody::Generate(_) => {}
             // Refused above outside plan 3, whose own structure is checked by
@@ -1315,6 +1334,13 @@ fn compile_generation(
             StepBody::Extract(_) | StepBody::AcceptModelDerived(_) => {
                 // Refused earlier by extraction-not-compiled.
             }
+            StepBody::Rank(_) | StepBody::Select(_) => {
+                return refuse(
+                    C::InvalidDefinition,
+                    format!("step:{}", s.id),
+                    "ranking-not-compiled",
+                );
+            }
             StepBody::Generate(_) => {}
             StepBody::Acquire(_) | StepBody::Widen(_) => {
                 crate::acquisition::resolve(&s.id, &s.body, sources)?;
@@ -1384,6 +1410,13 @@ fn compile_generation(
                 // Refused earlier by extraction-not-compiled.
                 Vec::new()
             }
+            StepBody::Rank(_) | StepBody::Select(_) => {
+                return refuse(
+                    C::InvalidDefinition,
+                    format!("step:{}", s.id),
+                    "ranking-not-compiled",
+                );
+            }
             StepBody::Generate(g) => crate::generation::dependencies(g, def),
             StepBody::Acquire(_) | StepBody::Widen(_) => crate::acquisition::refs(&s.body),
             StepBody::Corroborate(c) => corroborate_refs(c),
@@ -1449,6 +1482,13 @@ fn compile_generation(
         match &s.body {
             StepBody::Extract(_) | StepBody::AcceptModelDerived(_) => {
                 // Refused earlier by extraction-not-compiled.
+            }
+            StepBody::Rank(_) | StepBody::Select(_) => {
+                return refuse(
+                    C::InvalidDefinition,
+                    format!("step:{}", s.id),
+                    "ranking-not-compiled",
+                );
             }
             StepBody::Generate(_) => {
                 infos.insert(id.clone(), StepInfo::Generate);
@@ -1736,6 +1776,13 @@ fn compile_generation(
             StepBody::Extract(_) | StepBody::AcceptModelDerived(_) => {
                 // Refused earlier by extraction-not-compiled.
                 continue;
+            }
+            StepBody::Rank(_) | StepBody::Select(_) => {
+                return refuse(
+                    C::InvalidDefinition,
+                    format!("step:{}", s.id),
+                    "ranking-not-compiled",
+                );
             }
             StepBody::Generate(g) => {
                 let binding = crate::generation::bind(&s.id, g, &generated[&s.id], &sorted)?;
@@ -2332,6 +2379,7 @@ fn first_v2_construct(
             StepBody::AcceptModelDerived(_) => {
                 return Some((subject, "an accept_model_derived step"));
             }
+            StepBody::Rank(_) | StepBody::Select(_) => return Some((subject, "a ranking step")),
             StepBody::Generate(_) => return Some((subject, "a generate step")),
             StepBody::Acquire(_) | StepBody::Widen(_) => {
                 return Some((subject, "an acquisition step"));

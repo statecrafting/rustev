@@ -142,6 +142,8 @@ fn derive_descriptor(
     })
     .collect();
     BackendDescriptor {
+        // Spec 039 3.2: no ranking tasks yet (039 extends 005 for this directory).
+        ranking: None,
         schema: schema::BACKEND.into(),
         backend_id: program.backend_id.clone(),
         artifact,

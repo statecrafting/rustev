@@ -3292,6 +3292,7 @@ mod screening_hardening_tests {
         let mut d =
             Definition::parse(include_bytes!("testdata/screening.definition.json")).unwrap();
         let backend = BackendDescriptor {
+            ranking: None,
             schema: schema::BACKEND.into(),
             backend_id: "screen".into(),
             artifact: rustev_contract::ids::ArtifactId::parse(&format!(

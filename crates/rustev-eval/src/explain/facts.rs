@@ -330,7 +330,10 @@ pub(super) fn closure(plan: &rustev_contract::plan::Plan, root: &str) -> Option<
             | StepBody::Widen(_)
             | StepBody::Generate(_)
             | StepBody::Extract(_)
-            | StepBody::AcceptModelDerived(_) => return None,
+            | StepBody::AcceptModelDerived(_)
+            // Spec 039: ranking steps explain nothing yet (039 extends 004 for this crate).
+            | StepBody::Rank(_)
+            | StepBody::Select(_) => return None,
             // Spec 040, 3.5 item 5: undecodable closure uses judgment lineage, never a partial closure.
             StepBody::Exact(e) => rustev_core::ops::decode_v2(&e.op, e.version, &e.args)?
                 .ok()?

@@ -329,6 +329,7 @@ impl JevBackend {
             max_options,
         };
         let descriptor = BackendDescriptor {
+            ranking: None,
             schema: schema::BACKEND.to_string(),
             backend_id: config.backend_id.clone(),
             artifact: artifact.clone(),

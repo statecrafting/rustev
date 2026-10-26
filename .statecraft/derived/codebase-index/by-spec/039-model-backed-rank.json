@@ -47,6 +47,34 @@
       {
         "path": "crates/rustev-runtime/",
         "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-surface/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "integrations/rustev-bedrock/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "integrations/rustev-jev/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "integrations/rustev-node/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "integrations/rustev-otel/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "integrations/rustev-wasm/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "tools/rustev-release/",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
@@ -131,6 +159,97 @@
       {
         "locations": [
           {
+            "file": "crates/rustev-surface/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-surface/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "integrations/rustev-bedrock/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-bedrock/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "integrations/rustev-jev/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-jev/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "integrations/rustev-node/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-node/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "integrations/rustev-otel/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-otel/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "integrations/rustev-wasm/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-wasm/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "tools/rustev-release/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-release/"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "Makefile"
           }
         ],
@@ -172,5 +291,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "73b1ee341619735228495ceae30a9ded5fa352389c42d8a85d40d56da2ba1841"
+  "shardHash": "a5d6a3d458b1732de4b174d24fddde0668a962d1d0cce85eadb6da03810a1c79"
 }

@@ -54,7 +54,9 @@ fn target_parts(
             | StepBody::Widen(_)
             | StepBody::Generate(_)
             | StepBody::Extract(_)
-            | StepBody::AcceptModelDerived(_) => None,
+            | StepBody::AcceptModelDerived(_)
+            | StepBody::Rank(_)
+            | StepBody::Select(_) => None,
         })?;
     Some((binding, decl.task.clone(), decl.options.clone()))
 }

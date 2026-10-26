@@ -17,6 +17,14 @@ pub struct BackendDescriptor {
     pub operations: Vec<OperationSupport>,
     pub input_limit: InputLimit,
     pub determinism: Determinism,
+    /// Optional ranking capability; omission preserves existing identities.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "present"
+    )]
+    #[schemars(with = "Ranking")]
+    pub ranking: Option<Ranking>,
 }
 
 crate::document::document!(
@@ -297,4 +305,47 @@ fn language_tag(s: &str) -> bool {
         return i + 1 < parts.len();
     }
     i == parts.len()
+}
+
+/// Ranking capability (spec 039, 3.3).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Ranking {
+    #[serde(deserialize_with = "ranking_modes")]
+    pub modes: Vec<RankingMode>,
+    #[serde(deserialize_with = "crate::ranking::bound::<_, 1, 1024>")]
+    pub max_candidates: u64,
+    pub listwise_scores: ListwiseScores,
+    pub listwise_partial: ListwisePartial,
+}
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum RankingMode {
+    Listwise,
+    Pointwise,
+    Pairwise,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ListwiseScores {
+    Never,
+    Always,
+    Optional,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ListwisePartial {
+    Possible,
+    Never,
+}
+fn ranking_modes<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Vec<RankingMode>, D::Error> {
+    let modes = Vec::<RankingMode>::deserialize(d)?;
+    if modes.is_empty() || modes.windows(2).any(|w| w[0] >= w[1]) {
+        return Err(serde::de::Error::custom(
+            "ranking modes must be nonempty, ordered and unique",
+        ));
+    }
+    Ok(modes)
 }

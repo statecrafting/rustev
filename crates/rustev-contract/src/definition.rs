@@ -205,6 +205,8 @@ pub enum StepBody {
     Generate(Box<crate::generation::Generate>),
     Extract(Box<crate::extraction::Extract>),
     AcceptModelDerived(Box<crate::extraction::AcceptModelDerived>),
+    Rank(Box<crate::ranking::Rank>),
+    Select(Box<crate::ranking::Select>),
 }
 
 /// A corroboration step (spec 032, 3.7.1).

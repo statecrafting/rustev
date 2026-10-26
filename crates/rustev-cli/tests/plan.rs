@@ -27,7 +27,9 @@ fn semantic_mut<'a>(
         | StepBody::Widen(_)
         | StepBody::Generate(_)
         | StepBody::Extract(_)
-        | StepBody::AcceptModelDerived(_) => panic!("{id} is not semantic"),
+        | StepBody::AcceptModelDerived(_)
+        | StepBody::Rank(_)
+        | StepBody::Select(_) => panic!("{id} is not semantic"),
     }
 }
 

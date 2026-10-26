@@ -74,6 +74,7 @@ pub fn support(op: Operation, output: OutputKind, max: u64) -> OperationSupport 
 /// classify, proposition and rubric (R-01 shape, no model behind it).
 pub fn linear_head() -> BackendDescriptor {
     BackendDescriptor {
+        ranking: None,
         schema: schema::BACKEND.into(),
         backend_id: "synthetic-linear-head".into(),
         artifact: artifact('a'),
@@ -93,6 +94,7 @@ pub fn linear_head() -> BackendDescriptor {
 /// A synthetic backend that only returns labels.
 pub fn label_only() -> BackendDescriptor {
     BackendDescriptor {
+        ranking: None,
         schema: schema::BACKEND.into(),
         backend_id: "synthetic-label-only".into(),
         artifact: artifact('b'),

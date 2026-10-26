@@ -85,7 +85,7 @@ pub(crate) fn uses_track_construct(def: &Definition, decoded: &BTreeMap<String, 
         .any(|i| i.evidence.is_some() || i.on_disagreement.is_some() || type_v2(&i.ty))
         || def.steps.iter().any(|s| match &s.body {
             StepBody::Extract(_) | StepBody::AcceptModelDerived(_) => true,
-            StepBody::Corroborate(_) | StepBody::Acquire(_) | StepBody::Widen(_) | StepBody::Generate(_) => true,
+            StepBody::Corroborate(_) | StepBody::Acquire(_) | StepBody::Widen(_) | StepBody::Generate(_) | StepBody::Rank(_) | StepBody::Select(_) => true,
             StepBody::Exact(_) => decoded.get(&s.id).is_some_and(OpArgs::uses_v2),
             StepBody::Semantic(_) => false,
         })
@@ -381,7 +381,11 @@ pub(crate) fn structure_with_origin(
                     ));
                 }
             }
-            StepBody::Acquire(_) | StepBody::Widen(_) | StepBody::Generate(_) => {}
+            StepBody::Acquire(_)
+            | StepBody::Widen(_)
+            | StepBody::Generate(_)
+            | StepBody::Rank(_)
+            | StepBody::Select(_) => {}
             StepBody::Corroborate(c) => corroborate_structure(c, &subject)?,
             StepBody::Semantic(_) => {}
         }

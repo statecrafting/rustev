@@ -80,6 +80,7 @@ impl BedrockBackend {
             .unwrap_or_else(|| format!("https://bedrock-runtime.{}.amazonaws.com", binding.region));
         let transport = Transport::new(&endpoint)?;
         let descriptor = BackendDescriptor {
+            ranking: None,
             schema: schema::BACKEND.into(),
             backend_id,
             artifact: binding.artifact()?,
