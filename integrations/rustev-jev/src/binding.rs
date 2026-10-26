@@ -96,8 +96,10 @@ impl Transport {
             // Unverified (3.2): the TypeSafe-compatible base, then the
             // evaluate path.
             Transport::GatewayTypesafeBase => "/typesafe/v1/evaluate",
-            // The path and request shape pass the API's validation (3.2);
-            // the response shape is unverified.
+            // TypeSafe names its endpoint after the System One model, not
+            // the operation: `/v1/evaluate` is a 404 on the direct API.
+            // The path and request shape pass the API's validation (3.2,
+            // and discussion 002); the response shape is unverified.
             Transport::Direct => "/v1/systemone",
         }
     }
