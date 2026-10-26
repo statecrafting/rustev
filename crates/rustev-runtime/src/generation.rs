@@ -7,8 +7,7 @@ use std::task::{Poll, Waker};
 
 use rustev_contract::definition::StepBody;
 use rustev_contract::descriptor::{BackendDescriptor, OutputKind};
-use rustev_contract::execution::CostPolicy;
-use rustev_contract::generation::{CostLimit, GenerateRequest, ModelBound, RepairRequest};
+use rustev_contract::generation::{GenerateRequest, ModelBound, RepairRequest};
 use rustev_contract::generation_result::{FieldOrigin, TextLineage, TextOrigin, TextResult};
 use rustev_contract::judgment::Unresolved;
 use rustev_contract::optimization::{
@@ -24,7 +23,7 @@ use rustev_core::generation_eval::{
 };
 use rustev_core::seams::{CancelSignal, GenerationFields};
 
-use crate::driver::{DecisionCtx, RequestOutcome, drive, observation};
+use crate::driver::{DecisionCtx, RequestOutcome, drive, observation, step_deadline, step_ledger};
 use crate::optimization::{CacheMiss, CacheWrite, KeyParts, RequestKey, request_key};
 use crate::{Inner, Ledger, PreparedPlan};
 
@@ -384,9 +383,6 @@ pub(crate) async fn run(
     let mut budgets = BTreeMap::new();
     for s in &cx.plan.compiled.plan.definition.steps {
         if let StepBody::Generate(g) = &s.body {
-            let share = (g.limits.deadline_share.units() as u128
-                * cx.plan.compiled.plan.definition.limits.deadline_ms as u128
-                / 1_000_000_000) as u64;
             let ModelBound::Literal(item_ms) = g.limits.per_item_deadline_ms else {
                 return Err(GenerationError::InvalidState(
                     "unresolved generation deadline".into(),
@@ -395,13 +391,15 @@ pub(crate) async fn run(
             budgets.insert(
                 s.id.clone(),
                 StepBudget {
-                    deadline: cx.deadline.min(start.saturating_add(share)),
+                    deadline: step_deadline(
+                        cx.deadline,
+                        start,
+                        cx.plan.compiled.plan.definition.limits.deadline_ms,
+                        g.limits.deadline_share,
+                    ),
                     item_ms,
                     concurrency: g.limits.concurrency as usize,
-                    ledger: Ledger::new(match g.limits.max_cost_units {
-                        CostLimit::None => CostPolicy::Unlimited,
-                        CostLimit::Units { n } => CostPolicy::Hard { max_units: n },
-                    }),
+                    ledger: step_ledger(&g.limits.max_cost_units),
                 },
             );
         }

@@ -147,10 +147,10 @@ impl<'e> DecisionCtx<'_, 'e> {
 
     /// Release a reservation that was never dispatched.
     pub(crate) fn release(&self, units: u64) {
-        self.ledger.release(units);
         if let Some(step) = self.step_ledger {
             step.release(units);
         }
+        self.ledger.release(units);
         if let Some(shared) = &self.rt.shared {
             shared.release(units);
         }
@@ -241,6 +241,7 @@ pub(crate) async fn run_requests(
     let mut seen: BTreeMap<(String, Vec<String>), usize> = BTreeMap::new();
     let mut records: Vec<Option<RequestRecord>> = Vec::new();
     let mut waiting: VecDeque<SemanticRequest> = VecDeque::new();
+    let mut extraction_deadlines = BTreeMap::new();
     let mut active: Vec<Driving<'_>> = Vec::new();
     // Each running batch with its member count: members count against
     // `max_parallel_requests` until their batch ends (spec 017, 3.4).
@@ -258,6 +259,17 @@ pub(crate) async fn run_requests(
             if let std::collections::btree_map::Entry::Vacant(v) = seen.entry(key) {
                 v.insert(records.len());
                 records.push(None);
+                if let Some(limits) = &cx.plan.steps[&r.step].extraction {
+                    extraction_deadlines.insert(
+                        r.step.clone(),
+                        step_deadline(
+                            cx.deadline(),
+                            cx.now(),
+                            cx.plan.compiled.plan.definition.limits.deadline_ms,
+                            limits.deadline_share,
+                        ),
+                    );
+                }
                 waiting.push_back(r);
             }
         }
@@ -281,12 +293,28 @@ pub(crate) async fn run_requests(
                 });
             }
         }
+        // A queued extract expires even while every dispatch slot is occupied.
+        let mut remaining = VecDeque::new();
+        for r in waiting.drain(..) {
+            if let Some(&deadline) = extraction_deadlines.get(&r.step)
+                && cx.now() >= deadline
+            {
+                active.push(Box::pin(drive_extraction(cx, r, deadline)));
+            } else {
+                remaining.push_back(r);
+            }
+        }
+        waiting = remaining;
         let batched: usize = batches.iter().map(|(members, _)| members).sum();
         let mut candidates = Vec::new();
         while active.len() + acquiring.len() + batched + candidates.len()
             < cx.rt.config.max_parallel_requests
         {
             let Some(r) = waiting.pop_front() else { break };
+            if let Some(deadline) = extraction_deadlines.get(&r.step) {
+                active.push(Box::pin(drive_extraction(cx, r, *deadline)));
+                continue;
+            }
             match cache_lookup(cx, &r) {
                 CacheLookup::Done(out) => active.push(Box::pin(std::future::ready(*out))),
                 CacheLookup::Run {
@@ -326,6 +354,11 @@ pub(crate) async fn run_requests(
             .waiting
             .iter()
             .map(|(_, close)| *close)
+            .chain(
+                waiting
+                    .iter()
+                    .filter_map(|r| extraction_deadlines.get(&r.step).copied()),
+            )
             .min()
             .map(|close| cx.rt.clock.sleep_until(close));
         let ready = std::future::poll_fn(|task| {
@@ -433,7 +466,15 @@ pub(crate) async fn run_requests(
                         o.call(|o| o.step(progress));
                     }
                 }
-                None => cancelled |= !cx.screening_refused(),
+                None => {
+                    let mut ev = cx.ev();
+                    if !ev.screening_refused() {
+                        if ev.extraction_request(&out.step).is_some() {
+                            ev.cancel_extraction(&out.step).expect("pending extraction");
+                        }
+                        cancelled = true;
+                    }
+                }
             }
             let slot = seen[&(out.step.clone(), out.instance.clone())];
             records[slot] = Some(out.record);
@@ -1622,6 +1663,45 @@ async fn pause(cx: &DecisionCtx<'_, '_>, at: Instant) -> bool {
         Poll::Pending
     })
     .await
+}
+
+/// Floor the validated decimal share in integer milliseconds, then cap it.
+pub(crate) fn step_deadline(
+    deadline: Instant,
+    start: Instant,
+    duration_ms: u64,
+    share: rustev_contract::Decimal,
+) -> Instant {
+    let width = (share.units() as u128 * u128::from(duration_ms) / 1_000_000_000) as u64;
+    deadline.min(start.saturating_add(width))
+}
+
+pub(crate) fn step_ledger(limit: &rustev_contract::generation::CostLimit) -> Ledger {
+    use rustev_contract::{execution::CostPolicy, generation::CostLimit};
+    Ledger::new(match limit {
+        CostLimit::None => CostPolicy::Unlimited,
+        CostLimit::Units { n } => CostPolicy::Hard { max_units: *n },
+    })
+}
+
+/// Extraction uses the ordinary attempt driver with its own clock window and
+/// cost ledger. Cache and batch paths cannot bypass either step limit.
+async fn drive_extraction(
+    cx: &DecisionCtx<'_, '_>,
+    req: SemanticRequest,
+    deadline: Instant,
+) -> RequestOutcome {
+    let limits = cx.plan.steps[&req.step]
+        .extraction
+        .as_ref()
+        .expect("extract limits");
+    let ledger = step_ledger(&limits.max_cost_units);
+    let local = DecisionCtx {
+        deadline,
+        step_ledger: Some(&ledger),
+        ..cx.clone()
+    };
+    drive(&local, req, None, 0, vec![]).await
 }
 
 pub(crate) async fn drive(

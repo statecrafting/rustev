@@ -398,6 +398,7 @@ pub(crate) struct Target {
 
 pub(crate) struct StepRuntime {
     pub targets: Vec<Target>,
+    pub extraction: Option<rustev_contract::extraction::ExtractionLimits>,
     pub retry: RetryPolicy,
     pub timeout: AttemptTimeout,
     pub fallback_on: Vec<FailureClass>,
@@ -579,9 +580,15 @@ impl Runtime {
         }
         let mut steps = BTreeMap::new();
         for s in &compiled.plan.steps {
-            let (backend_id, artifact, descriptor) = match &s.detail {
-                PlanStepDetail::Semantic(b) => (&b.backend_id, &b.artifact, &b.descriptor),
-                PlanStepDetail::Generate(b) => (&b.backend_id, &b.artifact, &b.descriptor),
+            let (backend_id, artifact, descriptor, extraction) = match &s.detail {
+                PlanStepDetail::Semantic(b) => (&b.backend_id, &b.artifact, &b.descriptor, None),
+                PlanStepDetail::Generate(b) => (&b.backend_id, &b.artifact, &b.descriptor, None),
+                PlanStepDetail::Extract(b) => (
+                    &b.backend_id,
+                    &b.artifact,
+                    &b.descriptor,
+                    Some(b.limits.clone()),
+                ),
                 _ => continue,
             };
             let mut targets = vec![Target {
@@ -605,6 +612,7 @@ impl Runtime {
                 s.id.clone(),
                 StepRuntime {
                     targets,
+                    extraction,
                     retry: declared
                         .map(|d| d.retry.clone())
                         .unwrap_or_else(RetryPolicy::none),
@@ -632,6 +640,7 @@ impl Runtime {
                                     artifact: b.artifact.clone(),
                                     registered: target(&b.backend_id, &b.descriptor)?,
                                 }],
+                                extraction: None,
                                 retry: RetryPolicy::none(),
                                 timeout: AttemptTimeout::None,
                                 fallback_on: vec![],
