@@ -26,6 +26,7 @@ fn policy() -> rustev_contract::execution::ExecutionPolicy {
         expiry: ExpiryBasis::InjectedRuntimeTime,
         batch: None,
         memory_cache: Some(MemoryCachePolicy {
+            acquisition_pages: false,
             max_bytes: 10_000_000,
             max_entries: 512,
             max_entry_bytes: 16_384,

@@ -1081,6 +1081,25 @@ and per-tier outcomes in evidence (3.14). Tests in
 fills, specific skipped), protected fields asserted on every request,
 two-source pooling, and supply-order independence.
 
+**Increment 3 (2026-10-24): runtime dispatch.** `crates/rustev-runtime/src/acquisition.rs`
+installs acquisition sources through new entry points (existing
+signatures unchanged, 3.16.4) and dispatches pending acquisitions through
+them (3.13): acquisition windows from each step's `deadline_share`,
+retries for `transient`, `overloaded` and `timed_out` only when named in
+`retry_on` and never past the window's close, `denied` never retried and
+supplied as `missing_evidence`, spec 003's attempt timeout applied to
+each acquisition attempt, cost reserved and settled in the decision's
+ledger with `acquisition.max_calls` enforced, cancellation for each
+`cancellation` kind, contained source panics, paging and widening across
+sources, and every page and attempt recorded in `rustev.run/3`. Pages are
+cached under spec 017 only when the operation is `cacheable` and the
+cache policy opts in through its new optional `acquisition_pages` member
+(absent means off, so existing policies keep their bytes), keyed by the
+request identity, `SourceId` and the full authorized scope, with a hit
+recorded with its age (3.13.7). Tests:
+`crates/rustev-runtime/tests/acquisition.rs` under the manual clock with
+scripted sources, and `crates/rustev-contract/tests/acquisition_cache.rs`.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

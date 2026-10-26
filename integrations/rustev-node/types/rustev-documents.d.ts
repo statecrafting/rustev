@@ -5347,6 +5347,11 @@ export namespace RustevExecution1 {
    * another plan's entries.
    */
   export interface MemoryCachePolicy {
+    /**
+     * Opt in to eligible acquisition pages (spec 036, 3.13.7).
+     * Absence disables reuse; true is the only explicit wire value.
+     */
+    acquisition_pages?: true;
     eviction: EvictionOrder;
     max_bytes: number;
     max_entries: number;
@@ -8799,6 +8804,11 @@ export namespace RustevPlan2 {
    * another plan's entries.
    */
   export interface MemoryCachePolicy {
+    /**
+     * Opt in to eligible acquisition pages (spec 036, 3.13.7).
+     * Absence disables reuse; true is the only explicit wire value.
+     */
+    acquisition_pages?: true;
     eviction: EvictionOrder;
     max_bytes: number;
     max_entries: number;
@@ -10623,6 +10633,11 @@ export namespace RustevPlan3 {
    * another plan's entries.
    */
   export interface MemoryCachePolicy {
+    /**
+     * Opt in to eligible acquisition pages (spec 036, 3.13.7).
+     * Absence disables reuse; true is the only explicit wire value.
+     */
+    acquisition_pages?: true;
     eviction: EvictionOrder;
     max_bytes: number;
     max_entries: number;

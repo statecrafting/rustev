@@ -70,17 +70,18 @@ pub(crate) struct DecisionCtx<'a, 'e> {
     pub ledger: &'a Ledger,
     pub decision_id: &'a str,
     pub principal: &'a [u8],
+    pub evaluation_time: rustev_contract::Timestamp,
     pub ev: &'a Mutex<Evaluation<'e>>,
     /// Present only on the live re-execution path (spec 026).
     pub live: Option<&'a LiveCtx<'a>>,
 }
 
 impl<'e> DecisionCtx<'_, 'e> {
-    fn now(&self) -> Instant {
+    pub(crate) fn now(&self) -> Instant {
         self.rt.clock.now()
     }
 
-    fn elapsed(&self) -> u64 {
+    pub(crate) fn elapsed(&self) -> u64 {
         self.now().saturating_sub(self.submitted)
     }
 
@@ -89,7 +90,7 @@ impl<'e> DecisionCtx<'_, 'e> {
     }
 
     /// Reserve in the decision ledger, then the shared one; all or nothing.
-    fn reserve(&self, bound: CostBound) -> Result<u64, Refused> {
+    pub(crate) fn reserve(&self, bound: CostBound) -> Result<u64, Refused> {
         let units = self.ledger.units_for(bound)?;
         if let Some(shared) = &self.rt.shared {
             shared.units_for(bound)?;
@@ -105,14 +106,14 @@ impl<'e> DecisionCtx<'_, 'e> {
     }
 
     /// Release a reservation that was never dispatched.
-    fn release(&self, units: u64) {
+    pub(crate) fn release(&self, units: u64) {
         self.ledger.release(units);
         if let Some(shared) = &self.rt.shared {
             shared.release(units);
         }
     }
 
-    fn hold(&self, attempt_id: &str, units: u64, bounded: bool) -> Held<'_> {
+    pub(crate) fn hold(&self, attempt_id: &str, units: u64, bounded: bool) -> Held<'_> {
         Held {
             ledgers: [Some(self.ledger), self.rt.shared.as_deref()],
             attempt_id: attempt_id.to_string(),
@@ -131,7 +132,7 @@ impl<'e> DecisionCtx<'_, 'e> {
 /// if the decision's future is dropped first, as an unknown charge: a
 /// possibly charged attempt is never refunded because its local future ended
 /// (spec 003, 3.4.5 and 3.5.4).
-struct Held<'l> {
+pub(crate) struct Held<'l> {
     ledgers: [Option<&'l Ledger>; 2],
     attempt_id: String,
     units: u64,
@@ -140,7 +141,7 @@ struct Held<'l> {
 }
 
 impl Held<'_> {
-    fn settle(mut self, charge: Charge) {
+    pub(crate) fn settle(mut self, charge: Charge) {
         self.armed = false;
         for l in self.ledgers.iter().flatten() {
             l.settle(&self.attempt_id, self.units, charge, self.bounded);
@@ -178,7 +179,11 @@ type DrivingMany<'a> = Pin<Box<dyn Future<Output = Vec<RequestOutcome>> + Send +
 pub(crate) async fn run_requests(
     cx: &DecisionCtx<'_, '_>,
     mut capture: Option<&mut Capturing<'_>>,
-) -> (Vec<RequestRecord>, bool) {
+) -> (
+    Vec<RequestRecord>,
+    Vec<rustev_contract::acquisition_record::AcquisitionRecord>,
+    bool,
+) {
     // A refusal cancels this decision's work without raising the caller's signal.
     let withdrawal = cx.cancel.child();
     let local = DecisionCtx {
@@ -194,7 +199,13 @@ pub(crate) async fn run_requests(
     // `max_parallel_requests` until their batch ends (spec 017, 3.4).
     let mut batches: Vec<(usize, DrivingMany<'_>)> = Vec::new();
     let mut cancelled = false;
+    let mut pages = crate::acquisition::Queue::default();
+    let calls = std::sync::atomic::AtomicU64::new(0);
+    let mut acquiring: Vec<crate::acquisition::Driving<'_>> = Vec::new();
     loop {
+        pages.list(cx);
+        cancelled |= pages.expire_waiting(cx);
+        pages.list(cx);
         for r in cx.ev().pending() {
             let key = (r.step.clone(), r.instance.clone());
             if let std::collections::btree_map::Entry::Vacant(v) = seen.entry(key) {
@@ -225,7 +236,9 @@ pub(crate) async fn run_requests(
         }
         let batched: usize = batches.iter().map(|(members, _)| members).sum();
         let mut candidates = Vec::new();
-        while active.len() + batched + candidates.len() < cx.rt.config.max_parallel_requests {
+        while active.len() + acquiring.len() + batched + candidates.len()
+            < cx.rt.config.max_parallel_requests
+        {
             let Some(r) = waiting.pop_front() else { break };
             match cache_lookup(cx, &r) {
                 CacheLookup::Done(out) => active.push(Box::pin(std::future::ready(*out))),
@@ -246,14 +259,34 @@ pub(crate) async fn run_requests(
             }
         }
         schedule_batches(cx, candidates, &mut active, &mut batches);
-        if active.is_empty() && batches.is_empty() {
+        let batched: usize = batches.iter().map(|(members, _)| members).sum();
+        while active.len() + acquiring.len() + batched < cx.rt.config.max_parallel_requests {
+            let Some((r, close)) = pages.waiting.pop_front() else {
+                break;
+            };
+            acquiring.push(Box::pin(crate::acquisition::drive(cx, r, close, &calls)));
+        }
+        if active.is_empty() && batches.is_empty() && acquiring.is_empty() {
             break;
         }
         enum Ready {
+            QueuedExpiry,
+            Acquisition(usize, crate::acquisition::Outcome),
             Request(usize, Box<RequestOutcome>),
             Batch(usize, Vec<RequestOutcome>),
         }
+        let mut queued_timer = pages
+            .waiting
+            .iter()
+            .map(|(_, close)| *close)
+            .min()
+            .map(|close| cx.rt.clock.sleep_until(close));
         let ready = std::future::poll_fn(|task| {
+            for (idx, f) in acquiring.iter_mut().enumerate() {
+                if let Poll::Ready(out) = f.as_mut().poll(task) {
+                    return Poll::Ready(Ready::Acquisition(idx, out));
+                }
+            }
             for (idx, (_, f)) in batches.iter_mut().enumerate() {
                 if let Poll::Ready(o) = f.as_mut().poll(task) {
                     return Poll::Ready(Ready::Batch(idx, o));
@@ -264,10 +297,21 @@ pub(crate) async fn run_requests(
                     return Poll::Ready(Ready::Request(idx, Box::new(o)));
                 }
             }
+            if let Some(timer) = &mut queued_timer
+                && timer.as_mut().poll(task).is_ready()
+            {
+                return Poll::Ready(Ready::QueuedExpiry);
+            }
             Poll::Pending
         })
         .await;
         let outs = match ready {
+            Ready::QueuedExpiry => continue,
+            Ready::Acquisition(idx, out) => {
+                drop(acquiring.swap_remove(idx));
+                cancelled |= pages.supply(cx, out);
+                continue;
+            }
             Ready::Batch(idx, outs) => {
                 drop(batches.swap_remove(idx));
                 outs
@@ -355,7 +399,11 @@ pub(crate) async fn run_requests(
             records[slot] = Some(out.record);
         }
     }
-    (records.into_iter().flatten().collect(), cancelled)
+    (
+        records.into_iter().flatten().collect(),
+        pages.records.into_iter().flatten().collect(),
+        cancelled,
+    )
 }
 
 /// Screening identity comes from the lowered plan, never a name prefix.

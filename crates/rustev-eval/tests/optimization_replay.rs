@@ -25,6 +25,7 @@ fn cached() -> rustev_contract::execution::ExecutionPolicy {
         expiry: ExpiryBasis::InjectedRuntimeTime,
         batch: None,
         memory_cache: Some(MemoryCachePolicy {
+            acquisition_pages: false,
             max_bytes: 1_000_000,
             max_entries: 64,
             max_entry_bytes: 65_536,

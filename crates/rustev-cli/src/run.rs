@@ -165,6 +165,7 @@ fn mismatch_json(backend_id: &str, m: &rustev_backend_rules::PlanMismatch) -> se
 
 fn prepare_json(e: &PrepareError) -> serde_json::Value {
     match e {
+        PrepareError::SourceBinding(source) => json!({"kind": "source_binding", "source": source}),
         PrepareError::MissingBackend(b) => json!({"kind": "missing_backend", "backend_id": b}),
         PrepareError::DescriptorMismatch { backend_id } => {
             json!({"kind": "descriptor_mismatch", "backend_id": backend_id})

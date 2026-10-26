@@ -64,6 +64,7 @@ fn policy(batch: bool, cache: bool) -> ExecutionPolicy {
                 max_scope_bytes: 100_000,
                 ttl_ms: 1000,
                 eviction: EvictionOrder::Fifo,
+                acquisition_pages: false,
             }),
         });
     }

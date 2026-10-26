@@ -53,6 +53,7 @@ fn batch_policy(max_members: u32) -> ExecutionPolicy {
 
 fn memory(ttl_ms: u64, max_entries: u64, max_entry_bytes: u64) -> MemoryCachePolicy {
     MemoryCachePolicy {
+        acquisition_pages: false,
         max_bytes: 100_000,
         max_entries,
         max_entry_bytes,
