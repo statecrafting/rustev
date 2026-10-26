@@ -1,11 +1,11 @@
 ---
 id: "056-release-0-1-1-and-consumer-qualification"
-title: "Release 0.1.1: a CLI version command, declared consumer examples and the fresh-consumer qualification (amends 006, 007, 021 and 031)"
+title: "Release 0.1.1: a CLI version command, declared consumer examples and the fresh-consumer qualification (amends 006, 007 and 031)"
 status: draft
 implementation: pending
 created: "2026-10-26"
 summary: >
-  A narrow amendment of approved specs 006, 007, 021 and 031, written after
+  A narrow amendment of approved specs 006, 007 and 031, written after
   `v0.1.0` was published to crates.io, npm and GitHub on 2026-10-26 but could
   not be qualified (021 3.10, 031 3.9.7). The CLI has no version command;
   the support-routing package declares no runnable offline example (its
@@ -19,7 +19,6 @@ summary: >
 amends:
   - "006-cli-surface"
   - "007-support-routing-package"
-  - "021-packaging-and-first-release"
   - "031-public-api-and-release-family"
 extends:
   # The version command (3.1).
@@ -59,11 +58,12 @@ obligations:
     anchor: "3-4-authority-for-a-later-release"
 ---
 
-# 056: Release 0.1.1, a CLI version command, declared consumer examples and the fresh-consumer qualification (amends 006, 007, 021 and 031)
+# 056: Release 0.1.1, a CLI version command, declared consumer examples and the fresh-consumer qualification (amends 006, 007 and 031)
 
 Draft: the owner ratifies it before any change it describes merges. The
-approved texts of 006, 007, 021 and 031 are not edited; this spec records
-what it adds to them.
+approved texts of 006, 007 and 031 are not edited; this spec records what
+it adds to them. Spec 021 is not amended: its fresh-consumer steps (3.10)
+and version policy (3.2) are implemented here as written.
 
 ## 1. Purpose
 
@@ -220,8 +220,10 @@ attached after `0.1.0`.
 ## Verification
 
 Pending. Ratification authorizes the code and workflow changes and the
-`0.1.1` version bump; publishing `0.1.1` additionally needs the owner's
-signed instruction of 3.4.
+`0.1.1` version bump. Adding `.github/workflows/qualify.yml` needs the
+owner's approval of the `statecraft-review-exception` Environment once, as
+every change under `.github/workflows/` does (`AGENTS.md`). Publishing
+`0.1.1` additionally needs the owner's signed instruction of 3.4.
 
 ## Implementation record
 
