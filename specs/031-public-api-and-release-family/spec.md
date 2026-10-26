@@ -1015,6 +1015,28 @@ everywhere and save on a push to main, msrv caches registry and git only (its
 target was 4 GB), and workspace crates' artifacts are dropped before saving,
 because Cargo rebuilds them after any checkout.
 
+**First publication, 2026-10-26, `v0.1.0` at `9dbf8e0`.** The tagged run
+40351642532 bound every artifact to the signed manifest. With all twelve
+crates public (spec 021's record), run 40379390061 passed bind and the
+crate observation, then its `npm` job failed `ENEEDAUTH` on the first
+package: trusted publishing is configured per existing package, and none
+of the nine `@rustev/*` names existed, so nothing was published. The owner
+chose a local first publish with `NPM_TOKEN`: the nine tarballs, first
+checked against the signed manifest (`verify-artifacts`), were published
+in the release set's order, and each registry integrity equals its
+tarball's SHA-512. **These `0.1.0` packages carry no npm provenance**, an
+owner-accepted departure from 3.9.6 for the first publication only. The
+owner then attached a trusted publisher (`release.yml`, Environment
+`npm-publish`, `npm publish` allowed, `dist-tag` not) to each package;
+npm validates it on the next publication.
+`rustev-release hosted-release` then observed every crate and npm
+package public with its manifest checksum and created the GitHub release
+`v0.1.0` (layer 8): 60 assets, the twelve `.crate` archives, the CLI
+archives each with its `.sha256`, the SBOMs, the changelog, the signed
+manifest and `SHA256SUMS` with their signatures, and the journal summary;
+npm tarballs are not re-hosted. Fresh-consumer qualification (3.9.7) is
+the remaining step before the lifecycle reaches `qualified`.
+
 ## Decisions at approval
 
 1. **Crate and package names** (left to the implementer by #58): decided
