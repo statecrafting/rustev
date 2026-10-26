@@ -56,6 +56,14 @@ skip = [
   # ring 0.17 requires windows-sys 0.52 while tokio, mio and socket2 use
   # 0.61; Windows-only bindings with no shared state. Reviewed 2026-10-19.
   { crate = "windows-sys@0.52.0", reason = "ring 0.17 pins windows-sys 0.52; Windows-only bindings" },
+  # The Node binding's OTLP/HTTP exporter (spec 049) brings in ring 0.17,
+  # which requires getrandom 0.2, while opentelemetry_sdk's rand 0.9 uses
+  # getrandom 0.3; OS randomness shims with no shared state. Reviewed 2026-10-26.
+  { crate = "getrandom@0.2.17", reason = "ring 0.17 pins getrandom 0.2; opentelemetry_sdk's rand 0.9 uses 0.3" },
+  # prost-derive 0.14 (OTLP protobuf, spec 049) is built with syn 2 while the
+  # other proc macros use syn 3; build-time only, nothing reaches the binary.
+  # Reviewed 2026-10-26.
+  { crate = "syn@2.0.119", reason = "prost-derive 0.14 pins syn 2; build-time proc-macro dependency only" },
 ]
 
 [sources]

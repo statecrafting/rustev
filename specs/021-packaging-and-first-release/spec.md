@@ -707,3 +707,17 @@ The owner accepted each recommendation below when approving this spec.
    signing identity should the implementation adopt?
 5. Should public API documentation be hosted only by the registry service or
    also built and attached under a separately governed documentation policy?
+
+**Release rehearsal, 2026-10-26, at `e9a267a` (run 40279690969, the
+first spec 053 rehearsal on `release/next`).** Every build, the
+reproducibility comparison and the SBOMs passed; the audit failed (3.6) on
+the `rustev-node` graph alone. `cargo deny` 0.20.2 refused a wildcard path
+dependency on `rustev-otel` (fixed in 049's manifest) and two duplicate
+majors that spec 049's OTLP/HTTP exporter brought into the binding:
+`getrandom` 0.2.17 (from `ring` 0.17, beside 0.3.4 from
+`opentelemetry_sdk`'s `rand` 0.9) and `syn` 2.0.119 (from `prost-derive`
+0.14, beside syn 3 for every other proc macro). Both are listed as
+reviewed `skip` entries in `tools/rustev-release/deny.toml` with their
+reasons, by review and not automatically; no other policy changes. With
+them, `cargo deny` passes for the `rustev-cli`, `rustev-node` and
+`rustev-wasm` graphs and for the release set's workspace check.
