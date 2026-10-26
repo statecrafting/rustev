@@ -946,6 +946,7 @@ fn step_attributes(
     }
     if let Some(s) = se {
         match &s.status {
+            StepStatus::Skipped { .. } => b.put("rustev.step.status", Enum, "skipped".into()),
             StepStatus::Resolved { kind, derivation } => {
                 b.put("rustev.step.status", Enum, "resolved".into());
                 b.put("rustev.step.value_kind", Enum, kind.as_str().into());

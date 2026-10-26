@@ -51,6 +51,7 @@ impl Observing<'_> {
                 continue;
             }
             let (outcome, derivation) = match &step.status {
+                StepStatus::Skipped { .. } => continue,
                 StepStatus::Resolved { derivation, .. } => (Ok(()), *derivation),
                 // Unresolved values have no dynamic derivation in core evidence.
                 // Report the compiled, conservative derivation bound.

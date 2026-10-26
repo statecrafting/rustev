@@ -344,6 +344,68 @@ fn guarded_acquisition_requires_skipped_handling_except_for_presence_probes() {
 }
 
 #[test]
+fn guarded_acquisition_skipped_handlers_allow_only_as_unmet_and_escalate() {
+    use rustev_contract::actionability::Address;
+    use rustev_contract::definition::{
+        Cond, Handler, HandlerAction, Predicate, ReasonKind, ReasonSet,
+    };
+    let mut d = base(false);
+    if let StepBody::Acquire(a) = &mut d.steps[0].body {
+        a.when = rustev_contract::acquisition_step::Guard::Predicate(Predicate::All(vec![]));
+    }
+    d.inputs = serde_json::from_value(json!([{
+        "name":"query", "type":{"text":{"max_bytes":64}},
+        "provenance":["user-supplied"], "freshness":"not_required"
+    }]))
+    .unwrap();
+    d.actionability = Some(
+        serde_json::from_value(json!({
+            "caller_controlled":["user-supplied"], "remediations":[],
+            "questions":[], "constraint_groups":[], "checks":[]
+        }))
+        .unwrap(),
+    );
+    let mut checked = d.policy.rules[0].clone();
+    checked.id = "checked".into();
+    checked.when = Cond::Nonempty("step:lookup/items".into());
+    d.policy.rules.insert(0, checked);
+    for reasons in [ReasonSet::Any, ReasonSet::Only(ReasonKind::ALL.to_vec())] {
+        d.policy.on_unresolved = vec![Handler {
+            target: "step:lookup".into(),
+            reasons,
+            action: HandlerAction::AsUnmet,
+        }];
+        for action in [
+            HandlerAction::Propagate,
+            HandlerAction::PropagateWith {
+                remediation: None,
+                address: Address::Computed,
+            },
+            HandlerAction::NeedsInput {
+                fields: vec!["query".into()],
+                questions: vec![],
+            },
+        ] {
+            d.policy.on_unresolved[0].action = action;
+            let r = run(&d).unwrap_err();
+            assert_eq!(r.category, Category::UnhandledUnresolved);
+            assert_eq!(r.category as u8, 8);
+            assert_eq!(r.subject, "step:lookup");
+            assert_eq!(r.detail, "skipped_not_propagatable");
+        }
+        for action in [
+            HandlerAction::AsUnmet,
+            HandlerAction::Escalate {
+                reason: "review".into(),
+            },
+        ] {
+            d.policy.on_unresolved[0].action = action;
+            run(&d).expect("as_unmet and escalate handle skipped acquisitions");
+        }
+    }
+}
+
+#[test]
 fn exact_requests_types_cycles_and_source_mappings() {
     let mut d = base(false);
     d.inputs = vec![

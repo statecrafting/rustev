@@ -9,6 +9,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
+#[path = "acquisition_eval.rs"]
+mod acquisition_eval;
+pub use acquisition_eval::PendingAcquisition;
+
 use rustev_contract::actionability::Party;
 use rustev_contract::canonical::canonical_value_bytes;
 use rustev_contract::definition::{
@@ -51,7 +55,7 @@ use crate::value::{Value, decode};
 /// Why evaluation could not start.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StartError {
-    /// Acquisition compilation is available; staged evaluation is a later increment.
+    /// Widening evaluation is not yet available in this increment.
     AcquisitionNotAvailable,
     GenerationNotAvailable,
     /// The snapshot's `schema` is not `rustev.snapshot/1`.
@@ -182,6 +186,8 @@ pub struct FailureContext {
 /// An evaluation in progress.
 pub struct Evaluation<'c> {
     constructed: BTreeSet<String>,
+    skipped: BTreeMap<String, String>,
+    acquisitions: BTreeMap<String, acquisition_eval::State>,
     compiled: &'c Compiled,
     now: Timestamp,
     snapshot_id: SnapshotId,
@@ -440,7 +446,13 @@ impl<'c> Evaluation<'c> {
         snapshot: &Snapshot,
         now: Timestamp,
     ) -> Result<Self, StartError> {
-        if compiled.plan.acquisitions.is_some() {
+        if compiled
+            .plan
+            .definition
+            .steps
+            .iter()
+            .any(|s| matches!(s.body, rustev_contract::definition::StepBody::Widen(_)))
+        {
             return Err(StartError::AcquisitionNotAvailable);
         }
         // A plan 3 accepts a snapshot 1 or 2, a plan 2 only a snapshot 1,
@@ -479,6 +491,8 @@ impl<'c> Evaluation<'c> {
             .map_err(|e| StartError::NotCanonical(e.to_string()))?;
         let mut ev = Evaluation {
             constructed: BTreeSet::new(),
+            skipped: BTreeMap::new(),
+            acquisitions: BTreeMap::new(),
             compiled,
             now,
             snapshot_id,
@@ -1536,7 +1550,7 @@ impl<'c> Evaluation<'c> {
     }
 
     fn step_done(&self, s: &str) -> bool {
-        if self.exact.contains_key(s) {
+        if self.exact.contains_key(s) || self.skipped.contains_key(s) {
             return true;
         }
         match self.semantic.get(s) {
@@ -1604,11 +1618,29 @@ impl<'c> Evaluation<'c> {
                 if matches!(info.steps.get(id), Some(StepInfo::Generate))
                     || self.exact.contains_key(id)
                     || self.semantic.contains_key(id)
+                    || self.skipped.contains_key(id)
+                    || self.acquisitions.contains_key(id)
                 {
                     continue;
                 }
                 let deps = &info.deps[id];
-                if !deps.iter().all(|d| self.dep_done(d)) {
+                if !deps.iter().all(|d| self.dep_done(d)) && !self.acquisition_guard_terminal(id) {
+                    continue;
+                }
+                let skipped = deps.iter().find_map(|d| {
+                    let guard = self.skipped.get(d.strip_prefix("step:")?)?;
+                    let propagate = match &info.steps[id] {
+                        StepInfo::Acquisition(_) => false,
+                        StepInfo::Exact { args, .. } => !crate::compile::probe_only(args, d),
+                        _ => true,
+                    };
+                    propagate.then(|| guard.clone())
+                });
+                if let Some(guard) = skipped {
+                    self.skipped.insert(id.clone(), guard);
+                    self.lineage
+                        .insert(format!("step:{id}"), self.lineage_of(deps));
+                    progressed = true;
                     continue;
                 }
                 progressed = true;
@@ -1616,9 +1648,8 @@ impl<'c> Evaluation<'c> {
                 let lineage = self.lineage_of(deps);
                 match &info.steps[id] {
                     StepInfo::Generate => unreachable!("generation evaluation refused at start"),
-                    StepInfo::Acquisition(_) => {
-                        unreachable!("acquisition evaluation refused at start")
-                    }
+                    // Acquisition lineage is stored by the shared insertion after this match.
+                    StepInfo::Acquisition(a) => self.start_acquisition(id, a),
                     StepInfo::Exact { args, .. } => {
                         if matches!(args, OpArgs::ComposeKey(_))
                             || deps.iter().any(|d| self.constructed.contains(d))
@@ -1799,6 +1830,9 @@ impl<'c> Evaluation<'c> {
         let none = StepQuality::default();
         let reads = quality::op_reads(args);
         for r in &reads {
+            if View::skipped(self, &r.base) && crate::compile::probe_only(args, &r.base) {
+                continue;
+            }
             let ceiling = quality::read_ceiling(r, &info.trees);
             let meta = grading::read_meta(r, &self.metas);
             if let Err(u) = grading::check_read(r, &ceiling, &meta, self.now) {
@@ -2503,6 +2537,11 @@ impl<'c> Evaluation<'c> {
         for r in &decl.project {
             let v = match Ref::parse(r) {
                 Ok(Ref::Input(n, _)) => self.input_values.get(&n).map(Value::to_json),
+                Ok(Ref::Step(_)) if self.compiled.info.v2 => {
+                    crate::expr::eval_ref(r, &View::scope(self))
+                        .ok()
+                        .map(|v| v.to_json())
+                }
                 Ok(Ref::Step(n)) => self.exact_values.get(&n).map(Value::to_json),
                 Ok(Ref::Bind(b)) => {
                     let pos = decl.for_each.iter().position(|f| f.bind == b);
@@ -2589,9 +2628,9 @@ impl<'c> Evaluation<'c> {
         mut self,
         decision_id: &str,
     ) -> Result<(Judgment, EvidenceRecord), NotReady> {
-        if !self.pending.is_empty() {
+        if !self.pending.is_empty() || !self.pending_acquisitions().is_empty() {
             return Err(NotReady {
-                pending: self.pending.len(),
+                pending: self.pending.len() + self.pending_acquisitions().len(),
             });
         }
         let compiled = self.compiled;
@@ -2747,6 +2786,16 @@ impl<'c> Evaluation<'c> {
             .collect();
         let mut steps = Vec::new();
         for id in &compiled.info.step_ids {
+            if let Some(guard) = self.skipped.get(id) {
+                steps.push(StepEvidence::new(
+                    id.clone(),
+                    vec![],
+                    StepStatus::Skipped {
+                        guard: guard.clone(),
+                    },
+                ));
+                continue;
+            }
             let derivation = self
                 .derivation
                 .get(&format!("step:{id}"))
@@ -2770,6 +2819,17 @@ impl<'c> Evaluation<'c> {
                         },
                     ))
                 }
+                (StepInfo::Acquisition(a), Some(r), _) => steps.push(StepEvidence::new(
+                    id.clone(),
+                    vec![],
+                    match r {
+                        Ok(_) => StepStatus::Resolved {
+                            kind: a.ty.name(),
+                            derivation,
+                        },
+                        Err(u) => StepStatus::Unresolved(u.clone()),
+                    },
+                )),
                 (StepInfo::Semantic { kind, .. }, _, Some(SemState::Instances { values, .. })) => {
                     for (k, v) in values {
                         steps.push(StepEvidence::new(
@@ -2826,7 +2886,7 @@ impl<'c> Evaluation<'c> {
         });
         let evidence = EvidenceRecord {
             generation: None,
-            acquisitions: None,
+            acquisitions: self.acquisition_evidence(),
             screening: screening.filter(|entries: &Vec<ScreeningEvidence>| !entries.is_empty()),
             schema: if v2 {
                 schema::EVIDENCE_V2
@@ -3080,6 +3140,13 @@ impl<'c> Evaluation<'c> {
 }
 
 impl View for Evaluation<'_> {
+    fn skipped(&self, r: &str) -> bool {
+        self.skipped.contains_key(
+            crate::expr::base_ref_v2(r)
+                .strip_prefix("step:")
+                .unwrap_or(r),
+        )
+    }
     fn base(&self, r: &str) -> String {
         if self.compiled.info.v2 {
             crate::expr::base_ref_v2(r)

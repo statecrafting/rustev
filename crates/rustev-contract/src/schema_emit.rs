@@ -105,6 +105,10 @@ fn run_members(version: &str) -> impl FnOnce(&mut serde_json::Value) + '_ {
                 .as_object_mut()
                 .unwrap()
                 .remove("constructed");
+            v["$defs"]["StepStatus"]["oneOf"]
+                .as_array_mut()
+                .unwrap()
+                .retain(|v| v["properties"].get("skipped").is_none());
             v["properties"]
                 .as_object_mut()
                 .unwrap()
@@ -272,6 +276,10 @@ pub fn document_schemas() -> Vec<EmittedSchema> {
                 .as_object_mut()
                 .unwrap()
                 .remove("constructed");
+            v["$defs"]["StepStatus"]["oneOf"]
+                .as_array_mut()
+                .unwrap()
+                .retain(|v| v["properties"].get("skipped").is_none());
             prune_defs(v);
         }),
         emit::<EvidenceRecord>(schema::EVIDENCE_V2, None),

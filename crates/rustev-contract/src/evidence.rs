@@ -73,9 +73,16 @@ crate::document::versioned_document!(
 impl EvidenceRecord {
     fn screening_version(&self) -> Result<(), String> {
         if self.schema != schema::EVIDENCE_V2
-            && (self.acquisitions.is_some() || self.steps.iter().any(|s| s.constructed))
+            && (self.acquisitions.is_some()
+                || self
+                    .steps
+                    .iter()
+                    .any(|s| s.constructed || matches!(s.status, StepStatus::Skipped { .. })))
         {
-            return Err("acquisitions and constructed require rustev.evidence/2".into());
+            return Err(
+                "acquisitions, constructed values and skipped steps require rustev.evidence/2"
+                    .into(),
+            );
         }
         if self.generation.is_some() && self.schema != schema::EVIDENCE_V2 {
             return Err("generation requires rustev.evidence/2".into());
@@ -309,6 +316,9 @@ pub enum StepStatus {
         derivation: Derivation,
     },
     Unresolved(Unresolved),
+    Skipped {
+        guard: String,
+    },
 }
 
 impl StepEvidence {

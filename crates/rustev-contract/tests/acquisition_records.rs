@@ -441,3 +441,28 @@ fn legacy_replay_bundle_keeps_its_bytes_digest_and_limits() {
         refuses::<ReplayBundle>(&bad);
     }
 }
+
+#[test]
+fn skipped_is_distinct_and_evidence_two_only() {
+    use rustev_contract::evidence::StepStatus;
+    let status = StepStatus::Skipped {
+        guard: "lookup".into(),
+    };
+    assert_eq!(
+        serde_json::to_value(&status).unwrap(),
+        json!({"skipped":{"guard":"lookup"}})
+    );
+    assert_eq!(
+        serde_json::from_value::<StepStatus>(json!({"skipped":{"guard":"lookup"}})).unwrap(),
+        status
+    );
+    assert!(
+        serde_json::from_value::<StepStatus>(json!({"skipped":{"guard":"lookup","extra":true}}))
+            .is_err()
+    );
+    let mut v = run()["core"]["recorded"].clone();
+    v["steps"][0]["status"] = serde_json::to_value(status).unwrap();
+    round::<EvidenceRecord>(&v);
+    v["schema"] = json!("rustev.evidence/1");
+    refuses::<EvidenceRecord>(&v);
+}

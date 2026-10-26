@@ -1049,6 +1049,22 @@ ceiling is `hint` (3.7.4). Screening provenance treats a composed key as
 copying its parts' text. Acquisition evaluation still refuses at start and
 is part 2b. Tests: `crates/rustev-core/tests/compose_key.rs`.
 
+**Increment 2, part 2b (2026-10-26): staged acquisition and the seam.**
+`compose_key@1`'s compile-time argument checks and `request_constructed`
+join part 2a's evaluation (3.7). Staged evaluation (3.11) gains
+`pending_acquisitions`, `supply_page` and `supply_acquisition_failure`:
+guards, exact request building, the `skipped{guard}` outcome and its
+propagation (3.4.3, 3.4.4, 3.8.1, 3.8.2), page validation through the
+contract's validator, paging and stop conditions (3.6), freshness and
+value metadata (3.4.6) and the truncation notice (3.4.7), with skipped
+steps recorded in evidence as `StepStatus::Skipped{guard}`. The
+`AcquisitionSource` seam of 3.12 is defined in `rustev-core` with the
+std-only `BoxFuture` the other seams use; the core never calls it.
+Widening evaluation (3.5.5 to 3.5.8) still refuses at start and is part 3.
+Tests: `crates/rustev-core/tests/acquisition_eval.rs`, including
+byte-identical judgments and evidence across all 90 valid supply
+interleavings of three two-page acquisitions.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

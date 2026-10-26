@@ -784,6 +784,7 @@ pub fn eval_predicate(p: &Predicate, s: &Scope<'_>) -> Result<bool, Fault> {
             .constructed
             .is_some_and(|set| set.contains(&base_ref_v2(reference)))
             && eval_ref(reference, s).is_ok()),
+        Predicate::Present(r) if s.v2 => Ok(eval_ref(r, s).is_ok()),
         Predicate::Present(r) => Ok(r
             .strip_prefix("input:")
             .is_some_and(|n| s.present.contains(n))),
