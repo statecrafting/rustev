@@ -820,6 +820,21 @@ disagreements follow 3.8.3, and a batch is reserved against
 is never issued (3.7.5). The tie-break order is supplied by the caller
 (`crates/rustev-core/tests/ranking_schedules.rs`).
 
+**Increment 4 (2026-10-26): the model ranking value, `select` and
+backfill.** `crates/rustev-core/src/ranking/value.rs` builds the model
+ranking value of 3.9 from supplied outputs in each mode: listwise with
+validation (3.5.3), partial rankings and adjacent score disagreements,
+position-bias presentations aggregated by integer Borda points (3.8),
+pointwise (3.6) and pairwise (3.7) through increment 3's schedules, with
+win counts, cycle count and inconsistent pairs. Scores are kept as
+received, scoped to their request (3.5.5), and never reorder entries.
+`crates/rustev-core/src/ranking/select.rs` implements `select` (3.10)
+with per-position origin, source position, derivation and lineage (3.11);
+backfill reads only the declared exact-derived ordering, never repeats a
+selected id and never leaves the ranked pool. Nothing calls these until
+the compile increment (`crates/rustev-core/tests/ranking_value.rs`,
+`ranking_select.rs`).
+
 ## Decisions at approval
 
 Decided within the binding principles under the work order.
