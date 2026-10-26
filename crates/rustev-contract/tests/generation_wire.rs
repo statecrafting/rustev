@@ -623,3 +623,26 @@ fn text_result_accepts_item_and_judgment_notices() {
         assert_eq!(result.record_canonical().unwrap(), bytes);
     }
 }
+
+#[test]
+fn generation_request_wire_is_strict_and_record_canonical() {
+    use rustev_contract::generation::GenerateRequest;
+    let value = json!({"schema":"rustev.generate-request/1","step":"text","instance":["a","repair:1"],"template":"item-text","template_id":digest(),"instructions":"Describe.","language":"en-GB","projection":{"input:x":true},"output":step()["body"]["generate"]["output"],"vocabularies":{"tag_vocabulary":["quiet","central","family"]},"repair":{"round":1,"fields":[{"name":"headline","reason":"too_long"}]}});
+    let bytes = serde_json::to_vec(&value).unwrap();
+    let doc = GenerateRequest::parse(&bytes).unwrap();
+    assert_eq!(
+        GenerateRequest::parse(&doc.record_canonical().unwrap()).unwrap(),
+        doc
+    );
+    for (pointer, bad) in [
+        ("/schema", json!("rustev.generate-request/2")),
+        ("/repair/fields/0/reason", json!("unknown")),
+    ] {
+        let mut changed = value.clone();
+        *changed.pointer_mut(pointer).unwrap() = bad;
+        assert!(GenerateRequest::parse(&serde_json::to_vec(&changed).unwrap()).is_err());
+    }
+    let mut changed = value;
+    changed["unexpected"] = json!(true);
+    assert!(GenerateRequest::parse(&serde_json::to_vec(&changed).unwrap()).is_err());
+}

@@ -20,6 +20,7 @@ pub mod evaluate;
 pub(crate) mod execution;
 pub mod expr;
 mod generation;
+pub mod generation_eval;
 pub(crate) mod grading;
 #[cfg(feature = "parameterized")]
 pub mod instantiate;

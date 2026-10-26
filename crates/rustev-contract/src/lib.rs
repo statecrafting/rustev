@@ -67,6 +67,7 @@ pub use time::{DurationMs, Timestamp};
 /// the #76 track versions and source descriptors; and by spec 019: the
 /// dynamic question documents).
 pub mod schema {
+    pub const GENERATE_REQUEST: &str = "rustev.generate-request/1";
     pub const TEXT_RESULT: &str = "rustev.text-result/1";
     pub const PROMPT_TEMPLATE: &str = "rustev.prompt-template/1";
     /// Decision explanation record canonical document (spec 040, 3.3).

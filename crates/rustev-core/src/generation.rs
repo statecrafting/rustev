@@ -442,10 +442,12 @@ fn param_type(p: &PromptParamType) -> t::Type {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub(crate) struct Checked {
     pub binding: GenerateBinding,
     pub output_bytes: u64,
+    pub prompt: Option<t::Template>,
+    pub backstops: BTreeMap<String, t::Template>,
 }
 
 /// Interim fail-closed rule of spec 037 3.5 and 3.11. Spec 035's integrated
@@ -731,7 +733,7 @@ pub(crate) fn type_check(
             t::parameter_binding(&ty, &f, source).map_err(template_error)?;
             params.insert(param.name.clone(), t::Field::exact(ty));
         }
-        t::Template::compile(
+        let prompt = t::Template::compile(
             &p.instructions,
             [("param".into(), t::Field::exact(t::Type::Record(params)))].into(),
             t::Options::prompt(),
@@ -746,13 +748,14 @@ pub(crate) fn type_check(
             vocabularies.insert(n.clone(), options.clone());
         }
         let mut output_bytes = 0u64;
+        let mut backstops = BTreeMap::new();
         for f in &g.output.fields {
             let b = g.backstop.fields.get(&f.name);
             match &f.ty {
                 GeneratedType::Text { max_bytes, lines } => {
                     output_bytes = output_bytes.saturating_add(*max_bytes);
                     if let Some(BackstopField::Text(source)) = b {
-                        t::Template::compile(
+                        let template = t::Template::compile(
                             source,
                             roots.clone(),
                             t::Options {
@@ -776,6 +779,7 @@ pub(crate) fn type_check(
                             },
                         )
                         .map_err(template_error)?;
+                        backstops.insert(f.name.clone(), template);
                     }
                 }
                 GeneratedType::List {
@@ -819,6 +823,8 @@ pub(crate) fn type_check(
             s.id.clone(),
             Checked {
                 output_bytes,
+                prompt: Some(prompt),
+                backstops,
                 binding: GenerateBinding {
                     template_id: g.template.digest.clone(),
                     template: p.clone(),
@@ -1045,6 +1051,8 @@ pub(crate) fn checked_binding(
     Ok(Checked {
         binding: binding.clone(),
         output_bytes,
+        prompt: None,
+        backstops: BTreeMap::new(),
     })
 }
 

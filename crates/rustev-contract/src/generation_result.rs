@@ -220,6 +220,8 @@ pub struct GenerationEvidence {
     pub items: Vec<GenerationItemEvidence>,
     pub text_origin: TextOrigin,
     pub counts: TextCounts,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub notices: Vec<TextNotice>,
 }
 
 fn slot(origin: &FieldOrigin, truncated: bool, source: &TextSource) -> Result<(), String> {
@@ -442,4 +444,15 @@ pub(crate) fn evidence<'de, D: serde::Deserializer<'de>>(
     };
     check().map_err(serde::de::Error::custom)?;
     Ok(Some(v))
+}
+
+/// SHA-256 of the record-canonical field value, without a domain prefix
+/// (spec 037, 3.15.1). Text itself never enters generation evidence.
+pub fn generation_value_digest<T: serde::Serialize>(
+    value: &T,
+) -> Result<ContentDigest, crate::canonical::CanonicalError> {
+    use sha2::{Digest, Sha256};
+    let bytes = crate::canonical::canonical_bytes(value)?;
+    let hash = Sha256::digest(bytes);
+    Ok(ContentDigest::from_digest(format!("sha256:{hash:x}")))
 }

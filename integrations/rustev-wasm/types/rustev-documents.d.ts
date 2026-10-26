@@ -4381,6 +4381,7 @@ export namespace RustevEvidence2 {
           original_decision_id: string;
         };
       };
+  export type TextNoticeKind = "ownership_violation" | "ownership_restored" | "backstop_truncated";
   export type GenerationState =
     | "ran"
     | {
@@ -4902,6 +4903,7 @@ export namespace RustevEvidence2 {
   export interface GenerationEvidence {
     counts: TextCounts;
     items: GenerationItemEvidence[];
+    notices?: TextNotice[];
     state: GenerationState;
     step: string;
     text_origin: TextOrigin;
@@ -4940,6 +4942,12 @@ export namespace RustevEvidence2 {
     source: TextSource;
     truncated: boolean;
     value_digest?: ContentDigest;
+  }
+  export interface TextNotice {
+    field: string;
+    instance: string[];
+    kind: TextNoticeKind;
+    step: string;
   }
   export interface InputEvidence {
     /**
@@ -5828,6 +5836,73 @@ export namespace RustevExplanation1 {
   }
 }
 export type RustevExplanation1 = RustevExplanation1.RustevExplanation1;
+
+export namespace RustevGenerateRequest1 {
+  export type GeneratedType =
+    | {
+        text: {
+          lines: Lines;
+          max_bytes: number;
+        };
+      }
+    | {
+        list: {
+          max_items: number;
+          vocabulary: string;
+        };
+      };
+  export type Lines = "single" | "multi";
+  export type RepairRequest =
+    | "none"
+    | {
+        fields: RepairField[];
+        round: number;
+      };
+  export type FieldInvalid =
+    | "missing"
+    | "wrong_type"
+    | "empty"
+    | "too_long"
+    | "control_character"
+    | "not_in_vocabulary"
+    | "duplicate_item"
+    | "too_many_items";
+  export type PromptTemplateId = string;
+
+  /**
+   * The record carried by the generate operation (spec 037, 3.7).
+   */
+  export interface RustevGenerateRequest1 {
+    instance: string[];
+    instructions: string;
+    language: string;
+    output: OutputSchema;
+    projection: {
+      [k: string]: unknown | undefined;
+    };
+    repair: RepairRequest;
+    schema: "rustev.generate-request/1";
+    step: string;
+    template: string;
+    template_id: PromptTemplateId;
+    vocabularies: {
+      [k: string]: string[] | undefined;
+    };
+  }
+  export interface OutputSchema {
+    fields: GeneratedField[];
+  }
+  export interface GeneratedField {
+    name: string;
+    required: boolean;
+    type: GeneratedType;
+  }
+  export interface RepairField {
+    name: string;
+    reason: FieldInvalid;
+  }
+}
+export type RustevGenerateRequest1 = RustevGenerateRequest1.RustevGenerateRequest1;
 
 export namespace RustevJudgment1 {
   /**
@@ -15414,6 +15489,7 @@ export namespace RustevRun3 {
           original_decision_id: string;
         };
       };
+  export type TextNoticeKind = "ownership_violation" | "ownership_restored" | "backstop_truncated";
   export type GenerationState =
     | "ran"
     | {
@@ -16088,6 +16164,7 @@ export namespace RustevRun3 {
   export interface GenerationEvidence {
     counts: TextCounts;
     items: GenerationItemEvidence[];
+    notices?: TextNotice[];
     state: GenerationState;
     step: string;
     text_origin: TextOrigin;
@@ -16126,6 +16203,12 @@ export namespace RustevRun3 {
     source: TextSource;
     truncated: boolean;
     value_digest?: ContentDigest;
+  }
+  export interface TextNotice {
+    field: string;
+    instance: string[];
+    kind: TextNoticeKind;
+    step: string;
   }
   export interface InputEvidence {
     /**
