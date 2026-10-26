@@ -96,6 +96,7 @@ fn instruction(m: &ReleaseManifest) -> Instruction {
         commit: m.commit.clone(),
         registry: m.registry.clone(),
         packages: m.upload_order.clone(),
+        account: rustev_release::lifecycle::FAKE_ACCOUNT.into(),
         registries: m.registries.clone(),
         artifacts: m.artifacts.iter().map(|a| a.name.clone()).collect(),
         continuation: false,

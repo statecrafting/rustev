@@ -317,6 +317,12 @@ version availability, candidate commit, tag signature, archive digest, registry
 identity, account identity and current journal. The command uploads the exact
 already-verified archive, never a rebuilt archive.
 
+The owner's instruction names the registry account login. crates.io answers
+no account query made with an API token, so account identity is checked
+against each name's public owners: a name that already exists must list that
+login before its upload, every uploaded name must list it once visible and
+before the next upload, and owners that cannot be read stop the run.
+
 Each attempt is appended before execution to an outside-Git publication
 journal with package, version, archive digest and intended registry. Its result
 then records command status, registry response, observed index identity,
@@ -749,3 +755,17 @@ now fails CI whenever a release member's sources embed, with
 `include_str!` or `include_bytes!`, a file its reviewed archive does not
 carry, so the break surfaces in the change that introduces it rather than
 at candidate time.
+
+**Publication attempt, 2026-10-26, at `9dbf8e0` (tag `v0.1.0`).** The
+signed release verified and the tagged run 40351642532 bound every
+artifact, but `rustev-release publish` stopped at its preflight before any
+upload: crates.io refuses `GET /api/v1/me` with an API token ("this action
+can only be performed on the crates.io website", HTTP 403), so the account
+query of increment 7 could never succeed. The owner chose the public owner
+check now in 3.9: the instruction carries `account`, the preflight records
+it, and `publish` reads `GET /api/v1/crates/<name>/owner_user` without a
+token before each upload and once each name is visible, journaling an
+`owners` entry each time. The token is now read for uploads only.
+`tests/lifecycle.rs` covers a missing or malformed account, a name owned
+by another account (nothing uploaded), an upload made as another account
+(partially published after one package) and unreadable owners.

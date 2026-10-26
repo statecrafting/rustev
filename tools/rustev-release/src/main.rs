@@ -910,7 +910,7 @@ fn publish_cmd(dir: &str, instruction: &str, journal_path: &str) -> ExitCode {
             commit: m.commit.clone(),
         })
         .map_err(|r| r.0)?;
-        life.apply(Event::Authorized(instruction))
+        life.apply(Event::Authorized(instruction.clone()))
             .map_err(|r| r.0)?;
         let mut journal = match std::fs::read_to_string(&journal_path) {
             Ok(text) => Journal::from_lines(&text)?,
@@ -926,9 +926,10 @@ fn publish_cmd(dir: &str, instruction: &str, journal_path: &str) -> ExitCode {
         // ALLOWED_SIGNERS; `bind` journals the verified pair.
         rustev_release::family_lifecycle::bind(&m, &signature, &mut journal)?;
         let registry = CratesIo { wait_seconds: 10 };
-        let account = registry.account()?;
+        // The instruction's login; `publish` checks it against each name's
+        // public owners (3.9), since crates.io names no token's account.
         journal.record(Entry::Preflight {
-            account,
+            account: instruction.account.clone(),
             commit: m.commit.clone(),
             tag: m.tag.clone(),
             manifest_sha256: m.digest(),

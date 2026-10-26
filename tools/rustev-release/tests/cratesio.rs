@@ -4,7 +4,7 @@
 use std::collections::BTreeMap;
 
 use rustev_release::cratesio::{
-    ArchiveMetadata, classify, index_checksum, index_path, new_crate, publish_body,
+    ArchiveMetadata, classify, index_checksum, index_path, new_crate, owner_logins, publish_body,
 };
 use rustev_release::lifecycle::{
     Entry, Event, FakeRegistry, Instruction, Journal, Lifecycle, Outcome, Upload, publish,
@@ -30,6 +30,16 @@ fn the_index_checksum_is_read_per_version() {
     );
     assert_eq!(index_checksum(text, "0.2.0").as_deref(), Some("bb"));
     assert_eq!(index_checksum(text, "0.3.0"), None);
+}
+
+#[test]
+fn owners_are_read_from_the_public_owner_user_response() {
+    // The shape of `GET /api/v1/crates/<name>/owner_user`.
+    let body = r#"{"users":[{"id":1,"login":"bartekus","kind":"user"},{"id":2,"login":"other","kind":"user"}]}"#;
+    assert_eq!(owner_logins(body).unwrap(), ["bartekus", "other"]);
+    assert!(owner_logins(r#"{"users":[{"id":1}]}"#).is_err());
+    assert!(owner_logins(r#"{"errors":[]}"#).is_err());
+    assert!(owner_logins("<html>").is_err());
 }
 
 #[test]
@@ -125,6 +135,7 @@ fn authorized(dir: &std::path::Path) -> (Lifecycle, BTreeMap<String, Vec<u8>>) {
         commit: m.commit.clone(),
         registry: m.registry.clone(),
         packages: m.upload_order.clone(),
+        account: rustev_release::lifecycle::FAKE_ACCOUNT.into(),
         registries: m.registries.clone(),
         artifacts: vec![],
         continuation: false,
@@ -184,6 +195,9 @@ impl rustev_release::lifecycle::Registry for Unreachable {
     }
     fn upload(&mut self, n: &str, v: &str, a: &[u8]) -> Upload {
         self.0.upload(n, v, a)
+    }
+    fn owners(&mut self, n: &str) -> Result<Vec<String>, String> {
+        self.0.owners(n)
     }
     fn wait(&mut self) {}
 }

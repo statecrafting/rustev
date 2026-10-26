@@ -60,6 +60,7 @@ fn instruction(m: &ReleaseManifest) -> Instruction {
         commit: m.commit.clone(),
         registry: m.registry.clone(),
         packages: m.upload_order.clone(),
+        account: rustev_release::lifecycle::FAKE_ACCOUNT.into(),
         registries: m.registries.clone(),
         artifacts: vec![],
         continuation: false,
@@ -204,11 +205,16 @@ fn each_upload_waits_for_visibility_with_the_expected_checksum() {
         3 * l.manifest.packages.len() as u64,
         "three waits per package"
     );
-    // Journal: attempt before result, then the observed checksum.
+    // Journal: the name's owners (none yet), attempt before result, the
+    // observed checksum, then the owners again, now the uploading account.
     let first = &l.manifest.packages[0];
     assert_eq!(
-        &j.entries[1..4],
+        &j.entries[1..6],
         &[
+            Entry::Owners {
+                package: first.name.clone(),
+                owners: vec![],
+            },
             Entry::Attempt {
                 package: first.name.clone(),
                 version: l.manifest.version.clone(),
@@ -224,6 +230,10 @@ fn each_upload_waits_for_visibility_with_the_expected_checksum() {
                 observed: Lookup::Visible {
                     checksum: first.sha256.clone()
                 },
+            },
+            Entry::Owners {
+                package: first.name.clone(),
+                owners: vec![rustev_release::lifecycle::FAKE_ACCOUNT.into()],
             },
         ]
     );
@@ -441,6 +451,9 @@ impl rustev_release::lifecycle::Registry for Corrupting {
     fn upload(&mut self, name: &str, version: &str, _archive: &[u8]) -> Upload {
         self.0.upload(name, version, b"other bytes")
     }
+    fn owners(&mut self, name: &str) -> Result<Vec<String>, String> {
+        self.0.owners(name)
+    }
     fn wait(&mut self) {
         self.0.wait()
     }
@@ -589,4 +602,109 @@ fn a_stop_that_cannot_be_written_is_still_one_stop_entry() {
         .collect();
     assert_eq!(stops.len(), 1, "{stops:?}");
     assert!(stops[0].contains("publishes nothing") && stops[0].contains("not writable"));
+}
+
+// Spec 021 3.9 account identity: crates.io names no API token's account,
+// so every name's public owners must include the instruction's login.
+
+#[test]
+fn an_instruction_without_a_registry_account_is_refused() {
+    let (m, _) = fixture();
+    for account in ["", "bad login", "a/b"] {
+        let mut l = Lifecycle::new(m.clone());
+        l.apply(Event::GatesPass).unwrap();
+        l.apply(Event::CandidateVerified {
+            commit: m.commit.clone(),
+        })
+        .unwrap();
+        let mut i = instruction(&m);
+        i.account = account.into();
+        assert!(l.apply(Event::Authorized(i)).is_err(), "{account:?}");
+        assert_eq!(l.state, State::CandidateVerified);
+    }
+    let text = r#"{"version":"0.1.0","commit":"c","registry":"crates-io","packages":[]}"#;
+    assert!(
+        serde_json::from_str::<Instruction>(text).is_err(),
+        "the account is never defaulted"
+    );
+}
+
+#[test]
+fn a_name_owned_by_another_account_is_never_uploaded() {
+    let (mut l, a) = authorized();
+    let mut reg = FakeRegistry::default();
+    let first = l.manifest.upload_order[0].clone();
+    reg.owners
+        .insert(first.clone(), vec!["someone-else".into()]);
+    let mut j = signed_journal(&l.manifest);
+    assert!(
+        matches!(publish(&mut l, &a, &mut reg, &mut j), Outcome::Stopped { ref reason } if reason.contains("someone-else"))
+    );
+    assert!(reg.uploads.is_empty());
+    assert_eq!(l.state, State::PublicationAuthorized, "nothing is public");
+    assert!(j.entries.iter().any(|e| matches!(
+        e,
+        Entry::Owners { package, owners } if *package == first && owners == &["someone-else"]
+    )));
+}
+
+#[test]
+fn an_upload_made_as_another_account_stops_before_the_next_package() {
+    let (mut l, a) = authorized();
+    let mut reg = FakeRegistry {
+        uploader: Some("someone-else".into()),
+        ..Default::default()
+    };
+    let mut j = signed_journal(&l.manifest);
+    assert!(
+        matches!(publish(&mut l, &a, &mut reg, &mut j), Outcome::Stopped { ref reason } if reason.contains("not the instruction's account"))
+    );
+    assert_eq!(reg.uploads, l.manifest.upload_order[..1]);
+    assert_eq!(l.state, State::PartiallyPublished);
+}
+
+/// A registry whose owners cannot be read.
+struct NoOwners(FakeRegistry);
+
+impl rustev_release::lifecycle::Registry for NoOwners {
+    fn lookup(&mut self, name: &str, version: &str) -> Lookup {
+        self.0.lookup(name, version)
+    }
+    fn upload(&mut self, name: &str, version: &str, archive: &[u8]) -> Upload {
+        self.0.upload(name, version, archive)
+    }
+    fn owners(&mut self, _: &str) -> Result<Vec<String>, String> {
+        Err("owners HTTP 503".into())
+    }
+    fn wait(&mut self) {
+        self.0.wait()
+    }
+}
+
+#[test]
+fn unknown_owners_are_never_taken_for_none() {
+    let (mut l, a) = authorized();
+    let mut reg = NoOwners(FakeRegistry::default());
+    let mut j = signed_journal(&l.manifest);
+    assert!(
+        matches!(publish(&mut l, &a, &mut reg, &mut j), Outcome::Stopped { ref reason } if reason.contains("unknown"))
+    );
+    assert!(reg.0.uploads.is_empty());
+}
+
+#[test]
+fn every_published_name_is_checked_against_the_account() {
+    let (mut l, a) = authorized();
+    let mut reg = FakeRegistry::default();
+    let mut j = signed_journal(&l.manifest);
+    assert_eq!(publish(&mut l, &a, &mut reg, &mut j), Outcome::Complete);
+    for name in &l.manifest.upload_order {
+        let checks: Vec<_> = j
+            .entries
+            .iter()
+            .filter(|e| matches!(e, Entry::Owners { package, .. } if package == name))
+            .collect();
+        // Once before the upload (no owners yet) and once when visible.
+        assert_eq!(checks.len(), 2, "{name}");
+    }
 }
