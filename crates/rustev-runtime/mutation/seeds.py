@@ -37,7 +37,7 @@ SEEDS = [
     (
         "dispatch allowed at or after the deadline",
         RT + "driver.rs",
-        "if cx.now() >= cx.deadline {",
+        "if cx.now() >= cx.deadline() {",
         "if false {",
         ["--test", "time", "--test", "admission"],
     ),
@@ -156,7 +156,7 @@ SEEDS = [
         "no deadline check between cost disclosure and dispatch",
         RT + "driver.rs",
         """            // Disclosure is adapter code: check again, right before dispatch.
-            if cx.now() >= cx.deadline {""",
+            if cx.now() >= cx.deadline() {""",
         """            // Disclosure is adapter code: check again, right before dispatch.
             if false {""",
         ["--test", "time"],

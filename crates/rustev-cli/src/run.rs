@@ -353,6 +353,9 @@ async fn decide(
     let base = envelope::base(command, &s.decision_id, &plan_id);
     // The decision fields, and the status the decision alone gives.
     let ((mut out, mut exit), record) = match result {
+        Err(DecideError::GenerationFailed(detail)) => {
+            return Ok(envelope::rejected(base, "generation_failed", &detail));
+        }
         Err(DecideError::Rejected(r)) => {
             let (kind, detail) = rejection_kind(&r);
             return Ok(envelope::rejected(base, kind, &detail));
@@ -361,6 +364,7 @@ async fn decide(
             completion,
             record,
             delivery,
+            ..
         }) => {
             let receipt = match delivery {
                 Delivery::Acknowledged { receipt } => receipt,

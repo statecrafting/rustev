@@ -287,6 +287,38 @@ impl<'c> GenerationEvaluation<'c> {
         Ok(record_check(item, raw))
     }
 
+    /// Validate an attempt without resolving its request. Ownership notices
+    /// survive a transport retry or fallback that later returns a valid record.
+    pub fn check_attempt_output(
+        &mut self,
+        step: &str,
+        instance: &[String],
+        raw: &RawOutput,
+    ) -> Result<Result<(), Unresolved>, SupplyError> {
+        let checked = self.check_output(step, instance, raw)?;
+        if checked.is_err()
+            && let Some(item) = self.find(step, instance)
+            && let RawOutput::TextRecord(fields) = raw
+        {
+            let notices: Vec<_> = fields
+                .keys()
+                .filter(|n| !item.declaration.output.fields.iter().any(|f| &f.name == *n))
+                .map(|name| TextNotice {
+                    kind: TextNoticeKind::OwnershipViolation,
+                    step: step.into(),
+                    instance: item.result.id.clone(),
+                    field: name.clone(),
+                })
+                .collect();
+            for notice in notices {
+                if !self.notices.contains(&notice) {
+                    self.notices.push(notice);
+                }
+            }
+        }
+        Ok(checked)
+    }
+
     /// One scripted supply, with deterministic local attempt lineage.
     pub fn supply(
         &mut self,

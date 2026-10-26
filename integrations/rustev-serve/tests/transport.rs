@@ -135,6 +135,7 @@ fn every_refusal_has_the_contract_http_status() {
             ],
         ),
         (502, vec![RefusalCode::ContextUnavailable]),
+        (500, vec![RefusalCode::InternalError]),
         (
             409,
             vec![

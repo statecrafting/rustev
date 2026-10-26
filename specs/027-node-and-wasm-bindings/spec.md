@@ -298,6 +298,7 @@ await engine.shutdown({ drainMs });
    | `Rejection::QueueDeadline` | `DeadlineExceeded` | `queue_deadline` |
    | `Rejection::Cancelled` | `CancelledBeforeAdmission` | `cancelled` |
    | `DecideError::EvidenceNotDelivered` | `SinkFailure` | the delivery failure name; `detail` carries the run record bytes |
+   | `DecideError::GenerationFailed` (spec 037 3.12.6) | `GenerationFailed` | `generation_failed`; `detail` carries the invariant description for the in-process host, unlike spec 042's service wire, whose `internal_error` carries none |
    | `CaptureConfigError` | `CaptureConfigRefused` | its variant name |
    | context source failure before a decision (3.7) | `ContextUnavailable` | `host_seam_failed`, `host_seam_queue_full`, `invalid_snapshot` |
    | invalid `traceparent` (3.8) | `InvalidTraceContext` | `invalid_traceparent` |

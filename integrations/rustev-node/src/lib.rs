@@ -962,6 +962,11 @@ fn decided(r: std::result::Result<rustev_runtime::Decided, DecideError>) -> Resu
                 trace: None,
             })
         }
+        // Spec 027 3.4.1 gives the in-process host the invariant description in `detail`;
+        // spec 042's service-wire `internal_error` carries none.
+        Err(DecideError::GenerationFailed(detail)) => {
+            Err(fail("GenerationFailed", "generation_failed", detail))
+        }
         Err(DecideError::Rejected(r)) => Err(match r {
             Rejection::Overloaded => {
                 fail("AdmissionRejected", "overloaded", serde_json::Value::Null)

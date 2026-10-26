@@ -179,7 +179,7 @@
       }
     ],
     "sectionDigests": {
-      "027-node-api-binding-and-webassembly-build": "f3bbd27fed2ffd48f574a4b0fd66e16f6beb9aae626623bb4d7658c468c68b2b",
+      "027-node-api-binding-and-webassembly-build": "b21690dfaa654648d990b2a8aa636a6647b23f7c50c04a2e19c3f906f24afb06",
       "1-purpose": "8248211a41b85b51d1bfae9bc8fdbc1c3e326401ca9a926d748c532ffe36120d",
       "2-territory": "01c60a7d58cbc5c98a9af18fab1fc80ce6caa06e9bd86e299bd7fd0a54c7cf33",
       "3-1-surfaces-and-crates": "2edf806df6ee8344f0f4a1ded63a0cae7c800f18fd15075656c0519f104a72bc",
@@ -191,13 +191,13 @@
       "3-15-binding-principles": "e625525d3596218ae2fd16cf8c2b190b666468d7d0d068abbd2f39e9a8fc67fe",
       "3-2-typed-boundary-and-generated-types": "02e0123c671a8c3cb5c65fffa9e5da3f846c29ea240c4f5e4f24bf2751cfff90",
       "3-3-engine-lifecycle-and-the-typescript-api": "a1040377eae30104a6641e6a161b63e1c51ade97de2052905f02720182e3d34e",
-      "3-4-errors-and-unresolved-results": "1dfc2692592992847e97127bf6bc9407717fe67200c5bb0393ea20b9956a23e1",
+      "3-4-errors-and-unresolved-results": "57c1d3914bd74dff6aa3cb648439b37e08744914789855144d946f3bed28dc8b",
       "3-5-async-execution-and-cancellation": "22c7548e35d4706de8d961cc57223ccf91aab90ef87a8f5ce5604a6feeaff5b8",
       "3-6-host-implemented-seams": "6d71a5cff64502e1a3d1fd68b8e5cf933d5bc3c0559834c184d63330545e59a9",
       "3-7-seams-available-today-and-seams-that-join-later": "e6e9fcc264e5d7e6342e1c132000db826cef69d4a1c46e4c2e3fe0707e15b9dd",
       "3-8-trace-context": "d002a5fe4b634384100b257c5282270cb4857ab0e8467369705ba59e51279e6a",
       "3-9-memory-shutdown-and-observability": "d43098aed896056d07e32839e17ffd8f89843fa0320f8f1bd4a7fbb00f77d654",
-      "3-behavior": "3a89d3807583f921f415108f198f6612952293f2d7412ca836c8deb87bb1f92d",
+      "3-behavior": "c7d2459d2bc113c9848ff7460170ac07eeae1d00b3aca6a78fd68b4c774dbf40",
       "4-out-of-scope": "c08d31aad7ebde696420dabb7655112dd3cc51d01b992eb146df8db754533908",
       "5-observable-negative-cases": "ee56c10e4a806e990283b1ac16005970128ba627473abc36bef812ee50a4d971",
       "acceptance": "ede76f03d4516dab9362c7e567698c16b1ac066490b717b68e0adf3fa27a6482",
@@ -237,6 +237,6 @@
     "summary": "Approved (A-23). Two host surfaces over the existing engine: `rustev-node`, a napi-rs Node-API binding through which a TypeScript service compiles plans, runs decisions, replays and evaluates in-process and implements Rustev's seams in TypeScript as explicit composition (R-38); and `rustev-wasm`, a wasm-bindgen build of the pure crates for browsers, edge runtimes and tooling. Documents cross as the contract's canonical JSON, TypeScript types are generated from JSON Schema emitted by `rustev-contract`, command rendering moves into one pure crate shared by every surface, and every surface (CLI, native binding, WebAssembly, later HTTP and gRPC) runs one shared conformance suite. Approval does not authorize npm or crates.io publication, name reservation, a release, a live provider call, spend, or a claim that cross-target floating point agrees beyond what the parity suite measures.\n",
     "title": "Node-API binding and WebAssembly build"
   },
-  "shardHash": "d0bbda33b3fb4b259db7a63355f95aea504495621392e4a51aebf2de6e7da371",
+  "shardHash": "c7b4bb88a05edb41b82fbc090a4574c918023b7dfac427ee522fce947ae3f6c6",
   "specVersion": "1.10.0"
 }

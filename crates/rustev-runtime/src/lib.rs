@@ -17,6 +17,7 @@ mod capture;
 pub mod clock;
 mod driver;
 mod dynamic;
+mod generation;
 pub mod ledger;
 mod live;
 mod optimization;
@@ -116,6 +117,8 @@ pub enum Rejection {
 
 #[derive(Debug)]
 pub enum DecideError {
+    /// A pure generation invariant failed; no text result is returned.
+    GenerationFailed(String),
     Rejected(Rejection),
     /// Work and spending happened; the record did not reach the sink. The
     /// judgment inside `record` is evidence, not a result to act on.
@@ -156,6 +159,7 @@ pub enum Delivery {
 
 #[derive(Debug)]
 pub struct Decided {
+    pub text_result: Option<rustev_contract::generation_result::TextResult>,
     pub completion: Completion,
     pub record: Arc<RunRecord>,
     pub delivery: Delivery,
@@ -572,13 +576,15 @@ impl Runtime {
         }
         let mut steps = BTreeMap::new();
         for s in &compiled.plan.steps {
-            let PlanStepDetail::Semantic(b) = &s.detail else {
-                continue;
+            let (backend_id, artifact, descriptor) = match &s.detail {
+                PlanStepDetail::Semantic(b) => (&b.backend_id, &b.artifact, &b.descriptor),
+                PlanStepDetail::Generate(b) => (&b.backend_id, &b.artifact, &b.descriptor),
+                _ => continue,
             };
             let mut targets = vec![Target {
-                backend_id: b.backend_id.clone(),
-                artifact: b.artifact.clone(),
-                registered: target(&b.backend_id, &b.descriptor)?,
+                backend_id: backend_id.clone(),
+                artifact: artifact.clone(),
+                registered: target(backend_id, descriptor)?,
             }];
             let mut fb: Vec<_> = fallbacks.iter().filter(|f| f.step == s.id).collect();
             fb.sort_by_key(|f| f.target);
@@ -723,7 +729,9 @@ impl Runtime {
             .run(plan, req, cancel, Some(&mut capturing), None, None)
             .await;
         let capture = match &result {
-            Err(DecideError::Rejected(_)) => CaptureOutcome::NotAdmitted,
+            Err(DecideError::Rejected(_) | DecideError::GenerationFailed(_)) => {
+                CaptureOutcome::NotAdmitted
+            }
             Ok(Decided { record, .. }) | Err(DecideError::EvidenceNotDelivered { record, .. }) => {
                 CaptureOutcome::Captured(
                     capturing.finish(&decision_id, record.termination == Termination::Cancelled),
@@ -805,7 +813,7 @@ impl Runtime {
 
         let ledger = Ledger::new(plan.cost);
         let ev = std::sync::Mutex::new(ev);
-        let (requests, acquisitions, cancelled) = {
+        let (mut requests, acquisitions, mut cancelled) = {
             let cx = driver::DecisionCtx {
                 rt: i,
                 plan,
@@ -816,28 +824,65 @@ impl Runtime {
                 decision_id: &req.decision_id,
                 principal: &req.principal_handle,
                 evaluation_time: req.evaluation_time,
-                ev: &ev,
+                ev: Some(&ev),
+                generation: None,
+                step_ledger: None,
+                item_clock: None,
                 live,
                 observing: observing.as_ref(),
             };
             driver::run_requests(&cx, capture).await
         };
         let ev = ev.into_inner().unwrap_or_else(|e| e.into_inner());
+        let stage_cx = generation::StageContext {
+            rt: i,
+            plan,
+            deadline,
+            submitted,
+            cancel,
+            ledger: &ledger,
+            decision_id: &req.decision_id,
+            principal: &req.principal_handle,
+            evaluation_time: req.evaluation_time,
+        };
+        let mut text_result = None;
         let (completion, core) = if cancelled {
             (Completion::Cancelled, CoreEvidence::NotProduced)
         } else {
-            // Every listed request was supplied unless cancelled; anything
-            // else is a defect, not a runtime condition.
-            let (judgment, evidence) = ev
-                .finish(&req.decision_id)
-                .expect("every pending request was supplied");
-            if let Some(o) = &observing {
-                o.remaining(&evidence, &requests, &compiled.plan);
+            let stage = ev
+                .begin_generation(&req.decision_id)
+                .map_err(|e| DecideError::GenerationFailed(e.to_string()))?;
+            let stage = Mutex::new(stage);
+            // Spec 003 3.9.1 permits only judged or cancelled records; spec 037
+            // 3.12.6 requires generation to complete before judged. An invariant
+            // failure has no specified run-record termination, so this path
+            // returns GenerationFailed without delivery. Ordinary
+            // backend failures resolve through backstops and still deliver evidence
+            // (037 3.10.2, 3.12.7, 3.15.2); they do not take this error path.
+            let (generation_requests, was_cancelled) = generation::run(&stage_cx, &stage)
+                .await
+                .map_err(|e| DecideError::GenerationFailed(e.to_string()))?;
+            requests.extend(generation_requests);
+            cancelled = was_cancelled;
+            if cancelled {
+                (Completion::Cancelled, CoreEvidence::NotProduced)
+            } else {
+                let stage = stage.lock().unwrap_or_else(|e| e.into_inner());
+                let (mut judgment, evidence, mut text) = stage
+                    .finish()
+                    .map_err(|e| DecideError::GenerationFailed(e.to_string()))?;
+                if let Some(text) = &mut text {
+                    stage.verify_ownership(&mut judgment, text);
+                }
+                if let Some(o) = &observing {
+                    o.remaining(&evidence, &requests, &compiled.plan);
+                }
+                text_result = text;
+                (
+                    Completion::Judged(Box::new(judgment)),
+                    CoreEvidence::Recorded(Box::new(evidence)),
+                )
             }
-            (
-                Completion::Judged(Box::new(judgment)),
-                CoreEvidence::Recorded(Box::new(evidence)),
-            )
         };
         let elapsed_ms = i.clock.now().saturating_sub(submitted);
         let plan_3 = plan.compiled.plan.schema == schema::PLAN_V3;
@@ -886,6 +931,7 @@ impl Runtime {
         abandon.armed = false;
         match delivery {
             Ok(delivery) => Ok(Decided {
+                text_result,
                 completion,
                 record,
                 delivery,

@@ -511,6 +511,7 @@ pub fn run(case: &RuntimeCase, inputs: &Inputs) -> Result<Outputs, String> {
                     }}),
                     Some(d.record),
                 ),
+                Err(DecideError::GenerationFailed(detail)) => return Err(detail),
                 Err(DecideError::Rejected(r)) => (
                     json!({ "decision_id": id, "status": "rejected", "rejection": match r {
                         Rejection::Overloaded => "overloaded",

@@ -19190,7 +19190,8 @@ export namespace RustevServeRefusal1 {
     | "bundle_tampered"
     | "signature_invalid"
     | "signature_untrusted"
-    | "unsigned_refused";
+    | "unsigned_refused"
+    | "internal_error";
   /**
    * An oversized compiler refusal is represented by its digest and byte length.
    */
