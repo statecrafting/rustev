@@ -8,9 +8,9 @@
 //! crate enters the repository's tools (spec 001, 3.4.2).
 //!
 //! The registry token is read from `CARGO_REGISTRY_TOKEN` only inside
-//! [`CratesIo::upload`] and [`CratesIo::account`], is passed to `curl` on its
-//! standard input as a header file, and never enters an argument, a log or
-//! the journal (3.1, 3.9).
+//! [`CratesIo::upload`], is passed to `curl` on its standard input as a
+//! header file, and never enters an argument, a log or the journal (3.1,
+//! 3.9). Owners are read without it, from the public API.
 
 use std::collections::BTreeMap;
 use std::io::Write;
@@ -269,21 +269,6 @@ fn with_token(mut cmd: Command, body: Option<&[u8]>) -> Result<(Option<u16>, Str
 }
 
 impl CratesIo {
-    /// The account the token belongs to (3.9: the operator verifies it).
-    pub fn account(&self) -> Result<String, String> {
-        let mut cmd = curl();
-        cmd.arg(format!("{API}/me"));
-        let (status, body) = with_token(cmd, None)?;
-        if status != Some(200) {
-            return Err(format!("account query failed: {status:?}"));
-        }
-        let v: serde_json::Value = serde_json::from_str(&body).map_err(|e| e.to_string())?;
-        v["user"]["login"]
-            .as_str()
-            .map(str::to_string)
-            .ok_or_else(|| "no login in the account response".into())
-    }
-
     /// The metadata of the archive at `crate_path`, from its normalized
     /// manifest, read outside any workspace.
     pub fn metadata_of(crate_path: &std::path::Path, root: &str) -> Result<NewCrate, String> {
@@ -332,6 +317,23 @@ impl CratesIo {
         };
         Ok(new_crate(&p, readme))
     }
+}
+
+/// The `login` of each user in a crates.io `owner_user` response.
+pub fn owner_logins(body: &str) -> Result<Vec<String>, String> {
+    let v: serde_json::Value =
+        serde_json::from_str(body).map_err(|e| format!("unreadable owners: {e}"))?;
+    v["users"]
+        .as_array()
+        .ok_or("no users in the owners response")?
+        .iter()
+        .map(|u| {
+            u["login"]
+                .as_str()
+                .map(str::to_string)
+                .ok_or_else(|| "an owner without a login".to_string())
+        })
+        .collect()
 }
 
 impl Registry for CratesIo {
@@ -399,6 +401,27 @@ impl Registry for CratesIo {
             Err(e) => Upload::Refused {
                 reason: format!("not sent: {e}"),
             },
+        }
+    }
+
+    // 3.9 account identity. crates.io refuses `GET /me` with an API token
+    // ("this action can only be performed on the crates.io website"), so
+    // the account is read from the name's public owners, with no token.
+    fn owners(&mut self, name: &str) -> Result<Vec<String>, String> {
+        let o = curl()
+            .args(["-w", "\n%{http_code}"])
+            .arg(format!("{API}/crates/{name}/owner_user"))
+            .output()
+            .map_err(|e| format!("curl: {e}"))?;
+        if !o.status.success() {
+            return Err("owners transport failed".into());
+        }
+        let text = String::from_utf8_lossy(&o.stdout).into_owned();
+        let (body, code) = text.rsplit_once('\n').unwrap_or(("", &text));
+        match code.trim() {
+            "200" => owner_logins(body),
+            "404" => Ok(Vec::new()),
+            other => Err(format!("owners HTTP {other}")),
         }
     }
 

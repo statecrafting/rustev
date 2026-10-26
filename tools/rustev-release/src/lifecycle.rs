@@ -38,13 +38,18 @@ pub enum State {
 }
 
 /// The owner's publication instruction (I-4): it names the version, the
-/// exact candidate commit, the registry and the package set.
+/// exact candidate commit, the registry, the package set and the registry
+/// account that must own every published name (3.9).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Instruction {
     pub version: String,
     pub commit: String,
     pub registry: String,
     pub packages: Vec<String>,
+    /// The registry login the token belongs to. crates.io answers no
+    /// account query made with an API token, so the publisher checks this
+    /// login against each name's public owners instead (3.9).
+    pub account: String,
     #[serde(default)]
     pub registries: Vec<String>,
     #[serde(default)]
@@ -57,6 +62,14 @@ pub struct Instruction {
 
 fn publish_action() -> String {
     "publish".into()
+}
+
+/// A registry login: non-empty ASCII letters, digits, `-` and `_`.
+fn valid_account(account: &str) -> bool {
+    !account.is_empty()
+        && account
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
 }
 
 /// What can happen to a release.
@@ -131,6 +144,7 @@ impl Lifecycle {
                     || i.registry != m.registry
                     || i.packages != m.upload_order
                     || i.action != "publish"
+                    || !valid_account(&i.account)
                     // 3.11.1 "authorizes exactly one release, family version
                     // `0.1.0`"; section 4 leaves "any release after `0.1.0`"
                     // to a fresh owner act, which this tool does not define.
@@ -219,6 +233,9 @@ pub enum Upload {
 pub trait Registry {
     fn lookup(&mut self, name: &str, version: &str) -> Lookup;
     fn upload(&mut self, name: &str, version: &str, archive: &[u8]) -> Upload;
+    /// The public owner logins of `name`; empty when no such name exists.
+    /// An error is unknown state, never taken for no owners.
+    fn owners(&mut self, name: &str) -> Result<Vec<String>, String>;
     /// Let time pass between visibility queries (a fake advances its clock).
     fn wait(&mut self);
 }
@@ -320,7 +337,14 @@ pub enum Entry {
     Stopped {
         reason: String,
     },
-    /// What the operator verified before the first upload (3.9).
+    /// The public owners of a name, read before its upload and once it is
+    /// visible (3.9: account identity).
+    Owners {
+        package: String,
+        owners: Vec<String>,
+    },
+    /// What the operator verified before the first upload (3.9); `account`
+    /// is the instruction's login, checked against public owners.
     Preflight {
         account: String,
         commit: String,
@@ -498,6 +522,11 @@ pub fn publish(
         );
     }
     let m = life.manifest.clone();
+    let account = life
+        .instruction
+        .as_ref()
+        .map(|i| i.account.clone())
+        .unwrap_or_default();
     // A journal that binds no manifest is not yet this release's record:
     // the refusal leaves it untouched, so a later bind starts clean rather
     // than behind a `Stopped` entry that would demand a continuation.
@@ -573,6 +602,10 @@ pub fn publish(
                     observed: Lookup::Visible { checksum },
                 });
                 visible += 1;
+                if let Err(reason) = owned(registry, journal, &p.name, &account, true) {
+                    observe(life, visible);
+                    return stop(journal, reason);
+                }
                 continue;
             }
             Lookup::Visible { checksum } => {
@@ -606,6 +639,12 @@ pub fn publish(
                     ),
                 );
             }
+        }
+        // A name that already exists must belong to the instruction's
+        // account; a new name has no owners until its first upload.
+        if let Err(reason) = owned(registry, journal, &p.name, &account, false) {
+            observe(life, visible);
+            return stop(journal, reason);
         }
         if let Err(e) = journal.may_attempt(&p.name) {
             observe(life, visible);
@@ -689,6 +728,12 @@ pub fn publish(
                     observed: Lookup::Visible { checksum },
                 });
                 visible += 1;
+                // The first account check a new name allows: the uploader
+                // is now its public owner, before the next package goes.
+                if let Err(reason) = owned(registry, journal, &p.name, &account, true) {
+                    observe(life, visible);
+                    return stop(journal, reason);
+                }
             }
             Some(other) => {
                 journal.record(Entry::Query {
@@ -727,6 +772,35 @@ pub fn publish(
     Outcome::Complete
 }
 
+/// Spec 021 3.9 account identity: journal the public owners of `name` and
+/// refuse unless `account` is among them. `public` is whether the name is
+/// known to exist; a name not yet public may have no owners at all.
+fn owned(
+    registry: &mut dyn Registry,
+    journal: &mut Journal,
+    name: &str,
+    account: &str,
+    public: bool,
+) -> Result<(), String> {
+    let owners = registry
+        .owners(name)
+        .map_err(|e| format!("owners of {name} are unknown ({}); stopped", redact(&e)))?;
+    journal.record(Entry::Owners {
+        package: name.to_string(),
+        owners: owners.clone(),
+    });
+    if owners.iter().any(|o| o == account) || (!public && owners.is_empty()) {
+        Ok(())
+    } else {
+        Err(format!(
+            "{name} is owned by {owners:?}, not the instruction's account {account}"
+        ))
+    }
+}
+
+/// The login a [`FakeRegistry`] records as the owner of what it accepts.
+pub const FAKE_ACCOUNT: &str = "rustev-fixture";
+
 /// A scripted in-memory registry for the integration tests and dry runs.
 /// It is public because `tests/` and the dry-run harness are separate
 /// crates; this tool crate is never published (an exclusion of the release
@@ -743,6 +817,10 @@ pub struct FakeRegistry {
     pub lag: u64,
     pub now: u64,
     pub uploads: Vec<String>,
+    /// Owner logins per name; an accepted upload adds `uploader`.
+    pub owners: BTreeMap<String, Vec<String>>,
+    /// The account uploads are made as; [`FAKE_ACCOUNT`] when `None`.
+    pub uploader: Option<String>,
 }
 
 impl Registry for FakeRegistry {
@@ -774,8 +852,17 @@ impl Registry for FakeRegistry {
                 key,
                 (crate::archive::sha256_hex(archive), self.now + self.lag),
             );
+            let uploader = self.uploader.as_deref().unwrap_or(FAKE_ACCOUNT);
+            let owners = self.owners.entry(name.to_string()).or_default();
+            if !owners.iter().any(|o| o == uploader) {
+                owners.push(uploader.to_string());
+            }
         }
         outcome
+    }
+
+    fn owners(&mut self, name: &str) -> Result<Vec<String>, String> {
+        Ok(self.owners.get(name).cloned().unwrap_or_default())
     }
 
     fn wait(&mut self) {
