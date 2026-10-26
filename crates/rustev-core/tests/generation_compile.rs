@@ -376,7 +376,10 @@ fn iteration_and_remaining_compile_rows() {
         g["template"]["digest"] = json!(p.id().unwrap());
         g["template"]["params"] = json!({"count":"input:count"});
     });
-    assert_eq!(run(&d, &p, &b).unwrap_err().category, C::ModelOutputFlow);
+    assert_eq!(
+        run(&d, &p, &b).unwrap_err().category,
+        C::UnacceptedModelValue
+    );
 }
 
 #[test]

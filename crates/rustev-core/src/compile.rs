@@ -92,6 +92,7 @@ pub enum Category {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ShortfallReason {
     UnknownBackend,
+    OptionLogprobs,
     ScreenProfile,
     ScreenTextLimit {
         max: u64,
@@ -178,6 +179,7 @@ fn refuse<T>(
 #[derive(Debug, Clone)]
 pub(crate) enum StepInfo {
     Generate,
+    Extract,
     Acquisition(Box<crate::acquisition::Acquisition>),
     Exact {
         args: OpArgs,
@@ -315,6 +317,9 @@ impl Compiled {
             calibrations.iter().filter_map(|c| c.id().ok()).collect();
         let mut needed: Vec<(String, &DescriptorId)> = vec![];
         for step in &plan.steps {
+            if let PlanStepDetail::Extract(b) = &step.detail {
+                needed.push((b.backend_id.clone(), &b.descriptor));
+            }
             if let PlanStepDetail::Generate(b) = &step.detail {
                 needed.push((b.backend_id.clone(), &b.descriptor));
             }
@@ -445,6 +450,21 @@ fn recompile(
         .iter()
         .filter_map(|s| match &s.detail {
             PlanStepDetail::Generate(g) => Some(g.template.clone()),
+            PlanStepDetail::Extract(e) => Some(e.template.clone()),
+            _ => None,
+        })
+        .collect();
+    let programs: Vec<_> = plan
+        .steps
+        .iter()
+        .filter_map(|s| match &s.detail {
+            PlanStepDetail::Extract(e) => match &e.fallback {
+                rustev_contract::extraction_results::BoundExtractionFallback::Bound {
+                    program,
+                    ..
+                } => Some(program.clone()),
+                _ => None,
+            },
             _ => None,
         })
         .collect();
@@ -455,7 +475,7 @@ fn recompile(
         sources,
         execution,
         plan.instantiation.is_some(),
-        (&templates, &[]),
+        (&templates, &programs),
     )
     .map_err(Recompiled::Refused)?;
     #[cfg(feature = "parameterized")]
@@ -784,7 +804,7 @@ pub fn compile_with_templates(
 }
 
 /// Check extraction with supplied fallback programs and prompt documents.
-/// Extraction still refuses before plan emission in this compilation increment.
+/// Acceptance steps remain deferred; extraction emits plan 3 bindings.
 pub fn compile_with_extraction_documents(
     def: &Definition,
     descriptors: &[BackendDescriptor],
@@ -1072,23 +1092,18 @@ fn compile_generation(
             _ => Ok(()),
         }
     };
-    let options_of: BTreeMap<&str, &Vec<String>> = def
+    let mut options_of: BTreeMap<String, Vec<String>> = def
         .steps
         .iter()
-        .filter_map(|s| match &s.body {
-            StepBody::Extract(_) | StepBody::AcceptModelDerived(_) => {
-                // Extraction and acceptance are checked separately before plan emission.
+        .filter_map(|s| {
+            if let StepBody::Semantic(d) = &s.body {
+                Some((s.id.clone(), d.options.clone()))
+            } else {
                 None
             }
-            StepBody::Rank(_) | StepBody::Select(_) => None,
-            StepBody::Semantic(d) => Some((s.id.as_str(), &d.options)),
-            StepBody::Exact(_)
-            | StepBody::Corroborate(_)
-            | StepBody::Acquire(_)
-            | StepBody::Widen(_)
-            | StepBody::Generate(_) => None,
         })
         .collect();
+    options_of.extend(crate::extraction_compile::distribution_options(def));
     for (i, s) in def.steps.iter().enumerate() {
         let subject = format!("step:{}", s.id);
         if !valid_name(&s.id) || ids[..i].contains(&s.id) {
@@ -1497,8 +1512,17 @@ fn compile_generation(
         .iter()
         .map(|(k, (t, _))| (k.clone(), t.clone()))
         .collect();
+    crate::extraction_compile::model_gate(def)?;
     crate::extraction_compile::types(def, &input_tys)?;
     let mut step_tys: BTreeMap<String, StepTy> = BTreeMap::new();
+    // Semantic carries fan-out binds, not option names: these fields are scalar.
+    // cond_structure checks membership and threshold bounds using options_of,
+    // including literal vocabularies resolved from profiles before compilation.
+    // Supplying options here would make check_cond reject the field as fan-out.
+    // Accept steps (including min_mass) remain refused as extraction-not-compiled.
+    for (field, _) in crate::extraction_compile::distribution_options(def) {
+        step_tys.insert(field, StepTy::Semantic(SemKind::Distribution, vec![]));
+    }
     let mut infos: BTreeMap<String, StepInfo> = BTreeMap::new();
     let mut projection_bounds: BTreeMap<String, u64> = BTreeMap::new();
     let mut max_requests: BTreeMap<String, u64> = BTreeMap::new();
@@ -1521,9 +1545,10 @@ fn compile_generation(
             shortfalls: vec![],
         };
         match &s.body {
-            StepBody::Extract(_) | StepBody::AcceptModelDerived(_) => {
-                // Extraction and acceptance are checked separately before plan emission.
+            StepBody::Extract(_) => {
+                infos.insert(id.clone(), StepInfo::Extract);
             }
+            StepBody::AcceptModelDerived(_) => {}
             StepBody::Rank(_) | StepBody::Select(_) => {
                 return refuse(
                     C::InvalidDefinition,
@@ -1729,10 +1754,7 @@ fn compile_generation(
     )?;
     crate::extraction_compile::budget(def, &input_tys, execution)?;
     for s in &def.steps {
-        if matches!(
-            s.body,
-            StepBody::Extract(_) | StepBody::AcceptModelDerived(_)
-        ) {
+        if matches!(s.body, StepBody::AcceptModelDerived(_)) {
             return refuse(
                 C::InvalidDefinition,
                 format!("step:{}", s.id),
@@ -1767,7 +1789,7 @@ fn compile_generation(
         }
         for id in &order {
             let tree = match &infos[id] {
-                StepInfo::Generate => {
+                StepInfo::Generate | StepInfo::Extract => {
                     quality::Ceil::leaf(rustev_contract::grade::ValueGrade::Ungraded, false)
                 }
                 StepInfo::Acquisition(a) => a.tree.clone(),
@@ -1791,7 +1813,7 @@ fn compile_generation(
                 StepInfo::Corroborate { decl, .. } => {
                     quality::corroborate_refusal(&subject, decl, &trees)
                 }
-                StepInfo::Generate | StepInfo::Semantic { .. } => None,
+                StepInfo::Generate | StepInfo::Extract | StepInfo::Semantic { .. } => None,
             };
             if let Some(r) = found {
                 return Err(r);
@@ -1834,10 +1856,20 @@ fn compile_generation(
     for s in &def.steps {
         let subject = format!("step:{}", s.id);
         let d = match &s.body {
-            StepBody::Extract(_) | StepBody::AcceptModelDerived(_) => {
-                // Extraction and acceptance are checked separately before plan emission.
+            StepBody::Extract(e) => {
+                let binding = crate::extraction_compile::bind(
+                    &s.id,
+                    e,
+                    crate::extraction_compile::needs_logprobs(def, &s.id),
+                    &prompts[&s.id],
+                    programs,
+                    &input_tys,
+                    &sorted,
+                )?;
+                details.insert(s.id.clone(), PlanStepDetail::Extract(Box::new(binding)));
                 continue;
             }
+            StepBody::AcceptModelDerived(_) => unreachable!("acceptance refused in phase e"),
             StepBody::Rank(_) | StepBody::Select(_) => {
                 return refuse(
                     C::InvalidDefinition,
@@ -2077,7 +2109,21 @@ fn compile_generation(
     screening::budget(authored, &screens, descriptors)?;
     crate::acquisition::budget(def, sources, execution)?;
     let mut total: u64 = crate::generation::budget(def, &details)?;
+    total += def
+        .steps
+        .iter()
+        .filter(|s| matches!(s.body, StepBody::Extract(_)))
+        .count() as u64;
     for s in &def.steps {
+        if let Some(PlanStepDetail::Extract(b)) = details.get(&s.id)
+            && b.worst_case_request_bytes > def.limits.max_projection_bytes
+        {
+            return refuse(
+                C::Budget,
+                format!("step:{}", s.id),
+                "extraction request exceeds max_projection_bytes",
+            );
+        }
         if let Some(PlanStepDetail::Semantic(b)) = details.get(&s.id) {
             total = total.saturating_add(b.max_requests);
             if b.max_projection_bytes > def.limits.max_projection_bytes {
@@ -2364,7 +2410,7 @@ fn extend_reasons_v2(
                     rustev_contract::definition::OnContradiction::TreatAsHint => {}
                 }
             }
-            StepInfo::Generate => {}
+            StepInfo::Generate | StepInfo::Extract => {}
             StepInfo::Acquisition(_) | StepInfo::Semantic { .. } => {
                 for d in &deps[id] {
                     add.extend(reasons.get(d).cloned().unwrap_or_default());
@@ -2488,7 +2534,7 @@ fn corroborate_refs(c: &rustev_contract::definition::CorroborateDecl) -> Vec<Str
 
 fn cond_structure(
     c: &Cond,
-    options_of: &BTreeMap<&str, &Vec<String>>,
+    options_of: &BTreeMap<String, Vec<String>>,
     known: &dyn Fn(&str) -> Result<(), String>,
 ) -> Result<(), String> {
     let unit = Decimal::from_i64(1);
@@ -2496,7 +2542,6 @@ fn cond_structure(
         known(&format!("step:{step}"))?;
         options_of
             .get(step)
-            .copied()
             .ok_or_else(|| format!("{step:?} is not a semantic step"))
     };
     match c {
@@ -2687,6 +2732,9 @@ fn possible_reasons(
         let mut r = BTreeSet::new();
         match (&infos[id], &details[id]) {
             (StepInfo::Generate, _) => {}
+            (StepInfo::Extract, _) => {
+                r.insert(K::MissingEvidence);
+            }
             (StepInfo::Acquisition(a), _) => {
                 r.extend([
                     K::MissingEvidence,
@@ -3088,7 +3136,12 @@ fn static_derivations(
     let semantic: BTreeSet<&str> = def
         .steps
         .iter()
-        .filter(|s| matches!(s.body, StepBody::Semantic(_) | StepBody::Generate(_)))
+        .filter(|s| {
+            matches!(
+                s.body,
+                StepBody::Semantic(_) | StepBody::Generate(_) | StepBody::Extract(_)
+            )
+        })
         .map(|s| s.id.as_str())
         .collect();
     let mut out: BTreeMap<String, Derivation> = BTreeMap::new();

@@ -127,6 +127,7 @@
         "src/template/render.rs",
         "src/testdata/accept-step.json",
         "src/testdata/extract-step.json",
+        "src/testdata/extraction.plan.json",
         "src/testdata/generation.plan.json",
         "src/testdata/screening.definition.json",
         "src/testdata/support-routing.definition.json",

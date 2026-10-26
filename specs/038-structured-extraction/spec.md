@@ -1076,6 +1076,24 @@ refuses with `extraction-not-compiled` until part b adds the plan
 details, the backend capability phase and the model-value gate
 (`crates/rustev-core/tests/extraction_compile.rs`).
 
+**Increment 5, part b (2026-10-26): extract steps compile into plan 3.**
+An extract step binds a backend in phase f (3.10; category 5
+`no_capable_backend` otherwise), choosing among descriptors in 037's
+deterministic order, and fills its plan 3 step detail; the template,
+schema, fallback document, backend artifact and limits enter the `PlanId`
+(3.14.4), pinned by `crates/rustev-core/tests/golden/extraction.plan.json`
+and its `.id`. The model-value gate of 3.9 walks every exact consumer,
+model step projection and template parameter in phase e; until accept
+steps compile (part c), only an input accepted by a spec 033 check
+(3.9.2) passes, so a direct exact read of any other model value refuses
+27 `unaccepted_model_value`. Per 3.14.3 this also applies to version 2
+definitions without extraction constructs: two existing tests that fed a
+model-derived input to an acquisition request or a generate template
+parameter now see 27 in phase e before 036's and 037's own later checks.
+Evaluating a plan with an extract step is refused until the runtime
+increment. Remaining for part c: accept steps, the accepted-value
+exemption, extract field-path projections and calibrated thresholds.
+
 ## Decisions at approval
 
 Each is decided within this spec under the work order, inside the binding

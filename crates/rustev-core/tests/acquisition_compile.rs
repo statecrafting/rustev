@@ -431,8 +431,8 @@ fn exact_requests_types_cycles_and_source_mappings() {
         );
     }
     let r = run(&d).unwrap_err();
-    assert_eq!(r.category, Category::InvalidAcquisition);
-    assert!(r.detail.contains("exact_request"));
+    assert_eq!(r.category, Category::UnacceptedModelValue);
+    assert!(r.detail.contains("input:q"));
     d.inputs[0].provenance = vec![rustev_contract::definition::ProvenanceClass::SystemOfRecord];
     assert!(run(&d).is_ok());
     for (value, cat) in [
@@ -579,4 +579,39 @@ fn protected_request_rejects_a_constructed_hint() {
         compile(&d).is_ok(),
         "constructed exact requests are legal outside protected groups"
     );
+}
+
+#[test]
+fn extraction_gate_covers_acquisition_fields_guards_and_stop_counts() {
+    for widen in [false, true] {
+        for consumer in 0..3 {
+            let mut d = serde_json::to_value(base(widen)).unwrap();
+            d["inputs"] = json!([{"name":"model","type":"integer","provenance":["model-derived"],"freshness":"not_required"}]);
+            let body = &mut d["steps"][0]["body"][if widen { "widen" } else { "acquire" }];
+            match consumer {
+                0 => {
+                    body[if widen { "base_request" } else { "request" }]["optional"] =
+                        json!({"ref":"input:model"})
+                }
+                1 => {
+                    let guard = json!({"cmp":{"left":{"ref":"input:model"},"op":"ge","right":{"lit":{"integer":1}}}});
+                    if widen {
+                        body["tiers"][0]["when"] = guard;
+                    } else {
+                        body["when"] = guard;
+                    }
+                }
+                _ => {
+                    body["stop"] = if widen {
+                        json!({"unique_at_least":{"ref":"input:model"}})
+                    } else {
+                        json!({"items_at_least":{"count":{"ref":"input:model"}}})
+                    }
+                }
+            }
+            let refusal = run(&serde_json::from_value(d).unwrap()).unwrap_err();
+            assert_eq!(refusal.category as u8, 27, "{widen}/{consumer}: {refusal}");
+            assert!(refusal.detail.contains("input:model"));
+        }
+    }
 }

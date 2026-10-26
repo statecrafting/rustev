@@ -1,4 +1,4 @@
-//! Synthetic extraction compilation refusals, without backend calls or plans.
+//! Synthetic extraction compilation, plan identities and refusals without backend calls.
 mod common;
 use rustev_contract::{
     Identified,
@@ -62,9 +62,9 @@ fn fallback(d: &mut Definition) {
     .unwrap();
 }
 #[test]
-fn valid_structure_remains_closed_and_v1_guard_is_unchanged() {
+fn valid_structure_requires_backend_and_v1_guard_is_unchanged() {
     let mut d = fixture();
-    check(&d, C::InvalidDefinition, "extraction-not-compiled");
+    check(&d, C::NoCapableBackend, "no backend satisfies extract");
     d.schema = "rustev.definition/1".into();
     check(&d, C::InvalidDefinition, "requires-definition-2");
 }
@@ -118,7 +118,7 @@ fn extract_step_count_is_bounded() {
     assert_eq!(e.subject, "step:extract_8");
     assert!(e.detail.contains("eight"));
     d.steps.pop();
-    check(&d, C::InvalidDefinition, "extraction-not-compiled");
+    check(&d, C::NoCapableBackend, "no backend satisfies extract");
 }
 #[test]
 fn limits_repair_screen_and_declared_vocabularies_apply_to_typed_callers() {
@@ -182,7 +182,7 @@ fn input_vocabularies_resolve_types_provenance_and_enum_bound() {
         panic!()
     };
     options.pop();
-    check(&d, C::InvalidDefinition, "extraction-not-compiled");
+    check(&d, C::NoCapableBackend, "no backend satisfies extract");
     d.inputs[1].provenance.push(P::ModelDerived);
     check(&d, C::InvalidExtraction, "admits model-derived");
     d.inputs.pop();
@@ -198,7 +198,7 @@ fn list_vocabulary_runtime_bound_is_not_a_compile_bound() {
             max_items: 5000,
         },
     );
-    check(&d, C::InvalidDefinition, "extraction-not-compiled");
+    check(&d, C::NoCapableBackend, "no backend satisfies extract");
 }
 #[test]
 fn untrusted_projection_fails_closed_but_trusted_text_passes() {
@@ -207,7 +207,7 @@ fn untrusted_projection_fails_closed_but_trusted_text_passes() {
         d.inputs[0].provenance.push(p);
         check(&d, C::InvalidExtraction, "untrusted text");
         d.inputs[0].ty = TypeDecl::Bool;
-        check(&d, C::InvalidDefinition, "extraction-not-compiled");
+        check(&d, C::NoCapableBackend, "no backend satisfies extract");
     }
 }
 #[test]
@@ -218,7 +218,7 @@ fn fallback_must_be_supplied_and_bind() {
     let p = program();
     assert_eq!(
         refusal(&d, std::slice::from_ref(&p)).detail,
-        "extraction-not-compiled"
+        "no backend satisfies extract"
     );
     let mut incompatible = p.clone();
     incompatible.fields[0].field = "unknown".into();
@@ -289,7 +289,10 @@ fn oversized_input_projection_is_refused_even_with_a_step_reference() {
 fn accepted_input_projection_preserves_untrusted_text() {
     let mut d = fixture();
     accept(&mut d, "input:message");
-    check(&d, C::InvalidDefinition, "extraction-not-compiled");
+    let e = refusal(&d, &[]);
+    assert_eq!(e.category, C::InvalidDefinition);
+    assert_eq!(e.subject, "step:window_ok");
+    assert_eq!(e.detail, "extraction-not-compiled");
     d.inputs[0].provenance.push(P::UserSupplied);
     check(&d, C::InvalidExtraction, "untrusted text");
 }
@@ -314,7 +317,7 @@ fn fallback_conflicting_documents_are_refused() {
     assert!(e.detail.contains("conflicting"));
     assert_eq!(
         refusal(&d, &[p.clone(), p]).detail,
-        "extraction-not-compiled"
+        "no backend satisfies extract"
     );
 }
 
@@ -370,7 +373,11 @@ fn prompt_bindings_and_instruction_paths_are_checked() {
     for (binding, instructions, category) in [
         (json!({"literal":{"bool":true}}), "{{param.n}}", C::Template),
         (json!({"param":"unresolved"}), "{{param.n}}", C::Template),
-        (json!("input:message"), "{{param.n}}", C::Template),
+        (
+            json!("input:message"),
+            "{{param.n}}",
+            C::UnacceptedModelValue,
+        ),
         (
             json!({"literal":{"integer":2}}),
             "{{param.unknown}}",
@@ -401,7 +408,7 @@ fn extraction_request_and_projection_budgets_are_category_seven() {
     d.limits.max_projection_bytes = 1;
     check(&d, C::Budget, "max_projection_bytes");
     d.limits.max_projection_bytes = 65536;
-    check(&d, C::InvalidDefinition, "extraction-not-compiled");
+    check(&d, C::NoCapableBackend, "no backend satisfies extract");
     let policy = serde_json::from_value(json!({"schema":"rustev.execution/1","max_attempts_per_decision":0,"cost":"unlimited","steps":[]})).unwrap();
     let e = compile_with_extraction_documents(&d, &[], &[], &[], Some(&policy), &[prompt()], &[])
         .unwrap_err();
@@ -454,7 +461,7 @@ fn profile_vocabulary_and_prompt_parameter_resolve_before_compilation() {
         &[],
     )
     .unwrap_err();
-    assert_eq!(e.detail, "extraction-not-compiled");
+    assert_eq!(e.detail, "no backend satisfies extract");
     profile["values"]["options"] = json!(["pool", "pool"]);
     let e = compile_with_extraction_documents(
         &instantiate(&profile).unwrap().definition,
@@ -495,11 +502,547 @@ fn exact_template_reference_passes_and_text_reference_is_refused() {
     let e =
         compile_with_extraction_documents(&d, &[], &[], &[], None, std::slice::from_ref(&p), &[])
             .unwrap_err();
-    assert_eq!(e.detail, "extraction-not-compiled");
+    assert_eq!(e.detail, "no backend satisfies extract");
     d.inputs[0].ty = TypeDecl::Text { max_bytes: 128 };
     p.params =
         serde_json::from_value(json!([{"name":"n","type":{"text":{"max_bytes":128}}}])).unwrap();
     extract(&mut d).template.digest = p.id().unwrap();
     let e = compile_with_extraction_documents(&d, &[], &[], &[], None, &[p], &[]).unwrap_err();
     assert_eq!(e.category, C::Template);
+}
+
+fn descriptor() -> rustev_contract::descriptor::BackendDescriptor {
+    use rustev_contract::{
+        definition::Operation,
+        descriptor::{OutputKind, TextStructure},
+    };
+    let mut b = common::linear_head();
+    b.operations = vec![common::support(
+        Operation::Extract,
+        OutputKind::TypedRecord {
+            structure: TextStructure::JsonSchema,
+            max_output_bytes: 65536,
+            max_options: 32,
+            option_logprobs: false,
+        },
+        32,
+    )];
+    b
+}
+fn compiled(
+    d: &Definition,
+    p: &PromptTemplate,
+    b: &rustev_contract::descriptor::BackendDescriptor,
+    rules: &[ExtractRules],
+) -> Result<rustev_core::Compiled, Refusal> {
+    compile_with_extraction_documents(
+        d,
+        std::slice::from_ref(b),
+        &[],
+        &[],
+        None,
+        std::slice::from_ref(p),
+        rules,
+    )
+}
+#[test]
+fn extraction_plan_identity_and_reload() {
+    use rustev_contract::{
+        Document, extraction_results::BoundExtractionFallback, plan::PlanStepDetail,
+    };
+    let mut d = fixture();
+    fallback(&mut d);
+    let mut vocabulary = d.inputs[0].clone();
+    vocabulary.name = "feature_vocabulary".into();
+    vocabulary.ty = TypeDecl::List {
+        item: Box::new(TypeDecl::Text { max_bytes: 64 }),
+        max_items: 10,
+    };
+    d.inputs.push(vocabulary);
+    extract(&mut d).vocabularies.insert(
+        "feature_vocabulary".into(),
+        V::Input {
+            input: "input:feature_vocabulary".into(),
+        },
+    );
+    let p = prompt();
+    let b = descriptor();
+    let rules = program();
+    let c = compiled(&d, &p, &b, std::slice::from_ref(&rules)).unwrap();
+    assert_eq!(c.plan.schema, "rustev.plan/3");
+    assert_eq!(
+        c.plan.steps[0].derivation,
+        rustev_contract::judgment::Derivation::ModelDerived
+    );
+    let PlanStepDetail::Extract(e) = &c.plan.steps[0].detail else {
+        panic!()
+    };
+    assert_eq!(e.template_id, p.id().unwrap());
+    assert_eq!(e.template, p);
+    assert_eq!(e.descriptor, b.id().unwrap());
+    let BoundExtractionFallback::Bound {
+        identity, program, ..
+    } = &e.fallback
+    else {
+        panic!()
+    };
+    assert_eq!(*identity, rules.id().unwrap());
+    assert_eq!(program.canonical().unwrap(), rules.canonical().unwrap());
+    assert_eq!(
+        rustev_core::Compiled::load(&c.plan, std::slice::from_ref(&b), &[])
+            .unwrap()
+            .id,
+        c.id
+    );
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden/extraction.plan.json");
+    let id_path = path.with_extension("id");
+    if std::env::var_os("RUSTEV_BLESS").is_some() {
+        std::fs::write(&path, c.canonical()).unwrap();
+        std::fs::write(&id_path, c.id.to_string()).unwrap();
+    }
+    assert_eq!(std::fs::read(path).unwrap(), c.canonical());
+    assert_eq!(std::fs::read_to_string(id_path).unwrap(), c.id.to_string());
+    for change in 0..5 {
+        let mut d = d.clone();
+        let mut p = p.clone();
+        let mut b = b.clone();
+        let mut rules = rules.clone();
+        match change {
+            0 => {
+                p.instructions.push('!');
+                extract(&mut d).template.digest = p.id().unwrap();
+            }
+            1 => extract(&mut d).output.fields[1].ty = T::Integer { bounds: [1, 31] },
+            2 => {
+                rules.fields[0].rules[0].then =
+                    serde_json::from_value(json!({"literal":3})).unwrap()
+            }
+            3 => b.artifact = common::artifact('b'),
+            _ => extract(&mut d).fallback = Fallback::None,
+        }
+        assert_ne!(compiled(&d, &p, &b, &[rules]).unwrap().id, c.id);
+    }
+    let snapshot = rustev_contract::snapshot::Snapshot {
+        schema: "rustev.snapshot/2".into(),
+        entries: vec![],
+    };
+    assert!(matches!(
+        rustev_core::Evaluation::start(&c, &snapshot, common::ts(common::NOW)),
+        Err(rustev_core::evaluate::StartError::ExtractionNotAvailable)
+    ));
+}
+#[test]
+fn extraction_backend_shortfalls_and_stable_binding() {
+    use rustev_contract::descriptor::OutputKind;
+    let d = fixture();
+    let p = prompt();
+    let b = descriptor();
+    for change in 0..7 {
+        let mut b = b.clone();
+        let mut d = d.clone();
+        match change {
+            0 => b.operations.clear(),
+            1 => b.operations[0].max_options = 1,
+            2 => {
+                if let OutputKind::TypedRecord {
+                    max_output_bytes, ..
+                } = &mut b.operations[0].output
+                {
+                    *max_output_bytes = 1;
+                }
+            }
+            3 => b.input_limit.max_bytes = 1,
+            4 => {
+                extract(&mut d).backend.artifact =
+                    rustev_contract::definition::ArtifactPin::Pinned(common::artifact('b'))
+            }
+            5 => {
+                extract(&mut d).backend.binding =
+                    rustev_contract::definition::BindingChoice::Backend("unknown".into())
+            }
+            _ => {
+                if let OutputKind::TypedRecord { max_options, .. } = &mut b.operations[0].output {
+                    *max_options = 1;
+                }
+            }
+        }
+        let r = compiled(&d, &p, &b, &[]).unwrap_err();
+        assert_eq!(r.category, C::NoCapableBackend, "case {change}: {r}");
+        assert!(!r.shortfalls[0].reasons.is_empty());
+    }
+    let mut other = b.clone();
+    other.backend_id = "zz-last".into();
+    let a = compile_with_extraction_documents(
+        &d,
+        &[other.clone(), b.clone()],
+        &[],
+        &[],
+        None,
+        std::slice::from_ref(&p),
+        &[],
+    )
+    .unwrap();
+    let b = compile_with_extraction_documents(&d, &[b, other], &[], &[], None, &[p], &[]).unwrap();
+    assert_eq!(a.id, b.id);
+}
+#[test]
+fn model_gate_exact_policy_proposal_and_presence_reads() {
+    for r in ["input:message", "step:request_filters/party_size"] {
+        for consumer in 0..3 {
+            let mut d = fixture();
+            d.inputs[0].ty = TypeDecl::Integer;
+            d.inputs[0].provenance = vec![P::ModelDerived];
+            let mut default = d.policy.rules[0].clone();
+            default.id = "last".into();
+            d.policy.rules.push(default);
+            match consumer {
+                0 => d.steps.push(serde_json::from_value(json!({"id":"read","body":{"exact":{"op":"arith","version":1,"args":{"expr":{"ref":r}}}}})).unwrap()),
+                1 => d.policy.rules[0].when = serde_json::from_value(json!({"exact":{"cmp":{"left":{"ref":r},"op":"eq","right":{"lit":{"integer":1}}}}})).unwrap(),
+                _ => d.policy.rules[0].then = serde_json::from_value(json!({"propose":{"action":"recommend","params":[{"name":"value","value":{"ref":r}}]}})).unwrap(),
+            }
+            let e = compiled(&d, &prompt(), &descriptor(), &[]).unwrap_err();
+            assert_eq!(e.category as u8, 27, "{e}");
+            assert!(e.detail.contains(r));
+        }
+    }
+    let mut d = fixture();
+    d.inputs[0].ty = TypeDecl::Integer;
+    d.inputs[0].provenance = vec![P::ModelDerived];
+    let mut default = d.policy.rules[0].clone();
+    default.id = "last".into();
+    d.policy.rules.push(default);
+    d.policy.rules[0].when =
+        serde_json::from_value(json!({"exact":{"present":"input:message"}})).unwrap();
+    assert_ne!(
+        compiled(&d, &prompt(), &descriptor(), &[])
+            .unwrap_err()
+            .category,
+        C::UnacceptedModelValue
+    );
+    d.policy.rules[0].then = serde_json::from_value(json!({"propose":{"action":"recommend","params":[{"name":"value","value":{"lit":{"text":"input:message"}}}]}})).unwrap();
+    assert_ne!(
+        compiled(&d, &prompt(), &descriptor(), &[])
+            .unwrap_err()
+            .category,
+        C::UnacceptedModelValue
+    );
+}
+
+#[test]
+fn ungrouped_check_accepts_model_input_by_branch_or_default() {
+    for on_fail in [
+        json!({"by_provenance":{"model-derived":"abstain"},"default":"none"}),
+        json!({"by_provenance":{},"default":"abstain"}),
+    ] {
+        let mut d = fixture();
+        d.inputs[0].ty = TypeDecl::Integer;
+        d.inputs[0].provenance = vec![P::ModelDerived];
+        d.steps.push(serde_json::from_value(json!({"id":"read","body":{"exact":{"op":"arith","version":1,"args":{"expr":{"ref":"input:message"}}}}})).unwrap());
+        assert_eq!(
+            compiled(&d, &prompt(), &descriptor(), &[])
+                .unwrap_err()
+                .category,
+            C::UnacceptedModelValue
+        );
+        d.actionability = Some(serde_json::from_value(json!({
+            "caller_controlled":[],"remediations":[],"questions":[],
+            "constraint_groups":[],
+            "checks":[{"id":"guard","subject":"message",
+                "test":{"cmp":{"left":{"ref":"input:message"},"op":"gt","right":{"lit":{"integer":0}}}},
+                "on_fail":on_fail}]
+        })).unwrap());
+        compiled(&d, &prompt(), &descriptor(), &[]).unwrap();
+        // Extraction execution is deferred in this increment. Keep the exact
+        // consumer to verify the existing check evaluator independently.
+        d.steps.remove(0);
+        let c = compiled(&d, &prompt(), &descriptor(), &[]).unwrap();
+        // Spec 033 3.4.1 and 3.4.6: even outside any group, a failed
+        // terminal check prevents the exact read and extraction request.
+        let snapshot = serde_json::from_value(json!({"schema":"rustev.snapshot/2","entries":[{
+            "field":"message","value":-1,"provenance":"model-derived",
+            "as_of_ms":1800000000000i64,"source":"synthetic"
+        }]}))
+        .unwrap();
+        let ev = rustev_core::Evaluation::start(
+            &c,
+            &snapshot,
+            rustev_contract::time::Timestamp::from_ms(1800000000000).unwrap(),
+        )
+        .unwrap();
+        assert!(ev.pending().is_empty());
+        let (judgment, _) = ev.finish("ungrouped").unwrap();
+        assert!(
+            matches!(judgment.outcome.unresolved(), Some(rustev_contract::judgment::Unresolved::Abstained { rule }) if rule == "guard")
+        );
+    }
+}
+
+#[test]
+fn protected_constraint_and_model_projections_are_gated() {
+    let mut d = fixture();
+    d.inputs[0].ty = TypeDecl::Integer;
+    d.inputs[0].provenance = vec![P::ModelDerived];
+    let mut other = d.inputs[0].clone();
+    other.name = "other".into();
+    other.provenance = vec![P::SystemOfRecord];
+    d.inputs.push(other);
+    d.actionability = Some(serde_json::from_value(json!({"caller_controlled":[],"remediations":[],"questions":[],
+        "constraint_groups":[{"name":"protected","checks":["guard"]}],
+        "checks":[{"id":"guard","subject":"other","test":{"cmp":{"left":{"ref":"input:message"},"op":"eq","right":{"lit":{"integer":1}}}},
+        "on_fail":{"by_provenance":{},"default":"none"}}]})).unwrap());
+    let e = compiled(&d, &prompt(), &descriptor(), &[]).unwrap_err();
+    assert_eq!(e.category as u8, 27, "{e}");
+    assert_eq!(e.subject, "check:guard");
+    for kind in 0..3 {
+        let mut d = fixture();
+        let mut consumer = if kind == 0 {
+            d.steps[0].clone()
+        } else if kind == 1 {
+            common::support_routing()
+                .steps
+                .into_iter()
+                .find(|s| matches!(s.body, StepBody::Semantic(_)))
+                .unwrap()
+        } else {
+            let plan: rustev_contract::plan::Plan =
+                serde_json::from_str(include_str!("golden/generation.plan.json")).unwrap();
+            plan.definition.steps[0].clone()
+        };
+        consumer.id = "consumer".into();
+        match &mut consumer.body {
+            StepBody::Extract(e) => e.projection = vec!["step:request_filters".into()],
+            StepBody::Semantic(s) => {
+                s.project = vec!["step:request_filters/party_size".into()];
+                s.calibration = rustev_contract::definition::CalibrationRef::None;
+                s.requires = rustev_contract::definition::RequiredKind::Distribution;
+            }
+            StepBody::Generate(g) => {
+                g.projection = vec!["step:request_filters/party_size".into()];
+                g.template = extract(&mut d).template.clone();
+            }
+            _ => unreachable!(),
+        }
+        d.steps.push(consumer);
+        let e = compiled(&d, &prompt(), &descriptor(), &[]).unwrap_err();
+        assert_eq!(e.category as u8, 27, "kind {kind}: {e}");
+    }
+}
+
+#[test]
+fn extraction_threshold_requires_option_logprobs() {
+    let mut d = fixture();
+    let mut last = d.policy.rules[0].clone();
+    last.id = "last".into();
+    d.policy.rules.push(last);
+    d.policy.rules[0].when = serde_json::from_value(json!({"mass_at_least":{"step":"request_filters/insufficient","option":"true","threshold":"0.5","uncalibrated_threshold":{"declared":{"reason":"synthetic"}}}})).unwrap();
+    let mut b = descriptor();
+    let e = compiled(&d, &prompt(), &b, &[]).unwrap_err();
+    assert_eq!(e.category, C::NoCapableBackend, "{e}");
+    assert!(
+        e.shortfalls[0]
+            .reasons
+            .contains(&rustev_core::compile::ShortfallReason::OptionLogprobs)
+    );
+    if let rustev_contract::descriptor::OutputKind::TypedRecord {
+        option_logprobs, ..
+    } = &mut b.operations[0].output
+    {
+        *option_logprobs = true;
+    }
+    assert_eq!(
+        compiled(&d, &prompt(), &b, &[]).unwrap_err().category,
+        C::UnhandledUnresolved
+    );
+    d.policy.on_unresolved = serde_json::from_value(json!([{"target":"step:request_filters","reasons":"any","action":{"escalate":{"reason":"missing extraction"}}}])).unwrap();
+    let c = compiled(&d, &prompt(), &b, &[]).unwrap();
+    assert_eq!(
+        rustev_core::Compiled::load(&c.plan, &[b], &[]).unwrap().id,
+        c.id
+    );
+}
+
+#[test]
+fn missing_fallback_program_is_refused_with_a_capable_backend() {
+    let mut d = fixture();
+    fallback(&mut d);
+    let r = compiled(&d, &prompt(), &descriptor(), &[]).unwrap_err();
+    assert_eq!(r.category, C::InvalidExtraction);
+    assert_eq!(r.subject, "step:request_filters");
+    assert_eq!(r.detail, "fallback program not supplied");
+    assert!(compiled(&d, &prompt(), &descriptor(), &[program()]).is_ok());
+}
+
+fn mass_condition(d: &mut Definition, option: &str) {
+    d.policy.rules[0].when = serde_json::from_value(json!({"mass_at_least":{
+        "step":"request_filters/insufficient", "option":option, "threshold":"0.5",
+        "uncalibrated_threshold":{"declared":{"reason":"synthetic"}}
+    }}))
+    .unwrap();
+}
+
+fn distribution_fixture() -> (Definition, rustev_contract::descriptor::BackendDescriptor) {
+    let mut d = fixture();
+    let mut last = d.policy.rules[0].clone();
+    last.id = "last".into();
+    d.policy.rules.push(last);
+    d.policy.on_unresolved = serde_json::from_value(json!([{"target":"step:request_filters","reasons":"any","action":{"escalate":{"reason":"missing extraction"}}}])).unwrap();
+    let mut b = descriptor();
+    if let rustev_contract::descriptor::OutputKind::TypedRecord {
+        option_logprobs, ..
+    } = &mut b.operations[0].output
+    {
+        *option_logprobs = true;
+    }
+    (d, b)
+}
+
+#[test]
+fn extraction_mass_options_are_checked_separately_from_fan_out_binds() {
+    for enum_field in [false, true] {
+        let (mut d, b) = distribution_fixture();
+        let declared = if enum_field {
+            extract(&mut d).output.fields.last_mut().unwrap().ty = T::Enum {
+                vocabulary: "feature_vocabulary".into(),
+            };
+            "pool"
+        } else {
+            "true"
+        };
+        mass_condition(&mut d, "undeclared");
+        let r = compiled(&d, &prompt(), &b, &[]).unwrap_err();
+        assert_eq!(r.category, C::InvalidDefinition);
+        assert!(r.detail.contains("is not an option"), "{r}");
+        mass_condition(&mut d, declared);
+        assert!(compiled(&d, &prompt(), &b, &[]).is_ok());
+    }
+}
+
+#[test]
+fn dynamic_list_vocabulary_mass_condition_is_conservatively_refused() {
+    let (mut d, b) = distribution_fixture();
+    extract(&mut d).output.fields.last_mut().unwrap().ty = T::Enum {
+        vocabulary: "feature_vocabulary".into(),
+    };
+    input_vocabulary(
+        &mut d,
+        TypeDecl::List {
+            item: Box::new(TypeDecl::Text { max_bytes: 64 }),
+            max_items: 10,
+        },
+    );
+    // Input lists resolve at evaluation (038 3.3.2); this increment does not
+    // invent a static option set or admit policy thresholds over that set.
+    mass_condition(&mut d, "pool");
+    let r = compiled(&d, &prompt(), &b, &[]).unwrap_err();
+    assert_eq!(r.category, C::InvalidDefinition);
+    assert!(r.detail.contains("is not a semantic step"), "{r}");
+    d.policy.rules.remove(0);
+    assert!(compiled(&d, &prompt(), &b, &[]).is_ok());
+}
+
+#[cfg(feature = "parameterized")]
+#[test]
+fn profile_distribution_options_are_checked_after_instantiation() {
+    let (mut d, b) = distribution_fixture();
+    extract(&mut d).output.fields.last_mut().unwrap().ty = T::Enum {
+        vocabulary: "feature_vocabulary".into(),
+    };
+    mass_condition(&mut d, "pool");
+    let mut source = serde_json::to_value(d).unwrap();
+    source["parameters"] = json!([{"name":"options","type":{"list":{"item":{"text":{"max_bytes":64}},"max_items":256}},"lock":"free","bounds":"none","default":"none"}]);
+    source["steps"][0]["body"]["extract"]["vocabularies"]["feature_vocabulary"] =
+        json!({"param":"options"});
+    let profile = json!({"schema":"rustev.profile/1","profile":"test","version":"1.0.0","definition":{"name":source["name"],"version":source["version"]},"extends":"none","values":{"options":["pool"]}});
+    for option in ["pool", "undeclared"] {
+        source["policy"]["rules"][0]["when"]["mass_at_least"]["option"] = json!(option);
+        let bytes = serde_json::to_vec(&source).unwrap();
+        let instantiated = rustev_core::instantiate::instantiate(
+            &[&bytes],
+            Some(&serde_json::to_vec(&profile).unwrap()),
+            &[],
+            None,
+            None,
+        )
+        .unwrap();
+        let result = compiled(&instantiated.definition, &prompt(), &b, &[]);
+        if option == "pool" {
+            assert!(result.is_ok(), "{result:?}");
+        } else {
+            let r = result.unwrap_err();
+            assert_eq!(r.category, C::InvalidDefinition);
+            assert!(r.detail.contains("is not an option"), "{r}");
+        }
+    }
+}
+
+#[test]
+fn long_input_enum_option_refuses_primary_and_execution_fallback() {
+    use rustev_contract::{
+        descriptor::OutputKind,
+        execution::{CostPolicy, Delay, FailureClass},
+    };
+    use rustev_core::compile::ShortfallReason;
+    let mut d = fixture();
+    input_vocabulary(
+        &mut d,
+        TypeDecl::Enum {
+            options: vec!["\u{0001}".repeat(200)],
+        },
+    );
+    extract(&mut d).output.fields = vec![rustev_contract::extraction::ExtractionField {
+        name: "value".into(),
+        ty: T::Enum {
+            vocabulary: "feature_vocabulary".into(),
+        },
+    }];
+    let mut limited = descriptor();
+    if let OutputKind::TypedRecord {
+        max_output_bytes, ..
+    } = &mut limited.operations[0].output
+    {
+        *max_output_bytes = 600;
+    }
+    // The old bound was 422 bytes; escaping the declared option needs 1238.
+    let r = compiled(&d, &prompt(), &limited, &[]).unwrap_err();
+    assert_eq!(r.category, C::NoCapableBackend);
+    let check = |r: &Refusal| {
+        assert!(
+            r.shortfalls
+                .iter()
+                .flat_map(|s| &s.reasons)
+                .any(|s| matches!(
+                    s,
+                    ShortfallReason::OutputLimit {
+                        max: 600,
+                        needed: 1238
+                    }
+                ))
+        )
+    };
+    check(&r);
+    limited.backend_id = "zz-fallback".into();
+    let execution = common::execution(
+        CostPolicy::Unlimited,
+        vec![common::step_exec(
+            "request_filters",
+            1,
+            &[],
+            Delay::None,
+            &["zz-fallback"],
+            &[FailureClass::Permanent],
+        )],
+    );
+    let r = compile_with_extraction_documents(
+        &d,
+        &[descriptor(), limited],
+        &[],
+        &[],
+        Some(&execution),
+        &[prompt()],
+        &[],
+    )
+    .unwrap_err();
+    assert_eq!(r.category, C::InvalidExecution);
+    check(&r);
 }

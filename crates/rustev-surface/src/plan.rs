@@ -50,6 +50,7 @@ pub fn category_name(c: Category) -> &'static str {
 
 fn reason_json(r: &ShortfallReason) -> Value {
     match r {
+        ShortfallReason::OptionLogprobs => json!({"kind": "option_logprobs"}),
         ShortfallReason::ScreenProfile => json!({"kind": "screen_profile"}),
         ShortfallReason::ScreenTextLimit { max, needed } => {
             json!({"kind": "screen_text_limit", "max": max, "needed": needed})
