@@ -721,6 +721,14 @@ applicable from 1.88) wrote `percentile.is_multiple_of(10)` for
 `percentile % 10 == 0` in crates/rustev-eval/src/optimization.rs. Every
 test and golden is unchanged.
 
+**2026-10-26, packaged test fixture (021 3.5, 3.7).** The `why_order` unit
+test in `src/explain/order.rs` embedded a conformance bundle from
+`tools/rustev-conformance/`, outside the crate, so the first-release
+candidate's unpacked tests could not compile. It now embeds that bundle's
+retained record from `src/testdata/lodging-emb.record.json`, which the
+archive carries; `tests/packaged_fixtures.rs` keeps it equal to the
+fixture's bytes. No test or behavior changed.
+
 ## Tooling compatibility record (2026-10-02)
 
 Mutation seed copies exclude the managed `.bin` engine directory introduced

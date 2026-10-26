@@ -193,16 +193,14 @@ fn compare(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::Value;
     #[test]
     fn absent_scores_and_positions_use_record_reasons() {
         // Current RunRecord parsing requires these members. Exercise the
         // defensive walk on the canonical value of a real retained record.
-        let bundle: Value = serde_json::from_str(include_str!("../../../../tools/rustev-conformance/fixtures/cli/lodging.replay/lodging-emb.bundle.json")).unwrap();
-        let bytes = bundle["run"]["retention"]["retained"]["bytes"]
-            .as_str()
-            .unwrap()
-            .as_bytes();
+        // The retained record of the conformance fixture
+        // `lodging.replay/lodging-emb.bundle.json`, packaged with the crate
+        // (021 3.5); `tests/packaged_fixtures.rs` keeps the copy equal.
+        let bytes: &[u8] = include_bytes!("../testdata/lodging-emb.record.json");
         for member in ["score", "position"] {
             for index in [0, 1] {
                 let mut set = evidence::Set::read(&Evidence::Record {

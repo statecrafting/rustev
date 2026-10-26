@@ -351,7 +351,7 @@ mod tests {
     #[test]
     fn missing_primary_generate_backend_is_refused() {
         let plan: Plan =
-            serde_json::from_str(include_str!("../tests/golden/generation.plan.json")).unwrap();
+            serde_json::from_str(include_str!("testdata/generation.plan.json")).unwrap();
         let step = &plan.steps[0];
         let PlanStepDetail::Generate(binding) = &step.detail else {
             panic!("expected a generation binding");

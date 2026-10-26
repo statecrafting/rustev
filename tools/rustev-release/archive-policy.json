@@ -6,7 +6,7 @@
     "Cargo.lock",
     "Cargo.toml"
   ],
-  "max_file_bytes": 131072,
+  "max_file_bytes": 196608,
   "packages": {
     "rustev-contract": {
       "files": [
@@ -68,7 +68,7 @@
         "src/version.rs"
       ],
       "max_archive_bytes": 229376,
-      "max_unpacked_bytes": 458752
+      "max_unpacked_bytes": 917504
     },
     "rustev-core": {
       "files": [
@@ -115,12 +115,14 @@
         "src/template/mod.rs",
         "src/template/parse.rs",
         "src/template/render.rs",
+        "src/testdata/generation.plan.json",
+        "src/testdata/screening.definition.json",
         "src/unparameterized.rs",
         "src/value.rs",
         "src/widening_eval.rs"
       ],
       "max_archive_bytes": 393216,
-      "max_unpacked_bytes": 786432
+      "max_unpacked_bytes": 1310720
     },
     "rustev-runtime": {
       "files": [
@@ -193,10 +195,11 @@
         "src/replay.rs",
         "src/report.rs",
         "src/resolve.rs",
-        "src/selection.rs"
+        "src/selection.rs",
+        "src/testdata/lodging-emb.record.json"
       ],
-      "max_archive_bytes": 131072,
-      "max_unpacked_bytes": 393216
+      "max_archive_bytes": 196608,
+      "max_unpacked_bytes": 720896
     },
     "rustev-backend-rules": {
       "files": [

@@ -3268,7 +3268,7 @@ mod screening_hardening_tests {
     // cannot mutate Info or the accepted screening inputs of an evaluation.
     fn fixture() -> (Compiled, Snapshot, Timestamp) {
         let mut d =
-            Definition::parse(include_bytes!("../tests/golden/screening.definition.json")).unwrap();
+            Definition::parse(include_bytes!("testdata/screening.definition.json")).unwrap();
         let backend = BackendDescriptor {
             schema: schema::BACKEND.into(),
             backend_id: "screen".into(),

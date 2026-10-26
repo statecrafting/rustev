@@ -992,8 +992,7 @@ mod tests {
         use rustev_contract::descriptor::{
             BackendDescriptor, InputExcess, InputLimit, OperationSupport,
         };
-        let plan =
-            serde_json::from_str(include_str!("../tests/golden/generation.plan.json")).unwrap();
+        let plan = serde_json::from_str(include_str!("testdata/generation.plan.json")).unwrap();
         let backend = BackendDescriptor {
             schema: schema::BACKEND.into(),
             backend_id: "synthetic-linear-head".into(),
