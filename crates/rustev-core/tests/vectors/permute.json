@@ -1,0 +1,175 @@
+{
+  "permutations": [
+    {
+      "size": 1,
+      "seed": "one",
+      "step": "rank",
+      "instance": [],
+      "j": 0,
+      "order": [
+        0
+      ],
+      "rejected": 0
+    },
+    {
+      "size": 2,
+      "seed": "two",
+      "step": "rank",
+      "instance": [],
+      "j": 0,
+      "order": [
+        1,
+        0
+      ],
+      "rejected": 0
+    },
+    {
+      "size": 3,
+      "seed": "three",
+      "step": "rank",
+      "instance": [],
+      "j": 1,
+      "order": [
+        1,
+        0,
+        2
+      ],
+      "rejected": 0
+    },
+    {
+      "size": 5,
+      "seed": "five",
+      "step": "rank\"\\\n",
+      "instance": [
+        "a/b",
+        "é"
+      ],
+      "j": 2,
+      "order": [
+        0,
+        3,
+        2,
+        1,
+        4
+      ],
+      "rejected": 0
+    },
+    {
+      "size": 8,
+      "seed": "eight",
+      "step": "rank",
+      "instance": [],
+      "j": 7,
+      "order": [
+        1,
+        6,
+        0,
+        5,
+        7,
+        2,
+        3,
+        4
+      ],
+      "rejected": 0
+    },
+    {
+      "size": 6,
+      "seed": "six",
+      "step": "rank",
+      "instance": [
+        "nested",
+        "0"
+      ],
+      "j": 0,
+      "order": [
+        4,
+        2,
+        3,
+        1,
+        5,
+        0
+      ],
+      "rejected": 0
+    },
+    {
+      "size": 0,
+      "seed": "empty",
+      "step": "rank",
+      "instance": [],
+      "j": 0,
+      "order": [],
+      "rejected": 0
+    }
+  ],
+  "draws": [
+    {
+      "seed": "reject1",
+      "step": "rank",
+      "instance": [],
+      "j": 0,
+      "i": 9223372036854775808,
+      "value": 6187459204310010601,
+      "attempt": 3
+    },
+    {
+      "seed": "bits",
+      "step": "rank",
+      "instance": [
+        "x"
+      ],
+      "j": 0,
+      "i": 18446744073709551615,
+      "value": 869245062457116444,
+      "attempt": 0
+    },
+    {
+      "seed": "bits",
+      "step": "rank",
+      "instance": [
+        "x"
+      ],
+      "j": 0,
+      "i": 7,
+      "value": 3,
+      "attempt": 0
+    },
+    {
+      "seed": "bits",
+      "step": "rank",
+      "instance": [
+        "x"
+      ],
+      "j": "0",
+      "i": 1,
+      "value": 1,
+      "attempt": 0
+    },
+    {
+      "seed": "bits",
+      "step": "rank",
+      "instance": [
+        "x"
+      ],
+      "j": "0.1.2",
+      "i": 1,
+      "value": 0,
+      "attempt": 0
+    },
+    {
+      "seed": "bits",
+      "step": "rank",
+      "instance": [
+        "x"
+      ],
+      "j": "12",
+      "i": 1,
+      "value": 0,
+      "attempt": 0
+    }
+  ],
+  "small_pool_search": {
+    "size": 6,
+    "seeds": 10000,
+    "found": null
+  }
+}
