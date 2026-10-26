@@ -53,11 +53,19 @@
         "source": "spec-edge"
       },
       {
+        "path": "integrations/rustev-jev/",
+        "source": "spec-edge"
+      },
+      {
         "path": "integrations/rustev-node/",
         "source": "spec-edge"
       },
       {
         "path": "integrations/rustev-otel/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "integrations/rustev-remote-http/",
         "source": "spec-edge"
       },
       {
@@ -176,6 +184,19 @@
       {
         "locations": [
           {
+            "file": "integrations/rustev-jev/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-jev/"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "integrations/rustev-node/"
           }
         ],
@@ -197,6 +218,19 @@
         "unit": {
           "kind": "directory",
           "path": "integrations/rustev-otel/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "integrations/rustev-remote-http/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-remote-http/"
         }
       },
       {
@@ -308,5 +342,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "58672a79861c687cd1c00220ed859a759d5f29d0949bafb50e00cfe76b99a8bb"
+  "shardHash": "4652551f503b93da59ac3bd95b2ec50c1e9d51dc26043b400ae92b7a94086447"
 }

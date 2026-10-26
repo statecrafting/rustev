@@ -254,6 +254,8 @@ pub fn document_schemas() -> Vec<EmittedSchema> {
         emit::<crate::generation_result::TextResult>(schema::TEXT_RESULT, None),
         emit::<crate::generation::PromptTemplate>(schema::PROMPT_TEMPLATE, None),
         emit::<crate::generation::GenerateRequest>(schema::GENERATE_REQUEST, None),
+        emit::<crate::extraction_documents::ExtractRules>(schema::EXTRACT_RULES, None),
+        emit::<crate::extraction_documents::ExtractRequest>(schema::EXTRACT_REQUEST, None),
         emit::<crate::profile::Profile>(schema::PROFILE, None),
         emit::<crate::plan_diff::PlanDiff>(schema::PLAN_DIFF, None),
         emit::<Definition>(schema::DEFINITION, None),

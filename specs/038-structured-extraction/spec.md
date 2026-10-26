@@ -63,6 +63,8 @@ extends:
   - { spec: "007-support-routing-package", unit: { kind: directory, path: "packages/rustev-pkg-support-routing/" }, nature: additive }
   # The reviewed archive lists gain the new contract source files.
   - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
+  - { spec: "010-integrations", unit: { kind: directory, path: "integrations/rustev-jev/" }, nature: additive }
+  - { spec: "010-integrations", unit: { kind: directory, path: "integrations/rustev-remote-http/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "002-decision-contract-and-pure-core"
@@ -993,6 +995,20 @@ of 3.8.1's illustrative example is spelled with the contract's `cmp`
 operator. Documents without these members keep their bytes and identities
 (`crates/rustev-contract/tests/extraction_wire.rs`,
 `crates/rustev-core/tests/extraction_contract.rs`).
+
+**Increment 2, part a (2026-10-26): the fallback program, the request
+document and the typed record.** `crates/rustev-contract/src/extraction_documents.rs`
+adds `rustev.extract-rules/1` (3.7.1) with its document-local bounds
+(3.7.3, 3.7.4) and tagged digest, and `rustev.extract-request/1` (3.3.5),
+whose `RequestId` covers its members through the new `extract` operation
+variant of `rustev.request/1`. `Operation` gains `extract`, `OutputKind`
+gains `typed_record` and `RawOutput` gains `typed_record` with its
+document-local record-level checks (3.10.1, 3.10.3); the schema digest is
+the SHA-256 of the schema's canonical bytes. Checks that need the
+definition (program sources, field types, declared options) are left to
+compilation and validation. Existing request, descriptor and output
+documents keep their bytes and identities
+(`crates/rustev-contract/tests/extraction_documents.rs`).
 
 ## Decisions at approval
 

@@ -27,6 +27,7 @@ pub mod evidence;
 pub mod execution;
 pub mod explanation;
 pub mod extraction;
+pub mod extraction_documents;
 pub mod generation;
 pub mod generation_result;
 pub mod grade;
@@ -68,6 +69,8 @@ pub use time::{DurationMs, Timestamp};
 /// the #76 track versions and source descriptors; and by spec 019: the
 /// dynamic question documents).
 pub mod schema {
+    pub const EXTRACT_RULES: &str = "rustev.extract-rules/1";
+    pub const EXTRACT_REQUEST: &str = "rustev.extract-request/1";
     pub const GENERATE_REQUEST: &str = "rustev.generate-request/1";
     pub const TEXT_RESULT: &str = "rustev.text-result/1";
     pub const PROMPT_TEMPLATE: &str = "rustev.prompt-template/1";

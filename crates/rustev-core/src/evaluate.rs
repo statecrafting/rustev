@@ -1245,6 +1245,9 @@ impl<'c> Evaluation<'c> {
         };
         let tol = self.compiled.plan.definition.limits.distribution_tolerance;
         let offered = match raw {
+            RawOutput::TypedRecord { .. } => {
+                return Err(bad("typed_record is not a decision value".into()));
+            }
             RawOutput::TextRecord(_) => {
                 return Err(bad("text_record is not a decision value".into()));
             }
