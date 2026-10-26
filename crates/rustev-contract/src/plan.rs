@@ -98,6 +98,8 @@ impl crate::Document for Plan {
                     PlanStepDetail::Generate(_)
                         | PlanStepDetail::Extract(_)
                         | PlanStepDetail::AcceptModelDerived(_)
+                        | PlanStepDetail::Rank(_)
+                        | PlanStepDetail::Select(_)
                 )
             })
         {
@@ -244,6 +246,8 @@ pub enum PlanStepDetail {
     Generate(Box<crate::generation::GenerateBinding>),
     Extract(Box<crate::extraction_results::ExtractBinding>),
     AcceptModelDerived(Box<crate::extraction::AcceptModelDerived>),
+    Rank(Box<crate::ranking_result::RankBinding>),
+    Select(Box<crate::ranking::Select>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]

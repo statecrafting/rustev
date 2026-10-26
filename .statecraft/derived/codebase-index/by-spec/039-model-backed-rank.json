@@ -69,6 +69,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "integrations/rustev-remote-http/",
+        "source": "spec-edge"
+      },
+      {
         "path": "integrations/rustev-wasm/",
         "source": "spec-edge"
       },
@@ -224,6 +228,19 @@
       {
         "locations": [
           {
+            "file": "integrations/rustev-remote-http/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-remote-http/"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "integrations/rustev-wasm/"
           }
         ],
@@ -291,5 +308,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "a5d6a3d458b1732de4b174d24fddde0668a962d1d0cce85eadb6da03810a1c79"
+  "shardHash": "6ec7bebf76c2ec9da05be62c51f062180afa9099f98dd12ce2d73d2472dec5ac"
 }

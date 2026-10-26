@@ -679,7 +679,9 @@ struct ProjectionHead {
 fn output_kind_of(o: &RawOutput) -> Option<OutputKind> {
     match o {
         // The remote generation mapping is not defined by spec 037.
-        RawOutput::TextRecord(_) | RawOutput::TypedRecord { .. } => None,
+        RawOutput::TextRecord(_) | RawOutput::TypedRecord { .. } | RawOutput::Ranking { .. } => {
+            None
+        }
         RawOutput::Screen { .. } => Some(OutputKind::Screen),
         RawOutput::Label(_) => Some(OutputKind::Label),
         RawOutput::Distribution(_) => Some(OutputKind::Distribution),

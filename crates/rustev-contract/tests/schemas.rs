@@ -45,6 +45,31 @@ fn committed_schemas_equal_emitted_bytes() {
 }
 
 #[test]
+fn step_evidence_ranking_and_selection_are_versioned() {
+    let schemas = document_schemas();
+    for (file, expected) in [
+        ("rustev.evidence-1.schema.json", false),
+        ("rustev.evidence-2.schema.json", true),
+        ("rustev.run-1.schema.json", false),
+        ("rustev.run-2.schema.json", false),
+        ("rustev.run-3.schema.json", true),
+    ] {
+        let emitted = schemas.iter().find(|s| s.file == file).unwrap();
+        let schema: serde_json::Value = serde_json::from_slice(&emitted.bytes).unwrap();
+        let properties = schema["$defs"]["StepEvidence"]["properties"]
+            .as_object()
+            .unwrap();
+        for member in ["ranking", "selection"] {
+            assert_eq!(
+                properties.contains_key(member),
+                expected,
+                "{file}: {member}"
+            );
+        }
+    }
+}
+
+#[test]
 fn emission_is_deterministic_and_canonical() {
     let a = document_schemas();
     assert_eq!(a, document_schemas());

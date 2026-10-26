@@ -106,6 +106,11 @@ fn run_members(version: &str) -> impl FnOnce(&mut serde_json::Value) + '_ {
                 .as_object_mut()
                 .unwrap()
                 .remove("constructed");
+            // Version 1 and 2 documents only; evidence/2 and run/3 keep `ranking` and `selection` (spec 039 3.13).
+            if let Some(p) = v["$defs"]["StepEvidence"]["properties"].as_object_mut() {
+                p.remove("ranking");
+                p.remove("selection");
+            }
             v["$defs"]["StepStatus"]["oneOf"]
                 .as_array_mut()
                 .unwrap()
@@ -159,9 +164,15 @@ fn plan_members(version: &str) -> impl FnOnce(&mut serde_json::Value) + '_ {
         if version != schema::PLAN_V3 {
             if let Some(variants) = v["$defs"]["PlanStepDetail"]["oneOf"].as_array_mut() {
                 variants.retain(|v| {
-                    ["generate", "extract", "accept_model_derived"]
-                        .iter()
-                        .all(|key| v["properties"].get(*key).is_none())
+                    [
+                        "generate",
+                        "extract",
+                        "accept_model_derived",
+                        "rank",
+                        "select",
+                    ]
+                    .iter()
+                    .all(|key| v["properties"].get(*key).is_none())
                 });
             }
             v["properties"]
@@ -303,6 +314,11 @@ pub fn document_schemas() -> Vec<EmittedSchema> {
                 .as_object_mut()
                 .unwrap()
                 .remove("constructed");
+            // Version 1 and 2 documents only; evidence/2 and run/3 keep `ranking` and `selection` (spec 039 3.13).
+            if let Some(p) = v["$defs"]["StepEvidence"]["properties"].as_object_mut() {
+                p.remove("ranking");
+                p.remove("selection");
+            }
             v["$defs"]["StepStatus"]["oneOf"]
                 .as_array_mut()
                 .unwrap()

@@ -51,6 +51,7 @@ extends:
   - { spec: "028-opentelemetry-evidence-sink", unit: { kind: directory, path: "integrations/rustev-otel/" }, nature: additive }
   - { spec: "030-bedrock-backend", unit: { kind: directory, path: "integrations/rustev-bedrock/" }, nature: additive }
   - { spec: "012-jev-integration", unit: { kind: directory, path: "integrations/rustev-jev/" }, nature: additive }
+  - { spec: "009-remote-adapter-protocol", unit: { kind: directory, path: "integrations/rustev-remote-http/" }, nature: additive }
   # The new source file in the published contract crate's archive list.
   - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
 depends_on:
@@ -781,6 +782,19 @@ compile increment. `rustev.backend/1` gains the optional `ranking` member
 of 3.3, omitted when absent. Existing definitions, descriptors and plans
 keep their bytes, `DescriptorId`s and `PlanId`s
 (`crates/rustev-contract/tests/ranking_wire.rs`).
+
+**Increment 2 (2026-10-26): plan details, the ranking output, values,
+evidence and category 28.** `crates/rustev-contract/src/ranking_result.rs`
+adds the `rustev.plan/3` details of 3.2.4 and 3.10.6, the
+`RawOutput::Ranking` variant of 3.5.2 with its scores-length check (the
+pointwise and pairwise modes reuse the existing scores and label outputs,
+3.6 and 3.7), the model ranking and `Selection` values of 3.9 and 3.10.5
+with no conversion to or from any other value kind (I-1), the
+`rustev.evidence/2` entries of 3.13.1 with the bounds of 3.13.2, the
+`OutValue::Selection` parameter of 3.10.7 and category 28
+`exact_order_source`; nothing produces them until the evaluation and
+compile increments. Existing plans, outputs, evidence and judgments keep
+their bytes and identities (`crates/rustev-contract/tests/ranking_results.rs`).
 
 ## Decisions at approval
 

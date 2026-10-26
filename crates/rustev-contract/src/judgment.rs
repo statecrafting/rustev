@@ -424,6 +424,7 @@ pub enum OutValue {
     Filtered(Filtered),
     Shortlist(Shortlist),
     Ranking(Ranking),
+    Selection(crate::ranking_result::Selection),
 }
 
 /// The result of `filter_with_reasons@1`.

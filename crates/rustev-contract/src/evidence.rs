@@ -105,6 +105,14 @@ impl EvidenceRecord {
                     .into(),
             );
         }
+        if self.schema != schema::EVIDENCE_V2
+            && self
+                .steps
+                .iter()
+                .any(|s| s.ranking.is_some() || s.selection.is_some())
+        {
+            return Err("ranking and selection require rustev.evidence/2".into());
+        }
         if self.generation.is_some() && self.schema != schema::EVIDENCE_V2 {
             return Err("generation requires rustev.evidence/2".into());
         }
@@ -238,6 +246,21 @@ pub struct StepEvidence {
     /// Evidence 2, `corroborate` (spec 032, 3.7.6).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub corroboration: Option<Corroboration>,
+    /// Spec 039, evidence 2: ids and result metadata only.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::screening::present"
+    )]
+    #[schemars(with = "crate::ranking_result::RankingEvidence")]
+    pub ranking: Option<crate::ranking_result::RankingEvidence>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::screening::present"
+    )]
+    #[schemars(with = "crate::ranking_result::Selection")]
+    pub selection: Option<crate::ranking_result::Selection>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -360,6 +383,8 @@ impl StepEvidence {
             join: None,
             merge: None,
             corroboration: None,
+            ranking: None,
+            selection: None,
         }
     }
 }

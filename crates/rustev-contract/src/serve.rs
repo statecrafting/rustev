@@ -679,12 +679,26 @@ struct CompilerRefusalFields {
     // Category numbers are fixed by the specs: 18 and 19 are spec 035's
     // screening categories, 20 and 21 are spec 036 3.9.3's, and 22 to 24
     // are spec 037 3.5's. This is a wire range check only; nothing here
-    // converts the number to a `Category`.
-    category: Number<1, 24>,
+    // converts the number to a `Category`. Spec 039 adds 28, leaving
+    // the absent spec 038 categories 25 to 27 rejected.
+    #[serde(deserialize_with = "compiler_category")]
+    #[schemars(schema_with = "compiler_category_schema")]
+    category: u64,
     category_name: Text<1, 2048>,
     subject: Text<0, 2048>,
     detail: Text<0, 2048>,
     shortfalls: List<CompilerShortfall, 0, 1024>,
+}
+fn compiler_category<'de, D: Deserializer<'de>>(d: D) -> Result<u64, D::Error> {
+    let n = u64::deserialize(d)?;
+    if (1..=24).contains(&n) || n == 28 {
+        Ok(n)
+    } else {
+        Err(serde::de::Error::custom("unknown compiler category"))
+    }
+}
+fn compiler_category_schema(_: &mut SchemaGenerator) -> Schema {
+    schemars::json_schema!({"anyOf": [{"type": "integer", "minimum": 1, "maximum": 24}, {"const": 28}]})
 }
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 enum Refused {

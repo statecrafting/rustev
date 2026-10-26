@@ -1249,6 +1249,9 @@ impl<'c> Evaluation<'c> {
             RawOutput::TypedRecord { .. } => {
                 return Err(bad("typed_record is not a decision value".into()));
             }
+            RawOutput::Ranking { .. } => {
+                return Err(bad("ranking is not a semantic output".into()));
+            }
             RawOutput::TextRecord(_) => {
                 return Err(bad("text_record is not a decision value".into()));
             }
