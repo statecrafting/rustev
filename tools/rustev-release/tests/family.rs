@@ -659,3 +659,44 @@ fn crate_upload_without_signed_manifest_is_refused() {
     );
     assert!(r.uploads.is_empty());
 }
+
+#[test]
+fn candidate_collect_requires_rehearsal_and_binds_candidate_names() {
+    let (root, set, mut m, _) = fixture();
+    let set = rustev_release::candidate::release_set(&set, "v0.1.0-rc.1").unwrap();
+    let artifacts = root.join("artifacts");
+    for (name, bytes) in fa::workflow_files(&artifacts).unwrap() {
+        std::fs::remove_file(artifacts.join(&name)).unwrap();
+        let target = name.replace("0.1.0", "0.1.0-rc.1");
+        let bytes = if name.ends_with(".sha256") {
+            String::from_utf8(bytes)
+                .unwrap()
+                .replace("0.1.0", "0.1.0-rc.1")
+                .into_bytes()
+        } else {
+            bytes
+        };
+        write(&artifacts.join(target), &bytes);
+    }
+    let absent = root.join("no-crate-evidence");
+    assert!(
+        fa::collect(&set, &absent, None)
+            .unwrap_err()
+            .contains("053 3.1.3")
+    );
+    m.version = set.version.clone();
+    m.tag = set.tag.clone();
+    m.packages.clear();
+    m.artifacts = fa::collect(&set, &absent, Some(&artifacts)).unwrap();
+    assert!(m.artifacts.iter().all(|a| a.name.contains("0.1.0-rc.1")));
+    assert!(fa::verify(&m, &artifacts).is_empty());
+    write(
+        &artifacts.join("npm/rustev-rustev-wasm-0.1.0-rc.1.tgz"),
+        b"changed",
+    );
+    assert!(
+        fa::verify(&m, &artifacts)
+            .iter()
+            .any(|e| e.contains("bytes differ"))
+    );
+}

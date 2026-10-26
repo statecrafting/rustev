@@ -684,9 +684,13 @@ fn command_line(program: &str, args: &[&str]) -> Result<String, String> {
 
 fn manifest(set: &ReleaseSet, evidence_dir: &str, artifacts_dir: Option<&str>) -> ExitCode {
     use rustev_release::archive::sha256_hex;
-    use rustev_release::manifest::{Inputs, Toolchain, build, sha256sums};
+    use rustev_release::manifest::{Inputs, Toolchain, build};
+    let candidate = rustev_release::candidate::is_candidate_version(&set.version);
     let dir = Path::new(evidence_dir);
     let result = (|| -> Result<(), String> {
+        if candidate && artifacts_dir.is_none() {
+            return Err("053 3.1.3: candidate requires rehearsal artifacts".into());
+        }
         if !command_line("git", &["status", "--porcelain", "--untracked-files=no"])?.is_empty() {
             return Err(
                 "021 3.8: the manifest names an exact clean commit; the tree is dirty".into(),
@@ -718,7 +722,10 @@ fn manifest(set: &ReleaseSet, evidence_dir: &str, artifacts_dir: Option<&str>) -
             "deny.txt",
             "exceptions.txt",
             "dependencies.json",
-        ] {
+        ]
+        .into_iter()
+        .filter(|_| !candidate)
+        {
             let bytes = std::fs::read(dir.join(name)).map_err(|e| format!("{name}: {e}"))?;
             evidence.insert(name.to_string(), sha256_hex(&bytes));
         }
@@ -729,7 +736,10 @@ fn manifest(set: &ReleaseSet, evidence_dir: &str, artifacts_dir: Option<&str>) -
             .upload_order
             .iter()
             .map(|n| (format!("sbom-{n}.cdx.json"), "031 3.9.1"));
-        for (name, clause) in sboms.chain([("changelog.md".to_string(), "031 3.10")]) {
+        for (name, clause) in sboms
+            .chain([("changelog.md".to_string(), "031 3.10")])
+            .filter(|_| !candidate)
+        {
             let bytes =
                 std::fs::read(dir.join(&name)).map_err(|e| format!("{clause}: {name}: {e}"))?;
             evidence.insert(name, sha256_hex(&bytes));
@@ -751,10 +761,15 @@ fn manifest(set: &ReleaseSet, evidence_dir: &str, artifacts_dir: Option<&str>) -
                 limitations: LIMITATIONS.iter().map(|l| l.to_string()).collect(),
             },
         )?;
+        // 053 3.4.3: the release's limitations still hold; the candidate adds its own.
+        if candidate {
+            m.limitations
+                .push(rustev_release::candidate::LIMITATION.into());
+        }
         // PREVIOUS names the previous release's tag (`make release-candidate
         // PREVIOUS=<tag>`); only the first release, 0.1.0, has none (3.7).
         let previous = std::env::var("PREVIOUS").ok().filter(|p| !p.is_empty());
-        if previous.is_none() && set.version != "0.1.0" {
+        if !candidate && previous.is_none() && set.version != "0.1.0" {
             return Err(format!(
                 "PREVIOUS (the previous release's tag) is required for {}; only 0.1.0 is a first release",
                 set.version
@@ -786,20 +801,7 @@ fn manifest(set: &ReleaseSet, evidence_dir: &str, artifacts_dir: Option<&str>) -
         }
         rustev_release::family_artifacts::validate(&m)?;
         rustev_release::family_artifacts::stage(&m, dir, artifacts_dir.map(Path::new))?;
-        // Both files are written in full beside their targets, then renamed
-        // (each rename atomic), the manifest last: a manifest present means
-        // its SHA256SUMS is complete, and an interrupted run leaves only
-        // `.partial` files, which a re-run overwrites.
-        let put = |name: &str, bytes: &[u8]| -> Result<(), String> {
-            let partial = dir.join(format!("{name}.partial"));
-            std::fs::write(&partial, bytes).map_err(|e| format!("{}: {e}", partial.display()))
-        };
-        put("SHA256SUMS", sha256sums(&m).as_bytes())?;
-        put("release-manifest.json", &m.canonical())?;
-        for name in ["SHA256SUMS", "release-manifest.json"] {
-            std::fs::rename(dir.join(format!("{name}.partial")), dir.join(name))
-                .map_err(|e| format!("{name}: {e}"))?;
-        }
+        rustev_release::manifest::write_files(&m, dir)?;
         println!("release-manifest.json sha256 {}", m.digest());
         Ok(())
     })();
@@ -861,6 +863,10 @@ fn publish_cmd(dir: &str, instruction: &str, journal_path: &str) -> ExitCode {
     use rustev_release::manifest::ReleaseManifest;
     let result = (|| -> Result<Outcome, String> {
         let dir = Path::new(dir);
+        // 053 3.4.2: a candidate is refused before any journal or upload.
+        rustev_release::candidate::publication_manifest(
+            &std::fs::read(dir.join("release-manifest.json")).map_err(|e| e.to_string())?,
+        )?;
         let journal_path = Path::new(journal_path);
         // The journal lives outside Git (3.9).
         let top = command_line("git", &["rev-parse", "--show-toplevel"])?;
@@ -1021,15 +1027,51 @@ fn artifact_cmd(set: &ReleaseSet, args: &[&str]) -> ExitCode {
 }
 
 fn main() -> ExitCode {
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    let set = match ReleaseSet::parse(SET.as_bytes()) {
+    let mut args: Vec<String> = std::env::args().skip(1).collect();
+    let mut set = match ReleaseSet::parse(SET.as_bytes()) {
         Ok(s) => s,
         Err(e) => {
             eprintln!("{e}");
             return ExitCode::from(2);
         }
     };
+    if args.first().is_some_and(|a| a == "--candidate") {
+        let result = (|| {
+            let tag = args.get(1).ok_or("053 3.2.4: missing candidate tag")?;
+            if !matches!(
+                args.get(2).map(String::as_str),
+                Some("manifest" | "npm-audit" | "main-sbom" | "sbom-check" | "compare-artifacts")
+            ) {
+                return Err(
+                    "053 3.2.3: --candidate applies only to artifact commands and manifest".into(),
+                );
+            }
+            rustev_release::candidate::release_set(&set, tag)
+        })();
+        match result {
+            Ok(candidate) => set = candidate,
+            Err(e) => return verdict(Err(e)),
+        }
+        args.drain(..2);
+    }
     match args.iter().map(String::as_str).collect::<Vec<_>>()[..] {
+        ["candidate-version", tag] => verdict(
+            rustev_release::candidate::parse(tag, &set.version).map(|c| println!("{}", c.version)),
+        ),
+        ["candidate-manifest", file, tag, commit] => verdict(
+            std::fs::read(file)
+                .map_err(|e| e.to_string())
+                .and_then(|b| rustev_release::candidate::check_manifest(&b, tag, commit))
+                .map(|_| ()),
+        ),
+        ["prerelease", tag, manifest, signature, artifacts] => {
+            verdict(rustev_release::prerelease::run(
+                tag,
+                Path::new(manifest),
+                Path::new(signature),
+                Path::new(artifacts),
+            ))
+        }
         [
             "compare-artifacts" | "npm-audit" | "sbom-check" | "main-sbom",
             ..,
@@ -1063,7 +1105,7 @@ fn main() -> ExitCode {
         ["unpacked", dir, work, toolchain] => unpacked(&set, dir, work, Some(toolchain)),
         _ => {
             eprintln!(
-                "usage: rustev-release manifests | archives <dir> | compare <dir-a> <dir-b> | field <name> | unpacked <dir> <work> [<toolchain>] | deps | exceptions <YYYY-MM-DD> | changelog <out.md> [<previous tag>] | manifest <evidence-dir> [<artifacts-dir>] (PREVIOUS=<tag> after the first release) | verify-artifacts <manifest> <artifacts-dir> | observe-crates <manifest> | hosted-release <release-dir> <artifacts-dir> <instruction.json> <journal> | publish <release-dir> <instruction.json> <journal> | verify-release <dir> [<repo>]"
+                "usage: rustev-release [--candidate <tag>] manifest|npm-audit|main-sbom|sbom-check|compare-artifacts ... | candidate-version <tag> | candidate-manifest <manifest> <tag> <commit> | prerelease <tag> <manifest> <signature> <artifacts-dir> | manifests | archives <dir> | compare <dir-a> <dir-b> | field <name> | unpacked <dir> <work> [<toolchain>] | deps | exceptions <YYYY-MM-DD> | changelog <out.md> [<previous tag>] | manifest <evidence-dir> [<artifacts-dir>] (PREVIOUS=<tag> after the first release) | verify-artifacts <manifest> <artifacts-dir> | observe-crates <manifest> | hosted-release <release-dir> <artifacts-dir> <instruction.json> <journal> | publish <release-dir> <instruction.json> <journal> | verify-release <dir> [<repo>]"
             );
             ExitCode::from(2)
         }

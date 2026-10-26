@@ -141,7 +141,11 @@ pub struct Inputs {
 /// Build the manifest of `set` from the archives in `crates`.
 pub fn build(set: &ReleaseSet, crates: &Path, inputs: Inputs) -> Result<ReleaseManifest, String> {
     let mut packages = Vec::new();
-    for name in &set.upload_order {
+    for name in set
+        .upload_order
+        .iter()
+        .filter(|_| !crate::candidate::is_candidate_version(&set.version))
+    {
         let crate_file = format!("{name}-{}.crate", set.version);
         let bytes =
             std::fs::read(crates.join(&crate_file)).map_err(|e| format!("{crate_file}: {e}"))?;
@@ -438,4 +442,20 @@ pub fn verify_release(
         Err(e) => v.push(e),
     }
     v
+}
+
+/// Validate before writing either file; the canonical manifest is renamed last.
+pub fn write_files(m: &ReleaseManifest, dir: &Path) -> Result<(), String> {
+    crate::family_artifacts::validate(m)?;
+    for (name, bytes) in [
+        ("SHA256SUMS", sha256sums(m).into_bytes()),
+        ("release-manifest.json", m.canonical()),
+    ] {
+        std::fs::write(dir.join(format!("{name}.partial")), bytes).map_err(|e| e.to_string())?;
+    }
+    for name in ["SHA256SUMS", "release-manifest.json"] {
+        std::fs::rename(dir.join(format!("{name}.partial")), dir.join(name))
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }

@@ -197,6 +197,30 @@ The `tools/rustev-release/` tests run in CI as spec 031's do. The candidate
 run itself is evidence recorded in this spec's implementation record (run
 id, tag, pre-release URL), because it needs the owner's signed tag.
 
+## Implementation record
+
+Planned increments, each a separately reviewed pull request: (1) the
+release tooling under `tools/rustev-release/`; (2) the release workflow's
+candidate run; then the owner's signed candidate run and closure.
+
+**Increment 1 (2026-10-25): the release tooling.** `candidate.rs` holds
+the tag rules of 3.2 (`vX.Y.Z-rc.N`, `X.Y.Z` the release set's version,
+N positive without leading zeros) and the publication refusal of 3.4.2,
+which `publish`, `hosted-release` and the crate lifecycle apply before
+any upload or journal write. `artifacts.sh dispatch` refuses a candidate
+that is lightweight, unverified against `allowed_signers`, not reachable
+from `main`, or dispatched with `publish-npm`; a rehearsal may name the
+candidate it rehearses (3.1.2). `tag-manifest` binds the manifest to the
+tag's `release-manifest-sha256:` (3.3.1) and `npm-guard` refuses a
+candidate tag (3.4.2). A candidate's npm tarballs and CLI archives carry
+`X.Y.Z-rc.N` (3.2.3); its manifest names no crate packages, adds the
+candidate limitation (3.4.3) and refuses a container image before any
+file is written. `prerelease` creates the pre-release once and never
+replaces an asset (3.3.3, 3.3.4). The tests in
+`tools/rustev-release/tests/candidate.rs`, `signing.rs`, `artifacts.rs`
+and `family.rs` cover the tooling rows of section 5, and a workflow test
+refuses any job requesting the packages write permission.
+
 ## Decisions at approval
 
 Ratified as proposed (A-55):

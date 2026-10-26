@@ -308,3 +308,49 @@ fn npm_audit_keeps_listing_problems_when_unpack_fails() {
         "{errors:?}"
     );
 }
+
+#[test]
+fn candidate_npm_version_optional_dependencies_and_sbom() {
+    let dir = fresh_dir("candidate-npm").unwrap();
+    let set = rustev_release::candidate::release_set(&set(), "v0.1.0-rc.12").unwrap();
+    let mut p = main_package();
+    p["version"] = json!(set.version);
+    for v in p["optionalDependencies"]
+        .as_object_mut()
+        .unwrap()
+        .values_mut()
+    {
+        *v = json!(set.version);
+    }
+    let name = "rustev-rustev-0.1.0-rc.12.tgz";
+    tar(&dir, name, &p, None);
+    assert!(
+        rustev_release::artifacts::npm_audit(&set, &dir)
+            .unwrap()
+            .is_empty()
+    );
+    let bom = rustev_release::artifacts::main_sbom(&set, &dir.join(name), 0).unwrap();
+    assert!(serde_json::to_string(&bom).unwrap().contains("0.1.0-rc.12"));
+    p["version"] = json!("0.1.0");
+    tar(&dir, name, &p, None);
+    assert!(
+        rustev_release::artifacts::npm_audit(&set, &dir)
+            .unwrap()
+            .iter()
+            .any(|e| e.contains("package version"))
+    );
+    p["version"] = json!(set.version);
+    *p["optionalDependencies"]
+        .as_object_mut()
+        .unwrap()
+        .values_mut()
+        .next()
+        .unwrap() = json!("0.1.0");
+    tar(&dir, name, &p, None);
+    assert!(
+        rustev_release::artifacts::npm_audit(&set, &dir)
+            .unwrap()
+            .iter()
+            .any(|e| e.contains("optionalDependencies"))
+    );
+}

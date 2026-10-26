@@ -50,7 +50,7 @@
       }
     ],
     "sectionDigests": {
-      "053-signed-release-candidates-published-only-as-github-pre-releases-amends-031": "2dc6d4abd82cfb87d91cafd8ca8c5eda6968c4e574beb3f20eb30d9c87a06576",
+      "053-signed-release-candidates-published-only-as-github-pre-releases-amends-031": "43ae1c73c2d787c1db793b7774571c72a533b0c939f8f58940ba665db4de1989",
       "1-purpose": "934039f41fce8a3c166d25066e53a28ef32eb44da3dc1db39d5d67d52b8963f9",
       "2-territory": "d9f52a8747314b5fde8e314f21ac5cef52453479145705574107755f6d377953",
       "3-1-the-integration-rehearsal-branch": "bdb8f25d4a081cca2cd13007650f7c978903ba50e71b87f22d6addd970ace236",
@@ -63,6 +63,7 @@
       "5-observable-negative-cases": "01fc98e408fdead09ebaa5bacbc9282ce637f8ae27635f8ef9101b5b71824241",
       "acceptance": "e95aeca407e983ff63fbd24c3b6506d5f812d08982200ff55af9b7374addf47b",
       "decisions-at-approval": "e4a88a2e9e369a6cef7ba7685a9a4d48cca2f401f268e0fa22d3618d470db8cb",
+      "implementation-record": "2fb32f0e2e28561fcccf5b8f1f1f4601afe23c065768cc3b460950d08c3763ed",
       "verification": "2d4249db7b3cc907afdf699db7fe8d4ae48ae16b03248b917cd27eab2527e43c"
     },
     "sectionHeadings": [
@@ -79,6 +80,7 @@
       "5. Observable negative cases",
       "Acceptance",
       "Verification",
+      "Implementation record",
       "Decisions at approval"
     ],
     "specPath": "specs/053-signed-release-candidates/spec.md",
@@ -86,6 +88,6 @@
     "summary": "A narrow amendment of approved spec 031 (3.9, 3.11, 3.12). It adds a release candidate: an owner-signed annotated tag `vX.Y.Z-rc.N` on a commit of `main`, built and checked by the release workflow exactly as a release is, and published only as a GitHub pre-release of this repository. A candidate never reaches crates.io, the npm registry or the container registry, never consumes spec 031 3.11's first-release authority, and is the identity a downstream consumer such as traveler (`statecrafting/tm`) pins with a Cargo git dependency. An integration rehearsal branch, `release/next`, is where each candidate commit is rehearsed before the owner signs it. Ratified by the owner on 2026-10-25 (A-55).\n",
     "title": "Signed release candidates published only as GitHub pre-releases (amends 031)"
   },
-  "shardHash": "2c3dc5cea616c52f56b9e1c9fa4b1099e38eed3f5c7a5280ff7fe2d80e7bf0c8",
+  "shardHash": "c21906e1f289397483a5299b63819e9ab223050352fbe4b04accf3d8982a6027",
   "specVersion": "1.10.0"
 }
