@@ -1027,6 +1027,20 @@ take 25 to 27 in that order (spec 039 3.12); nothing produces them until
 the compile increment. Documents without these members keep their bytes
 and identities (`crates/rustev-contract/tests/extraction_results.rs`).
 
+**Increment 3 (2026-10-26): field validation, presence and distributions
+in the core.** `crates/rustev-core/src/extraction_validate.rs` implements
+the record-level check of 3.4.2, presence with exactly one reason per
+absent field (3.4.3), no coercion (3.4.4), the list order of 3.4.5 with
+per-item rejections and value digests, records (3.4.6), the derivation
+classes of 3.5.2, and distributions by the existing softmax in declared
+option order with `incomplete_logprobs` and `not_returned` (3.6.2); a
+value is never changed by its distribution. Reason codes shared with spec
+037 reuse its validation. A valid `YYYY-MM-DD` date whose 00:00 UTC lies
+outside spec 002 3.4.4's `Timestamp` range (before 1970-01-01) has no core
+value, so the field is absent `out_of_bounds`; a malformed or impossible
+date is `invalid_date`. Nothing calls these functions until the compile and
+evaluation increments (`crates/rustev-core/tests/extraction_validate.rs`).
+
 ## Decisions at approval
 
 Each is decided within this spec under the work order, inside the binding

@@ -19,6 +19,7 @@ pub mod dynamic;
 pub mod evaluate;
 pub(crate) mod execution;
 pub mod expr;
+pub mod extraction_validate;
 mod generation;
 pub mod generation_eval;
 pub(crate) mod grading;
