@@ -1,0 +1,88 @@
+{
+  "mapping": {
+    "amends": [
+      "006-cli-surface",
+      "007-support-routing-package",
+      "031-public-api-and-release-family"
+    ],
+    "dependsOn": [
+      "006-cli-surface",
+      "007-support-routing-package",
+      "021-packaging-and-first-release",
+      "031-public-api-and-release-family",
+      "053-signed-release-candidates"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/rustev-cli/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "packages/rustev-pkg-support-routing/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "tools/rustev-release/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-cli/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-cli/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "packages/rustev-pkg-support-routing/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "packages/rustev-pkg-support-routing/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "tools/rustev-release/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-release/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/decisions/00-founding-decisions.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "specId": "056-release-0-1-1-and-consumer-qualification",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "2c6977546d760a1c56d5225404000fdfb41d51931a8f44af72ff58ac8a602e73"
+}

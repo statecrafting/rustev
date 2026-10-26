@@ -1,0 +1,122 @@
+{
+  "record": {
+    "amends": [
+      "006-cli-surface",
+      "007-support-routing-package",
+      "031-public-api-and-release-family"
+    ],
+    "created": "2026-10-26",
+    "dependsOn": [
+      "006-cli-surface",
+      "007-support-routing-package",
+      "021-packaging-and-first-release",
+      "031-public-api-and-release-family",
+      "053-signed-release-candidates"
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "006-cli-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-cli/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "007-support-routing-package",
+        "unit": {
+          "kind": "directory",
+          "path": "packages/rustev-pkg-support-routing/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "031-public-api-and-release-family",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-release/"
+        }
+      }
+    ],
+    "id": "056-release-0-1-1-and-consumer-qualification",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-1-the-version-command",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "`rustev version` and `rustev --version` print `rustev <version>` and a newline to standard output, where `<version>` is the `rustev-cli` package version, and exit 0; both take no other argument."
+      },
+      {
+        "anchor": "3-2-the-declared-example",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "`rustev-pkg-support-routing` ships, as package data reachable from its public API, its SYNTHETIC rules program, the calibration bound to it, one SYNTHETIC snapshot and the outcome expected of it, so that a consumer with only registry packages reproduces the example offline."
+      },
+      {
+        "anchor": "3-3-the-qualification-harness",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "The qualification harness runs every step of 021 3.10 and of 031 3.9.7 for each artifact kind the signed manifest names (crates, npm, CLI binaries; 3.9.7 (c) only when the manifest names an image) against the public registries only, from an empty Cargo home and npm cache with no registry credential, and writes per step its command, output, lockfile or install record, checksums and environment identity; a step it cannot run is reported as not run with its reason, never as passing."
+      },
+      {
+        "anchor": "3-3-the-qualification-harness",
+        "id": "R-4",
+        "kind": "requirement",
+        "text": "The release lifecycle reaches `qualified` only through `rustev-release qualify`, which records the digest of each required evidence file of the harness and refuses when one is missing, failing or `not_run`; a step is `excluded`, and not required, only when the signed manifest names no artifact of its kind."
+      },
+      {
+        "anchor": "3-4-authority-for-a-later-release",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "A release after `0.1.0` is published only under an owner instruction whose bytes carry the owner's detached SSH signature in the `rustev-release` namespace, verified against `tools/rustev-release/allowed_signers`; an unsigned instruction for such a version is refused before any journal entry or upload."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "056-release-0-1-1-a-cli-version-command-declared-consumer-examples-and-the-fresh-consumer-qualification-amends-006-007-and-031": "92e9be70d41d7272c7434bd01a370f92487a69496d53f1ff78d90bc9757462a9",
+      "1-purpose": "e666644f03c77644b46a2bd02ace58cdbd73be6d7e4397624b05524b8f5f68ef",
+      "2-territory": "f0d9409479a8856c8cf8bb9c47564cc3f811195271d0f801c984d9401905e37c",
+      "3-1-the-version-command": "aa334437072a5f0fb26d0c09fdad49b79ec84864250b19b0079b1941b4d3ac76",
+      "3-2-the-declared-example": "5653a59411b0267e80d5ae82fa4aeaab0b5c97597a860c83b6ac23591617a55e",
+      "3-3-the-qualification-harness": "3c255a727ccb55801dc7d6ce152d769432b3764dd498fa0bfc15d0fc4bfe905e",
+      "3-4-authority-for-a-later-release": "8b749f859f3f8022f73ed30ca56650bc348149831aa2e8f218fea53749fc3b79",
+      "3-5-version-0-1-1": "b993b11fe95025e5f9ba9e91a63dd4c6ecb0d17d3818d88b3cbd3eda75363d54",
+      "3-behavior": "7be494ecd3245cccba354c18aee406601a736e97b5c0ca6b1892511ba1516c15",
+      "4-observable-negative-cases": "97baa1caaa78680821459648a3f9c88298293d0a924d5b1ba0fbc031bc910882",
+      "acceptance": "dddc5bc8513d366c9308b532359861464f1be6b13fcab9f8a8eabb4c0b2c1051",
+      "implementation-record": "915e017c90e6e2415c57aa0c336f8114252242da615571c1a6105ac7a22e591a",
+      "verification": "d858f3987006016d1cfb49e42e3c7e2ea4293a352a4ce12fa6d37efeae60bba4"
+    },
+    "sectionHeadings": [
+      "056: Release 0.1.1, a CLI version command, declared consumer examples and the fresh-consumer qualification (amends 006, 007 and 031)",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 The version command",
+      "3.2 The declared example",
+      "3.3 The qualification harness",
+      "3.4 Authority for a later release",
+      "3.5 Version 0.1.1",
+      "4. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Implementation record"
+    ],
+    "specPath": "specs/056-release-0-1-1-and-consumer-qualification/spec.md",
+    "status": "approved",
+    "summary": "A narrow amendment of approved specs 006, 007 and 031, written after `v0.1.0` was published to crates.io, npm and GitHub on 2026-10-26 but could not be qualified (021 3.10, 031 3.9.7). The CLI has no version command; the support-routing package declares no runnable offline example (its SYNTHETIC rules program is a test fixture of the rules backend); no harness runs the registry-only consumer across the platform matrix; and the npm packages carry no provenance. This spec adds `rustev version`, ships the package's SYNTHETIC example as package data, adds the qualification harness and its workflow, and defines how the owner authorizes a release after `0.1.0`, so that `0.1.1` is published through the existing pipeline with npm provenance and qualified. Ratified by the owner on 2026-10-26 (A-58).\n",
+    "title": "Release 0.1.1: a CLI version command, declared consumer examples and the fresh-consumer qualification (amends 006, 007 and 031)"
+  },
+  "shardHash": "2c6977546d760a1c56d5225404000fdfb41d51931a8f44af72ff58ac8a602e73",
+  "specVersion": "1.10.0"
+}
