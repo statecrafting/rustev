@@ -601,3 +601,31 @@ fn generation_template_parameters_require_screening_even_without_projection() {
     d.screening = None;
     assert_eq!(compile(&d).unwrap_err().category, C::UnscreenedText);
 }
+
+#[path = "common/output_screening.rs"]
+mod output_screening;
+#[test]
+fn output_screening_admission_binding_and_request_budget() {
+    let (mut d, p, mut b) = fixture();
+    output_screening::configure(&mut d, &mut b);
+    let c = run(&d, &p, &b).unwrap();
+    let PlanStepDetail::Generate(g) = &c.plan.steps[0].detail else {
+        panic!()
+    };
+    assert_eq!(g.worst_case_requests, 4);
+    assert_eq!(g.output_screener.as_ref().unwrap().backend_id, b.backend_id);
+    Compiled::load(&c.plan, &[b.clone()], &[]).unwrap();
+    d.limits.max_semantic_requests = 3;
+    assert_eq!(run(&d, &p, &b).unwrap_err().category, C::Budget);
+    d.limits.max_semantic_requests = 4;
+    b.operations
+        .last_mut()
+        .unwrap()
+        .screen
+        .as_mut()
+        .unwrap()
+        .max_text_bytes = 399;
+    assert_eq!(run(&d, &p, &b).unwrap_err().category, C::NoCapableBackend);
+    b.operations.pop();
+    assert_eq!(run(&d, &p, &b).unwrap_err().category, C::NoCapableBackend);
+}

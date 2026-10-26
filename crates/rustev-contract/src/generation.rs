@@ -225,6 +225,8 @@ pub enum PromptParamType {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct GenerateBinding {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_screener: Option<crate::screening::ScreenerBinding>,
     pub template_id: PromptTemplateId,
     pub template: PromptTemplate,
     pub helpers_version: String,
@@ -437,6 +439,32 @@ crate::document::document!(
     crate::schema::GENERATE_REQUEST,
     crate::limits::RECORD_V1
 );
+
+/// Identity of the single-field output screening request owned by a generate step.
+pub fn output_screen_step(step: &str, field: &str) -> String {
+    format!("screen-output:{step}:{field}")
+}
+
+/// Resolve a generated screening identity from plan bindings, never a prefix alone.
+pub fn output_screen_binding<'a>(
+    plan: &'a crate::plan::Plan,
+    step: &str,
+) -> Option<(&'a str, &'a crate::screening::ScreenerBinding)> {
+    plan.steps.iter().find_map(|s| {
+        let crate::plan::PlanStepDetail::Generate(g) = &s.detail else {
+            return None;
+        };
+        let binding = g.output_screener.as_ref()?;
+        g.output
+            .fields
+            .iter()
+            .any(|f| {
+                matches!(f.ty, GeneratedType::Text { .. })
+                    && output_screen_step(&s.id, &f.name) == step
+            })
+            .then_some((s.id.as_str(), binding))
+    })
+}
 
 #[cfg(test)]
 mod tests {

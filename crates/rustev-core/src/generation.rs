@@ -187,11 +187,6 @@ pub(crate) fn structure(def: &Definition) -> Result<(), Refusal> {
                 return Err(error(category, &s.id, format!("unknown step {id}")));
             }
         }
-        if !matches!(g.screen.output, ScreenOutput::None) {
-            return Err(bad(
-                "output screening requires spec 035 compiler integration".into(),
-            ));
-        }
         // Typed callers receive the same local bounds as document callers.
         serde_json::from_value::<Generate>(serde_json::to_value(g).unwrap())
             .map_err(|e| error(C::Parse, &s.id, e))?;
@@ -711,6 +706,7 @@ pub(crate) fn type_check(
                 prompt: Some(prompt),
                 backstops,
                 binding: GenerateBinding {
+                    output_screener: None,
                     template_id: g.template.digest.clone(),
                     template: p.clone(),
                     helpers_version: t::HELPERS.into(),
@@ -857,6 +853,35 @@ pub(crate) fn bind(
                 binding.backend_id = b.backend_id.clone();
                 binding.artifact = b.artifact.clone();
                 binding.descriptor = b.id().map_err(|e| error(C::Parse, id, e))?;
+                if let ScreenOutput::Screener { backend } = &g.screen.output {
+                    let max_bytes = g
+                        .output
+                        .fields
+                        .iter()
+                        .filter_map(|f| match f.ty {
+                            GeneratedType::Text { max_bytes, .. } => Some(max_bytes),
+                            _ => None,
+                        })
+                        .max()
+                        .unwrap_or(0);
+                    let bound = crate::compile::screening::projection_bound(max_bytes);
+                    let screener = sorted.iter().filter(|b| {
+                        matches!(&backend.binding, BindingChoice::Auto) || matches!(&backend.binding, BindingChoice::Backend(id) if id == &b.backend_id)
+                    }).find(|b| {
+                        b.determinism >= backend.min_determinism
+                        && (matches!(backend.artifact, ArtifactPin::Any) || matches!(&backend.artifact, ArtifactPin::Pinned(a) if a == &b.artifact))
+                        && b.input_limit.on_excess == rustev_contract::descriptor::InputExcess::Refuse
+                        && b.input_limit.max_bytes >= bound
+                        && b.operations.iter().any(|o| o.operation == Operation::Proposition && o.output == OutputKind::Screen && o.max_options >= 2 && o.screen.as_ref().is_some_and(|p| p.text_unit_bytes > 0 && p.max_text_bytes >= max_bytes))
+                    }).ok_or_else(|| error(C::NoCapableBackend, id, "no backend satisfies output screening"))?;
+                    binding.output_screener = Some(rustev_contract::screening::ScreenerBinding {
+                        backend_id: screener.backend_id.clone(),
+                        artifact: screener.artifact.clone(),
+                        descriptor: screener.id().map_err(|e| error(C::Parse, id, e))?,
+                    });
+                    binding.worst_case_projection_bytes =
+                        binding.worst_case_projection_bytes.max(bound);
+                }
                 return Ok(binding);
             }
             Err(reasons) => shortfalls.push(Shortfall {

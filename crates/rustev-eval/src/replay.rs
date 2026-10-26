@@ -382,6 +382,9 @@ fn resolve_all(
 
 /// The target binding of a step: artifact of target 0 or of a fallback.
 fn target_artifact(plan: &Plan, step: &str, target: u32) -> Option<ArtifactId> {
+    if let Some((_, b)) = rustev_contract::generation::output_screen_binding(plan, step) {
+        return (target == 0).then(|| b.artifact.clone());
+    }
     let artifact = match &plan.steps.iter().find(|s| s.id == step)?.detail {
         PlanStepDetail::Semantic(b) => &b.artifact,
         PlanStepDetail::Generate(b) => &b.artifact,
@@ -836,7 +839,7 @@ fn reproduce_inner(
         (Ok(a), Ok(b)) => a == b,
         _ => return Err(inconsistent(ItemLocation::Run, Inconsistency::NoRecordForm)),
     };
-    if !same || !generation_same {
+    if !same || !generation_same || actual_evidence.screening != evidence.screening {
         return Ok(ReplayOutcome::Diverged {
             expected: Box::new(expected.clone()),
             actual: Box::new(judgment),

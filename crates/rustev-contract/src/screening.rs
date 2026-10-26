@@ -273,7 +273,7 @@ pub enum ScreenVerdict {
 pub struct ScreeningEvidence {
     #[serde(deserialize_with = "name")]
     pub entry: String,
-    #[serde(deserialize_with = "field_reference")]
+    #[serde(deserialize_with = "evidence_field_reference")]
     pub field: String,
     /// Null means this field is not a list item.
     #[serde(default, deserialize_with = "optional_nonempty")]
@@ -406,4 +406,17 @@ pub(crate) fn evidence_list<'de, D: serde::Deserializer<'de>>(
         ));
     }
     Ok(Some(entries))
+}
+
+fn evidence_field_reference<'de, D: serde::Deserializer<'de>>(d: D) -> Result<String, D::Error> {
+    let s = String::deserialize(d)?;
+    let output = s
+        .strip_prefix("output:")
+        .and_then(|p| p.split_once('/'))
+        .is_some_and(|(step, field)| valid_name(step) && valid_name(field));
+    if reference(&s) || output {
+        Ok(s)
+    } else {
+        Err(serde::de::Error::custom("invalid screening evidence field"))
+    }
 }

@@ -426,7 +426,7 @@ pub(crate) async fn run(
             if cx.cancel.is_raised() || active.len() >= cx.rt.config.max_parallel_requests {
                 break;
             }
-            let step = req.document.step.clone();
+            let step = req.owner.clone();
             let item = item_id(&req.document);
             if active.iter().any(|(s, i, _)| s == &step && i == &item) {
                 continue;
@@ -507,7 +507,7 @@ pub(crate) async fn run(
             if !g
                 .pending()
                 .iter()
-                .any(|r| r.document.step == step && item_id(&r.document) == item)
+                .any(|r| r.owner == step && item_id(&r.document) == item)
             {
                 slots.remove(&(step, item));
             }
@@ -534,17 +534,21 @@ async fn request(
     req: GenerationRequest,
 ) -> Result<Finished, GenerationError> {
     let deadline = budget.deadline;
-    let projection = req
-        .document
-        .canonical()
-        .map_err(|e| GenerationError::InvalidState(e.to_string()))?;
+    let is_screen = req.screen_projection.is_some();
+    let projection = match req.screen_projection {
+        Some(bytes) => bytes,
+        None => req
+            .document
+            .canonical()
+            .map_err(|e| GenerationError::InvalidState(e.to_string()))?,
+    };
     let semantic = SemanticRequest {
         step: req.document.step.clone(),
         instance: req.document.instance.clone(),
         backend_id: req.backend_id,
         projection,
     };
-    let stream = cx.streaming.map(|s| RequestStream {
+    let stream = cx.streaming.filter(|_| !is_screen).map(|s| RequestStream {
         document: req.document,
         queue: s.0.clone(),
         emitted: Mutex::new(BTreeSet::new()),
@@ -572,7 +576,8 @@ async fn request(
     };
     let mut cache = None;
     let mut diagnostics = vec![];
-    if !cx.cancel.is_raised()
+    if !is_screen
+        && !cx.cancel.is_raised()
         && cx.rt.clock.now() < item_clock.deadline(deadline)
         && let Some(policy) = &cx.plan.optimization
         && policy.memory_cache.is_some()
@@ -685,7 +690,11 @@ async fn request(
     // Account exactly once here (the cache-hit early return has no new cost),
     // then stage the write for the delivery gate under spec 037 3.12.7/3.14.1.
     crate::driver::record_cache_cost(&mut out);
-    let write = pending_write(&out, cx.rt.clock.now());
+    let write = if is_screen {
+        None
+    } else {
+        pending_write(&out, cx.rt.clock.now())
+    };
     Ok(Finished {
         out,
         source: None,

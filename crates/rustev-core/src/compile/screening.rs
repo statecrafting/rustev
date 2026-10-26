@@ -217,7 +217,7 @@ pub(crate) fn projection(text: serde_json::Value) -> serde_json::Value {
     json!({"candidates": [], "instance": {}, "operation": "proposition", "options": ["false", "true"], "question": "screen", "task": "rustev.screen/1", "values": {"text": text}})
 }
 
-pub(super) fn projection_bound(max_bytes: u64) -> u64 {
+pub(crate) fn projection_bound(max_bytes: u64) -> u64 {
     // Each UTF-8 byte can require six JSON bytes (a control-byte escape).
     (canonical_value_bytes(&projection(json!(""))).unwrap().len() as u64)
         .saturating_add(max_bytes.saturating_mul(6))
