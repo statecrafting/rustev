@@ -11,6 +11,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use rustev_contract::definition::Definition;
+use rustev_contract::replay::ReplayBundle;
 use rustev_contract::run::{CoreEvidence, RunRecord};
 use rustev_contract::snapshot::Snapshot;
 use rustev_contract::source::SourceDescriptor;
@@ -18,8 +19,11 @@ use rustev_contract::time::Timestamp;
 use rustev_contract::{Document, schema};
 use rustev_core::seams::{BoxFuture, CancelSignal, EvidenceSink};
 use rustev_core::{Compiled, Evaluation, compile_with_sources};
+use rustev_eval::assemble::{AssemblyInput, Content, RetentionChoice, assemble_with_sources};
+use rustev_eval::replay::{ReplayConfig, ReplayOutcome, reproduce};
+use rustev_eval::resolve::NoExternal;
 use rustev_runtime::{
-    CaptureConfig, CaptureConfigError, DecisionRequest, ManualClock, PrepareError, Runtime,
+    CaptureConfig, CaptureOutcome, DecisionRequest, ManualClock, PrepareError, Runtime,
     RuntimeConfig, SinkPolicy,
 };
 use serde_json::{Value, json};
@@ -746,25 +750,68 @@ async fn a_plan_3_decision_delivers_run_3_with_evidence_2() {
 }
 
 #[tokio::test(flavor = "current_thread")]
-async fn a_run_1_sink_and_capture_refuse_a_plan_3() {
+async fn a_run_1_sink_refuses_a_plan_3_and_capture_writes_replay_2() {
     let (rt, _) = runtime(false);
     assert!(matches!(
         rt.prepare(compiled()),
         Err(PrepareError::SinkVersionUnsupported { .. })
     ));
     let (rt, sink) = runtime(true);
-    let plan = rt.prepare(compiled()).unwrap();
+    let compiled = compiled();
+    let plan = rt.prepare(compiled.clone()).unwrap();
     let h = |s: &str| rustev_contract::scope::Handle::new(s).unwrap();
     let config = CaptureConfig {
         scope: rustev_contract::scope::Scope::principal(h("tenant-a"), h("rev-1"), h("scope-p")),
         max_bytes: 1_024,
     };
-    let r = rt
-        .decide_with_capture(&plan, request(), &CancelSignal::default(), &config)
-        .await;
-    assert!(matches!(
-        r,
-        Err(CaptureConfigError::CaptureUnsupported { .. })
-    ));
-    assert!(sink.records.lock().unwrap().is_empty());
+    let request = request();
+    let snapshot = request.snapshot.clone();
+    let evaluation_time = request.evaluation_time;
+    let captured = rt
+        .decide_with_capture(&plan, request, &CancelSignal::default(), &config)
+        .await
+        .unwrap();
+    let result = captured.result.unwrap();
+    let CaptureOutcome::Captured(capture) = captured.capture else {
+        panic!("plan 3 was not captured")
+    };
+    let records = sink.records.lock().unwrap();
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0].schema, schema::RUN_V3);
+    let bundle = assemble_with_sources(
+        &AssemblyInput {
+            capture: Some(&capture),
+            scope: &capture.scope,
+            plan: &compiled.plan,
+            descriptors: &[],
+            calibrations: &[],
+            snapshot: &snapshot,
+            run: &result.record,
+            evaluation_time,
+            created_at_ms: evaluation_time,
+        },
+        &RetentionChoice {
+            content: Content::Embedded,
+            ..RetentionChoice::default()
+        },
+        &sources(),
+    )
+    .unwrap();
+    assert_eq!(bundle.schema, "rustev.replay/2");
+    assert!(bundle.acquisition_pages.is_none());
+    let bytes = bundle.record_canonical().unwrap();
+    let document: Value = serde_json::from_slice(&bytes).unwrap();
+    assert!(document.get("acquisition_pages").is_none());
+    let parsed = ReplayBundle::parse(&bytes).unwrap();
+    assert_eq!(parsed, bundle);
+    let replay = reproduce(
+        &parsed,
+        &NoExternal,
+        &ReplayConfig {
+            scope: config.scope,
+            now_ms: evaluation_time,
+            host_cap_ms: None,
+        },
+    );
+    assert!(matches!(replay, ReplayOutcome::Reproduced(_)), "{replay:?}");
 }

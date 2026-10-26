@@ -65,7 +65,11 @@ impl Queue {
         }
     }
 
-    pub fn expire_waiting(&mut self, cx: &DecisionCtx<'_, '_>) -> bool {
+    pub fn expire_waiting(
+        &mut self,
+        cx: &DecisionCtx<'_, '_>,
+        mut capture: Option<&mut crate::capture::Capturing<'_>>,
+    ) -> bool {
         let mut cancelled = false;
         let waiting = std::mem::take(&mut self.waiting);
         for (r, close) in waiting {
@@ -77,12 +81,20 @@ impl Queue {
             if !cx.cancel.is_raised() {
                 out = out.fail(Unresolved::DeadlineExceeded);
             }
-            cancelled |= self.supply(cx, out);
+            cancelled |= self.supply(cx, out, capture.as_deref_mut());
         }
         cancelled
     }
 
-    pub fn supply(&mut self, cx: &DecisionCtx<'_, '_>, out: Outcome) -> bool {
+    pub fn supply(
+        &mut self,
+        cx: &DecisionCtx<'_, '_>,
+        out: Outcome,
+        capture: Option<&mut crate::capture::Capturing<'_>>,
+    ) -> bool {
+        if let Some(c) = capture {
+            c.record_page(&out.record, out.bytes.as_deref());
+        }
         let r = &out.record;
         let cancelled = matches!(r.result, AcquisitionResult::NotSupplied);
         let supplied = match (&r.result, &out.bytes) {

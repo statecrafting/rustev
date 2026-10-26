@@ -40,3 +40,6 @@ pub use diff::{EvalDiff, diff, render_markdown};
 
 pub use comparison::{Comparison, NamedCandidate, RepeatEvidence, compare_candidates};
 pub use selection::{Selection, SelectionGate, evaluate_selection};
+
+mod acquisition_replay;
+pub use acquisition_replay::MissingAcquisition;

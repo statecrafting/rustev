@@ -14,7 +14,8 @@ use rustev_contract::Identified;
 use rustev_contract::output::BackendOutputDoc;
 use rustev_contract::reason::RuntimeReasonDoc;
 use rustev_contract::replay::{
-    Capture, CaptureStatus, CapturedSupply, CapturedValue, MAX_BUNDLE_ITEMS,
+    Capture, CaptureStatus, CapturedAcquisition, CapturedPage, CapturedSupply, CapturedValue,
+    MAX_BUNDLE_ITEMS,
 };
 use rustev_contract::run::RequestRecord;
 use rustev_contract::schema;
@@ -90,6 +91,7 @@ pub(crate) struct Capturing<'a> {
     bytes: u64,
     exceeded: bool,
     supplies: Vec<CapturedSupply>,
+    pages: Vec<CapturedAcquisition>,
 }
 
 impl<'a> Capturing<'a> {
@@ -99,6 +101,7 @@ impl<'a> Capturing<'a> {
             bytes: 0,
             exceeded: false,
             supplies: vec![],
+            pages: vec![],
         }
     }
 
@@ -110,11 +113,21 @@ impl<'a> Capturing<'a> {
         plan: &PreparedPlan,
         record: &RequestRecord,
         supplied: &Supplied,
+        failure_context: Option<rustev_core::FailureContext>,
     ) {
         if self.exceeded {
             return;
         }
-        let entry = self.entry(ev, plan, record, supplied);
+        let mut entry = self.entry(ev, plan, record, supplied);
+        if let Some((entry, _)) = &mut entry
+            && plan.compiled.plan.schema == schema::PLAN_V3
+        {
+            entry.failure_context =
+                failure_context.map(|c| rustev_contract::replay::CapturedFailureContext {
+                    origin: c.origin,
+                    determinism: c.determinism,
+                });
+        }
         self.push(entry);
     }
 
@@ -141,6 +154,7 @@ impl<'a> Capturing<'a> {
     fn discard(&mut self) {
         self.exceeded = true;
         self.supplies = vec![];
+        self.pages = vec![];
     }
 
     fn entry(
@@ -188,7 +202,8 @@ impl<'a> Capturing<'a> {
         let bytes = (len + request.as_str().len()) as u64;
         Some((
             CapturedSupply {
-                sequence: self.supplies.len() as u64,
+                failure_context: None,
+                sequence: (self.supplies.len() + self.pages.len()) as u64,
                 step: record.step.clone(),
                 instance: record.instance.clone(),
                 request,
@@ -201,6 +216,63 @@ impl<'a> Capturing<'a> {
             },
             bytes,
         ))
+    }
+
+    /// Capture a page before the driver supplies it, using the shared sequence.
+    pub fn record_page(
+        &mut self,
+        record: &rustev_contract::acquisition_record::AcquisitionRecord,
+        bytes: Option<&[u8]>,
+    ) {
+        use rustev_contract::acquisition_record::AcquisitionResult;
+        if self.exceeded || matches!(record.result, AcquisitionResult::NotSupplied) {
+            return;
+        }
+        let value = match (&record.result, bytes) {
+            (AcquisitionResult::Page, Some(bytes)) => {
+                rustev_contract::acquisition::AcquisitionPage::parse(bytes)
+                    .ok()
+                    .map(CapturedPage::Page)
+            }
+            (AcquisitionResult::Failed(reason), _) => {
+                Some(CapturedPage::Reason(RuntimeReasonDoc {
+                    schema: schema::RUNTIME_REASON.into(),
+                    reason: reason.clone(),
+                }))
+            }
+            _ => None,
+        };
+        let Some(value) = value else {
+            self.discard();
+            return;
+        };
+        let canonical = match &value {
+            CapturedPage::Page(p) => p.record_canonical(),
+            CapturedPage::Reason(r) => r.record_canonical(),
+        };
+        let Ok(bytes) = canonical else {
+            self.discard();
+            return;
+        };
+        self.bytes = self
+            .bytes
+            .saturating_add((bytes.len() + record.request.as_str().len()) as u64);
+        // The bundle bounds each member on its own (`ReplayBundle::check`):
+        // `acquisition_pages` and `supplies` each hold at most MAX_BUNDLE_ITEMS,
+        // and the shared sequence is only required to increase.
+        if self.bytes > self.config.max_bytes || self.pages.len() >= MAX_BUNDLE_ITEMS {
+            self.discard();
+            return;
+        }
+        self.pages.push(CapturedAcquisition {
+            sequence: (self.supplies.len() + self.pages.len()) as u64,
+            step: record.step.clone(),
+            tier: record.tier,
+            page: record.page,
+            request: record.request.clone(),
+            attempt_id: record.attempts.last().map(|a| a.attempt_id.clone()),
+            value,
+        });
     }
 
     /// The capture of a decision that ran to `cancelled` or a judgment.
@@ -217,6 +289,7 @@ impl<'a> Capturing<'a> {
             scope: self.config.scope.clone(),
             status,
             supplies: self.supplies,
+            acquisition_pages: self.pages,
             bytes: self.bytes,
         }
     }
@@ -240,6 +313,7 @@ mod tests {
             RuntimeReasonDoc::new(rustev_contract::judgment::Unresolved::DeadlineExceeded).unwrap();
         Some((
             CapturedSupply {
+                failure_context: None,
                 sequence: i,
                 step: format!("s{i}"),
                 instance: vec![],

@@ -299,11 +299,13 @@ pub fn document_schemas() -> Vec<EmittedSchema> {
             for key in ["sources", "acquisition_pages"] {
                 v["properties"].as_object_mut().unwrap().remove(key);
             }
+            v["$defs"]["SupplyEntry"]["properties"]
+                .as_object_mut()
+                .unwrap()
+                .remove("failure_context");
             prune_defs(v);
         }),
-        emit_adjusted::<ReplayBundle>(schema::REPLAY_V2, None, |v| {
-            v["required"].as_array_mut().unwrap().push("sources".into());
-        }),
+        emit::<ReplayBundle>(schema::REPLAY_V2, None),
         emit::<RequestDoc>(schema::REQUEST, None),
         emit::<RuntimeReasonDoc>(schema::RUNTIME_REASON, None),
         emit::<crate::acquisition::AcquisitionRequest>(schema::ACQUISITION_REQUEST, None),

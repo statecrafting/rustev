@@ -158,6 +158,7 @@
         "Cargo.toml.orig",
         "LICENSE",
         "README.md",
+        "src/acquisition_replay.rs",
         "src/assemble.rs",
         "src/baseline.rs",
         "src/bundle.rs",

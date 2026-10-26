@@ -63,9 +63,9 @@ pub struct ReplayBundle {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        deserialize_with = "crate::acquisition_record::list"
+        deserialize_with = "captured_pages"
     )]
-    #[schemars(with = "Vec<AcquisitionSupply>", length(min = 1, max = 4096))]
+    #[schemars(with = "Vec<AcquisitionSupply>", length(max = 4096))]
     pub acquisition_pages: Option<Vec<AcquisitionSupply>>,
 }
 
@@ -122,6 +122,20 @@ pub struct SupplyEntry {
     pub target: u32,
     /// A `rustev.backend-output/1` or `rustev.runtime-reason/1` document.
     pub value: RetentionItem,
+    /// Replay 2: runtime facts needed to recompute an actionability cause.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "failure_context"
+    )]
+    pub failure_context: Option<CapturedFailureContext>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct CapturedFailureContext {
+    pub origin: crate::actionability::Origin,
+    pub determinism: crate::definition::Determinism,
 }
 
 /// Where in a bundle a problem is.
@@ -251,7 +265,10 @@ impl ReplayBundle {
     fn parsed_members(&self) -> Result<(), String> {
         // Preserve replay 1 parsing; its existing structural check remains explicit.
         if self.schema == schema::REPLAY {
-            if self.sources.is_some() || self.acquisition_pages.is_some() {
+            if self.sources.is_some()
+                || self.acquisition_pages.is_some()
+                || self.supplies.iter().any(|s| s.failure_context.is_some())
+            {
                 return Err("acquisition members require rustev.replay/2".into());
             }
             return Ok(());
@@ -312,9 +329,7 @@ impl ReplayBundle {
             return Err(BundleError::Schema(self.schema.chars().take(80).collect()));
         }
         let v2 = self.schema == schema::REPLAY_V2;
-        if (!v2 && (self.sources.is_some() || self.acquisition_pages.is_some()))
-            || (v2 && self.sources.is_none())
-        {
+        if !v2 && (self.sources.is_some() || self.acquisition_pages.is_some()) {
             return Err(BundleError::Role {
                 location: ItemLocation::Bundle,
             });
@@ -413,6 +428,9 @@ impl ReplayBundle {
         {
             return Err(BundleError::Sequence { index: 0 });
         }
+        // One sequence space shared by acquisition pages and supplies (spec
+        // 036 3.15.3): pages enter `sequence` first, so a page colliding with
+        // another page or with a supply is refused here or in the supply loop.
         let mut sequence = BTreeSet::new();
         let mut page_keys = BTreeSet::new();
         if let Some(pages) = &self.acquisition_pages {
@@ -427,6 +445,15 @@ impl ReplayBundle {
         }
         let mut keys = BTreeSet::new();
         for (i, s) in self.supplies.iter().enumerate() {
+            if s.failure_context.is_some()
+                && (!v2 || s.value.document_schema != schema::RUNTIME_REASON)
+            {
+                return Err(BundleError::Role {
+                    location: ItemLocation::Supply(i),
+                });
+            }
+            // The v2 windows(2) checks above already enforce ascending order
+            // in both supplies and acquisition_pages; only v1 requires i here.
             if (!v2 && s.sequence != i as u64) || !sequence.insert(s.sequence) {
                 return Err(BundleError::Sequence { index: i });
             }
@@ -434,7 +461,7 @@ impl ReplayBundle {
                 return Err(BundleError::DuplicateSupply { index: i });
             }
         }
-        if sequence.iter().copied().ne(0..sequence.len() as u64) {
+        if !v2 && sequence.iter().copied().ne(0..sequence.len() as u64) {
             return Err(BundleError::Sequence { index: 0 });
         }
         Ok(())
@@ -455,6 +482,8 @@ pub struct Capture {
     /// The record-canonical lengths of every captured value document plus
     /// each `RequestId` string (spec 004, 5.7), counted before any discard.
     pub bytes: u64,
+    /// Acquisition supplies share the sequence with semantic supplies.
+    pub acquisition_pages: Vec<CapturedAcquisition>,
 }
 
 /// One supplied value, as [`SupplyEntry`] describes it before retention.
@@ -467,6 +496,7 @@ pub struct CapturedSupply {
     pub attempt_id: Option<String>,
     pub target: u32,
     pub value: CapturedValue,
+    pub failure_context: Option<CapturedFailureContext>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -474,4 +504,39 @@ pub enum CapturedValue {
     /// Names the actual producing artifact, fallback included.
     Output(BackendOutputDoc),
     Reason(RuntimeReasonDoc),
+}
+
+/// One captured acquisition before the host applies retention.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CapturedAcquisition {
+    pub sequence: u64,
+    pub step: String,
+    pub tier: u32,
+    pub page: u32,
+    pub request: crate::ids::AcquisitionRequestId,
+    pub attempt_id: Option<String>,
+    pub value: CapturedPage,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum CapturedPage {
+    Page(crate::acquisition::AcquisitionPage),
+    Reason(RuntimeReasonDoc),
+}
+
+// Empty captures are meaningful for a skipped acquisition or a removed last page.
+fn captured_pages<'de, D: serde::Deserializer<'de>>(
+    d: D,
+) -> Result<Option<Vec<AcquisitionSupply>>, D::Error> {
+    let pages = Vec::<AcquisitionSupply>::deserialize(d)?;
+    if pages.len() > MAX_BUNDLE_ITEMS {
+        return Err(serde::de::Error::custom("too many captured pages"));
+    }
+    Ok(Some(pages))
+}
+
+fn failure_context<'de, D: serde::Deserializer<'de>>(
+    d: D,
+) -> Result<Option<CapturedFailureContext>, D::Error> {
+    CapturedFailureContext::deserialize(d).map(Some)
 }

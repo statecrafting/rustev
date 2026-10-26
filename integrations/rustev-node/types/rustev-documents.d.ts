@@ -13545,16 +13545,23 @@ export namespace RustevReplay2 {
       };
   export type Handle = string;
   export type SnapshotId = string;
+  /**
+   * Declared determinism of a backend, weakest first.
+   */
+  export type Determinism = "unspecified" | "tolerance" | "bitwise";
+  /**
+   * Who registered a backend (3.9): `upstream` unless the host implements it.
+   */
+  export type Origin = "upstream" | "host";
   export type RequestId = string;
 
   export interface RustevReplay2 {
     /**
      * Replay 2: captured pages share the semantic supply sequence.
      *
-     * @minItems 1
      * @maxItems 4096
      */
-    acquisition_pages?: [AcquisitionSupply, ...AcquisitionSupply[]];
+    acquisition_pages?: AcquisitionSupply[];
     /**
      * Every calibration artifact the plan binds.
      */
@@ -13590,7 +13597,7 @@ export namespace RustevReplay2 {
      * @minItems 1
      * @maxItems 4096
      */
-    sources: [RetentionItem, ...RetentionItem[]];
+    sources?: [RetentionItem, ...RetentionItem[]];
     /**
      * In actual supply order.
      */
@@ -13631,6 +13638,10 @@ export namespace RustevReplay2 {
      * nothing was dispatched or a retry or fallback followed the last one.
      */
     attempt_id?: string | null;
+    /**
+     * Replay 2: runtime facts needed to recompute an actionability cause.
+     */
+    failure_context?: CapturedFailureContext | null;
     instance: string[];
     /**
      * The identity of the request for the producing target (spec 004, 3.2);
@@ -13652,6 +13663,10 @@ export namespace RustevReplay2 {
      * A `rustev.backend-output/1` or `rustev.runtime-reason/1` document.
      */
     value: RetentionItem;
+  }
+  export interface CapturedFailureContext {
+    determinism: Determinism;
+    origin: Origin;
   }
 }
 export type RustevReplay2 = RustevReplay2.RustevReplay2;

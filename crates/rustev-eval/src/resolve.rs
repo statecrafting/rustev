@@ -134,7 +134,9 @@ where
     }
     let version_3 = matches!(
         (T::SCHEMA, item.document_schema.as_str()),
-        (schema::PLAN, schema::PLAN_V3) | (schema::RUN, schema::RUN_V3)
+        (schema::PLAN, schema::PLAN_V3)
+            | (schema::RUN, schema::RUN_V3)
+            | (schema::SNAPSHOT, schema::SNAPSHOT_V2)
     );
     if item.document_schema != T::SCHEMA && !version_3 {
         return fail(Availability::Mismatched);
@@ -160,7 +162,9 @@ where
         }
         Err(_) => return fail(Availability::Mismatched),
     };
-    if matches!(T::SCHEMA, schema::PLAN | schema::RUN) && doc.schema() != item.document_schema {
+    if matches!(T::SCHEMA, schema::PLAN | schema::RUN | schema::SNAPSHOT)
+        && doc.schema() != item.document_schema
+    {
         return fail(Availability::Mismatched);
     }
     // Exactly the record canonical form, so the digest names the document.

@@ -405,13 +405,6 @@ impl Runtime {
             });
         }
         if let Some(c) = &req.capture {
-            if plan.compiled().plan.schema == schema::PLAN_V3 {
-                return Err(LiveRefusal::Capture(
-                    CaptureConfigError::CaptureUnsupported {
-                        plan_schema: schema::PLAN_V3,
-                    },
-                ));
-            }
             c.check().map_err(LiveRefusal::Capture)?;
         }
         let worst_case = worst_case_attempts(plan);

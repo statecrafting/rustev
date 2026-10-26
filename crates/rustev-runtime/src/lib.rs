@@ -716,13 +716,6 @@ impl Runtime {
         cancel: &CancelSignal,
         capture: &CaptureConfig,
     ) -> Result<CapturedDecision, CaptureConfigError> {
-        // Replay bundles admit plan 2 items only until spec 004 is amended
-        // (spec 032, 3.11.3).
-        if plan.compiled.plan.schema == schema::PLAN_V3 {
-            return Err(CaptureConfigError::CaptureUnsupported {
-                plan_schema: schema::PLAN_V3,
-            });
-        }
         capture.check()?;
         let decision_id = req.decision_id.clone();
         let mut capturing = capture::Capturing::new(capture);

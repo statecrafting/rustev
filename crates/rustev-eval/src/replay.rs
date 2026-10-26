@@ -37,6 +37,8 @@ use rustev_contract::{Document, Identified, schema};
 use rustev_core::evaluate::{Evaluation, Supplied};
 use rustev_core::{Compiled, LoadError};
 
+use crate::acquisition_replay::{MissingAcquisition, PageValue, fill_missing, supply_page};
+
 use crate::resolve::{Budget, ItemFailure, Resolver, check_bytes, item_bytes};
 
 /// The caller's trusted replay configuration.
@@ -95,8 +97,12 @@ pub enum Inconsistency {
 }
 
 /// Why a case cannot be reproduced or compared.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Incomparable {
+    AcquisitionNotCaptured {
+        missing: Vec<MissingAcquisition>,
+        judgment: Box<Judgment>,
+    },
     ScopeMismatch,
     InvalidBundle(BundleError),
     CaptureIncomplete(CaptureStatus),
@@ -131,9 +137,14 @@ impl Incomparable {
     /// A stable name for counting cases by reason.
     pub fn code(&self) -> String {
         match self {
+            Incomparable::AcquisitionNotCaptured { .. } => "acquisition-not-captured".into(),
             Incomparable::ScopeMismatch => "scope-mismatch".into(),
             Incomparable::InvalidBundle(_) => "invalid-bundle".into(),
             Incomparable::CaptureIncomplete(_) => "capture-incomplete".into(),
+            Incomparable::Unavailable {
+                location: ItemLocation::AcquisitionPage(_),
+                availability: Availability::Missing,
+            } => "content-not-retained".into(),
             Incomparable::Unavailable { availability, .. } => availability.name().into(),
             Incomparable::Oversized { .. } => "oversized".into(),
             Incomparable::NoExpectedJudgment => "no-expected-judgment".into(),
@@ -199,6 +210,7 @@ pub struct Reproduced {
     pub(crate) judgment: Judgment,
     pub(crate) run: RunRecord,
     pub(crate) supplies: Vec<RetainedSupply>,
+    pub(crate) pages: Vec<(rustev_contract::ids::AcquisitionRequestId, PageValue)>,
 }
 
 impl Reproduced {
@@ -278,6 +290,8 @@ struct Resolved {
     snapshot: Snapshot,
     run: RunRecord,
     values: Vec<Value>,
+    sources: Vec<rustev_contract::source::SourceDescriptor>,
+    pages: Vec<PageValue>,
 }
 
 enum Value {
@@ -333,7 +347,22 @@ fn resolve_all(
             Value::Output(typed(got)?)
         });
     }
+    let mut sources = vec![];
+    for (i, source) in bundle.sources.iter().flatten().enumerate() {
+        sources.push(typed(get(ItemLocation::Source(i), source)?)?);
+    }
+    let mut pages = vec![];
+    for (i, page) in bundle.acquisition_pages.iter().flatten().enumerate() {
+        let got = get(ItemLocation::AcquisitionPage(i), &page.value)?;
+        pages.push(if page.value.document_schema == schema::RUNTIME_REASON {
+            PageValue::Reason(typed::<RuntimeReasonDoc>(got)?.reason)
+        } else {
+            PageValue::Page(typed(got)?)
+        });
+    }
     Ok(Resolved {
+        sources,
+        pages,
         plan,
         descriptors,
         calibrations,
@@ -439,9 +468,23 @@ fn reproduce_inner(
             Inconsistency::TooManySupplies { max },
         ));
     }
+    let max_pages = r
+        .plan
+        .definition
+        .limits
+        .acquisition
+        .as_ref()
+        .map_or(0, |l| l.max_calls);
+    if r.pages.len() as u64 > max_pages {
+        return Err(inconsistent(
+            ItemLocation::Bundle,
+            Inconsistency::TooManySupplies { max: max_pages },
+        ));
+    }
     // 3. The plan, with its retained dependencies only.
     let compiled =
-        Compiled::load_checked(&r.plan, &r.descriptors, &r.calibrations).map_err(|e| match e {
+        Compiled::load_checked_with_sources(&r.plan, &r.descriptors, &r.calibrations, &r.sources)
+            .map_err(|e| match e {
             LoadError::CompilerChanged {
                 recorded_compiler,
                 current_compiler,
@@ -473,7 +516,42 @@ fn reproduce_inner(
     let mut seen = BTreeSet::new();
     list_new(&ev, &mut listed, &mut seen);
     let mut supplies = vec![];
-    for (i, (entry, value)) in bundle.supplies.iter().zip(&r.values).enumerate() {
+    let pages = bundle.acquisition_pages.as_deref().unwrap_or(&[]);
+    let mut missing = vec![];
+    let (mut semantic_index, mut page_index) = (0, 0);
+    loop {
+        fill_missing(&mut ev, &pages[page_index..], &mut missing)?;
+        list_new(&ev, &mut listed, &mut seen);
+        let semantic = bundle.supplies.get(semantic_index);
+        let page = pages.get(page_index);
+        if let Some(page) = page
+            && semantic.is_none_or(|s| page.sequence < s.sequence)
+        {
+            // Missing pages can make a later retained tier unreachable.
+            if missing.is_empty()
+                || ev.pending_acquisitions().iter().any(|p| {
+                    p.step == page.step && p.tier_index == page.tier && p.page_index == page.page
+                })
+            {
+                supply_page(&mut ev, page, &r.pages[page_index], run, page_index)?;
+            }
+            page_index += 1;
+            continue;
+        }
+        let Some(entry) = semantic else {
+            break;
+        };
+        let i = semantic_index;
+        let value = &r.values[i];
+        semantic_index += 1;
+        if !missing.is_empty()
+            && !ev
+                .pending()
+                .iter()
+                .any(|p| p.step == entry.step && p.instance == entry.instance)
+        {
+            continue;
+        }
         let at = ItemLocation::Supply(i);
         let bad = |what| Err(inconsistent(at, what));
         let Some(q) = by_key
@@ -542,6 +620,16 @@ fn reproduce_inner(
             ),
             _ => return bad(Inconsistency::Value),
         };
+        if let Some(context) = entry.failure_context {
+            ev.note_failure(
+                &entry.step,
+                &entry.instance,
+                rustev_core::FailureContext {
+                    origin: context.origin,
+                    determinism: context.determinism,
+                },
+            );
+        }
         if ev.supply(&entry.step, &entry.instance, supplied).is_err() {
             return bad(Inconsistency::NotPending);
         }
@@ -568,13 +656,19 @@ fn reproduce_inner(
         .iter()
         .map(|q| (q.step.clone(), q.instance.clone()))
         .collect();
-    if recorded != listed {
+    if missing.is_empty() && recorded != listed {
         return Err(inconsistent(run_at, Inconsistency::RequestOrder));
     }
     // 5. The verdict.
     let (judgment, _) = ev
         .finish(&bundle.decision_id)
         .map_err(|_| inconsistent(ItemLocation::Bundle, Inconsistency::FinishRefused))?;
+    if !missing.is_empty() {
+        return Err(Incomparable::AcquisitionNotCaptured {
+            missing,
+            judgment: Box::new(judgment),
+        });
+    }
     let expected = &evidence.judgment;
     let same = match (judgment.record_canonical(), expected.record_canonical()) {
         (Ok(a), Ok(b)) => a == b,
@@ -598,5 +692,10 @@ fn reproduce_inner(
         judgment,
         run: r.run.clone(),
         supplies,
+        pages: pages
+            .iter()
+            .zip(&r.pages)
+            .map(|(p, v)| (p.request.clone(), v.clone()))
+            .collect(),
     })))
 }

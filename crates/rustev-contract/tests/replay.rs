@@ -9,7 +9,7 @@ use rustev_contract::canonical::record_canonical_bytes;
 use rustev_contract::definition::RequiredKind;
 use rustev_contract::descriptor::OutputKind;
 use rustev_contract::ids::{
-    ArtifactId, ContentDigest, DescriptorId, PlanId, RequestId, SnapshotId,
+    AcquisitionRequestId, ArtifactId, ContentDigest, DescriptorId, PlanId, RequestId, SnapshotId,
 };
 use rustev_contract::judgment::Unresolved;
 use rustev_contract::limits::REQUEST_V1;
@@ -17,8 +17,8 @@ use rustev_contract::output::{BackendOutputDoc, RawOutput};
 use rustev_contract::plan::Normalization;
 use rustev_contract::reason::RuntimeReasonDoc;
 use rustev_contract::replay::{
-    BundleError, CaptureStatus, ItemLocation, LifetimeProblem, MAX_BUNDLE_ITEMS, ReplayBundle,
-    SupplyEntry,
+    AcquisitionSupply, BundleError, CaptureStatus, ItemLocation, LifetimeProblem, MAX_BUNDLE_ITEMS,
+    ReplayBundle, SupplyEntry,
 };
 use rustev_contract::request::RequestDoc;
 use rustev_contract::retention::{MAX_BUNDLE_LIFETIME_MS, Retention, RetentionItem};
@@ -182,6 +182,7 @@ fn item(document_schema: &str, expires: i64) -> RetentionItem {
 
 fn supply(sequence: u64, step: &str) -> SupplyEntry {
     SupplyEntry {
+        failure_context: None,
         step: step.into(),
         instance: vec![],
         request: RequestId::parse(&digest('f')).unwrap(),
@@ -213,6 +214,49 @@ fn bundle() -> ReplayBundle {
         capture: CaptureStatus::Complete,
         supplies: vec![supply(0, "a"), supply(1, "b")],
     }
+}
+
+#[test]
+fn v2_check_rejects_out_of_order_pages_and_supplies_separately() {
+    let mut b = bundle();
+    b.schema = schema::REPLAY_V2.into();
+    b.plan.document_schema = schema::PLAN_V3.into();
+    b.run.document_schema = schema::RUN_V3.into();
+    b.supplies[0].sequence = 1;
+    b.supplies[1].sequence = 3;
+    b.acquisition_pages = Some(
+        [0, 2]
+            .into_iter()
+            .map(|sequence| AcquisitionSupply {
+                sequence,
+                step: format!("acquire-{sequence}"),
+                tier: 0,
+                page: 0,
+                request: AcquisitionRequestId::parse(&digest('a')).unwrap(),
+                attempt_id: None,
+                value: item(schema::ACQUISITION_PAGE, CREATED + DAY),
+            })
+            .collect(),
+    );
+    b.check(None).unwrap();
+
+    let mut reversed_pages = b.clone();
+    reversed_pages
+        .acquisition_pages
+        .as_mut()
+        .unwrap()
+        .swap(0, 1);
+    assert_eq!(
+        reversed_pages.check(None),
+        Err(BundleError::Sequence { index: 0 })
+    );
+
+    let mut reversed_supplies = b;
+    reversed_supplies.supplies.swap(0, 1);
+    assert_eq!(
+        reversed_supplies.check(None),
+        Err(BundleError::Sequence { index: 0 })
+    );
 }
 
 #[test]
