@@ -600,6 +600,7 @@ impl Runtime {
                     &b.descriptor,
                     Some(b.limits.clone()),
                 ),
+                PlanStepDetail::Rank(b) => (&b.backend_id, &b.artifact, &b.descriptor, None),
                 _ => continue,
             };
             let mut targets = vec![Target {

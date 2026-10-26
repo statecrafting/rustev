@@ -158,7 +158,8 @@ pub(crate) fn validate(
                     "the step's compile-time fallback `unsupported` was taken",
                 );
             }
-            (Some(StepBody::Semantic(_)), Some(PlanStepDetail::Semantic(_)))
+            (Some(StepBody::Rank(_)), Some(PlanStepDetail::Rank(_)))
+            | (Some(StepBody::Semantic(_)), Some(PlanStepDetail::Semantic(_)))
             | (Some(StepBody::Extract(_)), Some(PlanStepDetail::Extract(_)))
             | (Some(StepBody::Generate(_)), Some(PlanStepDetail::Generate(_))) => {
                 (decl.unwrap(), details.get(&sp.step).unwrap())
@@ -240,6 +241,9 @@ pub(crate) fn validate(
         let (primary_id, primary_output, calibration) = match detail {
             PlanStepDetail::Extract(b) => (&b.backend_id, b.output.clone(), BoundCalibration::None),
             PlanStepDetail::Semantic(b) => (&b.backend_id, b.output.clone(), b.calibration.clone()),
+            PlanStepDetail::Rank(b) => {
+                (&b.backend_id, rank_output(&b.mode), BoundCalibration::None)
+            }
             PlanStepDetail::Generate(b) => {
                 let Some(backend) = sorted.iter().find(|d| d.backend_id == b.backend_id) else {
                     return refuse(
@@ -283,6 +287,14 @@ pub(crate) fn validate(
                 return refuse(subject, format!("fallback {id:?} was not supplied"));
             };
             let candidate = match (&decl.body, detail) {
+                (StepBody::Rank(d), PlanStepDetail::Rank(primary)) => {
+                    let mut d = *d.clone();
+                    d.backend.binding = rustev_contract::definition::BindingChoice::Auto;
+                    d.fallback = rustev_contract::ranking::RankFallback::None;
+                    crate::compile::ranking::bind(&decl.id, &d, primary.pool_bound, bound, &[b])
+                        .map(|_| rank_output(&primary.mode))
+                        .map_err(|e| e.shortfalls.into_iter().flat_map(|s| s.reasons).collect())
+                }
                 (StepBody::Semantic(d), PlanStepDetail::Semantic(primary)) => {
                     check_candidate(d, b, primary.requires, options_needed, bound)
                 }
@@ -363,6 +375,7 @@ pub(crate) fn validate(
     for s in &def.steps {
         let requests = match details.get(&s.id) {
             Some(PlanStepDetail::Semantic(b)) => b.max_requests,
+            Some(PlanStepDetail::Rank(b)) => b.max_requests,
             Some(PlanStepDetail::Generate(b)) => b.worst_case_requests,
             Some(PlanStepDetail::Extract(_)) => 1,
             _ => continue,
@@ -397,6 +410,17 @@ pub(crate) fn validate(
         policy: policy.clone(),
         fallbacks,
     })))
+}
+
+fn rank_output(
+    mode: &rustev_contract::ranking::RankMode,
+) -> rustev_contract::descriptor::OutputKind {
+    use rustev_contract::{descriptor::OutputKind, ranking::RankMode};
+    match mode {
+        RankMode::Listwise { .. } => OutputKind::Ranking,
+        RankMode::Pointwise => OutputKind::Scores,
+        RankMode::Pairwise { .. } => OutputKind::Label,
+    }
 }
 
 #[cfg(test)]

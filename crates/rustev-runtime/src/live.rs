@@ -402,6 +402,7 @@ fn worst_case_attempts(plan: &PreparedPlan) -> u64 {
             .iter()
             .filter_map(|s| match &s.detail {
                 PlanStepDetail::Semantic(b) => Some(b.max_requests),
+                PlanStepDetail::Rank(b) => Some(b.max_requests),
                 _ => None,
             })
             .fold(0, u64::saturating_add),
@@ -536,6 +537,9 @@ impl Runtime {
             .iter()
             .filter_map(|s| match &s.body {
                 StepBody::Semantic(d) => Some((s.id.clone(), d.operation)),
+                StepBody::Rank(_) => {
+                    Some((s.id.clone(), rustev_contract::definition::Operation::Rank))
+                }
                 _ => None,
             })
             .collect();

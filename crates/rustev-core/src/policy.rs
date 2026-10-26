@@ -142,6 +142,7 @@ impl<V: View> Run<'_, V> {
                     Seen::Exact(Value::Filtered(f)) => f.eligible.is_empty(),
                     Seen::Exact(Value::Shortlist(s)) => s.ids.is_empty(),
                     Seen::Exact(Value::Ranking(r)) => r.entries.is_empty(),
+                    Seen::Exact(Value::Selection(s)) => s.entries.is_empty(),
                     _ => {
                         return Err(Unresolved::invalid(
                             [],

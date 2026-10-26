@@ -830,3 +830,5 @@ pub fn golden(name: &str, bytes: &[u8]) {
         "golden {name} differs from the builder's output"
     );
 }
+
+pub mod rank;

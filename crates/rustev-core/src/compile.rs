@@ -38,7 +38,7 @@ use crate::quality;
 use crate::sem::SemKind;
 use crate::value::{Ty, Value};
 
-mod ranking;
+pub(crate) mod ranking;
 pub(crate) mod screening;
 
 /// The compiler identity recorded in every plan.
@@ -610,6 +610,7 @@ fn satisfies(output: OutputKind, required: RequiredKind) -> bool {
     use OutputKind as O;
     use RequiredKind as R;
     match required {
+        R::Ranking => false,
         R::ScreenVerdict => output == O::Screen,
         R::TextRecord | R::TypedRecord => false,
         R::Label => output == O::Label,
@@ -622,6 +623,11 @@ fn satisfies(output: OutputKind, required: RequiredKind) -> bool {
 
 fn sem_kind(op: Operation, required: RequiredKind) -> SemKind {
     match (op, required) {
+        // Unreachable from a definition: `kind_valid_for` refuses `requires:
+        // ranking` on every semantic operation and fallback before kinds are
+        // computed (039 3.12); only a rank step's own dispatch uses it. The arm
+        // stays total, and no consumer reads it as a label.
+        (_, RequiredKind::Ranking) => SemKind::Label,
         (Operation::Rubric, RequiredKind::Label) => SemKind::Ordinal(false),
         // Screening values are opaque to authored consumers; verdict
         // evaluation is spec 035's. A text record is refused before kind
@@ -1892,6 +1898,7 @@ fn compile_generation(
                 let StepTy::ModelRanking(pool) = step_tys[&s.id] else {
                     unreachable!()
                 };
+                bind_ctx.insert(s.id.clone(), (pool, projection_bounds[&s.id]));
                 let detail = ranking::bind(&s.id, r, pool, projection_bounds[&s.id], &sorted)?;
                 if let PlanStepDetail::Unsupported { capability } = &detail {
                     notices.push(Notice {

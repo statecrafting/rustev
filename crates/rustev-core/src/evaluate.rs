@@ -13,6 +13,8 @@ use std::fmt;
 mod acquisition_eval;
 #[path = "extraction_eval.rs"]
 mod extraction_eval;
+#[path = "ranking_eval.rs"]
+mod ranking_eval;
 pub use acquisition_eval::PendingAcquisition;
 
 use rustev_contract::actionability::Party;
@@ -62,7 +64,7 @@ pub enum StartError {
     GenerationNotAvailable,
     /// Reserved: accept steps evaluate since increment 6 part a2.
     AcceptanceNotAvailable,
-    /// A plan with a rank or select step; evaluated from increment 6 part b.
+    /// Reserved: rank and select steps evaluate since increment 6 part b.
     RankingNotAvailable,
     /// The snapshot's `schema` is not `rustev.snapshot/1`.
     Schema(String),
@@ -199,6 +201,8 @@ pub struct FailureContext {
 /// An evaluation in progress.
 pub struct Evaluation<'c> {
     extraction: extraction_eval::State,
+    ranks: BTreeMap<String, ranking_eval::State>,
+    selections: BTreeMap<String, rustev_contract::ranking_result::Selection>,
     constructed: BTreeSet<String>,
     skipped: BTreeMap<String, String>,
     acquisitions: BTreeMap<String, acquisition_eval::State>,
@@ -593,14 +597,6 @@ impl<'c> Evaluation<'c> {
     ) -> Result<Self, StartError> {
         // A plan 3 accepts a snapshot 1 or 2, a plan 2 only a snapshot 1,
         // so a grade claim is never silently dropped (spec 032, 3.1.4).
-        if compiled
-            .info
-            .steps
-            .values()
-            .any(|s| matches!(s, StepInfo::Ranking))
-        {
-            return Err(StartError::RankingNotAvailable);
-        }
         let v2 = compiled.info.v2;
         let accepted =
             snapshot.schema == schema::SNAPSHOT || (v2 && snapshot.schema == schema::SNAPSHOT_V2);
@@ -662,6 +658,8 @@ impl<'c> Evaluation<'c> {
             derivation: BTreeMap::new(),
             lineage: BTreeMap::new(),
             pending: BTreeMap::new(),
+            ranks: BTreeMap::new(),
+            selections: BTreeMap::new(),
             issued: 0,
             screening: BTreeMap::new(),
             screen_refusals: Vec::new(),
@@ -1212,7 +1210,12 @@ impl<'c> Evaluation<'c> {
         v.sort_by(|a, b| {
             rank[a.step.as_str()]
                 .cmp(&rank[b.step.as_str()])
-                .then_with(|| a.instance.cmp(&b.instance))
+                .then_with(
+                    || match (self.rank_request_order(a), self.rank_request_order(b)) {
+                        (Some(a), Some(b)) => a.cmp(&b),
+                        _ => a.instance.cmp(&b.instance),
+                    },
+                )
         });
         v
     }
@@ -1238,6 +1241,9 @@ impl<'c> Evaluation<'c> {
             .ok_or_else(not_pending)?;
         if self.extraction.requests.contains_key(step) {
             return self.extract_request_document(step, target, scope, req);
+        }
+        if self.ranks.contains_key(step) {
+            return self.ranking_document(req, target, scope);
         }
         let plan = &self.compiled.plan;
         let Some(PlanStepDetail::Semantic(b)) =
@@ -1290,15 +1296,23 @@ impl<'c> Evaluation<'c> {
         {
             Some(PlanStepDetail::Semantic(b)) => Some(b.artifact.clone()),
             Some(PlanStepDetail::Extract(b)) => Some(b.artifact.clone()),
+            Some(PlanStepDetail::Rank(b)) => Some(b.artifact.clone()),
             _ => None,
         };
         if bound.as_ref() != Some(&doc.artifact) {
-            if self.extraction.requests.contains_key(&doc.step) {
+            if self.extraction.requests.contains_key(&doc.step)
+                || self.ranks.contains_key(&doc.step)
+            {
                 return self.supply(
                     &doc.step,
                     &doc.instance,
                     Supplied::Failed(Unresolved::InvalidBackendOutput {
-                        detail: "artifact is not bound".into(),
+                        detail: if self.ranks.contains_key(&doc.step) {
+                            "artifact is not the bound artifact"
+                        } else {
+                            "artifact is not bound"
+                        }
+                        .into(),
                     }),
                 );
             }
@@ -1351,6 +1365,9 @@ impl<'c> Evaluation<'c> {
             self.advance();
             return Ok(());
         }
+        if self.ranks.contains_key(step) {
+            return self.supply_ranking(step, instance, s);
+        }
         let req = self.take(step, instance)?;
         let value = match s {
             Supplied::Failed(u) => Err(u),
@@ -1378,6 +1395,9 @@ impl<'c> Evaluation<'c> {
             })?;
         if self.extraction.requests.contains_key(step) {
             return Ok(self.validate_extract(step, raw).map(|_| ()));
+        }
+        if self.ranks.contains_key(step) {
+            return Ok(self.check_ranking(step, req, raw));
         }
         Ok(self.validate_output(step, req, raw).map(|_| ()))
     }
@@ -1822,6 +1842,7 @@ impl<'c> Evaluation<'c> {
             for id in &info.order {
                 if matches!(info.steps.get(id), Some(StepInfo::Generate))
                     || self.extraction.requests.contains_key(id)
+                    || self.ranks.contains_key(id)
                     || self.exact.contains_key(id)
                     || self.semantic.contains_key(id)
                     || self.skipped.contains_key(id)
@@ -1857,7 +1878,7 @@ impl<'c> Evaluation<'c> {
                     StepInfo::Generate => unreachable!("generation is a separate stage"),
                     StepInfo::Extract => self.start_extract(id),
                     StepInfo::Accept(a) => self.eval_accept(id, a),
-                    StepInfo::Ranking => unreachable!("ranking evaluation refused at start"),
+                    StepInfo::Ranking => self.start_ranking(id, deps),
                     // Acquisition lineage is stored by the shared insertion after this match.
                     StepInfo::Acquisition(a) => self.start_acquisition(id, a),
                     StepInfo::Exact { args, .. } => {
@@ -3094,6 +3115,10 @@ impl<'c> Evaluation<'c> {
                 .get(&format!("step:{id}"))
                 .copied()
                 .unwrap_or(Derivation::ExactDerived);
+            if matches!(compiled.info.steps[id], StepInfo::Ranking) {
+                steps.push(self.ranking_evidence(id));
+                continue;
+            }
             match (
                 &compiled.info.steps[id],
                 self.exact.get(id),

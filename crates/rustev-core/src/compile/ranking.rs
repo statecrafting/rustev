@@ -255,7 +255,7 @@ fn mode(m: &RankMode) -> RankingMode {
     }
 }
 
-pub(super) fn bind(
+pub(crate) fn bind(
     id: &str,
     r: &Rank,
     pool: u64,

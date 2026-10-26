@@ -17,6 +17,26 @@ fn packaged_copies_equal_their_sources() {
             "extraction.plan.json from tests/golden",
         ),
         (
+            include_str!("../src/testdata/ranking.listwise.evidence.json"),
+            include_str!("golden/ranking.listwise.evidence.json"),
+            "ranking.listwise.evidence.json",
+        ),
+        (
+            include_str!("../src/testdata/ranking.pointwise.evidence.json"),
+            include_str!("golden/ranking.pointwise.evidence.json"),
+            "ranking.pointwise.evidence.json",
+        ),
+        (
+            include_str!("../src/testdata/ranking.round.evidence.json"),
+            include_str!("golden/ranking.round.evidence.json"),
+            "ranking.round.evidence.json",
+        ),
+        (
+            include_str!("../src/testdata/ranking.merge.evidence.json"),
+            include_str!("golden/ranking.merge.evidence.json"),
+            "ranking.merge.evidence.json",
+        ),
+        (
             include_str!("../src/testdata/generation.plan.json"),
             include_str!("golden/generation.plan.json"),
             "generation.plan.json from tests/golden",

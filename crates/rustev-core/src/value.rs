@@ -238,6 +238,7 @@ pub enum Value {
     Filtered(Filtered),
     Shortlist(Shortlist),
     Ranking(Ranking),
+    Selection(rustev_contract::ranking_result::Selection),
     /// A `null` nullable field (spec 032, 3.4.1).
     Null,
     /// A value that failed its presence predicate, or a merged field that
@@ -333,6 +334,7 @@ impl Value {
             Value::Filtered(f) => OutValue::Filtered(f.clone()),
             Value::Shortlist(s) => OutValue::Shortlist(s.clone()),
             Value::Ranking(r) => OutValue::Ranking(r.clone()),
+            Value::Selection(s) => OutValue::Selection(s.clone()),
             // A proposal never reads an absent or null value: the read is
             // `missing_evidence` first (spec 032, 3.4.4).
             Value::Null | Value::Absent(_) => OutValue::None,
@@ -367,6 +369,7 @@ impl Value {
             Value::Filtered(f) => serde_json::to_value(f).unwrap_or(Json::Null),
             Value::Shortlist(s) => serde_json::to_value(s).unwrap_or(Json::Null),
             Value::Ranking(_) => Json::Null,
+            Value::Selection(_) => Json::Null,
             // Projections carry values only, never metadata or presence
             // (spec 032, 3.11.1).
             Value::Null | Value::Absent(_) => Json::Null,
