@@ -889,13 +889,29 @@ fn compile_generation(
         if !v2
             && matches!(
                 s.body,
-                StepBody::Acquire(_) | StepBody::Widen(_) | StepBody::Generate(_)
+                StepBody::Acquire(_)
+                    | StepBody::Widen(_)
+                    | StepBody::Generate(_)
+                    | StepBody::Extract(_)
+                    | StepBody::AcceptModelDerived(_)
             )
         {
             return refuse(
                 C::InvalidDefinition,
                 format!("step:{}", s.id),
                 "requires-definition-2",
+            );
+        }
+    }
+    for s in &def.steps {
+        if matches!(
+            s.body,
+            StepBody::Extract(_) | StepBody::AcceptModelDerived(_)
+        ) {
+            return refuse(
+                C::InvalidDefinition,
+                format!("step:{}", s.id),
+                "extraction-not-compiled",
             );
         }
     }
@@ -1011,6 +1027,10 @@ fn compile_generation(
         .steps
         .iter()
         .filter_map(|s| match &s.body {
+            StepBody::Extract(_) | StepBody::AcceptModelDerived(_) => {
+                // Refused earlier by extraction-not-compiled.
+                None
+            }
             StepBody::Semantic(d) => Some((s.id.as_str(), &d.options)),
             StepBody::Exact(_)
             | StepBody::Corroborate(_)
@@ -1028,6 +1048,9 @@ fn compile_generation(
             )?;
         }
         match &s.body {
+            StepBody::Extract(_) | StepBody::AcceptModelDerived(_) => {
+                // Refused earlier by extraction-not-compiled.
+            }
             StepBody::Generate(_) => {}
             // Refused above outside plan 3, whose own structure is checked by
             // `quality::structure`; here only the references are resolved.
@@ -1284,6 +1307,9 @@ fn compile_generation(
     for s in &def.steps {
         let subject = format!("step:{}", s.id);
         match &s.body {
+            StepBody::Extract(_) | StepBody::AcceptModelDerived(_) => {
+                // Refused earlier by extraction-not-compiled.
+            }
             StepBody::Generate(_) => {}
             StepBody::Acquire(_) | StepBody::Widen(_) => {
                 crate::acquisition::resolve(&s.id, &s.body, sources)?;
@@ -1349,6 +1375,10 @@ fn compile_generation(
     let mut deps: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for s in &def.steps {
         let mut refs: Vec<String> = match &s.body {
+            StepBody::Extract(_) | StepBody::AcceptModelDerived(_) => {
+                // Refused earlier by extraction-not-compiled.
+                Vec::new()
+            }
             StepBody::Generate(g) => crate::generation::dependencies(g, def),
             StepBody::Acquire(_) | StepBody::Widen(_) => crate::acquisition::refs(&s.body),
             StepBody::Corroborate(c) => corroborate_refs(c),
@@ -1412,6 +1442,9 @@ fn compile_generation(
             shortfalls: vec![],
         };
         match &s.body {
+            StepBody::Extract(_) | StepBody::AcceptModelDerived(_) => {
+                // Refused earlier by extraction-not-compiled.
+            }
             StepBody::Generate(_) => {
                 infos.insert(id.clone(), StepInfo::Generate);
             }
@@ -1695,6 +1728,10 @@ fn compile_generation(
     for s in &def.steps {
         let subject = format!("step:{}", s.id);
         let d = match &s.body {
+            StepBody::Extract(_) | StepBody::AcceptModelDerived(_) => {
+                // Refused earlier by extraction-not-compiled.
+                continue;
+            }
             StepBody::Generate(g) => {
                 let binding = crate::generation::bind(&s.id, g, &generated[&s.id], &sorted)?;
                 if let Some(checked) = generated.get_mut(&s.id) {
@@ -2286,6 +2323,10 @@ fn first_v2_construct(
     for s in &def.steps {
         let subject = format!("step:{}", s.id);
         match &s.body {
+            StepBody::Extract(_) => return Some((subject, "an extraction step")),
+            StepBody::AcceptModelDerived(_) => {
+                return Some((subject, "an accept_model_derived step"));
+            }
             StepBody::Generate(_) => return Some((subject, "a generate step")),
             StepBody::Acquire(_) | StepBody::Widen(_) => {
                 return Some((subject, "an acquisition step"));
@@ -2977,4 +3018,33 @@ fn static_derivations(
         );
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn v2_construct_describes_extraction_and_acceptance_separately() {
+        let mut def: Definition = serde_json::from_str(include_str!(
+            "../../../packages/rustev-pkg-support-routing/data/support-routing.definition.json"
+        ))
+        .unwrap();
+        for (fixture, description) in [
+            (
+                include_str!("../../rustev-contract/tests/fixtures/extract-step.json"),
+                "an extraction step",
+            ),
+            (
+                include_str!("../../rustev-contract/tests/fixtures/accept-step.json"),
+                "an accept_model_derived step",
+            ),
+        ] {
+            def.steps = vec![serde_json::from_str(fixture).unwrap()];
+            assert_eq!(
+                first_v2_construct(&def, &BTreeMap::new()),
+                Some((format!("step:{}", def.steps[0].id), description)),
+            );
+        }
+    }
 }

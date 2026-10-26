@@ -2,7 +2,7 @@
 id: "038-structured-extraction"
 title: "Structured extraction step and the model-derived input pattern (amends 002, 003 and 036)"
 status: approved
-implementation: pending
+implementation: in-progress
 created: "2026-10-17"
 summary: >
   An amendment of approved specs 002, 003 and 036 (R-16), for #76 child B6.
@@ -27,7 +27,7 @@ summary: >
   can drive spec 033's `needs_input` outcome and propose which declared
   questions it asks. Adds to the shared #76 versions; every version 1
   definition keeps its bytes, its plan and its `PlanId`. Approved (A-35);
-  implementation is pending.
+  implementation is in progress.
 amends:
   - "002-decision-contract-and-pure-core"
   - "003-runtime-execution-and-evidence"
@@ -49,6 +49,20 @@ extends:
   - { spec: "008-reference-package-lodging", unit: { kind: directory, path: "packages/rustev-pkg-lodging/" }, nature: additive }
   # Adds 038 to `make verify` when the implementation is complete.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  # Exhaustive matches over the new step bodies, the new snapshot entry
+  # member in struct literals, and regenerated document types of the
+  # bindings; no behavior.
+  - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: additive }
+  - { spec: "004-evaluation-and-replay", unit: { kind: directory, path: "crates/rustev-eval/" }, nature: additive }
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "crates/rustev-surface/" }, nature: additive }
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-node/" }, nature: additive }
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-wasm/" }, nature: additive }
+  - { spec: "010-integrations", unit: { kind: directory, path: "integrations/rustev-aicortex/" }, nature: additive }
+  - { spec: "010-integrations", unit: { kind: directory, path: "integrations/rustev-serve/" }, nature: additive }
+  - { spec: "028-opentelemetry-evidence-sink", unit: { kind: directory, path: "integrations/rustev-otel/" }, nature: additive }
+  - { spec: "007-support-routing-package", unit: { kind: directory, path: "packages/rustev-pkg-support-routing/" }, nature: additive }
+  # The reviewed archive lists gain the new contract source files.
+  - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "002-decision-contract-and-pure-core"
@@ -947,6 +961,38 @@ Pending with implementation. The implementing change adds `038` to `make
 verify` with repository-local deterministic tests over scripted backends
 and synthetic fixtures for every acceptance item. No live provider call is
 part of declared verification.
+
+## Implementation record
+
+Planned increments, each a separately reviewed pull request: (1) the
+contract vocabulary: the `extract` and `accept_model_derived` declarations,
+the extraction schema and the snapshot producer; (2) the remaining contract
+members: `rustev.extract-rules/1`, `rustev.extract-request/1`, the
+`typed_record` output, the plan 3 step details, the evidence 2 and judgment
+2 members and the refusal categories; (3) field validation, presence and
+distributions in the core; (4) the fallback extractor; (5) compilation of
+both kinds, acceptance and the model-value gate; (6) the runtime (3.11);
+(7) needs input, the lodging example, declared verification and closure.
+
+**Increment 1 (2026-10-26): the contract vocabulary.**
+`crates/rustev-contract/src/extraction.rs` adds the `extract` step body of
+3.3 with the extraction schema of 3.4.1, reusing spec 037's envelope types
+for the template, vocabularies, repair, screen, limits and backend, and the
+`accept_model_derived` step body of 3.8.1 and 3.8.2, each with its
+document-local checks (`for_each` `none` only, no repair, no output
+screening, declared vocabularies, field names, bounds, list and record
+item kinds, notice codes). Both kinds are version 2 constructs: in a
+`rustev.definition/1` they are refused, category 11 `requires-definition-2`;
+in a `rustev.definition/2` compilation refuses them with
+`invalid_definition` detail `extraction-not-compiled` until the compile
+increment. `rustev.snapshot/2` entries gain the optional `producer` of
+3.2.1; a producer on an entry that is not `model-derived` refuses the
+snapshot with `invalid_producer` (3.2.2), and a producer in a
+`rustev.snapshot/1` is refused as a snapshot version error. The predicate
+of 3.8.1's illustrative example is spelled with the contract's `cmp`
+operator. Documents without these members keep their bytes and identities
+(`crates/rustev-contract/tests/extraction_wire.rs`,
+`crates/rustev-core/tests/extraction_contract.rs`).
 
 ## Decisions at approval
 

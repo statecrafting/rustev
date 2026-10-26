@@ -245,7 +245,7 @@ crate::document::document!(
     PromptTemplateId
 );
 
-fn bound<'de, D: Deserializer<'de>, const MAX: u64>(d: D) -> Result<u64, D::Error> {
+pub(crate) fn bound<'de, D: Deserializer<'de>, const MAX: u64>(d: D) -> Result<u64, D::Error> {
     let n = u64::deserialize(d)?;
     if !(1..=MAX).contains(&n) {
         return Err(serde::de::Error::custom("generation bound out of range"));
@@ -259,7 +259,7 @@ fn repair_attempts<'de, D: Deserializer<'de>>(d: D) -> Result<u64, D::Error> {
     }
     Ok(n)
 }
-fn deadline_share<'de, D: Deserializer<'de>>(d: D) -> Result<Decimal, D::Error> {
+pub(crate) fn deadline_share<'de, D: Deserializer<'de>>(d: D) -> Result<Decimal, D::Error> {
     let text = String::deserialize(d)?;
     let n: Decimal = Decimal::parse(&text).map_err(serde::de::Error::custom)?;
     if n <= Decimal::ZERO
@@ -362,11 +362,20 @@ pub(crate) fn steps<'de, D: Deserializer<'de>>(
     {
         return Err(serde::de::Error::custom("more than eight generate steps"));
     }
+    if v.iter()
+        .filter(|s| matches!(s.body, crate::definition::StepBody::Extract(_)))
+        .count()
+        > 8
+    {
+        return Err(serde::de::Error::custom("more than eight extract steps"));
+    }
     Ok(v)
 }
 
 // Untagged alternatives must not reinterpret a list as a struct sequence.
-fn object<'de, D: Deserializer<'de>, T: serde::de::DeserializeOwned>(d: D) -> Result<T, D::Error> {
+pub(crate) fn object<'de, D: Deserializer<'de>, T: serde::de::DeserializeOwned>(
+    d: D,
+) -> Result<T, D::Error> {
     let v = serde_json::Value::deserialize(d)?;
     if !v.is_object() {
         return Err(serde::de::Error::custom("expected an object"));

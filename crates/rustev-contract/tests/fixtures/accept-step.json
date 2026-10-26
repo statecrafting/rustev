@@ -1,0 +1,1 @@
+{"body":{"accept_model_derived":{"field":"step:request_filters/window","min_mass":"none","on_fail":{"drop_field":{"notice":"extracted_window_dropped"}},"validate":{"predicate":{"cmp":{"left":{"ref":"step:request_filters/window/start"},"op":"gt","right":{"ref":"now"}}}}}},"id":"window_ok"}

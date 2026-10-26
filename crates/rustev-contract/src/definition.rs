@@ -203,6 +203,8 @@ pub enum StepBody {
     /// Version 2: the only way a grade rises (spec 032, 3.7).
     Corroborate(CorroborateDecl),
     Generate(Box<crate::generation::Generate>),
+    Extract(Box<crate::extraction::Extract>),
+    AcceptModelDerived(Box<crate::extraction::AcceptModelDerived>),
 }
 
 /// A corroboration step (spec 032, 3.7.1).

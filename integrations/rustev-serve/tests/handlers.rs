@@ -782,6 +782,7 @@ async fn context_extra_fields_and_failed_fetch_never_dispatch_a_decision() {
                         as_of_ms: serde_json::from_value(json!(0)).unwrap(),
                         source: "test".into(),
                         grade: None,
+                        producer: None,
                     }],
                 })
             })

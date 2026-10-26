@@ -328,6 +328,10 @@ impl Ctx<'_> {
             Some(StepBody::Acquire(_)) => Err(unknown(format!("step kind acquire ({step})"))),
             Some(StepBody::Widen(_)) => Err(unknown(format!("step kind widen ({step})"))),
             Some(StepBody::Generate(_)) => Err(unknown(format!("step kind generate ({step})"))),
+            Some(StepBody::Extract(_)) => Err(unknown(format!("step kind extract ({step})"))),
+            Some(StepBody::AcceptModelDerived(_)) => {
+                Err(unknown(format!("step kind accept_model_derived ({step})")))
+            }
             Some(StepBody::Exact(_)) => Ok("exact".into()),
             Some(StepBody::Semantic(s)) => Ok(operation_name(s.operation).into()),
             Some(StepBody::Corroborate(_)) => {

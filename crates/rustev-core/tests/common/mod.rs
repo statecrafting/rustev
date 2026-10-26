@@ -684,6 +684,7 @@ pub fn entry(field: &str, value: Json, provenance: P, as_of: i64) -> Entry {
         as_of_ms: ts(as_of),
         source: "synthetic".into(),
         grade: None,
+        producer: None,
     }
 }
 

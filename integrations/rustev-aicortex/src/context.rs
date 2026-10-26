@@ -436,6 +436,7 @@ fn map_slot(
             as_of_ms: as_of,
             source: format!("aicortex:claim/{}/tx/{}", c.claim_id, record.tx.seq),
             grade: None,
+            producer: None,
         });
     }
     entries.extend(field_entries);
