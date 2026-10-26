@@ -796,6 +796,18 @@ with no conversion to or from any other value kind (I-1), the
 compile increments. Existing plans, outputs, evidence and judgments keep
 their bytes and identities (`crates/rustev-contract/tests/ranking_results.rs`).
 
+**Increment 3, part a (2026-10-26): the permutation generator and the
+request bounds.** `crates/rustev-core/src/ranking/` adds `rustev.permute/1`
+exactly as 3.8.4 states (Fisher-Yates from the last index down, rejection
+above the largest multiple of `i + 1`, the pairwise presentation bit) and
+the worst-case request counts of 3.5.4, 3.6.3 and 3.7.5 with checked
+arithmetic, the `merge_sort@1` sum computed exactly. Known-answer vectors
+are committed with an independent reimplementation that reproduces them
+(`crates/rustev-core/tests/vectors/permute.py`, `permute.json`,
+`crates/rustev-core/tests/permute_vectors.rs`,
+`crates/rustev-core/tests/ranking_schedules.rs`). Nothing calls them until
+the compile and evaluation increments.
+
 ## Decisions at approval
 
 Decided within the binding principles under the work order.
