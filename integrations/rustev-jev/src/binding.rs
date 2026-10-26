@@ -62,8 +62,9 @@ pub enum Transport {
     /// response details are unverified; this adapter sends the Gateway
     /// shape there.
     GatewayTypesafeBase,
-    /// TypeSafe's own API with a version pin. Unverified: the path, the
-    /// request shape and the response's model field are assumptions.
+    /// TypeSafe's own API with a version pin. The path and request shape
+    /// pass the API's validation; the response's model field is an
+    /// assumption.
     Direct,
 }
 
@@ -95,8 +96,9 @@ impl Transport {
             // Unverified (3.2): the TypeSafe-compatible base, then the
             // evaluate path.
             Transport::GatewayTypesafeBase => "/typesafe/v1/evaluate",
-            // Unverified (3.2).
-            Transport::Direct => "/v1/evaluate",
+            // The path and request shape pass the API's validation (3.2);
+            // the response shape is unverified.
+            Transport::Direct => "/v1/systemone",
         }
     }
 }

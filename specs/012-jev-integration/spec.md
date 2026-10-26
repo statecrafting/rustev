@@ -138,7 +138,7 @@ therefore in its artifact identity:
 |---|---|---|
 | `gateway` (default) | `POST https://ai-gateway.vercel.sh/v1/evaluate`, `Authorization: Bearer <AI_GATEWAY_API_KEY>`, model `typesafe-ai/jev` | verified shape (C-09) |
 | `gateway_typesafe_base` | the Gateway's TypeSafe-compatible base under `/typesafe` | documented (C-09); request and response details unverified |
-| `direct` | TypeSafe's own API, with a version pin such as `jev-1.13.0` | pinning documented by TypeSafe; unverified here |
+| `direct` | `POST <base>/v1/systemone` on TypeSafe's own API (base `https://api.typesafe.ai`, given by the host), with a version pin such as `jev-1.13.0` | pinning documented by TypeSafe; the path and the request shape are accepted by the API's validation (2026-10-26, no answer billed); the response shape is unverified |
 
 The Gateway's OpenAI-, Anthropic- and Cohere-compatible endpoints do not
 support Jev (C-09) and are not transports. The credential is read by the
