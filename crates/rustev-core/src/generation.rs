@@ -1063,7 +1063,7 @@ mod tests {
     #[test]
     fn checked_binding_refuses_missing_vocabulary() {
         let plan: rustev_contract::plan::Plan =
-            serde_json::from_str(include_str!("../tests/golden/generation.plan.json")).unwrap();
+            serde_json::from_str(include_str!("testdata/generation.plan.json")).unwrap();
         let StepBody::Generate(g) = &plan.definition.steps[0].body else {
             panic!("expected generate declaration");
         };

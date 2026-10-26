@@ -721,3 +721,22 @@ reviewed `skip` entries in `tools/rustev-release/deny.toml` with their
 reasons, by review and not automatically; no other policy changes. With
 them, `cargo deny` passes for the `rustev-cli`, `rustev-node` and
 `rustev-wasm` graphs and for the release set's workspace check.
+
+**Candidate run, 2026-10-26, at `f566962` (the first-release candidate
+commit after #283).** The two packaging runs passed; the archive policy
+failed (3.5) on bounds the crates outgrew since 2026-10-21, as specs 033 to
+040 added code: `rustev-contract`'s unpacked total is 703,076 bytes against
+458,752; `rustev-core`'s is 999,637 against 786,432, and its
+`src/evaluate.rs` is 139,900 bytes against the per-file bound of 131,072;
+`rustev-eval`'s archive is 132,483 bytes against 131,072 and its unpacked
+total 531,344 against 393,216. The bounds are raised here, by review and
+not automatically, with room for about a quarter more growth:
+`rustev-contract` unpacked to 917,504 bytes (896 KiB), `rustev-core`
+unpacked to 1,310,720 (1,280 KiB), `rustev-eval` to 196,608 (192 KiB)
+archived and 720,896 (704 KiB) unpacked, and the per-file bound to 196,608
+(192 KiB). Every other bound is unchanged, and the file lists stay the
+exact reviewed allowlist (no file-list violation was reported). The rerun
+then failed the unpacked tests (3.7) of `rustev-core` and `rustev-eval`:
+unit tests embedded fixtures outside `src/`. Each crate now packages copies
+under `src/testdata/` (selected bounded fixtures, 3.5; `tests/` stays in
+the workspace), recorded in 002 and 004, and the two file lists add them.

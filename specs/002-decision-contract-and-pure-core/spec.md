@@ -535,6 +535,14 @@ workspace MSRV moved to 1.88 (spec 021's implementation record), so
 clippy's `collapsible_if` now proposes `let` chains; `cargo clippy --fix`
 collapsed the nested `if`s in crates/rustev-core/src/{compile,evaluate,execution,quality}.rs. Every test and golden is unchanged.
 
+**2026-10-26, packaged test fixtures (021 3.5, 3.7).** Four unit tests
+(`evaluate.rs`, `execution.rs`, `generation.rs`, `generation_eval.rs`)
+embedded goldens from `tests/golden/`, which the crate archive leaves in the
+workspace, so the first-release candidate's unpacked tests could not
+compile. They now embed copies in `src/testdata/`, which the archive
+carries; `tests/packaged_fixtures.rs` keeps each copy equal to its golden.
+No test or behavior changed.
+
 ## Decision history
 
 - 2026-09-23: approved by the owner with bounded corrections (A-02 in
