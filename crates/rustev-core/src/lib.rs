@@ -29,6 +29,7 @@ pub(crate) mod policy;
 pub(crate) mod quality;
 pub mod seams;
 pub mod sem;
+pub mod template;
 pub mod unparameterized;
 pub mod value;
 
