@@ -824,6 +824,11 @@ fn from_out(v: &OutValue) -> Result<Value, GenerationError> {
         OutValue::Filtered(v) => Value::Filtered(v.clone()),
         OutValue::Shortlist(v) => Value::Shortlist(v.clone()),
         OutValue::Ranking(v) => Value::Ranking(v.clone()),
+        OutValue::Selection(_) => {
+            return Err(GenerationError::InvalidState(
+                "selection is not a generation input".into(),
+            ));
+        }
     })
 }
 // Spec 037 3.3.3, 3.4.3 and 3.4.5: the compiler refuses a ranking or

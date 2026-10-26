@@ -51,6 +51,7 @@
         "src/plan_diff.rs",
         "src/profile.rs",
         "src/ranking.rs",
+        "src/ranking_result.rs",
         "src/reason.rs",
         "src/redaction.rs",
         "src/remote.rs",

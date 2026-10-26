@@ -950,7 +950,9 @@ fn step_attributes(
             | PlanStepDetail::Widen
             | PlanStepDetail::Generate(_)
             | PlanStepDetail::Extract(_)
-            | PlanStepDetail::AcceptModelDerived(_) => {}
+            | PlanStepDetail::AcceptModelDerived(_)
+            | PlanStepDetail::Rank(_)
+            | PlanStepDetail::Select(_) => {}
         }
     }
     if let Some(s) = se {

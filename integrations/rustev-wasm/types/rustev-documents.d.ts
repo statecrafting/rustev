@@ -164,6 +164,15 @@ export namespace RustevBackendOutput1 {
    */
   export type RawOutput =
     | {
+        ranking: {
+          /**
+           * @maxItems 1024
+           */
+          ids: string[];
+          scores: RankingScores;
+        };
+      }
+    | {
         label: string;
       }
     | {
@@ -204,6 +213,10 @@ export namespace RustevBackendOutput1 {
           };
         };
       };
+  /**
+   * Optional ranking scores with an explicit wire sentinel (spec 039, 3.5.2).
+   */
+  export type RankingScores = "none" | [number, ...number[]];
   /**
    * A screener's reported text units, distinct from runtime computed charges.
    */
@@ -4235,6 +4248,36 @@ export namespace RustevEvidence1 {
       }
     | {
         ranking: Ranking;
+      }
+    | {
+        selection: Selection;
+      };
+  export type SelectionBackfill =
+    | ("none" | "not_needed")
+    | {
+        used: {
+          skipped_outside_pool: number;
+          skipped_selected: number;
+          taken: number;
+        };
+      }
+    | {
+        unresolved: {
+          reason: Unresolved;
+        };
+      };
+  export type SelectionOrigin = "model" | "backfill";
+  export type SelectionModel =
+    | {
+        ranked: {
+          entries: number;
+          partial: boolean;
+        };
+      }
+    | {
+        failed: {
+          reason: Unresolved;
+        };
       };
   /**
    * Version 2's `{reason, action}` is tried first; no version 1 reason is
@@ -4502,6 +4545,27 @@ export namespace RustevEvidence1 {
      */
     position: number;
     score: number;
+  }
+  export interface Selection {
+    backfill: SelectionBackfill;
+    /**
+     * @maxItems 1024
+     */
+    entries: SelectionEntry[];
+    k: number;
+    model: SelectionModel;
+    shortfall: number;
+  }
+  export interface SelectionEntry {
+    derivation: Derivation;
+    id: string;
+    /**
+     * The supplying source's lineage (3.11.3).
+     */
+    lineage: Lineage;
+    origin: SelectionOrigin;
+    position: number;
+    source_position: number;
   }
   export interface ActionableUnresolved {
     action: Action;
@@ -5220,6 +5284,36 @@ export namespace RustevEvidence2 {
       }
     | {
         ranking: Ranking;
+      }
+    | {
+        selection: Selection;
+      };
+  export type SelectionBackfill =
+    | ("none" | "not_needed")
+    | {
+        used: {
+          skipped_outside_pool: number;
+          skipped_selected: number;
+          taken: number;
+        };
+      }
+    | {
+        unresolved: {
+          reason: Unresolved;
+        };
+      };
+  export type SelectionOrigin = "model" | "backfill";
+  export type SelectionModel =
+    | {
+        ranked: {
+          entries: number;
+          partial: boolean;
+        };
+      }
+    | {
+        failed: {
+          reason: Unresolved;
+        };
       };
   /**
    * Version 2's `{reason, action}` is tried first; no version 1 reason is
@@ -5265,6 +5359,36 @@ export namespace RustevEvidence2 {
           reason: AbsentReason;
         };
       };
+  export type ComparisonAnswer =
+    | ("first" | "second")
+    | {
+        failed: {
+          reason: Unresolved;
+        };
+      };
+  export type DropReason =
+    | ("unknown_id" | "outside_pool" | "duplicate")
+    | {
+        failed: {
+          reason: Unresolved;
+        };
+      };
+  export type RankMode =
+    | "pointwise"
+    | {
+        listwise: {
+          scores: RankScores;
+        };
+      }
+    | {
+        pairwise: {
+          max_comparisons: number;
+          schedule: PairwiseSchedule;
+        };
+      };
+  export type RankScores = "none" | "optional" | "required";
+  export type PairwiseSchedule = "round_robin@1" | "merge_sort@1";
+  export type CycleCount = "not_observable" | number;
   export type StepStatus =
     | {
         resolved: {
@@ -5732,6 +5856,27 @@ export namespace RustevEvidence2 {
     position: number;
     score: number;
   }
+  export interface Selection {
+    backfill: SelectionBackfill;
+    /**
+     * @maxItems 1024
+     */
+    entries: SelectionEntry[];
+    k: number;
+    model: SelectionModel;
+    shortfall: number;
+  }
+  export interface SelectionEntry {
+    derivation: Derivation;
+    id: string;
+    /**
+     * The supplying source's lineage (3.11.3).
+     */
+    lineage: Lineage;
+    origin: SelectionOrigin;
+    position: number;
+    source_position: number;
+  }
   export interface ActionableUnresolved {
     action: Action;
     reason: Unresolved;
@@ -5811,6 +5956,11 @@ export namespace RustevEvidence2 {
      * Evidence 2: the step value's metadata.
      */
     meta?: ValueMeta | null;
+    /**
+     * Spec 039, evidence 2: ids and result metadata only.
+     */
+    ranking?: RankingEvidence;
+    selection?: Selection;
     status: StepStatus;
     step: string;
   }
@@ -5860,6 +6010,83 @@ export namespace RustevEvidence2 {
      * `overlay_only`, `base_only` or `overlay_else_base_if_grade_at_least`.
      */
     rule: string;
+  }
+  export interface RankingEvidence {
+    /**
+     * Answers in schedule order, including failures, never item records.
+     *
+     * @maxItems 4096
+     */
+    comparisons: ComparisonAnswer[];
+    /**
+     * Absent when unresolved; the step status retains the failure reason.
+     */
+    ranking?: ModelRanking | null;
+    /**
+     * Request order. Request scores stay here when positions are averaged.
+     *
+     * @maxItems 4096
+     */
+    requests: RankingRequestEvidence[];
+  }
+  export interface ModelRanking {
+    /**
+     * @maxItems 8192
+     */
+    dropped: DroppedId[];
+    /**
+     * @maxItems 1024
+     */
+    entries: ModelRankEntry[];
+    mode: RankMode;
+    pairwise?: PairwiseCounts | null;
+    partial: boolean;
+    /**
+     * @maxItems 1024
+     */
+    pool: string[];
+    score_disagreements: number;
+    /**
+     * @maxItems 1024
+     */
+    unranked: string[];
+  }
+  export interface DroppedId {
+    id: string;
+    reason: DropReason;
+  }
+  export interface ModelRankEntry {
+    candidate: string;
+    points?: number | null;
+    position: number;
+    score?: RankingScore | null;
+    wins?: number | null;
+  }
+  /**
+   * A finite score with its request scope, never an unscoped probability.
+   */
+  export interface RankingScore {
+    candidate: string;
+    instance: string[];
+    plan: PlanId;
+    step: string;
+    value: number;
+  }
+  export interface PairwiseCounts {
+    cyclic_triples: CycleCount;
+    inconsistent_pairs: number;
+    issued: number;
+    max_comparisons: number;
+  }
+  export interface RankingRequestEvidence {
+    /**
+     * @maxItems 1024
+     */
+    presented: string[];
+    /**
+     * @maxItems 1024
+     */
+    scores: RankingScore[];
   }
 }
 export type RustevEvidence2 = RustevEvidence2.RustevEvidence2;
@@ -6904,12 +7131,24 @@ export namespace RustevJudgment1 {
       }
     | {
         ranking: Ranking;
+      }
+    | {
+        selection: Selection;
       };
-  /**
-   * Version 2's `{reason, action}` is tried first; no version 1 reason is
-   * named `reason` or `action`, so the two forms never overlap.
-   */
-  export type UnresolvedWire = ActionableUnresolved | Unresolved;
+  export type SelectionBackfill =
+    | ("none" | "not_needed")
+    | {
+        used: {
+          skipped_outside_pool: number;
+          skipped_selected: number;
+          taken: number;
+        };
+      }
+    | {
+        unresolved: {
+          reason: Unresolved;
+        };
+      };
   /**
    * The closed set of unresolved reasons (spec 002, 3.5.6). Field and fact
    * lists are sorted and deduplicated.
@@ -6975,6 +7214,24 @@ export namespace RustevJudgment1 {
           fields: [string, ...string[]];
         };
       };
+  export type SelectionOrigin = "model" | "backfill";
+  export type SelectionModel =
+    | {
+        ranked: {
+          entries: number;
+          partial: boolean;
+        };
+      }
+    | {
+        failed: {
+          reason: Unresolved;
+        };
+      };
+  /**
+   * Version 2's `{reason, action}` is tried first; no version 1 reason is
+   * named `reason` or `action`, so the two forms never overlap.
+   */
+  export type UnresolvedWire = ActionableUnresolved | Unresolved;
   export type ContentDigest = string;
   export type PlanId = string;
   export type SnapshotId = string;
@@ -7097,6 +7354,27 @@ export namespace RustevJudgment1 {
      */
     position: number;
     score: number;
+  }
+  export interface Selection {
+    backfill: SelectionBackfill;
+    /**
+     * @maxItems 1024
+     */
+    entries: SelectionEntry[];
+    k: number;
+    model: SelectionModel;
+    shortfall: number;
+  }
+  export interface SelectionEntry {
+    derivation: Derivation;
+    id: string;
+    /**
+     * The supplying source's lineage (3.11.3).
+     */
+    lineage: Lineage;
+    origin: SelectionOrigin;
+    position: number;
+    source_position: number;
   }
   export interface ActionableUnresolved {
     action: Action;
@@ -7372,6 +7650,9 @@ export namespace RustevJudgment2 {
       }
     | {
         ranking: Ranking;
+      }
+    | {
+        selection: Selection;
       };
   export type AcceptedOrigin =
     | ("supplied" | "extracted" | "fallback")
@@ -7380,11 +7661,20 @@ export namespace RustevJudgment2 {
           producer?: Producer | null;
         };
       };
-  /**
-   * Version 2's `{reason, action}` is tried first; no version 1 reason is
-   * named `reason` or `action`, so the two forms never overlap.
-   */
-  export type UnresolvedWire = ActionableUnresolved | Unresolved;
+  export type SelectionBackfill =
+    | ("none" | "not_needed")
+    | {
+        used: {
+          skipped_outside_pool: number;
+          skipped_selected: number;
+          taken: number;
+        };
+      }
+    | {
+        unresolved: {
+          reason: Unresolved;
+        };
+      };
   /**
    * The closed set of unresolved reasons (spec 002, 3.5.6). Field and fact
    * lists are sorted and deduplicated.
@@ -7450,6 +7740,24 @@ export namespace RustevJudgment2 {
           fields: [string, ...string[]];
         };
       };
+  export type SelectionOrigin = "model" | "backfill";
+  export type SelectionModel =
+    | {
+        ranked: {
+          entries: number;
+          partial: boolean;
+        };
+      }
+    | {
+        failed: {
+          reason: Unresolved;
+        };
+      };
+  /**
+   * Version 2's `{reason, action}` is tried first; no version 1 reason is
+   * named `reason` or `action`, so the two forms never overlap.
+   */
+  export type UnresolvedWire = ActionableUnresolved | Unresolved;
   export type ContentDigest = string;
   export type PlanId = string;
   export type SnapshotId = string;
@@ -7580,6 +7888,27 @@ export namespace RustevJudgment2 {
      */
     position: number;
     score: number;
+  }
+  export interface Selection {
+    backfill: SelectionBackfill;
+    /**
+     * @maxItems 1024
+     */
+    entries: SelectionEntry[];
+    k: number;
+    model: SelectionModel;
+    shortfall: number;
+  }
+  export interface SelectionEntry {
+    derivation: Derivation;
+    id: string;
+    /**
+     * The supplying source's lineage (3.11.3).
+     */
+    lineage: Lineage;
+    origin: SelectionOrigin;
+    position: number;
+    source_position: number;
   }
   export interface ActionableUnresolved {
     action: Action;
@@ -10998,6 +11327,12 @@ export namespace RustevPlan3 {
       }
     | {
         accept_model_derived: AcceptModelDerived;
+      }
+    | {
+        rank: RankBinding;
+      }
+    | {
+        select: Select;
       };
   export type BoundCalibration =
     | "none"
@@ -11087,6 +11422,7 @@ export namespace RustevPlan3 {
     | {
         input: string;
       };
+  export type PermutationGenerator = "rustev.permute/1";
 
   export interface RustevPlan3 {
     /**
@@ -12179,6 +12515,17 @@ export namespace RustevPlan3 {
   export interface ExtractionSource {
     name: string;
     ref: string;
+  }
+  export interface RankBinding {
+    artifact: ArtifactId;
+    backend_id: string;
+    bias: Bias;
+    descriptor: DescriptorId;
+    generator: PermutationGenerator;
+    max_requests: number;
+    mode: RankMode;
+    pool_bound: number;
+    tie_break: TieBreak;
   }
 }
 export type RustevPlan3 = RustevPlan3.RustevPlan3;
@@ -13773,6 +14120,15 @@ export namespace RustevRemoteInfer1Response {
    */
   export type RawOutput =
     | {
+        ranking: {
+          /**
+           * @maxItems 1024
+           */
+          ids: string[];
+          scores: RankingScores;
+        };
+      }
+    | {
         label: string;
       }
     | {
@@ -13813,6 +14169,10 @@ export namespace RustevRemoteInfer1Response {
           };
         };
       };
+  /**
+   * Optional ranking scores with an explicit wire sentinel (spec 039, 3.5.2).
+   */
+  export type RankingScores = "none" | [number, ...number[]];
   /**
    * A screener's reported text units, distinct from runtime computed charges.
    */
@@ -14857,6 +15217,36 @@ export namespace RustevRun1 {
       }
     | {
         ranking: Ranking;
+      }
+    | {
+        selection: Selection;
+      };
+  export type SelectionBackfill =
+    | ("none" | "not_needed")
+    | {
+        used: {
+          skipped_outside_pool: number;
+          skipped_selected: number;
+          taken: number;
+        };
+      }
+    | {
+        unresolved: {
+          reason: Unresolved;
+        };
+      };
+  export type SelectionOrigin = "model" | "backfill";
+  export type SelectionModel =
+    | {
+        ranked: {
+          entries: number;
+          partial: boolean;
+        };
+      }
+    | {
+        failed: {
+          reason: Unresolved;
+        };
       };
   /**
    * Version 2's `{reason, action}` is tried first; no version 1 reason is
@@ -15256,6 +15646,27 @@ export namespace RustevRun1 {
      */
     position: number;
     score: number;
+  }
+  export interface Selection {
+    backfill: SelectionBackfill;
+    /**
+     * @maxItems 1024
+     */
+    entries: SelectionEntry[];
+    k: number;
+    model: SelectionModel;
+    shortfall: number;
+  }
+  export interface SelectionEntry {
+    derivation: Derivation;
+    id: string;
+    /**
+     * The supplying source's lineage (3.11.3).
+     */
+    lineage: Lineage;
+    origin: SelectionOrigin;
+    position: number;
+    source_position: number;
   }
   export interface ActionableUnresolved {
     action: Action;
@@ -15924,6 +16335,36 @@ export namespace RustevRun2 {
       }
     | {
         ranking: Ranking;
+      }
+    | {
+        selection: Selection;
+      };
+  export type SelectionBackfill =
+    | ("none" | "not_needed")
+    | {
+        used: {
+          skipped_outside_pool: number;
+          skipped_selected: number;
+          taken: number;
+        };
+      }
+    | {
+        unresolved: {
+          reason: Unresolved;
+        };
+      };
+  export type SelectionOrigin = "model" | "backfill";
+  export type SelectionModel =
+    | {
+        ranked: {
+          entries: number;
+          partial: boolean;
+        };
+      }
+    | {
+        failed: {
+          reason: Unresolved;
+        };
       };
   /**
    * Version 2's `{reason, action}` is tried first; no version 1 reason is
@@ -16394,6 +16835,27 @@ export namespace RustevRun2 {
      */
     position: number;
     score: number;
+  }
+  export interface Selection {
+    backfill: SelectionBackfill;
+    /**
+     * @maxItems 1024
+     */
+    entries: SelectionEntry[];
+    k: number;
+    model: SelectionModel;
+    shortfall: number;
+  }
+  export interface SelectionEntry {
+    derivation: Derivation;
+    id: string;
+    /**
+     * The supplying source's lineage (3.11.3).
+     */
+    lineage: Lineage;
+    origin: SelectionOrigin;
+    position: number;
+    source_position: number;
   }
   export interface ActionableUnresolved {
     action: Action;
@@ -17353,6 +17815,36 @@ export namespace RustevRun3 {
       }
     | {
         ranking: Ranking;
+      }
+    | {
+        selection: Selection;
+      };
+  export type SelectionBackfill =
+    | ("none" | "not_needed")
+    | {
+        used: {
+          skipped_outside_pool: number;
+          skipped_selected: number;
+          taken: number;
+        };
+      }
+    | {
+        unresolved: {
+          reason: Unresolved;
+        };
+      };
+  export type SelectionOrigin = "model" | "backfill";
+  export type SelectionModel =
+    | {
+        ranked: {
+          entries: number;
+          partial: boolean;
+        };
+      }
+    | {
+        failed: {
+          reason: Unresolved;
+        };
       };
   /**
    * Version 2's `{reason, action}` is tried first; no version 1 reason is
@@ -17398,6 +17890,36 @@ export namespace RustevRun3 {
           reason: AbsentReason;
         };
       };
+  export type ComparisonAnswer =
+    | ("first" | "second")
+    | {
+        failed: {
+          reason: Unresolved;
+        };
+      };
+  export type DropReason =
+    | ("unknown_id" | "outside_pool" | "duplicate")
+    | {
+        failed: {
+          reason: Unresolved;
+        };
+      };
+  export type RankMode =
+    | "pointwise"
+    | {
+        listwise: {
+          scores: RankScores;
+        };
+      }
+    | {
+        pairwise: {
+          max_comparisons: number;
+          schedule: PairwiseSchedule;
+        };
+      };
+  export type RankScores = "none" | "optional" | "required";
+  export type PairwiseSchedule = "round_robin@1" | "merge_sort@1";
+  export type CycleCount = "not_observable" | number;
   export type StepStatus =
     | {
         resolved: {
@@ -18018,6 +18540,27 @@ export namespace RustevRun3 {
     position: number;
     score: number;
   }
+  export interface Selection {
+    backfill: SelectionBackfill;
+    /**
+     * @maxItems 1024
+     */
+    entries: SelectionEntry[];
+    k: number;
+    model: SelectionModel;
+    shortfall: number;
+  }
+  export interface SelectionEntry {
+    derivation: Derivation;
+    id: string;
+    /**
+     * The supplying source's lineage (3.11.3).
+     */
+    lineage: Lineage;
+    origin: SelectionOrigin;
+    position: number;
+    source_position: number;
+  }
   export interface ActionableUnresolved {
     action: Action;
     reason: Unresolved;
@@ -18097,6 +18640,11 @@ export namespace RustevRun3 {
      * Evidence 2: the step value's metadata.
      */
     meta?: ValueMeta | null;
+    /**
+     * Spec 039, evidence 2: ids and result metadata only.
+     */
+    ranking?: RankingEvidence;
+    selection?: Selection;
     status: StepStatus;
     step: string;
   }
@@ -18146,6 +18694,83 @@ export namespace RustevRun3 {
      * `overlay_only`, `base_only` or `overlay_else_base_if_grade_at_least`.
      */
     rule: string;
+  }
+  export interface RankingEvidence {
+    /**
+     * Answers in schedule order, including failures, never item records.
+     *
+     * @maxItems 4096
+     */
+    comparisons: ComparisonAnswer[];
+    /**
+     * Absent when unresolved; the step status retains the failure reason.
+     */
+    ranking?: ModelRanking | null;
+    /**
+     * Request order. Request scores stay here when positions are averaged.
+     *
+     * @maxItems 4096
+     */
+    requests: RankingRequestEvidence[];
+  }
+  export interface ModelRanking {
+    /**
+     * @maxItems 8192
+     */
+    dropped: DroppedId[];
+    /**
+     * @maxItems 1024
+     */
+    entries: ModelRankEntry[];
+    mode: RankMode;
+    pairwise?: PairwiseCounts | null;
+    partial: boolean;
+    /**
+     * @maxItems 1024
+     */
+    pool: string[];
+    score_disagreements: number;
+    /**
+     * @maxItems 1024
+     */
+    unranked: string[];
+  }
+  export interface DroppedId {
+    id: string;
+    reason: DropReason;
+  }
+  export interface ModelRankEntry {
+    candidate: string;
+    points?: number | null;
+    position: number;
+    score?: RankingScore | null;
+    wins?: number | null;
+  }
+  /**
+   * A finite score with its request scope, never an unscoped probability.
+   */
+  export interface RankingScore {
+    candidate: string;
+    instance: string[];
+    plan: PlanId;
+    step: string;
+    value: number;
+  }
+  export interface PairwiseCounts {
+    cyclic_triples: CycleCount;
+    inconsistent_pairs: number;
+    issued: number;
+    max_comparisons: number;
+  }
+  export interface RankingRequestEvidence {
+    /**
+     * @maxItems 1024
+     */
+    presented: string[];
+    /**
+     * @maxItems 1024
+     */
+    scores: RankingScore[];
   }
   /**
    * A decision's cost at the moment its record was built (spec 003, 3.5.6).
@@ -19205,7 +19830,6 @@ export namespace RustevServeRefusal1 {
           length: Number_2049_18446744073709551615;
         };
       };
-  export type Number_1_24 = number;
   /**
    * Length is enforced in decoded UTF-8 bytes by the parser.
    */
@@ -19327,7 +19951,7 @@ export namespace RustevServeRefusal1 {
     schema: "rustev.serve-refusal/1";
   }
   export interface CompilerRefusalFields {
-    category: Number_1_24;
+    category: number | 28;
     category_name: Text_1_2048;
     command: Text_1_2048;
     detail: Text_0_2048;
@@ -20084,6 +20708,9 @@ export namespace RustevTextResult1 {
       }
     | {
         ranking: Ranking;
+      }
+    | {
+        selection: Selection;
       };
   export type AcceptedOrigin =
     | ("supplied" | "extracted" | "fallback")
@@ -20097,6 +20724,98 @@ export namespace RustevTextResult1 {
    * A non-negative span in milliseconds.
    */
   export type DurationMs = number;
+  export type SelectionBackfill =
+    | ("none" | "not_needed")
+    | {
+        used: {
+          skipped_outside_pool: number;
+          skipped_selected: number;
+          taken: number;
+        };
+      }
+    | {
+        unresolved: {
+          reason: Unresolved;
+        };
+      };
+  /**
+   * The closed set of unresolved reasons (spec 002, 3.5.6). Field and fact
+   * lists are sorted and deduplicated.
+   */
+  export type Unresolved =
+    | "deadline_exceeded"
+    | {
+        missing_evidence: {
+          fields: string[];
+        };
+      }
+    | {
+        stale_evidence: {
+          fields: string[];
+        };
+      }
+    | {
+        invalid_input: {
+          detail: string;
+          fields: string[];
+        };
+      }
+    | {
+        abstained: {
+          rule: string;
+        };
+      }
+    | {
+        backend_unavailable: {
+          detail: string;
+        };
+      }
+    | {
+        invalid_backend_output: {
+          detail: string;
+        };
+      }
+    | {
+        budget_exhausted: {
+          resource: string;
+        };
+      }
+    | {
+        conflict: {
+          facts: string[];
+        };
+      }
+    | {
+        unsupported: {
+          capability: string;
+        };
+      }
+    | {
+        insufficient_grade: {
+          fields: string[];
+        };
+      }
+    | {
+        screen_unavailable: {
+          /**
+           * @minItems 1
+           */
+          fields: [string, ...string[]];
+        };
+      };
+  export type SelectionOrigin = "model" | "backfill";
+  export type SelectionModel =
+    | {
+        ranked: {
+          entries: number;
+          partial: boolean;
+        };
+      }
+    | {
+        failed: {
+          reason: Unresolved;
+        };
+      };
   /**
    * The lineage of the value, separate from cache delivery provenance.
    */
@@ -20163,71 +20882,6 @@ export namespace RustevTextResult1 {
     | "outcome_not_matched"
     | {
         source_unresolved: Unresolved;
-      };
-  /**
-   * The closed set of unresolved reasons (spec 002, 3.5.6). Field and fact
-   * lists are sorted and deduplicated.
-   */
-  export type Unresolved =
-    | "deadline_exceeded"
-    | {
-        missing_evidence: {
-          fields: string[];
-        };
-      }
-    | {
-        stale_evidence: {
-          fields: string[];
-        };
-      }
-    | {
-        invalid_input: {
-          detail: string;
-          fields: string[];
-        };
-      }
-    | {
-        abstained: {
-          rule: string;
-        };
-      }
-    | {
-        backend_unavailable: {
-          detail: string;
-        };
-      }
-    | {
-        invalid_backend_output: {
-          detail: string;
-        };
-      }
-    | {
-        budget_exhausted: {
-          resource: string;
-        };
-      }
-    | {
-        conflict: {
-          facts: string[];
-        };
-      }
-    | {
-        unsupported: {
-          capability: string;
-        };
-      }
-    | {
-        insufficient_grade: {
-          fields: string[];
-        };
-      }
-    | {
-        screen_unavailable: {
-          /**
-           * @minItems 1
-           */
-          fields: [string, ...string[]];
-        };
       };
   export type TextOrigin = "none" | "generated" | "backstop" | "partial";
 
@@ -20353,6 +21007,27 @@ export namespace RustevTextResult1 {
      */
     position: number;
     score: number;
+  }
+  export interface Selection {
+    backfill: SelectionBackfill;
+    /**
+     * @maxItems 1024
+     */
+    entries: SelectionEntry[];
+    k: number;
+    model: SelectionModel;
+    shortfall: number;
+  }
+  export interface SelectionEntry {
+    derivation: Derivation;
+    id: string;
+    /**
+     * The supplying source's lineage (3.11.3).
+     */
+    lineage: Lineage;
+    origin: SelectionOrigin;
+    position: number;
+    source_position: number;
   }
   export interface TextField {
     derivation?: Derivation;

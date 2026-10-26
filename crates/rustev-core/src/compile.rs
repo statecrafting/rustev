@@ -85,6 +85,7 @@ pub enum Category {
     InvalidExtraction = 25,
     InvalidAcceptance = 26,
     UnacceptedModelValue = 27,
+    ExactOrderSource = 28,
 }
 
 /// Why one candidate backend cannot serve a step.
