@@ -120,6 +120,8 @@
         "src/ranking/mod.rs",
         "src/ranking/permute.rs",
         "src/ranking/schedules.rs",
+        "src/ranking/select.rs",
+        "src/ranking/value.rs",
         "src/seams.rs",
         "src/sem.rs",
         "src/template/check.rs",
