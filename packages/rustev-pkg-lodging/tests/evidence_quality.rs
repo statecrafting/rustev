@@ -762,7 +762,7 @@ async fn a_run_1_sink_refuses_a_plan_3_and_capture_writes_replay_2() {
     let h = |s: &str| rustev_contract::scope::Handle::new(s).unwrap();
     let config = CaptureConfig {
         scope: rustev_contract::scope::Scope::principal(h("tenant-a"), h("rev-1"), h("scope-p")),
-        max_bytes: 1_024,
+        max_bytes: 1_000_000,
     };
     let request = request();
     let snapshot = request.snapshot.clone();

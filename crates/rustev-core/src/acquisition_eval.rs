@@ -78,6 +78,34 @@ impl Evaluation<'_> {
             .find_map(|r| self.skipped.get(r.strip_prefix("step:")?).cloned()))
     }
 
+    // An explicitly absent input is observable by a presence probe. Other
+    // unresolved reads still propagate their reason (spec 036, 3.4.3).
+    fn acquisition_guard_refs(
+        &self,
+        predicate: &rustev_contract::definition::Predicate,
+        refs: &mut Vec<String>,
+    ) {
+        use rustev_contract::definition::Predicate;
+        match predicate {
+            Predicate::Present(r)
+                if r.strip_prefix("input:")
+                    .and_then(|name| self.input_quality.get(name.split('/').next()?))
+                    .is_some_and(|q| {
+                        matches!(
+                            q.presence,
+                            Some(rustev_contract::grade::Presence::Absent { .. })
+                        )
+                    }) => {}
+            Predicate::All(ps) | Predicate::Any(ps) => {
+                for p in ps {
+                    self.acquisition_guard_refs(p, refs);
+                }
+            }
+            Predicate::Not(p) => self.acquisition_guard_refs(p, refs),
+            p => crate::expr::predicate_refs(p, refs),
+        }
+    }
+
     // A false or failed guard does not wait for request-only dependencies.
     pub(super) fn acquisition_guard_terminal(&self, id: &str) -> bool {
         let Some(StepBody::Acquire(a)) = self
@@ -102,7 +130,9 @@ impl Evaluation<'_> {
         {
             return false;
         }
-        if self.acquisition_refs(&refs).is_err() {
+        let mut status_refs = vec![];
+        self.acquisition_guard_refs(p, &mut status_refs);
+        if self.acquisition_refs(&status_refs).is_err() {
             return true;
         }
         let mut values = vec![];
@@ -213,7 +243,7 @@ impl Evaluation<'_> {
         let built = (|| -> Result<Option<String>, Unresolved> {
             if let Guard::Predicate(p) = &decl.when {
                 let mut refs = vec![];
-                crate::expr::predicate_refs(p, &mut refs);
+                self.acquisition_guard_refs(p, &mut refs);
                 self.acquisition_refs(&refs)?;
                 let mut values = vec![];
                 crate::compile::predicate_value_refs(p, &mut values);

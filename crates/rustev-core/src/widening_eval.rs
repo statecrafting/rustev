@@ -141,7 +141,10 @@ impl Evaluation<'_> {
             .ok_or_else(|| bad_page("missing tier"))?;
         if let Guard::Predicate(p) = &tier.when {
             let mut refs = vec![];
-            crate::expr::predicate_refs(p, &mut refs);
+            // `widening_eval` is a child module of `acquisition_eval`
+            // (declared there with `#[path]`), so its private methods are
+            // visible here.
+            self.acquisition_guard_refs(p, &mut refs);
             self.acquisition_refs(&refs)?;
             let mut values = vec![];
             crate::compile::predicate_value_refs(p, &mut values);

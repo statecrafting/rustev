@@ -288,6 +288,28 @@ fn field_ty<'t>(ty: &'t Ty, path: &[String]) -> Result<&'t Ty, String> {
     Ok(cur)
 }
 
+/// Plan 3 acquired-key projection (spec 036 acceptance): one list of
+/// records becomes a bounded text list. Metadata uses the same `*` path.
+fn step_field_ty(ty: &Ty, path: &[String]) -> Result<Ty, String> {
+    let Some(index) = path.iter().position(|p| p == "*") else {
+        return field_ty(ty, path).cloned();
+    };
+    let Ty::List { item, max } = field_ty(ty, &path[..index])? else {
+        return Err("text projection requires a list of records".into());
+    };
+    if !matches!(item.as_ref(), Ty::Record(_)) || index + 1 == path.len() {
+        return Err("text projection requires a record field".into());
+    }
+    let projected = field_ty(item, &path[index + 1..])?;
+    if !matches!(projected, Ty::Text { .. }) {
+        return Err("text projection requires a text field".into());
+    }
+    Ok(Ty::List {
+        item: Box::new(projected.clone()),
+        max: *max,
+    })
+}
+
 /// The type of a reference, or a kind mismatch.
 pub fn ref_ty(r: &str, env: &TyEnv<'_>) -> Result<Ty, String> {
     match Ref::parse(r)? {
@@ -304,7 +326,7 @@ pub fn ref_ty(r: &str, env: &TyEnv<'_>) -> Result<Ty, String> {
                 return Err(format!("{r:?} names no step"));
             }
             match env.steps.get(&s) {
-                Some(StepTy::Exact(t)) => field_ty(t, &path).cloned(),
+                Some(StepTy::Exact(t)) => step_field_ty(t, &path),
                 Some(StepTy::Semantic(..)) => Err(format!(
                     "step {s:?} is semantic; exact operators cannot read it"
                 )),
@@ -545,6 +567,25 @@ fn field<'v>(v: &'v Value, path: &[String], name: &dyn Fn() -> String) -> Result
     Ok(cur)
 }
 
+fn step_field(v: &Value, path: &[String], name: &dyn Fn() -> String) -> Result<Value, Fault> {
+    let Some(index) = path.iter().position(|p| p == "*") else {
+        return field(v, path, name).cloned();
+    };
+    let Value::List(items) = field(v, &path[..index], name)? else {
+        return Err(Fault::Invalid("text projection requires a list".into()));
+    };
+    items
+        .iter()
+        .map(|item| match field(item, &path[index + 1..], name)? {
+            Value::Text(text) => Ok(Value::Text(text.clone())),
+            _ => Err(Fault::Invalid(
+                "text projection requires a text field".into(),
+            )),
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map(Value::List)
+}
+
 pub fn eval_ref(r: &str, s: &Scope<'_>) -> Result<Value, Fault> {
     match Ref::parse(r).map_err(Fault::Invalid)? {
         Ref::Input(n, path) => {
@@ -560,7 +601,7 @@ pub fn eval_ref(r: &str, s: &Scope<'_>) -> Result<Value, Fault> {
                 return Err(Fault::Invalid(format!("{r:?} names no step")));
             }
             let v = s.steps.get(&id).ok_or_else(|| Fault::Missing(id.clone()))?;
-            field(v, &path, &|| format!("step:{n}")).cloned()
+            step_field(v, &path, &|| format!("step:{n}"))
         }
         Ref::Step(n) => s.steps.get(&n).cloned().ok_or(Fault::Missing(n)),
         Ref::Item(path) => {
@@ -825,6 +866,76 @@ mod tests {
                 )
             })
             .collect()
+    }
+
+    #[test]
+    fn plan_three_text_projection_checks_bounds_types_and_absence() {
+        let text = Ty::Text { max_bytes: 32 };
+        let records = Ty::List {
+            item: Box::new(Ty::Record(vec![
+                ("key".into(), text.clone()),
+                ("count".into(), Ty::Integer),
+            ])),
+            max: 4,
+        };
+        let ty = Ty::Record(vec![("items".into(), records)]);
+        let path: Vec<String> = ["items", "*", "key"].map(String::from).into();
+        assert_eq!(
+            step_field_ty(&ty, &path).unwrap(),
+            Ty::List {
+                item: Box::new(text),
+                max: 4
+            }
+        );
+        for p in [
+            vec!["items", "*", "count"],
+            vec!["items", "*", "unknown"],
+            vec!["items", "*"],
+            vec!["*", "key"],
+            vec!["items", "*", "key", "*", "x"],
+        ] {
+            assert!(
+                step_field_ty(&ty, &p.into_iter().map(String::from).collect::<Vec<_>>()).is_err()
+            );
+        }
+        let inputs = BTreeMap::new();
+        let steps = BTreeMap::from([("lookup".into(), StepTy::Exact(ty))]);
+        let mut env = TyEnv {
+            inputs: &inputs,
+            steps: &steps,
+            item: None,
+            v2: true,
+        };
+        assert!(ref_ty("step:lookup/items/*/key", &env).is_ok());
+        env.v2 = false;
+        assert!(ref_ty("step:lookup/items/*/key", &env).is_err());
+        let value = |keys: Vec<Value>| {
+            Value::Record(BTreeMap::from([(
+                "items".into(),
+                Value::List(
+                    keys.into_iter()
+                        .map(|key| Value::Record(BTreeMap::from([("key".into(), key)])))
+                        .collect(),
+                ),
+            )]))
+        };
+        let keys = vec![
+            Value::Text("b".into()),
+            Value::Text("a".into()),
+            Value::Text("b".into()),
+        ];
+        assert_eq!(
+            step_field(&value(keys.clone()), &path, &|| "lookup".into()).unwrap(),
+            Value::List(keys)
+        );
+        assert_eq!(
+            step_field(&value(vec![]), &path, &|| "lookup".into()).unwrap(),
+            Value::List(vec![])
+        );
+        assert!(matches!(
+            step_field(&value(vec![Value::Null]), &path, &|| "lookup/key".into()),
+            Err(Fault::Absent(_))
+        ));
     }
 
     #[test]

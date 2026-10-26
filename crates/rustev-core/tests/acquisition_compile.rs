@@ -288,6 +288,17 @@ fn every_budget_ceiling_has_a_refusal_golden() {
         .unwrap_err();
     assert_eq!(r.category, Category::Budget);
     refusal_golden("acquisition-hard-cost.refusal", &r);
+    // Spec 036 acceptance requires the hard ceiling on a widening too.
+    let r = compile_with_sources(
+        &base(true),
+        &[],
+        &[],
+        &[source("catalog"), source("other")],
+        Some(&policy),
+    )
+    .unwrap_err();
+    assert_eq!(r.category, Category::Budget);
+    refusal_golden("acquisition-widen-hard-cost.refusal", &r);
 }
 
 #[test]
@@ -528,4 +539,44 @@ fn plan_identity_covers_guard_request_tiers_groups_mapping_and_limits() {
             "{path}"
         );
     }
+}
+
+#[test]
+fn protected_request_rejects_a_constructed_hint() {
+    let mut d = base(true);
+    let StepBody::Widen(w) = &mut d.steps[0].body else {
+        panic!()
+    };
+    w.base_request.insert(
+        "q".into(),
+        serde_json::from_value(json!({"ref":"step:key"})).unwrap(),
+    );
+    d.steps.insert(
+        0,
+        serde_json::from_value(json!({"id":"key","body":{"exact":{
+            "op":"compose_key","version":1,"args":{"parts":[
+                {"value":{"lit":{"text":"city"}},"normalize":"exact"},
+                {"value":{"lit":{"text":"centre"}},"normalize":"exact"}],"separator":":"}
+        }}}))
+        .unwrap(),
+    );
+    let compile = |d: &Definition| {
+        let sources = ["catalog", "other"].map(|name| {
+            let mut v = serde_json::to_value(source(name)).unwrap();
+            v["operations"][0]["request"][0]["type"] = json!({"text":{"max_bytes":512}});
+            serde_json::from_value(v).unwrap()
+        });
+        compile_with_sources(d, &[], &[], &sources, None)
+    };
+    let refusal = compile(&d).unwrap_err();
+    assert_eq!(refusal.category, Category::UncorroboratedHint);
+    assert!(refusal.detail.contains("uncorroborated_hint"));
+    let StepBody::Widen(w) = &mut d.steps[1].body else {
+        panic!()
+    };
+    w.protected.clear();
+    assert!(
+        compile(&d).is_ok(),
+        "constructed exact requests are legal outside protected groups"
+    );
 }

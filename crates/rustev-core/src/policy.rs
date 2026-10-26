@@ -17,6 +17,7 @@ use crate::value::Value;
 /// A policy-visible value.
 pub(crate) enum Seen<'a> {
     Exact(&'a Value),
+    Projected(Value),
     Semantic(&'a SemValue),
 }
 
@@ -73,7 +74,9 @@ impl<V: View> Run<'_, V> {
         self.read(&r);
         match self.view.get(&r)? {
             Seen::Semantic(v) => Ok(Some(v)),
-            Seen::Exact(_) => Err(Unresolved::invalid([], format!("{r} is not semantic"))),
+            Seen::Exact(_) | Seen::Projected(_) => {
+                Err(Unresolved::invalid([], format!("{r} is not semantic")))
+            }
         }
     }
 
@@ -135,6 +138,7 @@ impl<V: View> Run<'_, V> {
                 self.read(r);
                 let empty = match self.view.get(r)? {
                     Seen::Exact(Value::List(v)) => v.is_empty(),
+                    Seen::Projected(Value::List(v)) => v.is_empty(),
                     Seen::Exact(Value::Filtered(f)) => f.eligible.is_empty(),
                     Seen::Exact(Value::Shortlist(s)) => s.ids.is_empty(),
                     Seen::Exact(Value::Ranking(r)) => r.entries.is_empty(),
@@ -226,6 +230,7 @@ impl<V: View> Run<'_, V> {
                             self.read(r);
                             match self.view.get(r)? {
                                 Seen::Exact(v) => v.to_out(),
+                                Seen::Projected(v) => v.to_out(),
                                 Seen::Semantic(_) => {
                                     return Err(Unresolved::invalid(
                                         [],

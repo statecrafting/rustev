@@ -360,6 +360,26 @@ changes; until then they are reachable through the library only.
 7. A truncated result carries a `truncation` notice naming the step. An
    empty result with `stopped_by: exhausted` is a resolved empty list: the
    source answered that nothing matched.
+8. **Field projection** (plan 3 only, a construct of this spec). Inside a
+   `rustev.exact/2` expression or a plan 3 policy predicate, the reference
+   `step:<id>/<list path>/*/<field path>` reads `<field path>` from every
+   element of the list at `<list path>` of an exact step's value and
+   yields a list of text in element order, duplicates kept. It compiles
+   only when the reference holds exactly one `*`, `<list path>` is
+   nonempty and names a list of records, and `<field path>` is nonempty
+   and names a `text` field of that record; any other use of `*` is an
+   ill-typed reference, refused like one (spec 002 3.8), and a plan 1 or
+   plan 2 definition refuses `*` in a reference. The result type is a list
+   of that text type bounded by the source list's maximum. An empty list
+   projects to an empty list; an element whose field is null or absent
+   makes the read `missing_evidence` naming that path (spec 002 3.10.4).
+   The value metadata (spec 032 3.2.2) is the combination of the field's
+   metadata over every element, so the weakest grade governs; an empty
+   list keeps the list's own. The form exists so spec 032's `member_ref`
+   can test a key against acquired keys, for example
+   `{ "member_ref": { "value": { "ref": "step:key" },
+   "set": "step:subareas/items/*/key" } }`; it adds no operator and leaves
+   `member_of@1` and `member` unchanged.
 
 ### 3.5 The `widen` construct
 
@@ -914,8 +934,8 @@ decision-result cache (#76 F1); quality claims (R-04, R-37).
   source's received requests). A definition relaxing a protected group is
   refused with a golden refusal.
 - **Corroboration:** a guarded `list_subareas` acquisition runs only when
-  the parent resolved, and `member_of@1` over its keys tests a
-  `compose_key@1` key; a run with the parent absent records `skipped` and
+  the parent resolved, and spec 032's `member_ref` over its keys (the
+  field projection of 3.4.8) tests a `compose_key@1` key; a run with the parent absent records `skipped` and
   the policy's handler path. A constructed key is `hint` and a spec 032
   corroboration step over the acquired keys raises it; these grade
   assertions need spec 032's implementation and are reported as externally
@@ -1117,6 +1137,29 @@ validation is unchanged. Tests: `crates/rustev-eval/tests/acquisition_replay.rs`
 removed page, a spec 032 plan 3 decision with `rustev.snapshot/2`, a
 `rustev.judgment/2` decision, replay 1 compatibility).
 
+**Increment 5 (2026-10-24): reference definitions, acceptance and seeds.**
+`packages/rustev-pkg-lodging/` gains synthetic reference definitions and
+scripted sources for specific-first widening, a two-source widening and
+the guarded `list_subareas` corroboration; the package's existing plan,
+goldens and data are byte-identical. The corroboration item's "`member_of@1`
+over its keys" is realized with spec 032's `member_ref` (spec 032's
+decision 10: "`member_of` extended as the predicate `member_ref` over a
+referenced list or map keys, leaving `member_of@1` and `member` with
+literal sets unchanged"), over the acquired keys read with the field
+projection `step:<id>/items/*/<field>` that 3.4.8 adds (decision 19); no
+existing exact operator yields a text list from a record list's field.
+Tests: `crates/rustev-core/src/expr.rs`
+(`plan_three_text_projection_checks_bounds_types_and_absence`) and
+`packages/rustev-pkg-lodging/tests/acquisition.rs`
+(`lodging_guarded_subareas_corroborate_composed_key_or_take_skipped_handler`).
+Acquisition guards now see an explicitly absent input as absent. Every
+Acceptance item and section 5 row is mapped to its test in
+`packages/rustev-pkg-lodging/tests/acquisition/README.md`. Six `spec 036`
+mutation seeds (a protected field patched, a skipped value treated as
+empty, a retry on `denied`, a truncation without notice, tier order
+reversed, an uncaptured page dispatched in replay) are each detected;
+`spec 036` joins the harness's `OWN_RUNS`.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child
@@ -1186,3 +1229,10 @@ decided within the binding principles, as written:
 18. **Parameter sites** (spec 034): only the stop `count`; limits, tiers,
     groups and mappings stay literal so the compile-time budget and the
     protected-group check are fixed per plan.
+19. **Field projection** (owner, 2026-10-24, after approval). The
+    corroboration Acceptance item needs a key tested against acquired
+    keys, but spec 032's `member_ref` takes a list of text or a map and an
+    acquisition yields a list of records. Rather than a new exact operator,
+    3.4.8 adds a bounded reference form that projects one text field
+    across a list of records, typed and bounded at compile time, so spec
+    032's operator vocabulary and its decision 10 stay unchanged.

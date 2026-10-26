@@ -501,14 +501,17 @@ fn freshness_boundary_and_remaining_page_validation_rules() {
 
 #[test]
 fn unresolved_guards_and_requests_propagate_without_dispatch() {
-    for guard in [false, true] {
+    for guard in ["request", "constructed", "present"] {
         let mut d = definition();
         let bad = exact(
             "bad",
             "compose_key",
             json!({"parts":[{"value":{"lit":{"text":""}},"normalize":"exact"},{"value":{"lit":{"integer":1}},"normalize":"exact"}],"separator":":"}),
         );
-        if guard {
+        if guard == "present" {
+            acquisition(&mut d).when =
+                serde_json::from_value(json!({"present":"step:bad"})).unwrap();
+        } else if guard == "constructed" {
             acquisition(&mut d).when =
                 serde_json::from_value(json!({"is_constructed":{"ref":"step:bad"}})).unwrap();
         } else {
