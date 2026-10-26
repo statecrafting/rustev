@@ -62,6 +62,8 @@ pub enum StartError {
     Schema(String),
     /// An entry names a field the definition does not declare.
     UndeclaredField(String),
+    /// A producer is only valid on model-derived entries.
+    InvalidProducer(String),
     /// The snapshot has no canonical form (a fractional number).
     NotCanonical(String),
 }
@@ -79,6 +81,7 @@ impl fmt::Display for StartError {
             StartError::UndeclaredField(s) => {
                 write!(f, "snapshot entry for undeclared field {s:?}")
             }
+            StartError::InvalidProducer(s) => write!(f, "invalid_producer: {s}"),
             StartError::NotCanonical(s) => write!(f, "snapshot has no canonical form: {s}"),
         }
     }
@@ -472,10 +475,20 @@ impl<'c> Evaluation<'c> {
                 schema::SNAPSHOT
             )));
         }
+        if snapshot.schema == schema::SNAPSHOT
+            && snapshot.entries.iter().any(|e| e.producer.is_some())
+        {
+            return Err(StartError::Schema(
+                "snapshot_version: producer requires rustev.snapshot/2".into(),
+            ));
+        }
         let info = &compiled.info;
         for e in &snapshot.entries {
             if !info.inputs.contains_key(&e.field) {
                 return Err(StartError::UndeclaredField(e.field.clone()));
+            }
+            if e.producer.is_some() && e.provenance != ProvenanceClass::ModelDerived {
+                return Err(StartError::InvalidProducer(e.field.clone()));
             }
         }
         let snapshot_id = snapshot
@@ -3329,6 +3342,7 @@ mod screening_hardening_tests {
                     as_of_ms: now,
                     source: "synthetic".into(),
                     grade: None,
+                    producer: None,
                 },
                 Entry {
                     field: "candidates".into(),
@@ -3337,6 +3351,7 @@ mod screening_hardening_tests {
                     as_of_ms: now,
                     source: "synthetic".into(),
                     grade: None,
+                    producer: None,
                 },
             ],
         };

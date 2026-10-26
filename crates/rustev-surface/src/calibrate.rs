@@ -52,7 +52,9 @@ fn target_parts(
             | StepBody::Corroborate(_)
             | StepBody::Acquire(_)
             | StepBody::Widen(_)
-            | StepBody::Generate(_) => None,
+            | StepBody::Generate(_)
+            | StepBody::Extract(_)
+            | StepBody::AcceptModelDerived(_) => None,
         })?;
     Some((binding, decl.task.clone(), decl.options.clone()))
 }

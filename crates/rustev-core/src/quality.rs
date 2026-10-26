@@ -84,6 +84,7 @@ pub(crate) fn uses_track_construct(def: &Definition, decoded: &BTreeMap<String, 
         .iter()
         .any(|i| i.evidence.is_some() || i.on_disagreement.is_some() || type_v2(&i.ty))
         || def.steps.iter().any(|s| match &s.body {
+            StepBody::Extract(_) | StepBody::AcceptModelDerived(_) => true,
             StepBody::Corroborate(_) | StepBody::Acquire(_) | StepBody::Widen(_) | StepBody::Generate(_) => true,
             StepBody::Exact(_) => decoded.get(&s.id).is_some_and(OpArgs::uses_v2),
             StepBody::Semantic(_) => false,
@@ -347,6 +348,9 @@ pub(crate) fn structure_with_origin(
             return Err(invalid(&subject, "version 2 step ids hold no '/'"));
         }
         match &s.body {
+            StepBody::Extract(_) | StepBody::AcceptModelDerived(_) => {
+                // Refused earlier by extraction-not-compiled.
+            }
             StepBody::Exact(_) => {
                 let Some(args) = decoded.get(&s.id) else {
                     continue;

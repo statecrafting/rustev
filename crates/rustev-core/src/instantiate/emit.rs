@@ -288,7 +288,11 @@ fn item_refs(d: &Definition, item: &Item) -> Vec<String> {
                 }
             }
             // Acquisition compilation is refused in phase (b).
-            StepBody::Acquire(_) | StepBody::Widen(_) | StepBody::Generate(_) => {}
+            StepBody::Acquire(_)
+            | StepBody::Widen(_)
+            | StepBody::Generate(_)
+            | StepBody::Extract(_)
+            | StepBody::AcceptModelDerived(_) => {}
             StepBody::Corroborate(c) => {
                 out.push(c.claim.clone());
                 for check in &c.by {

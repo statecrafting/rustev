@@ -723,6 +723,12 @@ export namespace RustevDefinition1 {
       }
     | {
         generate: Generate;
+      }
+    | {
+        extract: Extract;
+      }
+    | {
+        accept_model_derived: AcceptModelDerived;
       };
   /**
    * The delay before retry `n` (1-based). No jitter.
@@ -896,6 +902,75 @@ export namespace RustevDefinition1 {
     | {
         actions: string[];
       };
+  export type Distributions = "none" | "when_available";
+  export type Fallback2 = "none" | ExtractionRules;
+  export type Fill = "request_failure" | "absent_fields";
+  export type NoneOnly = "none";
+  export type ExtractionType =
+    | {
+        bool: {};
+      }
+    | {
+        integer: {
+          /**
+           * @minItems 2
+           * @maxItems 2
+           */
+          bounds: [number, number];
+        };
+      }
+    | {
+        decimal: DecimalBounds;
+      }
+    | {
+        text: {
+          max_bytes: number;
+        };
+      }
+    | {
+        date: {};
+      }
+    | {
+        enum: {
+          vocabulary: string;
+        };
+      }
+    | {
+        list: {
+          item: ExtractionType;
+          max_items: number;
+        };
+      }
+    | {
+        record: {
+          fields: ExtractionField[];
+        };
+      };
+  export type ExtractionVocabulary =
+    | Vocabulary
+    | {
+        input: string;
+      };
+  export type MinMass = "none" | MassThreshold;
+  export type MassBasis =
+    | {
+        calibration: string;
+      }
+    | {
+        uncalibrated_threshold: string;
+      };
+  export type OnFail =
+    | "unresolved"
+    | {
+        drop_field: {
+          notice: string;
+        };
+      };
+  export type Validation =
+    | "none"
+    | {
+        predicate: Predicate;
+      };
 
   /**
    * A versioned, authored description of a recurring decision.
@@ -941,7 +1016,7 @@ export namespace RustevDefinition1 {
    */
   export interface CheckDecl {
     id: string;
-    on_fail: OnFail;
+    on_fail: OnFail2;
     /**
      * The declared input whose provenance the check branches on.
      */
@@ -951,7 +1026,7 @@ export namespace RustevDefinition1 {
      */
     test: Predicate;
   }
-  export interface OnFail {
+  export interface OnFail2 {
     by_provenance: {
       "attributed-claim"?: Consequence;
       "authenticated-app-field"?: Consequence;
@@ -1401,6 +1476,55 @@ export namespace RustevDefinition1 {
     params: {
       [k: string]: TemplateBinding | undefined;
     };
+  }
+  export interface Extract {
+    backend: BackendReq;
+    distributions: Distributions;
+    fallback: Fallback2;
+    for_each: NoneOnly;
+    limits: ExtractionLimits;
+    output: ExtractionSchema;
+    projection: string[];
+    repair: Repair;
+    screen: GenerateScreen;
+    template: TemplateRef;
+    vocabularies: {
+      [k: string]: ExtractionVocabulary | undefined;
+    };
+  }
+  export interface ExtractionRules {
+    fill: Fill;
+    rules_program: string;
+  }
+  export interface ExtractionLimits {
+    deadline_share: Decimal;
+    max_cost_units: CostLimit;
+  }
+  export interface ExtractionSchema {
+    fields: ExtractionField[];
+  }
+  export interface ExtractionField {
+    name: string;
+    type: ExtractionType;
+  }
+  export interface DecimalBounds {
+    /**
+     * @minItems 2
+     * @maxItems 2
+     */
+    bounds: [string, string];
+    scale: number;
+  }
+  export interface AcceptModelDerived {
+    field: string;
+    min_mass: MinMass;
+    on_fail: OnFail;
+    validate: Validation;
+  }
+  export interface MassThreshold {
+    at_least: Decimal;
+    basis: MassBasis;
+    option: string;
   }
 }
 export type RustevDefinition1 = RustevDefinition1.RustevDefinition1;
@@ -1886,6 +2010,12 @@ export namespace RustevDefinition2 {
       }
     | {
         generate: Generate;
+      }
+    | {
+        extract: Extract;
+      }
+    | {
+        accept_model_derived: AcceptModelDerived;
       };
   /**
    * The delay before retry `n` (1-based). No jitter.
@@ -2059,6 +2189,75 @@ export namespace RustevDefinition2 {
     | {
         actions: string[];
       };
+  export type Distributions = "none" | "when_available";
+  export type Fallback2 = "none" | ExtractionRules;
+  export type Fill = "request_failure" | "absent_fields";
+  export type NoneOnly = "none";
+  export type ExtractionType =
+    | {
+        bool: {};
+      }
+    | {
+        integer: {
+          /**
+           * @minItems 2
+           * @maxItems 2
+           */
+          bounds: [number, number];
+        };
+      }
+    | {
+        decimal: DecimalBounds;
+      }
+    | {
+        text: {
+          max_bytes: number;
+        };
+      }
+    | {
+        date: {};
+      }
+    | {
+        enum: {
+          vocabulary: string;
+        };
+      }
+    | {
+        list: {
+          item: ExtractionType;
+          max_items: number;
+        };
+      }
+    | {
+        record: {
+          fields: ExtractionField[];
+        };
+      };
+  export type ExtractionVocabulary =
+    | Vocabulary
+    | {
+        input: string;
+      };
+  export type MinMass = "none" | MassThreshold;
+  export type MassBasis =
+    | {
+        calibration: string;
+      }
+    | {
+        uncalibrated_threshold: string;
+      };
+  export type OnFail =
+    | "unresolved"
+    | {
+        drop_field: {
+          notice: string;
+        };
+      };
+  export type Validation =
+    | "none"
+    | {
+        predicate: Predicate;
+      };
 
   /**
    * A versioned, authored description of a recurring decision.
@@ -2104,7 +2303,7 @@ export namespace RustevDefinition2 {
    */
   export interface CheckDecl {
     id: string;
-    on_fail: OnFail;
+    on_fail: OnFail2;
     /**
      * The declared input whose provenance the check branches on.
      */
@@ -2114,7 +2313,7 @@ export namespace RustevDefinition2 {
      */
     test: Predicate;
   }
-  export interface OnFail {
+  export interface OnFail2 {
     by_provenance: {
       "attributed-claim"?: Consequence;
       "authenticated-app-field"?: Consequence;
@@ -2564,6 +2763,55 @@ export namespace RustevDefinition2 {
     params: {
       [k: string]: TemplateBinding | undefined;
     };
+  }
+  export interface Extract {
+    backend: BackendReq;
+    distributions: Distributions;
+    fallback: Fallback2;
+    for_each: NoneOnly;
+    limits: ExtractionLimits;
+    output: ExtractionSchema;
+    projection: string[];
+    repair: Repair;
+    screen: GenerateScreen;
+    template: TemplateRef;
+    vocabularies: {
+      [k: string]: ExtractionVocabulary | undefined;
+    };
+  }
+  export interface ExtractionRules {
+    fill: Fill;
+    rules_program: string;
+  }
+  export interface ExtractionLimits {
+    deadline_share: Decimal;
+    max_cost_units: CostLimit;
+  }
+  export interface ExtractionSchema {
+    fields: ExtractionField[];
+  }
+  export interface ExtractionField {
+    name: string;
+    type: ExtractionType;
+  }
+  export interface DecimalBounds {
+    /**
+     * @minItems 2
+     * @maxItems 2
+     */
+    bounds: [string, string];
+    scale: number;
+  }
+  export interface AcceptModelDerived {
+    field: string;
+    min_mass: MinMass;
+    on_fail: OnFail;
+    validate: Validation;
+  }
+  export interface MassThreshold {
+    at_least: Decimal;
+    basis: MassBasis;
+    option: string;
   }
 }
 export type RustevDefinition2 = RustevDefinition2.RustevDefinition2;
@@ -7816,6 +8064,12 @@ export namespace RustevPlan2 {
       }
     | {
         generate: Generate;
+      }
+    | {
+        extract: Extract;
+      }
+    | {
+        accept_model_derived: AcceptModelDerived;
       };
   /**
    * The delay before retry `n` (1-based). No jitter.
@@ -7988,6 +8242,75 @@ export namespace RustevPlan2 {
     | "any_propose"
     | {
         actions: string[];
+      };
+  export type Distributions = "none" | "when_available";
+  export type Fallback2 = "none" | ExtractionRules;
+  export type Fill = "request_failure" | "absent_fields";
+  export type NoneOnly = "none";
+  export type ExtractionType =
+    | {
+        bool: {};
+      }
+    | {
+        integer: {
+          /**
+           * @minItems 2
+           * @maxItems 2
+           */
+          bounds: [number, number];
+        };
+      }
+    | {
+        decimal: DecimalBounds;
+      }
+    | {
+        text: {
+          max_bytes: number;
+        };
+      }
+    | {
+        date: {};
+      }
+    | {
+        enum: {
+          vocabulary: string;
+        };
+      }
+    | {
+        list: {
+          item: ExtractionType;
+          max_items: number;
+        };
+      }
+    | {
+        record: {
+          fields: ExtractionField[];
+        };
+      };
+  export type ExtractionVocabulary =
+    | Vocabulary
+    | {
+        input: string;
+      };
+  export type MinMass = "none" | MassThreshold;
+  export type MassBasis =
+    | {
+        calibration: string;
+      }
+    | {
+        uncalibrated_threshold: string;
+      };
+  export type OnFail =
+    | "unresolved"
+    | {
+        drop_field: {
+          notice: string;
+        };
+      };
+  export type Validation =
+    | "none"
+    | {
+        predicate: Predicate;
       };
   export type DefinitionId = string;
   export type PlanExecution =
@@ -8271,7 +8594,7 @@ export namespace RustevPlan2 {
    */
   export interface CheckDecl {
     id: string;
-    on_fail: OnFail;
+    on_fail: OnFail2;
     /**
      * The declared input whose provenance the check branches on.
      */
@@ -8281,7 +8604,7 @@ export namespace RustevPlan2 {
      */
     test: Predicate;
   }
-  export interface OnFail {
+  export interface OnFail2 {
     by_provenance: {
       "attributed-claim"?: Consequence;
       "authenticated-app-field"?: Consequence;
@@ -8731,6 +9054,55 @@ export namespace RustevPlan2 {
     params: {
       [k: string]: TemplateBinding | undefined;
     };
+  }
+  export interface Extract {
+    backend: BackendReq;
+    distributions: Distributions;
+    fallback: Fallback2;
+    for_each: NoneOnly;
+    limits: ExtractionLimits;
+    output: ExtractionSchema;
+    projection: string[];
+    repair: Repair;
+    screen: GenerateScreen;
+    template: TemplateRef;
+    vocabularies: {
+      [k: string]: ExtractionVocabulary | undefined;
+    };
+  }
+  export interface ExtractionRules {
+    fill: Fill;
+    rules_program: string;
+  }
+  export interface ExtractionLimits {
+    deadline_share: Decimal;
+    max_cost_units: CostLimit;
+  }
+  export interface ExtractionSchema {
+    fields: ExtractionField[];
+  }
+  export interface ExtractionField {
+    name: string;
+    type: ExtractionType;
+  }
+  export interface DecimalBounds {
+    /**
+     * @minItems 2
+     * @maxItems 2
+     */
+    bounds: [string, string];
+    scale: number;
+  }
+  export interface AcceptModelDerived {
+    field: string;
+    min_mass: MinMass;
+    on_fail: OnFail;
+    validate: Validation;
+  }
+  export interface MassThreshold {
+    at_least: Decimal;
+    basis: MassBasis;
+    option: string;
   }
   export interface DeclaredExecution {
     /**
@@ -9503,6 +9875,12 @@ export namespace RustevPlan3 {
       }
     | {
         generate: Generate;
+      }
+    | {
+        extract: Extract;
+      }
+    | {
+        accept_model_derived: AcceptModelDerived;
       };
   /**
    * The delay before retry `n` (1-based). No jitter.
@@ -9675,6 +10053,75 @@ export namespace RustevPlan3 {
     | "any_propose"
     | {
         actions: string[];
+      };
+  export type Distributions = "none" | "when_available";
+  export type Fallback2 = "none" | ExtractionRules;
+  export type Fill = "request_failure" | "absent_fields";
+  export type NoneOnly = "none";
+  export type ExtractionType =
+    | {
+        bool: {};
+      }
+    | {
+        integer: {
+          /**
+           * @minItems 2
+           * @maxItems 2
+           */
+          bounds: [number, number];
+        };
+      }
+    | {
+        decimal: DecimalBounds;
+      }
+    | {
+        text: {
+          max_bytes: number;
+        };
+      }
+    | {
+        date: {};
+      }
+    | {
+        enum: {
+          vocabulary: string;
+        };
+      }
+    | {
+        list: {
+          item: ExtractionType;
+          max_items: number;
+        };
+      }
+    | {
+        record: {
+          fields: ExtractionField[];
+        };
+      };
+  export type ExtractionVocabulary =
+    | Vocabulary
+    | {
+        input: string;
+      };
+  export type MinMass = "none" | MassThreshold;
+  export type MassBasis =
+    | {
+        calibration: string;
+      }
+    | {
+        uncalibrated_threshold: string;
+      };
+  export type OnFail =
+    | "unresolved"
+    | {
+        drop_field: {
+          notice: string;
+        };
+      };
+  export type Validation =
+    | "none"
+    | {
+        predicate: Predicate;
       };
   export type DefinitionId = string;
   export type PlanExecution =
@@ -10100,7 +10547,7 @@ export namespace RustevPlan3 {
    */
   export interface CheckDecl {
     id: string;
-    on_fail: OnFail;
+    on_fail: OnFail2;
     /**
      * The declared input whose provenance the check branches on.
      */
@@ -10110,7 +10557,7 @@ export namespace RustevPlan3 {
      */
     test: Predicate;
   }
-  export interface OnFail {
+  export interface OnFail2 {
     by_provenance: {
       "attributed-claim"?: Consequence;
       "authenticated-app-field"?: Consequence;
@@ -10560,6 +11007,55 @@ export namespace RustevPlan3 {
     params: {
       [k: string]: TemplateBinding | undefined;
     };
+  }
+  export interface Extract {
+    backend: BackendReq;
+    distributions: Distributions;
+    fallback: Fallback2;
+    for_each: NoneOnly;
+    limits: ExtractionLimits;
+    output: ExtractionSchema;
+    projection: string[];
+    repair: Repair;
+    screen: GenerateScreen;
+    template: TemplateRef;
+    vocabularies: {
+      [k: string]: ExtractionVocabulary | undefined;
+    };
+  }
+  export interface ExtractionRules {
+    fill: Fill;
+    rules_program: string;
+  }
+  export interface ExtractionLimits {
+    deadline_share: Decimal;
+    max_cost_units: CostLimit;
+  }
+  export interface ExtractionSchema {
+    fields: ExtractionField[];
+  }
+  export interface ExtractionField {
+    name: string;
+    type: ExtractionType;
+  }
+  export interface DecimalBounds {
+    /**
+     * @minItems 2
+     * @maxItems 2
+     */
+    bounds: [string, string];
+    scale: number;
+  }
+  export interface AcceptModelDerived {
+    field: string;
+    min_mass: MinMass;
+    on_fail: OnFail;
+    validate: Validation;
+  }
+  export interface MassThreshold {
+    at_least: Decimal;
+    basis: MassBasis;
+    option: string;
   }
   export interface DeclaredExecution {
     /**
@@ -11759,6 +12255,9 @@ export namespace RustevRemoteContextFetch1Response {
    * strongest, so `min` and `max` are the grade order of spec 032, 3.2.1.
    */
   export type Grade = "hint" | "estimated" | "cached" | "authoritative";
+  export type ArtifactId = string;
+  export type TemplateDigest = "none" | PromptTemplateId;
+  export type PromptTemplateId = string;
   /**
    * The closed set of provenance classes (spec 002, 3.7.1).
    */
@@ -11802,6 +12301,10 @@ export namespace RustevRemoteContextFetch1Response {
      * never raise it (spec 032, 3.3.5).
      */
     grade?: Grade | null;
+    /**
+     * Host-declared model producer, retained as evidence, never authorization.
+     */
+    producer?: Producer | null;
     provenance: ProvenanceClass;
     /**
      * Which source supplied it; recorded, never trusted as authority.
@@ -11811,6 +12314,11 @@ export namespace RustevRemoteContextFetch1Response {
      * Decoded strictly against the input's declared type.
      */
     value: unknown;
+  }
+  export interface Producer {
+    artifact_id: ArtifactId;
+    produced_at_ms: Timestamp;
+    template_digest: TemplateDigest;
   }
 }
 export type RustevRemoteContextFetch1Response = RustevRemoteContextFetch1Response.RustevRemoteContextFetch1Response;
@@ -18073,6 +18581,9 @@ export namespace RustevSnapshot1 {
    * strongest, so `min` and `max` are the grade order of spec 032, 3.2.1.
    */
   export type Grade = "hint" | "estimated" | "cached" | "authoritative";
+  export type ArtifactId = string;
+  export type TemplateDigest = "none" | PromptTemplateId;
+  export type PromptTemplateId = string;
   /**
    * The closed set of provenance classes (spec 002, 3.7.1).
    */
@@ -18099,6 +18610,10 @@ export namespace RustevSnapshot1 {
      * never raise it (spec 032, 3.3.5).
      */
     grade?: Grade | null;
+    /**
+     * Host-declared model producer, retained as evidence, never authorization.
+     */
+    producer?: Producer | null;
     provenance: ProvenanceClass;
     /**
      * Which source supplied it; recorded, never trusted as authority.
@@ -18108,6 +18623,11 @@ export namespace RustevSnapshot1 {
      * Decoded strictly against the input's declared type.
      */
     value: unknown;
+  }
+  export interface Producer {
+    artifact_id: ArtifactId;
+    produced_at_ms: Timestamp;
+    template_digest: TemplateDigest;
   }
 }
 export type RustevSnapshot1 = RustevSnapshot1.RustevSnapshot1;
@@ -18119,6 +18639,9 @@ export namespace RustevSnapshot2 {
    * strongest, so `min` and `max` are the grade order of spec 032, 3.2.1.
    */
   export type Grade = "hint" | "estimated" | "cached" | "authoritative";
+  export type ArtifactId = string;
+  export type TemplateDigest = "none" | PromptTemplateId;
+  export type PromptTemplateId = string;
   /**
    * The closed set of provenance classes (spec 002, 3.7.1).
    */
@@ -18145,6 +18668,10 @@ export namespace RustevSnapshot2 {
      * never raise it (spec 032, 3.3.5).
      */
     grade?: Grade | null;
+    /**
+     * Host-declared model producer, retained as evidence, never authorization.
+     */
+    producer?: Producer | null;
     provenance: ProvenanceClass;
     /**
      * Which source supplied it; recorded, never trusted as authority.
@@ -18154,6 +18681,11 @@ export namespace RustevSnapshot2 {
      * Decoded strictly against the input's declared type.
      */
     value: unknown;
+  }
+  export interface Producer {
+    artifact_id: ArtifactId;
+    produced_at_ms: Timestamp;
+    template_digest: TemplateDigest;
   }
 }
 export type RustevSnapshot2 = RustevSnapshot2.RustevSnapshot2;

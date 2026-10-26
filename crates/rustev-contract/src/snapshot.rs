@@ -44,4 +44,26 @@ pub struct Entry {
     /// never raise it (spec 032, 3.3.5).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub grade: Option<Grade>,
+    /// Host-declared model producer, retained as evidence, never authorization.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::screening::present"
+    )]
+    pub producer: Option<Producer>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Producer {
+    pub artifact_id: crate::ids::ArtifactId,
+    pub template_digest: TemplateDigest,
+    pub produced_at_ms: Timestamp,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum TemplateDigest {
+    None,
+    #[serde(untagged)]
+    Digest(crate::ids::PromptTemplateId),
 }

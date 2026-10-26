@@ -26,6 +26,7 @@ pub mod eval_report;
 pub mod evidence;
 pub mod execution;
 pub mod explanation;
+pub mod extraction;
 pub mod generation;
 pub mod generation_result;
 pub mod grade;
