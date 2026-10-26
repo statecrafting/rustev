@@ -541,7 +541,10 @@ embedded goldens from `tests/golden/`, which the crate archive leaves in the
 workspace, so the first-release candidate's unpacked tests could not
 compile. They now embed copies in `src/testdata/`, which the archive
 carries; `tests/packaged_fixtures.rs` keeps each copy equal to its golden.
-No test or behavior changed.
+No test or behavior changed. Spec 038's `compile.rs` unit test (#281) then
+embedded the support-routing definition and two contract step fixtures
+from outside the crate; it too embeds copies in `src/testdata/`, checked by
+the same test.
 
 ## Decision history
 

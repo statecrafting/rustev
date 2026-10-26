@@ -229,7 +229,7 @@
       }
     ],
     "sectionDigests": {
-      "021-packaging-and-first-public-release": "d85dee35cd14eb5378b06458f80a1f3890f6626561eeffdd0de59cf0d6f78f73",
+      "021-packaging-and-first-public-release": "1408cd2cdc867906c42bce46ce19bfd3ad34294118b051b69b2c3f3eab53eb57",
       "1-purpose": "06117bd1d659705227fb77273ed1f536626be5f1c2d876bab4dafcc2508e6b0d",
       "2-first-release-scope": "9f6956ecfcb382633ecc39fbd98c6426d77e53c16b92b539239ad0f02a03ee38",
       "3-1-lifecycle-and-authority": "b641fd2242e1d0d5cbe9c3aee40c8b79d901a9464843d1424cadb54c4c5f86de",
@@ -246,7 +246,7 @@
       "4-observable-negative-cases": "2a6c8bba48ed4102c220ab54c57c63d551cd1b3c907731a6b68f9e18c1735d96",
       "acceptance": "3fb6e446eb21f0958276d7c92ec302874efd13434dc99b9734f897319414bcdf",
       "implementation-record": "14bd48314b3df90bdf07dc74de0ec14dbe941d1996bf627b28e9b8b2f34d2e91",
-      "questions-settled-by-r-34": "d5f409ec79c0e297e002d4fb7263275a883211eea5582af3e35ab7aa6da32808",
+      "questions-settled-by-r-34": "1606e1cd5a070892ec1df0ddeff8f149e33238d05d7083b68db3e2c358cac82f",
       "verification": "9f16fc7fb6df9503918bae4433d72118078ee5b2abe6c1c7bb3645bbb3efb0e5"
     },
     "sectionHeadings": [
@@ -275,6 +275,6 @@
     "summary": "Defines the intended first public Rustev crate family, its lockstep pre-1.0 version policy, registry contents and features, internal dependency pins, license and dependency audit, reproducible package checks, signed release identity, publication journal, and fresh registry-only consumer proof. Candidate construction, owner publication authorization, registry upload, public availability, and consumer qualification are distinct lifecycle states. Approval authorizes candidate implementation only: no crate is publishable yet and no release, tag, upload, name reservation, or availability claim is authorized or made.\n",
     "title": "Packaging and first public release"
   },
-  "shardHash": "b2bea31b65319531e51c50ff3b7fde9c693137fffd670a4904a9e90c4676a85d",
+  "shardHash": "e5331d9f0b005a19b041010a6019192978397e9050dd1d8e3d972233469969d6",
   "specVersion": "1.10.0"
 }

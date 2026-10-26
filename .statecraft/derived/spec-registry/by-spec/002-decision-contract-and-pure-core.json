@@ -44,7 +44,7 @@
     "id": "002-decision-contract-and-pure-core",
     "implementation": "complete",
     "sectionDigests": {
-      "002-decision-contract-and-pure-core": "e214863b4b5f19445ede448aa496b623cc6356ef3c6667db5b45ba2a1f6bcaeb",
+      "002-decision-contract-and-pure-core": "07f4582cece559a0894c2c59aa4fba9e8b4e624b113dca72d0505ddfbb8cb231",
       "1-purpose": "efd6bb9c309da706ab17fe0263a710e07f25af759e95d4fdbf81da098b975dfd",
       "2-territory": "e229a2080dae05d3467052ac12d03e255c0064138cdf2df4b9f7e8c000d08be3",
       "3-1-purity": "1172db9f90fbb5bfeda4e0a12c246f621d7643a405fc11e43468de87bcc67939",
@@ -66,7 +66,7 @@
       "acceptance": "17d006ce0597943c7e053483738b1f04376a944ef29cde6f3068bda644284251",
       "decision-history": "69974f41df206db3498d863ea3e8be6e61d7f94fee1a974447a9b56c476e392d",
       "engineering-choices": "ad4c7add3dff980a4b0fdca87ae8e9396362b87b0f2a5e89fd1a242847d3d9b1",
-      "implementation-record": "4554356de20ea57bdef8fddbbb18f9bd15f4affe15dc19acedde5359165b35ab",
+      "implementation-record": "995e743147faf262d168d40911ea44e34a2a1c35b3191dae01ea2b2c2ff78b52",
       "verification": "a381b4b3cb4aeb5468a033e82d000b4f78ed6e8fd9b30a3ffd8c06f402e19d3d"
     },
     "sectionHeadings": [
@@ -100,6 +100,6 @@
     "summary": "Increment 1: the versioned wire contract (`rustev-contract`) and the pure core (`rustev-core`). Bounded parsing, canonical form and identities, value kinds without silent conversion, fixed-point decimals and millisecond time, input validation with provenance, freshness and conflict, a closed versioned exact-operator registry, decision definitions entered through a typed builder or canonical JSON, the plan compiler with capability matching, declared fallbacks and typed refusals, calibration binding, deterministic selection policy with explicit unresolved handling, and derivation classes with lineage. No I/O, no clock, no async executor, no model.\n",
     "title": "Decision contract and pure core"
   },
-  "shardHash": "35dea0d2c65e9d516e32095fc045affa4553f5fdea56cd65a46ab071cd6b1bb2",
+  "shardHash": "1f50e3032e1915d83f963a9c4a94889bff351f7bb8985249e6384cc641096d73",
   "specVersion": "1.10.0"
 }

@@ -117,8 +117,11 @@
         "src/template/mod.rs",
         "src/template/parse.rs",
         "src/template/render.rs",
+        "src/testdata/accept-step.json",
+        "src/testdata/extract-step.json",
         "src/testdata/generation.plan.json",
         "src/testdata/screening.definition.json",
+        "src/testdata/support-routing.definition.json",
         "src/unparameterized.rs",
         "src/value.rs",
         "src/widening_eval.rs"
