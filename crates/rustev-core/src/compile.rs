@@ -3026,17 +3026,15 @@ mod tests {
 
     #[test]
     fn v2_construct_describes_extraction_and_acceptance_separately() {
-        let mut def: Definition = serde_json::from_str(include_str!(
-            "../../../packages/rustev-pkg-support-routing/data/support-routing.definition.json"
-        ))
-        .unwrap();
+        let mut def: Definition =
+            serde_json::from_str(include_str!("testdata/support-routing.definition.json")).unwrap();
         for (fixture, description) in [
             (
-                include_str!("../../rustev-contract/tests/fixtures/extract-step.json"),
+                include_str!("testdata/extract-step.json"),
                 "an extraction step",
             ),
             (
-                include_str!("../../rustev-contract/tests/fixtures/accept-step.json"),
+                include_str!("testdata/accept-step.json"),
                 "an accept_model_derived step",
             ),
         ] {

@@ -740,3 +740,12 @@ then failed the unpacked tests (3.7) of `rustev-core` and `rustev-eval`:
 unit tests embedded fixtures outside `src/`. Each crate now packages copies
 under `src/testdata/` (selected bounded fixtures, 3.5; `tests/` stays in
 the workspace), recorded in 002 and 004, and the two file lists add them.
+
+**Candidate run, 2026-10-26, at `0829dfa` (after #286, with spec 038's
+#281).** The unpacked tests of `rustev-core` failed again (3.7): a new
+unit test embedded three files from outside the crate. They are packaged
+the same way (002's record), and `tools/rustev-release/tests/embedded_files.rs`
+now fails CI whenever a release member's sources embed, with
+`include_str!` or `include_bytes!`, a file its reviewed archive does not
+carry, so the break surfaces in the change that introduces it rather than
+at candidate time.
