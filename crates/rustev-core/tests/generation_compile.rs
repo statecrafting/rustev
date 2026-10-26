@@ -629,3 +629,70 @@ fn output_screening_admission_binding_and_request_budget() {
     b.operations.pop();
     assert_eq!(run(&d, &p, &b).unwrap_err().category, C::NoCapableBackend);
 }
+
+#[test]
+fn selection_generation_reads_are_refused_at_compile_time() {
+    for proposal in [false, true] {
+        for projection in [false, true] {
+            let (mut generation, mut prompt, mut backend) = fixture();
+            let (rank, _) = common::rank::fixture();
+            let mut d = common::lodging();
+            d.schema = "rustev.definition/2".into();
+            d.policy = rank.policy;
+            let mut selection = rank.steps[2].clone();
+            let StepBody::Select(select) = &mut selection.body else {
+                panic!()
+            };
+            select.from = "step:ranking".into();
+            select.backfill = rustev_contract::ranking::Backfill::From {
+                from: "step:shortlist".into(),
+                exclude_selected: true,
+            };
+            d.steps.push(selection);
+            d.policy.on_unresolved.push(serde_json::from_value(json!({"target":"step:chosen","reasons":"any","action":{"escalate":{"reason":"missing"}}})).unwrap());
+            backend.backend_id = "generation".into();
+            if let OutcomeDecl::Propose { params, .. } = &mut d.policy.rules[0].then {
+                params.push(ParamDecl {
+                    name: "selected".into(),
+                    value: ParamSource::Ref("step:chosen".into()),
+                });
+            }
+            let reference = if proposal {
+                "proposal:selected"
+            } else {
+                "step:chosen"
+            };
+            let StepBody::Generate(g) = &mut generation.steps[0].body else {
+                panic!()
+            };
+            if projection {
+                g.projection = vec![reference.into()];
+            } else {
+                prompt.params = vec![PromptParam {
+                    name: "selected".into(),
+                    ty: PromptParamType::Integer,
+                }];
+                prompt.instructions = "Selected: {{param.selected}}".into();
+                g.template.digest = prompt.id().unwrap();
+                g.template.params.insert(
+                    "selected".into(),
+                    TemplateBinding::Reference(reference.into()),
+                );
+            }
+            d.steps.extend(generation.steps);
+            let mut backends = common::descriptors();
+            backends.push(backend);
+            let error =
+                compile_with_templates(&d, &backends, &[], &[], None, &[prompt]).unwrap_err();
+            assert_eq!(
+                error.category,
+                if projection && !proposal {
+                    C::KindMismatch
+                } else {
+                    C::Template
+                },
+                "{error:?}"
+            );
+        }
+    }
+}

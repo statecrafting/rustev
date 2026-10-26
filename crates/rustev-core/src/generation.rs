@@ -681,6 +681,18 @@ pub(crate) fn type_check(
         }
         let mut projection_bytes = 2u64;
         for r in &g.projection {
+            if r.strip_prefix("step:").is_some_and(|path| {
+                matches!(
+                    steps.get(path.split('/').next().unwrap_or(path)),
+                    Some(StepTy::Selection(_))
+                )
+            }) {
+                return Err(error(
+                    C::KindMismatch,
+                    &s.id,
+                    "generation projection cannot convert Selection to an id list",
+                ));
+            }
             let bytes = if r.starts_with("input:") || r.starts_with("step:") {
                 crate::expr::ref_ty(r, &env).map_err(bad)?.max_json_bytes()
             } else {

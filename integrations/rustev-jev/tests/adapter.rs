@@ -34,6 +34,8 @@ fn detail(r: &rustev_core::seams::AttemptReport) -> String {
 async fn the_descriptor_declares_three_distribution_operations_and_no_rank() {
     let (b, _) = adapter("http://127.0.0.1:1", JevBinding::gateway());
     let d = b.descriptor();
+    assert!(d.ranking.is_none());
+    assert!(serde_json::to_value(d).unwrap().get("ranking").is_none());
     let ops: Vec<_> = d
         .operations
         .iter()

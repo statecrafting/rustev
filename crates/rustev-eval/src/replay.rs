@@ -389,6 +389,7 @@ fn target_artifact(plan: &Plan, step: &str, target: u32) -> Option<ArtifactId> {
         PlanStepDetail::Semantic(b) => &b.artifact,
         PlanStepDetail::Generate(b) => &b.artifact,
         PlanStepDetail::Extract(b) => &b.artifact,
+        PlanStepDetail::Rank(b) => &b.artifact,
         _ => return None,
     };
     if target == 0 {

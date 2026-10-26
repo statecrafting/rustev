@@ -230,3 +230,64 @@ fn pairwise_budget_is_refused_before_runtime_admission() {
         rustev_core::Category::Budget
     );
 }
+
+#[tokio::test]
+async fn selection_proposal_without_generation_preserves_its_value() {
+    use rustev_contract::definition::{OutcomeDecl, ParamDecl, ParamSource};
+    use rustev_contract::judgment::{OutValue, Outcome};
+    let (mut d, b) = rank::fixture();
+    d.policy.on_unresolved.push(serde_json::from_value(serde_json::json!({"target":"step:chosen","reasons":"any","action":{"escalate":{"reason":"missing"}}})).unwrap());
+    let OutcomeDecl::Propose { params, .. } = &mut d.policy.rules[0].then else {
+        panic!()
+    };
+    params.push(ParamDecl {
+        name: "selected".into(),
+        value: ParamSource::Ref("step:chosen".into()),
+    });
+    assert!(
+        d.steps
+            .iter()
+            .all(|s| !matches!(s.body, StepBody::Generate(_)))
+    );
+    let backend = Scripted::new(b.clone(), |_| {
+        Answer::Output(
+            RawOutput::Ranking {
+                ids: vec!["b".into()],
+                scores: RankingScores::None,
+            },
+            Charge::Observed { units: 1 },
+        )
+    });
+    let rig = rig(config(1, 0, 1), &[(backend, 1)]);
+    let plan = Arc::new(
+        rig.rt
+            .prepare(rustev_core::compile(&d, &[b], &[]).unwrap())
+            .unwrap(),
+    );
+    let mut req = request("selection-no-generation");
+    req.snapshot = rank::snapshot();
+    let result = done(start_req(&rig, &plan, req, &CancelSignal::new()))
+        .await
+        .unwrap();
+    let rustev_contract::run::CoreEvidence::Recorded(core) = &result.record.core else {
+        panic!()
+    };
+    let Outcome::Propose { params, .. } = &core.judgment.outcome else {
+        panic!()
+    };
+    let OutValue::Selection(selected) = &params["selected"] else {
+        panic!()
+    };
+    assert_eq!(selected.entries[0].id, "b");
+    assert_eq!(selected.entries.len(), 3);
+    assert_eq!(
+        Some(selected),
+        core.steps
+            .iter()
+            .find(|s| s.step == "chosen")
+            .unwrap()
+            .selection
+            .as_ref()
+    );
+    assert!(result.text_result.is_none());
+}

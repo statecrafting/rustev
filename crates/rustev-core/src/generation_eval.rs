@@ -96,6 +96,9 @@ impl<'c> GenerationEvaluation<'c> {
                 .max_semantic_requests
                 .saturating_sub(issued),
         };
+        if compiled.info.generation.is_empty() {
+            return Ok(stage);
+        }
         let mut roots = BTreeMap::from([
             ("input".into(), Value::Record(inputs)),
             ("step".into(), Value::Record(exact)),
@@ -1072,11 +1075,9 @@ fn from_out(v: &OutValue) -> Result<Value, GenerationError> {
         OutValue::Filtered(v) => Value::Filtered(v.clone()),
         OutValue::Shortlist(v) => Value::Shortlist(v.clone()),
         OutValue::Ranking(v) => Value::Ranking(v.clone()),
-        OutValue::Selection(_) => {
-            return Err(GenerationError::InvalidState(
-                "selection is not a generation input".into(),
-            ));
-        }
+        // Preserve the distinct kind even when an unrelated generate step exists.
+        // The compiler refuses generation reads of this proposal parameter.
+        OutValue::Selection(v) => Value::Selection(v.clone()),
     })
 }
 // Spec 037 3.3.3, 3.4.3 and 3.4.5: the compiler refuses a ranking or
