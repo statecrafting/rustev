@@ -149,7 +149,10 @@ fn interval(d: &ParameterDecl) -> Option<(Value, Value)> {
 fn compatible(d: &ParameterDecl, s: &Site) -> bool {
     use ParamType as T;
     match s.kind {
-        K::Expr | K::ProposalValue => scalar(&d.ty),
+        K::Expr | K::ProposalValue | K::PromptLiteral => scalar(&d.ty),
+        K::Vocabulary => {
+            matches!(&d.ty, T::List { item, max_items } if *max_items <= 256 && matches!(item.as_ref(), T::Text { max_bytes } if *max_bytes <= 64))
+        }
         K::ExactArgJson => true,
         K::Enabled => d.ty == T::Bool,
         K::Artifact => matches!(d.ty, T::Text { .. }),

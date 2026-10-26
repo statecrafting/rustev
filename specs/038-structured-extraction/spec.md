@@ -1060,6 +1060,22 @@ refusals of 3.7.3 are a pure `bind` function that the compile increment
 maps to `invalid_extraction`; nothing calls the evaluator until then
 (`crates/rustev-core/tests/extraction_fallback.rs`).
 
+**Increment 5, part a (2026-10-26): compile-time checks of the extract
+step.** `crates/rustev-core/src/extraction_compile.rs` applies the
+definition-level checks of 3.3 and 3.7.2 in spec 002's phase order:
+structure and the at-most-8 count, projection references, vocabularies
+(literal, profile parameter and `{input}`, with the 4096-option bound on
+an `enum{options}` input; a `list{item: text}` input's bounds are read at
+evaluation, 3.3.2), enum fields naming declared vocabularies, template
+resolution and profile parameter sites through 037's helpers, request,
+attempt and projection budgets, untrusted projection rules, and the
+supplied fallback program through `extraction_fallback::bind` with its
+canonical document and identity, each refused `invalid_extraction` unless
+3.3 names another category. A definition passing every check still
+refuses with `extraction-not-compiled` until part b adds the plan
+details, the backend capability phase and the model-value gate
+(`crates/rustev-core/tests/extraction_compile.rs`).
+
 ## Decisions at approval
 
 Each is decided within this spec under the work order, inside the binding

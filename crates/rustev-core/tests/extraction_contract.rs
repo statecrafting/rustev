@@ -21,8 +21,20 @@ fn extraction_and_acceptance_require_v2_and_remain_uncompiled() {
         ] {
             d.schema = schema.into();
             let e = compile(&d, &[], &[]).unwrap_err();
-            assert_eq!(e.category, Category::InvalidDefinition);
-            assert_eq!(e.detail, detail);
+            if schema == "rustev.definition/2"
+                && matches!(
+                    d.steps[0].body,
+                    rustev_contract::definition::StepBody::Extract(_)
+                )
+            {
+                // The fixture deliberately supplies neither its inputs nor fallback.
+                assert_eq!(e.category, Category::InvalidExtraction);
+                assert_eq!(e.subject, "step:request_filters");
+                assert!(e.detail.contains("unknown projection input"));
+            } else {
+                assert_eq!(e.category, Category::InvalidDefinition);
+                assert_eq!(e.detail, detail);
+            }
         }
     }
 }

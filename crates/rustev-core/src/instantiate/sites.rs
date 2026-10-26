@@ -16,6 +16,8 @@ pub enum SiteKind {
     AdjustmentScale,
     Enabled,
     ExactArgJson,
+    PromptLiteral,
+    Vocabulary,
 }
 /// Item identity and location survive pruning and do not depend on array renumbering.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -177,6 +179,20 @@ pub fn reference_sites(v: &Value) -> Result<Vec<Site>, InstantiationRefusal> {
                 exact(e, &q, &mut m);
                 exact_roots.push(child(&q, "args"));
             }
+            for (member, kind) in [
+                ("template/params", SiteKind::PromptLiteral),
+                ("vocabularies", SiteKind::Vocabulary),
+            ] {
+                let q = format!("{p}/body/extract/{member}");
+                if let Some(o) = v
+                    .pointer(&format!("/body/extract/{member}"))
+                    .and_then(Value::as_object)
+                {
+                    for name in o.keys() {
+                        m.insert(child(&q, name), kind);
+                    }
+                }
+            }
             for (f, k) in [
                 ("min_determinism", SiteKind::MinDeterminism),
                 ("artifact", SiteKind::Artifact),
@@ -284,6 +300,8 @@ pub(super) fn placeholder(k: SiteKind) -> Value {
         SiteKind::DistributionThreshold | SiteKind::DistributionTolerance => json!("0.01"),
         SiteKind::MinDeterminism => json!("unspecified"),
         SiteKind::Artifact => json!("any"),
+        SiteKind::PromptLiteral => json!({"literal":{"integer":0}}),
+        SiteKind::Vocabulary => json!(["placeholder"]),
         SiteKind::Enabled => json!(true),
         _ => json!(0),
     }
