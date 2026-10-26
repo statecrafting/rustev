@@ -55,7 +55,7 @@ obligations:
     anchor: "3-2-transports"
   - id: "I-5"
     kind: invariant
-    text: "Rustev exposes no Jev wire-compatible endpoint, and no crate outside `integrations/` names Jev, TypeSafe or Vercel."
+    text: "Rustev exposes no Jev wire-compatible endpoint, and no crate outside `integrations/` names Jev, TypeSafe or Vercel, except the recorded spend-journal header schema `rustev-jev.spend-journal/1`, which spec 043 3.5.1 keeps in `crates/rustev-live` because existing journal files carry it."
     anchor: "3-1-position-and-names"
   - id: "R-1"
     kind: requirement
@@ -692,6 +692,14 @@ workspace MSRV moved to 1.88 (spec 021's implementation record), so
 clippy's `collapsible_if` now proposes `let` chains; `cargo clippy --fix`
 collapsed the nested `if`s in integrations/rustev-jev/src/{adapter,spend}.rs. Every test and golden is unchanged.
 
+**2026-10-26, I-5 exception for the moved journal (owner decision).**
+Spec 043 3.5.1 moves the spend journal to `crates/rustev-live` unchanged,
+keeping its header schema `rustev-jev.spend-journal/1` because the journal
+holding the recorded testing spend carries it. The owner chose to narrow
+I-5 to exempt exactly that identifier: the acceptance grep removes it
+before matching, so any other mention of Jev, TypeSafe or Vercel outside
+`integrations/`, including one on the same line, still fails.
+
 ## Verification
 
 Run by `make verify` (012 is in `VERIFIED_SPECS`).
@@ -700,8 +708,9 @@ Run by `make verify` (012 is in `VERIFIED_SPECS`).
 # 3.2 to 3.7 and stage 1 of 3.8: mapping, errors, batching, cost, identity,
 # against recorded fixtures on a loopback server; no external host.
 cargo test -p rustev-jev --locked
-# I-5: the provider is named only under integrations/.
-sh -c 'if grep -rniE "jev|typesafe|vercel" crates tools backends --include=*.rs; then exit 1; fi'
+# I-5: the provider is named only under integrations/; the recorded
+# journal header schema (043 3.5.1) is the one exception.
+sh -c 'if grep -rniE "jev|typesafe|vercel" crates tools backends --include=*.rs | sed "s/rustev-jev\.spend-journal\/1//g" | grep -iE "jev|typesafe|vercel"; then exit 1; fi'
 cargo run -p rustev-boundaries --locked --quiet
 cargo clippy -p rustev-jev --all-targets --locked -- -D warnings
 ```

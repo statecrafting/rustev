@@ -70,6 +70,10 @@
   ],
   "excluded": [
     {
+      "name": "rustev-live",
+      "reason": "spec 043 increment 1 establishes the journal; not yet admitted to the release family"
+    },
+    {
       "name": "rustev-bedrock",
       "reason": "source-links sibling integration files; live AWS stages and provider boundaries are not satisfied by a standalone archive"
     },

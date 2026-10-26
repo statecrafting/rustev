@@ -28,7 +28,7 @@ amends:
   - "026-live-re-execution"
   - "006-cli-surface"
 establishes:
-  - { kind: directory, path: "crates/rustev-live/", planned: true }
+  - { kind: directory, path: "crates/rustev-live/" }
 extends:
   # `rustev.live-reexecution/1` gains mode, purpose, source and run members (3.9).
   - { spec: "002-decision-contract-and-pure-core", unit: { kind: directory, path: "crates/rustev-contract/" }, nature: amending }
@@ -40,6 +40,10 @@ extends:
   - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: amending }
   # The journal source moves to `rustev-live`; `rustev-jev` re-exports it unchanged (3.5).
   - { spec: "012-jev-integration", unit: { kind: directory, path: "integrations/rustev-jev/" }, nature: additive }
+  # Bedrock's journal include becomes a dependency on `rustev-live` (3.5).
+  - { spec: "030-bedrock-backend", unit: { kind: directory, path: "integrations/rustev-bedrock/" }, nature: additive }
+  # `rustev-live` is excluded from the release set until 043 is complete.
+  - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
   # The new crate in the workspace, and 043 in `make verify` at completion.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.toml" }, nature: additive }
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.lock" }, nature: additive }
@@ -690,6 +694,27 @@ objective API (#76 future).
 
 Pending with implementation. Approval satisfies no acceptance item, and no
 live run has been made under this spec.
+
+## Implementation record
+
+Delivered in increments, each its own pull request; nothing here claims an
+acceptance item before the increment that satisfies it.
+
+**Increment 1 (2026-10-26): the crate and the journal.** The workspace
+crate `crates/rustev-live` is established (not published until this spec
+is complete: `publish = false` and a release-set exclusion), and spec
+012's spend journal moves to `rustev_live::journal` unchanged (3.5.1): the
+header schema `rustev-jev.spend-journal/1`, line format, `fsync` per line,
+the `<journal>.lock` writer, crash rules, caps and every public signature
+(including `shared_runtime_ledger`) are as before. `rustev_jev::spend`
+re-exports it, and `rustev-bedrock`, which included the source by path,
+now depends on `rustev-live` and re-exports it as its `spend` module. New:
+`run_spend(run_id)`, the committed units of attempts under
+`live/<run_id>/` (observed, estimated, liability and outstanding;
+released reservations count zero), computed from the journal at open
+(3.5.3). Tests: `crates/rustev-live/tests/journal.rs` (an existing journal
+continues byte for byte, the lock refuses a second writer, run spend
+across a reopen).
 
 ## Decisions at approval
 

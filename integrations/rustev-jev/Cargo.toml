@@ -16,6 +16,7 @@ spec = "012-jev-integration"
 # crate depending on a crate under integrations/. Its dependencies are
 # therefore repeated here.
 [dependencies]
+rustev-live.workspace = true
 rustev-contract = { path = "../../crates/rustev-contract" }
 rustev-core = { path = "../../crates/rustev-core", features = ["parameterized"] }
 rustev-runtime = { path = "../../crates/rustev-runtime" }

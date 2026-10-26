@@ -29,6 +29,8 @@ homepage = "https://github.com/statecrafting/rustev"
 readme = "README.md"
 
 [workspace.dependencies]
+# Spec 043: included by the crates/* workspace member glob.
+rustev-live = { path = "crates/rustev-live", version = "=0.1.0" }
 # The first-release family (spec 021, 3.2): an exact `=X.Y.Z` version beside
 # the path, so a packaged manifest resolves from the registry by version alone.
 rustev-contract = { path = "crates/rustev-contract", version = "=0.1.0" }

@@ -4034,6 +4034,7 @@ dependencies = [
  "rustev-contract",
  "rustev-core",
  "rustev-eval",
+ "rustev-live",
  "rustev-pkg-lodging",
  "rustev-pkg-support-routing",
  "rustev-runtime",
@@ -4140,6 +4141,7 @@ dependencies = [
  "rustev-contract",
  "rustev-core",
  "rustev-eval",
+ "rustev-live",
  "rustev-pkg-lodging",
  "rustev-pkg-support-routing",
  "rustev-runtime",
@@ -4150,6 +4152,16 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "webpki-roots",
+]
+
+[[package]]
+name = "rustev-live"
+version = "0.1.0"
+dependencies = [
+ "rustev-contract",
+ "rustev-runtime",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -45,17 +45,37 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rustev-live",
+        "source": "manifest-metadata"
+      },
+      {
+        "path": "crates/rustev-live/",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/rustev-runtime/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "integrations/rustev-bedrock/",
         "source": "spec-edge"
       },
       {
         "path": "integrations/rustev-jev/",
         "source": "spec-edge"
+      },
+      {
+        "path": "tools/rustev-release/",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/rustev-live/"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -118,6 +138,19 @@
       {
         "locations": [
           {
+            "file": "integrations/rustev-bedrock/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-bedrock/"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "integrations/rustev-jev/"
           }
         ],
@@ -126,6 +159,19 @@
         "unit": {
           "kind": "directory",
           "path": "integrations/rustev-jev/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "tools/rustev-release/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-release/"
         }
       },
       {
@@ -198,5 +244,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "d199699104fc4e104f6335c98ef081ac9e3b671616bd6dd4e1e46fd79930fe65"
+  "shardHash": "f4e4c428ba11fd26fc3d0c2d7d38f9ffdde5c37ff7664a136d9e6424cb57777d"
 }
