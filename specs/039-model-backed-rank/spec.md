@@ -854,6 +854,15 @@ model-derived input there is refused `unaccepted_model_value` (category
 27, phase e), while a field accepted by an accept step (038 5c) may be
 projected (`crates/rustev-core/tests/extraction_compile.rs`).
 
+**Increment 6, part a (2026-10-26): the rules backend.** The rules
+backend serves pointwise `rank` tasks with decimal scoring and declares
+the descriptor `ranking` member (3.14); its program checks refuse an
+unsupported capability (`backends/rustev-backend-rules/tests/ranking.rs`).
+Under owner decision A-49 the Bedrock `rank` admission (3.15) is not part
+of this increment: it lands as its own change after spec 030 is complete,
+with the items A-49 lists as its acceptance. Core evaluation and runtime
+dispatch of rank requests are part b.
+
 ## Decisions at approval
 
 Decided within the binding principles under the work order.

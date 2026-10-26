@@ -401,7 +401,7 @@ pub(crate) fn check(p: &RulesProgram) -> Result<Vec<CTask>, ProgramError> {
 }
 
 fn check_task(t: &Task, at: &str) -> Result<CTask, ProgramError> {
-    if t.operation == Operation::Rank {
+    if t.operation == Operation::Rank && t.options != ["score"] {
         return Err(err(
             format!("{at}.operation"),
             ProgramErrorKind::UnsupportedOperation,
@@ -419,7 +419,11 @@ fn check_task(t: &Task, at: &str) -> Result<CTask, ProgramError> {
         &format!("{at}.options"),
         "options",
         t.options.len(),
-        limits::OPTIONS_MIN,
+        if t.operation == Operation::Rank {
+            1
+        } else {
+            limits::OPTIONS_MIN
+        },
         limits::OPTIONS,
     )?;
     let mut options = BTreeMap::new();
