@@ -137,10 +137,18 @@
           "kind": "file",
           "path": "Makefile"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "directory",
+          "path": "scripts/acceptance/"
+        }
       }
     ],
     "id": "036-mid-plan-acquisition",
-    "implementation": "in-progress",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-16-compatibility",
@@ -202,7 +210,7 @@
       }
     ],
     "sectionDigests": {
-      "036-mid-plan-context-acquisition-and-tiered-widening-amends-002-003-and-004": "d4da67826ff392e5c727929bf82fe5300282c533232b929b5542194fbf088b68",
+      "036-mid-plan-context-acquisition-and-tiered-widening-amends-002-003-and-004": "ecb79230f51153e481ba10912ff8922369efeea4d3ad2647edccbe553c7a6da4",
       "1-purpose": "5f4083dcf506f001c722d1559490954eefda6c0f4d165ded1ce82b74e9f7080e",
       "2-1-binding-principles-of-76": "74cdc41bd77da3dc5d7d5cad0318c24c60c7c65da25249d0b7ccebcef90e638b",
       "2-territory": "7bb46b0fedbdcd774748e9a7a569aaac1aa1b3ee828d689539892160fef3690d",
@@ -227,8 +235,8 @@
       "5-observable-negative-cases": "99e86f2e426d34ebd081d98971f7e51bacec7751293d14a830e70ab7552d80ae",
       "acceptance": "2fbadd315a98c37d5f5c4f97cb19f9a5c7f0bde28969c9363b35dab92303071b",
       "decisions-at-approval": "a716b6a3d1f4cdeb2c11cb79f44340a6fd4def4157c9e4230d5b6eb3842bdd0f",
-      "implementation-record": "6dd561a1b5c66728fcfd0ae918893529201858375fe2d6dc0c688944312e4063",
-      "verification": "ac006f1e2308300a1ebbc0c2ba5b45bd7f9d0c56ea898d34424a7448565534ed"
+      "implementation-record": "e51c998971aca4f1d09f6d8940b66169e83d09e60481d8dd826d243014f56813",
+      "verification": "17a6f08f5f019138004722894c163cc42c2ef2b95f60ed5633d656f213635928"
     },
     "sectionHeadings": [
       "036: Mid-plan context acquisition and tiered widening (amends 002, 003 and 004)",
@@ -261,9 +269,9 @@
     ],
     "specPath": "specs/036-mid-plan-acquisition/spec.md",
     "status": "approved",
-    "summary": "An amendment of approved specs 002, 003 and 004 (R-16), for #76 child B1 under owner decision R-40 (OD-3 of #76). A plan may declare bounded acquisition steps that ask a host-implemented acquisition source for more context between steps, with requests built only from exact values and literals, and a tiered widening construct that tries a finite, declared list of increasingly broad requests (optionally across sources) until a stop condition holds, never relaxing protected constraints. Paging is bounded by pages, items and a stop condition. Adds acquisition operations to spec 032's source descriptor (`rustev.source/1`), acquisition request and page documents, the `compose_key@1` operator, a typed `skipped` outcome, compile-time call, item, byte, deadline and cost budgets, and the in-process `AcquisitionSource` seam a later remote protocol (#76 A2) carries. Every page is recorded and captured by request identity; offline replay never dispatches and an uncaptured request is `missing_evidence`. Adds to the #76 track versions introduced by spec 032 (source 1, definition 2, plan 3, evidence 2, run 3, exact 2), introduces the track version `rustev.replay/2`, and admits every plan 3 decision to capture and replay, lifting spec 032's interim `capture_unsupported` refusal. Plans that use no #76 construct keep byte-identical documents and `PlanId`s. Approved (A-33); implementation is in progress.\n",
+    "summary": "An amendment of approved specs 002, 003 and 004 (R-16), for #76 child B1 under owner decision R-40 (OD-3 of #76). A plan may declare bounded acquisition steps that ask a host-implemented acquisition source for more context between steps, with requests built only from exact values and literals, and a tiered widening construct that tries a finite, declared list of increasingly broad requests (optionally across sources) until a stop condition holds, never relaxing protected constraints. Paging is bounded by pages, items and a stop condition. Adds acquisition operations to spec 032's source descriptor (`rustev.source/1`), acquisition request and page documents, the `compose_key@1` operator, a typed `skipped` outcome, compile-time call, item, byte, deadline and cost budgets, and the in-process `AcquisitionSource` seam a later remote protocol (#76 A2) carries. Every page is recorded and captured by request identity; offline replay never dispatches and an uncaptured request is `missing_evidence`. Adds to the #76 track versions introduced by spec 032 (source 1, definition 2, plan 3, evidence 2, run 3, exact 2), introduces the track version `rustev.replay/2`, and admits every plan 3 decision to capture and replay, lifting spec 032's interim `capture_unsupported` refusal. Plans that use no #76 construct keep byte-identical documents and `PlanId`s. Approved (A-33); implementation is complete.\n",
     "title": "Mid-plan context acquisition and tiered widening (amends 002, 003 and 004)"
   },
-  "shardHash": "aa05f1bb0b7f81b782eea54e7351ed42fd8f37e416b9cc0ddc9f8dcfccfa3a9d",
+  "shardHash": "f60fb0290402905af30318b2938d4026cbf59b8e64e83bf4796f348d00251fe0",
   "specVersion": "1.10.0"
 }

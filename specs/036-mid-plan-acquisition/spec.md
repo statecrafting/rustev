@@ -2,7 +2,7 @@
 id: "036-mid-plan-acquisition"
 title: "Mid-plan context acquisition and tiered widening (amends 002, 003 and 004)"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-10-17"
 summary: >
   An amendment of approved specs 002, 003 and 004 (R-16), for #76 child B1
@@ -26,7 +26,7 @@ summary: >
   decision to capture and replay, lifting spec 032's interim
   `capture_unsupported` refusal. Plans that use no #76 construct keep
   byte-identical documents and `PlanId`s. Approved (A-33); implementation
-  is in progress.
+  is complete.
 amends:
   - "002-decision-contract-and-pure-core"
   - "003-runtime-execution-and-evidence"
@@ -65,6 +65,7 @@ extends:
   - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
   # Adds 036 to `make verify` when the implementation is complete.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "002-decision-contract-and-pure-core"
@@ -978,7 +979,29 @@ decision-result cache (#76 F1); quality claims (R-04, R-37).
 
 ## Verification
 
-Pending with implementation. Approval satisfies no acceptance item.
+Declared for `spec-spine verify 036`; 036 is in `make verify` and in CI's
+`integrations-core` acceptance group.
+
+```verify:cli
+# 3.2, 3.3, 3.10, 3.14, 3.15: source, acquisition, record and cache wire.
+cargo test -p rustev-contract --locked --test acquisition_wire --test acquisition_steps --test acquisition_records --test acquisition_cache
+# 3.4 to 3.9: structure, compilation, refusals 20 and 21, budgets.
+cargo test -p rustev-core --locked --test acquisition_structure --test acquisition_compile
+# 3.7, 3.8, 3.11: compose_key, constructed values, staged evaluation.
+cargo test -p rustev-core --locked --test compose_key --test acquisition_eval
+# 3.4.8: the plan 3 field projection.
+cargo test -p rustev-core --locked --lib expr::
+# 3.12 to 3.14: runtime dispatch, windows, retries, cancellation, cache.
+cargo test -p rustev-runtime --locked --test acquisition
+# 3.15: capture, replay 2 and reproduction.
+cargo test -p rustev-eval --locked --test acquisition_replay
+# Refusal goldens through the binary, including category 20.
+cargo test -p rustev-cli --locked --test plan
+# Reference definitions and acceptance scenarios (lodging package).
+cargo test -p rustev-pkg-lodging --locked --test acquisition --test evidence_quality
+# The Acceptance's six seeds, each detected.
+sh crates/rustev-eval/mutation/seeds.sh "spec 036"
+```
 
 ## Implementation record
 
@@ -1159,6 +1182,19 @@ mutation seeds (a protected field patched, a skipped value treated as
 empty, a retry on `denied`, a truncation without notice, tier order
 reversed, an uncaptured page dispatched in replay) are each detected;
 `spec 036` joins the harness's `OWN_RUNS`.
+
+**Closure (2026-10-26).** Declared verification added (section
+Verification); 036 joins `VERIFIED_SPECS` and the `integrations-core`
+acceptance group. Every Acceptance item and every section 5 row is mapped
+to its exact test in `packages/rustev-pkg-lodging/tests/acquisition/README.md`
+(increment 5). Specs 032 and 033 are complete, so the corroboration grade
+assertions and the `rustev.judgment/2` replay case run rather than being
+reported as externally blocked. Compatibility: every existing golden is
+byte-identical; the one assertion that changed is the lodging capture test,
+whose former `capture_unsupported` refusal for plan 3 is the behaviour
+increment 4 replaces (section 5). The six seeded defects are each detected
+by `seeds.sh "spec 036"`. `make code`, `spec-spine verify 036` and `make
+gate` pass on this change's tree.
 
 ## Decisions at approval
 

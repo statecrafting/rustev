@@ -17,7 +17,7 @@ SPEC_SPINE ?= $(if $(wildcard $(SPEC_SPINE_LOCAL)),$(SPEC_SPINE_LOCAL),spec-spin
 
 CRATE_MANIFESTS := $(wildcard crates/*/Cargo.toml backends/*/Cargo.toml tools/*/Cargo.toml integrations/*/Cargo.toml)
 SKIP_NOTE := no crate exists yet, so cargo has nothing to judge
-VERIFIED_SPECS := 001 002 003 004 005 006 007 008 009 010 012 013 014 015 017 019 020 022 023 026 027 028 029 033 034 035 040 045 049
+VERIFIED_SPECS := 001 002 003 004 005 006 007 008 009 010 012 013 014 015 017 019 020 022 023 026 027 028 029 033 034 035 036 040 045 049
 
 .PHONY: tools gate refresh code build test clippy fmt boundaries verify verified-specs release-candidate adoption msrv semver changelog conformance conformance-harvest bindings landing-status
 
