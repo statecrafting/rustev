@@ -511,6 +511,7 @@ impl From<ArithError> for Fault {
 
 /// Values visible while evaluating.
 pub struct Scope<'a> {
+    pub constructed: Option<&'a BTreeSet<String>>,
     pub now: Timestamp,
     pub inputs: &'a BTreeMap<String, Value>,
     pub steps: &'a BTreeMap<String, Value>,
@@ -779,7 +780,10 @@ pub fn eval_predicate(p: &Predicate, s: &Scope<'_>) -> Result<bool, Fault> {
             let v = eval_expr(value, s)?;
             Ok(set.iter().any(|l| Value::from_literal(l) == v))
         }
-        Predicate::IsConstructed { .. } => Err(Fault::Invalid("acquisition-not-compiled".into())),
+        Predicate::IsConstructed { reference } => Ok(s
+            .constructed
+            .is_some_and(|set| set.contains(&base_ref_v2(reference)))
+            && eval_ref(reference, s).is_ok()),
         Predicate::Present(r) => Ok(r
             .strip_prefix("input:")
             .is_some_and(|n| s.present.contains(n))),
@@ -859,6 +863,7 @@ mod tests {
         let steps = BTreeMap::new();
         let present = BTreeSet::new();
         let s = Scope {
+            constructed: None,
             now: Timestamp::from_ms(0).unwrap(),
             inputs: &inputs,
             steps: &steps,
@@ -924,6 +929,7 @@ mod tests {
         let values = BTreeMap::from([("".to_string(), Value::Bool(true))]);
         let present = BTreeSet::new();
         let s = Scope {
+            constructed: None,
             now: Timestamp::from_ms(0).unwrap(),
             inputs: &BTreeMap::new(),
             steps: &values,
@@ -990,6 +996,7 @@ mod tests {
         let steps = BTreeMap::new();
         let present = BTreeSet::new();
         let s = Scope {
+            constructed: None,
             now: Timestamp::from_ms(0).unwrap(),
             inputs: &inputs,
             steps: &steps,
@@ -1015,6 +1022,7 @@ mod tests {
         let steps = BTreeMap::new();
         let present = BTreeSet::new();
         let s = Scope {
+            constructed: None,
             now: Timestamp::from_ms(0).unwrap(),
             inputs: &inputs,
             steps: &steps,

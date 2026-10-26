@@ -227,6 +227,13 @@ pub(super) fn projection_bound(max_bytes: u64) -> u64 {
 /// adding an operator requires a disclosure decision, pinned in tests.
 fn copies(a: &OpArgs) -> Vec<(String, Option<String>)> {
     match a {
+        OpArgs::ComposeKey(a) => {
+            let mut refs = vec![];
+            for part in &a.parts {
+                crate::expr::expr_refs(&part.value, &mut refs);
+            }
+            refs.into_iter().map(|r| (r, None)).collect()
+        }
         OpArgs::FilterWithReasons(a) => vec![(a.list.clone(), Some(a.id_field.clone()))],
         OpArgs::TopK(a) => vec![(a.list.clone(), Some(a.id_field.clone()))],
         OpArgs::WeightedRank(a) => vec![(a.candidates.clone(), None)],
@@ -610,6 +617,11 @@ mod tests {
     #[test]
     fn exact_text_copy_table_covers_every_registry_operator() {
         let rows = [
+            (
+                "compose_key",
+                json!({"parts":[{"value":{"ref":"input:untrusted_text"},"normalize":"exact"},{"value":{"ref":"input:other_text"},"normalize":"ascii_token"}],"separator":":"}),
+                vec![("input:untrusted_text", None), ("input:other_text", None)],
+            ),
             (
                 "count_where",
                 json!({"list":"input:xs","predicate":{"all":[]}}),
