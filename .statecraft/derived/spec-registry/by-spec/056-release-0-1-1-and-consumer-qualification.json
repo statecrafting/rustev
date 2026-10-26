@@ -83,7 +83,7 @@
       }
     ],
     "sectionDigests": {
-      "056-release-0-1-1-a-cli-version-command-declared-consumer-examples-and-the-fresh-consumer-qualification-amends-006-007-and-031": "42409672067f0fcfd2d99c8f66352cf4a20202d211b5bf278dc40a85542cdd16",
+      "056-release-0-1-1-a-cli-version-command-declared-consumer-examples-and-the-fresh-consumer-qualification-amends-006-007-and-031": "20ed19bc660f0c1b842302aaa7836a5977b5c7b5489f0fe1190c99bd995ccc0e",
       "1-purpose": "e666644f03c77644b46a2bd02ace58cdbd73be6d7e4397624b05524b8f5f68ef",
       "2-territory": "f0d9409479a8856c8cf8bb9c47564cc3f811195271d0f801c984d9401905e37c",
       "3-1-the-version-command": "aa334437072a5f0fb26d0c09fdad49b79ec84864250b19b0079b1941b4d3ac76",
@@ -113,10 +113,10 @@
       "Implementation record"
     ],
     "specPath": "specs/056-release-0-1-1-and-consumer-qualification/spec.md",
-    "status": "draft",
-    "summary": "A narrow amendment of approved specs 006, 007 and 031, written after `v0.1.0` was published to crates.io, npm and GitHub on 2026-10-26 but could not be qualified (021 3.10, 031 3.9.7). The CLI has no version command; the support-routing package declares no runnable offline example (its SYNTHETIC rules program is a test fixture of the rules backend); no harness runs the registry-only consumer across the platform matrix; and the npm packages carry no provenance. This spec adds `rustev version`, ships the package's SYNTHETIC example as package data, adds the qualification harness and its workflow, and defines how the owner authorizes a release after `0.1.0`, so that `0.1.1` is published through the existing pipeline with npm provenance and qualified.\n",
+    "status": "approved",
+    "summary": "A narrow amendment of approved specs 006, 007 and 031, written after `v0.1.0` was published to crates.io, npm and GitHub on 2026-10-26 but could not be qualified (021 3.10, 031 3.9.7). The CLI has no version command; the support-routing package declares no runnable offline example (its SYNTHETIC rules program is a test fixture of the rules backend); no harness runs the registry-only consumer across the platform matrix; and the npm packages carry no provenance. This spec adds `rustev version`, ships the package's SYNTHETIC example as package data, adds the qualification harness and its workflow, and defines how the owner authorizes a release after `0.1.0`, so that `0.1.1` is published through the existing pipeline with npm provenance and qualified. Ratified by the owner on 2026-10-26 (A-58).\n",
     "title": "Release 0.1.1: a CLI version command, declared consumer examples and the fresh-consumer qualification (amends 006, 007 and 031)"
   },
-  "shardHash": "70500e2de9e2e661f3c6d9f470838dc213451ca6a8a2e469f8af7f2884b32857",
+  "shardHash": "8dea96219c5b1980321fadeb8242e1fbf6f4aabdd7f32e652eb75e2643f7c1b5",
   "specVersion": "1.10.0"
 }

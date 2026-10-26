@@ -1,7 +1,7 @@
 ---
 id: "056-release-0-1-1-and-consumer-qualification"
 title: "Release 0.1.1: a CLI version command, declared consumer examples and the fresh-consumer qualification (amends 006, 007 and 031)"
-status: draft
+status: approved
 implementation: pending
 created: "2026-10-26"
 summary: >
@@ -15,7 +15,8 @@ summary: >
   ships the package's SYNTHETIC example as package data, adds the
   qualification harness and its workflow, and defines how the owner
   authorizes a release after `0.1.0`, so that `0.1.1` is published through
-  the existing pipeline with npm provenance and qualified.
+  the existing pipeline with npm provenance and qualified. Ratified by the
+  owner on 2026-10-26 (A-58).
 amends:
   - "006-cli-surface"
   - "007-support-routing-package"
@@ -60,7 +61,7 @@ obligations:
 
 # 056: Release 0.1.1, a CLI version command, declared consumer examples and the fresh-consumer qualification (amends 006, 007 and 031)
 
-Draft: the owner ratifies it before any change it describes merges. The
+Approved: ratified by the owner on 2026-10-26 (decision A-58). The
 approved texts of 006, 007 and 031 are not edited; this spec records what
 it adds to them. Spec 021 is not amended: its fresh-consumer steps (3.10)
 and version policy (3.2) are implemented here as written.
