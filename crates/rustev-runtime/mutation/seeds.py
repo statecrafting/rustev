@@ -134,8 +134,14 @@ SEEDS = [
     (
         "a panic while building an attempt not contained",
         RT + "driver.rs",
-        "let work = match catch_unwind(AssertUnwindSafe(|| backend.infer(call))) {",
-        "let work = match Ok::<_, Box<dyn std::any::Any + Send>>(backend.infer(call)) {",
+        """let work = match catch_unwind(AssertUnwindSafe(|| match &fields {
+        Some(fields) if fields.enabled => backend.infer_generation(call, fields),
+        _ => backend.infer(call),
+    })) {""",
+        """let work = match Ok::<_, Box<dyn std::any::Any + Send>>(match &fields {
+        Some(fields) if fields.enabled => backend.infer_generation(call, fields),
+        _ => backend.infer(call),
+    }) {""",
         ["--test", "retry"],
     ),
     (

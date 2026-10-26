@@ -1071,6 +1071,16 @@ decision service refuses with spec 042's `internal_error` (500, gRPC
 `INTERNAL`; owner decision 2026-10-26), never a request refusal.
 Streaming (3.13) and caching (3.14) follow in part 2.
 
+**Increment 5, part 2 (2026-10-26): streaming and caching.** Streaming
+(3.13) goes through an additive, default-compatible path on the core's
+backend seam: fields are delivered in order and only after validation,
+with lag bounded and the stream's waker woken only after its lock is
+released; a backend without the path behaves exactly as before. Generated
+values are cached under spec 017 per 3.14, keyed with the template
+identities and the authorized scope, preserving per-field origins and the
+cached source in every copy; a template change invalidates. Tests:
+`crates/rustev-runtime/tests/generation.rs` grows to 20.
+
 **Owner decision A-49 (2026-10-23): dependencies.** Spec 030 is no longer
 a declared dependency of this spec. No behavior or acceptance item here
 needs it: provider wire mappings, "including Bedrock's (spec 030 3.12)",

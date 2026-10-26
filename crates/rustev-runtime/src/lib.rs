@@ -18,6 +18,7 @@ pub mod clock;
 mod driver;
 mod dynamic;
 mod generation;
+pub use generation::{GenerationEvent, GenerationStream};
 pub mod ledger;
 mod live;
 mod optimization;
@@ -692,7 +693,7 @@ impl Runtime {
         req: DecisionRequest,
         cancel: &CancelSignal,
     ) -> Result<Decided, DecideError> {
-        self.run(plan, req, cancel, None, None, None).await
+        self.run(plan, req, cancel, None, None, None, None).await
     }
 
     /// Run with a value-free observer. The ordinary entry point has no callbacks.
@@ -703,7 +704,7 @@ impl Runtime {
         cancel: &CancelSignal,
         observer: &dyn ProgressObserver,
     ) -> Result<Decided, DecideError> {
-        self.run(plan, req, cancel, None, None, Some(observer))
+        self.run(plan, req, cancel, None, None, Some(observer), None)
             .await
     }
 
@@ -726,7 +727,7 @@ impl Runtime {
         let decision_id = req.decision_id.clone();
         let mut capturing = capture::Capturing::new(capture);
         let result = self
-            .run(plan, req, cancel, Some(&mut capturing), None, None)
+            .run(plan, req, cancel, Some(&mut capturing), None, None, None)
             .await;
         let capture = match &result {
             Err(DecideError::Rejected(_) | DecideError::GenerationFailed(_)) => {
@@ -741,6 +742,32 @@ impl Runtime {
         Ok(CapturedDecision { result, capture })
     }
 
+    /// Start an opt-in field stream. Poll the returned future to drive execution;
+    /// the receiver may be polled independently and never backpressures it.
+    pub fn decide_streaming<'a>(
+        &'a self,
+        plan: &'a PreparedPlan,
+        req: DecisionRequest,
+        cancel: &'a CancelSignal,
+        stream_buffer: usize,
+    ) -> Result<
+        (
+            impl std::future::Future<Output = Result<Decided, DecideError>> + Send + 'a,
+            GenerationStream,
+        ),
+        rustev_core::generation_eval::GenerationError,
+    > {
+        let (streaming, receiver) = generation::Streaming::new(plan, stream_buffer)?;
+        Ok((
+            async move {
+                self.run(plan, req, cancel, None, None, None, Some(&streaming))
+                    .await
+            },
+            receiver,
+        ))
+    }
+
+    #[allow(clippy::too_many_arguments)]
     async fn run(
         &self,
         plan: &PreparedPlan,
@@ -749,6 +776,7 @@ impl Runtime {
         capture: Option<&mut capture::Capturing<'_>>,
         live: Option<&live::LiveCtx<'_>>,
         observer: Option<&dyn ProgressObserver>,
+        streaming: Option<&generation::Streaming>,
     ) -> Result<Decided, DecideError> {
         let i = &*self.inner;
         // The runtime waits on its own child of the caller's signal, so a
@@ -813,6 +841,12 @@ impl Runtime {
 
         let ledger = Ledger::new(plan.cost);
         let ev = std::sync::Mutex::new(ev);
+        let deferred_cache = Mutex::new(vec![]);
+        let has_generation = compiled
+            .plan
+            .steps
+            .iter()
+            .any(|s| matches!(s.detail, PlanStepDetail::Generate(_)));
         let (mut requests, acquisitions, mut cancelled) = {
             let cx = driver::DecisionCtx {
                 rt: i,
@@ -827,7 +861,9 @@ impl Runtime {
                 ev: Some(&ev),
                 generation: None,
                 step_ledger: None,
+                stream: None,
                 item_clock: None,
+                deferred_cache: has_generation.then_some(&deferred_cache),
                 live,
                 observing: observing.as_ref(),
             };
@@ -844,8 +880,13 @@ impl Runtime {
             decision_id: &req.decision_id,
             principal: &req.principal_handle,
             evaluation_time: req.evaluation_time,
+            streaming,
         };
         let mut text_result = None;
+        let mut writes = vec![];
+        // Spec 037 3.13.1 permits Complete only after final verification and
+        // defines no failure event. Both cancellation paths close the stream
+        // without Complete: cancellation has no text result (3.12.6).
         let (completion, core) = if cancelled {
             (Completion::Cancelled, CoreEvidence::NotProduced)
         } else {
@@ -856,12 +897,13 @@ impl Runtime {
             // Spec 003 3.9.1 permits only judged or cancelled records; spec 037
             // 3.12.6 requires generation to complete before judged. An invariant
             // failure has no specified run-record termination, so this path
-            // returns GenerationFailed without delivery. Ordinary
+            // returns GenerationFailed without delivery or cache writes. Ordinary
             // backend failures resolve through backstops and still deliver evidence
             // (037 3.10.2, 3.12.7, 3.15.2); they do not take this error path.
-            let (generation_requests, was_cancelled) = generation::run(&stage_cx, &stage)
-                .await
-                .map_err(|e| DecideError::GenerationFailed(e.to_string()))?;
+            let (generation_requests, pending_writes, was_cancelled) =
+                generation::run(&stage_cx, &stage)
+                    .await
+                    .map_err(|e| DecideError::GenerationFailed(e.to_string()))?;
             requests.extend(generation_requests);
             cancelled = was_cancelled;
             if cancelled {
@@ -873,11 +915,18 @@ impl Runtime {
                     .map_err(|e| DecideError::GenerationFailed(e.to_string()))?;
                 if let Some(text) = &mut text {
                     stage.verify_ownership(&mut judgment, text);
+                    if let Some(streaming) = streaming {
+                        streaming.finish(text);
+                    }
                 }
                 if let Some(o) = &observing {
                     o.remaining(&evidence, &requests, &compiled.plan);
                 }
                 text_result = text;
+                writes = deferred_cache
+                    .into_inner()
+                    .unwrap_or_else(|e| e.into_inner());
+                writes.extend(pending_writes);
                 (
                     Completion::Judged(Box::new(judgment)),
                     CoreEvidence::Recorded(Box::new(evidence)),
@@ -930,12 +979,15 @@ impl Runtime {
         let delivery = self.deliver(record.clone()).await;
         abandon.armed = false;
         match delivery {
-            Ok(delivery) => Ok(Decided {
-                text_result,
-                completion,
-                record,
-                delivery,
-            }),
+            Ok(delivery) => {
+                generation::write_cache(&stage_cx, writes);
+                Ok(Decided {
+                    text_result,
+                    completion,
+                    record,
+                    delivery,
+                })
+            }
             Err(failure) => Err(DecideError::EvidenceNotDelivered { record, failure }),
         }
     }

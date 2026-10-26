@@ -74,7 +74,9 @@ pub(crate) struct DecisionCtx<'a, 'e> {
     pub ev: Option<&'a Mutex<Evaluation<'e>>>,
     pub generation: Option<&'a Mutex<rustev_core::generation_eval::GenerationEvaluation<'e>>>,
     pub step_ledger: Option<&'a Ledger>,
+    pub deferred_cache: Option<&'a Mutex<Vec<crate::generation::PendingWrite>>>,
     pub item_clock: Option<&'a crate::generation::ItemClock>,
+    pub stream: Option<&'a crate::generation::RequestStream>,
     /// Present only on the live re-execution path (spec 026).
     pub live: Option<&'a LiveCtx<'a>>,
 }
@@ -211,7 +213,7 @@ pub(crate) struct RequestOutcome {
     pub(crate) record: RequestRecord,
     /// Where a validated output may be cached: the request's key and the
     /// namespace generation captured before it ran.
-    cache: Option<(RequestKey, u64)>,
+    pub(crate) cache: Option<(RequestKey, u64)>,
 }
 
 type Driving<'a> = Pin<Box<dyn Future<Output = RequestOutcome> + Send + 'a>>;
@@ -548,7 +550,7 @@ enum CacheLookup {
     },
 }
 
-fn cache_miss_detail(miss: CacheMiss) -> &'static str {
+pub(crate) fn cache_miss_detail(miss: CacheMiss) -> &'static str {
     match miss {
         CacheMiss::Absent => "memory cache miss",
         CacheMiss::Expired => "memory cache entry expired or invalidated",
@@ -565,7 +567,7 @@ fn cache_refusal_detail(refusal: CacheRefusal) -> &'static str {
     }
 }
 
-fn observation(
+pub(crate) fn observation(
     policy: &OptimizationPolicy,
     mechanism: OptimizationMechanism,
     outcome: OptimizationOutcome,
@@ -717,7 +719,7 @@ fn cache_lookup(cx: &DecisionCtx<'_, '_>, req: &SemanticRequest) -> CacheLookup 
 /// Complete a request's optimization record and admit a validated output of
 /// the bound target to the memory cache. Only target 0's output is keyed by
 /// target 0's identity: a fallback's output is never cached (spec 017, 3.1).
-fn admit_to_cache(cx: &DecisionCtx<'_, '_>, out: &mut RequestOutcome) {
+pub(crate) fn record_cache_cost(out: &mut RequestOutcome) {
     if let Some(o) = out.record.optimization.as_mut()
         && o.mechanism != OptimizationMechanism::Batch
         && o.charge_owner
@@ -734,6 +736,19 @@ fn admit_to_cache(cx: &DecisionCtx<'_, '_>, out: &mut RequestOutcome) {
                 }
             }
         }
+    }
+}
+
+fn admit_to_cache(cx: &DecisionCtx<'_, '_>, out: &mut RequestOutcome) {
+    record_cache_cost(out);
+    if let Some(deferred) = cx.deferred_cache {
+        if let Some(write) = crate::generation::pending_write(out, cx.now()) {
+            deferred
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .push(write);
+        }
+        return;
     }
     let (Some((key, generation)), Some(Supplied::Output(raw)), Some(memory), Some(attempt)) = (
         &out.cache,
@@ -1402,6 +1417,25 @@ fn conclude_batch(
 // Independent execution (spec 003)
 // ---------------------------------------------------------------------------
 
+/// The inverse of `escape`, in one pass so no decoded `%` is decoded again.
+pub(crate) fn unescape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut rest = s;
+    while let Some(i) = rest.find('%') {
+        out.push_str(&rest[..i]);
+        let (c, skip) = match rest.get(i..i + 3) {
+            Some("%2F") => ('/', 3),
+            Some("%2C") => (',', 3),
+            Some("%25") => ('%', 3),
+            _ => ('%', 1),
+        };
+        out.push(c);
+        rest = &rest[i + skip..];
+    }
+    out.push_str(rest);
+    out
+}
+
 /// Percent-escape `%`, `/` and `,` so an attempt id's components cannot run
 /// into each other (spec 003, 3.9.2).
 pub(crate) fn escape(s: &str) -> String {
@@ -1864,7 +1898,13 @@ async fn attempt(
     let backend = &target.registered.backend;
     // A panic while building the future is contained like one while polling
     // it (spec 003, 3.4.4).
-    let work = match catch_unwind(AssertUnwindSafe(|| backend.infer(call))) {
+    let fields = cx
+        .stream
+        .map(|s| s.attempt(attempt_id, backend.descriptor()));
+    let work = match catch_unwind(AssertUnwindSafe(|| match &fields {
+        Some(fields) if fields.enabled => backend.infer_generation(call, fields),
+        _ => backend.infer(call),
+    })) {
         Ok(f) => f,
         Err(p) => {
             return (
@@ -2004,11 +2044,14 @@ pub(crate) fn answered(ack: CancelAck, charge: Charge) -> (Cancellation, RemoteS
 
 #[cfg(test)]
 mod tests {
-    use super::{allocate, escape};
+    use super::{allocate, escape, unescape};
 
     #[test]
     fn attempt_id_components_cannot_collide() {
         assert_eq!(escape("a/b,c%d"), "a%2Fb%2Cc%25d");
+        for s in ["a/b,c%d", "%2F", "%252F", "%%2C", "plain", ""] {
+            assert_eq!(unescape(&escape(s)), s);
+        }
         let id = |parts: &[&str]| {
             parts
                 .iter()

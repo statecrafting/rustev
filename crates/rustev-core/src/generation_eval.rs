@@ -467,6 +467,21 @@ impl<'c> GenerationEvaluation<'c> {
         Ok(())
     }
 
+    /// Mark only slots supplied by this cached attempt, preserving their origin.
+    /// A later repair or backstop does not inherit another attempt's delivery.
+    pub fn note_cached_attempt(&mut self, attempt: &str, decision: &str) {
+        for item in &mut self.items {
+            for field in item.result.generated.values_mut() {
+                if matches!(&field.lineage, Some(TextLineage::Model { attempt: a, .. }) if a == attempt)
+                {
+                    field.source = TextSource::ServedFromCache {
+                        original_decision_id: decision.into(),
+                    };
+                }
+            }
+        }
+    }
+
     /// Runtime withholding (including missing output) ends only unresolved
     /// slots. It never replaces a valid field or changes the judgment.
     pub fn withhold(

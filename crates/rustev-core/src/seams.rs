@@ -151,6 +151,12 @@ pub struct BatchAttemptReport {
     pub remote: RemoteEnd,
 }
 
+/// Receives complete candidate fields during a generation attempt. The runtime
+/// validates each field before exposing it. Core never invokes this seam.
+pub trait GenerationFields: Send + Sync {
+    fn field(&self, name: &str, value: rustev_contract::output::TextValue);
+}
+
 /// Answers semantic requests. States its capabilities and its cost; never
 /// manufactures a distribution or a calibration claim.
 pub trait DecisionBackend: Send + Sync {
@@ -161,6 +167,16 @@ pub trait DecisionBackend: Send + Sync {
     /// `bounded`; fractional costs are rounded up.
     fn cost_bound(&self, projection: &[u8]) -> CostBound;
     fn infer<'a>(&'a self, call: AttemptCall<'a>) -> BoxFuture<'a, AttemptReport>;
+
+    /// Optional generation streaming. Existing backends return their ordinary
+    /// complete report without emitting provisional fields.
+    fn infer_generation<'a>(
+        &'a self,
+        call: AttemptCall<'a>,
+        _fields: &'a dyn GenerationFields,
+    ) -> BoxFuture<'a, AttemptReport> {
+        self.infer(call)
+    }
 
     /// Opt-in general batch declaration. `None` preserves unbatched behavior.
     fn batch_capability(&self, _projection: &[u8]) -> Option<BatchCapability> {

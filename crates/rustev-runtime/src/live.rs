@@ -454,6 +454,7 @@ impl Runtime {
                 capturing.as_mut(),
                 Some(&live),
                 None,
+                None,
             )
             .await;
         let (record, delivery) = match result {
