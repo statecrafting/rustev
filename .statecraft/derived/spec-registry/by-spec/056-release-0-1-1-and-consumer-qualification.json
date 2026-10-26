@@ -58,13 +58,13 @@
         "anchor": "3-3-the-qualification-harness",
         "id": "R-3",
         "kind": "requirement",
-        "text": "The qualification harness runs every step of 021 3.10 and of 031 3.9.7 (a), (b) and (d) against the public registries only, from an empty Cargo home and npm cache with no registry credential, and writes per step its command, output, lockfile or install record, checksums and environment identity; a step it cannot run is reported as not run with its reason, never as passing."
+        "text": "The qualification harness runs every step of 021 3.10 and of 031 3.9.7 for each artifact kind the signed manifest names (crates, npm, CLI binaries; 3.9.7 (c) only when the manifest names an image) against the public registries only, from an empty Cargo home and npm cache with no registry credential, and writes per step its command, output, lockfile or install record, checksums and environment identity; a step it cannot run is reported as not run with its reason, never as passing."
       },
       {
         "anchor": "3-3-the-qualification-harness",
         "id": "R-4",
         "kind": "requirement",
-        "text": "The release lifecycle reaches `qualified` only through `rustev-release qualify`, which records the digest of each required evidence file of the harness and refuses when one is missing, failing or `not_run`."
+        "text": "The release lifecycle reaches `qualified` only through `rustev-release qualify`, which records the digest of each required evidence file of the harness and refuses when one is missing, failing or `not_run`; a step is `excluded`, and not required, only when the signed manifest names no artifact of its kind."
       },
       {
         "anchor": "3-4-authority-for-a-later-release",
@@ -83,15 +83,15 @@
       }
     ],
     "sectionDigests": {
-      "056-release-0-1-1-a-cli-version-command-declared-consumer-examples-and-the-fresh-consumer-qualification-amends-006-007-and-031": "a6f041de469e263846129867076d211417b9e52ad5b676f798421c6828b5aa12",
+      "056-release-0-1-1-a-cli-version-command-declared-consumer-examples-and-the-fresh-consumer-qualification-amends-006-007-and-031": "42409672067f0fcfd2d99c8f66352cf4a20202d211b5bf278dc40a85542cdd16",
       "1-purpose": "e666644f03c77644b46a2bd02ace58cdbd73be6d7e4397624b05524b8f5f68ef",
       "2-territory": "f0d9409479a8856c8cf8bb9c47564cc3f811195271d0f801c984d9401905e37c",
       "3-1-the-version-command": "aa334437072a5f0fb26d0c09fdad49b79ec84864250b19b0079b1941b4d3ac76",
       "3-2-the-declared-example": "5653a59411b0267e80d5ae82fa4aeaab0b5c97597a860c83b6ac23591617a55e",
-      "3-3-the-qualification-harness": "032fc0ca45f1c3c89723f03d43b89ffc982f24c4f9667396067d42d0fa86195d",
+      "3-3-the-qualification-harness": "955f87784dec8bca156f092cd69925b137af92767c258472a349792f4380b999",
       "3-4-authority-for-a-later-release": "8b749f859f3f8022f73ed30ca56650bc348149831aa2e8f218fea53749fc3b79",
       "3-5-version-0-1-1": "b993b11fe95025e5f9ba9e91a63dd4c6ecb0d17d3818d88b3cbd3eda75363d54",
-      "3-behavior": "6cff1a1ad90244038a0853cd7d11fef9984f92cc8270e1b5f247584b76101e25",
+      "3-behavior": "369b605b3e9546519a59b42a07a07e4e2160232675c1a46aaca65ff0a69e319a",
       "4-observable-negative-cases": "97baa1caaa78680821459648a3f9c88298293d0a924d5b1ba0fbc031bc910882",
       "acceptance": "dddc5bc8513d366c9308b532359861464f1be6b13fcab9f8a8eabb4c0b2c1051",
       "implementation-record": "915e017c90e6e2415c57aa0c336f8114252242da615571c1a6105ac7a22e591a",
@@ -117,6 +117,6 @@
     "summary": "A narrow amendment of approved specs 006, 007 and 031, written after `v0.1.0` was published to crates.io, npm and GitHub on 2026-10-26 but could not be qualified (021 3.10, 031 3.9.7). The CLI has no version command; the support-routing package declares no runnable offline example (its SYNTHETIC rules program is a test fixture of the rules backend); no harness runs the registry-only consumer across the platform matrix; and the npm packages carry no provenance. This spec adds `rustev version`, ships the package's SYNTHETIC example as package data, adds the qualification harness and its workflow, and defines how the owner authorizes a release after `0.1.0`, so that `0.1.1` is published through the existing pipeline with npm provenance and qualified.\n",
     "title": "Release 0.1.1: a CLI version command, declared consumer examples and the fresh-consumer qualification (amends 006, 007 and 031)"
   },
-  "shardHash": "107b819f718df4ea6ba30e3b844df35dc55efcca179e553024946ec3cfd92786",
+  "shardHash": "70500e2de9e2e661f3c6d9f470838dc213451ca6a8a2e469f8af7f2884b32857",
   "specVersion": "1.10.0"
 }

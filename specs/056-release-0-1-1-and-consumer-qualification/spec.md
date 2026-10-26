@@ -46,11 +46,11 @@ obligations:
     anchor: "3-2-the-declared-example"
   - id: "R-3"
     kind: requirement
-    text: "The qualification harness runs every step of 021 3.10 and of 031 3.9.7 (a), (b) and (d) against the public registries only, from an empty Cargo home and npm cache with no registry credential, and writes per step its command, output, lockfile or install record, checksums and environment identity; a step it cannot run is reported as not run with its reason, never as passing."
+    text: "The qualification harness runs every step of 021 3.10 and of 031 3.9.7 for each artifact kind the signed manifest names (crates, npm, CLI binaries; 3.9.7 (c) only when the manifest names an image) against the public registries only, from an empty Cargo home and npm cache with no registry credential, and writes per step its command, output, lockfile or install record, checksums and environment identity; a step it cannot run is reported as not run with its reason, never as passing."
     anchor: "3-3-the-qualification-harness"
   - id: "R-4"
     kind: requirement
-    text: "The release lifecycle reaches `qualified` only through `rustev-release qualify`, which records the digest of each required evidence file of the harness and refuses when one is missing, failing or `not_run`."
+    text: "The release lifecycle reaches `qualified` only through `rustev-release qualify`, which records the digest of each required evidence file of the harness and refuses when one is missing, failing or `not_run`; a step is `excluded`, and not required, only when the signed manifest names no artifact of its kind."
     anchor: "3-3-the-qualification-harness"
   - id: "I-1"
     kind: invariant
@@ -154,15 +154,23 @@ configuration, and runs:
   bound to `release.yml` at the tag), and its version, help, plan check
   and declared example run.
 
-Each step writes `<step>.json` (`rustev.qualification-step/1`: command,
-exit status, output digest, lockfile or install record, checksums, and the
-host, OS, architecture, toolchain and Node identities) and a step that
-cannot run on the host writes its reason as `not_run`. `.github/workflows/qualify.yml`,
-dispatched after publication with the tag, runs the harness on each
-platform of the release set's CLI and npm matrix and uploads the step
-files. `rustev-release qualify <release-dir> <evidence-dir> <instruction>
-<journal>` requires every step for every platform, refuses a failing or
-`not_run` step, and records their digests through `qualify` (the
+- **image** (031 3.9.7 (c)): run only when the signed manifest names a
+  container image. `0.1.1` names none (the image stays excluded, section
+  2), so the harness writes the step as `excluded` with that reason.
+
+The required steps are derived from the signed manifest, never from the
+harness's own list: a kind the manifest names is required, and a kind it
+does not name is `excluded`. Each step writes `<step>.json`
+(`rustev.qualification-step/1`: command, exit status, output digest,
+lockfile or install record, checksums, and the host, OS, architecture,
+toolchain and Node identities), and a step that cannot run on the host
+writes its reason as `not_run`, which is never `excluded`.
+`.github/workflows/qualify.yml`, dispatched after publication with the
+tag, runs the harness on each platform of the release set's CLI and npm
+matrix and uploads the step files. `rustev-release qualify <release-dir>
+<evidence-dir> <instruction> <journal>` requires every step for every
+platform, refuses a failing or `not_run` step and an `excluded` step whose
+kind the manifest names, and records their digests through `qualify` (the
 `Qualification` journal entry); only then is the lifecycle `qualified`.
 A qualification is evidence for the registry state and matrix it ran on,
 never a permanent availability claim (021 3.10).
