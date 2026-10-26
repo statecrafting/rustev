@@ -1,5 +1,7 @@
 //! Spec 037 compile-time cases; no generation execution or provider calls.
 mod common;
+#[path = "common/generation_screening.rs"]
+mod generation_screening;
 use rustev_contract::Identified;
 use rustev_contract::definition::*;
 use rustev_contract::descriptor::{BackendDescriptor, OutputKind, TextStructure};
@@ -334,7 +336,7 @@ fn iteration_and_remaining_compile_rows() {
             .provenance
             .push(ProvenanceClass::UserSupplied);
         let refusal = run(&untrusted, &p, &b).unwrap_err();
-        assert_eq!(refusal.category, C::InvalidGeneration);
+        assert_eq!(refusal.category, C::UnscreenedText);
         assert!(refusal.detail.contains(&format!("input:{source}")));
     }
     for bind in ["_item", "input"] {
@@ -472,7 +474,7 @@ fn generation_fallbacks_match_capacities_and_count_attempts() {
 }
 
 #[test]
-fn interim_screening_refuses_untrusted_text_and_accepts_system_of_record_only() {
+fn screening_refuses_untrusted_text_and_accepts_system_of_record_only() {
     for projection in ["input:message", "proposal:message"] {
         for untrusted in [false, true] {
             let (mut d, p, b) = fixture();
@@ -485,7 +487,7 @@ fn interim_screening_refuses_untrusted_text_and_accepts_system_of_record_only() 
             let result = run(&d, &p, &b);
             if untrusted {
                 let refusal = result.unwrap_err();
-                assert_eq!(refusal.category, C::InvalidGeneration);
+                assert_eq!(refusal.category, C::UnscreenedText);
                 assert_eq!(refusal.subject, "step:item_text");
                 assert!(refusal.detail.contains("input:message"));
             } else {
@@ -496,7 +498,7 @@ fn interim_screening_refuses_untrusted_text_and_accepts_system_of_record_only() 
 }
 
 #[test]
-fn interim_screening_follows_nested_text_and_exact_step_lineage() {
+fn screening_follows_nested_text_and_exact_step_lineage() {
     for projection in ["input:records", "step:first"] {
         let (mut d, p, b) = fixture();
         input(
@@ -511,7 +513,7 @@ fn interim_screening_follows_nested_text_and_exact_step_lineage() {
         d.steps.push(serde_json::from_value(json!({"id":"first","body":{"exact":{"op":"filter_with_reasons","version":1,"args":{"list":"input:records","id_field":"message","rules":[]}}}})).unwrap());
         edit(&mut d, |g| g["projection"] = json!([projection]));
         let refusal = run(&d, &p, &b).unwrap_err();
-        assert_eq!(refusal.category, C::InvalidGeneration);
+        assert_eq!(refusal.category, C::UnscreenedText);
         assert!(refusal.detail.contains("input:records"));
     }
 }
@@ -554,4 +556,48 @@ fn semantic_step_cannot_supply_a_backstop_path() {
     let refusal = run(&d, &p, &b).unwrap_err();
     assert_eq!(refusal.category, C::Template, "{refusal:?}");
     assert!(refusal.detail.contains("NotExact"), "{refusal:?}");
+}
+
+#[test]
+fn screened_generation_admission_and_budget_include_input_screening() {
+    let (mut d, p, b) = fixture();
+    let screen = generation_screening::configure(&mut d, &b, "fail_closed");
+    let backends = [b, screen];
+    let compile = |d: &Definition| {
+        compile_with_templates(d, &backends, &[], &[], None, std::slice::from_ref(&p))
+    };
+    let c = compile(&d).unwrap();
+    assert!(
+        c.plan
+            .order
+            .iter()
+            .position(|s| s == "screen:message:0")
+            .unwrap()
+            < c.plan.order.iter().position(|s| s == "item_text").unwrap()
+    );
+    assert_eq!(Compiled::load(&c.plan, &backends, &[]).unwrap().id, c.id);
+    d.limits.max_semantic_requests = 2;
+    assert_eq!(compile(&d).unwrap_err().category, C::Budget);
+}
+
+#[test]
+fn generation_template_parameters_require_screening_even_without_projection() {
+    let (mut d, mut p, b) = fixture();
+    let screen = generation_screening::configure(&mut d, &b, "fail_closed");
+    p.instructions = "Describe {{param.message}}".into();
+    p.params = serde_json::from_value(json!([{"name":"message","type":{"text":{"max_bytes":32}}}]))
+        .unwrap();
+    edit(&mut d, |g| {
+        g["projection"] = json!([]);
+        g["template"]["params"] = json!({"message":"input:message"});
+        g["template"]["digest"] = json!(p.id().unwrap());
+    });
+    let backends = [b, screen];
+    let compile = |d: &Definition| {
+        compile_with_templates(d, &backends, &[], &[], None, std::slice::from_ref(&p))
+    };
+    // Screening coverage does not relax the literal-only text parameter rule.
+    assert_eq!(compile(&d).unwrap_err().category, C::Template);
+    d.screening = None;
+    assert_eq!(compile(&d).unwrap_err().category, C::UnscreenedText);
 }

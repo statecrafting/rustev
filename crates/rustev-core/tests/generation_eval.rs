@@ -1,5 +1,7 @@
 //! Scripted generation supplies only. No runtime or provider calls.
 mod common;
+#[path = "common/generation_screening.rs"]
+mod generation_screening;
 use rustev_contract::definition::*;
 use rustev_contract::descriptor::{BackendDescriptor, OutputKind, TextStructure};
 use rustev_contract::generation::*;
@@ -681,4 +683,159 @@ fn truncating_backstop_records_utf8_boundary_and_notice() {
             .any(|n| n.kind == TextNoticeKind::BackstopTruncated && n.field == "headline")
     );
     assert_eq!(e.generation.unwrap()[0].notices, t.notices);
+}
+
+#[test]
+fn generation_input_screening_pass_block_unavailable_and_global_skip() {
+    use rustev_contract::output::ScreenUnits;
+    for policy in ["fail_closed", "skip_generation", "fail_open"] {
+        for verdict in ["pass", "blocked", "unavailable"] {
+            for projection in [
+                None,
+                Some("input:message"),
+                Some("proposal:message"),
+                Some("step:copied"),
+            ] {
+                let projected = projection.is_some();
+                let (mut d, p, b) = fixture();
+                let screen = generation_screening::configure(&mut d, &b, policy);
+                change(&mut d, |g| {
+                    g["projection"] = json!(projection.into_iter().collect::<Vec<_>>())
+                });
+                d.policy.rules[0].then = serde_json::from_value(json!({"propose":{"action":"recommend","params":[{"name":"message","value":{"ref":"input:message"}}]}})).unwrap();
+                d.steps.push(serde_json::from_value(json!({"id":"copied","body":{"exact":{"op":"compose_key","version":1,"args":{"parts":[{"value":{"ref":"input:message"},"normalize":"exact"},{"value":{"lit":{"text":"suffix"}},"normalize":"exact"}],"separator":":"}}}})).unwrap());
+                let c = compile_with_templates(&d, &[b, screen], &[], &[], None, &[p]).unwrap();
+                let snap = common::snapshot(vec![common::entry(
+                    "message",
+                    json!("SCREEN-CANARY"),
+                    ProvenanceClass::ThirdParty,
+                    common::NOW,
+                )]);
+                let mut ev =
+                    Evaluation::start(&c, &snap, Timestamp::from_ms(common::NOW).unwrap()).unwrap();
+                let pending = ev.pending();
+                assert_eq!(pending.len(), 1);
+                let supplied = match verdict {
+                    "unavailable" => Supplied::Failed(Unresolved::BackendUnavailable {
+                        detail: "offline".into(),
+                    }),
+                    _ => Supplied::Output(RawOutput::Screen {
+                        blocked: verdict == "blocked",
+                        categories: if verdict == "blocked" {
+                            vec!["injection".into()]
+                        } else {
+                            vec![]
+                        },
+                        units: ScreenUnits::NotReported,
+                    }),
+                };
+                ev.supply(&pending[0].step, &pending[0].instance, supplied)
+                    .unwrap();
+                let mut stage = ev.begin_generation("screened").unwrap();
+                let reason = if verdict == "unavailable"
+                    && (policy == "skip_generation" || (projected && policy == "fail_closed"))
+                {
+                    Some(TextReason::ScreenUnavailable)
+                } else if projected && verdict == "blocked" {
+                    Some(TextReason::ScreenBlocked)
+                } else {
+                    None
+                };
+                assert_eq!(
+                    stage.pending().is_empty(),
+                    reason.is_some(),
+                    "{policy}/{verdict}/{projection:?}"
+                );
+                if reason.is_none() {
+                    give(&mut stage, output("A title", "A reason"));
+                }
+                let (_, evidence, text) = stage.finish().unwrap();
+                if let Some(reason) = reason {
+                    assert_eq!(
+                        text.unwrap().steps[0].items[0].generated["headline"].origin,
+                        FieldOrigin::Backstop { reason }
+                    );
+                }
+                assert!(
+                    !serde_json::to_string(&evidence.screening)
+                        .unwrap()
+                        .contains("SCREEN-CANARY")
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn generation_input_screening_is_per_bound_item() {
+    use rustev_contract::output::ScreenUnits;
+    let (mut d, p, b) = fixture();
+    let screen = generation_screening::configure(&mut d, &b, "fail_closed");
+    d.inputs[0] = serde_json::from_value(
+        json!({"name":"message","type":{"list":{"item":{"record":{"fields":[
+        {"name":"id","type":{"enum":{"options":["a","b"]}}},
+        {"name":"text","type":{"text":{"max_bytes":32}}}
+    ]}},"max_items":2}},"provenance":["third-party"],"freshness":"not_required"}),
+    )
+    .unwrap();
+    d.inputs.push(serde_json::from_value(json!({"name":"selected","type":{"list":{"item":{"enum":{"options":["a","b"]}},"max_items":2}},"provenance":["system-of-record"],"freshness":"not_required"})).unwrap());
+    d.screening = Some(serde_json::from_value(json!({"max_text_units":4,"entries":[{
+        "id":"message","fields":["input:message[]/text"],"item_id":{"field":"id"},
+        "screener":"screen","on_block":"drop_text","address":"computed","on_unavailable":"fail_closed"
+    }]})).unwrap());
+    d.policy.on_unresolved.push(serde_json::from_value(json!({"target":"input:selected","reasons":"any","action":{"escalate":{"reason":"missing"}}})).unwrap());
+    d.policy.rules[0].then = serde_json::from_value(json!({"propose":{"action":"recommend","params":[{"name":"selected","value":{"ref":"input:selected"}}]}})).unwrap();
+    change(&mut d, |g| {
+        g["projection"] = json!(["bind:item/text"]);
+        g["for_each"] = json!({"over":"proposal:selected","bind":"item","items":{"list":{"list":"input:message","id_field":"id"}},"max_items":{"literal":2}});
+    });
+    d.limits.max_semantic_requests = 6;
+    let c = compile_with_templates(&d, &[b, screen], &[], &[], None, &[p]).unwrap();
+    let snap = common::snapshot(vec![
+        common::entry(
+            "message",
+            json!([
+                {"id":"a","text":"blocked"},{"id":"b","text":"accepted"}
+            ]),
+            ProvenanceClass::ThirdParty,
+            0,
+        ),
+        common::entry(
+            "selected",
+            json!(["a", "b"]),
+            ProvenanceClass::SystemOfRecord,
+            0,
+        ),
+    ]);
+    let mut ev = Evaluation::start(&c, &snap, Timestamp::from_ms(0).unwrap()).unwrap();
+    for r in ev.pending() {
+        let blocked = r.instance == ["a"];
+        ev.supply(
+            &r.step,
+            &r.instance,
+            Supplied::Output(RawOutput::Screen {
+                blocked,
+                categories: if blocked {
+                    vec!["injection".into()]
+                } else {
+                    vec![]
+                },
+                units: ScreenUnits::NotReported,
+            }),
+        )
+        .unwrap();
+    }
+    let mut stage = ev.begin_generation("per-item").unwrap();
+    assert_eq!(stage.pending().len(), 1);
+    assert_eq!(stage.pending()[0].document.instance, ["b"]);
+    give(&mut stage, output("Title", "Reason"));
+    let (_, _, text) = stage.finish().unwrap();
+    let text = text.unwrap();
+    assert_eq!(text.steps[0].items.len(), 2);
+    assert_eq!(
+        text.steps[0].items[0].generated["headline"].origin,
+        FieldOrigin::Backstop {
+            reason: TextReason::ScreenBlocked
+        }
+    );
 }
