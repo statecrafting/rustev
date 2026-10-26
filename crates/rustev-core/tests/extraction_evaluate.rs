@@ -47,7 +47,7 @@ fn compile_documents(
     let rules = serde_json::from_value(json!({"schema":"rustev.extract-rules/1","name":"filters-fallback","version":"1","sources":[{"name":"text","ref":"input:message"}],"fields":[{"field":"party_size","rules":[{"name":"party","when":"always","then":{"integer_after":{"source":"text","terms":["party"],"max_digits":2}}}]}]})).unwrap();
     compile_with_extraction_documents(
         d,
-        &[backend()],
+        &[backend(), screener()],
         calibrations,
         &[],
         None,
@@ -861,6 +861,315 @@ fn future_producer_timestamp_is_invalid_input_with_existing_precedence() {
             }
             InputStatus::Unresolved(Unresolved::Conflict { .. }) => assert!(conflict),
             other => panic!("unexpected {other:?}"),
+        }
+    }
+}
+
+fn screener() -> BackendDescriptor {
+    let mut b = backend();
+    b.backend_id = "screen".into();
+    b.operations = vec![common::support(
+        Operation::Proposition,
+        OutputKind::Screen,
+        2,
+    )];
+    b.operations[0].screen = Some(rustev_contract::descriptor::ScreenProfile {
+        policy_version: "synthetic/1".into(),
+        categories: vec!["injection".into()],
+        max_text_bytes: 128,
+        text_unit_bytes: 16,
+    });
+    b
+}
+fn screening(d: &mut Definition, unavailable: &str) {
+    d.inputs[0].provenance = vec![P::ThirdParty];
+    d.screening = Some(
+        serde_json::from_value(json!({"entries":[{
+        "id":"message", "fields":["input:message"], "item_id":"none",
+        "screener":"screen", "on_block":"drop_field",
+        "on_unavailable":unavailable, "address":"computed"
+    }], "max_text_units":32}))
+        .unwrap(),
+    );
+}
+fn verdict(blocked: bool) -> Supplied {
+    Supplied::Output(RawOutput::Screen {
+        blocked,
+        categories: vec![],
+        units: rustev_contract::output::ScreenUnits::NotReported,
+    })
+}
+#[test]
+fn screening_resolves_before_extraction_and_never_dispatches_withheld_text() {
+    for (mode, blocked, offline, reason) in [
+        (
+            "fail_closed",
+            true,
+            false,
+            Some(AbsenceReason::ScreenBlocked),
+        ),
+        (
+            "fail_closed",
+            false,
+            true,
+            Some(AbsenceReason::ScreenUnavailable),
+        ),
+        (
+            "skip_generation",
+            false,
+            true,
+            Some(AbsenceReason::ScreenUnavailable),
+        ),
+        ("fail_open", false, true, None),
+        ("fail_closed", false, false, None),
+    ] {
+        for fallback in [false, true] {
+            let mut d = definition();
+            screening(&mut d, mode);
+            if fallback {
+                extract(&mut d).fallback = serde_json::from_value(json!({
+                    "rules_program":"filters-fallback@1", "fill":"absent_fields"
+                }))
+                .unwrap();
+            }
+            let c = compile(&d);
+            let mut s = snapshot();
+            s.entries[0].provenance = P::ThirdParty;
+            let mut e = Evaluation::start(&c, &s, common::ts(common::NOW)).unwrap();
+            assert_eq!(e.pending().len(), 1);
+            assert_eq!(e.pending()[0].step, "screen:message:0");
+            assert!(e.extraction_request("request_filters").is_none());
+            e.supply(
+                "screen:message:0",
+                &[],
+                if offline {
+                    Supplied::Failed(Unresolved::BackendUnavailable {
+                        detail: "offline".into(),
+                    })
+                } else {
+                    verdict(blocked)
+                },
+            )
+            .unwrap();
+            if reason.is_none() {
+                assert_eq!(e.pending()[0].step, "request_filters");
+                assert_eq!(
+                    e.extraction_request("request_filters").unwrap().projection["input:message"],
+                    json!("party 4")
+                );
+                e.supply("request_filters", &[], output(json!({}))).unwrap();
+            }
+            assert!(e.pending().is_empty());
+            let (_, evidence) = e.finish("screened-extract").unwrap();
+            let extraction = &evidence.extraction.unwrap()[0];
+            if let Some(reason) = reason {
+                assert_eq!(
+                    extraction.request_outcome,
+                    ExtractionRequestOutcome::Withheld { reason }
+                );
+                if !fallback {
+                    assert!(
+                        extraction
+                            .fields
+                            .iter()
+                            .all(|f| f.origin == ExtractionOrigin::Absent { reason })
+                    );
+                }
+            }
+            if fallback {
+                let field = &extraction.fields[1];
+                assert_eq!(field.origin, ExtractionOrigin::Fallback);
+                assert_eq!(field.value(), Some(&json!(4)));
+                assert_eq!(field.derivation, Some(Derivation::ExactDerived));
+            }
+        }
+    }
+}
+
+#[test]
+fn a_block_names_the_outcome_when_another_screener_is_unavailable() {
+    let mut d = definition();
+    screening(&mut d, "fail_closed");
+    let mut note = d.inputs[0].clone();
+    note.name = "note".into();
+    d.inputs.push(note);
+    let mut screening = serde_json::to_value(d.screening.as_ref().unwrap()).unwrap();
+    let mut entry = screening["entries"][0].clone();
+    entry["id"] = json!("note");
+    entry["fields"] = json!(["input:note"]);
+    screening["entries"].as_array_mut().unwrap().push(entry);
+    d.screening = Some(serde_json::from_value(screening).unwrap());
+    extract(&mut d).projection.push("input:note".into());
+    let c = compile(&d);
+    let mut s = snapshot();
+    s.entries[0].provenance = P::ThirdParty;
+    let mut note = s.entries[0].clone();
+    note.field = "note".into();
+    s.entries.push(note);
+    let mut e = Evaluation::start(&c, &s, common::ts(common::NOW)).unwrap();
+    let steps: Vec<_> = e.pending().iter().map(|r| r.step.clone()).collect();
+    assert_eq!(steps.len(), 2, "{steps:?}");
+    for step in steps {
+        let supplied = if step.starts_with("screen:message") {
+            verdict(true)
+        } else {
+            Supplied::Failed(Unresolved::BackendUnavailable {
+                detail: "offline".into(),
+            })
+        };
+        e.supply(&step, &[], supplied).unwrap();
+    }
+    assert!(e.extraction_request("request_filters").is_none());
+    let (_, evidence) = e.finish("blocked-and-unavailable").unwrap();
+    assert_eq!(
+        evidence.extraction.unwrap()[0].request_outcome,
+        ExtractionRequestOutcome::Withheld {
+            reason: AbsenceReason::ScreenBlocked
+        }
+    );
+}
+
+#[test]
+fn screened_mixed_fallback_survives_acceptance_to_judgment() {
+    let mut d = definition();
+    screening(&mut d, "fail_closed");
+    d.inputs[0].provenance = vec![P::ModelDerived];
+    let mut exact = d.inputs[0].clone();
+    exact.name = "exact".into();
+    exact.provenance = vec![P::SystemOfRecord];
+    d.inputs.push(exact);
+    let e = extract(&mut d);
+    e.projection.push("input:exact".into());
+    e.fallback =
+        serde_json::from_value(json!({"rules_program":"mixed@1","fill":"absent_fields"})).unwrap();
+    let a = accept(&mut d);
+    a.field = "step:request_filters/party_size".into();
+    a.validate = Validation::None;
+    d.policy.rules[0].then = serde_json::from_value(json!({"propose":{"action":"recommend","params":[{"name":"party","value":{"ref":"step:window_ok"}}]}})).unwrap();
+    d.policy.on_unresolved = serde_json::from_value(json!([{"target":"step:window_ok","reasons":"any","action":{"escalate":{"reason":"absent"}}}])).unwrap();
+    let rules = serde_json::from_value(json!({"schema":"rustev.extract-rules/1","name":"mixed","version":"1",
+        "sources":[{"name":"model","ref":"input:message"},{"name":"exact","ref":"input:exact"}],
+        "fields":[{"field":"party_size","rules":[{"name":"both","when":{"contains_any":{"source":"exact","terms":["party"]}},
+        "then":{"integer_after":{"source":"model","terms":["party"],"max_digits":2}}}]}]})).unwrap();
+    let plan: Plan = serde_json::from_str(include_str!("golden/acceptance.plan.json")).unwrap();
+    let PlanStepDetail::Extract(b) = &plan.steps[0].detail else {
+        panic!()
+    };
+    let c = compile_with_extraction_documents(
+        &d,
+        &[backend(), screener()],
+        &[],
+        &[],
+        None,
+        std::slice::from_ref(&b.template),
+        &[rules],
+    )
+    .unwrap();
+    let mut s = snapshot();
+    s.schema = "rustev.snapshot/2".into();
+    s.entries[0].provenance = P::ModelDerived;
+    s.entries[0].producer = Some(serde_json::from_value(json!({"artifact_id":common::id('a'),"template_digest":"none","produced_at_ms":common::NOW})).unwrap());
+    s.entries.push(common::entry(
+        "exact",
+        json!("party"),
+        P::SystemOfRecord,
+        common::NOW,
+    ));
+    let mut ev = Evaluation::start(&c, &s, common::ts(common::NOW)).unwrap();
+    ev.supply("screen:message:0", &[], verdict(false)).unwrap();
+    ev.supply("request_filters", &[], output(json!({})))
+        .unwrap();
+    let (j, evidence) = ev.finish("mixed-fallback").unwrap();
+    let f = &evidence.extraction.unwrap()[0].fields[1];
+    assert_eq!(f.origin, ExtractionOrigin::Fallback);
+    assert_eq!(f.derivation, Some(Derivation::MixedDerived));
+    let Outcome::Propose { params, .. } = &j.outcome else {
+        panic!()
+    };
+    assert!(matches!(
+        &params["party"],
+        OutValue::Attributed {
+            derivation: Derivation::MixedDerived,
+            ..
+        }
+    ));
+    assert!(j.lineage.inputs.contains(&"exact".into()));
+    assert!(j.lineage.inputs.contains(&"message".into()));
+    assert_eq!(
+        j.lineage.producers.as_ref().unwrap()["message"],
+        s.entries[0].producer.clone().unwrap()
+    );
+}
+
+#[test]
+fn screening_covers_whole_records_and_accepted_input_field_paths() {
+    for accepted in [false, true] {
+        let mut d = definition();
+        screening(&mut d, "fail_closed");
+        d.inputs[0].ty = serde_json::from_value(json!({"record":{"fields":[
+            {"name":"text","type":{"text":{"max_bytes":64}}},
+            {"name":"other","type":{"text":{"max_bytes":64}}}
+        ]}}))
+        .unwrap();
+        let fields = if accepted {
+            d.inputs[0].provenance = vec![P::ModelDerived];
+            let mut a = d.steps[1].clone();
+            a.id = "input_ok".into();
+            let StepBody::AcceptModelDerived(body) = &mut a.body else {
+                panic!()
+            };
+            body.field = "input:message".into();
+            body.validate = Validation::None;
+            d.steps.push(a);
+            extract(&mut d).projection = vec!["step:input_ok/text".into()];
+            vec!["input:message/text"]
+        } else {
+            vec!["input:message/text", "input:message/other"]
+        };
+        d.screening.as_mut().unwrap().entries[0].fields =
+            fields.iter().map(|s| (*s).into()).collect();
+        let c = compile(&d);
+        let mut s = snapshot();
+        s.entries[0].value = json!({"text":"blocked", "other":"readable"});
+        s.entries[0].provenance = d.inputs[0].provenance[0];
+        if accepted {
+            s.schema = "rustev.snapshot/2".into();
+            s.entries[0].producer = Some(serde_json::from_value(json!({"artifact_id":common::id('a'),"template_digest":"none","produced_at_ms":common::NOW})).unwrap());
+        }
+        let mut ev = Evaluation::start(&c, &s, common::ts(common::NOW)).unwrap();
+        assert!(ev.pending().iter().all(|r| r.step.starts_with("screen:")));
+        ev.supply("screen:message:0", &[], verdict(true)).unwrap();
+        if !accepted {
+            assert!(ev.extraction_request("request_filters").is_none());
+            ev.supply("screen:message:1", &[], verdict(false)).unwrap();
+        }
+        assert!(ev.pending().is_empty());
+        let (_, evidence) = ev.finish("nested-screen").unwrap();
+        assert_eq!(
+            evidence.extraction.unwrap()[0].request_outcome,
+            ExtractionRequestOutcome::Withheld {
+                reason: AbsenceReason::ScreenBlocked
+            }
+        );
+        if !accepted {
+            d.screening.as_mut().unwrap().entries[0].fields.pop();
+            let plan: Plan =
+                serde_json::from_str(include_str!("golden/acceptance.plan.json")).unwrap();
+            let PlanStepDetail::Extract(b) = &plan.steps[0].detail else {
+                panic!()
+            };
+            let error = compile_with_extraction_documents(
+                &d,
+                &[backend(), screener()],
+                &[],
+                &[],
+                None,
+                std::slice::from_ref(&b.template),
+                &[],
+            )
+            .unwrap_err();
+            assert_eq!(error.category, rustev_core::Category::UnscreenedText);
+            assert!(error.detail.contains("input:message/other"));
         }
     }
 }

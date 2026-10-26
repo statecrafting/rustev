@@ -504,3 +504,106 @@ async fn record_fault_falls_back_but_field_fault_is_not_retried() {
         );
     }
 }
+
+#[tokio::test]
+async fn screening_controls_dispatch_and_exact_fallback_reads_original_text() {
+    use rustev_contract::{descriptor::ScreenProfile, output::ScreenUnits};
+    for (mode, blocked, offline, expected) in [
+        (
+            "fail_closed",
+            true,
+            false,
+            Some(AbsenceReason::ScreenBlocked),
+        ),
+        (
+            "fail_closed",
+            false,
+            true,
+            Some(AbsenceReason::ScreenUnavailable),
+        ),
+        (
+            "skip_generation",
+            false,
+            true,
+            Some(AbsenceReason::ScreenUnavailable),
+        ),
+        ("fail_open", false, true, None),
+        ("fail_closed", false, false, None),
+    ] {
+        for fallback in [false, true] {
+            let mut d = definition();
+            d.inputs[0].provenance = vec![ProvenanceClass::ThirdParty];
+            d.screening = Some(
+                serde_json::from_value(json!({"entries":[{
+                "id":"message", "fields":["input:message"], "item_id":"none",
+                "screener":"screen", "on_block":"drop_field",
+                "on_unavailable":mode, "address":"computed"
+            }], "max_text_units":32}))
+                .unwrap(),
+            );
+            if fallback {
+                extract(&mut d).fallback = serde_json::from_value(json!({
+                    "rules_program":"filters-fallback@1", "fill":"absent_fields"
+                }))
+                .unwrap();
+            }
+            let mut screen = descriptor();
+            screen.backend_id = "screen".into();
+            screen.operations = vec![support(Operation::Proposition, OutputKind::Screen, 2)];
+            screen.operations[0].screen = Some(ScreenProfile {
+                policy_version: "synthetic/1".into(),
+                categories: vec!["injection".into()],
+                max_text_bytes: 128,
+                text_unit_bytes: 16,
+            });
+            let screener = Scripted::new(screen.clone(), move |_| {
+                if offline {
+                    Answer::Fail(
+                        AdapterFailure::Transient,
+                        "offline".into(),
+                        Charge::Observed { units: 0 },
+                    )
+                } else {
+                    Answer::Output(
+                        RawOutput::Screen {
+                            blocked,
+                            categories: vec![],
+                            units: ScreenUnits::NotReported,
+                        },
+                        Charge::Observed { units: 1 },
+                    )
+                }
+            });
+            let model = Scripted::new(descriptor(), |_| answer());
+            let (rt, _) = runtime(&[screener.clone(), model.clone()], 2);
+            let plan = rt
+                .prepare(compiled(&d, &[descriptor(), screen], None))
+                .unwrap();
+            let mut request = req();
+            request.snapshot.entries[0].provenance = ProvenanceClass::ThirdParty;
+            let result = rt
+                .decide(&plan, request, &CancelSignal::new())
+                .await
+                .unwrap();
+            assert_eq!(screener.dispatched().len(), 1);
+            assert_eq!(model.dispatched().len(), usize::from(expected.is_none()));
+            let e = &evidence(&result).extraction.as_ref().unwrap()[0];
+            if let Some(reason) = expected {
+                assert_eq!(
+                    e.request_outcome,
+                    ExtractionRequestOutcome::Withheld { reason }
+                );
+                if fallback {
+                    assert_eq!(e.fields[1].origin, ExtractionOrigin::Fallback);
+                    assert_eq!(e.fields[1].value(), Some(&json!(4)));
+                } else {
+                    assert!(
+                        e.fields
+                            .iter()
+                            .all(|f| f.origin == ExtractionOrigin::Absent { reason })
+                    );
+                }
+            }
+        }
+    }
+}

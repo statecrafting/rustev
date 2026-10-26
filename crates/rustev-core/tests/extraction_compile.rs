@@ -205,7 +205,7 @@ fn untrusted_projection_fails_closed_but_trusted_text_passes() {
     for p in [P::UserSupplied, P::ModelDerived] {
         let mut d = fixture();
         d.inputs[0].provenance.push(p);
-        check(&d, C::InvalidExtraction, "untrusted text");
+        check(&d, C::UnscreenedText, "unscreened text");
         d.inputs[0].ty = TypeDecl::Bool;
         check(&d, C::NoCapableBackend, "no backend satisfies extract");
     }
@@ -248,9 +248,9 @@ fn structural_errors_precede_resolution_and_resolution_precedes_types() {
     extract(&mut d).repair.max_attempts = 0;
     check(&d, C::InvalidExtraction, "not supplied");
     let e = refusal(&d, &[program()]);
-    assert_eq!(e.category, C::InvalidExtraction);
+    assert_eq!(e.category, C::UnscreenedText);
     assert_eq!(e.subject, "step:request_filters");
-    assert!(e.detail.contains("untrusted text"));
+    assert!(e.detail.contains("unscreened text"));
 }
 
 #[test]
@@ -279,12 +279,12 @@ fn oversized_input_projection_is_refused_even_with_a_step_reference() {
         vec!["step:window_ok".into(), "input:message".into()],
     ] {
         let mut d = fixture();
-        let mut model_input = d.inputs[0].clone();
-        model_input.name = "flag".into();
-        model_input.ty = TypeDecl::Bool;
-        model_input.provenance = vec![P::ModelDerived];
-        d.inputs.push(model_input);
-        accept(&mut d, "input:flag");
+        let mut model = d.inputs[0].clone();
+        model.name = "model_count".into();
+        model.ty = TypeDecl::Integer;
+        model.provenance = vec![P::ModelDerived];
+        d.inputs.push(model);
+        accept(&mut d, "input:model_count");
         extract(&mut d).projection = projection;
         d.limits.max_projection_bytes = 127;
         check(&d, C::Budget, "max_projection_bytes");
@@ -298,7 +298,7 @@ fn accepted_input_projection_preserves_untrusted_text() {
     assert_eq!(e.category, C::InvalidAcceptance);
     assert_eq!(e.subject, "step:window_ok");
     d.inputs[0].provenance.push(P::ModelDerived);
-    check(&d, C::InvalidExtraction, "untrusted text");
+    check(&d, C::UnscreenedText, "unscreened text");
 }
 #[test]
 fn graph_cycle_precedes_projection_type_checks() {

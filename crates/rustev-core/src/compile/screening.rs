@@ -335,10 +335,18 @@ fn carried(
                     out,
                 );
             }
-        } else if let Some(s) = def.steps.iter().find(|s| s.id == id)
-            && let StepBody::Corroborate(c) = &s.body
-        {
-            carried(def, decoded, &c.claim, path.or(select), visiting, out);
+        } else if let Some(s) = def.steps.iter().find(|s| s.id == id) {
+            let source = match &s.body {
+                StepBody::Corroborate(c) => Some(&c.claim),
+                StepBody::AcceptModelDerived(a) => Some(&a.field),
+                _ => None,
+            };
+            if let Some(source) = source {
+                let source = path
+                    .or(select)
+                    .map_or_else(|| source.clone(), |p| format!("{source}/{p}"));
+                carried(def, decoded, &source, None, visiting, out);
+            }
         }
         visiting.remove(id);
     }
@@ -439,6 +447,18 @@ fn generation_text(
     out
 }
 
+fn extract_text(
+    def: &Definition,
+    decoded: &BTreeMap<String, OpArgs>,
+    e: &rustev_contract::extraction::Extract,
+) -> BTreeSet<String> {
+    let mut out = BTreeSet::new();
+    for r in &e.projection {
+        carried(def, decoded, r, None, &mut BTreeSet::new(), &mut out);
+    }
+    out
+}
+
 pub(super) fn coverage(
     def: &Definition,
     fields: &[Field],
@@ -447,6 +467,7 @@ pub(super) fn coverage(
     for s in &def.steps {
         let text = match &s.body {
             StepBody::Generate(g) => generation_text(def, decoded, g),
+            StepBody::Extract(e) => extract_text(def, decoded, e),
             StepBody::Semantic(d) if def.screening.is_some() => model_text(def, decoded, d),
             _ => continue,
         };
@@ -504,6 +525,7 @@ pub(super) fn dependencies(
         let text = match &s.body {
             StepBody::Semantic(d) => model_text(def, decoded, d),
             StepBody::Generate(g) => generation_text(def, decoded, g),
+            StepBody::Extract(e) => extract_text(def, decoded, e),
             _ => BTreeSet::new(),
         };
         for f in fields {

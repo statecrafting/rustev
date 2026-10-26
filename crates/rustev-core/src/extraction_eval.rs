@@ -1,4 +1,4 @@
-//! Decision-stage extraction and acceptance. Runtime owns dispatch and screening.
+//! Decision-stage extraction and acceptance. Screening resolves before dispatch.
 use super::*;
 use crate::extraction_validate::{self, ValidatedField};
 use crate::template as t;
@@ -70,7 +70,10 @@ impl Evaluation<'_> {
         let projection = b
             .projection
             .iter()
-            .map(|r| Some((r.clone(), self.value_and_meta(r).ok()?.0.to_json())))
+            .map(|r| {
+                self.value_and_meta(r).ok()?;
+                Some((r.clone(), self.model_node(r).render(&mut BTreeSet::new())))
+            })
             .collect::<Option<_>>()?;
         let params = b
             .template_binding
@@ -126,6 +129,30 @@ impl Evaluation<'_> {
     }
 
     pub(super) fn start_extract(&mut self, id: &str) {
+        let mut unavailable = BTreeSet::new();
+        let mut blocked = false;
+        for r in &self.extract_binding(id).projection {
+            let node = self.model_node(r);
+            blocked |= node.withheld();
+            node.render(&mut unavailable);
+        }
+        if blocked || !unavailable.is_empty() {
+            self.complete_extract(
+                id,
+                None,
+                ExtractionRequestOutcome::Withheld {
+                    // A block is a definite verdict on a read value, so it
+                    // names the outcome even when another source's screener
+                    // is unavailable (035 3.17.2, 038 3.11.4).
+                    reason: if blocked {
+                        AbsenceReason::ScreenBlocked
+                    } else {
+                        AbsenceReason::ScreenUnavailable
+                    },
+                },
+            );
+            return;
+        }
         let Some(request) = self.make_extract_request(id) else {
             self.complete_extract(
                 id,

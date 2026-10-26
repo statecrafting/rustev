@@ -103,7 +103,7 @@ fn text(ty: &Ty) -> bool {
     }
 }
 
-/// Phase e: resolve input field paths, vocabulary types and the interim
+/// Phase e: resolve input field paths, vocabulary types and the
 /// untrusted-text rule, including accepted field-path projections.
 pub(crate) fn types(
     def: &Definition,
@@ -121,20 +121,23 @@ pub(crate) fn types(
             continue;
         };
         for r in &e.projection {
-            let untrusted = if r.starts_with("input:") {
-                untrusted_input(def, r, &env).map_err(|err| bad(&step.id, err))?
-            } else {
-                // Accepted text retains model origin. Resolve the projected
-                // subpath, not every sibling of the accepted record.
-                text(&ref_ty(r, &env).map_err(|err| bad(&step.id, err))?)
-            };
-            if untrusted {
-                return Err(bad(
-                    &step.id,
-                    format!(
-                        "projection {r} can carry untrusted text; screening integration required"
-                    ),
-                ));
+            let ty = ref_ty(r, &env).map_err(|err| bad(&step.id, err))?;
+            // Accepted generated text has no input field a screening entry can cover.
+            if text(&ty) && r.starts_with("step:") {
+                let id = r.trim_start_matches("step:").split('/').next().unwrap();
+                if def.steps.iter().any(|s| {
+                    s.id == id
+                        && matches!(
+                            &s.body, StepBody::AcceptModelDerived(a) if a.field.starts_with("step:")
+                        )
+                }) {
+                    return Err(Refusal {
+                        category: Category::UnscreenedText,
+                        subject: format!("step:{}", step.id),
+                        detail: format!("unscreened text {r}"),
+                        shortfalls: vec![],
+                    });
+                }
             }
         }
         for (name, vocabulary) in &e.vocabularies {
@@ -184,16 +187,6 @@ fn input_decl<'a>(
 ) -> Option<&'a rustev_contract::definition::InputDecl> {
     let name = r.strip_prefix("input:")?.split('/').next()?;
     def.inputs.iter().find(|i| i.name == name)
-}
-
-fn untrusted_input(def: &Definition, r: &str, env: &TyEnv<'_>) -> Result<bool, String> {
-    let input = input_decl(def, r).ok_or_else(|| format!("unknown input {r}"))?;
-    let ty = ref_ty(r, env)?;
-    Ok(text(&ty)
-        && input
-            .provenance
-            .iter()
-            .any(|p| *p != ProvenanceClass::SystemOfRecord))
 }
 
 /// Phase e: the same parameter types, exactness and prompt grammar as 037.

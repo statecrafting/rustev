@@ -1178,6 +1178,21 @@ native and `wasm32` parity of the fallback (no wasm test harness yet; a
 native byte-identity test stands in), and the `origin/extraction`
 metrics fixture (spec 041).
 
+**Increment 7, part b (2026-10-26): screening of extract steps.** With
+spec 035 implemented, the interim refusal of untrusted extract
+projections is replaced by 035's `unscreened_text` check (category 19)
+on every extract projection, whether or not the definition declares
+screening (3.11.4). Screening resolves before dispatch: a projection that
+would hold a withheld value is not dispatched and every field is absent
+with `screen_blocked`, and under `fail_closed` an unavailable screener
+gives `screen_unavailable`; the fallback then runs, reading a source
+withheld only from model steps and never one withheld from exact steps
+(3.7.5). A fallback field over one exact-derived and one model-derived
+source is `mixed-derived` with both lineages and the model source's
+producer through acceptance to the judgment, which closes Acceptance item
+3 except for `wasm32` parity. The lodging example gains a blocked
+untrusted-text fixture.
+
 ## Decisions at approval
 
 Each is decided within this spec under the work order, inside the binding

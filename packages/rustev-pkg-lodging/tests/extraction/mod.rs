@@ -485,3 +485,65 @@ fn a_dropped_window_without_a_presence_guard_still_propagates_missing_evidence()
         }
     ));
 }
+
+#[test]
+fn pattern_b_blocked_untrusted_text_runs_only_exact_fallback() {
+    let blocked = fixture("blocked-screen.json");
+    let mut d = definition("definition.json");
+    d.inputs
+        .iter_mut()
+        .find(|i| i.name == "trip.text")
+        .unwrap()
+        .provenance = vec![P::ThirdParty];
+    d.screening = Some(serde_json::from_value(blocked["screening"].clone()).unwrap());
+    let mut screen = descriptor();
+    screen.backend_id = "screen".into();
+    screen.operations = vec![
+        serde_json::from_value(json!({
+            "operation":"proposition", "output":"screen", "max_options":2,
+            "screen":{"policy_version":"synthetic/1", "categories":["injection"],
+                "max_text_bytes":128, "text_unit_bytes":16}
+        }))
+        .unwrap(),
+    ];
+    let c = compile_with_extraction_documents(
+        &d,
+        &[descriptor(), screen],
+        &[],
+        &[],
+        None,
+        &[serde_json::from_value(fixture("template.json")).unwrap()],
+        &[serde_json::from_value(fixture("fallback.json")).unwrap()],
+    )
+    .unwrap();
+    let mut s = snapshot("snapshot.json");
+    let text = s
+        .entries
+        .iter_mut()
+        .find(|e| e.field == "trip.text")
+        .unwrap();
+    text.provenance = P::ThirdParty;
+    text.value = blocked["text"].clone();
+    let mut ev = Evaluation::start(&c, &s, Timestamp::from_ms(NOW).unwrap()).unwrap();
+    assert_eq!(ev.pending().len(), 1);
+    assert_eq!(ev.pending()[0].step, "screen:trip:0");
+    ev.supply(
+        "screen:trip:0",
+        &[],
+        rustev_core::Supplied::Output(serde_json::from_value(blocked["verdict"].clone()).unwrap()),
+    )
+    .unwrap();
+    assert!(ev.pending().is_empty());
+    let (_, evidence) = ev.finish("SYNTHETIC-screened-lodging").unwrap();
+    assert_eq!(
+        evidence.extraction.as_ref().unwrap()[0].request_outcome,
+        rustev_contract::extraction_results::ExtractionRequestOutcome::Withheld {
+            reason: AbsenceReason::ScreenBlocked
+        }
+    );
+    assert_eq!(
+        field(&evidence, "party_size").origin,
+        ExtractionOrigin::Fallback
+    );
+    assert_eq!(field(&evidence, "party_size").value(), Some(&json!(4)));
+}
