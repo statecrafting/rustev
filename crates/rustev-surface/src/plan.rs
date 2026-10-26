@@ -59,6 +59,11 @@ fn reason_json(r: &ShortfallReason) -> Value {
             json!({"kind": "output_limit", "max": max, "needed": needed})
         }
         ShortfallReason::Language { required } => json!({"kind": "language", "required": required}),
+        ShortfallReason::RankMode => json!({"kind": "rank_mode"}),
+        ShortfallReason::MaxCandidates { max, needed } => {
+            json!({"kind": "max_candidates", "max": max, "needed": needed})
+        }
+        ShortfallReason::ListwiseScores => json!({"kind": "listwise_scores"}),
         ShortfallReason::UnknownBackend => json!({"kind": "unknown_backend"}),
         ShortfallReason::Operation(op) => json!({"kind": "operation", "operation": op}),
         ShortfallReason::OutputKind { offered, required } => {

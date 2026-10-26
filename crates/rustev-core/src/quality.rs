@@ -1366,7 +1366,9 @@ pub(crate) fn evidence_bound(
         nodes = nodes.saturating_add(match info {
             crate::compile::StepInfo::Exact { ty, .. }
             | crate::compile::StepInfo::Corroborate { ty, .. } => ty_nodes(ty),
-            crate::compile::StepInfo::Generate | crate::compile::StepInfo::Semantic { .. } => 1,
+            crate::compile::StepInfo::Ranking
+            | crate::compile::StepInfo::Generate
+            | crate::compile::StepInfo::Semantic { .. } => 1,
             crate::compile::StepInfo::Acquisition(a) => ty_nodes(&a.ty),
         });
     }

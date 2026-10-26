@@ -38,6 +38,7 @@ use crate::quality;
 use crate::sem::SemKind;
 use crate::value::{Ty, Value};
 
+mod ranking;
 pub(crate) mod screening;
 
 /// The compiler identity recorded in every plan.
@@ -92,6 +93,12 @@ pub enum Category {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ShortfallReason {
     UnknownBackend,
+    RankMode,
+    MaxCandidates {
+        max: u64,
+        needed: u64,
+    },
+    ListwiseScores,
     ScreenProfile,
     ScreenTextLimit {
         max: u64,
@@ -177,6 +184,7 @@ fn refuse<T>(
 /// What the compiler knows about each step, kept for evaluation.
 #[derive(Debug, Clone)]
 pub(crate) enum StepInfo {
+    Ranking,
     Generate,
     Acquisition(Box<crate::acquisition::Acquisition>),
     Exact {
@@ -315,6 +323,9 @@ impl Compiled {
             calibrations.iter().filter_map(|c| c.id().ok()).collect();
         let mut needed: Vec<(String, &DescriptorId)> = vec![];
         for step in &plan.steps {
+            if let PlanStepDetail::Rank(b) = &step.detail {
+                needed.push((b.backend_id.clone(), &b.descriptor));
+            }
             if let PlanStepDetail::Generate(b) = &step.detail {
                 needed.push((b.backend_id.clone(), &b.descriptor));
             }
@@ -493,11 +504,13 @@ pub fn compile_bytes(
 ) -> Result<Compiled, Refusal> {
     #[cfg(not(feature = "parameterized"))]
     crate::unparameterized::definition(bytes)?;
-    let def = Definition::parse(bytes).map_err(|e| Refusal {
-        category: Category::Parse,
-        subject: "definition".into(),
-        detail: e.to_string(),
-        shortfalls: vec![],
+    let def = Definition::parse(bytes).map_err(|e| {
+        ranking::parse_refusal(bytes, &e).unwrap_or_else(|| Refusal {
+            category: Category::Parse,
+            subject: "definition".into(),
+            detail: e.to_string(),
+            shortfalls: vec![],
+        })
     })?;
     compile(&def, descriptors, calibrations)
 }
@@ -923,15 +936,7 @@ fn compile_generation(
             );
         }
     }
-    for s in &def.steps {
-        if matches!(s.body, StepBody::Rank(_) | StepBody::Select(_)) {
-            return refuse(
-                C::InvalidDefinition,
-                format!("step:{}", s.id),
-                "ranking-not-compiled",
-            );
-        }
-    }
+    ranking::structure(def, &decoded)?;
     for s in &def.steps {
         crate::acquisition::structure(&s.id, &s.body)?;
     }
@@ -1040,6 +1045,12 @@ fn compile_generation(
             _ => Ok(()),
         }
     };
+    let ranking_kinds: BTreeSet<&str> = def
+        .steps
+        .iter()
+        .filter(|s| matches!(s.body, StepBody::Rank(_) | StepBody::Select(_)))
+        .map(|s| s.id.as_str())
+        .collect();
     let options_of: BTreeMap<&str, &Vec<String>> = def
         .steps
         .iter()
@@ -1070,11 +1081,9 @@ fn compile_generation(
                 // Refused earlier by extraction-not-compiled.
             }
             StepBody::Rank(_) | StepBody::Select(_) => {
-                return refuse(
-                    C::InvalidDefinition,
-                    format!("step:{}", s.id),
-                    "ranking-not-compiled",
-                );
+                for r in ranking::refs(&s.body) {
+                    known(&r).or_else(|e| inv(subject.clone(), e))?;
+                }
             }
             StepBody::Generate(_) => {}
             // Refused above outside plan 3, whose own structure is checked by
@@ -1245,7 +1254,8 @@ fn compile_generation(
         if !valid_name(&r.id) || !rule_ids.insert(r.id.clone()) {
             inv(subject.clone(), "rule ids must be unique and valid".into())?;
         }
-        cond_structure(&r.when, &options_of, &known).or_else(|e| inv(subject.clone(), e))?;
+        cond_structure(&r.when, &options_of, &known, &ranking_kinds)
+            .or_else(|e| inv(subject.clone(), e))?;
         let mut refs = Vec::new();
         outcome_refs(&r.then, &mut refs);
         for x in &refs {
@@ -1300,7 +1310,8 @@ fn compile_generation(
                 format!("no proposal has parameter {:?}", a.param),
             )?;
         }
-        cond_structure(&a.when, &options_of, &known).or_else(|e| inv(subject, e))?;
+        cond_structure(&a.when, &options_of, &known, &ranking_kinds)
+            .or_else(|e| inv(subject, e))?;
     }
     // Spec 033's structure (3.8.1), after the policy's: checks, groups,
     // remediations, questions and the policy constructs it adds.
@@ -1335,13 +1346,7 @@ fn compile_generation(
             StepBody::Extract(_) | StepBody::AcceptModelDerived(_) => {
                 // Refused earlier by extraction-not-compiled.
             }
-            StepBody::Rank(_) | StepBody::Select(_) => {
-                return refuse(
-                    C::InvalidDefinition,
-                    format!("step:{}", s.id),
-                    "ranking-not-compiled",
-                );
-            }
+            StepBody::Rank(_) | StepBody::Select(_) => {}
             StepBody::Generate(_) => {}
             StepBody::Acquire(_) | StepBody::Widen(_) => {
                 crate::acquisition::resolve(&s.id, &s.body, sources)?;
@@ -1411,13 +1416,7 @@ fn compile_generation(
                 // Refused earlier by extraction-not-compiled.
                 Vec::new()
             }
-            StepBody::Rank(_) | StepBody::Select(_) => {
-                return refuse(
-                    C::InvalidDefinition,
-                    format!("step:{}", s.id),
-                    "ranking-not-compiled",
-                );
-            }
+            StepBody::Rank(_) | StepBody::Select(_) => ranking::refs(&s.body),
             StepBody::Generate(g) => crate::generation::dependencies(g, def),
             StepBody::Acquire(_) | StepBody::Widen(_) => crate::acquisition::refs(&s.body),
             StepBody::Corroborate(c) => corroborate_refs(c),
@@ -1485,11 +1484,10 @@ fn compile_generation(
                 // Refused earlier by extraction-not-compiled.
             }
             StepBody::Rank(_) | StepBody::Select(_) => {
-                return refuse(
-                    C::InvalidDefinition,
-                    format!("step:{}", s.id),
-                    "ranking-not-compiled",
-                );
+                let (ty, bytes) = ranking::types(id, &s.body, &env, &acquisition_derivations)?;
+                projection_bounds.insert(id.clone(), bytes);
+                step_tys.insert(id.clone(), ty);
+                infos.insert(id.clone(), StepInfo::Ranking);
             }
             StepBody::Generate(_) => {
                 infos.insert(id.clone(), StepInfo::Generate);
@@ -1614,12 +1612,12 @@ fn compile_generation(
                         Ref::Step(n) => {
                             let base = if v2 { crate::expr::split_step(&n).0 } else { n };
                             match step_tys.get(&base) {
-                                Some(StepTy::Semantic(..)) => {
+                                Some(StepTy::ModelRanking(_)) | Some(StepTy::Semantic(..)) => {
                                     return Err(km(format!(
                                         "{r} is semantic; only exact values are projected"
                                     )));
                                 }
-                                Some(StepTy::Exact(_)) => {}
+                                Some(StepTy::Selection(_)) | Some(StepTy::Exact(_)) => {}
                                 None => return Err(km(format!("{r} is not a declared step"))),
                             }
                             let t = crate::expr::ref_ty(r, &env).map_err(km)?;
@@ -1680,6 +1678,7 @@ fn compile_generation(
         );
     }
 
+    ranking::consumers(def, &deps, &step_tys, &decoded)?;
     screening::coverage(authored, &screens, &decoded)?;
     let mut generated = crate::generation::type_check(
         def,
@@ -1707,7 +1706,7 @@ fn compile_generation(
         }
         for id in &order {
             let tree = match &infos[id] {
-                StepInfo::Generate => {
+                StepInfo::Ranking | StepInfo::Generate => {
                     quality::Ceil::leaf(rustev_contract::grade::ValueGrade::Ungraded, false)
                 }
                 StepInfo::Acquisition(a) => a.tree.clone(),
@@ -1731,7 +1730,7 @@ fn compile_generation(
                 StepInfo::Corroborate { decl, .. } => {
                     quality::corroborate_refusal(&subject, decl, &trees)
                 }
-                StepInfo::Generate | StepInfo::Semantic { .. } => None,
+                StepInfo::Ranking | StepInfo::Generate | StepInfo::Semantic { .. } => None,
             };
             if let Some(r) = found {
                 return Err(r);
@@ -1778,12 +1777,32 @@ fn compile_generation(
                 // Refused earlier by extraction-not-compiled.
                 continue;
             }
-            StepBody::Rank(_) | StepBody::Select(_) => {
-                return refuse(
-                    C::InvalidDefinition,
-                    format!("step:{}", s.id),
-                    "ranking-not-compiled",
-                );
+            StepBody::Rank(r) => {
+                let StepTy::ModelRanking(pool) = step_tys[&s.id] else {
+                    unreachable!()
+                };
+                let detail = ranking::bind(&s.id, r, pool, projection_bounds[&s.id], &sorted)?;
+                if let PlanStepDetail::Unsupported { capability } = &detail {
+                    notices.push(Notice {
+                        screening: None,
+                        kind: NoticeKind::Fallback,
+                        subject: subject.clone(),
+                        reason: format!("unsupported: {capability}"),
+                        action: None,
+                    });
+                }
+                if let PlanStepDetail::Rank(binding) = &detail
+                    && let Some(backend) =
+                        sorted.iter().find(|b| b.backend_id == binding.backend_id)
+                {
+                    determinism.insert(s.id.clone(), backend.determinism);
+                }
+                details.insert(s.id.clone(), detail);
+                continue;
+            }
+            StepBody::Select(select) => {
+                details.insert(s.id.clone(), PlanStepDetail::Select(select.clone()));
+                continue;
             }
             StepBody::Generate(g) => {
                 let binding = crate::generation::bind(&s.id, g, &generated[&s.id], &sorted)?;
@@ -1824,7 +1843,8 @@ fn compile_generation(
         let options_needed = match &d.candidates {
             Candidates::From(r) => match &step_tys[step_ref(r).unwrap_or_default()] {
                 StepTy::Exact(t) => Value::id_bounds(t).map(|(m, _)| m).unwrap_or(0),
-                StepTy::Semantic(..) => 0,
+                StepTy::ModelRanking(_) | StepTy::Semantic(..) => 0,
+                StepTy::Selection(ty) => Value::id_bounds(ty).map_or(0, |(n, _)| n),
             },
             Candidates::None => d.options.len() as u64,
         };
@@ -2018,6 +2038,22 @@ fn compile_generation(
     crate::acquisition::budget(def, sources, execution)?;
     let mut total: u64 = crate::generation::budget(def, &details)?;
     for s in &def.steps {
+        if let StepBody::Rank(r) = &s.body {
+            let StepTy::ModelRanking(pool) = step_tys[&s.id] else {
+                unreachable!()
+            };
+            let count = ranking::budget(&s.id, r, pool)?;
+            if matches!(details[&s.id], PlanStepDetail::Rank(_)) {
+                total = total.saturating_add(count);
+            }
+            if projection_bounds[&s.id] > def.limits.max_projection_bytes {
+                return refuse(
+                    C::Budget,
+                    format!("step:{}", s.id),
+                    "rank projection exceeds max_projection_bytes",
+                );
+            }
+        }
         if let Some(PlanStepDetail::Semantic(b)) = details.get(&s.id) {
             total = total.saturating_add(b.max_requests);
             if b.max_projection_bytes > def.limits.max_projection_bytes {
@@ -2066,7 +2102,16 @@ fn compile_generation(
     // (h) Policy.
     let mut reasons = possible_reasons(def, &inputs, &order, &infos, &details);
     if v2 {
-        extend_reasons_v2(def, &inputs, &order, &infos, &deps, &trees, &mut reasons);
+        extend_reasons_v2(
+            def,
+            &inputs,
+            &order,
+            &infos,
+            &deps,
+            &trees,
+            &details,
+            &mut reasons,
+        );
     }
     check_policy(def, &input_tys, &step_tys, &reasons, &mut notices, v2)?;
 
@@ -2234,6 +2279,7 @@ fn extend_reasons_v2(
     infos: &BTreeMap<String, StepInfo>,
     deps: &BTreeMap<String, Vec<String>>,
     trees: &BTreeMap<String, quality::Ceil>,
+    details: &BTreeMap<String, PlanStepDetail>,
     reasons: &mut BTreeMap<String, BTreeSet<ReasonKind>>,
 ) {
     use ReasonKind as K;
@@ -2303,6 +2349,12 @@ fn extend_reasons_v2(
                     }
                     rustev_contract::definition::OnContradiction::TreatAsHint => {}
                 }
+            }
+            StepInfo::Ranking => {
+                let body = &def.steps.iter().find(|s| &s.id == id).unwrap().body;
+                let updated = ranking::reasons(body, &details[id], reasons);
+                reasons.insert(key, updated);
+                continue;
             }
             StepInfo::Generate => {}
             StepInfo::Acquisition(_) | StepInfo::Semantic { .. } => {
@@ -2430,8 +2482,13 @@ fn cond_structure(
     c: &Cond,
     options_of: &BTreeMap<&str, &Vec<String>>,
     known: &dyn Fn(&str) -> Result<(), String>,
+    deferred: &BTreeSet<&str>,
 ) -> Result<(), String> {
     let unit = Decimal::from_i64(1);
+    if matches!(c, Cond::TopLabel { step, .. } | Cond::MassAtLeast { step, .. } | Cond::TopMassBelow { step, .. } | Cond::ExpectationAtLeast { step, .. } if deferred.contains(step.as_str()))
+    {
+        return Ok(());
+    }
     let semantic_opts = |step: &str| -> Result<&Vec<String>, String> {
         known(&format!("step:{step}"))?;
         options_of
@@ -2492,8 +2549,8 @@ fn cond_structure(
         Cond::Empty(r) | Cond::Nonempty(r) => known(r),
         Cond::All(cs) | Cond::Any(cs) => cs
             .iter()
-            .try_for_each(|c| cond_structure(c, options_of, known)),
-        Cond::Not(c) => cond_structure(c, options_of, known),
+            .try_for_each(|c| cond_structure(c, options_of, known, deferred)),
+        Cond::Not(c) => cond_structure(c, options_of, known, deferred),
     }
 }
 
@@ -2626,6 +2683,10 @@ fn possible_reasons(
     for id in order {
         let mut r = BTreeSet::new();
         match (&infos[id], &details[id]) {
+            (StepInfo::Ranking, detail) => {
+                let body = &def.steps.iter().find(|s| &s.id == id).unwrap().body;
+                r = ranking::reasons(body, detail, &out);
+            }
             (StepInfo::Generate, _) => {}
             (StepInfo::Acquisition(a), _) => {
                 r.extend([
@@ -3028,11 +3089,24 @@ fn static_derivations(
     let semantic: BTreeSet<&str> = def
         .steps
         .iter()
-        .filter(|s| matches!(s.body, StepBody::Semantic(_) | StepBody::Generate(_)))
+        .filter(|s| {
+            matches!(
+                s.body,
+                StepBody::Semantic(_) | StepBody::Generate(_) | StepBody::Rank(_)
+            )
+        })
         .map(|s| s.id.as_str())
         .collect();
     let mut out: BTreeMap<String, Derivation> = BTreeMap::new();
     for id in order {
+        if def
+            .steps
+            .iter()
+            .any(|s| &s.id == id && matches!(s.body, StepBody::Select(_)))
+        {
+            out.insert(id.clone(), Derivation::MixedDerived);
+            continue;
+        }
         if let Some(StepInfo::Acquisition(a)) = infos.get(id) {
             out.insert(id.clone(), a.plan.derivation);
             continue;

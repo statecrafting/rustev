@@ -835,6 +835,19 @@ selected id and never leaves the ranked pool. Nothing calls these until
 the compile increment (`crates/rustev-core/tests/ranking_value.rs`,
 `ranking_select.rs`).
 
+**Increment 5 (2026-10-26): compilation and refusals.**
+`crates/rustev-core/src/compile/ranking.rs` replaces the
+`ranking-not-compiled` refusal: `rank` compiles in all three modes with
+its position-bias controls and increment 3's request bounds, binding a
+descriptor's `ranking` member in phase f with budget checks in phase g,
+and `select` compiles with its backfill and tie-order sources required to
+be exact-derived (category 28 `exact_order_source`); every refusal of 3.12
+keeps spec 002's phase order, and a ranking or selection read as another
+value kind is refused. The plan 3 details of 3.2.4 and 3.10.6 enter the
+`PlanId`, pinned per mode by `crates/rustev-core/tests/golden/ranking.*`.
+Evaluating a plan with a ranking step stays refused until the runtime
+increment (`crates/rustev-core/tests/ranking_compile.rs`).
+
 ## Decisions at approval
 
 Decided within the binding principles under the work order.

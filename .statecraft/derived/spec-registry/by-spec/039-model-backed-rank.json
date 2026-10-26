@@ -211,7 +211,7 @@
       }
     ],
     "sectionDigests": {
-      "039-model-backed-rank-and-deterministic-backfill-amends-002-and-005": "6b56ea01d8a054da0d44c9473bfb268f00245a9fb79f0adf7f110083bad76068",
+      "039-model-backed-rank-and-deterministic-backfill-amends-002-and-005": "4f29f311ecc9b50109a6649bac755498161f579f2b7831850636ab376f265015",
       "1-purpose": "62f7d816c0426136a873aa86f30c712d4acfed01b89c93ebeeb038255cc24387",
       "2-1-binding-principles-of-76": "92d2ff04f1fc2ab5b1445dd912edae007e4ddb9636bdcd1ce28a83c7d9b04f6f",
       "2-territory": "bc1d2b9c132cf6ae3da455c116e0dc3bbedf453ea20768604dffcb8bea34c988",
@@ -238,7 +238,7 @@
       "5-observable-negative-cases": "c561354840b91bdc404199554577534422e93ea0684383d81168517cdc6205cc",
       "acceptance": "98058c814af4678d7f221c62d7a7ec6680e6a0b9cf4177bfacb4c8a18982de2b",
       "decisions-at-approval": "4f4be317113055dcd51b758d2d77cba42f6a0a1d543d8d370df890f4c7293510",
-      "implementation-record": "de44a9a7912af9aa9bf1346df8af40361bbed548b3a05749a822d68cc98994dc",
+      "implementation-record": "54d273a4206df5558581d2073b0c4130d93491f56dd8b28fca559b98bc0c68d0",
       "verification": "e949104655033f12b1019faa8ff8ccfcd5251930255e9072bfe212c7a799a055"
     },
     "sectionHeadings": [
@@ -277,6 +277,6 @@
     "summary": "An amendment of approved specs 002 and 005 (R-16), for #76 child C2. Adds a `rank` step kind with three declared modes (listwise, pointwise, pairwise) over a bounded candidate pool, a distinct `ModelRanking` value kind that records partial rankings, dropped ids with reasons, scores scoped to one ranking request and pairwise win counts, optional identity-bearing position-bias controls driven by a named seeded generator, and a `select` step that fills k positions from a model ranking and, when it is short or its backend failed, from a declared exact ordering, with per-position origin and derivation. Pairwise schedules are deterministic and bounded by `max_comparisons`; cycles are resolved by win count, then an exact tie-break, and counted. The constructs join the #76 track versions (`rustev.definition/2`, `rustev.plan/3`, `rustev.evidence/2`); the backend descriptor gains an optional `ranking` member. The rules backend (spec 005) answers pointwise `rank` for the swap test. Bedrock (spec 030) admits its reserved `rank` value under 030 3.12. Jev (specs 012 and 022) keeps R-28: rankings over Jev answers stay composed in plans and feed `select` unchanged. Plans that use none of this keep byte-identical identities. Approved (A-36); implementation is in progress.\n",
     "title": "Model-backed rank and deterministic backfill (amends 002 and 005)"
   },
-  "shardHash": "17c0d4341c2b47a35e453678949378760414f7aa28d2145f77ae7238050f7f42",
+  "shardHash": "072b1d8c106d99ec681a05a9765dcc506defaf05936fb1453deeba14ced51886",
   "specVersion": "1.10.0"
 }
