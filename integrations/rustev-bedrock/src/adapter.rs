@@ -80,13 +80,36 @@ impl BedrockBackend {
             .unwrap_or_else(|| format!("https://bedrock-runtime.{}.amazonaws.com", binding.region));
         let transport = Transport::new(&endpoint)?;
         let descriptor = BackendDescriptor {
-            ranking: None,
+            ranking: binding
+                .operations
+                .iter()
+                .find(|o| o.operation == "rank")
+                .map(|o| {
+                    use rustev_contract::descriptor::{
+                        ListwisePartial, ListwiseScores, Ranking, RankingMode,
+                    };
+                    Ranking {
+                        modes: vec![
+                            RankingMode::Listwise,
+                            RankingMode::Pointwise,
+                            RankingMode::Pairwise,
+                        ],
+                        max_candidates: o.max_options,
+                        listwise_scores: if o.mapping_version == "rank-scored/1" {
+                            ListwiseScores::Always
+                        } else {
+                            ListwiseScores::Never
+                        },
+                        listwise_partial: ListwisePartial::Possible,
+                    }
+                }),
             schema: schema::BACKEND.into(),
             backend_id,
             artifact: binding.artifact()?,
             operations: binding
                 .operations
                 .iter()
+                .filter(|o| o.operation != "rank")
                 .map(|o| OperationSupport {
                     isolation: None,
                     screen: None,
@@ -148,6 +171,14 @@ impl BedrockBackend {
                 if f.backend_id == self.descriptor.backend_id && f.descriptor != id {
                     return Err("descriptor_mismatch".into());
                 }
+            }
+        }
+        for step in &plan.steps {
+            if let rustev_contract::plan::PlanStepDetail::Rank(b) = &step.detail
+                && b.backend_id == self.descriptor.backend_id
+                && b.descriptor != id
+            {
+                return Err("descriptor_mismatch".into());
             }
         }
         for step in &plan.definition.steps {
@@ -294,7 +325,7 @@ impl BedrockBackend {
                 )
                 .report());
             }
-            let mapped = mapping::response(&self.binding, &r.body)
+            let mapped = mapping::response_for(&self.binding, call.projection, &r.body)
                 .map_err(|_| fail(RemoteCode::MalformedResponse, "response", true))?;
             match mapped.output {
                 Ok(output) => Ok(AttemptReport {

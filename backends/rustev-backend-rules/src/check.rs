@@ -29,7 +29,7 @@ pub enum PlanMismatchKind {
 }
 
 impl RulesBackend {
-    /// Check every semantic step `plan` binds to this backend, as primary or
+    /// Check every semantic or rank step `plan` binds to this backend, as primary or
     /// runtime fallback target. Returns every mismatch; an empty plan use is
     /// not an error.
     pub fn check_plan(&self, plan: &Plan) -> Result<(), Vec<PlanMismatch>> {
@@ -37,10 +37,15 @@ impl RulesBackend {
         let my_descriptor = self.descriptor.id().ok();
         let mut bound: Vec<(&str, bool)> = vec![];
         for s in &plan.steps {
-            if let PlanStepDetail::Semantic(b) = &s.detail
-                && &b.backend_id == me
+            let binding = match &s.detail {
+                PlanStepDetail::Semantic(b) => Some((&b.backend_id, &b.descriptor)),
+                PlanStepDetail::Rank(b) => Some((&b.backend_id, &b.descriptor)),
+                _ => None,
+            };
+            if let Some((backend, descriptor)) = binding
+                && backend == me
             {
-                bound.push((&s.id, Some(&b.descriptor) == my_descriptor.as_ref()));
+                bound.push((&s.id, Some(descriptor) == my_descriptor.as_ref()));
             }
         }
         if let PlanExecution::Declared(d) = &plan.execution {
@@ -66,7 +71,32 @@ impl RulesBackend {
                 continue;
             }
             let decl = plan.definition.steps.iter().find_map(|s| match &s.body {
-                StepBody::Semantic(d) if s.id == step => Some(d),
+                StepBody::Semantic(d) if s.id == step => Some(d.clone()),
+                StepBody::Rank(r) if s.id == step => {
+                    use rustev_contract::definition::*;
+                    if r.mode != rustev_contract::ranking::RankMode::Pointwise {
+                        out.push(mismatch(PlanMismatchKind::TaskDiffers("mode")));
+                    }
+                    let mut project = r.project.clone();
+                    project.push(format!("bind:{}", r.bind));
+                    Some(SemanticDecl {
+                        operation: Operation::Rank,
+                        task: r.task.clone(),
+                        question: r.question.clone(),
+                        options: vec!["score".into()],
+                        candidates: Candidates::From(r.candidates.clone()),
+                        requires: RequiredKind::Scores,
+                        project,
+                        for_each: vec![ForEach {
+                            over: r.candidates.clone(),
+                            bind: r.bind.clone(),
+                            items: r.items.clone(),
+                        }],
+                        backend: r.backend.clone(),
+                        calibration: CalibrationRef::None,
+                        fallback: Fallback::None,
+                    })
+                }
                 _ => None,
             });
             let Some(decl) = decl else { continue };
@@ -83,7 +113,7 @@ impl RulesBackend {
             if task.options != decl.options {
                 out.push(mismatch(PlanMismatchKind::TaskDiffers("options")));
             }
-            for kind in fields(task, decl, plan) {
+            for kind in fields(task, &decl, plan) {
                 out.push(mismatch(kind));
             }
         }

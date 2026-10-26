@@ -412,3 +412,81 @@ fn environment_credentials_do_not_enable_the_probe_without_the_feature() {
     assert!(stderr.contains("requires the aws-config feature"));
     assert!(!stderr.contains("ENV_TEST"));
 }
+
+#[tokio::test]
+async fn rank_mapping_uses_signed_mock_transport_for_every_mode() {
+    use rustev_bedrock::binding::OperationBinding;
+    use rustev_contract::output::RawOutput;
+    use serde_json::json;
+    for (mode, ids, options, answer, expected) in [
+        (
+            "listwise",
+            vec!["a", "b"],
+            vec![],
+            json!({"ranking":["b","a"]}),
+            RawOutput::Ranking {
+                ids: vec!["b".into(), "a".into()],
+                scores: rustev_contract::output::RankingScores::None,
+            },
+        ),
+        (
+            "pointwise",
+            vec!["a"],
+            vec![],
+            json!({"score":0.25}),
+            RawOutput::Scores([("a".into(), 0.25)].into()),
+        ),
+        (
+            "pairwise",
+            vec!["a", "b"],
+            vec!["first", "second"],
+            json!({"choice":"second"}),
+            RawOutput::Label("second".into()),
+        ),
+    ] {
+        let body = json!({"stopReason":"tool_use","output":{"message":{"content":[{"toolUse":{"name":"rustev_answer","input":answer}}]}},"usage":{"inputTokens":10,"outputTokens":2}}).to_string();
+        let (url, handle, _) = server(200, "", &body, false).await;
+        let (mut binding, policy, materials) = fixture();
+        binding.operations.push(OperationBinding {
+            operation: "rank".into(),
+            mapping_version: "rank/1".into(),
+            max_options: 100,
+        });
+        let sink = Arc::new(Sink::default());
+        let backend = BedrockBackend::new(
+            "rank-test".into(),
+            binding,
+            policy,
+            materials,
+            Config {
+                endpoint: Some(url),
+                sink: sink.clone(),
+                credentials: Some(Arc::new(Credentials {
+                    calls: Arc::new(AtomicUsize::new(0)),
+                    delay: Duration::ZERO,
+                })),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            backend.descriptor().ranking.as_ref().unwrap().modes.len(),
+            3
+        );
+        let projection = serde_json::to_vec(&json!({"operation":"rank","question":"Choose","mode":mode,"options":options,"candidates":ids,"presented":ids.iter().map(|id|json!({"id":id,"item":null})).collect::<Vec<_>>(),"instance":{},"values":{}})).unwrap();
+        let report = backend
+            .infer(AttemptCall {
+                projection: &projection,
+                attempt_id: "rank",
+                cancel: CancelSignal::new(),
+                cx: &context(2000),
+            })
+            .await;
+        assert_eq!(report.result.unwrap(), expected);
+        assert_eq!(report.charge, Charge::Estimated { units: 60_000 });
+        let request = String::from_utf8(handle.await.unwrap()).unwrap();
+        assert!(request.contains("/bedrock/aws4_request"));
+        assert!(request.contains("presented"));
+        assert_eq!(sink.0.lock().unwrap().len(), 1);
+    }
+}

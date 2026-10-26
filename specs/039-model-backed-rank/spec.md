@@ -848,6 +848,16 @@ value kind is refused. The plan 3 details of 3.2.4 and 3.10.6 enter the
 Evaluating a plan with a ranking step stays refused until the runtime
 increment (`crates/rustev-core/tests/ranking_compile.rs`).
 
+**Increment 6, part a (2026-10-26): the rules backend and Bedrock.** The
+rules backend serves pointwise `rank` tasks with decimal scoring and
+declares the descriptor `ranking` member (3.14); its program checks refuse
+an unsupported capability. Bedrock maps `rank` in all three modes under
+spec 030 3.12 (3.15), both wire formats and the structured carriers,
+keeping the returned order without repair; tests use a mock transport
+only (`backends/rustev-backend-rules/tests/ranking.rs`,
+`integrations/rustev-bedrock/tests/ranking.rs`, `loopback.rs`). Core
+evaluation and runtime dispatch of rank requests are part b.
+
 ## Decisions at approval
 
 Decided within the binding principles under the work order.

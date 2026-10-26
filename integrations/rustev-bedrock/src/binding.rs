@@ -222,18 +222,27 @@ impl BedrockBinding {
         if self.mapping.version != MAPPING_VERSION {
             return Err("unsupported_mapping_version".into());
         }
-        if self.operations.is_empty() || self.operations.len() > 3 {
+        if self.operations.is_empty() || self.operations.len() > 4 {
             return Err("invalid_operations".into());
         }
         let mut seen = std::collections::BTreeSet::new();
         for op in &self.operations {
-            if !matches!(op.operation.as_str(), "classify" | "proposition" | "rubric") {
+            if !matches!(
+                op.operation.as_str(),
+                "classify" | "proposition" | "rubric" | "rank"
+            ) {
                 return Err("reserved_by_spec:operation".into());
             }
-            if !seen.insert(&op.operation)
-                || op.mapping_version != MAPPING_VERSION
-                || !(2..=256).contains(&op.max_options)
-            {
+            let valid_mapping = if op.operation == "rank" {
+                if self.structured_output == StructuredOutput::None {
+                    return Err("rank_requires_structured_output".into());
+                }
+                matches!(op.mapping_version.as_str(), "rank/1" | "rank-scored/1")
+                    && (1..=100).contains(&op.max_options)
+            } else {
+                op.mapping_version == MAPPING_VERSION && (2..=256).contains(&op.max_options)
+            };
+            if !seen.insert(&op.operation) || !valid_mapping {
                 return Err("invalid_operation_binding".into());
             }
         }

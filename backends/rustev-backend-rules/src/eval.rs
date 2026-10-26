@@ -131,6 +131,14 @@ pub(crate) fn evaluate(
     if !applied && task.on_no_match == NoMatch::Fail {
         return Evaluated::Failed(format!("task {:?}: no rule applied", task.name));
     }
+    if task.operation == rustev_contract::definition::Operation::Rank {
+        // choose validated the single presented id before any rules ran.
+        let id = doc["presented"][0]["id"].as_str().unwrap();
+        return Evaluated::Output(RawOutput::Scores(BTreeMap::from([(
+            id.to_owned(),
+            logits[0].to_f64_nearest(),
+        )])));
+    }
     Evaluated::Output(RawOutput::Logits(
         task.options
             .iter()
@@ -162,6 +170,23 @@ fn choose<'t>(tasks: &'t [CTask], doc: &Json) -> Result<&'t CTask, String> {
             "task {name:?}: question differs from the program's"
         ));
     }
+    if task.operation == rustev_contract::definition::Operation::Rank {
+        let presented = doc.get("presented").and_then(Json::as_array);
+        let candidate = presented
+            .filter(|p| p.len() == 1)
+            .and_then(|p| p[0].get("id"))
+            .and_then(Json::as_str);
+        if doc.get("mode").and_then(Json::as_str) != Some("pointwise")
+            || candidate.is_none_or(str::is_empty)
+            || doc.get("candidates") != Some(&serde_json::json!([candidate]))
+            || doc.get("options") != Some(&serde_json::json!([]))
+            || presented
+                .is_none_or(|p| !matches!(p[0].get("item"), Some(Json::Null | Json::Object(_))))
+        {
+            return Err("capability: rank requires one pointwise candidate".into());
+        }
+        return Ok(task);
+    }
     let options: Option<Vec<&str>> = doc
         .get("options")
         .and_then(Json::as_array)
@@ -185,7 +210,13 @@ fn read_fields(task: &CTask, doc: &Json) -> Result<Vec<FieldValue>, String> {
     task.fields
         .iter()
         .map(|f| {
-            let mut v = values.get(&f.key);
+            let mut v = if task.operation == rustev_contract::definition::Operation::Rank
+                && f.key.starts_with("bind:")
+            {
+                doc.pointer("/presented/0/item")
+            } else {
+                values.get(&f.key)
+            };
             if let Some(m) = &f.member {
                 v = match v {
                     Some(Json::Object(o)) => o.get(m),
