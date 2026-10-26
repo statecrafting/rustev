@@ -621,3 +621,13 @@ fn sigstore_bundle_bytes_round_trip_exactly() {
     assert_eq!(bundle.bytes(), text.as_bytes());
     assert_eq!(serde_json::to_string(&bundle).unwrap(), text);
 }
+
+#[test]
+fn generation_compile_refusal_category_bound() {
+    for category in [22, 23, 24, 25] {
+        let mut v = refusal();
+        v["code"] = json!("compile_refused");
+        v["compile_refusal"] = json!({"document":{"command":"plan compile","status":"refused","category":category,"category_name":"template","subject":"step:text","detail":"bad","shortfalls":[]}});
+        assert_eq!(parse::<ServeRefusal>(&v).is_ok(), category <= 24);
+    }
+}

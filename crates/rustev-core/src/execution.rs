@@ -116,7 +116,10 @@ pub(crate) fn validate(
                     "the step's compile-time fallback `unsupported` was taken",
                 );
             }
-            (Some(StepBody::Semantic(d)), Some(PlanStepDetail::Semantic(b))) => (d, b),
+            (Some(StepBody::Semantic(_)), Some(PlanStepDetail::Semantic(_)))
+            | (Some(StepBody::Generate(_)), Some(PlanStepDetail::Generate(_))) => {
+                (decl.unwrap(), details.get(&sp.step).unwrap())
+            }
             _ => return refuse(subject, "the step is not bound"),
         };
         if !seen.insert(sp.step.as_str()) {
@@ -169,8 +172,37 @@ pub(crate) fn validate(
         if !unique(&f.on) {
             return refuse(subject, "fallback.on repeats a class");
         }
-        let (decl, primary) = binding;
-        let mut chain: BTreeSet<&str> = [primary.backend_id.as_str()].into();
+        let (decl, detail) = binding;
+        let (primary_id, primary_output, calibration) = match detail {
+            PlanStepDetail::Semantic(b) => (&b.backend_id, b.output.clone(), b.calibration.clone()),
+            PlanStepDetail::Generate(b) => {
+                let Some(backend) = sorted.iter().find(|d| d.backend_id == b.backend_id) else {
+                    return refuse(
+                        subject,
+                        format!("bound backend {:?} was not supplied", b.backend_id),
+                    );
+                };
+                let StepBody::Generate(g) = &decl.body else {
+                    unreachable!()
+                };
+                let checked = crate::generation::checked_binding(&decl.id, g, b)?;
+                let output =
+                    crate::generation::candidate(g, &checked, backend).map_err(|reasons| {
+                        Refusal {
+                            category: Category::InvalidExecution,
+                            subject: subject.clone(),
+                            detail: "generation binding changed".into(),
+                            shortfalls: vec![Shortfall {
+                                backend_id: b.backend_id.clone(),
+                                reasons,
+                            }],
+                        }
+                    })?;
+                (&b.backend_id, output, BoundCalibration::None)
+            }
+            _ => unreachable!(),
+        };
+        let mut chain: BTreeSet<&str> = [primary_id.as_str()].into();
         let (options_needed, bound) = bind_ctx
             .get(&sp.step)
             .copied()
@@ -185,7 +217,20 @@ pub(crate) fn validate(
             let Some(b) = sorted.iter().find(|b| &b.backend_id == id) else {
                 return refuse(subject, format!("fallback {id:?} was not supplied"));
             };
-            let output = match check_candidate(decl, b, primary.requires, options_needed, bound) {
+            let candidate = match (&decl.body, detail) {
+                (StepBody::Semantic(d), PlanStepDetail::Semantic(primary)) => {
+                    check_candidate(d, b, primary.requires, options_needed, bound)
+                }
+                (StepBody::Generate(g), PlanStepDetail::Generate(primary)) => {
+                    crate::generation::candidate(
+                        g,
+                        &crate::generation::checked_binding(&decl.id, g, primary)?,
+                        b,
+                    )
+                }
+                _ => unreachable!(),
+            };
+            let output = match candidate {
                 Ok(o) => o,
                 Err(reasons) => {
                     return Err(Refusal {
@@ -199,16 +244,16 @@ pub(crate) fn validate(
                     });
                 }
             };
-            if output != primary.output {
+            if matches!(detail, PlanStepDetail::Semantic(_)) && output != primary_output {
                 return refuse(
                     subject,
                     format!(
                         "fallback {id:?} returns {output:?}; the bound backend returns {:?}",
-                        primary.output
+                        primary_output
                     ),
                 );
             }
-            if let BoundCalibration::Bound { binding, .. } = &primary.calibration
+            if let BoundCalibration::Bound { binding, .. } = &calibration
                 && binding.artifact != b.artifact
             {
                 return refuse(
@@ -239,13 +284,18 @@ pub(crate) fn validate(
     // Worst-case attempts over every bound semantic step.
     let mut worst: u64 = 0;
     for s in &def.steps {
-        if let Some(PlanStepDetail::Semantic(b)) = details.get(&s.id) {
+        let requests = match details.get(&s.id) {
+            Some(PlanStepDetail::Semantic(b)) => b.max_requests,
+            Some(PlanStepDetail::Generate(b)) => b.worst_case_requests,
+            _ => continue,
+        };
+        {
             let per_request = match policy.steps.iter().find(|p| p.step == s.id) {
                 Some(p) => u64::from(p.retry.max_attempts)
                     .saturating_mul(1 + p.fallback.backends.len() as u64),
                 None => 1,
             };
-            worst = worst.saturating_add(b.max_requests.saturating_mul(per_request));
+            worst = worst.saturating_add(requests.saturating_mul(per_request));
         }
     }
     if worst > policy.max_attempts_per_decision {
@@ -269,4 +319,46 @@ pub(crate) fn validate(
         policy: policy.clone(),
         fallbacks,
     })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rustev_contract::execution::{FallbackPolicy, RetryPolicy, StepExecution};
+    use rustev_contract::plan::Plan;
+
+    #[test]
+    fn missing_primary_generate_backend_is_refused() {
+        let plan: Plan =
+            serde_json::from_str(include_str!("../tests/golden/generation.plan.json")).unwrap();
+        let step = &plan.steps[0];
+        let PlanStepDetail::Generate(binding) = &step.detail else {
+            panic!("expected a generation binding");
+        };
+        let policy = ExecutionPolicy {
+            schema: schema::EXECUTION.into(),
+            max_attempts_per_decision: binding.worst_case_requests,
+            cost: CostPolicy::Unlimited,
+            optimization: None,
+            steps: vec![StepExecution {
+                step: step.id.clone(),
+                retry: RetryPolicy::none(),
+                attempt_timeout: AttemptTimeout::None,
+                fallback: FallbackPolicy {
+                    backends: vec![],
+                    on: vec![],
+                },
+            }],
+        };
+        let details = BTreeMap::from([(step.id.clone(), step.detail.clone())]);
+        let refusal = validate(&policy, &plan.definition, &[], &details, &BTreeMap::new())
+            .expect_err("a missing primary descriptor must be refused");
+        assert_eq!(refusal.category, Category::InvalidExecution);
+        assert_eq!(refusal.subject, format!("step:{}", step.id));
+        assert_eq!(
+            refusal.detail,
+            format!("bound backend {:?} was not supplied", binding.backend_id)
+        );
+        assert!(refusal.shortfalls.is_empty());
+    }
 }

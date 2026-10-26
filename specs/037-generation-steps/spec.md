@@ -51,6 +51,8 @@ extends:
   - { spec: "005-reference-backends", unit: { kind: directory, path: "backends/rustev-backend-rules/" }, nature: additive }
   - { spec: "012-jev-integration", unit: { kind: directory, path: "integrations/rustev-jev/" }, nature: additive }
   - { spec: "009-remote-adapter-protocol", unit: { kind: directory, path: "integrations/rustev-remote-http/" }, nature: additive }
+  # The CLI refusal goldens for 22 to 24 join the shared conformance suite.
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "tools/rustev-conformance/" }, nature: additive }
   # New contract and core source files join their reviewed archive lists.
   - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
 depends_on:
@@ -1021,6 +1023,25 @@ omitted when unused, with redaction classes. `OutputKind` is no longer
 `Copy`, because its text-record variant carries a language list; the
 clones this needs elsewhere change no behavior. Documents without these
 members keep their bytes and identities (`tests/generation_wire.rs`).
+
+**Increment 3 (2026-10-24): compiling generate steps.**
+`crates/rustev-core/src/generation.rs` replaces the temporary
+`generation-not-compiled` refusal: generate steps compile with their
+prompt and backstop templates validated through the template module and
+their identities bound into `PlanId` (3.3.4, 3.3.5, 3.5), a backstop for
+every required field, generated text isolated from exact operators,
+policy controls, acquisition requests and other model steps (3.6),
+static ownership checks (3.9), backend capability matching (3.17), and
+the plan members filled. New refusal categories 22 `invalid_generation`,
+23 `template` and 24 `model_output_flow` (3.5), with surface names, the
+serve refusal's category bound, core and CLI golden refusals and their
+harvested conformance cases. Until spec 035's compiler is integrated, the
+phase-b rule of 3.5 applies: a generate step whose projection can carry
+untrusted text is refused as 22, naming the step and field; spec 035's
+`unscreened_text` check replaces it. Profile-parameter substitution in
+generate steps is refused at compile for now. Tests:
+`crates/rustev-core/tests/generation_compile.rs` with plan and refusal
+goldens.
 
 **Owner decision A-49 (2026-10-23): dependencies.** Spec 030 is no longer
 a declared dependency of this spec. No behavior or acceptance item here

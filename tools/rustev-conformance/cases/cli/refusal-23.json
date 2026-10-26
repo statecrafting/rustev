@@ -1,0 +1,32 @@
+{
+  "argv": [
+    "plan",
+    "check",
+    "--definition",
+    "definition.json"
+  ],
+  "command": "plan check",
+  "derived": [],
+  "exit": 5,
+  "id": "refusal-23",
+  "inputs": [
+    {
+      "name": "definition.json",
+      "path": "tools/rustev-conformance/fixtures/cli/refusal-23/definition.json",
+      "sha256": "99ed67753f30484e3ec7d4ab78988d4b17e1b18bfc813bcf4633974b3d345e68"
+    }
+  ],
+  "outputs": [
+    {
+      "golden": "crates/rustev-cli/tests/golden/refusal-23.json",
+      "normalize": [],
+      "sha256": "3fc087e9920e92c85054cc0430b35c8aded94c5fa4923043cc6c89968eebb832",
+      "stream": "stdout"
+    }
+  ],
+  "surfaces": [
+    "cli",
+    "native",
+    "wasm"
+  ]
+}

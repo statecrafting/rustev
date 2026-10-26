@@ -567,3 +567,31 @@ fn protected_acquisition_group_is_category_20() {
     assert_eq!(j["category"], 20);
     cli_golden("refusal-20.json", &r.stdout);
 }
+
+#[test]
+fn generation_refusal_categories() {
+    for category in 22..=24 {
+        let s = Scratch::new(&format!("generation-{category}"));
+        let plan: serde_json::Value = serde_json::from_str(include_str!(
+            "../../rustev-core/tests/golden/generation.plan.json"
+        ))
+        .unwrap();
+        let mut definition = plan["definition"].clone();
+        let g = &mut definition["steps"][0]["body"]["generate"];
+        match category {
+            22 => {
+                g["backstop"]["fields"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("headline");
+            }
+            24 => g["projection"] = serde_json::json!(["step:item_text"]),
+            _ => {} // No template document is supplied to this CLI invocation.
+        }
+        s.write("definition.json", &serde_json::to_vec(&definition).unwrap());
+        let r = s.rustev(&["plan", "check", "--definition", "definition.json"]);
+        let j = r.expect(5, "refused");
+        assert_eq!(j["category"], category);
+        cli_golden(&format!("refusal-{category}.json"), &r.stdout);
+    }
+}

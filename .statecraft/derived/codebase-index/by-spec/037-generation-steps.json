@@ -71,6 +71,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "tools/rustev-conformance/",
+        "source": "spec-edge"
+      },
+      {
         "path": "tools/rustev-release/",
         "source": "spec-edge"
       }
@@ -235,6 +239,19 @@
       {
         "locations": [
           {
+            "file": "tools/rustev-conformance/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-conformance/"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "tools/rustev-release/"
           }
         ],
@@ -289,5 +306,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "c840f82b233d64ac7aed1c0a0d2ee70ef7f1c041abb8f53db4b400c1ac9809bb"
+  "shardHash": "a342ea9291d6e7b6dbb54a81ff4d08365174d213f1e0bce544ba5a1caefaf01e"
 }

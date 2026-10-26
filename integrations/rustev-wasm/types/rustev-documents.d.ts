@@ -17474,7 +17474,7 @@ export namespace RustevServeRefusal1 {
           length: Number_2049_18446744073709551615;
         };
       };
-  export type Number_1_21 = number;
+  export type Number_1_24 = number;
   /**
    * Length is enforced in decoded UTF-8 bytes by the parser.
    */
@@ -17587,7 +17587,7 @@ export namespace RustevServeRefusal1 {
     schema: "rustev.serve-refusal/1";
   }
   export interface CompilerRefusalFields {
-    category: Number_1_21;
+    category: Number_1_24;
     category_name: Text_1_2048;
     command: Text_1_2048;
     detail: Text_0_2048;

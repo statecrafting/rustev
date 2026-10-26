@@ -19,6 +19,7 @@ pub mod dynamic;
 pub mod evaluate;
 pub(crate) mod execution;
 pub mod expr;
+mod generation;
 pub(crate) mod grading;
 #[cfg(feature = "parameterized")]
 pub mod instantiate;
@@ -38,7 +39,7 @@ pub mod value;
 pub use actionable::{computed_party, transient};
 pub use compile::{
     Category, Compiled, LoadError, Refusal, compile, compile_bytes, compile_with,
-    compile_with_sources,
+    compile_with_sources, compile_with_templates,
 };
 pub use evaluate::{Evaluation, FailureContext, RequestIdentityError, SemanticRequest, Supplied};
 

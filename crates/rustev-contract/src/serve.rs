@@ -673,9 +673,10 @@ struct CompilerRefusalFields {
     command: Text<1, 2048>,
     status: Refused,
     // Category numbers are fixed by the specs: 18 and 19 are spec 035's
-    // screening categories, 20 and 21 are spec 036 3.9.3's. This is a wire
-    // range check only; nothing here converts the number to a `Category`.
-    category: Number<1, 21>,
+    // screening categories, 20 and 21 are spec 036 3.9.3's, and 22 to 24
+    // are spec 037 3.5's. This is a wire range check only; nothing here
+    // converts the number to a `Category`.
+    category: Number<1, 24>,
     category_name: Text<1, 2048>,
     subject: Text<0, 2048>,
     detail: Text<0, 2048>,

@@ -38,6 +38,9 @@ pub fn category_name(c: Category) -> &'static str {
         Category::UnscreenedText => "unscreened_text",
         Category::InvalidAcquisition => "invalid_acquisition",
         Category::SourceMapping => "source_mapping",
+        Category::InvalidGeneration => "invalid_generation",
+        Category::Template => "template",
+        Category::ModelOutputFlow => "model_output_flow",
     }
 }
 
@@ -48,6 +51,10 @@ fn reason_json(r: &ShortfallReason) -> Value {
             json!({"kind": "screen_text_limit", "max": max, "needed": needed})
         }
         ShortfallReason::ScreenInputExcess => json!({"kind": "screen_input_excess"}),
+        ShortfallReason::OutputLimit { max, needed } => {
+            json!({"kind": "output_limit", "max": max, "needed": needed})
+        }
+        ShortfallReason::Language { required } => json!({"kind": "language", "required": required}),
         ShortfallReason::UnknownBackend => json!({"kind": "unknown_backend"}),
         ShortfallReason::Operation(op) => json!({"kind": "operation", "operation": op}),
         ShortfallReason::OutputKind { offered, required } => {

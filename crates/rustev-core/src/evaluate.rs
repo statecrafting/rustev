@@ -53,6 +53,7 @@ use crate::value::{Value, decode};
 pub enum StartError {
     /// Acquisition compilation is available; staged evaluation is a later increment.
     AcquisitionNotAvailable,
+    GenerationNotAvailable,
     /// The snapshot's `schema` is not `rustev.snapshot/1`.
     Schema(String),
     /// An entry names a field the definition does not declare.
@@ -64,6 +65,9 @@ pub enum StartError {
 impl fmt::Display for StartError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            StartError::GenerationNotAvailable => {
+                write!(f, "generation evaluation is not available")
+            }
             StartError::AcquisitionNotAvailable => {
                 write!(f, "staged acquisition evaluation is not available")
             }
@@ -435,6 +439,14 @@ impl<'c> Evaluation<'c> {
         snapshot: &Snapshot,
         now: Timestamp,
     ) -> Result<Self, StartError> {
+        if compiled
+            .info
+            .steps
+            .values()
+            .any(|s| matches!(s, StepInfo::Generate))
+        {
+            return Err(StartError::GenerationNotAvailable);
+        }
         if compiled.plan.acquisitions.is_some() {
             return Err(StartError::AcquisitionNotAvailable);
         }
@@ -1606,6 +1618,7 @@ impl<'c> Evaluation<'c> {
                 let key = format!("step:{id}");
                 let lineage = self.lineage_of(deps);
                 match &info.steps[id] {
+                    StepInfo::Generate => unreachable!("generation evaluation refused at start"),
                     StepInfo::Acquisition(_) => {
                         unreachable!("acquisition evaluation refused at start")
                     }
@@ -2027,7 +2040,8 @@ impl<'c> Evaluation<'c> {
                 )),
                 StepInfo::Exact { .. }
                 | StepInfo::Corroborate { .. }
-                | StepInfo::Acquisition(_) => None,
+                | StepInfo::Acquisition(_)
+                | StepInfo::Generate => None,
             })
             .collect();
         let cx = OpContext {
