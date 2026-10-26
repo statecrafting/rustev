@@ -833,6 +833,7 @@ pub(crate) fn predicate_reads(
             expr_reads(&Expr::Ref(set.clone()), item, gate, out);
         }
         Predicate::Present(r) | Predicate::IsConstructed { reference: r } => {
+            let gate = gate && !matches!(p, Predicate::IsConstructed { .. });
             if let Some((base, path)) = resolve(r, item) {
                 out.push(Read {
                     base,
@@ -889,6 +890,11 @@ pub(crate) fn op_reads(args: &OpArgs) -> Vec<Read> {
     let mut out: Vec<Read> = Vec::new();
     let list_base = |r: &str| resolve(r, None);
     match args {
+        OpArgs::ComposeKey(a) => {
+            for p in &a.parts {
+                expr_reads(&p.value, None, false, &mut out);
+            }
+        }
         OpArgs::CountWhere(a) => {
             out.extend(node(&a.list));
             if let Some((b, p)) = list_base(&a.list) {
@@ -1170,6 +1176,7 @@ fn tree_at(trees: &BTreeMap<String, Ceil>, r: &str, extra: &[&str]) -> Ceil {
 pub(crate) fn step_tree(args: &OpArgs, trees: &BTreeMap<String, Ceil>) -> Ceil {
     let whole = combine_reads(&op_reads(args), trees);
     match args {
+        OpArgs::ComposeKey(_) => Ceil::leaf(ValueGrade::Hint, false),
         OpArgs::JoinKeyed(a) => {
             let id = if a.key == "id" {
                 tree_at(trees, &a.left, &["*"])

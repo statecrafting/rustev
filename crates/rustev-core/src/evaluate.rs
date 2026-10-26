@@ -181,6 +181,7 @@ pub struct FailureContext {
 
 /// An evaluation in progress.
 pub struct Evaluation<'c> {
+    constructed: BTreeSet<String>,
     compiled: &'c Compiled,
     now: Timestamp,
     snapshot_id: SnapshotId,
@@ -485,6 +486,7 @@ impl<'c> Evaluation<'c> {
             .id()
             .map_err(|e| StartError::NotCanonical(e.to_string()))?;
         let mut ev = Evaluation {
+            constructed: BTreeSet::new(),
             compiled,
             now,
             snapshot_id,
@@ -1623,6 +1625,11 @@ impl<'c> Evaluation<'c> {
                         unreachable!("acquisition evaluation refused at start")
                     }
                     StepInfo::Exact { args, .. } => {
+                        if matches!(args, OpArgs::ComposeKey(_))
+                            || deps.iter().any(|d| self.constructed.contains(d))
+                        {
+                            self.constructed.insert(key.clone());
+                        }
                         let derivation = combine(deps.iter().map(|d| {
                             self.derivation
                                 .get(d)
@@ -1654,6 +1661,8 @@ impl<'c> Evaluation<'c> {
                         };
                         if let Ok(v) = &result {
                             self.exact_values.insert(id.clone(), v.clone());
+                        } else {
+                            self.constructed.remove(&key);
                         }
                         self.exact.insert(id.clone(), result);
                         self.derivation.insert(key.clone(), derivation);
@@ -1667,9 +1676,15 @@ impl<'c> Evaluation<'c> {
                             .get(&claim)
                             .copied()
                             .unwrap_or(Derivation::ExactDerived);
+                        if self.constructed.contains(&claim) {
+                            self.constructed.insert(key.clone());
+                        }
                         let (result, meta, q) = self.eval_corroborate(id, decl);
+                        // As for exact steps: only a value is constructed.
                         if let Ok(v) = &result {
                             self.exact_values.insert(id.clone(), v.clone());
+                        } else {
+                            self.constructed.remove(&key);
                         }
                         if let Some(m) = meta {
                             self.metas.insert(key.clone(), m);
@@ -1795,7 +1810,10 @@ impl<'c> Evaluation<'c> {
                 return (Err(u), None, none);
             }
         }
-        let here = grading::combine_reads(&reads, &self.metas, Basis::Computed);
+        let mut here = grading::combine_reads(&reads, &self.metas, Basis::Computed);
+        if self.constructed.contains(&format!("step:{id}")) {
+            here.grade = ValueGrade::Hint;
+        }
         match args {
             OpArgs::JoinKeyed(a) => {
                 let joined = (|| {
@@ -2046,6 +2064,7 @@ impl<'c> Evaluation<'c> {
             .collect();
         let cx = OpContext {
             scope: Scope {
+                constructed: Some(&self.constructed),
                 now: self.now,
                 inputs: &self.input_values,
                 steps: &self.exact_values,
@@ -2272,6 +2291,15 @@ impl<'c> Evaluation<'c> {
                             .filter_map(|n| n.field(&a.id_field).cloned())
                             .collect(),
                         OpArgs::WeightedRank(a) => vec![self.model_node(&a.candidates)],
+                        // A composed key copies its parts' text, as `copies`
+                        // in compile/screening.rs discloses.
+                        OpArgs::ComposeKey(a) => {
+                            let mut refs = vec![];
+                            for part in &a.parts {
+                                crate::expr::expr_refs(&part.value, &mut refs);
+                            }
+                            refs.iter().map(|r| self.model_node(r)).collect()
+                        }
                         OpArgs::JoinKeyed(a) => {
                             let left = self.model_node(&a.left);
                             let right = self.model_node(&a.right);
@@ -2739,6 +2767,7 @@ impl<'c> Evaluation<'c> {
             // Evidence 2: each step's metadata and its join, merge or
             // corroboration record (spec 032, 3.10.1).
             for s in &mut steps {
+                s.constructed = self.constructed.contains(&format!("step:{}", s.step));
                 let key = format!("step:{}", s.step);
                 s.meta = self.metas.get(&key).map(|m| m.whole.clone());
                 if s.instance.is_empty()
@@ -3118,6 +3147,7 @@ impl View for Evaluation<'_> {
 
     fn scope(&self) -> Scope<'_> {
         Scope {
+            constructed: Some(&self.constructed),
             now: self.now,
             inputs: &self.input_values,
             steps: &self.exact_values,

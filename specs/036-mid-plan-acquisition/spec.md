@@ -1040,6 +1040,15 @@ widening. Remaining for part 2: `compose_key@1` (3.7) and the CLI golden
 for category 21, which needs source descriptors supplied to the CLI's
 compile.
 
+**Increment 2, part 2a (2026-10-26): `compose_key@1` evaluation.**
+`compose_key@1` evaluates with `exact` and `ascii_token` normalization,
+the separator and 512-byte bound and `invalid_input` faults (3.7.1 to
+3.7.3); the constructed flag is carried through exact steps and read by
+`is_constructed`, which is never a gate read, and a composed key's grade
+ceiling is `hint` (3.7.4). Screening provenance treats a composed key as
+copying its parts' text. Acquisition evaluation still refuses at start and
+is part 2b. Tests: `crates/rustev-core/tests/compose_key.rs`.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

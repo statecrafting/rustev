@@ -39,7 +39,8 @@ pub const REGISTRY: &[(&str, u32)] = &[
 ];
 
 /// Operators `rustev.exact/2` adds (spec 032, 3.1.1).
-pub const REGISTRY_V2_ADDS: &[(&str, u32)] = &[("join_keyed", 1), ("merge_fields", 1)];
+pub const REGISTRY_V2_ADDS: &[(&str, u32)] =
+    &[("join_keyed", 1), ("merge_fields", 1), ("compose_key", 1)];
 
 pub fn is_registered(op: &str, version: u32) -> bool {
     REGISTRY.iter().any(|(n, v)| *n == op && *v == version)
@@ -51,6 +52,72 @@ pub fn is_registered_v2(op: &str, version: u32) -> bool {
         || REGISTRY_V2_ADDS
             .iter()
             .any(|(n, v)| *n == op && *v == version)
+}
+
+/// A bounded constructed key (spec 036, 3.7).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ComposeKey {
+    pub parts: Vec<KeyPart>,
+    pub separator: String,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct KeyPart {
+    pub value: Expr,
+    pub normalize: KeyNormalization,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum KeyNormalization {
+    Exact,
+    AsciiToken,
+}
+impl ComposeKey {
+    fn eval(&self, scope: &Scope<'_>) -> Result<Value, Fault> {
+        let mut parts = Vec::new();
+        for p in &self.parts {
+            let text = match eval_expr(&p.value, scope)? {
+                Value::Text(s) | Value::Enum(s) => s,
+                Value::Integer(n) => n.to_string(),
+                _ => return Err(Fault::Invalid("compose_key part type".into())),
+            };
+            // Spec 036 3.7.2: trim whitespace only and collapse runs of
+            // whitespace, `-` and `_` into one `-`; a leading or trailing `-`
+            // is in `[a-z0-9-]` and stays, since nothing is stripped silently.
+            let text = if p.normalize == KeyNormalization::AsciiToken {
+                let mut out = String::new();
+                for b in text.trim_matches(|c: char| c.is_ascii_whitespace()).bytes() {
+                    let b = b.to_ascii_lowercase();
+                    if b.is_ascii_whitespace() || b == b'-' || b == b'_' {
+                        if !out.ends_with('-') {
+                            out.push('-');
+                        }
+                    } else if b.is_ascii_lowercase() || b.is_ascii_digit() {
+                        out.push(char::from(b));
+                    } else {
+                        return Err(Fault::Invalid(
+                            "compose_key invalid ascii_token byte".into(),
+                        ));
+                    }
+                }
+                out
+            } else {
+                text
+            };
+            if text.is_empty() || text.contains(&self.separator) {
+                return Err(Fault::Invalid(
+                    "compose_key empty part or separator in part".into(),
+                ));
+            }
+            parts.push(text);
+        }
+        let key = parts.join(&self.separator);
+        if key.len() > 512 {
+            return Err(Fault::Invalid("compose_key exceeds 512 bytes".into()));
+        }
+        Ok(Value::Text(key))
+    }
 }
 
 /// A typed keyed join (spec 032, 3.5).
@@ -289,6 +356,7 @@ pub enum OpArgs {
     WeightedRank(WeightedRank),
     JoinKeyed(JoinKeyed),
     MergeFields(MergeFields),
+    ComposeKey(ComposeKey),
 }
 
 fn de<T: DeserializeOwned>(args: &Json) -> Result<T, String> {
@@ -313,6 +381,7 @@ impl OpArgs {
             OpArgs::WeightedRank(_) => ("weighted_rank", 1),
             OpArgs::JoinKeyed(_) => ("join_keyed", 1),
             OpArgs::MergeFields(_) => ("merge_fields", 1),
+            OpArgs::ComposeKey(_) => ("compose_key", 1),
         }
     }
 
@@ -333,6 +402,7 @@ impl OpArgs {
             OpArgs::WeightedRank(a) => serde_json::to_value(a),
             OpArgs::JoinKeyed(a) => serde_json::to_value(a),
             OpArgs::MergeFields(a) => serde_json::to_value(a),
+            OpArgs::ComposeKey(a) => serde_json::to_value(a),
         };
         // Every argument type serializes to a JSON object.
         v.unwrap_or(Json::Null)
@@ -368,6 +438,7 @@ pub fn decode_v2(op: &str, version: u32, args: &Json) -> Option<Result<OpArgs, S
         return None;
     }
     match op {
+        "compose_key" => Some(de(args).map(OpArgs::ComposeKey)),
         "join_keyed" => Some(de(args).map(OpArgs::JoinKeyed)),
         "merge_fields" => Some(de(args).map(OpArgs::MergeFields)),
         _ => decode_any(op, args),
@@ -430,6 +501,11 @@ impl OpArgs {
     pub fn refs(&self) -> Vec<String> {
         let mut out = Vec::new();
         match self {
+            OpArgs::ComposeKey(a) => {
+                for p in &a.parts {
+                    expr_refs(&p.value, &mut out);
+                }
+            }
             OpArgs::CountWhere(a) => {
                 out.push(a.list.clone());
                 predicate_refs(&a.predicate, &mut out);
@@ -526,7 +602,7 @@ impl OpArgs {
             OpArgs::CountWhere(a) => predicate_uses_v2(&a.predicate),
             OpArgs::WindowFilter(a) => predicate_uses_v2(&a.predicate),
             OpArgs::Extremum(_) | OpArgs::FieldPresence(_) | OpArgs::WeightedRank(_) => false,
-            OpArgs::JoinKeyed(_) | OpArgs::MergeFields(_) => true,
+            OpArgs::JoinKeyed(_) | OpArgs::MergeFields(_) | OpArgs::ComposeKey(_) => true,
             OpArgs::TimestampDiff(a) => expr_uses_v2(&a.later) || expr_uses_v2(&a.earlier),
             OpArgs::Compare(a) => predicate_uses_v2(&a.predicate),
             OpArgs::Arith(a) => expr_uses_v2(&a.expr),
@@ -542,6 +618,14 @@ impl OpArgs {
     /// Structural checks (compile phase b).
     pub fn structure(&self) -> Result<(), String> {
         match self {
+            OpArgs::ComposeKey(a) => {
+                if !(2..=8).contains(&a.parts.len())
+                    || ![":", "/", "|", "."].contains(&a.separator.as_str())
+                {
+                    return Err("compose_key needs 2..=8 parts and separator : / | .".into());
+                }
+                a.parts.iter().try_for_each(|p| expr_structure(&p.value))
+            }
             OpArgs::CountWhere(a) => predicate_structure(&a.predicate),
             OpArgs::WindowFilter(a) => predicate_structure(&a.predicate),
             OpArgs::Extremum(_) => Ok(()),
@@ -636,6 +720,7 @@ impl OpArgs {
             OpArgs::WindowFilter(a) => has_fx_pred(&a.predicate),
             OpArgs::Compare(a) => has_fx_pred(&a.predicate),
             OpArgs::Arith(a) => has_fx_expr(&a.expr),
+            OpArgs::ComposeKey(a) => a.parts.iter().any(|p| has_fx_expr(&p.value)),
             OpArgs::MemberOf(a) => has_fx_expr(&a.value),
             OpArgs::FxConvert(_) => true,
             _ => false,
@@ -661,6 +746,17 @@ impl OpArgs {
     /// The output type, or a kind mismatch (compile phase e).
     pub fn type_check(&self, env: &TyEnv<'_>) -> Result<Ty, String> {
         match self {
+            OpArgs::ComposeKey(a) => {
+                for p in &a.parts {
+                    if !matches!(
+                        type_expr(&p.value, env)?,
+                        Ty::Text { .. } | Ty::Integer | Ty::Enum(_)
+                    ) {
+                        return Err("compose_key parts must be text, integer or enum".into());
+                    }
+                }
+                Ok(Ty::Text { max_bytes: 512 })
+            }
             OpArgs::CountWhere(a) => {
                 let item = list_item(&a.list, env)?;
                 type_predicate(&a.predicate, &with_item(env, &item))?;
@@ -1065,6 +1161,7 @@ fn items(r: &str, cx: &OpContext<'_>) -> Result<Vec<Value>, Unresolved> {
 
 fn item_scope<'a>(cx: &'a OpContext<'a>, item: &'a Value) -> Scope<'a> {
     Scope {
+        constructed: cx.scope.constructed,
         now: cx.scope.now,
         inputs: cx.scope.inputs,
         steps: cx.scope.steps,
@@ -1279,6 +1376,7 @@ impl OpArgs {
     pub fn eval(&self, cx: &OpContext<'_>) -> Result<Value, Unresolved> {
         let f = |e: Fault| fault(e, cx);
         match self {
+            OpArgs::ComposeKey(a) => a.eval(&cx.scope).map_err(f),
             // Plan 3 evaluation is increment 3 of spec 032; `Evaluation::start`
             // refuses a plan 3 until then, so these are never reached.
             OpArgs::JoinKeyed(_) | OpArgs::MergeFields(_) => Err(Unresolved::Unsupported {
