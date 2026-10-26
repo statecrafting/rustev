@@ -314,7 +314,7 @@ pub(crate) fn compile(
         } else {
             base == "now"
         };
-        if !exact {
+        if !exact && !crate::extraction_compile::accepted_reference(def, &r) {
             return Err(err(
                 C::InvalidAcquisition,
                 id,

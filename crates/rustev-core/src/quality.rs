@@ -1169,7 +1169,7 @@ fn max_grade(a: ValueGrade, b: ValueGrade) -> ValueGrade {
     }
 }
 
-fn tree_at(trees: &BTreeMap<String, Ceil>, r: &str, extra: &[&str]) -> Ceil {
+pub(crate) fn tree_at(trees: &BTreeMap<String, Ceil>, r: &str, extra: &[&str]) -> Ceil {
     let (base, mut path) = resolve(r, None).unwrap_or_default();
     path.extend(extra.iter().map(|s| s.to_string()));
     trees
@@ -1368,6 +1368,7 @@ pub(crate) fn evidence_bound(
             | crate::compile::StepInfo::Corroborate { ty, .. } => ty_nodes(ty),
             crate::compile::StepInfo::Generate
             | crate::compile::StepInfo::Extract
+            | crate::compile::StepInfo::Accept(_)
             | crate::compile::StepInfo::Semantic { .. } => 1,
             crate::compile::StepInfo::Acquisition(a) => ty_nodes(&a.ty),
         });

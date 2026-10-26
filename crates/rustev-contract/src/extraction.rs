@@ -356,7 +356,7 @@ fn projection<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<String>, D::Error> 
     let v = Vec::<String>::deserialize(d)?;
     if !(1..=8).contains(&v.len())
         || v.iter()
-            .any(|s| !valid_ref(s, "input:", 1, 2) && !valid_ref(s, "step:", 1, 1))
+            .any(|s| !valid_ref(s, "input:", 1, 2) && !valid_ref(s, "step:", 1, 3))
     {
         return Err(serde::de::Error::custom("invalid extraction projection"));
     }
