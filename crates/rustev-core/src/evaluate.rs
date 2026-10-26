@@ -11,6 +11,8 @@ use std::fmt;
 
 #[path = "acquisition_eval.rs"]
 mod acquisition_eval;
+#[path = "extraction_eval.rs"]
+mod extraction_eval;
 pub use acquisition_eval::PendingAcquisition;
 
 use rustev_contract::actionability::Party;
@@ -58,7 +60,8 @@ pub enum StartError {
     /// Reserved compatibility error for unavailable acquisition evaluators.
     AcquisitionNotAvailable,
     GenerationNotAvailable,
-    ExtractionNotAvailable,
+    /// A plan with an accept step; evaluated from increment 6 part a2.
+    AcceptanceNotAvailable,
     /// The snapshot's `schema` is not `rustev.snapshot/1`.
     Schema(String),
     /// An entry names a field the definition does not declare.
@@ -72,8 +75,8 @@ pub enum StartError {
 impl fmt::Display for StartError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            StartError::ExtractionNotAvailable => {
-                write!(f, "extraction evaluation is not available")
+            StartError::AcceptanceNotAvailable => {
+                write!(f, "acceptance evaluation is not available")
             }
             StartError::GenerationNotAvailable => {
                 write!(f, "generation evaluation is not available")
@@ -192,6 +195,7 @@ pub struct FailureContext {
 
 /// An evaluation in progress.
 pub struct Evaluation<'c> {
+    extraction: extraction_eval::State,
     constructed: BTreeSet<String>,
     skipped: BTreeMap<String, String>,
     acquisitions: BTreeMap<String, acquisition_eval::State>,
@@ -458,9 +462,9 @@ impl<'c> Evaluation<'c> {
             .info
             .steps
             .values()
-            .any(|s| matches!(s, StepInfo::Extract | StepInfo::Accept(_)))
+            .any(|s| matches!(s, StepInfo::Accept(_)))
         {
-            return Err(StartError::ExtractionNotAvailable);
+            return Err(StartError::AcceptanceNotAvailable);
         }
         // A plan 3 accepts a snapshot 1 or 2, a plan 2 only a snapshot 1,
         // so a grade claim is never silently dropped (spec 032, 3.1.4).
@@ -507,6 +511,7 @@ impl<'c> Evaluation<'c> {
             .id()
             .map_err(|e| StartError::NotCanonical(e.to_string()))?;
         let mut ev = Evaluation {
+            extraction: Default::default(),
             constructed: BTreeSet::new(),
             skipped: BTreeMap::new(),
             acquisitions: BTreeMap::new(),
@@ -1088,6 +1093,9 @@ impl<'c> Evaluation<'c> {
             .pending
             .get(&(step.to_string(), instance.to_vec()))
             .ok_or_else(not_pending)?;
+        if self.extraction.requests.contains_key(step) {
+            return self.extract_request_document(step, target, scope, req);
+        }
         let plan = &self.compiled.plan;
         let Some(PlanStepDetail::Semantic(b)) =
             plan.steps.iter().find(|s| s.id == step).map(|s| &s.detail)
@@ -1138,9 +1146,19 @@ impl<'c> Evaluation<'c> {
             .map(|s| &s.detail)
         {
             Some(PlanStepDetail::Semantic(b)) => Some(b.artifact.clone()),
+            Some(PlanStepDetail::Extract(b)) => Some(b.artifact.clone()),
             _ => None,
         };
         if bound.as_ref() != Some(&doc.artifact) {
+            if self.extraction.requests.contains_key(&doc.step) {
+                return self.supply(
+                    &doc.step,
+                    &doc.instance,
+                    Supplied::Failed(Unresolved::InvalidBackendOutput {
+                        detail: "artifact is not bound".into(),
+                    }),
+                );
+            }
             self.take(&doc.step, &doc.instance)?;
             return self.record(
                 &doc.step,
@@ -1184,6 +1202,12 @@ impl<'c> Evaluation<'c> {
                 return Err(SupplyError::NotARuntimeReason(k));
             }
         }
+        if self.extraction.requests.contains_key(step) {
+            self.take(step, instance)?;
+            self.supply_extract(step, s);
+            self.advance();
+            return Ok(());
+        }
         let req = self.take(step, instance)?;
         let value = match s {
             Supplied::Failed(u) => Err(u),
@@ -1209,6 +1233,9 @@ impl<'c> Evaluation<'c> {
                 step: step.into(),
                 instance: instance.to_vec(),
             })?;
+        if self.extraction.requests.contains_key(step) {
+            return Ok(self.validate_extract(step, raw).map(|_| ()));
+        }
         Ok(self.validate_output(step, req, raw).map(|_| ()))
     }
 
@@ -1628,8 +1655,17 @@ impl<'c> Evaluation<'c> {
                 }
             }
         }
+        let producers: BTreeMap<_, _> = inputs
+            .iter()
+            .filter_map(|n| {
+                self.extraction
+                    .producers
+                    .get(n)
+                    .map(|p| (n.clone(), p.clone()))
+            })
+            .collect();
         Lineage {
-            producers: None,
+            producers: (!producers.is_empty()).then_some(producers),
             inputs: inputs.into_iter().collect(),
             steps: steps.into_iter().collect(),
         }
@@ -1642,6 +1678,7 @@ impl<'c> Evaluation<'c> {
             let mut progressed = false;
             for id in &info.order {
                 if matches!(info.steps.get(id), Some(StepInfo::Generate))
+                    || self.extraction.requests.contains_key(id)
                     || self.exact.contains_key(id)
                     || self.semantic.contains_key(id)
                     || self.skipped.contains_key(id)
@@ -1674,11 +1711,9 @@ impl<'c> Evaluation<'c> {
                 let key = format!("step:{id}");
                 let lineage = self.lineage_of(deps);
                 match &info.steps[id] {
-                    StepInfo::Generate | StepInfo::Extract | StepInfo::Accept(_) => {
-                        unreachable!(
-                            "generation, extraction and acceptance evaluation refused at start"
-                        )
-                    }
+                    StepInfo::Generate => unreachable!("generation is a separate stage"),
+                    StepInfo::Extract => self.start_extract(id),
+                    StepInfo::Accept(_) => unreachable!("acceptance evaluation refused at start"),
                     // Acquisition lineage is stored by the shared insertion after this match.
                     StepInfo::Acquisition(a) => self.start_acquisition(id, a),
                     StepInfo::Exact { args, .. } => {
@@ -1804,6 +1839,11 @@ impl<'c> Evaluation<'c> {
                         source: used.source.clone(),
                     },
                 );
+                if let Some(producer) = &used.producer {
+                    self.extraction
+                        .producers
+                        .insert(name.into(), producer.clone());
+                }
                 self.present.insert(name.into());
                 self.derivation.insert(
                     key.clone(),
@@ -2669,7 +2709,13 @@ impl<'c> Evaluation<'c> {
         }
         let compiled = self.compiled;
         let v2 = compiled.info.v2;
-        let actionable = compiled.plan.actionability.is_some() || compiled.plan.screening.is_some();
+        let actionable = compiled.plan.actionability.is_some()
+            || compiled.plan.screening.is_some()
+            || compiled
+                .info
+                .steps
+                .values()
+                .any(|s| matches!(s, StepInfo::Extract));
         // A terminal check decides without the policy (spec 033, 3.4.6).
         let (outcome, reads, trace, site, handler) = if !self.screen_refusals.is_empty() {
             let refusals = self.screen_refusals.clone();
@@ -2804,7 +2850,7 @@ impl<'c> Evaluation<'c> {
             .map(|(k, v)| {
                 let q = self.input_quality.get(k).cloned().unwrap_or_default();
                 InputEvidence {
-                    producer: None,
+                    producer: self.extraction.producers.get(k).cloned(),
                     field: k.clone(),
                     status: v.clone(),
                     meta: q.meta.map(|m| m.whole),
@@ -2854,6 +2900,17 @@ impl<'c> Evaluation<'c> {
                         },
                     ))
                 }
+                (StepInfo::Extract, Some(r), _) => steps.push(StepEvidence::new(
+                    id.clone(),
+                    vec![],
+                    match r {
+                        Ok(_) => StepStatus::Resolved {
+                            kind: "record".into(),
+                            derivation,
+                        },
+                        Err(u) => StepStatus::Unresolved(u.clone()),
+                    },
+                )),
                 (StepInfo::Acquisition(a), Some(r), _) => steps.push(StepEvidence::new(
                     id.clone(),
                     vec![],
@@ -2921,7 +2978,14 @@ impl<'c> Evaluation<'c> {
         });
         let evidence = EvidenceRecord {
             generation: None,
-            extraction: None,
+            extraction: (!self.extraction.evidence.is_empty()).then(|| {
+                compiled
+                    .info
+                    .step_ids
+                    .iter()
+                    .filter_map(|id| self.extraction.evidence.get(id).cloned())
+                    .collect()
+            }),
             acceptance: None,
             acquisitions: self.acquisition_evidence(),
             screening: screening.filter(|entries: &Vec<ScreeningEvidence>| !entries.is_empty()),
@@ -2975,6 +3039,20 @@ impl<'c> Evaluation<'c> {
                             )],
                         ),
                     ),
+                    NoticeKind::Fallback
+                        if name
+                            .split_once('/')
+                            .is_some_and(|(s, _)| self.extraction.evidence.contains_key(s)) =>
+                    {
+                        (
+                            vec![Cause::CapabilityStep {
+                                capability: rustev_contract::actionability::CapabilityStep {
+                                    step: name.split('/').next().unwrap().into(),
+                                },
+                            }],
+                            Remediation::None,
+                        )
+                    }
                     NoticeKind::UncalibratedThreshold | NoticeKind::Fallback => (
                         vec![Cause::Capability { name: name.clone() }],
                         Remediation::with(

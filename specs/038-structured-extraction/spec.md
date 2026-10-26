@@ -1112,6 +1112,20 @@ thresholds over extract fields outside accept steps (3.6.4), whose plan
 detail needs a calibration-binding slot; evaluation of both kinds is the
 runtime increment.
 
+**Increment 6, part a1 (2026-10-26): core evaluation of extract steps.**
+`crates/rustev-core/src/extraction_eval.rs` lists one
+`rustev.extract-request/1` per decision and step when its projection
+resolves, accepts a supplied `typed_record` output, validates it (3.4),
+records field origins, derivations, distributions and lineage with
+producers (3.5, 3.6), runs the fallback under its `fill` mode or on a
+request failure (`request_failed{reason}`, 3.11.5), and takes the
+screening outcomes of 3.11.4 (`screen_blocked`, `screen_unavailable`) from
+the runtime. The evidence 2 `extraction` member is filled through the
+increment 2b constructors (R-19); evidence and judgment bytes are pinned
+by `crates/rustev-core/tests/golden/extraction.evidence.json` and
+`extraction.judgment.json`. A plan with an accept step is refused at
+evaluation until part a2 (`crates/rustev-core/tests/extraction_compile.rs`).
+
 ## Decisions at approval
 
 Each is decided within this spec under the work order, inside the binding

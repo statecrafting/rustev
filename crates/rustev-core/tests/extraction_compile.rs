@@ -631,10 +631,7 @@ fn extraction_plan_identity_and_reload() {
         schema: "rustev.snapshot/2".into(),
         entries: vec![],
     };
-    assert!(matches!(
-        rustev_core::Evaluation::start(&c, &snapshot, common::ts(common::NOW)),
-        Err(rustev_core::evaluate::StartError::ExtractionNotAvailable)
-    ));
+    assert!(rustev_core::Evaluation::start(&c, &snapshot, common::ts(common::NOW)).is_ok());
 }
 #[test]
 fn extraction_backend_shortfalls_and_stable_binding() {
@@ -1112,7 +1109,7 @@ fn acceptance_example_golden_and_member_identity() {
             },
             common::ts(common::NOW)
         ),
-        Err(rustev_core::evaluate::StartError::ExtractionNotAvailable)
+        Err(rustev_core::evaluate::StartError::AcceptanceNotAvailable)
     ));
     let path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden/acceptance.plan.json");
