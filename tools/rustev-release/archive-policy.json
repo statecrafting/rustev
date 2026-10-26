@@ -117,6 +117,7 @@
         "src/quality.rs",
         "src/ranking/mod.rs",
         "src/ranking/permute.rs",
+        "src/ranking/schedules.rs",
         "src/seams.rs",
         "src/sem.rs",
         "src/template/check.rs",

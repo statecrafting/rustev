@@ -1,5 +1,6 @@
 //! Pure ranking building blocks (spec 039); not wired into compilation or evaluation.
 pub mod permute;
+pub mod schedules;
 
 use rustev_contract::ranking::{Bias, PairwiseSchedule, RankMode};
 
