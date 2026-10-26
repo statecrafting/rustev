@@ -20,7 +20,7 @@ GROUPS = {
     "cli-backends": "001 005 006 014 029".split(),
     "integrations-base": "002 010 012 015 017 019 020 033 038 040".split(),
     "integrations-core": "022 034 035 036 037 045".split(),
-    "runtime-evidence": "003 007 008 009 013 023 026 027 028 049".split(),
+    "runtime-evidence": "003 007 008 009 013 023 026 027 028 039 049".split(),
 }
 
 

@@ -2,7 +2,7 @@
 id: "039-model-backed-rank"
 title: "Model-backed rank and deterministic backfill (amends 002 and 005)"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-10-17"
 summary: >
   An amendment of approved specs 002 and 005 (R-16), for #76 child C2.
@@ -23,7 +23,8 @@ summary: >
   reserved `rank` value under 030 3.12. Jev (specs 012 and 022) keeps
   R-28: rankings over Jev answers stay composed in plans and feed `select`
   unchanged. Plans that use none of this keep byte-identical identities.
-  Approved (A-36); implementation is in progress.
+  Approved (A-36); implementation is complete; the Bedrock `rank`
+  admission follows spec 030 as its own increment (A-49).
 amends:
   - "002-decision-contract-and-pure-core"
   - "005-reference-backends"
@@ -43,6 +44,8 @@ extends:
   - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: additive }
   # Adds 039 to `make verify` when the implementation is complete.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  # Places 039 in a CI acceptance group.
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
   # Exhaustive matches and `ranking: None` initializers for the new step
   # kinds and descriptor member; regenerated binding types.
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "crates/rustev-surface/" }, nature: additive }
@@ -110,7 +113,7 @@ obligations:
 
 Approved by the owner (A-36, 2026-10-17, under the 2026-10-16 delivery work
 order) as its own reviewable change before any code (R-16); implementation
-is in progress. It implements #76 child C2 (#67). The approved texts of specs
+is complete, with the Bedrock `rank` admission to follow under A-49. It implements #76 child C2 (#67). The approved texts of specs
 002 and 005 are not edited; this spec records what changes. Spec 030's
 reserved `rank` value is admitted under 030 3.12, which anticipates exactly
 this change, so 030 is not amended. Approval authorizes paid Bedrock smoke
@@ -727,10 +730,42 @@ metrics themselves (spec 041); quality claims (R-04, R-37).
 
 ## Verification
 
-Pending with implementation. The implementing change adds `039` to `make
-verify` with repository-local deterministic tests for every acceptance
-item; any live Bedrock smoke result is recorded with its journal total and
-is not part of declared verification.
+Declared for `spec-spine verify 039`; 039 is in `make verify` and in CI's
+`runtime-evidence` acceptance group. Every command is repository-local
+and deterministic; no live provider call is part of declared verification,
+and any later live Bedrock smoke result is recorded with its journal total
+outside it. `crates/rustev-core/tests/RANKING_ACCEPTANCE.md` maps each
+Acceptance item and section 5 row to its test.
+
+```verify:cli
+# 3.1 to 3.4, 3.13, 3.18: declarations, the request, outputs, values, evidence and unchanged bytes.
+cargo test -p rustev-contract --locked --test ranking_wire --test ranking_results --test ranking_request --test track_versions
+# 3.8.4: rustev.permute/1 known-answer vectors.
+cargo test -p rustev-core --locked --test permute_vectors
+# 3.4 to 3.8: request planning, the pairwise schedules and bounds.
+cargo test -p rustev-core --locked --test ranking_schedules
+# 3.5 to 3.11: the model ranking value, select, backfill, derivation and lineage.
+cargo test -p rustev-core --locked --test ranking_value --test ranking_select --test ranking_evaluate
+# 3.12: every refusal with a passing neighbour; 3.18 identity goldens.
+cargo test -p rustev-core --locked --test ranking_compile --test identity --test reference_plans
+# 3.9.1: value kinds never convert (compile-fail doctests).
+cargo test -p rustev-core --locked --doc
+# 3.13: dispatch, budgets and capture; replay reproduces with no dispatch.
+cargo test -p rustev-runtime --locked --test ranking
+cargo test -p rustev-eval --locked --test ranking_replay
+# 3.14: pointwise rank in the rules backend.
+cargo test -p rustev-backend-rules --locked --test ranking
+# 3.16: Jev composition; the adapter declares no rank.
+cargo test -p rustev-jev --locked --test adapter --test runtime
+```
+
+Externally blocked until spec 030 is complete, reported as such and never
+as passed: the Bedrock items owner decision A-49 moves to the Bedrock
+`rank` increment, namely section 5's row "Bedrock binding `rank` with
+`structured_output: none`", the Bedrock `rank` fixtures on both wires for
+the three modes (3.15, 030 3.12.3), the swap test run with the rules
+backend and with Bedrock fixtures, 3.18 item 1 for Bedrock bindings
+without `rank`, and any paid live Bedrock `rank` smoke call (Decision 18).
 
 **Owner decision A-49 (2026-10-23): dependencies.** Specs 022 and 030 are
 no longer declared dependencies of this spec; spec 012 remains one. Spec
@@ -893,6 +928,13 @@ generate step reading one is refused at compile time, and the generation
 stage of a plan without a generate step converts nothing
 (`crates/rustev-core/tests/generation_compile.rs`,
 `crates/rustev-runtime/tests/ranking.rs`).
+
+**Closure (2026-10-28).** 039 is in `make verify` and in CI's
+`runtime-evidence` acceptance group; its declared commands pass, with the
+rules backend and Jev composition as the backends exercising it, as A-49
+requires. The Bedrock `rank` admission (3.15), parked on its own branch,
+lands after spec 030 is complete with the acceptance A-49 lists; those
+items remain externally blocked, as the Verification section states.
 
 ## Decisions at approval
 
