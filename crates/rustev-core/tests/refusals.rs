@@ -38,7 +38,9 @@ fn semantic_mut<'a>(
         | StepBody::Widen(_)
         | StepBody::Generate(_)
         | StepBody::Extract(_)
-        | StepBody::AcceptModelDerived(_) => panic!("{id} is not semantic"),
+        | StepBody::AcceptModelDerived(_)
+        | StepBody::Rank(_)
+        | StepBody::Select(_) => panic!("{id} is not semantic"),
     }
 }
 
@@ -629,4 +631,35 @@ fn malformed_supplied_documents_are_parse_refusals() {
     let mut def = support_routing();
     def.schema = schema::PLAN.into();
     assert_eq!(category(&def), Some(Category::Parse));
+}
+
+#[test]
+fn ranking_kinds_require_v2_and_remain_closed_to_compilation() {
+    for body in [
+        serde_json::json!({"rank":{"task":"fit","question":"Best?","candidates":"step:eligible",
+            "items":"none","bind":"candidate","project":[],"mode":"pointwise","bias":"none",
+            "tie_break":"id_ascending","backend":{"min_determinism":"unspecified","artifact":"any","binding":"auto"},"fallback":"none"}}),
+        serde_json::json!({"select":{"from":"step:ranking","k":1,"backfill":"none","on_backend_failure":"propagate"}}),
+    ] {
+        for (version, detail) in [
+            (schema::DEFINITION, "requires-definition-2"),
+            (schema::DEFINITION_V2, "ranking-not-compiled"),
+        ] {
+            let mut def = support_routing();
+            def.schema = version.into();
+            def.steps.push(StepDecl {
+                id: "new_ranking".into(),
+                body: serde_json::from_value(body.clone()).unwrap(),
+            });
+            for result in [
+                compile(&def, &descriptors(), &cal()),
+                compile_bytes(&def.canonical().unwrap(), &descriptors(), &cal()),
+            ] {
+                let refusal = result.unwrap_err();
+                assert_eq!(refusal.category, Category::InvalidDefinition);
+                assert_eq!(refusal.detail, detail);
+                assert_eq!(refusal.subject, "step:new_ranking");
+            }
+        }
+    }
 }

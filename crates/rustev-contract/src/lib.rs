@@ -42,6 +42,7 @@ pub mod parameter;
 pub mod plan;
 pub mod plan_diff;
 pub mod profile;
+pub mod ranking;
 pub mod reason;
 pub mod redaction;
 pub mod remote;

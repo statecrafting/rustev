@@ -907,6 +907,7 @@ mod tests {
 
     fn descriptor() -> BackendDescriptor {
         BackendDescriptor {
+            ranking: None,
             schema: schema::BACKEND.into(),
             backend_id: "synthetic-remote".into(),
             artifact: ArtifactId::parse(A).unwrap(),

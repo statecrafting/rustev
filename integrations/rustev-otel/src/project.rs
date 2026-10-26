@@ -327,6 +327,8 @@ impl Ctx<'_> {
         match self.step_body(step) {
             Some(StepBody::Acquire(_)) => Err(unknown(format!("step kind acquire ({step})"))),
             Some(StepBody::Widen(_)) => Err(unknown(format!("step kind widen ({step})"))),
+            Some(StepBody::Rank(_)) => Err(unknown(format!("step kind rank ({step})"))),
+            Some(StepBody::Select(_)) => Err(unknown(format!("step kind select ({step})"))),
             Some(StepBody::Generate(_)) => Err(unknown(format!("step kind generate ({step})"))),
             Some(StepBody::Extract(_)) => Err(unknown(format!("step kind extract ({step})"))),
             Some(StepBody::AcceptModelDerived(_)) => {
