@@ -64,7 +64,7 @@
         "anchor": "3-3-the-qualification-harness",
         "id": "R-4",
         "kind": "requirement",
-        "text": "The release lifecycle reaches `qualified` only through `rustev-release qualify`, which records the digest of each required evidence file of the harness and refuses when one is missing or failing."
+        "text": "The release lifecycle reaches `qualified` only through `rustev-release qualify`, which records the digest of each required evidence file of the harness and refuses when one is missing, failing or `not_run`."
       },
       {
         "anchor": "3-4-authority-for-a-later-release",
@@ -117,6 +117,6 @@
     "summary": "A narrow amendment of approved specs 006, 007 and 031, written after `v0.1.0` was published to crates.io, npm and GitHub on 2026-10-26 but could not be qualified (021 3.10, 031 3.9.7). The CLI has no version command; the support-routing package declares no runnable offline example (its SYNTHETIC rules program is a test fixture of the rules backend); no harness runs the registry-only consumer across the platform matrix; and the npm packages carry no provenance. This spec adds `rustev version`, ships the package's SYNTHETIC example as package data, adds the qualification harness and its workflow, and defines how the owner authorizes a release after `0.1.0`, so that `0.1.1` is published through the existing pipeline with npm provenance and qualified.\n",
     "title": "Release 0.1.1: a CLI version command, declared consumer examples and the fresh-consumer qualification (amends 006, 007 and 031)"
   },
-  "shardHash": "91e2b7cfe953acca55b6604e1c4f7ceb1b419e8d4a122078e15319a6ed4bd9ec",
+  "shardHash": "dd17cc7922f827603872953cf1b97e6074690c49646b14518916736cca04532c",
   "specVersion": "1.10.0"
 }

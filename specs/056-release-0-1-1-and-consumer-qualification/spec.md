@@ -50,7 +50,7 @@ obligations:
     anchor: "3-3-the-qualification-harness"
   - id: "R-4"
     kind: requirement
-    text: "The release lifecycle reaches `qualified` only through `rustev-release qualify`, which records the digest of each required evidence file of the harness and refuses when one is missing or failing."
+    text: "The release lifecycle reaches `qualified` only through `rustev-release qualify`, which records the digest of each required evidence file of the harness and refuses when one is missing, failing or `not_run`."
     anchor: "3-3-the-qualification-harness"
   - id: "I-1"
     kind: invariant
