@@ -499,6 +499,14 @@ OTLP/HTTP, so what gRPC would add is `tonic` and its dependencies; the
 verification checks for `tonic` alone. `049` joins `VERIFIED_SPECS` and the
 acceptance group, and the implementation is complete.
 
+**Release audit fix, 2026-10-26.** The first release rehearsal (spec 053,
+run 40279690969) found that `rustev-node`'s `rustev-otel` dependency named
+a path without a version, which the release audit refuses as a wildcard
+(021 3.6). It now takes the workspace dependency (`workspace = true`,
+pinned `=0.1.0`) with the same `otlp-http` feature; `Cargo.lock` and the
+binding's behavior are unchanged. The two duplicate majors 3.1.4's
+exporter brings in are reviewed in 021's record.
+
 ## Decisions at approval
 
 1. **Ratification.** The owner approved this amendment on 2026-10-23 as
