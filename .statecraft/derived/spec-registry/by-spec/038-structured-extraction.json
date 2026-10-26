@@ -233,7 +233,7 @@
       }
     ],
     "sectionDigests": {
-      "038-structured-extraction-step-and-the-model-derived-input-pattern-amends-002-003-and-036": "1e708263db23f23540a1e79b3c8f4d949ad352c08f04cb641c3a56ba7e1d1bcc",
+      "038-structured-extraction-step-and-the-model-derived-input-pattern-amends-002-003-and-036": "001db6835652004901d7515725ddaacd09f2eb424e07f32cd46f0f7933ad78b3",
       "1-purpose": "ca5e09ba55083f98475c9dbcfa93bacc1b16e93b314ec0669d2d91ea90615f42",
       "2-1-binding-principles-of-76": "9d34b4f885f3673c2e98cb8bea7a3e1406800235e405353348a03f298eae2915",
       "2-territory": "baea5beee59bbf9b7faa2e6410446cfd34be37938be31ef022e7776ab281a97d",
@@ -258,7 +258,7 @@
       "5-observable-negative-cases": "0bfc79fbb3274e102858c212d34c3d0d620bdc2125bdd3515f80b98927bbedc8",
       "acceptance": "b26bfc4a750d486e82b809258c6b3d87009d6f564d6155c89eb7f89b06cdadaa",
       "decisions-at-approval": "04ac59d3e0a018ab5f6f0d2dfba5b92a2d040ed8d1b5414c2168abf434c27f91",
-      "implementation-record": "1a861bdf37f7eee40018923e0c70404c9c6d6e101fa62d382732626d346b688b",
+      "implementation-record": "9651cd95c4a563aa962db85999737c126d40452a640a22ef7f6d31d7b7808e2c",
       "verification": "e8849d1648e28aa74f3b657b6bfd9ff49f0b62a7c51a29df7a4b41c9632d2491"
     },
     "sectionHeadings": [
@@ -295,6 +295,6 @@
     "summary": "An amendment of approved specs 002, 003 and 036 (R-16), for #76 child B6. Two supported ways to turn free text into typed decision inputs, both keeping extracted values model-derived. Pattern A: the host extracts and submits snapshot entries with provenance `model-derived` and an optional producer identity (artifact, template digest, production time), recorded in evidence and lineage. Pattern B: an `extract` step, a model step of spec 037's bounded envelope, asks a backend for a typed record against a declared schema and vocabularies under an identified prompt template; every field is validated and is present or absent with a reason, never coerced, clamped or truncated; each field carries its origin (`extracted`, `fallback`, `absent`) and derivation; a deterministic in-core fallback extractor (`rustev.extract-rules/1`) yields exact-derived fields; per-field distributions exist only from backend log-probabilities and are thresholded only under a bound calibration or a declared `uncalibrated_threshold`. In both patterns an exact operator, policy predicate, proposal parameter, acquisition request or other model step reads a model value only through a declared acceptance rule (an `accept_model_derived` step, or a spec 033 check covering `model-derived`); selection-policy controls never read one. Extraction can drive spec 033's `needs_input` outcome and propose which declared questions it asks. Adds to the shared #76 versions; every version 1 definition keeps its bytes, its plan and its `PlanId`. Approved (A-35); implementation is in progress.\n",
     "title": "Structured extraction step and the model-derived input pattern (amends 002, 003 and 036)"
   },
-  "shardHash": "c294995752569c6c93df1863933aa1a3e33585bc596c48cb64de6af18c58f47b",
+  "shardHash": "b447a528a4bf1212b424c29c51cfae9e2f45d95ca48ab1736fae07a65a532e0f",
   "specVersion": "1.10.0"
 }

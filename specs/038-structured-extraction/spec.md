@@ -1041,6 +1041,25 @@ value, so the field is absent `out_of_bounds`; a malformed or impossible
 date is `invalid_date`. Nothing calls these functions until the compile and
 evaluation increments (`crates/rustev-core/tests/extraction_validate.rs`).
 
+**Increment 4 (2026-10-26): the fallback extractor.**
+`crates/rustev-core/src/extraction_fallback.rs` evaluates a
+`rustev.extract-rules/1` program over resolved sources (3.7.3 to 3.7.6):
+ASCII-folded matching, first applying rule for scalar and record fields,
+rule-order accumulation for list fields, `integer_after` and `date_iso`,
+absence with `fallback_no_match`, `fallback_invalid` (a produced value
+failing 3.4, including a list over `max_items`) and `source_unavailable`
+(unresolved, withheld from exact steps, or over `max_projection_bytes`).
+Conditions short-circuit in declared order; a field's derivation (3.5.2)
+and its recorded sources are the sources actually read while evaluating
+it, including reads by earlier rules that did not apply, since their
+outcome selected the winning rule. `integer_after` takes the earliest
+occurrence of any term, ties going to declared term order. The fill modes
+of 3.5.3 merge a fallback result into a model result without replacing a
+valid model field. The binding checks of 3.7.2 and the list and digit
+refusals of 3.7.3 are a pure `bind` function that the compile increment
+maps to `invalid_extraction`; nothing calls the evaluator until then
+(`crates/rustev-core/tests/extraction_fallback.rs`).
+
 ## Decisions at approval
 
 Each is decided within this spec under the work order, inside the binding
