@@ -683,7 +683,7 @@ pub enum HandlerAction {
     /// The caller is asked for these fields (spec 033, 3.7).
     NeedsInput {
         fields: Vec<String>,
-        questions: Vec<String>,
+        questions: QuestionSelection,
     },
 }
 
@@ -742,6 +742,27 @@ pub enum Cond {
     },
 }
 
+/// Declared questions, optionally selected by an accepted extraction (spec 038, 3.13).
+/// The list encoding preserves existing definition and plan bytes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(untagged, deny_unknown_fields)]
+pub enum QuestionSelection {
+    Declared(Vec<String>),
+    Proposed {
+        proposed_by: String,
+        allowed: Vec<String>,
+    },
+}
+
+impl QuestionSelection {
+    pub fn allowed(&self) -> &[String] {
+        match self {
+            Self::Declared(ids) => ids,
+            Self::Proposed { allowed, .. } => allowed,
+        }
+    }
+}
+
 /// What a matching rule proposes. Never a grant (spec 001, 3.2).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
@@ -760,7 +781,7 @@ pub enum OutcomeDecl {
     /// The caller is asked for these fields (spec 033, 3.7).
     NeedsInput {
         fields: Vec<String>,
-        questions: Vec<String>,
+        questions: QuestionSelection,
     },
 }
 

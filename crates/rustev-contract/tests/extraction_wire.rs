@@ -354,3 +354,19 @@ fn existing_snapshot_fixtures_keep_bytes_and_identity() {
         }
     }
 }
+
+#[test]
+fn question_selection_extends_the_wire_without_changing_declared_lists() {
+    use rustev_contract::definition::{OutcomeDecl, QuestionSelection};
+    let old =
+        serde_json::json!({"needs_input":{"fields":["trip.window"],"questions":["ask_window"]}});
+    let parsed: OutcomeDecl = serde_json::from_value(old.clone()).unwrap();
+    assert_eq!(serde_json::to_value(parsed).unwrap(), old);
+    let new = serde_json::json!({"proposed_by":"questions_ok","allowed":["ask_start","ask_end"]});
+    let parsed: QuestionSelection = serde_json::from_value(new.clone()).unwrap();
+    assert_eq!(parsed.allowed(), &["ask_start", "ask_end"]);
+    assert_eq!(serde_json::to_value(parsed).unwrap(), new);
+    let mut invalid = new;
+    invalid["text"] = serde_json::json!("undeclared text");
+    assert!(serde_json::from_value::<QuestionSelection>(invalid).is_err());
+}

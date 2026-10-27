@@ -394,7 +394,7 @@ fn guarded_acquisition_skipped_handlers_allow_only_as_unmet_and_escalate() {
             },
             HandlerAction::NeedsInput {
                 fields: vec!["query".into()],
-                questions: vec![],
+                questions: rustev_contract::definition::QuestionSelection::Declared(vec![]),
             },
         ] {
             d.policy.on_unresolved[0].action = action;

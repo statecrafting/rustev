@@ -191,6 +191,36 @@ impl<V: View> Run<'_, V> {
         })
     }
 
+    fn questions(
+        &mut self,
+        selection: &rustev_contract::definition::QuestionSelection,
+    ) -> Vec<String> {
+        use rustev_contract::definition::QuestionSelection;
+        let QuestionSelection::Proposed {
+            proposed_by,
+            allowed,
+        } = selection
+        else {
+            return selection.allowed().to_vec();
+        };
+        let reference = format!("step:{proposed_by}");
+        self.read(&reference);
+        match self.view.get(&reference) {
+            // 3.13.2: the compiler requires the accepted list's vocabulary to
+            // equal `allowed`, so every accepted id is in `allowed` and a
+            // non-empty list never filters to nothing.
+            Ok(Seen::Exact(Value::List(ids))) if !ids.is_empty() => allowed
+                .iter()
+                .filter(|id| {
+                    ids.iter()
+                        .any(|v| matches!(v, Value::Enum(text) if text == *id))
+                })
+                .cloned()
+                .collect(),
+            _ => allowed.clone(),
+        }
+    }
+
     /// `Ok(None)` when the outcome reads a value handled `as_unmet`.
     fn outcome(&mut self, o: &OutcomeDecl) -> Result<Option<Outcome>, Unresolved> {
         match o {
@@ -216,7 +246,7 @@ impl<V: View> Run<'_, V> {
             // Its questions, continuation and action are filled in by the
             // evaluation, which knows the plan and snapshot (spec 033, 3.7).
             OutcomeDecl::NeedsInput { fields, questions } => {
-                Ok(Some(needs_input(fields, questions)))
+                Ok(Some(needs_input(fields, &self.questions(questions))))
             }
             OutcomeDecl::Propose { action, params } => {
                 let mut out = BTreeMap::new();
@@ -346,7 +376,7 @@ pub(crate) fn evaluate<V: View>(policy: &PolicyDecl, view: &V) -> PolicyResult {
             }
             HandlerAction::NeedsInput { fields, questions } => {
                 return decided(
-                    needs_input(fields, questions),
+                    needs_input(fields, &run.questions(questions)),
                     run,
                     trace,
                     format!("handler:{i}"),

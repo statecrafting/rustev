@@ -99,7 +99,7 @@ fn version_1_policy_constructs_require_definition_2() {
             reasons: ReasonSet::Any,
             action: HandlerAction::NeedsInput {
                 fields: vec![def.inputs[0].name.clone()],
-                questions: vec![],
+                questions: rustev_contract::definition::QuestionSelection::Declared(vec![]),
             },
         },
     );
@@ -132,7 +132,7 @@ fn version_1_policy_constructs_require_definition_2() {
             }),
             then: OutcomeDecl::NeedsInput {
                 fields: vec![field],
-                questions: vec![],
+                questions: rustev_contract::definition::QuestionSelection::Declared(vec![]),
             },
         },
     );

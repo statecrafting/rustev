@@ -687,6 +687,17 @@ fn extraction_backend_shortfalls_and_stable_binding() {
     let b = compile_with_extraction_documents(&d, &[b, other], &[], &[], None, &[p], &[]).unwrap();
     assert_eq!(a.id, b.id);
 }
+fn gate_golden(name: &str, refusal: &Refusal) {
+    assert!(refusal.shortfalls.is_empty());
+    let bytes = rustev_contract::canonical::canonical_value_bytes(&json!({
+        "category": refusal.category as u8,
+        "subject": refusal.subject,
+        "detail": refusal.detail,
+    }))
+    .unwrap();
+    common::golden(&format!("extraction-gate-{name}.json"), &bytes);
+}
+
 #[test]
 fn model_gate_exact_policy_proposal_and_presence_reads() {
     for r in ["input:message", "step:request_filters/party_size"] {
@@ -705,6 +716,12 @@ fn model_gate_exact_policy_proposal_and_presence_reads() {
             let e = compiled(&d, &prompt(), &descriptor(), &[]).unwrap_err();
             assert_eq!(e.category as u8, 27, "{e}");
             assert!(e.detail.contains(r));
+            let source = if r.starts_with("input:") {
+                "input"
+            } else {
+                "extract"
+            };
+            gate_golden(&format!("{source}-reader-{consumer}"), &e);
         }
     }
     let mut d = fixture();
@@ -795,6 +812,7 @@ fn protected_constraint_and_model_projections_are_gated() {
     let e = compiled(&d, &prompt(), &descriptor(), &[]).unwrap_err();
     assert_eq!(e.category as u8, 27, "{e}");
     assert_eq!(e.subject, "check:guard");
+    gate_golden("protected-check", &e);
     for kind in 0..3 {
         let mut d = fixture();
         let mut consumer = if kind == 0 {
@@ -827,6 +845,7 @@ fn protected_constraint_and_model_projections_are_gated() {
         d.steps.push(consumer);
         let e = compiled(&d, &prompt(), &descriptor(), &[]).unwrap_err();
         assert_eq!(e.category as u8, 27, "kind {kind}: {e}");
+        gate_golden(&format!("projection-{kind}"), &e);
     }
 }
 
@@ -1243,6 +1262,7 @@ fn accepted_value_cannot_control_selection_weights() {
     let e = rustev_core::compile(&d, &common::descriptors(), &[]).unwrap_err();
     assert_eq!(e.category, C::UnacceptedModelValue, "{e}");
     assert!(e.detail.contains("policy_control"), "{e}");
+    gate_golden("accepted-policy-control", &e);
 }
 
 #[test]
