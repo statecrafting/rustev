@@ -117,6 +117,7 @@ pub(crate) fn validate(
                 );
             }
             (Some(StepBody::Semantic(_)), Some(PlanStepDetail::Semantic(_)))
+            | (Some(StepBody::Extract(_)), Some(PlanStepDetail::Extract(_)))
             | (Some(StepBody::Generate(_)), Some(PlanStepDetail::Generate(_))) => {
                 (decl.unwrap(), details.get(&sp.step).unwrap())
             }
@@ -195,6 +196,7 @@ pub(crate) fn validate(
         }
         let (decl, detail) = binding;
         let (primary_id, primary_output, calibration) = match detail {
+            PlanStepDetail::Extract(b) => (&b.backend_id, b.output.clone(), BoundCalibration::None),
             PlanStepDetail::Semantic(b) => (&b.backend_id, b.output.clone(), b.calibration.clone()),
             PlanStepDetail::Generate(b) => {
                 let Some(backend) = sorted.iter().find(|d| d.backend_id == b.backend_id) else {
@@ -241,6 +243,18 @@ pub(crate) fn validate(
             let candidate = match (&decl.body, detail) {
                 (StepBody::Semantic(d), PlanStepDetail::Semantic(primary)) => {
                     check_candidate(d, b, primary.requires, options_needed, bound)
+                }
+                (StepBody::Extract(e), PlanStepDetail::Extract(primary)) => {
+                    crate::extraction_compile::candidate(
+                        e,
+                        &def.inputs
+                            .iter()
+                            .map(|i| (i.name.clone(), crate::value::Ty::from_decl(&i.ty)))
+                            .collect(),
+                        primary.worst_case_request_bytes,
+                        crate::extraction_compile::needs_logprobs(def, &decl.id),
+                        b,
+                    )
                 }
                 (StepBody::Generate(g), PlanStepDetail::Generate(primary)) => {
                     crate::generation::candidate(
@@ -308,6 +322,7 @@ pub(crate) fn validate(
         let requests = match details.get(&s.id) {
             Some(PlanStepDetail::Semantic(b)) => b.max_requests,
             Some(PlanStepDetail::Generate(b)) => b.worst_case_requests,
+            Some(PlanStepDetail::Extract(_)) => 1,
             _ => continue,
         };
         {
