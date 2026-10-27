@@ -780,7 +780,8 @@ fn evaluate_inner(
         let (rubric, model_rubric) = measured::rubric_metrics(&declared, measured.scores, &scope);
         let (agreement, model_agreement) =
             measured::agreement_metrics(&declared, measured.scores, &scope);
-        let origin = crate::origin::origin_metrics(declared.origin, &scope, &origin_cases);
+        let origin =
+            crate::origin::origin_metrics(declared.origin, &m.fields, &scope, &origin_cases);
         let new = measured::metrics(m, &scope)
             .into_iter()
             .chain(origin)
