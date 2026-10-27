@@ -68,7 +68,7 @@ pub struct NewMetric {
     pub cases: Vec<Option<CaseMeasure>>,
 }
 
-struct Builder {
+pub(crate) struct Builder {
     name: String,
     /// A mean metric (3.11.1); otherwise a count ratio.
     mean: bool,
@@ -77,7 +77,7 @@ struct Builder {
 }
 
 impl Builder {
-    fn new(name: String, mean: bool, n: usize) -> Builder {
+    pub(crate) fn new(name: String, mean: bool, n: usize) -> Builder {
         Builder {
             name,
             mean,
@@ -86,13 +86,13 @@ impl Builder {
         }
     }
 
-    fn count(&mut self, reason: &str, by: u64) {
+    pub(crate) fn count(&mut self, reason: &str, by: u64) {
         if by > 0 {
             *self.breakdown.entry(reason.into()).or_default() += by;
         }
     }
 
-    fn push(&mut self, outcome: Result<CaseMeasure, &str>) {
+    pub(crate) fn push(&mut self, outcome: Result<CaseMeasure, &str>) {
         match outcome {
             Ok(m) => self.cases.push(Some(m)),
             Err(r) => {
@@ -105,7 +105,7 @@ impl Builder {
     /// The report value from the case measures, by the functions spec 029
     /// reconciles with (3.11.2): integers exactly, binary64 left to right,
     /// one division last.
-    fn finish(self, total: u64) -> NewMetric {
+    pub(crate) fn finish(self, total: u64) -> NewMetric {
         let (mut cnum, mut cden, mut mnum, mut mden) = (0u64, 0u64, 0.0f64, 0u64);
         for m in self.cases.iter().flatten() {
             match m {

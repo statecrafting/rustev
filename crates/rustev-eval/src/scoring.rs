@@ -143,11 +143,15 @@ impl OriginFamily {
         }
     }
 
-    /// Whether this build reads the family's evidence. None does yet: each
-    /// joins when its metrics are implemented, after its owning spec's
-    /// evidence is on `main` (3.5.1).
+    /// Whether this build reads the family's evidence (3.5.1). A family
+    /// joins once its owning spec is complete on `main`: corroboration
+    /// (spec 032), screening (035) and acquisition tiers (036) have;
+    /// text backstops (037) and extraction (038) have not.
     pub fn available(self) -> bool {
-        false
+        matches!(
+            self,
+            OriginFamily::Corroboration | OriginFamily::Screening | OriginFamily::AcquisitionTier
+        )
     }
 }
 

@@ -138,6 +138,8 @@ pub fn form_of(metric: &str) -> Option<Form> {
                 Some(Form::Mean)
             }
         }
+        // Every origin rate is a count ratio (spec 041, 3.11.1).
+        ["origin", ..] => Some(Form::CountRatio),
         // `qwk` is not case-decomposable (spec 041, 3.11.1).
         ["agreement", _, "exact" | "adjacent"]
         | ["model", "agreement", _, "exact" | "adjacent"] => Some(Form::CountRatio),
