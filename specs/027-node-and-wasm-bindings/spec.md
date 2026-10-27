@@ -1208,6 +1208,13 @@ against their schemas in their own contract tests.
   it every time (`lateResolutionsDiscarded: 3`). The test now waits until the
   runtime holds only the topic attempt before it advances the clock; its
   assertion is unchanged, and the seam's counting was already correct.
+- 2026-10-27: a pull request's own CI run builds and tests six of the
+  seven native platforms of 3.13.1, leaving out darwin-x64 (the slowest
+  leg, about 25 minutes, on the macOS Intel runner); its merge-queue entry
+  and every push to `main` run all seven, so nothing reaches `main`
+  untested on any platform. The label `statecraft:stacked-ci` runs all
+  seven on a pull request. The platform list moved from the `native`
+  matrix into the `scope` job of `bindings.yml`, unchanged.
 
 ## Decisions at approval
 
