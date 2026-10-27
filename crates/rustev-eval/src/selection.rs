@@ -239,6 +239,25 @@ fn result(clause: String, result: ClauseOutcome) -> ClauseResult {
     }
 }
 
+/// The metric a clause gates, if any.
+fn clause_metric(clause: &Clause) -> Option<&str> {
+    match clause {
+        Clause::Metric(m) | Clause::AllSlices { all_slices: m } => Some(m.metric()),
+        Clause::HeldOut { .. } => None,
+    }
+}
+
+/// Whether a run set's evaluator configuration produces `metric` from an
+/// opaque scorer, or an agreement with one (spec 041, 3.12).
+fn opaque(e: &RepeatEvidence<'_>, metric: &str) -> bool {
+    e.inputs.runs.iter().any(|r| {
+        r.evaluated
+            .config
+            .declarations()
+            .is_some_and(|d| d.metric_names().get(metric).is_some_and(|(_, o)| *o))
+    })
+}
+
 /// Verify all supplied bindings before comparing values. A failed precondition
 /// makes that candidate unknown. Once preconditions hold, any definite clause
 /// failure dominates unknown clauses, including unknown coverage denominators.
@@ -302,9 +321,21 @@ pub fn evaluate_selection(
         ] {
             for (i, clause) in list.iter().enumerate() {
                 let label = format!("{group}[{i}]");
-                clauses.push(match &precondition_reason {
-                    Some(r) => result(label, unknown(format!("precondition: {r}"))),
-                    None => evaluate_clause(
+                let opaque_side = clause_metric(clause).and_then(|m| {
+                    [("baseline", baseline_evidence), ("candidate", &c.evidence)]
+                        .into_iter()
+                        .find(|(_, e)| opaque(e, m))
+                        .map(|(side, _)| (side, m))
+                });
+                clauses.push(match (&precondition_reason, opaque_side) {
+                    (Some(r), _) => result(label, unknown(format!("precondition: {r}"))),
+                    // Spec 041, 3.12.2: an opaque scorer's identity names
+                    // code whose change no digest shows.
+                    (None, Some((side, m))) => result(
+                        label,
+                        unknown(format!("the {side}'s `{m}` comes from an opaque scorer")),
+                    ),
+                    (None, None) => evaluate_clause(
                         label,
                         clause,
                         gate,
@@ -373,7 +404,12 @@ pub fn evaluate_selection(
             let values: Result<Vec<_>, String> = gate
                 .rank_by
                 .iter()
-                .map(|m| metric(c.evidence.report, "all", m).and_then(|m| value(m, true)))
+                .map(|m| {
+                    if opaque(&c.evidence, m) || opaque(baseline_evidence, m) {
+                        return Err(format!("`{m}` comes from an opaque scorer"));
+                    }
+                    metric(c.evidence.report, "all", m).and_then(|m| value(m, true))
+                })
                 .collect();
             match values {
                 Ok(values) => ranks.push((c.name.to_string(), values)),

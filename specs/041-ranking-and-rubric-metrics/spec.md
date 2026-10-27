@@ -923,6 +923,24 @@ checked for every reproduced judgment, escalations included. Tests:
 (which has a `rubric` step) as the judge and an exact-only plan for the
 derivation refusal.
 
+**Increment 7, part a (2026-10-27): gate and selection preconditions.**
+`evaluate_gate` in `crates/rustev-eval/src/report.rs` makes a gate
+unknown, before comparing configuration identities, when the sides'
+adapter `measures` digests differ or only one side binds them, and when
+the gated metric is produced by an opaque scorer (or an agreement with
+one) on either side, naming the side (3.12.1). In
+`crates/rustev-eval/src/selection.rs`, a selection clause over such a
+metric is unknown with a reason naming the side, and `rank_by` over it
+lists the candidate as `unranked` (3.12.2). Every other spec 004 and spec
+029 rule is unchanged. Tests:
+`version_3_gates_refuse_opaque_scorers_and_other_measures` in
+`crates/rustev-eval/tests/reports.rs` and
+`an_opaque_scorers_metric_is_unknown_and_unranked` in
+`crates/rustev-eval/tests/selection.rs`. The spec 029 integration item of
+the acceptance (a replay repeat set over a version 3 configuration, with
+selection over `ranking/<name>/ndcg@10` and a `model/rubric/<name>`
+metric) is planned with increment 9.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child faithfully

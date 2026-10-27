@@ -3252,3 +3252,184 @@ async fn judge_bundles_reproduce_into_scores() {
 fn captured_run_digest(b: &ReplayBundle) -> rustev_contract::ids::ContentDigest {
     reproduced(replay(b)).run().record_digest().unwrap()
 }
+
+/// Lodging with other measure declarations: the same name, version and
+/// rules.
+struct LodgingOtherMeasures;
+
+impl TaskAdapter for LodgingOtherMeasures {
+    fn adapter(&self) -> AdapterRef {
+        Lodging.adapter()
+    }
+    fn rules(&self) -> AdapterRules {
+        Lodging.rules()
+    }
+    fn check_label(&self, label: &str) -> Result<(), String> {
+        Lodging.check_label(label)
+    }
+    fn correct(&self, action: &str, params: &BTreeMap<String, OutValue>, label: &str) -> bool {
+        Lodging.correct(action, params, label)
+    }
+}
+
+impl rustev_eval::measures::MeasuredAdapter for LodgingOtherMeasures {
+    fn measures(&self) -> rustev_eval::measures::Measures {
+        let mut m = rustev_eval::measures::MeasuredAdapter::measures(&Lodging);
+        m.constraints[0].k = 3;
+        m
+    }
+}
+
+/// Spec 041, 3.12.1: a gate over an opaque scorer's metric is unknown,
+/// naming the side, and so is a gate whose sides bind different measures.
+#[tokio::test(flavor = "current_thread")]
+async fn version_3_gates_refuse_opaque_scorers_and_other_measures() {
+    use Keep::*;
+    use rustev_eval::measured::Measured;
+    use rustev_eval::measures::MeasuredAdapter;
+    use rustev_eval::report::{Candidate, evaluate_measured, evaluate_views};
+    use rustev_eval::scores::{ScoreOutcome, score_views};
+    let probe = Probe::passing(lodging_rules());
+    let three = || {
+        vec![
+            candidate("c-1", "120", "USD", 2, true),
+            candidate("c-2", "90", "EUR", 4, false),
+            candidate("c-3", "250", "USD", 2, true),
+        ]
+    };
+    let claims = || vec![claim("k-1", "verified", "preference", NOW + DAY)];
+    let case = |id, snapshot, label| Case {
+        id,
+        snapshot,
+        label,
+        subgroups: vec![],
+        split: Split::FinalTest,
+        keep: Embedded,
+    };
+    let cases = vec![
+        case(
+            "g-01",
+            lodging_snapshot(true, three(), claims()),
+            Some("c-2"),
+        ),
+        case("g-02", lodging_snapshot(true, three(), vec![]), Some("c-1")),
+    ];
+    let p = probe.clone();
+    let bundles = bundles(&probe, || lodging_fixture(&p, &unlimited()), &cases).await;
+    let manifest = manifest("lodging gated", Lodging.adapter(), &cases);
+    let tone = scorer_descriptor(json!({
+        "id": "tone", "version": "1", "kind": "deterministic",
+        "output": {"ordinal": {"levels": ["short", "fair", "long"]}},
+        "rules": {"bound": rules_digest("tone rules").to_string()}, "reads_gold": false
+    }));
+    let size = scorer_descriptor(json!({
+        "id": "size", "version": "1", "kind": "deterministic",
+        "output": {"bounded": {"min": "0", "max": "10"}},
+        "rules": "opaque", "reads_gold": false
+    }));
+    let v3_for = |adapter: &dyn MeasuredAdapter| {
+        let mut c = config(&Lodging, &["ranking"], None);
+        c.schema = rustev_eval::config::EVALUATOR_CONFIG_V3.into();
+        c.adapter.measures = Some(adapter.measures().digest().unwrap());
+        c.scorers = Some(vec![tone.clone(), size.clone()]);
+        c.rubric_metrics = Some(
+            serde_json::from_value(json!([
+                {"name": "tone", "scorer": "tone", "aggregate": "mean_level_index"},
+                {"name": "size", "scorer": "size", "aggregate": "mean"}
+            ]))
+            .unwrap(),
+        );
+        c.human_scales = Some(vec![]);
+        c.agreements = Some(vec![]);
+        c.origin = Some(vec![]);
+        for name in ["ranking", "constraint", "rubric"] {
+            c.metrics.push(MetricFormula {
+                name: name.into(),
+                formula: "spec 041".into(),
+            });
+        }
+        let g = |name: &str, metric: &str| Gate {
+            name: name.into(),
+            metric: metric.into(),
+            direction: Direction::HigherIsBetter,
+            tolerance: dec("0"),
+            min_comparable_coverage: dec("0"),
+            min_labeled_coverage: dec("0"),
+        };
+        c.gates = vec![g("tone", "rubric/tone"), g("size", "rubric/size")];
+        c
+    };
+    let config = v3_for(&Lodging);
+    let fixture = lodging_fixture(&probe, &unlimited());
+    let bundle_inputs = inputs_of(&bundles);
+    let replay = config_for(&scope());
+    let inputs = |config, candidate| Inputs {
+        manifest: &manifest,
+        split: Split::FinalTest,
+        config,
+        adapter: &Lodging,
+        bundles: &bundle_inputs,
+        resolver: &NoExternal,
+        replay: &replay,
+        candidate,
+    };
+    let as_candidate = Some(Candidate {
+        plan: &fixture.compiled,
+        calibrations: &[],
+    });
+    struct Fixed(rustev_eval::scoring::ScorerDescriptor);
+    impl rustev_eval::scores::Scorer for Fixed {
+        fn descriptor(&self) -> &rustev_eval::scoring::ScorerDescriptor {
+            &self.0
+        }
+        fn score(
+            &self,
+            _: &rustev_eval::scores::CaseView,
+            _: &rustev_eval::scores::ProposalView,
+        ) -> ScoreOutcome {
+            ScoreOutcome::Score(1.0)
+        }
+    }
+    let evaluate_scored = |config, candidate, adapter: &dyn MeasuredAdapter| {
+        let views = evaluate_views(&inputs(config, candidate), unscored_for(adapter)).unwrap();
+        let scores = vec![
+            score_views(&Fixed(tone.clone()), &views).unwrap(),
+            score_views(&Fixed(size.clone()), &views).unwrap(),
+        ];
+        evaluate_measured(
+            &inputs(config, candidate),
+            Measured {
+                adapter,
+                scores: &scores,
+            },
+        )
+        .unwrap()
+    };
+    fn unscored_for(adapter: &dyn MeasuredAdapter) -> Measured<'_> {
+        Measured {
+            adapter,
+            scores: &[],
+        }
+    }
+    let base = evaluate_scored(&config, None, &Lodging);
+    let cand = evaluate_scored(&config, as_candidate, &Lodging);
+    let tone_gate = &config.gates[0];
+    let size_gate = &config.gates[1];
+    // A bound scorer's metric is compared.
+    assert!(!matches!(
+        evaluate_gate(tone_gate, &base, &cand),
+        GateResult::Unknown { .. }
+    ));
+    // An opaque scorer's metric is unknown, naming the side.
+    assert!(matches!(
+        evaluate_gate(size_gate, &base, &cand),
+        GateResult::Unknown { reason } if reason.contains("baseline's gated metric comes from an opaque scorer")
+    ));
+    // Sides binding different measures are unknown, named explicitly.
+    let other = v3_for(&LodgingOtherMeasures);
+    let cand_other = evaluate_scored(&other, as_candidate, &LodgingOtherMeasures);
+    assert!(matches!(
+        evaluate_gate(tone_gate, &base, &cand_other),
+        GateResult::Unknown { reason } if reason.contains("adapter measures digests differ")
+    ));
+}
