@@ -267,10 +267,29 @@ async fn deadline_and_cancellation_end_generation() {
             assert!(matches!(d.completion, Completion::Cancelled));
             assert!(d.text_result.is_none());
         } else {
-            assert!(matches!(
-                d.text_result.unwrap().steps[0].items[0].generated["headline"].origin,
-                FieldOrigin::Backstop { .. }
-            ));
+            let text = d.text_result.unwrap();
+            assert_eq!(text.text_origin, TextOrigin::Backstop);
+            assert_eq!(text.counts.backstop, 2);
+            assert_eq!(text.counts.absent, 1);
+            assert_eq!(text.counts.reasons[&TextReason::Deadline], 3);
+            for (name, f) in &text.steps[0].items[0].generated {
+                assert_eq!(
+                    f.origin,
+                    if name == "tags" {
+                        FieldOrigin::Absent {
+                            reason: TextReason::Deadline,
+                        }
+                    } else {
+                        FieldOrigin::Backstop {
+                            reason: TextReason::Deadline,
+                        }
+                    }
+                );
+            }
+            assert_eq!(
+                d.record.termination,
+                rustev_contract::run::Termination::Judged
+            );
         }
         assert_eq!(b.dispatched().len(), 1);
     }
@@ -971,5 +990,108 @@ async fn stream_wakes_allow_inline_recv_polling() {
             "drop" => assert!(received[0].is_none()),
             _ => unreachable!(),
         }
+    }
+}
+
+#[tokio::test]
+async fn forced_failure_origins_counts_and_judgment_are_unchanged() {
+    for reason in [
+        TextReason::BackendUnavailable,
+        TextReason::RetriesExhausted,
+        TextReason::InvalidOutput,
+        TextReason::BudgetExhausted,
+    ] {
+        let policy = execution(
+            CostPolicy::Hard {
+                max_units: if reason == TextReason::BudgetExhausted {
+                    1
+                } else {
+                    100
+                },
+            },
+            vec![step_exec(
+                "item_text",
+                2,
+                &[FailureClass::Transient],
+                Delay::None,
+                &[],
+                &[],
+            )],
+        );
+        let (rt, p, b, _) = setup_with(
+            Some(&policy),
+            move |_| match reason {
+                TextReason::InvalidOutput => {
+                    let RawOutput::TextRecord(mut fields) = output(&"x".repeat(121), "") else {
+                        panic!()
+                    };
+                    fields.remove("tags");
+                    Answer::Output(RawOutput::TextRecord(fields), Charge::Observed { units: 1 })
+                }
+                TextReason::BackendUnavailable => Answer::Fail(
+                    AdapterFailure::Permanent,
+                    "offline".into(),
+                    Charge::Observed { units: 1 },
+                ),
+                _ => Answer::Fail(
+                    AdapterFailure::Transient,
+                    "retry".into(),
+                    Charge::Observed { units: 1 },
+                ),
+            },
+            false,
+            |d| {
+                let StepBody::Generate(g) = &mut d.steps[0].body else {
+                    panic!()
+                };
+                g.repair.max_attempts = 0;
+            },
+            Arc::new(Sink),
+        );
+        let d = rt
+            .decide(&p, req("forced"), &CancelSignal::new())
+            .await
+            .unwrap();
+        let t = d.text_result.unwrap();
+        assert_eq!(t.text_origin, TextOrigin::Backstop);
+        assert_eq!(t.counts.backstop, 2);
+        assert_eq!(t.counts.absent, 1);
+        assert_eq!(t.counts.reasons[&reason], 3);
+        for (name, f) in &t.steps[0].items[0].generated {
+            assert_eq!(
+                f.origin,
+                if name == "tags" {
+                    FieldOrigin::Absent { reason }
+                } else {
+                    FieldOrigin::Backstop { reason }
+                }
+            );
+        }
+        assert_eq!(
+            b.dispatched().len(),
+            if reason == TextReason::RetriesExhausted {
+                2
+            } else {
+                1
+            }
+        );
+        let (mut plain, template, descriptor) = fixture();
+        plain.steps.clear();
+        plain.schema = "rustev.definition/1".into();
+        let compiled =
+            compile_with_templates(&plain, &[descriptor], &[], &[], None, &[template]).unwrap();
+        let (mut expected, _) = rustev_core::Evaluation::start(&compiled, &snapshot(vec![]), ts(0))
+            .unwrap()
+            .finish("forced")
+            .unwrap();
+        let rustev_contract::run::CoreEvidence::Recorded(e) = &d.record.core else {
+            panic!()
+        };
+        // Plan identity necessarily differs when the generate declaration is removed.
+        expected.plan_id = e.judgment.plan_id.clone();
+        assert_eq!(
+            expected.canonical().unwrap(),
+            e.judgment.canonical().unwrap()
+        );
     }
 }

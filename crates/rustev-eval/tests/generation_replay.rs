@@ -1,7 +1,7 @@
 //! Synthetic capture, replay and exact text metrics for spec 037.
 mod common;
 #[allow(dead_code)]
-#[path = "../../rustev-runtime/tests/common/scripted.rs"]
+#[path = "../../rustev-runtime/src/testdata/scripted.rs"]
 mod scripted;
 use common::core::*;
 use rustev_contract::definition::*;
@@ -386,6 +386,13 @@ async fn fixed_fixture_metrics_include_every_origin_reason_and_zero_slots() {
     );
     let (e, _) = repair.capture("e").await;
     let metrics = rustev_eval::metrics::generation(&[&a.run, &b.run, &c.run, &d.run, &e.run]);
+    let bytes = serde_json::to_string_pretty(&metrics).unwrap() + "\n";
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/generation-metrics.json");
+    if std::env::var_os("RUSTEV_BLESS").is_some() {
+        std::fs::write(&path, &bytes).unwrap();
+    }
+    assert_eq!(std::fs::read_to_string(path).unwrap(), bytes);
     use rustev_contract::eval_report::MetricValue;
     for prefix in ["text", "text/step/item_text"] {
         for (name, value) in [
@@ -627,4 +634,61 @@ async fn multiple_steps_replay_in_order_and_have_separate_metrics() {
             rustev_contract::eval_report::MetricValue::Measured { value, n: 1 }
         );
     }
+}
+
+#[test]
+#[ignore = "pending #76 F1 result-cache integration; request-cache tests do not prove this"]
+fn result_cache_preserves_generation_origins_pending_f1() {
+    let fixture: Value = serde_json::from_str(include_str!(
+        "fixtures/generation-result-cache-pending.json"
+    ))
+    .unwrap();
+    assert_eq!(fixture["status"], "pending F1 integration");
+    panic!(
+        "F1 must serve the fixture through its result cache and assert all retained fields and original decision identity"
+    );
+}
+
+#[tokio::test]
+async fn mixed_generated_repaired_backstop_slots_replay_cold_and_cached() {
+    let h = Harness::new(
+        |d| {
+            let StepBody::Generate(g) = &mut d.steps[0].body else {
+                panic!()
+            };
+            g.backstop
+                .fields
+                .insert("tags".into(), BackstopField::List(vec!["quiet".into()]));
+        },
+        |c| {
+            let fields = if c.attempt_id.contains("repair:1") {
+                BTreeMap::from([("why".into(), TextValue::Text("Repaired".into()))])
+            } else {
+                BTreeMap::from([("headline".into(), TextValue::Text("Generated".into()))])
+            };
+            Answer::Output(RawOutput::TextRecord(fields), Charge::Observed { units: 1 })
+        },
+    );
+    for id in ["mixed", "mixed-cached"] {
+        let (retained, text) = h.capture(id).await;
+        assert_eq!(
+            (
+                text.counts.generated,
+                text.counts.repaired,
+                text.counts.backstop
+            ),
+            (1, 1, 1)
+        );
+        assert_eq!(text.text_origin, TextOrigin::Partial);
+        if id == "mixed-cached" {
+            assert_eq!(
+                text.steps[0].items[0].generated["why"].source,
+                TextSource::ServedFromCache {
+                    original_decision_id: "mixed".into()
+                }
+            );
+        }
+        h.replay(&retained, &text);
+    }
+    assert_eq!(h.backend.dispatched().len(), 2);
 }

@@ -5,6 +5,8 @@
 
 #[path = "../../../rustev-core/tests/common/mod.rs"]
 pub mod core;
+// Packaged under src/testdata so the unit tests run from the archive (spec 021 3.7).
+#[path = "../../src/testdata/scripted.rs"]
 pub mod scripted;
 
 use std::sync::Arc;

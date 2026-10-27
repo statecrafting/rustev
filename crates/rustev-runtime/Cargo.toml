@@ -15,7 +15,7 @@ categories = ["asynchronous"]
 publish = ["crates-io"]
 # Spec 021, 3.5: the archive holds the library source; the reviewed file list
 # is tools/rustev-release/archive-policy.json.
-include = ["/src/**/*.rs", "/LICENSE"]
+include = ["/src/**/*.rs", "/src/testdata/*.json", "/LICENSE"]
 
 [package.metadata.spec-spine]
 spec = "003-runtime-execution-and-evidence"

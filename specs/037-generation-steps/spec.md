@@ -1097,6 +1097,29 @@ an unrecorded origin, tampering, a captured runtime failure, retries,
 multiple steps, every metric, and the report's text metrics and
 generation artifact).
 
+**Increment 7 (2026-10-24): acceptance audit, missing tests and seeds.**
+Every Acceptance item and section 5 row is mapped to its proving test in
+`crates/rustev-eval/tests/acceptance-037.md`; the missing tests are added
+(a private test module,
+`crates/rustev-runtime/src/generation_acceptance.rs`, and additions to the
+core, runtime and eval generation suites). The private module's fixtures
+(`generate-step.json`, the generation helpers and the shared scripted
+backend) live under `crates/rustev-runtime/src/testdata/`, which the
+reviewed archive carries, so its unit tests also run from the unpacked
+archive (spec 021 3.7). Eight `spec 037` mutation seeds
+(missing required backstop accepted, model-derived backstop path accepted,
+generated value readable by a rule, origin dropped on cache hit, repair
+overwriting a valid field, superseded event missing, carried mutation not
+restored, retries exhausted and backend unavailable swapped) are each
+detected (`seeds.sh "spec 037"` with `SEEDS_JOBS=1`: 8/8); `spec 037`
+joins the harness's `OWN_RUNS`. Not yet met, so `implementation` stays
+`in-progress`: the screening items wait for spec 035's `unscreened_text`
+and screening outcomes to replace this branch's interim category-22 rule
+once both chains are on `main`; the result-cache origin item waits for #76
+F1 (spec 044), recorded as an ignored test and a pending fixture, never as
+passed; WASI byte parity of the template module waits for the A1 toolchain
+integration.
+
 **Owner decision A-49 (2026-10-23): dependencies.** Spec 030 is no longer
 a declared dependency of this spec. No behavior or acceptance item here
 needs it: provider wire mappings, "including Bedrock's (spec 030 3.12)",
