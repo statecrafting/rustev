@@ -2,7 +2,7 @@
 id: "044-runtime-optimization-increment-2"
 title: "Runtime optimization increment 2: duplicate suppression, persistent and decision-result caches, batching qualification (amends 017, 003, 002, 009, 012 and 020)"
 status: approved
-implementation: pending
+implementation: in-progress
 created: "2026-10-17"
 summary: >
   An amendment of approved spec 017 (and, through it, of spec 003's
@@ -27,7 +27,7 @@ summary: >
   adapter-scoped batching gains a qualification procedure and report
   (`rustev.batch-qualification/1`). Plans, descriptors and records that use
   none of this keep their bytes and identities. Approved (A-41);
-  implementation is pending.
+  implementation is in progress.
 amends:
   - "017-general-runtime-optimization"
   - "003-runtime-execution-and-evidence"
@@ -825,6 +825,27 @@ Decisions within the spec, made for this plan:
   adapter-scoped and remote batches is enforced where those batches are
   formed (`rustev-remote-http`, `rustev-jev`); the runtime enforces it for
   runtime-planned batches.
+
+**Increment 1 (2026-10-27): per-item isolation on every batching path.**
+A backend any of whose capabilities declares `isolation: per_item` is
+never batched: `batch_capability` in `crates/rustev-runtime/src/driver.rs`
+no longer limits the rule to screeners, and in `rustev-remote-http` the
+client's `batch_capability` (the spec 020 remote batch), its direct
+`infer_batch` guard and the server's multi-item refusal (009 3.10.4) apply
+it to every capability. The client's adapter-scoped coalescing already
+keyed per-item capabilities apart. Decisions within the spec: the rule is
+per backend, as spec 035 3.15.3 already is for screeners, so a shared
+operation on such a backend is not batched either; that is stricter than
+3.7 and never weaker. The Jev adapter (012) builds its own descriptor with
+no per-item capability, so its batching has nothing to exclude; it gains
+no code here, and stage 1 of 3.8 (increment 6) covers it. Tests:
+`a_per_item_capability_is_never_batched` in
+`crates/rustev-runtime/tests/optimization.rs` and
+`integrations/rustev-remote-http/tests/isolation.rs`, which fail without
+the change; the spec 035 screening tests are unchanged, and spec 035's
+mutation seed `per_item request batched` in
+`crates/rustev-eval/mutation/seeds.py` now names the rewritten line, so
+its acceptance still detects every seed.
 
 ## Decisions at approval
 
