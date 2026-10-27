@@ -2714,15 +2714,30 @@ async fn version_3_reports_ranking_and_constraint_metrics() {
         evaluate_measured(&inputs(&other), measured),
         Err(EvalError::Adapter)
     ));
-    // Scorers are refused until their increment, never reported.
+    // A declared human scale with no rating in the manifest evaluates.
     let mut scored = v3.clone();
     scored.human_scales = Some(vec![rustev_eval::scoring::HumanScale {
         name: "rater".into(),
         levels: vec!["low".into(), "high".into()],
     }]);
+    assert!(evaluate_measured(&inputs(&scored), measured).is_ok());
+    // A rating not on its declared scale refuses the manifest (3.6.4).
+    let mut rated = manifest.clone();
+    rated.cases[0].gold.as_mut().unwrap().rubric = Some(BTreeMap::from([(
+        "rater".to_string(),
+        "medium".to_string(),
+    )]));
+    let refused = evaluate_measured(
+        &Inputs {
+            manifest: &rated,
+            ..inputs(&scored)
+        },
+        measured,
+    );
     assert!(matches!(
-        evaluate_measured(&inputs(&scored), measured),
-        Err(EvalError::Config(c)) if c.0.starts_with("metric-unavailable")
+        refused,
+        Err(EvalError::Dataset(rustev_eval::dataset::DatasetError::Gold { case, .. }))
+            if case == "l-01"
     ));
 }
 
@@ -3023,4 +3038,217 @@ async fn version_3_scores_views_and_reports_rubric_metrics() {
 #[track_caller]
 fn measured_metric(e: &Evaluated, m: &str) -> f64 {
     measured(e, m)
+}
+
+/// Hand-built score views over `n` proposals with distinct subjects.
+fn judge_views(n: usize) -> rustev_eval::scores::ScoreViews {
+    use rustev_contract::ids::{DatasetId, EvaluatorConfigId, PlanId};
+    use rustev_eval::scores::{CaseView, ProposalView, SCORE_VIEWS, ScoreViews, ViewEntry};
+    let id = |c: char| format!("sha256:{}", c.to_string().repeat(64));
+    ScoreViews {
+        schema: SCORE_VIEWS.into(),
+        dataset: DatasetId::parse(&id('1')).unwrap(),
+        split: Split::FinalTest,
+        config: EvaluatorConfigId::parse(&id('2')).unwrap(),
+        plan: PlanId::parse(&id('3')).unwrap(),
+        cases: (1..=n)
+            .map(|i| {
+                let proposal_view = ProposalView {
+                    action: format!("propose_{i}"),
+                    params: BTreeMap::new(),
+                    derivation: rustev_contract::judgment::Derivation::ModelDerived,
+                    notices: vec![],
+                };
+                ViewEntry {
+                    case: format!("j-{i}"),
+                    case_view: CaseView {
+                        id: format!("j-{i}"),
+                        label: Label::Missing,
+                        gold: None,
+                        subgroups: vec![],
+                    },
+                    subject: proposal_view.subject().unwrap(),
+                    proposal_view,
+                }
+            })
+            .collect(),
+    }
+}
+
+/// Spec 041, 3.8.3: the support-routing plan, which has a `rubric` step,
+/// as a judge whose level is its `priority` enum and whose subject field
+/// is `ticket.message`.
+#[tokio::test(flavor = "current_thread")]
+async fn judge_bundles_reproduce_into_scores() {
+    use Keep::*;
+    use rustev_eval::judge::{JudgeError, judge_scores};
+    use rustev_eval::scores::ScoreOutcome;
+    let views = judge_views(5);
+    let probe = Probe::passing(support_rules());
+    let p = probe.clone();
+    // A sharp calibration: an unmatched message is confidently `other`,
+    // so the judge proposes rather than escalating as ambiguous.
+    let fixture = || support_fixture(&[&p], &unlimited(), "0.1");
+    let plan = fixture().compiled.id.clone();
+    let judged = |i: usize, keep| {
+        let mut s = support_snapshot("pro", &[2, 5], 0);
+        for e in &mut s.entries {
+            if e.field == "ticket.message" {
+                e.value = json!(views.cases[i].subject.to_string());
+            }
+        }
+        Case {
+            id: ["j-1", "j-2", "j-3", "j-4", "j-5"][i],
+            snapshot: s,
+            label: None,
+            subgroups: vec![],
+            split: Split::FinalTest,
+            keep,
+        }
+    };
+    let cases = vec![judged(0, Embedded), judged(1, Embedded), judged(4, Altered)];
+    let mut captured = bundles(&probe, fixture, &cases).await;
+    // j-3 has no bundle; j-4 carries j-1's, whose subject is not j-4's.
+    let j1 = captured["j-1"].clone();
+    captured.insert("j-4".into(), j1);
+    let descriptor = scorer_descriptor(json!({
+        "id": "judge", "version": "1", "kind": "model",
+        "output": {"ordinal": {"levels": ["normal", "high", "urgent"]}},
+        "rules": {"bound": rules_digest("judge rules").to_string()}, "reads_gold": false,
+        "judge": {"plan": plan.to_string(), "artifacts": [],
+                  "level_param": "priority", "subject_field": "ticket.message"}
+    }));
+    let replay = config_for(&scope());
+    let scores = judge_scores(
+        &views,
+        &descriptor,
+        &plan,
+        &inputs_of(&captured),
+        &NoExternal,
+        &replay,
+    );
+    let scores = scores.unwrap();
+    assert_eq!(scores.views, views.record_digest().unwrap());
+    assert_eq!(scores.scorer, descriptor);
+    let outcomes: Vec<&ScoreOutcome> = scores.entries.iter().map(|e| &e.outcome).collect();
+    // j-1, j-2: reproduced, the subject supplied, `priority` normal is level
+    // 0; j-3 has no bundle; j-4's bundle supplies j-1's subject; j-5's
+    // retained judgment was altered, so it does not reproduce.
+    assert_eq!(
+        outcomes,
+        [
+            &ScoreOutcome::Score(0.0),
+            &ScoreOutcome::Score(0.0),
+            &ScoreOutcome::Unscored("judge_bundle_missing".into()),
+            &ScoreOutcome::Unscored("subject_mismatch".into()),
+            &ScoreOutcome::Unscored("judge_not_reproduced".into()),
+        ]
+    );
+    // A reproduced judgment binds its run record.
+    assert_eq!(
+        scores.entries[0].judge_run,
+        Some(captured_run_digest(&captured["j-1"]))
+    );
+    assert!(scores.entries[2..].iter().all(|e| e.judge_run.is_none()));
+
+    // An escalation is `judge_unresolved`: at temperature 1.5 an unmatched
+    // message is ambiguous.
+    let q = probe.clone();
+    let soft = || support_fixture(&[&q], &unlimited(), "1.5");
+    let soft_plan = soft().compiled.id.clone();
+    let soft_captured = bundles(&probe, soft, &[judged(0, Embedded)]).await;
+    let mut soft_descriptor = descriptor.clone();
+    soft_descriptor.judge.as_mut().unwrap().plan = soft_plan.clone();
+    let s = judge_scores(
+        &judge_views(1),
+        &soft_descriptor,
+        &soft_plan,
+        &inputs_of(&soft_captured),
+        &NoExternal,
+        &replay,
+    )
+    .unwrap();
+    assert_eq!(
+        s.entries[0].outcome,
+        ScoreOutcome::Unscored("judge_unresolved".into())
+    );
+
+    // A bundle of another plan refuses the whole call.
+    let mut mixed = captured.clone();
+    mixed.insert("j-2".into(), soft_captured["j-1"].clone());
+    let e = judge_scores(
+        &views,
+        &descriptor,
+        &plan,
+        &inputs_of(&mixed),
+        &NoExternal,
+        &replay,
+    )
+    .unwrap_err();
+    assert_eq!(e, JudgeError::PlanMismatch { case: "j-2".into() });
+    assert_eq!(e.code(), "judge-plan-mismatch");
+
+    // An exact-derived judgment under a model descriptor refuses the call.
+    let exact = || {
+        use rustev_contract::definition::{Cond, Freshness, ProvenanceClass as P};
+        use rustev_core::builder::{DefinitionBuilder, out, ty};
+        let def = DefinitionBuilder::new("exact-judge", "1.0.0", "rustev-reference")
+            .input(
+                "ticket.message",
+                ty::text(4096),
+                &[P::UserSupplied],
+                Freshness::NotRequired,
+            )
+            .rule(
+                "judge",
+                Cond::Always,
+                out::propose("judge", &[("priority", out::lit_enum("normal"))]),
+            )
+            .limits(limits(3))
+            .build()
+            .unwrap();
+        Fixture {
+            compiled: rustev_core::compile_with(&def, &[], &[], &unlimited()).unwrap(),
+            descriptors: vec![],
+            calibrations: vec![],
+        }
+    };
+    let exact_plan = exact().compiled.id.clone();
+    let mut only_message = judged(0, Embedded);
+    only_message
+        .snapshot
+        .entries
+        .retain(|e| e.field == "ticket.message");
+    let exact_captured = bundles(&probe, exact, &[only_message]).await;
+    let mut exact_descriptor = descriptor.clone();
+    exact_descriptor.judge.as_mut().unwrap().plan = exact_plan.clone();
+    let e = judge_scores(
+        &judge_views(1),
+        &exact_descriptor,
+        &exact_plan,
+        &inputs_of(&exact_captured),
+        &NoExternal,
+        &replay,
+    )
+    .unwrap_err();
+    assert_eq!(e.code(), "judge-derivation-mismatch");
+
+    // Only an ordinal model scorer naming this plan is a judge.
+    let mut other = descriptor.clone();
+    other.judge.as_mut().unwrap().plan = soft_plan;
+    assert!(matches!(
+        judge_scores(
+            &views,
+            &other,
+            &plan,
+            &inputs_of(&captured),
+            &NoExternal,
+            &replay
+        ),
+        Err(JudgeError::NotAJudge(_))
+    ));
+}
+
+fn captured_run_digest(b: &ReplayBundle) -> rustev_contract::ids::ContentDigest {
+    reproduced(replay(b)).run().record_digest().unwrap()
 }

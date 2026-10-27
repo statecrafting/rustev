@@ -25,6 +25,7 @@ pub mod fit;
 pub mod generator;
 pub mod gold;
 pub mod holdout;
+pub mod judge;
 pub mod live;
 pub mod measured;
 pub mod measures;

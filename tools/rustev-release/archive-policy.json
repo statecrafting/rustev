@@ -210,6 +210,7 @@
         "src/generator.rs",
         "src/gold.rs",
         "src/holdout.rs",
+        "src/judge.rs",
         "src/lib.rs",
         "src/live.rs",
         "src/measured.rs",

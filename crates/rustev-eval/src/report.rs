@@ -45,7 +45,6 @@ use crate::replay::{ReplayConfig, ReplayOutcome, RetainedValue, reproduce};
 use crate::resolve::Resolver;
 use crate::scores::{CaseView, ProposalView, SCORE_VIEWS, SCORES, ScoreViews, Scores, ViewEntry};
 use crate::scoring::Declarations;
-use crate::scoring::code;
 
 pub const EVAL_DETAIL: &str = "rustev.eval-detail/1";
 
@@ -758,11 +757,15 @@ fn evaluate_inner(
             cases: std::mem::take(&mut view_cases),
         };
         check_scores(&declared, measured.scores, &v)?;
-        let (rubric, model) = measured::rubric_metrics(&declared, measured.scores, &scope);
+        let (rubric, model_rubric) = measured::rubric_metrics(&declared, measured.scores, &scope);
+        let (agreement, model_agreement) =
+            measured::agreement_metrics(&declared, measured.scores, &scope);
         let new = measured::metrics(m, &scope)
             .into_iter()
             .chain(rubric)
-            .chain(model);
+            .chain(agreement)
+            .chain(model_rubric)
+            .chain(model_agreement);
         views = Some(v);
         for new in new {
             if cases_for.is_some() {
@@ -882,13 +885,22 @@ fn measures_of(
     if config.adapter.measures.as_ref() != Some(&digest) {
         return Err(EvalError::Adapter);
     }
-    // Agreements land in a later increment; until then they are refused,
-    // never reported.
-    if !(declared.human_scales.is_empty() && declared.agreements.is_empty()) {
-        return Err(EvalError::Config(ConfigError(format!(
-            "{}: human scales and agreements",
-            code::METRIC_UNAVAILABLE
-        ))));
+    // A human rating not on its declared scale refuses the manifest
+    // (3.6.4).
+    for c in &inputs.manifest.cases {
+        let Some(rubric) = c.gold.as_ref().and_then(|g| g.rubric.as_ref()) else {
+            continue;
+        };
+        for (scale, level) in rubric {
+            if let Some(h) = declared.human_scales.iter().find(|h| &h.name == scale)
+                && !h.levels.contains(level)
+            {
+                return Err(EvalError::Dataset(DatasetError::Gold {
+                    case: c.id.clone(),
+                    detail: format!("level `{level}` is not on human scale `{scale}`"),
+                }));
+            }
+        }
     }
     Ok(Some(measures))
 }

@@ -26,7 +26,9 @@ use crate::ranking_metrics::{
 };
 use crate::report::Count;
 use crate::scores::{ScoreOutcome, Scores, reserved, score_ok};
-use crate::scoring::{Declarations, MODEL_PREFIX, RubricAggregate, ScorerKind, ScorerOutput, code};
+use crate::scoring::{
+    Declarations, HUMAN_SIDE, MODEL_PREFIX, RubricAggregate, ScorerKind, ScorerOutput, code,
+};
 
 /// Version 3 evaluation inputs beside spec 004's `Inputs` (3.4.1): the
 /// adapter that declares the measures whose digest the configuration
@@ -513,4 +515,202 @@ pub fn rubric_metrics(
         }
     }
     (deterministic, model)
+}
+
+/// The four agreement statistics of 3.8.4.
+const AGREEMENT_STATS: [&str; 4] = ["exact", "adjacent", "mean_abs_diff", "qwk"];
+
+/// One agreement side's level index for a case, or why it has none.
+fn side_level(
+    side: &str,
+    declared: &Declarations<'_>,
+    scores: &[Scores],
+    case: &DatasetCase,
+) -> Result<usize, String> {
+    if let Some(scale) = side.strip_prefix(HUMAN_SIDE) {
+        let levels = &declared
+            .human_scales
+            .iter()
+            .find(|h| h.name == scale)
+            .expect("a checked agreement names a declared scale")
+            .levels;
+        let level = case
+            .gold
+            .as_ref()
+            .and_then(|g| g.rubric.as_ref()?.get(scale))
+            .ok_or_else(|| reason::NO_GOLD.to_string())?;
+        // Checked against the scale before any case (3.6.4).
+        return levels
+            .iter()
+            .position(|l| l == level)
+            .ok_or_else(|| reason::NO_GOLD.to_string());
+    }
+    let s = declared
+        .scorers
+        .iter()
+        .find(|s| s.id == side)
+        .expect("a checked agreement names a declared scorer");
+    let doc = scores
+        .iter()
+        .find(|d| d.scorer.id == side)
+        .ok_or_else(|| SCORES_MISSING.to_string())?;
+    match doc
+        .entries
+        .iter()
+        .find(|e| e.case == case.id)
+        .map(|e| &e.outcome)
+    {
+        Some(ScoreOutcome::Score(v)) if score_ok(&s.output, *v) => Ok(*v as usize),
+        Some(ScoreOutcome::Score(_)) => Err(format!("unscored:{}", reserved::INVALID_SCORE)),
+        Some(ScoreOutcome::Unscored(why)) => Err(format!("unscored:{why}")),
+        None => unreachable!("checked scores cover every view entry"),
+    }
+}
+
+/// A side's level list: a declared human scale's, or a declared ordinal
+/// scorer's; none for anything else.
+fn side_levels<'d>(side: &str, declared: &Declarations<'d>) -> Option<&'d [String]> {
+    if let Some(scale) = side.strip_prefix(HUMAN_SIDE) {
+        return declared
+            .human_scales
+            .iter()
+            .find(|h| h.name == scale)
+            .map(|h| h.levels.as_slice());
+    }
+    match &declared.scorers.iter().find(|s| s.id == side)?.output {
+        ScorerOutput::Ordinal { levels } => Some(levels.as_slice()),
+        ScorerOutput::Bounded { .. } => None,
+    }
+}
+
+/// Whether a side is a model scorer.
+fn model_side(side: &str, declared: &Declarations<'_>) -> bool {
+    declared
+        .scorers
+        .iter()
+        .any(|s| s.id == side && s.kind == ScorerKind::Model)
+}
+
+/// The agreement metrics of 3.8.4 over cases scored on both sides:
+/// `exact` and `adjacent` (count ratios), `mean_abs_diff` (a mean) and
+/// `qwk` (not case-decomposable: no per-case measure). Deterministic
+/// agreements first, then those with a model side, named under `model/`.
+/// A side with no scores document makes every statistic unknown
+/// (`scores-missing`).
+pub fn agreement_metrics(
+    declared: &Declarations<'_>,
+    scores: &[Scores],
+    scope: &[Scope<'_>],
+) -> (Vec<NewMetric>, Vec<NewMetric>) {
+    let total = scope.len() as u64;
+    let (mut deterministic, mut model) = (vec![], vec![]);
+    for a in declared.agreements {
+        let is_model = model_side(&a.a, declared) || model_side(&a.b, declared);
+        let prefix = if is_model { MODEL_PREFIX } else { "" };
+        // Both sides on one level list (3.8.4); the configuration check
+        // refuses any other pairing, and an unchecked one is never indexed.
+        let levels = match (side_levels(&a.a, declared), side_levels(&a.b, declared)) {
+            (Some(x), Some(y)) if x == y => Some(x.len()),
+            _ => None,
+        };
+        let mut builders: Vec<Builder> = AGREEMENT_STATS
+            .iter()
+            .map(|stat| {
+                Builder::new(
+                    format!("{prefix}agreement/{}/{stat}", a.name),
+                    *stat != "exact" && *stat != "adjacent",
+                    scope.len(),
+                )
+            })
+            .collect();
+        // Observed pair counts, rows side a, columns side b.
+        let size = levels.unwrap_or(0);
+        let mut observed = vec![vec![0u64; size]; size];
+        for sc in scope {
+            let pair = match (sc, levels) {
+                (Scope::Out(why), _) => Err(why.clone()),
+                (Scope::Proposal { .. }, None) => Err(code::SCALE_MISMATCH.to_string()),
+                (Scope::Proposal { case, .. }, Some(_)) => side_level(&a.a, declared, scores, case)
+                    .and_then(|x| Ok((x, side_level(&a.b, declared, scores, case)?))),
+            };
+            match pair {
+                Err(why) => {
+                    for b in &mut builders {
+                        b.push(Err(&why));
+                    }
+                }
+                Ok((x, y)) => {
+                    observed[x][y] += 1;
+                    let d = x.abs_diff(y) as u64;
+                    builders[0].push(Ok(CaseMeasure::Count {
+                        num: u64::from(d == 0),
+                        den: 1,
+                    }));
+                    builders[1].push(Ok(CaseMeasure::Count {
+                        num: u64::from(d <= 1),
+                        den: 1,
+                    }));
+                    builders[2].push(Ok(CaseMeasure::Mean {
+                        num: d as f64,
+                        den: 1,
+                    }));
+                    // `qwk` is not case-decomposable; its case contributes
+                    // to the observed matrix only.
+                    builders[3].push(Ok(CaseMeasure::Mean { num: 0.0, den: 1 }));
+                }
+            }
+        }
+        let mut out: Vec<NewMetric> = builders.into_iter().map(|b| b.finish(total)).collect();
+        let qwk = &mut out[3];
+        // With no case scored on both sides, keep the exclusion reasons
+        // (`scores-missing`, `scale-mismatch`, ...) the other statistics
+        // report.
+        if matches!(qwk.metric.value, MetricValue::Measured { .. }) {
+            qwk.metric.value = quadratic_weighted_kappa(&observed);
+        }
+        qwk.cases.iter_mut().for_each(|c| *c = None);
+        if is_model {
+            model.extend(out);
+        } else {
+            deterministic.extend(out);
+        }
+    }
+    (deterministic, model)
+}
+
+/// Quadratic weighted kappa (3.8.4): `1 - sum(w * O) / sum(w * E)`, with
+/// `w = (i - j)^2`, `E` the outer product of the marginal counts divided
+/// by the case count, sums in row-major order; unknown when
+/// `sum(w * E) = 0`.
+pub fn quadratic_weighted_kappa(observed: &[Vec<u64>]) -> MetricValue {
+    let k = observed.len();
+    let n: u64 = observed.iter().flatten().sum();
+    let rows: Vec<u64> = observed.iter().map(|r| r.iter().sum()).collect();
+    let cols: Vec<u64> = (0..k)
+        .map(|j| observed.iter().map(|r| r[j]).sum())
+        .collect();
+    if n == 0 {
+        return MetricValue::Unknown {
+            reason: "zero denominator: no case scored on both sides".into(),
+        };
+    }
+    let (mut num, mut den) = (0.0f64, 0.0f64);
+    for i in 0..k {
+        for j in 0..k {
+            let w = (i.abs_diff(j) * i.abs_diff(j)) as f64;
+            num += w * observed[i][j] as f64;
+            // The marginal product is exact in u128 for any u64 counts.
+            let product = u128::from(rows[i]) * u128::from(cols[j]);
+            den += w * (product as f64 / n as f64);
+        }
+    }
+    if den == 0.0 {
+        return MetricValue::Unknown {
+            reason: "zero denominator: sum(w * E) is 0".into(),
+        };
+    }
+    MetricValue::Measured {
+        value: 1.0 - num / den,
+        n,
+    }
 }

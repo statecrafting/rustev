@@ -882,6 +882,47 @@ or one reserved for eval, returned by a scorer is recorded as
 `version_3_scores_views_and_reports_rubric_metrics` in
 `crates/rustev-eval/tests/reports.rs`.
 
+**Increment 5, part a (2026-10-27): agreement statistics and the `model/`
+section.** `agreement_metrics` in `crates/rustev-eval/src/measured.rs`
+reports `exact`, `adjacent`, `mean_abs_diff` and `qwk` for each declared
+agreement over the cases scored on both sides (3.8.4). A human side reads
+the case's gold rubric level (`no_gold` when there is none), and a scorer
+side reads its scores document (`scores-missing` when there is none,
+`unscored:<reason>` per case). `qwk` sums in row-major order with
+integer counts and one division per expected cell, and is unknown when
+`sum(w * E) = 0`. It carries no per-case measure (3.11.1), and spec 029's
+form lookup names the other three. Report placement is now complete
+(3.2.4): ranking and constraint metrics, deterministic rubric metrics,
+deterministic agreements, then every `model/` rubric metric and
+agreement. A human rating not on its declared scale refuses the manifest
+before any case (3.6.4, `DatasetError::Gold`), and evaluation no longer
+refuses human scales or agreements. Decision within the spec: an
+expected cell is `(row count * column count) / case count`, an exact
+integer product converted to binary64 and divided once, then weighted.
+Tests: `crates/rustev-eval/tests/agreement_041.rs` (judge against human
+labels, two judges, a deterministic scorer, and the `qwk` unknown case,
+with the arithmetic written out).
+
+**Increment 5, part b (2026-10-27): judge reproduction.**
+`crates/rustev-eval/src/judge.rs` holds `judge_scores` (3.8.3). It
+reproduces each view entry's judge bundle with spec 004's reproduction
+and writes the judge's `rustev.scores/1`, each score the index of the
+`level_param` option, bound to the judge's run record digest. Per case it
+records `judge_bundle_missing`, `judge_not_reproduced` (a bundle that
+fails to load, diverges or is incomparable), `subject_mismatch` (the
+`subject_field` input is not the view's subject) and `judge_unresolved`
+(an escalation or any unresolved judgment). It refuses the whole call for
+a bundle of another plan (`judge-plan-mismatch`) and for an
+`exact-derived` judgment (`judge-derivation-mismatch`). Decisions within
+the spec: the descriptor must be an ordinal model scorer naming the given
+plan (`not-a-judge` otherwise); a proposal whose level parameter is not
+one of the scorer's levels is unscored `invalid_score`; the derivation is
+checked for every reproduced judgment, escalations included. Tests:
+`judge_bundles_reproduce_into_scores` in
+`crates/rustev-eval/tests/reports.rs`, with the support-routing plan
+(which has a `rubric` step) as the judge and an exact-only plan for the
+derivation refusal.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child faithfully
