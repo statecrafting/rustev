@@ -237,6 +237,9 @@ sh -c 'for d in crates tools; do [ -d "$d" ] || continue; if grep -rnE "(struct|
   checkout), the MSRV job keeps only registry and git (its target was 4 GB),
   and verify restores the preflight job's spec-spine binary instead of
   racing four saves of its own.
+- 2026-10-27: 040 moves from `integrations-core` (34 minutes measured) to
+  `integrations-base` (17), about 25 minutes each. Same commands, every
+  spec still exactly once.
 - 2026-10-27: a pull request's own CI run checks the acceptance partition
   but runs no acceptance group; the merge-queue entry, which tests the
   change against the latest `main`, and every push to `main` run all of

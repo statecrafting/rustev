@@ -1034,7 +1034,8 @@ kind.
 ## Verification
 
 Declared for `spec-spine verify 040`; 040 is in `make verify` and in CI's
-`integrations-core` acceptance group.
+`integrations-base` acceptance group (moved from `integrations-core` on
+2026-10-27 to balance the groups' times; the commands are unchanged).
 
 ```verify:cli
 # 3.4 to 3.14: the explainer, every query, diff, rendering, redaction,

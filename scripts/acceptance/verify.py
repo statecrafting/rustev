@@ -13,11 +13,13 @@ ROOT = Path(__file__).resolve().parents[2]
 # integrations-core reached its 45-minute limit once 037 joined it
 # (2026-10-27), so the specs no spec text places in it moved to
 # integrations-base: about 22 minutes each.
+# Remeasured 2026-10-27 (integrations-core 34 minutes, integrations-base
+# 17): 040 (about 7 minutes) moves to integrations-base.
 GROUPS = {
     "evaluation": "004".split(),
     "cli-backends": "001 005 006 014 029".split(),
-    "integrations-base": "002 010 012 015 017 019 020 033 038".split(),
-    "integrations-core": "022 034 035 036 037 040 045".split(),
+    "integrations-base": "002 010 012 015 017 019 020 033 038 040".split(),
+    "integrations-core": "022 034 035 036 037 045".split(),
     "runtime-evidence": "003 007 008 009 013 023 026 027 028 049".split(),
 }
 
