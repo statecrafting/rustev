@@ -289,3 +289,61 @@ fn share_at_k_counts_items_and_means_cases() {
     assert_eq!(out.cases, [Some(CaseMeasure::Mean { num: 1.0, den: 1 })]);
     assert_eq!(breakdown(&out), [("type_mismatch", 1)]);
 }
+
+#[test]
+fn share_at_least_without_its_level_is_never_a_mean() {
+    // The configuration check refuses this (3.6.3); evaluation, given it
+    // unchecked, excludes every case rather than read levels as a mean.
+    use rustev_eval::measured::rubric_metrics;
+    use rustev_eval::scores::{SCORES, ScoreEntry, ScoreOutcome, Scores};
+    use rustev_eval::scoring::{Declarations, RubricMetric, ScorerDescriptor};
+    let digest = |c: char| {
+        rustev_contract::ids::ContentDigest::parse(&format!("sha256:{}", c.to_string().repeat(64)))
+            .unwrap()
+    };
+    let scorer: ScorerDescriptor = serde_json::from_value(json!({
+        "id": "tone", "version": "1", "kind": "deterministic",
+        "output": {"ordinal": {"levels": ["low", "high"]}},
+        "rules": "opaque", "reads_gold": false
+    }))
+    .unwrap();
+    let rubric: Vec<RubricMetric> = serde_json::from_value(json!([
+        {"name": "great", "scorer": "tone", "aggregate": {"share_at_least": "great"}}
+    ]))
+    .unwrap();
+    let scorers = vec![scorer.clone()];
+    let declared = Declarations {
+        scorers: &scorers,
+        rubric_metrics: &rubric,
+        human_scales: &[],
+        agreements: &[],
+        origin: &[],
+    };
+    let c = case("a", None);
+    let p = params(vec![]);
+    let docs = [Scores {
+        schema: SCORES.into(),
+        scorer,
+        views: digest('d'),
+        entries: vec![ScoreEntry {
+            case: "a".into(),
+            subject: digest('e'),
+            outcome: ScoreOutcome::Score(1.0),
+            judge_run: None,
+        }],
+    }];
+    let (deterministic, _) = rubric_metrics(
+        &declared,
+        &docs,
+        &[Scope::Proposal {
+            case: &c,
+            params: &p,
+        }],
+    );
+    assert_eq!(deterministic[0].cases, [None]);
+    assert_eq!(deterministic[0].count.breakdown["scale-mismatch"], 1);
+    assert!(matches!(
+        deterministic[0].metric.value,
+        MetricValue::Unknown { .. }
+    ));
+}

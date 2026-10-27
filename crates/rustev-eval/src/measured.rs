@@ -25,6 +25,8 @@ use crate::ranking_metrics::{
     short_case,
 };
 use crate::report::Count;
+use crate::scores::{ScoreOutcome, Scores, reserved, score_ok};
+use crate::scoring::{Declarations, MODEL_PREFIX, RubricAggregate, ScorerKind, ScorerOutput, code};
 
 /// Version 3 evaluation inputs beside spec 004's `Inputs` (3.4.1): the
 /// adapter that declares the measures whose digest the configuration
@@ -32,6 +34,8 @@ use crate::report::Count;
 #[derive(Clone, Copy)]
 pub struct Measured<'a> {
     pub adapter: &'a dyn MeasuredAdapter,
+    /// One scores document per declared scorer that has one (3.7.5).
+    pub scores: &'a [Scores],
 }
 
 /// Constraint exclusion reasons (3.4.6).
@@ -419,4 +423,94 @@ fn constraint_metric(
         }
     }
     b.finish(total)
+}
+
+/// Why a rubric metric has no value for its scorer (3.7.5).
+pub const SCORES_MISSING: &str = "scores-missing";
+
+/// The rubric metrics of 3.6.3 over checked scores documents: the
+/// deterministic ones (`rubric/<name>`) and the model ones
+/// (`model/rubric/<name>`), each in declaration order, reported apart
+/// (3.2.4, I-3). A declared scorer with no document makes its metrics
+/// unknown (`scores-missing`); an unscored case is excluded and counted
+/// `unscored:<reason>`; a score outside the scorer's output is unscored
+/// `invalid_score`, never clamped.
+pub fn rubric_metrics(
+    declared: &Declarations<'_>,
+    scores: &[Scores],
+    scope: &[Scope<'_>],
+) -> (Vec<NewMetric>, Vec<NewMetric>) {
+    let total = scope.len() as u64;
+    let (mut deterministic, mut model) = (vec![], vec![]);
+    for r in declared.rubric_metrics {
+        let Some(s) = declared.scorers.iter().find(|s| s.id == r.scorer) else {
+            continue;
+        };
+        let is_model = s.kind == ScorerKind::Model;
+        let name = format!(
+            "{}rubric/{}",
+            if is_model { MODEL_PREFIX } else { "" },
+            r.name
+        );
+        let mean = !matches!(r.aggregate, RubricAggregate::ShareAtLeast(_));
+        let mut b = Builder::new(name, mean, scope.len());
+        let doc = scores.iter().find(|d| d.scorer.id == s.id);
+        let by_case: Option<BTreeMap<&str, &ScoreOutcome>> = doc.map(|d| {
+            d.entries
+                .iter()
+                .map(|e| (e.case.as_str(), &e.outcome))
+                .collect()
+        });
+        let at_least = match (&r.aggregate, &s.output) {
+            (RubricAggregate::ShareAtLeast(l), ScorerOutput::Ordinal { levels }) => {
+                levels.iter().position(|x| x == l)
+            }
+            _ => None,
+        };
+        for sc in scope {
+            let case = match sc {
+                Scope::Out(why) => {
+                    b.push(Err(why));
+                    continue;
+                }
+                Scope::Proposal { case, .. } => case,
+            };
+            let Some(by_case) = &by_case else {
+                b.push(Err(SCORES_MISSING));
+                continue;
+            };
+            let outcome = by_case.get(case.id.as_str());
+            let value = match outcome {
+                Some(ScoreOutcome::Score(v)) if score_ok(&s.output, *v) => *v,
+                Some(ScoreOutcome::Score(_)) => {
+                    b.push(Err(&format!("unscored:{}", reserved::INVALID_SCORE)));
+                    continue;
+                }
+                Some(ScoreOutcome::Unscored(why)) => {
+                    b.push(Err(&format!("unscored:{why}")));
+                    continue;
+                }
+                None => unreachable!("checked scores cover every view entry"),
+            };
+            b.push(match (&r.aggregate, at_least) {
+                (RubricAggregate::ShareAtLeast(_), Some(l)) => Ok(CaseMeasure::Count {
+                    num: u64::from(value >= l as f64),
+                    den: 1,
+                }),
+                // A level the scorer does not declare: the configuration
+                // check refuses it (3.6.3); never read as a mean.
+                (RubricAggregate::ShareAtLeast(_), None) => Err(code::SCALE_MISMATCH),
+                (RubricAggregate::MeanLevelIndex | RubricAggregate::Mean, _) => {
+                    Ok(CaseMeasure::Mean { num: value, den: 1 })
+                }
+            });
+        }
+        let m = b.finish(total);
+        if is_model {
+            model.push(m);
+        } else {
+            deterministic.push(m);
+        }
+    }
+    (deterministic, model)
 }

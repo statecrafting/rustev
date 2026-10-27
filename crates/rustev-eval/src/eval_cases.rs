@@ -146,14 +146,17 @@ pub fn form_of(metric: &str) -> Option<Form> {
     }
 }
 
-/// A metric's form, by name or, for a spec 041 constraint, whose name does
-/// not say whether it aggregates as `share_at_k` (a mean) or `all_at_k` (a
-/// count ratio), by the kind of its first case measure (3.11.1).
+/// A metric's form, by name or, for a spec 041 constraint or rubric
+/// metric, whose name does not say whether its aggregate is a mean
+/// (`share_at_k`, `mean_level_index`, `mean`) or a count ratio
+/// (`all_at_k`, `share_at_least`), by the kind of its first case measure
+/// (3.11.1).
 pub fn form_in(metric: &str, runs: &[&EvalCases]) -> Option<Form> {
     if let Some(form) = form_of(metric) {
         return Some(form);
     }
-    if !metric.starts_with("constraint/") {
+    let by_measures = ["constraint/", "rubric/", "model/rubric/"];
+    if !by_measures.iter().any(|p| metric.starts_with(p)) {
         return None;
     }
     runs.iter()

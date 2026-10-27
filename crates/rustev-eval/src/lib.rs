@@ -38,6 +38,7 @@ pub mod repeat_stats;
 pub mod replay;
 pub mod report;
 pub mod resolve;
+pub mod scores;
 pub mod scoring;
 pub mod selection;
 

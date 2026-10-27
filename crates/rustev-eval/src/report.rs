@@ -18,7 +18,7 @@ use rustev_contract::eval_report::{
 use rustev_contract::ids::{
     ArtifactId, CalibrationId, ContentDigest, DatasetId, EvaluatorConfigId, PlanId,
 };
-use rustev_contract::judgment::OutValue;
+use rustev_contract::judgment::{Derivation, Notice, OutValue};
 use rustev_contract::limits::REPLAY_V1;
 use rustev_contract::plan::{BoundCalibration, Plan, PlanExecution, PlanStepDetail};
 use rustev_contract::run::{Charge, RunRecord};
@@ -43,6 +43,8 @@ use crate::metrics::{
 use crate::repeat_config::TopK;
 use crate::replay::{ReplayConfig, ReplayOutcome, RetainedValue, reproduce};
 use crate::resolve::Resolver;
+use crate::scores::{CaseView, ProposalView, SCORE_VIEWS, SCORES, ScoreViews, Scores, ViewEntry};
+use crate::scoring::Declarations;
 use crate::scoring::code;
 
 pub const EVAL_DETAIL: &str = "rustev.eval-detail/1";
@@ -91,6 +93,9 @@ pub struct CaseDetail {
 pub enum EvalError {
     Config(ConfigError),
     Dataset(DatasetError),
+    /// A scores document that does not belong to this evaluation (spec
+    /// 041, 3.7.5), by refusal code.
+    Scores(String),
     /// The configuration names another adapter than the one supplied.
     Adapter,
     EmptySplit,
@@ -150,6 +155,9 @@ enum Status {
         probabilities: Result<Vec<(String, f64)>, String>,
         run: Box<RunRecord>,
         plan: Box<Plan>,
+        /// The judgment's derivation and notices, for score views (spec
+        /// 041, 3.7.1).
+        judged: Box<(Derivation, Vec<Notice>)>,
     },
 }
 
@@ -211,6 +219,7 @@ fn evaluate_case<'a>(inputs: &Inputs<'_>, case: &'a DatasetCase) -> CaseResult<'
                 probabilities,
                 run: Box::new(r.run.clone()),
                 plan: Box::new(r.plan.clone()),
+                judged: Box::new((r.judgment.derivation, r.judgment.notices.clone())),
             }
         }
         Some(cand) => match compare(&r, cand.plan) {
@@ -233,6 +242,7 @@ fn evaluate_case<'a>(inputs: &Inputs<'_>, case: &'a DatasetCase) -> CaseResult<'
                     probabilities,
                     run: Box::new(r.run.clone()),
                     plan: Box::new(cand.plan.plan.clone()),
+                    judged: Box::new((cmp.candidate.derivation, cmp.candidate.notices.clone())),
                 }
             }
         },
@@ -287,7 +297,7 @@ fn quantile_name(q: rustev_contract::decimal::Decimal) -> String {
 
 /// Evaluate one split of a dataset.
 pub fn evaluate(inputs: &Inputs<'_>) -> Result<Evaluated, EvalError> {
-    evaluate_inner(inputs, None, None).map(|(e, _)| e)
+    evaluate_inner(inputs, None, None).map(|(e, _, _)| e)
 }
 
 /// Evaluate one split under a version 3 configuration (spec 041), with
@@ -298,7 +308,20 @@ pub fn evaluate_measured(
     inputs: &Inputs<'_>,
     measured: Measured<'_>,
 ) -> Result<Evaluated, EvalError> {
-    evaluate_inner(inputs, None, Some(measured)).map(|(e, _)| e)
+    evaluate_inner(inputs, None, Some(measured)).map(|(e, _, _)| e)
+}
+
+/// The score views of a version 3 evaluation (spec 041, 3.7.1): the same
+/// function `evaluate_measured` uses, so the same inputs give the same
+/// views and record digest. Scores in `measured` are checked as
+/// evaluation checks them; pass none to compute views to score.
+pub fn evaluate_views(
+    inputs: &Inputs<'_>,
+    measured: Measured<'_>,
+) -> Result<ScoreViews, EvalError> {
+    evaluate_inner(inputs, None, Some(measured))?
+        .2
+        .ok_or_else(|| EvalError::Config(ConfigError("score views need version 3".into())))
 }
 
 /// [`evaluate_with_cases`] under a version 3 configuration (spec 041,
@@ -327,7 +350,7 @@ fn with_cases(
     top_k: Option<&TopK>,
     measured: Option<Measured<'_>>,
 ) -> Result<(Evaluated, EvalCases), EvalError> {
-    let (evaluated, cases) = evaluate_inner(inputs, Some(top_k), measured)?;
+    let (evaluated, cases, _) = evaluate_inner(inputs, Some(top_k), measured)?;
     let cases = EvalCases {
         schema: EVAL_CASES.into(),
         report: evaluated.detail.report.clone(),
@@ -374,13 +397,17 @@ fn mean_measure(term: Result<f64, String>) -> CaseMeasure {
     }
 }
 
+/// A report, its per-case measures when asked for, and its score views
+/// under version 3.
+type Inner = (Evaluated, Option<Vec<CaseMeasures>>, Option<ScoreViews>);
+
 /// `cases` is `Some` when per-case measures are wanted, with the declared
 /// top-k parameter.
 fn evaluate_inner(
     inputs: &Inputs<'_>,
     cases_for: Option<Option<&TopK>>,
     measured: Option<Measured<'_>>,
-) -> Result<(Evaluated, Option<Vec<CaseMeasures>>), EvalError> {
+) -> Result<Inner, EvalError> {
     let config = inputs.config;
     config.check().map_err(EvalError::Config)?;
     let measures = measures_of(inputs, config, measured)?;
@@ -419,6 +446,7 @@ fn evaluate_inner(
     let mut details = vec![];
     let mut case_measures: Vec<CaseMeasures> = vec![];
     let mut scope: Vec<measured::Scope<'_>> = Vec::with_capacity(results.len());
+    let mut view_cases: Vec<ViewEntry> = vec![];
     for r in &results {
         scope.push(match &r.status {
             Status::Incomparable(code) => measured::Scope::Out(format!("incomparable:{code}")),
@@ -428,12 +456,18 @@ fn evaluate_inner(
                 ..
             } => measured::Scope::Out("abstained".into()),
             Status::Comparable {
-                outcome: CaseOutcome::Proposal { params, .. },
+                outcome: CaseOutcome::Proposal { action, params, .. },
+                judged,
                 ..
-            } => measured::Scope::Proposal {
-                case: r.case,
-                params,
-            },
+            } => {
+                if measures.is_some() {
+                    view_cases.push(view_entry(r.case, action, params, judged)?);
+                }
+                measured::Scope::Proposal {
+                    case: r.case,
+                    params,
+                }
+            }
         });
         let mut measures = BTreeMap::new();
         let mut run_digest = None;
@@ -456,6 +490,7 @@ fn evaluate_inner(
                 probabilities,
                 run,
                 plan,
+                ..
             } => {
                 comparable += 1;
                 runs.push(run);
@@ -694,9 +729,42 @@ fn evaluate_inner(
     if inputs.candidate.is_none() {
         ms.extend(metrics::generation(&runs));
     }
-    // Spec 041, 3.2.4: after every existing metric, in declaration order.
-    if let Some(m) = &measures {
-        for new in measured::metrics(m, &scope) {
+    // The plan the envelope and the score views name.
+    let plan_id = match (inputs.candidate, plans.iter().next()) {
+        (Some(c), _) => c.plan.id.clone(),
+        (None, Some(p)) => p.clone(),
+        (None, None) => inputs
+            .bundles
+            .values()
+            .find_map(|b| match b {
+                BundleInput::Loaded(b) => Some(b.plan_id.clone()),
+                BundleInput::Failed(_) => None,
+            })
+            .ok_or(EvalError::EmptySplit)?,
+    };
+    let dataset = inputs.manifest.id().map_err(|_| EvalError::NotCanonical)?;
+    let config_id = config.id().map_err(|_| EvalError::NotCanonical)?;
+    let mut views = None;
+    // Spec 041, 3.2.4: after every existing metric, the deterministic ones
+    // in declaration order, then every `model/` metric.
+    if let (Some(m), Some(declared), Some(measured)) = (&measures, config.declarations(), measured)
+    {
+        let v = ScoreViews {
+            schema: SCORE_VIEWS.into(),
+            dataset: dataset.clone(),
+            split: inputs.split,
+            config: config_id.clone(),
+            plan: plan_id.clone(),
+            cases: std::mem::take(&mut view_cases),
+        };
+        check_scores(&declared, measured.scores, &v)?;
+        let (rubric, model) = measured::rubric_metrics(&declared, measured.scores, &scope);
+        let new = measured::metrics(m, &scope)
+            .into_iter()
+            .chain(rubric)
+            .chain(model);
+        views = Some(v);
+        for new in new {
             if cases_for.is_some() {
                 for (cm, c) in case_measures.iter_mut().zip(new.cases) {
                     if let Some(c) = c {
@@ -717,18 +785,6 @@ fn evaluate_inner(
     }
 
     // The envelope.
-    let plan_id = match (inputs.candidate, plans.iter().next()) {
-        (Some(c), _) => c.plan.id.clone(),
-        (None, Some(p)) => p.clone(),
-        (None, None) => inputs
-            .bundles
-            .values()
-            .find_map(|b| match b {
-                BundleInput::Loaded(b) => Some(b.plan_id.clone()),
-                BundleInput::Failed(_) => None,
-            })
-            .ok_or(EvalError::EmptySplit)?,
-    };
     let (artifacts, calibrations) = match (inputs.candidate, plan_doc) {
         (Some(c), _) => plan_parts(&c.plan.plan),
         (None, Some(p)) => plan_parts(p),
@@ -752,8 +808,6 @@ fn evaluate_inner(
     } else {
         ReportStatus::Complete
     };
-    let dataset = inputs.manifest.id().map_err(|_| EvalError::NotCanonical)?;
-    let config_id = config.id().map_err(|_| EvalError::NotCanonical)?;
     let report = EvalReport {
         schema: schema::EVAL_REPORT.into(),
         plan: plan_id,
@@ -797,6 +851,7 @@ fn evaluate_inner(
             config: config.clone(),
         },
         cases_for.map(|_| case_measures),
+        views,
     ))
 }
 
@@ -827,19 +882,71 @@ fn measures_of(
     if config.adapter.measures.as_ref() != Some(&digest) {
         return Err(EvalError::Adapter);
     }
-    // Scores, rubric metrics and agreements land in later increments;
-    // until then they are refused, never reported.
-    if !(declared.scorers.is_empty()
-        && declared.rubric_metrics.is_empty()
-        && declared.human_scales.is_empty()
-        && declared.agreements.is_empty())
-    {
+    // Agreements land in a later increment; until then they are refused,
+    // never reported.
+    if !(declared.human_scales.is_empty() && declared.agreements.is_empty()) {
         return Err(EvalError::Config(ConfigError(format!(
-            "{}: scorers, rubric metrics, human scales and agreements",
+            "{}: human scales and agreements",
             code::METRIC_UNAVAILABLE
         ))));
     }
     Ok(Some(measures))
+}
+
+/// One comparable proposal's score view entry (spec 041, 3.7.1).
+fn view_entry(
+    case: &DatasetCase,
+    action: &str,
+    params: &BTreeMap<String, OutValue>,
+    judged: &(Derivation, Vec<Notice>),
+) -> Result<ViewEntry, EvalError> {
+    let proposal_view = ProposalView {
+        action: action.into(),
+        params: params.clone(),
+        derivation: judged.0,
+        notices: judged.1.clone(),
+    };
+    Ok(ViewEntry {
+        case: case.id.clone(),
+        case_view: CaseView {
+            id: case.id.clone(),
+            label: case.label.clone(),
+            gold: case.gold.clone(),
+            subgroups: case.subgroups.clone(),
+        },
+        subject: proposal_view
+            .subject()
+            .map_err(|_| EvalError::NotCanonical)?,
+        proposal_view,
+    })
+}
+
+/// The refusals of spec 041, 3.7.5: a document whose scorer is not
+/// declared, two documents for one scorer, or a document over other views.
+fn check_scores(
+    declared: &Declarations<'_>,
+    scores: &[Scores],
+    views: &ScoreViews,
+) -> Result<(), EvalError> {
+    let digest = views.record_digest().map_err(|_| EvalError::NotCanonical)?;
+    let mut seen = BTreeSet::new();
+    for d in scores {
+        if !declared.scorers.contains(&d.scorer) {
+            return Err(EvalError::Scores("scorer-undeclared".into()));
+        }
+        if !seen.insert(d.scorer.id.as_str()) {
+            return Err(EvalError::Scores("scores-duplicate".into()));
+        }
+        let same_entries = d.entries.len() == views.cases.len()
+            && d.entries
+                .iter()
+                .zip(&views.cases)
+                .all(|(s, v)| s.case == v.case && s.subject == v.subject);
+        if d.schema != SCORES || d.views != digest || !same_entries {
+            return Err(EvalError::Scores("scores-mismatch".into()));
+        }
+    }
+    Ok(())
 }
 
 /// A comparable case's contributions to every case-decomposable metric of
