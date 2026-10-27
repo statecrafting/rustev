@@ -138,6 +138,12 @@ pub fn form_of(metric: &str) -> Option<Form> {
                 Some(Form::Mean)
             }
         }
+        // `qwk` is not case-decomposable (spec 041, 3.11.1).
+        ["agreement", _, "exact" | "adjacent"]
+        | ["model", "agreement", _, "exact" | "adjacent"] => Some(Form::CountRatio),
+        ["agreement", _, "mean_abs_diff"] | ["model", "agreement", _, "mean_abs_diff"] => {
+            Some(Form::Mean)
+        }
         ["latency_ms" | "queue_ms", q] => {
             let q = Decimal::parse(q.strip_prefix('p')?).ok()?;
             Some(Form::Sample { quantile: q })
