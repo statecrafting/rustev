@@ -442,3 +442,20 @@ snapshots!(
 /// The evaluation time every snapshot is fresh at: 2026-09-23T12:00:00Z,
 /// spec 002's synthetic evaluation time.
 pub const EVALUATION_TIME_MS: i64 = 1_790_164_800_000;
+
+/// The SYNTHETIC rules program for the declared offline example.
+pub const EXAMPLE_RULES: &[u8] = include_bytes!("../data/synthetic-example.rules.json");
+
+/// The SYNTHETIC, unfitted temperature calibration bound to [`EXAMPLE_RULES`].
+/// Parse its ID and pass it to [`Params::with_topic`] as
+/// [`TopicCalibration::Calibrated`] when building the example's [`definition`].
+/// This demonstrates mechanics, not calibration quality.
+pub const EXAMPLE_CALIBRATION: &[u8] = include_bytes!("../data/synthetic-example.calibration.json");
+
+/// The SYNTHETIC `sr-t01` snapshot, fresh at [`EVALUATION_TIME_MS`].
+pub const EXAMPLE_SNAPSHOT: &[u8] = include_bytes!("../data/synthetic-example.snapshot.json");
+
+/// The SYNTHETIC expected judgment at [`EVALUATION_TIME_MS`] with decision ID
+/// `SYNTHETIC-support-routing-example`, using [`EXAMPLE_RULES`],
+/// [`EXAMPLE_CALIBRATION`] and [`EXAMPLE_SNAPSHOT`]. Mechanics only.
+pub const EXAMPLE_JUDGMENT: &[u8] = include_bytes!("../data/synthetic-example.judgment.json");

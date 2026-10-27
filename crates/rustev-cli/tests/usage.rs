@@ -113,3 +113,33 @@ fn the_binary_reports_usage_on_stderr_with_exit_2() {
     assert!(r.stdout.is_empty());
     assert!(r.stderr.starts_with("rustev: "), "{}", r.stderr);
 }
+
+#[test]
+fn version_forms_print_the_cli_package_version() {
+    let s = Scratch::new("version");
+    for form in ["version", "--version"] {
+        let e = s.rustev(&[form]);
+        assert_eq!(e.code, 0);
+        assert_eq!(
+            e.stdout,
+            format!("rustev {}\n", env!("CARGO_PKG_VERSION")).as_bytes()
+        );
+        assert!(e.stderr.is_empty());
+    }
+}
+
+#[test]
+fn version_refuses_every_kind_of_extra_argument() {
+    for form in ["version", "--version"] {
+        for extra in ["extra", "--help", "--version", "--", ""] {
+            usage(&[form, extra], "version takes no further arguments");
+        }
+    }
+}
+
+#[test]
+fn top_level_help_lists_version() {
+    let e = run(&["--help"]);
+    assert_eq!(e.code, 0);
+    assert!(String::from_utf8_lossy(&e.stdout).contains("rustev version"));
+}

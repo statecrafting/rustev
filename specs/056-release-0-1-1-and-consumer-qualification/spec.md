@@ -2,7 +2,7 @@
 id: "056-release-0-1-1-and-consumer-qualification"
 title: "The next family release: a CLI version command, declared consumer examples and the fresh-consumer qualification (amends 006, 007 and 031)"
 status: approved
-implementation: pending
+implementation: in-progress
 created: "2026-10-26"
 summary: >
   A narrow amendment of approved specs 006, 007 and 031, written after
@@ -258,4 +258,15 @@ that version additionally needs the owner's signed instruction of 3.4.
 
 ## Implementation record
 
-Not started.
+**Part a (2026-10-27): the version command and the declared example.**
+`rustev version` and `rustev --version` print `rustev <version>` from the
+`rustev-cli` package version; either form with a further argument is a
+usage error, and help lists the command (`crates/rustev-cli/tests/usage.rs`).
+`rustev-pkg-support-routing` exposes `EXAMPLE_RULES`, `EXAMPLE_CALIBRATION`,
+`EXAMPLE_SNAPSHOT` and `EXAMPLE_JUDGMENT` (SYNTHETIC): the rules copy is
+kept equal to the backend fixture, the calibration is the package tests'
+unfitted temperature artifact bound to that program, the snapshot is
+`sr-t01`, and the expected judgment is reproduced in the workspace
+(`packages/rustev-pkg-support-routing/tests/example.rs`). The archive
+policy lists the four files. The harness, `qualify` and the signed
+instruction (part b) and the workflow (part c) follow.
