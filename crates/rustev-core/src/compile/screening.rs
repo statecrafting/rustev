@@ -378,35 +378,96 @@ fn model_text(
     out
 }
 
+/// Resolve generation reads to the same text-copy table used by semantic steps.
+fn generation_text(
+    def: &Definition,
+    decoded: &BTreeMap<String, OpArgs>,
+    g: &rustev_contract::generation::Generate,
+) -> BTreeSet<String> {
+    use rustev_contract::generation::{ModelForEach, TemplateBinding};
+    let mut refs = g.projection.clone();
+    refs.extend(g.template.params.values().filter_map(|p| match p {
+        TemplateBinding::Reference(r) => Some(r.clone()),
+        _ => None,
+    }));
+    if let ModelForEach::List(f) = &g.for_each {
+        refs.push(f.over.clone());
+        if let ItemSource::List { id_field, .. } = &f.items {
+            refs.push(format!("bind:{}/{}", f.bind, id_field));
+        }
+    }
+    let mut out = BTreeSet::new();
+    for r in refs {
+        let mut sources = vec![r.clone()];
+        if let Some(path) = r.strip_prefix("bind:") {
+            sources.clear();
+            if let ModelForEach::List(f) = &g.for_each {
+                let (bind, path) = path
+                    .split_once('/')
+                    .map_or((path, None), |(b, p)| (b, Some(p)));
+                if bind == f.bind {
+                    match &f.items {
+                        ItemSource::List { list, .. } => {
+                            carried(def, decoded, list, path, &mut BTreeSet::new(), &mut out);
+                        }
+                        // Spec 037 section 3.2 restricts `over` to IDs; without
+                        // an items list there is no bound record field to select.
+                        // The IDs themselves cross the request boundary and need
+                        // screening coverage (spec 035 section 3.5.5).
+                        ItemSource::None => sources.push(f.over.clone()),
+                    }
+                }
+            }
+        } else if let Some(path) = r.strip_prefix("proposal:") {
+            sources.clear();
+            let (name, path) = path
+                .split_once('/')
+                .map_or((path, None), |(n, p)| (n, Some(p)));
+            for params in crate::generation::matching(g, def) {
+                for p in params.iter().filter(|p| p.name == name) {
+                    if let ParamSource::Ref(source) = &p.value {
+                        sources
+                            .push(path.map_or_else(|| source.clone(), |p| format!("{source}/{p}")));
+                    }
+                }
+            }
+        }
+        for source in sources {
+            carried(def, decoded, &source, None, &mut BTreeSet::new(), &mut out);
+        }
+    }
+    out
+}
+
 pub(super) fn coverage(
     def: &Definition,
     fields: &[Field],
     decoded: &BTreeMap<String, OpArgs>,
 ) -> Result<(), Refusal> {
-    if def.screening.is_none() {
-        return Ok(());
-    }
     for s in &def.steps {
-        if let StepBody::Semantic(d) = &s.body {
-            for field in model_text(def, decoded, d) {
-                let name = field
-                    .trim_start_matches("input:")
-                    .split('/')
-                    .next()
-                    .unwrap()
-                    .trim_end_matches("[]");
-                let untrusted = def.inputs.iter().find(|i| i.name == name).is_some_and(|i| {
-                    i.provenance
-                        .iter()
-                        .any(|p| *p != ProvenanceClass::SystemOfRecord)
-                });
-                if untrusted && !fields.iter().any(|f| f.reference == field) {
-                    return refuse(
-                        Category::UnscreenedText,
-                        format!("step:{}", s.id),
-                        format!("unscreened text {field}"),
-                    );
-                }
+        let text = match &s.body {
+            StepBody::Generate(g) => generation_text(def, decoded, g),
+            StepBody::Semantic(d) if def.screening.is_some() => model_text(def, decoded, d),
+            _ => continue,
+        };
+        for field in text {
+            let name = field
+                .trim_start_matches("input:")
+                .split('/')
+                .next()
+                .unwrap()
+                .trim_end_matches("[]");
+            let untrusted = def.inputs.iter().find(|i| i.name == name).is_some_and(|i| {
+                i.provenance
+                    .iter()
+                    .any(|p| *p != ProvenanceClass::SystemOfRecord)
+            });
+            if untrusted && !fields.iter().any(|f| f.reference == field) {
+                return refuse(
+                    Category::UnscreenedText,
+                    format!("step:{}", s.id),
+                    format!("unscreened text {field}"),
+                );
             }
         }
     }
@@ -442,6 +503,7 @@ pub(super) fn dependencies(
     for s in &def.steps {
         let text = match &s.body {
             StepBody::Semantic(d) => model_text(def, decoded, d),
+            StepBody::Generate(g) => generation_text(def, decoded, g),
             _ => BTreeSet::new(),
         };
         for f in fields {

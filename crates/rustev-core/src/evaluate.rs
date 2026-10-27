@@ -250,6 +250,8 @@ struct ModelNode {
     value: Json,
     children: BTreeMap<String, ModelNode>,
     screen: Option<ScreeningEvidence>,
+    // Text transformations retain source screening even when bytes change.
+    inherited: Vec<ModelNode>,
 }
 impl ModelNode {
     fn plain(value: Json) -> Self {
@@ -269,9 +271,23 @@ impl ModelNode {
             value,
             children,
             screen: None,
+            inherited: vec![],
         }
     }
     fn render(&self, unavailable: &mut BTreeSet<String>) -> Json {
+        let mut withheld = false;
+        // Only compose_key attaches inherited nodes, one per referenced part.
+        // These are text sources of the transformed value, not sibling fields.
+        // Specs 035 sections 3.5.5 and 3.9.2 require their unavailability to
+        // propagate: a scratch set here would admit unscreened copied text.
+        for source in &self.inherited {
+            withheld |=
+                source.render(unavailable) == rustev_contract::screening::withheld_screen_blocked();
+        }
+        if withheld {
+            let marker = rustev_contract::screening::withheld_screen_blocked();
+            return marker;
+        }
         if let Some(e) = &self.screen {
             match e.consequence {
                 ScreenConsequence::DropField | ScreenConsequence::DropText => {
@@ -329,6 +345,111 @@ impl ModelNode {
             *child = Self::copied(child.value.clone(), sources);
         }
         result
+    }
+}
+
+/// Screening metadata is separate from exact values used by backstops.
+pub(crate) struct GenerationScreening {
+    nodes: BTreeMap<String, ModelNode>,
+    skip: bool,
+}
+impl GenerationScreening {
+    pub(crate) fn reason(
+        &self,
+        g: &rustev_contract::generation::Generate,
+        instance: &[String],
+        judgment: &Judgment,
+        def: &rustev_contract::definition::Definition,
+    ) -> Option<rustev_contract::generation_result::TextReason> {
+        use rustev_contract::definition::{OutcomeDecl, ParamSource};
+        use rustev_contract::generation::{ModelForEach, TemplateBinding};
+        use rustev_contract::generation_result::TextReason;
+        if self.skip {
+            return Some(TextReason::ScreenUnavailable);
+        }
+        let mut nodes = self.nodes.clone();
+        for rule in &def.policy.rules {
+            if judgment.trace.contains(&format!("rule:{}", rule.id))
+                && let OutcomeDecl::Propose { params, .. } = &rule.then
+            {
+                for p in params {
+                    if let ParamSource::Ref(r) = &p.value {
+                        let node = Self::resolve(&nodes, r);
+                        nodes.insert(format!("proposal:{}", p.name), node);
+                    }
+                }
+            }
+        }
+        let mut reads = g.projection.clone();
+        reads.extend(g.template.params.values().filter_map(|p| match p {
+            TemplateBinding::Reference(r) => Some(r.clone()),
+            _ => None,
+        }));
+        if let ModelForEach::List(f) = &g.for_each {
+            let node = match &f.items {
+                ItemSource::List { list, id_field } => Self::resolve(&nodes, list)
+                    .children
+                    .values()
+                    .find(|n| {
+                        n.value.get(id_field).and_then(Json::as_str)
+                            == instance.first().map(String::as_str)
+                    })
+                    .cloned()
+                    .unwrap_or_else(|| ModelNode::plain(Json::Null)),
+                ItemSource::None => ModelNode::plain(Json::Null),
+            };
+            nodes.insert(format!("bind:{}", f.bind), node);
+            // Only this item's id crosses the request boundary.
+            let ids = Self::resolve(&nodes, &f.over);
+            let id = Json::String(instance.first().cloned().unwrap_or_default());
+            fn matching_ids(node: &ModelNode, id: &Json, out: &mut Vec<ModelNode>) {
+                if &node.value == id {
+                    out.push(node.clone());
+                }
+                for child in node.children.values() {
+                    matching_ids(child, id, out);
+                }
+            }
+            let mut sources = vec![];
+            matching_ids(&ids, &id, &mut sources);
+            let node = ModelNode::copied(id, &sources);
+            nodes.insert("instance".into(), node);
+            reads.push("instance".into());
+            if let ItemSource::List { id_field, .. } = &f.items {
+                reads.push(format!("bind:{}/{}", f.bind, id_field));
+            }
+        }
+        fn blocked(node: &ModelNode) -> bool {
+            node.screen.as_ref().is_some_and(|s| {
+                matches!(
+                    s.consequence,
+                    ScreenConsequence::DropField | ScreenConsequence::DropText
+                )
+            }) || node.children.values().any(blocked)
+                || node.inherited.iter().any(blocked)
+        }
+        let mut unavailable = BTreeSet::new();
+        let mut withheld = false;
+        for r in reads {
+            let node = Self::resolve(&nodes, &r);
+            node.render(&mut unavailable);
+            withheld |= blocked(&node);
+        }
+        if !unavailable.is_empty() {
+            Some(TextReason::ScreenUnavailable)
+        } else if withheld {
+            Some(TextReason::ScreenBlocked)
+        } else {
+            None
+        }
+    }
+    fn resolve(nodes: &BTreeMap<String, ModelNode>, r: &str) -> ModelNode {
+        let (base, path) = r.split_once('/').map_or((r, None), |(b, p)| (b, Some(p)));
+        nodes
+            .get(base)
+            .and_then(|n| path.map_or(Some(n), |p| n.field(p)))
+            .cloned()
+            .unwrap_or_else(|| ModelNode::plain(Json::Null))
     }
 }
 
@@ -2482,7 +2603,11 @@ impl<'c> Evaluation<'c> {
                         | OpArgs::MemberOf(_)
                         | OpArgs::FieldPresence(_) => vec![],
                     };
-                    if matches!(args, OpArgs::FilterWithReasons(_) | OpArgs::TopK(_)) {
+                    if matches!(args, OpArgs::ComposeKey(_)) {
+                        let mut node = ModelNode::plain(output);
+                        node.inherited = sources;
+                        node
+                    } else if matches!(args, OpArgs::FilterWithReasons(_) | OpArgs::TopK(_)) {
                         let mut node = ModelNode::plain(output);
                         for name in ["eligible", "ids"] {
                             if let Some(ids) = node.children.get_mut(name) {
@@ -2680,6 +2805,22 @@ impl<'c> Evaluation<'c> {
         crate::generation_eval::GenerationEvaluation<'c>,
         crate::generation_eval::GenerationError,
     > {
+        let screening = GenerationScreening {
+            nodes: self
+                .input_values
+                .keys()
+                .map(|n| format!("input:{n}"))
+                .chain(self.exact_values.keys().map(|n| format!("step:{n}")))
+                .map(|r| {
+                    let node = self.model_node(&r);
+                    (r, node)
+                })
+                .collect(),
+            skip: self
+                .screening
+                .values()
+                .any(|e| e.consequence == ScreenConsequence::SkipGeneration),
+        };
         let compiled = self.compiled;
         let issued = self.issued;
         let inputs = self.input_values.clone();
@@ -2693,7 +2834,7 @@ impl<'c> Evaluation<'c> {
             judgment,
             evidence,
             (inputs, exact),
-            lineage,
+            (lineage, screening),
             issued,
         )
     }

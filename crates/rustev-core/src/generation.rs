@@ -29,7 +29,7 @@ fn name(s: &str) -> bool {
 fn last(r: &str) -> &str {
     r.rsplit(['/', ':']).next().unwrap_or(r)
 }
-fn matching<'a>(
+pub(crate) fn matching<'a>(
     g: &Generate,
     def: &'a Definition,
 ) -> Vec<&'a Vec<rustev_contract::definition::ParamDecl>> {
@@ -452,129 +452,13 @@ pub(crate) struct Checked {
     pub backstops: BTreeMap<String, t::Template>,
 }
 
-/// Interim fail-closed rule of spec 037 3.5 and 3.11. Spec 035's integrated
-/// `unscreened_text` check (035 3.17.2) replaces this refusal once available.
-/// Until then no generation projection may carry text from an untrusted input,
-/// including through a proposal, bound item, exact-step lineage or instance id.
-fn check_generation_untrusted_text_interim(
-    def: &Definition,
-    id: &str,
-    g: &Generate,
-    env: &TyEnv<'_>,
-    roots: &t::Schema,
-    deps: &BTreeMap<String, Vec<String>>,
-) -> Result<(), Refusal> {
-    fn text(ty: &Ty) -> bool {
-        match ty {
-            Ty::Text { .. }
-            | Ty::Filtered { .. }
-            | Ty::Shortlist { .. }
-            | Ty::Ranking { .. }
-            | Ty::Joined { .. }
-            | Ty::Map { .. } => true,
-            Ty::Maybe(t) | Ty::Nullable(t) | Ty::List { item: t, .. } => text(t),
-            Ty::Record(fs) => fs.iter().any(|(_, t)| text(t)),
-            _ => false,
-        }
-    }
-    fn template_text(ty: &t::Type) -> bool {
-        match ty {
-            t::Type::Text { .. } => true,
-            t::Type::Maybe(f) | t::Type::List { element: f, .. } => template_text(&f.kind),
-            t::Type::Record(fs) => fs.values().any(|f| template_text(&f.kind)),
-            _ => false,
-        }
-    }
-    fn origin(
-        def: &Definition,
-        g: &Generate,
-        env: &TyEnv<'_>,
-        deps: &BTreeMap<String, Vec<String>>,
-        r: &str,
-        seen: &mut BTreeSet<String>,
-    ) -> Option<String> {
-        if !seen.insert(r.into()) {
-            return None;
-        }
-        if let Some(path) = r.strip_prefix("input:") {
-            let input = def
-                .inputs
-                .iter()
-                .find(|i| i.name == path.split('/').next().unwrap())?;
-            if input
-                .provenance
-                .iter()
-                .any(|p| *p != ProvenanceClass::SystemOfRecord)
-                && crate::expr::ref_ty(r, env).is_ok_and(|t| text(&t))
-            {
-                return Some(r.into());
-            }
-        } else if let Some(path) = r.strip_prefix("step:") {
-            for source in deps
-                .get(path.split('/').next().unwrap())
-                .into_iter()
-                .flatten()
-            {
-                if let Some(field) = origin(def, g, env, deps, source, seen) {
-                    return Some(field);
-                }
-            }
-        } else if let Some(path) = r.strip_prefix("bind:") {
-            if let ModelForEach::List(f) = &g.for_each
-                && path.split('/').next() == Some(f.bind.as_str())
-                && let ItemSource::List { list, .. } = &f.items
-            {
-                return origin(def, g, env, deps, list, seen);
-            }
-        } else if let Some(path) = r.strip_prefix("proposal:") {
-            for params in matching(g, def) {
-                for p in params
-                    .iter()
-                    .filter(|p| p.name == path.split('/').next().unwrap())
-                {
-                    if let ParamSource::Ref(source) = &p.value
-                        && let Some(field) = origin(def, g, env, deps, source, seen)
-                    {
-                        return Some(field);
-                    }
-                }
-            }
-        }
-        None
-    }
-    let mut reads = g.projection.clone();
-    if let ModelForEach::List(f) = &g.for_each {
-        reads.push(f.over.clone());
-        if let ItemSource::List { id_field, .. } = &f.items {
-            reads.push(format!("bind:{}/{}", f.bind, id_field));
-        }
-    }
-    for r in reads {
-        let carries_text = if r.starts_with("input:") || r.starts_with("step:") {
-            crate::expr::ref_ty(&r, env).is_ok_and(|t| text(&t))
-        } else {
-            reference(&r, roots).is_ok_and(|f| template_text(&f.kind))
-        };
-        if carries_text && let Some(field) = origin(def, g, env, deps, &r, &mut BTreeSet::new()) {
-            return Err(error(
-                C::InvalidGeneration,
-                id,
-                format!(
-                    "step:{id} projection {r} can carry untrusted text from {field}; requires spec 035 compiler integration"
-                ),
-            ));
-        }
-    }
-    Ok(())
-}
-
 pub(crate) fn type_check(
     def: &Definition,
     prompts: &BTreeMap<String, PromptTemplate>,
     inputs: &BTreeMap<String, Ty>,
     steps: &BTreeMap<String, StepTy>,
     derivations: &BTreeMap<String, Derivation>,
-    deps: &BTreeMap<String, Vec<String>>,
+    _deps: &BTreeMap<String, Vec<String>>,
 ) -> Result<BTreeMap<String, Checked>, Refusal> {
     let mut checked = BTreeMap::new();
     let env = TyEnv {
@@ -811,7 +695,6 @@ pub(crate) fn type_check(
                 .saturating_add(6 * r.len() as u64 + 4)
                 .saturating_add(bytes);
         }
-        check_generation_untrusted_text_interim(def, &s.id, g, &env, &roots, deps)?;
         let k = if matches!(g.screen.output, ScreenOutput::Screener { .. }) {
             g.output
                 .fields

@@ -1120,6 +1120,19 @@ F1 (spec 044), recorded as an ignored test and a pending fixture, never as
 passed; WASI byte parity of the template module waits for the A1 toolchain
 integration.
 
+**Increment 8, part a (2026-10-26): input screening.** With spec 035
+implemented, the interim refusal of a generate step whose projection can
+carry untrusted text is replaced by 035's `unscreened_text` check
+(category 19) on generate projections and the template parameters they
+reference, with the screening requests counted in the step's worst-case
+requests (3.1.2). A blocked input takes its field's backstop, an
+unavailable screener follows the declared policy, and screening metadata
+follows a value through proposal references and text transformations;
+literal-only text template parameters stay restricted
+(`crates/rustev-core/tests/generation_compile.rs`, `generation_eval.rs`,
+`crates/rustev-runtime/src/generation_acceptance.rs`). The interim refusal
+of `screen.output` other than `none` stands until part b.
+
 **Owner decision A-49 (2026-10-23): dependencies.** Spec 030 is no longer
 a declared dependency of this spec. No behavior or acceptance item here
 needs it: provider wire mappings, "including Bedrock's (spec 030 3.12)",

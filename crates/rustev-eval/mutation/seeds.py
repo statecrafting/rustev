@@ -528,6 +528,14 @@ SEEDS += [
 SEEDS += [
     (
         "spec 037",
+        'generation input screening skipped',
+        'crates/rustev-core/src/generation_eval.rs',
+        '                                complete(item, reason);',
+        '                                let _ = reason;',
+        ['rustev-core', 'rustev-runtime'],
+    ),
+    (
+        "spec 037",
         'missing required backstop accepted',
         'crates/rustev-core/src/generation.rs',
         'if f.required && !g.backstop.fields.contains_key(&f.name) {',

@@ -70,10 +70,14 @@ impl<'c> GenerationEvaluation<'c> {
         judgment: Judgment,
         evidence: EvidenceRecord,
         values: (BTreeMap<String, Value>, BTreeMap<String, Value>),
-        lineage: BTreeMap<String, Lineage>,
+        context: (
+            BTreeMap<String, Lineage>,
+            crate::evaluate::GenerationScreening,
+        ),
         issued: u64,
     ) -> Result<Self, GenerationError> {
         let (inputs, exact) = values;
+        let (lineage, screening) = context;
         let mut stage = Self {
             compiled,
             judgment,
@@ -135,6 +139,16 @@ impl<'c> GenerationEvaluation<'c> {
                 match make_items(&step.id, g, checked, &roots, &lineage) {
                     Ok(mut items) => {
                         for item in &mut items {
+                            if item.pending.is_some()
+                                && let Some(reason) = screening.reason(
+                                    g,
+                                    &item.result.id,
+                                    &stage.judgment,
+                                    &compiled.plan.definition,
+                                )
+                            {
+                                complete(item, reason);
+                            }
                             if item.pending.is_some() {
                                 if stage.remaining == 0 {
                                     complete(item, TextReason::BudgetExhausted);

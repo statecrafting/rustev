@@ -237,3 +237,139 @@ async fn streaming_backstop_matches_result_evidence_capture_and_cache_bytes() {
     }
     assert_eq!(runs[0], runs[1]);
 }
+
+#[tokio::test]
+async fn input_screening_precedes_generation_and_preserves_digest_only_evidence() {
+    use rustev_contract::descriptor::ScreenProfile;
+    use rustev_contract::output::ScreenUnits;
+    for policy in ["fail_closed", "skip_generation", "fail_open"] {
+        for verdict in ["pass", "blocked", "unavailable"] {
+            let (mut d, p, b) = fixture();
+            d.inputs.push(
+                serde_json::from_value(json!({
+                    "name":"message", "type":{"text":{"max_bytes":32}},
+                    "provenance":["third-party"], "freshness":"not_required"
+                }))
+                .unwrap(),
+            );
+            d.policy.on_unresolved.push(serde_json::from_value(json!({
+                "target":"input:message", "reasons":"any", "action":{"escalate":{"reason":"missing"}}
+            })).unwrap());
+            let StepBody::Generate(g) = &mut d.steps[0].body else {
+                panic!()
+            };
+            g.projection = vec!["input:message".into()];
+            d.screening = Some(
+                serde_json::from_value(json!({
+                    "max_text_units":2, "entries":[{
+                        "id":"message", "fields":["input:message"], "item_id":"none",
+                        "screener":"screen", "on_block":"drop_field", "address":"computed",
+                        "on_unavailable":policy
+                    }]
+                }))
+                .unwrap(),
+            );
+            let mut screen = b.clone();
+            screen.backend_id = "screen".into();
+            screen.operations = vec![common::support(
+                Operation::Proposition,
+                OutputKind::Screen,
+                2,
+            )];
+            screen.operations[0].screen = Some(ScreenProfile {
+                policy_version: "synthetic/1".into(),
+                categories: vec!["injection".into()],
+                max_text_bytes: 32,
+                text_unit_bytes: 16,
+            });
+            let compiled =
+                compile_with_templates(&d, &[b.clone(), screen.clone()], &[], &[], None, &[p])
+                    .unwrap();
+            let screener = Scripted::new(screen, move |_| {
+                if verdict == "unavailable" {
+                    Answer::Fail(
+                        AdapterFailure::Permanent,
+                        "offline".into(),
+                        Charge::Observed { units: 0 },
+                    )
+                } else {
+                    Answer::Output(
+                        RawOutput::Screen {
+                            blocked: verdict == "blocked",
+                            categories: if verdict == "blocked" {
+                                vec!["injection".into()]
+                            } else {
+                                vec![]
+                            },
+                            units: ScreenUnits::NotReported,
+                        },
+                        Charge::Observed { units: 1 },
+                    )
+                }
+            });
+            let observed_screener = screener.clone();
+            let backend = Scripted::new(b, move |call| {
+                assert_eq!(observed_screener.dispatched().len(), 1);
+                assert!(call.projection.to_string().contains("SCREEN-CANARY"));
+                Answer::Output(output("Title", "Reason"), Charge::Observed { units: 1 })
+            });
+            let clock = ManualClock::new();
+            let rt = Runtime::builder(
+                Arc::new(clock),
+                Arc::new(Sink),
+                crate::RuntimeConfig {
+                    max_in_flight: 4,
+                    max_queued: 4,
+                    max_parallel_requests: 4,
+                    sink: crate::SinkPolicy::FailDecision { timeout_ms: 1000 },
+                },
+            )
+            .backend(Arc::new(Handle(screener.clone())), 1)
+            .backend(Arc::new(Handle(backend.clone())), 1)
+            .build()
+            .unwrap();
+            let plan = rt.prepare(compiled).unwrap();
+            let mut request = req("screened-generation");
+            request.snapshot = snapshot(vec![
+                serde_json::from_value(json!({
+                    "field":"message", "value":"SCREEN-CANARY", "provenance":"third-party",
+                    "as_of_ms":0, "source":"synthetic"
+                }))
+                .unwrap(),
+            ]);
+            let result = rt
+                .decide(&plan, request, &CancelSignal::new())
+                .await
+                .unwrap();
+            let allowed = verdict == "pass" || (verdict == "unavailable" && policy == "fail_open");
+            assert_eq!(screener.dispatched().len(), 1);
+            assert_eq!(
+                backend.dispatched().len(),
+                usize::from(allowed),
+                "{policy}/{verdict}"
+            );
+            let origin =
+                &result.text_result.as_ref().unwrap().steps[0].items[0].generated["headline"]
+                    .origin;
+            assert_eq!(
+                *origin,
+                if allowed {
+                    FieldOrigin::Generated
+                } else {
+                    FieldOrigin::Backstop {
+                        reason: if verdict == "blocked" {
+                            TextReason::ScreenBlocked
+                        } else {
+                            TextReason::ScreenUnavailable
+                        },
+                    }
+                }
+            );
+            assert!(
+                !String::from_utf8(result.record.record_canonical().unwrap())
+                    .unwrap()
+                    .contains("SCREEN-CANARY")
+            );
+        }
+    }
+}
