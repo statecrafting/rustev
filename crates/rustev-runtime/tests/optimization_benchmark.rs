@@ -34,6 +34,8 @@ fn policy() -> rustev_contract::execution::ExecutionPolicy {
             ttl_ms: 60_000,
             eviction: EvictionOrder::Fifo,
         }),
+        shared_calls: None,
+        persistent_cache: None,
     });
     policy
 }

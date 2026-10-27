@@ -1,10 +1,9 @@
 //! Neutral runtime optimization policy and evidence vocabulary (spec 017).
 //!
 //! These types describe behavior that is part of a plan and observations that
-//! belong to a run. They do not perform I/O or grant authority. This increment
-//! covers runtime-planned batching and bounded memory caching; concurrent
-//! duplicate suppression and persistent caching are later increments under
-//! the same spec.
+//! belong to a run. They do not perform I/O or grant authority. Spec 017
+//! covers runtime-planned batching and bounded memory caching; spec 044 adds
+//! shared calls and the persistent tier.
 
 use serde::{Deserialize, Serialize};
 
@@ -24,6 +23,89 @@ pub struct OptimizationPolicy {
     pub batch: Option<BatchPolicy>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub memory_cache: Option<MemoryCachePolicy>,
+    /// Concurrent duplicate suppression (spec 044, 3.2).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shared_calls: Option<SharedCallPolicy>,
+    /// The persistent request-level tier behind the host's store (spec 044,
+    /// 3.4).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub persistent_cache: Option<PersistentCachePolicy>,
+}
+
+/// Bounds of shared calls (spec 044, 3.1 and 3.2).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SharedCallPolicy {
+    /// Shared calls in flight on one runtime.
+    pub max_shared_calls: u32,
+    /// Waiters on one shared call, its leader included.
+    pub max_waiters_per_call: u32,
+    pub allocation: SharedChargeAllocation,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum SharedChargeAllocation {
+    /// The waiter that owns the attempt when it ends settles the whole
+    /// observed charge; every other waiter's share is 0 (spec 044, 3.2.4).
+    FinalOwner,
+}
+
+/// The persistent tier's bounds and the host store's declared terms (spec
+/// 044, 3.1 and 3.4).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PersistentCachePolicy {
+    pub store_contract: StoreContract,
+    pub max_entry_bytes: u64,
+    pub max_scope_bytes: u64,
+    pub max_namespace_bytes: u64,
+    pub ttl_ms: u64,
+    pub on_store_failure: StoreFailurePolicy,
+}
+
+/// The host store's terms, each a declared string recorded as given. Rustev
+/// checks only that each is stated and that the store reports the same
+/// contract; it owns none of them (spec 044, 2.1).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct StoreContract {
+    pub schema: String,
+    pub namespace: String,
+    pub durability: String,
+    pub encryption: String,
+    pub atomicity: String,
+    pub conflict: String,
+    pub expiry: String,
+    pub invalidation: String,
+    pub erasure: String,
+}
+
+impl StoreContract {
+    /// Every term in declaration order, with its name.
+    pub fn terms(&self) -> [(&'static str, &str); 9] {
+        [
+            ("schema", &self.schema),
+            ("namespace", &self.namespace),
+            ("durability", &self.durability),
+            ("encryption", &self.encryption),
+            ("atomicity", &self.atomicity),
+            ("conflict", &self.conflict),
+            ("expiry", &self.expiry),
+            ("invalidation", &self.invalidation),
+            ("erasure", &self.erasure),
+        ]
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum StoreFailurePolicy {
+    /// A read failure refuses under the policy's `admission`; a write
+    /// failure is recorded and the output kept (spec 044, 3.4.2).
+    FailClosed,
+    /// A failure is a miss and a diagnostic.
+    ContinueWithoutCache,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -106,6 +188,9 @@ pub enum OptimizationMechanism {
     Independent,
     Batch,
     MemoryCache,
+    /// The output of an attempt shared with concurrent equivalent requests
+    /// (spec 044, 3.2.5).
+    SharedCall,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -146,6 +231,43 @@ pub struct OptimizationRecord {
     /// [`MAX_OPTIMIZATION_DIAGNOSTICS`].
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub diagnostics: Vec<String>,
+    /// This request's part in a shared call (spec 044, 3.2.5).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shared: Option<SharedRecord>,
+}
+
+/// One waiter's view of a shared call. Waiter ids are opaque and
+/// runtime-generated, never decision ids, so a tenant-only scope exposes no
+/// principal's decisions to another (spec 044, decision 5).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SharedRecord {
+    pub shared_call_id: String,
+    pub attempt_id: String,
+    pub waiter_id: String,
+    pub role: SharedRole,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub left: Option<SharedLeave>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub handed_off_to: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub received_from: Option<String>,
+    pub final_owner: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum SharedRole {
+    Led,
+    Joined,
+}
+
+/// Why a waiter left before the shared attempt ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum SharedLeave {
+    Cancelled,
+    Deadline,
 }
 
 impl OptimizationRecord {

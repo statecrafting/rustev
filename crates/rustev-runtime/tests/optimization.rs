@@ -33,6 +33,8 @@ fn optimized(batch: Option<BatchPolicy>, memory: Option<MemoryCachePolicy>) -> E
         expiry: ExpiryBasis::InjectedRuntimeTime,
         batch,
         memory_cache: memory,
+        shared_calls: None,
+        persistent_cache: None,
     });
     policy
 }

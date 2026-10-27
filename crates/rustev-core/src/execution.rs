@@ -41,7 +41,11 @@ fn validate_optimization(policy: &OptimizationPolicy) -> Result<(), Refusal> {
     if policy.cache_namespace_version == 0 {
         return refuse(subject, "cache_namespace_version must be positive");
     }
-    if policy.batch.is_none() && policy.memory_cache.is_none() {
+    if policy.batch.is_none()
+        && policy.memory_cache.is_none()
+        && policy.shared_calls.is_none()
+        && policy.persistent_cache.is_none()
+    {
         return refuse(subject, "at least one optimization mechanism is enabled");
     }
     if let Some(p) = &policy.batch
@@ -71,6 +75,49 @@ fn validate_optimization(policy: &OptimizationPolicy) -> Result<(), Refusal> {
             subject,
             "memory cache bounds must be positive and internally consistent",
         );
+    }
+    // Spec 044, 3.9: the code is the detail's first token.
+    if let Some(p) = &policy.shared_calls
+        && (p.max_shared_calls == 0 || p.max_waiters_per_call < 2)
+    {
+        return refuse(
+            subject,
+            "shared_call_bounds: max_shared_calls must be positive and a call must admit at least two waiters",
+        );
+    }
+    if let Some(p) = &policy.persistent_cache {
+        if let Some((term, _)) = p
+            .store_contract
+            .terms()
+            .into_iter()
+            .find(|(_, v)| v.trim().is_empty())
+        {
+            return refuse(
+                subject,
+                format!("store_contract_incomplete: the store contract states no {term} term"),
+            );
+        }
+        if p.max_entry_bytes == 0
+            || p.ttl_ms == 0
+            || p.max_entry_bytes > p.max_scope_bytes
+            || p.max_scope_bytes > p.max_namespace_bytes
+        {
+            return refuse(
+                subject,
+                "persistent_bounds: persistent cache bounds must be positive and internally consistent",
+            );
+        }
+    }
+    // A mechanism the runtime of this build does not run is refused rather
+    // than silently run independently (spec 017, 3.1); each joins with its
+    // runtime increment of spec 044.
+    for (name, enabled) in [
+        ("shared_calls", policy.shared_calls.is_some()),
+        ("persistent_cache", policy.persistent_cache.is_some()),
+    ] {
+        if enabled {
+            return refuse(subject, format!("{name} is not available in this build"));
+        }
     }
     Ok(())
 }

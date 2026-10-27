@@ -6180,6 +6180,8 @@ export namespace RustevExecution1 {
   export type BatchChargeAllocation = "even_remainder_by_member_index";
   export type ExpiryBasis = "injected_runtime_time";
   export type EvictionOrder = "fifo";
+  export type StoreFailurePolicy = "fail_closed" | "continue_without_cache";
+  export type SharedChargeAllocation = "final_owner";
   export type AttemptTimeout =
     | "none"
     | {
@@ -6237,6 +6239,15 @@ export namespace RustevExecution1 {
     expiry: ExpiryBasis;
     key_schema_version: number;
     memory_cache?: MemoryCachePolicy | null;
+    /**
+     * The persistent request-level tier behind the host's store (spec 044,
+     * 3.4).
+     */
+    persistent_cache?: PersistentCachePolicy | null;
+    /**
+     * Concurrent duplicate suppression (spec 044, 3.2).
+     */
+    shared_calls?: SharedCallPolicy | null;
   }
   export interface BatchPolicy {
     allocation: BatchChargeAllocation;
@@ -6266,6 +6277,48 @@ export namespace RustevExecution1 {
     max_entry_bytes: number;
     max_scope_bytes: number;
     ttl_ms: number;
+  }
+  /**
+   * The persistent tier's bounds and the host store's declared terms (spec
+   * 044, 3.1 and 3.4).
+   */
+  export interface PersistentCachePolicy {
+    max_entry_bytes: number;
+    max_namespace_bytes: number;
+    max_scope_bytes: number;
+    on_store_failure: StoreFailurePolicy;
+    store_contract: StoreContract;
+    ttl_ms: number;
+  }
+  /**
+   * The host store's terms, each a declared string recorded as given. Rustev
+   * checks only that each is stated and that the store reports the same
+   * contract; it owns none of them (spec 044, 2.1).
+   */
+  export interface StoreContract {
+    atomicity: string;
+    conflict: string;
+    durability: string;
+    encryption: string;
+    erasure: string;
+    expiry: string;
+    invalidation: string;
+    namespace: string;
+    schema: string;
+  }
+  /**
+   * Bounds of shared calls (spec 044, 3.1 and 3.2).
+   */
+  export interface SharedCallPolicy {
+    allocation: SharedChargeAllocation;
+    /**
+     * Shared calls in flight on one runtime.
+     */
+    max_shared_calls: number;
+    /**
+     * Waiters on one shared call, its leader included.
+     */
+    max_waiters_per_call: number;
   }
   export interface StepExecution {
     attempt_timeout: AttemptTimeout;
@@ -9382,6 +9435,8 @@ export namespace RustevPlan2 {
   export type BatchChargeAllocation = "even_remainder_by_member_index";
   export type ExpiryBasis = "injected_runtime_time";
   export type EvictionOrder = "fifo";
+  export type StoreFailurePolicy = "fail_closed" | "continue_without_cache";
+  export type SharedChargeAllocation = "final_owner";
   export type AttemptTimeout =
     | "none"
     | {
@@ -10207,6 +10262,15 @@ export namespace RustevPlan2 {
     expiry: ExpiryBasis;
     key_schema_version: number;
     memory_cache?: MemoryCachePolicy | null;
+    /**
+     * The persistent request-level tier behind the host's store (spec 044,
+     * 3.4).
+     */
+    persistent_cache?: PersistentCachePolicy | null;
+    /**
+     * Concurrent duplicate suppression (spec 044, 3.2).
+     */
+    shared_calls?: SharedCallPolicy | null;
   }
   export interface BatchPolicy {
     allocation: BatchChargeAllocation;
@@ -10236,6 +10300,48 @@ export namespace RustevPlan2 {
     max_entry_bytes: number;
     max_scope_bytes: number;
     ttl_ms: number;
+  }
+  /**
+   * The persistent tier's bounds and the host store's declared terms (spec
+   * 044, 3.1 and 3.4).
+   */
+  export interface PersistentCachePolicy {
+    max_entry_bytes: number;
+    max_namespace_bytes: number;
+    max_scope_bytes: number;
+    on_store_failure: StoreFailurePolicy;
+    store_contract: StoreContract;
+    ttl_ms: number;
+  }
+  /**
+   * The host store's terms, each a declared string recorded as given. Rustev
+   * checks only that each is stated and that the store reports the same
+   * contract; it owns none of them (spec 044, 2.1).
+   */
+  export interface StoreContract {
+    atomicity: string;
+    conflict: string;
+    durability: string;
+    encryption: string;
+    erasure: string;
+    expiry: string;
+    invalidation: string;
+    namespace: string;
+    schema: string;
+  }
+  /**
+   * Bounds of shared calls (spec 044, 3.1 and 3.2).
+   */
+  export interface SharedCallPolicy {
+    allocation: SharedChargeAllocation;
+    /**
+     * Shared calls in flight on one runtime.
+     */
+    max_shared_calls: number;
+    /**
+     * Waiters on one shared call, its leader included.
+     */
+    max_waiters_per_call: number;
   }
   export interface StepExecution {
     attempt_timeout: AttemptTimeout;
@@ -11287,6 +11393,8 @@ export namespace RustevPlan3 {
   export type BatchChargeAllocation = "even_remainder_by_member_index";
   export type ExpiryBasis = "injected_runtime_time";
   export type EvictionOrder = "fifo";
+  export type StoreFailurePolicy = "fail_closed" | "continue_without_cache";
+  export type SharedChargeAllocation = "final_owner";
   export type AttemptTimeout =
     | "none"
     | {
@@ -12329,6 +12437,15 @@ export namespace RustevPlan3 {
     expiry: ExpiryBasis;
     key_schema_version: number;
     memory_cache?: MemoryCachePolicy | null;
+    /**
+     * The persistent request-level tier behind the host's store (spec 044,
+     * 3.4).
+     */
+    persistent_cache?: PersistentCachePolicy | null;
+    /**
+     * Concurrent duplicate suppression (spec 044, 3.2).
+     */
+    shared_calls?: SharedCallPolicy | null;
   }
   export interface BatchPolicy {
     allocation: BatchChargeAllocation;
@@ -12358,6 +12475,48 @@ export namespace RustevPlan3 {
     max_entry_bytes: number;
     max_scope_bytes: number;
     ttl_ms: number;
+  }
+  /**
+   * The persistent tier's bounds and the host store's declared terms (spec
+   * 044, 3.1 and 3.4).
+   */
+  export interface PersistentCachePolicy {
+    max_entry_bytes: number;
+    max_namespace_bytes: number;
+    max_scope_bytes: number;
+    on_store_failure: StoreFailurePolicy;
+    store_contract: StoreContract;
+    ttl_ms: number;
+  }
+  /**
+   * The host store's terms, each a declared string recorded as given. Rustev
+   * checks only that each is stated and that the store reports the same
+   * contract; it owns none of them (spec 044, 2.1).
+   */
+  export interface StoreContract {
+    atomicity: string;
+    conflict: string;
+    durability: string;
+    encryption: string;
+    erasure: string;
+    expiry: string;
+    invalidation: string;
+    namespace: string;
+    schema: string;
+  }
+  /**
+   * Bounds of shared calls (spec 044, 3.1 and 3.2).
+   */
+  export interface SharedCallPolicy {
+    allocation: SharedChargeAllocation;
+    /**
+     * Shared calls in flight on one runtime.
+     */
+    max_shared_calls: number;
+    /**
+     * Waiters on one shared call, its leader included.
+     */
+    max_waiters_per_call: number;
   }
   export interface StepExecution {
     attempt_timeout: AttemptTimeout;
@@ -15492,8 +15651,13 @@ export namespace RustevRun1 {
    */
   export type FailureClass = "invalid_output" | "transient" | "overloaded" | "permanent" | "timed_out" | "adapter_fault";
   export type RemoteState = "finished" | "stopped" | "possibly_continuing";
-  export type OptimizationMechanism = "independent" | "batch" | "memory_cache";
+  export type OptimizationMechanism = ("independent" | "batch" | "memory_cache") | "shared_call";
   export type OptimizationOutcome = "bypassed" | "miss" | "hit" | "batched" | "refused";
+  /**
+   * Why a waiter left before the shared attempt ended.
+   */
+  export type SharedLeave = "cancelled" | "deadline";
+  export type SharedRole = "led" | "joined";
   export type RequestResult =
     | {
         output: {
@@ -15992,6 +16156,10 @@ export namespace RustevRun1 {
     key_schema_version: number;
     mechanism: OptimizationMechanism;
     outcome: OptimizationOutcome;
+    /**
+     * This request's part in a shared call (spec 044, 3.2.5).
+     */
+    shared?: SharedRecord | null;
     shared_liability_units: number;
     /**
      * The attempt that produced the supplied output. For a cache hit it is
@@ -15999,6 +16167,21 @@ export namespace RustevRun1 {
      * its own; replay takes it as the output's origin.
      */
     source_attempt_id?: string | null;
+  }
+  /**
+   * One waiter's view of a shared call. Waiter ids are opaque and
+   * runtime-generated, never decision ids, so a tenant-only scope exposes no
+   * principal's decisions to another (spec 044, decision 5).
+   */
+  export interface SharedRecord {
+    attempt_id: string;
+    final_owner: boolean;
+    handed_off_to?: string | null;
+    left?: SharedLeave | null;
+    received_from?: string | null;
+    role: SharedRole;
+    shared_call_id: string;
+    waiter_id: string;
   }
   /**
    * Monotonic milliseconds from submission; never wall-clock time.
@@ -16708,8 +16891,13 @@ export namespace RustevRun2 {
    * or a fallback trigger.
    */
   export type FailureClass = "invalid_output" | "transient" | "overloaded" | "permanent" | "timed_out" | "adapter_fault";
-  export type OptimizationMechanism = "independent" | "batch" | "memory_cache";
+  export type OptimizationMechanism = ("independent" | "batch" | "memory_cache") | "shared_call";
   export type OptimizationOutcome = "bypassed" | "miss" | "hit" | "batched" | "refused";
+  /**
+   * Why a waiter left before the shared attempt ended.
+   */
+  export type SharedLeave = "cancelled" | "deadline";
+  export type SharedRole = "led" | "joined";
   export type RequestResult =
     | {
         output: {
@@ -17276,6 +17464,10 @@ export namespace RustevRun2 {
     key_schema_version: number;
     mechanism: OptimizationMechanism;
     outcome: OptimizationOutcome;
+    /**
+     * This request's part in a shared call (spec 044, 3.2.5).
+     */
+    shared?: SharedRecord | null;
     shared_liability_units: number;
     /**
      * The attempt that produced the supplied output. For a cache hit it is
@@ -17283,6 +17475,21 @@ export namespace RustevRun2 {
      * its own; replay takes it as the output's origin.
      */
     source_attempt_id?: string | null;
+  }
+  /**
+   * One waiter's view of a shared call. Waiter ids are opaque and
+   * runtime-generated, never decision ids, so a tenant-only scope exposes no
+   * principal's decisions to another (spec 044, decision 5).
+   */
+  export interface SharedRecord {
+    attempt_id: string;
+    final_owner: boolean;
+    handed_off_to?: string | null;
+    left?: SharedLeave | null;
+    received_from?: string | null;
+    role: SharedRole;
+    shared_call_id: string;
+    waiter_id: string;
   }
   /**
    * Monotonic milliseconds from submission; never wall-clock time.
@@ -18125,8 +18332,13 @@ export namespace RustevRun3 {
    * or a fallback trigger.
    */
   export type FailureClass = "invalid_output" | "transient" | "overloaded" | "permanent" | "timed_out" | "adapter_fault";
-  export type OptimizationMechanism = "independent" | "batch" | "memory_cache";
+  export type OptimizationMechanism = ("independent" | "batch" | "memory_cache") | "shared_call";
   export type OptimizationOutcome = "bypassed" | "miss" | "hit" | "batched" | "refused";
+  /**
+   * Why a waiter left before the shared attempt ended.
+   */
+  export type SharedLeave = "cancelled" | "deadline";
+  export type SharedRole = "led" | "joined";
   export type RequestResult =
     | {
         output: {
@@ -19014,6 +19226,10 @@ export namespace RustevRun3 {
     key_schema_version: number;
     mechanism: OptimizationMechanism;
     outcome: OptimizationOutcome;
+    /**
+     * This request's part in a shared call (spec 044, 3.2.5).
+     */
+    shared?: SharedRecord | null;
     shared_liability_units: number;
     /**
      * The attempt that produced the supplied output. For a cache hit it is
@@ -19021,6 +19237,21 @@ export namespace RustevRun3 {
      * its own; replay takes it as the output's origin.
      */
     source_attempt_id?: string | null;
+  }
+  /**
+   * One waiter's view of a shared call. Waiter ids are opaque and
+   * runtime-generated, never decision ids, so a tenant-only scope exposes no
+   * principal's decisions to another (spec 044, decision 5).
+   */
+  export interface SharedRecord {
+    attempt_id: string;
+    final_owner: boolean;
+    handed_off_to?: string | null;
+    left?: SharedLeave | null;
+    received_from?: string | null;
+    role: SharedRole;
+    shared_call_id: string;
+    waiter_id: string;
   }
   export interface ScreenRequest {
     cache: ScreenCache;

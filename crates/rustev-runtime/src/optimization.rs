@@ -560,6 +560,8 @@ mod tests {
                 expiry: ExpiryBasis::InjectedRuntimeTime,
                 batch: None,
                 memory_cache: Some(memory(4096, 2, 2048, 2048)),
+                shared_calls: None,
+                persistent_cache: None,
             },
         )
     }

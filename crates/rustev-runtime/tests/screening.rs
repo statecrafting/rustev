@@ -66,6 +66,8 @@ fn policy(batch: bool, cache: bool) -> ExecutionPolicy {
                 eviction: EvictionOrder::Fifo,
                 acquisition_pages: false,
             }),
+            shared_calls: None,
+            persistent_cache: None,
         });
     }
     p
