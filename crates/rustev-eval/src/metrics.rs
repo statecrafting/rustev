@@ -417,3 +417,139 @@ pub fn cost(runs: &[&RunRecord], units_comparable: bool) -> CostSeries {
         backends,
     }
 }
+
+/// Exact counts over reproduced generation evidence (spec 037, 3.16).
+/// No text or model scorer participates. `n` counts contributing cases for
+/// counts and field slots for the backstop rate.
+pub fn generation(runs: &[&RunRecord]) -> Vec<rustev_contract::eval_report::Metric> {
+    use rustev_contract::eval_report::{Metric, MetricValue};
+    use rustev_contract::generation_result::{TextCounts, TextOrigin, TextReason, TextSource};
+    use rustev_contract::run::CoreEvidence;
+    #[derive(Default)]
+    struct Counts {
+        fields: TextCounts,
+        cases: u64,
+        origins: [u64; 4],
+        cached: u64,
+    }
+    fn origin(c: &TextCounts) -> TextOrigin {
+        if c.generated + c.repaired + c.backstop == 0 {
+            TextOrigin::None
+        } else if c.backstop + c.absent == 0 {
+            TextOrigin::Generated
+        } else if c.generated + c.repaired == 0 {
+            TextOrigin::Backstop
+        } else {
+            TextOrigin::Partial
+        }
+    }
+    fn add(to: &mut TextCounts, from: &TextCounts) {
+        to.generated += from.generated;
+        to.repaired += from.repaired;
+        to.backstop += from.backstop;
+        to.absent += from.absent;
+        for (r, n) in &from.reasons {
+            *to.reasons.entry(*r).or_default() += n;
+        }
+    }
+    fn case(c: &mut Counts, fields: &TextCounts, cached: u64, origin: TextOrigin) {
+        add(&mut c.fields, fields);
+        c.cached += cached;
+        c.cases += 1;
+        c.origins[match origin {
+            TextOrigin::None => 0,
+            TextOrigin::Generated => 1,
+            TextOrigin::Backstop => 2,
+            TextOrigin::Partial => 3,
+        }] += 1;
+    }
+    let mut groups: BTreeMap<String, Counts> = BTreeMap::new();
+    for run in runs {
+        let CoreEvidence::Recorded(e) = &run.core else {
+            continue;
+        };
+        let Some(steps) = &e.generation else {
+            continue;
+        };
+        let mut total = TextCounts::default();
+        let mut hits = 0;
+        for s in steps {
+            let cached = s
+                .items
+                .iter()
+                .flat_map(|i| i.generated.values())
+                .filter(|f| matches!(f.source, TextSource::ServedFromCache { .. }))
+                .count() as u64;
+            case(
+                groups.entry(format!("text/step/{}", s.step)).or_default(),
+                &s.counts,
+                cached,
+                s.text_origin,
+            );
+            add(&mut total, &s.counts);
+            hits += cached;
+        }
+        case(
+            groups.entry("text".into()).or_default(),
+            &total,
+            hits,
+            origin(&total),
+        );
+    }
+    let mut metrics = vec![];
+    for (prefix, c) in groups {
+        let f = c.fields;
+        let slots = f.generated + f.repaired + f.backstop + f.absent;
+        let mut count = |name: &str, value: u64| {
+            metrics.push(Metric {
+                name: format!("{prefix}/{name}"),
+                value: MetricValue::Measured {
+                    value: value as f64,
+                    n: c.cases,
+                },
+            })
+        };
+        count("field_slots", slots);
+        count("origin/generated", f.generated);
+        count("origin/repaired", f.repaired);
+        count("origin/backstop", f.backstop);
+        count("origin/absent", f.absent);
+        count("served_from_cache", c.cached);
+        for (name, value) in ["none", "generated", "backstop", "partial"]
+            .into_iter()
+            .zip(c.origins)
+        {
+            count(&format!("text_origin/{name}"), value);
+        }
+        for reason in [
+            TextReason::ScreenBlocked,
+            TextReason::ScreenUnavailable,
+            TextReason::Deadline,
+            TextReason::RetriesExhausted,
+            TextReason::InvalidOutput,
+            TextReason::BackendUnavailable,
+            TextReason::BudgetExhausted,
+            TextReason::NotAttempted,
+        ] {
+            let name = serde_json::to_value(reason).expect("reason serializes");
+            count(
+                &format!("reason/{}", name.as_str().expect("reason name")),
+                f.reasons.get(&reason).copied().unwrap_or(0),
+            );
+        }
+        metrics.push(Metric {
+            name: format!("{prefix}/backstop_rate"),
+            value: if slots == 0 {
+                MetricValue::Unknown {
+                    reason: "zero field slots".into(),
+                }
+            } else {
+                MetricValue::Measured {
+                    value: (f.backstop + f.absent) as f64 / slots as f64,
+                    n: slots,
+                }
+            },
+        });
+    }
+    metrics
+}

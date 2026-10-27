@@ -20,6 +20,7 @@ use std::fmt;
 
 use rustev_contract::calibration::CalibrationArtifact;
 use rustev_contract::descriptor::BackendDescriptor;
+use rustev_contract::generation_result::TextResult;
 use rustev_contract::ids::{ArtifactId, RequestId};
 use rustev_contract::judgment::{Judgment, Unresolved};
 use rustev_contract::output::{BackendOutputDoc, RawOutput};
@@ -35,6 +36,7 @@ use rustev_contract::snapshot::Snapshot;
 use rustev_contract::time::Timestamp;
 use rustev_contract::{Document, Identified, schema};
 use rustev_core::evaluate::{Evaluation, Supplied};
+use rustev_core::generation_eval::GenerationEvaluation;
 use rustev_core::{Compiled, LoadError};
 
 use crate::acquisition_replay::{MissingAcquisition, PageValue, fill_missing, supply_page};
@@ -211,9 +213,15 @@ pub struct Reproduced {
     pub(crate) run: RunRecord,
     pub(crate) supplies: Vec<RetainedSupply>,
     pub(crate) pages: Vec<(rustev_contract::ids::AcquisitionRequestId, PageValue)>,
+    pub(crate) text_result: Option<TextResult>,
 }
 
 impl Reproduced {
+    /// Reconstructed generation text, never dispatched or fetched from a cache.
+    pub fn text_result(&self) -> Option<&TextResult> {
+        self.text_result.as_ref()
+    }
+
     pub fn decision_id(&self) -> &str {
         &self.decision_id
     }
@@ -374,13 +382,13 @@ fn resolve_all(
 
 /// The target binding of a step: artifact of target 0 or of a fallback.
 fn target_artifact(plan: &Plan, step: &str, target: u32) -> Option<ArtifactId> {
-    let Some(PlanStepDetail::Semantic(b)) =
-        plan.steps.iter().find(|s| s.id == step).map(|s| &s.detail)
-    else {
-        return None;
+    let artifact = match &plan.steps.iter().find(|s| s.id == step)?.detail {
+        PlanStepDetail::Semantic(b) => &b.artifact,
+        PlanStepDetail::Generate(b) => &b.artifact,
+        _ => return None,
     };
     if target == 0 {
-        return Some(b.artifact.clone());
+        return Some(artifact.clone());
     }
     match &plan.execution {
         PlanExecution::Declared(d) => d
@@ -392,14 +400,115 @@ fn target_artifact(plan: &Plan, step: &str, target: u32) -> Option<ArtifactId> {
     }
 }
 
+// The transition freezes selection before generation, just as runtime does.
+enum ReplayEvaluation<'a> {
+    Decision(Box<Evaluation<'a>>),
+    Generation(Box<GenerationEvaluation<'a>>),
+}
+impl<'a> ReplayEvaluation<'a> {
+    fn advance(self, decision: &str) -> Result<Self, Incomparable> {
+        // Plans 2 and 3 without generation enter an empty stage whose finish
+        // preserves judgment and evidence. Covered by
+        // instantiated_plan_assembles_and_replays_without_inference and
+        // support_routing_reproduces_offline_without_inference.
+        match self {
+            Self::Decision(ev)
+                if ev.pending().is_empty() && ev.pending_acquisitions().is_empty() =>
+            {
+                ev.begin_generation(decision)
+                    .map(Box::new)
+                    .map(Self::Generation)
+                    .map_err(|_| inconsistent(ItemLocation::Bundle, Inconsistency::FinishRefused))
+            }
+            other => Ok(other),
+        }
+    }
+    fn pending(&self) -> Vec<(String, Vec<String>)> {
+        match self {
+            Self::Decision(ev) => ev
+                .pending()
+                .iter()
+                .map(|r| (r.step.clone(), r.instance.clone()))
+                .collect(),
+            Self::Generation(g) => g
+                .pending()
+                .iter()
+                .map(|r| (r.document.step.clone(), r.document.instance.clone()))
+                .collect(),
+        }
+    }
+    fn request_document(
+        &self,
+        step: &str,
+        instance: &[String],
+        target: u32,
+        scope: &Scope,
+    ) -> Result<rustev_contract::request::RequestDoc, rustev_core::RequestIdentityError> {
+        match self {
+            Self::Decision(ev) => ev.request_document(step, instance, target, scope),
+            Self::Generation(g) => g.request_document(step, instance, target, scope),
+        }
+    }
+    fn accepts(&self, step: &str, instance: &[String], output: &RawOutput) -> bool {
+        match self {
+            Self::Decision(ev) => matches!(ev.check_output(step, instance, output), Ok(Ok(()))),
+            Self::Generation(g) => matches!(g.check_output(step, instance, output), Ok(Ok(()))),
+        }
+    }
+    fn supply(
+        &mut self,
+        step: &str,
+        instance: &[String],
+        value: Supplied,
+        q: &rustev_contract::run::RequestRecord,
+        decision: &str,
+    ) -> bool {
+        match self {
+            Self::Decision(ev) => ev.supply(step, instance, value).is_ok(),
+            Self::Generation(g) => {
+                // reproduce_inner rejects a missing supplied_from as NotInRun
+                // before calling supply with this same immutable record.
+                let from = q.supplied_from().expect("checked supplied request");
+                let attempt = from
+                    .attempt
+                    .map(|a| a.attempt_id.as_str())
+                    .or(from.reused_from);
+                let fallback = format!("{decision}/{step}/refused");
+                let attempt = attempt.unwrap_or(&fallback);
+                if g.supply_attempt(
+                    step,
+                    instance,
+                    value,
+                    attempt,
+                    (q.attempts.len() as u32).max(1),
+                )
+                .is_err()
+                {
+                    return false;
+                }
+                if let Some(source) = from.reused_from {
+                    let decision = source
+                        .split('/')
+                        .next()
+                        .unwrap_or("")
+                        .replace("%2F", "/")
+                        .replace("%2C", ",")
+                        .replace("%25", "%");
+                    g.note_cached_attempt(attempt, &decision);
+                }
+                true
+            }
+        }
+    }
+}
+
 /// Append newly pending requests in the core's listing order.
 fn list_new(
-    ev: &Evaluation<'_>,
+    ev: &ReplayEvaluation<'_>,
     listed: &mut Vec<(String, Vec<String>)>,
     seen: &mut BTreeSet<(String, Vec<String>)>,
 ) {
-    for r in ev.pending() {
-        let key = (r.step.clone(), r.instance.clone());
+    for key in ev.pending() {
         if seen.insert(key.clone()) {
             listed.push(key);
         }
@@ -504,8 +613,9 @@ fn reproduce_inner(
             LoadError::PlanMismatch { .. } => Incomparable::PlanMismatch,
         })?;
     // 4. The pure core, fed in actual supply order.
-    let mut ev = Evaluation::start(&compiled, &r.snapshot, bundle.evaluation_time_ms)
+    let ev = Evaluation::start(&compiled, &r.snapshot, bundle.evaluation_time_ms)
         .map_err(|_| inconsistent(ItemLocation::Snapshot, Inconsistency::StartRefused))?;
+    let mut ev = ReplayEvaluation::Decision(Box::new(ev)).advance(&bundle.decision_id)?;
     let by_key: BTreeMap<(&str, &[String]), usize> = run
         .requests
         .iter()
@@ -520,7 +630,10 @@ fn reproduce_inner(
     let mut missing = vec![];
     let (mut semantic_index, mut page_index) = (0, 0);
     loop {
-        fill_missing(&mut ev, &pages[page_index..], &mut missing)?;
+        if let ReplayEvaluation::Decision(decision) = &mut ev {
+            fill_missing(decision, &pages[page_index..], &mut missing)?;
+        }
+        ev = ev.advance(&bundle.decision_id)?;
         list_new(&ev, &mut listed, &mut seen);
         let semantic = bundle.supplies.get(semantic_index);
         let page = pages.get(page_index);
@@ -528,12 +641,22 @@ fn reproduce_inner(
             && semantic.is_none_or(|s| page.sequence < s.sequence)
         {
             // Missing pages can make a later retained tier unreachable.
+            let ReplayEvaluation::Decision(decision) = &mut ev else {
+                if !missing.is_empty() {
+                    page_index += 1;
+                    continue;
+                }
+                return Err(inconsistent(
+                    ItemLocation::AcquisitionPage(page_index),
+                    Inconsistency::NotPending,
+                ));
+            };
             if missing.is_empty()
-                || ev.pending_acquisitions().iter().any(|p| {
+                || decision.pending_acquisitions().iter().any(|p| {
                     p.step == page.step && p.tier_index == page.tier && p.page_index == page.page
                 })
             {
-                supply_page(&mut ev, page, &r.pages[page_index], run, page_index)?;
+                supply_page(decision, page, &r.pages[page_index], run, page_index)?;
             }
             page_index += 1;
             continue;
@@ -548,7 +671,7 @@ fn reproduce_inner(
             && !ev
                 .pending()
                 .iter()
-                .any(|p| p.step == entry.step && p.instance == entry.instance)
+                .any(|p| p.0 == entry.step && p.1 == entry.instance)
         {
             continue;
         }
@@ -602,9 +725,8 @@ fn reproduce_inner(
                     return bad(Inconsistency::OutputBinding);
                 }
                 // The run supplied it, so the same core accepts it.
-                match ev.check_output(&entry.step, &entry.instance, &o.output) {
-                    Ok(Ok(())) => {}
-                    _ => return bad(Inconsistency::OutputRefused),
+                if !ev.accepts(&entry.step, &entry.instance, &o.output) {
+                    return bad(Inconsistency::OutputRefused);
                 }
                 (
                     Supplied::Output(o.output.clone()),
@@ -620,8 +742,10 @@ fn reproduce_inner(
             ),
             _ => return bad(Inconsistency::Value),
         };
-        if let Some(context) = entry.failure_context {
-            ev.note_failure(
+        if let Some(context) = entry.failure_context
+            && let ReplayEvaluation::Decision(decision) = &mut ev
+        {
+            decision.note_failure(
                 &entry.step,
                 &entry.instance,
                 rustev_core::FailureContext {
@@ -630,9 +754,16 @@ fn reproduce_inner(
                 },
             );
         }
-        if ev.supply(&entry.step, &entry.instance, supplied).is_err() {
+        if !ev.supply(
+            &entry.step,
+            &entry.instance,
+            supplied,
+            q,
+            &bundle.decision_id,
+        ) {
             return bad(Inconsistency::NotPending);
         }
+        ev = ev.advance(&bundle.decision_id)?;
         list_new(&ev, &mut listed, &mut seen);
         supplies.push(RetainedSupply {
             step: entry.step.clone(),
@@ -646,8 +777,8 @@ fn reproduce_inner(
         return Err(inconsistent(
             ItemLocation::Bundle,
             Inconsistency::MissingSupply {
-                step: p.step.clone(),
-                instance: p.instance.clone(),
+                step: p.0.clone(),
+                instance: p.1.clone(),
             },
         ));
     }
@@ -660,8 +791,14 @@ fn reproduce_inner(
         return Err(inconsistent(run_at, Inconsistency::RequestOrder));
     }
     // 5. The verdict.
-    let (judgment, _) = ev
-        .finish(&bundle.decision_id)
+    let ReplayEvaluation::Generation(stage) = ev else {
+        return Err(inconsistent(
+            ItemLocation::Bundle,
+            Inconsistency::FinishRefused,
+        ));
+    };
+    let (judgment, actual_evidence, text_result) = stage
+        .finish()
         .map_err(|_| inconsistent(ItemLocation::Bundle, Inconsistency::FinishRefused))?;
     if !missing.is_empty() {
         return Err(Incomparable::AcquisitionNotCaptured {
@@ -676,7 +813,30 @@ fn reproduce_inner(
             return Err(inconsistent(ItemLocation::Run, Inconsistency::NoRecordForm));
         }
     };
-    if !same {
+    // Ownership notices are runtime observations, not reproduction inputs.
+    let generation_bytes =
+        |g: &Option<Vec<rustev_contract::generation_result::GenerationEvidence>>| {
+            let mut g = g.clone();
+            if let Some(steps) = &mut g {
+                for step in steps {
+                    step.notices.retain(|n| {
+                        matches!(
+                            n.kind,
+                            rustev_contract::generation_result::TextNoticeKind::BackstopTruncated
+                        )
+                    });
+                }
+            }
+            rustev_contract::canonical::record_canonical_bytes(&g)
+        };
+    let generation_same = match (
+        generation_bytes(&actual_evidence.generation),
+        generation_bytes(&evidence.generation),
+    ) {
+        (Ok(a), Ok(b)) => a == b,
+        _ => return Err(inconsistent(ItemLocation::Run, Inconsistency::NoRecordForm)),
+    };
+    if !same || !generation_same {
         return Ok(ReplayOutcome::Diverged {
             expected: Box::new(expected.clone()),
             actual: Box::new(judgment),
@@ -697,5 +857,6 @@ fn reproduce_inner(
             .zip(&r.pages)
             .map(|(p, v)| (p.request.clone(), v.clone()))
             .collect(),
+        text_result,
     })))
 }
