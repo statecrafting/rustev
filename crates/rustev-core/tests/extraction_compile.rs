@@ -1314,3 +1314,98 @@ fn acceptance_mass_calibration_binding_and_uncalibrated_notice() {
     m.basis = MassBasis::UncalibratedThreshold(String::new());
     assert_eq!(run(&d, &[]).unwrap_err().category, C::UncalibratedThreshold);
 }
+
+fn ranking_fixture() -> (Definition, rustev_contract::descriptor::BackendDescriptor) {
+    let mut d = fixture();
+    d.limits.max_semantic_requests = 64;
+    d.inputs.push(serde_json::from_value(json!({"name":"items","type":{"list":{"item":{"record":{"fields":[{"name":"id","type":{"text":{"max_bytes":8}}}]}},"max_items":5}},"provenance":["system-of-record"],"freshness":"not_required"})).unwrap());
+    let steps: Vec<rustev_contract::definition::StepDecl> = serde_json::from_value(json!([
+        {"id":"pool","body":{"exact":{"op":"filter_with_reasons","version":1,"args":{"list":"input:items","id_field":"id","rules":[]}}}},
+        {"id":"ranked","body":{"rank":{"task":"fit","question":"Which fits?","candidates":"step:pool","items":"none","bind":"candidate","project":[],"mode":{"listwise":{"scores":"optional"}},"bias":"none","tie_break":"id_ascending","backend":{"min_determinism":"unspecified","artifact":"any","binding":"auto"},"fallback":"none"}}},
+        {"id":"chosen","body":{"select":{"from":"step:ranked","k":3,"backfill":{"from":"step:pool","exclude_selected":true},"on_backend_failure":"backfill_all"}}}
+    ])).unwrap();
+    d.steps.extend(steps);
+    let mut b = descriptor();
+    b.ranking = Some(serde_json::from_value(json!({"modes":["listwise"],"max_candidates":1024,"listwise_scores":"optional","listwise_partial":"possible"})).unwrap());
+    (d, b)
+}
+
+#[test]
+fn rank_projection_refuses_unaccepted_extract_field() {
+    let (mut d, b) = ranking_fixture();
+    let StepBody::Rank(r) = &mut d.steps[2].body else {
+        panic!()
+    };
+    r.project = vec!["step:request_filters/party_size".into()];
+    let e = compiled(&d, &prompt(), &b, &[]).unwrap_err();
+    assert_eq!(e.category, C::UnacceptedModelValue);
+    assert_eq!(e.subject, "step:ranked");
+    assert!(e.detail.contains("step:request_filters/party_size"));
+}
+
+#[test]
+fn rank_projection_accepts_checked_model_input() {
+    let (mut d, b) = ranking_fixture();
+    d.inputs[0].ty = TypeDecl::Integer;
+    d.inputs[0].provenance = vec![P::ModelDerived];
+    d.actionability = Some(serde_json::from_value(json!({
+        "caller_controlled":[],"remediations":[],"questions":[],"constraint_groups":[],
+        "checks":[{"id":"guard","subject":"message",
+            "test":{"cmp":{"left":{"ref":"input:message"},"op":"gt","right":{"lit":{"integer":0}}}},
+            "on_fail":{"by_provenance":{"model-derived":"abstain"},"default":"none"}}]
+    })).unwrap());
+    let StepBody::Rank(r) = &mut d.steps[2].body else {
+        panic!()
+    };
+    r.project = vec!["input:message".into()];
+    compiled(&d, &prompt(), &b, &[]).unwrap();
+}
+
+#[test]
+fn rank_projection_accepts_accepted_extract_field() {
+    let (mut d, b) = ranking_fixture();
+    d.steps.insert(
+        1,
+        serde_json::from_str(include_str!(
+            "../../rustev-contract/tests/fixtures/accept-step.json"
+        ))
+        .unwrap(),
+    );
+    let StepBody::Rank(r) = &mut d.steps[3].body else {
+        panic!()
+    };
+    r.project = vec!["step:window_ok/start".into()];
+    compiled(&d, &prompt(), &b, &[]).unwrap();
+}
+
+#[test]
+fn ranking_exact_order_sources_refuse_unaccepted_extract_fields() {
+    for consumer in ["order_of", "from", "backfill"] {
+        let (mut d, b) = ranking_fixture();
+        let source = "step:request_filters/party_size".to_string();
+        let expected = if consumer == "order_of" {
+            let StepBody::Rank(r) = &mut d.steps[2].body else {
+                panic!()
+            };
+            r.tie_break = rustev_contract::ranking::TieBreak::OrderOf(source.clone());
+            "step:ranked"
+        } else {
+            let StepBody::Select(s) = &mut d.steps[3].body else {
+                panic!()
+            };
+            if consumer == "from" {
+                s.from = source.clone();
+            } else {
+                s.backfill = rustev_contract::ranking::Backfill::From {
+                    from: source.clone(),
+                    exclude_selected: true,
+                };
+            }
+            "step:chosen"
+        };
+        let e = compiled(&d, &prompt(), &b, &[]).unwrap_err();
+        assert_eq!(e.category, C::UnacceptedModelValue, "{consumer}: {e}");
+        assert_eq!(e.subject, expected);
+        assert!(e.detail.contains(&source));
+    }
+}

@@ -1369,6 +1369,7 @@ pub(crate) fn evidence_bound(
             crate::compile::StepInfo::Generate
             | crate::compile::StepInfo::Extract
             | crate::compile::StepInfo::Accept(_)
+            | crate::compile::StepInfo::Ranking
             | crate::compile::StepInfo::Semantic { .. } => 1,
             crate::compile::StepInfo::Acquisition(a) => ty_nodes(&a.ty),
         });

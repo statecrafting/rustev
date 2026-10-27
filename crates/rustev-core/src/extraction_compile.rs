@@ -708,8 +708,23 @@ pub(crate) fn model_gate(def: &Definition) -> Result<(), Refusal> {
                 false,
             )?,
             StepBody::Corroborate(_) => {}
-            // Refused earlier with `ranking-not-compiled` until spec 039 compiles them.
-            StepBody::Rank(_) | StepBody::Select(_) => {}
+            StepBody::Rank(r) => {
+                check(
+                    subject.clone(),
+                    serde_json::to_value(&r.project).unwrap(),
+                    false,
+                    false,
+                )?;
+                if let rustev_contract::ranking::TieBreak::OrderOf(source) = &r.tie_break {
+                    check(subject, J::String(source.clone()), true, false)?;
+                }
+            }
+            StepBody::Select(s) => {
+                check(subject.clone(), J::String(s.from.clone()), true, false)?;
+                if let rustev_contract::ranking::Backfill::From { from, .. } = &s.backfill {
+                    check(subject, J::String(from.clone()), true, false)?;
+                }
+            }
         }
     }
     for r in &def.policy.rules {
