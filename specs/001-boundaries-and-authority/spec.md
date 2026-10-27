@@ -237,6 +237,10 @@ sh -c 'for d in crates tools; do [ -d "$d" ] || continue; if grep -rnE "(struct|
   checkout), the MSRV job keeps only registry and git (its target was 4 GB),
   and verify restores the preflight job's spec-spine binary instead of
   racing four saves of its own.
+- 2026-10-27: `integrations-core` reached the acceptance job's 45-minute
+  limit once 037 joined it, so 002, 010, 012, 015, 017, 019, 020 and 033
+  move to a fifth group, `integrations-base` (about 22 minutes each). Same
+  commands, every spec still exactly once.
 - 2026-10-23: CI acceptance groups rebalanced on measured per-spec time
   (eight runs): spec 004 alone took about 24 of the `evaluation` group's
   36 minutes, so 004 runs alone and 023 and 029 join `runtime-evidence` and
