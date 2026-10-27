@@ -782,6 +782,23 @@ before that; (7) gate and selection preconditions (3.12) and the CLI
 surface (3.10); (8) the Node `Scorer` seam (3.9); (9) mutation seeds,
 the spec 029 integration test, declared verification and closure.
 
+**Increment 1 (2026-10-26): gold values, the discount table and ranking
+measures.** `crates/rustev-eval/src/gold.rs` holds the gold record of
+3.3.1 with its bounds (3.3.2) and kind-only matching of a proposal value
+with a gold value (3.3.3). `crates/rustev-eval/src/ranking_metrics.rs`
+extracts the ranked list of a `Ranking`, `Shortlist` or `Selection`
+parameter (`not_a_ranking`, `invalid_ranking`), and computes one case's
+contribution to `precision@k`, `recall@k`, `hit@k`, `mrr`, `mrr@k`,
+`ndcg@k`, `short@k` and `backfill@p<p>` over the condensed list, with the
+unjudged items it removed counted (3.4.3, 3.4.4); nothing calls it from
+`evaluate` yet. `tests/data/metrics/discounts.py` writes
+`discounts.json`, and the crate embeds the same bit patterns (3.11.3).
+Decision within the spec: a list without position p is outside
+`backfill@p<p>`'s denominator and counted `no_position`. Tests:
+`crates/rustev-eval/tests/ranking_metrics.rs` against the hand-computed
+`tests/data/metrics/ranking.json`, with the arithmetic of each case
+written out.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child faithfully
