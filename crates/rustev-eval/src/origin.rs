@@ -13,11 +13,15 @@ use rustev_contract::acquisition_record::{
     AcquisitionEvidence, AcquisitionKind, AcquisitionOutcome, AcquisitionStop, TierOutcome,
 };
 use rustev_contract::evidence::{CorroborationOutcome, EvidenceRecord};
+use rustev_contract::extraction_results::ExtractionOrigin;
+use rustev_contract::generation_result::{FieldOrigin, GenerationState, TextReason};
 use rustev_contract::plan::{Plan, PlanStepDetail};
 use rustev_contract::screening::ScreenVerdict;
 
 use crate::eval_cases::CaseMeasure;
+use crate::gold::{FieldGold, GoldValue};
 use crate::measured::{Builder, NewMetric, Scope};
+use crate::measures::FieldDecl;
 use crate::scoring::OriginFamily;
 
 /// Exclusion reasons of the origin metrics (3.5).
@@ -36,8 +40,22 @@ pub mod reason {
     pub const EMPTY: &str = "empty";
     /// Acquisition tier: the decision did not reach the widening step.
     pub const NOT_RUN: &str = "not_run";
-    /// Acquisition tier: every tier was skipped by its guard.
+    /// Acquisition tier: every tier was skipped by its guard. Text
+    /// backstop: every generate step was skipped (spec 037).
     pub const SKIPPED: &str = "skipped";
+    /// Text backstop: a generate step ran with no field slot.
+    pub const NO_SLOT: &str = "no_slot";
+    /// Extraction: the case's extract step has no result for the field.
+    pub const NO_RESULT: &str = "no_result";
+    /// Extraction accuracy: the gold record states nothing for the field.
+    pub const NO_GOLD: &str = "no_gold";
+    /// Extraction accuracy: the value is absent, which absence_rate counts.
+    pub const ABSENT: &str = "absent";
+    /// Extraction accuracy: spec 038 keeps only the digest of this field's
+    /// type, so the value cannot be compared (R-19).
+    pub const VALUE_NOT_RETAINED: &str = "value_not_retained";
+    /// Extraction accuracy: the value and gold kinds do not pair (3.3.3).
+    pub const TYPE_MISMATCH: &str = "type_mismatch";
 }
 
 /// One comparable proposal case as the origin metrics see it.
@@ -48,7 +66,8 @@ pub struct OriginCase<'a> {
     pub evidence: Option<&'a EvidenceRecord>,
 }
 
-/// The origin metrics of the declared families, in declaration order. Each
+/// The origin metrics of the declared families, in declaration order;
+/// `fields` are the adapter's field declarations (3.4.7). Each
 /// entry of `cases` belongs to the same index of `scope`: some for a
 /// proposal, none for a case outside every new metric. A family listed
 /// twice, which the configuration check refuses, is reported once.
@@ -58,6 +77,7 @@ pub struct OriginCase<'a> {
 /// If `scope` and `cases` differ in length.
 pub fn origin_metrics(
     families: &[OriginFamily],
+    fields: &[FieldDecl],
     scope: &[Scope<'_>],
     cases: &[Option<OriginCase<'_>>],
 ) -> Vec<NewMetric> {
@@ -70,9 +90,12 @@ pub fn origin_metrics(
             OriginFamily::Corroboration => out.push(corroboration(scope, cases, total)),
             OriginFamily::Screening => out.extend(screening(scope, cases, total)),
             OriginFamily::AcquisitionTier => out.extend(acquisition_tier(scope, cases, total)),
-            // Refused at configuration check until their owning specs are
-            // complete (3.5.1); a caller that skipped the check gets nothing.
-            OriginFamily::TextBackstop | OriginFamily::Extraction => {}
+            OriginFamily::TextBackstop => out.extend(text_backstop(scope, cases, total)),
+            OriginFamily::Extraction => {
+                for f in fields {
+                    out.extend(extraction(f, scope, cases, total));
+                }
+            }
         }
     }
     out
@@ -296,4 +319,218 @@ fn acquisition_tier(
         }
     }
     out
+}
+
+/// Every text reason, in spec 037's order, for the per-reason rates.
+const TEXT_REASONS: [TextReason; 8] = [
+    TextReason::ScreenBlocked,
+    TextReason::ScreenUnavailable,
+    TextReason::Deadline,
+    TextReason::RetriesExhausted,
+    TextReason::InvalidOutput,
+    TextReason::BackendUnavailable,
+    TextReason::BudgetExhausted,
+    TextReason::NotAttempted,
+];
+
+fn text_reason(r: TextReason) -> &'static str {
+    match r {
+        TextReason::ScreenBlocked => "screen_blocked",
+        TextReason::ScreenUnavailable => "screen_unavailable",
+        TextReason::Deadline => "deadline",
+        TextReason::RetriesExhausted => "retries_exhausted",
+        TextReason::InvalidOutput => "invalid_output",
+        TextReason::BackendUnavailable => "backend_unavailable",
+        TextReason::BudgetExhausted => "budget_exhausted",
+        TextReason::NotAttempted => "not_attempted",
+    }
+}
+
+/// One proposal's field slots over every generate step that ran: their
+/// count, the backstop slots by reason, and its aggregate text origin in
+/// spec 037's terms (3.11), or why the case is excluded.
+struct Slots {
+    slots: u64,
+    backstop: Vec<TextReason>,
+    partial: bool,
+    full_backstop: bool,
+}
+
+fn slots(e: &EvidenceRecord) -> Result<Slots, &'static str> {
+    let steps = e.generation.as_deref().unwrap_or_default();
+    let ran: Vec<_> = steps
+        .iter()
+        .filter(|s| s.state == GenerationState::Ran)
+        .collect();
+    if ran.is_empty() {
+        return Err(reason::SKIPPED);
+    }
+    let (mut produced, mut backstop, mut absent) = (0u64, vec![], 0u64);
+    for f in ran
+        .iter()
+        .flat_map(|s| &s.items)
+        .flat_map(|i| i.generated.values())
+    {
+        match &f.origin {
+            FieldOrigin::Generated | FieldOrigin::Repaired => produced += 1,
+            FieldOrigin::Backstop { reason } => backstop.push(*reason),
+            FieldOrigin::Absent { .. } => absent += 1,
+        }
+    }
+    let slots = produced + backstop.len() as u64 + absent;
+    if slots == 0 {
+        return Err(reason::NO_SLOT);
+    }
+    // Spec 037's aggregate: `backstop` when no slot was produced and at
+    // least one is a backstop, `partial` when some were and some were not.
+    let full_backstop = produced == 0 && !backstop.is_empty();
+    let partial = produced > 0 && (!backstop.is_empty() || absent > 0);
+    Ok(Slots {
+        slots,
+        backstop,
+        partial,
+        full_backstop,
+    })
+}
+
+/// `backstop_rate` (and per reason): backstop slots over every field slot
+/// of the proposal's generate steps that ran; `partial_rate` and
+/// `full_backstop_rate`: proposals whose aggregate text origin is partial
+/// (backstop) over proposals with a generate step that ran.
+fn text_backstop(
+    scope: &[Scope<'_>],
+    cases: &[Option<OriginCase<'_>>],
+    total: u64,
+) -> Vec<NewMetric> {
+    let in_plan = |p: &Plan| has_detail(p, |d| matches!(d, PlanStepDetail::Generate(_)));
+    let per_case: Vec<Result<Slots, String>> = scope
+        .iter()
+        .zip(cases)
+        .map(|(s, c)| evidence(s, c, in_plan).and_then(|e| slots(e).map_err(String::from)))
+        .collect();
+    let metric = |name: String, contribution: &dyn Fn(&Slots) -> CaseMeasure| {
+        let mut b = Builder::new(format!("origin/text_backstop/{name}"), false, scope.len());
+        for r in &per_case {
+            b.push(match r {
+                Ok(s) => Ok(contribution(s)),
+                Err(why) => Err(why.as_str()),
+            });
+        }
+        b.finish(total)
+    };
+    let mut out = vec![metric("backstop_rate".into(), &|s| CaseMeasure::Count {
+        num: s.backstop.len() as u64,
+        den: s.slots,
+    })];
+    for r in TEXT_REASONS {
+        out.push(metric(format!("backstop_rate/{}", text_reason(r)), &|s| {
+            CaseMeasure::Count {
+                num: s.backstop.iter().filter(|b| **b == r).count() as u64,
+                den: s.slots,
+            }
+        }));
+    }
+    out.push(metric("partial_rate".into(), &|s| CaseMeasure::Count {
+        num: u64::from(s.partial),
+        den: 1,
+    }));
+    out.push(metric("full_backstop_rate".into(), &|s| {
+        CaseMeasure::Count {
+            num: u64::from(s.full_backstop),
+            den: 1,
+        }
+    }));
+    out
+}
+
+/// Whether a retained extraction value equals a gold value, kind by kind
+/// as 3.3.3 pairs them: booleans, integers, strings (decimal, date and
+/// enum values are retained as their canonical strings) and lists of enum
+/// values against a path.
+fn matches_gold(value: &serde_json::Value, gold: &GoldValue) -> Result<bool, &'static str> {
+    use serde_json::Value;
+    match (value, gold) {
+        (Value::Bool(v), GoldValue::Bool(g)) => Ok(v == g),
+        (Value::Number(v), GoldValue::Integer(g)) => Ok(v.as_i64() == Some(*g)),
+        (Value::String(v), GoldValue::Text(g)) => Ok(v == g),
+        (Value::Array(v), GoldValue::Path(g)) => {
+            Ok(v.len() == g.len() && v.iter().zip(g).all(|(a, b)| a.as_str() == Some(b.as_str())))
+        }
+        _ => Err(reason::TYPE_MISMATCH),
+    }
+}
+
+/// `accuracy`: present values matching gold over present values whose gold
+/// is stated, where gold `"absent"` makes any present value wrong; and
+/// `absence_rate`: absent values over the step's results for the field.
+/// Both details count the measured values by origin (`origin:extracted`,
+/// `origin:fallback`).
+fn extraction(
+    f: &FieldDecl,
+    scope: &[Scope<'_>],
+    cases: &[Option<OriginCase<'_>>],
+    total: u64,
+) -> Vec<NewMetric> {
+    let in_plan = |p: &Plan| {
+        p.steps
+            .iter()
+            .any(|s| s.id == f.step && matches!(s.detail, PlanStepDetail::Extract(_)))
+    };
+    let name = |m: &str| format!("origin/extraction/{}/{m}", f.name);
+    let mut accuracy = Builder::new(name("accuracy"), false, scope.len());
+    let mut absence = Builder::new(name("absence_rate"), false, scope.len());
+    for (s, c) in scope.iter().zip(cases) {
+        let e = match evidence(s, c, in_plan) {
+            Ok(e) => e,
+            Err(why) => {
+                accuracy.push(Err(why.as_str()));
+                absence.push(Err(why.as_str()));
+                continue;
+            }
+        };
+        let Some(field) = e
+            .extraction
+            .iter()
+            .flatten()
+            .filter(|x| x.step == f.step)
+            .flat_map(|x| &x.fields)
+            .find(|x| x.name == f.field)
+        else {
+            accuracy.push(Err(reason::NO_RESULT));
+            absence.push(Err(reason::NO_RESULT));
+            continue;
+        };
+        let origin = match field.origin {
+            ExtractionOrigin::Extracted => "origin:extracted",
+            ExtractionOrigin::Fallback => "origin:fallback",
+            ExtractionOrigin::Absent { .. } => {
+                absence.push(Ok(CaseMeasure::Count { num: 1, den: 1 }));
+                accuracy.push(Err(reason::ABSENT));
+                continue;
+            }
+        };
+        absence.count(origin, 1);
+        absence.push(Ok(CaseMeasure::Count { num: 0, den: 1 }));
+        let Scope::Proposal { case, .. } = s else {
+            unreachable!("a case with evidence is a proposal")
+        };
+        let gold = case.gold.as_ref().and_then(|g| g.field(&f.name));
+        let correct = match (gold, field.value()) {
+            (None, _) => Err(reason::NO_GOLD),
+            (Some(FieldGold::Absent), _) => Ok(false),
+            (Some(FieldGold::Value(_)), None) => Err(reason::VALUE_NOT_RETAINED),
+            (Some(FieldGold::Value(g)), Some(v)) => matches_gold(v, g),
+        };
+        match correct {
+            Ok(hit) => {
+                accuracy.count(origin, 1);
+                accuracy.push(Ok(CaseMeasure::Count {
+                    num: u64::from(hit),
+                    den: 1,
+                }));
+            }
+            Err(why) => accuracy.push(Err(why)),
+        }
+    }
+    vec![accuracy.finish(total), absence.finish(total)]
 }

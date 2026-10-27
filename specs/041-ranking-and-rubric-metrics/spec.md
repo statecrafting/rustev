@@ -969,6 +969,37 @@ goldens, and the origin part of
 `version_3_reports_ranking_and_constraint_metrics` in
 `crates/rustev-eval/tests/reports.rs`, which reconciles with spec 029.
 
+**Increment 6, part b (2026-10-27): text backstops and extraction.** With
+spec 037 complete and spec 038's extraction evidence and runtime dispatch
+on `main` (#318, #319), every family is available and none is refused
+`metric-unavailable`; section 5's row for a family before its owning spec
+is therefore no longer reachable in this build. `text_backstop` reads the
+generation evidence of spec 037: `backstop_rate`, one
+`backstop_rate/<reason>` per spec 037 text reason (all eight, so the
+names do not depend on the data), `partial_rate` and
+`full_backstop_rate`. `extraction` reads the extraction evidence of spec
+038 for each field declaration of `rustev.task-adapter/2` (3.4.7), in
+declaration order: `origin/extraction/<name>/accuracy` and
+`/absence_rate`, with gold from the case's `fields` (`FieldGold`).
+Decisions within the spec: a backstop rate's denominator is every field
+slot of the proposal's generate steps that ran, `absent` slots included,
+and its numerator the `backstop` slots only (spec 037's own
+`text/backstop_rate` counts both); the aggregate origin is spec 037's,
+over the proposal's slots; a proposal whose generate steps were all
+skipped is excluded `skipped`, and one whose steps produced no slot
+`no_slot`. Extraction accuracy compares the value spec 038 retains
+(booleans, integers, decimal, date and enum strings, lists of enum
+values) with gold by kind, so a field whose type keeps only its digest
+(R-19) is excluded `value_not_retained`, never guessed from the
+proposal; a kind that does not pair is `type_mismatch`; an absent value
+is outside accuracy (`absent`) and inside `absence_rate`; a gold
+`"absent"` makes any present value wrong; a case whose step has no
+result for the field is `no_result`. Each detail counts its measured
+values by origin as `origin:extracted` and `origin:fallback` beside the
+exclusion reasons. Tests: `crates/rustev-eval/tests/origin_041.rs` over
+the spec 037 and 038 goldens, and `config_041.rs`, which accepts every
+family.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child faithfully

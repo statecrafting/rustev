@@ -184,12 +184,17 @@ fn section_5_configuration_refusals() {
     assert!(e.starts_with("scale-mismatch"), "{e}");
     let e = refused(|v| v["agreements"][0]["a"] = json!("length"));
     assert!(e.starts_with("scale-mismatch"), "{e}");
-    // An origin family before this build reads its evidence: its owning
-    // spec (037, 038) is not complete.
-    for f in ["text_backstop", "extraction"] {
-        let e = refused(|v| v["origin"] = json!([f]));
-        assert_eq!(e, format!("metric-unavailable: {f}"));
-    }
+    // Every origin family's evidence is in this build (3.5.1), so none is
+    // refused `metric-unavailable`.
+    let mut v = v3();
+    v["origin"] = json!([
+        "text_backstop",
+        "extraction",
+        "screening",
+        "corroboration",
+        "acquisition_tier"
+    ]);
+    parse(&v).check().unwrap();
 }
 
 #[test]
