@@ -212,6 +212,7 @@
         "src/holdout.rs",
         "src/lib.rs",
         "src/live.rs",
+        "src/measured.rs",
         "src/measures.rs",
         "src/metrics.rs",
         "src/optimization.rs",

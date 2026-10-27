@@ -2526,3 +2526,199 @@ async fn reproducibility_holds_within_the_baselines_band() {
         Reproducibility::Unknown { .. }
     ));
 }
+
+impl rustev_eval::measures::MeasuredAdapter for Lodging {
+    fn measures(&self) -> rustev_eval::measures::Measures {
+        serde_json::from_value(json!({
+            "rankings": [{"name": "offers", "param": "ranking", "relevant_at_least": 2,
+                          "gain": "exponential",
+                          "metrics": ["precision@2", "ndcg@3", "mrr", "hit@1"],
+                          "backfill_positions": 1}],
+            "constraints": [{"name": "usd", "ranking": "offers", "k": 2,
+                             "attribute": "currency", "test": "equals",
+                             "against": {"value": "USD"}, "aggregate": "share_at_k"}],
+            "fields": []
+        }))
+        .unwrap()
+    }
+}
+
+/// Spec 041, 3.2, 3.4, 3.11 and 3.13: a version 3 evaluation of the lodging
+/// cohort reports every existing metric unchanged, then the ranking and
+/// constraint metrics, and its case measures reconcile bit for bit.
+#[tokio::test(flavor = "current_thread")]
+async fn version_3_reports_ranking_and_constraint_metrics() {
+    use Keep::*;
+    use rustev_eval::measured::Measured;
+    use rustev_eval::measures::MeasuredAdapter;
+    use rustev_eval::report::{EvalError, evaluate_measured, evaluate_measured_with_cases};
+    let probe = Probe::passing(lodging_rules());
+    let three = || {
+        vec![
+            candidate("c-1", "120", "USD", 2, true),
+            candidate("c-2", "90", "EUR", 4, false),
+            candidate("c-3", "250", "USD", 2, true),
+        ]
+    };
+    let claims = || vec![claim("k-1", "verified", "preference", NOW + DAY)];
+    let case = |id, snapshot, label, keep| Case {
+        id,
+        snapshot,
+        label,
+        subgroups: vec![],
+        split: Split::FinalTest,
+        keep,
+    };
+    let cases = vec![
+        case(
+            "l-01",
+            lodging_snapshot(true, three(), claims()),
+            Some("c-2"),
+            Embedded,
+        ),
+        case(
+            "l-02",
+            lodging_snapshot(false, three(), claims()),
+            Some("c-1"),
+            Embedded,
+        ),
+        case(
+            "l-04",
+            lodging_snapshot(true, three(), vec![]),
+            None,
+            Embedded,
+        ),
+        case(
+            "l-05",
+            lodging_snapshot(true, vec![candidate("c-4", "80", "USD", 2, true)], claims()),
+            Some("c-4"),
+            Altered,
+        ),
+    ];
+    let p = probe.clone();
+    let bundles = bundles(&probe, || lodging_fixture(&p, &unlimited()), &cases).await;
+    let mut manifest = manifest("lodging gold", Lodging.adapter(), &cases);
+    manifest.schema = rustev_eval::dataset::DATASET_V2.into();
+    let gold: rustev_eval::gold::Gold = serde_json::from_value(json!({
+        "relevance": {"c-1": 2, "c-2": 3, "c-3": 0},
+        "items": {"c-1": {"currency": "USD"}, "c-2": {"currency": "EUR"},
+                  "c-3": {"currency": "USD"}}
+    }))
+    .unwrap();
+    for c in &mut manifest.cases {
+        c.gold = Some(gold.clone());
+    }
+    let v2 = config(&Lodging, &["ranking"], None);
+    let mut v3 = v2.clone();
+    v3.schema = rustev_eval::config::EVALUATOR_CONFIG_V3.into();
+    v3.adapter.measures = Some(Lodging.measures().digest().unwrap());
+    v3.scorers = Some(vec![]);
+    v3.rubric_metrics = Some(vec![]);
+    v3.human_scales = Some(vec![]);
+    v3.agreements = Some(vec![]);
+    v3.origin = Some(vec![]);
+    for (name, formula) in [
+        ("ranking", "per-case ranking measures over condensed lists"),
+        ("constraint", "per-case constraint checks over the top k"),
+    ] {
+        v3.metrics.push(MetricFormula {
+            name: name.into(),
+            formula: formula.into(),
+        });
+    }
+    let bundle_inputs = inputs_of(&bundles);
+    let replay = config_for(&scope());
+    let inputs = |config| Inputs {
+        manifest: &manifest,
+        split: Split::FinalTest,
+        config,
+        adapter: &Lodging,
+        bundles: &bundle_inputs,
+        resolver: &NoExternal,
+        replay: &replay,
+        candidate: None,
+    };
+    let measured = Measured { adapter: &Lodging };
+
+    // Version 2 is unchanged by the measured entry point (I-1).
+    let base = evaluate(&inputs(&v2)).unwrap();
+    let same = evaluate_measured(&inputs(&v2), measured).unwrap();
+    assert_eq!(
+        serde_json::to_vec(&same.report).unwrap(),
+        serde_json::to_vec(&base.report).unwrap()
+    );
+    assert_eq!(same.detail, base.detail);
+    // Plain `evaluate` has no declarations for a version 3 configuration.
+    assert!(matches!(evaluate(&inputs(&v3)), Err(EvalError::Adapter)));
+
+    let (e, cases) = evaluate_measured_with_cases(&inputs(&v3), measured, None).unwrap();
+    // Every existing metric first, in the same order with the same values.
+    let n = base.report.metrics.len();
+    assert_eq!(e.report.metrics[..n], base.report.metrics[..]);
+    let names: Vec<&str> = e.report.metrics[n..]
+        .iter()
+        .map(|m| m.name.as_str())
+        .collect();
+    assert_eq!(
+        names,
+        [
+            "ranking/offers/precision@2",
+            "ranking/offers/ndcg@3",
+            "ranking/offers/mrr",
+            "ranking/offers/hit@1",
+            "ranking/offers/short@2",
+            "ranking/offers/short@3",
+            "ranking/offers/short@1",
+            "ranking/offers/backfill@p1",
+            "constraint/usd",
+        ]
+    );
+    // The diverged and abstained cases are outside every new metric.
+    let (_, den, why) = count(&e.detail, "ranking/offers/precision@2");
+    assert_eq!(den, 4);
+    assert_eq!(why["diverged"], 1);
+    assert_eq!(why["abstained"], 1);
+    // A Ranking records no per-position origin.
+    let (_, _, why) = count(&e.detail, "ranking/offers/backfill@p1");
+    assert_eq!(why["no_origin"], 2);
+    for m in &e.report.metrics[n..n + 4] {
+        assert!(
+            matches!(m.value, MetricValue::Measured { n: 2, .. }),
+            "{}: {:?}",
+            m.name,
+            m.value
+        );
+    }
+    // Spec 029: the case measures carry each new metric and reconcile.
+    reconcile(&e, &cases).unwrap();
+    assert!(
+        cases
+            .cases
+            .iter()
+            .any(|c| c.measures.contains_key("constraint/usd"))
+    );
+    assert_eq!(
+        rustev_eval::eval_cases::form_in("constraint/usd", &[&cases]),
+        Some(Form::Mean)
+    );
+    assert_eq!(form_of("ranking/offers/hit@1"), Some(Form::CountRatio));
+    assert_eq!(form_of("ranking/offers/ndcg@3"), Some(Form::Mean));
+
+    // A measures digest other than the declarations' refuses (3.4.1).
+    let mut other = v3.clone();
+    other.adapter.measures = Some(rules_digest("other measures"));
+    assert!(matches!(
+        evaluate_measured(&inputs(&other), measured),
+        Err(EvalError::Adapter)
+    ));
+    // Scorers are refused until their increment, never reported.
+    let mut scored = v3.clone();
+    scored.human_scales = Some(vec![rustev_eval::scoring::HumanScale {
+        name: "rater".into(),
+        levels: vec!["low".into(), "high".into()],
+    }]);
+    assert!(matches!(
+        evaluate_measured(&inputs(&scored), measured),
+        Err(EvalError::Config(c)) if c.0.starts_with("metric-unavailable")
+    ));
+}

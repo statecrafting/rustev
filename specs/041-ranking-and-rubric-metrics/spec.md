@@ -828,6 +828,34 @@ CLI tests that build dataset cases and configurations name the new
 members. Tests: `crates/rustev-eval/tests/documents_041.rs` and
 `crates/rustev-eval/tests/config_041.rs`.
 
+**Increment 3 (2026-10-27): evaluation under version 3.**
+`crates/rustev-eval/src/measured.rs` computes the ranking, `short@k`,
+`backfill@p<p>` and constraint metrics of 3.4 over the split's cases in
+manifest order. Incomparable, diverged and abstained cases are outside
+every new metric and counted by the reasons coverage and acceptance use
+(3.2.1, 3.2.2). Each metric gets its detail count and per-case measure
+(3.2.3, 3.11), and its value is computed from those measures by spec
+029's functions, so reconciliation holds bit for bit. `evaluate_measured`
+and `evaluate_measured_with_cases` in `crates/rustev-eval/src/report.rs`
+take the `MeasuredAdapter` beside spec 004's inputs. They check its
+measures against the configuration's digest (3.4.1) and report the new
+metrics after every existing one (3.2.4). Under versions 1 and 2 they are
+`evaluate`, byte for byte, and plain `evaluate` refuses a version 3
+configuration as an adapter mismatch. Spec 029's form lookup reads a
+`constraint/<name>` metric's form from its case measures, since the name
+does not say whether it aggregates as `share_at_k` or `all_at_k`
+(`form_in`), and reconciliation compares a detail count with summed
+measures for count ratios only. Decisions within the spec: a mean
+metric's count is its measured cases of the split's cases, and a count
+ratio's is its sums; `share_at_k` counts unknown items in its breakdown
+by item and `all_at_k` counts excluded cases; `short@k` is reported for
+each distinct k in declaration order; until increments 4 and 5,
+evaluation refuses a configuration declaring scorers, rubric metrics,
+human scales or agreements (`metric-unavailable`) rather than report
+them. Tests: `crates/rustev-eval/tests/measured_041.rs` (section 5's
+constraint rows) and `version_3_reports_ranking_and_constraint_metrics`
+in `crates/rustev-eval/tests/reports.rs`.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child faithfully

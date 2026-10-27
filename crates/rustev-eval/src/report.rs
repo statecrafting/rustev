@@ -34,6 +34,8 @@ use crate::dataset::{DatasetCase, DatasetError, DatasetManifest, ModelRef};
 use crate::doc::eval_document;
 use crate::eval_cases::{self, CaseMeasure, CaseMeasures, EVAL_CASES, EvalCases};
 use crate::fit::CalibrationFit;
+use crate::measured::{self, Measured};
+use crate::measures::Measures;
 use crate::metrics::{
     self, CaseOutcome, Measure, Scored, TaskAdapter, brier, log_loss_term, mean_log_loss,
     nearest_rank, probabilities, reliability, reliability_bin,
@@ -41,6 +43,7 @@ use crate::metrics::{
 use crate::repeat_config::TopK;
 use crate::replay::{ReplayConfig, ReplayOutcome, RetainedValue, reproduce};
 use crate::resolve::Resolver;
+use crate::scoring::code;
 
 pub const EVAL_DETAIL: &str = "rustev.eval-detail/1";
 
@@ -284,7 +287,28 @@ fn quantile_name(q: rustev_contract::decimal::Decimal) -> String {
 
 /// Evaluate one split of a dataset.
 pub fn evaluate(inputs: &Inputs<'_>) -> Result<Evaluated, EvalError> {
-    evaluate_inner(inputs, None).map(|(e, _)| e)
+    evaluate_inner(inputs, None, None).map(|(e, _)| e)
+}
+
+/// Evaluate one split under a version 3 configuration (spec 041), with
+/// the adapter that declares its measures. Under versions 1 and 2 this is
+/// [`evaluate`], byte for byte; plain [`evaluate`] refuses a version 3
+/// configuration, which binds measures it has no declarations for.
+pub fn evaluate_measured(
+    inputs: &Inputs<'_>,
+    measured: Measured<'_>,
+) -> Result<Evaluated, EvalError> {
+    evaluate_inner(inputs, None, Some(measured)).map(|(e, _)| e)
+}
+
+/// [`evaluate_with_cases`] under a version 3 configuration (spec 041,
+/// 3.11): the case measures carry every new metric's contributions.
+pub fn evaluate_measured_with_cases(
+    inputs: &Inputs<'_>,
+    measured: Measured<'_>,
+    top_k: Option<&TopK>,
+) -> Result<(Evaluated, EvalCases), EvalError> {
+    with_cases(inputs, top_k, Some(measured))
 }
 
 /// Evaluate one split and write its per-case measures (spec 029, 3.2):
@@ -295,7 +319,15 @@ pub fn evaluate_with_cases(
     inputs: &Inputs<'_>,
     top_k: Option<&TopK>,
 ) -> Result<(Evaluated, EvalCases), EvalError> {
-    let (evaluated, cases) = evaluate_inner(inputs, Some(top_k))?;
+    with_cases(inputs, top_k, None)
+}
+
+fn with_cases(
+    inputs: &Inputs<'_>,
+    top_k: Option<&TopK>,
+    measured: Option<Measured<'_>>,
+) -> Result<(Evaluated, EvalCases), EvalError> {
+    let (evaluated, cases) = evaluate_inner(inputs, Some(top_k), measured)?;
     let cases = EvalCases {
         schema: EVAL_CASES.into(),
         report: evaluated.detail.report.clone(),
@@ -347,9 +379,11 @@ fn mean_measure(term: Result<f64, String>) -> CaseMeasure {
 fn evaluate_inner(
     inputs: &Inputs<'_>,
     cases_for: Option<Option<&TopK>>,
+    measured: Option<Measured<'_>>,
 ) -> Result<(Evaluated, Option<Vec<CaseMeasures>>), EvalError> {
     let config = inputs.config;
     config.check().map_err(EvalError::Config)?;
+    let measures = measures_of(inputs, config, measured)?;
     // Name and version always; in version 2 the rules too (spec 014, 3.2.2).
     if config.adapter.reference() != inputs.adapter.adapter()
         || config
@@ -384,7 +418,23 @@ fn evaluate_inner(
     let mut plan_doc: Option<&Plan> = None;
     let mut details = vec![];
     let mut case_measures: Vec<CaseMeasures> = vec![];
+    let mut scope: Vec<measured::Scope<'_>> = Vec::with_capacity(results.len());
     for r in &results {
+        scope.push(match &r.status {
+            Status::Incomparable(code) => measured::Scope::Out(format!("incomparable:{code}")),
+            Status::Diverged => measured::Scope::Out("diverged".into()),
+            Status::Comparable {
+                outcome: CaseOutcome::Abstention { .. },
+                ..
+            } => measured::Scope::Out("abstained".into()),
+            Status::Comparable {
+                outcome: CaseOutcome::Proposal { params, .. },
+                ..
+            } => measured::Scope::Proposal {
+                case: r.case,
+                params,
+            },
+        });
         let mut measures = BTreeMap::new();
         let mut run_digest = None;
         let mut ranked = None;
@@ -644,6 +694,20 @@ fn evaluate_inner(
     if inputs.candidate.is_none() {
         ms.extend(metrics::generation(&runs));
     }
+    // Spec 041, 3.2.4: after every existing metric, in declaration order.
+    if let Some(m) = &measures {
+        for new in measured::metrics(m, &scope) {
+            if cases_for.is_some() {
+                for (cm, c) in case_measures.iter_mut().zip(new.cases) {
+                    if let Some(c) = c {
+                        cm.measures.insert(new.metric.name.clone(), c);
+                    }
+                }
+            }
+            ms.push(new.metric);
+            counts.push(new.count);
+        }
+    }
     let declared: BTreeSet<&str> = config.metrics.iter().map(|m| m.name.as_str()).collect();
     for m in &ms {
         let base = m.name.split('/').next().unwrap_or(&m.name);
@@ -734,6 +798,48 @@ fn evaluate_inner(
         },
         cases_for.map(|_| case_measures),
     ))
+}
+
+/// A version 3 configuration's measure declarations, checked against the
+/// digest it binds (spec 041, 3.4.1); none under versions 1 and 2.
+fn measures_of(
+    inputs: &Inputs<'_>,
+    config: &EvaluatorConfig,
+    measured: Option<Measured<'_>>,
+) -> Result<Option<Measures>, EvalError> {
+    let Some(declared) = config.declarations() else {
+        return Ok(None);
+    };
+    // Without the declarations, a version 3 configuration's measures digest
+    // names semantics this evaluation cannot apply.
+    let Some(measured) = measured else {
+        return Err(EvalError::Adapter);
+    };
+    let a = measured.adapter;
+    if a.adapter() != inputs.adapter.adapter() || a.rules() != inputs.adapter.rules() {
+        return Err(EvalError::Adapter);
+    }
+    let measures = a.measures();
+    measures
+        .check()
+        .map_err(|e| EvalError::Config(ConfigError(format!("measures: {e}"))))?;
+    let digest = measures.digest().map_err(|_| EvalError::NotCanonical)?;
+    if config.adapter.measures.as_ref() != Some(&digest) {
+        return Err(EvalError::Adapter);
+    }
+    // Scores, rubric metrics and agreements land in later increments;
+    // until then they are refused, never reported.
+    if !(declared.scorers.is_empty()
+        && declared.rubric_metrics.is_empty()
+        && declared.human_scales.is_empty()
+        && declared.agreements.is_empty())
+    {
+        return Err(EvalError::Config(ConfigError(format!(
+            "{}: scorers, rubric metrics, human scales and agreements",
+            code::METRIC_UNAVAILABLE
+        ))));
+    }
+    Ok(Some(measures))
 }
 
 /// A comparable case's contributions to every case-decomposable metric of

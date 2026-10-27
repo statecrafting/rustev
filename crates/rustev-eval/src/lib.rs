@@ -26,6 +26,7 @@ pub mod generator;
 pub mod gold;
 pub mod holdout;
 pub mod live;
+pub mod measured;
 pub mod measures;
 pub mod metrics;
 pub mod optimization;

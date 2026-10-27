@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::{AdapterRules, ConfigError};
 use crate::dataset::DatasetManifest;
-use crate::eval_cases::{self, EvalCases, derived, form_of, metric_cases};
+use crate::eval_cases::{self, EvalCases, derived, form_in, metric_cases};
 use crate::generator::run_seed;
 use crate::holdout::{Append, HeldOutRecord, HoldoutLedger, LedgerError};
 use crate::repeat_config::RepeatConfig;
@@ -464,7 +464,7 @@ pub fn repeat(inputs: &RepeatInputs<'_>) -> Result<RepeatReport, RepeatError> {
             // resamples (3.4.5).
             let mut decomposable: Vec<MetricCases> = vec![];
             for m in &all_names {
-                if let Some(form) = form_of(m) {
+                if let Some(form) = form_in(m, &docs) {
                     let full = metric_cases(m, form, &docs).map_err(RepeatError::MixedRuns)?;
                     decomposable.push(MetricCases {
                         cases: members.iter().map(|&c| full.cases[c].clone()).collect(),
