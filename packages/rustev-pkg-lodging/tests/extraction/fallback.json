@@ -1,0 +1,31 @@
+{
+  "schema": "rustev.extract-rules/1",
+  "name": "lodging-fallback",
+  "version": "1",
+  "sources": [
+    {
+      "name": "text",
+      "ref": "input:trip.text"
+    }
+  ],
+  "fields": [
+    {
+      "field": "party_size",
+      "rules": [
+        {
+          "name": "party",
+          "when": "always",
+          "then": {
+            "integer_after": {
+              "source": "text",
+              "terms": [
+                "party"
+              ],
+              "max_digits": 2
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

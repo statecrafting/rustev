@@ -1,0 +1,7 @@
+{
+  "id": "filters",
+  "instructions": "Extract filters.",
+  "params": [],
+  "schema": "rustev.prompt-template/1",
+  "version": "1.0.0"
+}
