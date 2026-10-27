@@ -2,7 +2,9 @@
 //!
 //! A [`RulesBackend`] answers `classify`, `proposition` and `rubric`
 //! requests with authored logits computed by a bounded, identified rules
-//! program ([`RulesProgram`], `rustev.rules/1`). Its descriptor is derived
+//! program ([`RulesProgram`], `rustev.rules/1`). Pointwise `rank` requests
+//! return the authored score for the presented candidate (spec 039).
+//! Its descriptor is derived
 //! from the program, and the program's digest is the artifact identity a
 //! plan binds, so a changed rule, coefficient, lookup value, option mapping,
 //! limit or cost can never answer for a plan compiled against the old
@@ -142,8 +144,15 @@ fn derive_descriptor(
     })
     .collect();
     BackendDescriptor {
-        // Spec 039 3.2: no ranking tasks yet (039 extends 005 for this directory).
-        ranking: None,
+        ranking: tasks
+            .iter()
+            .any(|t| t.operation == Operation::Rank)
+            .then_some(rustev_contract::descriptor::Ranking {
+                modes: vec![rustev_contract::descriptor::RankingMode::Pointwise],
+                max_candidates: 1,
+                listwise_scores: rustev_contract::descriptor::ListwiseScores::Never,
+                listwise_partial: rustev_contract::descriptor::ListwisePartial::Never,
+            }),
         schema: schema::BACKEND.into(),
         backend_id: program.backend_id.clone(),
         artifact,
