@@ -1,0 +1,38 @@
+{
+  "schema": "rustev.snapshot/2",
+  "entries": [
+    {
+      "field": "hotels",
+      "value": [
+        {
+          "id": "all-year",
+          "available_from": 1790164800000,
+          "available_to": 1900000000000
+        },
+        {
+          "id": "short-stay",
+          "available_from": 1790164800000,
+          "available_to": 1790251200000
+        }
+      ],
+      "provenance": "system-of-record",
+      "as_of_ms": 1790164800000,
+      "source": "SYNTHETIC:lodging-extraction"
+    },
+    {
+      "field": "trip.window",
+      "value": {
+        "start": 1798761600000,
+        "end": 1798848000000
+      },
+      "provenance": "model-derived",
+      "as_of_ms": 1790164800000,
+      "source": "SYNTHETIC:lodging-extraction",
+      "producer": {
+        "artifact_id": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "template_digest": "none",
+        "produced_at_ms": 1790164800000
+      }
+    }
+  ]
+}

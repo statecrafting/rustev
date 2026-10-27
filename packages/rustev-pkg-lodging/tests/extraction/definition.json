@@ -1,0 +1,489 @@
+{
+  "inputs": [
+    {
+      "name": "trip.text",
+      "type": {
+        "text": {
+          "max_bytes": 128
+        }
+      },
+      "provenance": [
+        "system-of-record"
+      ],
+      "freshness": "not_required"
+    },
+    {
+      "name": "trip.window",
+      "type": {
+        "record": {
+          "fields": [
+            {
+              "name": "start",
+              "type": "timestamp"
+            },
+            {
+              "name": "end",
+              "type": "timestamp"
+            }
+          ]
+        }
+      },
+      "provenance": [
+        "user-supplied",
+        "model-derived"
+      ],
+      "freshness": "not_required"
+    },
+    {
+      "name": "feature_vocabulary",
+      "type": {
+        "list": {
+          "item": {
+            "text": {
+              "max_bytes": 64
+            }
+          },
+          "max_items": 10
+        }
+      },
+      "provenance": [
+        "system-of-record"
+      ],
+      "freshness": "not_required"
+    },
+    {
+      "name": "hotels",
+      "type": {
+        "list": {
+          "item": {
+            "record": {
+              "fields": [
+                {
+                  "name": "id",
+                  "type": {
+                    "text": {
+                      "max_bytes": 32
+                    }
+                  }
+                },
+                {
+                  "name": "available_from",
+                  "type": "timestamp"
+                },
+                {
+                  "name": "available_to",
+                  "type": "timestamp"
+                }
+              ]
+            }
+          },
+          "max_items": 10
+        }
+      },
+      "provenance": [
+        "system-of-record"
+      ],
+      "freshness": "not_required"
+    }
+  ],
+  "limits": {
+    "deadline_ms": 2000,
+    "distribution_tolerance": "0.000001",
+    "max_projection_bytes": 65536,
+    "max_semantic_requests": 3,
+    "on_excess": "refuse"
+  },
+  "name": "lodging-extraction",
+  "package": "synthetic-lodging",
+  "policy": {
+    "on_unresolved": [
+      {
+        "target": "step:eligible",
+        "reasons": "any",
+        "action": "propagate"
+      },
+      {
+        "target": "step:window_ok",
+        "reasons": "any",
+        "action": "as_unmet"
+      },
+      {
+        "target": "step:insufficient_ok",
+        "reasons": "any",
+        "action": "as_unmet"
+      }
+    ],
+    "rules": [
+      {
+        "id": "ask",
+        "when": {
+          "exact": {
+            "cmp": {
+              "left": {
+                "ref": "step:insufficient_ok"
+              },
+              "op": "eq",
+              "right": {
+                "lit": {
+                  "bool": true
+                }
+              }
+            }
+          }
+        },
+        "then": {
+          "needs_input": {
+            "fields": [
+              "trip.window"
+            ],
+            "questions": [
+              "ask_window"
+            ]
+          }
+        }
+      },
+      {
+        "id": "dated",
+        "when": {
+          "exact": {
+            "present": "step:window_ok"
+          }
+        },
+        "then": {
+          "propose": {
+            "action": "search_dated",
+            "params": [
+              {
+                "name": "hotels",
+                "value": {
+                  "ref": "step:eligible"
+                }
+              },
+              {
+                "name": "window",
+                "value": {
+                  "ref": "step:window_ok"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "undated",
+        "when": "always",
+        "then": {
+          "propose": {
+            "action": "search_undated",
+            "params": [
+              {
+                "name": "hotels",
+                "value": {
+                  "ref": "step:eligible"
+                }
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "adjustments": []
+  },
+  "schema": "rustev.definition/2",
+  "steps": [
+    {
+      "body": {
+        "extract": {
+          "backend": {
+            "artifact": "any",
+            "binding": "auto",
+            "min_determinism": "unspecified"
+          },
+          "distributions": "when_available",
+          "fallback": {
+            "rules_program": "lodging-fallback@1",
+            "fill": "request_failure"
+          },
+          "for_each": "none",
+          "limits": {
+            "deadline_share": "0.3",
+            "max_cost_units": "none"
+          },
+          "output": {
+            "fields": [
+              {
+                "name": "window",
+                "type": {
+                  "record": {
+                    "fields": [
+                      {
+                        "name": "start",
+                        "type": {
+                          "date": {}
+                        }
+                      },
+                      {
+                        "name": "end",
+                        "type": {
+                          "date": {}
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "party_size",
+                "type": {
+                  "integer": {
+                    "bounds": [
+                      1,
+                      30
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "features",
+                "type": {
+                  "list": {
+                    "item": {
+                      "enum": {
+                        "vocabulary": "feature_vocabulary"
+                      }
+                    },
+                    "max_items": 10
+                  }
+                }
+              },
+              {
+                "name": "area_name",
+                "type": {
+                  "text": {
+                    "max_bytes": 64
+                  }
+                }
+              },
+              {
+                "name": "insufficient",
+                "type": {
+                  "bool": {}
+                }
+              },
+              {
+                "name": "questions",
+                "type": {
+                  "list": {
+                    "item": {
+                      "enum": {
+                        "vocabulary": "questions"
+                      }
+                    },
+                    "max_items": 2
+                  }
+                }
+              }
+            ]
+          },
+          "projection": [
+            "input:trip.text"
+          ],
+          "repair": {
+            "max_attempts": 0,
+            "only_missing_fields": false
+          },
+          "screen": {
+            "input": "untrusted_fields",
+            "output": "none"
+          },
+          "template": {
+            "digest": "sha256:e015ea4f7e228b46dd622dae21b91ffd306da527ff4a35e6364e625b1e5a4303",
+            "id": "filters",
+            "params": {}
+          },
+          "vocabularies": {
+            "feature_vocabulary": {
+              "input": "input:feature_vocabulary"
+            },
+            "questions": [
+              "ask_end",
+              "ask_start"
+            ]
+          }
+        }
+      },
+      "id": "request_filters"
+    },
+    {
+      "body": {
+        "accept_model_derived": {
+          "field": "step:request_filters/window",
+          "min_mass": "none",
+          "on_fail": {
+            "drop_field": {
+              "notice": "extracted_window_dropped"
+            }
+          },
+          "validate": {
+            "predicate": {
+              "cmp": {
+                "left": {
+                  "ref": "step:request_filters/window/start"
+                },
+                "op": "gt",
+                "right": {
+                  "ref": "now"
+                }
+              }
+            }
+          }
+        }
+      },
+      "id": "window_ok"
+    },
+    {
+      "id": "insufficient_ok",
+      "body": {
+        "accept_model_derived": {
+          "field": "step:request_filters/insufficient",
+          "validate": "none",
+          "min_mass": "none",
+          "on_fail": "unresolved"
+        }
+      }
+    },
+    {
+      "id": "questions_ok",
+      "body": {
+        "accept_model_derived": {
+          "field": "step:request_filters/questions",
+          "validate": "none",
+          "min_mass": "none",
+          "on_fail": "unresolved"
+        }
+      }
+    },
+    {
+      "id": "eligible",
+      "body": {
+        "exact": {
+          "op": "filter_with_reasons",
+          "version": 1,
+          "args": {
+            "list": "input:hotels",
+            "id_field": "id",
+            "rules": [
+              {
+                "name": "available",
+                "predicate": {
+                  "any": [
+                    {
+                      "not": {
+                        "present": "step:window_ok"
+                      }
+                    },
+                    {
+                      "all": [
+                        {
+                          "cmp": {
+                            "left": {
+                              "ref": "item:available_from"
+                            },
+                            "op": "le",
+                            "right": {
+                              "ref": "step:window_ok/start"
+                            }
+                          }
+                        },
+                        {
+                          "cmp": {
+                            "left": {
+                              "ref": "item:available_to"
+                            },
+                            "op": "ge",
+                            "right": {
+                              "ref": "step:window_ok/end"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "version": "2.0.0",
+  "actionability": {
+    "caller_controlled": [
+      "user-supplied"
+    ],
+    "remediations": [
+      {
+        "code": "send_future_window",
+        "for": "caller",
+        "params": []
+      }
+    ],
+    "questions": [
+      {
+        "id": "ask_window",
+        "fields": [
+          "trip.window"
+        ],
+        "text": "When do you travel?"
+      },
+      {
+        "id": "ask_start",
+        "fields": [
+          "trip.window"
+        ],
+        "text": "When does your trip start?"
+      },
+      {
+        "id": "ask_end",
+        "fields": [
+          "trip.window"
+        ],
+        "text": "When does your trip end?"
+      }
+    ],
+    "constraint_groups": [],
+    "checks": [
+      {
+        "id": "future_window",
+        "subject": "trip.window",
+        "test": {
+          "cmp": {
+            "left": {
+              "ref": "input:trip.window/start"
+            },
+            "op": "gt",
+            "right": {
+              "ref": "now"
+            }
+          }
+        },
+        "on_fail": {
+          "by_provenance": {
+            "user-supplied": {
+              "refuse": {
+                "remediation": "send_future_window"
+              }
+            },
+            "model-derived": {
+              "drop_field": {
+                "notice": "inferred_window_dropped"
+              }
+            }
+          },
+          "default": "none"
+        }
+      }
+    ]
+  }
+}

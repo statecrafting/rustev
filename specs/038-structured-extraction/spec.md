@@ -1169,6 +1169,15 @@ covers the selected questions (3.13.3). An input entry whose producer's
 with the same precedence as a future `as_of`. The gate's refusals have
 goldens per reader kind.
 
+**Increment 7, part a2 (2026-10-26): the lodging example.** The lodging
+example of 3.15 is under
+`packages/rustev-pkg-lodging/tests/extraction/` (synthetic fixtures), with
+the acceptance mapping in its `ACCEPTANCE.md`. Externally blocked: the
+mixed-derived fallback over a model-admitting source (spec 035 screening),
+native and `wasm32` parity of the fallback (no wasm test harness yet; a
+native byte-identity test stands in), and the `origin/extraction`
+metrics fixture (spec 041).
+
 ## Decisions at approval
 
 Each is decided within this spec under the work order, inside the binding

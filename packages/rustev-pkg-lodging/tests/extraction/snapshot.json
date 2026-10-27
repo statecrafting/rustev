@@ -1,0 +1,40 @@
+{
+  "schema": "rustev.snapshot/2",
+  "entries": [
+    {
+      "field": "hotels",
+      "value": [
+        {
+          "id": "all-year",
+          "available_from": 1790164800000,
+          "available_to": 1900000000000
+        },
+        {
+          "id": "short-stay",
+          "available_from": 1790164800000,
+          "available_to": 1790251200000
+        }
+      ],
+      "provenance": "system-of-record",
+      "as_of_ms": 1790164800000,
+      "source": "SYNTHETIC:lodging-extraction"
+    },
+    {
+      "field": "trip.text",
+      "value": "SYNTHETIC party 4",
+      "provenance": "system-of-record",
+      "as_of_ms": 1790164800000,
+      "source": "SYNTHETIC:lodging-extraction"
+    },
+    {
+      "field": "feature_vocabulary",
+      "value": [
+        "pool",
+        "quiet"
+      ],
+      "provenance": "system-of-record",
+      "as_of_ms": 1790164800000,
+      "source": "SYNTHETIC:lodging-extraction"
+    }
+  ]
+}

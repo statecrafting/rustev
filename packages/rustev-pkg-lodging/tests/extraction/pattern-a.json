@@ -1,0 +1,284 @@
+{
+  "inputs": [
+    {
+      "name": "trip.text",
+      "type": {
+        "text": {
+          "max_bytes": 128
+        }
+      },
+      "provenance": [
+        "system-of-record"
+      ],
+      "freshness": "not_required"
+    },
+    {
+      "name": "trip.window",
+      "type": {
+        "record": {
+          "fields": [
+            {
+              "name": "start",
+              "type": "timestamp"
+            },
+            {
+              "name": "end",
+              "type": "timestamp"
+            }
+          ]
+        }
+      },
+      "provenance": [
+        "user-supplied",
+        "model-derived"
+      ],
+      "freshness": "not_required"
+    },
+    {
+      "name": "feature_vocabulary",
+      "type": {
+        "list": {
+          "item": {
+            "text": {
+              "max_bytes": 64
+            }
+          },
+          "max_items": 10
+        }
+      },
+      "provenance": [
+        "system-of-record"
+      ],
+      "freshness": "not_required"
+    },
+    {
+      "name": "hotels",
+      "type": {
+        "list": {
+          "item": {
+            "record": {
+              "fields": [
+                {
+                  "name": "id",
+                  "type": {
+                    "text": {
+                      "max_bytes": 32
+                    }
+                  }
+                },
+                {
+                  "name": "available_from",
+                  "type": "timestamp"
+                },
+                {
+                  "name": "available_to",
+                  "type": "timestamp"
+                }
+              ]
+            }
+          },
+          "max_items": 10
+        }
+      },
+      "provenance": [
+        "system-of-record"
+      ],
+      "freshness": "not_required"
+    }
+  ],
+  "limits": {
+    "deadline_ms": 2000,
+    "distribution_tolerance": "0.000001",
+    "max_projection_bytes": 65536,
+    "max_semantic_requests": 0,
+    "on_excess": "refuse"
+  },
+  "name": "lodging-extraction",
+  "package": "synthetic-lodging",
+  "policy": {
+    "on_unresolved": [
+      {
+        "target": "step:eligible",
+        "reasons": "any",
+        "action": "propagate"
+      },
+      {
+        "target": "input:trip.window",
+        "reasons": "any",
+        "action": "as_unmet"
+      }
+    ],
+    "rules": [
+      {
+        "id": "dated",
+        "when": {
+          "exact": {
+            "present": "input:trip.window"
+          }
+        },
+        "then": {
+          "propose": {
+            "action": "search_dated",
+            "params": [
+              {
+                "name": "hotels",
+                "value": {
+                  "ref": "step:eligible"
+                }
+              },
+              {
+                "name": "window",
+                "value": {
+                  "ref": "input:trip.window"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "undated",
+        "when": "always",
+        "then": {
+          "propose": {
+            "action": "search_undated",
+            "params": [
+              {
+                "name": "hotels",
+                "value": {
+                  "ref": "step:eligible"
+                }
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "adjustments": []
+  },
+  "schema": "rustev.definition/2",
+  "steps": [
+    {
+      "id": "eligible",
+      "body": {
+        "exact": {
+          "op": "filter_with_reasons",
+          "version": 1,
+          "args": {
+            "list": "input:hotels",
+            "id_field": "id",
+            "rules": [
+              {
+                "name": "available",
+                "predicate": {
+                  "any": [
+                    {
+                      "not": {
+                        "present": "input:trip.window"
+                      }
+                    },
+                    {
+                      "all": [
+                        {
+                          "cmp": {
+                            "left": {
+                              "ref": "item:available_from"
+                            },
+                            "op": "le",
+                            "right": {
+                              "ref": "input:trip.window/start"
+                            }
+                          }
+                        },
+                        {
+                          "cmp": {
+                            "left": {
+                              "ref": "item:available_to"
+                            },
+                            "op": "ge",
+                            "right": {
+                              "ref": "input:trip.window/end"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "version": "2.0.0",
+  "actionability": {
+    "caller_controlled": [
+      "user-supplied"
+    ],
+    "remediations": [
+      {
+        "code": "send_future_window",
+        "for": "caller",
+        "params": []
+      }
+    ],
+    "questions": [
+      {
+        "id": "ask_window",
+        "fields": [
+          "trip.window"
+        ],
+        "text": "When do you travel?"
+      },
+      {
+        "id": "ask_start",
+        "fields": [
+          "trip.window"
+        ],
+        "text": "When does your trip start?"
+      },
+      {
+        "id": "ask_end",
+        "fields": [
+          "trip.window"
+        ],
+        "text": "When does your trip end?"
+      }
+    ],
+    "constraint_groups": [],
+    "checks": [
+      {
+        "id": "future_window",
+        "subject": "trip.window",
+        "test": {
+          "cmp": {
+            "left": {
+              "ref": "input:trip.window/start"
+            },
+            "op": "gt",
+            "right": {
+              "ref": "now"
+            }
+          }
+        },
+        "on_fail": {
+          "by_provenance": {
+            "user-supplied": {
+              "refuse": {
+                "remediation": "send_future_window"
+              }
+            },
+            "model-derived": {
+              "drop_field": {
+                "notice": "inferred_window_dropped"
+              }
+            }
+          },
+          "default": "none"
+        }
+      }
+    ]
+  }
+}

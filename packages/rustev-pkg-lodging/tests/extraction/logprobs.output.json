@@ -1,0 +1,27 @@
+{
+  "typed_record": {
+    "fields": {
+      "window": {
+        "start": "2027-01-01",
+        "end": "2027-01-02"
+      },
+      "party_size": 4,
+      "features": [
+        "pool"
+      ],
+      "area_name": "SYNTHETIC area",
+      "insufficient": false
+    },
+    "logprobs": [
+      {
+        "field": "insufficient",
+        "item": "none",
+        "values": {
+          "false": 0.0,
+          "true": -1.0
+        }
+      }
+    ],
+    "provider_reported": {}
+  }
+}
