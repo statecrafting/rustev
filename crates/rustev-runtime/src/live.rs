@@ -104,6 +104,9 @@ pub struct LiveRequest {
 /// or spent.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LiveRefusal {
+    /// Source operations need their own authorization and spend identities.
+    /// This backend-only gated entry point refuses them before admission.
+    SpendAcquisitionUnsupported,
     /// The decision id is the historical decision's.
     HistoricalDecisionId,
     /// The historical link names a decision id outside 1 to 256 bytes.
@@ -131,6 +134,9 @@ pub enum LiveRefusal {
 impl fmt::Display for LiveRefusal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            LiveRefusal::SpendAcquisitionUnsupported => {
+                f.write_str("gated live acquisition dispatch is not implemented")
+            }
             LiveRefusal::HistoricalDecisionId => {
                 f.write_str("a live re-execution needs a new decision id, not the historical one")
             }
@@ -160,6 +166,8 @@ impl std::error::Error for LiveRefusal {}
 /// attempt, charge and remote state stays with the caller (spec 026, 5).
 #[derive(Debug)]
 pub struct LiveResult {
+    /// First spend refusal; later attempts of this decision were not sent.
+    pub spend_refusal: Option<crate::SpendRefusal>,
     pub completion: Completion,
     /// The new run record; the evidence of execution.
     pub record: Arc<RunRecord>,
@@ -188,6 +196,8 @@ struct Presented {
 /// The live path's state within one decision.
 pub(crate) struct LiveCtx<'l> {
     authorizer: &'l dyn LiveAuthorizer,
+    spend: Option<crate::LiveSpend<'l>>,
+    spend_refusal: Mutex<Option<crate::SpendRefusal>>,
     subject: &'l Handle,
     scope: &'l Scope,
     operations: BTreeMap<String, Operation>,
@@ -206,6 +216,64 @@ pub(crate) struct Proposal<'p> {
 }
 
 impl LiveCtx<'_> {
+    pub(crate) fn spend_refusal(&self) -> Option<crate::SpendRefusal> {
+        self.spend_refusal
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
+    }
+
+    pub(crate) fn reserve_spend(
+        &self,
+        cx: &DecisionCtx<'_, '_>,
+        p: Proposal<'_>,
+    ) -> Result<Option<crate::spend::HeldSpend<'_>>, crate::SpendRefusal> {
+        let Some(spend) = self.spend else {
+            return Ok(None);
+        };
+        let mut refusal = self.spend_refusal.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(r) = &*refusal {
+            return Err(r.clone());
+        }
+        let binding = spend
+            .bindings
+            .iter()
+            .find(|b| b.backend_id == p.target.backend_id && b.artifact == p.target.artifact);
+        let result = match binding {
+            None => Err(crate::SpendRefusal::new("spend-unit")),
+            Some(binding) => spend.gate.reserve(&crate::SpendAttempt {
+                decision_id: cx.decision_id.to_string(),
+                attempt_id: p.attempt_id.to_string(),
+                backend_id: p.target.backend_id.clone(),
+                target: p.target_index as u32,
+                artifact: p.target.artifact.clone(),
+                operation: self.operations[&p.req.step],
+                bound: p.bound,
+                cost_unit: binding.cost_unit,
+            }),
+        };
+        match result {
+            Ok(ticket) => Ok(Some(crate::spend::HeldSpend::new(spend.gate, ticket))),
+            Err(r) => {
+                *refusal = Some(r.clone());
+                Err(r)
+            }
+        }
+    }
+
+    pub(crate) fn expire_authorization(&self, attempt_id: &str) {
+        let mut presented = self.presented.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(p) = presented.iter_mut().find(|p| p.attempt_id == attempt_id)
+            && let AuthorizationOutcome::Allowed { reference } = &p.authorization
+        {
+            p.authorization = AuthorizationOutcome::Refused {
+                refusal: AuthorizationRefusal::Expired,
+                reference: Some(reference.clone()),
+                detail: "authorization expired during spend reservation".into(),
+            };
+        }
+    }
+
     /// Present one proposed attempt to the host, after its reservation and
     /// immediately before dispatch, and record the answer. `Ok` only for an
     /// allow that names this exact request and is still valid now.
@@ -213,7 +281,7 @@ impl LiveCtx<'_> {
         &self,
         cx: &DecisionCtx<'_, '_>,
         p: Proposal<'_>,
-    ) -> Result<(), AuthorizationRefusal> {
+    ) -> Result<u64, AuthorizationRefusal> {
         let now = cx.rt.clock.now();
         let identity = cx
             .ev()
@@ -258,6 +326,7 @@ impl LiveCtx<'_> {
             reference,
             detail: cut(detail, DETAIL_BYTES),
         };
+        let mut valid_until = now;
         let outcome = match catch_unwind(AssertUnwindSafe(|| self.authorizer.authorize(&asked))) {
             Err(p) => refused(
                 AuthorizationRefusal::Errored,
@@ -290,12 +359,13 @@ impl LiveCtx<'_> {
                         &format!("the answer was valid for {valid_for_ms} ms"),
                     )
                 } else {
+                    valid_until = now.saturating_add(valid_for_ms);
                     AuthorizationOutcome::Allowed { reference }
                 }
             }
         };
         let result = match &outcome {
-            AuthorizationOutcome::Allowed { .. } => Ok(()),
+            AuthorizationOutcome::Allowed { .. } => Ok(valid_until),
             AuthorizationOutcome::Refused { refusal, .. } => Err(*refusal),
         };
         self.presented
@@ -383,6 +453,44 @@ impl Runtime {
         authorizer: &dyn LiveAuthorizer,
         cancel: &CancelSignal,
     ) -> Result<LiveResult, LiveRefusal> {
+        self.reexecute_live_inner(plan, req, authorizer, cancel, None)
+            .await
+    }
+
+    /// Live re-execution with a durable spend gate, after budget and host
+    /// authorization on every attempt. Existing ungated callers are unchanged.
+    /// Plans with acquisitions are refused before admission until source
+    /// authorization and spend identities are supported.
+    pub async fn reexecute_live_with_gate(
+        &self,
+        plan: &PreparedPlan,
+        req: LiveRequest,
+        authorizer: &dyn LiveAuthorizer,
+        cancel: &CancelSignal,
+        spend: crate::LiveSpend<'_>,
+    ) -> Result<LiveResult, LiveRefusal> {
+        self.reexecute_live_inner(plan, req, authorizer, cancel, Some(spend))
+            .await
+    }
+
+    async fn reexecute_live_inner(
+        &self,
+        plan: &PreparedPlan,
+        req: LiveRequest,
+        authorizer: &dyn LiveAuthorizer,
+        cancel: &CancelSignal,
+        spend: Option<crate::LiveSpend<'_>>,
+    ) -> Result<LiveResult, LiveRefusal> {
+        if spend.is_some()
+            && plan
+                .compiled()
+                .plan
+                .acquisitions
+                .as_ref()
+                .is_some_and(|a| !a.is_empty())
+        {
+            return Err(LiveRefusal::SpendAcquisitionUnsupported);
+        }
         if req
             .historical
             .as_ref()
@@ -433,6 +541,8 @@ impl Runtime {
             .collect();
         let live = LiveCtx {
             authorizer,
+            spend,
+            spend_refusal: Mutex::new(None),
             subject: &req.subject,
             scope: &req.scope,
             operations,
@@ -473,6 +583,7 @@ impl Runtime {
                 record.termination == Termination::Cancelled,
             ))
         });
+        let spend_refusal = live.spend_refusal();
         let presented = live
             .presented
             .into_inner()
@@ -485,6 +596,7 @@ impl Runtime {
             _ => Completion::Cancelled,
         };
         Ok(LiveResult {
+            spend_refusal,
             completion,
             record,
             delivery,

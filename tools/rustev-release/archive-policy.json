@@ -165,6 +165,7 @@
         "src/optimization.rs",
         "src/progress.rs",
         "src/sink.rs",
+        "src/spend.rs",
         "src/testdata/generate-step.json",
         "src/testdata/generation.rs",
         "src/testdata/scripted.rs",

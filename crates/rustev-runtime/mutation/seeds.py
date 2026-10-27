@@ -186,7 +186,7 @@ SEEDS = [
         "live: a refused attempt is dispatched anyway",
         RT + "live.rs",
         "AuthorizationOutcome::Refused { refusal, .. } => Err(*refusal),",
-        "AuthorizationOutcome::Refused { .. } => Ok(()),",
+        "AuthorizationOutcome::Refused { .. } => Ok(u64::MAX),",
         ["--test", "live"],
     ),
     (

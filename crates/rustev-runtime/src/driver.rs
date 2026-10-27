@@ -1779,6 +1779,14 @@ pub(crate) async fn drive(
                 return b.cancelled();
             }
 
+            if let Some(refusal) = cx.live.and_then(LiveCtx::spend_refusal) {
+                return b.stop(
+                    &refusal.code,
+                    Unresolved::BackendUnavailable {
+                        detail: refusal.code.clone(),
+                    },
+                );
+            }
             let backend = &target.registered.backend;
             let bound = match catch_unwind(AssertUnwindSafe(|| backend.cost_bound(&req.projection)))
             {
@@ -1834,6 +1842,7 @@ pub(crate) async fn drive(
             // after its reservation and immediately before dispatch. A
             // refusal ends the request; nothing retries, falls back or
             // downgrades to avoid it (spec 026, 3.3).
+            let mut authorization_expiry = None;
             if let Some(live) = cx.live {
                 let role = if tries > 1 {
                     AttemptRole::Retry
@@ -1864,6 +1873,7 @@ pub(crate) async fn drive(
                         },
                     );
                 }
+                authorization_expiry = answer.ok();
                 // The host's answer is adapter-like code: check again.
                 if cx.now() >= cx.deadline() {
                     cx.release(reserved);
@@ -1874,6 +1884,76 @@ pub(crate) async fn drive(
                     return b.cancelled();
                 }
             }
+            // The spend gate runs after the host's answer and immediately
+            // before dispatch (spec 043, 3.6.2).
+            let spend_held = match cx.live {
+                None => None,
+                Some(live) => {
+                    let held = match live.reserve_spend(
+                        cx,
+                        Proposal {
+                            req: &req,
+                            target_index: t,
+                            target,
+                            role: if tries > 1 {
+                                AttemptRole::Retry
+                            } else if t > 0 {
+                                AttemptRole::Fallback
+                            } else {
+                                AttemptRole::Primary
+                            },
+                            attempt_id: &attempt_id,
+                            bound,
+                            reserved,
+                        },
+                    ) {
+                        Ok(held) => held,
+                        Err(refusal) => {
+                            cx.release(reserved);
+                            return b.stop(
+                                &refusal.code,
+                                Unresolved::BackendUnavailable {
+                                    detail: refusal.code.clone(),
+                                },
+                            );
+                        }
+                    };
+                    // Gate code can consume time or raise cancellation: check
+                    // again. Nothing has been sent yet, so both accounting
+                    // reservations are released.
+                    if cx.now() >= cx.deadline() {
+                        if let Some(held) = held {
+                            held.release();
+                        }
+                        cx.release(reserved);
+                        return b.stop("deadline", Unresolved::DeadlineExceeded);
+                    }
+                    if cx.cancel.is_raised() {
+                        if let Some(held) = held {
+                            held.release();
+                        }
+                        cx.release(reserved);
+                        return b.cancelled();
+                    }
+                    held
+                }
+            };
+            if spend_held.is_some() && authorization_expiry.is_some_and(|until| cx.now() >= until) {
+                if let Some(held) = spend_held {
+                    held.release();
+                }
+                cx.release(reserved);
+                if let Some(live) = cx.live {
+                    live.expire_authorization(&attempt_id);
+                }
+                let detail = rustev_contract::live::AuthorizationRefusal::Expired.to_string();
+                return b.stop(
+                    &detail,
+                    Unresolved::BackendUnavailable {
+                        detail: detail.clone(),
+                    },
+                );
+            }
             let held = cx.hold(
                 &attempt_id,
                 reserved,
@@ -1883,6 +1963,9 @@ pub(crate) async fn drive(
                 attempt(cx, target, &req, &attempt_id, step.timeout).await;
             drop(permit);
             held.settle(charge);
+            if let Some(held) = spend_held {
+                held.settle(&charge);
+            }
 
             record_units(cx, &req, target, &end, &mut b.screen);
             let (record_end, next) = judge_end(cx, &req, end);
