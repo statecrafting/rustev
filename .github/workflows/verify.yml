@@ -1,6 +1,9 @@
 # Every approved spec's declared acceptance (`make verify`, `spec-spine
 # verify`), a reusable workflow that ci-gate calls and requires
-# (ci.extra_required_jobs). Whole specs run in four isolated groups.
+# (ci.extra_required_jobs). Whole specs run in isolated groups.
+# A pull request's own run checks the partition only; the merge queue entry,
+# which tests the change against the latest main, and every push to main run
+# every group. The label `statecraft:stacked-ci` runs them on a pull request.
 # Not rendered by the setup profile: owned by spec 001.
 name: verify
 
@@ -16,19 +19,30 @@ jobs:
     timeout-minutes: 5
     outputs:
       matrix: ${{ steps.partition.outputs.matrix }}
+      run: ${{ steps.partition.outputs.run }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Test acceptance partition controls
         run: python3 -m unittest discover -s scripts/acceptance -p 'test_*.py'
       - name: Check complete coverage and plan groups
         id: partition
+        env:
+          EVENT: ${{ github.event_name }}
+          STACKED_CI: ${{ contains(github.event.pull_request.labels.*.name, 'statecraft:stacked-ci') }}
         run: |
           matrix=$(python3 scripts/acceptance/verify.py --matrix)
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          if [ "$EVENT" = pull_request ] && [ "$STACKED_CI" != true ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Declared acceptance runs in the merge queue for this pull request." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
 
   acceptance:
     name: acceptance (${{ matrix.group }})
     needs: plan
+    if: needs.plan.outputs.run == 'true'
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
@@ -110,5 +124,13 @@ jobs:
       - name: Require every acceptance group
         env:
           PLAN_RESULT: ${{ needs.plan.result }}
+          RUN: ${{ needs.plan.outputs.run }}
           ACCEPTANCE_RESULT: ${{ needs.acceptance.result }}
-        run: test "$PLAN_RESULT" = success && test "$ACCEPTANCE_RESULT" = success
+        # Skipped is accepted only when the plan chose not to run the groups.
+        run: |
+          test "$PLAN_RESULT" = success
+          if [ "$RUN" = false ]; then
+            test "$ACCEPTANCE_RESULT" = skipped
+          else
+            test "$ACCEPTANCE_RESULT" = success
+          fi

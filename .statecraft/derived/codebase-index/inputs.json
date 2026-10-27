@@ -22,13 +22,13 @@
       "contentHash": "bede732e7b06486451c7c08844bce094b37405bf5879cb5f2a50dc1d7615bc3f"
     },
     ".github/workflows/verify.yml": {
-      "contentHash": "009d9971c26586d5d6df5731de4b54626b9289b758e0e077bf1a6a1d1f4a7da7"
+      "contentHash": "b12c25bae4366863390487890e18399bba6aa381270fc47d3ef42b9c93e23389"
     },
     ".gitignore": {
       "contentHash": "218b76a5e1c09226bf9d0f4b5fd2f5ef13c7d8419386e4ca3907b422f50e1bef"
     },
     "AGENTS.md": {
-      "contentHash": "e399c95e8d862ce410ba3f363445f0bf94150eaafded33cdd41c437a62e851b6"
+      "contentHash": "278d5561b60c28ddab7090f42c51c3d7ffd02720f6296e8e1b8a5189766890e2"
     },
     "Cargo.toml": {
       "contentHash": "024a615d9893b4c9077b298b57d1668e273ede4c5de9608109e186f00f24a7c7"
