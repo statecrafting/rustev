@@ -170,7 +170,7 @@
         "src/wait.rs"
       ],
       "max_archive_bytes": 163840,
-      "max_unpacked_bytes": 327680
+      "max_unpacked_bytes": 393216
     },
     "rustev-eval": {
       "files": [

@@ -788,3 +788,11 @@ version alone, so the `0829dfa` candidate verified `rustev-core` against
 an earlier commit's `rustev-contract` and failed with E0599 until they
 were removed by hand.
 
+**Candidate run, 2026-10-27, at `43e98b4` (before 0.2.0).** The archive
+check refused `rustev-runtime`: it unpacks to 346,511 bytes against its
+reviewed bound of 327,680 (320 KiB), after spec 037's and 038's runtime
+stages and the unit-test fixtures 037 packages under `src/testdata/`
+(3.7). The bound becomes 393,216 (384 KiB); its archive (84,908 bytes
+against 160 KiB), its file list and every other bound are unchanged. No
+other member was over a bound; `rustev-core` unpacks to 1,220,234 of its
+1,310,720.
