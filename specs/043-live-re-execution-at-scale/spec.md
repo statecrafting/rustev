@@ -2,7 +2,7 @@
 id: "043-live-re-execution-at-scale"
 title: "Live re-execution at dataset scale with spend caps (amends 026 and 006)"
 status: approved
-implementation: pending
+implementation: in-progress
 created: "2026-10-17"
 summary: >
   An amendment of approved spec 026 (live re-execution) and of spec 006
@@ -715,6 +715,22 @@ released reservations count zero), computed from the journal at open
 (3.5.3). Tests: `crates/rustev-live/tests/journal.rs` (an existing journal
 continues byte for byte, the lock refuses a second writer, run spend
 across a reopen).
+
+**Increment 2 (2026-10-27): the configuration and checkpoint
+documents.** `crates/rustev-live/src/documents.rs` defines
+`rustev.live-config/1` (3.2), canonical with its digest as `LiveConfigId`
+(`rustev-contract`), with every member, bound and default of 3.2.1 and
+3.2.2; `LiveConfig::check` refuses `authorize` missing in the CLI or
+present in the library, duplicate bindings, a binding no candidate
+reaches and a reached binding with no entry (`invalid_input`,
+`live-config`). `decision_id` builds and validates the ids of 3.3.4.
+`rustev.live-checkpoint/1` (3.10.1) carries the run's bindings and each
+item's state, is written through a temporary file, `fsync` and rename,
+and a checkpoint whose bindings differ is refused (`checkpoint-mismatch`,
+3.10.2). Tests: `crates/rustev-live/tests/documents.rs`,
+`crates/rustev-contract/tests/live_config_id.rs`. The 3.9 members of
+`rustev.live-reexecution/1` come with the run engine, whose runtime and
+eval constructors they change.
 
 ## Decisions at approval
 
