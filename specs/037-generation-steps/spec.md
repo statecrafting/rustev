@@ -2,7 +2,7 @@
 id: "037-generation-steps"
 title: "Generation steps with deterministic backstops and per-field origin (amends 002, 003 and 004)"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-10-17"
 summary: >
   An amendment of approved specs 002, 003 and 004 (R-16), for #76 child B5
@@ -20,7 +20,7 @@ summary: >
   add to the shared #76 versions `rustev.definition/2`, `rustev.plan/3`
   and `rustev.evidence/2`; plans without any #76 construct keep
   byte-identical identities and documents. Approved
-  (A-34); implementation is in progress; approval authorizes no live provider
+  (A-34); implementation is complete; approval authorizes no live provider
   call, spend, release or real-user data.
 amends:
   - "002-decision-contract-and-pure-core"
@@ -40,6 +40,8 @@ extends:
   - { spec: "004-evaluation-and-replay", unit: { kind: directory, path: "crates/rustev-eval/" }, nature: amending }
   # Adds 037 to `make verify` when the implementation is complete.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  # Places 037 in a CI acceptance group.
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
   # Exhaustive matches over the new step body and kinds, and regenerated
   # document types of the bindings; no behavior.
   - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: additive }
@@ -970,7 +972,35 @@ claims about generated text (R-04, R-37); live provider calls or spend.
 
 ## Verification
 
-Pending with implementation. Approval satisfies no acceptance item.
+Declared for `spec-spine verify 037`; 037 is in `make verify` and in CI's
+`integrations-core` acceptance group. Every command is repository-local
+and deterministic over scripted backends and screeners; no live provider
+call is part of declared verification.
+
+```verify:cli
+# 3.2, 3.9, 3.17: the contract vocabulary, envelope and unchanged bytes.
+cargo test -p rustev-contract --locked --test generation_wire --test track_versions
+# 3.4, 3.5: the prompt and backstop template languages and their corpus.
+cargo test -p rustev-core --locked --test template
+# 3.1 to 3.3, 3.6, 3.11: compilation, isolation, model_output_flow and screening.
+cargo test -p rustev-core --locked --test generation_compile
+# 3.7 to 3.10: requests, validation, repair, ownership and per-field origin.
+cargo test -p rustev-core --locked --test generation_eval
+# 3.17: every committed golden and reference PlanId byte-identical.
+cargo test -p rustev-core --locked --test identity --test reference_plans
+# 3.11 to 3.14: the generation stage, screening, streaming and caching.
+cargo test -p rustev-runtime --locked --test generation
+cargo test -p rustev-runtime --locked --lib generation_acceptance
+# 3.15, 3.16: capture, replay and the text metrics.
+cargo test -p rustev-eval --locked --test generation_replay
+# The Acceptance's seeded defects, each detected.
+sh crates/rustev-eval/mutation/seeds.sh "spec 037"
+```
+
+Externally blocked, reported as such and never as passed: identical
+backstop rendering compiled for `wasm32-wasip1` under a WASI runtime
+(#76 A1's toolchain), and the #76 F1 result-cache conformance fixture,
+committed as pending for F1 to pass.
 
 ## Implementation record
 
@@ -1145,6 +1175,13 @@ no dispatch (`crates/rustev-core/tests/generation_eval.rs`,
 `crates/rustev-runtime/tests/generation.rs`,
 `crates/rustev-eval/tests/generation_replay.rs`). Mutation seeds cover a
 field screened twice, repair after a block and an ignored verdict.
+
+**Closure (2026-10-26).** 037 is in `make verify` and in CI's
+`integrations-core` acceptance group; its declared commands pass,
+including the twelve seeded defects, each detected. The screening
+acceptance items, externally blocked until spec 035 was implemented, are
+met by increment 8. Two items remain externally blocked, as the
+Verification section states.
 
 **Owner decision A-49 (2026-10-23): dependencies.** Spec 030 is no longer
 a declared dependency of this spec. No behavior or acceptance item here
