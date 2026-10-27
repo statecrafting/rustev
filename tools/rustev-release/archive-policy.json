@@ -95,6 +95,7 @@
         "src/execution.rs",
         "src/expr.rs",
         "src/extraction_compile.rs",
+        "src/extraction_eval.rs",
         "src/extraction_fallback.rs",
         "src/extraction_validate.rs",
         "src/generation.rs",

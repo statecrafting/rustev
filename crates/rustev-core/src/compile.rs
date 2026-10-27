@@ -805,7 +805,7 @@ pub fn compile_with_templates(
 }
 
 /// Check extraction with supplied fallback programs and prompt documents.
-/// Acceptance steps remain deferred; extraction emits plan 3 bindings.
+/// Extraction and acceptance emit plan 3 bindings.
 pub fn compile_with_extraction_documents(
     def: &Definition,
     descriptors: &[BackendDescriptor],

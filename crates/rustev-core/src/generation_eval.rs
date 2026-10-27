@@ -848,7 +848,7 @@ fn from_out(v: &OutValue) -> Result<Value, GenerationError> {
 }
 // Spec 037 3.3.3, 3.4.3 and 3.4.5: the compiler refuses a ranking or
 // duration template read (23 `template`), so the `None` arms are unreachable.
-fn template_value(v: &Value) -> Option<t::Value> {
+pub(crate) fn template_value(v: &Value) -> Option<t::Value> {
     Some(match v {
         Value::Bool(v) => t::Value::Bool(*v),
         Value::Integer(v) => t::Value::Integer(*v),
