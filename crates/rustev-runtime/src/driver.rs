@@ -634,6 +634,7 @@ pub(crate) fn observation(
         allocated_charge_units: 0,
         shared_liability_units: 0,
         diagnostics: vec![],
+        shared: None,
     };
     for d in diagnostics {
         record.diagnose(cut(&d, DETAIL_BYTES));

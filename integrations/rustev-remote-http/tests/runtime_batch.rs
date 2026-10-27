@@ -58,6 +58,8 @@ fn policy(batch: bool, steps: Vec<rustev_contract::execution::StepExecution>) ->
             allocation: BatchChargeAllocation::EvenRemainderByMemberIndex,
         }),
         memory_cache: None,
+        shared_calls: None,
+        persistent_cache: None,
     });
     p
 }

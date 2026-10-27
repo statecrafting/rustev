@@ -49,6 +49,10 @@ extends:
   - { spec: "009-remote-adapter-protocol", unit: { kind: directory, path: "integrations/rustev-remote-http/" }, nature: amending }
   # The production batching posture and qualification harness.
   - { spec: "012-jev-integration", unit: { kind: directory, path: "integrations/rustev-jev/" }, nature: amending }
+  # The Node and WebAssembly declarations generated from the contract
+  # schemas this spec's members change (spec 027, 3.2.3).
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-node/" }, nature: additive }
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-wasm/" }, nature: additive }
   # Archive policy entries and byte budgets for the new source files.
   - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
   # Adds 044 to `make verify` when the implementation is complete.
@@ -170,6 +174,9 @@ When delivered:
 - `integrations/rustev-remote-http/` (owner 009) and
   `integrations/rustev-jev/` (owner 012): per-item isolation in
   adapter-scoped batching and the production batching posture.
+- `integrations/rustev-node/` and `integrations/rustev-wasm/` (owner 027):
+  only their generated `types/rustev-documents.d.ts`, regenerated from the
+  contract schemas the new members change.
 - `tools/rustev-release/` (owner 031): the archive policy entry of each
   new source file in the crates above, and their archive byte budgets.
 - `Makefile` (owner 001): 044 joins `make verify` at completion.
@@ -846,6 +853,35 @@ the change; the spec 035 screening tests are unchanged, and spec 035's
 mutation seed `per_item request batched` in
 `crates/rustev-eval/mutation/seeds.py` now names the rewritten line, so
 its acceptance still detects every seed.
+
+**Increment 2, part a (2026-10-27): the shared-call and persistent
+members.** `rustev-contract` adds `shared_calls` (`SharedCallPolicy`, with
+allocation `final_owner`) and `persistent_cache` (`PersistentCachePolicy`
+and its `StoreContract`) to `OptimizationPolicy`, the `shared_call`
+mechanism, and the `shared` member of `OptimizationRecord`
+(`SharedRecord`, 3.2.5); each is omitted when absent. `rustev-core`
+refuses an incomplete member with the 3.9 code as the detail's first
+token: `shared_call_bounds`, `store_contract_incomplete` (naming the blank
+term) and `persistent_bounds`. The contract schemas and the generated Node
+and WebAssembly declarations are regenerated. Decisions within the spec:
+a call admits at least two waiters, a store term that is blank after
+trimming is not stated, and the persistent bounds nest
+(`max_entry_bytes <= max_scope_bytes <= max_namespace_bytes`) as the
+memory tier's do. Until each member's runtime increment lands (3 and 4),
+the compiler refuses a complete member as `<member> is not available in
+this build`, so no plan can enable a mechanism the runtime would run
+independently (017 3.1); the identity tests for these members land with
+that runtime. The planned increments change in two places: the
+`rustev.cache-entry/1` document moves to increment 4, where the
+persistent tier first writes it; and increment 4 adds a
+`crates/rustev-cli/` edge (spec 006), because the CLI matches every
+`PrepareError` and `store_missing` and `store_contract_mismatch` are new
+preparation errors. Tests:
+`shared_and_persistent_members_round_trip_and_are_omitted_when_absent`
+in `crates/rustev-contract/tests/documents.rs` and
+`incomplete_shared_and_persistent_members_are_refused` in
+`crates/rustev-core/tests/execution.rs`; the spec 017 byte and identity
+tests are unchanged.
 
 ## Decisions at approval
 

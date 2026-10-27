@@ -238,6 +238,66 @@ fn an_execution_policy_parses_round_trips_and_is_identified() {
     ));
 }
 
+/// Spec 044, 3.1 and 3.2.5: the shared-call and persistent members and the
+/// shared record parse and round-trip canonically, and are omitted when
+/// absent, so the bytes above are unchanged.
+#[test]
+fn shared_and_persistent_members_round_trip_and_are_omitted_when_absent() {
+    use rustev_contract::canonical::canonical_value_bytes;
+    use rustev_contract::optimization::{OptimizationPolicy, OptimizationRecord};
+    let policy = serde_json::json!({
+        "admission": "refuse", "cache_namespace_version": 1,
+        "expiry": "injected_runtime_time", "key_schema_version": 1,
+        "persistent_cache": {
+            "max_entry_bytes": 1, "max_namespace_bytes": 3, "max_scope_bytes": 2,
+            "on_store_failure": "fail_closed",
+            "store_contract": {"atomicity": "a", "conflict": "c", "durability": "d",
+                "encryption": "e", "erasure": "r", "expiry": "x", "invalidation": "i",
+                "namespace": "n", "schema": "s"},
+            "ttl_ms": 1},
+        "shared_calls": {"allocation": "final_owner", "max_shared_calls": 1,
+                         "max_waiters_per_call": 2}
+    });
+    let p: OptimizationPolicy = serde_json::from_value(policy.clone()).unwrap();
+    assert_eq!(
+        canonical_value_bytes(&serde_json::to_value(&p).unwrap()).unwrap(),
+        canonical_value_bytes(&policy).unwrap()
+    );
+    let mut bare = policy.clone();
+    let o = bare.as_object_mut().unwrap();
+    o.remove("shared_calls");
+    o.remove("persistent_cache");
+    let p: OptimizationPolicy = serde_json::from_value(bare.clone()).unwrap();
+    assert_eq!(serde_json::to_value(&p).unwrap(), bare);
+    let mut unknown = policy.clone();
+    unknown["shared_calls"]["max_joins"] = serde_json::json!(1);
+    assert!(serde_json::from_value::<OptimizationPolicy>(unknown).is_err());
+
+    let record = serde_json::json!({
+        "age_ms": 0, "allocated_charge_units": 0, "charge_owner": false,
+        "invalidation_generation": 0, "key_schema_version": 1,
+        "mechanism": "shared_call", "outcome": "hit", "shared_liability_units": 0,
+        "shared": {"attempt_id": "a", "final_owner": false, "handed_off_to": "w2",
+                   "left": "cancelled", "role": "led", "shared_call_id": "s",
+                   "waiter_id": "w1"}
+    });
+    let r: OptimizationRecord = serde_json::from_value(record.clone()).unwrap();
+    assert_eq!(serde_json::to_value(&r).unwrap(), record);
+    let mut joined = record.clone();
+    let shared = joined["shared"].as_object_mut().unwrap();
+    shared.remove("left");
+    shared.remove("handed_off_to");
+    shared.insert("role".into(), "joined".into());
+    shared.insert("received_from".into(), "w0".into());
+    shared.insert("final_owner".into(), true.into());
+    let r: OptimizationRecord = serde_json::from_value(joined.clone()).unwrap();
+    assert_eq!(serde_json::to_value(&r).unwrap(), joined);
+    joined.as_object_mut().unwrap().remove("shared");
+    let r: OptimizationRecord = serde_json::from_value(joined.clone()).unwrap();
+    assert!(r.shared.is_none());
+    assert!(!serde_json::to_string(&r).unwrap().contains("shared\""));
+}
+
 #[test]
 fn a_run_record_parses_under_record_limits() {
     use rustev_contract::run::{

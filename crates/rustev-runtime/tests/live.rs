@@ -766,6 +766,8 @@ async fn live_requests_bypass_the_memory_cache_and_batches() {
             ttl_ms: 60_000,
             eviction: EvictionOrder::Fifo,
         }),
+        shared_calls: None,
+        persistent_cache: None,
     });
     let plan = Arc::new(rig.rt.prepare(support_compiled(Some(&policy))).unwrap());
     // Warm the cache with an ordinary decision.

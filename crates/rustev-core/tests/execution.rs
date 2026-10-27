@@ -600,6 +600,8 @@ fn optimized() -> ExecutionPolicy {
             ttl_ms: 1_000,
             eviction: EvictionOrder::Fifo,
         }),
+        shared_calls: None,
+        persistent_cache: None,
     });
     policy
 }
@@ -709,6 +711,128 @@ fn incomplete_or_unsatisfiable_optimization_policies_are_refused() {
             o.batch = None;
         }
         accepted(&policy);
+    }
+}
+
+fn store_contract() -> rustev_contract::optimization::StoreContract {
+    let term = |t: &str| format!("SYNTHETIC {t} term");
+    rustev_contract::optimization::StoreContract {
+        schema: term("schema"),
+        namespace: term("namespace"),
+        durability: term("durability"),
+        encryption: term("encryption"),
+        atomicity: term("atomicity"),
+        conflict: term("conflict"),
+        expiry: term("expiry"),
+        invalidation: term("invalidation"),
+        erasure: term("erasure"),
+    }
+}
+
+/// `optimized()` with spec 044's members alone.
+fn shared_and_persistent() -> ExecutionPolicy {
+    use rustev_contract::optimization::*;
+    let mut policy = optimized();
+    let o = policy.optimization.as_mut().unwrap();
+    o.batch = None;
+    o.memory_cache = None;
+    o.shared_calls = Some(SharedCallPolicy {
+        max_shared_calls: 8,
+        max_waiters_per_call: 4,
+        allocation: SharedChargeAllocation::FinalOwner,
+    });
+    o.persistent_cache = Some(PersistentCachePolicy {
+        store_contract: store_contract(),
+        max_entry_bytes: 1_024,
+        max_scope_bytes: 4_096,
+        max_namespace_bytes: 8_192,
+        ttl_ms: 60_000,
+        on_store_failure: StoreFailurePolicy::ContinueWithoutCache,
+    });
+    policy
+}
+
+/// Spec 044, 3.9: one row per compile refusal of the shared-call and
+/// persistent members, each against the complete neighbour. Until their
+/// runtime increments land, the complete members are themselves refused as
+/// not available, never run independently.
+#[test]
+fn incomplete_shared_and_persistent_members_are_refused() {
+    use rustev_contract::optimization::OptimizationPolicy;
+    type Edit = fn(&mut OptimizationPolicy);
+    let shared = "shared_call_bounds: ";
+    let persistent = "persistent_bounds: ";
+    let rows: [(&str, Edit, &str); 9] = [
+        (
+            "no shared calls",
+            |p| p.shared_calls.as_mut().unwrap().max_shared_calls = 0,
+            shared,
+        ),
+        (
+            "one waiter",
+            |p| p.shared_calls.as_mut().unwrap().max_waiters_per_call = 1,
+            shared,
+        ),
+        (
+            "blank term",
+            |p| p.persistent_cache.as_mut().unwrap().store_contract.conflict = " ".into(),
+            "store_contract_incomplete: the store contract states no conflict term",
+        ),
+        (
+            "empty term",
+            |p| p.persistent_cache.as_mut().unwrap().store_contract.erasure = String::new(),
+            "store_contract_incomplete: the store contract states no erasure term",
+        ),
+        (
+            "zero entry",
+            |p| p.persistent_cache.as_mut().unwrap().max_entry_bytes = 0,
+            persistent,
+        ),
+        (
+            "zero ttl",
+            |p| p.persistent_cache.as_mut().unwrap().ttl_ms = 0,
+            persistent,
+        ),
+        (
+            "entry above scope",
+            |p| p.persistent_cache.as_mut().unwrap().max_entry_bytes = 4_097,
+            persistent,
+        ),
+        (
+            "scope above namespace",
+            |p| p.persistent_cache.as_mut().unwrap().max_scope_bytes = 8_193,
+            persistent,
+        ),
+        (
+            "zero scope and namespace",
+            |p| {
+                let c = p.persistent_cache.as_mut().unwrap();
+                c.max_scope_bytes = 0;
+                c.max_namespace_bytes = 0;
+            },
+            persistent,
+        ),
+    ];
+    for (row, edit, needle) in rows {
+        let mut policy = shared_and_persistent();
+        edit(policy.optimization.as_mut().unwrap());
+        let r = refused(&policy, needle);
+        assert_eq!(r.subject, "execution.optimization", "{row}");
+        assert!(r.detail.starts_with(needle), "{row}: {}", r.detail);
+    }
+    // Each complete member, alone or beside the spec 017 mechanisms, is
+    // refused as not yet available, never accepted and run independently.
+    for (name, keep_shared) in [("shared_calls", true), ("persistent_cache", false)] {
+        let mut policy = shared_and_persistent();
+        let o = policy.optimization.as_mut().unwrap();
+        if keep_shared {
+            o.persistent_cache = None;
+        } else {
+            o.shared_calls = None;
+        }
+        o.batch = optimized().optimization.unwrap().batch;
+        let r = refused(&policy, "is not available in this build");
+        assert_eq!(r.detail, format!("{name} is not available in this build"));
     }
 }
 

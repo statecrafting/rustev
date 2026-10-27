@@ -79,6 +79,22 @@
       },
       {
         "nature": "additive",
+        "spec": "027-node-and-wasm-bindings",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-node/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "027-node-and-wasm-bindings",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-wasm/"
+        }
+      },
+      {
+        "nature": "additive",
         "spec": "031-public-api-and-release-family",
         "unit": {
           "kind": "directory",
@@ -176,10 +192,10 @@
       }
     ],
     "sectionDigests": {
-      "044-runtime-optimization-increment-2-amends-017-003-002-009-012-and-020": "e4e34308faf4db8fd0b69ca2edf0880afa0490e5fd8c2d8573e88268789faaa9",
+      "044-runtime-optimization-increment-2-amends-017-003-002-009-012-and-020": "90586bcd69b308a45e171236af8fb556d576757969dd4de86dda396839eaac8a",
       "1-purpose": "ea80bf0f3f36a7db47061ac339b96e60d520ebbcc03c92a97ed01ffbc636bba3",
       "2-1-binding-principles-of-76": "fa0b4f40e2c3a80864d8c109330c03767c14d25dbdc6379f5666ffd220addf77",
-      "2-territory": "ba07e82bdf9da9f47af4e3ebb6675772fa9dde86e6bdb3bf1fd3ded06afd82db",
+      "2-territory": "4f44666fa2f2dffb9d94fca73faed5147c92ad9e431868f211db198a0ffbf84c",
       "3-1-policy-members-and-plan-identity": "1067ce6d34446e2a88c332abcbb3521844abda99376febedee5c3beb470d04aa",
       "3-10-compatibility": "c4891b1960108b30bf4f9d959b0298877af994004c8416cc78a0acb3208c7d69",
       "3-2-1-eligibility": "4d5843a33ed64a4bfe268e5155796abbf7ec637170841ecdcccb4fa654b3c6a5",
@@ -210,7 +226,7 @@
       "5-observable-negative-cases": "58ddc61ec6d5fb36906d88e5794f5e3057d0e7f498d04a9450a221b55290b094",
       "acceptance": "4fc00601fae7e454380245eb44b604e7b8d5dc1376bde84c5e15d663ec91a0c8",
       "decisions-at-approval": "07d8eec0785d785c4dec888d094e4ed84e5c519f1e57d0d7385b4f64aa91ba9c",
-      "implementation-record": "920264b9b9c5548dc7e5e8656ce525f2e78d1ce6a6de0d6f0d3c9251ba6da58b",
+      "implementation-record": "a3b074e5692c5797e04bf96c3aa1c9901f6aead100f41940f90bdd29fb1da175",
       "verification": "66c78ade74ffc36ba517fd2a30789886af5b72cd320117a882defe2dc0aa3933"
     },
     "sectionHeadings": [
@@ -256,6 +272,6 @@
     "summary": "An amendment of approved spec 017 (and, through it, of spec 003's concurrency and cancellation rules) for #76 child F1, which also amends specs 002, 009, 012 and 020 where its members and batching rules reach them. Completes 017 increment 2 and adds a decision-result cache. Concurrent duplicate suppression keeps spec 003's rule that the runtime spawns no task per request: a shared attempt lives in a runtime-owned slot that is driven by whichever waiter is polled, a waiter that cancels returns at once and hands charge ownership to the oldest remaining waiter, and the last waiter to leave cancels the attempt under spec 003's existing rules. Persistent caches sit behind a host-implemented `RuntimeStore` seam with durable generations, conditional writes, byte budgets and integrity-checked `rustev.cache-entry/1` entries. The decision-result cache reuses a whole decision's semantic work under a compiler-derived key that always holds plan identity, the complete authorized scope, the profile and declared upstream-origin dimensions; on a hit the core recomputes the judgment and the runtime re-runs the compiler-derived dependency closure of every declared volatile source, with a declared policy when refresh fails that never serves stale evidence as a value. Capabilities may declare `isolation: per_item`, which every batching path honours, and adapter-scoped batching gains a qualification procedure and report (`rustev.batch-qualification/1`). Plans, descriptors and records that use none of this keep their bytes and identities. Approved (A-41); implementation is in progress.\n",
     "title": "Runtime optimization increment 2: duplicate suppression, persistent and decision-result caches, batching qualification (amends 017, 003, 002, 009, 012 and 020)"
   },
-  "shardHash": "f5f9509b4d261718dcc2201e004aef61f7a235c18c3fc5666591d1ef1b3ae091",
+  "shardHash": "bf8299a411dfbdf5fc3742c5374dc6935bd903a3611760f153360c2ee3dfc092",
   "specVersion": "1.10.0"
 }
