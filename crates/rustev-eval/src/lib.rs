@@ -26,6 +26,7 @@ pub mod generator;
 pub mod gold;
 pub mod holdout;
 pub mod live;
+pub mod measures;
 pub mod metrics;
 pub mod optimization;
 pub mod ranking_metrics;
@@ -36,6 +37,7 @@ pub mod repeat_stats;
 pub mod replay;
 pub mod report;
 pub mod resolve;
+pub mod scoring;
 pub mod selection;
 
 pub use diff::{EvalDiff, diff, render_markdown};

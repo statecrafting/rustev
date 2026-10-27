@@ -145,6 +145,7 @@ fn manifest(name: &str, adapter: &str, cases: &[Case]) -> DatasetManifest {
                 split: c.split,
                 label: c.label.map_or(Label::Missing, |l| Label::Value(l.into())),
                 subgroups: vec![],
+                gold: None,
             })
             .collect(),
     }
@@ -246,6 +247,11 @@ fn config(adapter: &str, params: &[&str], probability_step: Option<&str>) -> Eva
             gate("latency", "latency_ms/p0.5", Direction::LowerIsBetter, "0"),
             fully_labeled,
         ],
+        scorers: None,
+        rubric_metrics: None,
+        human_scales: None,
+        agreements: None,
+        origin: None,
         temperature_grid: vec![dec("0.5"), dec("1"), dec("1.5"), dec("2"), dec("3")],
     }
 }

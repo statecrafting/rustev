@@ -220,6 +220,11 @@ fn config(
                 "0",
             ),
         ],
+        scorers: None,
+        rubric_metrics: None,
+        human_scales: None,
+        agreements: None,
+        origin: None,
         temperature_grid: vec![dec("0.5"), dec("1"), dec("1.5"), dec("2"), dec("3")],
     }
 }
@@ -273,6 +278,7 @@ fn manifest(name: &str, adapter: AdapterRef, cases: &[Case]) -> DatasetManifest 
                 split: c.split,
                 label: c.label.map_or(Label::Missing, |l| Label::Value(l.into())),
                 subgroups: c.subgroups.iter().map(|s| s.to_string()).collect(),
+                gold: None,
             })
             .collect(),
     }

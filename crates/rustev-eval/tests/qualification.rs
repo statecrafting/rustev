@@ -77,6 +77,7 @@ fn case(id: &str, split: Split, label: Option<&str>, subgroups: &[&str]) -> Data
         split,
         label: label.map_or(Label::Missing, |l| Label::Value(l.into())),
         subgroups: subgroups.iter().map(|s| s.to_string()).collect(),
+        gold: None,
     }
 }
 
@@ -237,6 +238,11 @@ fn config() -> EvaluatorConfig {
             min_comparable_coverage: dec("0.5"),
             min_labeled_coverage: dec("0.5"),
         }],
+        scorers: None,
+        rubric_metrics: None,
+        human_scales: None,
+        agreements: None,
+        origin: None,
         temperature_grid: vec![dec("1"), dec("2")],
     }
 }

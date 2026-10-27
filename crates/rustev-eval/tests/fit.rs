@@ -27,6 +27,7 @@ fn case(i: char, split: Split, label: Option<&str>) -> DatasetCase {
         split,
         label: label.map_or(Label::Missing, |l| Label::Value(l.into())),
         subgroups: vec![],
+        gold: None,
     }
 }
 
@@ -65,6 +66,11 @@ fn config(grid: &[&str]) -> EvaluatorConfig {
         cost_units_comparable: false,
         metrics: vec![],
         gates: vec![],
+        scorers: None,
+        rubric_metrics: None,
+        human_scales: None,
+        agreements: None,
+        origin: None,
         temperature_grid: grid.iter().map(|g| dec(g)).collect(),
     }
 }
@@ -335,6 +341,7 @@ fn another_dataset_sharing_a_fit_source_or_snapshot_does_not_qualify() {
             split: Split::FinalTest,
             label: Label::Value("a".into()),
             subgroups: vec![],
+            gold: None,
         }],
         ..manifest()
     };

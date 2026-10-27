@@ -211,6 +211,7 @@
         "src/holdout.rs",
         "src/lib.rs",
         "src/live.rs",
+        "src/measures.rs",
         "src/metrics.rs",
         "src/optimization.rs",
         "src/ranking_metrics.rs",
@@ -221,6 +222,7 @@
         "src/replay.rs",
         "src/report.rs",
         "src/resolve.rs",
+        "src/scoring.rs",
         "src/selection.rs",
         "src/testdata/lodging-emb.record.json"
       ],

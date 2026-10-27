@@ -490,6 +490,7 @@ async fn report_includes_text_metrics_and_generation_artifact() {
             split: Split::FinalTest,
             label: Label::Missing,
             subgroups: vec![],
+            gold: None,
         }],
     };
     let config = EvaluatorConfig {
@@ -526,6 +527,11 @@ async fn report_includes_text_metrics_and_generation_artifact() {
         })
         .collect(),
         gates: vec![],
+        scorers: None,
+        rubric_metrics: None,
+        human_scales: None,
+        agreements: None,
+        origin: None,
         temperature_grid: vec![],
     };
     let bundles = BTreeMap::from([(

@@ -146,7 +146,7 @@
       }
     ],
     "sectionDigests": {
-      "041-ranking-constraint-match-and-rubric-metrics-pluggable-scorers-amends-004-014-and-029": "c8ef7be16a36c8a2f5e314bef219821d10e11397fa90f90170bb9202ba719a31",
+      "041-ranking-constraint-match-and-rubric-metrics-pluggable-scorers-amends-004-014-and-029": "9035b6340fd6cff3ae6a25b4fa13a325c4d4597d8bf424eb60d61765799faaf0",
       "1-purpose": "51e08a00cd8e097638290d693e2250388a20657c51c40a9cbbfc7a284c15fe6b",
       "2-1-binding-principles-of-76": "4577bc59b9d80257a80e0a7e7fabaf4af2495ecd1bd37a24db0b490679cbaf36",
       "2-territory": "10bf11315180583b5619e68cd08324c7ec7bed0213cbb3dc4c2f9e77aec184eb",
@@ -168,7 +168,7 @@
       "5-observable-negative-cases": "cbb8b613b8740522d26156dba3477032ef7242915d01e71a9c7d4ca4654e13bc",
       "acceptance": "db750e1fabffd0367dce0d09f43304fe9164a2fcb1b959fe30d5f86ff0eb7824",
       "decisions-at-approval": "ed38f237ae942b3c0f7c28bece0f5bf1e5c629ba0d57999b8ba6d1c34d7f1e3e",
-      "implementation-record": "767fe381b1b95b9d4ce994b4221f065d89fbc7d20707fccfdaef3b3c6fc49b81",
+      "implementation-record": "4536d966be2cd87701f5da5705b25098301babb95fc13832bf6e37bbfd5b14e4",
       "verification": "4dcff6de6aef7005e943e23eb3a728b90365312b1d748a2833638a8a2fc975a5"
     },
     "sectionHeadings": [
@@ -202,6 +202,6 @@
     "summary": "An amendment of approved specs 004, 014 and 029 (R-16), for #76 child E1. Under a new `rustev.evaluator-config/3`, evaluation adds ranking metrics (precision, recall, nDCG, MRR and hit at k over graded gold relevance, with unjudged items excluded and counted, and per-position backfill rate), declarative constraint-match metrics declared in a new `rustev.task-adapter/2` and bound into evaluation identity, origin and evidence-quality rates for the constructs of #76 B1, B2, B5, B6, B7 and C2 (specs 036, 032, 037, 038, 035 and 039), and rubric metrics from pluggable scorers. Scorers are composed at compile time (a Rust trait, or a TypeScript object through the Node binding under R-38); their scores travel as `rustev.scores/1` documents bound to `rustev.score-views/1`. Model judges are ordinary plans with a `rubric` step whose retained bundles eval reproduces; their metrics are model-derived, named under `model/` and never pooled with deterministic ones, with judge agreement statistics. Gold records arrive in a new `rustev.dataset/2`. Every new metric defines its per-case measure, so spec 029's repeat statistics, intervals, slices and selection gates apply. Existing documents, identities, plans and CLI outputs keep their bytes. Approved (A-38); approval authorizes no live run, provider call or spend, and no quality claim (R-37).\n",
     "title": "Ranking, constraint-match and rubric metrics; pluggable scorers (amends 004, 014 and 029)"
   },
-  "shardHash": "4765bffa4b811429d17ca982b21ec8b896d9f3c5baefe24b21618847cb36adc6",
+  "shardHash": "1ba3f1dc17f15d78cd4259691828fba76bff75894380a48b01b44c522d7813cd",
   "specVersion": "1.10.0"
 }

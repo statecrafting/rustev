@@ -315,6 +315,11 @@ pub fn config() -> EvaluatorConfig {
             min_comparable_coverage: dec("0.5"),
             min_labeled_coverage: dec("0.5"),
         }],
+        scorers: None,
+        rubric_metrics: None,
+        human_scales: None,
+        agreements: None,
+        origin: None,
         temperature_grid: ["0.5", "0.75", "1", "1.5", "2", "3"]
             .iter()
             .map(|value| dec(value))
@@ -344,6 +349,7 @@ pub fn dataset() -> DatasetManifest {
                 split: case.split,
                 label: Label::Value(case.label.into()),
                 subgroups: vec![],
+                gold: None,
             })
             .collect(),
     }
