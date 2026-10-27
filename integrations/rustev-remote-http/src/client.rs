@@ -754,7 +754,8 @@ impl DecisionBackend for RemoteClient {
     /// Offered only when the binding enables runtime-planned batches and the
     /// negotiated terms declare shared-state batching (spec 020, 3.3).
     /// Any per-item operation disables batching for the entire backend
-    /// (spec 035, 3.15.3); the projected operation must also be declared.
+    /// (spec 035, 3.15.3, and spec 044, 3.7); the projected operation must
+    /// also be declared.
     /// Equal compatibility means the same binding and the same shared state
     /// (`instance` and `values`), which is what one request may carry.
     fn batch_capability(&self, projection: &[u8]) -> Option<BatchCapability> {
@@ -764,7 +765,7 @@ impl DecisionBackend for RemoteClient {
             .descriptor
             .operations
             .iter()
-            .any(|o| o.screen.is_some() && o.isolation == Some(Isolation::PerItem))
+            .any(|o| o.isolation == Some(Isolation::PerItem))
         {
             return None;
         }
@@ -827,13 +828,13 @@ async fn batch(inner: Arc<Inner>, call: BatchAttemptCall) -> BatchAttemptReport 
         );
     }
     // Apply the backend-wide server rule even when callers bypass
-    // batch_capability (spec 035, 3.15.3).
+    // batch_capability (spec 035, 3.15.3, and spec 044, 3.7).
     if call.members.len() > 1
         && inner
             .descriptor
             .operations
             .iter()
-            .any(|o| o.screen.is_some() && o.isolation == Some(Isolation::PerItem))
+            .any(|o| o.isolation == Some(Isolation::PerItem))
     {
         return batch_refused(
             AdapterFailure::Permanent,

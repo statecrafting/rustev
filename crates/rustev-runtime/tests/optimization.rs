@@ -217,6 +217,53 @@ async fn general_batch_is_one_dispatch_with_exact_member_evidence_and_allocation
     assert_eq!(owners, 1);
 }
 
+/// Spec 044, 3.7 and I-6: a backend whose capability declares
+/// `isolation: per_item` is never a member of a runtime-planned batch, even
+/// with batching enabled and a backend that offers one; every request is its
+/// own attempt, and the outcome equals the batched run's.
+#[tokio::test(flavor = "current_thread")]
+async fn a_per_item_capability_is_never_batched() {
+    let mut head = linear_head();
+    for op in &mut head.operations {
+        op.isolation = Some(rustev_contract::descriptor::Isolation::PerItem);
+    }
+    let mut descriptors = descriptors_with_fallbacks();
+    descriptors[0] = head.clone();
+    let compiled =
+        rustev_core::compile_with(&support_routing(), &descriptors, &cal(), &batch_policy(3))
+            .unwrap();
+    let backend = Scripted::new(head, |call| ok(call.task(), 1)).with_batch();
+    let rig = rig(config(1, 0, 3), &[(backend.clone(), 3)]);
+    let plan = rig.rt.prepare(compiled).unwrap();
+    let decided = rig
+        .rt
+        .decide(&plan, request("per-item"), &CancelSignal::new())
+        .await
+        .unwrap();
+
+    assert!(matches!(decided.completion, Completion::Judged(_)));
+    assert_eq!(batch_count(&backend), 0);
+    assert_eq!(decided.record.requests.len(), 3);
+    for record in &decided.record.requests {
+        assert_eq!(record.attempts.len(), 1);
+        assert_ne!(
+            record.optimization.as_ref().map(|o| o.mechanism),
+            Some(OptimizationMechanism::Batch)
+        );
+    }
+    let (_, batched, _) = independent_and_batched(
+        || answering(linear_head()).with_batch(),
+        "per-item-differential",
+    )
+    .await;
+    // The descriptor, and so the plan identity, differ; the outcome does not.
+    let outcome = |d: &Decided| match &d.completion {
+        Completion::Judged(j) => j.outcome.clone(),
+        Completion::Cancelled => panic!("cancelled"),
+    };
+    assert_eq!(outcome(&decided), outcome(&batched));
+}
+
 /// Spec 017, 3.5: the batch total is settled once against the summed
 /// reservation. An even share above one member's own bound is allocation
 /// evidence, not a bound violation; a total above the sum still is one.

@@ -899,14 +899,15 @@ fn batch_capability(cx: &DecisionCtx<'_, '_>, req: &SemanticRequest) -> Option<B
         return None;
     }
     let target = &step.targets[0];
-    if is_screen(cx, &req.step)
-        && target
-            .registered
-            .backend
-            .descriptor()
-            .operations
-            .iter()
-            .any(|op| op.screen.is_some() && op.isolation == Some(Isolation::PerItem))
+    // A backend with any per-item capability is never batched (spec 044,
+    // 3.7), as spec 035 3.15.3 already says for screeners.
+    if target
+        .registered
+        .backend
+        .descriptor()
+        .operations
+        .iter()
+        .any(|op| op.isolation == Some(Isolation::PerItem))
     {
         return None;
     }
