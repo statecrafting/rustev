@@ -14,7 +14,14 @@
 # reason, never as passing.
 set -eu
 
-root=$(git rev-parse --show-toplevel)
+script=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
+root=$(CDPATH='' cd -- "$script/../.." && pwd -P)
+version=${RUSTEV_ADOPTION_VERSION:-}
+if [ -n "$version" ]; then
+  case "$version" in *[!0-9.]*) exit 2 ;; esac
+  printf '%s\n' "$version" | grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' || exit 2
+  : "${RUSTEV_ADOPTION_MANIFEST:?registry adoption requires the signed manifest}"
+fi
 # The consumer's edition is the workspace's own.
 edition=$(sed -n 's/^edition = "\(.*\)"$/\1/p' "$root/Cargo.toml" | head -n 1)
 [ -n "$edition" ] || { echo "adoption: the workspace declares no edition" >&2; exit 1; }
@@ -65,9 +72,16 @@ echo "$subsets" | while IFS='|' read -r name features package chosen omitted; do
     # An empty workspace table: the consumer is its own workspace, never
     # a member of Rustev's.
     printf '[workspace]\n\n[dependencies]\n'
-    printf 'rustev = { path = "%s/integrations/rustev", default-features = false, features = [%s] }\n' "$root" "$feats"
-    if [ -n "$package" ]; then
-      printf '%s = { path = "%s/packages/%s" }\n' "$package" "$root" "$package"
+    if [ -n "$version" ]; then
+      printf 'rustev = { version = "=%s", default-features = false, features = [%s] }\n' "$version" "$feats"
+      if [ -n "$package" ]; then
+        printf '%s = "=%s"\n' "$package" "$version"
+      fi
+    else
+      printf 'rustev = { path = "%s/integrations/rustev", default-features = false, features = [%s] }\n' "$root" "$feats"
+      if [ -n "$package" ]; then
+        printf '%s = { path = "%s/packages/%s" }\n' "$package" "$root" "$package"
+      fi
     fi
   } > "$dir/Cargo.toml"
   printf '//! A consumer of the facade: subset %s.\n' "$name" > "$dir/src/lib.rs"
@@ -95,13 +109,20 @@ echo "$subsets" | while IFS='|' read -r name features package chosen omitted; do
   } > "$dir/tests/subset.rs"
   # The workspace's lockfile and pinned toolchain, so the consumer resolves
   # the reviewed versions and builds with the compiler the workspace uses.
-  cp "$root/Cargo.lock" "$dir/Cargo.lock"
-  cp "$root/rust-toolchain.toml" "$dir/rust-toolchain.toml"
+  if [ -z "$version" ]; then
+    cp "$root/Cargo.lock" "$dir/Cargo.lock"
+    cp "$root/rust-toolchain.toml" "$dir/rust-toolchain.toml"
+  else
+    (cd "$dir" && cargo generate-lockfile)
+    python3 "$script/qualify/harness.py" lock "$dir/Cargo.lock" "$RUSTEV_ADOPTION_MANIFEST"
+  fi
   echo "== subset $name: features [${features}]${package:+, package $package}"
   # The subset's own test must run and pass: a build alone is not enough.
   # The test writes a mark file, so its having run is checked directly.
   mark="$dir/ran"
-  if ! result=$(cd "$dir" && RUSTEV_ADOPTION_MARK="$mark" cargo test --quiet --test subset 2>&1); then
+  # In registry mode the lockfile was checked against the signed manifest
+  # before anything built, so the test runs `--locked` to keep it as checked.
+  if ! result=$(cd "$dir" && RUSTEV_ADOPTION_MARK="$mark" cargo test --quiet ${version:+--locked} --test subset 2>&1); then
     printf '%s\n' "$result" >&2
     echo "subset $name: tests failed" >&2
     exit 1
@@ -115,16 +136,23 @@ echo "$subsets" | while IFS='|' read -r name features package chosen omitted; do
   # packages, which the consumer's own root replaces. What it guarantees
   # instead is checked: every registry package the consumer resolved is at
   # exactly the version the workspace's lockfile pins.
-  drift=$(awk '
-    FNR == 1 { file++ }
-    /^name = / { n = $3 }
-    /^version = / { v = $3 }
-    /^source = "registry/ { if (file == 1) pinned[n] = pinned[n] " " v; else used[n " " v] = 1 }
-    END { for (k in used) { split(k, a, " "); if (index(pinned[a[1]] " ", " " a[2] " ") == 0) print k } }
-  ' "$root/Cargo.lock" "$dir/Cargo.lock")
-  if [ -n "$drift" ]; then
-    echo "subset $name: resolved versions the workspace does not pin: $drift" >&2
-    exit 1
+  if [ -z "$version" ]; then
+    drift=$(awk '
+      FNR == 1 { file++ }
+      /^name = / { n = $3 }
+      /^version = / { v = $3 }
+      /^source = "registry/ { if (file == 1) pinned[n] = pinned[n] " " v; else used[n " " v] = 1 }
+      END { for (k in used) { split(k, a, " "); if (index(pinned[a[1]] " ", " " a[2] " ") == 0) print k } }
+    ' "$root/Cargo.lock" "$dir/Cargo.lock")
+    if [ -n "$drift" ]; then
+      echo "subset $name: resolved versions the workspace does not pin: $drift" >&2
+      exit 1
+    fi
+  else
+    if [ -n "${RUSTEV_ADOPTION_EVIDENCE:-}" ]; then
+      mkdir -p "$RUSTEV_ADOPTION_EVIDENCE"
+      cp "$dir/Cargo.lock" "$RUSTEV_ADOPTION_EVIDENCE/$name.Cargo.lock"
+    fi
   fi
   tree=$(cd "$dir" && cargo tree -e normal --prefix none --format '{p}' | awk '{print $1}' | sort -u)
   for c in $chosen; do

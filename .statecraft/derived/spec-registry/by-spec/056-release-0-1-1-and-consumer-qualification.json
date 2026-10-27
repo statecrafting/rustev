@@ -83,7 +83,7 @@
       }
     ],
     "sectionDigests": {
-      "056-the-next-family-release-a-cli-version-command-declared-consumer-examples-and-the-fresh-consumer-qualification-amends-006-007-and-031": "2799d0f8c7dd12168636a07b713213b764fbe6d5972f768664924e2833e6e2e1",
+      "056-the-next-family-release-a-cli-version-command-declared-consumer-examples-and-the-fresh-consumer-qualification-amends-006-007-and-031": "b28dd3fbae56c47a9bd49e33994d8d01c1a3dddaf5bc21f1bb48affe322746c1",
       "1-purpose": "e666644f03c77644b46a2bd02ace58cdbd73be6d7e4397624b05524b8f5f68ef",
       "2-territory": "d1e67fd8bf2a11d632549b038fbb3114765c09f0c6c2f2db542db45e56186cc8",
       "3-1-the-version-command": "aa334437072a5f0fb26d0c09fdad49b79ec84864250b19b0079b1941b4d3ac76",
@@ -94,7 +94,7 @@
       "3-behavior": "cf72e5eeb5cb51de1d0862881e394da27a63a5444bcb512de182618d7d740d51",
       "4-observable-negative-cases": "8a5fd422597cf29febc0b8050c9e20905dc2187e326b270b844adf129943c553",
       "acceptance": "57a52526b32fa60c720e03da1a40ece9b4a0d507a56b1cf2f060b5bd55d2d5d3",
-      "implementation-record": "ec301efe2c49e8eb74351b2b1ef0cd71c402d628f2dc4196d7739b72ffc30c77",
+      "implementation-record": "032ad0f594f46aaa35de7e6eac35fa610b2c39ef043fced124d91f8df9df82d6",
       "verification": "ebfde5012a3ce6fe2f5cd618fa73b5053358437d02e051982896bd93a65323a8"
     },
     "sectionHeadings": [
@@ -117,6 +117,6 @@
     "summary": "A narrow amendment of approved specs 006, 007 and 031, written after `v0.1.0` was published to crates.io, npm and GitHub on 2026-10-26 but could not be qualified (021 3.10, 031 3.9.7). The CLI has no version command; the support-routing package declares no runnable offline example (its SYNTHETIC rules program is a test fixture of the rules backend); no harness runs the registry-only consumer across the platform matrix; and the npm packages carry no provenance. This spec adds `rustev version`, ships the package's SYNTHETIC example as package data, adds the qualification harness and its workflow, and defines how the owner authorizes a release after `0.1.0`, so that the next family version is published through the existing pipeline with npm provenance and qualified. Ratified by the owner on 2026-10-26 (A-58). Revised the same day (A-59): the work is folded into the next family version (`0.2.0`); there is no separate `0.1.1`.\n",
     "title": "The next family release: a CLI version command, declared consumer examples and the fresh-consumer qualification (amends 006, 007 and 031)"
   },
-  "shardHash": "b1877e6ef6cf4ef649a8350adb5f88b6e74c3172e7d1c97811eef9dbb682658d",
+  "shardHash": "2573bab9c9bb0d7afed38bd18b00f4754826ca33ecd0f36e0b1c509aae18f682",
   "specVersion": "1.10.0"
 }
