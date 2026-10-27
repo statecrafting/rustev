@@ -127,12 +127,42 @@ pub fn form_of(metric: &str) -> Option<Form> {
     match parts.as_slice() {
         ["reliability", _, _, "confidence"] => Some(Form::Mean),
         ["reliability", _, _, "accuracy"] => Some(Form::CountRatio),
+        // Spec 041, 3.11.1.
+        ["ranking", _, spec] => {
+            if ["hit@", "short@", "backfill@p"]
+                .iter()
+                .any(|p| spec.starts_with(p))
+            {
+                Some(Form::CountRatio)
+            } else {
+                Some(Form::Mean)
+            }
+        }
         ["latency_ms" | "queue_ms", q] => {
             let q = Decimal::parse(q.strip_prefix('p')?).ok()?;
             Some(Form::Sample { quantile: q })
         }
         _ => None,
     }
+}
+
+/// A metric's form, by name or, for a spec 041 constraint, whose name does
+/// not say whether it aggregates as `share_at_k` (a mean) or `all_at_k` (a
+/// count ratio), by the kind of its first case measure (3.11.1).
+pub fn form_in(metric: &str, runs: &[&EvalCases]) -> Option<Form> {
+    if let Some(form) = form_of(metric) {
+        return Some(form);
+    }
+    if !metric.starts_with("constraint/") {
+        return None;
+    }
+    runs.iter()
+        .flat_map(|r| &r.cases)
+        .find_map(|c| match c.measures.get(metric)? {
+            CaseMeasure::Count { .. } => Some(Form::CountRatio),
+            CaseMeasure::Mean { .. } => Some(Form::Mean),
+            CaseMeasure::Sample { .. } | CaseMeasure::Unknown { .. } => None,
+        })
 }
 
 /// One metric's contributions over a run set's case documents:
@@ -190,7 +220,7 @@ pub fn reconcile(run: &Evaluated, cases: &EvalCases) -> Result<(), String> {
         return Err("the case measures do not list the detail's cases and outcomes".into());
     }
     for c in &cases.cases {
-        if let Some(name) = c.measures.keys().find(|m| form_of(m).is_none()) {
+        if let Some(name) = c.measures.keys().find(|m| form_in(m, &[cases]).is_none()) {
             return Err(format!(
                 "case {} has a measure for `{name}`, which has none",
                 c.case
@@ -198,7 +228,7 @@ pub fn reconcile(run: &Evaluated, cases: &EvalCases) -> Result<(), String> {
         }
     }
     for m in &run.report.metrics {
-        let Some(form) = form_of(&m.name) else {
+        let Some(form) = form_in(&m.name, &[cases]) else {
             continue;
         };
         let metric = metric_cases(&m.name, form, &[cases])?;
@@ -216,7 +246,9 @@ pub fn reconcile(run: &Evaluated, cases: &EvalCases) -> Result<(), String> {
                 m.name
             ));
         }
-        if let Some(count) = run.detail.count(&m.name) {
+        // A count ratio's sums are its count; a mean's count (spec 041)
+        // states measured cases, which no sum of means gives.
+        if let (Form::CountRatio, Some(count)) = (&metric.form, run.detail.count(&m.name)) {
             let (mut num, mut den) = (0u128, 0u128);
             for per_run in &metric.cases {
                 if let Some(Contribution::Count { num: n, den: d }) = per_run[0] {
