@@ -1,6 +1,6 @@
 ---
 id: "056-release-0-1-1-and-consumer-qualification"
-title: "Release 0.1.1: a CLI version command, declared consumer examples and the fresh-consumer qualification (amends 006, 007 and 031)"
+title: "The next family release: a CLI version command, declared consumer examples and the fresh-consumer qualification (amends 006, 007 and 031)"
 status: approved
 implementation: pending
 created: "2026-10-26"
@@ -14,9 +14,11 @@ summary: >
   the npm packages carry no provenance. This spec adds `rustev version`,
   ships the package's SYNTHETIC example as package data, adds the
   qualification harness and its workflow, and defines how the owner
-  authorizes a release after `0.1.0`, so that `0.1.1` is published through
-  the existing pipeline with npm provenance and qualified. Ratified by the
-  owner on 2026-10-26 (A-58).
+  authorizes a release after `0.1.0`, so that the next family version is
+  published through the existing pipeline with npm provenance and qualified. Ratified by the
+  owner on 2026-10-26 (A-58). Revised the same day (A-59): the work is
+  folded into the next family version (`0.2.0`); there is no separate
+  `0.1.1`.
 amends:
   - "006-cli-surface"
   - "007-support-routing-package"
@@ -59,12 +61,20 @@ obligations:
     anchor: "3-4-authority-for-a-later-release"
 ---
 
-# 056: Release 0.1.1, a CLI version command, declared consumer examples and the fresh-consumer qualification (amends 006, 007 and 031)
+# 056: The next family release, a CLI version command, declared consumer examples and the fresh-consumer qualification (amends 006, 007 and 031)
 
 Approved: ratified by the owner on 2026-10-26 (decision A-58). The
 approved texts of 006, 007 and 031 are not edited; this spec records what
 it adds to them. Spec 021 is not amended: its fresh-consumer steps (3.10)
 and version policy (3.2) are implemented here as written.
+
+Revised on 2026-10-26 by the owner's decision A-59 to fold this work into
+the next family version (`0.2.0`) instead of a separate `0.1.1`: the title,
+summary, territory, 3.5 and the version named in sections 3 to 4,
+Acceptance and Verification now say "the next family version". The
+specification identifier keeps its original name. This revises 056's own
+text, ratified by its owner; no other spec is amended, so no `amends`
+edge applies.
 
 ## 1. Purpose
 
@@ -98,10 +108,10 @@ Every published version is immutable, so the fix is a new family version.
 In scope: the CLI's version command; package data and an accessor in
 `rustev-pkg-support-routing`; the qualification harness and the
 `qualify` command in `tools/rustev-release/`; a qualification workflow;
-the authority check for a release after `0.1.0`; and the family version
-`0.1.1`. Out of scope: any change of decision behavior, contract, plan
+the authority check for a release after `0.1.0`; and the next family
+version. Out of scope: any change of decision behavior, contract, plan
 identity or API beyond the version command and the package accessor; the
-container image (still excluded); a version beyond `0.1.1`.
+container image (still excluded); any other version change.
 
 ## 3. Behavior
 
@@ -156,7 +166,7 @@ configuration, and runs:
   and declared example run.
 
 - **image** (031 3.9.7 (c)): run only when the signed manifest names a
-  container image. `0.1.1` names none (the image stays excluded, section
+  container image. The next family version names none (the image stays excluded, section
   2), so the harness writes the step as `excluded` with that reason.
 
 The required steps are derived from the signed manifest, never from the
@@ -200,10 +210,12 @@ instruction. `0.1.0` keeps its 3.11.1 authority. Everything else in 021
 set; journal; layer order; owner approval of the `npm-publish`
 Environment) is unchanged.
 
-### 3.5 Version 0.1.1
+### 3.5 The next family version
 
-Every release-set crate and npm package moves to `0.1.1` in lockstep (021
-3.2), including members whose bytes do not otherwise change. The release
+This work ships in the next family version after `0.1.0`; there is no
+separate `0.1.1` release. Every release-set crate and npm package moves
+to that version in lockstep (021 3.2), including members whose bytes do
+not otherwise change. The release
 follows spec 053 (rehearsal on `release/next`, candidate evidence, owner
 signature and tag) and 031 3.9.6: the npm job publishes through trusted
 publishing with provenance, which also validates the trusted publishers
@@ -218,7 +230,7 @@ attached after `0.1.0`.
 | A consumer resolves a crate through a path, Git source or warm cache | The harness refuses the run as not fresh. |
 | An npm package installs without a verified provenance attestation | The npm step fails; not `qualified`. |
 | A platform's step is `not_run` | `rustev-release qualify` refuses. |
-| An instruction for `0.1.1` without a valid owner signature | `publish` refuses before any journal entry or upload. |
+| An instruction for a version after `0.1.0` without a valid owner signature | `publish` refuses before any journal entry or upload. |
 | An instruction for `0.1.0` today | Still governed by 031 3.11.1; no signature is required. |
 
 ## Acceptance
@@ -232,17 +244,17 @@ attached after `0.1.0`.
 - The harness runs locally against `0.1.0` and reports the version
   command and npm provenance as failing, and steps it cannot yet run as
   `not_run`, never as passing.
-- After `0.1.1` is published under a signed instruction, the workflow's
+- After the next family version is published under a signed instruction, the workflow's
   matrix passes and `rustev-release qualify` records the lifecycle as
   `qualified`.
 
 ## Verification
 
 Pending. Ratification authorizes the code and workflow changes and the
-`0.1.1` version bump. Adding `.github/workflows/qualify.yml` needs the
+next family version bump. Adding `.github/workflows/qualify.yml` needs the
 owner's approval of the `statecraft-review-exception` Environment once, as
 every change under `.github/workflows/` does (`AGENTS.md`). Publishing
-`0.1.1` additionally needs the owner's signed instruction of 3.4.
+that version additionally needs the owner's signed instruction of 3.4.
 
 ## Implementation record
 
