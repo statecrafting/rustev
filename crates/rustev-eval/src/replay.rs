@@ -388,6 +388,7 @@ fn target_artifact(plan: &Plan, step: &str, target: u32) -> Option<ArtifactId> {
     let artifact = match &plan.steps.iter().find(|s| s.id == step)?.detail {
         PlanStepDetail::Semantic(b) => &b.artifact,
         PlanStepDetail::Generate(b) => &b.artifact,
+        PlanStepDetail::Extract(b) => &b.artifact,
         _ => return None,
     };
     if target == 0 {

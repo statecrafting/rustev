@@ -1143,6 +1143,20 @@ a model-derived source) is not reachable yet, because a model-derived text
 projection is refused at compile until spec 035 screening is integrated
 (3.11.4); its lineage test comes with the runtime increment.
 
+**Increment 6, part b (2026-10-26): the runtime.** Extract requests go
+through the existing attempt driver (3.11.1): admission, concurrency,
+retries, runtime fallback, cancellation and the attempt trace, with cost
+reserved against the step sub-ledger before the decision ledgers
+(3.11.3). The step deadline starts when the core lists the request and is
+computed with spec 002 decimal arithmetic (3.11.2). Extract requests
+bypass the semantic cache and batching, so their limits and one request
+per decision cannot be sidestepped. A failed request leaves every field
+`request_failed{reason}` and the fallback runs (3.11.5). Capture records
+the supplied `typed_record`, and replay reproduces field evidence and
+judgment bytes without dispatch (3.11.6). Screening integration (3.11.4)
+waits on spec 035; until then the compiler's refusal keeps extraction
+fail-closed (`crates/rustev-runtime/tests/extraction.rs`).
+
 ## Decisions at approval
 
 Each is decided within this spec under the work order, inside the binding
