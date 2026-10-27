@@ -273,7 +273,7 @@ fn field_value(
             } else if !array.is_empty() && values.is_empty() {
                 Err(rejected
                     .first()
-                    .map(|r| r.reason.clone())
+                    .map(|r| r.reason)
                     .unwrap_or(Reason::WrongType))
             } else {
                 Ok(Value::List(values))

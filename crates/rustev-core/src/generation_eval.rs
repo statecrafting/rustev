@@ -831,11 +831,7 @@ fn reference<'a>(r: &str, roots: &'a BTreeMap<String, Value>) -> Result<&'a Valu
 }
 fn from_out(v: &OutValue) -> Result<Value, GenerationError> {
     Ok(match v {
-        OutValue::Attributed { .. } => {
-            return Err(GenerationError::InvalidState(
-                "attributed values are not evaluated in this increment".into(),
-            ));
-        }
+        OutValue::Attributed { value, .. } => return from_out(value),
         OutValue::Bool(v) => Value::Bool(*v),
         OutValue::Integer(v) => Value::Integer(*v),
         OutValue::Decimal(v) => Value::Decimal(*v),

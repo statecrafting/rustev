@@ -202,6 +202,7 @@ pub(crate) enum StepInfo {
 
 #[derive(Debug, Clone)]
 pub(crate) struct Info {
+    pub extraction_calibrations: Vec<CalibrationArtifact>,
     pub screen_categories: BTreeMap<String, Vec<String>>,
     pub generation: BTreeMap<String, crate::generation::Checked>,
     pub inputs: BTreeMap<String, (Ty, InputDecl)>,
@@ -2279,6 +2280,7 @@ fn compile_generation(
         plan,
         id,
         info: Info {
+            extraction_calibrations: calibrations.to_vec(),
             screen_categories: descriptors
                 .iter()
                 .filter_map(|d| {

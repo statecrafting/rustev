@@ -4,9 +4,9 @@ use rustev_contract::{
     Document,
     definition::{Definition, Operation, ProvenanceClass as P, StepBody},
     descriptor::{BackendDescriptor, OutputKind, TextStructure},
-    extraction::{AbsenceReason as Absence, *},
+    extraction::*,
     extraction_results::*,
-    judgment::{Derivation, Outcome, Unresolved},
+    judgment::{Derivation, OutValue, Outcome, Unresolved},
     output::RawOutput,
     plan::{Plan, PlanStepDetail},
     snapshot::Snapshot,
@@ -17,9 +17,7 @@ use std::collections::BTreeMap;
 
 fn definition() -> Definition {
     let plan: Plan = serde_json::from_str(include_str!("golden/acceptance.plan.json")).unwrap();
-    let mut d = plan.definition;
-    d.steps.truncate(1);
-    d
+    plan.definition
 }
 fn backend() -> BackendDescriptor {
     let mut b = common::linear_head();
@@ -36,6 +34,12 @@ fn backend() -> BackendDescriptor {
     b
 }
 fn compile(d: &Definition) -> Compiled {
+    compile_documents(d, &[])
+}
+fn compile_documents(
+    d: &Definition,
+    calibrations: &[rustev_contract::calibration::CalibrationArtifact],
+) -> Compiled {
     let plan: Plan = serde_json::from_str(include_str!("golden/acceptance.plan.json")).unwrap();
     let PlanStepDetail::Extract(b) = &plan.steps[0].detail else {
         panic!()
@@ -44,7 +48,7 @@ fn compile(d: &Definition) -> Compiled {
     compile_with_extraction_documents(
         d,
         &[backend()],
-        &[],
+        calibrations,
         &[],
         None,
         std::slice::from_ref(&b.template),
@@ -73,6 +77,12 @@ fn extract(d: &mut Definition) -> &mut Extract {
     };
     e
 }
+fn accept(d: &mut Definition) -> &mut AcceptModelDerived {
+    let StepBody::AcceptModelDerived(a) = &mut d.steps[1].body else {
+        panic!()
+    };
+    a
+}
 fn run(
     d: &Definition,
     supplied: Supplied,
@@ -98,7 +108,9 @@ fn golden(name: &str, bytes: &[u8]) {
 }
 #[test]
 fn example_requests_evidence_and_judgment_are_deterministic() {
-    let d = definition();
+    let mut d = definition();
+    d.policy.rules[0].then = serde_json::from_value(json!({"propose":{"action":"recommend","params":[{"name":"window","value":{"ref":"step:window_ok"}}]}})).unwrap();
+    d.policy.on_unresolved = serde_json::from_value(json!([{"target":"step:window_ok","reasons":"any","action":{"escalate":{"reason":"missing window"}}}])).unwrap();
     let c = compile(&d);
     let mut e = Evaluation::start(&c, &snapshot(), common::ts(common::NOW)).unwrap();
     let request = e.extraction_request("request_filters").unwrap();
@@ -121,11 +133,22 @@ fn example_requests_evidence_and_judgment_are_deterministic() {
     let second = run(&d, supplied);
     assert_eq!(first.0.canonical().unwrap(), second.0.canonical().unwrap());
     assert_eq!(first.1.canonical().unwrap(), second.1.canonical().unwrap());
-    assert!(matches!(first.0.outcome, Outcome::Propose { .. }));
-    assert!(first.1.acceptance.is_none());
-    let fields = &first.1.extraction.as_ref().unwrap()[0].fields;
-    assert_eq!(fields[0].origin, ExtractionOrigin::Extracted);
-    assert_eq!(fields[0].derivation, Some(Derivation::ModelDerived));
+    let Outcome::Propose { params, .. } = &first.0.outcome else {
+        panic!()
+    };
+    assert!(matches!(
+        &params["window"],
+        OutValue::Attributed {
+            derivation: Derivation::ModelDerived,
+            origin: AcceptedOrigin::Extracted,
+            ..
+        }
+    ));
+    assert_eq!(
+        first.1.acceptance.as_ref().unwrap()[0].outcome,
+        AcceptanceOutcome::Accepted
+    );
+    assert!(first.0.lineage.steps.contains(&"window_ok".into()));
     assert!(
         !String::from_utf8(first.1.canonical().unwrap())
             .unwrap()
@@ -135,47 +158,50 @@ fn example_requests_evidence_and_judgment_are_deterministic() {
     golden("extraction.judgment.json", &first.0.canonical().unwrap());
 }
 #[test]
-fn extraction_distributions() {
-    let mut supplied = output(json!({"insufficient":true}));
-    let Supplied::Output(RawOutput::TypedRecord { logprobs, .. }) = &mut supplied else {
-        panic!()
-    };
-    *logprobs = serde_json::from_value(
-        json!([{"field":"insufficient","item":"none","values":{"false":0.0,"true":0.0}}]),
-    )
-    .unwrap();
-    let (_, evidence) = run(&definition(), supplied);
-    assert_eq!(
-        evidence.extraction.unwrap()[0].fields[4].distribution,
-        FieldDistribution::Masses(vec![0.5, 0.5])
-    );
-}
-
-#[test]
-fn validation_absences() {
-    use Absence::*;
-    for (fields, reason) in [
-        (json!({}), Missing),
-        (json!({"party_size":"4"}), WrongType),
-        (json!({"party_size":31}), OutOfBounds),
-        (json!({"area_name":"x".repeat(65)}), TooLong),
-        (json!({"area_name":"a\nb"}), ControlCharacter),
+fn validation_absences_and_acceptance_outcomes() {
+    for (fields, name, reason) in [
+        (json!({}), "party_size", AbsenceReason::Missing),
+        (
+            json!({"party_size":"4"}),
+            "party_size",
+            AbsenceReason::WrongType,
+        ),
+        (
+            json!({"party_size":31}),
+            "party_size",
+            AbsenceReason::OutOfBounds,
+        ),
+        (
+            json!({"area_name":"x".repeat(65)}),
+            "area_name",
+            AbsenceReason::TooLong,
+        ),
+        (
+            json!({"area_name":"a\nb"}),
+            "area_name",
+            AbsenceReason::ControlCharacter,
+        ),
         (
             json!({"window":{"start":"2027-02-30","end":"2027-03-02"}}),
-            InvalidDate,
+            "window",
+            AbsenceReason::InvalidDate,
         ),
-        (json!({"features":["unknown"]}), NotInVocabulary),
-        (json!({"features":["pool","pool"]}), DuplicateItem),
-        (json!({"features":vec!["pool";11]}), TooManyItems),
+        (
+            json!({"features":["unknown"]}),
+            "features",
+            AbsenceReason::NotInVocabulary,
+        ),
+        (
+            json!({"features":["pool","pool"]}),
+            "features",
+            AbsenceReason::DuplicateItem,
+        ),
+        (
+            json!({"features":vec!["pool";11]}),
+            "features",
+            AbsenceReason::TooManyItems,
+        ),
     ] {
-        let name = fields
-            .as_object()
-            .unwrap()
-            .keys()
-            .next()
-            .map(String::as_str)
-            .unwrap_or("party_size")
-            .to_owned();
         let (_, e) = run(&definition(), output(fields));
         let f = e
             .extraction
@@ -187,8 +213,37 @@ fn validation_absences() {
             .unwrap();
         assert_eq!(f.origin, ExtractionOrigin::Absent { reason });
     }
+    let (j, e) = run(
+        &definition(),
+        output(json!({"window":{"start":"2020-01-01","end":"2020-01-02"}})),
+    );
+    assert_eq!(
+        e.acceptance.unwrap()[0].outcome,
+        AcceptanceOutcome::Dropped {
+            cause: AcceptanceFailure::ValidationFailed
+        }
+    );
+    let notice = j
+        .notices
+        .iter()
+        .find(|n| n.reason == "extracted_window_dropped")
+        .unwrap();
+    assert_eq!(
+        notice.action.as_ref().unwrap().addressed_to,
+        rustev_contract::actionability::Party::Host
+    );
+    let mut d = definition();
+    accept(&mut d).on_fail = OnFail::Unresolved;
+    d.policy.on_unresolved = serde_json::from_value(
+        json!([{"target":"step:window_ok","reasons":"any","action":"propagate"}]),
+    )
+    .unwrap();
+    let (_, e) = run(&d, output(json!({})));
+    assert_eq!(
+        e.acceptance.unwrap()[0].outcome,
+        AcceptanceOutcome::Unresolved
+    );
 }
-
 #[test]
 fn fallback_fill_modes_failure_and_screening() {
     for fill in ["absent_fields", "request_failure"] {
@@ -232,7 +287,40 @@ fn fallback_fill_modes_failure_and_screening() {
 }
 
 #[test]
-fn runtime_absences() {
+fn mass_threshold_and_runtime_absences() {
+    let mut d = definition();
+    let a = accept(&mut d);
+    a.field = "step:request_filters/insufficient".into();
+    a.validate = Validation::None;
+    a.min_mass = serde_json::from_value(
+        json!({"option":"true","at_least":"0.5","basis":{"uncalibrated_threshold":"synthetic"}}),
+    )
+    .unwrap();
+    for (logprobs, expected) in [
+        (
+            json!([]),
+            AcceptanceOutcome::Dropped {
+                cause: AcceptanceFailure::DistributionAbsent,
+            },
+        ),
+        (
+            json!([{"field":"insufficient","item":"none","values":{"false":0.0,"true":-2.0}}]),
+            AcceptanceOutcome::Dropped {
+                cause: AcceptanceFailure::MinMassNotMet,
+            },
+        ),
+        (
+            json!([{"field":"insufficient","item":"none","values":{"false":0.0,"true":0.0}}]),
+            AcceptanceOutcome::Accepted,
+        ),
+    ] {
+        let mut supplied = output(json!({"insufficient":true}));
+        let Supplied::Output(RawOutput::TypedRecord { logprobs: lp, .. }) = &mut supplied else {
+            panic!()
+        };
+        *lp = serde_json::from_value(logprobs).unwrap();
+        assert_eq!(run(&d, supplied).1.acceptance.unwrap()[0].outcome, expected);
+    }
     let c = compile(&definition());
     for unavailable in [false, true] {
         let mut e = Evaluation::start(&c, &snapshot(), common::ts(common::NOW)).unwrap();
@@ -243,9 +331,9 @@ fn runtime_absences() {
             e.extraction.unwrap()[0].fields[0].origin,
             ExtractionOrigin::Absent {
                 reason: if unavailable {
-                    Absence::ScreenUnavailable
+                    AbsenceReason::ScreenUnavailable
                 } else {
-                    Absence::ScreenBlocked
+                    AbsenceReason::ScreenBlocked
                 }
             }
         );
@@ -264,7 +352,7 @@ fn runtime_absences() {
     assert_eq!(
         e.finish("missing").unwrap().1.extraction.unwrap()[0].fields[0].origin,
         ExtractionOrigin::Absent {
-            reason: Absence::SourceUnavailable
+            reason: AbsenceReason::SourceUnavailable
         }
     );
     for reason in [
@@ -296,9 +384,51 @@ fn runtime_absences() {
         assert_eq!(
             e.finish("failure").unwrap().1.extraction.unwrap()[0].fields[0].origin,
             ExtractionOrigin::Absent {
-                reason: Absence::RequestFailed { reason }
+                reason: AbsenceReason::RequestFailed { reason }
             }
         );
+    }
+}
+
+#[test]
+fn input_acceptance_preserves_producer_and_supplied_values() {
+    let mut d = definition();
+    d.steps.remove(0);
+    d.inputs[0].ty = rustev_contract::definition::TypeDecl::Integer;
+    d.inputs[0].provenance = vec![P::ModelDerived, P::SystemOfRecord];
+    let StepBody::AcceptModelDerived(a) = &mut d.steps[0].body else {
+        panic!()
+    };
+    a.field = "input:message".into();
+    a.validate = Validation::None;
+    for provenance in [P::ModelDerived, P::SystemOfRecord] {
+        let c = compile(&d);
+        let mut s = common::snapshot(vec![common::entry(
+            "message",
+            json!(7),
+            provenance,
+            common::NOW,
+        )]);
+        s.schema = "rustev.snapshot/2".into();
+        if provenance == P::ModelDerived {
+            s.entries[0].producer = Some(serde_json::from_value(json!({"artifact_id":common::id('a'),"template_digest":"none","produced_at_ms":common::NOW})).unwrap());
+        }
+        let e = Evaluation::start(&c, &s, common::ts(common::NOW)).unwrap();
+        assert_eq!(
+            e.exact_value("window_ok"),
+            Some(&rustev_core::value::Value::Integer(7))
+        );
+        let (_, e) = e.finish("input").unwrap();
+        let a = &e.acceptance.unwrap()[0];
+        assert_eq!(
+            a.outcome,
+            if provenance == P::ModelDerived {
+                AcceptanceOutcome::Accepted
+            } else {
+                AcceptanceOutcome::PassedThrough
+            }
+        );
+        assert_eq!(e.inputs[0].producer, s.entries[0].producer);
     }
 }
 
@@ -311,9 +441,9 @@ fn fallback_and_vocabulary_absences() {
     .unwrap();
     let c = compile(&d);
     for (text, withheld, reason) in [
-        ("no party", false, Absence::FallbackNoMatch),
-        ("party 99", false, Absence::FallbackInvalid),
-        ("party 4", true, Absence::SourceUnavailable),
+        ("no party", false, AbsenceReason::FallbackNoMatch),
+        ("party 99", false, AbsenceReason::FallbackInvalid),
+        ("party 4", true, AbsenceReason::SourceUnavailable),
     ] {
         let s = common::snapshot(vec![common::entry(
             "message",
@@ -352,7 +482,150 @@ fn fallback_and_vocabulary_absences() {
     assert_eq!(
         e.extraction.unwrap()[0].fields[2].origin,
         ExtractionOrigin::Absent {
-            reason: Absence::VocabularyUnavailable
+            reason: AbsenceReason::VocabularyUnavailable
         }
     );
+}
+
+#[test]
+fn accepted_insufficient_field_selects_declared_questions() {
+    let mut d = definition();
+    accept(&mut d).field = "step:request_filters/insufficient".into();
+    accept(&mut d).validate = Validation::None;
+    let mut question_input = d.inputs[0].clone();
+    question_input.name = "details".into();
+    question_input.provenance = vec![P::UserSupplied];
+    d.inputs.push(question_input);
+    let mut raw = serde_json::to_value(d).unwrap();
+    raw["actionability"] = json!({"caller_controlled":["user-supplied"],"remediations":[],"checks":[],"constraint_groups":[],"questions":[{"id":"ask_details","fields":["details"],"text":"What else do you need?"}]});
+    raw["policy"]["on_unresolved"] =
+        json!([{"target":"step:window_ok","reasons":"any","action":"as_unmet"}]);
+    raw["policy"]["rules"] = json!([
+        {"id":"ask","when":{"exact":{"cmp":{"left":{"ref":"step:window_ok"},"op":"eq","right":{"lit":{"bool":true}}}}},"then":{"needs_input":{"fields":["details"],"questions":["ask_details"]}}},
+        {"id":"otherwise","when":"always","then":{"propose":{"action":"recommend","params":[]}}}
+    ]);
+    let d = serde_json::from_value(raw).unwrap();
+    let (j, _) = run(&d, output(json!({"insufficient":true})));
+    let Outcome::NeedsInput(n) = j.outcome else {
+        panic!("expected needs_input")
+    };
+    assert_eq!(n.questions[0].id, "ask_details");
+    assert_eq!(
+        n.action.addressed_to,
+        rustev_contract::actionability::Party::Caller
+    );
+    let (j, _) = run(&d, output(json!({"insufficient":false})));
+    assert!(matches!(j.outcome, Outcome::Propose { .. }));
+}
+
+#[test]
+fn calibrated_mass_threshold_uses_bound_artifact() {
+    use rustev_contract::{Identified, calibration::CalibrationArtifact};
+    let mut d = definition();
+    let base = compile(&d);
+    let PlanStepDetail::Extract(binding) = &base.plan.steps[0].detail else {
+        panic!()
+    };
+    let artifact: CalibrationArtifact = serde_json::from_value(json!({
+        "schema":"rustev.calibration/1",
+        "binding":{"artifact":backend().artifact,"task":format!("filters@{}", binding.template_id),
+            "question":"request_filters/insufficient","dataset":common::id('c'),"method":"temperature/1"},
+        "options":["false","true"],"parameters":{"temperature":{"temperature":"2"}}
+    })).unwrap();
+    let cid = artifact.id().unwrap();
+    let a = accept(&mut d);
+    a.field = "step:request_filters/insufficient".into();
+    a.validate = Validation::None;
+    a.min_mass = serde_json::from_value(
+        json!({"option":"true","at_least":"0.8","basis":{"calibration":cid}}),
+    )
+    .unwrap();
+    let c = compile_documents(&d, &[artifact]);
+    // At temperature 2, log odds 2 gives about .731, not the raw .881.
+    for (odds, cause) in [
+        (Some(4.0), None),
+        (Some(2.0), Some(AcceptanceFailure::MinMassNotMet)),
+        (None, Some(AcceptanceFailure::DistributionAbsent)),
+    ] {
+        let mut supplied = output(json!({"insufficient":true}));
+        let Supplied::Output(RawOutput::TypedRecord { logprobs, .. }) = &mut supplied else {
+            panic!()
+        };
+        if let Some(odds) = odds {
+            *logprobs = serde_json::from_value(
+                json!([{"field":"insufficient","item":"none","values":{"false":0.0,"true":odds}}]),
+            )
+            .unwrap();
+        }
+        let mut e = Evaluation::start(&c, &snapshot(), common::ts(common::NOW)).unwrap();
+        e.supply("request_filters", &[], supplied).unwrap();
+        if let Some(cause) = cause {
+            assert_acceptance_absent(&e, cause);
+        }
+        let (_, evidence) = e.finish("calibrated").unwrap();
+        assert_eq!(
+            evidence.acceptance.unwrap()[0].outcome,
+            cause.map_or(AcceptanceOutcome::Accepted, |cause| {
+                AcceptanceOutcome::Dropped { cause }
+            })
+        );
+        assert_eq!(
+            evidence.extraction.unwrap()[0].fields[4].calibration,
+            if odds.is_some() {
+                ExtractionCalibration::Applied(cid.clone())
+            } else {
+                ExtractionCalibration::None
+            }
+        );
+    }
+}
+
+fn assert_acceptance_absent(e: &Evaluation<'_>, cause: AcceptanceFailure) {
+    assert_eq!(
+        e.exact_value("window_ok"),
+        Some(&rustev_core::value::Value::Absent(
+            rustev_core::value::Absence {
+                reason: rustev_contract::grade::AbsentReason::AcceptanceFailed { cause },
+                predicate: None,
+            }
+        ))
+    );
+}
+
+#[test]
+fn dropped_acceptance_retains_absence_and_validation_causes() {
+    for (fields, fault, cause) in [
+        (
+            json!({}),
+            false,
+            AcceptanceFailure::Absence(AbsenceReason::Missing),
+        ),
+        (
+            json!({"window":{"start":"2020-01-01","end":"2020-01-02"}}),
+            false,
+            AcceptanceFailure::ValidationFailed,
+        ),
+        (
+            json!({"window":{"start":"2027-01-01","end":"2027-01-02"}}),
+            true,
+            AcceptanceFailure::ValidationFault,
+        ),
+    ] {
+        let mut d = definition();
+        if fault {
+            let mut missing = d.inputs[0].clone();
+            missing.name = "missing".into();
+            missing.ty = rustev_contract::definition::TypeDecl::Integer;
+            d.inputs.push(missing);
+            accept(&mut d).validate = serde_json::from_value(json!({"predicate":{"cmp":{"left":{"ref":"input:missing"},"op":"gt","right":{"lit":{"integer":0}}}}})).unwrap();
+        }
+        let c = compile(&d);
+        let mut e = Evaluation::start(&c, &snapshot(), common::ts(common::NOW)).unwrap();
+        e.supply("request_filters", &[], output(fields)).unwrap();
+        assert_acceptance_absent(&e, cause);
+        assert_eq!(
+            e.finish("absence").unwrap().1.acceptance.unwrap()[0].outcome,
+            AcceptanceOutcome::Dropped { cause }
+        );
+    }
 }

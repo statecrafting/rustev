@@ -60,7 +60,7 @@ pub enum StartError {
     /// Reserved compatibility error for unavailable acquisition evaluators.
     AcquisitionNotAvailable,
     GenerationNotAvailable,
-    /// A plan with an accept step; evaluated from increment 6 part a2.
+    /// Reserved: accept steps evaluate since increment 6 part a2.
     AcceptanceNotAvailable,
     /// The snapshot's `schema` is not `rustev.snapshot/1`.
     Schema(String),
@@ -579,14 +579,6 @@ impl<'c> Evaluation<'c> {
         snapshot: &Snapshot,
         now: Timestamp,
     ) -> Result<Self, StartError> {
-        if compiled
-            .info
-            .steps
-            .values()
-            .any(|s| matches!(s, StepInfo::Accept(_)))
-        {
-            return Err(StartError::AcceptanceNotAvailable);
-        }
         // A plan 3 accepts a snapshot 1 or 2, a plan 2 only a snapshot 1,
         // so a grade claim is never silently dropped (spec 032, 3.1.4).
         let v2 = compiled.info.v2;
@@ -958,6 +950,16 @@ impl<'c> Evaluation<'c> {
                     })
                     .unwrap_or_default(),
             },
+        };
+        let provenance = if field
+            .split_once('/')
+            .is_some_and(|(step, _)| self.extraction.evidence.contains_key(step))
+        {
+            CauseProvenance::Observed {
+                class: ProvenanceClass::ModelDerived,
+            }
+        } else {
+            provenance
         };
         Cause::Input {
             field: field.into(),
@@ -1834,7 +1836,7 @@ impl<'c> Evaluation<'c> {
                 match &info.steps[id] {
                     StepInfo::Generate => unreachable!("generation is a separate stage"),
                     StepInfo::Extract => self.start_extract(id),
-                    StepInfo::Accept(_) => unreachable!("acceptance evaluation refused at start"),
+                    StepInfo::Accept(a) => self.eval_accept(id, a),
                     // Acquisition lineage is stored by the shared insertion after this match.
                     StepInfo::Acquisition(a) => self.start_acquisition(id, a),
                     StepInfo::Exact { args, .. } => {
@@ -1928,6 +1930,19 @@ impl<'c> Evaluation<'c> {
                             self.metas.insert(key.clone(), Meta { whole: m, node });
                         }
                     }
+                }
+                let mut lineage = lineage;
+                if let StepInfo::Accept(a) = &info.steps[id] {
+                    // Lineage is keyed by the step, never by a field path within it.
+                    if let Some(source) = self.lineage.get(&crate::expr::base_ref_v2(&a.field)) {
+                        lineage.inputs.extend(source.inputs.clone());
+                        lineage.steps.extend(source.steps.clone());
+                    }
+                    lineage.steps.push(id.clone());
+                    lineage.inputs.sort();
+                    lineage.inputs.dedup();
+                    lineage.steps.sort();
+                    lineage.steps.dedup();
                 }
                 self.lineage.insert(key, lineage);
             }
@@ -2856,7 +2871,7 @@ impl<'c> Evaluation<'c> {
                 .info
                 .steps
                 .values()
-                .any(|s| matches!(s, StepInfo::Extract));
+                .any(|s| matches!(s, StepInfo::Extract | StepInfo::Accept(_)));
         // A terminal check decides without the policy (spec 033, 3.4.6).
         let (outcome, reads, trace, site, handler) = if !self.screen_refusals.is_empty() {
             let refusals = self.screen_refusals.clone();
@@ -2967,6 +2982,7 @@ impl<'c> Evaluation<'c> {
         } else {
             outcome
         };
+        let outcome = self.attribute_outcome(outcome, &trace);
         notices.sort();
         notices.dedup();
         let judgment = Judgment {
@@ -3041,17 +3057,24 @@ impl<'c> Evaluation<'c> {
                         },
                     ))
                 }
-                (StepInfo::Extract, Some(r), _) => steps.push(StepEvidence::new(
-                    id.clone(),
-                    vec![],
-                    match r {
-                        Ok(_) => StepStatus::Resolved {
-                            kind: "record".into(),
-                            derivation,
+                (StepInfo::Extract | StepInfo::Accept(_), Some(r), _) => {
+                    steps.push(StepEvidence::new(
+                        id.clone(),
+                        vec![],
+                        match r {
+                            Ok(_) => StepStatus::Resolved {
+                                kind: if matches!(compiled.info.steps[id], StepInfo::Extract) {
+                                    "record"
+                                } else {
+                                    "accepted_value"
+                                }
+                                .into(),
+                                derivation,
+                            },
+                            Err(u) => StepStatus::Unresolved(u.clone()),
                         },
-                        Err(u) => StepStatus::Unresolved(u.clone()),
-                    },
-                )),
+                    ))
+                }
                 (StepInfo::Acquisition(a), Some(r), _) => steps.push(StepEvidence::new(
                     id.clone(),
                     vec![],
@@ -3127,7 +3150,14 @@ impl<'c> Evaluation<'c> {
                     .filter_map(|id| self.extraction.evidence.get(id).cloned())
                     .collect()
             }),
-            acceptance: None,
+            acceptance: (!self.extraction.acceptance.is_empty()).then(|| {
+                compiled
+                    .info
+                    .step_ids
+                    .iter()
+                    .filter_map(|id| self.extraction.acceptance.get(id).cloned())
+                    .collect()
+            }),
             acquisitions: self.acquisition_evidence(),
             screening: screening.filter(|entries: &Vec<ScreeningEvidence>| !entries.is_empty()),
             schema: if v2 {
@@ -3499,6 +3529,11 @@ impl View for Evaluation<'_> {
         let s = r.strip_prefix("step:").unwrap_or(r);
         self.status(r)?;
         if let Some(v) = self.exact_values.get(s) {
+            if self.extraction.acceptance.contains_key(s)
+                && matches!(v, Value::Null | Value::Absent(_))
+            {
+                return Err(Unresolved::missing([s.to_string()]));
+            }
             return Ok(Seen::Exact(v));
         }
         match self.semantic.get(s) {
