@@ -107,6 +107,7 @@ pub struct Lifecycle {
     // artifacts cannot reach `released` or `qualified`, the safe direction.
     pub(crate) family_observed: bool,
     pub(crate) consumer_recorded: bool,
+    verified_instruction: Option<Instruction>,
 }
 
 impl Lifecycle {
@@ -118,7 +119,43 @@ impl Lifecycle {
             instruction: None,
             family_observed: false,
             consumer_recorded: false,
+            verified_instruction: None,
         }
+    }
+
+    /// Verify the exact instruction bytes before applying owner authority.
+    /// Production callers supply the built-in owner identity and allowed signers.
+    pub fn authorize_file(
+        &mut self,
+        path: &std::path::Path,
+        signers: &std::path::Path,
+        identity: &str,
+    ) -> Result<(), String> {
+        let bytes = std::fs::read(path).map_err(|e| format!("instruction: {e}"))?;
+        let instruction: Instruction =
+            serde_json::from_slice(&bytes).map_err(|e| format!("unreadable instruction: {e}"))?;
+        if instruction.version != FIRST_RELEASE_VERSION {
+            let mut signature = path.as_os_str().to_os_string();
+            signature.push(".sig");
+            let signature = std::path::PathBuf::from(signature);
+            if !signature.is_file() {
+                return Err("instruction requires an owner signature (<instruction>.sig)".into());
+            }
+            crate::manifest::ssh_verify(&bytes, &signature, signers, identity)
+                .map_err(|e| format!("instruction: {e}"))?;
+            self.verified_instruction = Some(instruction.clone());
+        }
+        let result = self.apply(Event::Authorized(instruction)).map_err(|e| e.0);
+        if result.is_err() {
+            self.verified_instruction = None;
+        }
+        result.map(|_| ())
+    }
+
+    pub(crate) fn instruction_verified(&self) -> bool {
+        self.instruction.as_ref().is_some_and(|i| {
+            i.version == FIRST_RELEASE_VERSION || self.verified_instruction.as_ref() == Some(i)
+        })
     }
 
     /// Apply one event, or refuse it and leave the state unchanged.
@@ -145,10 +182,9 @@ impl Lifecycle {
                     || i.packages != m.upload_order
                     || i.action != "publish"
                     || !valid_account(&i.account)
-                    // 3.11.1 "authorizes exactly one release, family version
-                    // `0.1.0`"; section 4 leaves "any release after `0.1.0`"
-                    // to a fresh owner act, which this tool does not define.
-                    || i.version != FIRST_RELEASE_VERSION
+                    // 056 3.4: later versions require the exact signed instruction.
+                    || (i.version != FIRST_RELEASE_VERSION
+                        && self.verified_instruction.as_ref() != Some(&i))
                     || (!m.artifacts.is_empty()
                         && (i.registries != m.registries
                             || i.artifacts
