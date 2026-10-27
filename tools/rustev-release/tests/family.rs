@@ -247,12 +247,10 @@ fn family_reaches_released_only_after_all_layers_and_qualification_is_recorded()
     assert_eq!(l.state, State::Released);
     assert!(l.apply(Event::ConsumerQualified).is_err());
     assert!(fl::qualify(&mut l, BTreeMap::new(), &mut j).is_err());
-    let mut evidence = BTreeMap::from([("crates-subsets".into(), "a".repeat(64))]);
-    for a in &m.artifacts {
-        if matches!(a.kind.as_str(), "npm" | "binary") {
-            evidence.insert(a.name.clone(), "b".repeat(64));
-        }
-    }
+    let evidence = rustev_release::qualification::required_files(&m)
+        .into_iter()
+        .map(|name| (name, "b".repeat(64)))
+        .collect();
     fl::qualify(&mut l, evidence, &mut j).unwrap();
     assert_eq!(l.state, State::Qualified);
     assert!(matches!(
@@ -700,4 +698,132 @@ fn candidate_collect_requires_rehearsal_and_binds_candidate_names() {
             .iter()
             .any(|e| e.contains("bytes differ"))
     );
+}
+
+fn qualification_steps(m: &ReleaseManifest, dir: &Path) {
+    use rustev_release::qualification::{self as q, Status, Step};
+    for platform in fa::PLATFORMS {
+        for kind in q::KINDS {
+            let step = Step {
+                schema: q::SCHEMA.into(),
+                manifest_sha256: m.digest(),
+                platform: (*platform).into(),
+                kind: (*kind).into(),
+                command: vec!["consumer-check".into()],
+                exit_status: Some(0),
+                output_digest: sha256_hex(b"output"),
+                lockfile_or_install_record: "Cargo.lock".into(),
+                checksums: BTreeMap::from([("artifact".into(), sha256_hex(b"artifact"))]),
+                host: "fixture-host".into(),
+                os: "fixture-os".into(),
+                architecture: "fixture-arch".into(),
+                toolchain: "rustc fixture".into(),
+                node: "node fixture".into(),
+                status: if q::required(m, kind) {
+                    Status::Passed
+                } else {
+                    Status::Excluded {
+                        reason: "signed manifest names no image".into(),
+                    }
+                },
+            };
+            write(
+                &dir.join(format!("{platform}.{kind}.json")),
+                &serde_json::to_vec(&step).unwrap(),
+            );
+        }
+    }
+}
+
+#[test]
+fn qualification_validates_every_platform_before_writing_the_journal() {
+    use rustev_release::qualification as q;
+    for case in [
+        "complete", "missing", "failed", "not_run", "excluded", "exit", "identity", "unknown",
+        "output",
+    ] {
+        let (root, _, m, files) = fixture();
+        let mut life = authorized(&m);
+        let mut j = journal(&m);
+        let path = root.join("publication.jsonl");
+        std::fs::write(&path, j.to_lines()).unwrap();
+        j.file = Some(path.clone());
+        fl::publish(
+            &mut life,
+            &files,
+            &mut fl::FakeHostedRelease::default(),
+            &mut j,
+        )
+        .unwrap();
+        let mut restored = authorized(&m);
+        q::restore_released(&mut restored, &files, &j).unwrap();
+        assert_eq!(restored.state, State::Released);
+        let dir = root.join("qualification");
+        qualification_steps(&m, &dir);
+        // Last matrix member catches accidental validation of only the host.
+        let step_path = dir.join("win32-x64-msvc.npm.json");
+        if case == "missing" {
+            std::fs::remove_file(&step_path).unwrap();
+        } else {
+            let mut step: serde_json::Value =
+                serde_json::from_slice(&std::fs::read(&step_path).unwrap()).unwrap();
+            match case {
+                "failed" => step["status"] = "failed".into(),
+                "not_run" => {
+                    step["status"] = serde_json::json!({"not_run":{"reason":"unavailable"}})
+                }
+                "excluded" => {
+                    step["status"] = serde_json::json!({"excluded":{"reason":"unavailable"}})
+                }
+                "exit" => step["exit_status"] = 1.into(),
+                "identity" => step["manifest_sha256"] = "f".repeat(64).into(),
+                "unknown" => step["unexpected"] = true.into(),
+                "output" => step["output_digest"] = "".into(),
+                _ => {}
+            }
+            std::fs::write(&step_path, serde_json::to_vec(&step).unwrap()).unwrap();
+        }
+        let before = std::fs::read(&path).unwrap();
+        let entries = j.entries.clone();
+        let result = q::evidence(&m, &dir).and_then(|e| fl::qualify(&mut restored, e, &mut j));
+        if case == "complete" {
+            result.unwrap();
+            assert_eq!(restored.state, State::Qualified);
+            let Entry::Qualification { evidence } = j.entries.last().unwrap() else {
+                panic!("missing qualification")
+            };
+            for (name, digest) in evidence {
+                assert_eq!(*digest, sha256_hex(&std::fs::read(dir.join(name)).unwrap()));
+            }
+            assert_eq!(evidence.len(), fa::PLATFORMS.len() * 4);
+        } else {
+            assert!(result.is_err(), "{case}");
+            assert_eq!(restored.state, State::Released);
+            assert_eq!(j.entries, entries, "{case}");
+            assert_eq!(std::fs::read(&path).unwrap(), before, "{case}");
+        }
+    }
+}
+
+#[test]
+fn qualification_refuses_incomplete_or_conflicting_publication() {
+    use rustev_release::qualification as q;
+    let (_, _, m, files) = fixture();
+    let mut life = authorized(&m);
+    let mut j = journal(&m);
+    assert!(q::restore_released(&mut life, &files, &j).is_err());
+    fl::publish(
+        &mut life,
+        &files,
+        &mut fl::FakeHostedRelease::default(),
+        &mut j,
+    )
+    .unwrap();
+    j.record(Entry::Query {
+        package: m.upload_order[0].clone(),
+        observed: Lookup::Absent,
+    });
+    let before = j.entries.clone();
+    assert!(q::restore_released(&mut authorized(&m), &files, &j).is_err());
+    assert_eq!(j.entries, before);
 }

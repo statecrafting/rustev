@@ -24,6 +24,7 @@ pub mod lifecycle;
 pub mod manifest;
 pub mod npm;
 pub mod prerelease;
+pub mod qualification;
 pub mod repro;
 
 use std::collections::{BTreeMap, BTreeSet};

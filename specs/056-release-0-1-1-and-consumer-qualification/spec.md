@@ -2,7 +2,7 @@
 id: "056-release-0-1-1-and-consumer-qualification"
 title: "The next family release: a CLI version command, declared consumer examples and the fresh-consumer qualification (amends 006, 007 and 031)"
 status: approved
-implementation: pending
+implementation: in-progress
 created: "2026-10-26"
 summary: >
   A narrow amendment of approved specs 006, 007 and 031, written after
@@ -258,4 +258,17 @@ that version additionally needs the owner's signed instruction of 3.4.
 
 ## Implementation record
 
-Not started.
+**Part b1 (2026-10-27): later-release authority and `qualify`.** An
+instruction for a version after `0.1.0` is authorized only with
+`<instruction>.sig`, an SSH signature over its exact bytes (namespace
+`rustev-release`, the owner identity, `allowed_signers`), verified by
+`publish` and `hosted-release` before any journal entry or upload; an
+unsigned, wrongly signed or altered instruction is refused, and `0.1.0`
+keeps its 031 3.11.1 authority (`tools/rustev-release/tests/signing.rs`).
+`rustev.qualification-step/1` and `rustev-release qualify` are in
+`tools/rustev-release/src/qualification.rs`: required kinds come from the
+signed manifest, every required kind needs a passed step for each
+platform of the CLI and npm matrix, and a missing, failing or `not_run`
+step, or an `excluded` step for a named kind, is refused before the
+journal (`tools/rustev-release/tests/family.rs`). The harness
+(`qualify.sh`, part b2) and the workflow (part c) follow.

@@ -857,9 +857,7 @@ fn verify_release_cmd(dir: &str, repo: &str) -> ExitCode {
 
 fn publish_cmd(dir: &str, instruction: &str, journal_path: &str) -> ExitCode {
     use rustev_release::cratesio::CratesIo;
-    use rustev_release::lifecycle::{
-        Entry, Event, Instruction, Journal, Lifecycle, Outcome, publish,
-    };
+    use rustev_release::lifecycle::{Entry, Event, Journal, Lifecycle, Outcome, publish};
     use rustev_release::manifest::ReleaseManifest;
     let result = (|| -> Result<Outcome, String> {
         let dir = Path::new(dir);
@@ -900,18 +898,18 @@ fn publish_cmd(dir: &str, instruction: &str, journal_path: &str) -> ExitCode {
                 ));
             }
         }
-        let instruction: Instruction = serde_json::from_slice(
-            &std::fs::read(instruction).map_err(|e| format!("{instruction}: {e}"))?,
-        )
-        .map_err(|e| format!("unreadable instruction: {e}"))?;
         let mut life = Lifecycle::new(m.clone());
         life.apply(Event::GatesPass).map_err(|r| r.0)?;
         life.apply(Event::CandidateVerified {
             commit: m.commit.clone(),
         })
         .map_err(|r| r.0)?;
-        life.apply(Event::Authorized(instruction.clone()))
-            .map_err(|r| r.0)?;
+        life.authorize_file(
+            Path::new(instruction),
+            &signers,
+            rustev_release::manifest::OWNER_IDENTITY,
+        )?;
+        let instruction = life.instruction.as_ref().ok_or("missing instruction")?;
         let mut journal = match std::fs::read_to_string(&journal_path) {
             Ok(text) => Journal::from_lines(&text)?,
             // Only an absent journal starts empty; any other read failure
@@ -1094,6 +1092,14 @@ fn main() -> ExitCode {
         ["compare", a, b] => compare(&set, a, b),
         ["field", name] => field(&set, name),
         ["deps"] => deps(&set),
+        ["qualify", dir, evidence, instruction, journal] => {
+            verdict(rustev_release::qualification::run(
+                Path::new(dir),
+                Path::new(evidence),
+                Path::new(instruction),
+                Path::new(journal),
+            ))
+        }
         ["publish", dir, instruction, journal] => publish_cmd(dir, instruction, journal),
         ["manifest", dir] => manifest(&set, dir, None),
         ["manifest", dir, artifacts] => manifest(&set, dir, Some(artifacts)),
@@ -1106,7 +1112,7 @@ fn main() -> ExitCode {
         ["unpacked", dir, work, toolchain] => unpacked(&set, dir, work, Some(toolchain)),
         _ => {
             eprintln!(
-                "usage: rustev-release [--candidate <tag>] manifest|npm-audit|main-sbom|sbom-check|compare-artifacts ... | candidate-version <tag> | candidate-manifest <manifest> <tag> <commit> | prerelease <tag> <manifest> <signature> <artifacts-dir> | manifests | archives <dir> | compare <dir-a> <dir-b> | field <name> | unpacked <dir> <work> [<toolchain>] | deps | exceptions <YYYY-MM-DD> | changelog <out.md> [<previous tag>] | manifest <evidence-dir> [<artifacts-dir>] (PREVIOUS=<tag> after the first release) | verify-artifacts <manifest> <artifacts-dir> | observe-crates <manifest> | hosted-release <release-dir> <artifacts-dir> <instruction.json> <journal> | publish <release-dir> <instruction.json> <journal> | verify-release <dir> [<repo>]"
+                "usage: rustev-release [--candidate <tag>] manifest|npm-audit|main-sbom|sbom-check|compare-artifacts ... | candidate-version <tag> | candidate-manifest <manifest> <tag> <commit> | prerelease <tag> <manifest> <signature> <artifacts-dir> | manifests | archives <dir> | compare <dir-a> <dir-b> | field <name> | unpacked <dir> <work> [<toolchain>] | deps | exceptions <YYYY-MM-DD> | changelog <out.md> [<previous tag>] | manifest <evidence-dir> [<artifacts-dir>] (PREVIOUS=<tag> after the first release) | verify-artifacts <manifest> <artifacts-dir> | observe-crates <manifest> | hosted-release <release-dir> <artifacts-dir> <instruction.json> <journal> | publish <release-dir> <instruction.json> <journal> | qualify <release-dir> <evidence-dir> <instruction> <journal> | verify-release <dir> [<repo>]"
             );
             ExitCode::from(2)
         }
