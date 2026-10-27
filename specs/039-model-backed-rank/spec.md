@@ -808,6 +808,18 @@ are committed with an independent reimplementation that reproduces them
 `crates/rustev-core/tests/ranking_schedules.rs`). Nothing calls them until
 the compile and evaluation increments.
 
+**Increment 3, part b (2026-10-26): request planning and the pairwise
+schedules.** `crates/rustev-core/src/ranking/schedules.rs` plans every
+mode's requests with the instance keys and comparison order of 3.4
+(`perm/<j>`, `cand/<id>`, `pair/<c>/<o>`), presenting orders from
+`rustev.permute/1` under 3.8, and runs `round_robin@1` as one round with
+cyclic-triple counting and `merge_sort@1` as a deterministic state machine
+with at most one pending comparison per merge (3.7.2, 3.7.3). Presentation
+disagreements follow 3.8.3, and a batch is reserved against
+`max_comparisons` before it is issued, so comparison `max_comparisons + 1`
+is never issued (3.7.5). The tie-break order is supplied by the caller
+(`crates/rustev-core/tests/ranking_schedules.rs`).
+
 ## Decisions at approval
 
 Decided within the binding principles under the work order.
