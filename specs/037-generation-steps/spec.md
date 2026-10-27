@@ -1133,6 +1133,19 @@ literal-only text template parameters stay restricted
 `crates/rustev-runtime/src/generation_acceptance.rs`). The interim refusal
 of `screen.output` other than `none` stands until part b.
 
+**Increment 8, part b (2026-10-26): output screening.** `screen.output`
+values of 3.11 compile, budgeted as one screening request per text field
+per item (3.1.2). Each generated text field is screened at most once per
+item, when it first becomes valid, and its verdict is final across repair
+rounds: a pass accepts it, and a block or an unavailable screener gives
+the field its declared backstop or absence and is never repaired, while
+repair never replaces a valid field (3.8.2). Screening evidence records
+digests only (035), and replay supplies captured screening requests with
+no dispatch (`crates/rustev-core/tests/generation_eval.rs`,
+`crates/rustev-runtime/tests/generation.rs`,
+`crates/rustev-eval/tests/generation_replay.rs`). Mutation seeds cover a
+field screened twice, repair after a block and an ignored verdict.
+
 **Owner decision A-49 (2026-10-23): dependencies.** Spec 030 is no longer
 a declared dependency of this spec. No behavior or acceptance item here
 needs it: provider wire mappings, "including Bedrock's (spec 030 3.12)",

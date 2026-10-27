@@ -124,8 +124,12 @@ fn setup_with(
     edit: impl FnOnce(&mut Definition),
     sink: Arc<dyn EvidenceSink>,
 ) -> Setup {
-    let (mut d, p, b) = fixture();
+    let (mut d, p, mut b) = fixture();
     edit(&mut d);
+    if matches!(&d.steps[0].body, StepBody::Generate(g) if matches!(g.screen.output, ScreenOutput::Screener { .. }))
+    {
+        output_screening::configure(&mut d, &mut b);
+    }
     let compiled =
         compile_with_templates(&d, std::slice::from_ref(&b), &[], &[], policy, &[p]).unwrap();
     let backend = Scripted::new(b, f);
@@ -1093,5 +1097,97 @@ async fn forced_failure_origins_counts_and_judgment_are_unchanged() {
             expected.canonical().unwrap(),
             e.judgment.canonical().unwrap()
         );
+    }
+}
+
+#[path = "../../rustev-core/tests/common/output_screening.rs"]
+mod output_screening;
+#[tokio::test]
+async fn output_screening_verdicts_and_repair_request_count() {
+    for verdict in [0, 1, 2] {
+        let (rt, plan, backend, _) = setup_with(
+            None,
+            move |call| {
+                if call.task() == "rustev.screen/1" {
+                    if verdict == 2 {
+                        Answer::Fail(
+                            AdapterFailure::Permanent,
+                            "private failure text".into(),
+                            Charge::Observed { units: 1 },
+                        )
+                    } else {
+                        Answer::Output(
+                            RawOutput::Screen {
+                                blocked: verdict == 1,
+                                categories: vec![],
+                                units: rustev_contract::output::ScreenUnits::NotReported,
+                            },
+                            Charge::Observed { units: 1 },
+                        )
+                    }
+                } else if call.projection["repair"].is_object() {
+                    Answer::Output(
+                        RawOutput::TextRecord(BTreeMap::from([(
+                            "why".into(),
+                            TextValue::Text("Repaired".into()),
+                        )])),
+                        Charge::Observed { units: 1 },
+                    )
+                } else {
+                    Answer::Output(output("SECRET valid", ""), Charge::Observed { units: 1 })
+                }
+            },
+            false,
+            |d| {
+                let StepBody::Generate(g) = &mut d.steps[0].body else {
+                    panic!()
+                };
+                g.screen.output = ScreenOutput::Screener {
+                    backend: g.backend.clone(),
+                };
+            },
+            Arc::new(Sink),
+        );
+        let result = rt
+            .decide(&plan, req("output-screen"), &CancelSignal::new())
+            .await
+            .unwrap();
+        assert_eq!(backend.dispatched().len(), 4);
+        assert_eq!(result.record.requests.len(), 4);
+        assert_eq!(
+            result
+                .record
+                .requests
+                .iter()
+                .filter(|r| r.screen.is_some())
+                .count(),
+            2
+        );
+        let text = result.text_result.unwrap();
+        let expected = match verdict {
+            0 => FieldOrigin::Generated,
+            1 => FieldOrigin::Backstop {
+                reason: TextReason::ScreenBlocked,
+            },
+            _ => FieldOrigin::Backstop {
+                reason: TextReason::ScreenUnavailable,
+            },
+        };
+        assert_eq!(
+            text.steps[0].items[0].generated["headline"].origin,
+            expected
+        );
+        assert_eq!(
+            text.steps[0].items[0].generated["why"].origin,
+            if verdict == 0 {
+                FieldOrigin::Repaired
+            } else {
+                expected
+            }
+        );
+        let bytes = result.record.record_canonical().unwrap();
+        assert!(!String::from_utf8_lossy(&bytes).contains("SECRET"));
+        assert!(!String::from_utf8_lossy(&bytes).contains("private failure"));
+        assert_eq!(RunRecord::parse(&bytes).unwrap(), *result.record);
     }
 }

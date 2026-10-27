@@ -454,11 +454,16 @@ fn is_screen(cx: &DecisionCtx<'_, '_>, step: &str) -> bool {
         .screening
         .as_ref()
         .is_some_and(|p| p.steps.iter().any(|s| s.step == step))
+        || rustev_contract::generation::output_screen_binding(&cx.plan.compiled.plan, step)
+            .is_some()
 }
 
 fn screen_record(cx: &DecisionCtx<'_, '_>, req: &SemanticRequest) -> Option<ScreenRequest> {
     is_screen(cx, &req.step).then(|| ScreenRequest {
-        cache: if cx.live.is_none() && cx.optimization().is_some_and(|p| p.memory_cache.is_some()) {
+        cache: if cx.generation.is_none()
+            && cx.live.is_none()
+            && cx.optimization().is_some_and(|p| p.memory_cache.is_some())
+        {
             ScreenCache::Miss
         } else {
             ScreenCache::Disabled

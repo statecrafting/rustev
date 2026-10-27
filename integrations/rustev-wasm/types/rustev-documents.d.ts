@@ -12502,6 +12502,7 @@ export namespace RustevPlan3 {
     helpers_version: string;
     max_items: number;
     output: OutputSchema;
+    output_screener?: ScreenerBinding | null;
     template: PromptTemplate;
     template_id: PromptTemplateId;
     vocabularies: {

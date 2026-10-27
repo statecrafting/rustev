@@ -839,3 +839,106 @@ fn generation_input_screening_is_per_bound_item() {
         }
     );
 }
+
+#[path = "common/output_screening.rs"]
+mod output_screening;
+#[test]
+fn output_screening_is_terminal_once_per_field_across_repairs() {
+    use rustev_contract::screening::ScreenVerdict;
+    for verdict in [0, 1, 2] {
+        for only_missing in [true, false] {
+            let (mut d, p, mut b) = fixture();
+            output_screening::configure(&mut d, &mut b);
+            let StepBody::Generate(g) = &mut d.steps[0].body else {
+                panic!()
+            };
+            g.repair.only_missing_fields = only_missing;
+            let c = compile(&d, &p, &b);
+            let mut ev = stage(&c);
+            let judgment = ev.judgment().clone();
+            ev.supply("item_text", &[], output("SECRET valid headline", ""))
+                .unwrap();
+            let pending = ev.pending();
+            assert_eq!(pending.len(), 1);
+            assert!(pending[0].document.step.ends_with(":headline"));
+            assert!(ev.finish().is_err());
+            let supplied = match verdict {
+                2 => Supplied::Failed(Unresolved::BackendUnavailable {
+                    detail: "unavailable".into(),
+                }),
+                _ => Supplied::Output(RawOutput::Screen {
+                    blocked: verdict == 1,
+                    categories: vec![],
+                    units: rustev_contract::output::ScreenUnits::NotReported,
+                }),
+            };
+            ev.supply(&pending[0].document.step, &[], supplied).unwrap();
+            let repair = ev.pending().remove(0);
+            let RepairRequest::Round { fields, .. } = &repair.document.repair else {
+                panic!()
+            };
+            assert_eq!(fields.len(), 1);
+            assert_eq!(fields[0].name, "why");
+            let repaired = if only_missing {
+                Supplied::Output(RawOutput::TextRecord(BTreeMap::from([(
+                    "why".into(),
+                    TextValue::Text("Repaired why".into()),
+                )])))
+            } else {
+                output("Replacement must be ignored", "Repaired why")
+            };
+            ev.supply("item_text", &repair.document.instance, repaired)
+                .unwrap();
+            let pending = ev.pending();
+            assert_eq!(
+                pending.len(),
+                1,
+                "a valid field must never be screened twice"
+            );
+            assert!(pending[0].document.step.ends_with(":why"));
+            ev.supply(
+                &pending[0].document.step,
+                &[],
+                Supplied::Output(RawOutput::Screen {
+                    blocked: false,
+                    categories: vec![],
+                    units: rustev_contract::output::ScreenUnits::NotReported,
+                }),
+            )
+            .unwrap();
+            let (got, evidence, text) = ev.finish().unwrap();
+            assert_eq!(got, judgment);
+            let screens = evidence.screening.as_ref().unwrap();
+            assert_eq!(screens.len(), 2);
+            assert!(matches!(
+                (&screens[0].verdict, verdict),
+                (ScreenVerdict::Pass, 0)
+                    | (ScreenVerdict::Blocked, 1)
+                    | (ScreenVerdict::Unavailable { .. }, 2)
+            ));
+            assert!(
+                !String::from_utf8(evidence.record_canonical().unwrap())
+                    .unwrap()
+                    .contains("SECRET")
+            );
+            let text = text.unwrap();
+            let f = &text.steps[0].items[0].generated["headline"];
+            assert_eq!(
+                f.origin,
+                match verdict {
+                    0 => FieldOrigin::Generated,
+                    1 => FieldOrigin::Backstop {
+                        reason: TextReason::ScreenBlocked
+                    },
+                    _ => FieldOrigin::Backstop {
+                        reason: TextReason::ScreenUnavailable
+                    },
+                }
+            );
+            assert_eq!(
+                text.steps[0].items[0].generated["why"].origin,
+                FieldOrigin::Repaired
+            );
+        }
+    }
+}

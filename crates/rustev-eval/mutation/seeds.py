@@ -601,6 +601,31 @@ SEEDS += [
 ]
 
 
+SEEDS += [
+    (
+        "spec 037", "output field screened twice across repair",
+        "crates/rustev-core/src/generation_eval.rs",
+        "if item.result.generated.contains_key(&field.name) {",
+        "if false && item.result.generated.contains_key(&field.name) {",
+        ["rustev-core"],
+    ),
+    (
+        "spec 037", "repair after output screening block",
+        "crates/rustev-core/src/generation_eval.rs",
+        "        categories.sort();\n        item.screening.insert(",
+        "        if reason == Some(TextReason::ScreenBlocked) { item.pending = Some(request.clone()); }\n        categories.sort();\n        item.screening.insert(",
+        ["rustev-core"],
+    ),
+    (
+        "spec 037", "output screening verdict ignored",
+        "crates/rustev-core/src/generation_eval.rs",
+        "        if let Some(reason) = reason {\n            // A screening verdict is terminal",
+        "        if let Some(reason) = reason.filter(|_| false) {\n            // A screening verdict is terminal",
+        ["rustev-core", "rustev-runtime"],
+    ),
+]
+
+
 def run(cmd, cwd, env, timeout=None):
     # A session of its own, so a timeout kills the test binaries too.
     p = subprocess.Popen(

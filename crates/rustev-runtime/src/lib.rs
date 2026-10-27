@@ -615,6 +615,32 @@ impl Runtime {
                 },
             );
         }
+        for s in &compiled.plan.steps {
+            if let PlanStepDetail::Generate(g) = &s.detail
+                && let Some(b) = &g.output_screener
+            {
+                for field in &g.output.fields {
+                    if matches!(
+                        field.ty,
+                        rustev_contract::generation::GeneratedType::Text { .. }
+                    ) {
+                        steps.insert(
+                            rustev_contract::generation::output_screen_step(&s.id, &field.name),
+                            StepRuntime {
+                                targets: vec![Target {
+                                    backend_id: b.backend_id.clone(),
+                                    artifact: b.artifact.clone(),
+                                    registered: target(&b.backend_id, &b.descriptor)?,
+                                }],
+                                retry: RetryPolicy::none(),
+                                timeout: AttemptTimeout::None,
+                                fallback_on: vec![],
+                            },
+                        );
+                    }
+                }
+            }
+        }
         Ok(PreparedPlan {
             compiled: Arc::new(compiled),
             steps,

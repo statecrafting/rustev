@@ -42,6 +42,8 @@ fn bad(s: impl ToString) -> GenerationError {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GenerationRequest {
     pub backend_id: String,
+    pub owner: String,
+    pub screen_projection: Option<Vec<u8>>,
     pub document: GenerateRequest,
 }
 struct Item {
@@ -51,6 +53,8 @@ struct Item {
     backstops: BTreeMap<String, TextField>,
     pending: Option<GenerationRequest>,
     round: u64,
+    screens: Vec<GenerationRequest>,
+    screening: BTreeMap<String, rustev_contract::screening::ScreeningEvidence>,
 }
 
 /// A decision is frozen before this stage exists. No generation value is stored
@@ -180,7 +184,13 @@ impl<'c> GenerationEvaluation<'c> {
     pub fn pending(&self) -> Vec<GenerationRequest> {
         self.items
             .iter()
-            .filter_map(|i| i.pending.clone())
+            .flat_map(|i| {
+                if i.screens.is_empty() {
+                    i.pending.clone().into_iter().collect()
+                } else {
+                    i.screens.clone()
+                }
+            })
             .collect()
     }
 
@@ -191,6 +201,30 @@ impl<'c> GenerationEvaluation<'c> {
         target: u32,
         scope: &Scope,
     ) -> Result<RequestDoc, RequestIdentityError> {
+        if let Some((_, r)) = self.find_screen(step, instance) {
+            let (_, b) =
+                output_screen_binding(&self.compiled.plan, step).expect("bound output screener");
+            if target != 0 {
+                return Err(RequestIdentityError::UnknownTarget {
+                    step: step.into(),
+                    target,
+                });
+            }
+            return Ok(RequestDoc {
+                schema: schema::REQUEST.into(),
+                scope: scope.clone(),
+                backend_id: b.backend_id.clone(),
+                artifact: b.artifact.clone(),
+                descriptor: b.descriptor.clone(),
+                projection: String::from_utf8(
+                    r.screen_projection.clone().expect("screen projection"),
+                )
+                .map_err(|_| RequestIdentityError::ProjectionNotUtf8 { step: step.into() })?,
+                output: OutputKind::Screen,
+                requires: RequiredKind::ScreenVerdict,
+                normalization: Normalization::None,
+            });
+        }
         let missing = || RequestIdentityError::NotPending {
             step: step.into(),
             instance: instance.to_vec(),
@@ -275,6 +309,138 @@ impl<'c> GenerationEvaluation<'c> {
         })
     }
 
+    fn find_screen(&self, step: &str, instance: &[String]) -> Option<(&Item, &GenerationRequest)> {
+        self.items.iter().find_map(|i| {
+            i.screens
+                .iter()
+                .find(|r| r.document.step == step && r.document.instance == instance)
+                .map(|r| (i, r))
+        })
+    }
+
+    fn screen_check(&self, step: &str, raw: &RawOutput) -> Result<(), Unresolved> {
+        let invalid = || Unresolved::InvalidBackendOutput {
+            detail: "invalid output screening verdict".into(),
+        };
+        let (_, b) = output_screen_binding(&self.compiled.plan, step).ok_or_else(invalid)?;
+        let declared = self
+            .compiled
+            .info
+            .screen_categories
+            .get(&b.backend_id)
+            .ok_or_else(invalid)?;
+        match raw {
+            RawOutput::Screen { categories, .. }
+                if categories.iter().collect::<BTreeSet<_>>().len() == categories.len()
+                    && categories.iter().all(|c| declared.contains(c)) =>
+            {
+                Ok(())
+            }
+            _ => Err(invalid()),
+        }
+    }
+
+    fn supply_screen(
+        &mut self,
+        step: &str,
+        instance: &[String],
+        supplied: Supplied,
+    ) -> Result<(), GenerationError> {
+        use rustev_contract::screening::{
+            ScreenConsequence, ScreenVerdict, ScreeningEvidence, screen_text_digest,
+        };
+        let supplied = match supplied {
+            Supplied::Output(raw) => match self.screen_check(step, &raw) {
+                Ok(()) => Supplied::Output(raw),
+                Err(u) => Supplied::Failed(u),
+            },
+            other => other,
+        };
+        let (_, binding) = output_screen_binding(&self.compiled.plan, step)
+            .ok_or_else(|| bad("unbound screener"))?;
+        let item = self
+            .items
+            .iter_mut()
+            .find(|i| {
+                i.screens
+                    .iter()
+                    .any(|r| r.document.step == step && r.document.instance == instance)
+            })
+            .ok_or_else(|| bad("screen request is not pending"))?;
+        let index = item
+            .screens
+            .iter()
+            .position(|r| r.document.step == step)
+            .ok_or_else(|| bad("missing screen"))?;
+        let request = item.screens.remove(index);
+        let name = &request.document.output.fields[0].name;
+        let Some(TextValue::Text(text)) = item.result.generated[name].value.as_ref() else {
+            return Err(bad("missing screened text"));
+        };
+        let digest = screen_text_digest(text);
+        let (verdict, mut categories, consequence, reason) = match supplied {
+            Supplied::Output(RawOutput::Screen {
+                blocked: false,
+                categories,
+                ..
+            }) => (
+                ScreenVerdict::Pass,
+                categories,
+                ScreenConsequence::None,
+                None,
+            ),
+            Supplied::Output(RawOutput::Screen { categories, .. }) => (
+                ScreenVerdict::Blocked,
+                categories,
+                ScreenConsequence::DropField,
+                Some(TextReason::ScreenBlocked),
+            ),
+            Supplied::Failed(reason) => (
+                ScreenVerdict::Unavailable {
+                    reason: match reason {
+                        Unresolved::BackendUnavailable { .. } => Unresolved::BackendUnavailable {
+                            detail: "output screener unavailable".into(),
+                        },
+                        Unresolved::InvalidBackendOutput { .. } => {
+                            Unresolved::InvalidBackendOutput {
+                                detail: "invalid output screening verdict".into(),
+                            }
+                        }
+                        other => other,
+                    },
+                },
+                vec![],
+                ScreenConsequence::FailClosed,
+                Some(TextReason::ScreenUnavailable),
+            ),
+            _ => return Err(bad("unchecked screen verdict")),
+        };
+        categories.sort();
+        item.screening.insert(
+            name.clone(),
+            ScreeningEvidence {
+                entry: item.step.clone(),
+                field: format!("output:{}/{name}", item.step),
+                item: item.result.id.first().cloned(),
+                text_digest: digest,
+                verdict,
+                categories,
+                consequence,
+                backend_id: binding.backend_id.clone(),
+                artifact: binding.artifact.clone(),
+                descriptor: binding.descriptor.clone(),
+                step: step.into(),
+            },
+        );
+        if let Some(reason) = reason {
+            // A screening verdict is terminal, including a block. Never repair it.
+            item.result
+                .generated
+                .insert(name.clone(), fallback_field(item, name, reason));
+        }
+        Ok(())
+    }
+
     fn find(&self, step: &str, instance: &[String]) -> Option<&Item> {
         self.items.iter().find(|i| {
             i.step == step
@@ -292,6 +458,9 @@ impl<'c> GenerationEvaluation<'c> {
         instance: &[String],
         raw: &RawOutput,
     ) -> Result<Result<(), Unresolved>, SupplyError> {
+        if self.find_screen(step, instance).is_some() {
+            return Ok(self.screen_check(step, raw));
+        }
         let item = self
             .find(step, instance)
             .ok_or_else(|| SupplyError::NotPending {
@@ -362,6 +531,9 @@ impl<'c> GenerationEvaluation<'c> {
         if attempt.is_empty() || attempts == 0 {
             return Err(bad("attempt identity and count required"));
         }
+        if self.find_screen(step, instance).is_some() {
+            return self.supply_screen(step, instance, supplied);
+        }
         let failure = if let Supplied::Failed(u) = &supplied {
             Some(failure_reason(u, attempts)?)
         } else {
@@ -409,6 +581,7 @@ impl<'c> GenerationEvaluation<'c> {
         let RawOutput::TextRecord(fields) = raw else {
             return Err(bad("record check disagreed"));
         };
+        let mut unavailable_screens = Vec::new();
         let mut invalid = Vec::new();
         for field in &item.declaration.output.fields {
             if item.result.generated.contains_key(&field.name) {
@@ -440,6 +613,40 @@ impl<'c> GenerationEvaluation<'c> {
                             }),
                         },
                     );
+                    if matches!(field.ty, GeneratedType::Text { .. })
+                        && matches!(
+                            item.declaration.screen.output,
+                            ScreenOutput::Screener { .. }
+                        )
+                    {
+                        let screen_step = output_screen_step(step, &field.name);
+                        let (_, b) = output_screen_binding(&self.compiled.plan, &screen_step)
+                            .ok_or_else(|| bad("unbound output screener"))?;
+                        let TextValue::Text(text) = value else {
+                            return Err(bad("invalid text"));
+                        };
+                        let mut document = request.document.clone();
+                        document.step = screen_step;
+                        document.instance = item.result.id.clone();
+                        document.repair = RepairRequest::None;
+                        document.output.fields = vec![field.clone()];
+                        if self.remaining == 0 {
+                            unavailable_screens
+                                .push((document.step.clone(), document.instance.clone()));
+                        }
+                        item.screens.push(GenerationRequest {
+                            backend_id: b.backend_id.clone(),
+                            owner: step.into(),
+                            document,
+                            screen_projection: Some(
+                                canonical_bytes(&crate::compile::screening::projection(
+                                    serde_json::json!(text),
+                                ))
+                                .map_err(bad)?,
+                            ),
+                        });
+                        self.remaining = self.remaining.saturating_sub(1);
+                    }
                 }
                 Err(reason) => invalid.push(RepairField {
                     name: field.name.clone(),
@@ -449,11 +656,9 @@ impl<'c> GenerationEvaluation<'c> {
         }
         if invalid.is_empty() {
             item.pending = None;
+        } else if item.round < item.declaration.repair.max_attempts && self.remaining == 0 {
+            complete(item, TextReason::BudgetExhausted);
         } else if item.round < item.declaration.repair.max_attempts {
-            if self.remaining == 0 {
-                complete(item, TextReason::BudgetExhausted);
-                return Ok(());
-            }
             self.remaining -= 1;
             item.round += 1;
             let mut next = request;
@@ -477,6 +682,15 @@ impl<'c> GenerationEvaluation<'c> {
             item.pending = Some(next);
         } else {
             complete(item, TextReason::InvalidOutput);
+        }
+        for (step, instance) in unavailable_screens {
+            self.supply_screen(
+                &step,
+                &instance,
+                Supplied::Failed(Unresolved::BudgetExhausted {
+                    resource: "max_semantic_requests".into(),
+                }),
+            )?;
         }
         Ok(())
     }
@@ -608,6 +822,17 @@ impl<'c> GenerationEvaluation<'c> {
         let mut judgment = self.judgment.clone();
         self.verify_ownership(&mut judgment, &mut text);
         let mut evidence_record = self.evidence.clone();
+        let screening: Vec<_> = self
+            .items
+            .iter()
+            .flat_map(|i| i.screening.values().cloned())
+            .collect();
+        if !screening.is_empty() {
+            evidence_record
+                .screening
+                .get_or_insert_with(Vec::new)
+                .extend(screening);
+        }
         evidence_record.generation = Some(
             text.steps
                 .iter()
@@ -697,29 +922,27 @@ pub fn validate_field<'a>(
     }
     Ok(value)
 }
+fn fallback_field(item: &Item, name: &str, reason: TextReason) -> TextField {
+    let mut slot = item.backstops.get(name).cloned().unwrap_or(TextField {
+        origin: FieldOrigin::Absent { reason },
+        truncated: false,
+        source: TextSource::Fresh,
+        value: None,
+        derivation: None,
+        lineage: None,
+    });
+    if slot.value.is_some() {
+        slot.origin = FieldOrigin::Backstop { reason };
+    }
+    slot
+}
 fn complete(item: &mut Item, reason: TextReason) {
     for field in &item.declaration.output.fields {
+        let fallback = fallback_field(item, &field.name, reason);
         item.result
             .generated
             .entry(field.name.clone())
-            .or_insert_with(|| {
-                let mut slot = item
-                    .backstops
-                    .get(&field.name)
-                    .cloned()
-                    .unwrap_or(TextField {
-                        origin: FieldOrigin::Absent { reason },
-                        truncated: false,
-                        source: TextSource::Fresh,
-                        value: None,
-                        derivation: None,
-                        lineage: None,
-                    });
-                if slot.value.is_some() {
-                    slot.origin = FieldOrigin::Backstop { reason };
-                }
-                slot
-            });
+            .or_insert(fallback);
     }
     item.pending = None;
 }
@@ -1023,7 +1246,11 @@ fn make_items(
             },
             backstops,
             round: 0,
+            screens: vec![],
+            screening: BTreeMap::new(),
             pending: Some(GenerationRequest {
+                owner: id.into(),
+                screen_projection: None,
                 backend_id: checked.binding.backend_id.clone(),
                 document: GenerateRequest {
                     schema: schema::GENERATE_REQUEST.into(),

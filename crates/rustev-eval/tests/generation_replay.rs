@@ -118,8 +118,12 @@ impl Harness {
         f: impl Fn(&Call) -> Answer + Send + Sync + 'static,
         policy: &rustev_contract::execution::ExecutionPolicy,
     ) -> Self {
-        let (mut d, p, b) = fixture();
+        let (mut d, p, mut b) = fixture();
         edit(&mut d);
+        if matches!(&d.steps[0].body, StepBody::Generate(g) if matches!(g.screen.output, ScreenOutput::Screener { .. }))
+        {
+            output_screening::configure(&mut d, &mut b);
+        }
         let compiled =
             compile_with_templates(&d, std::slice::from_ref(&b), &[], &[], Some(policy), &[p])
                 .unwrap();
@@ -697,4 +701,46 @@ async fn mixed_generated_repaired_backstop_slots_replay_cold_and_cached() {
         h.replay(&retained, &text);
     }
     assert_eq!(h.backend.dispatched().len(), 2);
+}
+
+#[path = "../../rustev-core/tests/common/output_screening.rs"]
+mod output_screening;
+#[tokio::test]
+async fn output_screening_replays_captured_requests_without_dispatch() {
+    for verdict in [0, 1, 2] {
+        let h = Harness::new(
+            |d| {
+                let StepBody::Generate(g) = &mut d.steps[0].body else {
+                    panic!()
+                };
+                g.screen.output = ScreenOutput::Screener {
+                    backend: g.backend.clone(),
+                };
+            },
+            move |call| {
+                if call.task() == "rustev.screen/1" {
+                    if verdict == 2 {
+                        return Answer::Fail(
+                            AdapterFailure::Permanent,
+                            "screen outage".into(),
+                            Charge::Observed { units: 1 },
+                        );
+                    }
+                    Answer::Output(
+                        RawOutput::Screen {
+                            blocked: verdict == 1,
+                            categories: vec![],
+                            units: rustev_contract::output::ScreenUnits::NotReported,
+                        },
+                        Charge::Observed { units: 1 },
+                    )
+                } else {
+                    answer()
+                }
+            },
+        );
+        let (retained, text) = h.capture("screened-output").await;
+        assert_eq!(h.backend.dispatched().len(), 3);
+        h.replay(&retained, &text);
+    }
 }
