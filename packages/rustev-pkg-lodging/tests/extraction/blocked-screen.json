@@ -1,0 +1,26 @@
+{
+  "screening": {
+    "entries": [
+      {
+        "id": "trip",
+        "fields": [
+          "input:trip.text"
+        ],
+        "item_id": "none",
+        "screener": "screen",
+        "on_block": "drop_field",
+        "on_unavailable": "fail_closed",
+        "address": "computed"
+      }
+    ],
+    "max_text_units": 32
+  },
+  "text": "SYNTHETIC blocked party 4",
+  "verdict": {
+    "screen": {
+      "blocked": true,
+      "categories": [],
+      "units": "not_reported"
+    }
+  }
+}

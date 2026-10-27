@@ -277,6 +277,15 @@ impl ModelNode {
             inherited: vec![],
         }
     }
+    fn withheld(&self) -> bool {
+        self.screen.as_ref().is_some_and(|e| {
+            matches!(
+                e.consequence,
+                ScreenConsequence::DropField | ScreenConsequence::DropText
+            )
+        }) || self.children.values().any(Self::withheld)
+    }
+
     fn render(&self, unavailable: &mut BTreeSet<String>) -> Json {
         let mut withheld = false;
         // Only compose_key attaches inherited nodes, one per referenced part.
@@ -2548,6 +2557,7 @@ impl<'c> Evaluation<'c> {
                 .unwrap_or(Json::Null);
             match self.compiled.info.steps.get(id) {
                 Some(StepInfo::Corroborate { decl, .. }) => self.model_node(&decl.claim),
+                Some(StepInfo::Accept(a)) => self.model_node(&a.field),
                 Some(StepInfo::Exact { args, .. }) => {
                     let sources: Vec<ModelNode> = match args {
                         OpArgs::WindowFilter(a) => self
