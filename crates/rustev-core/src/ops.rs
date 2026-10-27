@@ -1061,6 +1061,9 @@ fn semantic<'e>(r: &str, env: &'e TyEnv<'_>) -> Result<(SemKind, &'e Vec<String>
     match Ref::parse(r)? {
         Ref::Step(s) => match env.steps.get(&s) {
             Some(StepTy::Semantic(k, binds)) => Ok((*k, binds)),
+            Some(StepTy::ModelRanking(_)) | Some(StepTy::Selection(_)) => {
+                Err(format!("{r} is a distinct ranking value, not semantic"))
+            }
             Some(StepTy::Exact(t)) => Err(format!("{r} is exact ({}), not semantic", t.name())),
             None => Err(format!("unknown step {s:?}")),
         },

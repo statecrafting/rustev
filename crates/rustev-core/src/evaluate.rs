@@ -62,6 +62,8 @@ pub enum StartError {
     GenerationNotAvailable,
     /// Reserved: accept steps evaluate since increment 6 part a2.
     AcceptanceNotAvailable,
+    /// A plan with a rank or select step; evaluated from increment 6 part b.
+    RankingNotAvailable,
     /// The snapshot's `schema` is not `rustev.snapshot/1`.
     Schema(String),
     /// An entry names a field the definition does not declare.
@@ -78,6 +80,7 @@ impl fmt::Display for StartError {
             StartError::AcceptanceNotAvailable => {
                 write!(f, "acceptance evaluation is not available")
             }
+            StartError::RankingNotAvailable => write!(f, "ranking evaluation is not available"),
             StartError::GenerationNotAvailable => {
                 write!(f, "generation evaluation is not available")
             }
@@ -581,6 +584,14 @@ impl<'c> Evaluation<'c> {
     ) -> Result<Self, StartError> {
         // A plan 3 accepts a snapshot 1 or 2, a plan 2 only a snapshot 1,
         // so a grade claim is never silently dropped (spec 032, 3.1.4).
+        if compiled
+            .info
+            .steps
+            .values()
+            .any(|s| matches!(s, StepInfo::Ranking))
+        {
+            return Err(StartError::RankingNotAvailable);
+        }
         let v2 = compiled.info.v2;
         let accepted =
             snapshot.schema == schema::SNAPSHOT || (v2 && snapshot.schema == schema::SNAPSHOT_V2);
@@ -1837,6 +1848,7 @@ impl<'c> Evaluation<'c> {
                     StepInfo::Generate => unreachable!("generation is a separate stage"),
                     StepInfo::Extract => self.start_extract(id),
                     StepInfo::Accept(a) => self.eval_accept(id, a),
+                    StepInfo::Ranking => unreachable!("ranking evaluation refused at start"),
                     // Acquisition lineage is stored by the shared insertion after this match.
                     StepInfo::Acquisition(a) => self.start_acquisition(id, a),
                     StepInfo::Exact { args, .. } => {
@@ -2328,6 +2340,7 @@ impl<'c> Evaluation<'c> {
                 StepInfo::Exact { .. }
                 | StepInfo::Corroborate { .. }
                 | StepInfo::Acquisition(_)
+                | StepInfo::Ranking
                 | StepInfo::Generate
                 | StepInfo::Extract
                 | StepInfo::Accept(_) => None,

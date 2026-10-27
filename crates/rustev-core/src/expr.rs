@@ -61,6 +61,8 @@ impl Ref {
 /// The type of a step's result as expressions see it.
 #[derive(Debug, Clone, PartialEq)]
 pub enum StepTy {
+    ModelRanking(u64),
+    Selection(Ty),
     Exact(Ty),
     /// A semantic value and its fan-out binds; exact expressions cannot read
     /// it, only `weighted_rank@1` components and the policy can.
@@ -327,6 +329,10 @@ pub fn ref_ty(r: &str, env: &TyEnv<'_>) -> Result<Ty, String> {
             }
             match env.steps.get(&s) {
                 Some(StepTy::Exact(t)) => step_field_ty(t, &path),
+                Some(StepTy::Selection(ty)) if path.is_empty() => Ok(ty.clone()),
+                Some(StepTy::Selection(_)) | Some(StepTy::ModelRanking(_)) => {
+                    Err("ranking value kind cannot be read here".into())
+                }
                 Some(StepTy::Semantic(..)) => Err(format!(
                     "step {s:?} is semantic; exact operators cannot read it"
                 )),

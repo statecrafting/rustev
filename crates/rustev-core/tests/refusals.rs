@@ -634,17 +634,14 @@ fn malformed_supplied_documents_are_parse_refusals() {
 }
 
 #[test]
-fn ranking_kinds_require_v2_and_remain_closed_to_compilation() {
+fn ranking_kinds_require_v2() {
     for body in [
         serde_json::json!({"rank":{"task":"fit","question":"Best?","candidates":"step:eligible",
             "items":"none","bind":"candidate","project":[],"mode":"pointwise","bias":"none",
             "tie_break":"id_ascending","backend":{"min_determinism":"unspecified","artifact":"any","binding":"auto"},"fallback":"none"}}),
         serde_json::json!({"select":{"from":"step:ranking","k":1,"backfill":"none","on_backend_failure":"propagate"}}),
     ] {
-        for (version, detail) in [
-            (schema::DEFINITION, "requires-definition-2"),
-            (schema::DEFINITION_V2, "ranking-not-compiled"),
-        ] {
+        for (version, detail) in [(schema::DEFINITION, "requires-definition-2")] {
             let mut def = support_routing();
             def.schema = version.into();
             def.steps.push(StepDecl {
