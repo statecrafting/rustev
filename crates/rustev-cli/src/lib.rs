@@ -56,11 +56,18 @@ pub fn execute(argv: &[String], cx: &Context) -> Exit {
                 stderr: String::new(),
             };
         }
+        Ok(Invocation::Version) => {
+            return Exit {
+                code: code::OK,
+                stdout: format!("rustev {}\n", env!("CARGO_PKG_VERSION")).into_bytes(),
+                stderr: String::new(),
+            };
+        }
         Ok(Invocation::Command(p)) => p,
         Err(u) => return usage_exit(u),
     };
-    // `trace tail --text` is the one command whose stdout is not one JSON
-    // object (spec 028, 3.11.4).
+    // Besides `version`, `trace tail --text` is the one command whose stdout
+    // is not one JSON object (spec 028, 3.11.4).
     if parsed.spec.path == ["trace", "tail"] {
         return match trace::tail(&parsed) {
             Ok(exit) => exit,

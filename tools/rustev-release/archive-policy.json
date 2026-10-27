@@ -361,6 +361,10 @@
         "data/snapshots/sr-t04.json",
         "data/support-routing.definition.json",
         "data/support-routing.topic-calibration.json",
+        "data/synthetic-example.calibration.json",
+        "data/synthetic-example.judgment.json",
+        "data/synthetic-example.rules.json",
+        "data/synthetic-example.snapshot.json",
         "src/lib.rs"
       ],
       "max_archive_bytes": 65536,

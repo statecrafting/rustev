@@ -243,6 +243,7 @@ pub fn usage<T>(msg: impl Into<String>) -> Result<T, Usage> {
 #[derive(Debug)]
 pub enum Invocation {
     Help,
+    Version,
     Command(Parsed),
 }
 
@@ -322,6 +323,12 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Usage> {
     if argv.is_empty() {
         return usage("no command; run `rustev help`");
     }
+    if argv[0] == "version" || argv[0] == "--version" {
+        if argv.len() != 1 {
+            return usage("version takes no further arguments");
+        }
+        return Ok(Invocation::Version);
+    }
     if argv[0] == "help" || argv[0] == "--help" {
         return Ok(Invocation::Help);
     }
@@ -375,6 +382,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Usage> {
 pub const HELP: &str = "\
 rustev: compile, inspect, run, replay and evaluate Rustev decision plans.
 
+  rustev version      (or rustev --version)
   rustev plan check   --definition F [--descriptor F]... [--rules F]... [--calibration F]... [--execution F]
   rustev plan compile --definition F [...same...] --out F
                       [--profile F [--definition F]... [--profile-base F]...
@@ -422,5 +430,5 @@ rustev: compile, inspect, run, replay and evaluate Rustev decision plans.
          [--principal-scope H]   (required in principal mode, the default)
 
 Each command prints one JSON object on stdout; the exit code is its status.
-`trace tail --text` alone prints an indented tree instead.
+`version` prints one line, and `trace tail --text` alone prints an indented tree instead.
 ";
