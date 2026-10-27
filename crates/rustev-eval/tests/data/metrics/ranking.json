@@ -1,0 +1,114 @@
+{
+  "about": "Hand-computed ranking measures (spec 041, 3.4.3 and 3.4.4). D[i] is entry i of discounts.json. relevant_at_least is 1 and gain linear unless a case says otherwise. A mean is num/den, computed as one binary64 division; an nDCG value is given as its bit pattern.",
+  "cases": [
+    {
+      "name": "two unjudged items in the top 5 (section 5, row 1)",
+      "kind": "ranking", "list": ["a", "b", "c", "d", "e"],
+      "relevance": {"a": 2, "c": 0, "e": 0, "x": 1},
+      "arithmetic": "condensed top 5 = a(2), c(0), e(0); b and d unjudged. R = 2 (a, x). precision = 1/3; recall = 1/2; hit = 1; mrr@5 = 1/1. DCG = 2*D[1] = 2. IDCG over grades 2,1,0,0 = 2*D[1] + 1*D[2] + 0*D[3] + 0*D[4] = 2.6309297535714573. nDCG = 0.7601875334318686.",
+      "expect": {
+        "precision@5": {"mean": [1, 3], "unjudged_items": 2},
+        "recall@5": {"mean": [1, 2], "unjudged_items": 2},
+        "hit@5": {"count": [1, 1], "unjudged_items": 2},
+        "mrr@5": {"mean": [1, 1], "unjudged_items": 2},
+        "ndcg@5": {"bits": "3fe85374ce5d5648", "unjudged_items": 2}
+      }
+    },
+    {
+      "name": "a top 5 of only unjudged items, R = 2 (section 5, row 2)",
+      "kind": "shortlist", "list": ["p", "q", "r", "s", "t"],
+      "relevance": {"a": 1, "b": 3},
+      "arithmetic": "the condensed top 5 is empty: excluded from every @5 metric and from mrr, never 0.",
+      "expect": {
+        "precision@5": {"excluded": "no_judged_items", "unjudged_items": 5},
+        "recall@5": {"excluded": "no_judged_items", "unjudged_items": 5},
+        "hit@5": {"excluded": "no_judged_items", "unjudged_items": 5},
+        "mrr@5": {"excluded": "no_judged_items", "unjudged_items": 5},
+        "mrr": {"excluded": "no_judged_items", "unjudged_items": 5},
+        "ndcg@5": {"excluded": "no_judged_items", "unjudged_items": 5}
+      }
+    },
+    {
+      "name": "no gold relevance (section 5, row 3)",
+      "kind": "ranking", "list": ["a", "b"], "relevance": null,
+      "arithmetic": "no relevance map: excluded from every ranking metric.",
+      "expect": {
+        "precision@5": {"excluded": "no_gold", "unjudged_items": 0},
+        "mrr": {"excluded": "no_gold", "unjudged_items": 0},
+        "ndcg@5": {"excluded": "no_gold", "unjudged_items": 0}
+      }
+    },
+    {
+      "name": "R = 0 (section 5, row 4)",
+      "kind": "ranking", "list": ["a", "b"], "relevance": {"a": 0, "b": 0},
+      "arithmetic": "no gold item reaches grade 1: precision = 0/2; recall, hit, MRR and nDCG excluded.",
+      "expect": {
+        "precision@5": {"mean": [0, 2], "unjudged_items": 0},
+        "recall@5": {"excluded": "no_relevant", "unjudged_items": 0},
+        "hit@5": {"excluded": "no_relevant", "unjudged_items": 0},
+        "mrr": {"excluded": "no_relevant", "unjudged_items": 0},
+        "ndcg@5": {"excluded": "no_relevant", "unjudged_items": 0}
+      }
+    },
+    {
+      "name": "R = 0 and no judged item: no_relevant is counted",
+      "kind": "ranking", "list": ["p"], "relevance": {"a": 0},
+      "arithmetic": "both reasons apply to recall; 3.4.3 counts no_relevant. Precision has only no_judged_items.",
+      "expect": {
+        "recall@5": {"excluded": "no_relevant", "unjudged_items": 1},
+        "precision@5": {"excluded": "no_judged_items", "unjudged_items": 1}
+      }
+    },
+    {
+      "name": "a list of 3 under precision@5 (section 5, row 6)",
+      "kind": "ranking", "list": ["a", "b", "c"], "relevance": {"a": 1, "b": 0, "c": 1},
+      "arithmetic": "measured over the 3 entries, not padded: precision = 2/3.",
+      "expect": {
+        "precision@5": {"mean": [2, 3], "unjudged_items": 0}
+      },
+      "short": {"5": [1, 1], "3": [0, 1]}
+    },
+    {
+      "name": "the first relevant item beyond k",
+      "kind": "shortlist", "list": ["x", "a", "y", "b", "c", "d"],
+      "relevance": {"a": 0, "b": 0, "c": 0, "d": 1},
+      "arithmetic": "condensed whole list = a, b, c, d (x and y unjudged); d is at condensed position 4: mrr = 1/4. The condensed top 2 = a: mrr@2 = 0, hit@2 = 0.",
+      "expect": {
+        "mrr": {"mean": [1, 4], "unjudged_items": 2},
+        "mrr@2": {"mean": [0, 1], "unjudged_items": 1},
+        "hit@2": {"count": [0, 1], "unjudged_items": 1}
+      }
+    },
+    {
+      "name": "exponential gain, relevant at grade 2",
+      "kind": "ranking", "list": ["b", "a", "c"],
+      "relevance": {"a": 3, "b": 1, "c": 0, "d": 2},
+      "relevant_at_least": 2, "gain": "exponential",
+      "arithmetic": "gains: 2^1-1 = 1, 2^3-1 = 7, 0. DCG = 1*D[1] + 7*D[2] + 0*D[3] = 5.416508275000202. IDCG over grades 3,2,1 = 7*D[1] + 3*D[2] + 1*D[3] = 9.392789260714373. nDCG = 0.5766666455144386. b (grade 1) is not relevant at 2: hit@1 = 0; R = 2 (a, d), recall@3 = 1/2.",
+      "expect": {
+        "ndcg@3": {"bits": "3fe2740d9be5b697", "unjudged_items": 0},
+        "hit@1": {"count": [0, 1], "unjudged_items": 0},
+        "recall@3": {"mean": [1, 2], "unjudged_items": 0}
+      }
+    }
+  ],
+  "refused": [
+    {"name": "one id twice (section 5, row 7)", "kind": "ranking", "list": ["a", "b", "a"], "reason": "invalid_ranking"},
+    {"name": "a Filtered value (section 5, row 8)", "kind": "filtered", "list": ["a"], "reason": "not_a_ranking"},
+    {"name": "no such parameter", "kind": "none", "list": [], "reason": "not_a_ranking"}
+  ],
+  "backfill": [
+    {
+      "name": "a selection with two backfilled positions",
+      "kind": "selection", "list": ["a", "b", "c"], "origins": ["model", "backfill", "backfill"],
+      "arithmetic": "position 1 is model: 0/1; position 2 is backfill: 1/1; the list has no position 4, and no list has a position 0.",
+      "expect": {"0": {"excluded": "no_position"}, "1": {"count": [0, 1]}, "2": {"count": [1, 1]}, "4": {"excluded": "no_position"}}
+    },
+    {
+      "name": "a ranking carries no origin",
+      "kind": "ranking", "list": ["a", "b"],
+      "arithmetic": "only a Selection records per-position origin.",
+      "expect": {"1": {"excluded": "no_origin"}}
+    }
+  ]
+}
