@@ -237,6 +237,13 @@ sh -c 'for d in crates tools; do [ -d "$d" ] || continue; if grep -rnE "(struct|
   checkout), the MSRV job keeps only registry and git (its target was 4 GB),
   and verify restores the preflight job's spec-spine binary instead of
   racing four saves of its own.
+- 2026-10-27: a pull request's own CI run checks the acceptance partition
+  but runs no acceptance group; the merge-queue entry, which tests the
+  change against the latest `main`, and every push to `main` run all of
+  them, so nothing reaches `main` unverified. The label
+  `statecraft:stacked-ci` runs the groups on a pull request. A pull
+  request's run is about 25 minutes shorter; a defect only acceptance
+  finds now ejects the queue entry instead of failing the pull request.
 - 2026-10-27: `integrations-core` reached the acceptance job's 45-minute
   limit once 037 joined it, so 002, 010, 012, 015, 017, 019, 020 and 033
   move to a fifth group, `integrations-base` (about 22 minutes each). Same

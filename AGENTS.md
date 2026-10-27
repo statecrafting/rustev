@@ -76,5 +76,7 @@ the jobs of a pull request's older run; a run left waiting on the owner
 exception is cleaned up by `make landing-status ARGS=--cancel-superseded`. A
 stacked pull request runs governance, preflight and the AI review only; add
 the label `statecraft:stacked-ci` before pushing to get the full matrix as
-early feedback (its base is still refused). `make landing-status` orders the
+early feedback (its base is still refused). A pull request's own run checks
+the acceptance partition only; the merge queue and `main` run every
+acceptance group (the same label runs them early). `make landing-status` orders the
 open pull requests by what they unblock and names each one's next action.
