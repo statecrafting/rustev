@@ -1157,6 +1157,18 @@ judgment bytes without dispatch (3.11.6). Screening integration (3.11.4)
 waits on spec 035; until then the compiler's refusal keeps extraction
 fail-closed (`crates/rustev-runtime/tests/extraction.rs`).
 
+**Increment 7, part a1 (2026-10-26): needs input from extraction.**
+A `needs_input` outcome's `questions` is either the declared list (bytes
+unchanged) or `{proposed_by, allowed}` (3.13.2): the compiler requires the
+accept step's source to be an extract list of enum items whose literal
+vocabulary equals `allowed` as a set (`invalid_acceptance`), evaluation
+selects the accepted ids in `allowed` order (all of `allowed` when absent
+or empty) with the declared question text, and the `continuation` digest
+covers the selected questions (3.13.3). An input entry whose producer's
+`produced_at_ms` is after the evaluation time is `invalid_input`, checked
+with the same precedence as a future `as_of`. The gate's refusals have
+goldens per reader kind.
+
 ## Decisions at approval
 
 Each is decided within this spec under the work order, inside the binding

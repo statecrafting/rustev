@@ -708,8 +708,18 @@ export namespace RustevDefinition1 {
     | {
         needs_input: {
           fields: string[];
-          questions: string[];
+          questions: QuestionSelection;
         };
+      };
+  /**
+   * Declared questions, optionally selected by an accepted extraction (spec 038, 3.13).
+   * The list encoding preserves existing definition and plan bytes.
+   */
+  export type QuestionSelection =
+    | string[]
+    | {
+        allowed: string[];
+        proposed_by: string;
       };
   export type ReasonSet =
     | "any"
@@ -758,7 +768,7 @@ export namespace RustevDefinition1 {
     | {
         needs_input: {
           fields: string[];
-          questions: string[];
+          questions: QuestionSelection;
         };
       };
   export type ScreeningItemId = "none" | ScreeningItemField;
@@ -2062,8 +2072,18 @@ export namespace RustevDefinition2 {
     | {
         needs_input: {
           fields: string[];
-          questions: string[];
+          questions: QuestionSelection;
         };
+      };
+  /**
+   * Declared questions, optionally selected by an accepted extraction (spec 038, 3.13).
+   * The list encoding preserves existing definition and plan bytes.
+   */
+  export type QuestionSelection =
+    | string[]
+    | {
+        allowed: string[];
+        proposed_by: string;
       };
   export type ReasonSet =
     | "any"
@@ -2112,7 +2132,7 @@ export namespace RustevDefinition2 {
     | {
         needs_input: {
           fields: string[];
-          questions: string[];
+          questions: QuestionSelection;
         };
       };
   export type ScreeningItemId = "none" | ScreeningItemField;
@@ -8928,8 +8948,18 @@ export namespace RustevPlan2 {
     | {
         needs_input: {
           fields: string[];
-          questions: string[];
+          questions: QuestionSelection;
         };
+      };
+  /**
+   * Declared questions, optionally selected by an accepted extraction (spec 038, 3.13).
+   * The list encoding preserves existing definition and plan bytes.
+   */
+  export type QuestionSelection =
+    | string[]
+    | {
+        allowed: string[];
+        proposed_by: string;
       };
   export type ReasonSet =
     | "any"
@@ -8978,7 +9008,7 @@ export namespace RustevPlan2 {
     | {
         needs_input: {
           fields: string[];
-          questions: string[];
+          questions: QuestionSelection;
         };
       };
   export type ScreeningItemId = "none" | ScreeningItemField;
@@ -10823,8 +10853,18 @@ export namespace RustevPlan3 {
     | {
         needs_input: {
           fields: string[];
-          questions: string[];
+          questions: QuestionSelection;
         };
+      };
+  /**
+   * Declared questions, optionally selected by an accepted extraction (spec 038, 3.13).
+   * The list encoding preserves existing definition and plan bytes.
+   */
+  export type QuestionSelection =
+    | string[]
+    | {
+        allowed: string[];
+        proposed_by: string;
       };
   export type ReasonSet =
     | "any"
@@ -10873,7 +10913,7 @@ export namespace RustevPlan3 {
     | {
         needs_input: {
           fields: string[];
-          questions: string[];
+          questions: QuestionSelection;
         };
       };
   export type ScreeningItemId = "none" | ScreeningItemField;

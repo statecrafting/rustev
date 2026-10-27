@@ -300,25 +300,26 @@ pub(crate) fn validate_input(
     };
     // Spec 002's checks on the chosen entries: a future-dated entry, none
     // at all, then the newest decides.
-    let future: Vec<usize> = chosen
+    let future: Vec<(usize, &str)> = chosen
         .iter()
-        .filter(|(_, e)| e.as_of_ms > now)
-        .map(|(i, _)| *i)
+        .filter_map(|(i, e)| {
+            if e.as_of_ms > now {
+                Some((*i, "as_of is after the evaluation time"))
+            } else if e.producer.as_ref().is_some_and(|p| p.produced_at_ms > now) {
+                Some((*i, "produced_at is after the evaluation time"))
+            } else {
+                None
+            }
+        })
         .collect();
-    if !future.is_empty() {
-        for i in future {
+    if let Some((_, detail)) = future.first().copied() {
+        for (i, reason) in future {
             records[i].disposition = Disposition::Rejected {
-                reason: "as_of is after the evaluation time".into(),
+                reason: reason.into(),
             };
         }
         finish(&mut q, records);
-        return (
-            Err(Unresolved::invalid(
-                field(),
-                "as_of is after the evaluation time",
-            )),
-            q,
-        );
+        return (Err(Unresolved::invalid(field(), detail)), q);
     }
     let Some(&(used_index, used)) = chosen.iter().max_by_key(|(_, e)| e.as_of_ms) else {
         finish(&mut q, records);

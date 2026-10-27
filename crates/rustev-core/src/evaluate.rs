@@ -1858,6 +1858,7 @@ impl<'c> Evaluation<'c> {
                             merge(
                                 deps.iter()
                                     .filter(|d| !self.is_screen_ref(d))
+                                    .filter(|d| !v2 || !self.guarded_dropped_input(args, d))
                                     .filter_map(|d| self.status(d).err())
                                     .collect(),
                             )
@@ -2024,6 +2025,37 @@ impl<'c> Evaluation<'c> {
             crate::expr::Fault::Invalid(d) => Unresolved::invalid([], d),
         })?;
         Ok((v, grading::read_meta(&read, &self.metas)))
+    }
+
+    /// A dropped input may be inspected for presence before a filter reads
+    /// its fields (038, 3.15.1). Only a leading, decisive presence guard
+    /// bypasses eager dependency failure; unguarded reads still propagate it.
+    fn guarded_dropped_input(&self, args: &OpArgs, reference: &str) -> bool {
+        use rustev_contract::definition::Predicate;
+        let Some(input) = reference.strip_prefix("input:") else {
+            return false;
+        };
+        if !self.checks.dropped.contains_key(input) {
+            return false;
+        }
+        let OpArgs::FilterWithReasons(filter) = args else {
+            return false;
+        };
+        if crate::expr::base_ref_v2(&filter.list) == reference {
+            return false;
+        }
+        filter.rules.iter().all(|rule| {
+            let mut refs = vec![];
+            crate::expr::predicate_refs(&rule.predicate, &mut refs);
+            if !refs.iter().any(|r| crate::expr::base_ref_v2(r) == reference) {
+                return true;
+            }
+            let guard = match &rule.predicate {
+                Predicate::Any(parts) => parts.first(),
+                p => Some(p),
+            };
+            matches!(guard, Some(Predicate::Not(p)) if matches!(p.as_ref(), Predicate::Present(r) if r == reference))
+        })
     }
 
     /// Evaluate a plan 3 exact step: its requirements and graded hard gates

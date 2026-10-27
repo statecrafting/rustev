@@ -1506,6 +1506,7 @@ fn compile_generation(
         .iter()
         .map(|(k, (t, _))| (k.clone(), t.clone()))
         .collect();
+    crate::extraction_compile::question_selections(def)?;
     crate::extraction_compile::model_gate(def)?;
     let mut step_tys: BTreeMap<String, StepTy> = BTreeMap::new();
     // Semantic carries fan-out binds, not option names: these fields are scalar.

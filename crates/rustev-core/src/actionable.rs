@@ -379,7 +379,7 @@ pub(crate) fn structure(
                 names.address(&subject, address)?;
             }
             HandlerAction::NeedsInput { fields, questions } => {
-                names.needs_input(&subject, fields, questions)?
+                names.needs_input(&subject, fields, questions.allowed())?
             }
             _ => {}
         }
@@ -388,7 +388,7 @@ pub(crate) fn structure(
         let subject = format!("policy:rule:{}", r.id);
         provenance_conds(&r.when, &subject, inputs)?;
         if let OutcomeDecl::NeedsInput { fields, questions } = &r.then {
-            names.needs_input(&subject, fields, questions)?;
+            names.needs_input(&subject, fields, questions.allowed())?;
         }
     }
     for a in &policy.adjustments {

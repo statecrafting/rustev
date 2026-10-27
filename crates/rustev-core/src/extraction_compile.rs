@@ -1164,6 +1164,74 @@ pub(crate) fn accept_bindings(
     Ok(())
 }
 
+/// Phase e: a model can select template ids only through an accepted enum list.
+pub(crate) fn question_selections(def: &Definition) -> Result<(), Refusal> {
+    use rustev_contract::definition::{HandlerAction, OutcomeDecl, QuestionSelection};
+    let selections =
+        def.policy
+            .rules
+            .iter()
+            .filter_map(|r| match &r.then {
+                OutcomeDecl::NeedsInput { questions, .. } => {
+                    Some((format!("policy:rule:{}", r.id), questions))
+                }
+                _ => None,
+            })
+            .chain(def.policy.on_unresolved.iter().enumerate().filter_map(
+                |(i, h)| match &h.action {
+                    HandlerAction::NeedsInput { questions, .. } => {
+                        Some((format!("policy:handler:{i}"), questions))
+                    }
+                    _ => None,
+                },
+            ));
+    for (subject, selection) in selections {
+        let QuestionSelection::Proposed {
+            proposed_by,
+            allowed,
+        } = selection
+        else {
+            continue;
+        };
+        let vocabulary = (|| {
+            let step = def.steps.iter().find(|s| &s.id == proposed_by)?;
+            let StepBody::AcceptModelDerived(a) = &step.body else {
+                return None;
+            };
+            let (id, field) = a.field.strip_prefix("step:")?.split_once('/')?;
+            let step = def.steps.iter().find(|s| s.id == id)?;
+            let StepBody::Extract(e) = &step.body else {
+                return None;
+            };
+            let field = e.output.fields.iter().find(|f| f.name == field)?;
+            let ExtractionType::List { item, .. } = &field.ty else {
+                return None;
+            };
+            let ExtractionType::Enum { vocabulary } = item.as_ref() else {
+                return None;
+            };
+            let ExtractionVocabulary::Envelope(Vocabulary::Literal(options)) =
+                e.vocabularies.get(vocabulary)?
+            else {
+                return None;
+            };
+            Some(options)
+        })();
+        let set = |ids: &[String]| {
+            ids.iter()
+                .cloned()
+                .collect::<std::collections::BTreeSet<_>>()
+        };
+        // Set equality (3.13.2). A repeated id in `allowed` never reaches
+        // here: needs_input names each question once (033 3.7, phase b).
+        if allowed.is_empty() || vocabulary.is_none_or(|options| set(options) != set(allowed)) {
+            return Err(Refusal { category: Category::InvalidAcceptance, subject,
+                detail: "proposed_by must accept an extract list of enum items with literal vocabulary equal to allowed".into(), shortfalls: vec![] });
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod overflow_tests {
     use super::*;

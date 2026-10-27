@@ -629,3 +629,238 @@ fn dropped_acceptance_retains_absence_and_validation_causes() {
         );
     }
 }
+
+fn proposed_questions_definition() -> Definition {
+    let mut raw = serde_json::to_value(definition()).unwrap();
+    raw["inputs"].as_array_mut().unwrap().push(json!({"name":"details","type":{"text":{"max_bytes":128}},"provenance":["user-supplied"],"freshness":"not_required"}));
+    raw["steps"][0]["body"]["extract"]["output"]["fields"].as_array_mut().unwrap().push(json!({"name":"questions","type":{"list":{"item":{"enum":{"vocabulary":"questions"}},"max_items":3}}}));
+    // Literal vocabulary order is intentionally different from allowed order.
+    raw["steps"][0]["body"]["extract"]["vocabularies"]["questions"] =
+        json!(["third", "first", "second"]);
+    raw["steps"][1]["body"]["accept_model_derived"]["field"] =
+        json!("step:request_filters/questions");
+    raw["steps"][1]["body"]["accept_model_derived"]["validate"] = json!("none");
+    raw["actionability"] = json!({"caller_controlled":["user-supplied"],"remediations":[],"checks":[],"constraint_groups":[],"questions":[
+        {"id":"first","fields":["details"],"text":"First declared question?"},
+        {"id":"second","fields":["details"],"text":"Second declared question?"},
+        {"id":"third","fields":["details"],"text":"Third declared question?"}
+    ]});
+    raw["policy"]["rules"] = json!([{"id":"ask","when":"always","then":{"needs_input":{"fields":["details"],"questions":{"proposed_by":"window_ok","allowed":["first","second","third"]}}}}]);
+    serde_json::from_value(raw).unwrap()
+}
+
+#[test]
+fn proposed_questions_use_allowed_order_declared_text_and_selected_continuation() {
+    use rustev_contract::{
+        Identified,
+        canonical::{record_canonical_bytes, tagged_digest},
+    };
+    let d = proposed_questions_definition();
+    let c = compile(&d);
+    for (fields, selected) in [
+        (
+            json!({"questions":["third","first"]}),
+            vec!["first", "third"],
+        ),
+        (json!({"questions":["second"]}), vec!["second"]),
+        (json!({"questions":[]}), vec!["first", "second", "third"]),
+        (json!({}), vec!["first", "second", "third"]),
+        (
+            json!({"questions":["Injected question text?"]}),
+            vec!["first", "second", "third"],
+        ),
+    ] {
+        let (j, _) = run(&d, output(fields));
+        let Outcome::NeedsInput(n) = &j.outcome else {
+            panic!("{:?}", j.outcome)
+        };
+        assert_eq!(
+            n.questions
+                .iter()
+                .map(|q| q.id.as_str())
+                .collect::<Vec<_>>(),
+            selected
+        );
+        for q in &n.questions {
+            assert_eq!(
+                q,
+                d.actionability
+                    .as_ref()
+                    .unwrap()
+                    .questions
+                    .iter()
+                    .find(|t| t.id == q.id)
+                    .unwrap()
+            );
+        }
+        assert!(j.lineage.steps.contains(&"window_ok".into()));
+        let bytes = record_canonical_bytes(&json!({"plan_id":c.id,"snapshot_id":snapshot().id().unwrap(),"evaluation_time_ms":common::NOW,"site":"rule:ask","fields":["details"],"questions":selected})).unwrap();
+        assert_eq!(
+            n.continuation.to_string(),
+            tagged_digest("rustev.continuation/1", &bytes)
+        );
+    }
+}
+
+#[test]
+fn proposed_questions_require_acceptance_of_a_matching_literal_enum_list() {
+    let base = serde_json::to_value(proposed_questions_definition()).unwrap();
+    for (pointer, value) in [
+        (
+            "/policy/rules/0/then/needs_input/questions/proposed_by",
+            json!("missing"),
+        ),
+        (
+            "/policy/rules/0/then/needs_input/questions/proposed_by",
+            json!("request_filters"),
+        ),
+        (
+            "/policy/rules/0/then/needs_input/questions/allowed",
+            json!([]),
+        ),
+        (
+            "/policy/rules/0/then/needs_input/questions/allowed",
+            json!(["first"]),
+        ),
+        (
+            "/steps/1/body/accept_model_derived/field",
+            json!("input:message"),
+        ),
+        (
+            "/steps/1/body/accept_model_derived/field",
+            json!("step:request_filters/insufficient"),
+        ),
+        (
+            "/steps/0/body/extract/output/fields/5/type",
+            json!({"enum":{"vocabulary":"questions"}}),
+        ),
+        (
+            "/steps/0/body/extract/output/fields/5/type/list/item",
+            json!({"text":{"max_bytes":64}}),
+        ),
+        (
+            "/steps/0/body/extract/vocabularies/questions",
+            json!({"input":"input:message"}),
+        ),
+    ] {
+        let mut raw = base.clone();
+        *raw.pointer_mut(pointer).unwrap() = value;
+        let d: Definition = serde_json::from_value(raw).unwrap();
+        let plan: Plan = serde_json::from_str(include_str!("golden/acceptance.plan.json")).unwrap();
+        let PlanStepDetail::Extract(binding) = &plan.steps[0].detail else {
+            panic!()
+        };
+        let error = compile_with_extraction_documents(
+            &d,
+            &[backend()],
+            &[],
+            &[],
+            None,
+            std::slice::from_ref(&binding.template),
+            &[],
+        )
+        .unwrap_err();
+        assert_eq!(
+            error.category,
+            rustev_core::Category::InvalidAcceptance,
+            "{pointer}: {error:?}"
+        );
+    }
+    // A repeated allowed id is refused before the acceptance gate (033 3.7).
+    let mut raw = base;
+    raw["policy"]["rules"][0]["then"]["needs_input"]["questions"]["allowed"] =
+        json!(["first", "second", "third", "first"]);
+    let d: Definition = serde_json::from_value(raw).unwrap();
+    let plan: Plan = serde_json::from_str(include_str!("golden/acceptance.plan.json")).unwrap();
+    let PlanStepDetail::Extract(binding) = &plan.steps[0].detail else {
+        panic!()
+    };
+    let error = compile_with_extraction_documents(
+        &d,
+        &[backend()],
+        &[],
+        &[],
+        None,
+        std::slice::from_ref(&binding.template),
+        &[],
+    )
+    .unwrap_err();
+    assert_eq!(error.category, rustev_core::Category::InvalidDefinition);
+    assert!(error.detail.contains("each question once"), "{error:?}");
+}
+
+#[test]
+fn handler_question_selection_uses_the_same_accepted_values() {
+    let mut d = proposed_questions_definition();
+    let rustev_contract::definition::OutcomeDecl::NeedsInput { fields, questions } =
+        d.policy.rules.remove(0).then
+    else {
+        panic!()
+    };
+    d.policy.rules = definition().policy.rules;
+    d.policy
+        .on_unresolved
+        .push(rustev_contract::definition::Handler {
+            target: "input:details".into(),
+            reasons: rustev_contract::definition::ReasonSet::Any,
+            action: rustev_contract::definition::HandlerAction::NeedsInput { fields, questions },
+        });
+    let (j, _) = run(&d, output(json!({"questions":["second"]})));
+    let Outcome::NeedsInput(n) = j.outcome else {
+        panic!()
+    };
+    assert_eq!(
+        n.questions
+            .iter()
+            .map(|q| q.id.as_str())
+            .collect::<Vec<_>>(),
+        ["second"]
+    );
+}
+
+#[test]
+fn future_producer_timestamp_is_invalid_input_with_existing_precedence() {
+    use rustev_contract::evidence::InputStatus;
+    let mut d = definition();
+    d.steps.remove(0);
+    d.inputs[0].ty = rustev_contract::definition::TypeDecl::Integer;
+    d.inputs[0].provenance = vec![P::ModelDerived];
+    let StepBody::AcceptModelDerived(a) = &mut d.steps[0].body else {
+        panic!()
+    };
+    a.field = "input:message".into();
+    a.validate = Validation::None;
+    let c = compile(&d);
+    for (offset, conflict) in [(0, false), (1, false), (1, true)] {
+        let mut s = common::snapshot(vec![common::entry(
+            "message",
+            json!(7),
+            P::ModelDerived,
+            common::NOW,
+        )]);
+        s.schema = "rustev.snapshot/2".into();
+        s.entries[0].producer = Some(serde_json::from_value(json!({"artifact_id":common::id('a'),"template_digest":"none","produced_at_ms":common::NOW + offset})).unwrap());
+        if conflict {
+            s.entries.push(common::entry(
+                "message",
+                json!(8),
+                P::ModelDerived,
+                common::NOW,
+            ));
+        }
+        let (_, e) = Evaluation::start(&c, &s, common::ts(common::NOW))
+            .unwrap()
+            .finish("producer-time")
+            .unwrap();
+        match &e.inputs[0].status {
+            InputStatus::Resolved { .. } => assert_eq!(offset, 0),
+            InputStatus::Unresolved(Unresolved::InvalidInput { fields, .. }) => {
+                assert_eq!(offset, 1);
+                assert!(!conflict);
+                assert_eq!(fields, &["message"]);
+            }
+            InputStatus::Unresolved(Unresolved::Conflict { .. }) => assert!(conflict),
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+}
