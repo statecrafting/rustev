@@ -224,6 +224,7 @@
         "src/replay.rs",
         "src/report.rs",
         "src/resolve.rs",
+        "src/scores.rs",
         "src/scoring.rs",
         "src/selection.rs",
         "src/testdata/lodging-emb.record.json"

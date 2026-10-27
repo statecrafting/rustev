@@ -2638,7 +2638,10 @@ async fn version_3_reports_ranking_and_constraint_metrics() {
         replay: &replay,
         candidate: None,
     };
-    let measured = Measured { adapter: &Lodging };
+    let measured = Measured {
+        adapter: &Lodging,
+        scores: &[],
+    };
 
     // Version 2 is unchanged by the measured entry point (I-1).
     let base = evaluate(&inputs(&v2)).unwrap();
@@ -2721,4 +2724,303 @@ async fn version_3_reports_ranking_and_constraint_metrics() {
         evaluate_measured(&inputs(&scored), measured),
         Err(EvalError::Config(c)) if c.0.starts_with("metric-unavailable")
     ));
+}
+
+/// A deterministic test scorer: a level or bound from the ranking's length.
+struct LengthScorer {
+    descriptor: rustev_eval::scoring::ScorerDescriptor,
+    /// What to return for every entry, overriding the length.
+    fixed: Option<rustev_eval::scores::ScoreOutcome>,
+}
+
+impl rustev_eval::scores::Scorer for LengthScorer {
+    fn descriptor(&self) -> &rustev_eval::scoring::ScorerDescriptor {
+        &self.descriptor
+    }
+    fn score(
+        &self,
+        case: &rustev_eval::scores::CaseView,
+        proposal: &rustev_eval::scores::ProposalView,
+    ) -> rustev_eval::scores::ScoreOutcome {
+        use rustev_eval::scores::ScoreOutcome;
+        // 3.7.4: a scorer that does not read gold never sees it.
+        if !self.descriptor.reads_gold {
+            assert!(case.gold.is_none());
+        } else if case.id == "l-01" {
+            assert!(case.gold.is_some());
+        }
+        let n = match proposal.params.get("ranking") {
+            Some(OutValue::Ranking(r)) => r.entries.len(),
+            _ => return ScoreOutcome::Unscored("no_ranking".into()),
+        };
+        match &self.fixed {
+            Some(o) => o.clone(),
+            None => ScoreOutcome::Score(n.min(2) as f64),
+        }
+    }
+}
+
+fn scorer_descriptor(v: serde_json::Value) -> rustev_eval::scoring::ScorerDescriptor {
+    serde_json::from_value(v).unwrap()
+}
+
+/// Spec 041, 3.6 and 3.7: score views, scores and rubric metrics, with the
+/// scores refusals, withheld gold and model separation.
+#[tokio::test(flavor = "current_thread")]
+async fn version_3_scores_views_and_reports_rubric_metrics() {
+    use Keep::*;
+    use rustev_eval::measured::Measured;
+    use rustev_eval::measures::MeasuredAdapter;
+    use rustev_eval::report::{
+        EvalError, evaluate_measured, evaluate_measured_with_cases, evaluate_views,
+    };
+    use rustev_eval::scores::{ScoreOutcome, Scores, score_views};
+    let probe = Probe::passing(lodging_rules());
+    let three = || {
+        vec![
+            candidate("c-1", "120", "USD", 2, true),
+            candidate("c-2", "90", "EUR", 4, false),
+            candidate("c-3", "250", "USD", 2, true),
+        ]
+    };
+    let claims = || vec![claim("k-1", "verified", "preference", NOW + DAY)];
+    let case = |id, snapshot, label, keep| Case {
+        id,
+        snapshot,
+        label,
+        subgroups: vec![],
+        split: Split::FinalTest,
+        keep,
+    };
+    let cases = vec![
+        case(
+            "l-01",
+            lodging_snapshot(true, three(), claims()),
+            Some("c-2"),
+            Embedded,
+        ),
+        case(
+            "l-02",
+            lodging_snapshot(false, three(), claims()),
+            Some("c-1"),
+            Embedded,
+        ),
+        case(
+            "l-04",
+            lodging_snapshot(true, three(), vec![]),
+            None,
+            Embedded,
+        ),
+    ];
+    let p = probe.clone();
+    let bundles = bundles(&probe, || lodging_fixture(&p, &unlimited()), &cases).await;
+    let mut manifest = manifest("lodging scored", Lodging.adapter(), &cases);
+    manifest.schema = rustev_eval::dataset::DATASET_V2.into();
+    manifest.cases[0].gold =
+        Some(serde_json::from_value(json!({"relevance": {"c-2": 3}})).unwrap());
+    let levels = json!({"ordinal": {"levels": ["short", "fair", "long"]}});
+    let tone = scorer_descriptor(json!({
+        "id": "tone", "version": "1", "kind": "deterministic", "output": levels,
+        "rules": {"bound": rules_digest("tone rules").to_string()}, "reads_gold": false
+    }));
+    let size = scorer_descriptor(json!({
+        "id": "size", "version": "1", "kind": "deterministic",
+        "output": {"bounded": {"min": "0", "max": "10"}},
+        "rules": "opaque", "reads_gold": true
+    }));
+    let judge = scorer_descriptor(json!({
+        "id": "judge", "version": "1", "kind": "model", "output": levels,
+        "rules": {"bound": rules_digest("judge rules").to_string()}, "reads_gold": false,
+        "judge": {"plan": rules_digest("judge plan").to_string(), "artifacts": [],
+                  "level_param": "level", "subject_field": "subject"}
+    }));
+    let mut v3 = config(&Lodging, &["ranking"], None);
+    v3.schema = rustev_eval::config::EVALUATOR_CONFIG_V3.into();
+    v3.adapter.measures = Some(Lodging.measures().digest().unwrap());
+    v3.scorers = Some(vec![tone.clone(), size.clone(), judge.clone()]);
+    v3.rubric_metrics = Some(
+        serde_json::from_value(json!([
+            {"name": "judged", "scorer": "judge", "aggregate": "mean_level_index"},
+            {"name": "tone_long", "scorer": "tone", "aggregate": {"share_at_least": "long"}},
+            {"name": "size", "scorer": "size", "aggregate": "mean"}
+        ]))
+        .unwrap(),
+    );
+    v3.human_scales = Some(vec![]);
+    v3.agreements = Some(vec![]);
+    v3.origin = Some(vec![]);
+    for name in ["ranking", "constraint", "rubric", "model"] {
+        v3.metrics.push(MetricFormula {
+            name: name.into(),
+            formula: "spec 041".into(),
+        });
+    }
+    let bundle_inputs = inputs_of(&bundles);
+    let replay = config_for(&scope());
+    let inputs = Inputs {
+        manifest: &manifest,
+        split: Split::FinalTest,
+        config: &v3,
+        adapter: &Lodging,
+        bundles: &bundle_inputs,
+        resolver: &NoExternal,
+        replay: &replay,
+        candidate: None,
+    };
+    let unscored = Measured {
+        adapter: &Lodging,
+        scores: &[],
+    };
+
+    // Views: the comparable proposals only, the same bytes every time.
+    let views = evaluate_views(&inputs, unscored).unwrap();
+    assert_eq!(evaluate_views(&inputs, unscored).unwrap(), views);
+    let ids: Vec<&str> = views.cases.iter().map(|e| e.case.as_str()).collect();
+    assert_eq!(ids, ["l-01", "l-04"]);
+    for e in &views.cases {
+        assert_eq!(e.subject, e.proposal_view.subject().unwrap());
+    }
+    assert!(views.cases[0].case_view.gold.is_some());
+
+    // Scoring: gold withheld from a scorer that does not read it; a level
+    // outside the scale and a reserved reason become `invalid_score`.
+    let score = |d: &rustev_eval::scoring::ScorerDescriptor, fixed| {
+        score_views(
+            &LengthScorer {
+                descriptor: d.clone(),
+                fixed,
+            },
+            &views,
+        )
+        .unwrap()
+    };
+    let tone_scores = score(&tone, None);
+    let size_scores = score(&size, None);
+    let judge_scores = score(&judge, None);
+    for (fixed, reason) in [
+        (ScoreOutcome::Score(7.0), "invalid_score"),
+        (
+            ScoreOutcome::Unscored("judge_unresolved".into()),
+            "invalid_score",
+        ),
+        (ScoreOutcome::Unscored("Bad Reason".into()), "invalid_score"),
+        (ScoreOutcome::Unscored("no_text".into()), "no_text"),
+    ] {
+        let s = score(&tone, Some(fixed));
+        assert!(
+            s.entries
+                .iter()
+                .all(|e| e.outcome == ScoreOutcome::Unscored(reason.into())),
+            "{reason}"
+        );
+    }
+
+    let all = [
+        tone_scores.clone(),
+        size_scores.clone(),
+        judge_scores.clone(),
+    ];
+    let measured = Measured {
+        adapter: &Lodging,
+        scores: &all,
+    };
+    let (e, cases) = evaluate_measured_with_cases(&inputs, measured, None).unwrap();
+    reconcile(&e, &cases).unwrap();
+    let names: Vec<&str> = e.report.metrics.iter().map(|m| m.name.as_str()).collect();
+    let tail = &names[names.len() - 3..];
+    // Deterministic rubric metrics in declaration order, model last (I-3).
+    assert_eq!(
+        tail,
+        ["rubric/tone_long", "rubric/size", "model/rubric/judged"]
+    );
+    let size_value = measured_metric(&e, "rubric/size");
+    let tone_value = measured_metric(&e, "rubric/tone_long");
+    assert!((0.0..=2.0).contains(&size_value));
+    assert!((0.0..=1.0).contains(&tone_value));
+
+    // A declared scorer with no document: its metrics unknown.
+    let partial = [tone_scores.clone()];
+    let e2 = evaluate_measured(
+        &inputs,
+        Measured {
+            adapter: &Lodging,
+            scores: &partial,
+        },
+    )
+    .unwrap();
+    assert!(unknown_metric(&e2, "rubric/size").contains("scores-missing"));
+
+    // An invalid score in a document is unscored, never clamped.
+    let mut bad = tone_scores.clone();
+    bad.entries[0].outcome = ScoreOutcome::Score(7.0);
+    let e3 = evaluate_measured(
+        &inputs,
+        Measured {
+            adapter: &Lodging,
+            scores: std::slice::from_ref(&bad),
+        },
+    )
+    .unwrap();
+    let (_, _, why) = count(&e3.detail, "rubric/tone_long");
+    assert_eq!(why["unscored:invalid_score"], 1);
+
+    // The refusals of 3.7.5.
+    let refused = |scores: &[Scores]| match evaluate_measured(
+        &inputs,
+        Measured {
+            adapter: &Lodging,
+            scores,
+        },
+    ) {
+        Err(EvalError::Scores(code)) => code,
+        other => panic!("{other:?}"),
+    };
+    let mut undeclared = tone_scores.clone();
+    undeclared.scorer.version = "2".into();
+    assert_eq!(refused(&[undeclared]), "scorer-undeclared");
+    assert_eq!(
+        refused(&[tone_scores.clone(), tone_scores.clone()]),
+        "scores-duplicate"
+    );
+    let mut moved = tone_scores.clone();
+    moved.entries[0].subject = moved.entries[1].subject.clone();
+    assert_eq!(refused(&[moved]), "scores-mismatch");
+    let mut other_views = tone_scores.clone();
+    other_views.views = rules_digest("other views");
+    assert_eq!(refused(&[other_views]), "scores-mismatch");
+    let mut reordered = tone_scores.clone();
+    reordered.entries.reverse();
+    assert_eq!(refused(&[reordered]), "scores-mismatch");
+
+    // Changing the judge's scores changes no deterministic metric's bytes.
+    let mut flipped = judge_scores.clone();
+    for e in &mut flipped.entries {
+        e.outcome = ScoreOutcome::Score(0.0);
+    }
+    let again = evaluate_measured(
+        &inputs,
+        Measured {
+            adapter: &Lodging,
+            scores: &[tone_scores, size_scores, flipped],
+        },
+    )
+    .unwrap();
+    let deterministic = |e: &Evaluated| -> Vec<Vec<u8>> {
+        e.report
+            .metrics
+            .iter()
+            .filter(|m| !m.name.starts_with("model/"))
+            .map(|m| serde_json::to_vec(m).unwrap())
+            .collect()
+    };
+    assert_eq!(deterministic(&again), deterministic(&e));
+    assert_ne!(
+        measured_metric(&again, "model/rubric/judged"),
+        measured_metric(&e, "model/rubric/judged")
+    );
+}
+
+#[track_caller]
+fn measured_metric(e: &Evaluated, m: &str) -> f64 {
+    measured(e, m)
 }

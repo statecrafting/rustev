@@ -856,6 +856,32 @@ them. Tests: `crates/rustev-eval/tests/measured_041.rs` (section 5's
 constraint rows) and `version_3_reports_ranking_and_constraint_metrics`
 in `crates/rustev-eval/tests/reports.rs`.
 
+**Increment 4 (2026-10-27): scorers, views, scores and rubric metrics.**
+`crates/rustev-eval/src/scores.rs` holds the `Scorer` trait (3.6),
+`rustev.score-views/1` and `rustev.scores/1` (3.7.1, 3.7.2), and
+`score_views` (3.7.3). It calls a scorer once per view entry in order,
+hands a scorer that does not declare `reads_gold` a case view with `gold`
+null (3.7.4), and records a score outside the output as unscored
+`invalid_score`, never clamped. Evaluation keeps each comparable
+proposal's derivation and notices, so `evaluate_views` and
+`evaluate_measured` build the views by one function. Evaluation refuses a
+scores document that is undeclared (`scorer-undeclared`), duplicated
+(`scores-duplicate`) or over other views (`scores-mismatch`) as
+`EvalError::Scores` (3.7.5). `rubric_metrics` in `measured.rs` reports
+`rubric/<name>` after the constraint metrics and `model/rubric/<name>`
+last (3.2.4, 3.6.3, I-3). A missing document makes a scorer's metrics
+unknown (`scores-missing`), and an unscored case is counted
+`unscored:<reason>`. Spec 029's form lookup reads a rubric metric's form
+from its case measures, as for constraints. Decisions within the spec:
+the subject digest is over the proposal view's record canonical bytes,
+since parameters may hold binary64 values; a malformed unscored reason,
+or one reserved for eval, returned by a scorer is recorded as
+`invalid_score`; two documents for one scorer are refused as
+`scores-duplicate`; human scales and agreements stay refused
+(`metric-unavailable`) until increment 5. Tests:
+`version_3_scores_views_and_reports_rubric_metrics` in
+`crates/rustev-eval/tests/reports.rs`.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child faithfully
