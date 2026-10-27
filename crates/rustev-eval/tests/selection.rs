@@ -649,3 +649,78 @@ fn gate_parser_enforces_descriptor_limits_at_the_boundary() {
     g.require.push(g.require[0].clone());
     assert!(SelectionGate::parse(&g.canonical().unwrap()).is_err());
 }
+
+/// Spec 041, 3.12.2: a selection clause over a metric an opaque scorer
+/// produces is unknown, and `rank_by` over it leaves the candidate
+/// unranked; a bound scorer's metric is gated as any other.
+#[test]
+fn an_opaque_scorers_metric_is_unknown_and_unranked() {
+    let selection_for = |rules: serde_json::Value, require_q: bool| {
+        let mut f = Fixture::new();
+        let mut config = serde_json::to_value(&f.b.config).unwrap();
+        config["schema"] = json!("rustev.evaluator-config/3");
+        config["adapter"]["measures"] = json!(digest(9));
+        config["metrics"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"name": "rubric", "formula": "synthetic"}));
+        config["scorers"] = json!([{
+            "id": "q", "version": "1", "kind": "deterministic",
+            "output": {"bounded": {"min": "0", "max": "1"}},
+            "rules": rules, "reads_gold": false
+        }]);
+        config["rubric_metrics"] = json!([{"name": "q", "scorer": "q", "aggregate": "mean"}]);
+        for k in ["human_scales", "agreements", "origin"] {
+            config[k] = json!([]);
+        }
+        let config: rustev_eval::config::EvaluatorConfig = serde_json::from_value(config).unwrap();
+        config.check().unwrap();
+        for (e, cases) in [(&mut f.b, &mut f.bc), (&mut f.c, &mut f.cc)] {
+            e.config = config.clone();
+            e.report.metrics.push(rustev_contract::eval_report::Metric {
+                name: "rubric/q".into(),
+                value: rustev_contract::eval_report::MetricValue::Measured { value: 0.5, n: 2 },
+            });
+            for c in &mut cases.cases {
+                c.measures.insert(
+                    "rubric/q".into(),
+                    rustev_eval::eval_cases::CaseMeasure::Mean { num: 0.5, den: 1 },
+                );
+            }
+            Fixture::bind(e, cases);
+        }
+        let g = edit_gate(&gate(), |v| {
+            v["metrics"]["rubric/q"] = json!("higher_is_better");
+            if require_q {
+                v["require"] = json!([{"metric": "rubric/q", "not_worse_than": "baseline", "within": "noise"}]);
+            }
+            v["rank_by"] = json!(["rubric/q"]);
+        });
+        f.select(&g)
+    };
+    let opaque = selection_for(json!("opaque"), true);
+    let clause = opaque.candidates[0]
+        .clauses
+        .iter()
+        .find(|c| c.clause == "require[0]")
+        .unwrap();
+    assert!(matches!(
+        &clause.result,
+        ClauseOutcome::Unknown { reason } if reason.contains("opaque scorer")
+    ));
+    assert_eq!(
+        opaque.candidates[0].verdict,
+        Verdict::Unknown {
+            clause: "require[0]".into()
+        }
+    );
+    // A bound scorer's metric qualifies and ranks as any metric does.
+    let bound = selection_for(json!({"bound": digest(8)}), true);
+    assert_eq!(bound.candidates[0].verdict, Verdict::Qualifies);
+    assert_eq!(bound.ranked, ["candidate"]);
+    // Qualifying on another metric, ranked by the opaque one: unranked.
+    let ranked = selection_for(json!("opaque"), false);
+    assert_eq!(ranked.candidates[0].verdict, Verdict::Qualifies);
+    assert!(ranked.ranked.is_empty());
+    assert!(ranked.unranked[0].reason.contains("opaque scorer"));
+}

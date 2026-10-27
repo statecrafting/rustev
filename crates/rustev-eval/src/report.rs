@@ -1186,6 +1186,30 @@ pub fn evaluate_gate(gate: &Gate, baseline: &Evaluated, candidate: &Evaluated) -
         }
         _ => {}
     }
+    // Spec 041, 3.12.1: version 3 preconditions, named before the
+    // configuration identities they are implied by.
+    match (
+        baseline.config.adapter.measures.as_ref(),
+        candidate.config.adapter.measures.as_ref(),
+    ) {
+        (Some(x), Some(y)) if x != y => {
+            return unknown("the baseline's and candidate's adapter measures digests differ");
+        }
+        (Some(_), None) => return unknown("only the baseline binds adapter measures"),
+        (None, Some(_)) => return unknown("only the candidate binds adapter measures"),
+        _ => {}
+    }
+    for (side, e) in [("baseline", baseline), ("candidate", candidate)] {
+        if e.config.declarations().is_some_and(|d| {
+            d.metric_names()
+                .get(&gate.metric)
+                .is_some_and(|(_, opaque)| *opaque)
+        }) {
+            return unknown(&format!(
+                "the {side}'s gated metric comes from an opaque scorer"
+            ));
+        }
+    }
     if b.evaluator_config != c.evaluator_config {
         return unknown("the cohorts use different evaluator configurations");
     }
