@@ -209,3 +209,8 @@ identity!(
     /// Identity of an authored prompt template (spec 037).
     PromptTemplateId
 );
+
+identity!(
+    /// Identity of a canonical live configuration (spec 043, 3.2).
+    LiveConfigId
+);
