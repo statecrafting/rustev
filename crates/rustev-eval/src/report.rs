@@ -445,8 +445,19 @@ fn evaluate_inner(
     let mut details = vec![];
     let mut case_measures: Vec<CaseMeasures> = vec![];
     let mut scope: Vec<measured::Scope<'_>> = Vec::with_capacity(results.len());
+    let mut origin_cases: Vec<Option<crate::origin::OriginCase<'_>>> =
+        Vec::with_capacity(results.len());
     let mut view_cases: Vec<ViewEntry> = vec![];
     for r in &results {
+        if !matches!(
+            &r.status,
+            Status::Comparable {
+                outcome: CaseOutcome::Proposal { .. },
+                ..
+            }
+        ) {
+            origin_cases.push(None);
+        }
         scope.push(match &r.status {
             Status::Incomparable(code) => measured::Scope::Out(format!("incomparable:{code}")),
             Status::Diverged => measured::Scope::Out("diverged".into()),
@@ -457,11 +468,20 @@ fn evaluate_inner(
             Status::Comparable {
                 outcome: CaseOutcome::Proposal { action, params, .. },
                 judged,
+                run,
+                plan,
                 ..
             } => {
                 if measures.is_some() {
                     view_cases.push(view_entry(r.case, action, params, judged)?);
                 }
+                origin_cases.push(Some(crate::origin::OriginCase {
+                    plan,
+                    evidence: match &run.core {
+                        rustev_contract::run::CoreEvidence::Recorded(e) => Some(e),
+                        rustev_contract::run::CoreEvidence::NotProduced => None,
+                    },
+                }));
                 measured::Scope::Proposal {
                     case: r.case,
                     params,
@@ -760,8 +780,10 @@ fn evaluate_inner(
         let (rubric, model_rubric) = measured::rubric_metrics(&declared, measured.scores, &scope);
         let (agreement, model_agreement) =
             measured::agreement_metrics(&declared, measured.scores, &scope);
+        let origin = crate::origin::origin_metrics(declared.origin, &scope, &origin_cases);
         let new = measured::metrics(m, &scope)
             .into_iter()
+            .chain(origin)
             .chain(rubric)
             .chain(agreement)
             .chain(model_rubric)

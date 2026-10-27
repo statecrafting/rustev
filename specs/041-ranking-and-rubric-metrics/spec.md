@@ -2,7 +2,7 @@
 id: "041-ranking-and-rubric-metrics"
 title: "Ranking, constraint-match and rubric metrics; pluggable scorers (amends 004, 014 and 029)"
 status: approved
-implementation: pending
+implementation: in-progress
 created: "2026-10-17"
 summary: >
   An amendment of approved specs 004, 014 and 029 (R-16), for #76 child
@@ -940,6 +940,34 @@ lists the candidate as `unranked` (3.12.2). Every other spec 004 and spec
 the acceptance (a replay repeat set over a version 3 configuration, with
 selection over `ranking/<name>/ndcg@10` and a `model/rubric/<name>`
 metric) is planned with increment 9.
+
+**Increment 6, part a (2026-10-27): corroboration, screening and
+acquisition tiers.** `crates/rustev-eval/src/origin.rs` computes the
+origin metrics of 3.5.2 from each proposal case's `rustev.evidence/2`
+record, read through its run record, and adds nothing to it: the
+corroboration outcomes of spec 032, the screening verdicts of spec 035 and
+the widening records of spec 036. `OriginFamily::available` now admits
+these three; `text_backstop` (spec 037) and `extraction` (spec 038) are
+still refused `metric-unavailable` until their owning specs are complete,
+and are part b. The metrics follow the 3.4 metrics in the report (3.2.4)
+in the configuration's family order, and `form_of` names every
+`origin/...` metric a count ratio (3.11.1). Decisions within the spec:
+a case whose plan lacks the construct is excluded and counted
+`not_in_plan`, so a plan without it gives zero denominators (3.5.3);
+families named per screener or per step report one metric per screener
+`backend_id` or widening step the evaluated plans bind, and none when
+they bind none; an `empty` screened value sends no request (spec 035,
+3.6.1), so it is outside the screening denominators and counted `empty`;
+an `uncorroborated` outcome is outside the corroboration denominator and
+counted; a widening step "ran" when its record exists and its outcome is
+not `skipped`, it "stopped at tier n" for the 0-based index of the last
+tier whose outcome is neither `skipped` nor `not_needed`, the tier
+indices are those its records list, and `exhausted` counts
+`tiers_exhausted`, which also counts at its last tier. Tests:
+`crates/rustev-eval/tests/origin_041.rs` over the spec 035 and 036
+goldens, and the origin part of
+`version_3_reports_ranking_and_constraint_metrics` in
+`crates/rustev-eval/tests/reports.rs`, which reconciles with spec 029.
 
 ## Decisions at approval
 

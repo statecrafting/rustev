@@ -2739,6 +2739,35 @@ async fn version_3_reports_ranking_and_constraint_metrics() {
         Err(EvalError::Dataset(rustev_eval::dataset::DatasetError::Gold { case, .. }))
             if case == "l-01"
     ));
+
+    // Origin families (3.5): the lodging plan has no corroboration,
+    // screening or widening construct, so corroboration's metric follows
+    // the 3.4 metrics, unknown with every proposal `not_in_plan`, and the
+    // families named per screener or step report none.
+    let mut origin = v3.clone();
+    origin.origin = Some(vec![
+        rustev_eval::scoring::OriginFamily::Corroboration,
+        rustev_eval::scoring::OriginFamily::Screening,
+        rustev_eval::scoring::OriginFamily::AcquisitionTier,
+    ]);
+    origin.metrics.push(MetricFormula {
+        name: "origin".into(),
+        formula: "per-case origin counts from the decision evidence".into(),
+    });
+    let (o, cases) = evaluate_measured_with_cases(&inputs(&origin), measured, None).unwrap();
+    assert_eq!(
+        o.report.metrics[..e.report.metrics.len()],
+        e.report.metrics[..]
+    );
+    let last = o.report.metrics.last().unwrap();
+    assert_eq!(last.name, "origin/corroboration/hint_disagreement_rate");
+    assert_eq!(o.report.metrics.len(), e.report.metrics.len() + 1);
+    assert!(matches!(&last.value, MetricValue::Unknown { reason }
+        if reason.contains("not_in_plan: 2")));
+    let (_, den, why) = count(&o.detail, &last.name);
+    assert_eq!(den, 0);
+    assert_eq!((why["diverged"], why["abstained"]), (1, 1));
+    reconcile(&o, &cases).unwrap();
 }
 
 /// A deterministic test scorer: a level or bound from the ranking's length.

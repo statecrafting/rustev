@@ -31,6 +31,7 @@ pub mod measured;
 pub mod measures;
 pub mod metrics;
 pub mod optimization;
+pub mod origin;
 pub mod ranking_metrics;
 pub mod remote_evidence;
 pub mod repeat;
