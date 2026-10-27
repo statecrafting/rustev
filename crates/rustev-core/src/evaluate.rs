@@ -458,7 +458,7 @@ impl<'c> Evaluation<'c> {
             .info
             .steps
             .values()
-            .any(|s| matches!(s, StepInfo::Extract))
+            .any(|s| matches!(s, StepInfo::Extract | StepInfo::Accept(_)))
         {
             return Err(StartError::ExtractionNotAvailable);
         }
@@ -1674,8 +1674,10 @@ impl<'c> Evaluation<'c> {
                 let key = format!("step:{id}");
                 let lineage = self.lineage_of(deps);
                 match &info.steps[id] {
-                    StepInfo::Generate | StepInfo::Extract => {
-                        unreachable!("generation and extraction evaluation refused at start")
+                    StepInfo::Generate | StepInfo::Extract | StepInfo::Accept(_) => {
+                        unreachable!(
+                            "generation, extraction and acceptance evaluation refused at start"
+                        )
                     }
                     // Acquisition lineage is stored by the shared insertion after this match.
                     StepInfo::Acquisition(a) => self.start_acquisition(id, a),
@@ -2119,7 +2121,8 @@ impl<'c> Evaluation<'c> {
                 | StepInfo::Corroborate { .. }
                 | StepInfo::Acquisition(_)
                 | StepInfo::Generate
-                | StepInfo::Extract => None,
+                | StepInfo::Extract
+                | StepInfo::Accept(_) => None,
             })
             .collect();
         let cx = OpContext {

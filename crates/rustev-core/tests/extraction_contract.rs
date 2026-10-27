@@ -1,4 +1,4 @@
-//! Spec 038 contract increment: compilation is deliberately closed.
+//! Spec 038 version guards and producer validation.
 mod common;
 mod eq;
 use rustev_contract::definition::ProvenanceClass;
@@ -8,16 +8,17 @@ use rustev_core::{Category, Evaluation, compile};
 use serde_json::json;
 
 #[test]
-fn extraction_and_acceptance_require_v2_and_remain_uncompiled() {
+fn extraction_and_acceptance_require_v2_and_valid_sources() {
     for fixture in [
         include_str!("../../rustev-contract/tests/fixtures/extract-step.json"),
         include_str!("../../rustev-contract/tests/fixtures/accept-step.json"),
     ] {
         let mut d = common::support_routing();
         d.steps = vec![serde_json::from_str(fixture).unwrap()];
+        d.policy = serde_json::from_value(json!({"rules":[{"id":"default","when":"always","then":{"escalate":{"reason":"review"}}}],"adjustments":[],"on_unresolved":[]})).unwrap();
         for (schema, detail) in [
             ("rustev.definition/1", "requires-definition-2"),
-            ("rustev.definition/2", "extraction-not-compiled"),
+            ("rustev.definition/2", ""),
         ] {
             d.schema = schema.into();
             let e = compile(&d, &[], &[]).unwrap_err();
@@ -31,6 +32,8 @@ fn extraction_and_acceptance_require_v2_and_remain_uncompiled() {
                 assert_eq!(e.category, Category::InvalidExtraction);
                 assert_eq!(e.subject, "step:request_filters");
                 assert!(e.detail.contains("unknown projection input"));
+            } else if schema == "rustev.definition/2" {
+                assert_eq!(e.category, Category::InvalidAcceptance);
             } else {
                 assert_eq!(e.category, Category::InvalidDefinition);
                 assert_eq!(e.detail, detail);

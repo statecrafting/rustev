@@ -7,6 +7,11 @@
 fn packaged_copies_equal_their_sources() {
     for (copy, source, name) in [
         (
+            include_str!("../src/testdata/acceptance.plan.json"),
+            include_str!("golden/acceptance.plan.json"),
+            "acceptance.plan.json from tests/golden",
+        ),
+        (
             include_str!("../src/testdata/extraction.plan.json"),
             include_str!("golden/extraction.plan.json"),
             "extraction.plan.json from tests/golden",

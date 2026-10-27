@@ -180,6 +180,7 @@ fn refuse<T>(
 pub(crate) enum StepInfo {
     Generate,
     Extract,
+    Accept(Box<rustev_contract::extraction::AcceptModelDerived>),
     Acquisition(Box<crate::acquisition::Acquisition>),
     Exact {
         args: OpArgs,
@@ -957,23 +958,6 @@ fn compile_generation(
             );
         }
     }
-    // Acceptance-only definitions retain the contract increment's refusal.
-    // With extraction present, finish its structural checks first.
-    if !def
-        .steps
-        .iter()
-        .any(|s| matches!(s.body, StepBody::Extract(_)))
-    {
-        for s in &def.steps {
-            if matches!(s.body, StepBody::AcceptModelDerived(_)) {
-                return refuse(
-                    C::InvalidDefinition,
-                    format!("step:{}", s.id),
-                    "extraction-not-compiled",
-                );
-            }
-        }
-    }
     for s in &def.steps {
         if matches!(s.body, StepBody::Rank(_) | StepBody::Select(_)) {
             return refuse(
@@ -1464,7 +1448,16 @@ fn compile_generation(
                     _ => None,
                 }))
                 .collect(),
-            StepBody::AcceptModelDerived(a) => vec![a.field.clone()],
+            StepBody::AcceptModelDerived(a) => crate::extraction_compile::accept_refs(a)
+                .into_iter()
+                .filter(|r| {
+                    // Unknown acceptance references are category 26 in phase e,
+                    // not graph nodes. Known nodes retain every validation edge.
+                    let base = base_ref_v2(r);
+                    base.strip_prefix("step:")
+                        .is_none_or(|id| ids.iter().any(|s| s == id))
+                })
+                .collect(),
             StepBody::Rank(_) | StepBody::Select(_) => {
                 return refuse(
                     C::InvalidDefinition,
@@ -1513,7 +1506,6 @@ fn compile_generation(
         .map(|(k, (t, _))| (k.clone(), t.clone()))
         .collect();
     crate::extraction_compile::model_gate(def)?;
-    crate::extraction_compile::types(def, &input_tys)?;
     let mut step_tys: BTreeMap<String, StepTy> = BTreeMap::new();
     // Semantic carries fan-out binds, not option names: these fields are scalar.
     // cond_structure checks membership and threshold bounds using options_of,
@@ -1545,10 +1537,25 @@ fn compile_generation(
             shortfalls: vec![],
         };
         match &s.body {
-            StepBody::Extract(_) => {
+            StepBody::Extract(e) => {
+                step_tys.insert(
+                    id.clone(),
+                    StepTy::Exact(crate::extraction_compile::record_ty(e, &input_tys)),
+                );
                 infos.insert(id.clone(), StepInfo::Extract);
             }
-            StepBody::AcceptModelDerived(_) => {}
+            StepBody::AcceptModelDerived(a) => {
+                let ty = crate::extraction_compile::accept(
+                    id,
+                    a,
+                    def,
+                    &env,
+                    &acquisition_derivations,
+                    calibrations,
+                )?;
+                step_tys.insert(id.clone(), StepTy::Exact(ty));
+                infos.insert(id.clone(), StepInfo::Accept(a.clone()));
+            }
             StepBody::Rank(_) | StepBody::Select(_) => {
                 return refuse(
                     C::InvalidDefinition,
@@ -1745,6 +1752,7 @@ fn compile_generation(
         );
     }
 
+    crate::extraction_compile::types(def, &input_tys, &step_tys)?;
     crate::extraction_compile::templates(
         def,
         &prompts,
@@ -1752,16 +1760,7 @@ fn compile_generation(
         &step_tys,
         &acquisition_derivations,
     )?;
-    crate::extraction_compile::budget(def, &input_tys, execution)?;
-    for s in &def.steps {
-        if matches!(s.body, StepBody::AcceptModelDerived(_)) {
-            return refuse(
-                C::InvalidDefinition,
-                format!("step:{}", s.id),
-                "extraction-not-compiled",
-            );
-        }
-    }
+    crate::extraction_compile::budget(def, &input_tys, &step_tys, execution)?;
     screening::coverage(authored, &screens, &decoded)?;
     let mut generated = crate::generation::type_check(
         def,
@@ -1792,6 +1791,7 @@ fn compile_generation(
                 StepInfo::Generate | StepInfo::Extract => {
                     quality::Ceil::leaf(rustev_contract::grade::ValueGrade::Ungraded, false)
                 }
+                StepInfo::Accept(a) => quality::tree_at(&trees, &a.field, &[]),
                 StepInfo::Acquisition(a) => a.tree.clone(),
                 StepInfo::Exact { args, .. } => quality::step_tree(args, &trees),
                 StepInfo::Semantic { decl, .. } => quality::semantic_tree(decl, &trees),
@@ -1813,7 +1813,10 @@ fn compile_generation(
                 StepInfo::Corroborate { decl, .. } => {
                     quality::corroborate_refusal(&subject, decl, &trees)
                 }
-                StepInfo::Generate | StepInfo::Extract | StepInfo::Semantic { .. } => None,
+                StepInfo::Generate
+                | StepInfo::Extract
+                | StepInfo::Accept(_)
+                | StepInfo::Semantic { .. } => None,
             };
             if let Some(r) = found {
                 return Err(r);
@@ -1863,13 +1866,21 @@ fn compile_generation(
                     crate::extraction_compile::needs_logprobs(def, &s.id),
                     &prompts[&s.id],
                     programs,
-                    &input_tys,
+                    &TyEnv {
+                        inputs: &input_tys,
+                        steps: &step_tys,
+                        item: None,
+                        v2,
+                    },
                     &sorted,
                 )?;
                 details.insert(s.id.clone(), PlanStepDetail::Extract(Box::new(binding)));
                 continue;
             }
-            StepBody::AcceptModelDerived(_) => unreachable!("acceptance refused in phase e"),
+            StepBody::AcceptModelDerived(a) => {
+                details.insert(s.id.clone(), PlanStepDetail::AcceptModelDerived(a.clone()));
+                continue;
+            }
             StepBody::Rank(_) | StepBody::Select(_) => {
                 return refuse(
                     C::InvalidDefinition,
@@ -2098,6 +2109,8 @@ fn compile_generation(
         details.insert(s.id.clone(), PlanStepDetail::Semantic(Box::new(binding)));
     }
 
+    crate::extraction_compile::accept_bindings(def, calibrations, &details, &mut notices)?;
+
     // (f) continued: the execution policy, once every step is bound
     // (spec 003, 3.2.3).
     let plan_execution = match execution {
@@ -2184,7 +2197,13 @@ fn compile_generation(
     let derivations = static_derivations(def, &inputs, &order, &deps, &infos);
     // A plan records the lowest registry containing every operator,
     // predicate and reference form it uses (spec 032, 3.1.3).
-    let registry = if v2 && uses_exact_v2(def, &decoded) {
+    let registry = if v2
+        && (uses_exact_v2(def, &decoded)
+            || def
+                .steps
+                .iter()
+                .any(|s| matches!(s.body, StepBody::AcceptModelDerived(_))))
+    {
         schema::EXACT_REGISTRY_V2
     } else {
         schema::EXACT_REGISTRY
@@ -2408,6 +2427,20 @@ fn extend_reasons_v2(
                         add.insert(K::Abstained);
                     }
                     rustev_contract::definition::OnContradiction::TreatAsHint => {}
+                }
+            }
+            StepInfo::Accept(a) => {
+                add.extend(
+                    reasons
+                        .get(&base_ref_v2(&a.field))
+                        .cloned()
+                        .unwrap_or_default(),
+                );
+                if matches!(
+                    a.on_fail,
+                    rustev_contract::extraction::OnFail::DropField { .. }
+                ) {
+                    absent.insert(key.clone());
                 }
             }
             StepInfo::Generate | StepInfo::Extract => {}
@@ -2731,6 +2764,12 @@ fn possible_reasons(
     for id in order {
         let mut r = BTreeSet::new();
         match (&infos[id], &details[id]) {
+            (StepInfo::Accept(a), _) => {
+                r.extend(out.get(&base_ref_v2(&a.field)).cloned().unwrap_or_default());
+                if matches!(a.on_fail, rustev_contract::extraction::OnFail::Unresolved) {
+                    r.extend([K::InvalidInput, K::MissingEvidence]);
+                }
+            }
             (StepInfo::Generate, _) => {}
             (StepInfo::Extract, _) => {
                 r.insert(K::MissingEvidence);
@@ -3148,6 +3187,16 @@ fn static_derivations(
     for id in order {
         if let Some(StepInfo::Acquisition(a)) = infos.get(id) {
             out.insert(id.clone(), a.plan.derivation);
+            continue;
+        }
+        if let Some(StepInfo::Accept(a)) = infos.get(id) {
+            let source = base_ref_v2(&a.field);
+            let class = source
+                .strip_prefix("step:")
+                .and_then(|s| out.get(s))
+                .copied()
+                .unwrap_or(Derivation::ModelDerived);
+            out.insert(id.clone(), class);
             continue;
         }
         if semantic.contains(id.as_str()) {

@@ -48,13 +48,22 @@ fn examples_roundtrip_canonical_bytes() {
     }
 }
 #[test]
+fn extraction_projection_bounds_step_reference_depth() {
+    let mut v = extract();
+    v["projection"] = json!(["step:raw/field/subfield"]);
+    assert!(serde_json::from_value::<Extract>(v.clone()).is_ok());
+
+    v["projection"] = json!(["step:raw/field/subfield/nested"]);
+    assert!(serde_json::from_value::<Extract>(v).is_err());
+}
+#[test]
 fn extraction_envelope_refuses_invalid_members() {
     for (path, bad) in [
         ("/for_each", json!({"over":"input:x"})),
         ("/for_each", json!("all")),
         ("/projection", json!([])),
         ("/projection", json!(vec!["input:x"; 9])),
-        ("/projection", json!(["step:raw/field"])),
+        ("/projection", json!(["step:raw//field"])),
         ("/projection", json!(["input:"])),
         ("/projection", json!(["input:x//y"])),
         ("/projection", json!(["now"])),
@@ -153,7 +162,12 @@ fn accepts_schema_boundaries_and_shared_vocabulary_forms() {
     ] {
         let mut v = extract();
         v["vocabularies"]["feature_vocabulary"] = vocabulary;
-        v["projection"] = json!(["input:x/field", "step:accepted"]);
+        v["projection"] = json!([
+            "input:x/field",
+            "step:accepted",
+            "step:accepted/field",
+            "step:raw/field/subfield"
+        ]);
         v["output"]["fields"].as_array_mut().unwrap().push(
             json!({"name":"decimal","type":{"decimal":{"bounds":["-1.25","9.99"],"scale":2}}}),
         );

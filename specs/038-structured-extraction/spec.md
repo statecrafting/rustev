@@ -1094,6 +1094,24 @@ Evaluating a plan with an extract step is refused until the runtime
 increment. Remaining for part c: accept steps, the accepted-value
 exemption, extract field-path projections and calibrated thresholds.
 
+**Increment 5, part c (2026-10-26): accept steps compile.** An
+`accept_model_derived` step compiles with the checks of 3.8.6 (category
+26 `invalid_acceptance`, phase e; a cycle through accept steps is spec
+002's category 4 in phase d), its `validate` predicate typed as 3.8.2
+allows, and `min_mass` bound to a calibration (its vocabulary, task,
+question, backend and parameters checked as 3.6 requires) or declared
+`uncalibrated_threshold`. Every accept step member enters the `PlanId`,
+pinned by `crates/rustev-core/tests/golden/acceptance.plan.json` and its
+`.id`; an accepted value keeps its source derivation. The gate now exempts
+accepted values for every exact consumer, model step projection and
+acquisition request field, guard or stop count (3.9.3, 3.9.4), and still
+refuses a selection-policy control (`policy_control`). Extract field-path
+references (`step:<extract id>/<field>` and subpaths) resolve in
+projections and accept steps. Left for a later part: calibrated policy
+thresholds over extract fields outside accept steps (3.6.4), whose plan
+detail needs a calibration-binding slot; evaluation of both kinds is the
+runtime increment.
+
 ## Decisions at approval
 
 Each is decided within this spec under the work order, inside the binding

@@ -127,6 +127,7 @@
         "src/template/parse.rs",
         "src/template/render.rs",
         "src/testdata/accept-step.json",
+        "src/testdata/acceptance.plan.json",
         "src/testdata/extract-step.json",
         "src/testdata/extraction.plan.json",
         "src/testdata/generation.plan.json",

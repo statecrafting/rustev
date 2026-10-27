@@ -615,3 +615,38 @@ fn extraction_gate_covers_acquisition_fields_guards_and_stop_counts() {
         }
     }
 }
+
+#[test]
+fn accepted_model_input_can_feed_request_guard_and_stop() {
+    let mut d = base(false);
+    let mut input = common::support_routing().inputs[0].clone();
+    input.name = "model_count".into();
+    input.ty = rustev_contract::definition::TypeDecl::Integer;
+    input.provenance = vec![rustev_contract::definition::ProvenanceClass::ModelDerived];
+    d.inputs.push(input);
+    d.steps.push(
+        serde_json::from_value(json!({"id":"count_ok","body":{"accept_model_derived":{
+        "field":"input:model_count","validate":"none","min_mass":"none","on_fail":"unresolved"}}}))
+        .unwrap(),
+    );
+    let mut wire = serde_json::to_value(d).unwrap();
+    wire["steps"][0]["body"]["acquire"]["request"]["optional"] = json!({"ref":"step:count_ok"});
+    wire["steps"][0]["body"]["acquire"]["when"] =
+        json!({"cmp":{"left":{"ref":"step:count_ok"},"op":"gt","right":{"lit":{"integer":0}}}});
+    wire["steps"][0]["body"]["acquire"]["stop"] =
+        json!({"items_at_least":{"count":{"ref":"step:count_ok"}}});
+    let d: Definition = serde_json::from_value(wire.clone()).unwrap();
+    let c = run(&d).unwrap();
+    assert_eq!(c.plan.order, ["count_ok", "lookup"]);
+    wire["steps"][0]["body"]["acquire"]["request"]["optional"] = json!({"ref":"input:model_count"});
+    let e = run(&serde_json::from_value(wire.clone()).unwrap()).unwrap_err();
+    assert_eq!(e.category, Category::UnacceptedModelValue);
+    wire["actionability"] = json!({"caller_controlled":[],"remediations":[],"questions":[],"constraint_groups":[],
+        "checks":[{"id":"checked","subject":"model_count","test":{"cmp":{"left":{"ref":"input:model_count"},"op":"gt","right":{"lit":{"integer":0}}}},
+            "on_fail":{"by_provenance":{"model-derived":"abstain"},"default":"none"}}]});
+    let wire = serde_json::to_string(&wire)
+        .unwrap()
+        .replace("step:count_ok", "input:model_count");
+    let d: Definition = serde_json::from_str(&wire).unwrap();
+    run(&d).unwrap();
+}

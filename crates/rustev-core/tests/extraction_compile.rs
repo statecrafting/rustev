@@ -279,7 +279,12 @@ fn oversized_input_projection_is_refused_even_with_a_step_reference() {
         vec!["step:window_ok".into(), "input:message".into()],
     ] {
         let mut d = fixture();
-        accept(&mut d, "input:message");
+        let mut model_input = d.inputs[0].clone();
+        model_input.name = "flag".into();
+        model_input.ty = TypeDecl::Bool;
+        model_input.provenance = vec![P::ModelDerived];
+        d.inputs.push(model_input);
+        accept(&mut d, "input:flag");
         extract(&mut d).projection = projection;
         d.limits.max_projection_bytes = 127;
         check(&d, C::Budget, "max_projection_bytes");
@@ -290,10 +295,9 @@ fn accepted_input_projection_preserves_untrusted_text() {
     let mut d = fixture();
     accept(&mut d, "input:message");
     let e = refusal(&d, &[]);
-    assert_eq!(e.category, C::InvalidDefinition);
+    assert_eq!(e.category, C::InvalidAcceptance);
     assert_eq!(e.subject, "step:window_ok");
-    assert_eq!(e.detail, "extraction-not-compiled");
-    d.inputs[0].provenance.push(P::UserSupplied);
+    d.inputs[0].provenance.push(P::ModelDerived);
     check(&d, C::InvalidExtraction, "untrusted text");
 }
 #[test]
@@ -838,7 +842,7 @@ fn extraction_threshold_requires_option_logprobs() {
     d.policy.rules[0].when = serde_json::from_value(json!({"mass_at_least":{"step":"request_filters/insufficient","option":"true","threshold":"0.5","uncalibrated_threshold":{"declared":{"reason":"synthetic"}}}})).unwrap();
     let mut b = descriptor();
     let e = compiled(&d, &prompt(), &b, &[]).unwrap_err();
-    assert_eq!(e.category, C::NoCapableBackend, "{e}");
+    assert_eq!(e.category, C::KindMismatch, "{e}");
     assert!(
         e.shortfalls[0]
             .reasons
@@ -1045,4 +1049,271 @@ fn long_input_enum_option_refuses_primary_and_execution_fallback() {
     .unwrap_err();
     assert_eq!(r.category, C::InvalidExecution);
     check(&r);
+}
+
+fn acceptance_fixture() -> Definition {
+    let mut d = fixture();
+    d.steps.push(
+        serde_json::from_str(include_str!(
+            "../../rustev-contract/tests/fixtures/accept-step.json"
+        ))
+        .unwrap(),
+    );
+    d
+}
+fn acceptance(d: &mut Definition) -> &mut rustev_contract::extraction::AcceptModelDerived {
+    let StepBody::AcceptModelDerived(a) = &mut d.steps[1].body else {
+        panic!()
+    };
+    a
+}
+fn logprob_descriptor() -> rustev_contract::descriptor::BackendDescriptor {
+    let mut b = descriptor();
+    if let rustev_contract::descriptor::OutputKind::TypedRecord {
+        option_logprobs, ..
+    } = &mut b.operations[0].output
+    {
+        *option_logprobs = true;
+    }
+    b
+}
+fn threshold() -> rustev_contract::extraction::MinMass {
+    serde_json::from_value(
+        json!({"option":"true","at_least":"0.5","basis":{"uncalibrated_threshold":"synthetic"}}),
+    )
+    .unwrap()
+}
+#[test]
+fn acceptance_example_golden_and_member_identity() {
+    use rustev_contract::{Document, plan::PlanStepDetail};
+    let d = acceptance_fixture();
+    let c = compiled(&d, &prompt(), &descriptor(), &[]).unwrap();
+    assert_eq!(c.plan.schema, "rustev.plan/3");
+    assert_eq!(c.plan.registry, "rustev.exact/2");
+    assert_eq!(
+        c.plan.steps[1].derivation,
+        rustev_contract::judgment::Derivation::ModelDerived
+    );
+    assert!(
+        matches!(&c.plan.steps[1].detail, PlanStepDetail::AcceptModelDerived(a) if **a == *acceptance(&mut d.clone()))
+    );
+    assert_eq!(
+        rustev_core::Compiled::load(&c.plan, &[descriptor()], &[])
+            .unwrap()
+            .id,
+        c.id
+    );
+    assert!(matches!(
+        rustev_core::Evaluation::start(
+            &c,
+            &rustev_contract::snapshot::Snapshot {
+                schema: "rustev.snapshot/2".into(),
+                entries: vec![]
+            },
+            common::ts(common::NOW)
+        ),
+        Err(rustev_core::evaluate::StartError::ExtractionNotAvailable)
+    ));
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden/acceptance.plan.json");
+    if std::env::var_os("RUSTEV_BLESS").is_some() {
+        std::fs::write(&path, c.canonical()).unwrap();
+        std::fs::write(path.with_extension("id"), c.id.to_string()).unwrap();
+    }
+    assert_eq!(std::fs::read(&path).unwrap(), c.canonical());
+    assert_eq!(
+        std::fs::read_to_string(path.with_extension("id")).unwrap(),
+        c.id.to_string()
+    );
+    assert_eq!(
+        rustev_contract::plan::Plan::parse(&c.canonical()).unwrap(),
+        c.plan
+    );
+    let mut mass = d.clone();
+    acceptance(&mut mass).field = "step:request_filters/insufficient".into();
+    acceptance(&mut mass).validate = rustev_contract::extraction::Validation::None;
+    let base = compiled(&mass, &prompt(), &logprob_descriptor(), &[]).unwrap();
+    for change in 0..4 {
+        let mut d = mass.clone();
+        match change {
+            0 => acceptance(&mut d).field = "step:request_filters/party_size".into(),
+            1 => acceptance(&mut d).validate = serde_json::from_value(json!({"predicate":{"cmp":{"left":{"ref":"step:request_filters/insufficient"},"op":"eq","right":{"lit":{"bool":false}}}}})).unwrap(),
+            2 => acceptance(&mut d).min_mass = threshold(),
+            _ => acceptance(&mut d).on_fail = rustev_contract::extraction::OnFail::Unresolved,
+        }
+        assert_ne!(
+            compiled(&d, &prompt(), &logprob_descriptor(), &[])
+                .unwrap()
+                .id,
+            base.id,
+            "member {change}"
+        );
+    }
+}
+#[test]
+fn acceptance_refuses_each_invalid_member_and_validation_cycle() {
+    for case in 0..8 {
+        let mut d = acceptance_fixture();
+        match case {
+            0 => acceptance(&mut d).field = "input:message".into(),
+            1 => acceptance(&mut d).field = "step:request_filters/missing".into(),
+            2 => acceptance(&mut d).validate = serde_json::from_value(json!({"predicate":{"cmp":{"left":{"ref":"step:request_filters/party_size"},"op":"gt","right":{"lit":{"integer":0}}}}})).unwrap(),
+            3 => acceptance(&mut d).validate = serde_json::from_value(json!({"predicate":{"cmp":{"left":{"ref":"step:request_filters/window/start"},"op":"gt","right":{"lit":{"bool":true}}}}})).unwrap(),
+            4 => acceptance(&mut d).min_mass = threshold(),
+            5 => {
+                acceptance(&mut d).field = "step:request_filters/insufficient".into();
+                acceptance(&mut d).validate = rustev_contract::extraction::Validation::None;
+                let mut m = threshold();
+                if let rustev_contract::extraction::MinMass::Threshold(m) = &mut m { m.option = "unknown".into(); }
+                acceptance(&mut d).min_mass = m;
+            }
+            6 => acceptance(&mut d).on_fail = rustev_contract::extraction::OnFail::DropField { notice: "INVALID".into() },
+            _ => acceptance(&mut d).field = "step:missing/window".into(),
+        }
+        let e = compiled(&d, &prompt(), &descriptor(), &[]).unwrap_err();
+        assert_eq!(e.category, C::InvalidAcceptance, "case {case}: {e}");
+        assert_eq!(e.subject, "step:window_ok");
+    }
+    let mut d = acceptance_fixture();
+    let mut other = d.steps[1].clone();
+    other.id = "other_ok".into();
+    d.steps.push(other);
+    for (index, r) in [(1, "step:other_ok/start"), (2, "step:window_ok/start")] {
+        let StepBody::AcceptModelDerived(a) = &mut d.steps[index].body else {
+            panic!()
+        };
+        a.validate = serde_json::from_value(
+            json!({"predicate":{"cmp":{"left":{"ref":r},"op":"gt","right":{"ref":"now"}}}}),
+        )
+        .unwrap();
+    }
+    assert_eq!(
+        compiled(&d, &prompt(), &descriptor(), &[])
+            .unwrap_err()
+            .category,
+        C::Cycle
+    );
+}
+#[test]
+fn accepted_paths_feed_exact_consumers_and_model_projections() {
+    let mut d = acceptance_fixture();
+    d.steps.push(serde_json::from_value(json!({"id":"read","body":{"exact":{"op":"timestamp_diff","version":1,"args":{"later":{"ref":"step:window_ok/start"},"earlier":{"ref":"now"},"unit_ms":1}}}})).unwrap());
+    let c = compiled(&d, &prompt(), &descriptor(), &[]).unwrap();
+    assert_eq!(
+        c.plan.steps[2].derivation,
+        rustev_contract::judgment::Derivation::MixedDerived
+    );
+    let mut other = d.steps[0].clone();
+    other.id = "again".into();
+    let StepBody::Extract(e) = &mut other.body else {
+        panic!()
+    };
+    e.projection = vec!["step:window_ok/start".into()];
+    d.steps.push(other);
+    let wire = serde_json::to_value(&d).unwrap();
+    let d: Definition = serde_json::from_value(wire).unwrap();
+    compiled(&d, &prompt(), &descriptor(), &[]).unwrap();
+    let mut direct = serde_json::to_value(&d).unwrap();
+    direct["steps"][3]["body"]["extract"]["projection"] =
+        json!(["step:request_filters/window/start"]);
+    let direct: Definition = serde_json::from_value(direct).unwrap();
+    assert_eq!(
+        compiled(&direct, &prompt(), &descriptor(), &[])
+            .unwrap_err()
+            .category,
+        C::UnacceptedModelValue
+    );
+}
+#[test]
+fn accepted_value_cannot_control_selection_weights() {
+    let mut d: Definition =
+        serde_json::from_str(include_str!("golden/lodging.definition.json")).unwrap();
+    d.schema = "rustev.definition/2".into();
+    d.inputs
+        .iter_mut()
+        .find(|i| i.name == "traveler.claims")
+        .unwrap()
+        .provenance = vec![P::ModelDerived];
+    d.steps.push(serde_json::from_value(json!({"id":"accepted","body":{"accept_model_derived":{"field":"input:traveler.claims","validate":"none","min_mass":"none","on_fail":"unresolved"}}})).unwrap());
+    // Replace every read, including the weights table, with the accepted value.
+    let wire = serde_json::to_string(&d)
+        .unwrap()
+        .replace("input:traveler.claims", "step:accepted");
+    let mut wire: serde_json::Value = serde_json::from_str(&wire).unwrap();
+    wire["steps"].as_array_mut().unwrap().last_mut().unwrap()["body"]["accept_model_derived"]["field"] =
+        json!("input:traveler.claims");
+    let d: Definition = serde_json::from_value(wire).unwrap();
+    let e = rustev_core::compile(&d, &common::descriptors(), &[]).unwrap_err();
+    assert_eq!(e.category, C::UnacceptedModelValue, "{e}");
+    assert!(e.detail.contains("policy_control"), "{e}");
+}
+
+#[test]
+fn acceptance_mass_calibration_binding_and_uncalibrated_notice() {
+    use rustev_contract::{
+        calibration::CalibrationArtifact,
+        extraction::{MassBasis, MinMass},
+    };
+    let mut d = acceptance_fixture();
+    acceptance(&mut d).field = "step:request_filters/insufficient".into();
+    acceptance(&mut d).validate = rustev_contract::extraction::Validation::None;
+    acceptance(&mut d).min_mass = threshold();
+    let b = logprob_descriptor();
+    let c = compiled(&d, &prompt(), &b, &[]).unwrap();
+    assert!(c.plan.notices.iter().any(|n| n.reason == "synthetic"));
+    let art: CalibrationArtifact = serde_json::from_value(json!({"schema":"rustev.calibration/1",
+        "binding":{"artifact":b.artifact,"task":format!("filters@{}", prompt().id().unwrap()),"question":"request_filters/insufficient","dataset":format!("sha256:{}","c".repeat(64)),"method":"temperature/1"},
+        "options":["false","true"],"parameters":{"temperature":{"temperature":"1"}}})).unwrap();
+    let run = |d: &Definition, arts: &[CalibrationArtifact]| {
+        compile_with_extraction_documents(
+            d,
+            std::slice::from_ref(&b),
+            arts,
+            &[],
+            None,
+            &[prompt()],
+            &[],
+        )
+    };
+    for case in 0..6 {
+        let mut art = art.clone();
+        match case {
+            1 => art.binding.task = "wrong".into(),
+            2 => art.binding.question = "wrong".into(),
+            3 => art.options.reverse(),
+            4 => art.binding.artifact = common::artifact('b'),
+            5 => {
+                art.parameters =
+                    serde_json::from_value(json!({"temperature":{"temperature":"0"}})).unwrap()
+            }
+            _ => {}
+        }
+        let MinMass::Threshold(m) = &mut acceptance(&mut d).min_mass else {
+            panic!()
+        };
+        m.basis = MassBasis::Calibration(art.id().unwrap().to_string());
+        assert_eq!(run(&d, &[]).unwrap_err().category, C::CalibrationBinding);
+        let result = run(&d, std::slice::from_ref(&art));
+        if case == 0 {
+            let c = result.unwrap();
+            assert_eq!(
+                rustev_core::Compiled::load(&c.plan, std::slice::from_ref(&b), &[art])
+                    .unwrap()
+                    .id,
+                c.id
+            );
+        } else {
+            assert_eq!(
+                result.unwrap_err().category,
+                C::CalibrationBinding,
+                "case {case}"
+            );
+        }
+    }
+    acceptance(&mut d).min_mass = threshold();
+    let MinMass::Threshold(m) = &mut acceptance(&mut d).min_mass else {
+        panic!()
+    };
+    m.basis = MassBasis::UncalibratedThreshold(String::new());
+    assert_eq!(run(&d, &[]).unwrap_err().category, C::UncalibratedThreshold);
 }

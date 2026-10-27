@@ -103,22 +103,16 @@ fn text(ty: &Ty) -> bool {
     }
 }
 
-fn extracted_text(ty: &ExtractionType) -> bool {
-    match ty {
-        ExtractionType::Text { .. } => true,
-        ExtractionType::List { item, .. } => extracted_text(item),
-        ExtractionType::Record { fields } => fields.iter().any(|f| extracted_text(&f.ty)),
-        _ => false,
-    }
-}
-
 /// Phase e: resolve input field paths, vocabulary types and the interim
-/// untrusted-text rule. Acceptance compilation itself remains deferred.
-pub(crate) fn types(def: &Definition, inputs: &BTreeMap<String, Ty>) -> Result<(), Refusal> {
-    let steps = BTreeMap::new();
+/// untrusted-text rule, including accepted field-path projections.
+pub(crate) fn types(
+    def: &Definition,
+    inputs: &BTreeMap<String, Ty>,
+    steps: &BTreeMap<String, crate::expr::StepTy>,
+) -> Result<(), Refusal> {
     let env = TyEnv {
         inputs,
-        steps: &steps,
+        steps,
         item: None,
         v2: true,
     };
@@ -130,48 +124,9 @@ pub(crate) fn types(def: &Definition, inputs: &BTreeMap<String, Ty>) -> Result<(
             let untrusted = if r.starts_with("input:") {
                 untrusted_input(def, r, &env).map_err(|err| bad(&step.id, err))?
             } else {
-                let id = r
-                    .strip_prefix("step:")
-                    .ok_or_else(|| bad(&step.id, format!("invalid extraction projection {r}")))?;
-                let accept = def.steps.iter().find(|s| s.id == id).ok_or_else(|| {
-                    bad(&step.id, format!("projection {r} must name an accept step"))
-                })?;
-                let StepBody::AcceptModelDerived(a) = &accept.body else {
-                    return Err(bad(
-                        &step.id,
-                        format!("projection {r} must name an accept step"),
-                    ));
-                };
-                if a.field.starts_with("input:") {
-                    untrusted_input(def, &a.field, &env).map_err(|err| bad(&step.id, err))?
-                } else {
-                    // Accepted extraction text remains model-origin text.
-                    let path = a
-                        .field
-                        .strip_prefix("step:")
-                        .ok_or_else(|| bad(&step.id, "invalid accepted field"))?;
-                    let (source, field) = path
-                        .split_once('/')
-                        .ok_or_else(|| bad(&step.id, "invalid accepted field"))?;
-                    let extract = def
-                        .steps
-                        .iter()
-                        .find(|s| s.id == source)
-                        .and_then(|s| match &s.body {
-                            StepBody::Extract(e) => Some(e),
-                            _ => None,
-                        })
-                        .ok_or_else(|| {
-                            bad(&step.id, "accepted field does not name an extract step")
-                        })?;
-                    let field = extract
-                        .output
-                        .fields
-                        .iter()
-                        .find(|f| f.name == field)
-                        .ok_or_else(|| bad(&step.id, "unknown accepted extract field"))?;
-                    extracted_text(&field.ty)
-                }
+                // Accepted text retains model origin. Resolve the projected
+                // subpath, not every sibling of the accepted record.
+                text(&ref_ty(r, &env).map_err(|err| bad(&step.id, err))?)
             };
             if untrusted {
                 return Err(bad(
@@ -317,16 +272,16 @@ pub(crate) fn templates(
 /// Phase g checks available before backend binding and plan emission.
 /// Each extract contributes one request, regardless of its number of fields.
 /// Aggregate budgets with other step kinds and accepted-value projection bounds
-/// require the later plan bindings. The caller still refuses plan emission.
+/// are bounded from the resolved static types.
 pub(crate) fn budget(
     def: &Definition,
     inputs: &BTreeMap<String, Ty>,
+    steps: &BTreeMap<String, crate::expr::StepTy>,
     execution: Option<&rustev_contract::execution::ExecutionPolicy>,
 ) -> Result<(), Refusal> {
-    let steps = BTreeMap::new();
     let env = TyEnv {
         inputs,
-        steps: &steps,
+        steps,
         item: None,
         v2: true,
     };
@@ -382,7 +337,7 @@ pub(crate) fn bind(
     needs_logprobs: bool,
     prompt: &rustev_contract::generation::PromptTemplate,
     programs: &[ExtractRules],
-    inputs: &BTreeMap<String, Ty>,
+    env: &TyEnv<'_>,
     sorted: &[&rustev_contract::descriptor::BackendDescriptor],
 ) -> Result<rustev_contract::extraction_results::ExtractBinding, Refusal> {
     use crate::compile::{Shortfall, ShortfallReason as S};
@@ -390,13 +345,6 @@ pub(crate) fn bind(
         definition::BindingChoice,
         extraction_documents::extraction_schema_digest,
         extraction_results::{BoundExtractionFallback, ExtractBinding, ResolvedVocabulary},
-    };
-    let steps = BTreeMap::new();
-    let env = TyEnv {
-        inputs,
-        steps: &steps,
-        item: None,
-        v2: true,
     };
     let vocabularies = e
         .vocabularies
@@ -416,7 +364,7 @@ pub(crate) fn bind(
         .projection
         .iter()
         .try_fold(2u64, |n, r| {
-            ref_ty(r, &env).map(|ty| {
+            ref_ty(r, env).map(|ty| {
                 n.saturating_add((r.len() as u64).saturating_mul(6).saturating_add(4))
                     .saturating_add(ty.max_json_bytes())
             })
@@ -468,7 +416,7 @@ pub(crate) fn bind(
                     })
                 }
                 ExtractionVocabulary::Input { input } => {
-                    match ref_ty(input, &env).map_err(|err| bad(id, err))? {
+                    match ref_ty(input, env).map_err(|err| bad(id, err))? {
                         Ty::Enum(options) => options.iter().fold(2u64, |n, s| {
                             n.saturating_add((s.len() as u64).saturating_mul(6).saturating_add(3))
                         }),
@@ -492,7 +440,7 @@ pub(crate) fn bind(
         BindingChoice::Auto => true,
         BindingChoice::Backend(id) => id == &b.backend_id,
     }) {
-        let output = match candidate(e, inputs, request_bytes, needs_logprobs, b) {
+        let output = match candidate(e, env.inputs, request_bytes, needs_logprobs, b) {
             Ok(output) => output,
             Err(reasons) => {
                 shortfalls.push(Shortfall {
@@ -542,10 +490,20 @@ pub(crate) fn bind(
             reasons: vec![S::UnknownBackend],
         });
     }
+    let missing_mass = shortfalls.iter().any(|s| s.reasons == [S::OptionLogprobs]);
     Err(Refusal {
-        category: Category::NoCapableBackend,
+        category: if missing_mass {
+            Category::KindMismatch
+        } else {
+            Category::NoCapableBackend
+        },
         subject: format!("step:{id}"),
-        detail: "no backend satisfies extract".into(),
+        detail: if missing_mass {
+            "extraction threshold requires option_logprobs"
+        } else {
+            "no backend satisfies extract"
+        }
+        .into(),
         shortfalls,
     })
 }
@@ -613,7 +571,7 @@ fn type_bytes(ty: &ExtractionType, vocabulary_bytes: &BTreeMap<String, u64>) -> 
 }
 
 /// Phase e, before ordinary typing: model values need an acceptance rule.
-/// The accept-step exemption is intentionally absent until acceptance compiles.
+/// Accepted values remain barred from selection-policy controls.
 pub(crate) fn model_gate(def: &Definition) -> Result<(), Refusal> {
     use serde_json::Value as J;
     if def.schema != rustev_contract::schema::DEFINITION_V2 {
@@ -622,33 +580,13 @@ pub(crate) fn model_gate(def: &Definition) -> Result<(), Refusal> {
     fn model(def: &Definition, r: &str, inputs: bool, control: bool) -> bool {
         if let Some(path) = r.strip_prefix("step:") {
             let id = path.split('/').next().unwrap();
-            def.steps
-                .iter()
-                .any(|s| s.id == id && matches!(s.body, StepBody::Extract(_)))
+            def.steps.iter().any(|s| {
+                s.id == id
+                    && (matches!(s.body, StepBody::Extract(_))
+                        || control && matches!(s.body, StepBody::AcceptModelDerived(_)))
+            })
         } else {
-            // Spec 033 3.4.1 runs all declared checks before steps, with
-            // consequences applied by 3.4.4-6. Group membership is not an
-            // enforcement switch: 3.3.3 groups identify checks for relaxation.
-            // evaluate::run_checks likewise iterates every declared check, so
-            // an ungrouped check qualifies under spec 038 3.9.2.
-            let accepted = def.actionability.as_ref().is_some_and(|a| {
-                a.checks.iter().any(|c| {
-                    c.subject
-                        == r.strip_prefix("input:")
-                            .unwrap_or(r)
-                            .split('/')
-                            .next()
-                            .unwrap_or(r)
-                        && (c
-                            .on_fail
-                            .by_provenance
-                            .contains_key(&ProvenanceClass::ModelDerived)
-                            || !matches!(
-                                c.on_fail.default,
-                                rustev_contract::actionability::DefaultConsequence::None
-                            ))
-                })
-            });
+            let accepted = accepted_reference(def, r);
             inputs
                 && (control || !accepted)
                 && input_decl(def, r)
@@ -657,9 +595,9 @@ pub(crate) fn model_gate(def: &Definition) -> Result<(), Refusal> {
     }
     // Walk serialized, typed consumer subtrees only. Literal payloads and
     // presence predicates are terminal, even when their text looks like a ref.
-    fn walk(def: &Definition, v: &J, inputs: bool, control: bool) -> Option<String> {
+    fn walk(def: &Definition, v: &J, inputs: bool, control: bool) -> Option<(String, bool)> {
         match v {
-            J::String(r) if model(def, r, inputs, control) => Some(r.clone()),
+            J::String(r) if model(def, r, inputs, control) => Some((r.clone(), control)),
             J::Array(a) => a.iter().find_map(|v| walk(def, v, inputs, control)),
             J::Object(m) => m
                 .iter()
@@ -708,7 +646,7 @@ pub(crate) fn model_gate(def: &Definition) -> Result<(), Refusal> {
         }
     }
     let check = |subject: String, value: J, inputs, control| {
-        if let Some(r) = walk(def, &value, inputs, control) {
+        if let Some((r, control)) = walk(def, &value, inputs, control) {
             Err(Refusal {
                 category: Category::UnacceptedModelValue,
                 subject,
@@ -909,7 +847,9 @@ pub(crate) fn needs_logprobs(def: &Definition, id: &str) -> bool {
             _ => false,
         }
     }
-    crate::quality::policy_conds(def).any(|(_, c)| reads(c, id))
+    crate::quality::policy_conds(def).any(|(_, c)| reads(c, id)) || def.steps.iter().any(|s| {
+        matches!(&s.body, StepBody::AcceptModelDerived(a) if !matches!(a.min_mass, rustev_contract::extraction::MinMass::None) && a.field.strip_prefix("step:").and_then(|p| p.split('/').next()) == Some(id))
+    })
 }
 
 /// Eligible scalar field distributions use the existing probability conditions.
@@ -943,6 +883,285 @@ pub(crate) fn distribution_options(def: &Definition) -> BTreeMap<String, Vec<Str
         }
     }
     result
+}
+
+/// Spec 038 3.9: the exemption is direct, never inherited by computations.
+pub(crate) fn accepted_reference(def: &Definition, r: &str) -> bool {
+    let base = crate::expr::base_ref_v2(r);
+    if let Some(id) = base.strip_prefix("step:") {
+        return def
+            .steps
+            .iter()
+            .any(|s| s.id == id && matches!(s.body, StepBody::AcceptModelDerived(_)));
+    }
+    let Some(name) = base.strip_prefix("input:") else {
+        return false;
+    };
+    // Spec 033 3.4.1 runs all declared checks before steps, with
+    // consequences applied by 3.4.4-6. Group membership is not an
+    // enforcement switch: 3.3.3 groups identify checks for relaxation.
+    // evaluate::run_checks likewise iterates every declared check, so
+    // an ungrouped check qualifies under spec 038 3.9.2.
+    def.actionability.as_ref().is_some_and(|a| {
+        a.checks.iter().any(|c| {
+            c.subject == name
+                && (c
+                    .on_fail
+                    .by_provenance
+                    .contains_key(&ProvenanceClass::ModelDerived)
+                    || !matches!(
+                        c.on_fail.default,
+                        rustev_contract::actionability::DefaultConsequence::None
+                    ))
+        })
+    })
+}
+
+pub(crate) fn accept_refs(a: &rustev_contract::extraction::AcceptModelDerived) -> Vec<String> {
+    let mut refs = vec![a.field.clone()];
+    if let rustev_contract::extraction::Validation::Predicate(p) = &a.validate {
+        crate::expr::predicate_refs(p, &mut refs);
+    }
+    refs
+}
+
+pub(crate) fn record_ty(e: &Extract, inputs: &BTreeMap<String, Ty>) -> Ty {
+    fn ty(t: &ExtractionType, e: &Extract, inputs: &BTreeMap<String, Ty>) -> Ty {
+        match t {
+            ExtractionType::Bool {} => Ty::Bool,
+            ExtractionType::Integer { .. } => Ty::Integer,
+            ExtractionType::Decimal(_) => Ty::Decimal,
+            ExtractionType::Date {} => Ty::Timestamp,
+            ExtractionType::Text { max_bytes } => Ty::Text {
+                max_bytes: *max_bytes,
+            },
+            ExtractionType::Enum { vocabulary } => match e.vocabularies.get(vocabulary) {
+                Some(ExtractionVocabulary::Envelope(Vocabulary::Literal(v))) => Ty::Enum(v.clone()),
+                Some(ExtractionVocabulary::Input { input }) => {
+                    let steps = BTreeMap::new();
+                    let env = TyEnv {
+                        inputs,
+                        steps: &steps,
+                        item: None,
+                        v2: true,
+                    };
+                    match ref_ty(input, &env) {
+                        Ok(Ty::Enum(v)) => Ty::Enum(v),
+                        _ => Ty::Text { max_bytes: 64 },
+                    }
+                }
+                _ => Ty::Text { max_bytes: 64 },
+            },
+            ExtractionType::List { item, max_items } => Ty::List {
+                item: Box::new(ty(item, e, inputs)),
+                max: *max_items,
+            },
+            ExtractionType::Record { fields } => Ty::Record(
+                fields
+                    .iter()
+                    .map(|f| (f.name.clone(), ty(&f.ty, e, inputs)))
+                    .collect(),
+            ),
+        }
+    }
+    Ty::Record(
+        e.output
+            .fields
+            .iter()
+            .map(|f| (f.name.clone(), ty(&f.ty, e, inputs)))
+            .collect(),
+    )
+}
+
+/// Phase e. Predicates are boolean by construction; type checking their
+/// operands rejects ill-typed directly constructed definitions as well.
+pub(crate) fn accept(
+    id: &str,
+    a: &rustev_contract::extraction::AcceptModelDerived,
+    def: &Definition,
+    env: &TyEnv<'_>,
+    derivations: &BTreeMap<String, rustev_contract::judgment::Derivation>,
+    calibrations: &[rustev_contract::calibration::CalibrationArtifact],
+) -> Result<Ty, Refusal> {
+    use rustev_contract::extraction::{AcceptModelDerived, MassBasis, MinMass, Validation};
+    let error = |detail: String| Refusal {
+        category: Category::InvalidAcceptance,
+        subject: format!("step:{id}"),
+        detail,
+        shortfalls: vec![],
+    };
+    let field_is_model = if a.field.starts_with("input:") {
+        input_decl(def, &a.field)
+            .is_some_and(|i| i.provenance.contains(&ProvenanceClass::ModelDerived))
+    } else {
+        a.field
+            .strip_prefix("step:")
+            .and_then(|p| p.split_once('/'))
+            .is_some_and(|(id, field)| {
+                !field.contains('/')
+                    && def
+                        .steps
+                        .iter()
+                        .any(|s| s.id == id && matches!(s.body, StepBody::Extract(_)))
+            })
+    };
+    if !field_is_model {
+        return Err(error("field is not a model value".into()));
+    }
+    let ty = ref_ty(&a.field, env).map_err(error)?;
+    if let Validation::Predicate(p) = &a.validate {
+        let mut refs = vec![];
+        crate::expr::predicate_refs(p, &mut refs);
+        for r in refs {
+            if r == a.field
+                || r.strip_prefix(&a.field).is_some_and(|p| p.starts_with('/'))
+                || r == "now"
+            {
+                continue;
+            }
+            let base = crate::expr::base_ref_v2(&r);
+            let allowed = if r.starts_with("input:") {
+                input_decl(def, &r)
+                    .is_some_and(|i| !i.provenance.contains(&ProvenanceClass::ModelDerived))
+            } else {
+                accepted_reference(def, &r)
+                    || base.strip_prefix("step:").is_some_and(|id| {
+                        derivations.get(id)
+                            == Some(&rustev_contract::judgment::Derivation::ExactDerived)
+                    })
+            };
+            if !allowed {
+                return Err(error(format!(
+                    "validate reads another unaccepted model value: {r}"
+                )));
+            }
+        }
+        crate::expr::type_predicate(p, env).map_err(error)?;
+    }
+    if let MinMass::Threshold(m) = &a.min_mass {
+        let field = a.field.strip_prefix("step:").unwrap_or("");
+        if !distribution_options(def)
+            .get(field)
+            .is_some_and(|options| options.contains(&m.option))
+        {
+            return Err(error(
+                "min_mass field is not eligible or lacks the option".into(),
+            ));
+        }
+        let category = match &m.basis {
+            MassBasis::Calibration(cid) => {
+                let cal_error = |detail: String| {
+                    let mut r = error(detail);
+                    r.category = Category::CalibrationBinding;
+                    r
+                };
+                let art = calibrations
+                    .iter()
+                    .find(|c| c.id().is_ok_and(|id| id.to_string() == *cid))
+                    .ok_or_else(|| cal_error(format!("calibration {cid} was not supplied")))?;
+                let (source, name) = field.split_once('/').expect("eligible field");
+                let e = def
+                    .steps
+                    .iter()
+                    .find_map(|s| match &s.body {
+                        StepBody::Extract(e) if s.id == source => Some(e),
+                        _ => None,
+                    })
+                    .expect("eligible field");
+                let f = e
+                    .output
+                    .fields
+                    .iter()
+                    .find(|f| f.name == name)
+                    .expect("eligible field");
+                if matches!(&f.ty, ExtractionType::Enum { vocabulary } if matches!(e.vocabularies.get(vocabulary), Some(ExtractionVocabulary::Input { .. })))
+                {
+                    return Err(cal_error(
+                        "calibration cannot bind an input vocabulary".into(),
+                    ));
+                }
+                crate::calibrate::check_static(
+                    art,
+                    &format!("{}@{}", e.template.id, e.template.digest),
+                    field,
+                    &distribution_options(def)[field],
+                )
+                .map_err(|e| cal_error(e.to_string()))?;
+                None
+            }
+            MassBasis::UncalibratedThreshold(reason) if reason.is_empty() => {
+                Some(Category::UncalibratedThreshold)
+            }
+            _ => None,
+        };
+        if let Some(category) = category {
+            let mut r = error("min_mass requires a supported calibration binding or an uncalibrated_threshold reason".into());
+            r.category = category;
+            return Err(r);
+        }
+    }
+    serde_json::from_value::<AcceptModelDerived>(
+        serde_json::to_value(a).expect("accept serialization"),
+    )
+    .map_err(|e| error(e.to_string()))?;
+    Ok(ty)
+}
+
+/// Complete acceptance's calibration binding after backend selection. The
+/// artifact identity is already committed by the accept step's basis.
+pub(crate) fn accept_bindings(
+    def: &Definition,
+    calibrations: &[rustev_contract::calibration::CalibrationArtifact],
+    details: &BTreeMap<String, rustev_contract::plan::PlanStepDetail>,
+    notices: &mut Vec<rustev_contract::judgment::Notice>,
+) -> Result<(), Refusal> {
+    use rustev_contract::{
+        extraction::{MassBasis, MinMass},
+        judgment::{Notice, NoticeKind},
+        plan::PlanStepDetail,
+    };
+    for s in &def.steps {
+        let StepBody::AcceptModelDerived(a) = &s.body else {
+            continue;
+        };
+        let MinMass::Threshold(m) = &a.min_mass else {
+            continue;
+        };
+        match &m.basis {
+            MassBasis::UncalibratedThreshold(reason) => notices.push(Notice {
+                screening: None,
+                kind: NoticeKind::UncalibratedThreshold,
+                subject: format!("step:{}", s.id),
+                reason: reason.clone(),
+                action: None,
+            }),
+            MassBasis::Calibration(cid) => {
+                let art = calibrations
+                    .iter()
+                    .find(|c| c.id().is_ok_and(|id| id.to_string() == *cid))
+                    .expect("phase e checked");
+                let source = a
+                    .field
+                    .strip_prefix("step:")
+                    .unwrap()
+                    .split('/')
+                    .next()
+                    .unwrap();
+                let PlanStepDetail::Extract(e) = &details[source] else {
+                    unreachable!()
+                };
+                if art.binding.artifact != e.artifact {
+                    return Err(Refusal {
+                        category: Category::CalibrationBinding,
+                        subject: format!("step:{}", s.id),
+                        detail: "calibration artifact differs from bound backend".into(),
+                        shortfalls: vec![],
+                    });
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
