@@ -883,6 +883,31 @@ in `crates/rustev-contract/tests/documents.rs` and
 `crates/rustev-core/tests/execution.rs`; the spec 017 byte and identity
 tests are unchanged.
 
+**Increment 3, part a (2026-10-27): the shared slot.**
+`crates/rustev-runtime/src/shared.rs` holds the slot of 3.2.2 and 3.2.3
+on its own, not yet driven by any request: the bounded registry of
+in-flight attempts by request key; entry that joins an attempt in flight
+when its dispatched deadline is at or after the joiner's and the waiter
+bound has room (3.2.1 items 2, 3 and 5), leads a new slot otherwise, and
+reports `Full` at `max_shared_calls`; a slot that owns the attempt
+future (wrapped to contain a panic, 3.2.2 item 4) and its own
+cancellation signal; polling under mutual exclusion with a waker that
+wakes every registered waiter; the same result for every waiter and the
+slot's removal from the registry before any waiter takes it (3.2.2 items
+5 and 6); leaving with handoff of charge ownership to the earliest
+remaining waiter; the last waiter raising the slot's signal and polling
+once on its own task, or, when dropped, dropping the attempt future
+without raising it. Nothing in it spawns a task or reads a clock. The
+planned parts change: part a is this primitive, and part b wires it into
+the driver with eligibility by the 017 key, reservations and
+`final_owner` settlement (3.2.4), the records (3.2.5), the section 5
+waiter rows and the lifting of `shared_calls`' availability refusal.
+Tests: the unit tests in `shared.rs`, driven by hand with counting
+wakers: one attempt polled from either waiter, a waiter that finds the
+attempt being polled, the joining rules, handoff on leave and on drop,
+the last waiter's single poll (answered and abandoned), a contained
+panic, and a leave after completion.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

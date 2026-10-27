@@ -25,6 +25,9 @@ pub mod ledger;
 mod live;
 mod optimization;
 mod progress;
+// Driven by no request until spec 044 increment 3 part b wires it in.
+#[cfg_attr(not(test), allow(dead_code))]
+mod shared;
 mod sink;
 pub use progress::{ProgressObserver, StepProgress};
 mod wait;

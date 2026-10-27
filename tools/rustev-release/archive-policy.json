@@ -164,6 +164,7 @@
         "src/live.rs",
         "src/optimization.rs",
         "src/progress.rs",
+        "src/shared.rs",
         "src/sink.rs",
         "src/testdata/generate-step.json",
         "src/testdata/generation.rs",
