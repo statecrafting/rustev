@@ -215,6 +215,14 @@ sh -c 'for d in crates tools; do [ -d "$d" ] || continue; if grep -rnE "(struct|
 
 ## Implementation record
 
+- 2026-10-27: `make landing-status` caps stack depth per chain. A PR's
+  depth is the number of unmerged PRs beneath it; the cap is 1 by default
+  and 2 for the 037, 038 and 039 chains (the owner's 2026-10-26 choice), and
+  the report prints both. The single cap of 2 it replaces let every chain
+  run two PRs above its base. Over the 217 PRs merged from 2026-10-19 to
+  2026-10-27, a stacked PR landed about 1.2 hours after its base at depth 1
+  or 2 alike, while AI reviews per PR rose from 5.8 at depth 1 to 7.8 at
+  depth 2 and 10.7 at depth 3 or more.
 - 2026-10-24: `make landing-status` orders each action class by cost of
   delay (1, plus the specs a spec unblocks, plus its place in the owner's
   release order: 031 4, 034 3, 035 and 036 2), then by age. It lists the

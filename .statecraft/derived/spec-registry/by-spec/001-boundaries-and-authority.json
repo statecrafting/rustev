@@ -42,7 +42,7 @@
     "id": "001-boundaries-and-authority",
     "implementation": "complete",
     "sectionDigests": {
-      "001-ecosystem-boundaries-proposals-versus-authority-and-product-principles": "71c59de7c4351c45146161a115951bbc98f39db1882a750f2568c0113161b1f4",
+      "001-ecosystem-boundaries-proposals-versus-authority-and-product-principles": "ab651986da8e17ebf213b856d43f157cb2fc9e5d450d369afd7dba3d5e026c5d",
       "1-purpose": "23d9fbfd79c7d53855467fa3936d5b3587d0827055ec39dc204addca739a071f",
       "2-territory": "c011c575f7bd83c135b1913052b322c24e052219daaba432722e5187a695a5c7",
       "3-1-responsibilities": "9239843abb6815deae05a2316acdf2bccb66d4c1a40ba6272b5163b0714aaa28",
@@ -58,7 +58,7 @@
       "acceptance": "6745eef13e379ef3665bc3d6f9153896b02a987b6d493e3b6920797347a3e5f8",
       "decision-history": "c5e60fb2a1f31afb91c9d7b50cfee0123cb9d60a6c6edb74887d4cac047ae8a2",
       "engine-upgrade-record-2026-10-02": "61612c1be943f9a3f40b63cc0a1cd451a7f6718965e4731c1e316f23904310fc",
-      "implementation-record": "e8c4d522f4e0eca2d73ae4e4b8e1fa097bfd312005d5be5fe082d478e7de9754",
+      "implementation-record": "65185843ad654f43e563dcd8ddaec923021f10deef1f04f70393ebd8d5fecf74",
       "profile-upgrade-record-2026-10-02": "6c81fa3739f224dfdb744b86aaef78dc0d1fea39886b759607741736c9f0e027",
       "verification": "e7c72eb6207c95ccc8e643cad92aa8d980aad37cfa4195b7cc4c06e41bc33bbe"
     },
@@ -88,6 +88,6 @@
     "summary": "What Rustev owns and refuses to own within the ecosystem (spec-spine, Aicortex, Rahi, statecraft-cli, applications), the rule that Rustev produces proposals and never grants, the provenance classes of Rustev outputs, the dependency layout that keeps contracts transport-neutral and the core free of integrations, and the product principles that are the constitution's principles VI onward. Owns the workspace manifest, the Makefile and the boundary check that enforces the dependency rules.\n",
     "title": "Ecosystem boundaries, proposals versus authority, and product principles"
   },
-  "shardHash": "f8cae86ff23dcc86805a98a5cc6943fe098351c64dacf02655af110bd92fb155",
+  "shardHash": "ec1854ad5bcebf13c44b9f2029de878069c4c09a505de3b48c43284edd7e18c0",
   "specVersion": "1.10.0"
 }
