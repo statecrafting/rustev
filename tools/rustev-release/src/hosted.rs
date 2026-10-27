@@ -235,7 +235,7 @@ pub fn run(
     repo: &Path,
     set: &crate::ReleaseSet,
 ) -> Result<(), String> {
-    use crate::lifecycle::{Event, Instruction, Journal, Lifecycle};
+    use crate::lifecycle::{Event, Journal, Lifecycle};
     // 053 3.4.2: a candidate is refused before any journal or upload.
     crate::candidate::publication_manifest(
         &std::fs::read(dir.join("release-manifest.json")).map_err(|e| e.to_string())?,
@@ -276,16 +276,13 @@ pub fn run(
             return Err(format!("{name}: evidence differs"));
         }
     }
-    let i: Instruction =
-        serde_json::from_slice(&std::fs::read(instruction).map_err(|e| e.to_string())?)
-            .map_err(|e| e.to_string())?;
     let mut life = Lifecycle::new(m.clone());
     life.apply(Event::GatesPass).map_err(|e| e.0)?;
     life.apply(Event::CandidateVerified {
         commit: m.commit.clone(),
     })
     .map_err(|e| e.0)?;
-    life.apply(Event::Authorized(i)).map_err(|e| e.0)?;
+    life.authorize_file(instruction, &signers, crate::manifest::OWNER_IDENTITY)?;
     let mut j = match std::fs::read_to_string(&journal) {
         Ok(s) => Journal::from_lines(&s)?,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Journal::default(),

@@ -253,15 +253,8 @@ fn run(
     {
         return Err("instruction differs from manifest".into());
     }
-    // 3.11.1: the first-release instruction authorizes exactly 0.1.0, so a
-    // matching instruction for any other version is refused on its own
-    // ground rather than as a mismatch.
-    if m.version != crate::lifecycle::FIRST_RELEASE_VERSION {
-        return Err(format!(
-            "family publication authorizes only {}, manifest names {}",
-            crate::lifecycle::FIRST_RELEASE_VERSION,
-            m.version
-        ));
+    if !life.instruction_verified() {
+        return Err("family publication requires a verified owner instruction".into());
     }
     // 3.11.4: any earlier run that reached an upload, stopped or not (a
     // journal that could not record its stop, or a killed process, leaves
@@ -421,12 +414,7 @@ pub fn qualify(
     if life.state != State::Released {
         return Err("release is not complete".into());
     }
-    let mut required = vec!["crates-subsets".to_string()];
-    for a in &life.manifest.artifacts {
-        if matches!(a.kind.as_str(), "npm" | "binary") {
-            required.push(a.name.clone());
-        }
-    }
+    let required = crate::qualification::required_files(&life.manifest);
     if required.iter().any(|k| {
         evidence
             .get(k)

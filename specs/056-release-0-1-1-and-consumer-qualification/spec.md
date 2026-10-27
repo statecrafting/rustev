@@ -268,5 +268,19 @@ kept equal to the backend fixture, the calibration is the package tests'
 unfitted temperature artifact bound to that program, the snapshot is
 `sr-t01`, and the expected judgment is reproduced in the workspace
 (`packages/rustev-pkg-support-routing/tests/example.rs`). The archive
-policy lists the four files. The harness, `qualify` and the signed
-instruction (part b) and the workflow (part c) follow.
+policy lists the four files.
+
+**Part b1 (2026-10-27): later-release authority and `qualify`.** An
+instruction for a version after `0.1.0` is authorized only with
+`<instruction>.sig`, an SSH signature over its exact bytes (namespace
+`rustev-release`, the owner identity, `allowed_signers`), verified by
+`publish` and `hosted-release` before any journal entry or upload; an
+unsigned, wrongly signed or altered instruction is refused, and `0.1.0`
+keeps its 031 3.11.1 authority (`tools/rustev-release/tests/signing.rs`).
+`rustev.qualification-step/1` and `rustev-release qualify` are in
+`tools/rustev-release/src/qualification.rs`: required kinds come from the
+signed manifest, every required kind needs a passed step for each
+platform of the CLI and npm matrix, and a missing, failing or `not_run`
+step, or an `excluded` step for a named kind, is refused before the
+journal (`tools/rustev-release/tests/family.rs`). The harness
+(`qualify.sh`, part b2) and the workflow (part c) follow.
