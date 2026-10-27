@@ -49,6 +49,8 @@ extends:
   - { spec: "009-remote-adapter-protocol", unit: { kind: directory, path: "integrations/rustev-remote-http/" }, nature: amending }
   # The production batching posture and qualification harness.
   - { spec: "012-jev-integration", unit: { kind: directory, path: "integrations/rustev-jev/" }, nature: amending }
+  # Archive policy entries and byte budgets for the new source files.
+  - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
   # Adds 044 to `make verify` when the implementation is complete.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
 depends_on:
@@ -63,6 +65,7 @@ depends_on:
   - "020-remote-protocol-refinements"
   - "023-real-data-quality-qualification"
   - "027-node-and-wasm-bindings"
+  - "031-public-api-and-release-family"
   - "032-evidence-quality"
   - "034-parameterized-definitions"
   - "035-screening-seam"
@@ -167,6 +170,8 @@ When delivered:
 - `integrations/rustev-remote-http/` (owner 009) and
   `integrations/rustev-jev/` (owner 012): per-item isolation in
   adapter-scoped batching and the production batching posture.
+- `tools/rustev-release/` (owner 031): the archive policy entry of each
+  new source file in the crates above, and their archive byte budgets.
 - `Makefile` (owner 001): 044 joins `make verify` at completion.
 
 No new dependency family. The store seam is a Rust trait; the Node binding
@@ -753,6 +758,73 @@ this spec made after spec 022 is complete, and this spec is not recorded
 `complete` until that increment lands. Until then no binding enables
 adapter-scoped batching in production (R-28 unchanged). Every other item,
 including stage 1 of 3.8 for the Jev adapter, is unchanged.
+
+## Implementation record
+
+Planned increments, each a separately reviewed pull request of about
+1,000 lines. Ordinals are build order; increment 1 depends on nothing
+else here, and each later one needs increment 2a.
+
+1. Per-item isolation (3.7) on every batching path: runtime-planned
+   batching (017 3.3), which today excludes only per-item screeners,
+   adapter-scoped batching in `rustev-remote-http` (009 3.10.4) and the
+   Jev adapter (012), and the spec 020 remote batch. One test per path;
+   section 5 row "A per-item capability with batching enabled". No
+   contract member is added: `isolation` is spec 035's.
+2. Contract and core members, in two parts. (a) `shared_calls` and
+   `persistent_cache` in `OptimizationPolicy`, the `shared_call`
+   mechanism and the `shared` member of `OptimizationRecord` (3.2.5),
+   `rustev.cache-entry/1` (3.4.3), the compile refusals
+   `shared_call_bounds`, `persistent_bounds` and
+   `store_contract_incomplete`, and goldens showing that a policy without
+   them keeps its bytes and `PlanId`. (b) `decision_cache` in
+   `rustev.plan/3`: validation (`decision_cache_bounds`,
+   `volatile_unknown_source`, `volatile_without_freshness`,
+   `key_dimension_invalid`), the compiled `decision_key_schema` (3.6.1)
+   and refresh closure (3.6.2) in the plan's execution section, and the
+   `decision_cache` member of `rustev.run/3` (3.6.6). No runtime behavior
+   yet.
+3. Concurrent duplicate suppression (3.2), in two parts. (a) The bounded
+   shared-call registry, the slot with its broadcast waker,
+   eligibility (3.2.1), completion for every waiter and slot removal
+   before cache admission (3.2.2). (b) Leaving, handoff and the last
+   waiter (3.2.3), `final_owner` charges and liability (3.2.4) and the
+   records (3.2.5). Tests run on a manual executor with a spawn counter
+   and a manual clock; they cover the waiter rows of section 5 and each
+   spec 003 3.7.3 cancellation answer.
+4. The `RuntimeStore` seam and the persistent tier (3.3, 3.4), the
+   request-level key's profile member (3.5) and invalidation across tiers
+   (3.10.3, 3.10.4): `store_missing`, `store_contract_mismatch`, every
+   entry check and its diagnostic, budgets, both store failure policies
+   and a restart modelled as a new runtime over the same test store.
+5. The decision-result cache (3.5, 3.6): key dimensions, lookup and
+   serving, closure dispatch and `closure_mismatch`, admission, the three
+   refresh-failure policies, the run record member and
+   `served_from_cache`.
+6. Stage 1 of the batching qualification (3.8 items 1 and 3) for the
+   remote-http and Jev adapters, and `rustev.batch-qualification/1` in
+   `rustev-eval`. Stage 2 (item 2) runs only under the work order's live
+   scope; until then a report's verdict is `unknown`.
+7. Cold and warm benchmarks (Acceptance), declared verification and the
+   Verification section. 044 joins `make verify` here, and stays
+   `in-progress`.
+8. After spec 022 is complete (A-49): 3.8 item 4, R-2's construction
+   check `batch_unqualified` and its section 5 row. This increment is
+   externally blocked on spec 022, and this spec is not recorded
+   `complete` before it lands.
+
+Decisions within the spec, made for this plan:
+
+- **Key dimensions travel beside the request, not in it.** The host
+  supplies 3.5 item 3's handles through a new `Runtime` entry point taking
+  the decision request and its dimensions, so `DecisionRequest`, built by
+  literal in a dozen crates outside this spec's territory, keeps its
+  fields. A plan without `decision_cache` never needs the new entry
+  point.
+- **Remote-only paths stay in their integrations.** Per-item isolation in
+  adapter-scoped and remote batches is enforced where those batches are
+  formed (`rustev-remote-http`, `rustev-jev`); the runtime enforces it for
+  runtime-planned batches.
 
 ## Decisions at approval
 
