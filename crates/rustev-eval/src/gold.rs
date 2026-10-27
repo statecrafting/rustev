@@ -117,7 +117,8 @@ fn map_ok<V>(what: &str, m: &BTreeMap<String, V>) -> Result<(), String> {
 }
 
 impl GoldValue {
-    fn check(&self) -> Result<(), String> {
+    /// The path bound of 3.3.2.
+    pub fn check(&self) -> Result<(), String> {
         match self {
             GoldValue::Path(p) if p.is_empty() || p.len() > MAX_PATH => {
                 Err(format!("a gold path holds 1 to {MAX_PATH} strings"))

@@ -799,6 +799,35 @@ Decision within the spec: a list without position p is outside
 `tests/data/metrics/ranking.json`, with the arithmetic of each case
 written out.
 
+**Increment 2 (2026-10-26): the documents.**
+`crates/rustev-eval/src/dataset.rs` parses either dataset version;
+`DatasetCase` gains the optional `gold` record, refused in a version 1
+manifest and checked against 3.3.2 in version 2 (`DatasetError::Gold`,
+naming the case), and each version's identity is tagged with its own
+schema, so version 1 keeps its bytes and identity.
+`crates/rustev-eval/src/measures.rs` holds the ranking, constraint and
+field declarations of 3.4 with their bounds, the `MeasuredAdapter` trait
+and the measures digest. `crates/rustev-eval/src/scoring.rs` holds the
+scorer descriptor, judge reference, rubric metric, human scale, agreement
+and origin family declarations with the checks of 3.5 to 3.8
+(`scale-mismatch`, `judge-output-kind`, `model-prefix`,
+`metric-unavailable`), and `rustev.evaluator-config/3` in
+`crates/rustev-eval/src/config.rs` adds the adapter `measures` digest and
+those five members, each required in version 3 and refused in versions 1
+and 2, which keep their bytes and identities. Decisions within the spec:
+the measures digest is `tagged_digest("rustev.task-adapter/2", canonical
+bytes of measures)`, the adapter document's own schema (3.1.5); a refusal
+code leads its `ConfigError` text (`<code>: <detail>`); every origin
+family is `metric-unavailable` until its metrics land in increment 6,
+including those whose owning spec is complete, so none is ever reported
+as zero; the model-prefix rule is checked for every gate; level and human scale
+names are 1 to 256 bytes, the bound 3.3.2 gives gold names, with no
+character set, while scorer ids and rubric metric and agreement names,
+which enter metric names, use 3.4.1's. The package and
+CLI tests that build dataset cases and configurations name the new
+members. Tests: `crates/rustev-eval/tests/documents_041.rs` and
+`crates/rustev-eval/tests/config_041.rs`.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child faithfully

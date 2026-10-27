@@ -18,6 +18,11 @@
 //! `rules`, a digest of the document that determines the adapter's label
 //! check and correctness, or `opaque`. Version 1 has no `rules`, keeps its
 //! bytes and identity, and counts as unbound for every gate (spec 014).
+//!
+//! Version 3 (spec 041, 3.1.3) adds the digest of the adapter's measure
+//! declarations to the adapter reference, and declares scorers, rubric
+//! metrics, human scales, agreements and origin families, so every one of
+//! them enters the identity. Versions 1 and 2 produce no new metric.
 
 use std::collections::BTreeSet;
 use std::fmt;
@@ -31,9 +36,16 @@ use rustev_contract::{Document, DocumentError, Identified};
 use serde::{Deserialize, Serialize};
 
 use crate::dataset::AdapterRef;
+use crate::scoring::{
+    AgreementDecl, Declarations, HumanScale, OriginFamily, RubricMetric, ScorerDescriptor,
+    check_prefix,
+};
 pub const EVALUATOR_CONFIG: &str = "rustev.evaluator-config/1";
 /// Version 2: the adapter reference binds the adapter's rules (spec 014).
 pub const EVALUATOR_CONFIG_V2: &str = "rustev.evaluator-config/2";
+/// Version 3: measures, scorers, rubric metrics, agreements and origin
+/// families (spec 041).
+pub const EVALUATOR_CONFIG_V3: &str = "rustev.evaluator-config/3";
 /// The most temperatures one grid may hold (spec 004, 3.6.2).
 pub const MAX_GRID: usize = 4096;
 
@@ -62,6 +74,18 @@ pub struct EvaluatorConfig {
     /// Candidate temperatures for fitting: strictly increasing, in
     /// (0, 1000], at most 4096; empty when nothing is fitted.
     pub temperature_grid: Vec<Decimal>,
+    /// Version 3 only, as are the four members below (spec 041, 3.6 to
+    /// 3.8 and 3.5).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scorers: Option<Vec<ScorerDescriptor>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rubric_metrics: Option<Vec<RubricMetric>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub human_scales: Option<Vec<HumanScale>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agreements: Option<Vec<AgreementDecl>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<Vec<OriginFamily>>,
 }
 
 /// Either version parses; `SCHEMA` names version 1 only because the trait
@@ -77,9 +101,11 @@ impl Document for EvaluatorConfig {
     fn parse(bytes: &[u8]) -> Result<Self, DocumentError> {
         let doc: Self = rustev_contract::bounded::parse_bounded(bytes, &Self::LIMITS)
             .map_err(DocumentError::Parse)?;
-        if doc.schema != EVALUATOR_CONFIG && doc.schema != EVALUATOR_CONFIG_V2 {
+        if ![EVALUATOR_CONFIG, EVALUATOR_CONFIG_V2, EVALUATOR_CONFIG_V3]
+            .contains(&doc.schema.as_str())
+        {
             return Err(DocumentError::Schema {
-                expected: EVALUATOR_CONFIG_V2,
+                expected: EVALUATOR_CONFIG_V3,
                 found: doc.schema.chars().take(80).collect(),
             });
         }
@@ -111,9 +137,13 @@ impl Identified for EvaluatorConfig {
 pub struct ConfigAdapter {
     pub name: String,
     pub version: String,
-    /// Absent in version 1, required in version 2.
+    /// Absent in version 1, required in versions 2 and 3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rules: Option<AdapterRules>,
+    /// The digest of the adapter's measure declarations; version 3 only
+    /// (spec 041, 3.4.1).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub measures: Option<ContentDigest>,
 }
 
 impl ConfigAdapter {
@@ -123,6 +153,7 @@ impl ConfigAdapter {
             name: r.name,
             version: r.version,
             rules: None,
+            measures: None,
         }
     }
 
@@ -132,6 +163,17 @@ impl ConfigAdapter {
             name: r.name,
             version: r.version,
             rules: Some(rules),
+            measures: None,
+        }
+    }
+
+    /// A version 3 reference: rules and the measures digest.
+    pub fn v3(r: AdapterRef, rules: AdapterRules, measures: ContentDigest) -> ConfigAdapter {
+        ConfigAdapter {
+            name: r.name,
+            version: r.version,
+            rules: Some(rules),
+            measures: Some(measures),
         }
     }
 
@@ -214,18 +256,52 @@ impl EvaluatorConfig {
     /// none (version 1 rules are unbound, spec 014 3.2.3).
     pub fn bound_rules(&self) -> Option<&ContentDigest> {
         match (&self.adapter.rules, self.schema.as_str()) {
-            (Some(AdapterRules::Bound(d)), EVALUATOR_CONFIG_V2) => Some(d),
+            (Some(AdapterRules::Bound(d)), EVALUATOR_CONFIG_V2 | EVALUATOR_CONFIG_V3) => Some(d),
             _ => None,
         }
     }
 
+    /// The version 3 declarations; none in versions 1 and 2.
+    pub fn declarations(&self) -> Option<Declarations<'_>> {
+        if self.schema != EVALUATOR_CONFIG_V3 {
+            return None;
+        }
+        Some(Declarations {
+            scorers: self.scorers.as_deref()?,
+            rubric_metrics: self.rubric_metrics.as_deref()?,
+            human_scales: self.human_scales.as_deref()?,
+            agreements: self.agreements.as_deref()?,
+            origin: self.origin.as_deref()?,
+        })
+    }
+
     pub fn check(&self) -> Result<(), ConfigError> {
         let bad = |m: &str| Err(ConfigError(m.into()));
+        let v3_members = [
+            self.scorers.is_some(),
+            self.rubric_metrics.is_some(),
+            self.human_scales.is_some(),
+            self.agreements.is_some(),
+            self.origin.is_some(),
+        ];
+        let measures = self.adapter.measures.is_some();
         match (self.schema.as_str(), &self.adapter.rules) {
-            (EVALUATOR_CONFIG, None) | (EVALUATOR_CONFIG_V2, Some(_)) => {}
+            (EVALUATOR_CONFIG, None) | (EVALUATOR_CONFIG_V2 | EVALUATOR_CONFIG_V3, Some(_)) => {}
             (EVALUATOR_CONFIG, Some(_)) => return bad("version 1 names no adapter rules"),
             (EVALUATOR_CONFIG_V2, None) => return bad("version 2 names the adapter rules"),
+            (EVALUATOR_CONFIG_V3, None) => return bad("version 3 names the adapter rules"),
             _ => return bad("schema"),
+        }
+        if self.schema == EVALUATOR_CONFIG_V3 {
+            if !measures || v3_members.contains(&false) {
+                return bad(
+                    "version 3 names the adapter measures, scorers, rubric metrics, human scales, agreements and origin",
+                );
+            }
+        } else if measures || v3_members.contains(&true) {
+            return bad(
+                "only version 3 names measures, scorers, rubric metrics, agreements or origin",
+            );
         }
         let one = Decimal::from_i64(1);
         let b = &self.reliability_bins;
@@ -261,6 +337,23 @@ impl EvaluatorConfig {
                 if c.is_negative() || c > one {
                     return bad("a minimum coverage is in [0, 1]");
                 }
+            }
+        }
+        if let Some(d) = self.declarations() {
+            d.check()?;
+            let reported = d.metric_names();
+            // Spec 004's declared-metric rule, for every name the
+            // declarations report.
+            for name in reported.keys() {
+                let base = name.split('/').next().unwrap_or_default();
+                if !names.contains(base) {
+                    return bad(
+                        "a reported metric names a base the configuration does not declare",
+                    );
+                }
+            }
+            for g in &self.gates {
+                check_prefix(&g.metric, &reported)?;
             }
         }
         let t = &self.temperature_grid;

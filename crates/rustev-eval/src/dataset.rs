@@ -7,20 +7,30 @@
 //! snapshot identity repeated across splits is refused as leakage. Semantic
 //! duplicates the manifest cannot identify (two sources with the same
 //! content) remain a stated limit: Rustev does not detect them.
+//!
+//! `rustev.dataset/2` (spec 041, 3.1.1) is version 1 with an optional gold
+//! record per case. A version 1 manifest is a version 2 manifest whose every
+//! case has no gold, and keeps its bytes and identity; each version's
+//! identity is tagged with its own schema.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-use rustev_contract::Identified;
+use rustev_contract::bounded::ParseLimits;
+use rustev_contract::canonical::{CanonicalError, tagged_digest};
 use rustev_contract::decimal::Decimal;
 use rustev_contract::eval_report::{DatasetProvenance, Split};
 use rustev_contract::ids::{ContentDigest, DatasetId, SnapshotId};
 use rustev_contract::limits::REPLAY_V1;
+use rustev_contract::{Document, DocumentError, Identified};
 use serde::{Deserialize, Serialize};
 
 use crate::doc::eval_document;
+use crate::gold::Gold;
 
 pub const DATASET: &str = "rustev.dataset/1";
+/// Version 2: per-case gold records (spec 041, 3.1.1).
+pub const DATASET_V2: &str = "rustev.dataset/2";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -34,7 +44,45 @@ pub struct DatasetManifest {
     pub cases: Vec<DatasetCase>,
 }
 
-eval_document!(DatasetManifest, DATASET, REPLAY_V1, DatasetId);
+/// Either version parses; `SCHEMA` names version 1 only because the trait
+/// holds one constant. The identity is tagged with the document's own
+/// schema, so a version 1 identity is what it always was.
+impl Document for DatasetManifest {
+    const SCHEMA: &'static str = DATASET;
+    const LIMITS: ParseLimits = REPLAY_V1;
+    fn schema(&self) -> &str {
+        &self.schema
+    }
+
+    fn parse(bytes: &[u8]) -> Result<Self, DocumentError> {
+        let doc: Self = rustev_contract::bounded::parse_bounded(bytes, &Self::LIMITS)
+            .map_err(DocumentError::Parse)?;
+        if doc.schema != DATASET && doc.schema != DATASET_V2 {
+            return Err(DocumentError::Schema {
+                expected: DATASET_V2,
+                found: doc.schema.chars().take(80).collect(),
+            });
+        }
+        Ok(doc)
+    }
+
+    fn record_digest(&self) -> Result<ContentDigest, CanonicalError> {
+        let raw = self.record_canonical()?;
+        Ok(ContentDigest::parse(&tagged_digest(&self.schema, &raw))
+            .expect("a tagged digest is a content digest"))
+    }
+}
+
+impl Identified for DatasetManifest {
+    type Id = DatasetId;
+    fn wrap(digest: String) -> DatasetId {
+        DatasetId::parse(&digest).expect("a tagged digest is an identity")
+    }
+
+    fn id(&self) -> Result<DatasetId, CanonicalError> {
+        Ok(Self::wrap(tagged_digest(&self.schema, &self.canonical()?)))
+    }
+}
 
 /// A task adapter, by name and version.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -54,6 +102,9 @@ pub struct DatasetCase {
     pub split: Split,
     pub label: Label,
     pub subgroups: Vec<String>,
+    /// The case's gold record; version 2 only (spec 041, 3.3).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gold: Option<Gold>,
 }
 
 /// A label, or an explicit statement that there is none.
@@ -95,6 +146,12 @@ pub enum DatasetError {
     },
     /// The manifest names another adapter than the one checking it.
     Adapter,
+    /// A malformed gold record, or gold in a version 1 manifest (spec 041,
+    /// 3.3.2).
+    Gold {
+        case: String,
+        detail: String,
+    },
 }
 
 impl fmt::Display for DatasetError {
@@ -120,7 +177,7 @@ impl DatasetManifest {
         adapter: &AdapterRef,
         check_label: impl Fn(&str) -> Result<(), String>,
     ) -> Result<(), DatasetError> {
-        if self.schema != DATASET {
+        if self.schema != DATASET && self.schema != DATASET_V2 {
             return Err(DatasetError::Schema);
         }
         if &self.adapter != adapter {
@@ -162,6 +219,17 @@ impl DatasetManifest {
                         split_of.insert(identity, c.split);
                     }
                 }
+            }
+            if let Some(gold) = &c.gold {
+                let detail = if self.schema == DATASET {
+                    Err("a version 1 manifest holds no gold".to_owned())
+                } else {
+                    gold.check()
+                };
+                detail.map_err(|detail| DatasetError::Gold {
+                    case: c.id.clone(),
+                    detail,
+                })?;
             }
             if let Label::Value(v) = &c.label {
                 check_label(v).map_err(|detail| DatasetError::Label {

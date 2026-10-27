@@ -439,6 +439,11 @@ pub fn config(p: Payload) -> EvaluatorConfig {
             min_comparable_coverage: dec("0.5"),
             min_labeled_coverage: dec("0.5"),
         }],
+        scorers: None,
+        rubric_metrics: None,
+        human_scales: None,
+        agreements: None,
+        origin: None,
         temperature_grid: ["0.5", "0.75", "1", "1.5", "2", "3"]
             .iter()
             .map(|s| dec(s))
@@ -468,6 +473,7 @@ pub fn dataset(p: Payload) -> DatasetManifest {
                 split: c.split,
                 label: Label::Value(p.label(c).into()),
                 subgroups: vec![format!("tier:{}", c.tier)],
+                gold: None,
             })
             .collect(),
     }
