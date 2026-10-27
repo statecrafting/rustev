@@ -35,6 +35,18 @@ extends:
   - { spec: "004-evaluation-and-replay", unit: { kind: directory, path: "crates/rustev-eval/" }, nature: amending }
   # `rustev.task-adapter/2`, `eval --scores`, `views.json` and `eval judge`.
   - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: additive }
+  # The declarative `rustev.task-adapter/2` the CLI reads (3.10.1) lives
+  # with version 1 in the shared surface.
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "crates/rustev-surface/" }, nature: additive }
+  # The `Scorer` host seam and `engine.scoreViews` (3.9), joining under
+  # spec 027 3.7.
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-node/" }, nature: additive }
+  # The archive policy lists each new `rustev-eval` source and data file.
+  - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
+  # `DatasetCase` gains `gold` (3.1.1); the package tests that build
+  # dataset cases name it, with no change to either package.
+  - { spec: "007-support-routing-package", unit: { kind: directory, path: "packages/rustev-pkg-support-routing/" }, nature: additive }
+  - { spec: "008-reference-package-lodging", unit: { kind: directory, path: "packages/rustev-pkg-lodging/" }, nature: additive }
   # Adds 041 to `make verify` when the implementation is complete.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
 depends_on:
@@ -46,6 +58,7 @@ depends_on:
   - "023-real-data-quality-qualification"
   - "027-node-and-wasm-bindings"
   - "029-evaluation-repeatability"
+  - "031-public-api-and-release-family"
   - "032-evidence-quality"
   - "035-screening-seam"
   - "036-mid-plan-acquisition"
@@ -115,12 +128,19 @@ When delivered:
   rubric and agreement metrics, the `Scorer` trait, `rustev.score-views/1`,
   `rustev.scores/1`, judge reproduction, and the per-case measures spec 029
   consumes. Test data lives under `crates/rustev-eval/tests/data/metrics/`.
-- `crates/rustev-cli/` (owner spec 006): `rustev.task-adapter/2`, the `eval`
-  additions and `eval judge` of 3.10.
-- `integrations/rustev-node/` (planned by spec 027, not yet on disk): the
-  `Scorer` host seam of 3.9. Spec 027 3.7 lets later seams join through
-  their owning specs; the extends edge to that directory is added by an
-  authoring edit of this spec when spec 027's crate exists.
+- `crates/rustev-cli/` (owner spec 006): the `eval` additions and `eval
+  judge` of 3.10.
+- `crates/rustev-surface/` (owner spec 027): the declarative
+  `rustev.task-adapter/2` the CLI reads (3.10.1), beside version 1.
+- `integrations/rustev-node/` (owner spec 027): the `Scorer` host seam of
+  3.9. Spec 027 3.7 lets later seams join through their owning specs; the
+  extends edge to that directory was added by an authoring edit of this
+  spec once spec 027's crate existed.
+- `tools/rustev-release/` (owner spec 031): the archive policy entries for
+  each new `rustev-eval` source and embedded data file.
+- `packages/rustev-pkg-support-routing/` and `packages/rustev-pkg-lodging/`
+  (owner specs 007 and 008): their tests build `DatasetCase` values, which
+  gain the `gold` member; neither package's behavior changes.
 - `Makefile` (owner spec 001): 041 joins `make verify` at completion.
 
 Specs 036, 037, 038 and 039 (B1, B5, B6 and C2) are in `depends_on` for the
@@ -741,6 +761,26 @@ B5, B6, B7 or C2 (their specs do); significance tests between judges.
 
 Pending with implementation. Approval satisfies no acceptance item, and no
 existing evaluation computes any metric of this spec.
+
+## Implementation record
+
+Planned increments, each a separately reviewed pull request of about
+1,000 lines: (1) gold values and their kind matching (3.3.3), the
+committed discount table with its generator (3.11.3), and the per-case
+ranking measures of 3.4.3 and 3.4.4 as a pure module, not yet wired into
+`evaluate`; (2) the documents: `rustev.dataset/2` with gold records,
+the measure declarations of `rustev.task-adapter/2` and
+`MeasuredAdapter`, and `rustev.evaluator-config/3` with its checks and
+identity; (3) evaluation under version 3: ranking, `short@k`,
+`backfill@p<p>` and constraint metrics with their detail counts, report
+placement and the per-case measures spec 029 reconciles; (4) scorers,
+`rustev.score-views/1`, `rustev.scores/1`, `score_views` and rubric
+metrics; (5) model judges, judge reproduction, agreement statistics and
+the `model/` separation; (6) origin families, each once its owning
+spec's evidence is on `main`, and the `metric-unavailable` refusal
+before that; (7) gate and selection preconditions (3.12) and the CLI
+surface (3.10); (8) the Node `Scorer` seam (3.9); (9) mutation seeds,
+the spec 029 integration test, declared verification and closure.
 
 ## Decisions at approval
 
