@@ -9,6 +9,9 @@
     ".github/workflows/boundaries.yml": {
       "contentHash": "5da4d3c3f91a1fa6998458fcd41df060c53431a6e8ffabcbc57b1586e18c77a4"
     },
+    ".github/workflows/qualify.yml": {
+      "contentHash": "8bc3df3a840a5bc67fc04e445ed406928119c55a39762a403beb2806180f0f3c"
+    },
     ".github/workflows/release-checks.yml": {
       "contentHash": "926bacfb464c674718b2ba99fe9517b4d29c49bcff096cfee623bd60a3057781"
     },
