@@ -24,8 +24,7 @@ pub mod pool;
 #[path = "../../rustev-remote-http/src/principal.rs"]
 pub mod principal;
 pub mod signing;
-#[path = "../../rustev-jev/src/spend.rs"]
-pub mod spend;
+pub use rustev_live::journal as spend;
 #[path = "../../rustev-remote-http/src/taxonomy.rs"]
 pub mod taxonomy;
 #[path = "../../rustev-remote-http/src/wire.rs"]

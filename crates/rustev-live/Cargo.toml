@@ -1,0 +1,24 @@
+[package]
+name = "rustev-live"
+version.workspace = true
+description = "Persistent spend accounting for Rustev live decision execution."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+# Increment 1 is not admitted to the release family.
+publish = false
+
+[package.metadata.spec-spine]
+spec = "043-live-re-execution-at-scale"
+
+[dependencies]
+rustev-contract.workspace = true
+rustev-runtime.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true
