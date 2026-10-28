@@ -249,6 +249,8 @@ impl std::error::Error for JournalError {}
 /// Why a reservation was refused. Nothing may be sent.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SpendRefusal {
+    /// The live run has no room for this reservation.
+    RunCap,
     /// The reservation would pass the cap.
     OverCap {
         budget: BudgetKind,
@@ -264,6 +266,7 @@ pub enum SpendRefusal {
 impl fmt::Display for SpendRefusal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            SpendRefusal::RunCap => f.write_str("run-cap-exceeded"),
             SpendRefusal::OverCap {
                 budget,
                 period,
@@ -503,10 +506,25 @@ impl SpendJournal {
     /// Reserve `units` for `attempt_id` in the current period, durably, or
     /// refuse. Refused means: do not send.
     pub fn reserve(&self, attempt_id: &str, units: u64) -> Result<Reservation, SpendRefusal> {
+        self.reserve_checked(attempt_id, units, None)
+    }
+
+    pub(crate) fn reserve_checked(
+        &self,
+        attempt_id: &str,
+        units: u64,
+        run: Option<(&str, u64)>,
+    ) -> Result<Reservation, SpendRefusal> {
         let now = self.inner.clock.now_ms();
         let kind = self.inner.kind;
         let period = kind.period(now);
         let mut s = self.lock();
+        if let Some((run_id, cap)) = run {
+            let committed = run_total(&s.res, run_id);
+            if committed > cap || units > cap.saturating_sub(committed) {
+                return Err(SpendRefusal::RunCap);
+            }
+        }
         let t = totals(&s.res, kind, &period);
         let committed = t.committed();
         if committed.saturating_add(units) > kind.cap() {
@@ -541,13 +559,14 @@ impl SpendJournal {
         Ok(Reservation { seq, units })
     }
 
-    fn write(&self, s: &mut State, e: &Entry) {
+    fn write(&self, s: &mut State, e: &Entry) -> bool {
         let ok = serde_json::to_vec(e)
             .ok()
             .is_some_and(|line| append(&mut s.file, &line).is_ok());
         if !ok {
             self.inner.write_failures.fetch_add(1, Ordering::SeqCst);
         }
+        ok
     }
 
     /// Settle a reservation with the attempt's charge: observed and
@@ -560,7 +579,9 @@ impl SpendJournal {
         if state != ResState::Outstanding {
             return;
         }
-        self.write(&mut s, &Entry::Settle { seq: r.seq, charge });
+        if !self.write(&mut s, &Entry::Settle { seq: r.seq, charge }) {
+            return;
+        }
         if let Some(x) = s.res.get_mut(&r.seq) {
             x.state = settled(charge);
         }
@@ -572,7 +593,9 @@ impl SpendJournal {
         if s.res.get(&r.seq).map(|x| x.state) != Some(ResState::Outstanding) {
             return;
         }
-        self.write(&mut s, &Entry::Release { seq: r.seq });
+        if !self.write(&mut s, &Entry::Release { seq: r.seq }) {
+            return;
+        }
         if let Some(x) = s.res.get_mut(&r.seq) {
             x.state = ResState::Released;
         }
@@ -589,13 +612,15 @@ impl SpendJournal {
         if s.res.get(&seq).map(|x| x.state) != Some(ResState::Liability) {
             return false;
         }
-        self.write(
+        if !self.write(
             &mut s,
             &Entry::Reconcile {
                 seq,
                 units: observed_units,
             },
-        );
+        ) {
+            return false;
+        }
         if let Some(x) = s.res.get_mut(&seq) {
             x.state = ResState::Observed(observed_units);
         }
@@ -659,19 +684,7 @@ impl SpendJournal {
     /// periods; released reservations contribute nothing. Replayed reservation
     /// state at open preserves this total across a restart.
     pub fn run_spend(&self, run_id: &str) -> u64 {
-        let prefix = format!("live/{run_id}/");
-        self.lock()
-            .res
-            .values()
-            .filter(|r| r.attempt.starts_with(&prefix))
-            .fold(0_u64, |total, r| {
-                let units = match r.state {
-                    ResState::Observed(u) | ResState::Estimated(u) => u,
-                    ResState::Outstanding | ResState::Liability => r.units,
-                    ResState::Released => 0,
-                };
-                total.saturating_add(units)
-            })
+        run_total(&self.lock().res, run_id)
     }
 
     /// Units still available in the current period.
@@ -695,6 +708,20 @@ impl SpendJournal {
     pub fn shared_runtime_ledger(&self) -> Arc<Ledger> {
         Arc::new(Ledger::new(self.runtime_cost_policy()))
     }
+}
+
+fn run_total(res: &BTreeMap<u64, Res>, run_id: &str) -> u64 {
+    let prefix = format!("live/{run_id}/");
+    res.values()
+        .filter(|r| r.attempt.starts_with(&prefix))
+        .fold(0_u64, |total, r| {
+            let units = match r.state {
+                ResState::Observed(u) | ResState::Estimated(u) => u,
+                ResState::Outstanding | ResState::Liability => r.units,
+                ResState::Released => 0,
+            };
+            total.saturating_add(units)
+        })
 }
 
 fn settled(charge: Charge) -> ResState {
@@ -732,6 +759,32 @@ fn totals(res: &BTreeMap<u64, Res>, kind: BudgetKind, period: &str) -> SpendSumm
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn failed_settlement_and_release_keep_the_reservation() {
+        let dir = std::env::temp_dir().join(format!(
+            "rustev-journal-write-failure-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        let path = dir.join("journal");
+        let journal =
+            SpendJournal::open(&path, BudgetKind::Testing, Arc::new(SetClock::new(0))).unwrap();
+        let ticket = journal.reserve("live/run/attempt", 10).unwrap();
+        // A read-only handle deterministically makes append fail.
+        journal.lock().file = File::open(&path).unwrap();
+        journal.settle(ticket, Charge::Observed { units: 1 });
+        assert_eq!(journal.run_spend("run"), 10);
+        journal.release(ticket);
+        assert_eq!(journal.run_spend("run"), 10);
+        assert_eq!(journal.write_failures(), 2);
+        drop(journal);
+        let reopened =
+            SpendJournal::open(&path, BudgetKind::Testing, Arc::new(SetClock::new(0))).unwrap();
+        assert_eq!(reopened.summary().liability, 10);
+        drop(reopened);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 
     #[test]
     fn utc_months() {

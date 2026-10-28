@@ -870,3 +870,345 @@ async fn decide_never_consults_an_authorizer_and_keeps_its_behavior() {
     let id: SnapshotId = request("x").snapshot.id().unwrap();
     assert_eq!(id, link().snapshot_id);
 }
+
+use rustev_runtime::{
+    LiveSpend, SpendAttempt, SpendBinding, SpendGate, SpendRefusal, SpendTicket, SpendUnit,
+};
+
+#[derive(Default)]
+struct TestSpend {
+    attempts: Mutex<Vec<SpendAttempt>>,
+    settled: Mutex<Vec<(String, Charge)>>,
+    released: Mutex<Vec<String>>,
+    refuse_at: Option<usize>,
+    cancel: Option<CancelSignal>,
+    advance: Option<ManualClock>,
+    events: Arc<Mutex<Vec<String>>>,
+}
+impl SpendGate for TestSpend {
+    fn reserve(&self, a: &SpendAttempt) -> Result<SpendTicket, SpendRefusal> {
+        self.events
+            .lock()
+            .unwrap()
+            .push(format!("gate:{}", a.attempt_id));
+        let mut attempts = self.attempts.lock().unwrap();
+        attempts.push(a.clone());
+        if self.refuse_at == Some(attempts.len()) {
+            return Err(SpendRefusal::new("run-cap-exceeded"));
+        }
+        if let Some(cancel) = &self.cancel {
+            cancel.raise();
+        }
+        if let Some(clock) = &self.advance {
+            clock.advance(5);
+        }
+        Ok(Box::new(a.attempt_id.clone()))
+    }
+    fn settle(&self, t: SpendTicket, c: &Charge) {
+        self.settled
+            .lock()
+            .unwrap()
+            .push((*t.downcast::<String>().unwrap(), *c));
+    }
+    fn release(&self, t: SpendTicket) {
+        self.released
+            .lock()
+            .unwrap()
+            .push(*t.downcast::<String>().unwrap());
+    }
+}
+fn spend_bindings() -> Vec<SpendBinding> {
+    [linear_head(), linear_head_replica()]
+        .into_iter()
+        .map(|d| SpendBinding {
+            backend_id: d.backend_id,
+            artifact: d.artifact,
+            cost_unit: SpendUnit::NanoUsd,
+        })
+        .collect()
+}
+fn start_spend(
+    rig: &Rig,
+    plan: &Arc<PreparedPlan>,
+    host: &Arc<Host>,
+    gate: Arc<TestSpend>,
+    cancel: &CancelSignal,
+) -> LiveRun {
+    let (rt, plan, host, cancel) = (rig.rt.clone(), plan.clone(), host.clone(), cancel.clone());
+    tokio::spawn(async move {
+        rt.reexecute_live_with_gate(
+            &plan,
+            live_request("live/run/c/1/case"),
+            &*host,
+            &cancel,
+            LiveSpend {
+                gate: &*gate,
+                bindings: &spend_bindings(),
+            },
+        )
+        .await
+    })
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn spend_checks_refuse_in_order_without_dispatch_or_leaked_reservations() {
+    for stage in 0..4 {
+        let head = answering(linear_head())
+            .with_cost(CostModel::Bounded, CostBound::Bounded { max_units: 5 });
+        let shared = Arc::new(rustev_runtime::Ledger::new(CostPolicy::Hard {
+            max_units: if stage == 1 { 1 } else { 100 },
+        }));
+        let rig = rig_with(
+            config(1, 0, 3),
+            &[(head.clone(), 8)],
+            SinkAnswer::Ack,
+            Some(shared.clone()),
+        );
+        let policy = execution(
+            CostPolicy::Hard {
+                max_units: if stage == 0 { 1 } else { 100 },
+            },
+            vec![],
+        );
+        let plan = Arc::new(rig.rt.prepare(support_compiled(Some(&policy))).unwrap());
+        let events = Arc::new(Mutex::new(vec![]));
+        let log = events.clone();
+        let ledger = shared.clone();
+        let host = Host::new(&rig.clock, move |r, _| {
+            // Both monetary reservations already exist at host authorization.
+            assert_eq!(ledger.reserved(), 5);
+            log.lock().unwrap().push(format!("host:{}", r.attempt_id));
+            Ok(Some(if stage == 2 { refuse(r) } else { allow(r) }))
+        });
+        let gate = Arc::new(TestSpend {
+            refuse_at: Some(1),
+            events: events.clone(),
+            ..Default::default()
+        });
+        let r = finish(start_spend(
+            &rig,
+            &plan,
+            &host,
+            gate.clone(),
+            &CancelSignal::new(),
+        ))
+        .await
+        .unwrap();
+        assert!(head.dispatched().is_empty());
+        assert_eq!(shared.reserved(), 0);
+        assert_eq!(shared.summary().liability, 0);
+        assert_eq!(r.record.cost.liability, 0);
+        if stage < 2 {
+            assert!(host.asked().is_empty());
+        }
+        if stage < 3 {
+            assert!(gate.attempts.lock().unwrap().is_empty());
+        } else {
+            assert_eq!(
+                host.asked().len(),
+                1,
+                "first spend refusal stops later requests"
+            );
+            assert_eq!(gate.attempts.lock().unwrap().len(), 1);
+            assert_eq!(r.spend_refusal.unwrap().code, "run-cap-exceeded");
+            let e = events.lock().unwrap();
+            assert_eq!(e.len(), 2);
+            assert!(e[0].starts_with("host:"));
+            assert!(e[1].starts_with("gate:"));
+        }
+    }
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn spend_retry_and_fallback_reserve_new_tickets_after_authorization() {
+    let events = Arc::new(Mutex::new(vec![]));
+    let log = events.clone();
+    let head = Scripted::new(linear_head(), move |c| {
+        log.lock().unwrap().push(format!("send:{}", c.attempt_id));
+        if c.task() == "support.topic" {
+            Answer::Fail(
+                if c.n == 1 {
+                    AdapterFailure::Transient
+                } else {
+                    AdapterFailure::Permanent
+                },
+                "scripted".into(),
+                Charge::Estimated { units: 1 },
+            )
+        } else {
+            ok(c.task(), 1)
+        }
+    });
+    let log = events.clone();
+    let replica = Scripted::new(linear_head_replica(), move |c| {
+        log.lock().unwrap().push(format!("send:{}", c.attempt_id));
+        ok(c.task(), 1)
+    });
+    let rig = rig(config(1, 0, 3), &[(head, 8), (replica, 8)]);
+    let policy = execution(
+        CostPolicy::Unlimited,
+        vec![step_exec(
+            "topic",
+            2,
+            &[F::Transient],
+            Delay::None,
+            &[REPLICA],
+            &[F::Permanent],
+        )],
+    );
+    let plan = Arc::new(rig.rt.prepare(support_compiled(Some(&policy))).unwrap());
+    let log = events.clone();
+    let host = Host::new(&rig.clock, move |r, _| {
+        log.lock().unwrap().push(format!("host:{}", r.attempt_id));
+        Ok(Some(allow(r)))
+    });
+    let gate = Arc::new(TestSpend {
+        events: events.clone(),
+        ..Default::default()
+    });
+    let r = finish(start_spend(
+        &rig,
+        &plan,
+        &host,
+        gate.clone(),
+        &CancelSignal::new(),
+    ))
+    .await
+    .unwrap();
+    r.document.check().unwrap();
+    assert!(r.spend_refusal.is_none());
+    assert_eq!(topic(&r).attempts.len(), 3);
+    let attempts = gate.attempts.lock().unwrap();
+    assert_eq!(attempts.len(), 5);
+    assert_eq!(gate.settled.lock().unwrap().len(), 5);
+    assert!(gate.released.lock().unwrap().is_empty());
+    let events = events.lock().unwrap();
+    for a in attempts.iter() {
+        let positions: Vec<_> = ["host", "gate", "send"]
+            .iter()
+            .map(|prefix| {
+                events
+                    .iter()
+                    .position(|e| e == &format!("{prefix}:{}", a.attempt_id))
+                    .unwrap()
+            })
+            .collect();
+        assert!(positions[0] < positions[1] && positions[1] < positions[2]);
+        assert_eq!(a.decision_id, "live/run/c/1/case");
+    }
+    let topic_ids: std::collections::BTreeSet<_> =
+        topic(&r).attempts.iter().map(|a| &a.attempt_id).collect();
+    assert_eq!(topic_ids.len(), 3);
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn cancelled_after_gate_before_send_releases_ticket_and_budgets() {
+    let (rig, head, plan) = plain();
+    let host = Host::allowing(&rig.clock);
+    let cancel = CancelSignal::new();
+    let gate = Arc::new(TestSpend {
+        cancel: Some(cancel.clone()),
+        ..Default::default()
+    });
+    let r = finish(start_spend(&rig, &plan, &host, gate.clone(), &cancel))
+        .await
+        .unwrap();
+    assert!(head.dispatched().is_empty());
+    assert_eq!(gate.attempts.lock().unwrap().len(), 1);
+    assert_eq!(gate.released.lock().unwrap().len(), 1);
+    assert!(gate.settled.lock().unwrap().is_empty());
+    assert_eq!(r.record.cost.liability, 0);
+    assert_eq!(r.completion, Completion::Cancelled);
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn dropping_inflight_live_work_keeps_spend_liability() {
+    let head = gate_all(linear_head());
+    let rig = rig(config(1, 0, 3), &[(head.clone(), 8)]);
+    let plan = Arc::new(rig.rt.prepare(support_compiled(None)).unwrap());
+    let gate = Arc::new(TestSpend::default());
+    let run = start_spend(
+        &rig,
+        &plan,
+        &Host::allowing(&rig.clock),
+        gate.clone(),
+        &CancelSignal::new(),
+    );
+    until(|| head.gated().len() == 3).await;
+    run.abort();
+    assert!(run.await.unwrap_err().is_cancelled());
+    assert_eq!(gate.settled.lock().unwrap().len(), 3);
+    assert!(
+        gate.settled
+            .lock()
+            .unwrap()
+            .iter()
+            .all(|(_, c)| *c == Charge::Unknown)
+    );
+    assert!(gate.released.lock().unwrap().is_empty());
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn first_spend_refusal_stops_new_work_but_inflight_work_settles() {
+    let head = gate_all(linear_head());
+    let rig = rig(config(1, 0, 3), &[(head.clone(), 8)]);
+    let plan = Arc::new(rig.rt.prepare(support_compiled(None)).unwrap());
+    let gate = Arc::new(TestSpend {
+        refuse_at: Some(2),
+        ..Default::default()
+    });
+    let host = Host::allowing(&rig.clock);
+    let run = start_spend(&rig, &plan, &host, gate.clone(), &CancelSignal::new());
+    until(|| gate.attempts.lock().unwrap().len() == 2).await;
+    let sent = head.gated();
+    assert_eq!(sent.len(), 1);
+    let task = if sent[0].contains("/topic/") {
+        "support.topic"
+    } else if sent[0].contains("/frustration/") {
+        "support.frustration"
+    } else {
+        "support.deadline"
+    };
+    assert!(head.release(&sent[0], ok(task, 1)));
+    let result = finish(run).await.unwrap();
+    assert_eq!(result.spend_refusal.unwrap().code, "run-cap-exceeded");
+    assert_eq!(head.dispatched().len(), 1);
+    assert_eq!(host.asked().len(), 2);
+    assert_eq!(
+        *gate.settled.lock().unwrap(),
+        vec![(sent[0].clone(), Charge::Observed { units: 1 })]
+    );
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn authorization_expiring_during_gate_releases_without_sending() {
+    let (rig, head, plan) = plain();
+    let host = Host::new(&rig.clock, |r, _| {
+        Ok(Some(DispatchAnswer::Allow {
+            answers: r.digest().unwrap(),
+            reference: reference(r),
+            valid_for_ms: 5,
+        }))
+    });
+    let gate = Arc::new(TestSpend {
+        advance: Some(rig.clock.clone()),
+        ..Default::default()
+    });
+    let r = finish(start_spend(
+        &rig,
+        &plan,
+        &host,
+        gate.clone(),
+        &CancelSignal::new(),
+    ))
+    .await
+    .unwrap();
+    r.document.check().unwrap();
+    assert!(head.dispatched().is_empty());
+    assert_eq!(gate.released.lock().unwrap().len(), 3);
+    assert!(gate.settled.lock().unwrap().is_empty());
+    for effect in &r.document.effects {
+        assert_eq!(refusal(effect), AuthorizationRefusal::Expired);
+        assert_eq!(effect.dispatch, Dispatch::NotDispatched);
+    }
+}

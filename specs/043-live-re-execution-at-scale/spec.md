@@ -732,6 +732,24 @@ and a checkpoint whose bindings differ is refused (`checkpoint-mismatch`,
 `rustev.live-reexecution/1` come with the run engine, whose runtime and
 eval constructors they change.
 
+**Increment 3 (2026-10-27): the spend gate.** `rustev-runtime` gains the
+synchronous seam of 3.6.1 (`SpendGate`: `reserve`, `settle`, `release`;
+`crates/rustev-runtime/src/spend.rs`), taken only by
+`reexecute_live_with_gate`; `reexecute_live`, `decide` and every other path
+are unchanged. Each attempt, retries and fallbacks included, passes the
+decision budget, the shared ledger, host authorization and then the
+gate before any byte is sent, and a refusal releases the earlier
+reservations (3.6.2); the first spend refusal stops every later attempt
+of the decision (3.6.5), and settlement and release follow 3.6.6.
+`rustev_live::JournalGate` reserves the full worst-case exposure, refuses
+`unknown` exposure, reserves `cost_unit: none` at zero, and refuses
+`run-cap-exceeded` and `spend-cap-exceeded` with liability and
+outstanding counted in full; a non-testing journal is refused
+(`journal-budget`, 3.5.4). A plan with acquisitions is refused by the
+gated entry point until acquisition attempts carry their own spend
+identities. Tests: `crates/rustev-live/tests/gate.rs`,
+`crates/rustev-runtime/tests/live.rs`.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

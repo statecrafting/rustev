@@ -166,6 +166,7 @@
         "src/progress.rs",
         "src/shared.rs",
         "src/sink.rs",
+        "src/spend.rs",
         "src/testdata/generate-step.json",
         "src/testdata/generation.rs",
         "src/testdata/scripted.rs",

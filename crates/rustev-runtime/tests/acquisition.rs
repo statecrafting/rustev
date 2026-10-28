@@ -870,3 +870,66 @@ fn acquisition_execution_timeout_validation() {
         assert!(compile_with_sources(&d, &[], &[], &[source()], Some(&policy)).is_err());
     }
 }
+
+#[tokio::test]
+async fn gated_live_acquisitions_refuse_before_any_source_call() {
+    struct NoCalls;
+    impl rustev_runtime::LiveAuthorizer for NoCalls {
+        fn authorize(
+            &self,
+            _: &rustev_contract::live::AuthorizationRequest,
+        ) -> Result<Option<rustev_runtime::DispatchAnswer>, String> {
+            panic!("must refuse before authorization")
+        }
+    }
+    impl rustev_runtime::SpendGate for NoCalls {
+        fn reserve(
+            &self,
+            _: &rustev_runtime::SpendAttempt,
+        ) -> Result<rustev_runtime::SpendTicket, rustev_runtime::SpendRefusal> {
+            panic!("must refuse before reservation")
+        }
+        fn settle(&self, _: rustev_runtime::SpendTicket, _: &Charge) {
+            panic!("no ticket")
+        }
+        fn release(&self, _: rustev_runtime::SpendTicket) {
+            panic!("no ticket")
+        }
+    }
+    let source = Source::new(source(), vec![]);
+    let sources = [source.clone()];
+    let clock = ManualClock::new();
+    let rt = runtime(&clock, &sources, 1);
+    let plan = prepare(&rt, &definition(), &sources, None);
+    let req = request("live/run/c/1/case");
+    let handle = rustev_contract::scope::Handle::new("synthetic").unwrap();
+    let req = rustev_runtime::LiveRequest {
+        decision_id: req.decision_id,
+        snapshot: req.snapshot,
+        expected_snapshot_id: None,
+        evaluation_time: req.evaluation_time,
+        deadline_ms: None,
+        principal_handle: req.principal_handle,
+        subject: handle.clone(),
+        scope: rustev_contract::scope::Scope::principal(handle.clone(), handle.clone(), handle),
+        capture: None,
+        historical: None,
+    };
+    let result = rt
+        .reexecute_live_with_gate(
+            &plan,
+            req,
+            &NoCalls,
+            &CancelSignal::new(),
+            rustev_runtime::LiveSpend {
+                gate: &NoCalls,
+                bindings: &[],
+            },
+        )
+        .await;
+    assert!(matches!(
+        result,
+        Err(rustev_runtime::LiveRefusal::SpendAcquisitionUnsupported)
+    ));
+    assert!(source.seen.lock().unwrap().is_empty());
+}

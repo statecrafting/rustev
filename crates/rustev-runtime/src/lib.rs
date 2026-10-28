@@ -1178,3 +1178,8 @@ fn fit_remote_evidence(record: &mut RunRecord) {
         record.remote_evidence_truncated = true;
     }
 }
+
+mod spend;
+pub use spend::{
+    LiveSpend, SpendAttempt, SpendBinding, SpendGate, SpendRefusal, SpendTicket, SpendUnit,
+};
