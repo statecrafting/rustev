@@ -1,9 +1,12 @@
 # Spec 056 3.3: the fresh-consumer qualification of a published family
-# version. Dispatched after publication with the release tag; it runs
-# tools/rustev-release/qualify.sh on each platform of the release set's CLI
-# and npm matrix and uploads that platform's step files. Recording the
-# lifecycle as `qualified` is `rustev-release qualify` over the collected
-# evidence, never this workflow. Not a required check (spec 056 3.3).
+# version. It runs tools/rustev-release/qualify.sh on each platform of the
+# release set's CLI and npm matrix and uploads that platform's step files.
+# Spec 058 3.4.2: release.yml calls it as its last stage with the tag it
+# released; `record` then records the lifecycle through `rustev-release
+# qualify` from the run's manifest and publication.json, with no instruction
+# or journal. It stays dispatchable by hand to requalify a published tag (a
+# release made before spec 058 has no publication.json, and `record` says
+# so). Not a required check (spec 056 3.3).
 name: qualify
 
 on:
@@ -11,6 +14,12 @@ on:
     inputs:
       tag:
         description: "The published release tag, for example v0.2.0"
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      tag:
+        description: "The published release tag"
         required: true
         type: string
 
@@ -57,10 +66,15 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: refs/tags/${{ inputs.tag }}
-      - name: The signed manifest of the hosted release
+      - name: The manifest of the hosted release
         id: release
         run: |
-          gh release download "$TAG" -p release-manifest.json -p release-manifest.json.sig -D release
+          gh release download "$TAG" -p release-manifest.json -D release
+          # A release before spec 058 carries the owner's signature; a tagged
+          # run's manifest carries the run's attestation instead (058 3.2.5).
+          if gh release view "$TAG" --json assets --jq '.assets[].name' | grep -qx release-manifest.json.sig; then
+            gh release download "$TAG" -p release-manifest.json.sig -D release
+          fi
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
           echo "pinned=$(sed -n 's/^channel = "\(.*\)"$/\1/p' rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
           # The MSRV comes from the workspace at the tag, never the manifest:
@@ -116,3 +130,41 @@ jobs:
           name: qualify-${{ matrix.platform }}
           path: evidence
           if-no-files-found: error
+
+  record:
+    name: record
+    needs: qualify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ inputs.tag }}
+    steps:
+      - name: The tag is a stable release tag, checked before any checkout
+        run: |
+          printf '%s\n' "$TAG" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' \
+            || { echo "qualify: tag must be v<major>.<minor>.<patch>" >&2; exit 2; }
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: qualify-*
+          path: evidence
+          merge-multiple: true
+      - name: Record the lifecycle from the run's release (058 3.4.2)
+        run: |
+          set -eu
+          if ! gh release view "$TAG" --json assets --jq '.assets[].name' | grep -qx publication.json; then
+            echo "::notice::$TAG has no publication.json (released before spec 058); its lifecycle is recorded with its instruction and journal, not here"
+            exit 0
+          fi
+          git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
+          gh release download "$TAG" -p release-manifest.json -p SHA256SUMS -p publication.json -D release
+          cargo run --quiet --locked -p rustev-release -- qualify release evidence > qualification.json
+          cat qualification.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: qualification
+          path: qualification.json
+          if-no-files-found: ignore

@@ -164,6 +164,14 @@ class Harness:
                 raise NotRun(f'{name} is not installed')
 
     def verify_manifest(self):
+        if not Path(str(self.manifest_path) + '.sig').exists():
+            # Spec 058 3.2.5: a tagged run's manifest carries that run's
+            # build provenance attestation, not an owner signature.
+            self.need('gh')
+            self.run('gh', 'attestation', 'verify', self.manifest_path, '--repo', REPO,
+                     '--signer-workflow', REPO + '/.github/workflows/release.yml',
+                     '--source-ref', 'refs/tags/' + self.m['tag'], '--source-digest', self.m['commit'])
+            return
         self.need('ssh-keygen')
         self.commands.append('ssh-keygen -Y verify -f allowed_signers -I 7887446+bartekus@users.noreply.github.com -n rustev-release -s ' + str(self.manifest_path) + '.sig')
         with self.manifest_path.open('rb') as data:

@@ -5,7 +5,8 @@
 //! public state (3.3, 3.5.2), recording every item in `publication.json`
 //! (3.5.4). [`publish_release`] creates the run's GitHub release once
 //! (3.3.3), and [`verify_assets`] checks a release directory against the
-//! run's manifest (3.4.1).
+//! run's manifest (3.4.1). [`qualify`] records the lifecycle from the run's
+//! manifest and publication record, with no instruction or journal (3.4.2).
 //!
 //! Registry and release state come through [`Publisher`] and
 //! [`Releases`], so tests drive every rule offline. Nothing here reads a
@@ -19,11 +20,12 @@ use std::process::Command;
 use serde::{Deserialize, Serialize};
 
 use crate::archive::sha256_hex;
-use crate::lifecycle::{Lookup, redact};
+use crate::lifecycle::{Event, Lifecycle, Lookup, State, redact};
 use crate::manifest::{ReleaseManifest, sha256sums};
 use crate::prerelease::{Assets, Outcome, Releases};
 
 pub const RECORD_SCHEMA: &str = "rustev.publication-record/1";
+pub const QUALIFICATION_SCHEMA: &str = "rustev.qualification-record/1";
 const RELEASE_SET_PATH: &str = "tools/rustev-release/release-set.json";
 
 /// What `tag` hands the run: the verified tag's identity (3.1.1).
@@ -607,4 +609,61 @@ pub fn notes(m: &ReleaseManifest, assets: &Assets) -> Result<String, String> {
     }
     let changelog = assets.get("changelog.md").ok_or("031 3.10: no changelog")?;
     String::from_utf8(changelog.clone()).map_err(|e| format!("changelog.md: {e}"))
+}
+
+/// The lifecycle record `qualify` prints (3.4.2).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Qualification {
+    pub schema: String,
+    pub version: String,
+    pub tag: String,
+    pub commit: String,
+    pub manifest_sha256: String,
+    pub state: State,
+    pub evidence: BTreeMap<String, String>,
+}
+
+/// 3.4.2: the lifecycle of the tagged run whose manifest, `SHA256SUMS` and
+/// `publication.json` are in `dir`, qualified by the step files in
+/// `evidence_dir`. `tag_object` is the local tag's object id, which the
+/// manifest must name. No instruction and no journal is read.
+pub fn qualify(dir: &Path, evidence_dir: &Path, tag_object: &str) -> Result<Qualification, String> {
+    let read = |n: &str| std::fs::read(dir.join(n)).map_err(|e| format!("{n}: {e}"));
+    let m = crate::candidate::publication_manifest(&read("release-manifest.json")?)?;
+    if read("SHA256SUMS")? != sha256sums(&m).into_bytes() {
+        return Err("058 3.4.1: SHA256SUMS does not list exactly the manifest's files".into());
+    }
+    released(&m, &read("publication.json")?)?;
+    let evidence = crate::qualification::evidence(&m, evidence_dir)?;
+    let mut life = Lifecycle::new(m.clone());
+    let step = |life: &mut Lifecycle, e: Event| life.apply(e).map(|_| ()).map_err(|r| r.0);
+    step(&mut life, Event::GatesPass)?;
+    step(
+        &mut life,
+        Event::CandidateVerified {
+            commit: m.commit.clone(),
+        },
+    )?;
+    step(
+        &mut life,
+        Event::TagAuthorized {
+            tag_object: tag_object.into(),
+        },
+    )?;
+    // Every registry item is recorded public above, and the release holds
+    // the record: layers 1 to 8 are observed.
+    life.family_observed = true;
+    step(&mut life, Event::Observed { complete: true })?;
+    step(&mut life, Event::ReleaseCreated)?;
+    life.consumer_recorded = true;
+    step(&mut life, Event::ConsumerQualified)?;
+    Ok(Qualification {
+        schema: QUALIFICATION_SCHEMA.into(),
+        version: m.version.clone(),
+        tag: m.tag.clone(),
+        commit: m.commit.clone(),
+        manifest_sha256: m.digest(),
+        state: life.state,
+        evidence,
+    })
 }

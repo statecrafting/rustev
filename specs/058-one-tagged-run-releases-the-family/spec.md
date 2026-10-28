@@ -429,6 +429,39 @@ the new workflow. Not done: a crate without a crates.io trusted publisher
 is refused by crates.io at its upload, not before the first upload, since
 no public API names a crate's trusted publishers.
 
+**Increment 2 (2026-10-28).** `.github/workflows/release.yml` runs on a
+pushed `v*` tag (a `workflow_dispatch` is the dry run, with no inputs):
+`tag` (`rustev-release tag`, with the commit's `ci-gate` check runs read by
+`gh api`), the unchanged `bindings`, `cli`, `rebuild`, `archive`, `pack`,
+`sbom` and `audit`, `crates` (`candidate.sh` at the tagged commit) and
+`crates-rebuild` (a second `cargo package` on its own runner), with
+`reproducibility` now comparing the `.crate` archives too; `manifest`
+(`run-manifest`, then one build provenance attestation over every file,
+its bundle staged as each `<file>.intoto.jsonl`; the per-job attestations
+of `archive` and `pack` move here); `approve` (Environment `release`);
+`publish-crates` (Environment `crates-publish`, `id-token: write`,
+`rust-lang/crates-io-auth-action` v1.0.5 by commit); `publish-npm`
+(Environment `npm-publish`, `id-token: write`, the pinned npm 11.21.0);
+`github-release` (the only `contents: write`); `verify-release`
+(`verify-assets`, `gh attestation verify` against each bundle and the
+store, `observe-registries`, `npm audit signatures`); and `qualify`, which
+calls `qualify.yml` (now also `workflow_call`), whose new `record` job runs
+`rustev-release qualify <release-dir> <evidence-dir>`. A candidate tag ends
+at the pre-release (3.7). The jobs `bind`, `npm` and `prerelease` and the
+dispatch inputs leave the workflow; the commands behind them stay until
+increment 3.
+
+Carried from increment 1: `qualify <release-dir> <evidence-dir>` drives
+the lifecycle through the new `TagAuthorized` event (the manifest must name
+the local tag's object) and the release's `publication.json`, with no
+instruction or journal, and prints `rustev.qualification-record/1`; the
+harness verifies a manifest without `.sig` through its attestation.
+`tests/release_workflow.rs` is the workflow test of Acceptance. Not
+checked by a test: the workflow's behavior on GitHub, which the closing
+release (increment 5) shows. A crates.io token from trusted publishing
+lives 30 minutes; a `publish-crates` job that outlives it fails and is
+resumed by rerunning it (3.5.1).
+
 ## Open questions for the owner
 
 Settled at ratification (A-61): the `release` Environment has no

@@ -9,9 +9,10 @@ use std::process::Command;
 
 use rustev_release::archive::sha256_hex;
 use rustev_release::family_artifacts as fa;
-use rustev_release::lifecycle::Lookup;
+use rustev_release::lifecycle::{Lookup, State};
 use rustev_release::manifest::{self, Inputs, ReleaseManifest, Toolchain};
 use rustev_release::prerelease::{Assets, Outcome, Release, Releases};
+use rustev_release::qualification::{KINDS, SCHEMA, Status, Step, required};
 use rustev_release::repro::{Scratch, fresh_dir};
 use rustev_release::tagged::{self, Item, Publisher, Record};
 use rustev_release::{ReleaseSet, prerelease};
@@ -583,6 +584,67 @@ fn the_github_release_is_created_once_and_never_replaced() {
         }
     }
     assert!(tagged::publish_release(&mut Old, "v0.3.0", &notes, &assets, false).is_err());
+}
+
+// 3.4.2 ------------------------------------------------------------------
+
+fn steps(m: &ReleaseManifest, dir: &Path) {
+    for platform in fa::PLATFORMS {
+        for kind in KINDS {
+            let passed = required(m, kind);
+            let step = Step {
+                schema: SCHEMA.into(),
+                manifest_sha256: m.digest(),
+                kind: (*kind).into(),
+                platform: (*platform).into(),
+                command: vec!["consumer".into()],
+                exit_status: passed.then_some(0),
+                output_digest: "f".repeat(64),
+                lockfile_or_install_record: "records".into(),
+                checksums: BTreeMap::from([("x".into(), "f".repeat(64))]),
+                host: "h".into(),
+                os: "o".into(),
+                architecture: "a".into(),
+                toolchain: "t".into(),
+                node: "n".into(),
+                status: if passed {
+                    Status::Passed
+                } else {
+                    Status::Excluded {
+                        reason: "absent".into(),
+                    }
+                },
+            };
+            write(
+                &dir.join(format!("{platform}.{kind}.json")),
+                &serde_json::to_vec(&step).unwrap(),
+            );
+        }
+    }
+}
+
+#[test]
+fn qualify_needs_no_instruction_or_journal() {
+    let (root, m, dir) = release();
+    let evidence = root.join("evidence");
+    steps(&m, &evidence);
+    let q = tagged::qualify(&dir, &evidence, &"e".repeat(40)).unwrap();
+    assert_eq!(q.state, State::Qualified);
+    assert_eq!(q.manifest_sha256, m.digest());
+    assert_eq!(q.evidence.len(), fa::PLATFORMS.len() * KINDS.len());
+    // Another tag object than the manifest's is not this run's authority.
+    let err = tagged::qualify(&dir, &evidence, &"0".repeat(40)).unwrap_err();
+    assert!(err.contains("058 3.1.2"), "{err}");
+    // A missing platform's step leaves the lifecycle unqualified.
+    std::fs::remove_file(evidence.join("linux-x64-gnu.cli.json")).unwrap();
+    assert!(tagged::qualify(&dir, &evidence, &"e".repeat(40)).is_err());
+    // So does a package the record does not show public.
+    steps(&m, &evidence);
+    let mut r = Record::load(&dir.join("publication.json"), &m).unwrap();
+    r.entries.pop();
+    r.write(&dir.join("publication.json")).unwrap();
+    let err = tagged::qualify(&dir, &evidence, &"e".repeat(40)).unwrap_err();
+    assert!(err.contains("058 3.5.4"), "{err}");
 }
 
 #[test]
