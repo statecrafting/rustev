@@ -26,9 +26,6 @@ mod live;
 mod optimization;
 mod progress;
 mod shared;
-// The entry checks are driven by no request until spec 044 increment 4
-// part b wires the persistent tier in.
-#[cfg_attr(not(test), allow(dead_code))]
 mod store;
 pub use store::{
     Invalidated, PutAnswer, PutTerms, RuntimeStore, StoreCall, StoreFailure, StoreSelector, Stored,
@@ -114,6 +111,11 @@ pub enum PrepareError {
     SinkVersionUnsupported {
         schema: &'static str,
     },
+    /// A persistent tier, and a runtime built without a store (spec 044,
+    /// 3.4.1).
+    StoreMissing,
+    /// The store's contract is not the one the plan states.
+    StoreContractMismatch,
 }
 
 /// Why a decision was not admitted (spec 003, 3.4.1). Nothing was dispatched
@@ -224,6 +226,8 @@ pub(crate) struct Inner {
     pub queue: Option<mpsc::Sender<Job>>,
     pub stats: Arc<Stats>,
     pub shared: Option<Arc<Ledger>>,
+    /// The host's store behind the persistent tier (spec 044, 3.4).
+    pub store: Option<Arc<dyn RuntimeStore>>,
     optimizer: optimization::Optimizer,
     admission: Arc<Semaphore>,
     queued: AtomicUsize,
@@ -250,6 +254,7 @@ pub struct RuntimeBuilder {
     )>,
     shared: Option<Arc<Ledger>>,
     sources: Vec<(Arc<dyn rustev_core::seams::AcquisitionSource>, usize)>,
+    store: Option<Arc<dyn RuntimeStore>>,
 }
 
 impl RuntimeBuilder {
@@ -287,6 +292,13 @@ impl RuntimeBuilder {
             max_concurrency,
             rustev_contract::actionability::Origin::Host,
         ));
+        self
+    }
+
+    /// The host's store, for plans whose policy enables the persistent tier
+    /// (spec 044, 3.4.1).
+    pub fn store(mut self, store: Arc<dyn RuntimeStore>) -> Self {
+        self.store = Some(store);
         self
     }
 
@@ -384,6 +396,7 @@ impl RuntimeBuilder {
                 queue,
                 stats,
                 shared: self.shared,
+                store: self.store,
                 optimizer: optimization::Optimizer::default(),
                 admission: Arc::new(Semaphore::new(c.max_in_flight)),
                 queued: AtomicUsize::new(0),
@@ -482,6 +495,7 @@ impl Runtime {
             backends: vec![],
             sources: vec![],
             shared: None,
+            store: None,
         }
     }
 
@@ -532,6 +546,17 @@ impl Runtime {
             .map(|p| p.cost)
             .unwrap_or(CostPolicy::Unlimited);
         let optimization = policy.as_ref().and_then(|p| p.optimization.clone());
+        if let Some(persistent) = optimization
+            .as_ref()
+            .and_then(|o| o.persistent_cache.as_ref())
+        {
+            let Some(store) = &self.inner.store else {
+                return Err(PrepareError::StoreMissing);
+            };
+            if *store.contract() != persistent.store_contract {
+                return Err(PrepareError::StoreContractMismatch);
+            }
+        }
         let target = |backend_id: &str, descriptor: &rustev_contract::ids::DescriptorId| {
             let r = self
                 .inner
@@ -920,6 +945,14 @@ impl Runtime {
         let ledger = Ledger::new(plan.cost);
         let ev = std::sync::Mutex::new(ev);
         let deferred_cache = Mutex::new(vec![]);
+        // The persistent tier (spec 044, 3.4); live re-execution observes
+        // fresh backend work and reads no tier.
+        let persistent = plan
+            .optimization
+            .as_ref()
+            .and_then(|o| o.persistent_cache.as_ref())
+            .filter(|_| i.store.is_some() && live.is_none());
+        let mut pending = store::Pending::default();
         let has_generation = compiled
             .plan
             .steps
@@ -942,6 +975,7 @@ impl Runtime {
                 stream: None,
                 item_clock: None,
                 deferred_cache: has_generation.then_some(&deferred_cache),
+                persistent: persistent.map(|_| &pending),
                 live,
                 observing: observing.as_ref(),
             };
@@ -987,20 +1021,53 @@ impl Runtime {
             if cancelled {
                 (Completion::Cancelled, CoreEvidence::NotProduced)
             } else {
-                let stage = stage.lock().unwrap_or_else(|e| e.into_inner());
-                let (mut judgment, evidence, mut text) = stage
-                    .finish()
-                    .map_err(|e| DecideError::GenerationFailed(e.to_string()))?;
-                if let Some(text) = &mut text {
-                    stage.verify_ownership(&mut judgment, text);
-                    if let Some(streaming) = streaming {
-                        streaming.finish(text);
+                let (judgment, evidence) = {
+                    let stage = stage.lock().unwrap_or_else(|e| e.into_inner());
+                    let (mut judgment, evidence, mut text) = stage
+                        .finish()
+                        .map_err(|e| DecideError::GenerationFailed(e.to_string()))?;
+                    if let Some(text) = &mut text {
+                        stage.verify_ownership(&mut judgment, text);
+                        if let Some(streaming) = streaming {
+                            streaming.finish(text);
+                        }
+                    }
+                    if let Some(o) = &observing {
+                        o.remaining(&evidence, &requests, &compiled.plan);
+                    }
+                    text_result = text;
+                    (judgment, evidence)
+                };
+                // Persistent writes follow the evidence, whose digest each
+                // entry binds, and precede the run record, which records
+                // every admission not made (spec 044, 3.4).
+                if let (Some(persistent), Some(store), Some(policy)) =
+                    (persistent, i.store.as_deref(), plan.optimization.as_ref())
+                {
+                    let written = store::write_pending(
+                        std::mem::take(&mut pending),
+                        store::Writing {
+                            rt: i,
+                            store,
+                            policy,
+                            persistent,
+                            cancel,
+                            deadline,
+                            created: req.evaluation_time,
+                            evidence: rustev_contract::Document::record_digest(&evidence).ok(),
+                        },
+                    )
+                    .await;
+                    for ((step, instance), diagnostic) in written {
+                        if let Some(o) = requests
+                            .iter_mut()
+                            .find(|r| r.step == step && r.instance == instance)
+                            .and_then(|r| r.optimization.as_mut())
+                        {
+                            o.diagnose(diagnostic);
+                        }
                     }
                 }
-                if let Some(o) = &observing {
-                    o.remaining(&evidence, &requests, &compiled.plan);
-                }
-                text_result = text;
                 writes = deferred_cache
                     .into_inner()
                     .unwrap_or_else(|e| e.into_inner());

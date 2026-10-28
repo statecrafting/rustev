@@ -6,17 +6,24 @@
 //! here, on every read, in the order of 3.4.3; any failure is a miss with
 //! its diagnostic, never a value.
 
+use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Mutex;
+
 use rustev_contract::Document;
 use rustev_contract::cache_entry::{
     CacheEntry, EntryBody, EntryGenerations, EntryKind, EntryPayload, RequestPayload,
 };
 use rustev_contract::canonical::CanonicalError;
 use rustev_contract::ids::ContentDigest;
-use rustev_contract::optimization::{OptimizationPolicy, StoreContract};
+use rustev_contract::optimization::{OptimizationPolicy, PersistentCachePolicy, StoreContract};
+use rustev_contract::output::RawOutput;
 use rustev_contract::schema;
+use rustev_contract::time::DurationMs;
 use rustev_contract::time::Timestamp;
 use rustev_core::seams::{BoxFuture, CancelSignal};
 
+use crate::Inner;
+use crate::clock::Instant;
 use crate::optimization::RequestKey;
 
 /// What a store call made for a decision receives (3.4.1): the decision's
@@ -268,6 +275,146 @@ pub(crate) fn write_entry(w: EntryWrite<'_>) -> Result<Vec<u8>, CanonicalError> 
         evidence: w.evidence,
     })?;
     entry.record_canonical()
+}
+
+/// A validated output of a request's primary target, queued for the
+/// persistent tier until the decision's evidence exists.
+pub(crate) struct PendingWrite {
+    pub step: String,
+    pub instance: Vec<String>,
+    pub key: RequestKey,
+    pub output: RawOutput,
+    pub source_attempt_id: String,
+}
+
+/// One decision's persistent-tier state: the generations each read
+/// captured before the work began, by key id, and the writes queued.
+#[derive(Default)]
+pub(crate) struct Pending {
+    captured: Mutex<BTreeMap<String, EntryGenerations>>,
+    writes: Mutex<Vec<PendingWrite>>,
+}
+
+impl Pending {
+    /// Keep the first generations read for a key: those before the work.
+    pub(crate) fn capture(&self, key_id: &str, generations: EntryGenerations) {
+        lock(&self.captured)
+            .entry(key_id.to_string())
+            .or_insert(generations);
+    }
+
+    pub(crate) fn queue(&self, write: PendingWrite) {
+        lock(&self.writes).push(write);
+    }
+}
+
+fn lock<S>(m: &Mutex<S>) -> std::sync::MutexGuard<'_, S> {
+    m.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// What the decision's writes answered, by request: the diagnostic of each
+/// admission not made (3.4.1).
+pub(crate) type WriteDiagnostics = Vec<((String, Vec<String>), String)>;
+
+/// What the decision-end writes need besides the queue.
+pub(crate) struct Writing<'a> {
+    pub rt: &'a Inner,
+    pub store: &'a dyn RuntimeStore,
+    pub policy: &'a OptimizationPolicy,
+    pub persistent: &'a PersistentCachePolicy,
+    pub cancel: &'a CancelSignal,
+    pub deadline: Instant,
+    pub created: Timestamp,
+    /// The digest of the decision's evidence record (3.4.3), or none when
+    /// the record has no canonical form, so no entry can bind it.
+    pub evidence: Option<ContentDigest>,
+}
+
+/// Write each queued entry once, under the generations its read captured
+/// (3.4.3); a request whose store was never read has none and is not
+/// written. Every answer but `stored`, a failure and an entry over
+/// `max_entry_bytes` is a diagnostic for its request; none changes its
+/// output or the judgment.
+pub(crate) async fn write_pending(pending: Pending, w: Writing<'_>) -> WriteDiagnostics {
+    let captured = pending
+        .captured
+        .into_inner()
+        .unwrap_or_else(|e| e.into_inner());
+    let writes = pending
+        .writes
+        .into_inner()
+        .unwrap_or_else(|e| e.into_inner());
+    let mut written = BTreeSet::new();
+    let mut diagnostics = vec![];
+    for write in writes {
+        let Some(&generations) = captured.get(&write.key.id) else {
+            continue;
+        };
+        if !written.insert(write.key.id.clone()) {
+            continue;
+        }
+        let at = (write.step.clone(), write.instance.clone());
+        let Some(evidence) = w.evidence.clone() else {
+            diagnostics.push((
+                at,
+                "persistent cache entry not written: the evidence has no canonical form".into(),
+            ));
+            continue;
+        };
+        let bytes = match write_entry(EntryWrite {
+            key: &write.key,
+            policy: w.policy,
+            generations,
+            created: w.created,
+            ttl_ms: w.persistent.ttl_ms,
+            payload: RequestPayload {
+                target: 0,
+                output: write.output,
+                source_attempt_id: write.source_attempt_id,
+            },
+            evidence,
+        }) {
+            Ok(bytes) => bytes,
+            Err(_) => {
+                diagnostics.push((at, "persistent cache entry has no canonical form".into()));
+                continue;
+            }
+        };
+        if u64::try_from(bytes.len()).unwrap_or(u64::MAX) > w.persistent.max_entry_bytes {
+            diagnostics.push((at, "over_budget: entry exceeds max_entry_bytes".into()));
+            continue;
+        }
+        // A hint only: reads judge expiry from `created` and `ttl_ms`. Past
+        // the last representable time, the hint is that time.
+        let expires = w
+            .created
+            .checked_add(DurationMs(w.persistent.ttl_ms))
+            .unwrap_or_else(|_| {
+                Timestamp::from_ms(rustev_contract::time::MAX_TIMESTAMP_MS)
+                    .expect("the last representable time is a timestamp")
+            });
+        let terms = PutTerms {
+            scope: write.key.scope_id.clone(),
+            generations,
+            max_scope_bytes: w.persistent.max_scope_bytes,
+            max_namespace_bytes: w.persistent.max_namespace_bytes,
+            expires,
+        };
+        let key = &write.key;
+        let answer = crate::driver::store_call(w.rt, w.cancel, w.deadline, |call| {
+            w.store.put(&key.namespace, &key.id, bytes, terms, call)
+        })
+        .await;
+        match answer {
+            Ok(answer) => {
+                if let Some(d) = answer.diagnostic() {
+                    diagnostics.push((at, d.into()));
+                }
+            }
+            Err(failure) => diagnostics.push((at, format!("store_failed: {}", failure.detail))),
+        }
+    }
+    diagnostics
 }
 
 fn hex(bytes: &[u8]) -> String {

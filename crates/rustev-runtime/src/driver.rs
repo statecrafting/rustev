@@ -75,6 +75,9 @@ pub(crate) struct DecisionCtx<'a, 'e> {
     pub generation: Option<&'a Mutex<rustev_core::generation_eval::GenerationEvaluation<'e>>>,
     pub step_ledger: Option<&'a Ledger>,
     pub deferred_cache: Option<&'a Mutex<Vec<crate::generation::PendingWrite>>>,
+    /// The persistent tier's captured generations and queued writes, when
+    /// the plan enables it (spec 044, 3.4).
+    pub persistent: Option<&'a crate::store::Pending>,
     pub item_clock: Option<&'a crate::generation::ItemClock>,
     pub stream: Option<&'a crate::generation::RequestStream>,
     /// Present only on the live re-execution path (spec 026).
@@ -329,7 +332,7 @@ pub(crate) async fn run_requests(
                         diagnostics,
                         capability,
                     }),
-                    None => active.push(Box::pin(drive(cx, r, key, generation, diagnostics))),
+                    None => active.push(Box::pin(tiered(cx, r, key, generation, diagnostics))),
                 },
             }
         }
@@ -654,7 +657,10 @@ fn cache_lookup(cx: &DecisionCtx<'_, '_>, req: &SemanticRequest) -> CacheLookup 
     let Some(policy) = cx.optimization() else {
         return run;
     };
-    if policy.memory_cache.is_none() && policy.shared_calls.is_none() {
+    if policy.memory_cache.is_none()
+        && policy.shared_calls.is_none()
+        && policy.persistent_cache.is_none()
+    {
         return run;
     }
     // A live re-execution observes fresh backend work: no earlier
@@ -694,8 +700,8 @@ fn cache_lookup(cx: &DecisionCtx<'_, '_>, req: &SemanticRequest) -> CacheLookup 
         projection: &req.projection,
     });
     let generation = cx.rt.optimizer.generation(&key.namespace);
-    // Shared calls alone: the key is for the shared-call registry (spec 044,
-    // 3.3); there is no memory tier to read.
+    // No memory tier to read: the key is for the persistent tier or the
+    // shared-call registry (spec 044, 3.3).
     if policy.memory_cache.is_none() {
         return CacheLookup::Run {
             key: Some(key),
@@ -714,29 +720,15 @@ fn cache_lookup(cx: &DecisionCtx<'_, '_>, req: &SemanticRequest) -> CacheLookup 
                     vec![],
                 );
                 o.entry_id = Some(hit.entry_id);
-                o.source_attempt_id = Some(hit.source_attempt_id.clone());
                 o.age_ms = hit.age_ms;
-                return CacheLookup::Done(Box::new(RequestOutcome {
-                    step: req.step.clone(),
-                    instance: req.instance.clone(),
-                    supplied: Some(Supplied::Output(hit.output)),
-                    record: RequestRecord {
-                        screen: screen_record(cx, req).map(|mut screen| {
-                            screen.cache = ScreenCache::Hit {
-                                source_attempt: hit.source_attempt_id,
-                            };
-                            screen.units.basis = ScreenUnitBasis::CacheHit;
-                            screen
-                        }),
-                        step: req.step.clone(),
-                        instance: req.instance.clone(),
-                        result: RequestResult::Output { target: hit.target },
-                        attempts: vec![],
-                        transitions: vec![],
-                        optimization: Some(o),
-                    },
-                    cache: None,
-                }));
+                return CacheLookup::Done(Box::new(served(
+                    cx,
+                    req,
+                    o,
+                    hit.output,
+                    hit.target,
+                    hit.source_attempt_id,
+                )));
             }
             Ok(Err(_)) | Err(_) => "memory cache output failed request validation",
         },
@@ -772,6 +764,217 @@ fn cache_lookup(cx: &DecisionCtx<'_, '_>, req: &SemanticRequest) -> CacheLookup 
     }
 }
 
+/// A request served from a cache tier without dispatch: the stored output
+/// of `target`, attributed to its source attempt.
+fn served(
+    cx: &DecisionCtx<'_, '_>,
+    req: &SemanticRequest,
+    mut o: OptimizationRecord,
+    output: RawOutput,
+    target: u32,
+    source_attempt: String,
+) -> RequestOutcome {
+    o.source_attempt_id = Some(source_attempt.clone());
+    RequestOutcome {
+        step: req.step.clone(),
+        instance: req.instance.clone(),
+        supplied: Some(Supplied::Output(output)),
+        record: RequestRecord {
+            screen: screen_record(cx, req).map(|mut screen| {
+                screen.cache = ScreenCache::Hit { source_attempt };
+                screen.units.basis = ScreenUnitBasis::CacheHit;
+                screen
+            }),
+            step: req.step.clone(),
+            instance: req.instance.clone(),
+            result: RequestResult::Output { target },
+            attempts: vec![],
+            transitions: vec![],
+            optimization: Some(o),
+        },
+        cache: None,
+    }
+}
+
+/// The persistent tier, after the memory tier and before a shared call or
+/// dispatch (spec 044, 3.3): a validated entry is served and admitted to
+/// the memory tier; anything else runs the request, which may then be
+/// written at the end of the decision.
+async fn tiered(
+    cx: &DecisionCtx<'_, '_>,
+    req: SemanticRequest,
+    key: Option<RequestKey>,
+    generation: u64,
+    mut diagnostics: Vec<String>,
+) -> RequestOutcome {
+    if let (Some(pending), Some(k)) = (cx.persistent, key.as_ref()) {
+        match persistent_read(cx, pending, &req, k, generation).await {
+            Ok(out) => return out,
+            Err(diagnostic) => diagnostics.extend(diagnostic),
+        }
+    }
+    drive(cx, req, key, generation, diagnostics).await
+}
+
+/// One store call for a decision, bounded by its deadline and its
+/// cancellation (spec 044, 3.4.2): store time counts against the deadline.
+pub(crate) async fn store_call<'s, T>(
+    rt: &Inner,
+    cancel: &CancelSignal,
+    deadline: Instant,
+    call: impl FnOnce(
+        crate::store::StoreCall,
+    ) -> rustev_core::seams::BoxFuture<'s, Result<T, crate::store::StoreFailure>>,
+) -> Result<T, crate::store::StoreFailure> {
+    use crate::store::{StoreCall, StoreFailure};
+    let signal = cancel.child();
+    let mut work = call(StoreCall {
+        remaining_ms: Some(deadline.saturating_sub(rt.clock.now())),
+        cancel: signal.clone(),
+    });
+    let mut timer = rt.clock.sleep_until(deadline);
+    let failed = |detail: &str| StoreFailure {
+        detail: detail.into(),
+    };
+    match race(&mut work, cancel, &mut timer).await {
+        Raced::Done(r) => r,
+        Raced::Cancelled => {
+            signal.raise();
+            Err(failed("cancelled"))
+        }
+        Raced::Expired => {
+            signal.raise();
+            Err(failed("deadline"))
+        }
+    }
+}
+
+/// Read the request's entry and check it (3.4.3). `Ok` is the request's
+/// outcome without dispatch: a hit, or a refusal under `fail_closed`.
+/// `Err` holds the miss's diagnostic, if any; the store's generations are
+/// captured for a later write whenever the store answered.
+async fn persistent_read(
+    cx: &DecisionCtx<'_, '_>,
+    pending: &crate::store::Pending,
+    req: &SemanticRequest,
+    key: &RequestKey,
+    generation: u64,
+) -> Result<RequestOutcome, Option<String>> {
+    use crate::store::{Expected, read_entry};
+    use rustev_contract::optimization::StoreFailurePolicy;
+    let (Some(policy), Some(store)) = (cx.optimization(), cx.rt.store.as_ref()) else {
+        return Err(None);
+    };
+    let Some(persistent) = policy.persistent_cache.as_ref() else {
+        return Err(None);
+    };
+    let stored = store_call(cx.rt, cx.cancel, cx.deadline(), |call| {
+        store.get(&key.namespace, &key.scope_id, &key.id, call)
+    })
+    .await;
+    let stored = match stored {
+        Ok(stored) => stored,
+        Err(failure) => {
+            let detail = cut(&format!("store_failed: {}", failure.detail), DETAIL_BYTES);
+            if persistent.on_store_failure == StoreFailurePolicy::FailClosed
+                && policy.admission == OptimizationAdmission::Refuse
+            {
+                let b = Builder {
+                    screen: screen_record(cx, req),
+                    req,
+                    attempts: vec![],
+                    transitions: vec![],
+                    optimization: Some(observation(
+                        policy,
+                        OptimizationMechanism::PersistentCache,
+                        OptimizationOutcome::Refused,
+                        generation,
+                        vec![detail.clone()],
+                    )),
+                    cache: None,
+                };
+                return Ok(b.stop("store_failed", Unresolved::BackendUnavailable { detail }));
+            }
+            return Err(Some(detail));
+        }
+    };
+    pending.capture(&key.id, stored.generations);
+    let Some(bytes) = stored.bytes else {
+        return Err(Some("persistent cache miss".into()));
+    };
+    let miss = match read_entry(
+        &bytes,
+        Expected {
+            key,
+            generations: stored.generations,
+            now: cx.evaluation_time,
+        },
+    ) {
+        Ok(hit) => {
+            let valid = matches!(
+                cx.ev()
+                    .check_output(&req.step, &req.instance, &hit.payload.output),
+                Ok(Ok(()))
+            );
+            if valid && hit.payload.target == 0 {
+                let mut o = observation(
+                    policy,
+                    OptimizationMechanism::PersistentCache,
+                    OptimizationOutcome::Hit,
+                    generation,
+                    vec![],
+                );
+                o.entry_id = Some(key.id.clone());
+                o.age_ms = hit.age_ms;
+                // A persistent hit is admitted to the memory tier under its
+                // own bounds (3.3).
+                if let Some(memory) = policy.memory_cache.as_ref()
+                    && let Err(refusal) = cx.rt.optimizer.insert(
+                        memory,
+                        key.clone(),
+                        CacheWrite {
+                            output: hit.payload.output.clone(),
+                            source_attempt_id: hit.payload.source_attempt_id.clone(),
+                            target: hit.payload.target,
+                            captured_generation: generation,
+                            now: cx.now(),
+                        },
+                    )
+                {
+                    o.diagnose(cache_refusal_detail(refusal));
+                }
+                return Ok(served(
+                    cx,
+                    req,
+                    o,
+                    hit.payload.output,
+                    hit.payload.target,
+                    hit.payload.source_attempt_id,
+                ));
+            }
+            return Err(Some(
+                if valid {
+                    "persistent cache entry names a fallback target"
+                } else {
+                    "persistent cache output failed request validation"
+                }
+                .into(),
+            ));
+        }
+        Err(miss) => miss,
+    };
+    let mut diagnostic = miss.diagnostic().to_string();
+    if miss.deletes()
+        && let Err(failure) = store_call(cx.rt, cx.cancel, cx.deadline(), |call| {
+            store.delete(&key.namespace, &key.id, call)
+        })
+        .await
+    {
+        diagnostic = format!("{diagnostic}; store_failed: {}", failure.detail);
+    }
+    Err(Some(cut(&diagnostic, DETAIL_BYTES)))
+}
+
 /// Complete a request's optimization record and admit a validated output of
 /// the bound target to the memory cache. Only target 0's output is keyed by
 /// target 0's identity: a fallback's output is never cached (spec 017, 3.1).
@@ -805,6 +1008,21 @@ fn admit_to_cache(cx: &DecisionCtx<'_, '_>, out: &mut RequestOutcome) {
                 .push(write);
         }
         return;
+    }
+    if let (Some(pending), Some((key, _)), Some(Supplied::Output(raw)), Some(attempt)) = (
+        cx.persistent,
+        &out.cache,
+        &out.supplied,
+        out.record.attempts.last(),
+    ) && attempt.target == 0
+    {
+        pending.queue(crate::store::PendingWrite {
+            step: out.step.clone(),
+            instance: out.instance.clone(),
+            key: key.clone(),
+            output: raw.clone(),
+            source_attempt_id: attempt.attempt_id.clone(),
+        });
     }
     let (Some((key, generation)), Some(Supplied::Output(raw)), Some(memory), Some(attempt)) = (
         &out.cache,
@@ -1725,7 +1943,13 @@ pub(crate) async fn drive(
 ) -> RequestOutcome {
     let step = &cx.plan.steps[&req.step];
     let optimization = cx.optimization().map(|policy| {
-        let (mechanism, outcome) = if key.is_some() {
+        let persistent_only = policy.memory_cache.is_none() && policy.persistent_cache.is_some();
+        let (mechanism, outcome) = if key.is_some() && persistent_only {
+            (
+                OptimizationMechanism::PersistentCache,
+                OptimizationOutcome::Miss,
+            )
+        } else if key.is_some() {
             (
                 OptimizationMechanism::MemoryCache,
                 OptimizationOutcome::Miss,

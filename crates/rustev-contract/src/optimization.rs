@@ -191,6 +191,9 @@ pub enum OptimizationMechanism {
     /// The output of an attempt shared with concurrent equivalent requests
     /// (spec 044, 3.2.5).
     SharedCall,
+    /// The persistent request-level tier behind the host's store (spec
+    /// 044, 3.3 and 3.4).
+    PersistentCache,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]

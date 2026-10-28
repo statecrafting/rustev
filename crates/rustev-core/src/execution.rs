@@ -108,12 +108,6 @@ fn validate_optimization(policy: &OptimizationPolicy) -> Result<(), Refusal> {
             );
         }
     }
-    // A mechanism the runtime of this build does not run is refused rather
-    // than silently run independently (spec 017, 3.1); the persistent tier
-    // joins with its runtime increment of spec 044.
-    if policy.persistent_cache.is_some() {
-        return refuse(subject, "persistent_cache is not available in this build");
-    }
     Ok(())
 }
 
