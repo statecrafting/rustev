@@ -36,6 +36,7 @@ fn policy() -> rustev_contract::execution::ExecutionPolicy {
         }),
         shared_calls: None,
         persistent_cache: None,
+        decision_cache: None,
     });
     policy
 }

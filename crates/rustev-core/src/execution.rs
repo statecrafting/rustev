@@ -6,15 +6,16 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use rustev_contract::definition::{Definition, StepBody};
+use rustev_contract::definition::{Definition, Freshness, InputDecl, StepBody};
 use rustev_contract::descriptor::BackendDescriptor;
 use rustev_contract::execution::{
     AttemptTimeout, CostPolicy, Delay, ExecutionPolicy, MAX_ATTEMPTS_PER_TARGET, MAX_DELAY_MS,
     MAX_FALLBACKS,
 };
-use rustev_contract::optimization::OptimizationPolicy;
+use rustev_contract::optimization::{DecisionCachePolicy, DecisionCacheTier, OptimizationPolicy};
 use rustev_contract::plan::{
-    BoundCalibration, DeclaredExecution, FallbackBinding, PlanExecution, PlanStepDetail,
+    BoundCalibration, DeclaredExecution, FallbackBinding, PlanDecisionCache, PlanExecution,
+    PlanStepDetail,
 };
 use rustev_contract::{Identified, schema};
 
@@ -45,6 +46,7 @@ fn validate_optimization(policy: &OptimizationPolicy) -> Result<(), Refusal> {
         && policy.memory_cache.is_none()
         && policy.shared_calls.is_none()
         && policy.persistent_cache.is_none()
+        && policy.decision_cache.is_none()
     {
         return refuse(subject, "at least one optimization mechanism is enabled");
     }
@@ -403,7 +405,167 @@ pub(crate) fn validate(
         id,
         policy: policy.clone(),
         fallbacks,
+        decision_cache: None,
     })))
+}
+
+/// Validates a policy's `decision_cache` against the definition and derives
+/// the plan's key schema and refresh closure from its step graph (spec 044,
+/// 3.1, 3.5 and 3.6). `order` is the plan's step order and `deps` each
+/// step's base references; `v2` is a version 2 definition, whose plan is
+/// `rustev.plan/3`. Compile refusals are category 12 with the 3.9 code as
+/// the detail's first token.
+pub(crate) fn decision_cache(
+    policy: &ExecutionPolicy,
+    def: &Definition,
+    order: &[String],
+    deps: &BTreeMap<String, Vec<String>>,
+    v2: bool,
+) -> Result<Option<PlanDecisionCache>, Refusal> {
+    let Some(p) = policy
+        .optimization
+        .as_ref()
+        .and_then(|o| o.decision_cache.as_ref())
+    else {
+        return Ok(None);
+    };
+    let subject = "execution.optimization";
+    if !v2 {
+        return refuse(subject, "decision_cache requires rustev.plan/3");
+    }
+    let memory = p.tiers.contains(&DecisionCacheTier::Memory);
+    let persistent = policy
+        .optimization
+        .as_ref()
+        .is_some_and(|o| o.persistent_cache.is_some());
+    if p.tiers.is_empty()
+        || !p.tiers.is_sorted_by(|a, b| a < b)
+        || p.max_entry_bytes == 0
+        || p.ttl_ms == 0
+        || p.max_entries.is_some() != memory
+        || p.max_entries == Some(0)
+        || (p.tiers.contains(&DecisionCacheTier::Persistent) && !persistent)
+        || !unique(&p.volatile)
+    {
+        return refuse(
+            subject,
+            "decision_cache_bounds: decision cache tiers and bounds must be positive and internally consistent",
+        );
+    }
+    for v in &p.volatile {
+        match v.strip_prefix("step:") {
+            Some(id) => {
+                if !def.steps.iter().any(|s| {
+                    s.id == id && matches!(s.body, StepBody::Acquire(_) | StepBody::Widen(_))
+                }) {
+                    return refuse(
+                        subject,
+                        format!("volatile_unknown_source: {v:?} is not an acquisition step"),
+                    );
+                }
+            }
+            None => match def.inputs.iter().find(|i| &i.name == v) {
+                None => {
+                    return refuse(
+                        subject,
+                        format!("volatile_unknown_source: {v:?} is not an input"),
+                    );
+                }
+                Some(i) if i.freshness == Freshness::NotRequired => {
+                    return refuse(
+                        subject,
+                        format!("volatile_without_freshness: input {v:?} declares no freshness"),
+                    );
+                }
+                Some(_) => {}
+            },
+        }
+    }
+    // A dimension is named as an input is, and is not one (3.5 item 3).
+    if let Some(d) = p.key_dimensions.iter().enumerate().find_map(|(n, d)| {
+        (d.is_empty()
+            || d.contains(':')
+            || d.chars().any(char::is_whitespace)
+            || p.key_dimensions[..n].contains(d)
+            || def.inputs.iter().any(|i| &i.name == d))
+        .then_some(d)
+    }) {
+        return refuse(
+            subject,
+            format!("key_dimension_invalid: {d:?} is not a distinct dimension name"),
+        );
+    }
+    Ok(Some(PlanDecisionCache {
+        decision_key_schema: key_schema(&def.inputs, p),
+        refresh_closure: refresh_closure(order, deps, &p.volatile),
+    }))
+}
+
+/// The decision-level key's members in order (spec 044, 3.5 and 3.6.1):
+/// the request-level key's fixed members, then each key dimension as
+/// declared, then each non-volatile input in declaration order, whose
+/// snapshot entries the key digests.
+fn key_schema(inputs: &[InputDecl], p: &DecisionCachePolicy) -> Vec<String> {
+    let fixed = [
+        "plan_id",
+        "key_schema_version",
+        "cache_namespace_version",
+        "runtime_version",
+        "scope",
+        "profile",
+    ];
+    fixed
+        .into_iter()
+        .map(String::from)
+        .chain(p.key_dimensions.iter().map(|d| format!("dimension:{d}")))
+        .chain(
+            inputs
+                .iter()
+                .filter(|i| !p.volatile.contains(&i.name))
+                .map(|i| format!("input:{}", i.name)),
+        )
+        .collect()
+}
+
+/// Every step that is a volatile source or reads one directly or through
+/// another step, in plan order (spec 044, 3.6.2). Exact steps fall inside
+/// by the same rule; the closure still governs only external work, since
+/// exact steps are recomputed on every hit.
+fn refresh_closure(
+    order: &[String],
+    deps: &BTreeMap<String, Vec<String>>,
+    volatile: &[String],
+) -> Vec<String> {
+    let mut sources: BTreeSet<String> = volatile
+        .iter()
+        .map(|v| match v.strip_prefix("step:") {
+            Some(_) => v.clone(),
+            None => format!("input:{v}"),
+        })
+        .collect();
+    let mut closure = Vec::new();
+    // `order` is topological, so a step's dependencies are decided first.
+    for id in order {
+        let step = format!("step:{id}");
+        if sources.contains(&step) || deps[id].iter().any(|r| sources.contains(r)) {
+            sources.insert(step);
+            closure.push(id.clone());
+        }
+    }
+    closure
+}
+
+/// A mechanism the runtime of this build does not run is refused rather
+/// than silently run independently (spec 017, 3.1). The decision-result
+/// cache joins with spec 044's increment 5.
+pub(crate) fn available(execution: &PlanExecution) -> Result<(), Refusal> {
+    match execution {
+        PlanExecution::Declared(d) if d.decision_cache.is_some() => refuse(
+            "execution.optimization",
+            "decision_cache is not available in this build",
+        ),
+        _ => Ok(()),
+    }
 }
 
 fn rank_output(
@@ -422,6 +584,88 @@ mod tests {
     use super::*;
     use rustev_contract::execution::{FallbackPolicy, RetryPolicy, StepExecution};
     use rustev_contract::plan::Plan;
+
+    fn names(v: &[&str]) -> Vec<String> {
+        v.iter().map(|s| s.to_string()).collect()
+    }
+
+    /// Spec 044, 3.6.1: the fixed members, the dimensions as declared, then
+    /// every non-volatile input in declaration order.
+    #[test]
+    fn the_decision_key_schema_orders_its_members() {
+        use rustev_contract::definition::{ProvenanceClass, TypeDecl};
+        use rustev_contract::optimization::{DecisionCacheTier, RefreshFailurePolicy};
+        let input = |name: &str| InputDecl {
+            name: name.into(),
+            ty: TypeDecl::Bool,
+            provenance: vec![ProvenanceClass::SystemOfRecord],
+            freshness: Freshness::MaxAgeMs(1),
+            evidence: None,
+            on_disagreement: None,
+        };
+        let inputs = [input("price"), input("catalogue"), input("availability")];
+        let policy = DecisionCachePolicy {
+            tiers: vec![DecisionCacheTier::Memory],
+            max_entry_bytes: 1,
+            max_entries: Some(1),
+            ttl_ms: 1,
+            volatile: names(&["availability", "step:fetch"]),
+            key_dimensions: names(&["region", "catalogue_revision"]),
+            on_refresh_failure: RefreshFailurePolicy::Unresolved,
+        };
+        assert_eq!(
+            key_schema(&inputs, &policy),
+            names(&[
+                "plan_id",
+                "key_schema_version",
+                "cache_namespace_version",
+                "runtime_version",
+                "scope",
+                "profile",
+                "dimension:region",
+                "dimension:catalogue_revision",
+                "input:price",
+                "input:catalogue",
+            ])
+        );
+    }
+
+    /// Spec 044, 3.6.2: a step reading a volatile input or acquisition step
+    /// directly or through any other step is inside, in plan order; a step
+    /// reading only stable sources is outside.
+    #[test]
+    fn the_refresh_closure_follows_the_step_graph() {
+        let deps: BTreeMap<String, Vec<String>> = [
+            ("fetch", &["input:catalogue"][..]),
+            ("stable", &["input:catalogue"]),
+            ("live", &["input:availability"]),
+            ("joined", &["step:stable", "step:live"]),
+            ("pages", &["step:fetch"]),
+            ("judge", &["step:pages", "input:price"]),
+            ("unrelated", &["step:stable", "input:price"]),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), names(v)))
+        .collect();
+        let order = names(&[
+            "fetch",
+            "stable",
+            "live",
+            "joined",
+            "pages",
+            "judge",
+            "unrelated",
+        ]);
+        assert_eq!(
+            refresh_closure(&order, &deps, &names(&["availability"])),
+            names(&["live", "joined"])
+        );
+        assert_eq!(
+            refresh_closure(&order, &deps, &names(&["availability", "step:fetch"])),
+            names(&["fetch", "live", "joined", "pages", "judge"])
+        );
+        assert!(refresh_closure(&order, &deps, &[]).is_empty());
+    }
 
     #[test]
     fn missing_primary_generate_backend_is_refused() {

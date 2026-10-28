@@ -623,6 +623,7 @@ mod tests {
                 memory_cache: Some(memory(4096, 2, 2048, 2048)),
                 shared_calls: None,
                 persistent_cache: None,
+                decision_cache: None,
             },
         )
     }

@@ -395,6 +395,7 @@ fn production_preparation_refuses_a_development_gateway_fallback() {
             descriptor: descriptors()[0].id().unwrap(),
             output: OutputKind::Distribution,
         }],
+        decision_cache: None,
     }));
     // Keep only the fallback to prove that it is independently examined.
     plan.steps.clear();

@@ -50,6 +50,10 @@ pub struct RunRecord {
         length(min = 1, max = 4096)
     )]
     pub acquisitions: Option<Vec<crate::acquisition_record::AcquisitionRecord>>,
+    /// `rustev.run/3` only (spec 044, 3.6.6): omitted when the plan has no
+    /// decision-result cache.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decision_cache: Option<crate::optimization::DecisionCacheRecord>,
 }
 
 // `rustev.run/3` is `rustev.run/1` with its core member holding
@@ -112,6 +116,18 @@ impl RunRecord {
             }
             if pages.iter().map(|p| p.attempts.len()).sum::<usize>() > 4096 {
                 return Err(RunVersionError::Members("too many acquisition attempts"));
+            }
+        }
+        if let Some(d) = &self.decision_cache {
+            if self.schema != schema::RUN_V3 {
+                return Err(RunVersionError::Members(
+                    "decision_cache requires rustev.run/3",
+                ));
+            }
+            if d.diagnostics.len() > crate::optimization::MAX_OPTIMIZATION_DIAGNOSTICS {
+                return Err(RunVersionError::Members(
+                    "too many decision cache diagnostics",
+                ));
             }
         }
         let v2 = self.schema == schema::RUN_V2;

@@ -199,6 +199,7 @@ fn execution_notices_and_unsupported_capability() {
         id: policy.id().unwrap(),
         policy,
         fallbacks: vec![],
+        decision_cache: None,
     }));
     r.notices.clear();
     r.steps[1].detail = PlanStepDetail::Unsupported {

@@ -112,6 +112,23 @@ impl crate::Document for Plan {
                 message: "acquisitions require rustev.plan/3".into(),
             }));
         }
+        if let PlanExecution::Declared(d) = &doc.execution {
+            let declared = d
+                .policy
+                .optimization
+                .as_ref()
+                .is_some_and(|o| o.decision_cache.is_some());
+            if declared != d.decision_cache.is_some() {
+                return Err(DocumentError::Parse(ParseError::Schema {
+                    message: "decision_cache and its compiled parts appear together".into(),
+                }));
+            }
+            if declared && doc.schema != schema::PLAN_V3 {
+                return Err(DocumentError::Parse(ParseError::Schema {
+                    message: "decision_cache is a rustev.plan/3 member".into(),
+                }));
+            }
+        }
         if doc.schema != schema::PLAN_V3 && doc.screening.is_some() {
             return Err(DocumentError::Parse(ParseError::Schema {
                 message: "screening is a rustev.plan/3 member".into(),
@@ -200,6 +217,22 @@ pub struct DeclaredExecution {
     pub policy: ExecutionPolicy,
     /// Every runtime fallback target, by step in policy order, then position.
     pub fallbacks: Vec<FallbackBinding>,
+    /// Present exactly when the policy has `decision_cache`, and only in a
+    /// `rustev.plan/3` (spec 044, 3.1).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decision_cache: Option<PlanDecisionCache>,
+}
+
+/// What the compiler derives from a policy's `decision_cache` (spec 044,
+/// 3.6.1 and 3.6.2).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PlanDecisionCache {
+    /// The decision-level key's members, in order (3.6.1).
+    pub decision_key_schema: Vec<String>,
+    /// Every step that reads a volatile source directly or through another
+    /// step, in plan order (3.6.2).
+    pub refresh_closure: Vec<String>,
 }
 
 /// A runtime fallback target bound at compile time.

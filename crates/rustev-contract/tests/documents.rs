@@ -298,13 +298,107 @@ fn shared_and_persistent_members_round_trip_and_are_omitted_when_absent() {
     assert!(!serde_json::to_string(&r).unwrap().contains("shared\""));
 }
 
+/// Spec 044, 3.1 and 3.6.6: the policy and run record members of the
+/// decision-result cache round-trip, are omitted when absent, and the run
+/// record member is a `rustev.run/3` member.
 #[test]
-fn a_run_record_parses_under_record_limits() {
+fn decision_cache_members_round_trip_and_are_omitted_when_absent() {
+    use rustev_contract::canonical::canonical_value_bytes;
+    use rustev_contract::optimization::{
+        DecisionCacheRecord, OptimizationPolicy, RefreshFailurePolicy,
+    };
+    use rustev_contract::run::RunRecord;
+    let policy = serde_json::json!({
+        "admission": "refuse", "cache_namespace_version": 1,
+        "expiry": "injected_runtime_time", "key_schema_version": 1,
+        "decision_cache": {
+            "key_dimensions": ["catalogue_revision"], "max_entries": 8,
+            "max_entry_bytes": 1, "on_refresh_failure": "serve_cached_within_freshness",
+            "tiers": ["memory", "persistent"], "ttl_ms": 1,
+            "volatile": ["availability", "step:fetch"]}
+    });
+    let p: OptimizationPolicy = serde_json::from_value(policy.clone()).unwrap();
+    assert_eq!(
+        canonical_value_bytes(&serde_json::to_value(&p).unwrap()).unwrap(),
+        canonical_value_bytes(&policy).unwrap()
+    );
+    // An omitted refresh-failure policy is `unresolved` and is written.
+    let mut implied = policy.clone();
+    implied["decision_cache"]
+        .as_object_mut()
+        .unwrap()
+        .remove("on_refresh_failure");
+    let p: OptimizationPolicy = serde_json::from_value(implied).unwrap();
+    let c = p.decision_cache.as_ref().unwrap();
+    assert_eq!(c.on_refresh_failure, RefreshFailurePolicy::Unresolved);
+    assert!(serde_json::to_string(c).unwrap().contains("\"unresolved\""));
+    let mut bare = policy.clone();
+    bare.as_object_mut().unwrap().remove("decision_cache");
+    let p: OptimizationPolicy = serde_json::from_value(bare.clone()).unwrap();
+    assert_eq!(serde_json::to_value(&p).unwrap(), bare);
+    let mut unknown = policy.clone();
+    unknown["decision_cache"]["max_bytes"] = serde_json::json!(1);
+    assert!(serde_json::from_value::<OptimizationPolicy>(unknown).is_err());
+
+    let digest = |c: char| format!("sha256:{}", c.to_string().repeat(64));
+    let record = serde_json::json!({
+        "age_ms": 5, "diagnostics": ["refresh_failed"], "entry_id": "e",
+        "generations": {"namespace": 1, "scope": 2}, "mismatched": [2],
+        "on_refresh_failure": "serve_cached_within_freshness", "outcome": "refreshed",
+        "refreshed": [1], "reused": [0], "source_run_record": digest('a'),
+        "substituted": [{"entry_digest": digest('b'), "input": "availability"}]
+    });
+    let r: DecisionCacheRecord = serde_json::from_value(record.clone()).unwrap();
+    assert_eq!(serde_json::to_value(&r).unwrap(), record);
+    let bypassed =
+        serde_json::json!({"outcome": "bypassed", "diagnostics": ["key_dimension_missing"]});
+    let r: DecisionCacheRecord = serde_json::from_value(bypassed.clone()).unwrap();
+    assert_eq!(serde_json::to_value(&r).unwrap(), bypassed);
+
+    let base: RunRecord = RunRecord::parse(&run_record_bytes()).unwrap();
+    assert!(
+        !String::from_utf8(run_record_bytes())
+            .unwrap()
+            .contains("decision_cache")
+    );
+    for (schema, ok) in [("rustev.run/1", false), ("rustev.run/3", true)] {
+        let with = RunRecord {
+            schema: schema.into(),
+            decision_cache: Some(r.clone()),
+            ..base.clone()
+        };
+        let bytes = serde_json::to_vec(&with).unwrap();
+        match RunRecord::parse(&bytes) {
+            Ok(parsed) => assert!(ok && parsed == with, "{schema}"),
+            Err(e) => assert!(
+                !ok && e
+                    .to_string()
+                    .contains("decision_cache requires rustev.run/3"),
+                "{schema}: {e}"
+            ),
+        }
+    }
+    let mut noisy = r.clone();
+    noisy.diagnostics = vec!["d".into(); 9];
+    let over = RunRecord {
+        schema: "rustev.run/3".into(),
+        decision_cache: Some(noisy),
+        ..base
+    };
+    assert!(RunRecord::parse(&serde_json::to_vec(&over).unwrap()).is_err());
+}
+
+fn run_record_bytes() -> Vec<u8> {
+    serde_json::to_vec(&a_run_record()).unwrap()
+}
+
+fn a_run_record() -> rustev_contract::run::RunRecord {
     use rustev_contract::run::{
         CostMode, CostSummary, FinalCost, RecordedExecution, RunRecord, Termination, Timing,
     };
-    let record = RunRecord {
+    RunRecord {
         acquisitions: None,
+        decision_cache: None,
         schema: "rustev.run/1".into(),
         decision_id: "d-1".into(),
         plan_id: rustev_contract::ids::PlanId::parse(
@@ -333,7 +427,13 @@ fn a_run_record_parses_under_record_limits() {
         },
         remote_evidence: None,
         remote_evidence_truncated: false,
-    };
+    }
+}
+
+#[test]
+fn a_run_record_parses_under_record_limits() {
+    use rustev_contract::run::RunRecord;
+    let record = a_run_record();
     let bytes = serde_json::to_vec(&record).unwrap();
     assert_eq!(RunRecord::parse(&bytes).unwrap(), record);
 }
