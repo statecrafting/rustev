@@ -176,6 +176,18 @@ pub struct Decided {
     pub completion: Completion,
     pub record: Arc<RunRecord>,
     pub delivery: Delivery,
+    /// The decision-result cache entry the decision was served from, its
+    /// judgment recomputed by the core (spec 044, 3.6.6).
+    pub served_from_cache: Option<ServedFromCache>,
+}
+
+/// The entry a decision was served from (spec 044, 3.6.6), as its run
+/// record's `decision_cache` member names it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ServedFromCache {
+    pub entry_id: String,
+    /// The digest of the run record of the decision that wrote the entry.
+    pub source_run_record: rustev_contract::ids::ContentDigest,
 }
 
 /// What [`Runtime::decide_with_capture`] captured (spec 004, 5.3).
@@ -879,7 +891,26 @@ impl Runtime {
         req: DecisionRequest,
         cancel: &CancelSignal,
     ) -> Result<Decided, DecideError> {
-        self.run(plan, req, cancel, None, None, None, None).await
+        self.run(plan, req, cancel, None, None, None, None, &BTreeMap::new())
+            .await
+    }
+
+    /// [`Runtime::decide`] with the host's key dimensions (spec 044, 3.5
+    /// item 3): one scope handle per dimension the plan's
+    /// `decision_cache` declares. A decision missing a declared dimension,
+    /// or naming one the plan does not declare, is neither served from nor
+    /// admitted to the decision cache, and runs or is refused under the
+    /// policy's `admission`. A plan without the decision cache ignores
+    /// them.
+    pub async fn decide_keyed(
+        &self,
+        plan: &PreparedPlan,
+        req: DecisionRequest,
+        dimensions: &BTreeMap<String, rustev_contract::scope::Handle>,
+        cancel: &CancelSignal,
+    ) -> Result<Decided, DecideError> {
+        self.run(plan, req, cancel, None, None, None, None, dimensions)
+            .await
     }
 
     /// Run with a value-free observer. The ordinary entry point has no callbacks.
@@ -890,8 +921,17 @@ impl Runtime {
         cancel: &CancelSignal,
         observer: &dyn ProgressObserver,
     ) -> Result<Decided, DecideError> {
-        self.run(plan, req, cancel, None, None, Some(observer), None)
-            .await
+        self.run(
+            plan,
+            req,
+            cancel,
+            None,
+            None,
+            Some(observer),
+            None,
+            &BTreeMap::new(),
+        )
+        .await
     }
 
     /// Contained progress callback panics across this runtime's decisions.
@@ -935,6 +975,7 @@ impl Runtime {
                 None,
                 None,
                 streaming,
+                &BTreeMap::new(),
             )
             .await;
         let capture = match &result {
@@ -968,8 +1009,17 @@ impl Runtime {
         let (streaming, receiver) = generation::Streaming::new(plan, stream_buffer)?;
         Ok((
             async move {
-                self.run(plan, req, cancel, None, None, None, Some(&streaming))
-                    .await
+                self.run(
+                    plan,
+                    req,
+                    cancel,
+                    None,
+                    None,
+                    None,
+                    Some(&streaming),
+                    &BTreeMap::new(),
+                )
+                .await
             },
             receiver,
         ))
@@ -985,6 +1035,7 @@ impl Runtime {
         live: Option<&live::LiveCtx<'_>>,
         observer: Option<&dyn ProgressObserver>,
         streaming: Option<&generation::Streaming>,
+        dimensions: &BTreeMap<String, rustev_contract::scope::Handle>,
     ) -> Result<Decided, DecideError> {
         let i = &*self.inner;
         // The runtime waits on its own child of the caller's signal, so a
@@ -1058,6 +1109,15 @@ impl Runtime {
             .and_then(|o| o.persistent_cache.as_ref())
             .filter(|_| i.store.is_some() && live.is_none());
         let mut pending = store::Pending::default();
+        // The decision-result cache reads its tier after admission and
+        // before the core starts (spec 044, 3.6.3).
+        let decision = optimization::decision::DecisionRun::start(
+            &i.optimizer,
+            plan,
+            &req,
+            dimensions,
+            live.is_some(),
+        );
         let has_generation = compiled
             .plan
             .steps
@@ -1081,12 +1141,30 @@ impl Runtime {
                 item_clock: None,
                 deferred_cache: has_generation.then_some(&deferred_cache),
                 persistent: persistent.map(|_| &pending),
+                decision: decision.as_ref(),
                 live,
                 observing: observing.as_ref(),
             };
             driver::run_requests(&cx, capture.as_deref_mut()).await
         };
         let ev = ev.into_inner().unwrap_or_else(|e| e.into_inner());
+        // A volatile input the core did not accept from the new snapshot is
+        // a failed refresh (spec 044, 3.6.5).
+        let decision_policy = plan
+            .optimization
+            .as_ref()
+            .and_then(|o| o.decision_cache.as_ref());
+        let unresolved_volatile: Vec<String> = decision_policy
+            .filter(|_| decision.as_ref().is_some_and(|d| d.hit.is_some()))
+            .map(|p| {
+                p.volatile
+                    .iter()
+                    .filter(|v| !v.starts_with("step:"))
+                    .filter(|v| ev.status_of(&format!("input:{v}")).is_err())
+                    .cloned()
+                    .collect()
+            })
+            .unwrap_or_default();
         let stage_cx = generation::StageContext {
             rt: i,
             plan,
@@ -1101,6 +1179,7 @@ impl Runtime {
         };
         let mut text_result = None;
         let mut writes = vec![];
+        let mut judged = false;
         // Spec 037 3.13.1 permits Complete only after final verification and
         // defines no failure event. Both cancellation paths close the stream
         // without Complete: cancellation has no text result (3.12.6).
@@ -1177,6 +1256,7 @@ impl Runtime {
                     .into_inner()
                     .unwrap_or_else(|e| e.into_inner());
                 writes.extend(pending_writes);
+                judged = true;
                 (
                     Completion::Judged(Box::new(judgment)),
                     CoreEvidence::Recorded(Box::new(evidence)),
@@ -1194,9 +1274,31 @@ impl Runtime {
         } else {
             (None, false)
         };
+        // A judged miss may be admitted once its record exists, since the
+        // entry names the record's digest (spec 044, 3.6.4).
+        let admission = match (&decision, decision_policy) {
+            (Some(d), Some(policy)) if judged => match d.admissible(&requests, policy) {
+                Ok(admit) => admit,
+                Err(diagnostic) => {
+                    d.diagnose(diagnostic);
+                    None
+                }
+            },
+            _ => None,
+        };
+        let served_from_cache =
+            decision
+                .as_ref()
+                .and_then(|d| d.hit.as_ref())
+                .map(|hit| ServedFromCache {
+                    entry_id: hit.entry_id.clone(),
+                    source_run_record: hit.entry.source_run_record.clone(),
+                });
         let mut record = RunRecord {
             acquisitions: (!acquisitions.is_empty()).then_some(acquisitions),
-            decision_cache: None,
+            decision_cache: decision
+                .as_ref()
+                .map(|d| d.record(&requests, &unresolved_volatile)),
             // A plan 3 decision's record holds evidence 2 (spec 032, 3.10.3).
             schema: if plan_3 {
                 schema::RUN_V3
@@ -1232,11 +1334,32 @@ impl Runtime {
         match delivery {
             Ok(delivery) => {
                 generation::write_cache(&stage_cx, writes);
+                if let (Some(d), Some(policy), Some((key, requests)), Ok(source)) = (
+                    &decision,
+                    decision_policy,
+                    admission,
+                    rustev_contract::Document::record_digest(&*record),
+                ) {
+                    // A refused admission (a generation advanced, or an
+                    // equal digest over other material) is a miss for the
+                    // next decision; this record is already delivered.
+                    let _ = i.optimizer.insert_decision(
+                        policy,
+                        key,
+                        optimization::decision::DecisionEntry {
+                            requests,
+                            source_run_record: source,
+                            created: req.evaluation_time,
+                        },
+                        d.generation,
+                    );
+                }
                 Ok(Decided {
                     text_result,
                     completion,
                     record,
                     delivery,
+                    served_from_cache,
                 })
             }
             Err(failure) => Err(DecideError::EvidenceNotDelivered { record, failure }),

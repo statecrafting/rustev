@@ -1297,6 +1297,96 @@ Tests: the unit tests in the `decision` module of `optimization.rs`.
   namespace's invalidation and a capture from before one.
 - The spec 017 tests are unchanged.
 
+**Increment 5, part b (2026-10-28): serving and admitting decisions from
+the memory tier.** The compiler accepts a `decision_cache` whose only
+tier is `memory` and whose `on_refresh_failure` is `unresolved`, over a
+plan with no acquisition, widening, generation or extraction step.
+Anything else validates and is then refused as `decision_cache <part> is
+not available in this build`, so no plan enables what the runtime would
+ignore (017 3.1). Parts c to e lift those refusals.
+
+What part b adds:
+- `Runtime::decide_keyed` takes the request and its key dimensions, one
+  scope `Handle` per declared dimension; the other entry points supply
+  none.
+- `DecisionRun` in the `decision` module of
+  `crates/rustev-runtime/src/optimization.rs` derives the key, reads the
+  tier before the core starts, writes the run record member (3.6.6) and
+  decides admission (3.6.4).
+- `from_decision` in `crates/rustev-runtime/src/driver.rs` serves a hit
+  (3.6.3). A request inside the closure is dispatched. One outside it is
+  supplied the entry's output when its 017 key equals the stored one and
+  the output passes request validation; otherwise it alone is dispatched
+  with `closure_mismatch`. The core recomputes the judgment in every case.
+- `Decided.served_from_cache` names the entry and the source run record.
+- `OptimizationMechanism` gains `decision_cache`, the mechanism of a
+  request supplied from an entry or refused with its decision; the
+  schemas and Node and WebAssembly declarations are regenerated.
+
+Decisions within the spec:
+- **`hit` and `refreshed` follow what was dispatched again.** 3.6.6
+  defines `hit` by an empty closure and `refreshed` by a request
+  dispatched again. They disagree for a closure that holds only exact
+  steps, or steps the core does not request. Exact steps are recomputed,
+  never dispatched, and 3.6.2 says the closure governs external work. So
+  a decision that dispatched nothing again is `hit`.
+- **A refused decision still judges.** Under `admission: refuse`, each
+  request of an unkeyed decision is refused without dispatch, as 017
+  refuses one request: mechanism `decision_cache`, outcome `refused`,
+  and `backend_unavailable` with the diagnostic. The core still judges
+  over them, so a run record exists that says `refused`.
+- **An entry is admitted only after its run record is delivered**,
+  because the entry names that record's digest, as the generation
+  stage's deferred cache writes do. Admission uses the generation
+  captured when the decision started. The miss record carries the
+  admission diagnostics known before delivery: a request without a
+  validated target 0 output, or an entry over `max_entry_bytes`. A
+  generation that advances before the insert leaves only a miss for the
+  next decision. A served decision is never admitted.
+- **The `decision_cache` member counts as a #76 construct** for
+  `use_definition_1` in `crates/rustev-core`. 3.1 makes a plan using it
+  `rustev.plan/3`, yet a version 2 definition whose only #76 construct
+  was the member was refused `use_definition_1`, and as version 1 it is
+  refused as requiring `rustev.plan/3`. This closes a gap left by
+  increment 2, part b.
+- **Live re-execution is `bypassed`** under any `admission`, since it
+  observes fresh backend work (spec 026, 3.4), as the request-level
+  tiers bypass it.
+- **A reused request records its origin.** Its record has no attempt,
+  and its optimization record has mechanism `decision_cache`, outcome
+  `hit`, the entry id, the age and the source attempt. So
+  `supplied_from` names the original attempt, which replay takes as the
+  origin, and the request has no new charge.
+- **A failed refresh under `unresolved`** is a volatile input the core
+  did not accept from the new snapshot, or a refreshed request that
+  failed or was not supplied. The failure is supplied as it is. The
+  record carries `on_refresh_failure: unresolved` and the diagnostic
+  `refresh_failed` naming each one.
+- **A reused output the core does not validate** is dispatched as a
+  `closure_mismatch`, with a diagnostic saying so.
+
+Tests:
+- `crates/rustev-runtime/tests/decision_cache.rs` covers a repeated
+  decision served with nothing dispatched and its reused origins and
+  charges, a changed volatile input refreshing its closure, a moved
+  request key outside the closure, a missing key dimension under both
+  admissions, two tenants, expiry by evaluation time and invalidation, an
+  invalidation during the decision, a failed request outside the
+  closure, and a failed refresh under `unresolved`. Every served judgment
+  and its core evidence are compared with independent execution of the
+  same request on a fresh runtime (3.6.3 item 3).
+- `decision_cache_members_are_validated_and_unrun_parts_refused` in
+  `crates/rustev-core/tests/execution.rs`, formerly
+  `decision_cache_members_are_validated_then_refused_as_unavailable`,
+  shows a memory tier accepted and part of `PlanId`, and the persistent
+  tier and the other refresh policies refused.
+  `a_decision_cache_over_generation_steps_is_not_available` in
+  `crates/rustev-core/tests/generation_compile.rs` covers a step kind.
+- `decision_cache_alone_carries_a_version_2_definition` in
+  `crates/rustev-core/tests/execution.rs` covers the `use_definition_1`
+  fix and the same definition refused without the member.
+- The spec 017 tests and increments 2 to 4's tests are unchanged.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

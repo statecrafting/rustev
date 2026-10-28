@@ -247,6 +247,9 @@ pub enum OptimizationMechanism {
     /// The persistent request-level tier behind the host's store (spec
     /// 044, 3.3 and 3.4).
     PersistentCache,
+    /// A request supplied from a decision-result cache entry, or refused
+    /// with its decision (spec 044, 3.6.3 and 3.6.6).
+    DecisionCache,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]

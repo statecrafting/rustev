@@ -571,6 +571,7 @@ async fn request(
         // queue. Generation returns its pending write to the delivery gate.
         deferred_cache: None,
         persistent: None,
+        decision: None,
         live: None,
     };
     let mut cache = None;
