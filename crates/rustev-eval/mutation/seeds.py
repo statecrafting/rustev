@@ -41,7 +41,7 @@ REQUIRED = [
 # run them a second time in CI; `seeds.sh "spec 023"`, `live-comparison` and
 # `"spec 029"` still run and require every one. A spec whose acceptance
 # starts filtering its own seeds joins this list.
-OWN_RUNS = ("spec 023", "live-comparison", "spec 029", "spec 040", "spec 035", "spec 036", "spec 037")
+OWN_RUNS = ("spec 023", "live-comparison", "spec 029", "spec 040", "spec 035", "spec 036", "spec 037", "spec 041")
 # Generous: a new test binary can wait on the OS before it starts.
 TEST_TIMEOUT_S = 1800
 
@@ -622,6 +622,79 @@ SEEDS += [
         "        if let Some(reason) = reason {\n            // A screening verdict is terminal",
         "        if let Some(reason) = reason.filter(|_| false) {\n            // A screening verdict is terminal",
         ["rustev-core", "rustev-runtime"],
+    ),
+]
+
+
+# Spec 041 Acceptance: one seed for each listed defect, each detected by the
+# eval tests that own the affected rule.
+SEEDS += [
+    (
+        "spec 041",
+        "an unjudged item counted as non-relevant",
+        E + "ranking_metrics.rs",
+        ".filter_map(|e| gold.get(&e.id).copied())",
+        ".map(|e| gold.get(&e.id).copied().unwrap_or(0))",
+        EVAL,
+    ),
+    (
+        "spec 041",
+        "an off-by-one discount index",
+        E + "ranking_metrics.rs",
+        "                dcg += rel.gain.of(*g) * discount(i + 1);\n            }\n            let mut ideal",
+        "                dcg += rel.gain.of(*g) * discount(i + 2);\n            }\n            let mut ideal",
+        EVAL,
+    ),
+    (
+        "spec 041",
+        "a short list padded with non-relevant items",
+        E + "ranking_metrics.rs",
+        "RankingMetric::Precision(_) => mean(hits as f64 / condensed.len() as f64),",
+        "RankingMetric::Precision(k) => mean(hits as f64 / (condensed.len() + (k as usize).saturating_sub(read)) as f64),",
+        EVAL,
+    ),
+    (
+        "spec 041",
+        "an unknown attribute counted as failing",
+        E + "measured.rs",
+        "(None, _) => Err(UNKNOWN_ATTRIBUTE),",
+        "(None, _) => Ok(false),",
+        EVAL,
+    ),
+    (
+        "spec 041",
+        "an invalid score clamped",
+        E + "scores.rs",
+        "ScoreOutcome::Score(v) if score_ok(&d.output, v) => ScoreOutcome::Score(v),",
+        "ScoreOutcome::Score(v) if v.is_finite() => ScoreOutcome::Score(match &d.output {\n"
+        "            ScorerOutput::Ordinal { levels } => v.round().clamp(0.0, (levels.len() - 1) as f64),\n"
+        "            ScorerOutput::Bounded { min, max } => v.clamp(min.to_f64_nearest(), max.to_f64_nearest()),\n"
+        "        }),",
+        EVAL,
+    ),
+    (
+        "spec 041",
+        "a model metric pooled into a deterministic one",
+        E + "measured.rs",
+        "        if is_model {\n            model.push(m);\n        } else {\n            deterministic.push(m);\n        }",
+        "        deterministic.push(m);",
+        EVAL,
+    ),
+    (
+        "spec 041",
+        "the measures digest left out of the configuration identity",
+        E + "config.rs",
+        '#[serde(default, skip_serializing_if = "Option::is_none")]\n    pub measures',
+        "#[serde(default, skip_serializing)]\n    pub measures",
+        EVAL,
+    ),
+    (
+        "spec 041",
+        "an opaque scorer passing a gate",
+        E + "report.rs",
+        ".is_some_and(|(_, opaque)| *opaque)",
+        ".is_some_and(|_| false)",
+        EVAL,
     ),
 ]
 

@@ -1087,6 +1087,50 @@ Tests:
   covers throwing, rejecting, out-of-output, queue-full, late, cancelled
   and gold-withholding scorers (section 5) and each refused declaration.
 
+**Increment 9, part a (2026-10-28): mutation seeds and the spec 029
+integration.** Increment 9 is split: part a lands the seeds and the spec
+029 integration test; part b, later, adds the declared verification, the
+acceptance mapping and closure. `crates/rustev-eval/mutation/seeds.py`
+gains one seed per defect the acceptance lists, labelled `spec 041`: an
+unjudged item kept in the condensed list as grade 0, the DCG discount
+read one position late, `precision@k` divided by k for a short list,
+an unknown attribute counted as a failed item, a score outside the
+output clamped into it, a model rubric metric reported with the
+deterministic ones, the adapter `measures` member left out of the
+configuration's canonical bytes, and a gate that never finds an opaque
+scorer. `seeds.sh "spec 041"` runs them, and each is detected by the
+existing 041 tests or the new one. The test
+`version_3_repeat_sets_reconcile_and_select` in
+`crates/rustev-eval/tests/reports.rs` evaluates the lodging cohort under
+a version 3 configuration with `ndcg@10` among every ranking metric
+form, both constraint aggregates, a deterministic and a judge rubric
+metric, and two agreements with human labels. A two-run replay repeat set
+over it reconciles, pools each new case-decomposable metric to the
+report's own bits with a bootstrap interval, and gives each `qwk`
+across-run values with an unknown interval and pooled value
+(`not-case-decomposable`). A selection gate over
+`ranking/offers/ndcg@10` and `model/rubric/judged` qualifies on the same
+judge levels, rejects a lower one beyond the zero replay band, and is
+unknown, with the ranking clause still passing, when the judge's rules
+are `opaque` (3.12.2). Decisions within the spec:
+- `spec 041` joins `OWN_RUNS`, so spec 004's unfiltered run leaves these
+  seeds out and part b's declared verification runs them under their own
+  filter, as spec 023's do.
+- The integration test lives in `reports.rs`, beside the other version 3
+  tests, whose lodging cohort, bundles and configuration helpers it
+  reuses. Its cohort has no excluded case: spec 029 makes an interval
+  unknown when any resample holds no measured case, so an excluded case in
+  a cohort this small would leave the intervals unknown by chance.
+- The candidate is the same lodging plan evaluated in the candidate role,
+  so the ranking metrics are equal and the judge's levels decide the
+  verdict.
+
+Tests:
+- `version_3_repeat_sets_reconcile_and_select` in
+  `crates/rustev-eval/tests/reports.rs`.
+- `bash crates/rustev-eval/mutation/seeds.sh "spec 041"`: every seed
+  detected.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child faithfully

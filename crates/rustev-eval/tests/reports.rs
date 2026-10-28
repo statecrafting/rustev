@@ -3462,3 +3462,407 @@ async fn version_3_gates_refuse_opaque_scorers_and_other_measures() {
         GateResult::Unknown { reason } if reason.contains("adapter measures digests differ")
     ));
 }
+
+/// Lodging with the measures of the spec 029 integration: `ndcg@10` among
+/// every ranking metric form, and both constraint aggregates.
+struct LodgingAtTen;
+
+impl TaskAdapter for LodgingAtTen {
+    fn adapter(&self) -> AdapterRef {
+        Lodging.adapter()
+    }
+    fn rules(&self) -> AdapterRules {
+        Lodging.rules()
+    }
+    fn check_label(&self, label: &str) -> Result<(), String> {
+        Lodging.check_label(label)
+    }
+    fn correct(&self, action: &str, params: &BTreeMap<String, OutValue>, label: &str) -> bool {
+        Lodging.correct(action, params, label)
+    }
+}
+
+impl rustev_eval::measures::MeasuredAdapter for LodgingAtTen {
+    fn measures(&self) -> rustev_eval::measures::Measures {
+        serde_json::from_value(json!({
+            "rankings": [{"name": "offers", "param": "ranking", "relevant_at_least": 2,
+                          "gain": "exponential",
+                          "metrics": ["precision@2", "recall@3", "ndcg@10", "hit@1",
+                                      "mrr", "mrr@2"],
+                          "backfill_positions": 0}],
+            "constraints": [
+                {"name": "usd", "ranking": "offers", "k": 2, "attribute": "currency",
+                 "test": "equals", "against": {"value": "USD"}, "aggregate": "share_at_k"},
+                {"name": "usd_all", "ranking": "offers", "k": 3, "attribute": "currency",
+                 "test": "equals", "against": {"value": "USD"}, "aggregate": "all_at_k"}
+            ],
+            "fields": []
+        }))
+        .unwrap()
+    }
+}
+
+/// A test scorer answering a fixed level index per case.
+struct ByCase {
+    descriptor: rustev_eval::scoring::ScorerDescriptor,
+    levels: BTreeMap<&'static str, f64>,
+}
+
+impl rustev_eval::scores::Scorer for ByCase {
+    fn descriptor(&self) -> &rustev_eval::scoring::ScorerDescriptor {
+        &self.descriptor
+    }
+    fn score(
+        &self,
+        case: &rustev_eval::scores::CaseView,
+        _: &rustev_eval::scores::ProposalView,
+    ) -> rustev_eval::scores::ScoreOutcome {
+        use rustev_eval::scores::ScoreOutcome;
+        self.levels
+            .get(case.id.as_str())
+            .map_or(ScoreOutcome::Unscored("no_level".into()), |v| {
+                ScoreOutcome::Score(*v)
+            })
+    }
+}
+
+/// Spec 041, 3.11 and 3.12.2 (acceptance, spec 029 integration): a replay
+/// repeat set over a version 3 configuration reconciles every new metric
+/// bit for bit, gives each case-decomposable one a bootstrap interval and
+/// `qwk` `not-case-decomposable`, and a selection gate over
+/// `ranking/offers/ndcg@10` and `model/rubric/judged` qualifies, rejects,
+/// and is unknown when the judge's rules are opaque.
+#[tokio::test(flavor = "current_thread")]
+async fn version_3_repeat_sets_reconcile_and_select() {
+    use rustev_eval::comparison::{NamedCandidate, RepeatEvidence};
+    use rustev_eval::measured::Measured;
+    use rustev_eval::measures::MeasuredAdapter;
+    use rustev_eval::report::{Candidate, evaluate_measured_with_cases, evaluate_views};
+    use rustev_eval::scores::score_views;
+    use rustev_eval::selection::{ClauseOutcome, SelectionGate, Verdict, evaluate_selection};
+    let probe = Probe::passing(lodging_rules());
+    let three = || {
+        vec![
+            candidate("c-1", "120", "USD", 2, true),
+            candidate("c-2", "90", "EUR", 4, false),
+            candidate("c-3", "250", "USD", 2, true),
+        ]
+    };
+    let claims = || vec![claim("k-1", "verified", "preference", NOW + DAY)];
+    let case = |id, snapshot, label| Case {
+        id,
+        snapshot,
+        label,
+        subgroups: vec![],
+        split: Split::FinalTest,
+        keep: Keep::Embedded,
+    };
+    let two = vec![
+        candidate("c-1", "120", "USD", 2, true),
+        candidate("c-2", "90", "EUR", 4, false),
+    ];
+    let cases = vec![
+        case(
+            "s-01",
+            lodging_snapshot(true, three(), claims()),
+            Some("c-2"),
+        ),
+        case("s-03", lodging_snapshot(true, two, claims()), Some("c-1")),
+        case("s-04", lodging_snapshot(true, three(), vec![]), None),
+    ];
+    let p = probe.clone();
+    let bundles = bundles(&probe, || lodging_fixture(&p, &unlimited()), &cases).await;
+    let mut manifest = manifest("lodging repeated", Lodging.adapter(), &cases);
+    manifest.schema = rustev_eval::dataset::DATASET_V2.into();
+    for (c, rating) in manifest.cases.iter_mut().zip(["high", "low", "low"]) {
+        c.gold = Some(
+            serde_json::from_value(json!({
+                "relevance": {"c-1": 2, "c-2": 3, "c-3": 0},
+                "items": {"c-1": {"currency": "USD"}, "c-2": {"currency": "EUR"},
+                          "c-3": {"currency": "USD"}},
+                "rubric": {"rater": rating}
+            }))
+            .unwrap(),
+        );
+    }
+    let levels = json!({"ordinal": {"levels": ["low", "mid", "high"]}});
+    let tone = scorer_descriptor(json!({
+        "id": "tone", "version": "1", "kind": "deterministic", "output": levels,
+        "rules": {"bound": rules_digest("tone rules").to_string()}, "reads_gold": false
+    }));
+    let judge_with = |rules: serde_json::Value| {
+        scorer_descriptor(json!({
+            "id": "judge", "version": "1", "kind": "model", "output": levels,
+            "rules": rules, "reads_gold": false,
+            "judge": {"plan": rules_digest("judge plan").to_string(), "artifacts": [],
+                      "level_param": "level", "subject_field": "subject"}
+        }))
+    };
+    let v3_with = |judge: &rustev_eval::scoring::ScorerDescriptor| {
+        let mut c = config(&Lodging, &["ranking"], None);
+        c.schema = rustev_eval::config::EVALUATOR_CONFIG_V3.into();
+        c.adapter.measures = Some(LodgingAtTen.measures().digest().unwrap());
+        c.scorers = Some(vec![tone.clone(), judge.clone()]);
+        c.rubric_metrics = Some(
+            serde_json::from_value(json!([
+                {"name": "judged", "scorer": "judge", "aggregate": "mean_level_index"},
+                {"name": "tone_high", "scorer": "tone", "aggregate": {"share_at_least": "high"}}
+            ]))
+            .unwrap(),
+        );
+        c.human_scales = Some(vec![rustev_eval::scoring::HumanScale {
+            name: "rater".into(),
+            levels: vec!["low".into(), "mid".into(), "high".into()],
+        }]);
+        c.agreements = Some(
+            serde_json::from_value(json!([
+                {"name": "tone", "a": "tone", "b": "human:rater"},
+                {"name": "judge", "a": "judge", "b": "human:rater"}
+            ]))
+            .unwrap(),
+        );
+        c.origin = Some(vec![]);
+        for name in ["ranking", "constraint", "rubric", "agreement", "model"] {
+            c.metrics.push(MetricFormula {
+                name: name.into(),
+                formula: "spec 041".into(),
+            });
+        }
+        c
+    };
+    let bound = v3_with(&judge_with(
+        json!({"bound": rules_digest("judge rules").to_string()}),
+    ));
+    let opaque = v3_with(&judge_with(json!("opaque")));
+    let fixture = lodging_fixture(&probe, &unlimited());
+    let bundle_inputs = inputs_of(&bundles);
+    let replay = config_for(&scope());
+    // One evaluation with its case measures: the views computed, scored by
+    // the tone scorer and by a judge answering `judged`, then evaluated.
+    let evaluated = |config: &EvaluatorConfig, as_candidate: bool, judged: [f64; 3]| {
+        let inputs = Inputs {
+            manifest: &manifest,
+            split: Split::FinalTest,
+            config,
+            adapter: &LodgingAtTen,
+            bundles: &bundle_inputs,
+            resolver: &NoExternal,
+            replay: &replay,
+            candidate: as_candidate.then_some(Candidate {
+                plan: &fixture.compiled,
+                calibrations: &[],
+            }),
+        };
+        let unscored = Measured {
+            adapter: &LodgingAtTen,
+            scores: &[],
+        };
+        let views = evaluate_views(&inputs, unscored).unwrap();
+        let ids = ["s-01", "s-03", "s-04"];
+        let by_case = |descriptor: &rustev_eval::scoring::ScorerDescriptor, v: [f64; 3]| {
+            score_views(
+                &ByCase {
+                    descriptor: descriptor.clone(),
+                    levels: ids.into_iter().zip(v).collect(),
+                },
+                &views,
+            )
+            .unwrap()
+        };
+        let judge = &config.scorers.as_ref().unwrap()[1];
+        let scores = [by_case(&tone, [2.0, 0.0, 1.0]), by_case(judge, judged)];
+        evaluate_measured_with_cases(
+            &inputs,
+            Measured {
+                adapter: &LodgingAtTen,
+                scores: &scores,
+            },
+            None,
+        )
+        .unwrap()
+    };
+    let repeat_config = repeat_config(json!({ "k_sd": { "k": "2" } }), json!([]));
+    let repeated = |set: &(Evaluated, EvalCases)| {
+        let runs = [Run {
+            evaluated: &set.0,
+            cases: &set.1,
+        }; 2];
+        repeat(&RepeatInputs {
+            source: Source::Replay,
+            config: &repeat_config,
+            manifest: &manifest,
+            runs: &runs,
+        })
+        .unwrap()
+    };
+
+    // The repeat set: every new metric measured, reconciled, and pooled to
+    // the report's own bits; an interval for each case-decomposable one,
+    // `not-case-decomposable` for `qwk`.
+    let base = evaluated(&bound, false, [2.0, 1.0, 0.0]);
+    reconcile(&base.0, &base.1).unwrap();
+    let report = repeated(&base);
+    let all = cohort(&report, "all");
+    let n = evaluate(&Inputs {
+        manifest: &manifest,
+        split: Split::FinalTest,
+        config: &config(&Lodging, &["ranking"], None),
+        adapter: &Lodging,
+        bundles: &bundle_inputs,
+        resolver: &NoExternal,
+        replay: &replay,
+        candidate: None,
+    })
+    .unwrap()
+    .report
+    .metrics
+    .len();
+    let new: Vec<&rustev_contract::eval_report::Metric> =
+        base.0.report.metrics[n..].iter().collect();
+    let names: Vec<&str> = new.iter().map(|m| m.name.as_str()).collect();
+    for expected in [
+        "ranking/offers/ndcg@10",
+        "constraint/usd",
+        "constraint/usd_all",
+        "rubric/tone_high",
+        "agreement/tone/qwk",
+        "model/rubric/judged",
+        "model/agreement/judge/mean_abs_diff",
+        "model/agreement/judge/qwk",
+    ] {
+        assert!(names.contains(&expected), "{expected} in {names:?}");
+    }
+    // Every `model/` metric after every deterministic one (3.2.4).
+    let first_model = names.iter().position(|m| m.starts_with("model/")).unwrap();
+    assert!(names[first_model..].iter().all(|m| m.starts_with("model/")));
+    for m in &new {
+        let MetricValue::Measured { value, .. } = m.value else {
+            panic!("{}: {:?}", m.name, m.value);
+        };
+        let r = metric_of(all, &m.name);
+        if m.name.ends_with("/qwk") {
+            assert_eq!(form_in_cases(&m.name, &base.1), None, "{}", m.name);
+            assert_eq!(
+                r.interval,
+                IntervalDoc::Unknown {
+                    reason: "not-case-decomposable".into(),
+                    undefined: 0
+                },
+                "{}",
+                m.name
+            );
+            assert_eq!(r.pooled, FigureDoc::Unknown("not-case-decomposable".into()));
+            assert_eq!(r.runs, [FigureDoc::Value(value), FigureDoc::Value(value)]);
+        } else {
+            assert!(form_in_cases(&m.name, &base.1).is_some(), "{}", m.name);
+            assert!(
+                matches!(r.interval, IntervalDoc::Bounds { .. }),
+                "{}: {:?}",
+                m.name,
+                r.interval
+            );
+            let FigureDoc::Value(pooled) = r.pooled else {
+                panic!("{}: {:?}", m.name, r.pooled);
+            };
+            assert_eq!(pooled.to_bits(), value.to_bits(), "{}", m.name);
+        }
+    }
+
+    // Selection over the ranking and the judge's rubric metric.
+    let gate = SelectionGate::parse(
+        json!({
+            "schema": "rustev.selection-gate/1", "gate": "spec041", "per": "variant",
+            "metrics": {"ranking/offers/ndcg@10": "higher_is_better",
+                        "model/rubric/judged": "higher_is_better"},
+            "min_comparable_coverage": "0", "min_labeled_coverage": "0",
+            "require": [
+                {"metric": "ranking/offers/ndcg@10", "not_worse_than": "baseline",
+                 "within": "noise"},
+                {"metric": "model/rubric/judged", "not_worse_than": "baseline",
+                 "within": "noise"}
+            ],
+            "rank_by": ["ranking/offers/ndcg@10"]
+        })
+        .to_string()
+        .as_bytes(),
+    )
+    .unwrap();
+    let select = |config: &EvaluatorConfig, judged: [f64; 3]| {
+        let b = evaluated(config, false, [2.0, 1.0, 0.0]);
+        let c = evaluated(config, true, judged);
+        let (br, cr) = (repeated(&b), repeated(&c));
+        let b_runs = [Run {
+            evaluated: &b.0,
+            cases: &b.1,
+        }; 2];
+        let c_runs = [Run {
+            evaluated: &c.0,
+            cases: &c.1,
+        }; 2];
+        let inputs = |runs| RepeatInputs {
+            source: Source::Replay,
+            config: &repeat_config,
+            manifest: &manifest,
+            runs,
+        };
+        let baseline = record_baseline("lodging.v3", &inputs(&b_runs), &br, 0).unwrap();
+        evaluate_selection(
+            &gate,
+            &baseline,
+            &RepeatEvidence {
+                report: &br,
+                inputs: inputs(&b_runs),
+            },
+            &[NamedCandidate {
+                name: "candidate",
+                evidence: RepeatEvidence {
+                    report: &cr,
+                    inputs: inputs(&c_runs),
+                },
+            }],
+        )
+        .unwrap()
+    };
+    // The same judgments qualify and rank.
+    let same = select(&bound, [2.0, 1.0, 0.0]);
+    assert_eq!(same.candidates[0].verdict, Verdict::Qualifies);
+    assert_eq!(same.exit_code(), 0);
+    assert_eq!(same.ranked, ["candidate"]);
+    // A lower judged level is worse beyond the zero replay band: rejected.
+    let worse = select(&bound, [1.0, 1.0, 0.0]);
+    assert_eq!(
+        worse.candidates[0].verdict,
+        Verdict::Rejected {
+            clause: "require[1]".into()
+        }
+    );
+    assert_eq!(worse.exit_code(), 11);
+    // An opaque judge: its clause is unknown, never qualifies, while the
+    // ranking clause still passes.
+    let unknown = select(&opaque, [2.0, 1.0, 0.0]);
+    assert_eq!(
+        unknown.candidates[0].verdict,
+        Verdict::Unknown {
+            clause: "require[1]".into()
+        }
+    );
+    assert_eq!(unknown.exit_code(), 12);
+    let clause = |label: &str| {
+        &unknown.candidates[0]
+            .clauses
+            .iter()
+            .find(|c| c.clause == label)
+            .unwrap()
+            .result
+    };
+    assert!(matches!(clause("require[0]"), ClauseOutcome::Pass { .. }));
+    assert!(matches!(
+        clause("require[1]"),
+        ClauseOutcome::Unknown { reason } if reason.contains("opaque scorer")
+    ));
+}
+
+/// Spec 029's form of a metric over one run's case measures.
+fn form_in_cases(metric: &str, cases: &EvalCases) -> Option<Form> {
+    rustev_eval::eval_cases::form_in(metric, &[cases])
+}
