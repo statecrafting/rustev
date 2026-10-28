@@ -16,9 +16,13 @@ spec = "043-live-re-execution-at-scale"
 
 [dependencies]
 rustev-contract.workspace = true
+rustev-core.workspace = true
 rustev-runtime.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["sync", "time", "rt", "macros"] }
 
 [lints]
 workspace = true

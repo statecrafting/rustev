@@ -75,7 +75,8 @@ fn missing_unknown_null_and_invalid_wire_values() {
         v.as_object_mut().unwrap().remove(key);
         refusal(parse(&v), "live-config");
     }
-    for key in ["interval_ms", "snapshot", "digest", "provenance"] {
+    // An absent or `real` provenance is `probe-snapshot` (3.7.2; tests/probe.rs).
+    for key in ["interval_ms", "snapshot", "digest"] {
         let mut v = original.clone();
         v["probe"].as_object_mut().unwrap().remove(key);
         refusal(parse(&v), "live-config");
@@ -93,7 +94,6 @@ fn missing_unknown_null_and_invalid_wire_values() {
     for (pointer, bad) in [
         ("/authorize", Value::Null),
         ("/budget", json!("production")),
-        ("/probe/provenance", json!("real")),
         ("/bindings/0/cost_unit", json!("usd")),
         ("/evaluation_time", json!({"fixed": {"ms": 1, "extra": 0}})),
         ("/run_cap_units", json!(-1)),

@@ -494,6 +494,16 @@ impl Runtime {
         }
     }
 
+    /// The registered backend's descriptor and static cost model, for a
+    /// host's checks before any dispatch (spec 043, 3.7.1).
+    pub fn backend_terms(
+        &self,
+        backend_id: &str,
+    ) -> Option<(&rustev_contract::descriptor::BackendDescriptor, CostModel)> {
+        let r = self.inner.backends.get(backend_id)?;
+        Some((r.backend.descriptor(), r.backend.cost_model()))
+    }
+
     /// Check a compiled plan against the registered backends (spec 003,
     /// 3.5.3 and 3.6.5).
     pub fn prepare(&self, compiled: Compiled) -> Result<PreparedPlan, PrepareError> {

@@ -750,6 +750,39 @@ gated entry point until acquisition attempts carry their own spend
 identities. Tests: `crates/rustev-live/tests/gate.rs`,
 `crates/rustev-runtime/tests/live.rs`.
 
+**Increment 4 (2026-10-28): the probe.** `rustev_live::probe::probe`
+(`crates/rustev-live/src/probe.rs`) runs 3.7 as a library call over the
+runtime, the checked configuration, the candidate plans, the host's
+authorizer and the `JournalGate`. `ProbeSnapshot` reads `probe.snapshot`
+within the snapshot bound, recomputes its digest and refuses
+`probe-snapshot` when it differs from `probe.digest` or equals a case
+snapshot's, before any journal is opened; `LiveConfig::parse` now refuses
+an absent or non-`synthetic` `probe.provenance` as `probe-snapshot`
+rather than `live-config` (3.7.2). Static checks precede every call: a
+reached binding with no entry is `live-config`, an `unknown` cost model is
+`spend-unit` whatever the unit (3.6.3), and a registered descriptor naming
+another backend or artifact (`descriptor-identity`) or a plan that does
+not prepare (`check-plan`) fails the probe with no call; `rustev-runtime`
+gains `Runtime::backend_terms` for these checks. Each binding then
+receives `probe.calls` sequential decisions of the first candidate, in
+name order, reaching it, as `live/<run_id>/.probe/<binding>/<call>`
+(counted as run spend; no candidate name starts with `.`), spaced by
+`probe.interval_ms` on the injected clock, through
+`reexecute_live_with_gate`; a `cost_unit: none` binding reserves and
+settles zero. The first failing call stops that binding and is reported
+with its code (the failure class, `authorization_refused`,
+`served-identity-mismatch`, or the spend code); a spend refusal stops
+every later call and the probe ends `spend_capped` (3.6.5). Served
+identity comes from the record's remote evidence, absent being `unknown`,
+and is judged `mismatched`, then `unverified`, then `matched` (3.7.3). A
+binding with no attempt in a call is not reachable (`probe-unreached`):
+the strict reading, so a binding reached only as a fallback fails its
+probe until a seam directs a probe call to a fallback target. The
+`probe` purpose and the probe section are reported in `ProbeReport`;
+writing them into `rustev.live-reexecution/1` and `rustev.live-run/1`,
+and `--probe-only` with its exit codes (3.7.5), come with the run engine
+and the CLI. Tests: `crates/rustev-live/tests/probe.rs`.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

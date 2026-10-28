@@ -4159,9 +4159,11 @@ name = "rustev-live"
 version = "0.1.0"
 dependencies = [
  "rustev-contract",
+ "rustev-core",
  "rustev-runtime",
  "serde",
  "serde_json",
+ "tokio",
 ]
 
 [[package]]
