@@ -1,0 +1,50 @@
+{
+  "mapping": {
+    "amends": [
+      "027-node-and-wasm-bindings"
+    ],
+    "dependsOn": [
+      "027-node-and-wasm-bindings",
+      "052-wasm-budget-for-specs-035-to-037",
+      "055-wasm-gzip-measured"
+    ],
+    "implementingPaths": [
+      {
+        "path": "tools/rustev-conformance/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "tools/rustev-conformance/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-conformance/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/decisions/00-founding-decisions.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "specId": "057-wasm-raw-budget-for-spec-039",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "bd1fcc8a44370b3dad2a03812dec861b2fb67877292ecff2c931a6729547d5bb"
+}
