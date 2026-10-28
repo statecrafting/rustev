@@ -1,6 +1,7 @@
 //! Spec 041, 3.8.4 and 3.8.5: agreement statistics, hand-computed: a judge
 //! against human labels, two judges, a deterministic scorer against human
-//! labels, and the `qwk` unknown case.
+//! labels, and the `qwk` unknown case, against the fixture in
+//! `data/metrics/agreement.json`.
 
 use std::collections::BTreeMap;
 
@@ -8,7 +9,7 @@ use rustev_contract::eval_report::{MetricValue, Split};
 use rustev_contract::ids::{ContentDigest, SnapshotId};
 use rustev_contract::judgment::OutValue;
 use rustev_eval::dataset::{DatasetCase, Label};
-use rustev_eval::eval_cases::{CaseMeasure, form_of};
+use rustev_eval::eval_cases::form_of;
 use rustev_eval::measured::{NewMetric, Scope, agreement_metrics, quadratic_weighted_kappa};
 use rustev_eval::repeat_stats::Form;
 use rustev_eval::scores::{SCORES, ScoreEntry, ScoreOutcome, Scores};
@@ -16,6 +17,10 @@ use rustev_eval::scoring::{
     AgreementDecl, Declarations, HumanScale, OriginFamily, RubricMetric, ScorerDescriptor,
 };
 use serde_json::json;
+
+mod metrics_support;
+
+const AGREEMENT: &str = include_str!("data/metrics/agreement.json");
 
 fn digest(c: char) -> ContentDigest {
     ContentDigest::parse(&format!("sha256:{}", c.to_string().repeat(64))).unwrap()
@@ -73,10 +78,8 @@ fn scores(d: &ScorerDescriptor, values: &[(&str, Option<f64>)]) -> Scores {
     }
 }
 
-fn find<'a>(out: &'a [NewMetric], name: &str) -> &'a NewMetric {
-    out.iter()
-        .find(|m| m.metric.name == name)
-        .unwrap_or_else(|| panic!("no {name}"))
+fn find<'a>(out: &'a [NewMetric], name: &str) -> Option<&'a NewMetric> {
+    out.iter().find(|m| m.metric.name == name)
 }
 
 fn bits(m: &NewMetric) -> u64 {
@@ -88,164 +91,101 @@ fn bits(m: &NewMetric) -> u64 {
 
 #[test]
 fn qwk_by_hand() {
-    // n = 4, rows (2, 2), columns (1, 3); sum(w * O) = 1, sum(w * E) =
-    // 2 * 3 / 4 + 2 * 1 / 4 = 2: 1 - 1/2.
-    let v = quadratic_weighted_kappa(&[vec![1, 1], vec![0, 2]]);
-    assert_eq!(v, MetricValue::Measured { value: 0.5, n: 4 });
-    // n = 6, rows (3, 2, 1), columns (2, 2, 2); sum(w * O) = 2,
-    // sum(w * E) = 8: 1 - 2/8.
-    let v = quadratic_weighted_kappa(&[vec![2, 1, 0], vec![0, 1, 1], vec![0, 0, 1]]);
-    assert_eq!(v, MetricValue::Measured { value: 0.75, n: 6 });
-    // Marginals whose product exceeds u64: no overflow, a finite value.
-    let big = u64::MAX / 4;
-    let v = quadratic_weighted_kappa(&[vec![big, big], vec![0, big]]);
-    assert!(matches!(v, MetricValue::Measured { value, .. } if value.is_finite()));
-    // Every case on one level on both sides: sum(w * E) = 0.
-    let v = quadratic_weighted_kappa(&[vec![0, 0], vec![0, 3]]);
-    assert!(matches!(v, MetricValue::Unknown { .. }));
+    let fixture: serde_json::Value = serde_json::from_str(AGREEMENT).unwrap();
+    let mut checked = 0;
+    for c in fixture["qwk"].as_array().unwrap() {
+        let observed: Vec<Vec<u64>> = serde_json::from_value(c["observed"].clone()).unwrap();
+        let v = quadratic_weighted_kappa(&observed);
+        metrics_support::check_value(&v, &c["expect"], c["name"].as_str().unwrap());
+        checked += 1;
+    }
+    assert_eq!(checked, 4);
 }
 
 #[test]
 fn judges_and_human_labels_agree_by_hand() {
-    let j1 = scorer("j1", true);
-    let j2 = scorer("j2", true);
-    let t = scorer("t", false);
-    let scorers = vec![j1.clone(), j2.clone(), t.clone()];
-    let scales = vec![HumanScale {
-        name: "rater".into(),
-        levels: vec!["low".into(), "mid".into(), "high".into()],
-    }];
-    let agreements: Vec<AgreementDecl> = serde_json::from_value(json!([
-        {"name": "j1_rater", "a": "j1", "b": "human:rater"},
-        {"name": "j1_j2", "a": "j1", "b": "j2"},
-        {"name": "t_rater", "a": "t", "b": "human:rater"}
-    ]))
-    .unwrap();
-    let rubric: Vec<RubricMetric> = vec![];
-    let origin: Vec<OriginFamily> = vec![];
-    let declared = Declarations {
-        scorers: &scorers,
-        rubric_metrics: &rubric,
-        human_scales: &scales,
-        agreements: &agreements,
-        origin: &origin,
-    };
-    let cases = [
-        case("a", Some("low")),
-        case("b", Some("mid")),
-        case("c", Some("high")),
-        case("d", None),
-    ];
-    let params: BTreeMap<String, OutValue> = BTreeMap::new();
-    let mut scope: Vec<Scope<'_>> = cases
-        .iter()
-        .map(|case| Scope::Proposal {
-            case,
-            params: &params,
-        })
-        .collect();
-    scope.push(Scope::Out("abstained".into()));
-    let docs = [
-        scores(
-            &j1,
-            &[
-                ("a", Some(0.0)),
-                ("b", Some(2.0)),
-                ("c", Some(2.0)),
-                ("d", Some(1.0)),
-            ],
-        ),
-        scores(
-            &j2,
-            &[
-                ("a", Some(0.0)),
-                ("b", Some(1.0)),
-                ("c", None),
-                ("d", Some(1.0)),
-            ],
-        ),
-        scores(
-            &t,
-            &[
-                ("a", Some(0.0)),
-                ("b", Some(1.0)),
-                ("c", Some(2.0)),
-                ("d", Some(0.0)),
-            ],
-        ),
-    ];
-    let (deterministic, model) = agreement_metrics(&declared, &docs, &scope);
-    let names =
-        |v: &[NewMetric]| -> Vec<String> { v.iter().map(|m| m.metric.name.clone()).collect() };
-    assert_eq!(
-        names(&deterministic),
-        [
-            "agreement/t_rater/exact",
-            "agreement/t_rater/adjacent",
-            "agreement/t_rater/mean_abs_diff",
-            "agreement/t_rater/qwk",
-        ]
-    );
-    assert!(
-        names(&model)
+    let fixture: serde_json::Value = serde_json::from_str(AGREEMENT).unwrap();
+    let mut checked = 0;
+    for c in fixture["cases"].as_array().unwrap() {
+        let name = c["name"].as_str().unwrap();
+        let scorers: Vec<ScorerDescriptor> = c["scorers"]
+            .as_array()
+            .unwrap()
             .iter()
-            .all(|n| n.starts_with("model/agreement/"))
-    );
-    assert_eq!(model.len(), 8);
-
-    // Judge against human labels: a (0, 0), b (2, 1), c (2, 2); d has no
-    // rating. exact 2/3, adjacent 3/3, mean |d| = (0 + 1 + 0) / 3. qwk:
-    // O = [[1,0,0],[0,0,0],[0,1,1]], sum(w * O) = 1, sum(w * E) = 5: 0.8.
-    let exact = find(&model, "model/agreement/j1_rater/exact");
-    assert_eq!((exact.count.numerator, exact.count.denominator), (2, 3));
-    assert_eq!(exact.count.breakdown["no_gold"], 1);
-    assert_eq!(exact.count.breakdown["abstained"], 1);
-    assert_eq!(
-        bits(find(&model, "model/agreement/j1_rater/adjacent")),
-        1.0f64.to_bits()
-    );
-    assert_eq!(
-        bits(find(&model, "model/agreement/j1_rater/mean_abs_diff")),
-        (1.0f64 / 3.0).to_bits()
-    );
-    let qwk = find(&model, "model/agreement/j1_rater/qwk");
-    assert_eq!(bits(qwk), 0x3fe999999999999a);
-    // qwk has no per-case measure (3.11.1).
-    assert!(qwk.cases.iter().all(Option::is_none));
-
-    // Two judges: a (0, 0), b (2, 1), d (1, 1); c is unscored by j2.
-    let exact = find(&model, "model/agreement/j1_j2/exact");
-    assert_eq!((exact.count.numerator, exact.count.denominator), (2, 3));
-    assert_eq!(exact.count.breakdown["unscored:refused"], 1);
-    assert_eq!(
-        exact.cases[..4],
-        [
-            Some(CaseMeasure::Count { num: 1, den: 1 }),
-            Some(CaseMeasure::Count { num: 0, den: 1 }),
-            None,
-            Some(CaseMeasure::Count { num: 1, den: 1 }),
-        ]
-    );
-
-    // A deterministic scorer in full agreement: exact 1, qwk 1.
-    assert_eq!(
-        bits(find(&deterministic, "agreement/t_rater/exact")),
-        1.0f64.to_bits()
-    );
-    assert_eq!(
-        bits(find(&deterministic, "agreement/t_rater/qwk")),
-        1.0f64.to_bits()
-    );
-
-    // A side with no scores document: every statistic unknown.
-    let (_, model) = agreement_metrics(&declared, &docs[..1], &scope);
-    for stat in ["exact", "adjacent", "mean_abs_diff", "qwk"] {
-        let m = find(&model, &format!("model/agreement/j1_j2/{stat}"));
-        let MetricValue::Unknown { reason } = &m.metric.value else {
-            panic!("{stat}: {:?}", m.metric.value);
+            .map(|s| scorer(s["id"].as_str().unwrap(), s["model"].as_bool().unwrap()))
+            .collect();
+        let scales = vec![HumanScale {
+            name: c["human_scale"].as_str().unwrap().into(),
+            levels: vec!["low".into(), "mid".into(), "high".into()],
+        }];
+        let agreements: Vec<AgreementDecl> =
+            serde_json::from_value(c["agreements"].clone()).unwrap();
+        let rubric: Vec<RubricMetric> = vec![];
+        let origin: Vec<OriginFamily> = vec![];
+        let declared = Declarations {
+            scorers: &scorers,
+            rubric_metrics: &rubric,
+            human_scales: &scales,
+            agreements: &agreements,
+            origin: &origin,
         };
-        assert!(reason.contains("scores-missing"), "{stat}: {reason}");
+        let cases: Vec<DatasetCase> = c["split"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|r| case(r[0].as_str().unwrap(), r[1].as_str()))
+            .collect();
+        let params: BTreeMap<String, OutValue> = BTreeMap::new();
+        let mut scope: Vec<Scope<'_>> = cases
+            .iter()
+            .map(|case| Scope::Proposal {
+                case,
+                params: &params,
+            })
+            .collect();
+        for why in c["out"].as_array().unwrap() {
+            scope.push(Scope::Out(why.as_str().unwrap().into()));
+        }
+        let docs: Vec<Scores> = scorers
+            .iter()
+            .filter_map(|d| {
+                let by_case = c["scores"].get(&d.id)?.as_object().unwrap();
+                let values: Vec<(&str, Option<f64>)> = cases
+                    .iter()
+                    .map(|case| {
+                        let v = &by_case[&case.id];
+                        (case.id.as_str(), v.as_f64())
+                    })
+                    .collect();
+                let mut doc = scores(d, &values);
+                // A string is the case's unscored reason.
+                for e in &mut doc.entries {
+                    if let Some(why) = by_case[&e.case].as_str() {
+                        e.outcome = ScoreOutcome::Unscored(why.into());
+                    }
+                }
+                Some(doc)
+            })
+            .collect();
+        let (deterministic, model) = agreement_metrics(&declared, &docs, &scope);
+        let e = &c["expect"];
+        let names =
+            |v: &[NewMetric]| -> Vec<String> { v.iter().map(|m| m.metric.name.clone()).collect() };
+        for (side, got) in [("deterministic", &deterministic), ("model", &model)] {
+            if let Some(want) = e.get(side) {
+                let want: Vec<String> = serde_json::from_value(want.clone()).unwrap();
+                assert_eq!(names(got), want, "{name}: {side} names");
+                checked += 1;
+            }
+        }
+        for (metric, want) in e["metrics"].as_object().unwrap() {
+            let m = find(&deterministic, metric)
+                .or_else(|| find(&model, metric))
+                .unwrap_or_else(|| panic!("{name}: no {metric}"));
+            checked += metrics_support::check_metric(m, want, &format!("{name}, {metric}"));
+        }
     }
+    assert_eq!(checked, 17);
 }
 
 #[test]
@@ -278,11 +218,14 @@ fn one_level_on_both_sides_makes_qwk_unknown_and_exact_one() {
     let docs = [scores(&t, &[("a", Some(1.0)), ("b", Some(1.0))])];
     let (deterministic, _) = agreement_metrics(&declared, &docs, &scope);
     assert_eq!(
-        bits(find(&deterministic, "agreement/flat/exact")),
+        bits(find(&deterministic, "agreement/flat/exact").unwrap()),
         1.0f64.to_bits()
     );
     assert!(matches!(
-        find(&deterministic, "agreement/flat/qwk").metric.value,
+        find(&deterministic, "agreement/flat/qwk")
+            .unwrap()
+            .metric
+            .value,
         MetricValue::Unknown { .. }
     ));
 }

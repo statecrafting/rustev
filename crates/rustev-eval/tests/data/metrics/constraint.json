@@ -1,0 +1,101 @@
+{
+  "about": "Hand-computed constraint measures (spec 041, 3.4.5 and 3.4.6), each over one case. The constraint is named c, over the ranking r of the shortlist parameter list, on the attribute city; params are extra Integer parameters. cases is the one case's measure (null when excluded); a mean is num/den, computed as one binary64 division; breakdown is the whole exclusion count; the metric value is constraint/c's.",
+  "cases": [
+    {
+      "name": "all_at_k, one unknown attribute, no failure (section 5, row 9)",
+      "aggregate": "all_at_k", "k": 5, "test": {"path_prefix": 2}, "against": {"requested": "city"},
+      "gold": {"items": {"x": {"city": ["FR", "Paris"]}, "y": {"city": ["FR", "Lyon"]}, "z": {"other": 1}}, "requested": {"city": ["FR", "Paris"]}},
+      "list": ["x", "z"],
+      "arithmetic": "x: FR/Paris against FR/Paris, the first 2 elements equal: satisfied. z has no city: unknown. No item fails, one is unknown: the case is excluded, unknown_attribute.",
+      "expect": {"cases": [null], "breakdown": {"unknown_attribute": 1}}
+    },
+    {
+      "name": "all_at_k, reference absent, no item failing (section 5, row 10)",
+      "aggregate": "all_at_k", "k": 5, "test": {"path_prefix": 2}, "against": {"requested": "city"},
+      "gold": {"items": {"x": {"city": ["FR", "Paris"]}, "y": {"city": ["FR", "Lyon"]}, "z": {"other": 1}}, "requested": {}},
+      "list": ["x"],
+      "arithmetic": "requested holds no city, so nothing is checked: excluded, no_reference.",
+      "expect": {"breakdown": {"no_reference": 1}}
+    },
+    {
+      "name": "all_at_k, one unknown attribute and one failure (section 5, row 11)",
+      "aggregate": "all_at_k", "k": 5, "test": {"path_prefix": 2}, "against": {"requested": "city"},
+      "gold": {"items": {"x": {"city": ["FR", "Paris"]}, "y": {"city": ["FR", "Lyon"]}, "z": {"other": 1}}, "requested": {"city": ["FR", "Paris"]}},
+      "list": ["x", "y", "z"],
+      "arithmetic": "x satisfied; y: FR/Lyon against FR/Paris fails at element 2; z unknown. One known failure decides the case: 0/1.",
+      "expect": {"cases": [{"count": [0, 1]}]}
+    },
+    {
+      "name": "all_at_k, every item satisfies",
+      "aggregate": "all_at_k", "k": 5, "test": {"path_prefix": 2}, "against": {"requested": "city"},
+      "gold": {"items": {"x": {"city": ["FR", "Paris"]}, "y": {"city": ["FR", "Lyon"]}, "z": {"other": 1}}, "requested": {"city": ["FR", "Paris"]}},
+      "list": ["x"],
+      "arithmetic": "x satisfied, nothing else in the top 5: 1/1; the metric is 1/1.",
+      "expect": {"cases": [{"count": [1, 1]}], "value": {"mean": [1, 1]}}
+    },
+    {
+      "name": "all_at_k over an empty list (section 5, row 12)",
+      "aggregate": "all_at_k", "k": 5, "test": {"path_prefix": 2}, "against": {"requested": "city"},
+      "gold": {"items": {"x": {"city": ["FR", "Paris"]}, "y": {"city": ["FR", "Lyon"]}, "z": {"other": 1}}, "requested": {"city": ["FR", "Paris"]}},
+      "list": [],
+      "arithmetic": "no item in the top 5: excluded, empty_ranking, never vacuously 1.",
+      "expect": {"breakdown": {"empty_ranking": 1}}
+    },
+    {
+      "name": "path_prefix: 2 against a one-element path (section 5, row 13)",
+      "aggregate": "all_at_k", "k": 5, "test": {"path_prefix": 2}, "against": {"requested": "city"},
+      "gold": {"items": {"x": {"city": ["FR", "Paris"]}, "y": {"city": ["FR", "Lyon"]}, "z": {"other": 1}}, "requested": {"city": ["FR"]}},
+      "list": ["x"],
+      "arithmetic": "the reference FR has no element 2, so the first 2 elements cannot match: x fails, 0/1.",
+      "expect": {"cases": [{"count": [0, 1]}]}
+    },
+    {
+      "name": "all_at_k checks only the top k",
+      "aggregate": "all_at_k", "k": 1, "test": {"path_prefix": 2}, "against": {"requested": "city"},
+      "gold": {"items": {"x": {"city": ["FR", "Paris"]}, "y": {"city": ["FR", "Lyon"]}, "z": {"other": 1}}, "requested": {"city": ["FR", "Paris"]}},
+      "list": ["x", "y"],
+      "arithmetic": "k = 1: only x is checked and satisfies; y, which would fail, is beyond k: 1/1.",
+      "expect": {"cases": [{"count": [1, 1]}]}
+    },
+    {
+      "name": "equals against an Integer parameter and a path attribute (section 5, row 15)",
+      "aggregate": "all_at_k", "k": 5, "test": "equals", "against": {"param": "stars"},
+      "gold": {"items": {"x": {"city": ["FR", "Paris"]}, "y": {"city": ["FR", "Lyon"]}, "z": {"other": 1}}, "requested": {}},
+      "list": ["x"], "params": {"stars": 4},
+      "arithmetic": "x's city is a path and the reference is the Integer 4: no comparison of two kinds, so x is unknown and the case excluded, type_mismatch.",
+      "expect": {"breakdown": {"type_mismatch": 1}}
+    },
+    {
+      "name": "no gold items",
+      "aggregate": "all_at_k", "k": 5, "test": {"path_prefix": 2}, "against": {"requested": "city"},
+      "gold": {"relevance": {}},
+      "list": ["x"],
+      "arithmetic": "the gold record has no items: excluded, no_gold.",
+      "expect": {"breakdown": {"no_gold": 1}}
+    },
+    {
+      "name": "share_at_k counts items and means cases",
+      "aggregate": "share_at_k", "k": 5, "test": "member_of", "against": {"value": ["Paris", "Lyon"]},
+      "gold": {"items": {"x": {"city": "Paris"}, "y": {"city": "Nice"}, "z": {"city": ["FR"]}, "w": {}}},
+      "list": ["x", "y", "z", "w"],
+      "arithmetic": "x: Paris is a member, satisfied; y: Nice is not, fails; z: a path against text values, type_mismatch; w: no city, unknown_attribute. Checked items x and y: 1/2, the case's mean.",
+      "expect": {"cases": [{"mean": [1, 2]}], "breakdown": {"type_mismatch": 1, "unknown_attribute": 1}}
+    },
+    {
+      "name": "share_at_k with no checked item",
+      "aggregate": "share_at_k", "k": 5, "test": "member_of", "against": {"value": ["Paris", "Lyon"]},
+      "gold": {"items": {"x": {"city": "Paris"}, "y": {"city": "Nice"}, "z": {"city": ["FR"]}, "w": {}}},
+      "list": ["z", "w"],
+      "arithmetic": "z: type_mismatch; w: unknown_attribute. No checked item, so 0/0 is never a mean: excluded, no_checked_items.",
+      "expect": {"cases": [null], "breakdown": {"no_checked_items": 1, "type_mismatch": 1, "unknown_attribute": 1}}
+    },
+    {
+      "name": "share_at_k, equals between gold values of one kind",
+      "aggregate": "share_at_k", "k": 5, "test": "equals", "against": {"value": "Paris"},
+      "gold": {"items": {"x": {"city": "Paris"}, "y": {"city": 3}}},
+      "list": ["x", "y"],
+      "arithmetic": "x: Paris equals Paris, satisfied; y: the Integer 3 against text, type_mismatch. Checked items x: 1/1.",
+      "expect": {"cases": [{"mean": [1, 1]}], "breakdown": {"type_mismatch": 1}}
+    }
+  ]
+}

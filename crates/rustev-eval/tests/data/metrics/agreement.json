@@ -1,0 +1,92 @@
+{
+  "about": "Hand-computed agreement statistics (spec 041, 3.8.4 and 3.8.5). qwk cases give an observed matrix, rows side a and columns side b, with w = (i - j)^2 and E the outer product of the marginals over n. Every scorer has the ordinal levels low, mid, high; model marks a judge. split is the cases in order with each one's human rating (null: none), then out the cases outside every new metric; scores maps each scorer to its document, each case to its level index or, as a string, its unscored reason. A count is num/den over cases; a mean is num/den, computed as one binary64 division, or given as its bit pattern; breakdown is the whole exclusion count.",
+  "qwk": [
+    {
+      "name": "two levels, one disagreement",
+      "observed": [[1, 1], [0, 2]],
+      "arithmetic": "n = 4, rows (2, 2), columns (1, 3); sum(w * O) = 1, sum(w * E) = 2 * 3 / 4 + 2 * 1 / 4 = 2: 1 - 1/2.",
+      "expect": {"mean": [1, 2], "n": 4}
+    },
+    {
+      "name": "three levels",
+      "observed": [[2, 1, 0], [0, 1, 1], [0, 0, 1]],
+      "arithmetic": "n = 6, rows (3, 2, 1), columns (2, 2, 2); sum(w * O) = 1 + 1 = 2, sum(w * E) = 8: 1 - 2/8.",
+      "expect": {"mean": [3, 4], "n": 6}
+    },
+    {
+      "name": "marginals whose product exceeds u64",
+      "observed": [[4611686018427387903, 4611686018427387903], [0, 4611686018427387903]],
+      "arithmetic": "each count is u64::MAX / 4; a row total times a column total exceeds u64, and the product is taken in u128: no overflow, a finite value.",
+      "expect": {"finite": true}
+    },
+    {
+      "name": "every case on one level on both sides",
+      "observed": [[0, 0], [0, 3]],
+      "arithmetic": "rows (0, 3), columns (0, 3): E is 3 at (1, 1) and 0 elsewhere, so sum(w * E) = 0 and qwk is unknown.",
+      "expect": {"unknown": "sum(w * E) is 0"}
+    }
+  ],
+  "cases": [
+    {
+      "name": "judges and human labels",
+      "scorers": [{"id": "j1", "model": true}, {"id": "j2", "model": true}, {"id": "t", "model": false}],
+      "human_scale": "rater",
+      "agreements": [
+        {"name": "j1_rater", "a": "j1", "b": "human:rater"},
+        {"name": "j1_j2", "a": "j1", "b": "j2"},
+        {"name": "t_rater", "a": "t", "b": "human:rater"}
+      ],
+      "split": [["a", "low"], ["b", "mid"], ["c", "high"], ["d", null]],
+      "out": ["abstained"],
+      "scores": {
+        "j1": {"a": 0, "b": 2, "c": 2, "d": 1},
+        "j2": {"a": 0, "b": 1, "c": "refused", "d": 1},
+        "t": {"a": 0, "b": 1, "c": 2, "d": 0}
+      },
+      "arithmetic": "Judge against human labels: a (0, 0), b (2, 1), c (2, 2); d has no rating. exact 2/3, adjacent 3/3, mean |d| = (0 + 1 + 0) / 3. qwk: O = [[1,0,0],[0,0,0],[0,1,1]], sum(w * O) = 1, sum(w * E) = 5: 0.8; qwk has no per-case measure (3.11.1). Two judges: a (0, 0), b (2, 1), d (1, 1); c is unscored by j2: exact 2/3. A deterministic scorer in full agreement, a (0, 0), b (1, 1), c (2, 2): exact 1, qwk 1. Agreements with a model side are named under model/, after the deterministic ones.",
+      "expect": {
+        "deterministic": ["agreement/t_rater/exact", "agreement/t_rater/adjacent", "agreement/t_rater/mean_abs_diff", "agreement/t_rater/qwk"],
+        "model": [
+          "model/agreement/j1_rater/exact", "model/agreement/j1_rater/adjacent", "model/agreement/j1_rater/mean_abs_diff", "model/agreement/j1_rater/qwk",
+          "model/agreement/j1_j2/exact", "model/agreement/j1_j2/adjacent", "model/agreement/j1_j2/mean_abs_diff", "model/agreement/j1_j2/qwk"
+        ],
+        "metrics": {
+          "model/agreement/j1_rater/exact": {"count": [2, 3], "breakdown": {"abstained": 1, "no_gold": 1}},
+          "model/agreement/j1_rater/adjacent": {"value": {"bits": "3ff0000000000000"}},
+          "model/agreement/j1_rater/mean_abs_diff": {"value": {"bits": "3fd5555555555555"}},
+          "model/agreement/j1_rater/qwk": {"value": {"bits": "3fe999999999999a"}, "cases": [null, null, null, null, null]},
+          "model/agreement/j1_j2/exact": {
+            "count": [2, 3], "breakdown": {"abstained": 1, "unscored:refused": 1},
+            "cases": [{"count": [1, 1]}, {"count": [0, 1]}, null, {"count": [1, 1]}, null]
+          },
+          "agreement/t_rater/exact": {"value": {"bits": "3ff0000000000000"}},
+          "agreement/t_rater/qwk": {"value": {"bits": "3ff0000000000000"}}
+        }
+      }
+    },
+    {
+      "name": "a side with no scores document",
+      "scorers": [{"id": "j1", "model": true}, {"id": "j2", "model": true}, {"id": "t", "model": false}],
+      "human_scale": "rater",
+      "agreements": [
+        {"name": "j1_rater", "a": "j1", "b": "human:rater"},
+        {"name": "j1_j2", "a": "j1", "b": "j2"},
+        {"name": "t_rater", "a": "t", "b": "human:rater"}
+      ],
+      "split": [["a", "low"], ["b", "mid"], ["c", "high"], ["d", null]],
+      "out": ["abstained"],
+      "scores": {
+        "j1": {"a": 0, "b": 2, "c": 2, "d": 1}
+      },
+      "arithmetic": "j2 has no document: every statistic of j1_j2 is unknown, scores-missing.",
+      "expect": {
+        "metrics": {
+          "model/agreement/j1_j2/exact": {"value": {"unknown": "scores-missing"}},
+          "model/agreement/j1_j2/adjacent": {"value": {"unknown": "scores-missing"}},
+          "model/agreement/j1_j2/mean_abs_diff": {"value": {"unknown": "scores-missing"}},
+          "model/agreement/j1_j2/qwk": {"value": {"unknown": "scores-missing"}}
+        }
+      }
+    }
+  ]
+}
