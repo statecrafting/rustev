@@ -2,7 +2,7 @@
 id: "031-public-api-and-release-family"
 title: "Public API facade, compatibility policy and release family (amends 021)"
 status: approved
-implementation: pending
+implementation: in-progress
 created: "2026-10-16"
 summary: >
   Amends spec 021 so the first public release becomes a release family: the
@@ -119,7 +119,7 @@ obligations:
 
 Approved by the owner (A-27, 2026-10-16, under the 2026-10-16 delivery work
 order) as its own reviewable change before any code (R-16); implementation is
-pending. It records owner decision OD-6 of tracking issue #76 as R-39 and
+in progress (see the Implementation record). It records owner decision OD-6 of tracking issue #76 as R-39 and
 implements #76 child A3 (#58). Approval authorizes the facade crate, the
 release tooling, manifest changes and candidate evidence. It does not by
 itself publish, tag, upload, reserve a name, create a hosted release, change
@@ -1036,6 +1036,12 @@ archives each with its `.sha256`, the SBOMs, the changelog, the signed
 manifest and `SHA256SUMS` with their signatures, and the journal summary;
 npm tarballs are not re-hosted. Fresh-consumer qualification (3.9.7) is
 the remaining step before the lifecycle reaches `qualified`.
+
+**2026-10-28: implementation state.** `implementation:` moves from
+`pending` to `in-progress`, which increments 1 to 10 and the first
+publication above already were. The remaining step is fresh-consumer
+qualification (3.9.7), run with spec 056's harness and `rustev-release
+qualify` on the next family version; this spec closes when it passes.
 
 ## Decisions at approval
 
