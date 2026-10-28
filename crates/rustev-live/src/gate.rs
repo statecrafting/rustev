@@ -44,6 +44,10 @@ impl JournalGate {
             run_cap_units,
         })
     }
+
+    pub fn run_id(&self) -> &str {
+        &self.run_id
+    }
 }
 
 impl SpendGate for JournalGate {

@@ -24,7 +24,7 @@ pub struct LiveError {
 }
 
 impl LiveError {
-    fn invalid(subject: &'static str, detail: impl fmt::Display) -> Self {
+    pub(crate) fn invalid(subject: &'static str, detail: impl fmt::Display) -> Self {
         Self {
             status: "invalid_input",
             subject,
@@ -188,8 +188,16 @@ pub type Candidates = BTreeMap<String, Vec<BindingIdentity>>;
 
 impl LiveConfig {
     /// Bounded parsing with the live input refusal vocabulary.
+    /// A probe whose provenance is absent or not `synthetic` is refused
+    /// `probe-snapshot` (spec 043, 3.7.2); every other defect `live-config`.
     pub fn parse(bytes: &[u8]) -> Result<Self, LiveError> {
-        <Self as Document>::parse(bytes).map_err(LiveError::config)
+        <Self as Document>::parse(bytes).map_err(|e| {
+            if probe_provenance_undeclared(bytes) {
+                LiveError::invalid("probe-snapshot", "probe.provenance must be synthetic")
+            } else {
+                LiveError::config(e)
+            }
+        })
     }
 
     pub fn check(&self, mode: Mode, candidates: &Candidates) -> Result<(), LiveError> {
@@ -236,6 +244,19 @@ impl LiveConfig {
         }
         Ok(())
     }
+}
+
+// Consulted only for a refused document within the parse bound, the same
+// bound `LiveConfig::parse` applies (`<LiveConfig as Document>::LIMITS`).
+fn probe_provenance_undeclared(bytes: &[u8]) -> bool {
+    bytes.len() <= <LiveConfig as Document>::LIMITS.max_bytes
+        && serde_json::from_slice::<serde_json::Value>(bytes)
+            .ok()
+            .and_then(|v| {
+                let probe = v.get("probe")?.as_object()?;
+                Some(probe.get("provenance").and_then(|p| p.as_str()) != Some("synthetic"))
+            })
+            .unwrap_or(false)
 }
 
 // Spec 006, 3.9.1. The eval candidate checker is crate-private and the

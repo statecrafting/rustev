@@ -3,4 +3,5 @@
 pub mod documents;
 pub mod gate;
 pub mod journal;
+pub mod probe;
 pub use gate::JournalGate;
