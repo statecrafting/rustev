@@ -1231,3 +1231,459 @@ fn repeat_refuses_invalid_documents_and_rolls_back_failed_publication() {
     std::fs::create_dir(s.path("multi/a")).unwrap();
     s.rustev_owned(&a).expect(3, "io_error");
 }
+
+// Spec 041, 3.10: version 3 evaluation through the CLI.
+
+const LODGING_ADAPTER_V2: &str = r#"{"schema":"rustev.task-adapter/2","name":"lodging","version":"1",
+"labels":{"values":["none"],"prefixes":["c-"]},
+"rules":[{"action":"present_ranked_lodging","param":"ranking","select":"first_ranked","map":{},"otherwise":null},
+{"action":"no_eligible_lodging","label":"none"}],
+"measures":{"rankings":[{"name":"offers","param":"ranking","relevant_at_least":2,"gain":"exponential",
+"metrics":["precision@2","ndcg@3","mrr"],"backfill_positions":0}],"constraints":[],"fields":[]}}"#;
+
+fn tagged(schema: &str, bytes: &[u8]) -> rustev_contract::ids::ContentDigest {
+    rustev_contract::ids::ContentDigest::parse(&rustev_contract::canonical::tagged_digest(
+        schema, bytes,
+    ))
+    .unwrap()
+}
+
+/// A deterministic scorer: 1 when the lodging decision presented a
+/// ranking, else 0.
+struct Presented(rustev_eval::scoring::ScorerDescriptor);
+
+impl rustev_eval::scores::Scorer for Presented {
+    fn descriptor(&self) -> &rustev_eval::scoring::ScorerDescriptor {
+        &self.0
+    }
+    fn score(
+        &self,
+        _: &rustev_eval::scores::CaseView,
+        p: &rustev_eval::scores::ProposalView,
+    ) -> rustev_eval::scores::ScoreOutcome {
+        let presented = p.action == "present_ranked_lodging";
+        rustev_eval::scores::ScoreOutcome::Score(if presented { 1.0 } else { 0.0 })
+    }
+}
+
+/// The lodging cohort with gold under `rustev.dataset/2`, a version 2
+/// adapter and a version 3 configuration declaring the `presented` scorer
+/// and the `judge` scorer, whose judge plan is `judge_plan`.
+fn v3_setup(s: &Scratch, judge_plan: &str) -> EvaluatorConfig {
+    let snap = |cands: Vec<Json>| {
+        lodging_snapshot(
+            true,
+            cands,
+            vec![claim("k-1", "verified", "preference", NOW + DAY)],
+        )
+    };
+    let cases = vec![
+        Case {
+            id: "l-1",
+            snapshot: lodging_snapshot_default(),
+            label: Some("c-1"),
+            split: Split::FinalTest,
+        },
+        Case {
+            id: "l-2",
+            snapshot: snap(vec![candidate("c-9", "900", "USD", 1, false)]),
+            label: Some("none"),
+            split: Split::FinalTest,
+        },
+    ];
+    capture_cases(s, "lodging", &cases);
+    let mut m = manifest("lodging gold", "lodging", &cases);
+    m.schema = rustev_eval::dataset::DATASET_V2.into();
+    let gold: rustev_eval::gold::Gold = serde_json::from_value(json!({
+        "relevance": {"c-1": 2, "c-2": 3, "c-3": 0}
+    }))
+    .unwrap();
+    for c in &mut m.cases {
+        c.gold = Some(gold.clone());
+    }
+    s.write("lodging.dataset.json", &canonical(&m));
+    s.write("lodging.adapter.json", LODGING_ADAPTER_V2.as_bytes());
+    let adapter: Json = serde_json::from_str(LODGING_ADAPTER_V2).unwrap();
+    let adapter_bytes = rustev_contract::canonical::canonical_value_bytes(&adapter).unwrap();
+    let measures = rustev_contract::canonical::canonical_value_bytes(&adapter["measures"]).unwrap();
+    let mut c = serde_json::to_value(config("lodging", &[], None)).unwrap();
+    c["schema"] = json!(rustev_eval::config::EVALUATOR_CONFIG_V3);
+    c["adapter"]["rules"] = json!({"bound": tagged("rustev.task-adapter/2", &adapter_bytes)});
+    c["adapter"]["measures"] = json!(tagged("rustev.task-adapter/2", &measures));
+    for (name, formula) in [
+        ("ranking", "per-case ranking measures over condensed lists"),
+        ("rubric", "deterministic rubric metrics"),
+        ("model", "model-derived metrics"),
+    ] {
+        c["metrics"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"name": name, "formula": format!("SYNTHETIC {formula}")}));
+    }
+    c["scorers"] = json!([
+        {"id": "presented", "version": "1", "kind": "deterministic",
+         "output": {"bounded": {"min": "0", "max": "1"}},
+         "rules": {"bound": tagged("test", b"presented")}, "reads_gold": false},
+        {"id": "judge", "version": "1", "kind": "model",
+         "output": {"ordinal": {"levels": ["normal", "high", "urgent"]}},
+         "rules": {"bound": tagged("test", b"judge")}, "reads_gold": false,
+         "judge": {"plan": judge_plan, "artifacts": [],
+                   "level_param": "priority", "subject_field": "ticket.message"}}
+    ]);
+    c["rubric_metrics"] = json!([
+        {"name": "presented", "scorer": "presented", "aggregate": "mean"},
+        {"name": "judged", "scorer": "judge", "aggregate": "mean_level_index"}
+    ]);
+    for k in ["human_scales", "agreements", "origin"] {
+        c[k] = json!([]);
+    }
+    let config = EvaluatorConfig::parse(&serde_json::to_vec(&c).unwrap()).unwrap();
+    config.check().unwrap();
+    s.write("lodging.config.json", &canonical(&config));
+    config
+}
+
+fn views_args(out: &str) -> Vec<String> {
+    let mut a = eval_args(
+        "lodging.dataset.json",
+        "final_test",
+        "lodging.config.json",
+        "lodging.adapter.json",
+        out,
+    );
+    a.insert(1, "views".into());
+    a
+}
+
+fn metric<'a>(report: &'a Json, name: &str) -> &'a Json {
+    report["metrics"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|m| m["name"] == name)
+        .unwrap_or_else(|| panic!("no metric {name} in {report}"))
+}
+
+/// Spec 041, 3.10.2 and 3.10.3: `eval views` writes the views `eval`
+/// computes; `eval --scores` reads a scorer's document and adds
+/// `views.json` to `out`; a declared scorer without a document is unknown.
+#[test]
+fn version_3_eval_writes_views_and_reads_scores() {
+    use rustev_eval::scores::{ScoreViews, Scores, score_views};
+    let s = Scratch::new("eval-041-scores");
+    run_inputs(&s);
+    let plan_id = format!("sha256:{}", "e".repeat(64));
+    let config = v3_setup(&s, &plan_id);
+    let r = s.rustev_owned(&views_args("views.json"));
+    let j = r.expect(0, "viewed");
+    let views = ScoreViews::parse(&s.read("views.json")).unwrap();
+    assert_eq!(
+        j["views_digest"],
+        views.record_digest().unwrap().to_string()
+    );
+    assert_eq!(j["cases"], 2);
+    assert_eq!(views.config, config.id().unwrap());
+    // The output file is never overwritten.
+    s.rustev_owned(&views_args("views.json"))
+        .expect(3, "io_error");
+
+    let presented = Presented(config.scorers.as_ref().unwrap()[0].clone());
+    let scores = score_views(&presented, &views).unwrap();
+    s.write("presented.scores.json", &scores.record_canonical().unwrap());
+    std::fs::create_dir(s.path("scored")).unwrap();
+    let mut a = eval_args(
+        "lodging.dataset.json",
+        "final_test",
+        "lodging.config.json",
+        "lodging.adapter.json",
+        "scored",
+    );
+    a.extend(["--scores".into(), "presented.scores.json".into()]);
+    let j = s.rustev_owned(&a).expect(0, "reported");
+    // `views.json` is the same document `eval views` wrote.
+    assert_eq!(s.read("scored/views.json"), s.read("views.json"));
+    assert_eq!(
+        serde_json::from_slice::<Json>(&s.read("scored/adapter.json")).unwrap(),
+        serde_json::from_str::<Json>(LODGING_ADAPTER_V2).unwrap()
+    );
+    let report: Json = serde_json::from_slice(&s.read("scored/report.json")).unwrap();
+    assert_eq!(j["metrics"], report["metrics"]);
+    assert!(metric(&report, "ranking/offers/precision@2")["value"].is_object());
+    assert_eq!(
+        metric(&report, "rubric/presented")["value"]["measured"]["n"],
+        2,
+        "{report}"
+    );
+    // The judge has no scores document: its metric is unknown.
+    let judged = metric(&report, "model/rubric/judged");
+    assert!(judged["value"]["unknown"].is_object(), "{judged}");
+    let d = detail(&s, "scored");
+    d.reconcile().unwrap();
+
+    // Without `--scores`, every scorer's metric is unknown, and the views
+    // are still written.
+    std::fs::create_dir(s.path("unscored")).unwrap();
+    s.rustev_owned(&eval_args(
+        "lodging.dataset.json",
+        "final_test",
+        "lodging.config.json",
+        "lodging.adapter.json",
+        "unscored",
+    ))
+    .expect(0, "reported");
+    assert_eq!(s.read("unscored/views.json"), s.read("views.json"));
+    let report: Json = serde_json::from_slice(&s.read("unscored/report.json")).unwrap();
+    assert!(metric(&report, "rubric/presented")["value"]["unknown"].is_object());
+
+    // A scores document whose subjects are not this evaluation's is
+    // refused, naming its code, and nothing is written.
+    let mut other: Scores = scores.clone();
+    other.entries.swap(0, 1);
+    s.write("other.scores.json", &other.record_canonical().unwrap());
+    std::fs::create_dir(s.path("refused")).unwrap();
+    let mut a = eval_args(
+        "lodging.dataset.json",
+        "final_test",
+        "lodging.config.json",
+        "lodging.adapter.json",
+        "refused",
+    );
+    a.extend(["--scores".into(), "other.scores.json".into()]);
+    let j = s.rustev_owned(&a).expect(4, "invalid_input");
+    assert_eq!(j["input"], "--scores");
+    assert!(
+        j["detail"].as_str().unwrap().contains("scores-mismatch"),
+        "{j}"
+    );
+    assert_eq!(std::fs::read_dir(s.path("refused")).unwrap().count(), 0);
+
+    // A version 1 adapter cannot declare a version 3 configuration's
+    // measures.
+    s.write("v1.adapter.json", LODGING_ADAPTER.as_bytes());
+    let r = s.rustev_owned(&eval_args(
+        "lodging.dataset.json",
+        "final_test",
+        "lodging.config.json",
+        "v1.adapter.json",
+        "refused",
+    ));
+    let j = r.expect(4, "invalid_input");
+    assert!(
+        j["detail"]
+            .as_str()
+            .unwrap()
+            .contains("rustev.task-adapter/2"),
+        "{j}"
+    );
+}
+
+/// Spec 041, 3.10.2 and 3.10.5: `--scores` is a usage error with a version
+/// 1 or 2 configuration, past 16 documents and with `--repeat-config`;
+/// `eval views` needs a version 3 configuration.
+#[test]
+fn scores_usage_and_version_rules() {
+    let s = Scratch::new("eval-041-usage");
+    support_setup(&s);
+    std::fs::create_dir(s.path("o")).unwrap();
+    let base = eval_args(
+        "support.dataset.json",
+        "final_test",
+        "support.config.json",
+        "support.adapter.json",
+        "o",
+    );
+    let with_scores = |n: usize| {
+        let mut a = base.clone();
+        for _ in 0..n {
+            a.extend(["--scores".into(), "absent.scores.json".into()]);
+        }
+        a
+    };
+    let r = s.rustev_owned(&with_scores(1));
+    assert_eq!(r.code, 2, "{}", r.stdout_str());
+    assert!(r.stdout.is_empty());
+    assert_eq!(s.rustev_owned(&with_scores(17)).code, 2);
+    let mut a = with_scores(1);
+    a.extend(["--repeat-config".into(), "repeat.json".into()]);
+    assert_eq!(s.rustev_owned(&a).code, 2);
+    assert_eq!(std::fs::read_dir(s.path("o")).unwrap().count(), 0);
+    // `eval views` over a version 2 configuration is invalid input.
+    let mut a = base.clone();
+    a.insert(1, "views".into());
+    *a.iter_mut().find(|x| *x == "o").unwrap() = "views.json".into();
+    let j = s.rustev_owned(&a).expect(4, "invalid_input");
+    assert_eq!(j["input"], "support.config.json");
+    assert!(!s.exists("views.json"));
+}
+
+/// Spec 041, 3.10.4: `eval judge` reproduces each view's judge bundle and
+/// writes the judge's scores, which `eval --scores` then reads.
+#[test]
+fn eval_judge_writes_scores_from_judge_bundles() {
+    use rustev_eval::scores::{ScoreOutcome, ScoreViews, Scores};
+    let s = Scratch::new("eval-041-judge");
+    run_inputs(&s);
+    // A sharp calibration: an unmatched message is confidently `other`,
+    // so the judge proposes rather than escalating.
+    let cal = compile_with_temperature(&s, "0.1", "judge.plan.json");
+    let compiled = s
+        .rustev(&[
+            "plan",
+            "show",
+            "--plan",
+            "judge.plan.json",
+            "--rules",
+            "support.rules.json",
+            "--calibration",
+            &cal,
+        ])
+        .expect(0, "ok");
+    let plan_id = compiled["plan_id"].as_str().unwrap().to_string();
+    v3_setup(&s, &plan_id);
+    s.rustev_owned(&views_args("views.json"))
+        .expect(0, "viewed");
+    let views = ScoreViews::parse(&s.read("views.json")).unwrap();
+
+    // l-1's judge run supplies its subject; l-2 has no bundle.
+    std::fs::create_dir_all(s.path("judge-bundles")).unwrap();
+    let mut snap = support_snapshot("pro", &[2, 5], 0);
+    for e in &mut snap.entries {
+        if e.field == "ticket.message" {
+            e.value = json!(views.cases[0].subject.to_string());
+        }
+    }
+    s.write("judge-snap.json", &canonical(&snap));
+    let mut a: Vec<String> = [
+        "run",
+        "--plan",
+        "judge.plan.json",
+        "--rules",
+        "support.rules.json",
+        "--calibration",
+        &cal,
+        "--snapshot",
+        "judge-snap.json",
+        "--evaluation-time",
+        NOW_ARG,
+        "--decision-id",
+        "judge-l-1",
+        "--record-out",
+        "judge-l-1.record.json",
+        "--capture-bytes",
+        "16777216",
+        "--bundle-out",
+        "judge-bundles/l-1.json",
+        "--now-ms",
+        "1800000000000",
+        "--retain",
+        "embedded",
+    ]
+    .iter()
+    .map(|x| x.to_string())
+    .collect();
+    a.extend(scope());
+    s.rustev_owned(&a).expect(0, "judged");
+
+    let judge = |scorer: &str, out: &str| {
+        let mut a: Vec<String> = [
+            "eval",
+            "judge",
+            "--config",
+            "lodging.config.json",
+            "--views",
+            "views.json",
+            "--judge-plan",
+            "judge.plan.json",
+            "--rules",
+            "support.rules.json",
+            "--calibration",
+            &cal,
+            "--bundles",
+            "judge-bundles",
+            "--now-ms",
+            LATER,
+            "--scorer",
+            scorer,
+            "--out",
+            out,
+        ]
+        .iter()
+        .map(|x| x.to_string())
+        .collect();
+        a.extend(scope());
+        s.rustev_owned(&a)
+    };
+    let j = judge("judge", "judge.scores.json").expect(0, "scored");
+    let scores = Scores::parse(&s.read("judge.scores.json")).unwrap();
+    assert_eq!(
+        j["scores_digest"],
+        scores.record_digest().unwrap().to_string()
+    );
+    assert_eq!(
+        j["outcomes"],
+        json!({"judge_bundle_missing": 1, "scored": 1})
+    );
+    assert_eq!(scores.views, views.record_digest().unwrap());
+    assert!(matches!(scores.entries[0].outcome, ScoreOutcome::Score(_)));
+    assert!(scores.entries[0].judge_run.is_some());
+
+    // The judge's scores are read by `eval`.
+    std::fs::create_dir(s.path("judged")).unwrap();
+    let mut a = eval_args(
+        "lodging.dataset.json",
+        "final_test",
+        "lodging.config.json",
+        "lodging.adapter.json",
+        "judged",
+    );
+    a.extend(["--scores".into(), "judge.scores.json".into()]);
+    s.rustev_owned(&a).expect(0, "reported");
+    let report: Json = serde_json::from_slice(&s.read("judged/report.json")).unwrap();
+    assert_eq!(
+        metric(&report, "model/rubric/judged")["value"]["measured"]["n"],
+        1,
+        "{report}"
+    );
+
+    // A scorer the configuration does not declare, and a deterministic
+    // scorer, are refused as invalid input; nothing is written.
+    let j = judge("absent", "x.json").expect(4, "invalid_input");
+    assert_eq!(j["input"], "lodging.config.json");
+    let j = judge("presented", "x.json").expect(4, "invalid_input");
+    assert!(j["detail"].as_str().unwrap().contains("not-a-judge"), "{j}");
+    assert!(!s.exists("x.json"));
+    // Views computed under another configuration are refused.
+    let mut other = views.clone();
+    other.config =
+        rustev_contract::ids::EvaluatorConfigId::parse(&format!("sha256:{}", "2".repeat(64)))
+            .unwrap();
+    s.write("other.views.json", &other.record_canonical().unwrap());
+    let mut a: Vec<String> = [
+        "eval",
+        "judge",
+        "--config",
+        "lodging.config.json",
+        "--views",
+        "other.views.json",
+        "--judge-plan",
+        "judge.plan.json",
+        "--rules",
+        "support.rules.json",
+        "--calibration",
+        &cal,
+        "--bundles",
+        "judge-bundles",
+        "--now-ms",
+        LATER,
+        "--scorer",
+        "judge",
+        "--out",
+        "x.json",
+    ]
+    .iter()
+    .map(|x| x.to_string())
+    .collect();
+    a.extend(scope());
+    let j = s.rustev_owned(&a).expect(4, "invalid_input");
+    assert_eq!(j["input"], "other.views.json");
+}

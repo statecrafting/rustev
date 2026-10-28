@@ -1000,6 +1000,47 @@ exclusion reasons. Tests: `crates/rustev-eval/tests/origin_041.rs` over
 the spec 037 and 038 goldens, and `config_041.rs`, which accepts every
 family.
 
+**Increment 7, part b (2026-10-28): the CLI surface.**
+`crates/rustev-surface/src/adapter.rs` reads `rustev.task-adapter/2`
+beside version 1: version 2 requires `measures`, version 1 refuses them,
+both versions parse, and the rules and record digests are tagged with
+the document's own schema, so a version 1 document keeps its bytes and
+digests (3.1.2). The document is the `MeasuredAdapter` `eval` hands to
+`evaluate_measured_with_views`, a new `rustev-eval` entry point that
+returns the report with the views it computed, so `eval` replays each
+bundle once. In `crates/rustev-surface/src/eval.rs`, `eval_scored` is
+`eval` with scores documents. Under a version 3 configuration it
+refuses a version 1 adapter, reads each `--scores` document, and adds
+`views.json` to `out`, all or none, when any scorer is declared. `eval`
+delegates to it with none, so the existing hosts are unchanged. `views`
+writes `rustev.score-views/1` to a file and prints `viewed`. `judge`
+reads the configuration, the views, the judge plan with its dependencies
+and the judge bundles. It writes the judge scorer's `rustev.scores/1`
+and prints `scored` with its digest and a count per outcome (3.10.2 to
+3.10.4). The CLI adds `--scores` to `eval` and the commands `eval views`
+and `eval judge`. Decisions within the spec:
+- `--scores` past 16, with `--repeat-config`, or with a configuration
+  that parses as version 1 or 2 is a usage error. The configuration is
+  the one file read first, and an unreadable configuration is left to
+  `eval` to report.
+- `eval views` takes no scores, since views do not depend on them.
+- A refusal of a scores document names `--scores` as its input.
+- `eval judge` refuses views computed under another configuration
+  identity and an undeclared scorer, checks the views' case ids as
+  bundle file names, and names each judge refusal's code (3.8.3). Every
+  refusal is `invalid_input`, and no new exit code is added (3.10.5).
+- The stdout of `eval` is unchanged.
+
+Tests:
+- `version_3_eval_writes_views_and_reads_scores`,
+  `scores_usage_and_version_rules` and
+  `eval_judge_writes_scores_from_judge_bundles` in
+  `crates/rustev-cli/tests/eval.rs`. The judge test uses the
+  support-routing plan as the judge over the lodging cohort's views.
+- `version_2_requires_measures_and_tags_its_digest` in the adapter
+  module.
+- The existing CLI goldens, unchanged.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child faithfully
