@@ -602,6 +602,7 @@ fn optimized() -> ExecutionPolicy {
         }),
         shared_calls: None,
         persistent_cache: None,
+        decision_cache: None,
     });
     policy
 }
@@ -928,4 +929,219 @@ fn acquisition_cache_opt_in_changes_plan_identity_and_keeps_cache_validation() {
         )
         .is_err()
     );
+}
+
+/// `support_routing()` as a version 2 definition, whose plan is
+/// `rustev.plan/3`; a map input is its #76 track construct.
+fn support_routing_v2() -> rustev_contract::definition::Definition {
+    use rustev_contract::definition::{Freshness, InputDecl, ProvenanceClass, TypeDecl};
+    let mut d = support_routing();
+    d.schema = schema::DEFINITION_V2.into();
+    d.inputs.push(InputDecl {
+        name: "ticket.tags".into(),
+        ty: TypeDecl::Map {
+            key_max_bytes: 16,
+            value: Box::new(TypeDecl::Bool),
+            max_entries: 4,
+        },
+        provenance: vec![ProvenanceClass::UserSupplied],
+        freshness: Freshness::MaxAgeMs(60_000),
+        evidence: None,
+        on_disagreement: None,
+    });
+    d
+}
+
+fn with_v2(policy: &ExecutionPolicy) -> Result<Compiled, Refusal> {
+    compile_with(
+        &support_routing_v2(),
+        &descriptors_with_fallbacks(),
+        &cal(),
+        policy,
+    )
+}
+
+/// The decision-result cache alone: a memory tier, the payments list as
+/// its volatile source and one key dimension.
+fn decision_cached() -> ExecutionPolicy {
+    use rustev_contract::optimization::*;
+    let mut policy = optimized();
+    let o = policy.optimization.as_mut().unwrap();
+    o.batch = None;
+    o.memory_cache = None;
+    o.decision_cache = Some(DecisionCachePolicy {
+        tiers: vec![DecisionCacheTier::Memory],
+        max_entry_bytes: 4_096,
+        max_entries: Some(8),
+        ttl_ms: 60_000,
+        volatile: vec!["payments.events".into()],
+        key_dimensions: vec!["catalogue_revision".into()],
+        on_refresh_failure: RefreshFailurePolicy::Unresolved,
+    });
+    policy
+}
+
+/// Spec 044, 3.9: one row per compile refusal of `decision_cache`, each
+/// against the complete neighbour. Until the runtime increment lands, the
+/// complete member is itself refused as not available after it validates,
+/// and only a `rustev.plan/3` may carry it (3.1).
+#[test]
+fn decision_cache_members_are_validated_then_refused_as_unavailable() {
+    use rustev_contract::optimization::{DecisionCachePolicy, DecisionCacheTier as T};
+    type Edit = fn(&mut DecisionCachePolicy);
+    let bounds = "decision_cache_bounds: ";
+    let unknown = "volatile_unknown_source: ";
+    let dimension = "key_dimension_invalid: ";
+    let rows: [(&str, Edit, &str); 17] = [
+        ("no tier", |p| p.tiers.clear(), bounds),
+        (
+            "tiers out of order",
+            |p| p.tiers = vec![T::Persistent, T::Memory],
+            bounds,
+        ),
+        (
+            "repeated tier",
+            |p| p.tiers = vec![T::Memory, T::Memory],
+            bounds,
+        ),
+        ("zero entry bytes", |p| p.max_entry_bytes = 0, bounds),
+        ("zero ttl", |p| p.ttl_ms = 0, bounds),
+        ("memory without entries", |p| p.max_entries = None, bounds),
+        ("zero entries", |p| p.max_entries = Some(0), bounds),
+        (
+            "persistent without a store",
+            |p| p.tiers.push(T::Persistent),
+            bounds,
+        ),
+        (
+            "repeated volatile",
+            |p| p.volatile.push("payments.events".into()),
+            bounds,
+        ),
+        (
+            "unknown input",
+            |p| p.volatile = vec!["payments".into()],
+            unknown,
+        ),
+        (
+            "not an acquisition",
+            |p| p.volatile = vec!["step:topic".into()],
+            unknown,
+        ),
+        (
+            "no freshness",
+            |p| p.volatile = vec!["ticket.message".into()],
+            "volatile_without_freshness: input \"ticket.message\" declares no freshness",
+        ),
+        (
+            "empty dimension",
+            |p| p.key_dimensions.push(String::new()),
+            dimension,
+        ),
+        (
+            "colon",
+            |p| p.key_dimensions = vec!["a:b".into()],
+            dimension,
+        ),
+        (
+            "whitespace",
+            |p| p.key_dimensions = vec!["a b".into()],
+            dimension,
+        ),
+        (
+            "repeated dimension",
+            |p| p.key_dimensions.push("catalogue_revision".into()),
+            dimension,
+        ),
+        (
+            "an input",
+            |p| p.key_dimensions = vec!["account.tier".into()],
+            dimension,
+        ),
+    ];
+    let unavailable = "decision_cache is not available in this build";
+    for (row, edit, needle) in rows {
+        let mut policy = decision_cached();
+        edit(
+            policy
+                .optimization
+                .as_mut()
+                .unwrap()
+                .decision_cache
+                .as_mut()
+                .unwrap(),
+        );
+        let r = with_v2(&policy).expect_err(row);
+        assert_eq!(r.category, Category::InvalidExecution, "{row}");
+        assert_eq!(r.subject, "execution.optimization", "{row}");
+        assert!(r.detail.starts_with(needle), "{row}: {}", r.detail);
+    }
+    // Every row's neighbour, and each tier with its bounds, validates and is
+    // then refused as not yet available, never run independently.
+    let mut persistent = decision_cached();
+    let o = persistent.optimization.as_mut().unwrap();
+    o.persistent_cache = shared_and_persistent()
+        .optimization
+        .unwrap()
+        .persistent_cache;
+    let c = o.decision_cache.as_mut().unwrap();
+    c.tiers = vec![T::Persistent];
+    c.max_entries = None;
+    c.volatile.clear();
+    c.key_dimensions.clear();
+    for policy in [decision_cached(), persistent] {
+        let r = with_v2(&policy).expect_err("unavailable");
+        assert_eq!(r.category, Category::InvalidExecution);
+        assert_eq!(r.detail, unavailable);
+    }
+    // A version 1 definition compiles to `rustev.plan/2`.
+    let r = refused(&decision_cached(), "decision_cache requires rustev.plan/3");
+    assert_eq!(r.subject, "execution.optimization");
+    // Without the member, the policy's other mechanisms compile as before.
+    let mut without = decision_cached();
+    let o = without.optimization.as_mut().unwrap();
+    o.decision_cache = None;
+    o.memory_cache = optimized().optimization.unwrap().memory_cache;
+    with_v2(&without).unwrap();
+}
+
+/// Spec 044, 3.1: a plan carries `decision_cache` and its compiled parts
+/// together, and only as `rustev.plan/3`; such a plan round-trips.
+#[test]
+fn decision_cache_plan_members_are_a_plan_3_pair() {
+    use rustev_contract::plan::PlanDecisionCache;
+    let mut plan = with_v2(&execution(CostPolicy::Unlimited, vec![]))
+        .unwrap()
+        .plan;
+    assert_eq!(plan.schema, schema::PLAN_V3);
+    let PlanExecution::Declared(d) = &mut plan.execution else {
+        panic!("declared execution");
+    };
+    d.policy = decision_cached();
+    d.decision_cache = Some(PlanDecisionCache {
+        decision_key_schema: vec!["plan_id".into(), "input:account.tier".into()],
+        refresh_closure: vec!["failed_30d".into()],
+    });
+    let bytes = plan.canonical().unwrap();
+    assert_eq!(Plan::parse(&bytes).unwrap(), plan);
+    for (edit, message) in [
+        (
+            (|p: &mut Plan| p.schema = schema::PLAN.into()) as fn(&mut Plan),
+            "decision_cache is a rustev.plan/3 member",
+        ),
+        (
+            |p: &mut Plan| {
+                let PlanExecution::Declared(d) = &mut p.execution else {
+                    unreachable!()
+                };
+                d.decision_cache = None;
+            },
+            "decision_cache and its compiled parts appear together",
+        ),
+    ] {
+        let mut p = plan.clone();
+        edit(&mut p);
+        let err = Plan::parse(&p.canonical().unwrap()).unwrap_err();
+        assert!(err.to_string().contains(message), "{err}");
+    }
 }

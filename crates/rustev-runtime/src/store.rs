@@ -457,6 +457,7 @@ mod tests {
             memory_cache: None,
             shared_calls: None,
             persistent_cache: None,
+            decision_cache: None,
         }
     }
 

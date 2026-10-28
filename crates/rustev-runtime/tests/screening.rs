@@ -68,6 +68,7 @@ fn policy(batch: bool, cache: bool) -> ExecutionPolicy {
             }),
             shared_calls: None,
             persistent_cache: None,
+            decision_cache: None,
         });
     }
     p

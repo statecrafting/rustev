@@ -2148,10 +2148,16 @@ fn compile_generation(
 
     // (f) continued: the execution policy, once every step is bound
     // (spec 003, 3.2.3).
-    let plan_execution = match execution {
+    let mut plan_execution = match execution {
         None => PlanExecution::None,
         Some(policy) => crate::execution::validate(policy, def, &sorted, &details, &bind_ctx)?,
     };
+    // The decision-result cache's key schema and refresh closure (spec 044,
+    // 3.1).
+    if let PlanExecution::Declared(d) = &mut plan_execution {
+        d.decision_cache = crate::execution::decision_cache(&d.policy, def, &order, &deps, v2)?;
+    }
+    crate::execution::available(&plan_execution)?;
 
     // (g) Budget.
     screening::budget(authored, &screens, descriptors)?;

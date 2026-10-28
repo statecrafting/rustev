@@ -66,6 +66,7 @@ fn policy_with(
         memory_cache: memory,
         shared_calls: None,
         persistent_cache: Some(persistent),
+        decision_cache: None,
     });
     p
 }

@@ -3,7 +3,7 @@
 //! These types describe behavior that is part of a plan and observations that
 //! belong to a run. They do not perform I/O or grant authority. Spec 017
 //! covers runtime-planned batching and bounded memory caching; spec 044 adds
-//! shared calls and the persistent tier.
+//! shared calls, the persistent tier and the decision-result cache.
 
 use serde::{Deserialize, Serialize};
 
@@ -30,6 +30,10 @@ pub struct OptimizationPolicy {
     /// 3.4).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub persistent_cache: Option<PersistentCachePolicy>,
+    /// The decision-result cache (spec 044, 3.6). Only a `rustev.plan/3`
+    /// carries it (3.1).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decision_cache: Option<DecisionCachePolicy>,
 }
 
 /// Bounds of shared calls (spec 044, 3.1 and 3.2).
@@ -106,6 +110,55 @@ pub enum StoreFailurePolicy {
     FailClosed,
     /// A failure is a miss and a diagnostic.
     ContinueWithoutCache,
+}
+
+/// The decision-result cache's tiers, bounds and declared sources (spec
+/// 044, 3.1 and 3.6).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DecisionCachePolicy {
+    /// In lookup order, memory before persistent (3.3). The persistent tier
+    /// is the store `persistent_cache` declares.
+    pub tiers: Vec<DecisionCacheTier>,
+    pub max_entry_bytes: u64,
+    /// Entries of the memory tier; present exactly when it is a tier.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_entries: Option<u64>,
+    pub ttl_ms: u64,
+    /// Input names, and `step:<id>` for an acquisition step, refreshed on
+    /// every hit (3.6.2).
+    pub volatile: Vec<String>,
+    /// Upstream-origin dimensions the host supplies as scope handles (3.5).
+    pub key_dimensions: Vec<String>,
+    /// Omitted means `unresolved` (3.6.5); always written.
+    #[serde(default)]
+    pub on_refresh_failure: RefreshFailurePolicy,
+}
+
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum DecisionCacheTier {
+    Memory,
+    Persistent,
+}
+
+/// What a failed refresh supplies (spec 044, 3.6.5). No policy supplies a
+/// value older than its declared freshness or turns a failure into a value.
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum RefreshFailurePolicy {
+    /// The failure is supplied as it is.
+    #[default]
+    Unresolved,
+    /// The hit is abandoned and the decision runs again with no reuse.
+    Recompute,
+    /// A volatile input's stored snapshot entry is supplied with its
+    /// original as-of time, and the core's freshness check decides.
+    ServeCachedWithinFreshness,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -271,6 +324,70 @@ pub enum SharedRole {
 pub enum SharedLeave {
     Cancelled,
     Deadline,
+}
+
+/// The decision-result cache's part in one decision, a `rustev.run/3`
+/// member (spec 044, 3.6.6). Request indices are positions in the run
+/// record's `requests`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DecisionCacheRecord {
+    pub outcome: DecisionCacheOutcome,
+    /// The entry served from; absent unless `hit` or `refreshed`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entry_id: Option<String>,
+    /// The digest of the run record of the decision that wrote the entry.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_run_record: Option<crate::ids::ContentDigest>,
+    /// By evaluation time, as for a persistent entry.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub age_ms: Option<u64>,
+    /// The store's generations, for an entry of the persistent tier.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub generations: Option<crate::cache_entry::EntryGenerations>,
+    /// Requests supplied from the entry.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub reused: Vec<u32>,
+    /// Requests inside the refresh closure, dispatched again.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub refreshed: Vec<u32>,
+    /// Requests outside the closure dispatched for `closure_mismatch`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub mismatched: Vec<u32>,
+    /// Volatile inputs supplied from the entry under
+    /// `serve_cached_within_freshness`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub substituted: Vec<SubstitutedInput>,
+    /// The policy applied, present when a refresh failed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub on_refresh_failure: Option<RefreshFailurePolicy>,
+    /// At most [`MAX_OPTIMIZATION_DIAGNOSTICS`], as a request's record.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub diagnostics: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DecisionCacheOutcome {
+    /// Served from an entry with no request dispatched again.
+    Hit,
+    /// Served from an entry with at least one request dispatched again.
+    Refreshed,
+    /// No usable entry, or a hit abandoned under `recompute`.
+    Miss,
+    /// Neither served nor admitted; run under `execute_independent`.
+    Bypassed,
+    /// The same conditions under `admission: refuse`.
+    Refused,
+}
+
+/// A volatile input's stored snapshot entry supplied after a failed
+/// refresh (spec 044, 3.6.5).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SubstitutedInput {
+    pub input: String,
+    pub entry_digest: crate::ids::ContentDigest,
 }
 
 impl OptimizationRecord {

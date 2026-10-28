@@ -35,6 +35,7 @@ fn policy(max_waiters: u32, admission: OptimizationAdmission) -> ExecutionPolicy
             allocation: SharedChargeAllocation::FinalOwner,
         }),
         persistent_cache: None,
+        decision_cache: None,
     });
     p
 }

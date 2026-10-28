@@ -768,6 +768,7 @@ async fn live_requests_bypass_the_memory_cache_and_batches() {
         }),
         shared_calls: None,
         persistent_cache: None,
+        decision_cache: None,
     });
     let plan = Arc::new(rig.rt.prepare(support_compiled(Some(&policy))).unwrap());
     // Warm the cache with an ordinary decision.

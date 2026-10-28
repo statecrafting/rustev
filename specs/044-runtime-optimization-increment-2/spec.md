@@ -887,6 +887,90 @@ in `crates/rustev-contract/tests/documents.rs` and
 `crates/rustev-core/tests/execution.rs`; the spec 017 byte and identity
 tests are unchanged.
 
+**Increment 2, part b (2026-10-28): the decision cache members.** The
+policy, plan and run record members of the decision-result cache, with no
+runtime behavior.
+
+What part b adds:
+- In `crates/rustev-contract/src/optimization.rs`, `decision_cache`
+  (`DecisionCachePolicy`, with `DecisionCacheTier` and
+  `RefreshFailurePolicy`) in `OptimizationPolicy`, and
+  `DecisionCacheRecord` (3.6.6). Each new member is omitted when absent.
+- In `crates/rustev-contract/src/plan.rs`, the compiled
+  `PlanDecisionCache` (`decision_key_schema` and `refresh_closure`) as an
+  optional member of the plan's `DeclaredExecution`. The parser refuses
+  it, or the policy member, in a `rustev.plan/2`, and refuses either one
+  without the other.
+- `RunRecord.decision_cache`, which the parser refuses outside
+  `rustev.run/3` and beyond 017's diagnostic bound.
+- In `crates/rustev-core/src/execution.rs`, the validation of the member
+  against the definition with the 3.9 codes, and the derivation of the
+  key schema and the refresh closure from the plan's step order and
+  dependencies, written into the plan's execution section.
+- The contract schemas and the generated Node and WebAssembly
+  declarations are regenerated.
+
+Until increment 5 lands, the compiler refuses a complete, valid member as
+`decision_cache is not available in this build`, as part a did for its
+members, so no plan can enable a mechanism the runtime ignores (017 3.1).
+`served_from_cache` on the runtime's decision result is a runtime type and
+lands with increment 5.
+
+Decisions within the spec:
+- **A version 1 definition is refused.** Its plan is `rustev.plan/2`, which
+  never carries the member (3.1). The refusal is category 12 with the
+  detail `decision_cache requires rustev.plan/3`. 3.9 names no code for
+  it, because it is a version rule, not an unsatisfiable member.
+- **One spelling per tier set.** `tiers` is non-empty, has no repeats and
+  is in lookup order, memory before persistent (3.3), so equal policies
+  have equal `PlanId`s.
+- **Bounds.** `max_entries` is present and positive exactly when the
+  memory tier is. A persistent tier needs `persistent_cache`, whose store
+  holds its entries. `max_entry_bytes` and `ttl_ms` are positive.
+- **Repeats.** A repeated `volatile` entry is a malformed member, not an
+  unknown source, so it is also `decision_cache_bounds`.
+- **Naming a volatile acquisition.** Spec 036 has landed, so a `volatile`
+  entry is an input name, or `step:<id>` for an acquisition or widening
+  step (both capture pages). Input names never contain `:`, so the two
+  forms cannot collide. Anything else is `volatile_unknown_source`. An
+  input whose freshness is `not_required` is
+  `volatile_without_freshness`.
+- **Key dimension names.** A key dimension follows the input name rule
+  (non-empty, no `:` and no whitespace), appears once, and is not an
+  input name, since 3.5 item 3 dimensions are not inputs. Anything else is
+  `key_dimension_invalid`.
+- **Required and default members.** `volatile` and `key_dimensions` are
+  required and may be empty. `on_refresh_failure` may be omitted, which
+  reads as `unresolved` (3.6.5), and is always written, so both spellings
+  give one `PlanId`.
+- **The key schema's members.** In order: `plan_id`, `key_schema_version`,
+  `cache_namespace_version`, `runtime_version`, `scope` and `profile` (the
+  3.5 members, in the request-level key's order); then
+  `dimension:<name>` for each key dimension as declared; then
+  `input:<name>` for each declared input that is not volatile, in
+  declaration order (3.6.1).
+- **The refresh closure.** The closure is computed in the plan's
+  topological order. A step is inside when it is a volatile acquisition
+  step, or when one of its dependencies is a volatile input or a step
+  already inside. Exact steps are inside by this rule as 3.6.2 states,
+  and the runtime recomputes them on every hit in any case.
+- **The run record member.** `entry_id`, `source_run_record` and `age_ms`
+  are present only for a decision served from an entry. `generations` is
+  present only for an entry of the persistent tier. The request index
+  lists are positions in `requests` and are omitted when empty.
+  `on_refresh_failure` is present only when a refresh failed.
+
+Tests:
+- `decision_cache_members_round_trip_and_are_omitted_when_absent` in
+  `crates/rustev-contract/tests/documents.rs`.
+- `decision_cache_members_are_validated_then_refused_as_unavailable` and
+  `decision_cache_plan_members_are_a_plan_3_pair` in
+  `crates/rustev-core/tests/execution.rs`.
+- The unit tests `the_decision_key_schema_orders_its_members` and
+  `the_refresh_closure_follows_the_step_graph` in
+  `crates/rustev-core/src/execution.rs`.
+- The spec 017 byte and identity tests, and part a's, are unchanged.
+
 **Increment 3, part a (2026-10-27): the shared slot.**
 `crates/rustev-runtime/src/shared.rs` holds the slot of 3.2.2 and 3.2.3
 on its own, not yet driven by any request: the bounded registry of

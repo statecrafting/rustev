@@ -6344,6 +6344,12 @@ export namespace RustevExecution1 {
    * members. Member order is the runtime-recorded batch index order.
    */
   export type BatchChargeAllocation = "even_remainder_by_member_index";
+  /**
+   * What a failed refresh supplies (spec 044, 3.6.5). No policy supplies a
+   * value older than its declared freshness or turns a failure into a value.
+   */
+  export type RefreshFailurePolicy = "unresolved" | "recompute" | "serve_cached_within_freshness";
+  export type DecisionCacheTier = "memory" | "persistent";
   export type ExpiryBasis = "injected_runtime_time";
   export type EvictionOrder = "fifo";
   export type StoreFailurePolicy = "fail_closed" | "continue_without_cache";
@@ -6402,6 +6408,11 @@ export namespace RustevExecution1 {
     admission: OptimizationAdmission;
     batch?: BatchPolicy | null;
     cache_namespace_version: number;
+    /**
+     * The decision-result cache (spec 044, 3.6). Only a `rustev.plan/3`
+     * carries it (3.1).
+     */
+    decision_cache?: DecisionCachePolicy | null;
     expiry: ExpiryBasis;
     key_schema_version: number;
     memory_cache?: MemoryCachePolicy | null;
@@ -6426,6 +6437,36 @@ export namespace RustevExecution1 {
      * within one decision's admission wave, so the runtime waits zero.
      */
     max_queue_delay_ms: number;
+  }
+  /**
+   * The decision-result cache's tiers, bounds and declared sources (spec
+   * 044, 3.1 and 3.6).
+   */
+  export interface DecisionCachePolicy {
+    /**
+     * Upstream-origin dimensions the host supplies as scope handles (3.5).
+     */
+    key_dimensions: string[];
+    /**
+     * Entries of the memory tier; present exactly when it is a tier.
+     */
+    max_entries?: number | null;
+    max_entry_bytes: number;
+    /**
+     * Omitted means `unresolved` (3.6.5); always written.
+     */
+    on_refresh_failure?: RefreshFailurePolicy & string;
+    /**
+     * In lookup order, memory before persistent (3.3). The persistent tier
+     * is the store `persistent_cache` declares.
+     */
+    tiers: DecisionCacheTier[];
+    ttl_ms: number;
+    /**
+     * Input names, and `step:<id>` for an acquisition step, refreshed on
+     * every hit (3.6.2).
+     */
+    volatile: string[];
   }
   /**
    * Bounds apply to one plan's cache namespace; no plan's policy evicts
@@ -9600,6 +9641,12 @@ export namespace RustevPlan2 {
    * members. Member order is the runtime-recorded batch index order.
    */
   export type BatchChargeAllocation = "even_remainder_by_member_index";
+  /**
+   * What a failed refresh supplies (spec 044, 3.6.5). No policy supplies a
+   * value older than its declared freshness or turns a failure into a value.
+   */
+  export type RefreshFailurePolicy = "unresolved" | "recompute" | "serve_cached_within_freshness";
+  export type DecisionCacheTier = "memory" | "persistent";
   export type ExpiryBasis = "injected_runtime_time";
   export type EvictionOrder = "fifo";
   export type StoreFailurePolicy = "fail_closed" | "continue_without_cache";
@@ -10377,11 +10424,31 @@ export namespace RustevPlan2 {
   }
   export interface DeclaredExecution {
     /**
+     * Present exactly when the policy has `decision_cache`, and only in a
+     * `rustev.plan/3` (spec 044, 3.1).
+     */
+    decision_cache?: PlanDecisionCache | null;
+    /**
      * Every runtime fallback target, by step in policy order, then position.
      */
     fallbacks: FallbackBinding[];
     id: ExecutionPolicyId;
     policy: ExecutionPolicy;
+  }
+  /**
+   * What the compiler derives from a policy's `decision_cache` (spec 044,
+   * 3.6.1 and 3.6.2).
+   */
+  export interface PlanDecisionCache {
+    /**
+     * The decision-level key's members, in order (3.6.1).
+     */
+    decision_key_schema: string[];
+    /**
+     * Every step that reads a volatile source directly or through another
+     * step, in plan order (3.6.2).
+     */
+    refresh_closure: string[];
   }
   /**
    * A runtime fallback target bound at compile time.
@@ -10426,6 +10493,11 @@ export namespace RustevPlan2 {
     admission: OptimizationAdmission;
     batch?: BatchPolicy | null;
     cache_namespace_version: number;
+    /**
+     * The decision-result cache (spec 044, 3.6). Only a `rustev.plan/3`
+     * carries it (3.1).
+     */
+    decision_cache?: DecisionCachePolicy | null;
     expiry: ExpiryBasis;
     key_schema_version: number;
     memory_cache?: MemoryCachePolicy | null;
@@ -10450,6 +10522,36 @@ export namespace RustevPlan2 {
      * within one decision's admission wave, so the runtime waits zero.
      */
     max_queue_delay_ms: number;
+  }
+  /**
+   * The decision-result cache's tiers, bounds and declared sources (spec
+   * 044, 3.1 and 3.6).
+   */
+  export interface DecisionCachePolicy {
+    /**
+     * Upstream-origin dimensions the host supplies as scope handles (3.5).
+     */
+    key_dimensions: string[];
+    /**
+     * Entries of the memory tier; present exactly when it is a tier.
+     */
+    max_entries?: number | null;
+    max_entry_bytes: number;
+    /**
+     * Omitted means `unresolved` (3.6.5); always written.
+     */
+    on_refresh_failure?: RefreshFailurePolicy & string;
+    /**
+     * In lookup order, memory before persistent (3.3). The persistent tier
+     * is the store `persistent_cache` declares.
+     */
+    tiers: DecisionCacheTier[];
+    ttl_ms: number;
+    /**
+     * Input names, and `step:<id>` for an acquisition step, refreshed on
+     * every hit (3.6.2).
+     */
+    volatile: string[];
   }
   /**
    * Bounds apply to one plan's cache namespace; no plan's policy evicts
@@ -11559,6 +11661,12 @@ export namespace RustevPlan3 {
    * members. Member order is the runtime-recorded batch index order.
    */
   export type BatchChargeAllocation = "even_remainder_by_member_index";
+  /**
+   * What a failed refresh supplies (spec 044, 3.6.5). No policy supplies a
+   * value older than its declared freshness or turns a failure into a value.
+   */
+  export type RefreshFailurePolicy = "unresolved" | "recompute" | "serve_cached_within_freshness";
+  export type DecisionCacheTier = "memory" | "persistent";
   export type ExpiryBasis = "injected_runtime_time";
   export type EvictionOrder = "fifo";
   export type StoreFailurePolicy = "fail_closed" | "continue_without_cache";
@@ -12553,11 +12661,31 @@ export namespace RustevPlan3 {
   }
   export interface DeclaredExecution {
     /**
+     * Present exactly when the policy has `decision_cache`, and only in a
+     * `rustev.plan/3` (spec 044, 3.1).
+     */
+    decision_cache?: PlanDecisionCache | null;
+    /**
      * Every runtime fallback target, by step in policy order, then position.
      */
     fallbacks: FallbackBinding[];
     id: ExecutionPolicyId;
     policy: ExecutionPolicy;
+  }
+  /**
+   * What the compiler derives from a policy's `decision_cache` (spec 044,
+   * 3.6.1 and 3.6.2).
+   */
+  export interface PlanDecisionCache {
+    /**
+     * The decision-level key's members, in order (3.6.1).
+     */
+    decision_key_schema: string[];
+    /**
+     * Every step that reads a volatile source directly or through another
+     * step, in plan order (3.6.2).
+     */
+    refresh_closure: string[];
   }
   /**
    * A runtime fallback target bound at compile time.
@@ -12602,6 +12730,11 @@ export namespace RustevPlan3 {
     admission: OptimizationAdmission;
     batch?: BatchPolicy | null;
     cache_namespace_version: number;
+    /**
+     * The decision-result cache (spec 044, 3.6). Only a `rustev.plan/3`
+     * carries it (3.1).
+     */
+    decision_cache?: DecisionCachePolicy | null;
     expiry: ExpiryBasis;
     key_schema_version: number;
     memory_cache?: MemoryCachePolicy | null;
@@ -12626,6 +12759,36 @@ export namespace RustevPlan3 {
      * within one decision's admission wave, so the runtime waits zero.
      */
     max_queue_delay_ms: number;
+  }
+  /**
+   * The decision-result cache's tiers, bounds and declared sources (spec
+   * 044, 3.1 and 3.6).
+   */
+  export interface DecisionCachePolicy {
+    /**
+     * Upstream-origin dimensions the host supplies as scope handles (3.5).
+     */
+    key_dimensions: string[];
+    /**
+     * Entries of the memory tier; present exactly when it is a tier.
+     */
+    max_entries?: number | null;
+    max_entry_bytes: number;
+    /**
+     * Omitted means `unresolved` (3.6.5); always written.
+     */
+    on_refresh_failure?: RefreshFailurePolicy & string;
+    /**
+     * In lookup order, memory before persistent (3.3). The persistent tier
+     * is the store `persistent_cache` declares.
+     */
+    tiers: DecisionCacheTier[];
+    ttl_ms: number;
+    /**
+     * Input names, and `step:<id>` for an acquisition step, refreshed on
+     * every hit (3.6.2).
+     */
+    volatile: string[];
   }
   /**
    * Bounds apply to one plan's cache namespace; no plan's policy evicts
@@ -15756,6 +15919,12 @@ export namespace RustevRun1 {
       };
   export type FinalCost = "known" | "includes_estimates" | "unknown";
   export type CostMode = "unlimited" | "hard" | "estimated";
+  /**
+   * What a failed refresh supplies (spec 044, 3.6.5). No policy supplies a
+   * value older than its declared freshness or turns a failure into a value.
+   */
+  export type RefreshFailurePolicy = "unresolved" | "recompute" | "serve_cached_within_freshness";
+  export type DecisionCacheOutcome = "hit" | "refreshed" | "miss" | "bypassed" | "refused";
   export type RecordedExecution =
     | "none"
     | {
@@ -15863,6 +16032,11 @@ export namespace RustevRun1 {
   export interface RustevRun1 {
     core: CoreEvidence;
     cost: CostSummary;
+    /**
+     * `rustev.run/3` only (spec 044, 3.6.6): omitted when the plan has no
+     * decision-result cache.
+     */
+    decision_cache?: DecisionCacheRecord | null;
     /**
      * Supplied by the caller; the delivery key sinks deduplicate by.
      */
@@ -16272,6 +16446,67 @@ export namespace RustevRun1 {
      * True only under `hard` with no liability and no bound violation.
      */
     within_guaranteed_cap: boolean;
+  }
+  /**
+   * The decision-result cache's part in one decision, a `rustev.run/3`
+   * member (spec 044, 3.6.6). Request indices are positions in the run
+   * record's `requests`.
+   */
+  export interface DecisionCacheRecord {
+    /**
+     * By evaluation time, as for a persistent entry.
+     */
+    age_ms?: number | null;
+    /**
+     * At most [`MAX_OPTIMIZATION_DIAGNOSTICS`], as a request's record.
+     */
+    diagnostics?: string[];
+    /**
+     * The entry served from; absent unless `hit` or `refreshed`.
+     */
+    entry_id?: string | null;
+    /**
+     * The store's generations, for an entry of the persistent tier.
+     */
+    generations?: EntryGenerations | null;
+    /**
+     * Requests outside the closure dispatched for `closure_mismatch`.
+     */
+    mismatched?: number[];
+    /**
+     * The policy applied, present when a refresh failed.
+     */
+    on_refresh_failure?: RefreshFailurePolicy | null;
+    outcome: DecisionCacheOutcome;
+    /**
+     * Requests inside the refresh closure, dispatched again.
+     */
+    refreshed?: number[];
+    /**
+     * Requests supplied from the entry.
+     */
+    reused?: number[];
+    /**
+     * The digest of the run record of the decision that wrote the entry.
+     */
+    source_run_record?: ContentDigest | null;
+    /**
+     * Volatile inputs supplied from the entry under
+     * `serve_cached_within_freshness`.
+     */
+    substituted?: SubstitutedInput[];
+  }
+  export interface EntryGenerations {
+    namespace: number;
+    scope: number;
+  }
+  /**
+   * A volatile input's stored snapshot entry supplied after a failed
+   * refresh (spec 044, 3.6.5).
+   */
+  export interface SubstitutedInput {
+    entry_digest: ContentDigest;
+    input: string;
   }
   export interface RequestRecord {
     attempts: AttemptRecord[];
@@ -16935,6 +17170,12 @@ export namespace RustevRun2 {
       };
   export type FinalCost = "known" | "includes_estimates" | "unknown";
   export type CostMode = "unlimited" | "hard" | "estimated";
+  /**
+   * What a failed refresh supplies (spec 044, 3.6.5). No policy supplies a
+   * value older than its declared freshness or turns a failure into a value.
+   */
+  export type RefreshFailurePolicy = "unresolved" | "recompute" | "serve_cached_within_freshness";
+  export type DecisionCacheOutcome = "hit" | "refreshed" | "miss" | "bypassed" | "refused";
   export type RecordedExecution =
     | "none"
     | {
@@ -17103,6 +17344,11 @@ export namespace RustevRun2 {
   export interface RustevRun2 {
     core: CoreEvidence;
     cost: CostSummary;
+    /**
+     * `rustev.run/3` only (spec 044, 3.6.6): omitted when the plan has no
+     * decision-result cache.
+     */
+    decision_cache?: DecisionCacheRecord | null;
     /**
      * Supplied by the caller; the delivery key sinks deduplicate by.
      */
@@ -17522,6 +17768,67 @@ export namespace RustevRun2 {
      * True only under `hard` with no liability and no bound violation.
      */
     within_guaranteed_cap: boolean;
+  }
+  /**
+   * The decision-result cache's part in one decision, a `rustev.run/3`
+   * member (spec 044, 3.6.6). Request indices are positions in the run
+   * record's `requests`.
+   */
+  export interface DecisionCacheRecord {
+    /**
+     * By evaluation time, as for a persistent entry.
+     */
+    age_ms?: number | null;
+    /**
+     * At most [`MAX_OPTIMIZATION_DIAGNOSTICS`], as a request's record.
+     */
+    diagnostics?: string[];
+    /**
+     * The entry served from; absent unless `hit` or `refreshed`.
+     */
+    entry_id?: string | null;
+    /**
+     * The store's generations, for an entry of the persistent tier.
+     */
+    generations?: EntryGenerations | null;
+    /**
+     * Requests outside the closure dispatched for `closure_mismatch`.
+     */
+    mismatched?: number[];
+    /**
+     * The policy applied, present when a refresh failed.
+     */
+    on_refresh_failure?: RefreshFailurePolicy | null;
+    outcome: DecisionCacheOutcome;
+    /**
+     * Requests inside the refresh closure, dispatched again.
+     */
+    refreshed?: number[];
+    /**
+     * Requests supplied from the entry.
+     */
+    reused?: number[];
+    /**
+     * The digest of the run record of the decision that wrote the entry.
+     */
+    source_run_record?: ContentDigest | null;
+    /**
+     * Volatile inputs supplied from the entry under
+     * `serve_cached_within_freshness`.
+     */
+    substituted?: SubstitutedInput[];
+  }
+  export interface EntryGenerations {
+    namespace: number;
+    scope: number;
+  }
+  /**
+   * A volatile input's stored snapshot entry supplied after a failed
+   * refresh (spec 044, 3.6.5).
+   */
+  export interface SubstitutedInput {
+    entry_digest: ContentDigest;
+    input: string;
   }
   /**
    * One remote attempt's evidence reference in `rustev.run/2` (spec 020,
@@ -18479,6 +18786,12 @@ export namespace RustevRun3 {
       };
   export type FinalCost = "known" | "includes_estimates" | "unknown";
   export type CostMode = "unlimited" | "hard" | "estimated";
+  /**
+   * What a failed refresh supplies (spec 044, 3.6.5). No policy supplies a
+   * value older than its declared freshness or turns a failure into a value.
+   */
+  export type RefreshFailurePolicy = "unresolved" | "recompute" | "serve_cached_within_freshness";
+  export type DecisionCacheOutcome = "hit" | "refreshed" | "miss" | "bypassed" | "refused";
   export type RecordedExecution =
     | "none"
     | {
@@ -18560,6 +18873,11 @@ export namespace RustevRun3 {
     acquisitions?: [AcquisitionRecord, ...AcquisitionRecord[]];
     core: CoreEvidence;
     cost: CostSummary;
+    /**
+     * `rustev.run/3` only (spec 044, 3.6.6): omitted when the plan has no
+     * decision-result cache.
+     */
+    decision_cache?: DecisionCacheRecord | null;
     /**
      * Supplied by the caller; the delivery key sinks deduplicate by.
      */
@@ -19343,6 +19661,67 @@ export namespace RustevRun3 {
      * True only under `hard` with no liability and no bound violation.
      */
     within_guaranteed_cap: boolean;
+  }
+  /**
+   * The decision-result cache's part in one decision, a `rustev.run/3`
+   * member (spec 044, 3.6.6). Request indices are positions in the run
+   * record's `requests`.
+   */
+  export interface DecisionCacheRecord {
+    /**
+     * By evaluation time, as for a persistent entry.
+     */
+    age_ms?: number | null;
+    /**
+     * At most [`MAX_OPTIMIZATION_DIAGNOSTICS`], as a request's record.
+     */
+    diagnostics?: string[];
+    /**
+     * The entry served from; absent unless `hit` or `refreshed`.
+     */
+    entry_id?: string | null;
+    /**
+     * The store's generations, for an entry of the persistent tier.
+     */
+    generations?: EntryGenerations | null;
+    /**
+     * Requests outside the closure dispatched for `closure_mismatch`.
+     */
+    mismatched?: number[];
+    /**
+     * The policy applied, present when a refresh failed.
+     */
+    on_refresh_failure?: RefreshFailurePolicy | null;
+    outcome: DecisionCacheOutcome;
+    /**
+     * Requests inside the refresh closure, dispatched again.
+     */
+    refreshed?: number[];
+    /**
+     * Requests supplied from the entry.
+     */
+    reused?: number[];
+    /**
+     * The digest of the run record of the decision that wrote the entry.
+     */
+    source_run_record?: ContentDigest | null;
+    /**
+     * Volatile inputs supplied from the entry under
+     * `serve_cached_within_freshness`.
+     */
+    substituted?: SubstitutedInput[];
+  }
+  export interface EntryGenerations {
+    namespace: number;
+    scope: number;
+  }
+  /**
+   * A volatile input's stored snapshot entry supplied after a failed
+   * refresh (spec 044, 3.6.5).
+   */
+  export interface SubstitutedInput {
+    entry_digest: ContentDigest;
+    input: string;
   }
   export interface RequestRecord {
     attempts: AttemptRecord[];

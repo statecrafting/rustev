@@ -60,6 +60,7 @@ fn policy(batch: bool, steps: Vec<rustev_contract::execution::StepExecution>) ->
         memory_cache: None,
         shared_calls: None,
         persistent_cache: None,
+        decision_cache: None,
     });
     p
 }
