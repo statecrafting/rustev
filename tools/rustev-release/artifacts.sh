@@ -159,6 +159,8 @@ case "${1:-}" in
       ty=module; [ "$t" != nodejs ] || ty=commonjs
       printf '{ "type": "%s" }\n' "$ty" > "integrations/rustev-wasm/$d/package.json"
     done
+    # 031 3.9.2: stage the exports entry points (index.js, index.d.ts), as make bindings does.
+    node tools/rustev-conformance/js/wrap-wasm.mjs integrations/rustev-wasm
     for p in $platforms; do cp "$addons/rustev.$p.node" "integrations/rustev-node/npm/$p/"; done
     dirs=$(jq -er '.npm[].directory' tools/rustev-release/release-set.json)
     for dir in $dirs; do

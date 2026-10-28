@@ -1043,6 +1043,19 @@ publication above already were. The remaining step is fresh-consumer
 qualification (3.9.7), run with spec 056's harness and `rustev-release
 qualify` on the next family version; this spec closes when it passes.
 
+**2026-10-28: the WebAssembly package's entry points.** The published
+`@rustev/rustev-wasm@0.1.0` tarball lacks its entry points: its `exports`
+name `./web`, `./bundler` and `./node` `index.js` and `index.d.ts`, and
+the tarball holds none of them, because the `pack` step ran wasm-bindgen
+and wasm-opt but never staged the wrappers. The npm declaration comparison
+found it (`missing or external declaration entry @rustev/rustev-wasm
+./bundler`). `artifacts.sh pack` now runs
+`tools/rustev-conformance/js/wrap-wasm.mjs` on the package, as `make
+bindings` does, and `npm-audit` (3.9.2) refuses a tarball missing any file
+its `main`, `types`, `typings` or `exports` (every condition) names, or
+naming a wildcard, which the comparison also refuses. The fix reaches
+consumers in the next family version.
+
 ## Decisions at approval
 
 1. **Crate and package names** (left to the implementer by #58): decided
