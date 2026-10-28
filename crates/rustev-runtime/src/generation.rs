@@ -570,6 +570,7 @@ async fn request(
         // drive() does not admit to cache; only run_requests() uses this
         // queue. Generation returns its pending write to the delivery gate.
         deferred_cache: None,
+        persistent: None,
         live: None,
     };
     let mut cache = None;

@@ -176,6 +176,9 @@ fn prepare_json(e: &PrepareError) -> serde_json::Value {
         PrepareError::SinkVersionUnsupported { schema } => {
             json!({"kind": "sink_version_unsupported", "schema": schema})
         }
+        // Spec 044, 3.4.1: the CLI installs no store.
+        PrepareError::StoreMissing => json!({"kind": "store_missing"}),
+        PrepareError::StoreContractMismatch => json!({"kind": "store_contract_mismatch"}),
     }
 }
 

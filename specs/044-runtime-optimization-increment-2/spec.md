@@ -55,6 +55,9 @@ extends:
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-wasm/" }, nature: additive }
   # Archive policy entries and byte budgets for the new source files.
   - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
+  # The CLI reports every `PrepareError`, including `store_missing` and
+  # `store_contract_mismatch` (3.4.1).
+  - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: additive }
   # Adds 044 to `make verify` when the implementation is complete.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
 depends_on:
@@ -62,6 +65,7 @@ depends_on:
   - "002-decision-contract-and-pure-core"
   - "003-runtime-execution-and-evidence"
   - "004-evaluation-and-replay"
+  - "006-cli-surface"
   - "009-remote-adapter-protocol"
   - "012-jev-integration"
   - "013-remote-state-on-failed-attempts"
@@ -998,6 +1002,80 @@ Tests:
   check in order with its diagnostic and deletion, and the `put` answers.
 - `a_cache_entry_is_sealed_over_its_body` in
   `crates/rustev-contract/tests/documents.rs`.
+
+**Increment 4, part b (2026-10-28): the persistent tier.** The compiler
+accepts `persistent_cache`. The tier joins the runtime, and increment 4
+gains a part c.
+
+What part b adds:
+- `RuntimeBuilder::store` installs the host's `RuntimeStore`. `prepare`
+  fails with `store_missing` (`PrepareError::StoreMissing`) for a
+  persistent tier on a runtime without a store, and with
+  `store_contract_mismatch` when the store's contract is not the
+  plan's. The CLI and the Node binding report both. Neither installs a
+  store, since the Node exposure of the store is out of scope (section
+  4).
+- In `crates/rustev-runtime/src/driver.rs`, a request that misses the
+  memory tier reads the store before it dispatches (3.3), on its own
+  task and under the decision's deadline and cancellation.
+- An entry that passes every check of 3.4.3, and whose output the core
+  validates, is served with the new mechanism `persistent_cache`
+  (outcome `hit`, the key id as `entry_id`, its age by evaluation time,
+  and its source attempt) and admitted to the memory tier under that
+  tier's bounds.
+- A miss carries its diagnostic, and a corrupt entry is deleted.
+- A read failure under `fail_closed` refuses the request when
+  `admission` is `refuse`. Otherwise it is a miss with `store_failed`.
+- The generations each read returns are those captured before the
+  work. A request whose primary target answered is queued for writing.
+- At the end of a judged decision, `write_pending` in
+  `crates/rustev-runtime/src/store.rs` writes each queued key once,
+  under the generations its read captured. An entry over
+  `max_entry_bytes` is not sent. Every answer but `stored`, and every
+  failure, is a diagnostic on that request's record. None changes the
+  output or the judgment, and none is retried.
+
+Part c holds the request key's profile member (3.5), invalidation
+across tiers (3.10.3) and the `Runtime::invalidate` entry point.
+
+Decisions within the spec:
+- **The entry's `evidence` is the decision's evidence record digest**
+  (3.4.3's "the evidence digest"). The run record cannot carry its own
+  digest, and it must carry each write's answer (section 5's
+  `store_conflict`). So writes follow the evidence and precede the run
+  record, and a cancelled decision, which has no evidence, writes
+  nothing.
+- **A request whose store read failed captured no generations**, so it
+  is never written.
+- **Only primary-target outputs are written**, as for the memory tier
+  (017 3.1).
+- **A request the runtime batches reads and writes no persistent
+  entry.** Batch membership is decided before dispatch, and its records
+  are the batch's.
+- **Live re-execution and the generation stage read and write no
+  persistent entry**, as for the memory tier.
+- **A request whose plan has no memory tier records the mechanism
+  `persistent_cache`** on a miss as well as on a hit. With a memory
+  tier, a miss stays `memory_cache`.
+
+Tests: `crates/rustev-runtime/tests/persistent.rs`, over an in-memory
+test store with generations and failures on demand:
+- the store's presence and contract at `prepare`
+- a restart, as a new runtime over the same store, served without
+  dispatch with the same proposal
+- two tenants
+- a corrupt entry, deleted and written again
+- an entry from the future, expired, of another schema, and older than
+  the store generation, each kept
+- an invalidation during the decision
+- a conflicting `put`, with the output kept
+- both failure policies on read and write
+- both budgets
+- a persistent hit admitted to the memory tier
+
+`incomplete_shared_and_persistent_members_are_refused` in
+`crates/rustev-core/tests/execution.rs` now shows the persistent member
+accepted and part of `PlanId`.
 
 ## Decisions at approval
 

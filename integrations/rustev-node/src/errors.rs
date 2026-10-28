@@ -88,5 +88,15 @@ pub fn prepare_error(e: PrepareError) -> Error {
             "sink_version_unsupported",
             serde_json::json!({ "schema": schema }),
         ),
+        // Spec 044, 3.4.1: the binding installs no store (its exposure is
+        // out of that spec's scope).
+        PrepareError::StoreMissing => {
+            fail("PlanPrepareRefused", "store_missing", serde_json::json!({}))
+        }
+        PrepareError::StoreContractMismatch => fail(
+            "PlanPrepareRefused",
+            "store_contract_mismatch",
+            serde_json::json!({}),
+        ),
     }
 }

@@ -821,15 +821,33 @@ fn incomplete_shared_and_persistent_members_are_refused() {
         assert!(r.detail.starts_with(needle), "{row}: {}", r.detail);
     }
     // The complete persistent member, alone or beside the spec 017
-    // mechanisms, is refused as not yet available, never accepted and run
-    // independently; complete shared calls are accepted, and are part of
-    // the plan's identity.
+    // mechanisms, is accepted and is part of the plan's identity, as are
+    // complete shared calls.
     let mut policy = shared_and_persistent();
     let o = policy.optimization.as_mut().unwrap();
     o.shared_calls = None;
     o.batch = optimized().optimization.unwrap().batch;
-    let r = refused(&policy, "is not available in this build");
-    assert_eq!(r.detail, "persistent_cache is not available in this build");
+    let with_persistent = accepted(&policy);
+    policy
+        .optimization
+        .as_mut()
+        .unwrap()
+        .persistent_cache
+        .as_mut()
+        .unwrap()
+        .ttl_ms += 1;
+    assert_ne!(with_persistent.id, accepted(&policy).id);
+    policy
+        .optimization
+        .as_mut()
+        .unwrap()
+        .persistent_cache
+        .as_mut()
+        .unwrap()
+        .store_contract
+        .conflict = "last writer wins".into();
+    assert_ne!(with_persistent.id, accepted(&policy).id);
+    assert_ne!(with_persistent.id, accepted(&optimized()).id);
     let mut shared = shared_and_persistent();
     shared.optimization.as_mut().unwrap().persistent_cache = None;
     let with_shared = accepted(&shared);
