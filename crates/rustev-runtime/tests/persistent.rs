@@ -20,8 +20,9 @@ use rustev_contract::optimization::{
 use rustev_contract::run::{RequestRecord, RequestResult};
 use rustev_core::seams::{BoxFuture, CancelSignal};
 use rustev_runtime::{
-    Completion, Decided, DecisionRequest, Invalidated, ManualClock, PrepareError, PutAnswer,
-    PutTerms, Runtime, RuntimeStore, StoreCall, StoreFailure, StoreSelector, Stored,
+    Completion, Decided, DecisionRequest, Invalidated, ManualClock, PersistentInvalidation,
+    PrepareError, PutAnswer, PutTerms, Runtime, RuntimeStore, StoreCall, StoreFailure,
+    StoreSelector, Stored,
 };
 
 fn contract() -> StoreContract {
@@ -97,6 +98,7 @@ struct State {
     scope_generation: BTreeMap<(String, String), u64>,
     fail_get: bool,
     fail_put: bool,
+    fail_invalidate: bool,
     /// Answer every `put` with this instead of storing.
     answer: Option<PutAnswer>,
     /// Advance the namespace generation on the next `get`, after reading:
@@ -236,6 +238,9 @@ impl RuntimeStore for TestStore {
     ) -> BoxFuture<'a, Result<Invalidated, StoreFailure>> {
         Box::pin(async move {
             let mut s = self.state();
+            if s.fail_invalidate {
+                return Err(failed("invalidate"));
+            }
             let before = s.entries.len();
             let generation = match &selector {
                 StoreSelector::Namespace => {
@@ -666,4 +671,133 @@ async fn a_persistent_hit_is_admitted_to_memory() {
     // The memory tier answered before the store was read.
     assert_eq!(store.state().gets, gets);
     assert_eq!(backend.dispatched().len(), 3);
+}
+
+/// Spec 044, 3.10.3: `invalidate_plan` invalidates the memory tier and
+/// marks the namespace unavailable to the persistent tier, which neither
+/// reads nor writes it until `Runtime::invalidate` has completed in the
+/// store; a store failure leaves it unavailable until a later call
+/// reconciles it.
+#[tokio::test(flavor = "current_thread")]
+async fn invalidation_reaches_every_tier() {
+    let backend = answering(linear_head());
+    let store = TestStore::new();
+    let rt = runtime(&backend, Some(store.clone()));
+    let plan = rt.prepare(support_compiled(Some(&policy()))).unwrap();
+    let cancel = CancelSignal::new();
+    let run = |id: &str| rt.decide(&plan, request(id), &cancel);
+    run("cold").await.unwrap();
+    assert_eq!(store.state().entries.len(), 3);
+
+    let marked = rt.invalidate_plan(&plan).unwrap();
+    assert_eq!(marked.persistent, Some(PersistentInvalidation::Pending));
+    assert!(!marked.complete);
+    // Unavailable: no read and no write, though the store still holds the
+    // entries.
+    let gets = store.state().gets;
+    let d = run("unavailable").await.unwrap();
+    assert!(every(&d, OptimizationOutcome::Miss));
+    assert!(diagnosed(
+        &d,
+        "persistent tier unavailable until invalidation completes"
+    ));
+    assert_eq!(store.state().gets, gets);
+    assert_eq!(store.state().puts, 3);
+    assert_eq!(backend.dispatched().len(), 6);
+
+    // A failed store invalidation keeps it unavailable.
+    store.state().fail_invalidate = true;
+    let failed = rt.invalidate(&plan, None).await.unwrap();
+    assert!(matches!(
+        failed.persistent,
+        Some(PersistentInvalidation::Failed { .. })
+    ));
+    assert!(!failed.complete);
+    let d = run("still").await.unwrap();
+    assert!(diagnosed(&d, "unavailable until invalidation completes"));
+
+    // A later call reconciles it: the store's generation advances and its
+    // entries go; the tier reads and writes again.
+    store.state().fail_invalidate = false;
+    let done = rt.invalidate(&plan, None).await.unwrap();
+    assert_eq!(
+        done.persistent,
+        Some(PersistentInvalidation::Done {
+            generation: 1,
+            removed: 3
+        })
+    );
+    assert!(done.complete);
+    let d = run("after").await.unwrap();
+    assert!(every(&d, OptimizationOutcome::Miss));
+    assert_eq!(store.state().entries.len(), 3);
+    let d = run("warm").await.unwrap();
+    assert!(every(&d, OptimizationOutcome::Hit));
+}
+
+/// Spec 044, 3.10.3: a scope's invalidation reaches only that scope.
+#[tokio::test(flavor = "current_thread")]
+async fn a_scope_invalidation_leaves_other_scopes() {
+    let backend = answering(linear_head());
+    let store = TestStore::new();
+    let rt = runtime(&backend, Some(store.clone()));
+    let plan = rt.prepare(support_compiled(Some(&policy()))).unwrap();
+    let tenant = |id: &str, t: &[u8]| {
+        let mut r = request(id);
+        r.principal_handle = t.to_vec();
+        r
+    };
+    for (id, t) in [("a", b"tenant-a"), ("b", b"tenant-b")] {
+        rt.decide(&plan, tenant(id, t), &CancelSignal::new())
+            .await
+            .unwrap();
+    }
+    assert_eq!(store.state().entries.len(), 6);
+    let done = rt.invalidate(&plan, Some(b"tenant-a")).await.unwrap();
+    assert!(done.complete);
+    assert_eq!(
+        done.persistent,
+        Some(PersistentInvalidation::Done {
+            generation: 1,
+            removed: 3
+        })
+    );
+    let b = rt
+        .decide(&plan, tenant("b2", b"tenant-b"), &CancelSignal::new())
+        .await
+        .unwrap();
+    assert!(every(&b, OptimizationOutcome::Hit));
+    let a = rt
+        .decide(&plan, tenant("a2", b"tenant-a"), &CancelSignal::new())
+        .await
+        .unwrap();
+    assert!(every(&a, OptimizationOutcome::Miss));
+    // A scope's store invalidation does not complete it while its
+    // namespace awaits its own; the namespace's completes both.
+    rt.invalidate_plan(&plan).unwrap();
+    let scoped = rt.invalidate(&plan, Some(b"tenant-a")).await.unwrap();
+    assert!(matches!(
+        scoped.persistent,
+        Some(PersistentInvalidation::Done { .. })
+    ));
+    assert!(!scoped.complete);
+    let a = rt
+        .decide(&plan, tenant("a3", b"tenant-a"), &CancelSignal::new())
+        .await
+        .unwrap();
+    assert!(diagnosed(&a, "unavailable until invalidation completes"));
+    assert!(rt.invalidate(&plan, None).await.unwrap().complete);
+    // A plan with a memory tier alone invalidates it, complete at once; a
+    // plan with no optimization policy has nothing to invalidate.
+    let mut memory_only = policy_with(
+        persistent(StoreFailurePolicy::ContinueWithoutCache),
+        Some(memory()),
+        OptimizationAdmission::Refuse,
+    );
+    memory_only.optimization.as_mut().unwrap().persistent_cache = None;
+    let memory_plan = rt.prepare(support_compiled(Some(&memory_only))).unwrap();
+    let r = rt.invalidate(&memory_plan, None).await.unwrap();
+    assert_eq!((r.persistent, r.complete), (None, true));
+    let plain = rt.prepare(support_compiled(None)).unwrap();
+    assert_eq!(rt.invalidate(&plain, None).await, None);
 }

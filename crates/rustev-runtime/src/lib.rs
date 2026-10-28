@@ -64,7 +64,7 @@ pub use clock::{Clock, Instant, ManualClock, TokioClock};
 pub use dynamic::{DynamicAsked, DynamicBounds, DynamicDelivery, ask_dynamic};
 pub use ledger::Ledger;
 pub use live::{DispatchAnswer, LiveAuthorizer, LiveRefusal, LiveRequest, LiveResult};
-pub use optimization::InvalidationResult;
+pub use optimization::{InvalidationResult, PersistentInvalidation};
 pub use sink::{DeliveryFailure, DeliveryTicket, SinkPolicy, SinkStats};
 
 use crate::optimization::InvalidationSelector;
@@ -228,6 +228,9 @@ pub(crate) struct Inner {
     pub shared: Option<Arc<Ledger>>,
     /// The host's store behind the persistent tier (spec 044, 3.4).
     pub store: Option<Arc<dyn RuntimeStore>>,
+    /// Persistent selections invalidated in the memory tiers and not yet
+    /// in the store: a namespace, or a scope in it (spec 044, 3.10.3).
+    unavailable: Mutex<BTreeSet<(String, Option<String>)>>,
     optimizer: optimization::Optimizer,
     admission: Arc<Semaphore>,
     queued: AtomicUsize,
@@ -237,6 +240,16 @@ pub(crate) struct Inner {
     /// Decision ids submitted and not yet finished, so no two live
     /// decisions share attempt ids (spec 003, 3.9.2).
     live: Mutex<BTreeSet<String>>,
+}
+
+impl Inner {
+    /// Whether a persistent selection covering this key awaits its store
+    /// invalidation (spec 044, 3.10.3).
+    pub(crate) fn persistent_unavailable(&self, namespace: &str, scope_id: &str) -> bool {
+        let marks = self.unavailable.lock().unwrap_or_else(|e| e.into_inner());
+        marks.contains(&(namespace.to_string(), None))
+            || marks.contains(&(namespace.to_string(), Some(scope_id.to_string())))
+    }
 }
 
 pub struct Runtime {
@@ -397,6 +410,7 @@ impl RuntimeBuilder {
                 stats,
                 shared: self.shared,
                 store: self.store,
+                unavailable: Mutex::new(BTreeSet::new()),
                 optimizer: optimization::Optimizer::default(),
                 admission: Arc::new(Semaphore::new(c.max_in_flight)),
                 queued: AtomicUsize::new(0),
@@ -706,32 +720,123 @@ impl Runtime {
     /// Invalidate every reusable result in this plan's namespace, for any
     /// correction, revocation, erasure, artifact withdrawal or policy
     /// change the host observed. The generation advances before entries are
-    /// removed, so a result captured earlier is never stored or served.
+    /// removed, so a result captured earlier is never stored or served. A
+    /// plan with a persistent tier also has its namespace marked
+    /// unavailable in this process until [`Runtime::invalidate`] completes
+    /// for it (spec 044, 3.10.3).
     pub fn invalidate_plan(&self, plan: &PreparedPlan) -> Option<InvalidationResult> {
         let namespace = plan.optimization_namespace()?;
-        Some(
-            self.inner
-                .optimizer
-                .invalidate(&InvalidationSelector::Namespace { namespace }),
-        )
+        Some(self.invalidate_memory(plan, namespace, None))
     }
 
     /// Invalidate reusable results for one opaque authorized scope, as for
-    /// an erasure or a scope revocation.
+    /// an erasure or a scope revocation, as [`Runtime::invalidate_plan`]
+    /// does for a namespace.
     pub fn invalidate_scope(
         &self,
         plan: &PreparedPlan,
         principal_handle: &[u8],
     ) -> Option<InvalidationResult> {
         let namespace = plan.optimization_namespace()?;
-        Some(
-            self.inner
-                .optimizer
-                .invalidate(&InvalidationSelector::Scope {
-                    namespace,
-                    scope_id: optimization::scope_id(principal_handle),
-                }),
-        )
+        Some(self.invalidate_memory(
+            plan,
+            namespace,
+            Some(optimization::scope_id(principal_handle)),
+        ))
+    }
+
+    /// Invalidate the plan's namespace, or one authorized scope of it, in
+    /// every tier (spec 044, 3.10.3): the memory tier at once, then the
+    /// store, whose generation advances. The selection is unavailable to
+    /// the persistent tier until the store answers; a failure leaves it
+    /// unavailable, and a later call reconciles it. Invalidation is not
+    /// carried to other processes (3.10.4).
+    pub async fn invalidate(
+        &self,
+        plan: &PreparedPlan,
+        principal_handle: Option<&[u8]>,
+    ) -> Option<InvalidationResult> {
+        let namespace = plan.optimization_namespace()?;
+        let scope = principal_handle.map(optimization::scope_id);
+        let mut result = self.invalidate_memory(plan, namespace.clone(), scope.clone());
+        let Some(store) = self
+            .inner
+            .store
+            .as_ref()
+            .filter(|_| result.persistent.is_some())
+        else {
+            return Some(result);
+        };
+        let selector = match &scope {
+            None => StoreSelector::Namespace,
+            Some(scope) => StoreSelector::Scope(scope.clone()),
+        };
+        let call = StoreCall {
+            remaining_ms: None,
+            cancel: CancelSignal::new(),
+        };
+        match store.invalidate(&namespace, selector, call).await {
+            Ok(done) => {
+                let mut marks = self.unavailable();
+                match &scope {
+                    // A namespace covers every scope in it.
+                    None => marks.retain(|(n, _)| *n != namespace),
+                    Some(scope) => {
+                        marks.remove(&(namespace.clone(), Some(scope.clone())));
+                    }
+                }
+                result.persistent = Some(PersistentInvalidation::Done {
+                    generation: done.generation,
+                    removed: done.removed,
+                });
+                // A scope stays unavailable while its namespace awaits its
+                // own store invalidation.
+                result.complete = !marks.contains(&(namespace.clone(), None));
+            }
+            Err(failure) => {
+                result.persistent = Some(PersistentInvalidation::Failed {
+                    detail: failure.detail,
+                });
+            }
+        }
+        Some(result)
+    }
+
+    fn unavailable(&self) -> std::sync::MutexGuard<'_, BTreeSet<(String, Option<String>)>> {
+        self.inner
+            .unavailable
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// The memory tier's invalidation, with the selection marked
+    /// unavailable to the persistent tier when the plan has one.
+    fn invalidate_memory(
+        &self,
+        plan: &PreparedPlan,
+        namespace: String,
+        scope: Option<String>,
+    ) -> InvalidationResult {
+        let selector = match &scope {
+            None => InvalidationSelector::Namespace {
+                namespace: namespace.clone(),
+            },
+            Some(scope_id) => InvalidationSelector::Scope {
+                namespace: namespace.clone(),
+                scope_id: scope_id.clone(),
+            },
+        };
+        let mut result = self.inner.optimizer.invalidate(&selector);
+        let persistent = plan
+            .optimization
+            .as_ref()
+            .is_some_and(|o| o.persistent_cache.is_some());
+        if persistent && self.inner.store.is_some() {
+            self.unavailable().insert((namespace, scope));
+            result.persistent = Some(PersistentInvalidation::Pending);
+            result.complete = false;
+        }
+        result
     }
 
     async fn admit(

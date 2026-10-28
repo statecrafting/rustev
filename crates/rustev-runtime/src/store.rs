@@ -354,6 +354,12 @@ pub(crate) async fn write_pending(pending: Pending, w: Writing<'_>) -> WriteDiag
             continue;
         }
         let at = (write.step.clone(), write.instance.clone());
+        if w.rt
+            .persistent_unavailable(&write.key.namespace, &write.key.scope_id)
+        {
+            diagnostics.push((at, crate::driver::UNAVAILABLE.into()));
+            continue;
+        }
         let Some(evidence) = w.evidence.clone() else {
             diagnostics.push((
                 at,
@@ -460,6 +466,7 @@ mod tests {
         let descriptor = DescriptorId::parse(&digest('c')).unwrap();
         request_key(KeyParts {
             plan_id: &plan,
+            profile: "none",
             policy: &policy(),
             principal,
             backend_artifact: &artifact,
