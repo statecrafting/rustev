@@ -298,3 +298,13 @@ tests cover usage, freshness refusals and a dry run whose `not_run` steps
 `qualify` refuses (`tools/rustev-release/tests/qualify_harness.rs`). A
 live run needs a published version after `0.1.0` and part a's example.
 
+**Part c (2026-10-27): the workflow.** `.github/workflows/qualify.yml`,
+dispatched with a published tag, downloads the signed manifest from the
+hosted release, installs the pinned and MSRV toolchains, and runs
+`qualify.sh` on each of release.yml's seven platforms; the musl
+platforms run it in an Alpine container on the host, pinned by digest. Each platform's step
+files are uploaded as `qualify-<platform>`, and `rustev-release qualify`
+over the collected files records the lifecycle. It is not a required
+check. Remaining for `implementation: complete`: the next family
+version's publication under a signed instruction, the workflow's passing
+matrix and the recorded qualification (Acceptance).
