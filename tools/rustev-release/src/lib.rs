@@ -26,6 +26,7 @@ pub mod npm;
 pub mod prerelease;
 pub mod qualification;
 pub mod repro;
+pub mod tagged;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;

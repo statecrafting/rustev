@@ -2,7 +2,7 @@
 id: "058-one-tagged-run-releases-the-family"
 title: "One tagged run releases the family (amends 021, 031, 053 and 056)"
 status: approved
-implementation: pending
+implementation: in-progress
 created: "2026-10-28"
 summary: >
   A proposed amendment of approved specs 021 (3.1, 3.8 to 3.10), 031 (3.9,
@@ -387,6 +387,47 @@ request; later parts append here and do not edit this list:
    and `crates-publish` Environments, the tag ruleset, and the `release/next` protection
    removed.
 5. **Closure**: the first release under this spec (Acceptance).
+
+**Increment 1 (2026-10-28).** `tools/rustev-release/src/tagged.rs` and
+new `rustev-release` subcommands, beside the old ones (retired in
+increment 3):
+
+- `tag <tag> <main-ref> <check-runs.json>` checks 3.1.1 in order (the ref's
+  form, an annotated tag verifying against the built-in `allowed_signers`,
+  the release set's version at the tagged commit, reachability from
+  `<main-ref>`, and a `ci-gate` check run concluded `success` on the commit
+  in the GitHub check-runs response the workflow fetches) and prints the
+  commit, tag object, version, candidate flag and source date as
+  `$GITHUB_OUTPUT` lines.
+- `run-manifest <evidence-dir> <artifacts-dir> <tag>` is `manifest` with
+  the run's artifacts required and the annotated tag's object id recorded
+  as the manifest's optional `tag_object` (3.2.4); no signature is read.
+- `publish-crates` and `publish-npm <release-dir> <publication.json>`
+  check each `.crate` or tarball against the run's manifest, then publish
+  idempotently (3.3, 3.5.2): present with the run's checksum is recorded
+  `present`, present with another fails, absent runs `cargo publish
+  --locked` or `npm publish --provenance --access public` and must then
+  appear with the run's checksum before the next item. npm starts only when
+  every crate is public. Neither reads a registry token; `cargo` and `npm`
+  read the trusted-publishing credentials the workflow supplies.
+  `publication.json` (`rustev.publication-record/1`) is written on success
+  and failure alike.
+- `github-release <release-dir>` requires every manifest file, each
+  binary's `.sha256`, a non-empty `<file>.intoto.jsonl` per attested file
+  and, for a release, `publication.json`, then creates the release once
+  (a candidate: a pre-release, never latest); an existing release with the
+  same assets and flag is success, any difference fails.
+  `verify-assets <release-dir>` is the same check over a downloaded
+  release; `observe-registries <manifest>` compares crates.io and npm with
+  the manifest.
+
+`tests/tagged.rs` breaks each rule of 3.1.1 once and covers the run's
+manifest and 3.5.2 for crates, npm and the GitHub release. Moved to
+increment 2, to keep each pull request reviewable: `qualify` without an
+instruction or journal, and the workflow test of Acceptance, which tests
+the new workflow. Not done: a crate without a crates.io trusted publisher
+is refused by crates.io at its upload, not before the first upload, since
+no public API names a crate's trusted publishers.
 
 ## Open questions for the owner
 
