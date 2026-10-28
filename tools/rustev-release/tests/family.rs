@@ -4,7 +4,7 @@ use rustev_release::{
     ReleaseSet,
     archive::sha256_hex,
     family_artifacts as fa,
-    lifecycle::Lookup,
+    lifecycle::{Lookup, Registry},
     manifest::{self, Inputs, ReleaseManifest, Toolchain},
     repro::{Scratch, fresh_dir},
 };
@@ -185,16 +185,28 @@ fn slsa_three_missing_sbom_unknown_kinds_and_paths_are_refused() {
     }
 }
 
+/// The named crate absent, every other one present with another checksum.
+struct Index(String);
+impl Registry for Index {
+    fn lookup(&mut self, name: &str, _: &str) -> Lookup {
+        if name == self.0 {
+            Lookup::Absent
+        } else {
+            Lookup::Visible {
+                checksum: "wrong".into(),
+            }
+        }
+    }
+}
+
 #[test]
 fn observations_report_all_missing_and_mismatched_and_npm_errors_stay_unknown() {
     let (_, _, mut m) = fixture();
     let mut p = m.packages[0].clone();
     p.name = "second".into();
     m.packages.push(p);
-    let mut r = rustev_release::lifecycle::FakeRegistry::default();
-    r.index
-        .insert(("second".into(), m.version.clone()), ("wrong".into(), 0));
-    let e = rustev_release::hosted::observe_crates(&m, &mut r);
+    let absent = m.packages[0].name.clone();
+    let e = rustev_release::hosted::observe_crates(&m, &mut Index(absent));
     assert_eq!(e.len(), 2);
     assert!(e[0].contains("missing") && e[1].contains("mismatch"));
     assert_eq!(

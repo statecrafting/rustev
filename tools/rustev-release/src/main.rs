@@ -930,10 +930,8 @@ fn publish_cmd(dir: &str, record: &str, kind: &str) -> Result<(), String> {
     let list = items(&m, kind, Some(dir))?;
     if kind == "npm" {
         // 031 3.1, layer 6: npm starts after every crate is public.
-        let missing = rustev_release::hosted::observe_crates(
-            &m,
-            &mut rustev_release::cratesio::CratesIo { wait_seconds: 0 },
-        );
+        let missing =
+            rustev_release::hosted::observe_crates(&m, &mut rustev_release::cratesio::CratesIo);
         if !missing.is_empty() {
             return Err(format!(
                 "058 3.3.2: crates not public: {}",
@@ -990,10 +988,8 @@ fn verify_assets_cmd(dir: &str) -> Result<(), String> {
 fn observe_registries(manifest: &str) -> Result<(), String> {
     let bytes = std::fs::read(manifest).map_err(|e| format!("{manifest}: {e}"))?;
     let m = rustev_release::candidate::publication_manifest(&bytes)?;
-    let mut problems = rustev_release::hosted::observe_crates(
-        &m,
-        &mut rustev_release::cratesio::CratesIo { wait_seconds: 0 },
-    );
+    let mut problems =
+        rustev_release::hosted::observe_crates(&m, &mut rustev_release::cratesio::CratesIo);
     for item in rustev_release::tagged::items(&m, "npm", None)? {
         match rustev_release::hosted::npm_lookup(&item.name, &m.version) {
             rustev_release::lifecycle::Lookup::Visible { checksum }

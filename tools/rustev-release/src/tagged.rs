@@ -416,11 +416,7 @@ pub struct Cargo {
 
 impl Publisher for Cargo {
     fn lookup(&mut self, item: &Item, version: &str) -> Lookup {
-        crate::lifecycle::Registry::lookup(
-            &mut crate::cratesio::CratesIo { wait_seconds: 0 },
-            &item.name,
-            version,
-        )
+        crate::lifecycle::Registry::lookup(&mut crate::cratesio::CratesIo, &item.name, version)
     }
     fn publish(&mut self, item: &Item, _: &str) -> Result<(), String> {
         let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".into());
