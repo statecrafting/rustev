@@ -7,6 +7,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use rustev_release::ReleaseSet;
 use rustev_release::archive::sha256_hex;
 use rustev_release::family_artifacts as fa;
 use rustev_release::lifecycle::{Lookup, State};
@@ -15,7 +16,6 @@ use rustev_release::prerelease::{Assets, Outcome, Release, Releases};
 use rustev_release::qualification::{KINDS, SCHEMA, Status, Step, required};
 use rustev_release::repro::{Scratch, fresh_dir};
 use rustev_release::tagged::{self, Item, Publisher, Record};
-use rustev_release::{ReleaseSet, prerelease};
 
 const IDENTITY: &str = "release@example.invalid";
 
@@ -528,9 +528,6 @@ impl Releases for Gh {
     fn lookup(&mut self, _: &str) -> Result<Option<Release>, String> {
         Ok(self.present.clone())
     }
-    fn create(&mut self, _: &str, _: &str, _: &Assets) -> Result<(), String> {
-        unreachable!("058 creates through create_release")
-    }
     fn create_release(
         &mut self,
         _: &str,
@@ -573,17 +570,6 @@ fn the_github_release_is_created_once_and_never_replaced() {
     assert!(err.contains("058 3.5.2"), "{err}");
     assert!(tagged::publish_release(&mut gh, "v0.3.0", &notes, &assets, true).is_err());
     assert_eq!(gh.creates.len(), 1);
-    // The adapter of 053 alone cannot create a release.
-    struct Old;
-    impl Releases for Old {
-        fn lookup(&mut self, _: &str) -> Result<Option<Release>, String> {
-            Ok(None)
-        }
-        fn create(&mut self, _: &str, _: &str, _: &prerelease::Assets) -> Result<(), String> {
-            Ok(())
-        }
-    }
-    assert!(tagged::publish_release(&mut Old, "v0.3.0", &notes, &assets, false).is_err());
 }
 
 // 3.4.2 ------------------------------------------------------------------

@@ -28,40 +28,6 @@ triple() {
   esac
 }
 case "${1:-}" in
-  dispatch)
-    # 031 3.11, 3.12; 021 3.8: rehearsal is never publication authority.
-    test "$#" = 4 || fail 'dispatch <rehearsal> <publish-npm> <tag>'
-    rehearsal=$2 publish=$3 tag=$4
-    candidate=false
-    case "$tag" in *-rc.*) candidate=true; test "$publish" != true || fail '053 3.4.2: a candidate is never published to npm' ;; esac
-    case "$rehearsal:$publish" in true:true) fail '031 3.11: rehearsal cannot publish npm' ;; true:false|false:true|false:false) ;; *) fail 'dispatch booleans must be true or false' ;; esac
-    version=$(release field version)
-    if [ "$candidate" = true ]; then version=$(release candidate-version "$tag"); fi
-    if [ "$rehearsal" = true ]; then
-      test -z "$tag" || test "$candidate" = true || fail '053 3.2.4: rehearsal tag must be a candidate'
-      commit=$(git rev-parse "${GITHUB_SHA:?}^{commit}")
-      if [ "$candidate" = true ]; then
-        git merge-base --is-ancestor "$commit" refs/remotes/origin/main || fail '053 3.1.1: rehearsal commit is not reachable from main'
-        if git show-ref --verify --quiet "refs/tags/$tag"; then
-          test "$(git cat-file -t "refs/tags/$tag")" = tag || fail '021 3.8: annotated tag required'
-          git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile=tools/rustev-release/allowed_signers verify-tag "refs/tags/$tag" || fail '021 3.8: tag signature does not verify'
-          test "$(git rev-parse "refs/tags/$tag^{commit}")" = "$commit" || fail '053 3.2.4: candidate differs from rehearsal commit'
-        fi
-      fi
-    else
-      expected=$(jq -er .tag tools/rustev-release/release-set.json)
-      test "$candidate" = true || test "$tag" = "$expected" || fail '031 3.12: tag differs from release set'
-      test "${GITHUB_REF:?}" = "refs/tags/$tag" || fail '031 3.12: dispatch must use the release tag ref'
-      test "$(git cat-file -t "refs/tags/$tag")" = tag || fail '021 3.8: annotated tag required'
-      git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile=tools/rustev-release/allowed_signers verify-tag "refs/tags/$tag" || fail '021 3.8: tag signature does not verify'
-      commit=$(git rev-parse "refs/tags/$tag^{commit}")
-      if [ "$candidate" = true ]; then
-        git merge-base --is-ancestor "$commit" refs/remotes/origin/main || fail '053 3.2.4: candidate commit is not reachable from main'
-      fi
-    fi
-    test "$(git rev-parse HEAD)" = "$commit" || fail '031 3.12: checkout differs from dispatched commit'
-    printf 'commit=%s\nversion=%s\nepoch=%s\ncandidate=%s\n' "$commit" "$version" "$(git log -1 --format=%ct "$commit")" "$candidate"
-    ;;
   archive-cli)
     # 031 3.9.3: raw inputs <bin-dir>/<platform>/rustev[.exe], all seven required.
     test "$#" = 5 || fail 'archive-cli <bin-dir> <out-dir> <version> <epoch>'
@@ -226,18 +192,5 @@ case "${1:-}" in
     test "$failed" = 0 || fail '021 3.6: dependency audit failed; policy changes require separate review'
     release exceptions "$(date -u +%Y-%m-%d)"
     ;;
-  tag-manifest)
-    test "$#" = 3 || fail 'tag-manifest <tag> <manifest-file>'
-    test -s "$3" || fail '053 3.3.1: a candidate run needs the signed manifest'
-    message=$(git for-each-ref --format='%(contents)' "refs/tags/$2")
-    digest=$(printf '%s\n' "$message" | sed -n 's/^release-manifest-sha256: //p')
-    test -n "$digest" || fail '021 3.8: tag message needs release-manifest-sha256:'
-    actual=$(sha256sum "$3"); actual=${actual%% *}
-    test "$actual" = "$digest" || fail '053 3.3.1; 031 3.11.2: manifest digest differs from tag'
-    ;;
-  npm-guard)
-    test "$#" = 2 || fail 'npm-guard <tag>'
-    case "$2" in *-rc.*) fail '053 3.4.2: a candidate is never published to npm' ;; esac
-    ;;
-  *) fail 'expected dispatch, build-native, archive-cli, pack, sbom, audit, tag-manifest or npm-guard' ;;
+  *) fail 'expected build-native, archive-cli, pack, sbom or audit' ;;
 esac

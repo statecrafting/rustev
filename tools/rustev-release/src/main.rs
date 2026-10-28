@@ -1,5 +1,7 @@
-//! `rustev-release`: release-candidate checks of spec 021. Read-only: it
-//! never uploads, tags, signs or reads a credential.
+//! `rustev-release`: the release checks of spec 021 and the tagged run of
+//! spec 058. Only `publish-crates`, `publish-npm` and `github-release`
+//! publish, with the credentials the release workflow supplies; nothing here
+//! tags or signs.
 //!
 //! `rustev-release manifests` runs `cargo metadata` for this workspace and
 //! exits 1 naming every violation of the release set's manifest policy,
@@ -21,21 +23,11 @@
 //! build closure, development-only additions, each with source, checksum
 //! and license) and exits 1 on a missing license or checksum.
 //!
-//! `rustev-release manifest <evidence-dir>` writes the canonical
-//! `release-manifest.json` and `SHA256SUMS` for the archives in
-//! `<evidence-dir>/a` at the clean commit at HEAD (3.8). Signing them and
-//! the tag is the owner's act.
-//!
-//! `rustev-release verify-release <dir> [<repo>]` checks every binding of
-//! 3.8 against the committed `allowed_signers` and the owner identity.
-//!
-//! `rustev-release publish <release-dir> <instruction.json> <journal>` is the
-//! owner-authorized publication of 3.9: it verifies the signed release in
-//! `<release-dir>` against the local tag, checks the instruction names
-//! exactly that release (I-4), records the account and release identity in
-//! the journal (a file outside the repository), and uploads the exact
-//! verified archives to crates.io in order. It reads `CARGO_REGISTRY_TOKEN`
-//! only for the account query and the uploads.
+//! `rustev-release manifest <evidence-dir> [<artifacts-dir>]` writes the
+//! canonical `release-manifest.json` and `SHA256SUMS` for the archives in
+//! `<evidence-dir>/a` at the clean commit at HEAD (3.8): the dry run's
+//! manifest. A tagged run writes its own through `run-manifest` below and
+//! attests it; neither is signed or read back as an input (spec 058 3.2.4).
 //!
 //! `rustev-release changelog <out.md> [<previous tag>]` writes the release
 //! changelog generated from the governed corpus (spec 031, 3.10) through
@@ -704,7 +696,7 @@ fn manifest(
     let dir = Path::new(evidence_dir);
     let result = (|| -> Result<(), String> {
         if candidate && artifacts_dir.is_none() {
-            return Err("053 3.1.3: candidate requires rehearsal artifacts".into());
+            return Err("058 3.7: a candidate requires the run's artifacts".into());
         }
         if !command_line("git", &["status", "--porcelain", "--untracked-files=no"])?.is_empty() {
             return Err(
@@ -838,165 +830,6 @@ const LIMITATIONS: &[&str] = &[
     "Pre-1.0: a minor version may change any public contract (3.2).",
 ];
 
-fn verify_release_cmd(dir: &str, repo: &str) -> ExitCode {
-    // The built-in record, written to a scratch file `ssh-keygen` can read.
-    let scratch = match rustev_release::repro::fresh_dir("rustev-release-signers") {
-        Ok(d) => d,
-        Err(e) => {
-            eprintln!("{e}");
-            return ExitCode::from(2);
-        }
-    };
-    // `scratch` is a `Scratch` guard: the directory is removed when it drops
-    // at the end of this function, on every path.
-    let signers = scratch.join("allowed_signers");
-    if let Err(e) = std::fs::write(&signers, rustev_release::manifest::ALLOWED_SIGNERS) {
-        eprintln!("{}: {e}", signers.display());
-        return ExitCode::from(2);
-    }
-    let v = rustev_release::manifest::verify_release(
-        Path::new(dir),
-        Path::new(repo),
-        &signers,
-        rustev_release::manifest::OWNER_IDENTITY,
-    );
-    if v.is_empty() {
-        println!("release in {dir}: commit, tree, tag, manifest, checksums and key bind (3.8)");
-        ExitCode::SUCCESS
-    } else {
-        for x in &v {
-            eprintln!("{x}");
-        }
-        ExitCode::from(1)
-    }
-}
-
-fn publish_cmd(dir: &str, instruction: &str, journal_path: &str) -> ExitCode {
-    use rustev_release::cratesio::CratesIo;
-    use rustev_release::lifecycle::{Entry, Event, Journal, Lifecycle, Outcome, publish};
-    use rustev_release::manifest::ReleaseManifest;
-    let result = (|| -> Result<Outcome, String> {
-        let dir = Path::new(dir);
-        // 053 3.4.2: a candidate is refused before any journal or upload.
-        rustev_release::candidate::publication_manifest(
-            &std::fs::read(dir.join("release-manifest.json")).map_err(|e| e.to_string())?,
-        )?;
-        let journal_path = Path::new(journal_path);
-        // The journal lives outside Git (3.9).
-        let top = command_line("git", &["rev-parse", "--show-toplevel"])?;
-        // Both sides canonical, so a symlink cannot hide the journal inside.
-        let top = Path::new(&top)
-            .canonicalize()
-            .map_err(|e| format!("{top}: {e}"))?;
-        let journal_path = rustev_release::hosted::journal_path(journal_path, &top)?;
-        // The signed release: archives, manifest, checksums, tag and key bind.
-        let scratch = rustev_release::repro::fresh_dir("rustev-release-signers")?;
-        let signers = scratch.join("allowed_signers");
-        std::fs::write(&signers, rustev_release::manifest::ALLOWED_SIGNERS)
-            .map_err(|e| e.to_string())?;
-        let v = rustev_release::manifest::verify_release(
-            dir,
-            &top,
-            &signers,
-            rustev_release::manifest::OWNER_IDENTITY,
-        );
-        if !v.is_empty() {
-            return Err(v.join("\n"));
-        }
-        let bytes = std::fs::read(dir.join("release-manifest.json")).map_err(|e| e.to_string())?;
-        let m = ReleaseManifest::parse(&bytes)?;
-        // The candidate evidence the manifest names is the evidence present.
-        for (name, digest) in &m.evidence {
-            let b = std::fs::read(dir.join(name)).map_err(|e| format!("{name}: {e}"))?;
-            if rustev_release::archive::sha256_hex(&b) != *digest {
-                return Err(format!(
-                    "021 3.7: evidence {name} is not the one the manifest names"
-                ));
-            }
-        }
-        let mut life = Lifecycle::new(m.clone());
-        life.apply(Event::GatesPass).map_err(|r| r.0)?;
-        life.apply(Event::CandidateVerified {
-            commit: m.commit.clone(),
-        })
-        .map_err(|r| r.0)?;
-        life.authorize_file(
-            Path::new(instruction),
-            &signers,
-            rustev_release::manifest::OWNER_IDENTITY,
-        )?;
-        let instruction = life.instruction.as_ref().ok_or("missing instruction")?;
-        let mut journal = match std::fs::read_to_string(&journal_path) {
-            Ok(text) => Journal::from_lines(&text)?,
-            // Only an absent journal starts empty; any other read failure
-            // would discard the history the publisher resumes from.
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Journal::default(),
-            Err(e) => return Err(format!("journal {}: {e}", journal_path.display())),
-        };
-        journal.file = Some(journal_path.to_path_buf());
-        let signature = std::fs::read_to_string(dir.join("release-manifest.json.sig"))
-            .map_err(|e| e.to_string())?;
-        // `verify_release` above already checked this signature against
-        // ALLOWED_SIGNERS; `bind` journals the verified pair.
-        rustev_release::family_lifecycle::bind(&m, &signature, &mut journal)?;
-        let registry = CratesIo { wait_seconds: 10 };
-        // The instruction's login; `publish` checks it against each name's
-        // public owners (3.9), since crates.io names no token's account.
-        journal.record(Entry::Preflight {
-            account: instruction.account.clone(),
-            commit: m.commit.clone(),
-            tag: m.tag.clone(),
-            manifest_sha256: m.digest(),
-        });
-        let mut archives = std::collections::BTreeMap::new();
-        for p in &m.packages {
-            let b = std::fs::read(dir.join(&p.crate_file)).map_err(|e| e.to_string())?;
-            archives.insert(p.crate_file.clone(), b);
-        }
-        let mut registry = registry;
-        let outcome = publish(&mut life, &archives, &mut registry, &mut journal);
-        println!("lifecycle state: {:?}", life.state);
-        Ok(outcome)
-    })();
-    match result {
-        Ok(rustev_release::lifecycle::Outcome::Complete) => {
-            println!(
-                "every crate is public with its verified checksum; this command publishes the crate layers only, and the release workflow publishes layers 6 to 8 (npm, CLI archives, hosted release) after it"
-            );
-            ExitCode::SUCCESS
-        }
-        Ok(rustev_release::lifecycle::Outcome::Stopped { reason }) => {
-            eprintln!("publication stopped: {reason}");
-            ExitCode::from(1)
-        }
-        Err(e) => {
-            eprintln!("{e}");
-            ExitCode::from(2)
-        }
-    }
-}
-
-// Spec 031 3.1 and 3.11.2: read-only gates for the release workflow.
-fn family_check(manifest: &str, artifacts: Option<&str>) -> ExitCode {
-    let result = std::fs::read(manifest)
-        .map_err(|e| e.to_string())
-        .and_then(|b| rustev_release::manifest::ReleaseManifest::parse(&b))
-        .map(|m| match artifacts {
-            Some(dir) => rustev_release::family_artifacts::verify(&m, Path::new(dir)),
-            None => rustev_release::hosted::observe_crates(
-                &m,
-                &mut rustev_release::cratesio::CratesIo { wait_seconds: 0 },
-            ),
-        });
-    verdict(result.and_then(|errors| {
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors.join("\n"))
-        }
-    }))
-}
-
 fn verdict(result: Result<(), String>) -> ExitCode {
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -1088,7 +921,7 @@ fn release_manifest(dir: &Path) -> Result<rustev_release::manifest::ReleaseManif
 }
 
 // Spec 058 3.3.1, 3.3.2, 3.5: idempotent publication of one registry's items.
-fn publish_cmd_058(dir: &str, record: &str, kind: &str) -> Result<(), String> {
+fn publish_cmd(dir: &str, record: &str, kind: &str) -> Result<(), String> {
     use rustev_release::tagged::{Cargo, Npm, POLLS, Publisher, Record, items, publish_items};
     let dir = Path::new(dir);
     let bytes = std::fs::read(dir.join("release-manifest.json")).map_err(|e| e.to_string())?;
@@ -1180,7 +1013,7 @@ fn observe_registries(manifest: &str) -> Result<(), String> {
 }
 
 // Spec 058 3.4.2: qualification from the run's release, no instruction or journal.
-fn qualify_058(dir: &str, evidence: &str) -> Result<(), String> {
+fn qualify_cmd(dir: &str, evidence: &str) -> Result<(), String> {
     let m = release_manifest(Path::new(dir))?;
     let object = command_line("git", &["rev-parse", &format!("refs/tags/{}", m.tag)])?;
     let q = rustev_release::tagged::qualify(Path::new(dir), Path::new(evidence), &object)?;
@@ -1230,60 +1063,15 @@ fn main() -> ExitCode {
         ["candidate-version", tag] => verdict(
             rustev_release::candidate::parse(tag, &set.version).map(|c| println!("{}", c.version)),
         ),
-        ["candidate-manifest", file, tag, commit] => verdict(
-            std::fs::read(file)
-                .map_err(|e| e.to_string())
-                .and_then(|b| rustev_release::candidate::check_manifest(&b, tag, commit))
-                .map(|_| ()),
-        ),
-        ["prerelease", tag, manifest, signature, artifacts] => {
-            verdict(rustev_release::prerelease::run(
-                tag,
-                Path::new(manifest),
-                Path::new(signature),
-                Path::new(artifacts),
-            ))
-        }
         [
             "compare-artifacts" | "npm-audit" | "sbom-check" | "main-sbom",
             ..,
         ] => artifact_cmd(&set, &args.iter().map(String::as_str).collect::<Vec<_>>()),
         ["manifests"] => manifests(&set),
-        ["verify-artifacts", manifest, artifacts] => family_check(manifest, Some(artifacts)),
-        ["observe-crates", manifest] => family_check(manifest, None),
-        ["hosted-release", dir, artifacts, instruction, journal] => {
-            verdict(rustev_release::hosted::run(
-                Path::new(dir),
-                Path::new(artifacts),
-                Path::new(instruction),
-                Path::new(journal),
-                Path::new("."),
-                &set,
-            ))
-        }
         ["archives", dir] => archives(&set, dir),
         ["compare", a, b] => compare(&set, a, b),
         ["field", name] => field(&set, name),
         ["deps"] => deps(&set),
-        ["qualify", dir, evidence, instruction, journal] => {
-            // The journal lives outside Git (3.9), checked against the
-            // repository root, as `publish` does.
-            // Arguments in `run`'s order: release dir, evidence dir,
-            // instruction, journal, then the repository root.
-            verdict(
-                command_line("git", &["rev-parse", "--show-toplevel"]).and_then(|repo| {
-                    let (journal, repo) = (Path::new(journal), Path::new(&repo));
-                    rustev_release::qualification::run(
-                        Path::new(dir),
-                        Path::new(evidence),
-                        Path::new(instruction),
-                        journal,
-                        repo,
-                    )
-                }),
-            )
-        }
-        ["publish", dir, instruction, journal] => publish_cmd(dir, instruction, journal),
         ["manifest", dir] => manifest(&set, dir, None, None),
         ["manifest", dir, artifacts] => manifest(&set, dir, Some(artifacts), None),
         ["run-manifest", dir, artifacts, tag] => match run_tag_object(&set, tag) {
@@ -1291,14 +1079,12 @@ fn main() -> ExitCode {
             Err(e) => verdict(Err(e)),
         },
         ["tag", tag, main_ref, check_runs] => tag_cmd(tag, main_ref, check_runs),
-        ["publish-crates", dir, record] => verdict(publish_cmd_058(dir, record, "crate")),
-        ["publish-npm", dir, record] => verdict(publish_cmd_058(dir, record, "npm")),
+        ["publish-crates", dir, record] => verdict(publish_cmd(dir, record, "crate")),
+        ["publish-npm", dir, record] => verdict(publish_cmd(dir, record, "npm")),
         ["github-release", dir] => verdict(github_release_cmd(dir)),
         ["verify-assets", dir] => verdict(verify_assets_cmd(dir)),
         ["observe-registries", manifest] => verdict(observe_registries(manifest)),
-        ["qualify", dir, evidence] => verdict(qualify_058(dir, evidence)),
-        ["verify-release", dir] => verify_release_cmd(dir, "."),
-        ["verify-release", dir, repo] => verify_release_cmd(dir, repo),
+        ["qualify", dir, evidence] => verdict(qualify_cmd(dir, evidence)),
         ["exceptions", today] => exceptions(today),
         ["changelog", out] => changelog_cmd(&set, out, None),
         ["changelog", out, previous] => changelog_cmd(&set, out, Some(previous)),
@@ -1306,7 +1092,7 @@ fn main() -> ExitCode {
         ["unpacked", dir, work, toolchain] => unpacked(&set, dir, work, Some(toolchain)),
         _ => {
             eprintln!(
-                "usage: rustev-release [--candidate <tag>] manifest|npm-audit|main-sbom|sbom-check|compare-artifacts ... | candidate-version <tag> | candidate-manifest <manifest> <tag> <commit> | prerelease <tag> <manifest> <signature> <artifacts-dir> | manifests | archives <dir> | compare <dir-a> <dir-b> | field <name> | unpacked <dir> <work> [<toolchain>] | deps | exceptions <YYYY-MM-DD> | changelog <out.md> [<previous tag>] | manifest <evidence-dir> [<artifacts-dir>] (PREVIOUS=<tag> after the first release) | verify-artifacts <manifest> <artifacts-dir> | observe-crates <manifest> | hosted-release <release-dir> <artifacts-dir> <instruction.json> <journal> | publish <release-dir> <instruction.json> <journal> | qualify <release-dir> <evidence-dir> <instruction> <journal> | verify-release <dir> [<repo>] | tag <tag> <main-ref> <check-runs.json> | run-manifest <evidence-dir> <artifacts-dir> <tag> | publish-crates <release-dir> <publication.json> | publish-npm <release-dir> <publication.json> | github-release <release-dir> | verify-assets <release-dir> | observe-registries <manifest> | qualify <release-dir> <evidence-dir>"
+                "usage: rustev-release [--candidate <tag>] manifest|npm-audit|main-sbom|sbom-check|compare-artifacts ... | candidate-version <tag> | manifests | archives <dir> | compare <dir-a> <dir-b> | field <name> | unpacked <dir> <work> [<toolchain>] | deps | exceptions <YYYY-MM-DD> | changelog <out.md> [<previous tag>] | manifest <evidence-dir> [<artifacts-dir>] (PREVIOUS=<tag> after the first release) | tag <tag> <main-ref> <check-runs.json> | run-manifest <evidence-dir> <artifacts-dir> <tag> | publish-crates <release-dir> <publication.json> | publish-npm <release-dir> <publication.json> | github-release <release-dir> | verify-assets <release-dir> | observe-registries <manifest> | qualify <release-dir> <evidence-dir>"
             );
             ExitCode::from(2)
         }

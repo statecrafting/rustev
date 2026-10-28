@@ -196,9 +196,9 @@ step dependencies.json "$release" deps
 # to no argument at all (not to ""), so the first-release form runs.
 # shellcheck disable=SC2086
 step changelog.txt "$release" changelog "$out/changelog.md" ${PREVIOUS:-}
-# 3.8: the canonical manifest and SHA256SUMS of run a. Signing them and the
-# tag is the owner's act; nothing here signs.
-# 031 3.11.2: downloaded rehearsal bytes are optional candidate inputs.
+# 3.8: the canonical manifest and SHA256SUMS of run a, as evidence only; a
+# tagged run writes and attests its own (058 3.2.4), and nothing here signs.
+# A run's downloaded artifacts are optional inputs (031 3.11.2).
 if [ -n "${RUSTEV_RELEASE_ARTIFACTS:-}" ]; then
   step manifest.txt "$release" manifest "$out" "$RUSTEV_RELEASE_ARTIFACTS"
 else

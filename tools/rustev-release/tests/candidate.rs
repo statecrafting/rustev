@@ -56,14 +56,11 @@ fn manifest() -> m::ReleaseManifest {
     .unwrap()
 }
 #[test]
-fn candidate_manifest_identity_packages_and_canonical_bytes() {
+fn candidate_manifest_packages_and_canonical_bytes() {
     let mut m = manifest();
     assert!(m.packages.is_empty());
-    c::check_manifest(&m.canonical(), &m.tag, &m.commit).unwrap();
-    let other = m.tag.replace("-rc.1", "-rc.2");
-    assert!(c::check_manifest(&m.canonical(), &other, &m.commit).is_err());
-    assert!(c::check_manifest(&m.canonical(), &m.tag, &"c".repeat(40)).is_err());
-    assert!(c::check_manifest(&serde_json::to_vec_pretty(&m).unwrap(), &m.tag, &m.commit).is_err());
+    assert_eq!(m::ReleaseManifest::parse(&m.canonical()).unwrap(), m);
+    assert!(m::ReleaseManifest::parse(&serde_json::to_vec_pretty(&m).unwrap()).is_err());
     m.packages.push(m::PackageArtifact {
         name: "rustev".into(),
         crate_file: format!("rustev-{}.crate", m.version),
@@ -138,71 +135,6 @@ fn candidate_publish_journals_nothing() {
     );
     assert!(!dir.join("journal").exists());
 }
-#[derive(Default)]
-struct Fake {
-    present: Option<pr::Release>,
-    creates: usize,
-}
-impl pr::Releases for Fake {
-    fn lookup(&mut self, _: &str) -> Result<Option<pr::Release>, String> {
-        Ok(self.present.clone())
-    }
-    fn create(&mut self, _: &str, notes: &str, assets: &pr::Assets) -> Result<(), String> {
-        assert!(notes.contains(c::LIMITATION));
-        assert!(notes.contains(&rustev_release::archive::sha256_hex(
-            &assets["release-manifest.json"]
-        )));
-        self.creates += 1;
-        self.present = Some(pr::Release {
-            prerelease: true,
-            assets: assets
-                .iter()
-                .map(|(n, b)| (n.clone(), rustev_release::archive::sha256_hex(b)))
-                .collect(),
-        });
-        Ok(())
-    }
-}
-#[test]
-fn prerelease_created_then_present_without_upload() {
-    let assets = BTreeMap::from([("release-manifest.json".into(), manifest().canonical())]);
-    let mut api = Fake::default();
-    assert_eq!(
-        pr::publish_prerelease(&mut api, &candidate(), &assets).unwrap(),
-        pr::Outcome::Created
-    );
-    assert_eq!(
-        pr::publish_prerelease(&mut api, &candidate(), &assets).unwrap(),
-        pr::Outcome::Present
-    );
-    assert_eq!(api.creates, 1);
-}
-#[test]
-fn prerelease_conflicts_change_nothing() {
-    let assets = BTreeMap::from([("release-manifest.json".into(), manifest().canonical())]);
-    for change in ["digest", "missing", "extra", "release"] {
-        let mut api = Fake::default();
-        pr::publish_prerelease(&mut api, &candidate(), &assets).unwrap();
-        let p = api.present.as_mut().unwrap();
-        match change {
-            "digest" => {
-                p.assets
-                    .insert("release-manifest.json".into(), "0".repeat(64));
-            }
-            "missing" => p.assets.clear(),
-            "extra" => {
-                p.assets.insert("extra".into(), "0".repeat(64));
-            }
-            _ => p.prerelease = false,
-        }
-        assert!(
-            pr::publish_prerelease(&mut api, &candidate(), &assets)
-                .unwrap_err()
-                .contains("053 3.3.4")
-        );
-        assert_eq!(api.creates, 1);
-    }
-}
 #[test]
 fn workflow_write_permissions_are_confined() {
     let workflow = include_str!("../../../.github/workflows/release.yml");
@@ -265,7 +197,8 @@ fn gh_adapter_fails_closed_and_creates_only_a_prerelease() {
     assert!(!calls.exists());
     respond(serde_json::json!({"status": "404"}), "1");
     let assets = BTreeMap::from([("release-manifest.json".into(), manifest().canonical())]);
-    pr::publish_prerelease(&mut api, &candidate(), &assets).unwrap();
+    api.create_release(&candidate(), "notes", &assets, true)
+        .unwrap();
     let args = std::fs::read_to_string(calls).unwrap();
     for required in [
         "--prerelease\n",

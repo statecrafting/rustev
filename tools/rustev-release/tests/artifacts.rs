@@ -249,19 +249,6 @@ fn main_sbom_is_deterministic_and_names_every_platform() {
 }
 
 #[test]
-fn rehearsal_refuses_publication_before_reading_a_tag() {
-    let output = Command::new("sh")
-        .arg(concat!(env!("CARGO_MANIFEST_DIR"), "/artifacts.sh"))
-        .args(["dispatch", "true", "true", ""])
-        .output()
-        .unwrap();
-    assert_eq!(output.status.code(), Some(1));
-    assert!(
-        String::from_utf8_lossy(&output.stderr).contains("031 3.11: rehearsal cannot publish npm")
-    );
-}
-
-#[test]
 fn empty_artifact_sets_and_unreadable_tarballs_fail_closed() {
     let a = fresh_dir("artifact-empty-a").unwrap();
     let b = fresh_dir("artifact-empty-b").unwrap();

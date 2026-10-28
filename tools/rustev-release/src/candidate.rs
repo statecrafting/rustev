@@ -53,16 +53,6 @@ pub fn refuse_publication(m: &ReleaseManifest) -> Result<(), String> {
     Ok(())
 }
 
-pub fn check_manifest(bytes: &[u8], tag: &str, commit: &str) -> Result<ReleaseManifest, String> {
-    let m = ReleaseManifest::parse(bytes)?;
-    let set = ReleaseSet::parse(include_bytes!("../release-set.json"))?;
-    let c = parse(tag, &set.version)?;
-    if m.version != c.version || m.tag != tag || m.commit != commit {
-        return Err("053 3.3.1: candidate manifest version, tag or commit differs".into());
-    }
-    Ok(m)
-}
-
 /// Refuse candidate attempts before canonical validation or any publisher effect.
 pub fn publication_manifest(bytes: &[u8]) -> Result<ReleaseManifest, String> {
     let m: ReleaseManifest = serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
