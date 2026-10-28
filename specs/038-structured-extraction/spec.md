@@ -2,7 +2,7 @@
 id: "038-structured-extraction"
 title: "Structured extraction step and the model-derived input pattern (amends 002, 003 and 036)"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-10-17"
 summary: >
   An amendment of approved specs 002, 003 and 036 (R-16), for #76 child B6.
@@ -27,7 +27,7 @@ summary: >
   can drive spec 033's `needs_input` outcome and propose which declared
   questions it asks. Adds to the shared #76 versions; every version 1
   definition keeps its bytes, its plan and its `PlanId`. Approved (A-35);
-  implementation is in progress.
+  implementation is complete.
 amends:
   - "002-decision-contract-and-pure-core"
   - "003-runtime-execution-and-evidence"
@@ -49,6 +49,8 @@ extends:
   - { spec: "008-reference-package-lodging", unit: { kind: directory, path: "packages/rustev-pkg-lodging/" }, nature: additive }
   # Adds 038 to `make verify` when the implementation is complete.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  # Places 038 in a CI acceptance group.
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
   # Exhaustive matches over the new step bodies, the new snapshot entry
   # member in struct literals, and regenerated document types of the
   # bindings; no behavior.
@@ -413,7 +415,11 @@ section states what `extract` adds and which envelope members it uses.
    a string for a boolean, a date in another format: each is absent with
    its reason. A decimal with more fractional digits than `scale` is
    absent `out_of_bounds` (scale is a declared bound); a string that is
-   not a decimal string is absent `wrong_type`. Nothing is clamped, rounded, truncated, case-folded,
+   not a decimal string is absent `wrong_type`. A valid `YYYY-MM-DD`
+   date whose 00:00 UTC lies before 1970-01-01, outside spec 002 3.4.4's
+   `Timestamp` range, has no core value and stays absent `out_of_bounds`,
+   never `invalid_date` and never moved into range (owner confirmed
+   2026-10-26). Nothing is clamped, rounded, truncated, case-folded,
    trimmed, matched approximately or defaulted.
 5. **Lists.** Checks apply in this order; the first that makes the field
    absent decides its reason:
@@ -616,7 +622,11 @@ value     = { literal: json }
    `acceptance_failed{cause}`, where cause is the source's absence reason,
    `validation_failed`, `validation_fault`, `min_mass_not_met` (a
    distribution below `min_mass`) or `distribution_absent` (`min_mass` set
-   and the distribution absent). The
+   and the distribution absent). `acceptance_failed{cause}` is an
+   additive variant of spec 032's `AbsentReason`; the evidence and run
+   schemas that carry that type, version 1 included, are regenerated with
+   it, and no existing document changes its bytes (owner confirmed
+   2026-10-26). The
    judgment carries a spec 033 `field_dropped` notice (033 3.5.4) with
    subject the step id, reason the declared notice code, and an action
    whose `caused_by` is the source with `observed{model-derived}` (an
@@ -959,10 +969,35 @@ externally blocked, never as passed.
 
 ## Verification
 
-Pending with implementation. The implementing change adds `038` to `make
-verify` with repository-local deterministic tests over scripted backends
-and synthetic fixtures for every acceptance item. No live provider call is
-part of declared verification.
+Declared for `spec-spine verify 038`; 038 is in `make verify` and in CI's
+`integrations-base` acceptance group. Every command is repository-local
+and deterministic over scripted backends, scripted screeners and synthetic
+fixtures; no live provider call is part of declared verification.
+
+```verify:cli
+# 3.2 to 3.4, 3.8, 3.10, 3.12, 3.14: the contract vocabulary, documents and unchanged bytes.
+cargo test -p rustev-contract --locked --test extraction_wire --test extraction_documents --test extraction_results --test track_versions
+# 3.4 to 3.6: validation, presence, coercion, lists, records and distributions.
+cargo test -p rustev-core --locked --test extraction_validate
+# 3.7: the fallback extractor, its bounds and determinism.
+cargo test -p rustev-core --locked --test extraction_fallback
+# 3.3, 3.7.2, 3.8.6, 3.9, 3.10, 3.11.4, 3.13.2: compilation, screening, the gate and its golden refusals.
+cargo test -p rustev-core --locked --test extraction_compile --test extraction_contract
+# 3.5, 3.8, 3.11.4, 3.12, 3.13: evaluation, screening, acceptance, evidence, judgment and needs input.
+cargo test -p rustev-core --locked --test extraction_evaluate
+# 3.14.2: every committed golden and reference PlanId byte-identical.
+cargo test -p rustev-core --locked --test identity --test reference_plans --test replay_identity
+# 3.11: dispatch, deadlines, budgets, request failure, screening, capture and replay.
+cargo test -p rustev-runtime --locked --test extraction
+# 3.13, 3.15: the lodging example, needs input, proposed questions and blocked untrusted text.
+cargo test -p rustev-pkg-lodging --locked --test extraction
+# 3.12: per-field evidence suffices for spec 041's origin/extraction metrics.
+cargo test -p rustev-eval --locked --test origin_041 extraction_accuracy_and_absence_compare_retained_values_with_gold
+```
+
+Externally blocked, reported as such and never as passed: native and
+`wasm32` parity of the fallback evaluator (no `wasm32` test harness in the
+repository; a native byte-identity test stands in).
 
 ## Implementation record
 
@@ -1192,6 +1227,24 @@ source is `mixed-derived` with both lineages and the model source's
 producer through acceptance to the judgment, which closes Acceptance item
 3 except for `wasm32` parity. The lodging example gains a blocked
 untrusted-text fixture.
+
+**Closure (2026-10-27).** 038 is in `make verify` and in CI's
+`integrations-base` acceptance group; its nine declared commands pass.
+Every Acceptance item is covered by a named test (the mapping for the
+lodging example is
+`packages/rustev-pkg-lodging/tests/extraction/ACCEPTANCE.md`): increment 7
+part a1 covers needs input and proposed questions, part a2 the lodging
+example, and part b screening of extract steps, including the
+mixed-derived fallback over a model-admitting source. The spec 041 metrics
+item, externally blocked until spec 041's extraction family existed, is
+met by its increment 6 part b (`crates/rustev-eval/tests/origin_041.rs`),
+which reads this spec's golden extraction evidence. One item remains
+externally blocked, as the Verification section states: `wasm32` parity
+of the fallback evaluator. Two owner confirmations of 2026-10-26 are
+recorded where the behavior is specified: a valid date before 1970-01-01
+stays absent `out_of_bounds` (3.4.4), and the additive
+`acceptance_failed{cause}` variant of spec 032's `AbsentReason`, with the
+regenerated evidence and run schemas, is accepted (3.8.4).
 
 ## Decisions at approval
 

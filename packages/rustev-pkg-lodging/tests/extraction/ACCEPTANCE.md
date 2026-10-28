@@ -1,4 +1,4 @@
-# Structured extraction: increment 7b coverage
+# Structured extraction: acceptance coverage
 
 Synthetic fixtures only. `definition.json` is the extraction example, not the
 package reference definition. `pattern-a.json` uses the same presence-guarded
@@ -16,9 +16,9 @@ Test paths below are relative to the workspace. `C` means
 | 5. Model-value gate refusal goldens, accepted reads/checks, controls refused | C/extraction_compile.rs: `model_gate_exact_policy_proposal_and_presence_reads`, `protected_constraint_and_model_projections_are_gated`, `accepted_paths_feed_exact_consumers_and_model_projections`, `accepted_value_cannot_control_selection_weights`. Eleven `extraction-gate-*.json` goldens pin exact, policy condition, proposal, protected check, extract/classify/generate projection and accepted control refusals. L Pattern A proves the 033 check accepts the model input. |
 | 6. Needs input and declared question selection | L: `insufficient_requests_the_declared_window_question`, `extraction_proposes_only_a_declared_question`; C/extraction_evaluate.rs: `proposed_questions_use_allowed_order_declared_text_and_selected_continuation`, `proposed_questions_require_acceptance_of_a_matching_literal_enum_list`, `handler_question_selection_uses_the_same_accepted_values`. |
 | 7. Producers, invalid producer and future timestamp | L Pattern A checks input evidence and lineage; C/extraction_contract.rs: `producer_refused_for_non_model_entries_before_evaluation`; C/extraction_evaluate.rs: `future_producer_timestamp_is_invalid_input_with_existing_precedence`, `input_acceptance_preserves_producer_and_supplied_values`. |
-| 8. Origin/extraction metrics | Externally blocked: spec 041 metrics fixture is not implemented. Extraction evidence is asserted here without claiming metric integration. |
+| 8. Origin/extraction metrics | `crates/rustev-eval/tests/origin_041.rs`: `extraction_accuracy_and_absence_compare_retained_values_with_gold` computes spec 041's `origin/extraction` accuracy and absence rates from C/golden/extraction.evidence.json. |
 | 9. Existing golden and reference PlanId bytes | C/reference_plans.rs: `goldens_pin_both_definitions_plans_and_plan_ids`; C/extraction_compile.rs: `extraction_plan_identity_and_reload`, `acceptance_example_golden_and_member_identity`; packages/rustev-pkg-lodging/tests/documents.rs: `definition_matches_the_existing_core_golden_byte_for_byte`. Existing goldens are unchanged; only new refusal goldens are added. Full repository verification is not claimed by these three package suites. |
-| 10. Code, declared verification, governance gate | Run the seven commands in the task brief. Full `make code` is not substituted for those commands. Declared 038 verification is externally blocked by its pending specification and out-of-territory Makefile wiring. `make gate` invokes `spec-spine index coverage`, explicitly prohibited by this task. Neither blocked gate is claimed as passed. |
+| 10. Code, declared verification, governance gate | `make code`, `spec-spine verify 038` (spec 038's Verification section, in `make verify` and CI's `integrations-base` group) and `make gate`. |
 
 Decisions within the specification:
 
