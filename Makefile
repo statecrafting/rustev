@@ -103,11 +103,13 @@ conformance:
 	cargo test -p rustev-conformance --locked
 
 # Spec 027, 3.12.2: rebuild the CLI cases and their fixtures from the CLI
-# tests that pin each golden (`RUSTEV_HARVEST`), then the manifest that
-# aggregates every case, then check them.
+# tests that pin each golden (`RUSTEV_HARVEST`), then the explain cases from
+# the CLI's explain goldens, then the manifest that aggregates every case,
+# then check them.
 conformance-harvest:
 	rm -rf tools/rustev-conformance/cases/cli tools/rustev-conformance/fixtures/cli
 	RUSTEV_HARVEST=1 cargo test -p rustev-cli --locked
+	RUSTEV_BLESS=1 cargo test -p rustev-conformance --locked --test explain
 	RUSTEV_BLESS=1 cargo test -p rustev-conformance --locked --test manifest
 	cargo test -p rustev-conformance --locked
 

@@ -320,3 +320,9 @@ embed one are regenerated through their bless and harvest paths (the
 and the `rustev-release` tests about the current family version read it
 from the release set, while those about `0.1.0`'s own authority (031
 3.11.1) keep `0.1.0`. No behavior changes.
+
+**The qualify README (2026-10-28, 3.3).** `tools/rustev-release/qualify/README.md`
+said every consumer test runs offline. Only the declared example does; the
+partial-adoption subsets resolve from the registry and build with `--locked`
+after the lockfile is checked against the signed manifest. The README now
+says so (#342). Documentation only.
