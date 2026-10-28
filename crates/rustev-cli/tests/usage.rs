@@ -143,3 +143,32 @@ fn top_level_help_lists_version() {
     assert_eq!(e.code, 0);
     assert!(String::from_utf8_lossy(&e.stdout).contains("rustev version"));
 }
+
+/// Spec 041, section 5: `eval judge` without `--config` is a usage error,
+/// exit 2, with every other required flag present.
+#[test]
+fn eval_judge_requires_its_configuration() {
+    usage(
+        &[
+            "eval",
+            "judge",
+            "--views",
+            "v.json",
+            "--judge-plan",
+            "p.json",
+            "--bundles",
+            "b",
+            "--now-ms",
+            "1",
+            "--tenant",
+            "t",
+            "--context-revision",
+            "1",
+            "--scorer",
+            "judge",
+            "--out",
+            "x.json",
+        ],
+        "--config is required",
+    );
+}

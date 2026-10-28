@@ -1,0 +1,109 @@
+{
+  "about": "Hand-computed rubric metrics (spec 041, 3.6.3 and 3.7.5), each one metric over one scorer. split is the cases in order, then out the cases outside every new metric; scores maps each case to its score or, as a string, its unscored reason, and null is no scores document. An ordinal score is a level index. A count is num/den over cases; a mean is num/den, computed as one binary64 division, or given as its bit pattern; count is the metric's detail count and breakdown its whole exclusion count. placement is deterministic (rubric/<name>) or model (model/rubric/<name>), and the other list is empty.",
+  "cases": [
+    {
+      "name": "mean_level_index with an unscored, an invalid and an abstained case",
+      "scorer": {"kind": "deterministic", "output": {"ordinal": {"levels": ["low", "mid", "high"]}}},
+      "aggregate": "mean_level_index",
+      "split": ["a", "b", "c", "d", "e"], "out": ["abstained"],
+      "scores": {"a": 0, "b": 2, "c": 2, "d": "refused", "e": 7},
+      "arithmetic": "e's 7 is outside 3 levels: unscored:invalid_score, never clamped to 2. d is unscored:refused. Scored a, b, c: (0 + 2 + 2) / 3 = 4/3. A mean's count is 3 measured of the 6 cases.",
+      "expect": {
+        "metric": "rubric/tone", "placement": "deterministic",
+        "value": {"mean": [4, 3]},
+        "count": [3, 6],
+        "breakdown": {"abstained": 1, "unscored:invalid_score": 1, "unscored:refused": 1},
+        "cases": [{"mean": [0, 1]}, {"mean": [2, 1]}, {"mean": [2, 1]}, null, null, null]
+      }
+    },
+    {
+      "name": "share_at_least a declared level",
+      "scorer": {"kind": "deterministic", "output": {"ordinal": {"levels": ["low", "mid", "high"]}}},
+      "aggregate": {"share_at_least": "mid"},
+      "split": ["a", "b", "c", "d", "e"], "out": ["abstained"],
+      "scores": {"a": 0, "b": 2, "c": 2, "d": "refused", "e": 7},
+      "arithmetic": "mid is level 1. a (0) is below it, b (2) and c (2) at or above: 2/3 scored cases, a count ratio.",
+      "expect": {
+        "metric": "rubric/tone", "placement": "deterministic",
+        "value": {"mean": [2, 3]},
+        "count": [2, 3],
+        "breakdown": {"abstained": 1, "unscored:invalid_score": 1, "unscored:refused": 1},
+        "cases": [{"count": [0, 1]}, {"count": [1, 1]}, {"count": [1, 1]}, null, null, null]
+      }
+    },
+    {
+      "name": "mean over a bounded scorer",
+      "scorer": {"kind": "deterministic", "output": {"bounded": {"min": "0", "max": "1"}}},
+      "aggregate": "mean",
+      "split": ["a", "b", "c", "d"], "out": [],
+      "scores": {"a": 0.25, "b": 0.5, "c": 1.0, "d": 1.5},
+      "arithmetic": "d's 1.5 is above max 1: unscored:invalid_score. (0.25 + 0.5 + 1.0) / 3 = 1.75 / 3 = 0.5833333333333334.",
+      "expect": {
+        "metric": "rubric/tone", "placement": "deterministic",
+        "value": {"bits": "3fe2aaaaaaaaaaab"},
+        "count": [3, 4],
+        "breakdown": {"unscored:invalid_score": 1},
+        "cases": [{"mean": [1, 4]}, {"mean": [1, 2]}, {"mean": [1, 1]}, null]
+      }
+    },
+    {
+      "name": "a declared scorer with no scores document",
+      "scorer": {"kind": "deterministic", "output": {"ordinal": {"levels": ["low", "mid", "high"]}}},
+      "aggregate": "mean_level_index",
+      "split": ["a", "b"], "out": [],
+      "scores": null,
+      "arithmetic": "no document for the scorer: each case is excluded, scores-missing, and the metric is unknown.",
+      "expect": {
+        "metric": "rubric/tone", "placement": "deterministic",
+        "value": {"unknown": "scores-missing: 2"},
+        "count": [0, 2],
+        "breakdown": {"scores-missing": 2},
+        "cases": [null, null]
+      }
+    },
+    {
+      "name": "an empty split",
+      "scorer": {"kind": "deterministic", "output": {"ordinal": {"levels": ["low", "mid", "high"]}}},
+      "aggregate": {"share_at_least": "high"},
+      "split": [], "out": [],
+      "scores": {},
+      "arithmetic": "no case: 0/0 is unknown, never 0.",
+      "expect": {
+        "metric": "rubric/tone", "placement": "deterministic",
+        "value": {"unknown": "no case in the denominator"},
+        "count": [0, 0],
+        "breakdown": {},
+        "cases": []
+      }
+    },
+    {
+      "name": "share_at_least naming an undeclared level (section 5, row 30)",
+      "scorer": {"kind": "deterministic", "output": {"ordinal": {"levels": ["low", "high"]}}},
+      "aggregate": {"share_at_least": "great"},
+      "split": ["a"], "out": [],
+      "scores": {"a": 1},
+      "arithmetic": "the configuration check refuses this (3.6.3); evaluation, given it unchecked, excludes every case as scale-mismatch rather than read levels as a mean.",
+      "expect": {
+        "metric": "rubric/tone", "placement": "deterministic",
+        "value": {"unknown": "scale-mismatch: 1"},
+        "breakdown": {"scale-mismatch": 1},
+        "cases": [null]
+      }
+    },
+    {
+      "name": "a model scorer's metric is reported apart",
+      "scorer": {"kind": "model", "output": {"ordinal": {"levels": ["low", "mid", "high"]}}},
+      "aggregate": "mean_level_index",
+      "split": ["a", "b"], "out": [],
+      "scores": {"a": 1, "b": 2},
+      "arithmetic": "(1 + 2) / 2 = 3/2, named under model/ and never among the deterministic metrics.",
+      "expect": {
+        "metric": "model/rubric/tone", "placement": "model",
+        "value": {"mean": [3, 2]},
+        "count": [2, 2],
+        "breakdown": {},
+        "cases": [{"mean": [1, 1]}, {"mean": [2, 1]}]
+      }
+    }
+  ]
+}

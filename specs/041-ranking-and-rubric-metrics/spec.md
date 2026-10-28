@@ -2,7 +2,7 @@
 id: "041-ranking-and-rubric-metrics"
 title: "Ranking, constraint-match and rubric metrics; pluggable scorers (amends 004, 014 and 029)"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-10-17"
 summary: >
   An amendment of approved specs 004, 014 and 029 (R-16), for #76 child
@@ -22,8 +22,9 @@ summary: >
   `rustev.dataset/2`. Every new metric defines its per-case measure, so
   spec 029's repeat statistics, intervals, slices and selection gates
   apply. Existing documents, identities, plans and CLI outputs keep their
-  bytes. Approved (A-38); approval authorizes no live run, provider call
-  or spend, and no quality claim (R-37).
+  bytes. Approved (A-38); implementation is complete. Approval
+  authorizes no live run, provider call or spend, and no quality claim
+  (R-37).
 amends:
   - "004-evaluation-and-replay"
   - "014-report-integrity"
@@ -49,6 +50,8 @@ extends:
   - { spec: "008-reference-package-lodging", unit: { kind: directory, path: "packages/rustev-pkg-lodging/" }, nature: additive }
   # Adds 041 to `make verify` when the implementation is complete.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  # Places 041 in a CI acceptance group.
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
 depends_on:
   - "002-decision-contract-and-pure-core"
   - "004-evaluation-and-replay"
@@ -99,7 +102,7 @@ obligations:
 
 Approved by the owner (A-38, by the 2026-10-16 delivery work
 order) as its own reviewable change before any code (R-16); implementation
-is pending. This spec implements #76 child E1 (#72). The approved texts of
+is complete. This spec implements #76 child E1 (#72). The approved texts of
 specs 004, 006, 014, 027 and 029 are not edited; this spec records what
 changes, as 014 does for 004. Approval authorizes no live run, provider call
 or spend, no judge execution against a live backend, and no quality claim:
@@ -759,8 +762,41 @@ B5, B6, B7 or C2 (their specs do); significance tests between judges.
 
 ## Verification
 
-Pending with implementation. Approval satisfies no acceptance item, and no
-existing evaluation computes any metric of this spec.
+Declared for `spec-spine verify 041`; 041 is in `make verify` and in CI's
+`cli-backends` acceptance group. Every command is repository-local and
+deterministic; no live run, provider call or judge execution against a
+live backend is part of it, and its synthetic fixtures prove mechanics
+only (R-37). `crates/rustev-eval/tests/acceptance-041.md` maps each
+Acceptance item and section 5 row to its test.
+
+```verify:cli
+# 3.3, 3.4.3, 3.4.4, 3.11.3: gold matching, the hand-computed ranking measures and the embedded discount table.
+cargo test -p rustev-eval --locked --test ranking_metrics
+python3 -I crates/rustev-eval/tests/data/metrics/discounts.py --check
+# 3.1, 3.4.1, 3.6 to 3.8: the documents, the version 3 configuration, its identity and its refusals.
+cargo test -p rustev-eval --locked --test documents_041 --test config_041
+# 3.2, 3.4, 3.5, 3.6.3, 3.8.4: ranking, constraint, origin, rubric and agreement metrics, with section 5's rows; the constraint, rubric and agreement fixtures in `tests/data/metrics/`.
+cargo test -p rustev-eval --locked --test measured_041 --test agreement_041 --test origin_041
+# 3.7, 3.8, 3.11, 3.12, 3.13: scores, judge reproduction, gates, selection, the spec 029 integration, and every existing eval and 029 golden.
+cargo test -p rustev-eval --locked
+# 3.9.2, 3.10: the CLI surface, the scorer fixture and its usage errors; the existing CLI goldens.
+cargo test -p rustev-cli --locked
+# 3.1.2: `rustev.task-adapter/2` beside version 1.
+cargo test -p rustev-surface --locked
+# 3.13: plan and definition goldens with their PlanIds; the packages that build dataset cases.
+cargo test -p rustev-core --locked --test reference_plans --test identity
+cargo test -p rustev-pkg-support-routing -p rustev-pkg-lodging --locked
+# Negative control: the eight spec 041 seeds must each be detected.
+sh crates/rustev-eval/mutation/seeds.sh "spec 041"
+```
+
+The TypeScript half of the Node scorer item (3.9),
+`integrations/rustev-node/test/scorer.test.mjs`, needs a built addon and
+runs in CI's `bindings` job (`make bindings`), as every Node binding test
+does; its Rust half, `the_scorer_fixture_reproduces`, is declared above.
+Section 5's row for an origin family before its owning spec is
+implemented is not reachable in this build (increment 6, part b), and the
+mapping says so. Nothing is externally blocked.
 
 ## Implementation record
 
@@ -1130,6 +1166,26 @@ Tests:
   `crates/rustev-eval/tests/reports.rs`.
 - `bash crates/rustev-eval/mutation/seeds.sh "spec 041"`: every seed
   detected.
+
+**Closure (2026-10-28).** 041 is in `make verify` and in CI's
+`cli-backends` acceptance group, beside 014 and 029, which it amends; its
+declared commands pass. `crates/rustev-eval/tests/acceptance-041.md`
+maps every Acceptance item and section 5 row to its test, and
+`eval_judge_requires_its_configuration` in
+`crates/rustev-cli/tests/usage.rs` is added for the one row that had
+none (`eval judge` without `--config`). Section 5's `metric-unavailable`
+row for an origin family is unreachable now that every owning spec's
+evidence is on `main`. Spec 027 is complete, so the Node scorer item is
+no longer externally blocked; its TypeScript test runs in CI's
+`bindings` job. Acceptance item 1's hand-computed fixtures are data
+files under `crates/rustev-eval/tests/data/metrics/`, each case with its
+arithmetic written out: `ranking.json` (3.4.3, 3.4.4), `constraint.json`
+(3.4.5, 3.4.6), `rubric.json` (3.6.3, 3.7.5) and `agreement.json`
+(3.8.4), which `ranking_metrics.rs`, `measured_041.rs` and
+`agreement_041.rs` read with `include_str!`. The owner confirmed the
+reading of the seed "a model metric pooled into a deterministic one":
+metric names are unique, so the seed is a model rubric metric reported
+among the deterministic ones.
 
 ## Decisions at approval
 

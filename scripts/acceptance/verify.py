@@ -15,9 +15,10 @@ ROOT = Path(__file__).resolve().parents[2]
 # integrations-base: about 22 minutes each.
 # Remeasured 2026-10-27 (integrations-core 34 minutes, integrations-base
 # 17): 040 (about 7 minutes) moves to integrations-base.
+# 041 joins cli-backends beside 014 and 029, the specs it amends.
 GROUPS = {
     "evaluation": "004".split(),
-    "cli-backends": "001 005 006 014 029".split(),
+    "cli-backends": "001 005 006 014 029 041".split(),
     "integrations-base": "002 010 012 015 017 019 020 033 038 040".split(),
     "integrations-core": "022 034 035 036 037 045".split(),
     "runtime-evidence": "003 007 008 009 013 023 026 027 028 039 049".split(),
