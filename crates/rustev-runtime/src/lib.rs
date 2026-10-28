@@ -26,6 +26,13 @@ mod live;
 mod optimization;
 mod progress;
 mod shared;
+// The entry checks are driven by no request until spec 044 increment 4
+// part b wires the persistent tier in.
+#[cfg_attr(not(test), allow(dead_code))]
+mod store;
+pub use store::{
+    Invalidated, PutAnswer, PutTerms, RuntimeStore, StoreCall, StoreFailure, StoreSelector, Stored,
+};
 mod sink;
 pub use progress::{ProgressObserver, StepProgress};
 mod wait;
