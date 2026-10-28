@@ -45,6 +45,16 @@ fn set() -> ReleaseSet {
     .unwrap()
 }
 
+/// The workspace's release set, which the candidate dispatch reads.
+fn release_set() -> ReleaseSet {
+    ReleaseSet::parse(include_bytes!("../release-set.json")).unwrap()
+}
+
+/// The first candidate tag of the workspace's family version (053 3.2).
+fn candidate() -> String {
+    format!("{}-rc.1", release_set().tag)
+}
+
 fn keygen(dir: &Path, name: &str) -> PathBuf {
     let key = dir.join(name);
     run(Command::new("ssh-keygen")
@@ -414,13 +424,13 @@ impl Fixture {
     fn candidate_tag(&self, kind: &str) {
         match kind {
             "lightweight" => {
-                git(&self.repo, &["tag", "v0.1.0-rc.1"]);
+                git(&self.repo, &["tag", &candidate()]);
             }
             "unsigned" => {
-                git(&self.repo, &["tag", "-a", "v0.1.0-rc.1", "-m", "candidate"]);
+                git(&self.repo, &["tag", "-a", &candidate(), "-m", "candidate"]);
             }
             _ => {
-                git(&self.repo, &["tag", "-s", "v0.1.0-rc.1", "-m", "candidate"]);
+                git(&self.repo, &["tag", "-s", &candidate(), "-m", "candidate"]);
             }
         }
     }
@@ -438,7 +448,7 @@ fn candidate_dispatch_rejects_lightweight_unsigned_and_foreign_signer() {
             );
         }
         f.candidate_tag(kind);
-        let out = f.candidate_dispatch(false, false, "v0.1.0-rc.1");
+        let out = f.candidate_dispatch(false, false, &candidate());
         assert!(!out.status.success());
         assert!(
             String::from_utf8_lossy(&out.stderr).contains("021 3.8"),
@@ -452,10 +462,10 @@ fn candidate_dispatch_main_reachability_and_valid_signed_tag() {
     // A descendant as main is sufficient: the candidate need not be its tip.
     git(&f.repo, &["update-ref", "refs/remotes/origin/main", "HEAD"]);
     f.candidate_tag("signed");
-    let out = f.candidate_dispatch(false, false, "v0.1.0-rc.1");
+    let out = f.candidate_dispatch(false, false, &candidate());
     assert!(out.status.success(), "{out:?}");
     let text = String::from_utf8_lossy(&out.stdout);
-    assert!(text.contains("version=0.1.0-rc.1\n"));
+    assert!(text.contains(&format!("version={}\n", &candidate()[1..])));
     assert!(text.contains("candidate=true\n"));
     // An unrelated root commit, created without moving the fixture HEAD.
     let tree = f.tree();
@@ -464,7 +474,7 @@ fn candidate_dispatch_main_reachability_and_valid_signed_tag() {
         &f.repo,
         &["update-ref", "refs/remotes/origin/main", &unrelated],
     );
-    let out = f.candidate_dispatch(false, false, "v0.1.0-rc.1");
+    let out = f.candidate_dispatch(false, false, &candidate());
     assert!(!out.status.success());
     assert!(String::from_utf8_lossy(&out.stderr).contains("053 3.2.4"));
 }
@@ -472,22 +482,28 @@ fn candidate_dispatch_main_reachability_and_valid_signed_tag() {
 fn candidate_rehearsal_before_tag_and_publication_refusal() {
     let f = Fixture::new("candidate-rehearsal");
     git(&f.repo, &["update-ref", "refs/remotes/origin/main", "HEAD"]);
-    let out = f.candidate_dispatch(true, false, "v0.1.0-rc.1");
+    let out = f.candidate_dispatch(true, false, &candidate());
     assert!(out.status.success(), "{out:?}");
-    assert!(String::from_utf8_lossy(&out.stdout).contains("version=0.1.0-rc.1"));
+    assert!(
+        String::from_utf8_lossy(&out.stdout).contains(&format!("version={}", &candidate()[1..]))
+    );
     for rehearsal in [false, true] {
-        let out = f.candidate_dispatch(rehearsal, true, "v0.1.0-rc.1");
+        let out = f.candidate_dispatch(rehearsal, true, &candidate());
         assert!(!out.status.success());
         assert!(String::from_utf8_lossy(&out.stderr).contains("053 3.4.2"));
     }
-    assert!(!f.candidate_dispatch(true, false, "v0.1.0").status.success());
+    assert!(
+        !f.candidate_dispatch(true, false, &release_set().tag)
+            .status
+            .success()
+    );
     assert!(f.candidate_dispatch(true, false, "").status.success());
     let unrelated = git(&f.repo, &["commit-tree", &f.tree(), "-m", "unrelated"]);
     git(
         &f.repo,
         &["update-ref", "refs/remotes/origin/main", &unrelated],
     );
-    let out = f.candidate_dispatch(true, false, "v0.1.0-rc.1");
+    let out = f.candidate_dispatch(true, false, &candidate());
     assert!(String::from_utf8_lossy(&out.stderr).contains("053 3.1.1"));
 }
 #[test]

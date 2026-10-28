@@ -23,9 +23,19 @@ fn candidate_forms() {
         assert!(c::parse(tag, "0.1.0").unwrap_err().starts_with("053 3.2."));
     }
 }
+/// The release set's family version, which a candidate is a candidate of.
+fn family_version() -> String {
+    ReleaseSet::parse(include_bytes!("../release-set.json"))
+        .unwrap()
+        .version
+}
+/// The first candidate tag of that version (053 3.2).
+fn candidate() -> String {
+    format!("v{}-rc.1", family_version())
+}
 fn manifest() -> m::ReleaseManifest {
     let set = ReleaseSet::parse(include_bytes!("../release-set.json")).unwrap();
-    let set = c::release_set(&set, "v0.1.0-rc.1").unwrap();
+    let set = c::release_set(&set, &candidate()).unwrap();
     m::build(
         &set,
         std::path::Path::new("/nonexistent"),
@@ -50,12 +60,13 @@ fn candidate_manifest_identity_packages_and_canonical_bytes() {
     let mut m = manifest();
     assert!(m.packages.is_empty());
     c::check_manifest(&m.canonical(), &m.tag, &m.commit).unwrap();
-    assert!(c::check_manifest(&m.canonical(), "v0.1.0-rc.2", &m.commit).is_err());
+    let other = m.tag.replace("-rc.1", "-rc.2");
+    assert!(c::check_manifest(&m.canonical(), &other, &m.commit).is_err());
     assert!(c::check_manifest(&m.canonical(), &m.tag, &"c".repeat(40)).is_err());
     assert!(c::check_manifest(&serde_json::to_vec_pretty(&m).unwrap(), &m.tag, &m.commit).is_err());
     m.packages.push(m::PackageArtifact {
         name: "rustev".into(),
-        crate_file: "rustev-0.1.0-rc.1.crate".into(),
+        crate_file: format!("rustev-{}.crate", m.version),
         bytes: 1,
         sha256: "0".repeat(64),
     });
@@ -65,8 +76,8 @@ fn candidate_manifest_identity_packages_and_canonical_bytes() {
             .contains("053 3.2.3")
     );
     m.packages.clear();
-    m.version = "0.1.0".into();
-    m.tag = "v0.1.0".into();
+    m.version = family_version();
+    m.tag = format!("v{}", family_version());
     assert!(m::ReleaseManifest::parse(&m.canonical()).is_err());
 }
 #[test]
@@ -99,7 +110,7 @@ fn candidate_publish_journals_nothing() {
     for tag_only in [false, true] {
         let mut m = manifest();
         if tag_only {
-            m.version = "0.1.0".into();
+            m.version = family_version();
         }
         let mut life = Lifecycle::new(m);
         let result = lifecycle::publish(
@@ -157,11 +168,11 @@ fn prerelease_created_then_present_without_upload() {
     let assets = BTreeMap::from([("release-manifest.json".into(), manifest().canonical())]);
     let mut api = Fake::default();
     assert_eq!(
-        pr::publish_prerelease(&mut api, "v0.1.0-rc.1", &assets).unwrap(),
+        pr::publish_prerelease(&mut api, &candidate(), &assets).unwrap(),
         pr::Outcome::Created
     );
     assert_eq!(
-        pr::publish_prerelease(&mut api, "v0.1.0-rc.1", &assets).unwrap(),
+        pr::publish_prerelease(&mut api, &candidate(), &assets).unwrap(),
         pr::Outcome::Present
     );
     assert_eq!(api.creates, 1);
@@ -171,7 +182,7 @@ fn prerelease_conflicts_change_nothing() {
     let assets = BTreeMap::from([("release-manifest.json".into(), manifest().canonical())]);
     for change in ["digest", "missing", "extra", "release"] {
         let mut api = Fake::default();
-        pr::publish_prerelease(&mut api, "v0.1.0-rc.1", &assets).unwrap();
+        pr::publish_prerelease(&mut api, &candidate(), &assets).unwrap();
         let p = api.present.as_mut().unwrap();
         match change {
             "digest" => {
@@ -185,7 +196,7 @@ fn prerelease_conflicts_change_nothing() {
             _ => p.prerelease = false,
         }
         assert!(
-            pr::publish_prerelease(&mut api, "v0.1.0-rc.1", &assets)
+            pr::publish_prerelease(&mut api, &candidate(), &assets)
                 .unwrap_err()
                 .contains("053 3.3.4")
         );
@@ -231,15 +242,15 @@ fn gh_adapter_fails_closed_and_creates_only_a_prerelease() {
         std::fs::write(dir.join("status"), status).unwrap();
     };
     respond(serde_json::json!({"status": "404"}), "1");
-    assert!(api.lookup("v0.1.0-rc.1").unwrap().is_none());
+    assert!(api.lookup(&candidate()).unwrap().is_none());
     respond(serde_json::json!({"status": "403"}), "1");
-    assert!(api.lookup("v0.1.0-rc.1").is_err());
+    assert!(api.lookup(&candidate()).is_err());
     for digest in [serde_json::Value::Null, serde_json::json!("sha256:bad")] {
         respond(
             serde_json::json!({"prerelease": true, "assets": [{"name": "a", "digest": digest}]}),
             "0",
         );
-        assert!(api.lookup("v0.1.0-rc.1").is_err());
+        assert!(api.lookup(&candidate()).is_err());
     }
     let digest = "a".repeat(64);
     respond(
@@ -247,13 +258,13 @@ fn gh_adapter_fails_closed_and_creates_only_a_prerelease() {
         "0",
     );
     assert_eq!(
-        api.lookup("v0.1.0-rc.1").unwrap().unwrap().assets["a"],
+        api.lookup(&candidate()).unwrap().unwrap().assets["a"],
         digest
     );
     assert!(!calls.exists());
     respond(serde_json::json!({"status": "404"}), "1");
     let assets = BTreeMap::from([("release-manifest.json".into(), manifest().canonical())]);
-    pr::publish_prerelease(&mut api, "v0.1.0-rc.1", &assets).unwrap();
+    pr::publish_prerelease(&mut api, &candidate(), &assets).unwrap();
     let args = std::fs::read_to_string(calls).unwrap();
     for required in [
         "--prerelease\n",

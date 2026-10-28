@@ -1,6 +1,6 @@
 {
   "name": "@rustev/rustev-win32-x64-msvc",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Rustev's Node-API addon for win32-x64-msvc; installed through @rustev/rustev, never directly.",
   "license": "Apache-2.0",

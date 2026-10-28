@@ -21,6 +21,11 @@ fn fixture() -> (
 ) {
     let root = fresh_dir("rustev-family-test").unwrap();
     let mut set = ReleaseSet::parse(include_bytes!("../release-set.json")).unwrap();
+    // Spec 031 3.11.1: publication authorizes exactly the first release, so
+    // the publication path runs on the release set at that version. A later
+    // version's authority (056 3.4) is tested on its own.
+    set.version = rustev_release::lifecycle::FIRST_RELEASE_VERSION.into();
+    set.tag = format!("v{}", set.version);
     set.upload_order = vec!["rustev-contract".into()];
     set.layers = vec![set.upload_order.clone()];
     set.npm = vec![set.npm.last().unwrap().clone()];
@@ -661,16 +666,25 @@ fn crate_upload_without_signed_manifest_is_refused() {
 
 #[test]
 fn candidate_collect_requires_rehearsal_and_binds_candidate_names() {
-    let (root, set, mut m, _) = fixture();
-    let set = rustev_release::candidate::release_set(&set, "v0.1.0-rc.1").unwrap();
+    let (root, mut set, mut m, _) = fixture();
+    // Spec 053 3.2.2: a candidate is of the workspace's family version, so
+    // the fixture's first-release names move to that version's first
+    // candidate.
+    let first = set.version.clone();
+    set.version = ReleaseSet::parse(include_bytes!("../release-set.json"))
+        .unwrap()
+        .version;
+    set.tag = format!("v{}", set.version);
+    let rc = format!("{}-rc.1", set.version);
+    let set = rustev_release::candidate::release_set(&set, &format!("v{rc}")).unwrap();
     let artifacts = root.join("artifacts");
     for (name, bytes) in fa::workflow_files(&artifacts).unwrap() {
         std::fs::remove_file(artifacts.join(&name)).unwrap();
-        let target = name.replace("0.1.0", "0.1.0-rc.1");
+        let target = name.replace(&first, &rc);
         let bytes = if name.ends_with(".sha256") {
             String::from_utf8(bytes)
                 .unwrap()
-                .replace("0.1.0", "0.1.0-rc.1")
+                .replace(&first, &rc)
                 .into_bytes()
         } else {
             bytes
@@ -687,10 +701,10 @@ fn candidate_collect_requires_rehearsal_and_binds_candidate_names() {
     m.tag = set.tag.clone();
     m.packages.clear();
     m.artifacts = fa::collect(&set, &absent, Some(&artifacts)).unwrap();
-    assert!(m.artifacts.iter().all(|a| a.name.contains("0.1.0-rc.1")));
+    assert!(m.artifacts.iter().all(|a| a.name.contains(&rc)));
     assert!(fa::verify(&m, &artifacts).is_empty());
     write(
-        &artifacts.join("npm/rustev-rustev-wasm-0.1.0-rc.1.tgz"),
+        &artifacts.join(format!("npm/rustev-rustev-wasm-{rc}.tgz")),
         b"changed",
     );
     assert!(
