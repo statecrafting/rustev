@@ -1215,6 +1215,11 @@ against their schemas in their own contract tests.
   untested on any platform. The label `statecraft:stacked-ci` runs all
   seven on a pull request. The platform list moved from the `native`
   matrix into the `scope` job of `bindings.yml`, unchanged.
+- 2026-10-28: `make conformance-harvest` (3.12.2) removed
+  `tools/rustev-conformance/cases/cli`, which also holds the 152 `explain.*`
+  cases, and regenerated only the CLI cases, so it left the explain cases
+  deleted (#349). The recipe now blesses `--test explain` after the CLI
+  harvest and before the manifest. No case changes.
 
 ## Decisions at approval
 

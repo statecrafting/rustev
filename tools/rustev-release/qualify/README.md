@@ -27,8 +27,11 @@ adoption mode. The subset list remains owned by adoption.sh.
 The evidence directory retains per-kind logs, SHA-256 output digests, lockfiles,
 install/audit records and exported example documents. It contains only the host's
 four step JSON files; collect other hosts' evidence separately for `qualify`.
-Both pinned and MSRV consumer tests run with Cargo offline; process network denial
-uses sandbox-exec or a network namespace when available, and logs its absence.
+The declared example's pinned and MSRV consumer tests run with Cargo offline;
+process network denial uses sandbox-exec or a network namespace when available,
+and logs its absence. The partial-adoption subsets run adoption.sh in registry
+mode: they resolve from the registry, then build with `--locked` once the
+lockfile has been checked against the signed manifest.
 The remote client/server example is compiled but never calls a provider.
 
 `RUSTEV_QUALIFY_DRY=1` performs no signature verification or network steps. Required
