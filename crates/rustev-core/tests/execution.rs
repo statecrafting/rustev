@@ -820,20 +820,29 @@ fn incomplete_shared_and_persistent_members_are_refused() {
         assert_eq!(r.subject, "execution.optimization", "{row}");
         assert!(r.detail.starts_with(needle), "{row}: {}", r.detail);
     }
-    // Each complete member, alone or beside the spec 017 mechanisms, is
-    // refused as not yet available, never accepted and run independently.
-    for (name, keep_shared) in [("shared_calls", true), ("persistent_cache", false)] {
-        let mut policy = shared_and_persistent();
-        let o = policy.optimization.as_mut().unwrap();
-        if keep_shared {
-            o.persistent_cache = None;
-        } else {
-            o.shared_calls = None;
-        }
-        o.batch = optimized().optimization.unwrap().batch;
-        let r = refused(&policy, "is not available in this build");
-        assert_eq!(r.detail, format!("{name} is not available in this build"));
-    }
+    // The complete persistent member, alone or beside the spec 017
+    // mechanisms, is refused as not yet available, never accepted and run
+    // independently; complete shared calls are accepted, and are part of
+    // the plan's identity.
+    let mut policy = shared_and_persistent();
+    let o = policy.optimization.as_mut().unwrap();
+    o.shared_calls = None;
+    o.batch = optimized().optimization.unwrap().batch;
+    let r = refused(&policy, "is not available in this build");
+    assert_eq!(r.detail, "persistent_cache is not available in this build");
+    let mut shared = shared_and_persistent();
+    shared.optimization.as_mut().unwrap().persistent_cache = None;
+    let with_shared = accepted(&shared);
+    shared
+        .optimization
+        .as_mut()
+        .unwrap()
+        .shared_calls
+        .as_mut()
+        .unwrap()
+        .max_waiters_per_call = 5;
+    assert_ne!(with_shared.id, accepted(&shared).id);
+    assert_ne!(with_shared.id, accepted(&optimized()).id);
 }
 
 /// Spec 017, 2: enabling or changing the optimization member changes

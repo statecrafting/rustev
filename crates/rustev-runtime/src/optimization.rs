@@ -5,7 +5,7 @@
 //! inserting scope's own oldest entries (I-2).
 
 use std::collections::{BTreeMap, VecDeque};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use rustev_contract::canonical::{record_canonical_bytes, tagged_digest};
 use rustev_contract::ids::{ArtifactId, DescriptorId, PlanId};
@@ -256,9 +256,26 @@ pub struct InvalidationResult {
 #[derive(Debug, Default)]
 pub(crate) struct Optimizer {
     namespaces: Mutex<BTreeMap<String, NamespaceState>>,
+    /// Shared calls in flight, per plan namespace (spec 044, 3.2): a key
+    /// holds the plan, so no attempt is shared across plans, and each plan's
+    /// `max_shared_calls` bounds its own slots.
+    shared: Mutex<BTreeMap<String, crate::driver::SharedCalls>>,
 }
 
 impl Optimizer {
+    pub(crate) fn shared_calls(
+        &self,
+        namespace: &str,
+        max_slots: usize,
+    ) -> crate::driver::SharedCalls {
+        self.shared
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .entry(namespace.to_string())
+            .or_insert_with(|| Arc::new(crate::shared::Registry::new(max_slots)))
+            .clone()
+    }
+
     fn lock(&self) -> std::sync::MutexGuard<'_, BTreeMap<String, NamespaceState>> {
         self.namespaces.lock().unwrap_or_else(|e| e.into_inner())
     }

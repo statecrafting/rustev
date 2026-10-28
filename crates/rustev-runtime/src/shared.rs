@@ -87,6 +87,7 @@ impl<K: Ord + Clone + Send + Sync + 'static, T: Clone + Send + 'static> Registry
         key: &K,
         deadline: u64,
         max_waiters: usize,
+        label: &str,
         lead: impl FnOnce(CancelSignal) -> BoxFuture<'static, T>,
     ) -> Entered<K, T> {
         let mut slots = lock(&self.inner.slots);
@@ -113,6 +114,7 @@ impl<K: Ord + Clone + Send + Sync + 'static, T: Clone + Send + 'static> Registry
         let attempt = lead(signal.clone());
         let slot = Arc::new(Slot {
             key: key.clone(),
+            label: label.to_string(),
             deadline,
             signal,
             registry: Arc::downgrade(&self.inner),
@@ -136,6 +138,8 @@ type Attempt<T> = Pin<Box<CatchUnwind<BoxFuture<'static, T>>>>;
 
 struct Slot<K, T> {
     key: K,
+    /// The attempt's id, as its leader named it.
+    label: String,
     /// The dispatched deadline: the leader's.
     deadline: u64,
     /// The slot's own signal, never a child of any caller's (3.2.2 item 1).
@@ -240,6 +244,14 @@ pub(crate) enum Left<T> {
     Abandoned,
 }
 
+/// What dropping a waiter left behind.
+#[derive(Debug)]
+pub(crate) enum Dropped<T> {
+    Remained,
+    Completed { result: Shared<T>, owner: bool },
+    Last,
+}
+
 /// One request's place in a shared attempt.
 pub(crate) struct Waiter<K: Ord + Clone + Send + Sync + 'static, T: Clone + Send + 'static> {
     slot: Arc<Slot<K, T>>,
@@ -259,6 +271,11 @@ impl<K: Ord + Clone + Send + Sync + 'static, T: Clone + Send + 'static> Waiter<K
 
     pub(crate) fn id(&self) -> u64 {
         self.id
+    }
+
+    /// The shared attempt's id.
+    pub(crate) fn label(&self) -> &str {
+        &self.slot.label
     }
 
     /// Whether this waiter owns the attempt's charge now.
@@ -353,21 +370,61 @@ impl<K: Ord + Clone + Send + Sync + 'static, T: Clone + Send + 'static> Waiter<K
     }
 }
 
+impl<K: Ord + Clone + Send + Sync + 'static, T: Clone + Send + 'static> Waiter<K, T> {
+    /// Leave as a dropped waiter does, and say what that left behind, so
+    /// the caller settles its reservation: handed off while another waiter
+    /// remains, the result's charge if it had completed for this owner, or
+    /// the abandoned attempt's liability when this was the last waiter
+    /// (spec 044, 3.2.3 items 2 and 3).
+    pub(crate) fn abandon(mut self) -> Dropped<T> {
+        // A waiter that already left or took its result has nothing to hand
+        // off or abandon.
+        self.release().unwrap_or(Dropped::Remained)
+    }
+
+    /// Remove this waiter, and say what it left behind, in one critical
+    /// section: a check and a removal under two locks would let another
+    /// waiter leave in between, so two concurrent last waiters could each
+    /// see the other remain and neither record the abandoned attempt.
+    fn release(&mut self) -> Option<Dropped<T>> {
+        if self.done {
+            return None;
+        }
+        self.done = true;
+        let mut st = lock(&self.slot.state);
+        if let Some(result) = st.result.clone() {
+            let owner = st.owner == self.id;
+            st.waiters.remove(&self.id);
+            return Some(Dropped::Completed { result, owner });
+        }
+        st.remove(self.id);
+        if !st.waiters.is_empty() {
+            return Some(Dropped::Remained);
+        }
+        let attempt = st.attempt.take();
+        drop(st);
+        drop(attempt);
+        self.slot.retire();
+        Some(Dropped::Last)
+    }
+}
+
+impl<K: Ord + Clone + Send + Sync + 'static, T: Clone + Send + 'static> std::fmt::Debug
+    for Registry<K, T>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Registry")
+            .field("max_slots", &self.inner.max_slots)
+            .field("slots", &self.len())
+            .finish()
+    }
+}
+
 impl<K: Ord + Clone + Send + Sync + 'static, T: Clone + Send + 'static> Drop for Waiter<K, T> {
     /// A dropped waiter hands off while another remains; the last one drops
     /// the attempt future without raising its signal (spec 003, 3.4.5).
     fn drop(&mut self) {
-        if self.done {
-            return;
-        }
-        let mut st = lock(&self.slot.state);
-        st.remove(self.id);
-        if st.waiters.is_empty() && st.result.is_none() {
-            let attempt = st.attempt.take();
-            drop(st);
-            drop(attempt);
-            self.slot.retire();
-        }
+        let _ = self.release();
     }
 }
 
@@ -467,8 +524,8 @@ mod tests {
     fn every_waiter_receives_one_attempts_result_and_the_slot_is_removed() {
         let reg = Registry::new(4);
         let remote = Arc::new(Remote::default());
-        let mut a = led(reg.enter(&"k", 100, 3, lead(&remote)));
-        let mut b = joined(reg.enter(&"k", 100, 3, lead(&Arc::default())));
+        let mut a = led(reg.enter(&"k", 100, 3, "a", lead(&remote)));
+        let mut b = joined(reg.enter(&"k", 100, 3, "a", lead(&Arc::default())));
         let (ca, wa) = counter();
         let (cb, wb) = counter();
         assert!(a.poll_attempt(&mut Context::from_waker(&wa)).is_pending());
@@ -494,7 +551,7 @@ mod tests {
         assert_eq!(remote.dropped.load(Ordering::SeqCst), 1);
         assert!(!remote.raised());
         assert!(matches!(
-            reg.enter(&"k", 100, 3, lead(&Arc::default())),
+            reg.enter(&"k", 100, 3, "a", lead(&Arc::default())),
             Entered::Led(_)
         ));
     }
@@ -503,8 +560,8 @@ mod tests {
     fn a_waiter_finding_the_attempt_being_polled_registers_and_waits() {
         let reg = Registry::<&str, u32>::new(1);
         let remote = Arc::new(Remote::default());
-        let a = led(reg.enter(&"k", 100, 2, lead(&remote)));
-        let mut b = joined(reg.enter(&"k", 100, 2, lead(&Arc::default())));
+        let a = led(reg.enter(&"k", 100, 2, "a", lead(&remote)));
+        let mut b = joined(reg.enter(&"k", 100, 2, "a", lead(&Arc::default())));
         lock(&a.slot.state).polling = true;
         let (_, wb) = counter();
         assert!(b.poll_attempt(&mut Context::from_waker(&wb)).is_pending());
@@ -517,22 +574,22 @@ mod tests {
     fn joining_needs_time_room_and_an_attempt_in_flight() {
         let reg = Registry::new(1);
         let remote = Arc::new(Remote::default());
-        let _a = led(reg.enter(&"k", 100, 2, lead(&remote)));
+        let _a = led(reg.enter(&"k", 100, 2, "a", lead(&remote)));
         assert!(matches!(
-            reg.enter(&"k", 101, 2, lead(&Arc::default())),
+            reg.enter(&"k", 101, 2, "a", lead(&Arc::default())),
             Entered::Ineligible(Ineligible::Deadline)
         ));
-        let _b = joined(reg.enter(&"k", 99, 2, lead(&Arc::default())));
+        let _b = joined(reg.enter(&"k", 99, 2, "a", lead(&Arc::default())));
         assert!(matches!(
-            reg.enter(&"k", 50, 2, lead(&Arc::default())),
+            reg.enter(&"k", 50, 2, "a", lead(&Arc::default())),
             Entered::Ineligible(Ineligible::Waiters)
         ));
         assert!(matches!(
-            reg.enter(&"other", 100, 2, lead(&Arc::default())),
+            reg.enter(&"other", 100, 2, "a", lead(&Arc::default())),
             Entered::Full
         ));
         assert!(matches!(
-            Registry::<&str, u32>::new(1).enter(&"k", 100, 0, lead(&Arc::default())),
+            Registry::<&str, u32>::new(1).enter(&"k", 100, 0, "a", lead(&Arc::default())),
             Entered::Full
         ));
     }
@@ -541,9 +598,9 @@ mod tests {
     fn a_leaving_owner_returns_at_once_and_hands_off_to_the_earliest_waiter() {
         let reg = Registry::new(1);
         let remote = Arc::new(Remote::default());
-        let mut a = led(reg.enter(&"k", 100, 4, lead(&remote)));
-        let mut b = joined(reg.enter(&"k", 100, 4, lead(&Arc::default())));
-        let c = joined(reg.enter(&"k", 100, 4, lead(&Arc::default())));
+        let mut a = led(reg.enter(&"k", 100, 4, "a", lead(&remote)));
+        let mut b = joined(reg.enter(&"k", 100, 4, "a", lead(&Arc::default())));
+        let c = joined(reg.enter(&"k", 100, 4, "a", lead(&Arc::default())));
         let (ca, wa) = counter();
         let (_, wc) = counter();
         assert!(a.poll_attempt(&mut Context::from_waker(&wa)).is_pending());
@@ -578,7 +635,7 @@ mod tests {
         // Still pending: abandoned, the future dropped.
         let reg = Registry::new(1);
         let remote = Arc::new(Remote::default());
-        let mut a = led(reg.enter(&"k", 100, 2, lead(&remote)));
+        let mut a = led(reg.enter(&"k", 100, 2, "a", lead(&remote)));
         let (_, w) = counter();
         assert!(a.poll_attempt(&mut Context::from_waker(&w)).is_pending());
         assert!(matches!(
@@ -592,8 +649,8 @@ mod tests {
 
         // Answered by that one poll.
         let remote = Arc::new(Remote::default());
-        let mut a = led(reg.enter(&"k", 100, 2, lead(&remote)));
-        let b = joined(reg.enter(&"k", 100, 2, lead(&Arc::default())));
+        let mut a = led(reg.enter(&"k", 100, 2, "a", lead(&remote)));
+        let b = joined(reg.enter(&"k", 100, 2, "a", lead(&Arc::default())));
         assert!(a.poll_attempt(&mut Context::from_waker(&w)).is_pending());
         drop(b);
         *lock(&remote.answer) = Some(9);
@@ -608,8 +665,8 @@ mod tests {
     fn a_dropped_waiter_hands_off_and_the_last_drops_the_attempt_unsignalled() {
         let reg = Registry::new(1);
         let remote = Arc::new(Remote::default());
-        let mut a = led(reg.enter(&"k", 100, 2, lead(&remote)));
-        let b = joined(reg.enter(&"k", 100, 2, lead(&Arc::default())));
+        let mut a = led(reg.enter(&"k", 100, 2, "a", lead(&remote)));
+        let b = joined(reg.enter(&"k", 100, 2, "a", lead(&Arc::default())));
         let (_, w) = counter();
         assert!(a.poll_attempt(&mut Context::from_waker(&w)).is_pending());
         let a_id = a.id();
@@ -628,8 +685,8 @@ mod tests {
         let reg = Registry::new(1);
         let remote = Arc::new(Remote::default());
         *lock(&remote.panic) = true;
-        let mut a = led(reg.enter(&"k", 100, 2, lead(&remote)));
-        let mut b = joined(reg.enter(&"k", 100, 2, lead(&Arc::default())));
+        let mut a = led(reg.enter(&"k", 100, 2, "a", lead(&remote)));
+        let mut b = joined(reg.enter(&"k", 100, 2, "a", lead(&Arc::default())));
         let (_, w) = counter();
         let detail = Poll::Ready(Err("SYNTHETIC attempt panic".to_string()));
         assert_eq!(b.poll_attempt(&mut Context::from_waker(&w)), detail);
@@ -638,11 +695,68 @@ mod tests {
     }
 
     #[test]
+    fn abandoning_reports_what_the_waiter_left_behind() {
+        let reg = Registry::new(1);
+        let remote = Arc::new(Remote::default());
+        let a = led(reg.enter(&"k", 100, 3, "a", lead(&remote)));
+        let b = joined(reg.enter(&"k", 100, 3, "a", lead(&Arc::default())));
+        let mut c = joined(reg.enter(&"k", 100, 3, "a", lead(&Arc::default())));
+        assert!(matches!(a.abandon(), Dropped::Remained));
+        remote.answer(4);
+        let (_, w) = counter();
+        assert_eq!(
+            c.poll_attempt(&mut Context::from_waker(&w)),
+            Poll::Ready(Ok(4))
+        );
+        // b owns the charge after the handoff and never took the result.
+        assert!(matches!(
+            b.abandon(),
+            Dropped::Completed {
+                result: Ok(4),
+                owner: true
+            }
+        ));
+        let remote = Arc::new(Remote::default());
+        let d = led(reg.enter(&"k", 100, 3, "a", lead(&remote)));
+        assert!(matches!(d.abandon(), Dropped::Last));
+        assert!(!remote.raised());
+        assert_eq!(remote.dropped.load(Ordering::SeqCst), 1);
+    }
+
+    /// Two waiters dropped at once on two threads: exactly one is the last
+    /// and abandons the attempt, whatever the interleaving.
+    #[test]
+    fn concurrent_abandons_leave_exactly_one_last_waiter() {
+        for _ in 0..2_000 {
+            let reg = Registry::new(1);
+            let remote = Arc::new(Remote::default());
+            let a = led(reg.enter(&"k", 100, 2, "a", lead(&remote)));
+            let b = joined(reg.enter(&"k", 100, 2, "a", lead(&Arc::default())));
+            let barrier = Arc::new(std::sync::Barrier::new(2));
+            let run = |w: W, barrier: Arc<std::sync::Barrier>| {
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    w.abandon()
+                })
+            };
+            let (x, y) = (run(a, barrier.clone()), run(b, barrier));
+            let outcomes = [x.join().unwrap(), y.join().unwrap()];
+            let last = outcomes
+                .iter()
+                .filter(|d| matches!(d, Dropped::Last))
+                .count();
+            assert_eq!(last, 1, "{outcomes:?}");
+            assert_eq!(remote.dropped.load(Ordering::SeqCst), 1);
+            assert_eq!(reg.len(), 0);
+        }
+    }
+
+    #[test]
     fn leaving_after_completion_takes_the_result() {
         let reg = Registry::new(1);
         let remote = Arc::new(Remote::default());
-        let a = led(reg.enter(&"k", 100, 2, lead(&remote)));
-        let mut b = joined(reg.enter(&"k", 100, 2, lead(&Arc::default())));
+        let a = led(reg.enter(&"k", 100, 2, "a", lead(&remote)));
+        let mut b = joined(reg.enter(&"k", 100, 2, "a", lead(&Arc::default())));
         remote.answer(5);
         let (_, w) = counter();
         assert_eq!(
