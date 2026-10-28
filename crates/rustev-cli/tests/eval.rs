@@ -1266,6 +1266,29 @@ impl rustev_eval::scores::Scorer for Presented {
     }
 }
 
+/// The scorer of the cross-language fixture (spec 041, 3.9.2): 1 when the
+/// lodging decision presented a ranking, else unscored with an ordinary
+/// reason. `integrations/rustev-node/test/scorer.test.mjs` holds the same
+/// scorer in TypeScript.
+struct Shown(rustev_eval::scoring::ScorerDescriptor);
+
+impl rustev_eval::scores::Scorer for Shown {
+    fn descriptor(&self) -> &rustev_eval::scoring::ScorerDescriptor {
+        &self.0
+    }
+    fn score(
+        &self,
+        _: &rustev_eval::scores::CaseView,
+        p: &rustev_eval::scores::ProposalView,
+    ) -> rustev_eval::scores::ScoreOutcome {
+        if p.action == "present_ranked_lodging" {
+            rustev_eval::scores::ScoreOutcome::Score(1.0)
+        } else {
+            rustev_eval::scores::ScoreOutcome::Unscored("not_presented".into())
+        }
+    }
+}
+
 /// The lodging cohort with gold under `rustev.dataset/2`, a version 2
 /// adapter and a version 3 configuration declaring the `presented` scorer
 /// and the `judge` scorer, whose judge plan is `judge_plan`.
@@ -1686,4 +1709,69 @@ fn eval_judge_writes_scores_from_judge_bundles() {
     a.extend(scope());
     let j = s.rustev_owned(&a).expect(4, "invalid_input");
     assert_eq!(j["input"], "other.views.json");
+}
+
+/// The fixture's committed files: the inputs, then the outputs.
+const SCORER_INPUTS: [&str; 5] = [
+    "lodging.dataset.json",
+    "lodging.config.json",
+    "lodging.adapter.json",
+    "bundles/l-1.json",
+    "bundles/l-2.json",
+];
+const SCORER_OUTPUTS: [&str; 3] = ["views.json", "shown.scores.json", "report.json"];
+
+/// Spec 041, 3.9.2: the fixture a TypeScript scorer reproduces byte for
+/// byte through the Node binding
+/// (`integrations/rustev-node/test/scorer.test.mjs`). Over the committed
+/// inputs, the CLI's views, the Rust scorer's scores and the report read
+/// with them must equal the committed outputs. `RUSTEV_BLESS=1` captures
+/// the inputs afresh and rewrites every file.
+#[test]
+fn the_scorer_fixture_reproduces() {
+    use rustev_eval::scores::{ScoreViews, score_views};
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/golden/scorer");
+    let bless = std::env::var("RUSTEV_BLESS").as_deref() == Ok("1");
+    let s = Scratch::new("eval-041-fixture");
+    if bless {
+        run_inputs(&s);
+        v3_setup(&s, &format!("sha256:{}", "e".repeat(64)));
+    } else {
+        for name in SCORER_INPUTS {
+            s.write(name, &std::fs::read(root.join(name)).unwrap());
+        }
+    }
+    s.rustev_owned(&views_args("views.json"))
+        .expect(0, "viewed");
+    let views = ScoreViews::parse(&s.read("views.json")).unwrap();
+    let config = EvaluatorConfig::parse(&s.read("lodging.config.json")).unwrap();
+    let shown = Shown(config.scorers.as_ref().unwrap()[0].clone());
+    let scores = score_views(&shown, &views).unwrap();
+    s.write("shown.scores.json", &scores.record_canonical().unwrap());
+    std::fs::create_dir(s.path("scored")).unwrap();
+    let mut a = eval_args(
+        "lodging.dataset.json",
+        "final_test",
+        "lodging.config.json",
+        "lodging.adapter.json",
+        "scored",
+    );
+    a.extend(["--scores".into(), "shown.scores.json".into()]);
+    s.rustev_owned(&a).expect(0, "reported");
+    s.write("report.json", &s.read("scored/report.json"));
+    let report: Json = serde_json::from_slice(&s.read("report.json")).unwrap();
+    let presented = metric(&report, "rubric/presented");
+    assert_eq!(presented["value"]["measured"]["n"], 1, "{presented}");
+    for name in SCORER_INPUTS.iter().chain(&SCORER_OUTPUTS) {
+        if bless {
+            let p = root.join(name);
+            std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+            std::fs::write(p, s.read(name)).unwrap();
+        }
+        assert_eq!(
+            s.read(name),
+            std::fs::read(root.join(name)).unwrap(),
+            "fixture {name}"
+        );
+    }
 }

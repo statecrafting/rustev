@@ -69,6 +69,31 @@ export interface ContextSource {
   fetch(fields: string[], call: { decisionId: string; traceparent?: string }): Promise<DocumentInput>;
 }
 
+/** What a host scorer is given with the views (spec 041, 3.9.1). */
+export interface ScoreCall {
+  /** Absent when `scoreViews` was given no deadline. */
+  remainingMs?: number;
+  signal: AbortSignal;
+  /** The views' record canonical bytes. */
+  raw: { caseView: Uint8Array; proposalView: Uint8Array };
+}
+
+/** A score inside the scorer's output, or why there is none: 1 to 64
+ * bytes of `[a-z0-9_]`, not a reason eval reserves. */
+export type ScoreAnswer = { score: number } | { unscored: string };
+
+/** A host scorer (spec 041, 3.9). A throw or rejection is
+ * `scorer_failed`, never a score. */
+export interface Scorer {
+  /** The scorer's `ScorerDescriptor`, as the configuration declares it. */
+  descriptor: DocumentInput;
+  /** 1 to 65,536 each; there is no default. */
+  maxConcurrency: number;
+  queueCapacity: number;
+  /** `caseView.gold` is null unless the descriptor declares `reads_gold`. */
+  score(caseView: unknown, proposalView: unknown, call: ScoreCall): Promise<ScoreAnswer>;
+}
+
 export interface EngineOptions {
   runtime: RuntimeConfig;
   /** Required; there is no default sink. */
@@ -146,7 +171,8 @@ export declare class Engine {
     calibrations?: DocumentInput[];
   }): PlanHandle;
   /** A pure command through the shared surface (`check`, `compile`,
-   * `show`, `replay`, `eval`, `gate`, `calibrateFit`, `calibrateQualify`),
+   * `show`, `replay`, `eval`, `evalViews`, `gate`, `calibrateFit`,
+   * `calibrateQualify`),
    * on the engine's blocking pool. */
   command(name: string, inputs: Record<string, DocumentInput>, args: object): Promise<CommandResult>;
   commandSync(name: string, inputs: Record<string, DocumentInput>, args: object): CommandResult;
@@ -155,6 +181,14 @@ export declare class Engine {
   replay(inputs: Record<string, DocumentInput>, args: object): Promise<CommandResult>;
   evaluate(inputs: Record<string, DocumentInput>, args: object): Promise<CommandResult>;
   gate(inputs: Record<string, DocumentInput>, args: object): Promise<CommandResult>;
+  /** `rustev eval views`: `args.out` names the one artifact written. */
+  evalViews(inputs: Record<string, DocumentInput>, args: object): Promise<CommandResult>;
+  /** One host scorer's `rustev.scores/1` over the views (041 3.9). */
+  scoreViews(
+    views: DocumentInput,
+    scorer: Scorer,
+    options?: { deadlineMs?: number; signal?: AbortSignal },
+  ): Promise<{ scores: unknown; raw: Uint8Array }>;
   calibrateFit(inputs: Record<string, DocumentInput>, args: object): Promise<CommandResult>;
   calibrateQualify(inputs: Record<string, DocumentInput>, args: object): Promise<CommandResult>;
   onGauges(cb: (gauges: EngineGauges) => void | Promise<void>, options: { everyMs: number }): () => void;

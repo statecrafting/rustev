@@ -178,19 +178,44 @@ function contextSeam(source) {
   };
 }
 
-function backendSeam(b) {
+/** The `AbortController`s of one seam's calls in flight, by call id. */
+function aborts() {
   const controllers = new Map();
-  // An abort and its attempt's call reach JavaScript through two separate
-  // queues, so the abort can arrive first: it is remembered, and the
-  // attempt starts with its signal already aborted.
-  // Kept briefly: an abort that crossed with its attempt's answer (the
-  // attempt already done) is never consumed, and is pruned after a minute
-  // (checked whenever an attempt starts or an abort arrives).
+  // An abort and its call reach JavaScript through two separate queues, so
+  // the abort can arrive first: it is remembered, and the call starts with
+  // its signal already aborted.
+  // Kept briefly: an abort that crossed with its call's answer (the call
+  // already done) is never consumed, and is pruned after a minute (checked
+  // whenever a call starts or an abort arrives).
   const abortedEarly = new Map();
   const prune = () => {
     const stale = Date.now() - 60_000;
     for (const [id, at] of abortedEarly) if (at < stale) abortedEarly.delete(id);
   };
+  return {
+    start(id) {
+      const controller = new AbortController();
+      controllers.set(id, controller);
+      if (abortedEarly.delete(id)) controller.abort();
+      // Pruned whenever a call starts too, so stale entries never outlive
+      // a minute of activity.
+      prune();
+      return controller.signal;
+    },
+    end(id) {
+      controllers.delete(id);
+    },
+    abort(id) {
+      prune();
+      const controller = controllers.get(id);
+      if (controller) controller.abort();
+      else abortedEarly.set(id, Date.now());
+    },
+  };
+}
+
+function backendSeam(b) {
+  const calls = aborts();
   return {
     descriptor: bytes(b.descriptor),
     costModel: JSON.stringify(b.costModel),
@@ -198,12 +223,7 @@ function backendSeam(b) {
     maxConcurrency: b.maxConcurrency,
     queueCapacity: b.queueCapacity,
     infer: async (call) => {
-      const controller = new AbortController();
-      controllers.set(call.attemptId, controller);
-      if (abortedEarly.delete(call.attemptId)) controller.abort();
-      // Pruned whenever an attempt starts too, so stale entries never
-      // outlive a minute of activity.
-      prune();
+      const signal = calls.start(call.attemptId);
       try {
         const answer = await b.infer({
           attemptId: call.attemptId,
@@ -211,7 +231,7 @@ function backendSeam(b) {
           remainingMs: call.remainingMs,
           reservedBound: JSON.parse(call.reservedBound),
           principalHandle: call.principalHandle,
-          signal: controller.signal,
+          signal,
           traceparent: call.traceparent ?? undefined,
         });
         return {
@@ -230,15 +250,50 @@ function backendSeam(b) {
         }
         throw e;
       } finally {
-        controllers.delete(call.attemptId);
+        calls.end(call.attemptId);
       }
     },
-    abort: (attemptId) => {
-      prune();
-      const controller = controllers.get(attemptId);
-      if (controller) controller.abort();
-      else abortedEarly.set(attemptId, Date.now());
+    abort: (attemptId) => calls.abort(attemptId),
+  };
+}
+
+const utf8 = (b) => Buffer.from(b).toString('utf8');
+
+/** A host scorer (spec 041, 3.9.1). It is given the parsed case and
+ * proposal views, and in `call` their canonical bytes, the remaining
+ * deadline and an `AbortSignal`. Its answer is `{ score }` or
+ * `{ unscored }`; the native layer records anything else as
+ * `invalid_score`, and a throw or rejection as `scorer_failed`. */
+function scorerSeam(s) {
+  for (const field of ['queueCapacity', 'maxConcurrency']) {
+    if (!Number.isInteger(s[field])) {
+      throw new classes.ConfigRefused('out_of_range', { field: `scorer.${field}`, min: 1, max: 65_536 });
+    }
+  }
+  const calls = aborts();
+  return {
+    descriptor: bytes(s.descriptor),
+    queueCapacity: s.queueCapacity,
+    maxConcurrency: s.maxConcurrency,
+    score: async (call) => {
+      const signal = calls.start(call.callId);
+      try {
+        const answer = await s.score(JSON.parse(utf8(call.caseView)), JSON.parse(utf8(call.proposalView)), {
+          remainingMs: call.remainingMs ?? undefined,
+          signal,
+          raw: { caseView: call.caseView, proposalView: call.proposalView },
+        });
+        // A non-finite score has no JSON form: it crosses as null, which
+        // is outside every output.
+        if (answer !== null && typeof answer === 'object' && typeof answer.score === 'number' && !Number.isFinite(answer.score)) {
+          return { ...answer, score: null };
+        }
+        return answer ?? null;
+      } finally {
+        calls.end(call.callId);
+      }
     },
+    abort: (callId) => calls.abort(callId),
   };
 }
 
@@ -335,10 +390,14 @@ const running = new WeakMap();
  * engine cannot replace what its plans decide through. */
 const natives = new WeakMap();
 
+/** Each engine's scorer seams, by the host's scorer object (041 3.9). */
+const scorerSeams = new WeakMap();
+
 class Engine {
   constructor(nativeEngine) {
     natives.set(this, nativeEngine);
     running.set(this, new Set());
+    scorerSeams.set(this, new WeakMap());
   }
 
   /** Create an engine (3.3); every refusal happens before any thread. */
@@ -443,8 +502,47 @@ class Engine {
   replay(inputs, args) {
     return this.command('replay', inputs, args);
   }
+  /** `args.scores` names the inputs holding scores documents (041 3.10). */
   evaluate(inputs, args) {
     return this.command('eval', inputs, args);
+  }
+  /** `rustev eval views` (041 3.10.3): `args.out` names one artifact. */
+  evalViews(inputs, args) {
+    return this.command('evalViews', inputs, args);
+  }
+
+  /** Score a `rustev.score-views/1` document with a host scorer (041 3.9):
+   * one call per entry, at most the scorer's `maxConcurrency` at once, each
+   * bounded by `deadlineMs` and `signal`. Every `scoreViews` with the same
+   * scorer object shares one seam and its queue. */
+  async scoreViews(views, scorer, options = {}) {
+    if (scorer === null || typeof scorer !== 'object' || typeof scorer.score !== 'function') {
+      throw new classes.ConfigRefused('missing_scorer', { field: 'scorer.score' });
+    }
+    const n = natives.get(this);
+    const seams = scorerSeams.get(this);
+    let seam = seams.get(scorer);
+    if (seam === undefined) {
+      seam = wrap(() => n.scorer(scorerSeam(scorer)));
+      seams.set(scorer, seam);
+    }
+    const cancel = wrap(() => n.cancelHandle());
+    running.get(this).add(cancel);
+    const signal = options.signal;
+    if (signal?.aborted) cancel.raise();
+    const onAbort = () => cancel.raise();
+    signal?.addEventListener('abort', onAbort, { once: true });
+    begin();
+    try {
+      const raw = await n.scoreViews(bytes(views), seam, options.deadlineMs, cancel);
+      return { scores: JSON.parse(utf8(raw)), raw };
+    } catch (e) {
+      throw typed(e);
+    } finally {
+      end();
+      running.get(this).delete(cancel);
+      signal?.removeEventListener('abort', onAbort);
+    }
   }
   gate(inputs, args) {
     return this.command('gate', inputs, args);

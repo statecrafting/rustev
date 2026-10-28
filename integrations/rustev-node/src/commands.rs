@@ -149,26 +149,32 @@ pub fn run(name: &str, inputs: BTreeMap<String, Vec<u8>>, a: &Json) -> Result<Co
             let config = replay_config(a)?;
             rustev_surface::replay::replay("replay", &host, s(a, "bundle")?, &store, &config)
         }
-        "eval" => {
+        "eval" | "evalViews" => {
             let split = split_named(s(a, "split")?).ok_or_else(|| usage("split"))?;
             let config = replay_config(a)?;
-            rustev_surface::eval::eval(
-                "eval",
-                &host,
-                EvalArgs {
-                    split,
-                    replay: &config,
-                    out: s(a, "out")?,
-                    dataset: s(a, "dataset")?,
-                    config: s(a, "config")?,
-                    adapter: s(a, "adapter")?,
-                    bundles: s(a, "bundles")?,
-                    candidate_plan: a["candidatePlan"].as_str(),
-                    deps,
-                },
-                &store,
-                &mut hook,
-            )
+            let args = EvalArgs {
+                split,
+                replay: &config,
+                out: s(a, "out")?,
+                dataset: s(a, "dataset")?,
+                config: s(a, "config")?,
+                adapter: s(a, "adapter")?,
+                bundles: s(a, "bundles")?,
+                candidate_plan: a["candidatePlan"].as_str(),
+                deps,
+            };
+            // Spec 041, 3.9.2 and 3.10: `scores` names the inputs holding a
+            // version 3 configuration's scores documents; the surface
+            // checks them as the CLI's `--scores`.
+            let scores = list(a, "scores")?;
+            if name == "evalViews" {
+                if !scores.is_empty() {
+                    return Err(usage("evalViews takes no scores"));
+                }
+                rustev_surface::eval::views("eval views", &host, args, &store, &mut hook)
+            } else {
+                rustev_surface::eval::eval_scored("eval", &host, args, &scores, &store, &mut hook)
+            }
         }
         "gate" => rustev_surface::eval::gate(
             "gate",

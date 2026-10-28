@@ -1041,6 +1041,52 @@ Tests:
   module.
 - The existing CLI goldens, unchanged.
 
+**Increment 8 (2026-10-28): the Node `Scorer` seam.**
+`crates/rustev-eval/src/scores.rs` splits `score_views` into the public
+parts a host seam reuses: `scorer_case` (gold withheld unless
+`reads_gold`, 3.7.4), `checked` (3.7.5), `ScoreEntry::of` and
+`Scores::over`; `score_views` is built from them, unchanged. In
+`integrations/rustev-node`, `HostScorer` (`src/seams.rs`) is a seam under
+every rule of spec 027 3.6: the host declares its descriptor,
+`maxConcurrency` and `queueCapacity` (each 1 to 65,536), and each call
+carries the case and proposal views as record canonical bytes, the
+remaining deadline and a call identity an abort names.
+`Engine.scoreViews(views, scorer, { deadlineMs, signal })` calls it once
+per entry in order, at most `maxConcurrency` outstanding, on the engine's
+runtime and clock, and returns the `rustev.scores/1` record canonical
+bytes `score_views` writes for the same answers (3.9.2). The JavaScript
+layer makes one seam per scorer object, so concurrent calls share its
+queue, and the seam's counters appear in `gauges()` while the scorer
+lives. `evaluate` takes `scores` (input names, as `--scores`) and
+`evalViews` is `rustev eval views` (3.10.2, 3.10.3). Decisions within
+the spec:
+- A host answer is `{ score }` or `{ unscored }` and is recorded as
+  `checked` states; any other shape, a non-finite score included, is
+  `invalid_score`. The binding's own reasons (`scorer_failed`,
+  `scorer_overloaded`, `scorer_deadline`) are never passed through
+  `checked`, which would refuse them as reserved.
+- `deadlineMs` is optional and bounds the whole call from its start. An
+  entry not yet begun when the deadline passes, or when the signal is
+  raised, is `scorer_deadline` without a host call; a call in flight
+  then is aborted, never awaited, and its later settlement is discarded
+  and counted (027 3.6.4).
+- A canonical-bytes failure of a view is `scorer_failed`, since the host
+  was never given it.
+- The queue is per seam and the concurrency bound per call, so a second
+  call with the same scorer while the queue is full is
+  `scorer_overloaded`, as section 5 states.
+
+Tests:
+- `the_scorer_fixture_reproduces` in `crates/rustev-cli/tests/eval.rs`
+  writes the lodging cohort's inputs, views, a Rust scorer's scores and
+  the report to `crates/rustev-cli/tests/golden/scorer` under
+  `RUSTEV_BLESS=1`, and checks them otherwise.
+- `integrations/rustev-node/test/scorer.test.mjs` runs the same scorer
+  in TypeScript through `evalViews`, `scoreViews` and `evaluate` and
+  compares views, scores and report byte for byte (acceptance). It also
+  covers throwing, rejecting, out-of-output, queue-full, late, cancelled
+  and gold-withholding scorers (section 5) and each refused declaration.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child faithfully

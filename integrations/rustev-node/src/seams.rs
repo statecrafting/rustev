@@ -1,5 +1,5 @@
-//! Host-implemented seams (spec 027, 3.6): a TypeScript backend or sink
-//! wrapped in the seam's Rust trait, calling JavaScript through a
+//! Host-implemented seams (spec 027, 3.6): a TypeScript backend, sink,
+//! context source or scorer (spec 041, 3.9) wrapped in the seam's Rust trait, calling JavaScript through a
 //! threadsafe function. Rust never blocks on JavaScript (3.6.1): every call
 //! is asynchronous, each seam has a bounded queue whose overflow is a typed
 //! refusal at once (3.6.2), a cancellation is forwarded to the host as an
@@ -19,13 +19,17 @@ use napi::bindgen_prelude::*;
 use napi::threadsafe_function::ThreadsafeFunction;
 use napi_derive::napi;
 use rustev_contract::Document;
+use rustev_contract::canonical::record_canonical_bytes;
 use rustev_contract::descriptor::BackendDescriptor;
 use rustev_contract::output::RawOutput;
 use rustev_contract::run::{Charge, CostBound, CostModel, RunRecord};
 use rustev_core::seams::{
-    AdapterFailure, AttemptCall, AttemptReport, BoxFuture, CancelAck, DecisionBackend,
-    EvidenceSink, RemoteEnd,
+    AdapterFailure, AttemptCall, AttemptReport, BoxFuture, CancelAck, CancelSignal,
+    DecisionBackend, EvidenceSink, RemoteEnd,
 };
+use rustev_eval::scores::{ScoreOutcome, ViewEntry, checked, reserved, scorer_case};
+use rustev_eval::scoring::ScorerDescriptor;
+use rustev_runtime::{Clock, Instant};
 
 use crate::errors::fail;
 
@@ -523,5 +527,157 @@ fn why(e: &napi::Error) -> String {
         format!("the host seam failed without a reason ({})", e.status)
     } else {
         e.reason.clone()
+    }
+}
+
+/// One view entry as the host's scorer receives it (spec 041, 3.9.1): the
+/// case view (gold withheld unless the scorer reads it) and the proposal
+/// view as record canonical bytes, the remaining deadline and the call's
+/// identity, which an abort names.
+#[napi(object, object_from_js = false)]
+pub struct ScoreCall {
+    pub call_id: String,
+    pub case_view: Uint8Array,
+    pub proposal_view: Uint8Array,
+    pub remaining_ms: Option<f64>,
+}
+
+type ScoreFn =
+    ThreadsafeFunction<ScoreCall, Promise<serde_json::Value>, ScoreCall, Status, false, true>;
+
+/// The host scorer as the JavaScript layer hands it over: its declared
+/// descriptor, concurrency and queue, and the adapted `score` and `abort`.
+#[napi(object, object_to_js = false)]
+pub struct ScorerSeam {
+    /// The `ScorerDescriptor` JSON.
+    pub descriptor: Uint8Array,
+    pub max_concurrency: u32,
+    pub queue_capacity: u32,
+    pub score: ScoreFn,
+    pub abort: AbortFn,
+}
+
+pub struct HostScorer {
+    pub descriptor: ScorerDescriptor,
+    pub max_concurrency: usize,
+    capacity: usize,
+    score: Arc<ScoreFn>,
+    abort: Arc<AbortFn>,
+    calls: AtomicU64,
+    pub stats: Arc<SeamStats>,
+}
+
+impl HostScorer {
+    pub fn new(s: ScorerSeam) -> Result<HostScorer> {
+        let descriptor: ScorerDescriptor = serde_json::from_slice(&s.descriptor)
+            .map_err(|e| fail("InvalidDocument", "invalid_document", e.to_string()))?;
+        Ok(HostScorer {
+            max_concurrency: capacity("scorer.maxConcurrency", s.max_concurrency)?,
+            capacity: capacity("scorer.queueCapacity", s.queue_capacity)?,
+            stats: SeamStats::new(format!("scorer:{}", descriptor.id)),
+            descriptor,
+            score: Arc::new(s.score),
+            abort: Arc::new(s.abort),
+            calls: AtomicU64::new(0),
+        })
+    }
+
+    /// Score one entry (3.9.1): a full queue is `scorer_overloaded` at once;
+    /// a throw or rejection is `scorer_failed`; past `deadline` or cancelled
+    /// is `scorer_deadline`, with the host's call aborted, never awaited,
+    /// and its later settlement discarded and counted. The host's answer is
+    /// recorded as [`checked`] states; the reasons above are the binding's
+    /// and bypass it. The queue slot is taken before this returns, so calls
+    /// are admitted in the order they are begun.
+    pub fn begin(
+        &self,
+        entry: &ViewEntry,
+        clock: Arc<dyn Clock>,
+        deadline: Option<Instant>,
+        cancel: CancelSignal,
+    ) -> BoxFuture<'static, ScoreOutcome> {
+        let unscored = |r: &str| ScoreOutcome::Unscored(r.into());
+        let Some(slot) = self.stats.admit(self.capacity) else {
+            let r = unscored(reserved::SCORER_OVERLOADED);
+            return Box::pin(async { r });
+        };
+        let views = (
+            record_canonical_bytes(&scorer_case(&self.descriptor, &entry.case_view)),
+            record_canonical_bytes(&entry.proposal_view),
+        );
+        let (Ok(case_view), Ok(proposal_view)) = views else {
+            let r = unscored(reserved::SCORER_FAILED);
+            return Box::pin(async { r });
+        };
+        let id = format!("score-{}", self.calls.fetch_add(1, Ordering::SeqCst));
+        let js = ScoreCall {
+            call_id: id.clone(),
+            case_view: Uint8Array::new(case_view),
+            proposal_view: Uint8Array::new(proposal_view),
+            remaining_ms: deadline.map(|d| d.saturating_sub(clock.now()) as f64),
+        };
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        let mut rx = Reply::new(rx, self.stats.clone());
+        let score = self.score.clone();
+        let stats = self.stats.clone();
+        tokio::spawn(async move {
+            let r = match score.call_async_catch(js).await {
+                Ok(p) => p.await.map_err(|e| why(&e)),
+                Err(e) => Err(why(&e)),
+            };
+            drop(slot);
+            if tx.send(r).is_err() {
+                stats
+                    .late_resolutions_discarded
+                    .fetch_add(1, Ordering::SeqCst);
+            }
+        });
+        let abort = self.abort.clone();
+        let d = self.descriptor.clone();
+        let mut late = deadline.map(|at| clock.sleep_until(at));
+        Box::pin(async move {
+            let r = std::future::poll_fn(|cx| {
+                if let std::task::Poll::Ready(r) = std::pin::Pin::new(&mut rx).poll(cx) {
+                    return std::task::Poll::Ready(Some(r));
+                }
+                let expired = late
+                    .as_mut()
+                    .is_some_and(|l| l.as_mut().poll(cx).is_ready());
+                if expired || cancel.poll_raised(cx).is_ready() {
+                    return std::task::Poll::Ready(None);
+                }
+                std::task::Poll::Pending
+            })
+            .await;
+            match r {
+                Some(Ok(Ok(answer))) => checked(&d, answer_of(&answer)),
+                Some(_) => ScoreOutcome::Unscored(reserved::SCORER_FAILED.into()),
+                None => {
+                    // Forwarded, never awaited; `rx` drops with this future,
+                    // so a settlement after this is discarded and counted.
+                    let _ = abort.call(
+                        id,
+                        napi::threadsafe_function::ThreadsafeFunctionCallMode::NonBlocking,
+                    );
+                    ScoreOutcome::Unscored(reserved::SCORER_DEADLINE.into())
+                }
+            }
+        })
+    }
+}
+
+/// The host's answer: `{ score: number }` or `{ unscored: string }`. Any
+/// other shape is a score outside the output, `invalid_score` (3.7.5).
+fn answer_of(v: &serde_json::Value) -> ScoreOutcome {
+    let invalid = || ScoreOutcome::Unscored(reserved::INVALID_SCORE.into());
+    let Some(o) = v.as_object().filter(|o| o.len() == 1) else {
+        return invalid();
+    };
+    match (o.get("score"), o.get("unscored")) {
+        (Some(s), None) => s.as_f64().map_or_else(invalid, ScoreOutcome::Score),
+        (None, Some(r)) => r
+            .as_str()
+            .map_or_else(invalid, |r| ScoreOutcome::Unscored(r.into())),
+        _ => invalid(),
     }
 }

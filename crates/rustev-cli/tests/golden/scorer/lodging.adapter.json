@@ -1,0 +1,6 @@
+{"schema":"rustev.task-adapter/2","name":"lodging","version":"1",
+"labels":{"values":["none"],"prefixes":["c-"]},
+"rules":[{"action":"present_ranked_lodging","param":"ranking","select":"first_ranked","map":{},"otherwise":null},
+{"action":"no_eligible_lodging","label":"none"}],
+"measures":{"rankings":[{"name":"offers","param":"ranking","relevant_at_least":2,"gain":"exponential",
+"metrics":["precision@2","ndcg@3","mrr"],"backfill_positions":0}],"constraints":[],"fields":[]}}

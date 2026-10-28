@@ -162,48 +162,74 @@ pub fn score_ok(output: &ScorerOutput, value: f64) -> bool {
     }
 }
 
-/// Calls the scorer once per entry, in order, synchronously (3.7.3). A
-/// scorer that does not declare `reads_gold` is handed the case view with
-/// `gold` null (3.7.4). A score outside the output, or an unscored reason
-/// that is malformed or reserved for eval, is recorded as unscored
-/// `invalid_score`, never clamped or passed through.
+/// The case view a scorer is handed (3.7.4): the entry's, with `gold`
+/// null unless the scorer declares `reads_gold`.
+pub fn scorer_case(d: &ScorerDescriptor, case: &CaseView) -> CaseView {
+    CaseView {
+        gold: if d.reads_gold {
+            case.gold.clone()
+        } else {
+            None
+        },
+        ..case.clone()
+    }
+}
+
+/// A scorer's answer as it is recorded (3.7.5): a score outside the
+/// output, or an unscored reason that is malformed or reserved for eval,
+/// becomes unscored `invalid_score`, never clamped or passed through.
+pub fn checked(d: &ScorerDescriptor, outcome: ScoreOutcome) -> ScoreOutcome {
+    match outcome {
+        ScoreOutcome::Score(v) if score_ok(&d.output, v) => ScoreOutcome::Score(v),
+        ScoreOutcome::Unscored(r) if reason_ok(&r) && !reserved::ALL.contains(&r.as_str()) => {
+            ScoreOutcome::Unscored(r)
+        }
+        _ => ScoreOutcome::Unscored(reserved::INVALID_SCORE.into()),
+    }
+}
+
+impl ScoreEntry {
+    /// The entry recording `outcome` for one view entry, with no judge run.
+    pub fn of(entry: &ViewEntry, outcome: ScoreOutcome) -> ScoreEntry {
+        ScoreEntry {
+            case: entry.case.clone(),
+            subject: entry.subject.clone(),
+            outcome,
+            judge_run: None,
+        }
+    }
+}
+
+impl Scores {
+    /// One scorer's document over `views`, its entries as given (3.7.2).
+    /// Evaluation checks them against the views it computes, so entries
+    /// that do not match the views are refused there, never read.
+    pub fn over(
+        d: &ScorerDescriptor,
+        views: &ScoreViews,
+        entries: Vec<ScoreEntry>,
+    ) -> Result<Scores, CanonicalError> {
+        Ok(Scores {
+            schema: SCORES.into(),
+            scorer: d.clone(),
+            views: views.record_digest()?,
+            entries,
+        })
+    }
+}
+
+/// Calls the scorer once per entry, in order, synchronously (3.7.3), with
+/// the case view of [`scorer_case`], and records each answer as
+/// [`checked`] states.
 pub fn score_views(scorer: &dyn Scorer, views: &ScoreViews) -> Result<Scores, CanonicalError> {
     let d = scorer.descriptor();
     let entries = views
         .cases
         .iter()
         .map(|e| {
-            let withheld;
-            let case = if d.reads_gold {
-                &e.case_view
-            } else {
-                withheld = CaseView {
-                    gold: None,
-                    ..e.case_view.clone()
-                };
-                &withheld
-            };
-            let outcome = match scorer.score(case, &e.proposal_view) {
-                ScoreOutcome::Score(v) if score_ok(&d.output, v) => ScoreOutcome::Score(v),
-                ScoreOutcome::Unscored(r)
-                    if reason_ok(&r) && !reserved::ALL.contains(&r.as_str()) =>
-                {
-                    ScoreOutcome::Unscored(r)
-                }
-                _ => ScoreOutcome::Unscored(reserved::INVALID_SCORE.into()),
-            };
-            ScoreEntry {
-                case: e.case.clone(),
-                subject: e.subject.clone(),
-                outcome,
-                judge_run: None,
-            }
+            let outcome = scorer.score(&scorer_case(d, &e.case_view), &e.proposal_view);
+            ScoreEntry::of(e, checked(d, outcome))
         })
         .collect();
-    Ok(Scores {
-        schema: SCORES.into(),
-        scorer: d.clone(),
-        views: views.record_digest()?,
-        entries,
-    })
+    Scores::over(d, views, entries)
 }
