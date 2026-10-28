@@ -120,20 +120,6 @@ fn candidate_publish_journals_nothing() {
     }
     assert!(journal.entries.is_empty());
     assert!(!dir.join("journal").exists());
-    std::fs::write(dir.join("release-manifest.json"), manifest().canonical()).unwrap();
-    assert!(
-        rustev_release::hosted::run(
-            &dir,
-            &dir,
-            &dir.join("missing"),
-            &dir.join("journal"),
-            &dir,
-            &ReleaseSet::parse(include_bytes!("../release-set.json")).unwrap()
-        )
-        .unwrap_err()
-        .contains("053 3.4.2")
-    );
-    assert!(!dir.join("journal").exists());
 }
 #[test]
 fn workflow_write_permissions_are_confined() {

@@ -104,10 +104,10 @@ pub struct Lifecycle {
     pub manifest: ReleaseManifest,
     pub candidate_commit: Option<String>,
     pub instruction: Option<Instruction>,
-    // Set only by the family lifecycle (`family_lifecycle`, increment 9 part
-    // 1b-ii) once every artifact layer is observed public and the
-    // fresh-consumer evidence is recorded; until then a manifest with
-    // artifacts cannot reach `released` or `qualified`, the safe direction.
+    // Set only by `tagged::qualify` once every artifact layer is recorded
+    // public and the fresh-consumer evidence is validated; until then a
+    // manifest with artifacts cannot reach `released` or `qualified`, the
+    // safe direction.
     pub(crate) family_observed: bool,
     pub(crate) consumer_recorded: bool,
     verified_instruction: Option<Instruction>,
@@ -153,12 +153,6 @@ impl Lifecycle {
             self.verified_instruction = None;
         }
         result.map(|_| ())
-    }
-
-    pub(crate) fn instruction_verified(&self) -> bool {
-        self.instruction.as_ref().is_some_and(|i| {
-            i.version == FIRST_RELEASE_VERSION || self.verified_instruction.as_ref() == Some(i)
-        })
     }
 
     /// Apply one event, or refuse it and leave the state unchanged.

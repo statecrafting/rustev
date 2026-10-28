@@ -306,28 +306,6 @@ fn compare_files(artifacts: &[WorkflowArtifact], files: &BTreeMap<String, Vec<u8
     errors
 }
 
-/// Spec 031 3.9.3: compare all rehearsal artifacts, reporting every difference.
-pub fn verify(m: &ReleaseManifest, dir: &Path) -> Vec<String> {
-    if let Err(e) = validate(m) {
-        return vec![e];
-    }
-    let workflow: Vec<_> = m
-        .artifacts
-        .iter()
-        .filter(|a| {
-            a.kind == "npm"
-                || a.kind == "binary"
-                || a.name.ends_with(".tgz.cdx.json")
-                || a.name.ends_with(".tar.gz.cdx.json")
-        })
-        .cloned()
-        .collect();
-    match workflow_files(dir) {
-        Ok(files) => compare_files(&workflow, &files),
-        Err(e) => vec![e],
-    }
-}
-
 /// Spec 031 3.11.2: flatten the release assets beside the crates.
 pub fn stage(m: &ReleaseManifest, evidence: &Path, artifacts: Option<&Path>) -> Result<(), String> {
     if let Some(dir) = artifacts {

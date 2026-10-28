@@ -3,13 +3,7 @@ use std::{collections::BTreeMap, path::Path};
 
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    archive::sha256_hex,
-    family_artifacts::PLATFORMS,
-    family_lifecycle,
-    lifecycle::{Entry, Event, Journal, Lifecycle, Lookup, State},
-    manifest::{self, ReleaseManifest},
-};
+use crate::{archive::sha256_hex, family_artifacts::PLATFORMS, manifest::ReleaseManifest};
 
 pub const SCHEMA: &str = "rustev.qualification-step/1";
 pub const KINDS: &[&str] = &["crates", "npm", "cli", "image"];
@@ -85,7 +79,7 @@ fn checksum(s: &str) -> bool {
         })
 }
 
-/// All validation happens before the journal is touched.
+/// All validation happens before the lifecycle is recorded.
 pub fn evidence(m: &ReleaseManifest, dir: &Path) -> Result<BTreeMap<String, String>, String> {
     let mut evidence = BTreeMap::new();
     for platform in PLATFORMS {
@@ -146,101 +140,4 @@ pub fn evidence(m: &ReleaseManifest, dir: &Path) -> Result<BTreeMap<String, Stri
         }
     }
     Ok(evidence)
-}
-
-/// Restore released state only when the bound journal observes every hosted
-/// and registry item with the expected checksum. No registry contact occurs.
-pub fn restore_released(
-    life: &mut Lifecycle,
-    files: &BTreeMap<String, Vec<u8>>,
-    journal: &Journal,
-) -> Result<(), String> {
-    if life.state != State::PublicationAuthorized {
-        return Err("qualification requires the exact owner instruction".into());
-    }
-    family_lifecycle::bound(&life.manifest, journal)?;
-    for item in family_lifecycle::items(&life.manifest, files)? {
-        let observed = journal.entries.iter().rev().find_map(|entry| match entry {
-            Entry::Query { package, observed } if *package == item.name => Some(observed),
-            _ => None,
-        });
-        if observed
-            != Some(&Lookup::Visible {
-                checksum: item.checksum,
-            })
-        {
-            return Err(format!("release is not complete: {}", item.name));
-        }
-    }
-    // A refused transition leaves the lifecycle as it was found.
-    let (observed, state) = (life.family_observed, life.state);
-    life.family_observed = true;
-    life.state = State::Published;
-    life.apply(Event::ReleaseCreated).map(|_| ()).map_err(|e| {
-        life.family_observed = observed;
-        life.state = state;
-        e.0
-    })
-}
-
-pub fn run(
-    dir: &Path,
-    evidence_dir: &Path,
-    instruction: &Path,
-    journal: &Path,
-    repo: &Path,
-) -> Result<(), String> {
-    let scratch = crate::repro::fresh_dir("rustev-qualification")?;
-    let signers = scratch.join("allowed_signers");
-    std::fs::write(&signers, manifest::ALLOWED_SIGNERS).map_err(|e| e.to_string())?;
-    let errors = manifest::verify_release(dir, repo, &signers, manifest::OWNER_IDENTITY);
-    if !errors.is_empty() {
-        return Err(errors.join("\n"));
-    }
-    let m = crate::candidate::publication_manifest(
-        &std::fs::read(dir.join("release-manifest.json")).map_err(|e| e.to_string())?,
-    )?;
-    let evidence = evidence(&m, evidence_dir)?;
-    let mut life = Lifecycle::new(m.clone());
-    life.apply(Event::GatesPass).map_err(|e| e.0)?;
-    life.apply(Event::CandidateVerified {
-        commit: m.commit.clone(),
-    })
-    .map_err(|e| e.0)?;
-    life.authorize_file(instruction, &signers, manifest::OWNER_IDENTITY)?;
-    let journal = crate::hosted::journal_path(journal, repo)?;
-    let mut j =
-        Journal::from_lines(&std::fs::read_to_string(&journal).map_err(|e| e.to_string())?)?;
-    let mut files = BTreeMap::new();
-    for name in m
-        .packages
-        .iter()
-        .map(|p| p.crate_file.as_str())
-        .chain(m.artifacts.iter().map(|a| a.name.as_str()))
-        .chain([
-            "release-manifest.json",
-            "release-manifest.json.sig",
-            "SHA256SUMS",
-            "SHA256SUMS.sig",
-        ])
-    {
-        files.insert(
-            name.to_string(),
-            std::fs::read(dir.join(name)).map_err(|e| format!("{name}: {e}"))?,
-        );
-    }
-    let summary = j
-        .entries
-        .iter()
-        .find_map(|e| match e {
-            Entry::Summary { text } => Some(text.as_bytes().to_vec()),
-            _ => None,
-        })
-        .ok_or("journal has no hosted summary")?;
-    files.insert("journal-summary.jsonl".into(), summary);
-    restore_released(&mut life, &files, &j)?;
-    j.file = Some(journal);
-    family_lifecycle::qualify(&mut life, evidence, &mut j)?;
-    println!("lifecycle state: {:?}", life.state);
-    Ok(())
 }
