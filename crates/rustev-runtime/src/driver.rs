@@ -27,7 +27,7 @@ use rustev_contract::judgment::Unresolved;
 use rustev_contract::live::AttemptRole;
 use rustev_contract::optimization::{
     OptimizationAdmission, OptimizationMechanism, OptimizationOutcome, OptimizationPolicy,
-    OptimizationRecord,
+    OptimizationRecord, SharedLeave,
 };
 use rustev_contract::output::{RawOutput, ScreenUnits};
 use rustev_contract::run::{
@@ -654,11 +654,11 @@ fn cache_lookup(cx: &DecisionCtx<'_, '_>, req: &SemanticRequest) -> CacheLookup 
     let Some(policy) = cx.optimization() else {
         return run;
     };
-    if policy.memory_cache.is_none() {
+    if policy.memory_cache.is_none() && policy.shared_calls.is_none() {
         return run;
     }
     // A live re-execution observes fresh backend work: no earlier
-    // observation is credited to it (spec 026, 3.4).
+    // observation is credited to it (spec 026, 3.4), and it shares none.
     if cx.live.is_some() {
         return CacheLookup::Run {
             key: None,
@@ -694,6 +694,15 @@ fn cache_lookup(cx: &DecisionCtx<'_, '_>, req: &SemanticRequest) -> CacheLookup 
         projection: &req.projection,
     });
     let generation = cx.rt.optimizer.generation(&key.namespace);
+    // Shared calls alone: the key is for the shared-call registry (spec 044,
+    // 3.3); there is no memory tier to read.
+    if policy.memory_cache.is_none() {
+        return CacheLookup::Run {
+            key: Some(key),
+            generation,
+            diagnostics: vec![],
+        };
+    }
     let miss = match cx.rt.optimizer.lookup(&key, cx.now()) {
         Ok(hit) => match cx.ev().check_output(&req.step, &req.instance, &hit.output) {
             Ok(Ok(())) => {
@@ -1511,7 +1520,8 @@ fn failure_reason(class: FailureClass, detail: &str) -> Unresolved {
 }
 
 /// How one dispatched attempt ended, before retry and fallback decisions.
-enum Ended {
+#[derive(Clone)]
+pub(crate) enum Ended {
     Output(RawOutput),
     Failed(FailureClass, String),
     Deadline,
@@ -1959,32 +1969,94 @@ pub(crate) async fn drive(
                 reserved,
                 matches!(bound, CostBound::Bounded { .. }),
             );
-            let (end, cancellation, remote, charge, dispatched_ms) =
-                attempt(cx, target, &req, &attempt_id, step.timeout).await;
-            drop(permit);
-            held.settle(charge);
-            if let Some(held) = spend_held {
-                held.settle(&charge);
-            }
+            // Spec 044, 3.2: target 0's attempt may be shared with
+            // concurrent equivalent requests; a waiter that is not its final
+            // owner records no attempt of its own.
+            let (end, cancellation, remote, charge, dispatched_ms, attempt_id, owner) =
+                match shared_registry(cx, t, &b) {
+                    Some((registry, material)) => {
+                        // Only a live re-execution holds spend (spec 043),
+                        // and it never shares (spec 026, 3.4).
+                        debug_assert!(spend_held.is_none());
+                        let waited = share(
+                            cx,
+                            Sharing {
+                                registry,
+                                material,
+                                permit,
+                                held,
+                                target,
+                                req: &req,
+                                attempt_id: &attempt_id,
+                                timeout: step.timeout,
+                            },
+                            &mut b,
+                        )
+                        .await;
+                        match waited {
+                            Waited::Ended(end, owner) => (
+                                end.ended,
+                                end.cancellation,
+                                end.remote,
+                                end.charge,
+                                end.dispatched_ms,
+                                end.attempt_id,
+                                owner,
+                            ),
+                            Waited::Left(SharedLeave::Cancelled) => return b.cancelled(),
+                            Waited::Left(SharedLeave::Deadline) => {
+                                return b.stop("deadline", Unresolved::DeadlineExceeded);
+                            }
+                            Waited::Refused => {
+                                return b.stop(
+                                    "shared_full",
+                                    Unresolved::BackendUnavailable {
+                                        detail: "shared_full".into(),
+                                    },
+                                );
+                            }
+                        }
+                    }
+                    None => {
+                        let (end, cancellation, remote, charge, dispatched_ms) =
+                            attempt(cx, target, &req, &attempt_id, step.timeout).await;
+                        drop(permit);
+                        held.settle(charge);
+                        if let Some(held) = spend_held {
+                            held.settle(&charge);
+                        }
+                        (
+                            end,
+                            cancellation,
+                            remote,
+                            charge,
+                            dispatched_ms,
+                            attempt_id,
+                            true,
+                        )
+                    }
+                };
 
             record_units(cx, &req, target, &end, &mut b.screen);
             let (record_end, next) = judge_end(cx, &req, end);
-            b.attempts.push(AttemptRecord {
-                attempt_id,
-                target: t as u32,
-                backend_id: target.backend_id.clone(),
-                artifact: target.artifact.clone(),
-                dispatched_ms,
-                ended_ms: cx.elapsed(),
-                end: record_end.clone(),
-                cancellation,
-                remote,
-                cost: AttemptCost {
-                    bound,
-                    reserved,
-                    charge,
-                },
-            });
+            if owner {
+                b.attempts.push(AttemptRecord {
+                    attempt_id,
+                    target: t as u32,
+                    backend_id: target.backend_id.clone(),
+                    artifact: target.artifact.clone(),
+                    dispatched_ms,
+                    ended_ms: cx.elapsed(),
+                    end: record_end.clone(),
+                    cancellation,
+                    remote,
+                    cost: AttemptCost {
+                        bound,
+                        reserved,
+                        charge,
+                    },
+                });
+            }
             let (class, detail) = match next {
                 Ok(out) => {
                     return b.finish(
@@ -2042,6 +2114,389 @@ pub(crate) async fn drive(
     )
 }
 
+/// What a shared attempt gives every waiter (spec 044, 3.2.2 item 5).
+#[derive(Clone)]
+pub(crate) struct SharedEnd {
+    ended: Ended,
+    cancellation: Cancellation,
+    remote: RemoteState,
+    charge: Charge,
+    dispatched_ms: u64,
+    /// The attempt the dispatching waiter made.
+    attempt_id: String,
+}
+
+/// One plan's shared-call registry, keyed by request key material.
+pub(crate) type SharedCalls = std::sync::Arc<crate::shared::Registry<Vec<u8>, SharedEnd>>;
+
+/// How a waiter's part in a shared attempt ended.
+enum Waited {
+    /// The attempt ended for this waiter, which is its final owner or not.
+    Ended(SharedEnd, bool),
+    /// The waiter left while another remained (3.2.3 item 1).
+    Left(rustev_contract::optimization::SharedLeave),
+    /// No shared call could admit it, under `admission: refuse`.
+    Refused,
+}
+
+struct Sharing<'r, 'h> {
+    registry: SharedCalls,
+    material: Vec<u8>,
+    permit: tokio::sync::OwnedSemaphorePermit,
+    held: Held<'h>,
+    target: &'r Target,
+    req: &'r SemanticRequest,
+    attempt_id: &'r str,
+    timeout: AttemptTimeout,
+}
+
+/// The shared-call registry and key for target 0's attempt, when the plan
+/// enables shared calls and this request may share: never on the live path
+/// (spec 026, 3.4) or for a streamed generation attempt, whose fields belong
+/// to one decision's stream.
+fn shared_registry(
+    cx: &DecisionCtx<'_, '_>,
+    t: usize,
+    b: &Builder<'_>,
+) -> Option<(SharedCalls, Vec<u8>)> {
+    let policy = cx.optimization()?.shared_calls.as_ref()?;
+    if t != 0 || cx.live.is_some() || cx.stream.is_some() {
+        return None;
+    }
+    let (key, _) = b.cache.as_ref()?;
+    let max = usize::try_from(policy.max_shared_calls).unwrap_or(usize::MAX);
+    Some((
+        cx.rt.optimizer.shared_calls(&key.namespace, max),
+        key.material.clone(),
+    ))
+}
+
+/// Lead or join the shared attempt for this request's key, wait for it or
+/// leave, and settle this waiter's reservation: the final owner settles the
+/// whole observed charge, every other waiter none (3.2.4). A request that
+/// cannot join runs alone, or is refused, as the policy's `admission` says
+/// (3.2.1 item 5).
+async fn share(cx: &DecisionCtx<'_, '_>, sharing: Sharing<'_, '_>, b: &mut Builder<'_>) -> Waited {
+    use crate::shared::{Entered, Ineligible, Left};
+    use rustev_contract::optimization::{SharedRecord, SharedRole};
+    let Sharing {
+        registry,
+        material,
+        permit,
+        held,
+        target,
+        req,
+        attempt_id,
+        timeout,
+    } = sharing;
+    let policy = cx.optimization().and_then(|p| p.shared_calls.as_ref());
+    let max_waiters = policy.map_or(0, |p| {
+        usize::try_from(p.max_waiters_per_call).unwrap_or(usize::MAX)
+    });
+    let now = cx.now();
+    let dispatched_ms = now.saturating_sub(cx.submitted);
+    let deadline = cx.deadline();
+    let limit = match timeout {
+        AttemptTimeout::None => deadline,
+        AttemptTimeout::Ms(ms) => deadline.min(now.saturating_add(ms)),
+    };
+    // The permit moves into the attempt only if this request leads; a
+    // request that cannot share keeps it for its own attempt.
+    let permit = std::sync::Arc::new(Mutex::new(Some(permit)));
+    let lead = {
+        let permit = permit.clone();
+        let backend = target.registered.backend.clone();
+        let clock = cx.rt.clock.clone();
+        let projection = req.projection.clone();
+        let id = attempt_id.to_string();
+        let call_cx = CallContext {
+            remaining_ms: DurationMs(deadline.saturating_sub(now)),
+            trace_id: cx.decision_id.to_string(),
+            principal_handle: cx.principal.to_vec(),
+        };
+        move |signal: CancelSignal| -> rustev_core::seams::BoxFuture<'static, SharedEnd> {
+            Box::pin(async move {
+                // The attempt holds the backend permit; joiners hold none.
+                let _permit = permit.lock().unwrap_or_else(|e| e.into_inner()).take();
+                let adapter = signal.child();
+                let end = |ended, cancellation, remote, charge| SharedEnd {
+                    ended,
+                    cancellation,
+                    remote,
+                    charge,
+                    dispatched_ms,
+                    attempt_id: id.clone(),
+                };
+                let call = AttemptCall {
+                    projection: &projection,
+                    attempt_id: &id,
+                    cancel: adapter.clone(),
+                    cx: &call_cx,
+                };
+                let work = match catch_unwind(AssertUnwindSafe(|| backend.infer(call))) {
+                    Ok(work) => work,
+                    Err(p) => {
+                        return end(
+                            Ended::Failed(
+                                FailureClass::AdapterFault,
+                                format!(
+                                    "adapter panicked: {}",
+                                    crate::wait::panic_detail(p.as_ref())
+                                ),
+                            ),
+                            Cancellation::NotRequested,
+                            RemoteState::PossiblyContinuing,
+                            Charge::Unknown,
+                        );
+                    }
+                };
+                // The slot's own signal, raised only by its last waiter.
+                let (ended, cancellation, remote, charge) = await_attempt(
+                    work,
+                    &adapter,
+                    Waiting {
+                        cancel: &signal,
+                        clock: clock.as_ref(),
+                        dispatched: now,
+                        limit,
+                        deadline,
+                    },
+                    || false,
+                )
+                .await;
+                end(ended, cancellation, remote, charge)
+            })
+        }
+    };
+    let (waiter, role) = match registry.enter(&material, deadline, max_waiters, attempt_id, lead) {
+        Entered::Led(w) => (w, SharedRole::Led),
+        Entered::Joined(w) => {
+            drop(permit.lock().unwrap_or_else(|e| e.into_inner()).take());
+            (w, SharedRole::Joined)
+        }
+        refused @ (Entered::Full | Entered::Ineligible(_)) => {
+            // `lead` was not called, so the permit is still unused: run
+            // alone with this request's own attempt.
+            let why = match refused {
+                Entered::Ineligible(Ineligible::Deadline) => {
+                    "shared_ineligible: the attempt in flight ends before this request's deadline"
+                }
+                _ => "shared_full: no shared call can admit this request",
+            };
+            if let Some(o) = b.optimization.as_mut() {
+                o.diagnose(why);
+            }
+            let deadline_only = matches!(refused, Entered::Ineligible(Ineligible::Deadline));
+            if !deadline_only
+                && cx.optimization().map(|p| p.admission) == Some(OptimizationAdmission::Refuse)
+            {
+                held.settle(Charge::Observed { units: 0 });
+                if let Some(o) = b.optimization.as_mut() {
+                    o.mechanism = OptimizationMechanism::SharedCall;
+                    o.outcome = OptimizationOutcome::Refused;
+                }
+                return Waited::Refused;
+            }
+            let permit = permit.lock().unwrap_or_else(|e| e.into_inner()).take();
+            let alone = alone(cx, target, req, attempt_id, timeout, held).await;
+            drop(permit);
+            return alone;
+        }
+    };
+    let waiter_id = |id: u64| format!("waiter/{id}");
+    let mut record = SharedRecord {
+        shared_call_id: String::new(),
+        attempt_id: String::new(),
+        waiter_id: waiter_id(waiter.id()),
+        role,
+        left: None,
+        handed_off_to: None,
+        received_from: None,
+        final_owner: false,
+    };
+    // Until this waiter settles, dropping the decision's future drops it
+    // here, and its reservation settles by what it left behind.
+    let mut guard = Guard {
+        waiter: Some(waiter),
+        held: Some(held),
+    };
+    let mut timer = cx.rt.clock.sleep_until(deadline);
+    let raced = std::future::poll_fn(|c| {
+        let waiter = guard.waiter.as_mut().expect("waiting");
+        if let Poll::Ready(r) = waiter.poll_attempt(c) {
+            return Poll::Ready(Ok(r));
+        }
+        if cx.cancel.poll_raised(c).is_ready() {
+            return Poll::Ready(Err(SharedLeave::Cancelled));
+        }
+        if timer.as_mut().poll(c).is_ready() {
+            return Poll::Ready(Err(SharedLeave::Deadline));
+        }
+        Poll::Pending
+    })
+    .await;
+    let finish = |r: crate::shared::Shared<SharedEnd>| {
+        r.unwrap_or_else(|panic| SharedEnd {
+            ended: Ended::Failed(
+                FailureClass::AdapterFault,
+                format!("adapter panicked: {panic}"),
+            ),
+            cancellation: Cancellation::NotRequested,
+            remote: RemoteState::PossiblyContinuing,
+            charge: Charge::Unknown,
+            dispatched_ms,
+            attempt_id: attempt_id.to_string(),
+        })
+    };
+    let waiter = guard.waiter.take().expect("waiting");
+    let held = guard.held.take().expect("held");
+    // Ownership as the waiter last saw it; leaving may end it.
+    record.final_owner = waiter.is_owner();
+    let (end, owner) = match raced {
+        Ok(r) => {
+            let owner = waiter.is_owner();
+            record.received_from = waiter.received_from().map(waiter_id);
+            (finish(r), owner)
+        }
+        Err(why) => {
+            record.left = Some(why);
+            record.received_from = waiter.received_from().map(waiter_id);
+            let label = waiter.label().to_string();
+            let mut leaving = Some(waiter);
+            let left =
+                std::future::poll_fn(|c| Poll::Ready(leaving.take().expect("left once").leave(c)))
+                    .await;
+            match left {
+                Left::Remained { handed_off_to } => {
+                    record.handed_off_to = handed_off_to.map(waiter_id);
+                    record.final_owner = false;
+                    held.settle(Charge::Observed { units: 0 });
+                    record.shared_call_id = shared_call_id(&material);
+                    record.attempt_id = label;
+                    set_shared(b, record, false);
+                    return Waited::Left(why);
+                }
+                Left::Completed(r) => {
+                    // The result was ready when the waiter left: it wins
+                    // (spec 003, 3.3.4), with the ownership it ended with.
+                    record.left = None;
+                    let owner = record.final_owner;
+                    (finish(r), owner)
+                }
+                Left::Answered(r) => {
+                    let mut end = finish(r);
+                    if why == SharedLeave::Deadline && matches!(end.ended, Ended::Cancelled) {
+                        end.ended = Ended::Deadline;
+                    }
+                    (end, true)
+                }
+                Left::Abandoned => (
+                    SharedEnd {
+                        ended: match why {
+                            SharedLeave::Cancelled => Ended::Cancelled,
+                            SharedLeave::Deadline => Ended::Deadline,
+                        },
+                        cancellation: Cancellation::Requested {
+                            answer: CancelAnswer::NotObserved,
+                        },
+                        remote: RemoteState::PossiblyContinuing,
+                        charge: Charge::Unknown,
+                        dispatched_ms,
+                        attempt_id: label.clone(),
+                    },
+                    true,
+                ),
+            }
+        }
+    };
+    held.settle(if owner {
+        end.charge
+    } else {
+        Charge::Observed { units: 0 }
+    });
+    record.final_owner = owner;
+    record.shared_call_id = shared_call_id(&material);
+    record.attempt_id = end.attempt_id.clone();
+    set_shared(b, record, owner);
+    Waited::Ended(end, owner)
+}
+
+/// A waiter and its reservation while it waits for a shared attempt.
+struct Guard<'h> {
+    waiter: Option<crate::shared::Waiter<Vec<u8>, SharedEnd>>,
+    held: Option<Held<'h>>,
+}
+
+impl Drop for Guard<'_> {
+    /// A dropped waiter whose attempt goes on for another hands off and
+    /// settles nothing; the last one leaves its reservation as the
+    /// abandoned attempt's unknown liability (spec 003, 3.4.5).
+    fn drop(&mut self) {
+        let (Some(waiter), Some(held)) = (self.waiter.take(), self.held.take()) else {
+            return;
+        };
+        match waiter.abandon() {
+            crate::shared::Dropped::Remained => held.settle(Charge::Observed { units: 0 }),
+            crate::shared::Dropped::Completed { result, owner } => held.settle(match result {
+                Ok(end) if owner => end.charge,
+                Err(_) if owner => Charge::Unknown,
+                _ => Charge::Observed { units: 0 },
+            }),
+            crate::shared::Dropped::Last => drop(held),
+        }
+    }
+}
+
+/// An opaque id for one shared call: no decision id appears in it.
+fn shared_call_id(material: &[u8]) -> String {
+    tagged_digest("rustev.shared-call/1", material)
+}
+
+/// Record this waiter's part (3.2.5) on its optimization record.
+fn set_shared(
+    b: &mut Builder<'_>,
+    record: rustev_contract::optimization::SharedRecord,
+    owner: bool,
+) {
+    if let Some(o) = b.optimization.as_mut() {
+        o.mechanism = OptimizationMechanism::SharedCall;
+        o.outcome = match record.role {
+            rustev_contract::optimization::SharedRole::Led => OptimizationOutcome::Miss,
+            rustev_contract::optimization::SharedRole::Joined => OptimizationOutcome::Hit,
+        };
+        o.charge_owner = owner;
+        if !owner {
+            o.source_attempt_id = Some(record.attempt_id.clone());
+        }
+        o.shared = Some(record);
+    }
+}
+
+/// Run this request's own attempt after it could not share.
+async fn alone(
+    cx: &DecisionCtx<'_, '_>,
+    target: &Target,
+    req: &SemanticRequest,
+    attempt_id: &str,
+    timeout: AttemptTimeout,
+    held: Held<'_>,
+) -> Waited {
+    let (ended, cancellation, remote, charge, dispatched_ms) =
+        attempt(cx, target, req, attempt_id, timeout).await;
+    held.settle(charge);
+    Waited::Ended(
+        SharedEnd {
+            ended,
+            cancellation,
+            remote,
+            charge,
+            dispatched_ms,
+            attempt_id: attempt_id.to_string(),
+        },
+        true,
+    )
+}
+
 /// Dispatch one attempt and wait for it, the deadline, its timeout or the
 /// caller's cancellation, in that order of precedence (spec 003, 3.3.4).
 async fn attempt(
@@ -2092,13 +2547,59 @@ async fn attempt(
             );
         }
     };
-    let mut work = CatchUnwind::new(work);
     let limit = match timeout {
         AttemptTimeout::None => cx.deadline(),
         AttemptTimeout::Ms(ms) => cx.deadline().min(now.saturating_add(ms)),
     };
-    let mut timer = cx.rt.clock.sleep_until(limit);
-    let raced = race(&mut work, cx.cancel, &mut timer).await;
+    let (why, cancellation, remote, charge) = await_attempt(
+        work,
+        &signal,
+        Waiting {
+            cancel: cx.cancel,
+            clock: cx.rt.clock.as_ref(),
+            dispatched: now,
+            limit,
+            deadline: cx.deadline(),
+        },
+        || cx.screening_refused(),
+    )
+    .await;
+    (why, cancellation, remote, charge, dispatched_ms)
+}
+
+/// What a dispatched attempt is raced against.
+struct Waiting<'a> {
+    /// The signal whose raising cancels the attempt: the caller's, or a
+    /// shared slot's own (spec 044, 3.2.2).
+    cancel: &'a CancelSignal,
+    clock: &'a dyn crate::clock::Clock,
+    dispatched: Instant,
+    /// The attempt timeout, at most the deadline.
+    limit: Instant,
+    deadline: Instant,
+}
+
+/// Wait for a dispatched attempt, its time limit or the cancellation in
+/// `waiting`, in that order of precedence (spec 003, 3.3.4); on a limit or
+/// a cancellation, raise the adapter's `signal` and poll once more for its
+/// answer. `screening_refused` keeps an output that answered a withdrawal
+/// (spec 035, 3.9).
+async fn await_attempt(
+    work: rustev_core::seams::BoxFuture<'_, rustev_core::seams::AttemptReport>,
+    signal: &CancelSignal,
+    waiting: Waiting<'_>,
+    screening_refused: impl Fn() -> bool,
+) -> (Ended, Cancellation, RemoteState, Charge) {
+    let Waiting {
+        cancel,
+        clock,
+        dispatched: now,
+        limit,
+        deadline,
+    } = waiting;
+    let mut work = CatchUnwind::new(work);
+    let mut timer = clock.sleep_until(limit);
+    let raced = race(&mut work, cancel, &mut timer).await;
     let (mut why, report) = match raced {
         // The adapter saw the caller's cancellation (propagated to its
         // child signal) and answered it: that is a cancellation, not an
@@ -2108,13 +2609,7 @@ async fn attempt(
                 && matches!(report.result, Err((AdapterFailure::Cancelled, _))) =>
         {
             let (cancellation, remote, charge) = answered(report.cancel, report.charge);
-            return (
-                Ended::Cancelled,
-                cancellation,
-                remote,
-                charge,
-                dispatched_ms,
-            );
+            return (Ended::Cancelled, cancellation, remote, charge);
         }
         Raced::Done(Ok(report)) => {
             let ended = adapter_ended(report.result);
@@ -2139,7 +2634,7 @@ async fn attempt(
                 }
                 _ => (RemoteState::Finished, report.charge),
             };
-            return (ended, cancellation, remote, charge, dispatched_ms);
+            return (ended, cancellation, remote, charge);
         }
         Raced::Done(Err(panic)) => {
             return (
@@ -2150,11 +2645,10 @@ async fn attempt(
                 Cancellation::NotRequested,
                 RemoteState::PossiblyContinuing,
                 Charge::Unknown,
-                dispatched_ms,
             );
         }
         Raced::Cancelled => (Ended::Cancelled, ()),
-        Raced::Expired if cx.now() >= cx.deadline() => (Ended::Deadline, ()),
+        Raced::Expired if clock.now() >= deadline => (Ended::Deadline, ()),
         Raced::Expired => (
             Ended::Failed(
                 FailureClass::TimedOut,
@@ -2169,7 +2663,7 @@ async fn attempt(
     signal.raise();
     let (cancellation, remote, charge) = match poll_once(&mut work).await {
         Some(Ok(report)) => {
-            if cx.screening_refused()
+            if screening_refused()
                 && let Ok(output) = report.result
             {
                 why = Ended::Output(output);
@@ -2185,7 +2679,7 @@ async fn attempt(
         ),
     };
     drop(work);
-    (why, cancellation, remote, charge, dispatched_ms)
+    (why, cancellation, remote, charge)
 }
 
 /// What an adapter's answer to a raised signal establishes (spec 003, 3.7.3).

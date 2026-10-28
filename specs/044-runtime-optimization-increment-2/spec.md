@@ -908,6 +908,44 @@ attempt being polled, the joining rules, handoff on leave and on drop,
 the last waiter's single poll (answered and abandoned), a contained
 panic, and a leave after completion.
 
+**Increment 3, part b (2026-10-27): shared calls in the driver.** The
+compiler accepts `shared_calls`, and `drive` in
+`crates/rustev-runtime/src/driver.rs` shares target 0's attempt through
+the slot of part a, one registry per plan namespace in the runtime's
+optimizer (`max_shared_calls` bounds each plan's slots; no key spans
+plans). The waiting half of `attempt` is now `await_attempt`, raced
+against the caller's signal or the slot's own, so a shared attempt
+honours the attempt timeout and spec 003 3.3.4 as an independent one
+does. The leader's backend permit moves into the slot; a joiner releases
+its own before it waits. Each waiter reserves its own exposure: the final
+owner settles the observed charge, every other waiter settles none, a
+waiter that leaves while another remains settles none and returns at
+once (`cancelled` or `deadline_exceeded`), and the last waiter records
+the one poll's answer or, with none, the request as possibly continuing
+with unknown liability. A decision dropped while it waits hands off when
+another waiter remains and otherwise leaves its reservation as the
+abandoned attempt's liability. Records: mechanism `shared_call`, outcome
+`miss` for the leader and `hit` for a joiner, and the `shared` member;
+the final owner's record holds the one attempt record, so the charge and
+any liability are counted once, and every other waiter's supplied output
+names the shared attempt as its origin. Decisions within the spec: only
+target 0's attempt is shared, since the key names target 0; live
+re-executions and streamed generation attempts never share; a request
+whose attempt in flight ends before its deadline runs alone with the
+diagnostic `shared_ineligible`, and one that finds the waiter or slot
+bound reached is refused or runs alone under `admission`
+(`shared_full`); the shared call id is a digest of the key material and
+waiter ids are per-call numbers, so neither carries a decision id. Tests:
+`crates/rustev-runtime/tests/shared_calls.rs`, one per waiter row of
+section 5 (sharing, handoff on cancel, the last waiter's cancel with each
+answer and its deadline, a dropped owner and a dropped last waiter, a
+late request, a joiner needing more time, two tenants, a full call), each
+checking that the runtime spawned no task; the slot's own tests gain
+`abandon`, which decides what a dropped waiter left behind in the same
+critical section that removes it, so two waiters dropped at once on two
+threads leave exactly one last waiter
+(`concurrent_abandons_leave_exactly_one_last_waiter`).
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child
