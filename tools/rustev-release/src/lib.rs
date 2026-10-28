@@ -18,7 +18,6 @@ pub mod candidate;
 pub mod changelog;
 pub mod cratesio;
 pub mod family_artifacts;
-pub mod family_lifecycle;
 pub mod hosted;
 pub mod lifecycle;
 pub mod manifest;

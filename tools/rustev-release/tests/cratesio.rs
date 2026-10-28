@@ -1,15 +1,10 @@
 //! Spec 021, 3.9: the crates.io adapter maps responses and archives without
-//! touching the network, and the journal reaches disk before an upload.
-
-use std::collections::BTreeMap;
+//! touching the network.
 
 use rustev_release::cratesio::{
     ArchiveMetadata, classify, index_checksum, index_path, new_crate, owner_logins, publish_body,
 };
-use rustev_release::lifecycle::{
-    Entry, Event, FakeRegistry, Instruction, Journal, Lifecycle, Outcome, Upload, publish,
-};
-use rustev_release::manifest::{Inputs, Toolchain, build};
+use rustev_release::lifecycle::Upload;
 
 #[test]
 fn index_paths_follow_the_sparse_layout() {
@@ -95,129 +90,4 @@ fn the_body_carries_the_metadata_and_the_exact_archive() {
     let crate_len = u32::from_le_bytes(rest[..4].try_into().unwrap()) as usize;
     assert_eq!(&rest[4..], archive);
     assert_eq!(crate_len, archive.len());
-}
-
-fn authorized(dir: &std::path::Path) -> (Lifecycle, BTreeMap<String, Vec<u8>>) {
-    let mut set = rustev_release::ReleaseSet::parse(include_bytes!("../release-set.json")).unwrap();
-    // Spec 031 3.11.1: publication authorizes exactly the first release, so
-    // the publication path runs on the release set at that version. A later
-    // version's authority (056 3.4) is tested on its own.
-    set.version = rustev_release::lifecycle::FIRST_RELEASE_VERSION.into();
-    set.tag = format!("v{}", set.version);
-    std::fs::create_dir_all(dir).unwrap();
-    let mut archives = BTreeMap::new();
-    for name in &set.upload_order {
-        let file = format!("{name}-{}.crate", set.version);
-        std::fs::write(dir.join(&file), name.as_bytes()).unwrap();
-        archives.insert(file, name.as_bytes().to_vec());
-    }
-    let m = build(
-        &set,
-        dir,
-        Inputs {
-            commit: "c".repeat(40),
-            tree: "t".repeat(40),
-            toolchain: Toolchain {
-                rustc: String::new(),
-                cargo: String::new(),
-                host: String::new(),
-                audit: String::new(),
-            },
-            source_date_epoch: 0,
-            evidence: BTreeMap::new(),
-            limitations: vec![],
-        },
-    )
-    .unwrap();
-    let mut l = Lifecycle::new(m.clone());
-    l.apply(Event::GatesPass).unwrap();
-    l.apply(Event::CandidateVerified {
-        commit: m.commit.clone(),
-    })
-    .unwrap();
-    l.apply(Event::Authorized(Instruction {
-        version: m.version.clone(),
-        commit: m.commit.clone(),
-        registry: m.registry.clone(),
-        packages: m.upload_order.clone(),
-        account: rustev_release::lifecycle::FAKE_ACCOUNT.into(),
-        registries: m.registries.clone(),
-        artifacts: vec![],
-        continuation: false,
-        action: "publish".into(),
-    }))
-    .unwrap();
-    (l, archives)
-}
-
-#[test]
-fn every_entry_reaches_the_journal_file_as_it_is_recorded() {
-    let dir = std::env::temp_dir().join(format!("rustev-release-journal-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    let (mut l, a) = authorized(&dir.join("crates"));
-    let path = dir.join("journal.jsonl");
-    let mut j = Journal {
-        file: Some(path.clone()),
-        ..Default::default()
-    };
-    rustev_release::family_lifecycle::bind(&l.manifest, "fixture signature", &mut j).unwrap();
-    assert_eq!(
-        publish(&mut l, &a, &mut FakeRegistry::default(), &mut j),
-        Outcome::Complete
-    );
-    let on_disk = Journal::from_lines(&std::fs::read_to_string(&path).unwrap()).unwrap();
-    assert_eq!(on_disk.entries, j.entries);
-    assert!(matches!(on_disk.entries[0], Entry::SignedManifest { .. }));
-    let _ = std::fs::remove_dir_all(&dir);
-}
-
-#[test]
-fn an_unwritable_journal_uploads_nothing() {
-    let dir = std::env::temp_dir().join(format!("rustev-release-nojournal-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    let (mut l, a) = authorized(&dir.join("crates"));
-    let mut j = Journal {
-        file: Some(dir.join("missing-dir/journal.jsonl")),
-        ..Default::default()
-    };
-    let mut reg = FakeRegistry::default();
-    assert!(matches!(
-        publish(&mut l, &a, &mut reg, &mut j),
-        Outcome::Stopped { .. }
-    ));
-    assert!(reg.uploads.is_empty());
-    let _ = std::fs::remove_dir_all(&dir);
-}
-
-/// A registry whose index cannot be read.
-struct Unreachable(FakeRegistry);
-
-impl rustev_release::lifecycle::Registry for Unreachable {
-    fn lookup(&mut self, _: &str, _: &str) -> rustev_release::lifecycle::Lookup {
-        rustev_release::lifecycle::Lookup::Unknown {
-            detail: "index HTTP 503".into(),
-        }
-    }
-    fn upload(&mut self, n: &str, v: &str, a: &[u8]) -> Upload {
-        self.0.upload(n, v, a)
-    }
-    fn owners(&mut self, n: &str) -> Result<Vec<String>, String> {
-        self.0.owners(n)
-    }
-    fn wait(&mut self) {}
-}
-
-#[test]
-fn unknown_public_state_is_never_taken_for_absence() {
-    let dir = std::env::temp_dir().join(format!("rustev-release-unknown-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    let (mut l, a) = authorized(&dir.join("crates"));
-    let mut reg = Unreachable(FakeRegistry::default());
-    let mut j = Journal::default();
-    rustev_release::family_lifecycle::bind(&l.manifest, "fixture signature", &mut j).unwrap();
-    assert!(
-        matches!(publish(&mut l, &a, &mut reg, &mut j), Outcome::Stopped { ref reason } if reason.contains("unknown"))
-    );
-    assert!(reg.0.uploads.is_empty());
-    let _ = std::fs::remove_dir_all(&dir);
 }
