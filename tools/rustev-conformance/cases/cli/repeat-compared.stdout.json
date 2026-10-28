@@ -37,42 +37,42 @@
     {
       "name": "bundles/s-1.json",
       "path": "tools/rustev-conformance/fixtures/cli/repeat-compared.stdout/bundles/s-1.json",
-      "sha256": "530bef569fc662d87856a0e6878f120402270ea2578c65f6ca8148a70bb99379"
+      "sha256": "f5aa52642816ab71b68ac9e6c9ea3d2e93cf373494dba6af562d012e3c32f8ee"
     },
     {
       "name": "bundles/s-2.json",
       "path": "tools/rustev-conformance/fixtures/cli/repeat-compared.stdout/bundles/s-2.json",
-      "sha256": "573f61562e3dea114bda6e9ea7d3ba47c5fc17e632b4ce1649b565aae205c9a9"
+      "sha256": "d36d08628d0f0fc5419b3daeff871f23aa246c6f69ec1838d2e4412c1fd81603"
     },
     {
       "name": "bundles/s-3.json",
       "path": "tools/rustev-conformance/fixtures/cli/repeat-compared.stdout/bundles/s-3.json",
-      "sha256": "59b6509d6a077ecef401030ccbd675be288795daf772056dcad25d60b761a9aa"
+      "sha256": "12c0b4e8f130a39a20c07284819301afa7f23ab77b2e3a7527d166010994a074"
     },
     {
       "name": "bundles/s-4.json",
       "path": "tools/rustev-conformance/fixtures/cli/repeat-compared.stdout/bundles/s-4.json",
-      "sha256": "92b94407624be98cd7a6ed3dbffda7549716feba80b6f0301e6cad55be48a744"
+      "sha256": "a269c6a98939d952ed8f7860f3cb590f0ff00de398b58c15e0d8a8cd8749d8a4"
     },
     {
       "name": "bundles/s-5.json",
       "path": "tools/rustev-conformance/fixtures/cli/repeat-compared.stdout/bundles/s-5.json",
-      "sha256": "4799b554cf1feb64f8a4b8164c71d6006ae64892aeba1f1a17cdd3d5ed428564"
+      "sha256": "899f9991029cc3b0706ba1d65b4c90aa4e66707fa9742e8c06d722772c90e33b"
     },
     {
       "name": "bundles/s-6.json",
       "path": "tools/rustev-conformance/fixtures/cli/repeat-compared.stdout/bundles/s-6.json",
-      "sha256": "2bd532721a9b9119d2110ad4fd8ed9b8be163708ba20020af775a8dabb2515ff"
+      "sha256": "caede553df3bb70e9c1f2ce87690d1b032b9610615c80143dcf29df76593d78a"
     },
     {
       "name": "bundles/s-7.json",
       "path": "tools/rustev-conformance/fixtures/cli/repeat-compared.stdout/bundles/s-7.json",
-      "sha256": "ee2a7b246114bd9baf8fb03637702025183545c7cf2582cd1c1e7750eb99189d"
+      "sha256": "d19e7e6dc1a78235e837642dc64cd8867e0b88dee5ef6bff67a8dcbc36b6758a"
     },
     {
       "name": "bundles/s-8.json",
       "path": "tools/rustev-conformance/fixtures/cli/repeat-compared.stdout/bundles/s-8.json",
-      "sha256": "368aa4654987cbb058d211fd63d1ec49f9fd7287403b0065159aabb70b9fe2b4"
+      "sha256": "8565b54465c065c6744e01da66cb90cb5f8a1646e6f1b2dd9baf65fbfe1b4d01"
     },
     {
       "name": "comparison/.keep",
@@ -107,7 +107,7 @@
     {
       "name": "variants/z/plan.json",
       "path": "tools/rustev-conformance/fixtures/cli/repeat-compared.stdout/variants/z/plan.json",
-      "sha256": "a722b8cd5577766e77e5f3406d77b30af4fc2bdf2d4295afcc91e4a7cd253c89"
+      "sha256": "92a5cc1f2341384e1e83c6921fb76b85d71b21295674a715dd925fccb14e293c"
     },
     {
       "name": "variants/z/rules/rules.json",
@@ -126,7 +126,7 @@
       "file": "comparison/comparison.json",
       "golden": "crates/rustev-cli/tests/golden/repeat-comparison.json",
       "normalize": [],
-      "sha256": "385a19f43506eb70b47176eba15e20c599e3acbb4f2826d76c032bdd40c50e69"
+      "sha256": "415d6d9767f1ae46c331642140fd8c215c0f50f4146a2417b01b9e4aeb99af99"
     },
     {
       "file": "comparison/comparison.md",

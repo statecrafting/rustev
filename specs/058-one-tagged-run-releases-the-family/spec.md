@@ -474,18 +474,36 @@ on npmjs.com, which shows them only to an authenticated owner; the
 closing release (increment 5) shows them working, since `publish-npm`
 reads no token.
 
+**The 0.3.0 version move (2026-10-28).** By owner decision (A-62, revised
+by A-63), the release that closes this spec is `0.3.0`, which follows the
+0.2.0 npm packages with provenance. A patch is not possible: `cargo
+semver-checks` against 0.2.0 reports major changes in `rustev-contract`
+(variants added to the exhaustive enums `RequiredKind`, `OutputKind` and
+`OptimizationMechanism` by specs 039 and 044, moving `RequiredKind`'s
+discriminants), and for a `0.x` family the next compatible step is the
+minor version. Every release-set crate and npm package moves from `0.2.0`
+to `0.3.0` in lockstep, in the sites 056 3.5 names: the workspace version
+and its internal `=` pins, the nine npm `package.json` files and
+`tools/rustev-release/release-set.json`. Every PlanId embeds the compiler
+identity `rustev-core/<crate version>` (002 3.3.4), so the goldens,
+conformance cases and fixtures that carry one are regenerated through
+their bless and harvest paths, and the `rustev-serve` Sigstore fixture is
+re-signed with its throwaway keys. No behavior changes.
+
 ## Open questions for the owner
 
 Settled at ratification (A-61): the `release` Environment has no
 required reviewer, so the signed tag alone authorizes a release; crates.io
 uses trusted publishing, with no token fallback. Settled by the owner on
-2026-10-28 (A-62):
+2026-10-28 (A-62, revised by A-63):
 
 1. Deleting and re-signing an unpublished `vX.Y.Z` tag (3.1.4) is
    acceptable, as 3.1.4 states; every tag whose run made anything public
    is permanent.
-2. The 0.2.0 npm packages, published without provenance, are followed by
-   a patch release, `0.2.1`, under this spec. It is the first release after
-   0.2.0 that the Acceptance names, and closes this spec.
+2. The 0.2.0 npm packages, published without provenance, are followed
+   now by the next release under this spec, `0.3.0` (a patch is not
+   possible: `main` changes `rustev-contract`'s API incompatibly against
+   0.2.0). It is the first release after 0.2.0 that the Acceptance names,
+   and closes this spec.
 
 None is open.
