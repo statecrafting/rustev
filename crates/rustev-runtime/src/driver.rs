@@ -679,8 +679,10 @@ fn cache_lookup(cx: &DecisionCtx<'_, '_>, req: &SemanticRequest) -> CacheLookup 
         .descriptor()
         .id()
         .expect("a prepared backend has a valid descriptor");
+    let profile = crate::optimization::profile_of(&cx.plan.compiled.plan);
     let key = request_key(KeyParts {
         plan_id: &cx.plan.compiled.id,
+        profile: &profile,
         policy,
         principal: cx.principal,
         backend_artifact: &target.artifact,
@@ -763,6 +765,10 @@ fn cache_lookup(cx: &DecisionCtx<'_, '_>, req: &SemanticRequest) -> CacheLookup 
         diagnostics: vec![miss.into()],
     }
 }
+
+/// The diagnostic of a persistent read or write skipped while an
+/// invalidation of its selection awaits the store.
+pub(crate) const UNAVAILABLE: &str = "persistent tier unavailable until invalidation completes";
 
 /// A request served from a cache tier without dispatch: the stored output
 /// of `target`, attributed to its source attempt.
@@ -868,6 +874,11 @@ async fn persistent_read(
     let Some(persistent) = policy.persistent_cache.as_ref() else {
         return Err(None);
     };
+    // An invalidation in this process has not reached the store yet: no
+    // read, and with nothing captured, no write (spec 044, 3.10.3).
+    if cx.rt.persistent_unavailable(&key.namespace, &key.scope_id) {
+        return Err(Some(UNAVAILABLE.into()));
+    }
     let stored = store_call(cx.rt, cx.cancel, cx.deadline(), |call| {
         store.get(&key.namespace, &key.scope_id, &key.id, call)
     })

@@ -35,10 +35,13 @@ pub(crate) struct RequestKey {
 /// canonical projection identifies the concrete projected values, instance,
 /// canonical inputs and provenance-relevant revisions. Descriptor and
 /// artifact ids bind the selected installed target. `principal` is the
-/// host-supplied complete authorized-scope handle. Runtime and key-schema
-/// versions prevent reuse across implementation or key interpretation.
+/// host-supplied complete authorized-scope handle. `profile` is the plan's
+/// profile identity or `none` (spec 044, 3.5.2), held apart from the plan
+/// id so no profile can collide with none. Runtime and key-schema versions
+/// prevent reuse across implementation or key interpretation.
 pub(crate) struct KeyParts<'a> {
     pub plan_id: &'a PlanId,
+    pub profile: &'a str,
     pub policy: &'a OptimizationPolicy,
     pub principal: &'a [u8],
     pub backend_artifact: &'a ArtifactId,
@@ -56,6 +59,7 @@ fn part(out: &mut Vec<u8>, bytes: &[u8]) {
 pub(crate) fn request_key(p: KeyParts<'_>) -> RequestKey {
     let mut material = Vec::new();
     part(&mut material, p.plan_id.as_str().as_bytes());
+    part(&mut material, p.profile.as_bytes());
     part(&mut material, &p.policy.key_schema_version.to_be_bytes());
     part(
         &mut material,
@@ -79,6 +83,26 @@ pub(crate) fn request_key(p: KeyParts<'_>) -> RequestKey {
         scope_id,
         namespace,
     }
+}
+
+/// The plan's profile identity for request keys (spec 044, 3.5.2): the
+/// JSON array of the profile ids its instantiation applied, in chain
+/// order, or `none`. An array delimits every id, and never reads `none`.
+/// The match is exhaustive, so a new chain variant must be given its own
+/// encoding here and can never share another's key.
+pub(crate) fn profile_of(plan: &rustev_contract::plan::Plan) -> String {
+    use rustev_contract::plan::ProfileChain;
+    match plan.instantiation.as_ref().map(|i| &i.profile) {
+        None | Some(ProfileChain::None) => "none".into(),
+        // An empty chain is `[]`: still an array, never `none`.
+        Some(ProfileChain::Chain(entries)) => {
+            profile_ids(&entries.iter().map(|e| e.id.as_str()).collect::<Vec<_>>())
+        }
+    }
+}
+
+fn profile_ids(ids: &[&str]) -> String {
+    serde_json::to_string(ids).expect("a list of strings serializes")
 }
 
 pub(crate) fn scope_id(principal: &[u8]) -> String {
@@ -246,11 +270,29 @@ pub(crate) enum InvalidationSelector {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InvalidationResult {
-    /// The namespace generation after the invalidation. Results captured
-    /// under an earlier generation are never stored.
+    /// The memory tier's namespace generation after the invalidation.
+    /// Results captured under an earlier generation are never stored.
     pub generation: u64,
     pub removed_entries: u64,
     pub removed_bytes: u64,
+    /// The persistent tier's result, when the plan has one (spec 044,
+    /// 3.10.3).
+    pub persistent: Option<PersistentInvalidation>,
+    /// Whether every tier of the selection is invalidated. Until it is, the
+    /// selection's persistent entries are neither read nor written.
+    pub complete: bool,
+}
+
+/// The persistent tier's part of an invalidation (spec 044, 3.10.3).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PersistentInvalidation {
+    /// Marked unavailable; `Runtime::invalidate` has not completed it.
+    Pending,
+    /// The store advanced the selected generation.
+    Done { generation: u64, removed: u64 },
+    /// The store failed; the selection stays unavailable until a later
+    /// `Runtime::invalidate` reconciles it (spec 017, 3.7).
+    Failed { detail: String },
 }
 
 #[derive(Debug, Default)]
@@ -496,6 +538,8 @@ impl Optimizer {
             generation: ns.generation,
             removed_entries: ids.len() as u64,
             removed_bytes,
+            persistent: None,
+            complete: true,
         }
     }
 
@@ -599,6 +643,7 @@ mod tests {
         let (plan_id, policy) = policy(plan);
         request_key(KeyParts {
             plan_id: &plan_id,
+            profile: "none",
             policy: &policy,
             principal,
             backend_artifact: &ArtifactId::parse(&digest('2')).unwrap(),
@@ -649,6 +694,7 @@ mod tests {
         let with = |instance: &[String]| {
             request_key(KeyParts {
                 plan_id: &plan_id,
+                profile: "none",
                 policy: &policy,
                 principal: b"t",
                 backend_artifact: &ArtifactId::parse(&digest('2')).unwrap(),
@@ -843,5 +889,43 @@ mod tests {
         }
         let (fifo, scoped) = optimizer.queue_lengths(&key.namespace);
         assert!(fifo <= 20 && scoped <= 20, "{fifo} {scoped}");
+    }
+
+    /// Spec 044, 3.5.2: the profile identity is its own key member, so a
+    /// profile never shares a key with `none` or with another profile.
+    #[test]
+    fn the_profile_is_a_key_member() {
+        let (plan_id, policy) = policy('1');
+        let with = |profile: &str| {
+            request_key(KeyParts {
+                plan_id: &plan_id,
+                profile,
+                policy: &policy,
+                principal: b"tenant-a",
+                backend_artifact: &ArtifactId::parse(&digest('2')).unwrap(),
+                backend_descriptor: &DescriptorId::parse(&digest('3')).unwrap(),
+                step: "classify",
+                instance: &["one".into()],
+                projection: b"projection",
+            })
+        };
+        let none = with("none");
+        let a = with(&digest('a'));
+        let b = with(&digest('b'));
+        assert_eq!(none, key_in('1', b"tenant-a", "classify"));
+        assert_ne!(none.id, a.id);
+        assert_ne!(a.id, b.id);
+        // A chain's ids are delimited: one id holding a comma is not two.
+        assert_eq!(profile_ids(&["a", "b"]), r#"["a","b"]"#);
+        assert_ne!(profile_ids(&["a,b"]), profile_ids(&["a", "b"]));
+        assert_ne!(
+            with(&profile_ids(&["a,b"])).id,
+            with(&profile_ids(&["a", "b"])).id
+        );
+        // The namespace and scope are the plan's and the principal's alone.
+        assert_eq!(
+            (&a.namespace, &a.scope_id),
+            (&none.namespace, &none.scope_id)
+        );
     }
 }

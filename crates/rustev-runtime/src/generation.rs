@@ -587,8 +587,10 @@ async fn request(
             .and_then(|s| s.targets.first())
         && let Ok(descriptor) = target.registered.backend.descriptor().id()
     {
+        let profile = crate::optimization::profile_of(&cx.plan.compiled.plan);
         let key = request_key(KeyParts {
             plan_id: &cx.plan.compiled.id,
+            profile: &profile,
             policy,
             principal: cx.principal,
             backend_artifact: &target.artifact,

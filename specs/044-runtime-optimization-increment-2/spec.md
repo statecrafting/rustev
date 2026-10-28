@@ -1077,6 +1077,47 @@ test store with generations and failures on demand:
 `crates/rustev-core/tests/execution.rs` now shows the persistent member
 accepted and part of `PlanId`.
 
+**Increment 4, part c (2026-10-28): the profile member and invalidation
+across tiers.**
+
+What part c adds:
+- Every request key holds the plan's profile identity, or `none`, as its
+  own member (3.5.2). `profile_of` in
+  `crates/rustev-runtime/src/optimization.rs` reads it from the plan's
+  instantiation.
+- `InvalidationResult` gains `persistent` (`pending`, `done` with the
+  store's generation and the count removed, or `failed`) and `complete`
+  (3.10.3).
+- `invalidate_plan` and `invalidate_scope` keep their signatures. For a
+  plan with a persistent tier on a runtime with a store, they also mark
+  the namespace or scope unavailable in this process.
+- The new asynchronous `Runtime::invalidate(plan, scope)` invalidates the
+  memory tier, then calls the store's `invalidate`. Success clears the
+  mark, and a namespace covers every scope in it. A scope's call is not
+  complete while its namespace is still marked. A failure leaves the
+  selection unavailable until a later call reconciles it.
+- While a selection is unavailable, a read is a miss and captures
+  nothing, and a queued write is not sent. Both are recorded with the
+  diagnostic `persistent tier unavailable until invalidation completes`.
+
+Decisions within the spec:
+- The profile identity of a plan whose instantiation applied a chain is
+  the JSON array of its profile ids in chain order. The array delimits
+  every id, so no chain reads as another and none reads as `none`.
+- Adding the member changes every request key's material and id, which
+  are runtime observations that no document's identity holds and no
+  golden fixes. Entries under the old material are misses, never
+  migrated (017 section 5).
+- The store call of an invalidation is made for no decision, so it has
+  no deadline and its own signal.
+
+Tests:
+- `the_profile_is_a_key_member` in `optimization.rs`.
+- `invalidation_reaches_every_tier` and
+  `a_scope_invalidation_leaves_other_scopes` in
+  `crates/rustev-runtime/tests/persistent.rs`.
+- The spec 017 invalidation tests, unchanged.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child
