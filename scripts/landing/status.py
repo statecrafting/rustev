@@ -31,9 +31,16 @@ QUIET = ("running", "merging", "stacked", "draft")
 # The owner's release order (2026-10-24): 031, then 034, then 035 and 036.
 # A spec on it costs more to delay than its unlock count alone says.
 RELEASE_WEIGHT = {"031": 4, "034": 3, "035": 2, "036": 2}
-# A cap on speculative work: PRs stacked on unmerged PRs. Past it, land the
-# bottom of a stack before opening anything above it.
-MAX_STACK_DEPTH = 2
+# A cap on speculative work: PRs stacked on unmerged PRs. A PR's depth is the
+# number of unmerged PRs beneath it (0 when it targets main). Measured over
+# the 217 PRs merged 2026-10-19 to 2026-10-27: once its base merges, a stacked
+# PR lands in about 1.2 h at depth 1 or 2 alike, while its AI reviews rise
+# from 5.8 (depth 1) to 7.8 (depth 2) and 10.7 (depth 3 or more, 16.5 h from
+# open to merge). Depth 1 keeps a chain's next PR reviewed and ready; the
+# owner allows depth 2 on the 037, 038 and 039 chains (2026-10-26). Past a
+# PR's cap, land the bottom of its stack before opening anything above it.
+DEFAULT_STACK_DEPTH = 1
+STACK_DEPTH = {"037": 2, "038": 2, "039": 2}
 MAX_STACKED = 4
 
 
@@ -80,6 +87,15 @@ def cost_of_delay(spec, weight):
     """Value lost per hour a spec's PR waits: itself, what it unblocks, and
     its place in the release order."""
     return 1 + weight.get(spec, 0) + RELEASE_WEIGHT.get(spec, 0)
+
+
+def depth_caps(caps):
+    """The depth caps as one line: the default, then each spec that differs."""
+    rest = {}
+    for spec, cap in caps.items():
+        if spec != "default":
+            rest.setdefault(cap, []).append(spec)
+    return "; ".join([str(caps["default"])] + [f"{' '.join(specs)}: {cap}" for cap, specs in sorted(rest.items())])
 
 
 def stack_depth(pr, by_head):
@@ -277,11 +293,13 @@ def main():
     # Within an action class, the costliest delay first, then the oldest.
     items.sort(key=lambda i: (RANK[i["action"]], -i["cod"], i["created"], i["pr"]))
     stacked = [i for i in items if i["depth"] > 0]
-    over = sorted({i["bottom"] for i in stacked if i["depth"] > MAX_STACK_DEPTH})
+    over = sorted({i["bottom"] for i in stacked
+                   if i["depth"] > STACK_DEPTH.get(i["spec"], DEFAULT_STACK_DEPTH)})
     report = {"actions": items, "finishing": finishing(specs, items, weight),
               "speculative": {"stacked": len(stacked), "cap": MAX_STACKED,
                               "max_depth": max((i["depth"] for i in items), default=0),
-                              "depth_cap": MAX_STACK_DEPTH, "land_first": over},
+                              "depth_cap": {"default": DEFAULT_STACK_DEPTH, **STACK_DEPTH},
+                              "land_first": over},
               "metrics": metrics(prs, items, waiting_runs, open_heads, specs)}
 
     # Only pull-request runs: a release dispatch waiting on its own
@@ -320,7 +338,7 @@ def main():
         print(f"     {r['spec']} (cost of delay {r['cod']}/h): {prs}")
     sp = report["speculative"]
     print(f"\nSpeculative work: {sp['stacked']} stacked PR(s) (cap {sp['cap']}), "
-          f"deepest stack {sp['max_depth']} (cap {sp['depth_cap']})")
+          f"deepest stack {sp['max_depth']} (cap {depth_caps(sp['depth_cap'])})")
     if sp["stacked"] > sp["cap"] or sp["land_first"]:
         bottoms = ", ".join(f"#{n}" for n in sp["land_first"])
         print("     over the cap: open nothing new on a stack"
