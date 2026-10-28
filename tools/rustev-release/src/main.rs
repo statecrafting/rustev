@@ -42,6 +42,15 @@
 //! `spec-spine registry list --json` at the clean commit at HEAD and, when a
 //! previous release is named, at that tag. It reads only the repository.
 //!
+//! Spec 058's tagged run: `tag <tag> <main-ref> <check-runs.json>` checks
+//! 3.1.1 and prints the run's identity; `run-manifest <evidence-dir>
+//! <artifacts-dir> <tag>` writes the run's manifest naming the tag object;
+//! `publish-crates` and `publish-npm <release-dir> <publication.json>`
+//! publish idempotently through the trusted-publishing credentials `cargo`
+//! and `npm` read; `github-release <release-dir>` creates the release once;
+//! `verify-assets <release-dir>` and `observe-registries <manifest>` check
+//! what was published.
+//!
 //! `rustev-release exceptions <YYYY-MM-DD>` exits 1 unless every advisory
 //! `deny.toml` ignores has an owner-approved exception unexpired on that
 //! date (3.6).
@@ -682,7 +691,12 @@ fn command_line(program: &str, args: &[&str]) -> Result<String, String> {
     Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
-fn manifest(set: &ReleaseSet, evidence_dir: &str, artifacts_dir: Option<&str>) -> ExitCode {
+fn manifest(
+    set: &ReleaseSet,
+    evidence_dir: &str,
+    artifacts_dir: Option<&str>,
+    tag_object: Option<String>,
+) -> ExitCode {
     use rustev_release::archive::sha256_hex;
     use rustev_release::manifest::{Inputs, Toolchain, build};
     let candidate = rustev_release::candidate::is_candidate_version(&set.version);
@@ -799,6 +813,7 @@ fn manifest(set: &ReleaseSet, evidence_dir: &str, artifacts_dir: Option<&str>) -
             m.limitations
                 .push(rustev_release::family_artifacts::MISSING.into());
         }
+        m.tag_object = tag_object;
         rustev_release::family_artifacts::validate(&m)?;
         rustev_release::family_artifacts::stage(&m, dir, artifacts_dir.map(Path::new))?;
         rustev_release::manifest::write_files(&m, dir)?;
@@ -1025,6 +1040,144 @@ fn artifact_cmd(set: &ReleaseSet, args: &[&str]) -> ExitCode {
     }
 }
 
+/// The built-in `allowed_signers`, written where Git and `ssh-keygen` read it.
+fn signers() -> Result<(rustev_release::repro::Scratch, std::path::PathBuf), String> {
+    let scratch = rustev_release::repro::fresh_dir("rustev-release-signers")?;
+    let path = scratch.join("allowed_signers");
+    std::fs::write(&path, rustev_release::manifest::ALLOWED_SIGNERS).map_err(|e| e.to_string())?;
+    Ok((scratch, path))
+}
+
+// Spec 058 3.1.1: every check of the `tag` job, as `$GITHUB_OUTPUT` lines.
+fn tag_cmd(tag: &str, main_ref: &str, check_runs: &str) -> ExitCode {
+    verdict((|| {
+        let runs = std::fs::read(check_runs).map_err(|e| format!("{check_runs}: {e}"))?;
+        let (_scratch, path) = signers()?;
+        let facts = rustev_release::tagged::check_tag(Path::new("."), tag, main_ref, &path, &runs)?;
+        print!("{}", facts.outputs());
+        Ok(())
+    })())
+}
+
+/// Spec 058 3.2.4: the object id of the annotated tag `tag`, which must be
+/// the release set's (or a candidate of it) and point at HEAD.
+fn run_tag_object(set: &ReleaseSet, tag: &str) -> Result<String, String> {
+    if tag != set.tag {
+        return Err(format!(
+            "058 3.2.4: {tag} is not the release set's tag {}",
+            set.tag
+        ));
+    }
+    let tag_ref = format!("refs/tags/{tag}");
+    if command_line("git", &["cat-file", "-t", &tag_ref])? != "tag" {
+        return Err(format!("058 3.1.1: {tag} is not an annotated tag"));
+    }
+    if command_line("git", &["rev-parse", &format!("{tag_ref}^{{commit}}")])?
+        != command_line("git", &["rev-parse", "HEAD"])?
+    {
+        return Err(format!("058 3.2.4: {tag} does not point at HEAD"));
+    }
+    command_line("git", &["rev-parse", &tag_ref])
+}
+
+fn release_manifest(dir: &Path) -> Result<rustev_release::manifest::ReleaseManifest, String> {
+    let bytes = std::fs::read(dir.join("release-manifest.json"))
+        .map_err(|e| format!("release-manifest.json: {e}"))?;
+    rustev_release::manifest::ReleaseManifest::parse(&bytes)
+}
+
+// Spec 058 3.3.1, 3.3.2, 3.5: idempotent publication of one registry's items.
+fn publish_cmd_058(dir: &str, record: &str, kind: &str) -> Result<(), String> {
+    use rustev_release::tagged::{Cargo, Npm, POLLS, Publisher, Record, items, publish_items};
+    let dir = Path::new(dir);
+    let bytes = std::fs::read(dir.join("release-manifest.json")).map_err(|e| e.to_string())?;
+    // 053 3.4.2: a candidate is refused before any registry contact.
+    let m = rustev_release::candidate::publication_manifest(&bytes)?;
+    let list = items(&m, kind, Some(dir))?;
+    if kind == "npm" {
+        // 031 3.1, layer 6: npm starts after every crate is public.
+        let missing = rustev_release::hosted::observe_crates(
+            &m,
+            &mut rustev_release::cratesio::CratesIo { wait_seconds: 0 },
+        );
+        if !missing.is_empty() {
+            return Err(format!(
+                "058 3.3.2: crates not public: {}",
+                missing.join("; ")
+            ));
+        }
+    }
+    let path = Path::new(record);
+    let mut r = Record::load(path, &m)?;
+    let mut publisher: Box<dyn Publisher> = if kind == "crate" {
+        Box::new(Cargo { wait_seconds: 10 })
+    } else {
+        Box::new(Npm {
+            dir: dir.to_path_buf(),
+            wait_seconds: 10,
+        })
+    };
+    let result = publish_items(&list, &m.version, POLLS, publisher.as_mut(), &mut r);
+    // The record is written whatever happened, so a rerun's evidence and a
+    // partial publication are both visible (3.5.4).
+    r.write(path)?;
+    result.map(|()| {
+        println!(
+            "{} {kind} item(s) public with the run's checksums",
+            list.len()
+        )
+    })
+}
+
+// Spec 058 3.3.3: the run's GitHub release, created once.
+fn github_release_cmd(dir: &str) -> Result<(), String> {
+    use rustev_release::tagged::{notes, publish_release, verify_assets};
+    let m = release_manifest(Path::new(dir))?;
+    let assets = verify_assets(&m, Path::new(dir)).map_err(|p| p.join("\n"))?;
+    let candidate = rustev_release::candidate::is_candidate_version(&m.version);
+    let mut gh = rustev_release::prerelease::Gh {
+        executable: "gh".into(),
+    };
+    let outcome = publish_release(&mut gh, &m.tag, &notes(&m, &assets)?, &assets, candidate)?;
+    println!("{}: {outcome:?} with {} asset(s)", m.tag, assets.len());
+    Ok(())
+}
+
+// Spec 058 3.4.1: a downloaded release against its manifest.
+fn verify_assets_cmd(dir: &str) -> Result<(), String> {
+    let m = release_manifest(Path::new(dir))?;
+    let assets =
+        rustev_release::tagged::verify_assets(&m, Path::new(dir)).map_err(|p| p.join("\n"))?;
+    println!("{}: {} asset(s) equal the manifest", m.tag, assets.len());
+    Ok(())
+}
+
+// Spec 058 3.4.1: every crate and npm package public with the manifest's checksum.
+fn observe_registries(manifest: &str) -> Result<(), String> {
+    let bytes = std::fs::read(manifest).map_err(|e| format!("{manifest}: {e}"))?;
+    let m = rustev_release::candidate::publication_manifest(&bytes)?;
+    let mut problems = rustev_release::hosted::observe_crates(
+        &m,
+        &mut rustev_release::cratesio::CratesIo { wait_seconds: 0 },
+    );
+    for item in rustev_release::tagged::items(&m, "npm", None)? {
+        match rustev_release::hosted::npm_lookup(&item.name, &m.version) {
+            rustev_release::lifecycle::Lookup::Visible { checksum }
+                if checksum == item.expected => {}
+            other => problems.push(format!("{}: {other:?}", item.name)),
+        }
+    }
+    if problems.is_empty() {
+        println!(
+            "every crate and npm package of {} is public with its checksum",
+            m.tag
+        );
+        Ok(())
+    } else {
+        Err(format!("058 3.4.1: {}", problems.join("\n")))
+    }
+}
+
 fn main() -> ExitCode {
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     let mut set = match ReleaseSet::parse(SET.as_bytes()) {
@@ -1039,7 +1192,14 @@ fn main() -> ExitCode {
             let tag = args.get(1).ok_or("053 3.2.4: missing candidate tag")?;
             if !matches!(
                 args.get(2).map(String::as_str),
-                Some("manifest" | "npm-audit" | "main-sbom" | "sbom-check" | "compare-artifacts")
+                Some(
+                    "manifest"
+                        | "run-manifest"
+                        | "npm-audit"
+                        | "main-sbom"
+                        | "sbom-check"
+                        | "compare-artifacts"
+                )
             ) {
                 return Err(
                     "053 3.2.3: --candidate applies only to artifact commands and manifest".into(),
@@ -1111,8 +1271,18 @@ fn main() -> ExitCode {
             )
         }
         ["publish", dir, instruction, journal] => publish_cmd(dir, instruction, journal),
-        ["manifest", dir] => manifest(&set, dir, None),
-        ["manifest", dir, artifacts] => manifest(&set, dir, Some(artifacts)),
+        ["manifest", dir] => manifest(&set, dir, None, None),
+        ["manifest", dir, artifacts] => manifest(&set, dir, Some(artifacts), None),
+        ["run-manifest", dir, artifacts, tag] => match run_tag_object(&set, tag) {
+            Ok(object) => manifest(&set, dir, Some(artifacts), Some(object)),
+            Err(e) => verdict(Err(e)),
+        },
+        ["tag", tag, main_ref, check_runs] => tag_cmd(tag, main_ref, check_runs),
+        ["publish-crates", dir, record] => verdict(publish_cmd_058(dir, record, "crate")),
+        ["publish-npm", dir, record] => verdict(publish_cmd_058(dir, record, "npm")),
+        ["github-release", dir] => verdict(github_release_cmd(dir)),
+        ["verify-assets", dir] => verdict(verify_assets_cmd(dir)),
+        ["observe-registries", manifest] => verdict(observe_registries(manifest)),
         ["verify-release", dir] => verify_release_cmd(dir, "."),
         ["verify-release", dir, repo] => verify_release_cmd(dir, repo),
         ["exceptions", today] => exceptions(today),
@@ -1122,7 +1292,7 @@ fn main() -> ExitCode {
         ["unpacked", dir, work, toolchain] => unpacked(&set, dir, work, Some(toolchain)),
         _ => {
             eprintln!(
-                "usage: rustev-release [--candidate <tag>] manifest|npm-audit|main-sbom|sbom-check|compare-artifacts ... | candidate-version <tag> | candidate-manifest <manifest> <tag> <commit> | prerelease <tag> <manifest> <signature> <artifacts-dir> | manifests | archives <dir> | compare <dir-a> <dir-b> | field <name> | unpacked <dir> <work> [<toolchain>] | deps | exceptions <YYYY-MM-DD> | changelog <out.md> [<previous tag>] | manifest <evidence-dir> [<artifacts-dir>] (PREVIOUS=<tag> after the first release) | verify-artifacts <manifest> <artifacts-dir> | observe-crates <manifest> | hosted-release <release-dir> <artifacts-dir> <instruction.json> <journal> | publish <release-dir> <instruction.json> <journal> | qualify <release-dir> <evidence-dir> <instruction> <journal> | verify-release <dir> [<repo>]"
+                "usage: rustev-release [--candidate <tag>] manifest|npm-audit|main-sbom|sbom-check|compare-artifacts ... | candidate-version <tag> | candidate-manifest <manifest> <tag> <commit> | prerelease <tag> <manifest> <signature> <artifacts-dir> | manifests | archives <dir> | compare <dir-a> <dir-b> | field <name> | unpacked <dir> <work> [<toolchain>] | deps | exceptions <YYYY-MM-DD> | changelog <out.md> [<previous tag>] | manifest <evidence-dir> [<artifacts-dir>] (PREVIOUS=<tag> after the first release) | verify-artifacts <manifest> <artifacts-dir> | observe-crates <manifest> | hosted-release <release-dir> <artifacts-dir> <instruction.json> <journal> | publish <release-dir> <instruction.json> <journal> | qualify <release-dir> <evidence-dir> <instruction> <journal> | verify-release <dir> [<repo>] | tag <tag> <main-ref> <check-runs.json> | run-manifest <evidence-dir> <artifacts-dir> <tag> | publish-crates <release-dir> <publication.json> | publish-npm <release-dir> <publication.json> | github-release <release-dir> | verify-assets <release-dir> | observe-registries <manifest>"
             );
             ExitCode::from(2)
         }

@@ -37,6 +37,10 @@ pub struct ReleaseManifest {
     pub schema: String,
     pub version: String,
     pub tag: String,
+    /// Spec 058 3.2.4: the object id of the annotated tag a tagged run
+    /// built from; absent in a manifest made before spec 058.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tag_object: Option<String>,
     pub commit: String,
     pub tree: String,
     pub registry: String,
@@ -160,6 +164,7 @@ pub fn build(set: &ReleaseSet, crates: &Path, inputs: Inputs) -> Result<ReleaseM
         schema: MANIFEST_SCHEMA.into(),
         version: set.version.clone(),
         tag: set.tag.clone(),
+        tag_object: None,
         commit: inputs.commit,
         tree: inputs.tree,
         registry: set.registry.clone(),
@@ -244,7 +249,7 @@ pub fn ssh_verify(
     }
 }
 
-fn git(repo: &Path, args: &[&str], allowed_signers: &Path) -> Result<String, String> {
+pub(crate) fn git(repo: &Path, args: &[&str], allowed_signers: &Path) -> Result<String, String> {
     // The signers file goes through Git's environment configuration, so no
     // character of its path can be read as part of a `-c key=value`.
     let mut cmd = Command::new("git");

@@ -11,6 +11,21 @@ pub struct Release {
 pub trait Releases {
     fn lookup(&mut self, tag: &str) -> Result<Option<Release>, String>;
     fn create(&mut self, tag: &str, notes: &str, assets: &Assets) -> Result<(), String>;
+    /// Spec 058 3.3.3: a release (`prerelease` false, marked latest) or a
+    /// candidate's pre-release.
+    fn create_release(
+        &mut self,
+        tag: &str,
+        notes: &str,
+        assets: &Assets,
+        prerelease: bool,
+    ) -> Result<(), String> {
+        if prerelease {
+            self.create(tag, notes, assets)
+        } else {
+            Err("058 3.3.3: this adapter creates pre-releases only".into())
+        }
+    }
 }
 #[derive(Debug, PartialEq, Eq)]
 pub enum Outcome {
@@ -102,22 +117,24 @@ impl Releases for Gh {
         Ok(Some(Release { prerelease, assets }))
     }
     fn create(&mut self, tag: &str, notes: &str, assets: &Assets) -> Result<(), String> {
+        self.create_release(tag, notes, assets, true)
+    }
+    fn create_release(
+        &mut self,
+        tag: &str,
+        notes: &str,
+        assets: &Assets,
+        prerelease: bool,
+    ) -> Result<(), String> {
         let scratch = crate::repro::fresh_dir("rustev-prerelease")?;
         let mut cmd = Command::new(&self.executable);
-        cmd.args([
-            "release",
-            "create",
-            tag,
-            "--repo",
-            repository()?,
-            "--prerelease",
-            "--latest=false",
-            "--verify-tag",
-            "--title",
-            tag,
-            "--notes",
-            notes,
-        ]);
+        cmd.args(["release", "create", tag, "--repo", repository()?]);
+        if prerelease {
+            cmd.args(["--prerelease", "--latest=false"]);
+        } else {
+            cmd.arg("--latest");
+        }
+        cmd.args(["--verify-tag", "--title", tag, "--notes", notes]);
         for (name, bytes) in assets {
             let path = scratch.join(name);
             std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
