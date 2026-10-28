@@ -462,15 +462,30 @@ release (increment 5) shows. A crates.io token from trusted publishing
 lives 30 minutes; a `publish-crates` job that outlives it fails and is
 resumed by rerunning it (3.5.1).
 
+**Increment 4 (2026-10-28).** The owner settings of 3.8 are in place:
+crates.io trusted publishers for the twelve crates (workflow
+`release.yml`, Environment `crates-publish`); the `release` and
+`crates-publish` Environments, neither with a required reviewer; the
+`npm-publish` Environment with its required reviewer removed (3.1.3); the
+repository tag ruleset "release tags owner-only (spec 058)" over `v*`
+(3.1.4); and the `release/next` branch ruleset of 053 decision 2 deleted.
+npm's trusted publishers for the nine packages are configured by the owner
+on npmjs.com, which shows them only to an authenticated owner; the
+closing release (increment 5) shows them working, since `publish-npm`
+reads no token.
+
 ## Open questions for the owner
 
 Settled at ratification (A-61): the `release` Environment has no
 required reviewer, so the signed tag alone authorizes a release; crates.io
-uses trusted publishing, with no token fallback. Still open:
+uses trusted publishing, with no token fallback. Settled by the owner on
+2026-10-28 (A-62):
 
-1. Is deleting and re-signing an unpublished `vX.Y.Z` tag (3.1.4)
-   acceptable, or is every pushed release tag permanent, as 053 3.2.5
-   holds for candidates?
-2. Should the 0.2.0 npm packages, published without provenance, be
-   followed by a patch release under this spec, or left to the next
-   minor?
+1. Deleting and re-signing an unpublished `vX.Y.Z` tag (3.1.4) is
+   acceptable, as 3.1.4 states; every tag whose run made anything public
+   is permanent.
+2. The 0.2.0 npm packages, published without provenance, are followed by
+   a patch release, `0.2.1`, under this spec. It is the first release after
+   0.2.0 that the Acceptance names, and closes this spec.
+
+None is open.
