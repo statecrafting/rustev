@@ -103,6 +103,8 @@ fn dispatch(p: &Parsed, cx: &Context) -> Result<Done, args::Usage> {
         ["replay"] => replay::replay(p)?,
         ["eval"] if p.has("repeat-config") => repeat::eval(p)?,
         ["eval"] => eval::eval(p)?,
+        ["eval", "views"] => eval::views(p)?,
+        ["eval", "judge"] => eval::judge(p)?,
         ["eval", "candidates"] => repeat::eval(p)?,
         ["baseline", "record"] => repeat::baseline(p)?,
         ["eval", "reproducibility"] | ["eval", "diff"] => repeat::compare(p),

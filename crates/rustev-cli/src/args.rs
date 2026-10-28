@@ -160,7 +160,7 @@ pub const COMMANDS: &[CommandSpec] = &[
                       "rules": Many, "calibration": Many, "scope": One, "tenant": One,
                       "context-revision": One, "principal-scope": One, "repeat-config": One, "repeat": One,
                       "purpose": One, "lineage": One, "ledger": One,
-                      "ledger-new": Switch, "ledger-out": One),
+                      "ledger-new": Switch, "ledger-out": One, "scores": Many),
         required: &[
             "dataset",
             "split",
@@ -171,6 +171,45 @@ pub const COMMANDS: &[CommandSpec] = &[
             "out",
             "tenant",
             "context-revision",
+        ],
+    },
+    // Spec 041, 3.10.3 and 3.10.4, additions to this spec.
+    CommandSpec {
+        path: &["eval", "views"],
+        flags: flags!("dataset": One, "split": One, "config": One, "adapter": One,
+                      "bundles": One, "now-ms": One, "store": One, "host-cap-ms": One,
+                      "out": One, "candidate-plan": One, "descriptor": Many,
+                      "rules": Many, "calibration": Many, "scope": One, "tenant": One,
+                      "context-revision": One, "principal-scope": One),
+        required: &[
+            "dataset",
+            "split",
+            "config",
+            "adapter",
+            "bundles",
+            "now-ms",
+            "out",
+            "tenant",
+            "context-revision",
+        ],
+    },
+    CommandSpec {
+        path: &["eval", "judge"],
+        flags: flags!("config": One, "views": One, "judge-plan": One, "descriptor": Many,
+                      "rules": Many, "calibration": Many, "bundles": One, "now-ms": One,
+                      "store": One, "host-cap-ms": One, "scope": One, "tenant": One,
+                      "context-revision": One, "principal-scope": One, "scorer": One,
+                      "out": One),
+        required: &[
+            "config",
+            "views",
+            "judge-plan",
+            "bundles",
+            "now-ms",
+            "tenant",
+            "context-revision",
+            "scorer",
+            "out",
         ],
     },
     CommandSpec {
@@ -414,6 +453,11 @@ rustev: compile, inspect, run, replay and evaluate Rustev decision plans.
                       [--repeat-config F [--repeat N] [--bundles DIR]...]
                       [--purpose measurement|optimization]
                       [--lineage H (--ledger F|--ledger-new) --ledger-out F]
+                      [--scores F]...   (a version 3 configuration, at most 16)
+  rustev eval views   [...eval inputs, one --bundles, no repeat or scores...] --out F
+  rustev eval judge   --config F --views F --judge-plan F [--descriptor F]... [--rules F]...
+                      [--calibration F]... --bundles DIR --scorer ID
+                      --now-ms MS|system SCOPE --out F [--store DIR] [--host-cap-ms N]
   rustev baseline record --name NAME --eval DIR --now-ms MS|system --out F
   rustev eval reproducibility --baseline F --baseline-eval DIR --run DIR
   rustev eval diff    --baseline F --baseline-eval DIR --run DIR --out DIR

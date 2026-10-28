@@ -1,17 +1,19 @@
 //! The declarative task adapter, `rustev.task-adapter/1` (spec 006, 3.8):
 //! how evaluation reads labels and decides whether a proposal is correct,
-//! without writing Rust.
+//! without writing Rust. Version 2 (spec 041, 3.1.2) adds the measure
+//! declarations a version 3 evaluator configuration binds.
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use rustev_contract::Document;
-use rustev_contract::bounded::ParseLimits;
-use rustev_contract::canonical::tagged_digest;
+use rustev_contract::bounded::{ParseLimits, parse_bounded};
+use rustev_contract::canonical::{CanonicalError, tagged_digest};
 use rustev_contract::ids::ContentDigest;
 use rustev_contract::judgment::OutValue;
 use rustev_contract::limits::DESCRIPTOR_V1;
+use rustev_contract::{Document, DocumentError};
 use rustev_eval::config::AdapterRules;
 use rustev_eval::dataset::AdapterRef;
+use rustev_eval::measures::{MeasuredAdapter, Measures, TASK_ADAPTER_V2};
 use rustev_eval::metrics::TaskAdapter;
 use serde::{Deserialize, Serialize};
 
@@ -28,6 +30,10 @@ pub struct TaskAdapterDoc {
     pub version: String,
     pub labels: Labels,
     pub rules: Vec<Rule>,
+    /// Required in version 2 and absent in version 1, whose bytes and
+    /// rules digest are unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub measures: Option<Measures>,
 }
 
 /// A label is well formed when it equals one of `values` or starts with one
@@ -75,11 +81,30 @@ pub enum Select {
     FirstRanked,
 }
 
+/// Either version parses; `SCHEMA` names version 1 only because the trait
+/// holds one constant. Digests are tagged with the document's own schema,
+/// so a version 1 digest is what it always was.
 impl Document for TaskAdapterDoc {
     const SCHEMA: &'static str = TASK_ADAPTER;
     const LIMITS: ParseLimits = DESCRIPTOR_V1;
     fn schema(&self) -> &str {
         &self.schema
+    }
+
+    fn parse(bytes: &[u8]) -> Result<Self, DocumentError> {
+        let doc: Self = parse_bounded(bytes, &Self::LIMITS).map_err(DocumentError::Parse)?;
+        if doc.schema != TASK_ADAPTER && doc.schema != TASK_ADAPTER_V2 {
+            return Err(DocumentError::Schema {
+                expected: TASK_ADAPTER_V2,
+                found: doc.schema.chars().take(80).collect(),
+            });
+        }
+        Ok(doc)
+    }
+
+    fn record_digest(&self) -> Result<ContentDigest, CanonicalError> {
+        let digest = tagged_digest(&self.schema, &self.record_canonical()?);
+        Ok(ContentDigest::parse(&digest).expect("a tagged digest is a content digest"))
     }
 }
 
@@ -100,8 +125,14 @@ fn text(what: &str, s: &str, max: usize) -> Result<(), String> {
 }
 
 impl TaskAdapterDoc {
-    /// Validate the adapter (spec 006, 3.8.1).
+    /// Validate the adapter (spec 006, 3.8.1; spec 041, 3.4.1).
     pub fn check(&self) -> Result<(), String> {
+        match (self.schema == TASK_ADAPTER_V2, &self.measures) {
+            (true, Some(m)) => m.check().map_err(|e| format!("measures: {e}"))?,
+            (true, None) => return Err(format!("{TASK_ADAPTER_V2} requires measures")),
+            (false, Some(_)) => return Err(format!("{TASK_ADAPTER} has no measures")),
+            (false, None) => {}
+        }
         text("name", &self.name, 64)?;
         text("version", &self.version, 64)?;
         let l = &self.labels;
@@ -167,13 +198,14 @@ impl TaskAdapter for TaskAdapterDoc {
 
     /// Always bound: the document is the whole definition (spec 014,
     /// 3.1.4), and the digest is over the canonical bytes `eval` writes as
-    /// `adapter.json`.
+    /// `adapter.json`, tagged with the document's schema, so a version 2
+    /// digest covers `measures` (spec 041, 3.1.2).
     fn rules(&self) -> AdapterRules {
         let bytes = self
             .canonical()
             .expect("a checked adapter document has a canonical form");
         AdapterRules::Bound(
-            ContentDigest::parse(&tagged_digest(TASK_ADAPTER, &bytes))
+            ContentDigest::parse(&tagged_digest(&self.schema, &bytes))
                 .expect("a tagged digest is a content digest"),
         )
     }
@@ -210,6 +242,14 @@ impl TaskAdapter for TaskAdapterDoc {
     }
 }
 
+/// A version 1 document declares no measures; `eval` refuses it under a
+/// version 3 configuration before evaluation.
+impl MeasuredAdapter for TaskAdapterDoc {
+    fn measures(&self) -> Measures {
+        self.measures.clone().unwrap_or_default()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -241,6 +281,7 @@ mod tests {
                 .collect(),
                 otherwise: Some("other".into()),
             })],
+            measures: None,
         }
     }
 
@@ -292,6 +333,7 @@ mod tests {
                     label: "none".into(),
                 }),
             ],
+            measures: None,
         };
         a.check().unwrap();
         let entry = |c: &str, p| RankEntry {
@@ -333,5 +375,44 @@ mod tests {
         // Unknown fields are refused by the parser.
         let bytes = br#"{"schema":"rustev.task-adapter/1","name":"n","version":"1","labels":{"values":["a"],"prefixes":[]},"rules":[{"action":"x","label":"a","extra":1}]}"#;
         assert!(TaskAdapterDoc::parse(bytes).is_err());
+    }
+
+    /// Spec 041, 3.1.2: version 2 is version 1 plus required `measures`,
+    /// and its rules digest is tagged with its own schema.
+    #[test]
+    fn version_2_requires_measures_and_tags_its_digest() {
+        let v1 = support();
+        let mut v2 = support();
+        v2.schema = TASK_ADAPTER_V2.into();
+        assert!(v2.check().unwrap_err().contains("requires measures"));
+        v2.measures = Some(Measures::default());
+        v2.check().unwrap();
+        let mut v1_with = support();
+        v1_with.measures = Some(Measures::default());
+        assert!(v1_with.check().unwrap_err().contains("has no measures"));
+        // Version 1 bytes carry no `measures` member, so its digests are
+        // unchanged; version 2's differ.
+        let v1_bytes = v1.canonical().unwrap();
+        assert!(!String::from_utf8_lossy(&v1_bytes).contains("measures"));
+        let tagged = |schema: &str, bytes: &[u8]| {
+            AdapterRules::Bound(ContentDigest::parse(&tagged_digest(schema, bytes)).unwrap())
+        };
+        assert_eq!(v1.rules(), tagged(TASK_ADAPTER, &v1_bytes));
+        assert_eq!(
+            v2.rules(),
+            tagged(TASK_ADAPTER_V2, &v2.canonical().unwrap())
+        );
+        assert_eq!(
+            v2.record_digest().unwrap().to_string(),
+            tagged_digest(TASK_ADAPTER_V2, &v2.record_canonical().unwrap())
+        );
+        // Both versions parse; another schema does not.
+        let round = TaskAdapterDoc::parse(&v2.canonical().unwrap()).unwrap();
+        assert_eq!(round, v2);
+        assert_eq!(round.measures(), Measures::default());
+        assert_eq!(v1.measures(), Measures::default());
+        let mut v3 = v2.clone();
+        v3.schema = "rustev.task-adapter/3".into();
+        assert!(TaskAdapterDoc::parse(&v3.canonical().unwrap()).is_err());
     }
 }

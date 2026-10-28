@@ -323,6 +323,16 @@ pub fn evaluate_views(
         .ok_or_else(|| EvalError::Config(ConfigError("score views need version 3".into())))
 }
 
+/// [`evaluate_measured`] with the score views it computed (spec 041,
+/// 3.10.2), so a host that writes both replays each bundle once. The views
+/// are none under versions 1 and 2.
+pub fn evaluate_measured_with_views(
+    inputs: &Inputs<'_>,
+    measured: Measured<'_>,
+) -> Result<(Evaluated, Option<ScoreViews>), EvalError> {
+    evaluate_inner(inputs, None, Some(measured)).map(|(e, _, v)| (e, v))
+}
+
 /// [`evaluate_with_cases`] under a version 3 configuration (spec 041,
 /// 3.11): the case measures carry every new metric's contributions.
 pub fn evaluate_measured_with_cases(
