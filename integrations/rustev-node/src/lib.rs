@@ -26,7 +26,8 @@ use rustev_contract::definition::Definition;
 use rustev_contract::descriptor::BackendDescriptor;
 use rustev_contract::snapshot::Snapshot;
 use rustev_contract::time::Timestamp;
-use rustev_core::seams::{CancelSignal, DecisionBackend, EvidenceSink};
+use rustev_core::seams::{BoxFuture, CancelSignal, DecisionBackend, EvidenceSink};
+use rustev_eval::scores::{ScoreEntry, ScoreOutcome, ScoreViews, Scores, reserved};
 use rustev_runtime::{
     Clock, Completion, DecideError, DecisionRequest, Delivery, ManualClock, PreparedPlan,
     Rejection, Runtime, RuntimeConfig, SinkPolicy, TokioClock,
@@ -84,6 +85,11 @@ struct EngineInner {
     /// for them as for decisions.
     blocking: AtomicU64,
     seams: Vec<Arc<seams::SeamStats>>,
+    /// The scorer seams' statistics (spec 041, 3.9), held weakly: a scorer
+    /// the host drops leaves the gauges with it.
+    scorers: std::sync::Mutex<Vec<std::sync::Weak<seams::SeamStats>>>,
+    /// The engine's clock, which bounds scorer calls.
+    clock: Arc<dyn Clock>,
     traces: seams::Traces,
     context: Option<Arc<seams::HostContext>>,
     telemetry: Option<Arc<rustev_otel::OtelSink>>,
@@ -216,6 +222,8 @@ impl Engine {
                     in_flight: AtomicU64::new(0),
                     blocking: AtomicU64::new(0),
                     seams: stats,
+                    scorers: Default::default(),
+                    clock,
                     traces,
                     context: context.map(Arc::new),
                 }),
@@ -505,12 +513,114 @@ impl Engine {
             "sink": { "acknowledged": g.sink.acknowledged, "failed": g.sink.failed,
                       "timedOut": g.sink.timed_out, "dropped": g.sink.dropped,
                       "queued": g.sink.queued, "inDelivery": g.sink.in_delivery },
-            "seams": self.inner.seams.iter().map(|s| s.json()).collect::<Vec<_>>(),
+            "seams": self.inner.seams.iter().map(|s| s.json()).chain(self.scorer_stats()).collect::<Vec<_>>(),
         });
         if let Some(t) = &self.inner.telemetry {
             view["telemetry"] = telemetry::stats(t.stats());
         }
         view
+    }
+
+    /// The live scorer seams' statistics, pruning those the host dropped.
+    fn scorer_stats(&self) -> Vec<serde_json::Value> {
+        let mut scorers = self.inner.scorers.lock().unwrap_or_else(|e| e.into_inner());
+        scorers.retain(|w| w.strong_count() > 0);
+        scorers
+            .iter()
+            .filter_map(|w| w.upgrade().map(|s| s.json()))
+            .collect()
+    }
+
+    /// A host scorer seam (spec 041, 3.9.1), with its own bounded queue;
+    /// the JavaScript layer makes one per scorer object, so every
+    /// `scoreViews` with that scorer shares it.
+    #[napi]
+    pub fn scorer(&self, seam: seams::ScorerSeam) -> Result<ScorerHandle> {
+        guard(|| {
+            let scorer = Arc::new(seams::HostScorer::new(seam)?);
+            self.inner
+                .scorers
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .push(Arc::downgrade(&scorer.stats));
+            Ok(ScorerHandle { scorer })
+        })
+    }
+
+    /// Score every entry of a `rustev.score-views/1` document with a host
+    /// scorer (spec 041, 3.9): in entry order, at most the scorer's
+    /// `maxConcurrency` outstanding, each bounded by `deadlineMs` from now
+    /// on the engine's clock and by `cancel`. Returns the
+    /// `rustev.scores/1` record canonical bytes `score_views` would write
+    /// for the same answers (3.9.2). Runs on the engine's runtime.
+    #[napi]
+    pub async fn score_views(
+        &self,
+        views: Uint8Array,
+        scorer: &ScorerHandle,
+        deadline_ms: Option<f64>,
+        cancel: &CancelHandle,
+    ) -> Result<Uint8Array> {
+        let counted = InFlight::enter(self.inner.clone());
+        self.live()?;
+        let views = ScoreViews::parse(&views)
+            .map_err(|e| fail("InvalidDocument", "invalid_document", e.to_string()))?;
+        let deadline_ms = deadline_ms
+            .map(|d| {
+                // As `advanceClock`: an integral, non-negative number of
+                // milliseconds up to 2^53 - 1, never truncated.
+                if d.fract() == 0.0 && (0.0..=9_007_199_254_740_991.0).contains(&d) {
+                    Ok(d as u64)
+                } else {
+                    Err(fail(
+                        "ConfigRefused",
+                        "out_of_range",
+                        serde_json::json!({ "field": "deadlineMs", "min": 0, "max": 9_007_199_254_740_991u64 }),
+                    ))
+                }
+            })
+            .transpose()?;
+        let clock = self.inner.clock.clone();
+        let deadline = deadline_ms.map(|d| clock.now().saturating_add(d));
+        let scorer = scorer.scorer.clone();
+        let signal = cancel.signal.clone();
+        let task = self.inner.rt.spawn(async move {
+            let _counted = counted;
+            let gate = Arc::new(tokio::sync::Semaphore::new(scorer.max_concurrency));
+            let mut running = Vec::with_capacity(views.cases.len());
+            for e in &views.cases {
+                let permit = gate
+                    .clone()
+                    .acquire_owned()
+                    .await
+                    .map_err(|e| fail("InternalError", "internal", e.to_string()))?;
+                // Past the deadline or cancelled before its call: the host
+                // is not called (3.9.1).
+                let call: BoxFuture<'static, ScoreOutcome> =
+                    if signal.is_raised() || deadline.is_some_and(|d| clock.now() >= d) {
+                        Box::pin(async { ScoreOutcome::Unscored(reserved::SCORER_DEADLINE.into()) })
+                    } else {
+                        scorer.begin(e, clock.clone(), deadline, signal.clone())
+                    };
+                running.push(tokio::spawn(async move {
+                    let _permit = permit;
+                    call.await
+                }));
+            }
+            let mut entries = Vec::with_capacity(running.len());
+            for (e, call) in views.cases.iter().zip(running) {
+                let outcome = call
+                    .await
+                    .map_err(|e| fail("InternalError", "internal", e.to_string()))?;
+                entries.push(ScoreEntry::of(e, outcome));
+            }
+            Scores::over(&scorer.descriptor, &views, entries)
+                .and_then(|s| s.record_canonical())
+                .map(Uint8Array::new)
+                .map_err(|e| fail("InternalError", "internal", e.to_string()))
+        });
+        task.await
+            .map_err(|e| fail("InternalError", "internal", e.to_string()))?
     }
 
     /// Forward a bounded exchange document (049 3.5.2).
@@ -627,6 +737,12 @@ pub struct CommandResult {
 }
 
 mod commands;
+
+/// A host scorer seam made by [`Engine::scorer`].
+#[napi]
+pub struct ScorerHandle {
+    scorer: Arc<seams::HostScorer>,
+}
 
 /// A raisable cancellation signal.
 #[napi]
