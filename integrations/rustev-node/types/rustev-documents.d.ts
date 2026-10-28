@@ -262,6 +262,170 @@ export namespace RustevBackendOutput1 {
 }
 export type RustevBackendOutput1 = RustevBackendOutput1.RustevBackendOutput1;
 
+export namespace RustevCacheEntry1 {
+  export type Timestamp = number;
+  export type ContentDigest = string;
+  /**
+   * `request` entries only in this increment; the decision-result cache
+   * (3.6.4) adds `decision`.
+   */
+  export type EntryKind = "request";
+  export type EntryPayload = {
+    request: RequestPayload;
+  };
+  /**
+   * What a backend returned, before validation.
+   */
+  export type RawOutput =
+    | {
+        ranking: {
+          /**
+           * @maxItems 1024
+           */
+          ids: string[];
+          scores: RankingScores;
+        };
+      }
+    | {
+        label: string;
+      }
+    | {
+        distribution: {
+          [k: string]: number | undefined;
+        };
+      }
+    | {
+        logits: {
+          [k: string]: number | undefined;
+        };
+      }
+    | {
+        scores: {
+          [k: string]: number | undefined;
+        };
+      }
+    | {
+        screen: {
+          blocked: boolean;
+          categories: string[];
+          units: ScreenUnits;
+        };
+      }
+    | {
+        text_record: {
+          [k: string]: TextValue | undefined;
+        };
+      }
+    | {
+        typed_record: {
+          fields: {
+            [k: string]: unknown | undefined;
+          };
+          logprobs: FieldLogprobs[];
+          provider_reported: {
+            [k: string]: string | undefined;
+          };
+        };
+      };
+  /**
+   * Optional ranking scores with an explicit wire sentinel (spec 039, 3.5.2).
+   */
+  export type RankingScores = "none" | [number, ...number[]];
+  /**
+   * A screener's reported text units, distinct from runtime computed charges.
+   */
+  export type ScreenUnits =
+    | "not_reported"
+    | {
+        reported: {
+          n: number;
+        };
+      };
+  /**
+   * A generated field before plan-dependent validation (spec 037, 3.7).
+   */
+  export type TextValue =
+    | {
+        text: string;
+      }
+    | {
+        list: string[];
+      };
+  export type LogprobItem = "none" | number;
+
+  export interface RustevCacheEntry1 {
+    entry: EntryBody;
+    /**
+     * Over the record canonical bytes of `entry`, tagged with the schema.
+     */
+    integrity: ContentDigest;
+    schema: "rustev.cache-entry/1";
+  }
+  /**
+   * Everything an entry holds besides its integrity digest.
+   */
+  export interface EntryBody {
+    /**
+     * The evaluation time of the decision that wrote the entry; expiry
+     * is measured from it (3.4.3).
+     */
+    created: Timestamp;
+    /**
+     * The digest of the run record whose attempt produced the payload.
+     */
+    evidence: ContentDigest;
+    /**
+     * The store's generations captured before the work began.
+     */
+    generations: EntryGenerations;
+    /**
+     * The key's digest, under which the store keeps the entry.
+     */
+    key_id: string;
+    /**
+     * The complete canonical key material, lowercase hexadecimal.
+     */
+    key_material: string;
+    key_schema_version: number;
+    kind: EntryKind;
+    namespace_version: number;
+    payload: EntryPayload;
+    /**
+     * The runtime version that wrote the entry.
+     */
+    runtime_version: string;
+    ttl_ms: number;
+  }
+  export interface EntryGenerations {
+    namespace: number;
+    scope: number;
+  }
+  /**
+   * A validated raw output and where it came from. Its derivation follows
+   * from the plan, which the key names; its lineage is the source attempt
+   * and the entry's `evidence`.
+   */
+  export interface RequestPayload {
+    output: RawOutput;
+    source_attempt_id: string;
+    /**
+     * The index of the target that answered: the primary, or a fallback.
+     */
+    target: number;
+  }
+  /**
+   * Backend option log-probabilities; field eligibility is checked by the core.
+   */
+  export interface FieldLogprobs {
+    field: string;
+    item: LogprobItem;
+    values: {
+      [k: string]: number | undefined;
+    };
+  }
+}
+export type RustevCacheEntry1 = RustevCacheEntry1.RustevCacheEntry1;
+
 export namespace RustevCalibration1 {
   export type ArtifactId = string;
   export type DatasetId = string;

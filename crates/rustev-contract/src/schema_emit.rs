@@ -366,6 +366,7 @@ pub fn document_schemas() -> Vec<EmittedSchema> {
         emit::<DynamicCapability>(schema::DYNAMIC_CAPABILITY, None),
         emit::<DynamicOutcome>(schema::DYNAMIC_OUTCOME, None),
         emit::<LiveReexecution>(schema::LIVE_REEXECUTION, None),
+        emit::<crate::cache_entry::CacheEntry>(schema::CACHE_ENTRY, None),
         emit::<RedactionPolicy>(REDACTION, None),
         emit::<TraceLine>(TRACE, None),
     ];

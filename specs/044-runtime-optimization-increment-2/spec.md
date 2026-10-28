@@ -946,6 +946,59 @@ critical section that removes it, so two waiters dropped at once on two
 threads leave exactly one last waiter
 (`concurrent_abandons_leave_exactly_one_last_waiter`).
 
+**Increment 4, part a (2026-10-28): the entry document and the store
+seam.** Increment 4 lands in two parts: (a) the entry document, the store
+seam and the entry checks, driven by no request yet; (b) the persistent
+tier in the driver, `store_missing` and `store_contract_mismatch` with
+the `crates/rustev-cli/` edge, the request key's profile member,
+invalidation across tiers, and the lifting of `persistent_cache`'s
+availability refusal.
+
+What part a adds:
+- `crates/rustev-contract/src/cache_entry.rs` holds
+  `rustev.cache-entry/1` (3.4.3). Its `EntryBody` holds every member but
+  the integrity digest, which is tagged with the schema over the body's
+  record canonical bytes. The schema and the generated Node and
+  WebAssembly declarations are regenerated.
+- `crates/rustev-runtime/src/store.rs` holds the `RuntimeStore` seam
+  (3.4.1) with its calls, answers and failures, and a `put` answer's
+  diagnostic.
+- The same module writes a request-level entry and checks a read in the
+  order of 3.4.3. Each failed check is a miss with its diagnostic:
+  `entry_schema_unknown`, `entry_corrupt` (the only miss that deletes the
+  entry), `entry_collision`, `generation_advanced`, then the expiry check
+  by evaluation time: `entry_from_future` for an entry created after the
+  request's evaluation time, otherwise `entry_expired`.
+
+Decisions within the spec:
+- `get` also takes the scope, because the store never interprets an entry
+  and still returns the scope's generation on a miss.
+- `contract()` is synchronous: it is declared data that `prepare` reads,
+  as a backend's descriptor is.
+- A store call receives the decision's remaining milliseconds and its
+  signal, not an instant of the runtime's clock.
+- The key material is lowercase hexadecimal.
+- A `request` payload holds the target, the validated output and the
+  source attempt id. Its derivation follows from the plan the key names,
+  and its lineage is that attempt and the entry's `evidence`.
+- `kind` has only `request` until the decision-result cache (increment 5)
+  adds `decision`.
+- Bytes that are not JSON are `entry_corrupt`. A JSON document that does
+  not name `rustev.cache-entry/1`, or names no schema at all, is
+  `entry_schema_unknown` and is kept.
+- Key material other than the request's is `entry_collision`, whether
+  the ids are equal (017 3.2) or the store returned another key's entry.
+  An intact entry whose key id is not the one its material names was
+  written wrong, and is `entry_corrupt`.
+- 3.9 names no code for a key collision or an expiry, so these take the
+  same form as its codes: `entry_collision` and `entry_expired`.
+
+Tests:
+- The unit tests in `store.rs`: a served entry with its age, each failed
+  check in order with its diagnostic and deletion, and the `put` answers.
+- `a_cache_entry_is_sealed_over_its_body` in
+  `crates/rustev-contract/tests/documents.rs`.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

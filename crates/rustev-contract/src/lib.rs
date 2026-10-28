@@ -15,6 +15,7 @@ pub mod acquisition_record;
 pub mod acquisition_step;
 pub mod actionability;
 pub mod bounded;
+pub mod cache_entry;
 pub mod calibration;
 pub mod canonical;
 pub mod decimal;
@@ -135,6 +136,8 @@ pub mod schema {
     pub const DYNAMIC_QUESTION: &str = "rustev.dynamic-question/1";
     pub const DYNAMIC_CAPABILITY: &str = "rustev.dynamic-capability/1";
     pub const DYNAMIC_OUTCOME: &str = "rustev.dynamic-outcome/1";
+    /// A persistent-tier entry (spec 044, 3.4.3).
+    pub const CACHE_ENTRY: &str = "rustev.cache-entry/1";
 }
 
 pub mod plan_bundle;

@@ -337,3 +337,75 @@ fn a_run_record_parses_under_record_limits() {
     let bytes = serde_json::to_vec(&record).unwrap();
     assert_eq!(RunRecord::parse(&bytes).unwrap(), record);
 }
+
+/// Spec 044, 3.4.3: a cache entry is sealed by an integrity digest over
+/// its body, round-trips in record canonical form, and refuses unknown
+/// members.
+#[test]
+fn a_cache_entry_is_sealed_over_its_body() {
+    use rustev_contract::cache_entry::{
+        CacheEntry, EntryBody, EntryGenerations, EntryKind, EntryPayload, RequestPayload,
+    };
+    use rustev_contract::canonical::{record_canonical_bytes, tagged_digest};
+    use rustev_contract::ids::ContentDigest;
+    use rustev_contract::output::RawOutput;
+    let body = EntryBody {
+        kind: EntryKind::Request,
+        key_material: "00ff".into(),
+        key_id: format!("sha256:{}", "1".repeat(64)),
+        key_schema_version: 1,
+        namespace_version: 2,
+        runtime_version: "0.1.0".into(),
+        generations: EntryGenerations {
+            namespace: 3,
+            scope: 4,
+        },
+        created: rustev_contract::Timestamp::from_ms(1_000).unwrap(),
+        ttl_ms: 60_000,
+        payload: EntryPayload::Request(RequestPayload {
+            target: 0,
+            output: RawOutput::Distribution(
+                [("a".to_string(), 0.25), ("b".to_string(), 0.75)].into(),
+            ),
+            source_attempt_id: "att-1".into(),
+        }),
+        evidence: ContentDigest::parse(&format!("sha256:{}", "2".repeat(64))).unwrap(),
+    };
+    let entry = CacheEntry::seal(body.clone()).unwrap();
+    assert_eq!(entry.schema, "rustev.cache-entry/1");
+    assert_eq!(
+        entry.integrity.to_string(),
+        tagged_digest(
+            "rustev.cache-entry/1",
+            &record_canonical_bytes(&body).unwrap()
+        )
+    );
+    assert!(entry.intact());
+    let bytes = entry.record_canonical().unwrap();
+    let parsed = CacheEntry::parse(&bytes).unwrap();
+    assert_eq!(parsed, entry);
+    // Any change to the body breaks the seal.
+    let mut altered = parsed.clone();
+    altered.entry.generations.scope = 5;
+    assert!(!altered.intact());
+    // Unknown members are refused at every level, the payload's variant
+    // included.
+    let base: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let refused = |edit: &dyn Fn(&mut serde_json::Value)| {
+        let mut v = base.clone();
+        edit(&mut v);
+        CacheEntry::parse(&serde_json::to_vec(&v).unwrap()).is_err()
+    };
+    assert!(refused(&|v| v["extra"] = serde_json::json!(1)));
+    assert!(refused(&|v| v["entry"]["extra"] = serde_json::json!(1)));
+    assert!(refused(
+        &|v| v["entry"]["payload"]["extra"] = serde_json::json!(1)
+    ));
+    assert!(refused(
+        &|v| v["entry"]["payload"]["request"]["extra"] = serde_json::json!(1)
+    ));
+    assert!(refused(
+        &|v| v["entry"]["generations"]["extra"] = serde_json::json!(1)
+    ));
+    assert!(!refused(&|_| {}));
+}
