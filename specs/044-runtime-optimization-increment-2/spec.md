@@ -1202,6 +1202,101 @@ Tests:
   `crates/rustev-runtime/tests/persistent.rs`.
 - The spec 017 invalidation tests, unchanged.
 
+**Increment 5, the plan (2026-10-28): five parts.** The decision-result
+cache is too large for one review, so increment 5 lands in five parts.
+Each part lifts the compile refusal only for what it runs:
+
+- (a) The decision key and the memory tier, driven by no decision yet.
+  The key is derived from the compiled `decision_key_schema` with its
+  dimension members (3.5 items 1 to 3, 3.6.1). The tier covers lookup and
+  its checks, evaluation-time expiry, bounds, admission under a captured
+  generation, and invalidation. The compile refusal stands.
+- (b) The memory tier in the runtime. This part adds `Runtime::decide_keyed`,
+  serving a hit with closure dispatch and `closure_mismatch` (3.6.3),
+  admission of a judged miss (3.6.4), and the run record member and
+  `served_from_cache` (3.6.6) with every outcome but a store failure's.
+  It also adds the request mechanism of a reused request and
+  `on_refresh_failure: unresolved`. The compiler accepts a memory-tier
+  decision cache over exact and semantic steps.
+- (c) The persistent tier for decision entries: the `decision` kind of
+  `rustev.cache-entry/1`, store reads and writes with their checks and
+  generations, a store read failure's `bypassed`, `refused` or `miss`
+  (3.4.2), and a restart.
+- (d) The refresh-failure policies `recompute` and
+  `serve_cached_within_freshness` (3.6.5), with the stored volatile
+  snapshot entries and `substituted`.
+- (e) Plans with acquisition, widening, generation or extraction steps:
+  refreshed acquisitions (3.6.2), generated text keeping its origin
+  (3.6.6) and the remaining section 5 rows.
+
+**Increment 5, part a (2026-10-28): the decision key and the memory
+tier.** `crates/rustev-runtime/src/optimization.rs` gains the module
+`decision`, which no decision drives yet. The compiler still refuses
+`decision_cache` as not available in this build.
+
+What part a adds:
+- `decision_key` derives a decision's key from the plan's compiled
+  `decision_key_schema` (3.6.1). The members are the plan, the key-schema,
+  namespace and runtime versions, the complete authorized scope, the
+  profile identity or `none` (3.5 item 2), each declared dimension's
+  handle (3.5 item 3) and each listed input's snapshot entries. A volatile
+  input is not in the schema, so a changed live value keeps the key.
+- The memory tier holds decision entries in the plan's namespace, under
+  the namespace's generation, beside the request entries. An entry holds
+  each reused request's 017 key, output and source attempt, the source
+  run record's digest, and the source decision's evaluation time.
+- A lookup serves an entry only with the request's own key material and
+  the current generation, within `ttl_ms` by evaluation time.
+- Admission refuses an entry over `max_entry_bytes`, one captured under
+  an earlier generation, and one whose key id holds other material. It
+  evicts the namespace's oldest decision entries beyond `max_entries`.
+- `Runtime::invalidate_plan` and `invalidate_scope` remove the selected
+  decision entries with the request entries.
+
+Decisions within the spec:
+- **Key material names each member beside its value.** An input member
+  holds the count and the digest of each of the input's snapshot entries
+  in full as supplied, in snapshot order. That is a superset of value,
+  provenance class and as-of time (3.6.1): source, grade and producer
+  also reach the judgment under spec 032. A superset lowers hits and
+  never safety.
+- **Unkeyed decisions.** A declared dimension the host does not supply
+  is `key_dimension_missing` (3.5 item 3). A dimension the plan does not
+  declare, a schema member this runtime does not know, and a snapshot
+  entry without canonical form are `key_ineligible` (3.5 item 4). 3.9
+  names no code for the latter, so it takes the same form as its codes.
+  Part b handles both under `admission`.
+- **Decision entries expire by evaluation time** in the memory tier too
+  (decision 6 at approval). An entry created after the request's
+  evaluation time is a miss (`entry_from_future`) and is kept. An expired
+  entry is a miss (`entry_expired`) and is removed. Other material under
+  the same key id is `entry_collision`, and an entry from an earlier
+  generation is `generation_advanced`, as for persistent entries.
+- **Bounds.** `max_entries` bounds a plan's decision entries, evicted
+  first in, first out. `max_entry_bytes` counts the key material and each
+  reused request's key material, canonical output and source attempt id.
+- **Invalidation.** Removed decision entries count in `removed_entries`
+  and `removed_bytes`. A scope's invalidation advances its namespace's
+  generation, as 017's does, so other scopes' decision entries are then
+  misses too.
+- **The entry id** is a digest of the key material and the source run
+  record's digest, so two entries for one key differ by their source.
+- **The memory entry holds no judgment digest**, because nothing in a
+  process reads it. The `decision` payload of part c carries it (3.6.4).
+
+Tests: the unit tests in the `decision` module of `optimization.rs`.
+- `the_decision_key_follows_its_schema` covers the profile, scope,
+  dimension and input members, a volatile input left out, and each
+  unkeyed case.
+- `a_decision_entry_expires_by_evaluation_time` covers age, the edge of
+  `ttl_ms`, an entry from the future (kept), an expired entry (removed)
+  and each miss's diagnostic.
+- `admission_is_bounded_and_checked` covers the entry bound, a stale
+  generation, a collision on admission and on lookup, and eviction.
+- `invalidation_reaches_decision_entries` covers a scope's and a
+  namespace's invalidation and a capture from before one.
+- The spec 017 tests are unchanged.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

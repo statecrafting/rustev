@@ -613,6 +613,9 @@ fn cache_refusal_detail(refusal: CacheRefusal) -> &'static str {
         CacheRefusal::EntryTooLarge => "memory cache entry exceeds max_entry_bytes",
         CacheRefusal::StaleGeneration => "memory cache refused a result from an earlier generation",
         CacheRefusal::Collision => "memory cache key collision",
+        CacheRefusal::NoCapacity => {
+            "the decision cache policy has no memory tier, or one bounded to no entries"
+        }
     }
 }
 
