@@ -12,6 +12,10 @@ fn set() -> ReleaseSet {
 }
 
 fn tar(dir: &Path, name: &str, manifest: &Value, extra: Option<(&str, &str)>) {
+    tar_files(dir, name, manifest, extra.as_slice());
+}
+
+fn tar_files(dir: &Path, name: &str, manifest: &Value, extra: &[(&str, &str)]) {
     let src = fresh_dir("rustev-artifact-fixture").unwrap();
     std::fs::create_dir(src.join("package")).unwrap();
     std::fs::write(
@@ -19,7 +23,7 @@ fn tar(dir: &Path, name: &str, manifest: &Value, extra: Option<(&str, &str)>) {
         serde_json::to_vec(manifest).unwrap(),
     )
     .unwrap();
-    if let Some((path, text)) = extra {
+    for (path, text) in extra {
         let path = src.join(path);
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(path, text).unwrap();
@@ -133,6 +137,13 @@ fn sbom_coverage_complete_missing_and_invalid() {
     assert_eq!(sbom_check(&a, &s).unwrap().len(), 2);
 }
 
+/// The files `integrations/rustev-node/package.json` names as entry points.
+const MAIN_FILES: [(&str, &str); 3] = [
+    ("package/index.js", "exports.x = 1;"),
+    ("package/index.d.ts", "export {};"),
+    ("package/types/rustev-documents.d.ts", "export {};"),
+];
+
 fn main_package() -> Value {
     serde_json::from_slice(include_bytes!(
         "../../../integrations/rustev-node/package.json"
@@ -144,12 +155,7 @@ fn main_package() -> Value {
 fn npm_audit_accepts_family_and_rejects_each_dependency_rule() {
     let dir = fresh_dir("artifact-npm").unwrap();
     let set = set();
-    tar(
-        &dir,
-        "main.tgz",
-        &main_package(),
-        Some(("package/index.js", "exports.x = 1;")),
-    );
+    tar_files(&dir, "main.tgz", &main_package(), &MAIN_FILES);
     tar(
         &dir,
         "platform.tgz",
@@ -268,6 +274,57 @@ fn empty_artifact_sets_and_unreadable_tarballs_fail_closed() {
 }
 
 #[test]
+fn npm_audit_refuses_a_tarball_missing_a_declared_entry_point() {
+    let wasm: Value = serde_json::from_slice(include_bytes!(
+        "../../../integrations/rustev-wasm/package.json"
+    ))
+    .unwrap();
+    let all = [
+        ("package/web/index.js", "export {};"),
+        ("package/web/index.d.ts", "export {};"),
+        ("package/bundler/index.js", "export {};"),
+        ("package/bundler/index.d.ts", "export {};"),
+        ("package/node/index.js", "module.exports = {};"),
+        ("package/node/index.d.ts", "export {};"),
+        ("package/types/rustev-documents.d.ts", "export {};"),
+    ];
+    let dir = fresh_dir("artifact-npm-entry-points").unwrap();
+    tar_files(&dir, "wasm.tgz", &wasm, &all);
+    assert!(npm_audit(&set(), &dir).unwrap().is_empty());
+    for (missing, key, target) in [
+        (
+            "package/bundler/index.d.ts",
+            "exports ./bundler#types",
+            "./bundler/index.d.ts",
+        ),
+        (
+            "package/web/index.js",
+            "exports ./web#import",
+            "./web/index.js",
+        ),
+    ] {
+        let present: Vec<_> = all.into_iter().filter(|(p, _)| *p != missing).collect();
+        tar_files(&dir, "wasm.tgz", &wasm, &present);
+        assert_eq!(
+            npm_audit(&set(), &dir).unwrap(),
+            [format!(
+                "031 3.9.2: wasm.tgz: missing or external entry point {key}: {target}"
+            )]
+        );
+    }
+    let mut p = main_package();
+    p["exports"]["./extra/*"] = json!("./extra/*.js");
+    p["main"] = json!("../index.js");
+    tar_files(&dir, "wasm.tgz", &p, &MAIN_FILES);
+    let errors = npm_audit(&set(), &dir).unwrap();
+    assert!(
+        errors.iter().any(|e| e.contains("wildcard entry point"))
+            && errors.iter().any(|e| e.contains("main: ../index.js")),
+        "{errors:?}"
+    );
+}
+
+#[test]
 fn npm_audit_keeps_listing_problems_when_unpack_fails() {
     let dir = fresh_dir("artifact-npm-unpack-failure").unwrap();
     let first = fresh_dir("artifact-file-entry").unwrap();
@@ -323,7 +380,7 @@ fn candidate_npm_version_optional_dependencies_and_sbom() {
         *v = json!(set.version);
     }
     let name = "rustev-rustev-0.1.0-rc.12.tgz";
-    tar(&dir, name, &p, None);
+    tar_files(&dir, name, &p, &MAIN_FILES);
     assert!(
         rustev_release::artifacts::npm_audit(&set, &dir)
             .unwrap()

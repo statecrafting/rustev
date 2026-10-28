@@ -222,6 +222,55 @@ fn audit_manifest(set: &ReleaseSet, p: &Value) -> Vec<String> {
     errors
 }
 
+/// 031 3.9.2: every file the manifest names as an entry point is packed.
+/// `main`, `types`, `typings` and each string leaf of `exports`, under every
+/// condition, must name a file at `package/<target>`; wildcards are refused,
+/// as the npm declaration comparison refuses them.
+fn audit_entry_points(p: &Value, entries: &Files) -> Vec<String> {
+    fn walk(value: &Value, key: &str, out: &mut Vec<(String, String)>) {
+        match value {
+            Value::String(target) => out.push((key.to_owned(), target.clone())),
+            Value::Array(items) => items.iter().for_each(|v| walk(v, key, out)),
+            Value::Object(map) => {
+                for (k, v) in map {
+                    if k.starts_with('.') {
+                        walk(v, &format!("exports {k}"), out);
+                    } else {
+                        walk(v, &format!("{key}#{k}"), out);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut targets = Vec::new();
+    for field in ["main", "types", "typings"] {
+        if let Some(target) = p.get(field).and_then(Value::as_str) {
+            targets.push((field.to_owned(), target.to_owned()));
+        }
+    }
+    if let Some(exports) = p.get("exports") {
+        walk(exports, "exports .", &mut targets);
+    }
+    let mut errors = Vec::new();
+    for (key, target) in targets {
+        let path = target.strip_prefix("./").unwrap_or(&target);
+        if target.contains('*') {
+            errors.push(format!(
+                "wildcard entry point {key}: {target} is not supported"
+            ));
+        } else if path.is_empty()
+            || path.starts_with('/')
+            || path.ends_with('/')
+            || path.split('/').any(|part| part == ".." || part == ".")
+            || !entries.contains_key(&format!("package/{path}"))
+        {
+            errors.push(format!("missing or external entry point {key}: {target}"));
+        }
+    }
+    errors
+}
+
 /// 031 3.9.2: inspect packed bytes, including empty node_modules directories.
 pub fn npm_audit(set: &ReleaseSet, dir: &Path) -> Result<Vec<String>, String> {
     let mut errors = Vec::new();
@@ -254,6 +303,7 @@ pub fn npm_audit(set: &ReleaseSet, dir: &Path) -> Result<Vec<String>, String> {
                 .ok_or("no package/package.json")?;
             let p: Value = serde_json::from_slice(manifest).map_err(|e| e.to_string())?;
             problems.extend(audit_manifest(set, &p));
+            problems.extend(audit_entry_points(&p, &entries));
             Ok(())
         })();
         if let Err(e) = result {
