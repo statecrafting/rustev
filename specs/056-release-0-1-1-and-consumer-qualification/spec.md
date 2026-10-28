@@ -308,3 +308,15 @@ over the collected files records the lifecycle. It is not a required
 check. Remaining for `implementation: complete`: the next family
 version's publication under a signed instruction, the workflow's passing
 matrix and the recorded qualification (Acceptance).
+
+**The version move (2026-10-28, 3.5).** Every release-set crate and npm
+package moves from `0.1.0` to `0.2.0` in lockstep: the workspace version
+and its internal `=` pins, the nine npm `package.json` files and
+`tools/rustev-release/release-set.json`. Because spec 002 3.3.4 puts the
+compiler identity `rustev-core/<crate version>` in every plan document,
+every PlanId moves too; the goldens, conformance cases and fixtures that
+embed one are regenerated through their bless and harvest paths (the
+`rustev-serve` Sigstore fixture is re-signed with its throwaway keys),
+and the `rustev-release` tests about the current family version read it
+from the release set, while those about `0.1.0`'s own authority (031
+3.11.1) keep `0.1.0`. No behavior changes.

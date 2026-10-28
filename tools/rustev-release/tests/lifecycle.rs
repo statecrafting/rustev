@@ -18,7 +18,12 @@ const SET: &str = include_str!("../release-set.json");
 
 /// The real release set, with a synthetic archive per member.
 fn fixture() -> (ReleaseManifest, BTreeMap<String, Vec<u8>>) {
-    let set = ReleaseSet::parse(SET.as_bytes()).unwrap();
+    let mut set = ReleaseSet::parse(SET.as_bytes()).unwrap();
+    // Spec 031 3.11.1: publication authorizes exactly the first release, so
+    // the publication path runs on the release set at that version. A later
+    // version's authority (056 3.4) is tested on its own.
+    set.version = rustev_release::lifecycle::FIRST_RELEASE_VERSION.into();
+    set.tag = format!("v{}", set.version);
     // One directory per fixture: tests run in parallel, and a shared one
     // would be rewritten while another test reads it.
     static N: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);

@@ -62,8 +62,10 @@ fn the_workspace_passes_the_release_set() {
 #[test]
 fn the_release_set_fixes_the_first_family() {
     let s = set();
-    assert_eq!(s.version, "0.1.0");
-    assert_eq!(s.tag, "v0.1.0");
+    // Spec 021 3.2: the set names the family version its members carry.
+    let family = package(&mut metadata(), "rustev-contract").version.clone();
+    assert_eq!(s.version, family);
+    assert_eq!(s.tag, format!("v{family}"));
     let layers: Vec<Vec<&str>> = s
         .layers
         .iter()

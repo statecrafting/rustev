@@ -98,7 +98,12 @@ fn the_body_carries_the_metadata_and_the_exact_archive() {
 }
 
 fn authorized(dir: &std::path::Path) -> (Lifecycle, BTreeMap<String, Vec<u8>>) {
-    let set = rustev_release::ReleaseSet::parse(include_bytes!("../release-set.json")).unwrap();
+    let mut set = rustev_release::ReleaseSet::parse(include_bytes!("../release-set.json")).unwrap();
+    // Spec 031 3.11.1: publication authorizes exactly the first release, so
+    // the publication path runs on the release set at that version. A later
+    // version's authority (056 3.4) is tested on its own.
+    set.version = rustev_release::lifecycle::FIRST_RELEASE_VERSION.into();
+    set.tag = format!("v{}", set.version);
     std::fs::create_dir_all(dir).unwrap();
     let mut archives = BTreeMap::new();
     for name in &set.upload_order {

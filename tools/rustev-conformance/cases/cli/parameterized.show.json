@@ -20,14 +20,14 @@
     {
       "name": "plan",
       "path": "tools/rustev-conformance/fixtures/cli/parameterized.show/plan",
-      "sha256": "87b3a64a2c71acdea9df8d94057c4ac261fa79cb9d2b6bb5ac62d23641347a5a"
+      "sha256": "d07a2061374d9a37e78461959820499054cdf40c98b84c8bf7ce1233e598128f"
     }
   ],
   "outputs": [
     {
       "golden": "crates/rustev-cli/tests/golden/parameterized.show.json",
       "normalize": [],
-      "sha256": "821f80e7b250a467f4a80515d2a5d17e8f70a6c72c8634cd1447cc1f3f5660e5",
+      "sha256": "0290c7e98f282115d2d95e51da5376a52267fca34d5ef3b3cfc3f989825af606",
       "stream": "stdout"
     }
   ],

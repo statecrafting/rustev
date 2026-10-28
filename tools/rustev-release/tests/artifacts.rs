@@ -159,7 +159,7 @@ fn npm_audit_accepts_family_and_rejects_each_dependency_rule() {
     tar(
         &dir,
         "platform.tgz",
-        &json!({"name":"@rustev/rustev-darwin-arm64","version":"0.1.0"}),
+        &json!({"name":"@rustev/rustev-darwin-arm64","version":set.version}),
         Some(("package/addon.node", "binary")),
     );
     assert!(npm_audit(&set, &dir).unwrap().is_empty());
@@ -190,11 +190,12 @@ fn npm_audit_accepts_family_and_rejects_each_dependency_rule() {
                 .any(|p| p.contains(key))
         );
     }
+    let caret = format!("^{}", set.version);
     for (name, version) in [
-        ("external", "0.1.0"),
-        ("@rustev/rustev", "0.1.0"),
-        ("@rustev/rustev-wasm", "0.1.0"),
-        ("@rustev/rustev-darwin-arm64", "^0.1.0"),
+        ("external", set.version.as_str()),
+        ("@rustev/rustev", set.version.as_str()),
+        ("@rustev/rustev-wasm", set.version.as_str()),
+        ("@rustev/rustev-darwin-arm64", caret.as_str()),
     ] {
         let p = json!({"optionalDependencies":{name:version}});
         tar(&dir, "bad.tgz", &p, None);
@@ -233,7 +234,7 @@ fn main_sbom_is_deterministic_and_names_every_platform() {
     assert_eq!(a["metadata"]["timestamp"], "2023-11-14T22:13:20Z");
     assert_eq!(
         a["metadata"]["component"]["purl"],
-        "pkg:npm/%40rustev/rustev@0.1.0"
+        format!("pkg:npm/%40rustev/rustev@{}", set.version)
     );
     let components = a["components"].as_array().unwrap();
     assert_eq!(components.len(), 7);
@@ -369,7 +370,8 @@ fn npm_audit_keeps_listing_problems_when_unpack_fails() {
 #[test]
 fn candidate_npm_version_optional_dependencies_and_sbom() {
     let dir = fresh_dir("candidate-npm").unwrap();
-    let set = rustev_release::candidate::release_set(&set(), "v0.1.0-rc.12").unwrap();
+    let family = set().version;
+    let set = rustev_release::candidate::release_set(&set(), &format!("v{family}-rc.12")).unwrap();
     let mut p = main_package();
     p["version"] = json!(set.version);
     for v in p["optionalDependencies"]
@@ -379,7 +381,7 @@ fn candidate_npm_version_optional_dependencies_and_sbom() {
     {
         *v = json!(set.version);
     }
-    let name = "rustev-rustev-0.1.0-rc.12.tgz";
+    let name = &format!("rustev-rustev-{}.tgz", set.version);
     tar_files(&dir, name, &p, &MAIN_FILES);
     assert!(
         rustev_release::artifacts::npm_audit(&set, &dir)
@@ -387,8 +389,12 @@ fn candidate_npm_version_optional_dependencies_and_sbom() {
             .is_empty()
     );
     let bom = rustev_release::artifacts::main_sbom(&set, &dir.join(name), 0).unwrap();
-    assert!(serde_json::to_string(&bom).unwrap().contains("0.1.0-rc.12"));
-    p["version"] = json!("0.1.0");
+    assert!(
+        serde_json::to_string(&bom)
+            .unwrap()
+            .contains(&format!("{family}-rc.12"))
+    );
+    p["version"] = json!(family);
     tar(&dir, name, &p, None);
     assert!(
         rustev_release::artifacts::npm_audit(&set, &dir)
@@ -402,7 +408,7 @@ fn candidate_npm_version_optional_dependencies_and_sbom() {
         .unwrap()
         .values_mut()
         .next()
-        .unwrap() = json!("0.1.0");
+        .unwrap() = json!(family);
     tar(&dir, name, &p, None);
     assert!(
         rustev_release::artifacts::npm_audit(&set, &dir)

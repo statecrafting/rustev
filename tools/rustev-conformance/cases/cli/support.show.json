@@ -23,7 +23,7 @@
     {
       "name": "support.plan.json",
       "path": "tools/rustev-conformance/fixtures/cli/support.show/support.plan.json",
-      "sha256": "df14b26804cb588cff37e0d2eb2eefe3c8894b6b0ae3d6a4b9502bf822810d50"
+      "sha256": "a722b8cd5577766e77e5f3406d77b30af4fc2bdf2d4295afcc91e4a7cd253c89"
     },
     {
       "name": "support.rules.json",
@@ -40,7 +40,7 @@
     {
       "golden": "crates/rustev-cli/tests/golden/support.show.json",
       "normalize": [],
-      "sha256": "f4810f14c8ffb022c44fedb35de3aa89a7ce01e7fb3c72c8ccdcd391ebb3fc14",
+      "sha256": "738e4e28049b5b8ed913e7bb7893cb81954e5bb767ed4c096dc66c89dfd6b619",
       "stream": "stdout"
     }
   ],

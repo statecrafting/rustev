@@ -5,7 +5,7 @@
     {
       "name": "support.plan.json",
       "path": "tools/rustev-conformance/fixtures/runtime/support.plan.json",
-      "sha256": "2ed61c9444ba8f310db46623dc873620e0f831687ef9a7d05366d94ad98827fd"
+      "sha256": "470c8b9cd0cfe1535b5117034b1e7ab5a704cf0c3b5c5cea96bb35e45ad0b268"
     },
     {
       "name": "support.snapshot.json",
@@ -44,7 +44,7 @@
       "file": "d1.record.json",
       "golden": "tools/rustev-conformance/expected/runtime/runtime.deadline/d1.record.json",
       "normalize": [],
-      "sha256": "f7542d08876c09a8aedf4f84e1bb81aa0d6795dd2f567fdad25f7abf32132400"
+      "sha256": "b524a51585b79c2d35d82049a12e2181bec984a4faf50d50cffe7b408808aeb9"
     },
     {
       "file": "d1.result.json",

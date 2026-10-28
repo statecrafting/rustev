@@ -1,6 +1,6 @@
 {
   "name": "@rustev/rustev",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Rustev's Node-API binding: compile plans, run decisions, replay and evaluate in-process, with host-implemented seams.",
   "license": "Apache-2.0",
@@ -25,12 +25,12 @@
   },
   "files": ["index.js", "index.d.ts", "types"],
   "optionalDependencies": {
-    "@rustev/rustev-linux-x64-gnu": "0.1.0",
-    "@rustev/rustev-linux-x64-musl": "0.1.0",
-    "@rustev/rustev-linux-arm64-gnu": "0.1.0",
-    "@rustev/rustev-linux-arm64-musl": "0.1.0",
-    "@rustev/rustev-darwin-arm64": "0.1.0",
-    "@rustev/rustev-darwin-x64": "0.1.0",
-    "@rustev/rustev-win32-x64-msvc": "0.1.0"
+    "@rustev/rustev-linux-x64-gnu": "0.2.0",
+    "@rustev/rustev-linux-x64-musl": "0.2.0",
+    "@rustev/rustev-linux-arm64-gnu": "0.2.0",
+    "@rustev/rustev-linux-arm64-musl": "0.2.0",
+    "@rustev/rustev-darwin-arm64": "0.2.0",
+    "@rustev/rustev-darwin-x64": "0.2.0",
+    "@rustev/rustev-win32-x64-msvc": "0.2.0"
   }
 }

@@ -28,7 +28,7 @@
     {
       "name": "lodging.plan.json",
       "path": "tools/rustev-conformance/fixtures/cli/lodging.run/lodging.plan.json",
-      "sha256": "7281eea84e0f03022315c90d17381434adcfe77abe37a576923afb0332b5c752"
+      "sha256": "97f33516e0b7af625c7a796cf97072fe74fc0ebb5a529c32ff3d003b84953eb2"
     },
     {
       "name": "lodging.rules.json",
@@ -47,7 +47,7 @@
       "normalize": [
         "receipt"
       ],
-      "sha256": "7a2d15501532982a00a0c1496963a933f7017d56f63dbaac39be40b25d762a5e",
+      "sha256": "1d823900d1ecdd55b55dba942ccacb92d19a578afd7ee9544b5616f3b275093a",
       "stream": "stdout"
     },
     {
@@ -56,7 +56,7 @@
       "normalize": [
         "timing"
       ],
-      "sha256": "c3e0b9e65ae95c71b9c068b5859e8344fefa78438ca1085523b563deddca8ed8"
+      "sha256": "b2a8b5d26b7c2e949d204e0be0e4c9487e51a55d58f4063b685ed0295eca1015"
     }
   ],
   "surfaces": [
