@@ -12,7 +12,9 @@ use rustev_contract::execution::{
     AttemptTimeout, CostPolicy, Delay, ExecutionPolicy, MAX_ATTEMPTS_PER_TARGET, MAX_DELAY_MS,
     MAX_FALLBACKS,
 };
-use rustev_contract::optimization::{DecisionCachePolicy, DecisionCacheTier, OptimizationPolicy};
+use rustev_contract::optimization::{
+    DecisionCachePolicy, DecisionCacheTier, OptimizationPolicy, RefreshFailurePolicy,
+};
 use rustev_contract::plan::{
     BoundCalibration, DeclaredExecution, FallbackBinding, PlanDecisionCache, PlanExecution,
     PlanStepDetail,
@@ -557,15 +559,43 @@ fn refresh_closure(
 
 /// A mechanism the runtime of this build does not run is refused rather
 /// than silently run independently (spec 017, 3.1). The decision-result
-/// cache joins with spec 044's increment 5.
-pub(crate) fn available(execution: &PlanExecution) -> Result<(), Refusal> {
-    match execution {
-        PlanExecution::Declared(d) if d.decision_cache.is_some() => refuse(
+/// cache runs its memory tier over exact and semantic steps with the
+/// `unresolved` refresh policy; its other parts join with the later parts
+/// of spec 044's increment 5.
+pub(crate) fn available(execution: &PlanExecution, def: &Definition) -> Result<(), Refusal> {
+    let PlanExecution::Declared(d) = execution else {
+        return Ok(());
+    };
+    let Some(p) = d
+        .policy
+        .optimization
+        .as_ref()
+        .and_then(|o| o.decision_cache.as_ref())
+    else {
+        return Ok(());
+    };
+    let unavailable = |what: &str| {
+        refuse(
             "execution.optimization",
-            "decision_cache is not available in this build",
-        ),
-        _ => Ok(()),
+            format!("decision_cache {what} is not available in this build"),
+        )
+    };
+    if p.tiers.contains(&DecisionCacheTier::Persistent) {
+        return unavailable("tier persistent");
     }
+    if p.on_refresh_failure != RefreshFailurePolicy::Unresolved {
+        return unavailable("on_refresh_failure other than unresolved");
+    }
+    for s in &def.steps {
+        let kind = match s.body {
+            StepBody::Acquire(_) | StepBody::Widen(_) => "acquisition",
+            StepBody::Generate(_) => "generation",
+            StepBody::Extract(_) => "extraction",
+            _ => continue,
+        };
+        return unavailable(&format!("over {kind} steps"));
+    }
+    Ok(())
 }
 
 fn rank_output(

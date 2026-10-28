@@ -1010,14 +1010,17 @@ fn compile_generation(
     // 032 other than an operator outside `rustev.exact/1`, which phase (c)
     // refuses as before (spec 032, 3.1.3).
     if v2 {
+        // The `decision_cache` policy is a #76 construct of its own: a plan
+        // using it is `rustev.plan/3` (spec 044, 3.1), so it may be a
+        // version 2 definition's only one.
+        let decision_cache = execution
+            .and_then(|e| e.optimization.as_ref())
+            .is_some_and(|o| o.decision_cache.is_some());
         #[cfg(feature = "parameterized")]
-        if instantiated {
-            quality::structure_with_origin(def, &decoded, true)?;
-        } else {
-            quality::structure(def, &decoded)?;
-        }
+        let construct_elsewhere = instantiated || decision_cache;
         #[cfg(not(feature = "parameterized"))]
-        quality::structure(def, &decoded)?;
+        let construct_elsewhere = decision_cache;
+        quality::structure_with_origin(def, &decoded, construct_elsewhere)?;
     } else if let Some((subject, construct)) = first_v2_construct(def, &decoded) {
         return refuse(
             C::InvalidDefinition,
@@ -2157,7 +2160,7 @@ fn compile_generation(
     if let PlanExecution::Declared(d) = &mut plan_execution {
         d.decision_cache = crate::execution::decision_cache(&d.policy, def, &order, &deps, v2)?;
     }
-    crate::execution::available(&plan_execution)?;
+    crate::execution::available(&plan_execution, def)?;
 
     // (g) Budget.
     screening::budget(authored, &screens, descriptors)?;

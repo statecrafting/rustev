@@ -624,13 +624,12 @@ pub(crate) fn acquisition_key(
 // The decision-result cache (spec 044, 3.5 and 3.6)
 // ---------------------------------------------------------------------------
 
-#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) mod decision {
-    //! The decision-result cache's key and memory tier (spec 044, 3.5 and
-    //! 3.6), driven by no decision until increment 5, part b.
+    //! The decision-result cache's key, memory tier and per-decision run
+    //! (spec 044, 3.5 and 3.6).
 
-    use std::collections::BTreeMap;
-    use std::sync::Arc;
+    use std::collections::{BTreeMap, BTreeSet};
+    use std::sync::{Arc, Mutex, MutexGuard};
 
     use rustev_contract::canonical::{record_canonical_bytes, tagged_digest};
     use rustev_contract::ids::{ContentDigest, PlanId};
@@ -640,7 +639,7 @@ pub(crate) mod decision {
     use rustev_contract::snapshot::Snapshot;
     use rustev_contract::time::Timestamp;
 
-    use super::{CacheRefusal, Optimizer, RequestKey, namespace, part, scope_id};
+    use super::{CacheRefusal, Optimizer, RequestKey, namespace, part, profile_of, scope_id};
 
     const DECISION_KEY_TAG: &str = "rustev.decision-key/1";
     const DECISION_ENTRY_TAG: &str = "rustev.decision-entry/1";
@@ -938,6 +937,261 @@ pub(crate) mod decision {
                 },
             );
             Ok(entry_id)
+        }
+    }
+
+    type At = (String, Vec<String>);
+
+    /// What one decision did with the decision cache, filled while it runs.
+    #[derive(Debug, Default)]
+    pub(crate) struct DecisionLog {
+        /// The 017 key of each request outside the closure, on a miss.
+        pub keys: BTreeMap<At, RequestKey>,
+        /// Each output supplied to the core, on a miss.
+        pub outputs: BTreeMap<At, RawOutput>,
+        pub reused: Vec<At>,
+        pub refreshed: Vec<At>,
+        pub mismatched: Vec<At>,
+        pub diagnostics: Vec<String>,
+    }
+
+    /// One decision's part in the decision-result cache (spec 044, 3.6): its
+    /// key, the entry it is served from on a hit, and its log.
+    #[derive(Debug)]
+    pub(crate) struct DecisionRun {
+        /// Steps whose requests are dispatched again on a hit (3.6.2).
+        pub closure: BTreeSet<String>,
+        /// Absent when the decision is unkeyed (3.5 item 3) or live.
+        pub key: Option<RequestKey>,
+        /// The namespace generation captured before the lookup; admission
+        /// uses it (3.6.4).
+        pub generation: u64,
+        pub hit: Option<DecisionHit>,
+        /// Under `admission: refuse`, an unkeyed decision's requests are
+        /// refused with this diagnostic and never dispatched.
+        pub refused: Option<String>,
+        outcome: rustev_contract::optimization::DecisionCacheOutcome,
+        log: Mutex<DecisionLog>,
+    }
+
+    impl DecisionRun {
+        /// Derive the key and read the memory tier after admission and before
+        /// the core starts (spec 044, 3.6.3 item 1). `None` for a plan without
+        /// the decision cache.
+        pub(crate) fn start(
+            optimizer: &Optimizer,
+            plan: &crate::PreparedPlan,
+            req: &crate::DecisionRequest,
+            dimensions: &BTreeMap<String, rustev_contract::scope::Handle>,
+            live: bool,
+        ) -> Option<DecisionRun> {
+            use rustev_contract::optimization::{DecisionCacheOutcome, OptimizationAdmission};
+            use rustev_contract::plan::PlanExecution;
+            let policy = plan.optimization.as_ref()?;
+            let cache = policy.decision_cache.as_ref()?;
+            let PlanExecution::Declared(d) = &plan.compiled.plan.execution else {
+                return None;
+            };
+            let compiled = d.decision_cache.as_ref()?;
+            let mut run = DecisionRun {
+                closure: compiled.refresh_closure.iter().cloned().collect(),
+                key: None,
+                generation: 0,
+                hit: None,
+                refused: None,
+                outcome: DecisionCacheOutcome::Miss,
+                log: Mutex::default(),
+            };
+            let log = run.log.get_mut().unwrap_or_else(|e| e.into_inner());
+            // A live re-execution observes fresh backend work (spec 026, 3.4).
+            if live {
+                run.outcome = DecisionCacheOutcome::Bypassed;
+                log.diagnostics
+                    .push("live re-execution observes fresh backend work".into());
+                return Some(run);
+            }
+            let key = decision_key(DecisionKeyParts {
+                schema: &compiled.decision_key_schema,
+                plan_id: &plan.compiled.id,
+                profile: &profile_of(&plan.compiled.plan),
+                policy,
+                principal: &req.principal_handle,
+                dimensions,
+                snapshot: &req.snapshot,
+            });
+            match key {
+                Err(unkeyed) => {
+                    let diagnostic = unkeyed.diagnostic();
+                    log.diagnostics.push(diagnostic.clone());
+                    if policy.admission == OptimizationAdmission::Refuse {
+                        run.outcome = DecisionCacheOutcome::Refused;
+                        run.refused = Some(diagnostic);
+                    } else {
+                        run.outcome = DecisionCacheOutcome::Bypassed;
+                    }
+                }
+                Ok(key) => {
+                    run.generation = optimizer.generation(&key.namespace);
+                    match optimizer.lookup_decision(&key, req.evaluation_time, cache.ttl_ms) {
+                        Ok(hit) => run.hit = Some(hit),
+                        Err(miss) => log.diagnostics.push(miss.diagnostic().into()),
+                    }
+                    run.key = Some(key);
+                }
+            }
+            Some(run)
+        }
+
+        pub(crate) fn log(&self) -> MutexGuard<'_, DecisionLog> {
+            self.log.lock().unwrap_or_else(|e| e.into_inner())
+        }
+
+        /// The run record member (spec 044, 3.6.6). `unresolved_volatile` names
+        /// each volatile input the core did not accept from the new snapshot; it
+        /// and any refreshed request without an output are a failed refresh,
+        /// supplied as it is under `unresolved` (3.6.5).
+        pub(crate) fn record(
+            &self,
+            requests: &[rustev_contract::run::RequestRecord],
+            unresolved_volatile: &[String],
+        ) -> rustev_contract::optimization::DecisionCacheRecord {
+            use rustev_contract::optimization::{
+                DecisionCacheOutcome, DecisionCacheRecord, MAX_OPTIMIZATION_DIAGNOSTICS,
+                RefreshFailurePolicy,
+            };
+            use rustev_contract::run::RequestResult;
+            let log = self.log();
+            let index = |list: &[At]| {
+                let mut found: Vec<u32> = list
+                    .iter()
+                    .filter_map(|(step, instance)| {
+                        requests
+                            .iter()
+                            .position(|r| &r.step == step && &r.instance == instance)
+                    })
+                    .map(|n| n as u32)
+                    .collect();
+                found.sort_unstable();
+                found
+            };
+            let mut record = DecisionCacheRecord {
+                outcome: self.outcome,
+                entry_id: None,
+                source_run_record: None,
+                age_ms: None,
+                generations: None,
+                reused: index(&log.reused),
+                refreshed: index(&log.refreshed),
+                mismatched: index(&log.mismatched),
+                substituted: vec![],
+                on_refresh_failure: None,
+                diagnostics: vec![],
+            };
+            let mut diagnostics = log.diagnostics.clone();
+            if let Some(hit) = &self.hit {
+                record.outcome = if record.refreshed.is_empty() && record.mismatched.is_empty() {
+                    DecisionCacheOutcome::Hit
+                } else {
+                    DecisionCacheOutcome::Refreshed
+                };
+                record.entry_id = Some(hit.entry_id.clone());
+                record.source_run_record = Some(hit.entry.source_run_record.clone());
+                record.age_ms = Some(hit.age_ms);
+                let mut failed: Vec<String> = unresolved_volatile
+                    .iter()
+                    .map(|v| format!("input {v:?}"))
+                    .collect();
+                failed.extend(record.refreshed.iter().filter_map(|&n| {
+                    let r = &requests[n as usize];
+                    matches!(
+                        r.result,
+                        RequestResult::Failed(_) | RequestResult::NotSupplied
+                    )
+                    .then(|| format!("step {:?}", r.step))
+                }));
+                if !failed.is_empty() {
+                    record.on_refresh_failure = Some(RefreshFailurePolicy::Unresolved);
+                    diagnostics.push(format!("refresh_failed: {}", failed.join(", ")));
+                }
+            }
+            for d in diagnostics {
+                let d = crate::wait::cut(&d, crate::driver::DETAIL_BYTES);
+                match record.diagnostics.len() {
+                    n if n + 1 < MAX_OPTIMIZATION_DIAGNOSTICS => record.diagnostics.push(d),
+                    n if n + 1 == MAX_OPTIMIZATION_DIAGNOSTICS => {
+                        record
+                            .diagnostics
+                            .push("further diagnostics dropped".into());
+                    }
+                    _ => {}
+                }
+            }
+            record
+        }
+
+        /// The entry a judged miss may admit (spec 044, 3.6.4): every request
+        /// outside the closure was supplied a validated output of target 0
+        /// without a fallback transition, and the entry fits
+        /// `max_entry_bytes`. A served, unkeyed or live decision admits
+        /// nothing. `Err` holds the diagnostic of an admission not made.
+        pub(crate) fn admissible(
+            &self,
+            requests: &[rustev_contract::run::RequestRecord],
+            policy: &rustev_contract::optimization::DecisionCachePolicy,
+        ) -> Result<Option<(RequestKey, ReusedRequests)>, String> {
+            use rustev_contract::run::{RequestResult, Transition};
+            let (Some(key), None) = (&self.key, &self.hit) else {
+                return Ok(None);
+            };
+            let log = self.log();
+            let mut reused = ReusedRequests::new();
+            for r in requests.iter().filter(|r| !self.closure.contains(&r.step)) {
+                let at = (r.step.clone(), r.instance.clone());
+                let fallback = r
+                    .transitions
+                    .iter()
+                    .any(|t| matches!(t, Transition::Fallback { .. }));
+                let source = r
+                    .supplied_from()
+                    .filter(|f| f.target == 0 && matches!(r.result, RequestResult::Output { .. }))
+                    .and_then(|f| {
+                        f.attempt
+                            .map(|a| a.attempt_id.clone())
+                            .or(f.reused_from.map(String::from))
+                    });
+                match (fallback, source, log.keys.get(&at), log.outputs.get(&at)) {
+                    (false, Some(source_attempt_id), Some(k), Some(output)) => {
+                        reused.insert(
+                            at,
+                            ReusedRequest {
+                                key: k.clone(),
+                                output: output.clone(),
+                                source_attempt_id,
+                            },
+                        );
+                    }
+                    _ => {
+                        return Err(format!(
+                            "decision cache not admitted: step {:?} has no validated target 0 output",
+                            r.step
+                        ));
+                    }
+                }
+            }
+            match decision_entry_bytes(key, &reused) {
+                Ok(bytes) if bytes <= policy.max_entry_bytes => Ok(Some((key.clone(), reused))),
+                Ok(_) | Err(CacheRefusal::EntryTooLarge) => {
+                    Err("decision cache not admitted: entry exceeds max_entry_bytes".into())
+                }
+                Err(_) => {
+                    Err("decision cache not admitted: an output has no canonical form".into())
+                }
+            }
+        }
+
+        /// Record that this decision's evidence carries an admission not made.
+        pub(crate) fn diagnose(&self, diagnostic: String) {
+            self.log().diagnostics.push(diagnostic);
         }
     }
 

@@ -696,3 +696,44 @@ fn selection_generation_reads_are_refused_at_compile_time() {
         }
     }
 }
+
+/// Spec 044, increment 5 part b: a decision-result cache over a generation
+/// step validates and is refused as not yet available, never run without
+/// its generation rules (3.6.2 and 3.6.6).
+#[test]
+fn a_decision_cache_over_generation_steps_is_not_available() {
+    use rustev_contract::execution::ExecutionPolicy;
+    let (d, p, b) = fixture();
+    let policy: ExecutionPolicy = serde_json::from_value(json!({
+        "schema": rustev_contract::schema::EXECUTION,
+        "max_attempts_per_decision": 1000, "cost": "unlimited", "steps": [],
+        "optimization": {
+            "key_schema_version": 1, "cache_namespace_version": 1,
+            "admission": "refuse", "expiry": "injected_runtime_time",
+            "decision_cache": {
+                "tiers": ["memory"], "max_entry_bytes": 4096, "max_entries": 8,
+                "ttl_ms": 60000, "volatile": [], "key_dimensions": [],
+                "on_refresh_failure": "unresolved"
+            }
+        }
+    }))
+    .unwrap();
+    let compile = |policy| {
+        compile_with_templates(
+            &d,
+            std::slice::from_ref(&b),
+            &[],
+            &[],
+            policy,
+            std::slice::from_ref(&p),
+        )
+    };
+    let r = compile(Some(&policy)).unwrap_err();
+    assert_eq!(r.category, C::InvalidExecution, "{r:?}");
+    assert_eq!(
+        r.detail,
+        "decision_cache over generation steps is not available in this build"
+    );
+    // Without the member the same definition compiles.
+    compile(None).unwrap();
+}

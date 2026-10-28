@@ -982,11 +982,12 @@ fn decision_cached() -> ExecutionPolicy {
 }
 
 /// Spec 044, 3.9: one row per compile refusal of `decision_cache`, each
-/// against the complete neighbour. Until the runtime increment lands, the
-/// complete member is itself refused as not available after it validates,
-/// and only a `rustev.plan/3` may carry it (3.1).
+/// against the complete neighbour. A memory tier compiles; what the
+/// runtime does not run yet is refused as not available after it
+/// validates (increment 5, part b), and only a `rustev.plan/3` may carry
+/// the member (3.1).
 #[test]
-fn decision_cache_members_are_validated_then_refused_as_unavailable() {
+fn decision_cache_members_are_validated_and_unrun_parts_refused() {
     use rustev_contract::optimization::{DecisionCachePolicy, DecisionCacheTier as T};
     type Edit = fn(&mut DecisionCachePolicy);
     let bounds = "decision_cache_bounds: ";
@@ -1059,7 +1060,6 @@ fn decision_cache_members_are_validated_then_refused_as_unavailable() {
             dimension,
         ),
     ];
-    let unavailable = "decision_cache is not available in this build";
     for (row, edit, needle) in rows {
         let mut policy = decision_cached();
         edit(
@@ -1076,8 +1076,33 @@ fn decision_cache_members_are_validated_then_refused_as_unavailable() {
         assert_eq!(r.subject, "execution.optimization", "{row}");
         assert!(r.detail.starts_with(needle), "{row}: {}", r.detail);
     }
-    // Every row's neighbour, and each tier with its bounds, validates and is
-    // then refused as not yet available, never run independently.
+    // Every row's neighbour, with the memory tier, compiles, and the
+    // derived parts are in the plan and its identity.
+    let compiled = with_v2(&decision_cached()).unwrap();
+    let PlanExecution::Declared(d) = &compiled.plan.execution else {
+        panic!("declared execution");
+    };
+    assert_eq!(
+        d.decision_cache.as_ref().unwrap().refresh_closure,
+        [
+            "failed_30d",
+            "failed_payments_30d",
+            "first_failure",
+            "hours_since_first_failure"
+        ]
+    );
+    let mut other = decision_cached();
+    other
+        .optimization
+        .as_mut()
+        .unwrap()
+        .decision_cache
+        .as_mut()
+        .unwrap()
+        .ttl_ms += 1;
+    assert_ne!(with_v2(&other).unwrap().id, compiled.id);
+    // The persistent tier and the other refresh policies validate and are
+    // then refused as not yet available, never run without them.
     let mut persistent = decision_cached();
     let o = persistent.optimization.as_mut().unwrap();
     o.persistent_cache = shared_and_persistent()
@@ -1089,10 +1114,30 @@ fn decision_cache_members_are_validated_then_refused_as_unavailable() {
     c.max_entries = None;
     c.volatile.clear();
     c.key_dimensions.clear();
-    for policy in [decision_cached(), persistent] {
+    let refresh = |on: rustev_contract::optimization::RefreshFailurePolicy| {
+        let mut p = decision_cached();
+        let o = p.optimization.as_mut().unwrap();
+        o.decision_cache.as_mut().unwrap().on_refresh_failure = on;
+        p
+    };
+    use rustev_contract::optimization::RefreshFailurePolicy as R;
+    for (policy, what) in [
+        (persistent, "tier persistent"),
+        (
+            refresh(R::Recompute),
+            "on_refresh_failure other than unresolved",
+        ),
+        (
+            refresh(R::ServeCachedWithinFreshness),
+            "on_refresh_failure other than unresolved",
+        ),
+    ] {
         let r = with_v2(&policy).expect_err("unavailable");
         assert_eq!(r.category, Category::InvalidExecution);
-        assert_eq!(r.detail, unavailable);
+        assert_eq!(
+            r.detail,
+            format!("decision_cache {what} is not available in this build")
+        );
     }
     // A version 1 definition compiles to `rustev.plan/2`.
     let r = refused(&decision_cached(), "decision_cache requires rustev.plan/3");
@@ -1103,6 +1148,28 @@ fn decision_cache_members_are_validated_then_refused_as_unavailable() {
     o.decision_cache = None;
     o.memory_cache = optimized().optimization.unwrap().memory_cache;
     with_v2(&without).unwrap();
+}
+
+/// Spec 044, 3.1: a plan using `decision_cache` is `rustev.plan/3`, so the
+/// member is a #76 construct of its own. A version 2 definition whose only
+/// such construct is the member compiles; without it, the same definition
+/// is refused `use_definition_1`.
+#[test]
+fn decision_cache_alone_carries_a_version_2_definition() {
+    let mut def = support_routing();
+    def.schema = schema::DEFINITION_V2.into();
+    let compile = |policy: &ExecutionPolicy| {
+        compile_with(&def, &descriptors_with_fallbacks(), &cal(), policy)
+    };
+    let compiled = compile(&decision_cached()).unwrap();
+    assert_eq!(compiled.plan.schema, "rustev.plan/3");
+    let mut without = decision_cached();
+    let o = without.optimization.as_mut().unwrap();
+    o.decision_cache = None;
+    o.memory_cache = optimized().optimization.unwrap().memory_cache;
+    let r = compile(&without).expect_err("use_definition_1");
+    assert_eq!(r.category, Category::InvalidDefinition, "{r}");
+    assert!(r.detail.starts_with("use_definition_1"), "{r}");
 }
 
 /// Spec 044, 3.1: a plan carries `decision_cache` and its compiled parts

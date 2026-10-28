@@ -316,19 +316,15 @@ pub(crate) fn gate_predicates(args: &OpArgs) -> Vec<&Predicate> {
 
 /// Phase (b) for a version 2 definition: everything spec 032 adds to the
 /// structure checks, in input, step and policy order.
-pub(crate) fn structure(
-    def: &Definition,
-    decoded: &BTreeMap<String, OpArgs>,
-) -> Result<(), Refusal> {
-    structure_with_origin(def, decoded, false)
-}
-
+/// `construct_elsewhere` holds when the definition is instantiated or its
+/// execution policy uses a #76 construct, so `use_definition_1` does not
+/// apply to the definition alone.
 pub(crate) fn structure_with_origin(
     def: &Definition,
     decoded: &BTreeMap<String, OpArgs>,
-    instantiated: bool,
+    construct_elsewhere: bool,
 ) -> Result<(), Refusal> {
-    if !instantiated && !uses_track_construct(def, decoded) {
+    if !construct_elsewhere && !uses_track_construct(def, decoded) {
         return Err(invalid(
             "definition",
             format!(
@@ -1467,7 +1463,7 @@ mod tests {
     }
 
     fn structure_of(v: &Value) -> Result<(), Refusal> {
-        structure(&def(v), &BTreeMap::new())
+        structure_with_origin(&def(v), &BTreeMap::new(), false)
     }
 
     fn assert_invalid(r: Result<(), Refusal>, category: Category, detail: &str) {

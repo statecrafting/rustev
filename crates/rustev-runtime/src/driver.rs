@@ -78,6 +78,9 @@ pub(crate) struct DecisionCtx<'a, 'e> {
     /// The persistent tier's captured generations and queued writes, when
     /// the plan enables it (spec 044, 3.4).
     pub persistent: Option<&'a crate::store::Pending>,
+    /// The decision's part in the decision-result cache, when the plan
+    /// enables it (spec 044, 3.6).
+    pub decision: Option<&'a crate::optimization::decision::DecisionRun>,
     pub item_clock: Option<&'a crate::generation::ItemClock>,
     pub stream: Option<&'a crate::generation::RequestStream>,
     /// Present only on the live re-execution path (spec 026).
@@ -318,6 +321,10 @@ pub(crate) async fn run_requests(
                 active.push(Box::pin(drive_extraction(cx, r, *deadline)));
                 continue;
             }
+            if let Some(out) = cx.decision.and_then(|d| from_decision(cx, d, &r)) {
+                active.push(Box::pin(std::future::ready(out)));
+                continue;
+            }
             match cache_lookup(cx, &r) {
                 CacheLookup::Done(out) => active.push(Box::pin(std::future::ready(*out))),
                 CacheLookup::Run {
@@ -417,6 +424,13 @@ pub(crate) async fn run_requests(
             // Even discarded results retain optimization charge attribution;
             // absent supplied output prevents cache admission.
             admit_to_cache(cx, &mut out);
+            if let (Some(d), Some(Supplied::Output(raw))) = (cx.decision, &out.supplied)
+                && d.hit.is_none()
+            {
+                d.log()
+                    .outputs
+                    .insert((out.step.clone(), out.instance.clone()), raw.clone());
+            }
             match out.supplied {
                 Some(s) => {
                     let mut ev = cx.ev();
@@ -675,35 +689,7 @@ fn cache_lookup(cx: &DecisionCtx<'_, '_>, req: &SemanticRequest) -> CacheLookup 
             diagnostics: vec![LIVE_BYPASS.into()],
         };
     }
-    let target = &cx.plan.steps[&req.step].targets[0];
-    let descriptor = target
-        .registered
-        .backend
-        .descriptor()
-        .id()
-        .expect("a prepared backend has a valid descriptor");
-    let profile = crate::optimization::profile_of(&cx.plan.compiled.plan);
-    let key = request_key(KeyParts {
-        plan_id: &cx.plan.compiled.id,
-        profile: &profile,
-        policy,
-        principal: cx.principal,
-        backend_artifact: &target.artifact,
-        backend_descriptor: &descriptor,
-        // Lowered screening semantics and target are bound by the plan and
-        // descriptor; its projection deliberately excludes item identity.
-        step: if is_screen(cx, &req.step) {
-            ""
-        } else {
-            &req.step
-        },
-        instance: if is_screen(cx, &req.step) {
-            &[]
-        } else {
-            &req.instance
-        },
-        projection: &req.projection,
-    });
+    let key = key_of(cx, req, policy);
     let generation = cx.rt.optimizer.generation(&key.namespace);
     // No memory tier to read: the key is for the persistent tier or the
     // shared-call registry (spec 044, 3.3).
@@ -767,6 +753,136 @@ fn cache_lookup(cx: &DecisionCtx<'_, '_>, req: &SemanticRequest) -> CacheLookup 
         generation,
         diagnostics: vec![miss.into()],
     }
+}
+
+/// A request's 017 key under the plan's policy, for target 0 (spec 017,
+/// 3.2, and spec 044, 3.5).
+fn key_of(
+    cx: &DecisionCtx<'_, '_>,
+    req: &SemanticRequest,
+    policy: &OptimizationPolicy,
+) -> RequestKey {
+    let target = &cx.plan.steps[&req.step].targets[0];
+    let descriptor = target
+        .registered
+        .backend
+        .descriptor()
+        .id()
+        .expect("a prepared backend has a valid descriptor");
+    let profile = crate::optimization::profile_of(&cx.plan.compiled.plan);
+    request_key(KeyParts {
+        plan_id: &cx.plan.compiled.id,
+        profile: &profile,
+        policy,
+        principal: cx.principal,
+        backend_artifact: &target.artifact,
+        backend_descriptor: &descriptor,
+        // Lowered screening semantics and target are bound by the plan and
+        // descriptor; its projection deliberately excludes item identity.
+        step: if is_screen(cx, &req.step) {
+            ""
+        } else {
+            &req.step
+        },
+        instance: if is_screen(cx, &req.step) {
+            &[]
+        } else {
+            &req.instance
+        },
+        projection: &req.projection,
+    })
+}
+
+/// A request of a decision under the decision-result cache (spec 044,
+/// 3.6.3 item 2). `Some` is its outcome without dispatch: the entry's
+/// output when the request is outside the refresh closure and its 017 key
+/// equals the stored one, or a refusal of an unkeyed decision under
+/// `admission: refuse`. `None` runs it through the normal path: inside the
+/// closure, on a miss (whose key is kept for admission), or as a
+/// `closure_mismatch`.
+fn from_decision(
+    cx: &DecisionCtx<'_, '_>,
+    d: &crate::optimization::decision::DecisionRun,
+    req: &SemanticRequest,
+) -> Option<RequestOutcome> {
+    let policy = cx.optimization()?;
+    let observe = |outcome, diagnostics| {
+        observation(
+            policy,
+            OptimizationMechanism::DecisionCache,
+            outcome,
+            d.generation,
+            diagnostics,
+        )
+    };
+    if let Some(detail) = &d.refused {
+        let b = Builder {
+            screen: screen_record(cx, req),
+            req,
+            attempts: vec![],
+            transitions: vec![],
+            optimization: Some(observe(OptimizationOutcome::Refused, vec![detail.clone()])),
+            cache: None,
+        };
+        return Some(b.stop(
+            detail.split(':').next().unwrap_or(detail),
+            Unresolved::BackendUnavailable {
+                detail: cut(detail, DETAIL_BYTES),
+            },
+        ));
+    }
+    // A bypassed decision is neither served nor admitted.
+    d.key.as_ref()?;
+    let at = (req.step.clone(), req.instance.clone());
+    if d.closure.contains(&req.step) {
+        if d.hit.is_some() {
+            d.log().refreshed.push(at);
+        }
+        return None;
+    }
+    let key = key_of(cx, req, policy);
+    let Some(hit) = &d.hit else {
+        d.log().keys.insert(at, key);
+        return None;
+    };
+    let stored = hit
+        .entry
+        .requests
+        .get(&at)
+        .filter(|stored| stored.key.material == key.material);
+    let valid = stored.is_some_and(|stored| {
+        matches!(
+            cx.ev()
+                .check_output(&req.step, &req.instance, &stored.output),
+            Ok(Ok(()))
+        )
+    });
+    let Some(stored) = stored.filter(|_| valid) else {
+        let mut log = d.log();
+        log.diagnostics.push(format!(
+            "closure_mismatch: step {:?}{}",
+            req.step,
+            if stored.is_some() {
+                " output failed request validation"
+            } else {
+                ""
+            }
+        ));
+        log.mismatched.push(at);
+        return None;
+    };
+    d.log().reused.push(at);
+    let mut o = observe(OptimizationOutcome::Hit, vec![]);
+    o.entry_id = Some(hit.entry_id.clone());
+    o.age_ms = hit.age_ms;
+    Some(served(
+        cx,
+        req,
+        o,
+        stored.output.clone(),
+        0,
+        stored.source_attempt_id.clone(),
+    ))
 }
 
 /// The diagnostic of a persistent read or write skipped while an

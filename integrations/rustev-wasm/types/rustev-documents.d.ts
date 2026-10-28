@@ -15989,7 +15989,8 @@ export namespace RustevRun1 {
    */
   export type FailureClass = "invalid_output" | "transient" | "overloaded" | "permanent" | "timed_out" | "adapter_fault";
   export type RemoteState = "finished" | "stopped" | "possibly_continuing";
-  export type OptimizationMechanism = ("independent" | "batch" | "memory_cache") | "shared_call" | "persistent_cache";
+  export type OptimizationMechanism =
+    ("independent" | "batch" | "memory_cache") | "shared_call" | "persistent_cache" | "decision_cache";
   export type OptimizationOutcome = "bypassed" | "miss" | "hit" | "batched" | "refused";
   /**
    * Why a waiter left before the shared attempt ended.
@@ -17301,7 +17302,8 @@ export namespace RustevRun2 {
    * or a fallback trigger.
    */
   export type FailureClass = "invalid_output" | "transient" | "overloaded" | "permanent" | "timed_out" | "adapter_fault";
-  export type OptimizationMechanism = ("independent" | "batch" | "memory_cache") | "shared_call" | "persistent_cache";
+  export type OptimizationMechanism =
+    ("independent" | "batch" | "memory_cache") | "shared_call" | "persistent_cache" | "decision_cache";
   export type OptimizationOutcome = "bypassed" | "miss" | "hit" | "batched" | "refused";
   /**
    * Why a waiter left before the shared attempt ended.
@@ -18814,7 +18816,8 @@ export namespace RustevRun3 {
    * or a fallback trigger.
    */
   export type FailureClass = "invalid_output" | "transient" | "overloaded" | "permanent" | "timed_out" | "adapter_fault";
-  export type OptimizationMechanism = ("independent" | "batch" | "memory_cache") | "shared_call" | "persistent_cache";
+  export type OptimizationMechanism =
+    ("independent" | "batch" | "memory_cache") | "shared_call" | "persistent_cache" | "decision_cache";
   export type OptimizationOutcome = "bypassed" | "miss" | "hit" | "batched" | "refused";
   /**
    * Why a waiter left before the shared attempt ended.
