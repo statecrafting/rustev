@@ -1,100 +1,59 @@
-# The release workflow of spec 031 (3.9, 3.12): builds the release's npm
-# tarballs and prebuilt CLI binaries from the owner's signed tag, builds
-# each of them a second time on independent runners and requires identical
-# bytes (3.9.3), writes a CycloneDX SBOM per artifact (3.9.1), audits what
-# they contain (3.9.2), and gives each release artifact a keyless signature
-# with an in-toto SLSA build provenance attestation bound to this workflow,
-# the commit and the tag (3.9.5, SLSA v1.0 Build Level 2). Not rendered by
-# the setup profile: owned by spec 031. It is not a required job of ci-gate.
+# The release workflow of spec 058 (amending 021, 031, 053 and 056): one
+# run, started by the owner's signed annotated tag, releases the family.
+# Not rendered by the setup profile: owned in text by 031 3.12 and 058. It
+# is not a required job of ci-gate.
 #
-# It runs only when dispatched by hand. A release run names the tag and is
-# dispatched on it (`gh workflow run release.yml --ref vX.Y.Z -f
-# tag=vX.Y.Z`); by default it builds, checks, attests and uploads the
-# artifacts, and publishes nothing. The `npm` job publishes, with npm
-# provenance (3.9.6), only when dispatched with `publish-npm: true` and only
-# after the owner approves the `npm-publish` Environment: publication is the
-# owner's act under 031 3.11 and spec 021 3.9. It uses npm trusted
-# publishing (OIDC); no registry token is stored or read here. Crates are
-# uploaded by `rustev-release publish` (spec 021), never by this workflow.
+# A push of `vX.Y.Z` on a commit of main builds every artifact once at the
+# tagged commit, builds each a second time on independent runners and
+# requires identical bytes (3.2.2), writes the SBOMs and audits (3.2.3),
+# generates the manifest and SHA256SUMS from what it built and attests every
+# file (3.2.4, 3.2.5), then publishes crates and npm packages through
+# trusted publishing (3.3), creates and verifies the GitHub release (3.3.3,
+# 3.4.1) and ends with the fresh-consumer qualification (3.4.2). The signed
+# tag is the owner's publication instruction (3.1.2); the `release`
+# Environment has no reviewer, so no job waits for a person.
 #
-# A rehearsal (`gh workflow run release.yml --ref <branch> -f
-# rehearsal=true`) runs every build and check at the dispatched commit
-# without a tag: it attests nothing, never runs the `npm` job, and refuses
-# `publish-npm` (031 3.11). It is evidence for that commit only.
+# A candidate tag `vX.Y.Z-rc.N` runs the same builds and checks and ends at a
+# GitHub pre-release, never latest: no `approve`, no registry, no
+# qualification (3.7). `workflow_dispatch` is a dry run at the dispatched
+# commit: every build and check, attesting and publishing nothing (3.1.5).
+# A failed run resumes by rerunning its failed jobs; every publication step
+# skips what is already public with the run's checksum and fails on any
+# other (3.5).
 #
-# A release candidate (spec 053) is dispatched on the owner's signed
-# annotated tag `vX.Y.Z-rc.N` (`gh workflow run release.yml --ref
-# vX.Y.Z-rc.N -f tag=vX.Y.Z-rc.N -f manifest=... -f manifest-signature=...`).
-# It runs every build and check of a release, binds the artifacts to the
-# candidate manifest the tag names, and then `prerelease` creates one GitHub
-# pre-release of this repository. It never publishes to npm, crates.io or a
-# container registry: `tag` refuses `publish-npm`, `npm` refuses a candidate
-# tag, and no job is granted the packages write permission (053 3.4). Its
-# rehearsal is dispatched on `release/next` with `rehearsal=true` and the
-# candidate's tag name, so it builds the bytes the candidate must reproduce
-# (053 3.1).
-#
-# - `tag`: the dispatched tag is the release-set file's tag, signed and
-#   verified against `tools/rustev-release/allowed_signers`, and the
-#   checkout is that tag's commit (a rehearsal: the dispatched commit).
-# - `bindings`: spec 027's bindings workflow at that commit (every test, the
-#   budgets and the corpus), which uploads each platform's addon.
-# - `cli`: the `rustev` binary per platform of 027 3.13.1, smoke tested
-#   (help, and a reference plan check equal to its golden).
-# - `rebuild`: the second, independent build of each platform's binary and
-#   addon, on its own runners, in the same images and environments (3.9.3).
-# - `archive`: both builds' binaries archived with GNU tar in a fixed
-#   order, owner and time (3.9.3); the release's archives attested.
-# - `pack`: the nine npm tarballs, packed once from bindings' addons (the
-#   release, attested) and once from the rebuild's (3.9.3), each
-#   `package.json` with exactly its `private` guard removed (spec 027 keeps
-#   it until publication), checked by `rustev-release manifests` first.
-# - `reproducibility`: the two builds' binaries, addons, archives and
-#   tarballs compared byte for byte; any difference fails (3.9.3).
-# - `sbom`: a CycloneDX 1.5 SBOM per archive and tarball (3.9.1).
-# - `audit`: the tarballs' npm dependency closure is the family alone, and
-#   `cargo deny` passes for the crates compiled into them (3.9.2).
-# - `bind`: given the signed release manifest (the `manifest` input, whose
-#   SHA-256 the signed tag's message names), every artifact this run built
-#   must equal the manifest's bytes (031 3.9.3, 3.11.2): the tag build
-#   reproduces what the owner signed.
-# - `prerelease`: a candidate only, after every check and `bind`: the one
-#   GitHub pre-release, created once and never replaced (053 3.3); the only
-#   job granted write access to contents.
-# - `npm`: the gated publication, in the release set's npm order, only
-#   after every check above, the binding to the signed manifest, and every
-#   crate of the manifest observed public with its checksum (3.1: layer 6
-#   starts after the crate layers).
+# - `tag`: 3.1.1 through `rustev-release tag`: the form, the annotated tag's
+#   signature against `tools/rustev-release/allowed_signers`, the release
+#   set's version at the commit, reachability from main, and ci-gate's
+#   success on the commit (its check runs, read here with `gh api`).
+# - `bindings`, `cli`, `rebuild`, `archive`, `pack`: the addons, CLI
+#   binaries, archives and npm tarballs, each built twice (031 3.9.3).
+# - `crates`: the `.crate` archives packaged in two clean checkouts at the
+#   commit time, the archive policy, the unpacked tests on the pinned
+#   toolchain and the MSRV, `cargo deny`, the dependency report, the crate
+#   SBOMs and the changelog (`candidate.sh`, 021 3.5 to 3.7, 031 3.10).
+#   `crates-rebuild` packages them again on its own runner.
+# - `reproducibility`: every pair compared byte for byte, `.crate` included.
+# - `sbom`, `audit`: 031 3.9.1 and 3.9.2.
+# - `manifest`: `rustev.release-manifest/2` and SHA256SUMS from this run's
+#   artifacts, naming the tag object; every file attested, its Sigstore
+#   bundle staged as `<file>.intoto.jsonl`.
+# - `approve`: the `release` Environment gate (no reviewer, A-61).
+# - `publish-crates`, `publish-npm`: idempotent publication in the release
+#   set's order, through crates.io and npm trusted publishing (OIDC), npm with
+#   provenance; `publication.json` records each item.
+# - `github-release`: the release (a candidate: the pre-release), created
+#   once; the only job that writes contents. No job writes packages.
+# - `verify-release`: the downloaded release against the manifest, every
+#   attestation against its bundle and the attestation store, and the
+#   registries against the manifest.
+# - `qualify`: qualify.yml, the last stage; its failure fails the run and
+#   leaves the lifecycle at `released`.
 name: release
 
 on:
+  push:
+    tags: ["v*"]
   workflow_dispatch:
-    inputs:
-      tag:
-        description: "The signed release tag vX.Y.Z or candidate tag vX.Y.Z-rc.N; for a rehearsal, empty or the candidate to rehearse"
-        required: false
-        type: string
-        default: ""
-      publish-npm:
-        description: "Publish the npm tarballs (needs the owner's npm-publish Environment approval)"
-        required: false
-        type: boolean
-        default: false
-      rehearsal:
-        description: "Build and check at the dispatched commit without a tag; attests and publishes nothing"
-        required: false
-        type: boolean
-        default: false
-      manifest:
-        description: "The signed release manifest's exact bytes (rustev.release-manifest/2); required to publish and for a candidate"
-        required: false
-        type: string
-        default: ""
-      manifest-signature:
-        description: "The manifest's detached SSH signature (release-manifest.json.sig); required for a candidate"
-        required: false
-        type: string
-        default: ""
 
 permissions:
   contents: read
@@ -103,7 +62,7 @@ env:
   CARGO_TERM_COLOR: never
 
 concurrency:
-  group: ${{ inputs.rehearsal && format('release-rehearsal-{0}', github.ref) || format('release-{0}', inputs.tag) }}
+  group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -111,54 +70,51 @@ jobs:
     name: tag
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    permissions:
+      contents: read
+      checks: read
     outputs:
       commit: ${{ steps.tag.outputs.commit }}
+      tag_object: ${{ steps.tag.outputs.tag_object }}
       version: ${{ steps.tag.outputs.version }}
       epoch: ${{ steps.tag.outputs.epoch }}
       candidate: ${{ steps.tag.outputs.candidate }}
     steps:
+      - name: A tag run is a vX.Y.Z or vX.Y.Z-rc.N tag (058 3.1.1)
+        if: github.event_name == 'push'
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          printf '%s\n' "$REF" | grep -Eq '^refs/tags/v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-rc\.[1-9][0-9]*)?$' \
+            || { echo "058 3.1.1: $REF is not a release or candidate tag" >&2; exit 1; }
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ inputs.rehearsal && github.sha || format('refs/tags/{0}', inputs.tag) }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
-      - name: The tag is the release set's, signed by the owner (021 3.8), or a rehearsal (031 3.11)
+      - name: The signed tag authorizes this commit (058 3.1.1), or a dry run (3.1.5)
         id: tag
         env:
-          REHEARSAL: ${{ inputs.rehearsal }}
-          PUBLISH_NPM: ${{ inputs.publish-npm }}
-          TAG: ${{ inputs.tag }}
-        # Dispatched on the tag itself, so this workflow and the bindings
-        # workflow it calls are the tag's own files.
-        run: sh tools/rustev-release/artifacts.sh dispatch "$REHEARSAL" "$PUBLISH_NPM" "$TAG" >> "$GITHUB_OUTPUT"
-      - name: The manifest is the one the signed tag names (031 3.11.2)
-        if: ${{ !inputs.rehearsal && steps.tag.outputs.candidate != 'true' && (inputs.publish-npm || inputs.manifest != '') }}
-        env:
-          TAG: ${{ inputs.tag }}
-          MANIFEST: ${{ inputs.manifest }}
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
         run: |
           set -eu
-          test -n "$MANIFEST" || { echo "031 3.11.2: publishing needs the signed release manifest (input manifest)" >&2; exit 1; }
-          printf %s "$MANIFEST" > "$RUNNER_TEMP/release-manifest.json"
-          got=$(sha256sum "$RUNNER_TEMP/release-manifest.json" | cut -d' ' -f1)
-          want=$(git tag -l --format='%(contents)' "$TAG" | sed -n 's/^release-manifest-sha256: //p')
-          test -n "$want" || { echo "021 3.8: the tag message names no release-manifest-sha256" >&2; exit 1; }
-          test "$got" = "$want" || { echo "031 3.11.2: the manifest's SHA-256 $got is not the tag's $want" >&2; exit 1; }
-      - name: The candidate manifest is the one the signed tag names, for its commit (053 3.3.1)
-        if: ${{ !inputs.rehearsal && steps.tag.outputs.candidate == 'true' }}
-        env:
-          TAG: ${{ inputs.tag }}
-          COMMIT: ${{ steps.tag.outputs.commit }}
-          MANIFEST: ${{ inputs.manifest }}
-          SIGNATURE: ${{ inputs.manifest-signature }}
-        run: |
-          set -eu
-          printf %s "$MANIFEST" > "$RUNNER_TEMP/release-manifest.json"
-          sh tools/rustev-release/artifacts.sh tag-manifest "$TAG" "$RUNNER_TEMP/release-manifest.json"
-          cargo run --quiet --locked -p rustev-release -- candidate-manifest "$RUNNER_TEMP/release-manifest.json" "$TAG" "$COMMIT"
-          test -n "$SIGNATURE" || { echo "053 3.3.3: the pre-release holds the manifest's detached signature; a candidate run needs it" >&2; exit 1; }
-          printf '%s\n' "$SIGNATURE" > "$RUNNER_TEMP/release-manifest.json.sig"
-          ssh-keygen -Y verify -f tools/rustev-release/allowed_signers -I 7887446+bartekus@users.noreply.github.com \
-            -n rustev-release -s "$RUNNER_TEMP/release-manifest.json.sig" < "$RUNNER_TEMP/release-manifest.json"
+          if [ "$EVENT" = push ]; then
+            # Annotated tag objects are fetched by tag name, never peeled.
+            git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
+            commit=$(git rev-parse "refs/tags/$TAG^{commit}")
+            gh api "repos/$REPO/commits/$commit/check-runs?check_name=ci-gate&per_page=100" > "$RUNNER_TEMP/check-runs.json"
+            cargo run --quiet --locked -p rustev-release -- tag "$TAG" refs/remotes/origin/main "$RUNNER_TEMP/check-runs.json" > "$RUNNER_TEMP/tag.txt"
+          else
+            version=$(cargo run --quiet --locked -p rustev-release -- field version)
+            printf 'commit=%s\ntag_object=\nversion=%s\ncandidate=false\nepoch=%s\n' "$SHA" "$version" "$(git log -1 --format=%ct "$SHA")" > "$RUNNER_TEMP/tag.txt"
+          fi
+          cat "$RUNNER_TEMP/tag.txt"
+          test "$(sed -n 's/^commit=//p' "$RUNNER_TEMP/tag.txt")" = "$(git rev-parse HEAD)" \
+            || { echo "058 3.1.1: the checkout is not the tagged commit" >&2; exit 1; }
+          cat "$RUNNER_TEMP/tag.txt" >> "$GITHUB_OUTPUT"
 
   bindings:
     name: bindings
@@ -248,10 +204,6 @@ jobs:
     needs: [tag, cli, rebuild]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    permissions:
-      contents: read
-      id-token: write
-      attestations: write
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -274,11 +226,6 @@ jobs:
           set -eu
           sh tools/rustev-release/artifacts.sh archive-cli dist/release/raw dist/release/archives "$VERSION" "$EPOCH"
           sh tools/rustev-release/artifacts.sh archive-cli dist/rebuild-native/cli dist/rebuild/archives "$VERSION" "$EPOCH"
-      - name: Attest build provenance (031 3.9.5)
-        if: ${{ !inputs.rehearsal }}
-        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        with:
-          subject-path: dist/release/archives/rustev-*.tar.gz
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: cli
@@ -295,10 +242,6 @@ jobs:
     needs: [tag, bindings, rebuild]
     runs-on: ubuntu-24.04
     timeout-minutes: 60
-    permissions:
-      contents: read
-      id-token: write
-      attestations: write
     strategy:
       fail-fast: false
       matrix:
@@ -343,21 +286,16 @@ jobs:
           # A candidate's tarballs carry X.Y.Z-rc.N (053 3.2.3).
           sh tools/rustev-release/artifacts.sh pack "$addons" dist/npm "$EPOCH" "$VERSION"
           ls dist/npm
-      - name: Attest build provenance (031 3.9.5)
-        if: ${{ matrix.run == 'release' && !inputs.rehearsal }}
-        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        with:
-          subject-path: dist/npm/*.tgz
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          # Only the release run's tarballs are the ones `npm` publishes.
+          # Only the release run's tarballs are the ones `publish-npm` publishes.
           name: ${{ matrix.run == 'release' && 'npm' || 'npm-rebuild' }}
           path: dist/npm
           if-no-files-found: error
 
   reproducibility:
     name: reproducibility
-    needs: [tag, archive, pack]
+    needs: [tag, archive, pack, crates, crates-rebuild]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -395,9 +333,19 @@ jobs:
         with:
           name: npm-rebuild
           path: dist/rebuild/npm
-      - name: Compare the two builds byte for byte (031 3.9.3)
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: crates
+          path: dist/crates
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: crates-rebuild
+          path: dist/crates-rebuild
+      - name: Compare the two builds byte for byte (031 3.9.3; 058 3.2.2)
         run: |
           set -eu
+          # The `.crate` archives of `crates` (its run a) and `crates-rebuild`.
+          cargo run --quiet --locked -p rustev-release -- compare dist/crates/a dist/crates-rebuild
           mv dist/rebuild-native/cli dist/rebuild/raw
           mv dist/rebuild-native/addons dist/rebuild/addons
           # A difference fails here and is explained in the report; it is
@@ -462,43 +410,249 @@ jobs:
           cargo install cargo-deny --locked --version 0.20.2
           sh tools/rustev-release/artifacts.sh audit dist/npm "$VERSION"
 
-  bind:
-    name: bind
-    needs: [tag, archive, pack, sbom]
-    if: ${{ !inputs.rehearsal && inputs.manifest != '' }}
+  crates:
+    name: crates
+    needs: tag
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 120
+    outputs:
+      previous: ${{ steps.crates.outputs.previous }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.tag.outputs.commit }}
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      # The changelog is generated from the governed corpus (031 3.10).
+      - name: Read the spec-spine pin
+        id: pin
+        run: sh scripts/statecraft/gate.sh pin >> "$GITHUB_OUTPUT"
+      - name: Restore the pinned spec-spine
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .bin/spec-spine
+          key: spec-spine-${{ steps.pin.outputs.version }}-${{ runner.os }}-${{ runner.arch }}
+      - name: Install the pinned spec-spine
+        run: |
+          if test -x .bin/spec-spine && .bin/spec-spine --version; then
+            :
+          else
+            make tools
+          fi
+      - name: The pinned audit and SBOM tools and the MSRV toolchain (021 3.6, 3.7; 031 3.9.1)
+        run: |
+          set -eu
+          cargo install cargo-deny --locked --version 0.20.2
+          cargo install cargo-cyclonedx --locked --version 0.5.9
+          rustup toolchain install "$(cargo run --quiet --locked -p rustev-release -- field msrv)" --profile minimal
+      - name: Package, check and test every crate twice at the commit time (021 3.5 to 3.7)
+        id: crates
+        env:
+          VERSION: ${{ needs.tag.outputs.version }}
+        run: |
+          set -eu
+          # The previous release is the newest stable tag merged into this
+          # commit other than this version's own (031 3.7, 3.10).
+          previous=$(git tag --merged HEAD --list 'v*' --sort=-v:refname \
+            | grep -E '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' \
+            | grep -vx "v${VERSION%%-rc.*}" | head -n 1 || true)
+          echo "previous release: ${previous:-none}"
+          echo "previous=$previous" >> "$GITHUB_OUTPUT"
+          mkdir -p "$RUNNER_TEMP/worktrees"
+          PREVIOUS=$previous RUSTEV_WORKTREES=$RUNNER_TEMP/worktrees sh tools/rustev-release/candidate.sh
+          target=$(cargo run --quiet --locked -p rustev-release -- field target)
+          mv "$target/release-candidate/$(git rev-parse HEAD)" "$RUNNER_TEMP/crates"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: crates
+          path: ${{ runner.temp }}/crates
+          if-no-files-found: error
+
+  crates-rebuild:
+    name: crates-rebuild
+    needs: tag
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.tag.outputs.commit }}
+      - name: Package every crate a second time, on its own runner, at the commit time (021 3.7; 058 3.2.2)
+        env:
+          EPOCH: ${{ needs.tag.outputs.epoch }}
+        run: |
+          set -eu
+          git ls-files -z | xargs -0 touch -h -d "$(date -u -d "@$EPOCH" +%Y-%m-%dT%H:%M:%SZ)"
+          version=$(cargo run --quiet --locked -p rustev-release -- field version)
+          packages=$(cargo run --quiet --locked -p rustev-release -- field packages)
+          flags=""
+          for p in $packages; do flags="$flags -p $p"; done
+          # shellcheck disable=SC2086 # one -p per member
+          SOURCE_DATE_EPOCH=$EPOCH cargo package --locked $flags
+          mkdir -p "$RUNNER_TEMP/crates-rebuild"
+          for p in $packages; do cp "target/package/$p-$version.crate" "$RUNNER_TEMP/crates-rebuild/"; done
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: crates-rebuild
+          path: ${{ runner.temp }}/crates-rebuild
+          if-no-files-found: error
+
+  manifest:
+    name: manifest
+    needs: [tag, crates, archive, pack, reproducibility, sbom, audit]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.tag.outputs.commit }}
+          fetch-depth: 0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: crates
+          path: ${{ runner.temp }}/evidence
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: cli
+          path: ${{ runner.temp }}/artifacts/cli
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: npm
+          path: ${{ runner.temp }}/artifacts/npm
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: sbom
+          path: ${{ runner.temp }}/artifacts/sbom
+      - name: The manifest and SHA256SUMS from this run's artifacts (058 3.2.4)
+        env:
+          EVENT: ${{ github.event_name }}
+          TAG: ${{ github.ref_name }}
+          CANDIDATE: ${{ needs.tag.outputs.candidate }}
+          PREVIOUS: ${{ needs.crates.outputs.previous }}
+        run: |
+          set -eu
+          cargo install cargo-deny --locked --version 0.20.2
+          ev=$RUNNER_TEMP/evidence art=$RUNNER_TEMP/artifacts
+          if [ "$EVENT" != push ]; then
+            cargo run --quiet --locked -p rustev-release -- manifest "$ev" "$art"
+          else
+            git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
+            candidate=""
+            if [ "$CANDIDATE" = true ]; then candidate="--candidate $TAG"; fi
+            # shellcheck disable=SC2086 # the optional prefix
+            cargo run --quiet --locked -p rustev-release -- $candidate run-manifest "$ev" "$art" "$TAG"
+          fi
+          # The release directory: every file the manifest names, flat.
+          mkdir -p dist/release
+          jq -r '.packages[].crate_file' "$ev/release-manifest.json" | while read -r f; do cp "$ev/a/$f" dist/release/; done
+          jq -r '.artifacts[].name' "$ev/release-manifest.json" | while read -r f; do cp "$ev/$f" dist/release/; done
+          cp "$ev/release-manifest.json" "$ev/SHA256SUMS" dist/release/
+          # The binaries' checksum sidecars, attested with everything else.
+          cp "$art"/cli/*.sha256 dist/release/
+          ls dist/release
+      - name: Require the OIDC token (058 3.2.5)
+        if: github.event_name == 'push'
+        run: |
+          if [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ] || [ -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
+            echo "058 3.2.5: no OIDC token; nothing is attested or published" >&2
+            exit 1
+          fi
+      - name: Attest build provenance of every file (031 3.9.5; 058 3.2.5)
+        id: attest
+        if: github.event_name == 'push'
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/release/*
+      - name: Stage the Sigstore bundle beside each attested file (058 3.2.5)
+        if: github.event_name == 'push'
+        env:
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          set -eu
+          if [ -z "$BUNDLE" ] || [ ! -s "$BUNDLE" ]; then
+            echo "058 3.2.5: the attestation yielded no bundle; nothing is published" >&2
+            exit 1
+          fi
+          for f in dist/release/*; do cp "$BUNDLE" "$f.intoto.jsonl"; done
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release
+          path: dist/release
+          if-no-files-found: error
+
+  approve:
+    name: approve
+    needs: [tag, bindings, cli, rebuild, crates, crates-rebuild, archive, pack, reproducibility, sbom, audit, manifest]
+    if: github.event_name == 'push' && needs.tag.outputs.candidate == 'false'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # No required reviewer (owner decision A-61): the signed tag alone
+    # authorizes; this Environment is the one gate every publication job
+    # needs (058 3.1.3).
+    environment: release
+    steps:
+      - name: The signed tag authorizes publication (058 3.1.2)
+        env:
+          TAG: ${{ github.ref_name }}
+          COMMIT: ${{ needs.tag.outputs.commit }}
+          OBJECT: ${{ needs.tag.outputs.tag_object }}
+        run: echo "publication of $TAG (tag object $OBJECT) at $COMMIT is authorized"
+
+  publish-crates:
+    name: publish-crates
+    needs: [tag, approve]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    # Scopes the crates.io trusted publishers; no reviewer (058 3.1.3).
+    environment: crates-publish
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.tag.outputs.commit }}
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: cli
-          path: dist/artifacts/cli
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: npm
-          path: dist/artifacts/npm
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: sbom
-          path: dist/artifacts/sbom
-      - name: Every artifact equals the signed manifest's bytes (031 3.9.3, 3.11.2)
+          name: release
+          path: ${{ runner.temp }}/release
+      - name: Every source file carries the commit time, as packaged (021 3.7)
         env:
-          MANIFEST: ${{ inputs.manifest }}
-        run: |
-          set -eu
-          printf %s "$MANIFEST" > "$RUNNER_TEMP/release-manifest.json"
-          cargo run --quiet --locked -p rustev-release -- verify-artifacts "$RUNNER_TEMP/release-manifest.json" dist/artifacts
+          EPOCH: ${{ needs.tag.outputs.epoch }}
+        run: git ls-files -z | xargs -0 touch -h -d "$(date -u -d "@$EPOCH" +%Y-%m-%dT%H:%M:%SZ)"
+      - name: Build the publisher
+        run: cargo build --quiet --locked -p rustev-release
+      # Trusted publishing (058 3.3.1, A-61): the job's OIDC token is
+      # exchanged for a short-lived crates.io token, revoked when the job
+      # ends. No crates.io secret exists or is read.
+      - name: Exchange the OIDC token for a crates.io publishing token
+        id: auth
+        uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1.0.5
+      - name: Publish in upload order; what is public with the run's checksum is skipped (058 3.3.1, 3.5.2)
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+          SOURCE_DATE_EPOCH: ${{ needs.tag.outputs.epoch }}
+        run: target/debug/rustev-release publish-crates "$RUNNER_TEMP/release" "$RUNNER_TEMP/publication.json"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: publication-crates
+          path: ${{ runner.temp }}/publication.json
+          if-no-files-found: ignore
+          overwrite: true
 
-  npm:
-    name: npm publish
-    needs: [tag, pack, reproducibility, sbom, audit, bind]
-    if: ${{ inputs.publish-npm && !inputs.rehearsal }}
+  publish-npm:
+    name: publish-npm
+    needs: [tag, approve, publish-crates]
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    # The owner approves this Environment for each publication (031 3.11).
+    timeout-minutes: 60
+    # Scopes the npm trusted publishers; no reviewer (058 3.1.3).
     environment: npm-publish
     permissions:
       contents: read
@@ -507,10 +661,6 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.tag.outputs.commit }}
-      - name: A candidate is never published to npm (053 3.4.2)
-        env:
-          TAG: ${{ inputs.tag }}
-        run: sh tools/rustev-release/artifacts.sh npm-guard "$TAG"
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
@@ -531,65 +681,116 @@ jobs:
           test "$(npm --version)" = 11.21.0
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: npm
-          path: dist/npm
-      - name: Every crate layer is public with its expected checksum (031 3.1)
-        env:
-          MANIFEST: ${{ inputs.manifest }}
-        run: |
-          set -eu
-          printf %s "$MANIFEST" > "$RUNNER_TEMP/release-manifest.json"
-          cargo run --quiet --locked -p rustev-release -- observe-crates "$RUNNER_TEMP/release-manifest.json"
-      - name: Publish with npm provenance, in the release set's order (031 3.9.6)
-        env:
-          VERSION: ${{ needs.tag.outputs.version }}
-        run: |
-          set -eu
-          (cd dist/npm && sha256sum -c SHA256SUMS)
-          jq -r '.npm[].name' tools/rustev-release/release-set.json | while read -r name; do
-            file="dist/npm/$(printf %s "$name" | sed 's/^@//; s|/|-|')-$VERSION.tgz"
-            test -f "$file" || { echo "031 3.12: no tarball for $name ($file)" >&2; exit 1; }
-            # An already public identical version is skipped by npm's own
-            # refusal; any refusal stops the run (021 3.9: no blind retry).
-            npm publish "$file" --provenance --access public
-          done
+          name: release
+          path: ${{ runner.temp }}/release
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: publication-crates
+          path: ${{ runner.temp }}
+      - name: Build the publisher
+        run: cargo build --quiet --locked -p rustev-release
+      - name: Publish with provenance in the release set's order, after every crate is public (058 3.3.2, 3.5.2)
+        run: target/debug/rustev-release publish-npm "$RUNNER_TEMP/release" "$RUNNER_TEMP/publication.json"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: publication
+          path: ${{ runner.temp }}/publication.json
+          if-no-files-found: ignore
+          overwrite: true
 
-  prerelease:
-    name: prerelease
-    needs: [tag, archive, pack, reproducibility, sbom, audit, bind]
-    if: ${{ !inputs.rehearsal && needs.tag.outputs.candidate == 'true' }}
+  github-release:
+    name: github-release
+    needs: [tag, bindings, cli, rebuild, crates, crates-rebuild, archive, pack, reproducibility, sbom, audit, manifest, approve, publish-crates, publish-npm]
+    # A release after npm; a candidate straight after `manifest` (3.7).
+    if: >-
+      !cancelled() && github.event_name == 'push' && needs.manifest.result == 'success' &&
+      (needs.tag.outputs.candidate == 'true' || needs.publish-npm.result == 'success')
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    # The owner's signed candidate tag is the authority (053, decision 1):
-    # no Environment, because a pre-release is not registry publication.
-    # The only job of this workflow that may write contents (053 3.3.3).
+    timeout-minutes: 30
+    # The only job of this workflow that may write contents (058 3.3.3).
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: refs/tags/${{ inputs.tag }}
-          fetch-depth: 0
+          ref: ${{ needs.tag.outputs.commit }}
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: cli
-          path: dist/artifacts/cli
+          name: release
+          path: ${{ runner.temp }}/release
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: needs.tag.outputs.candidate == 'false'
         with:
-          name: npm
-          path: dist/artifacts/npm
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: sbom
-          path: dist/artifacts/sbom
-      - name: Create the pre-release once; a rerun with identical assets uploads nothing (053 3.3.3, 3.3.4)
+          name: publication
+          path: ${{ runner.temp }}/release
+      - name: Create the release once; identical assets are success, any difference fails (058 3.3.3, 3.5.2)
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ inputs.tag }}
-          MANIFEST: ${{ inputs.manifest }}
-          SIGNATURE: ${{ inputs.manifest-signature }}
+        run: cargo run --quiet --locked -p rustev-release -- github-release "$RUNNER_TEMP/release"
+
+  verify-release:
+    name: verify-release
+    needs: [tag, github-release]
+    if: ${{ !cancelled() && needs.github-release.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # attestations: read, for `gh attestation verify` against the store.
+    permissions:
+      contents: read
+      attestations: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.tag.outputs.commit }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: Every asset is present and equals the manifest and SHA256SUMS (058 3.4.1)
         run: |
           set -eu
-          printf %s "$MANIFEST" > "$RUNNER_TEMP/release-manifest.json"
-          printf '%s\n' "$SIGNATURE" > "$RUNNER_TEMP/release-manifest.json.sig"
-          cargo run --quiet --locked -p rustev-release -- prerelease "$TAG" "$RUNNER_TEMP/release-manifest.json" "$RUNNER_TEMP/release-manifest.json.sig" dist/artifacts
+          gh release download "$TAG" --repo "$REPO" --dir "$RUNNER_TEMP/published"
+          cargo run --quiet --locked -p rustev-release -- verify-assets "$RUNNER_TEMP/published"
+      - name: Every attestation verifies against its bundle and the attestation store (058 3.4.1)
+        run: |
+          set -u
+          failures=0
+          for bundle in "$RUNNER_TEMP"/published/*.intoto.jsonl; do
+            f=${bundle%.intoto.jsonl}
+            gh attestation verify "$f" --bundle "$bundle" --repo "$REPO" \
+              --signer-workflow "$REPO/.github/workflows/release.yml" --source-ref "refs/tags/$TAG" \
+              || { echo "058 3.4.1: $f does not verify against its bundle" >&2; failures=$((failures + 1)); }
+            gh attestation verify "$f" --repo "$REPO" \
+              --signer-workflow "$REPO/.github/workflows/release.yml" --source-ref "refs/tags/$TAG" \
+              || { echo "058 3.4.1: $f does not verify against the attestation store" >&2; failures=$((failures + 1)); }
+          done
+          test "$failures" -eq 0 || { echo "058 3.4.1: $failures attestation check(s) failed; nothing is unpublished" >&2; exit 1; }
+      - name: The registries hold the manifest's checksums, and npm signatures verify (058 3.4.1)
+        if: needs.tag.outputs.candidate == 'false'
+        env:
+          VERSION: ${{ needs.tag.outputs.version }}
+        run: |
+          set -eu
+          cargo run --quiet --locked -p rustev-release -- observe-registries "$RUNNER_TEMP/published/release-manifest.json"
+          names=$(jq -r --arg v "$VERSION" '.npm[].name + "@" + $v' tools/rustev-release/release-set.json)
+          mkdir "$RUNNER_TEMP/audit" && cd "$RUNNER_TEMP/audit"
+          npm init -y >/dev/null
+          # Every platform package, whatever this host's platform.
+          # shellcheck disable=SC2086 # one argument per package
+          npm install --ignore-scripts --force --no-audit --no-fund $names
+          npm audit signatures
+
+  qualify:
+    name: qualify
+    needs: [tag, verify-release]
+    if: ${{ !cancelled() && github.event_name == 'push' && needs.tag.outputs.candidate == 'false' && needs.verify-release.result == 'success' }}
+    permissions:
+      contents: read
+      attestations: read
+    uses: ./.github/workflows/qualify.yml
+    with:
+      tag: ${{ github.ref_name }}

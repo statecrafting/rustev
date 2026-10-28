@@ -81,6 +81,9 @@ pub enum Event {
     CandidateVerified { commit: String },
     /// The owner's instruction (I-4).
     Authorized(Instruction),
+    /// Spec 058 3.1.2: the verified signed tag of a tagged run, which the
+    /// run's manifest names by object id, is the owner's instruction.
+    TagAuthorized { tag_object: String },
     /// The publisher observed these packages visible with their expected
     /// checksums; `complete` when that is every package of the set.
     Observed { complete: bool },
@@ -199,6 +202,18 @@ impl Lifecycle {
                     );
                 }
                 self.instruction = Some(i);
+                PublicationAuthorized
+            }
+            (CandidateVerified, Event::TagAuthorized { tag_object }) => {
+                // 0.1.0's authority is spent (031 3.11.1); a tagged run's
+                // manifest names its tag object (058 3.2.4).
+                if self.manifest.version == FIRST_RELEASE_VERSION
+                    || self.manifest.tag_object.as_deref() != Some(tag_object.as_str())
+                {
+                    return refuse(
+                        "058 3.1.2: the manifest does not name this verified tag object".into(),
+                    );
+                }
                 PublicationAuthorized
             }
             (PublicationAuthorized | PartiallyPublished, Event::Observed { complete }) => {

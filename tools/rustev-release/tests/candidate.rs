@@ -215,10 +215,11 @@ fn workflow_write_permissions_are_confined() {
         assert!(!line.contains("packages: write"));
         if line.contains("contents: write") {
             writes += 1;
-            assert_eq!(job, "prerelease");
+            // 058 3.3.3: the pre-release is created by `github-release`.
+            assert_eq!(job, "github-release");
         }
     }
-    // Exactly one: the `prerelease` job holds it and no other job does.
+    // Exactly one: the `github-release` job holds it and no other job does.
     assert_eq!(writes, 1);
 }
 
