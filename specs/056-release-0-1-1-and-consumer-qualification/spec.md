@@ -282,5 +282,19 @@ keeps its 031 3.11.1 authority (`tools/rustev-release/tests/signing.rs`).
 signed manifest, every required kind needs a passed step for each
 platform of the CLI and npm matrix, and a missing, failing or `not_run`
 step, or an `excluded` step for a named kind, is refused before the
-journal (`tools/rustev-release/tests/family.rs`). The harness
-(`qualify.sh`, part b2) and the workflow (part c) follow.
+journal (`tools/rustev-release/tests/family.rs`).
+
+**Part b2 (2026-10-27): the harness.** `tools/rustev-release/qualify.sh
+<version> <manifest> <evidence-dir>` runs `qualify/harness.py` in a new
+temporary directory: it refuses a workspace ancestor and any path, Git,
+patch, source-replacement or alternate-registry configuration, starts
+with empty Cargo and npm homes and no registry token, checks every
+lockfile source and checksum against the signed manifest, and writes one
+`rustev.qualification-step/1` file per kind and platform. The crates step
+uses `qualify/consumer.rs` and `adoption.sh` in its new registry mode
+(`RUSTEV_ADOPTION_VERSION`), the npm step `qualify/smoke.cjs`; a step the
+host cannot run is `not_run`, and an absent image is `excluded`. Offline
+tests cover usage, freshness refusals and a dry run whose `not_run` steps
+`qualify` refuses (`tools/rustev-release/tests/qualify_harness.rs`). A
+live run needs a published version after `0.1.0` and part a's example.
+
