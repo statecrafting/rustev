@@ -876,6 +876,24 @@ dispatches rank requests through the existing admission, cost, retry,
 fallback, cancellation and deadline handling
 (`crates/rustev-core/tests/ranking_evaluate.rs`, `crates/rustev-runtime/tests/ranking.rs`).
 
+**Increment 7, part a (2026-10-26): Jev composition and the remaining
+acceptance tests.** R-28 stands: the Jev adapter declares no `ranking`
+member, and a ranking composed from a fan-out answered by Jev plus
+`weighted_rank@1` is a valid `select.from` whose failure is detected as
+3.10.3 states (`integrations/rustev-jev/tests/runtime.rs`). Offline replay
+now binds captured rank requests to their steps, so a rank decision
+replays with identical evidence and no dispatch (3.13;
+`crates/rustev-eval/tests/ranking_replay.rs`). The remaining Acceptance
+items and section 5 rows have tests, including compile-fail doctests for
+3.9.1; `crates/rustev-core/tests/RANKING_ACCEPTANCE.md` maps each to its
+test, and the Bedrock items as deferred by A-49. A `selection` is never a
+generation input: spec 037's template inputs and projections (037 3.3)
+admit no ranking value kind and 3.9.1 forbids a silent conversion, so a
+generate step reading one is refused at compile time, and the generation
+stage of a plan without a generate step converts nothing
+(`crates/rustev-core/tests/generation_compile.rs`,
+`crates/rustev-runtime/tests/ranking.rs`).
+
 ## Decisions at approval
 
 Decided within the binding principles under the work order.

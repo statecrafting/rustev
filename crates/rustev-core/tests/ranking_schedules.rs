@@ -573,3 +573,64 @@ fn merge_caps_never_expose_an_extra_presentation() {
         }
     }
 }
+
+#[test]
+fn pools_zero_through_twelve_stay_bounded_and_replay_identically() {
+    for n in 0..=12 {
+        let pool: Vec<_> = (0..n).rev().map(|i| format!("id-{i:02}")).collect();
+        for schedule in [PairwiseSchedule::RoundRobin, PairwiseSchedule::MergeSort] {
+            for bias in [
+                Bias::None,
+                average(2),
+                Bias::Shuffle {
+                    seed: "sweep".into(),
+                },
+            ] {
+                let orders = if bias == average(2) { 2 } else { 1 };
+                let bound = pairwise_bound(n, schedule).unwrap() * orders;
+                let cap = bound.max(1);
+                let mut first = machine(&pool, schedule, &bias, cap, None);
+                let mut replay = machine(&pool, schedule, &bias, cap, None);
+                let mut issued = 0;
+                loop {
+                    match first.state().unwrap() {
+                        ScheduleState::Pending(requests) => {
+                            assert_eq!(pending(&mut replay), requests);
+                            issued += requests.len() as u64;
+                            assert!(issued <= cap && issued <= bound, "n={n}, {schedule:?}");
+                            // Recorded answers are delivered in reverse order on replay.
+                            let answers: Vec<_> = requests
+                                .iter()
+                                .map(|r| {
+                                    (
+                                        r.suffix.clone(),
+                                        if r.presented[0] < r.presented[1] {
+                                            Answer::First
+                                        } else {
+                                            Answer::Second
+                                        },
+                                    )
+                                })
+                                .collect();
+                            for (key, answer) in &answers {
+                                first.answer(key, *answer).unwrap();
+                            }
+                            for (key, answer) in answers.iter().rev() {
+                                replay.answer(key, *answer).unwrap();
+                            }
+                        }
+                        ScheduleState::Complete(result) => {
+                            assert_eq!(complete(&mut replay), result);
+                            assert_eq!(result.comparisons, issued);
+                            let mut expected = pool.clone();
+                            expected.sort();
+                            assert_eq!(result.order, expected);
+                            break;
+                        }
+                        other => panic!("unexpected {other:?}"),
+                    }
+                }
+            }
+        }
+    }
+}

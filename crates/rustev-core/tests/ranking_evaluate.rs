@@ -189,3 +189,163 @@ fn pointwise_pending_preserves_pool_order() {
         ["cand/c", "cand/a", "cand/b"]
     );
 }
+
+#[test]
+fn five_positions_and_stale_candidate_evidence() {
+    use rustev_contract::{
+        evidence::StepStatus, judgment::Derivation, ranking_result::SelectionOrigin,
+    };
+    let (mut d, b) = fixture();
+    let StepBody::Select(s) = &mut d.steps[2].body else {
+        panic!()
+    };
+    s.k = 5;
+    d.inputs[0].freshness = serde_json::from_value(serde_json::json!({"max_age_ms":1})).unwrap();
+    let c = compile(&d, &[b], &[]).unwrap();
+    for (stale, failed) in [(false, false), (true, false), (false, true)] {
+        let mut snap = snapshot();
+        snap.entries[0].value = serde_json::json!([
+            {"id":"a"},{"id":"b"},{"id":"c"},{"id":"d"},{"id":"e"}
+        ]);
+        let mut ev = Evaluation::start(
+            &c,
+            &snap,
+            common::ts(common::NOW + if stale { 2 } else { 0 }),
+        )
+        .unwrap();
+        for request in ev.pending() {
+            ev.supply(
+                &request.step,
+                &request.instance,
+                if failed {
+                    Supplied::Failed(Unresolved::DeadlineExceeded)
+                } else {
+                    Supplied::Output(RawOutput::Ranking {
+                        ids: vec!["c".into(), "a".into(), "e".into()],
+                        scores: RankingScores::None,
+                    })
+                },
+            )
+            .unwrap();
+        }
+        let (judgment, evidence) = ev.finish("five").unwrap();
+        let chosen = evidence.steps.iter().find(|s| s.step == "chosen").unwrap();
+        if stale {
+            assert!(matches!(
+                chosen.status,
+                StepStatus::Unresolved(Unresolved::StaleEvidence { .. })
+            ));
+            assert!(chosen.selection.is_none());
+            continue;
+        }
+        if failed {
+            assert!(matches!(
+                chosen.status,
+                StepStatus::Resolved {
+                    derivation: Derivation::MixedDerived,
+                    ..
+                }
+            ));
+            let selection = chosen.selection.as_ref().unwrap();
+            assert_eq!(selection.entries.len(), 5);
+            for (i, entry) in selection.entries.iter().enumerate() {
+                assert_eq!(entry.position, i as u64 + 1);
+                assert_eq!(entry.source_position, i as u64 + 1);
+                assert_eq!(entry.origin, SelectionOrigin::Backfill);
+                assert_eq!(entry.derivation, Derivation::ExactDerived);
+            }
+            assert!(
+                judgment
+                    .notices
+                    .iter()
+                    .any(|n| n.kind == rustev_contract::judgment::NoticeKind::Fallback)
+            );
+            continue;
+        }
+        let ranked = evidence.steps.iter().find(|s| s.step == "ranked").unwrap();
+        assert!(matches!(
+            ranked.status,
+            StepStatus::Resolved {
+                derivation: Derivation::ModelDerived,
+                ..
+            }
+        ));
+        assert!(matches!(
+            chosen.status,
+            StepStatus::Resolved {
+                derivation: Derivation::MixedDerived,
+                ..
+            }
+        ));
+        let selection = chosen.selection.as_ref().unwrap();
+        assert_eq!(
+            selection
+                .entries
+                .iter()
+                .map(|e| e.id.as_str())
+                .collect::<Vec<_>>(),
+            ["c", "a", "e", "b", "d"]
+        );
+        for (i, entry) in selection.entries.iter().enumerate() {
+            assert_eq!(entry.position, i as u64 + 1);
+            assert_eq!(entry.source_position, [1, 2, 3, 2, 4][i]);
+            assert_eq!(
+                entry.origin,
+                if i < 3 {
+                    SelectionOrigin::Model
+                } else {
+                    SelectionOrigin::Backfill
+                }
+            );
+            assert_eq!(
+                entry.derivation,
+                if i < 3 {
+                    Derivation::ModelDerived
+                } else {
+                    Derivation::ExactDerived
+                }
+            );
+            assert!(entry.lineage.inputs.contains(&"items".into()));
+        }
+    }
+}
+
+#[test]
+fn permutations_change_with_seed_and_survive_backend_swap() {
+    let (mut d, b) = fixture();
+    let mut snap = snapshot();
+    snap.entries[0].value = serde_json::json!([
+        {"id":"a"},{"id":"b"},{"id":"c"},{"id":"d"},{"id":"e"}
+    ]);
+    let mut observed = vec![];
+    for seed in ["a", "b"] {
+        let StepBody::Rank(r) = &mut d.steps[1].body else {
+            panic!()
+        };
+        r.bias = Bias::PermutationAverage {
+            orders: 8,
+            seed: seed.into(),
+        };
+        let mut bindings = vec![];
+        for backend in ["first", "second"] {
+            let mut descriptor = b.clone();
+            descriptor.backend_id = backend.into();
+            let c = compile(&d, &[descriptor], &[]).unwrap();
+            let ev = Evaluation::start(&c, &snap, common::ts(common::NOW)).unwrap();
+            let orders: Vec<_> = ev
+                .pending()
+                .iter()
+                .map(|r| {
+                    let v: serde_json::Value = serde_json::from_slice(&r.projection).unwrap();
+                    (r.instance.clone(), v["candidates"].clone())
+                })
+                .collect();
+            bindings.push((c.id, orders));
+        }
+        assert_ne!(bindings[0].0, bindings[1].0);
+        assert_eq!(bindings[0].1, bindings[1].1);
+        observed.push(bindings.remove(0));
+    }
+    assert_ne!(observed[0].0, observed[1].0);
+    assert_ne!(observed[0].1, observed[1].1);
+}

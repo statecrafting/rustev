@@ -1,4 +1,150 @@
-//! Pure ranking building blocks (spec 039); not wired into compilation or evaluation.
+//! Pure ranking building blocks (spec 039).
+//!
+//! Ranking and selection cannot convert to or from other value kinds (039, 3.9.1).
+//!
+//! ```compile_fail,E0277
+//! use rustev_core::kinds::ModelScore;
+//! use rustev_contract::ranking_result::ModelRanking;
+//! fn convert(value: ModelRanking) -> ModelScore { value.into() }
+//! ```
+//!
+//! ```compile_fail,E0277
+//! use rustev_core::kinds::ModelScore;
+//! use rustev_contract::ranking_result::ModelRanking;
+//! fn convert(value: ModelScore) -> ModelRanking { value.into() }
+//! ```
+//!
+//! ```compile_fail,E0277
+//! use rustev_core::kinds::Distribution;
+//! use rustev_contract::ranking_result::ModelRanking;
+//! fn convert(value: ModelRanking) -> Distribution { value.into() }
+//! ```
+//!
+//! ```compile_fail,E0277
+//! use rustev_core::kinds::Distribution;
+//! use rustev_contract::ranking_result::ModelRanking;
+//! fn convert(value: Distribution) -> ModelRanking { value.into() }
+//! ```
+//!
+//! ```compile_fail,E0277
+//! use rustev_core::kinds::CalibratedProbability;
+//! use rustev_contract::ranking_result::ModelRanking;
+//! fn convert(value: ModelRanking) -> CalibratedProbability { value.into() }
+//! ```
+//!
+//! ```compile_fail,E0277
+//! use rustev_core::kinds::CalibratedProbability;
+//! use rustev_contract::ranking_result::ModelRanking;
+//! fn convert(value: CalibratedProbability) -> ModelRanking { value.into() }
+//! ```
+//!
+//! ```compile_fail,E0277
+//! use rustev_core::kinds::SelectedLabel;
+//! use rustev_contract::ranking_result::ModelRanking;
+//! fn convert(value: ModelRanking) -> SelectedLabel { value.into() }
+//! ```
+//!
+//! ```compile_fail,E0277
+//! use rustev_core::kinds::SelectedLabel;
+//! use rustev_contract::ranking_result::ModelRanking;
+//! fn convert(value: SelectedLabel) -> ModelRanking { value.into() }
+//! ```
+//!
+//! ```compile_fail,E0277
+//! use rustev_core::kinds::OrdinalLevel;
+//! use rustev_contract::ranking_result::ModelRanking;
+//! fn convert(value: ModelRanking) -> OrdinalLevel { value.into() }
+//! ```
+//!
+//! ```compile_fail,E0277
+//! use rustev_core::kinds::OrdinalLevel;
+//! use rustev_contract::ranking_result::ModelRanking;
+//! fn convert(value: OrdinalLevel) -> ModelRanking { value.into() }
+//! ```
+//!
+//! ```compile_fail,E0277
+//! use rustev_core::kinds::RankPosition;
+//! use rustev_contract::ranking_result::ModelRanking;
+//! fn convert(value: ModelRanking) -> RankPosition { value.into() }
+//! ```
+//!
+//! ```compile_fail,E0277
+//! use rustev_core::kinds::RankPosition;
+//! use rustev_contract::ranking_result::ModelRanking;
+//! fn convert(value: RankPosition) -> ModelRanking { value.into() }
+//! ```
+//!
+//! ```compile_fail,E0277
+//! use rustev_core::kinds::ModelScore;
+//! use rustev_contract::ranking_result::Selection;
+//! fn convert(value: Selection) -> ModelScore { value.into() }
+//! ```
+//!
+//! ```compile_fail,E0277
+//! use rustev_core::kinds::ModelScore;
+//! use rustev_contract::ranking_result::Selection;
+//! fn convert(value: ModelScore) -> Selection { value.into() }
+//! ```
+//!
+//! ```compile_fail,E0277
+//! use rustev_core::kinds::Distribution;
+//! use rustev_contract::ranking_result::Selection;
+//! fn convert(value: Selection) -> Distribution { value.into() }
+//! ```
+//!
+//! ```compile_fail,E0277
+//! use rustev_core::kinds::Distribution;
+//! use rustev_contract::ranking_result::Selection;
+//! fn convert(value: Distribution) -> Selection { value.into() }
+//! ```
+//!
+//! ```compile_fail,E0277
+//! use rustev_core::kinds::CalibratedProbability;
+//! use rustev_contract::ranking_result::Selection;
+//! fn convert(value: Selection) -> CalibratedProbability { value.into() }
+//! ```
+//!
+//! ```compile_fail,E0277
+//! use rustev_core::kinds::CalibratedProbability;
+//! use rustev_contract::ranking_result::Selection;
+//! fn convert(value: CalibratedProbability) -> Selection { value.into() }
+//! ```
+//!
+//! ```compile_fail,E0277
+//! use rustev_core::kinds::SelectedLabel;
+//! use rustev_contract::ranking_result::Selection;
+//! fn convert(value: Selection) -> SelectedLabel { value.into() }
+//! ```
+//!
+//! ```compile_fail,E0277
+//! use rustev_core::kinds::SelectedLabel;
+//! use rustev_contract::ranking_result::Selection;
+//! fn convert(value: SelectedLabel) -> Selection { value.into() }
+//! ```
+//!
+//! ```compile_fail,E0277
+//! use rustev_core::kinds::OrdinalLevel;
+//! use rustev_contract::ranking_result::Selection;
+//! fn convert(value: Selection) -> OrdinalLevel { value.into() }
+//! ```
+//!
+//! ```compile_fail,E0277
+//! use rustev_core::kinds::OrdinalLevel;
+//! use rustev_contract::ranking_result::Selection;
+//! fn convert(value: OrdinalLevel) -> Selection { value.into() }
+//! ```
+//!
+//! ```compile_fail,E0277
+//! use rustev_core::kinds::RankPosition;
+//! use rustev_contract::ranking_result::Selection;
+//! fn convert(value: Selection) -> RankPosition { value.into() }
+//! ```
+//!
+//! ```compile_fail,E0277
+//! use rustev_core::kinds::RankPosition;
+//! use rustev_contract::ranking_result::Selection;
+//! fn convert(value: RankPosition) -> Selection { value.into() }
+//! ```
 pub mod permute;
 pub mod schedules;
 pub mod select;

@@ -480,3 +480,108 @@ fn empty_pools_controls_and_pairwise_budget() {
         ));
     }
 }
+
+#[test]
+fn listwise_origin_fixtures_validate_before_selecting() {
+    use rustev_contract::ranking::{BackendFailure, Backfill, Select};
+    use rustev_core::ranking::select::{ExactOrdering, Source, select};
+    let pool = ids("a b c");
+    let lineage = Lineage::default();
+    for (returned, expected, model_count, dropped) in [
+        ("c b a", "c b a", 3, vec![]),
+        ("b", "b a c", 1, vec![]),
+        ("b b a", "b a c", 2, vec![DropReason::Duplicate]),
+        ("zz b", "b a c", 1, vec![DropReason::UnknownId]),
+        ("x b", "b a c", 1, vec![DropReason::OutsidePool]),
+        (
+            "b b zz x a",
+            "b a c",
+            2,
+            vec![
+                DropReason::Duplicate,
+                DropReason::UnknownId,
+                DropReason::OutsidePool,
+            ],
+        ),
+    ] {
+        let ranked = run(
+            lw(RankScores::None),
+            Bias::None,
+            [("perm/0".into(), list(returned, RankingScores::None))].into(),
+            None,
+        )
+        .value
+        .unwrap();
+        assert_eq!(
+            ranked
+                .dropped
+                .iter()
+                .map(|d| d.reason.clone())
+                .collect::<Vec<_>>(),
+            dropped
+        );
+        let ranked_ids: Vec<_> = ranked.entries.iter().map(|e| e.candidate.clone()).collect();
+        let model = Source {
+            ids: Ok(&ranked_ids),
+            partial: ranked.partial,
+            derivation: Derivation::ModelDerived,
+            lineage: &lineage,
+        };
+        let exact = ExactOrdering {
+            from: "step:pool",
+            static_class: Derivation::ExactDerived,
+            source: Source {
+                ids: Ok(&pool),
+                partial: false,
+                derivation: Derivation::ExactDerived,
+                lineage: &lineage,
+            },
+        };
+        let selected = select(
+            &Select {
+                from: "step:rank".into(),
+                k: 3,
+                backfill: Backfill::From {
+                    from: "step:pool".into(),
+                    exclude_selected: true,
+                },
+                on_backend_failure: BackendFailure::BackfillAll,
+            },
+            &pool,
+            &model,
+            Some(&exact),
+        )
+        .value
+        .unwrap();
+        assert_eq!(
+            selected
+                .entries
+                .iter()
+                .map(|e| e.id.clone())
+                .collect::<Vec<_>>(),
+            ids(expected)
+        );
+        for (i, entry) in selected.entries.iter().enumerate() {
+            let model_position = i < model_count;
+            assert_eq!(entry.position, i as u64 + 1);
+            assert_eq!(
+                entry.origin,
+                if model_position {
+                    SelectionOrigin::Model
+                } else {
+                    SelectionOrigin::Backfill
+                }
+            );
+            assert_eq!(
+                entry.derivation,
+                if model_position {
+                    Derivation::ModelDerived
+                } else {
+                    Derivation::ExactDerived
+                }
+            );
+            let source = if model_position { &ranked_ids } else { &pool };
+            assert_eq!(source[entry.source_position as usize - 1], entry.id);
+        }
+    }
+}

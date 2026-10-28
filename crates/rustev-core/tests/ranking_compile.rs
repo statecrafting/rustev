@@ -420,3 +420,110 @@ fn bias_parameters_and_pairwise_parameters_each_enter_identity() {
     };
     assert_ne!(run(&d, &b).unwrap().id, baseline);
 }
+
+#[test]
+fn refusal_rows_have_passing_neighbours() {
+    // Each category in 3.12 is paired with the same definition repaired.
+    let (mut d, mut b) = fixture();
+    select(&mut d).k = 1025;
+    refusal(&d, &b, C::InvalidDefinition);
+    select(&mut d).k = 1024;
+    run(&d, &b).unwrap();
+
+    d.policy.rules.insert(
+        0,
+        serde_json::from_value(json!({"id":"mass",
+        "when":{"mass_at_least":{"step":"chosen","option":"a","threshold":"0.5",
+            "uncalibrated_threshold":{"declared":{"reason":"test"}}}},
+        "then":{"propose":{"action":"recommend","params":[]}}}))
+        .unwrap(),
+    );
+    refusal(&d, &b, C::KindMismatch);
+    d.policy.rules[0].when = Cond::Nonempty("step:chosen".into());
+    d.policy.on_unresolved.push(
+        serde_json::from_value(
+            json!({"target":"step:chosen","reasons":"any","action":"propagate"}),
+        )
+        .unwrap(),
+    );
+    run(&d, &b).unwrap();
+
+    // Acceptance admits the exact consumer without changing derivation.
+    d.actionability = Some(
+        serde_json::from_value(json!({
+            "caller_controlled":[],"remediations":[],"questions":[],
+            "constraint_groups":[],
+            "checks":[{"id":"guard","subject":"items",
+                "test":{"present":"input:items"},
+                "on_fail":{"by_provenance":{"model-derived":"abstain"},"default":"none"}}]
+        }))
+        .unwrap(),
+    );
+    d.inputs[0].provenance = vec![ProvenanceClass::ModelDerived];
+    refusal(&d, &b, C::ExactOrderSource);
+    d.inputs[0].provenance = vec![ProvenanceClass::SystemOfRecord];
+    d.actionability = None;
+    run(&d, &b).unwrap();
+
+    if let TypeDecl::List { max_items, .. } = &mut d.inputs[0].ty {
+        *max_items = 60;
+    }
+    b.ranking.as_mut().unwrap().max_candidates = 50;
+    refusal(&d, &b, C::NoCapableBackend);
+    b.ranking.as_mut().unwrap().max_candidates = 60;
+    run(&d, &b).unwrap();
+
+    if let TypeDecl::List { max_items, .. } = &mut d.inputs[0].ty {
+        *max_items = 10;
+    }
+    rank(&mut d).mode = RankMode::Pairwise {
+        schedule: PairwiseSchedule::RoundRobin,
+        max_comparisons: 44,
+    };
+    refusal(&d, &b, C::Budget);
+    rank(&mut d).mode = RankMode::Pairwise {
+        schedule: PairwiseSchedule::RoundRobin,
+        max_comparisons: 45,
+    };
+    run(&d, &b).unwrap();
+}
+
+#[test]
+fn model_derived_shortlist_backfill_refused_with_exact_neighbour() {
+    let mut definition = common::lodging();
+    definition.schema = "rustev.definition/2".into();
+    definition.steps.push(
+        serde_json::from_value(json!({
+            "id":"chosen", "body":{"select":{
+                "from":"step:ranking", "k":5,
+                "backfill":{"from":"step:shortlist","exclude_selected":true},
+                "on_backend_failure":"backfill_all"
+            }}
+        }))
+        .unwrap(),
+    );
+    compile(&definition, &common::descriptors(), &[]).unwrap();
+    // Acceptance admits the exact consumer without changing derivation.
+    definition.actionability = Some(
+        serde_json::from_value(json!({
+            "caller_controlled":[],"remediations":[],"questions":[],
+            "constraint_groups":[],
+            "checks":[{"id":"guard","subject":"inventory.candidates",
+                "test":{"present":"input:inventory.candidates"},
+                "on_fail":{"by_provenance":{"model-derived":"abstain"},"default":"none"}}]
+        }))
+        .unwrap(),
+    );
+    definition
+        .inputs
+        .iter_mut()
+        .find(|i| i.name == "inventory.candidates")
+        .unwrap()
+        .provenance = vec![ProvenanceClass::ModelDerived];
+    assert_eq!(
+        compile(&definition, &common::descriptors(), &[])
+            .unwrap_err()
+            .category,
+        C::ExactOrderSource
+    );
+}

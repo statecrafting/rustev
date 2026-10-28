@@ -150,19 +150,19 @@ fn no_backfill_shortfall_and_lazy_unresolved_backfill() {
     let full = source(Ok(&pool), Derivation::ModelDerived, &lineage);
     let v = select(&d, &pool, &full, Some(&bad)).value.unwrap();
     assert_eq!(v.backfill, SelectionBackfill::NotNeeded);
+    assert_eq!(v.entries.len(), 3);
+    assert!(v.entries.iter().all(|e| e.origin == SelectionOrigin::Model));
     assert_eq!(v.shortfall, 0);
     let empty = vec![];
     let exhausted = ExactOrdering {
         source: source(Ok(&empty), Derivation::ExactDerived, &lineage),
         ..bad
     };
-    assert_eq!(
-        select(&d, &pool, &model, Some(&exhausted))
-            .value
-            .unwrap()
-            .shortfall,
-        2
-    );
+    let short = select(&d, &pool, &model, Some(&exhausted)).value.unwrap();
+    assert_eq!(short.shortfall, 2);
+    assert_eq!(short.entries.len(), 1);
+    assert_eq!(short.entries[0].origin, SelectionOrigin::Model);
+    assert_eq!(short.entries[0].source_position, 1);
 }
 
 #[test]
