@@ -2,7 +2,7 @@
 id: "053-signed-release-candidates"
 title: "Signed release candidates published only as GitHub pre-releases (amends 031)"
 status: approved
-implementation: pending
+implementation: in-progress
 created: "2026-10-25"
 summary: >
   A narrow amendment of approved spec 031 (3.9, 3.11, 3.12). It adds a release candidate: an owner-signed
@@ -235,6 +235,11 @@ the only job granted write access to contents; it waits for no
 Environment (decision 1) and creates the pre-release through
 `rustev-release prerelease` (3.3.3, 3.3.4). The input
 `manifest-signature` carries the manifest's detached signature.
+
+**2026-10-28: implementation state.** `implementation:` moves from
+`pending` to `in-progress`, which increments 1 and 2 above already were.
+The owner's signed candidate run (recorded here with its run id, tag and
+pre-release URL) and closure remain.
 
 ## Decisions at approval
 
