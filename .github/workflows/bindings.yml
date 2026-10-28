@@ -145,26 +145,55 @@ jobs:
             target
           key: ${{ steps.cargo-cache.outputs.cache-primary-key }}
 
+  # Which native platforms this run covers (spec 027 3.13.1). A pull
+  # request's own run, unless labelled `statecraft:stacked-ci`, leaves out
+  # darwin-x64; its merge-queue entry and every push to main build and test
+  # all seven, so nothing reaches main untested on any platform.
+  scope:
+    name: native scope
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      native: ${{ steps.scope.outputs.native }}
+    steps:
+      - id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+          STACKED_CI: ${{ contains(github.event.pull_request.labels.*.name, 'statecraft:stacked-ci') }}
+          # glibc legs build in Debian bookworm (glibc 2.36) so the addon
+          # loads on older distributions; musl legs build and test in Alpine
+          # 3.22 (its Node 22); darwin-x64 is a native x64 runner, no Rosetta.
+          PLATFORMS: |
+            [
+              {"platform": "linux-x64-gnu", "runner": "ubuntu-24.04", "image": "rust:1.98.1-bookworm@sha256:93ce27a88655056a51dbdd8f5f2d7ddc071c7b0070fb288a37b5a285fc83971e"},
+              {"platform": "linux-arm64-gnu", "runner": "ubuntu-24.04-arm", "image": "rust:1.98.1-bookworm@sha256:93ce27a88655056a51dbdd8f5f2d7ddc071c7b0070fb288a37b5a285fc83971e"},
+              {"platform": "linux-x64-musl", "runner": "ubuntu-24.04", "image": "rust:1.98.1-alpine3.22@sha256:a1796ca6fa216d6727b5f61c69e4c665b120b1a4dcb969639e2f25f1ed309456"},
+              {"platform": "linux-arm64-musl", "runner": "ubuntu-24.04-arm", "image": "rust:1.98.1-alpine3.22@sha256:a1796ca6fa216d6727b5f61c69e4c665b120b1a4dcb969639e2f25f1ed309456"},
+              {"platform": "darwin-arm64", "runner": "macos-15"},
+              {"platform": "darwin-x64", "runner": "macos-15-intel"},
+              {"platform": "win32-x64-msvc", "runner": "windows-2025"}
+            ]
+        run: |
+          if [ "$EVENT" = pull_request ] && [ "$STACKED_CI" != true ]; then
+            native=$(printf '%s' "$PLATFORMS" | jq -c 'map(select(.platform != "darwin-x64"))')
+            echo "darwin-x64 runs in the merge queue for this pull request." >> "$GITHUB_STEP_SUMMARY"
+          else
+            native=$(printf '%s' "$PLATFORMS" | jq -c .)
+          fi
+          echo "native=$native" >> "$GITHUB_OUTPUT"
+
   native:
     name: native ${{ matrix.platform }}
+    needs: scope
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        include:
-          # glibc: built in Debian bookworm (glibc 2.36) so the addon loads on
-          # older distributions than the runner's; tested on the runner.
-          - { platform: linux-x64-gnu, runner: ubuntu-24.04, image: "rust:1.98.1-bookworm@sha256:93ce27a88655056a51dbdd8f5f2d7ddc071c7b0070fb288a37b5a285fc83971e" }
-          - { platform: linux-arm64-gnu, runner: ubuntu-24.04-arm, image: "rust:1.98.1-bookworm@sha256:93ce27a88655056a51dbdd8f5f2d7ddc071c7b0070fb288a37b5a285fc83971e" }
-          # musl: built and tested in Alpine 3.22 (its Node 22), the recorded
-          # emulation of 3.13.1 for the musl targets.
-          - { platform: linux-x64-musl, runner: ubuntu-24.04, image: "rust:1.98.1-alpine3.22@sha256:a1796ca6fa216d6727b5f61c69e4c665b120b1a4dcb969639e2f25f1ed309456" }
-          - { platform: linux-arm64-musl, runner: ubuntu-24.04-arm, image: "rust:1.98.1-alpine3.22@sha256:a1796ca6fa216d6727b5f61c69e4c665b120b1a4dcb969639e2f25f1ed309456" }
-          - { platform: darwin-arm64, runner: macos-15 }
-          # A native x64 macOS runner, so no Rosetta emulation is needed.
-          - { platform: darwin-x64, runner: macos-15-intel }
-          - { platform: win32-x64-msvc, runner: windows-2025 }
+        # The seven platforms of 3.13.1, from `scope`: a pull request's own
+        # run leaves out darwin-x64 (the slowest leg, about 25 minutes);
+        # the merge queue and main run all seven.
+        include: ${{ fromJSON(needs.scope.outputs.native) }}
     defaults:
       run:
         shell: bash
