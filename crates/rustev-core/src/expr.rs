@@ -762,6 +762,9 @@ pub fn eval_expr(e: &Expr, s: &Scope<'_>) -> Result<Value, Fault> {
             Ok(Value::Decimal(fx(a, &from, &to, &table, name, *scale)?))
         }
         Expr::Len(v) => match eval_expr(v, s)? {
+            Value::Selection(s) => i64::try_from(s.entries.len())
+                .map(Value::Integer)
+                .map_err(|_| overflow()),
             Value::List(items) => i64::try_from(items.len())
                 .map(Value::Integer)
                 .map_err(|_| overflow()),

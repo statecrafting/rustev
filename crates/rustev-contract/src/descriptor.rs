@@ -54,6 +54,7 @@ pub struct OperationSupport {
 )]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum OutputKind {
+    Ranking,
     Label,
     Scores,
     Distribution,

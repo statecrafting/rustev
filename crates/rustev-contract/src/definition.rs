@@ -304,6 +304,7 @@ pub enum Operation {
 )]
 #[serde(rename_all = "snake_case")]
 pub enum RequiredKind {
+    Ranking,
     Label,
     Distribution,
     CalibratedProbability,

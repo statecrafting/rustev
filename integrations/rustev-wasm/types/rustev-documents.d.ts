@@ -85,7 +85,7 @@ export namespace RustevBackend1 {
    * What a backend returns for an operation (design section 8.2).
    */
   export type OutputKind =
-    | ("label" | "scores" | "distribution" | "logits" | "screen")
+    | ("ranking" | "label" | "scores" | "distribution" | "logits" | "screen")
     | {
         typed_record: {
           max_options: number;
@@ -888,6 +888,7 @@ export namespace RustevDefinition1 {
    * The value kind a semantic step requires (spec 002, 3.9.3).
    */
   export type RequiredKind =
+    | "ranking"
     | "label"
     | "distribution"
     | "calibrated_probability"
@@ -2252,6 +2253,7 @@ export namespace RustevDefinition2 {
    * The value kind a semantic step requires (spec 002, 3.9.3).
    */
   export type RequiredKind =
+    | "ranking"
     | "label"
     | "distribution"
     | "calibrated_probability"
@@ -9181,6 +9183,7 @@ export namespace RustevPlan2 {
    * The value kind a semantic step requires (spec 002, 3.9.3).
    */
   export type RequiredKind =
+    | "ranking"
     | "label"
     | "distribution"
     | "calibrated_probability"
@@ -9392,7 +9395,7 @@ export namespace RustevPlan2 {
    * What a backend returns for an operation (design section 8.2).
    */
   export type OutputKind =
-    | ("label" | "scores" | "distribution" | "logits" | "screen")
+    | ("ranking" | "label" | "scores" | "distribution" | "logits" | "screen")
     | {
         typed_record: {
           max_options: number;
@@ -11139,6 +11142,7 @@ export namespace RustevPlan3 {
    * The value kind a semantic step requires (spec 002, 3.9.3).
    */
   export type RequiredKind =
+    | "ranking"
     | "label"
     | "distribution"
     | "calibrated_probability"
@@ -11350,7 +11354,7 @@ export namespace RustevPlan3 {
    * What a backend returns for an operation (design section 8.2).
    */
   export type OutputKind =
-    | ("label" | "scores" | "distribution" | "logits" | "screen")
+    | ("ranking" | "label" | "scores" | "distribution" | "logits" | "screen")
     | {
         typed_record: {
           max_options: number;
@@ -13859,7 +13863,7 @@ export namespace RustevRemoteDescribe1Response {
    * What a backend returns for an operation (design section 8.2).
    */
   export type OutputKind =
-    | ("label" | "scores" | "distribution" | "logits" | "screen")
+    | ("ranking" | "label" | "scores" | "distribution" | "logits" | "screen")
     | {
         typed_record: {
           max_options: number;
@@ -14945,7 +14949,7 @@ export namespace RustevRequest1 {
    * What a backend returns for an operation (design section 8.2).
    */
   export type OutputKind =
-    | ("label" | "scores" | "distribution" | "logits" | "screen")
+    | ("ranking" | "label" | "scores" | "distribution" | "logits" | "screen")
     | {
         typed_record: {
           max_options: number;
@@ -14967,6 +14971,7 @@ export namespace RustevRequest1 {
    * The value kind a semantic step requires (spec 002, 3.9.3).
    */
   export type RequiredKind =
+    | "ranking"
     | "label"
     | "distribution"
     | "calibrated_probability"
@@ -20288,7 +20293,7 @@ export namespace RustevServeRefusal1 {
    * What a backend returns for an operation (design section 8.2).
    */
   export type OutputKind =
-    | ("label" | "scores" | "distribution" | "logits" | "screen")
+    | ("ranking" | "label" | "scores" | "distribution" | "logits" | "screen")
     | {
         typed_record: {
           max_options: number;
@@ -20310,6 +20315,7 @@ export namespace RustevServeRefusal1 {
    * The value kind a semantic step requires (spec 002, 3.9.3).
    */
   export type RequiredKind =
+    | "ranking"
     | "label"
     | "distribution"
     | "calibrated_probability"

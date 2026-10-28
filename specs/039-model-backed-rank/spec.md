@@ -863,6 +863,19 @@ of this increment: it lands as its own change after spec 030 is complete,
 with the items A-49 lists as its acceptance. Core evaluation and runtime
 dispatch of rank requests are part b.
 
+**Increment 6, part b (2026-10-26): evaluation and dispatch.** The rank
+request of 3.4 extends `rustev.request/1` additively (existing request
+documents keep their bytes and identities, `crates/rustev-contract/tests/ranking_request.rs`).
+`crates/rustev-core/src/ranking_eval.rs` lifts the evaluation refusal:
+requests are listed per the plan's schedule (pointwise in pool order,
+pairwise in schedule order), supplied `ranking` outputs build the model
+ranking value, and `select` records each position's model or backfill
+origin and derivation, with the 3.13 evidence pinned per mode by
+`crates/rustev-core/tests/golden/ranking.*.evidence.json`. The runtime
+dispatches rank requests through the existing admission, cost, retry,
+fallback, cancellation and deadline handling
+(`crates/rustev-core/tests/ranking_evaluate.rs`, `crates/rustev-runtime/tests/ranking.rs`).
+
 ## Decisions at approval
 
 Decided within the binding principles under the work order.
