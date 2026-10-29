@@ -510,6 +510,22 @@ every state of 021 3.1 through the verified tag (`TagAuthorized`).
 `Registry`'s upload half and `FakeRegistry` stay until the crates.io
 upload adapter leaves in the next part.
 
+Part d, the crates.io upload adapter and the owner-signed manifest:
+`cratesio`'s publish-API upload (the registry token read, the request
+body built from the archive, the owners query) and the upload half of
+`Registry` with `Upload` and `FakeRegistry`, since `publish-crates` runs
+`cargo publish` under trusted publishing; and `manifest::verify_release`,
+`ssh_verify`, `tag_message` and `NAMESPACE`, the detached signatures over
+the manifest and `SHA256SUMS` and the `release-manifest-sha256:` tag line
+(021 3.8, 031 3.11.2), with `tests/signing.rs`. Stays: the public index
+lookup that `publish-crates` and `observe-registries` read,
+`ALLOWED_SIGNERS` and `OWNER_IDENTITY`, against which `tag` verifies the
+tag (their test moves to `tests/tagged.rs`), and the manifest, its
+canonical form and `SHA256SUMS`, now written and attested by the run.
+Workflows: `release.yml` and `qualify.yml` call none of the retired
+commands; the comment and documentation of the old procedure in the
+tool are replaced by the tagged run's.
+
 **Increment 4 (2026-10-28).** The owner settings of 3.8 are in place:
 crates.io trusted publishers for the twelve crates (workflow
 `release.yml`, Environment `crates-publish`); the `release` and

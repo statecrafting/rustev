@@ -8,8 +8,10 @@
 //! restriction and exact-family dependency closure (3.2, 3.4), and the package versus binary
 //! naming of the CLI (3.4).
 //!
-//! Nothing here uploads, tags, signs or reads a registry credential. A
-//! passing check is candidate evidence only (spec 021, I-1).
+//! A passing check is candidate evidence only (spec 021, I-1). Only the
+//! publication steps of [`tagged`] upload, through `cargo publish` and `npm
+//! publish` with the credentials the release workflow supplies (spec 058
+//! 3.3); nothing here tags, signs or reads a long-lived registry token.
 
 pub mod archive;
 pub mod artifacts;

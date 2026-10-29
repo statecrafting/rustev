@@ -135,6 +135,16 @@ fn gate(commit: &str, conclusion: &str) -> Vec<u8> {
     .unwrap()
 }
 
+// The tag's signer: the built-in record names exactly the documented owner.
+#[test]
+fn the_documented_owner_identity_is_the_committed_allowed_signer() {
+    let signers = manifest::ALLOWED_SIGNERS;
+    let line = signers.lines().next().unwrap();
+    assert!(line.starts_with(manifest::OWNER_IDENTITY));
+    assert!(line.contains(" ssh-ed25519 "));
+    assert!(!signers.contains("PRIVATE"));
+}
+
 #[test]
 fn a_signed_annotated_tag_on_main_with_a_green_gate_passes() {
     let r = Repo::new("0.3.0");

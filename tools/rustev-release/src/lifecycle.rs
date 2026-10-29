@@ -8,8 +8,6 @@
 //! publication journal is read. [`Lookup`] and [`Registry`] are the public
 //! registry state the publication steps of `tagged` read.
 
-use std::collections::BTreeMap;
-
 use serde::{Deserialize, Serialize};
 
 use crate::manifest::ReleaseManifest;
@@ -158,29 +156,9 @@ pub enum Lookup {
     },
 }
 
-/// What an upload returned.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Upload {
-    Accepted,
-    Refused {
-        reason: String,
-    },
-    /// The outcome is unknown: a timeout, a lost response, a server error.
-    Ambiguous {
-        detail: String,
-    },
-}
-
-/// A registry: its public state, and the uploads of the fake below.
+/// A registry's public state for a name and version.
 pub trait Registry {
     fn lookup(&mut self, name: &str, version: &str) -> Lookup;
-    fn upload(&mut self, name: &str, version: &str, archive: &[u8]) -> Upload;
-    /// The public owner logins of `name`; empty when no such name exists.
-    /// An error is unknown state, never taken for no owners.
-    fn owners(&mut self, name: &str) -> Result<Vec<String>, String>;
-    /// Let time pass between visibility queries (a fake advances its clock).
-    fn wait(&mut self);
 }
 
 /// Registry-supplied text with every token shape of the archive scan
@@ -231,76 +209,4 @@ pub fn redact(text: &str) -> String {
     }
     out.push_str(&text[at..]);
     out
-}
-
-/// The login a [`FakeRegistry`] records as the owner of what it accepts.
-pub const FAKE_ACCOUNT: &str = "rustev-fixture";
-
-/// A scripted in-memory registry for the integration tests and dry runs.
-/// It is public because `tests/` and the dry-run harness are separate
-/// crates; this tool crate is never published (an exclusion of the release
-/// set), so no consumer ever links it.
-#[derive(Debug, Default)]
-pub struct FakeRegistry {
-    /// Published versions: (name, version) -> (checksum, visible at tick).
-    pub index: BTreeMap<(String, String), (String, u64)>,
-    /// Scripted outcomes per package name; `Accepted` when absent.
-    pub script: BTreeMap<String, Upload>,
-    /// Ambiguous uploads that were in fact accepted.
-    pub ambiguous_accepts: Vec<String>,
-    /// Ticks between acceptance and visibility.
-    pub lag: u64,
-    pub now: u64,
-    pub uploads: Vec<String>,
-    /// Owner logins per name; an accepted upload adds `uploader`.
-    pub owners: BTreeMap<String, Vec<String>>,
-    /// The account uploads are made as; [`FAKE_ACCOUNT`] when `None`.
-    pub uploader: Option<String>,
-}
-
-impl Registry for FakeRegistry {
-    fn lookup(&mut self, name: &str, version: &str) -> Lookup {
-        match self.index.get(&(name.to_string(), version.to_string())) {
-            Some((checksum, at)) if *at <= self.now => Lookup::Visible {
-                checksum: checksum.clone(),
-            },
-            _ => Lookup::Absent,
-        }
-    }
-
-    fn upload(&mut self, name: &str, version: &str, archive: &[u8]) -> Upload {
-        self.uploads.push(name.to_string());
-        let key = (name.to_string(), version.to_string());
-        if self.index.contains_key(&key) {
-            return Upload::Refused {
-                reason: format!("{name} {version} already exists"),
-            };
-        }
-        let outcome = self.script.get(name).cloned().unwrap_or(Upload::Accepted);
-        let accepted = match &outcome {
-            Upload::Accepted => true,
-            Upload::Ambiguous { .. } => self.ambiguous_accepts.iter().any(|n| n == name),
-            Upload::Refused { .. } => false,
-        };
-        if accepted {
-            self.index.insert(
-                key,
-                (crate::archive::sha256_hex(archive), self.now + self.lag),
-            );
-            let uploader = self.uploader.as_deref().unwrap_or(FAKE_ACCOUNT);
-            let owners = self.owners.entry(name.to_string()).or_default();
-            if !owners.iter().any(|o| o == uploader) {
-                owners.push(uploader.to_string());
-            }
-        }
-        outcome
-    }
-
-    fn owners(&mut self, name: &str) -> Result<Vec<String>, String> {
-        Ok(self.owners.get(name).cloned().unwrap_or_default())
-    }
-
-    fn wait(&mut self) {
-        self.now += 1;
-    }
 }
