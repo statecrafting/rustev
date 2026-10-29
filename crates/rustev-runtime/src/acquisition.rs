@@ -323,7 +323,7 @@ pub(crate) async fn drive(
             escape(&r.step),
             r.tier_index,
             r.page_index,
-            n
+            cx.attempt_number(n)
         );
         let held = cx.hold(&id, reserved, matches!(bound, CostBound::Bounded { .. }));
         let mut a = attempt(cx, &r, source, op, close, &id).await;

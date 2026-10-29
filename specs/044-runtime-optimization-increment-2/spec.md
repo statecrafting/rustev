@@ -837,10 +837,6 @@ The spec 009, 012 and 017 tests are unchanged (3.10.5) and run under
 those specs' own declared verification.
 
 Open, reported as such and never as passed:
-- `on_refresh_failure: recompute` (3.6.5) and section 5's row "Refresh
-  fails under `recompute`": increment 5, part d2, built on the
-  representation the owner chose (A-64). Until it lands the compiler
-  refuses the policy as not available in this build.
 - Stage 2 of 3.8 (item 2): it runs only under the work order's live scope,
   so both stage 1 reports keep the verdict `unknown`.
 - 3.8 item 4, R-2's construction check `batch_unqualified` and section 5's
@@ -2038,8 +2034,8 @@ follows from them, section 4):
 9 seconds when its test targets are already built, and about 70 seconds
 when they are rebuilt, well inside the acceptance group's 45 minutes.
 
-Still open, as the Verification section states: `recompute` (part d2),
-stage 2 of 3.8, and increment 8.
+Still open, as the Verification section states: stage 2 of 3.8, and
+increment 8.
 
 **Increment 5, part d2, the plan (2026-10-29).** The owner chose the
 representation above (A-64), and 3.6.5 and 3.6.6 now say it. Part d2
@@ -2065,6 +2061,76 @@ builds it:
   the rerun.
 
 The spec 037 fixture amendment (A-64 item 2) is spec 037's own change.
+
+**Increment 5, part d2 (2026-10-29): `recompute`.** The compiler accepts
+`on_refresh_failure: recompute`, and the runtime runs it as 3.6.5 says.
+With this part increment 5 is complete.
+
+What part d2 adds:
+- **Contract.** `DecisionCacheRecord.abandoned` is an `AbandonedRun` with
+  `requests` and `acquisitions`, each omitted when empty. A record whose
+  `abandoned` holds neither is refused when read, and its acquisition
+  attempts are bounded as the record's own. `DecisionCacheRecord` is no
+  longer `Eq`, since request records are not. The run schemas and the Node
+  and WebAssembly declarations are regenerated.
+- **Compiler.** Under `recompute` the worst-case attempts count twice
+  against `max_attempts_per_decision`, and the refusal says so: `worst case
+  <2n> attempts (twice the plan's, under on_refresh_failure recompute)
+  exceeds max_attempts_per_decision <m>`.
+- **Runtime.** `Runtime::run` runs a served pass and, when its refresh
+  failed under `recompute`, a second pass:
+  - The served pass runs to its end: every request, acquisition and
+    generation request it dispatched has ended before the rerun starts.
+  - `DecisionRun::abandon` keeps the served pass's `refreshed` and
+    `mismatched` request records and its acquisition records. It records
+    `refresh_failed` and turns the decision into a miss with nothing
+    reused, so the rerun dispatches every request and may be admitted.
+  - The rerun starts the core again over the same snapshot and
+    evaluation time, and restarts the capture. It shares the ledger, so
+    the cost summary covers both passes and the rerun's reservations meet
+    the budget the served pass left.
+  - `DecisionCtx` and `StageContext` carry `rerun`, and every attempt id
+    the rerun forms ends in `r<n>`: requests, batch members, generation
+    requests and acquisitions.
+  - A generation stream receives both passes' provisional fields; the
+    final text supersedes the served pass's (spec 037 3.13.2), and
+    `Complete` follows the rerun only.
+  - A rerun never recomputes. If the core refused the snapshot a second
+    time, the served pass would stand with the diagnostic `recompute not
+    started`; it accepted the same snapshot once, so this is a guard.
+- **Test support.** The scripted backend reads an attempt number after an
+  optional `r`.
+
+Tests:
+- In `crates/rustev-runtime/tests/decision_cache.rs`:
+  - `a_failed_refreshed_request_is_recomputed`: section 5's row "Refresh
+    fails under `recompute`" for a refreshed request. It checks the
+    adapter sees `d2/frustration//1` and then `d2/frustration//r1`, the
+    abandoned request with its charge, a cost summary over both passes,
+    and requests and core evidence equal to independent execution.
+  - `a_missing_volatile_input_is_recomputed`: nothing was dispatched
+    before the failure, so `abandoned` is omitted.
+  - `a_recomputed_decision_captures_the_rerun_alone`
+  - `a_recomputed_decision_is_admitted`: the next identical decision is
+    served from the rerun's entry.
+- `a_failed_refreshed_acquisition_is_recomputed` in
+  `crates/rustev-runtime/tests/acquisition.rs`.
+- `decision_cache_members_are_validated_and_unrun_parts_refused` in
+  `crates/rustev-core/tests/execution.rs`: `recompute` compiles and is part
+  of `PlanId`, and the doubled bound refuses at the plan's worst case and
+  compiles at twice it.
+- `decision_cache_members_round_trip_and_are_omitted_when_absent` in
+  `crates/rustev-contract/tests/documents.rs`: `abandoned` round-trips and
+  an empty one is refused.
+
+Not separately tested:
+- **Replay.** A recomputed record's requests are an independent run's,
+  and replay reads only them.
+- **A late charge for an abandoned attempt.** It reconciles by attempt id
+  through the ledger's existing path, which the distinct `r<n>` ids keep
+  unambiguous.
+- **A generation stream across both passes.** It follows spec 037's
+  existing supersession at `Complete`.
 
 ## Decisions at approval
 

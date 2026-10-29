@@ -721,3 +721,211 @@ async fn a_captured_decision_is_never_substituted() {
     );
     same_judgment(&d, &independent(&serving_stored(), later).await);
 }
+
+/// The payment events as the volatile source, under `recompute`.
+fn recomputing() -> ExecutionPolicy {
+    let mut p = volatile_payments();
+    p.optimization
+        .as_mut()
+        .unwrap()
+        .decision_cache
+        .as_mut()
+        .unwrap()
+        .on_refresh_failure = RefreshFailurePolicy::Recompute;
+    p
+}
+
+/// Every attempt in the record's requests ends in `r<n>`: the rerun's own
+/// namespace (spec 044, 3.6.5 item 2).
+#[track_caller]
+fn all_rerun(d: &Decided) {
+    for r in &d.record.requests {
+        for a in &r.attempts {
+            let n = a.attempt_id.rsplit('/').next().unwrap();
+            assert!(
+                n.strip_prefix('r')
+                    .is_some_and(|n| n.parse::<u32>().is_ok()),
+                "{}",
+                a.attempt_id
+            );
+        }
+    }
+}
+
+/// Spec 044, 3.6.5 under `recompute`, section 5's row "Refresh fails under
+/// `recompute`": a refreshed request fails, so the served run is abandoned
+/// once it has ended and the decision runs again. The rerun's attempt ids
+/// are `r<n>`, its requests and core evidence are an independent run's, the
+/// served run's request is in `abandoned` with its charge, and the cost
+/// summary covers both runs.
+#[tokio::test(flavor = "current_thread")]
+async fn a_failed_refreshed_request_is_recomputed() {
+    // `frustration` fails in the second decision's served run only.
+    let failing = || {
+        Scripted::new(linear_head(), |c| {
+            if c.task() == "support.frustration" && c.attempt_id == "d2/frustration//1" {
+                return Answer::Fail(
+                    AdapterFailure::Transient,
+                    "down".into(),
+                    Charge::Observed { units: 2 },
+                );
+            }
+            ok(c.task(), 1)
+        })
+    };
+    let c = cached_with(&recomputing(), failing());
+    decide(&c, request("d1")).await;
+    let mut changed = request("d2");
+    changed.snapshot = support_snapshot("pro", &[2], 0);
+    let before = c.backend.dispatched().len();
+    let d = decide(&c, changed.clone()).await;
+    let m = dc(&d);
+    assert_eq!(m.outcome, DecisionCacheOutcome::Miss);
+    assert_eq!(m.entry_id, None);
+    assert!(m.reused.is_empty() && m.refreshed.is_empty());
+    assert_eq!(m.on_refresh_failure, Some(RefreshFailurePolicy::Recompute));
+    assert!(
+        m.diagnostics
+            .iter()
+            .any(|x| x == "refresh_failed: step \"frustration\"")
+    );
+    // The adapter saw the served run's key and then the rerun's.
+    let seen = &c.backend.dispatched()[before..];
+    assert!(seen.iter().any(|a| a == "d2/frustration//1"), "{seen:?}");
+    assert!(seen.iter().any(|a| a == "d2/frustration//r1"), "{seen:?}");
+    all_rerun(&d);
+    let abandoned = m.abandoned.as_ref().unwrap();
+    assert!(abandoned.acquisitions.is_empty());
+    let served: Vec<_> = abandoned.requests.iter().map(|r| r.step.as_str()).collect();
+    assert!(served.contains(&"frustration"), "{served:?}");
+    let frustration = abandoned
+        .requests
+        .iter()
+        .find(|r| r.step == "frustration")
+        .unwrap();
+    assert!(matches!(frustration.result, RequestResult::Failed(_)));
+    assert_eq!(frustration.attempts[0].attempt_id, "d2/frustration//1");
+    // The cost summary covers both runs.
+    let charged = |rs: &[rustev_contract::run::RequestRecord]| -> u64 {
+        rs.iter()
+            .flat_map(|r| &r.attempts)
+            .map(|a| match a.cost.charge {
+                Charge::Observed { units } => units,
+                _ => 0,
+            })
+            .sum()
+    };
+    assert_eq!(
+        d.record.cost.observed,
+        charged(&d.record.requests) + charged(&abandoned.requests)
+    );
+    assert!(charged(&abandoned.requests) >= 2);
+    // Requests and core evidence are an independent run's.
+    let alone = decide(&cached(&recomputing()), changed).await;
+    same_judgment(&d, &alone);
+    assert_eq!(d.record.requests.len(), alone.record.requests.len());
+    for (a, b) in d.record.requests.iter().zip(&alone.record.requests) {
+        assert_eq!(
+            (&a.step, &a.instance, &a.result),
+            (&b.step, &b.instance, &b.result)
+        );
+    }
+}
+
+/// Spec 044, 3.6.5 under `recompute`: a volatile input with no accepted
+/// entry in the new snapshot fails the refresh before anything is
+/// dispatched, so the rerun abandons nothing and `abandoned` is omitted.
+#[tokio::test(flavor = "current_thread")]
+async fn a_missing_volatile_input_is_recomputed() {
+    let c = cached(&recomputing());
+    decide(&c, request("d1")).await;
+    let mut stale = request("d2");
+    stale.snapshot = support_snapshot("pro", &[2, 5], 600_000);
+    let d = decide(&c, stale.clone()).await;
+    let m = dc(&d);
+    assert_eq!(m.outcome, DecisionCacheOutcome::Miss);
+    assert_eq!(m.abandoned, None);
+    assert_eq!(m.on_refresh_failure, Some(RefreshFailurePolicy::Recompute));
+    assert!(
+        m.diagnostics
+            .iter()
+            .any(|x| x.starts_with("refresh_failed: input \"payments.events\""))
+    );
+    assert!(!d.record.requests.is_empty());
+    all_rerun(&d);
+    same_judgment(&d, &independent(&recomputing(), stale).await);
+}
+
+/// Spec 044, 3.6.5 item 3: a captured decision under `recompute` captures
+/// the rerun's supplies alone, each naming an `r<n>` attempt.
+#[tokio::test(flavor = "current_thread")]
+async fn a_recomputed_decision_captures_the_rerun_alone() {
+    let failing = Scripted::new(linear_head(), |c| {
+        if c.task() == "support.frustration" && c.attempt_id == "d2/frustration//1" {
+            Answer::Fail(
+                AdapterFailure::Transient,
+                "down".into(),
+                Charge::Observed { units: 0 },
+            )
+        } else {
+            ok(c.task(), 1)
+        }
+    });
+    let c = cached_with(&recomputing(), failing);
+    decide(&c, request("d1")).await;
+    let mut changed = request("d2");
+    changed.snapshot = support_snapshot("pro", &[2], 0);
+    let captured =
+        c.rt.decide_with_capture(
+            &c.plan,
+            changed,
+            &CancelSignal::new(),
+            &CaptureConfig {
+                scope: Scope::tenant_only(
+                    Dimension::new("tenant-a").unwrap(),
+                    Dimension::new("rev-1").unwrap(),
+                ),
+                max_bytes: MAX_CAPTURE_BYTES,
+            },
+        )
+        .await
+        .unwrap();
+    let d = captured.result.unwrap();
+    assert_eq!(dc(&d).outcome, DecisionCacheOutcome::Miss);
+    assert!(dc(&d).abandoned.is_some());
+    all_rerun(&d);
+    let rustev_runtime::CaptureOutcome::Captured(capture) = captured.capture else {
+        panic!("captured");
+    };
+    let text = format!("{capture:?}");
+    assert!(text.contains("d2/frustration//r1"), "{text}");
+    assert!(!text.contains("d2/frustration//1\""), "{text}");
+}
+
+/// Spec 044, 3.6.4: the rerun is a miss that ran normally, so it is
+/// admitted, and the next identical decision is served from its entry.
+#[tokio::test(flavor = "current_thread")]
+async fn a_recomputed_decision_is_admitted() {
+    let failing = Scripted::new(linear_head(), |c| {
+        if c.task() == "support.frustration" && c.attempt_id == "d2/frustration//1" {
+            Answer::Fail(
+                AdapterFailure::Transient,
+                "down".into(),
+                Charge::Observed { units: 0 },
+            )
+        } else {
+            ok(c.task(), 1)
+        }
+    });
+    let c = cached_with(&recomputing(), failing);
+    decide(&c, request("d1")).await;
+    let mut changed = request("d2");
+    changed.snapshot = support_snapshot("pro", &[2], 0);
+    let d = decide(&c, changed.clone()).await;
+    assert_eq!(dc(&d).outcome, DecisionCacheOutcome::Miss);
+    let source = d.record.record_digest().unwrap();
+    changed.decision_id = "d3".into();
+    let next = decide(&c, changed).await;
+    assert_eq!(dc(&next).outcome, DecisionCacheOutcome::Refreshed);
+    assert_eq!(dc(&next).source_run_record.as_ref(), Some(&source));
+}

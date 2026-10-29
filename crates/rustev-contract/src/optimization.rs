@@ -332,7 +332,7 @@ pub enum SharedLeave {
 /// The decision-result cache's part in one decision, a `rustev.run/3`
 /// member (spec 044, 3.6.6). Request indices are positions in the run
 /// record's `requests`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DecisionCacheRecord {
     pub outcome: DecisionCacheOutcome,
@@ -364,6 +364,10 @@ pub struct DecisionCacheRecord {
     /// The policy applied, present when a refresh failed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub on_refresh_failure: Option<RefreshFailurePolicy>,
+    /// The served run abandoned under `recompute` (3.6.5); never supplied
+    /// to the core or to replay.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub abandoned: Option<AbandonedRun>,
     /// At most [`MAX_OPTIMIZATION_DIAGNOSTICS`], as a request's record.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub diagnostics: Vec<String>,
@@ -382,6 +386,18 @@ pub enum DecisionCacheOutcome {
     Bypassed,
     /// The same conditions under `admission: refuse`.
     Refused,
+}
+
+/// A served run abandoned under `on_refresh_failure: recompute` (spec 044,
+/// 3.6.6): the records its dispatched requests and its acquisitions would
+/// have had, with their attempts and charges.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AbandonedRun {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub requests: Vec<crate::run::RequestRecord>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub acquisitions: Vec<crate::acquisition_record::AcquisitionRecord>,
 }
 
 /// A volatile input's stored snapshot entry supplied after a failed

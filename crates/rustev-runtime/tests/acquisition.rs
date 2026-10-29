@@ -1046,3 +1046,50 @@ async fn a_failed_refreshed_acquisition_is_supplied_as_it_is() {
         assert_eq!(served.record.core, independent.record.core);
     }
 }
+
+/// Spec 044, 3.6.5 under `recompute`: a refreshed acquisition fails, so the
+/// served run is abandoned and the decision runs again. Its acquisition
+/// attempts are `r<n>`, the served run's acquisition is in `abandoned`, and
+/// the judgment equals independent execution given the rerun's page.
+#[tokio::test]
+async fn a_failed_refreshed_acquisition_is_recomputed() {
+    let policy = decision_cached(&["step:lookup"], "recompute");
+    let page = || Action::Page(vec![1], json!("none"));
+    let fail = Action::Fail(AcquisitionFailure::Permanent);
+    let (_, served, _) = twice(&definition(), &policy, vec![page(), fail, page()]).await;
+    let dc = served.record.decision_cache.as_ref().unwrap();
+    assert_eq!(dc.outcome, DecisionCacheOutcome::Miss);
+    assert_eq!(
+        dc.on_refresh_failure,
+        Some(rustev_contract::optimization::RefreshFailurePolicy::Recompute)
+    );
+    assert_eq!(
+        dc.diagnostics,
+        vec!["refresh_failed: acquisition step \"lookup\"".to_string()]
+    );
+    let abandoned = dc.abandoned.as_ref().unwrap();
+    assert_eq!(abandoned.acquisitions.len(), 1);
+    assert!(
+        abandoned.acquisitions[0].attempts[0]
+            .attempt_id
+            .ends_with("/1")
+    );
+    let pages = served.record.acquisitions.as_ref().unwrap();
+    for a in pages.iter().flat_map(|p| &p.attempts) {
+        assert!(a.attempt_id.ends_with("/r1"), "{}", a.attempt_id);
+    }
+    let alone = Source::new(source(), vec![page()]);
+    let rt = runtime(&ManualClock::new(), std::slice::from_ref(&alone), 1);
+    let plan = prepare(
+        &rt,
+        &definition(),
+        std::slice::from_ref(&alone),
+        Some(&policy),
+    );
+    let independent = rt
+        .decide(&plan, request("served"), &CancelSignal::new())
+        .await
+        .unwrap();
+    assert_eq!(served.completion, independent.completion);
+    assert_eq!(served.record.core, independent.record.core);
+}

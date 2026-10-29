@@ -85,6 +85,9 @@ pub(crate) struct DecisionCtx<'a, 'e> {
     pub stream: Option<&'a crate::generation::RequestStream>,
     /// Present only on the live re-execution path (spec 026).
     pub live: Option<&'a LiveCtx<'a>>,
+    /// The rerun of a served decision abandoned under `recompute`, whose
+    /// attempt numbers are `r<n>` (spec 044, 3.6.5 item 2).
+    pub rerun: bool,
 }
 
 impl<'e> DecisionCtx<'_, 'e> {
@@ -95,6 +98,16 @@ impl<'e> DecisionCtx<'_, 'e> {
 
     pub(crate) fn now(&self) -> Instant {
         self.rt.clock.now()
+    }
+
+    /// An attempt id's last component: `n`, or `r<n>` in a rerun (spec 003,
+    /// 3.9.2 item 2, as spec 044 3.6.5 amends it).
+    pub(crate) fn attempt_number(&self, n: u32) -> String {
+        if self.rerun {
+            format!("r{n}")
+        } else {
+            n.to_string()
+        }
     }
 
     pub(crate) fn elapsed(&self) -> u64 {
@@ -1530,10 +1543,11 @@ async fn drive_batch(
                 .collect::<Vec<_>>()
                 .join(",");
             let attempt_id = format!(
-                "{}/{}/{}/1",
+                "{}/{}/{}/{}",
                 escape(cx.decision_id),
                 escape(&candidate.req.step),
-                instance
+                instance,
+                cx.attempt_number(1)
             );
             BatchMember {
                 candidate,
@@ -2231,7 +2245,7 @@ pub(crate) async fn drive(
                 escape(cx.decision_id),
                 escape(&req.step),
                 instance,
-                n
+                cx.attempt_number(n)
             );
             // Live re-execution: the host authorizes this exact attempt,
             // after its reservation and immediately before dispatch. A

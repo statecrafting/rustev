@@ -387,11 +387,26 @@ pub(crate) fn validate(
             worst = worst.saturating_add(requests.saturating_mul(per_request));
         }
     }
+    // Under `recompute` an abandoned served run and its rerun share one
+    // record, so the plan's worst case counts twice (spec 044, 3.6.5 item 5).
+    let recompute = policy
+        .optimization
+        .as_ref()
+        .and_then(|o| o.decision_cache.as_ref())
+        .is_some_and(|c| c.on_refresh_failure == RefreshFailurePolicy::Recompute);
+    if recompute {
+        worst = worst.saturating_mul(2);
+    }
     if worst > policy.max_attempts_per_decision {
         return refuse(
             "execution",
             format!(
-                "worst case {worst} attempts exceeds max_attempts_per_decision {}",
+                "worst case {worst} attempts{} exceeds max_attempts_per_decision {}",
+                if recompute {
+                    " (twice the plan's, under on_refresh_failure recompute)"
+                } else {
+                    ""
+                },
                 policy.max_attempts_per_decision
             ),
         );
@@ -559,34 +574,29 @@ fn refresh_closure(
 
 /// A mechanism the runtime of this build does not run is refused rather
 /// than silently run independently (spec 017, 3.1). The decision-result
-/// cache runs its memory and persistent tiers with the `unresolved` and
-/// `serve_cached_within_freshness` refresh policies (spec 044, 3.6.5);
-/// `recompute` joins with a later part of spec 044's increment 5. An
-/// acquisition or widening step outside the refresh closure is refused:
-/// its pages are never stored in an entry, so it could only be dispatched
-/// again, which 3.6.2 reserves for steps inside the closure (spec 044,
-/// increment 5, part e).
+/// cache runs its memory and persistent tiers with every refresh policy
+/// (spec 044, 3.6.5). An acquisition or widening step outside the refresh
+/// closure is refused: its pages are never stored in an entry, so it could
+/// only be dispatched again, which 3.6.2 reserves for steps inside the
+/// closure (spec 044, increment 5, part e).
 pub(crate) fn available(execution: &PlanExecution, def: &Definition) -> Result<(), Refusal> {
     let PlanExecution::Declared(d) = execution else {
         return Ok(());
     };
-    let Some(p) = d
-        .policy
+    if d.policy
         .optimization
         .as_ref()
         .and_then(|o| o.decision_cache.as_ref())
-    else {
+        .is_none()
+    {
         return Ok(());
-    };
+    }
     let unavailable = |what: &str| {
         refuse(
             "execution.optimization",
             format!("decision_cache {what} is not available in this build"),
         )
     };
-    if p.on_refresh_failure == RefreshFailurePolicy::Recompute {
-        return unavailable("on_refresh_failure recompute");
-    }
     let closure = d
         .decision_cache
         .as_ref()
