@@ -196,3 +196,41 @@ pub fn release_all(b: &Scripted) -> usize {
 pub fn gate_all(d: BackendDescriptor) -> Arc<Scripted> {
     Scripted::new(d, |_| Answer::Gate)
 }
+
+/// Support routing instantiated from a spec 034 template under the profile
+/// `profile`, compiled with `policy`. Every profile sets the same value, so
+/// two plans differ only by the profile they name (spec 044, 3.5.2).
+pub fn support_profiled(policy: &ExecutionPolicy, profile: &str) -> Compiled {
+    let def = support_routing();
+    let requests = def.limits.max_semantic_requests;
+    let name = def.name.clone();
+    let template = rustev_core::builder::TemplateBuilder::from_definition(def)
+        .parameter(
+            serde_json::from_value(serde_json::json!({
+                "name": "requests", "type": "integer", "lock": "bounded",
+                "bounds": {"range": [1, 100]}, "default": {"value": requests}
+            }))
+            .unwrap(),
+        )
+        .reference("/limits/max_semantic_requests", "requests")
+        .build()
+        .unwrap();
+    let profile = rustev_contract::canonical::canonical_bytes(&serde_json::json!({
+        "schema": "rustev.profile/1", "profile": profile, "version": "1.0.0",
+        "definition": {"name": name, "version": ">=0.0.0"},
+        "extends": "none", "values": {"requests": requests}
+    }))
+    .unwrap();
+    rustev_core::compile_profiled_with(
+        &[&template],
+        Some(&profile),
+        &[],
+        None,
+        None,
+        &descriptors_with_fallbacks(),
+        &cal(),
+        &[],
+        Some(policy),
+    )
+    .unwrap()
+}
