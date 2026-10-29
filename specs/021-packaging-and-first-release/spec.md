@@ -796,3 +796,15 @@ stages and the unit-test fixtures 037 packages under `src/testdata/`
 against 160 KiB), its file list and every other bound are unchanged. No
 other member was over a bound; `rustev-core` unpacks to 1,220,234 of its
 1,310,720.
+
+**Candidate run, 2026-10-29, the `v0.3.0` tag run at `c97a5f8`.** The
+archive check refused two members, and nothing was published (058 3.2: the
+check precedes `approve`). `rustev-core` unpacks to 1,312,695 bytes against
+its reviewed bound of 1,310,720 (1.25 MiB), after spec 039's rank and
+select compilation and the ranking evidence copies it packages under
+`src/testdata/`; the bound becomes 1,376,256 (1.3125 MiB). `rustev-runtime`
+unpacks to 494,288 bytes against 393,216 (384 KiB), after spec 044's
+shared slot, memory and persistent tiers and spec 039's rank dispatch; the
+bound becomes 524,288 (512 KiB). Their archives (290,313 bytes against 384
+KiB; 118,242 against 160 KiB), file lists and every other bound are
+unchanged; no other member was over a bound.

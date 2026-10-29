@@ -148,7 +148,7 @@
         "src/widening_eval.rs"
       ],
       "max_archive_bytes": 393216,
-      "max_unpacked_bytes": 1310720
+      "max_unpacked_bytes": 1376256
     },
     "rustev-runtime": {
       "files": [
@@ -180,7 +180,7 @@
         "src/wait.rs"
       ],
       "max_archive_bytes": 163840,
-      "max_unpacked_bytes": 393216
+      "max_unpacked_bytes": 524288
     },
     "rustev-eval": {
       "files": [
