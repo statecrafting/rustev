@@ -34,7 +34,7 @@
       "contentHash": "278d5561b60c28ddab7090f42c51c3d7ffd02720f6296e8e1b8a5189766890e2"
     },
     "Cargo.toml": {
-      "contentHash": "5fde580749868486993ecc1f445edbbe9f67a8c867e43a48f9a3b667dd25f717"
+      "contentHash": "b4e1d330404f0a7fa3fea9111bcbd1407e49fdf72668e9e0777d1aff0b7f0f75"
     },
     "Makefile": {
       "contentHash": "bc07b8c928b89d7135cadc6bea46f6df0fb0ad2a86ba1fe424de4c31cf47f565"
@@ -67,7 +67,7 @@
       "contentHash": "896ccc486bd9f594e4b323e11fd1da0fd62b96f6da5018c26c75560bfa3ac9fc"
     },
     "docs/decisions/00-founding-decisions.md": {
-      "contentHash": "30b6b9d1d0a5a2c21cdc7bec25c60944c2fab756d34f78cce2ee4b7359e04d0e"
+      "contentHash": "b04bdc0d7f4cb82880e03191a6253c3d90e5891a9a686db06be0d3434de6c590"
     },
     "docs/design/001-decision-engine-architecture.md": {
       "contentHash": "97b0ab9aefbfcce74dc39e9c00fc786d18916d48f84ac7ef4cb26acc543d2a1f"

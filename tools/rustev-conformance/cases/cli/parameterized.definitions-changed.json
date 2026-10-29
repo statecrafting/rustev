@@ -47,14 +47,14 @@
     {
       "golden": "crates/rustev-cli/tests/golden/parameterized.definitions-changed.json",
       "normalize": [],
-      "sha256": "8c13a1164f94922c71dec724397c2ced661db4a7a3e50904e7643579edca0ecf",
+      "sha256": "330fdd795709b1108ef523814aed22f10a85f4d0b73f1e3eaea67ae3975c57b0",
       "stream": "stdout"
     },
     {
       "file": "diff",
       "golden": "crates/rustev-cli/tests/golden/parameterized.definitions-changed.document.json",
       "normalize": [],
-      "sha256": "c28011b6a4b495524a2a1612fff8736fc181e7060d11db208a207e3ea229f40a"
+      "sha256": "4d5dd99da6d48bc1967918131d6a1ce978ba52bf577e7efc616839cb9e0216dd"
     }
   ],
   "surfaces": [

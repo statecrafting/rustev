@@ -30,7 +30,7 @@
     {
       "name": "actionable.plan.json",
       "path": "tools/rustev-conformance/fixtures/cli/actionable.run-unresolved/actionable.plan.json",
-      "sha256": "590df4f72cc6907eda4016dce1d1973ac8614d3044185fc720a94d8710315141"
+      "sha256": "1091ed71ebd964ad0ca33f8c987d4dff0ee7bdef47b5e9f4af2b6529dd485fa4"
     },
     {
       "name": "support.rules.json",
@@ -54,7 +54,7 @@
       "normalize": [
         "receipt"
       ],
-      "sha256": "ef7066ceefcdb8d8ee116e6d94a1f71029a2368bd9880e48cf91548182e5f925",
+      "sha256": "dd79a1e2a1cd33528be7faa51ded836ac81951069714d3d2b2bab717b343eaf3",
       "stream": "stdout"
     }
   ],
