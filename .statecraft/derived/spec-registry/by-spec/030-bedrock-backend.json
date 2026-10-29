@@ -164,7 +164,7 @@
       }
     ],
     "sectionDigests": {
-      "030-hosted-model-platform-backend-aws-bedrock": "9c0663be1c61214ecd7a5871e55fbc2b900bff8b8cba262cac94da75f9afe7df",
+      "030-hosted-model-platform-backend-aws-bedrock": "9632b48ab8382eb3eb663d0169544bbe4f265d8a82ba8d753f518e311eb14a2f",
       "1-purpose": "c8803f461f533a8c51de7505c7fdc8318afacf16f61e71ad6926686529d8e9b6",
       "2-territory": "5e34925b0ff05fffd186fdf11d173e08c3f855b37a0e27e51cf52683d46f442c",
       "3-1-position-authority-and-provenance": "665f12655de73b292d7c48e4b1b5c874c14a4d45b63b1c5d9f9b4e6506c4f020",
@@ -177,19 +177,19 @@
       "3-2-the-binding-document": "e71e3f0758a5485230b2af78ac1c946545645ec4ee4eb91300911431828011bf",
       "3-3-residency-and-inference-profiles": "90381d26d751d7c95c35389380fba4198c7519c4fd613e2f4bf7a679e2e7353f",
       "3-4-model-policy": "239819304fbdb673b24f9147cbfc9b08c0b2163c1061346d21306101e945b322",
-      "3-5-credentials-signing-and-transport": "e4f4721e104de62fe5b1a632652d95daa810ca4ebf5d3aaa9d0c3b6abb78d74d",
+      "3-5-credentials-signing-and-transport": "c99635f39f9630c57f9644255f5e74bc5885c06efa11f55a01140f64c93ba01d",
       "3-6-the-converse-and-responses-wires": "cbba4da8249aa2efe76175e9cf67f289c3a616bda4a1515f05efd146fb97fd0b",
       "3-7-operations-and-output-kinds": "8350ae9979247695dcb8e933949fa8faf5f2eb4d0905d215963a59bea65148e8",
       "3-8-served-identity": "831edb85cad6d64d02726454a0bd29600b81a00f60ecf247f47e7f2c9b4acee8",
       "3-9-cost-and-spend": "19a902fa6bf01c7cb55c04c52401364ef740c521b3b2f4221066908c99fbb4ae",
-      "3-behavior": "b0fd9e7e67640492cb85a735ad58814eace0ea53247cbb705839bf08ad6fe222",
+      "3-behavior": "f6c499909dfc8e7f7ee468649c15a0a95a9362d99c25e9b3f2e284fa04116af3",
       "4-out-of-scope": "bef76b97313b51fdc47f31c8d3da95ead0499f4cc66cdff2b2925bf7974229de",
-      "5-observable-negative-cases": "4624d3c60116e909673f245b229fe6bcbfeeb57653716ba3794ac5c6ee0b55d3",
-      "acceptance": "2380fef499558d98adbbf011b97ef78fe6edabd218668dedb0c453ac4b1f96e5",
+      "5-observable-negative-cases": "9646abc927f5edd9e2c5dc48cfd135596478512bfb349a241d77d093bf52584c",
+      "acceptance": "28a95830d44bbaab57f8a1a87586cc7c907835e1c429c379e44e4f89fbf28b42",
       "decisions-at-approval": "3f7cf9bf7573b20c050abe01faca21294f95b5ffcf50068c3319858806c371fb",
       "facts-relied-on": "3d991387232049fac357bbc0b12eddb16a39dd34d682f58554f39f8d8cb4e1f7",
-      "implementation-record": "56ba1f7e7a433e3bf81bf388ada6ff2d45041d5a28d16b059f309dfe1a13d7f4",
-      "verification": "c64cf25085085002be6cbcdd3ad441584947868f180e32b7a669f890a7be2661"
+      "implementation-record": "15f7d7be8326ed153857b05f0d2ac988236b545bbd130a0d65779bc8a17882d6",
+      "verification": "fd0d986284e03f6da835cb55ea9721df4b590ccee6b8a19bf63fdafba3ce88f4"
     },
     "sectionHeadings": [
       "030: Hosted model platform backend: AWS Bedrock",
@@ -224,6 +224,6 @@
     "summary": "A remote decision backend under `integrations/rustev-bedrock/` for Amazon Bedrock over two wires on the `bedrock-runtime` endpoint, Converse and the OpenAI-compatible Responses API, signed with SigV4 over Rustev's existing hyper and rustls stack. A versioned binding document puts wire, region, model or inference profile, declared destination regions, residency policy, parameters, structured output mode, price table and reserved members for later operations into the artifact identity. A host-supplied `ModelPolicy` (deny wins, no default allowlist) is evaluated at bind time and again at runtime start. Wave 1 serves `classify`, `proposition` and `rubric` as `Label` outputs, because neither wire documents token log-probabilities; `rank`, `generate`, `extract` and Guardrails screening are added by their own specs into members reserved here. Amends spec 001 only by adding a cloud SDK dependency family to the boundary check. Approved (A-26) under the 2026-10-16 delivery work order; implementation is pending. The work order authorizes paid Bedrock smoke and probe calls on synthetic or spec 023 admitted data within R-29's USD 5 total testing cap across all providers; the owner supplies AWS credentials, whose absence blocks only the live stage. Approval makes no quality, residency-compliance or production claim.\n",
     "title": "Hosted model platform backend: AWS Bedrock"
   },
-  "shardHash": "75b0204e14c99633656b57b1bb0d8b7a61e1e20fabb41d2eaddbec1206c55df1",
+  "shardHash": "79b87e3c6615b81e663438b3a0c90128e0d8829ce40f672ccd6c6bd8df901da2",
   "specVersion": "1.10.0"
 }
