@@ -697,11 +697,11 @@ fn selection_generation_reads_are_refused_at_compile_time() {
     }
 }
 
-/// Spec 044, increment 5 part b: a decision-result cache over a generation
-/// step validates and is refused as not yet available, never run without
-/// its generation rules (3.6.2 and 3.6.6).
+/// Spec 044, increment 5 part e: a decision-result cache over a generation
+/// step compiles, its step outside the closure with no volatile source
+/// (3.6.2), and is part of `PlanId`.
 #[test]
-fn a_decision_cache_over_generation_steps_is_not_available() {
+fn a_decision_cache_over_generation_steps_compiles() {
     use rustev_contract::execution::ExecutionPolicy;
     let (d, p, b) = fixture();
     let policy: ExecutionPolicy = serde_json::from_value(json!({
@@ -728,12 +728,16 @@ fn a_decision_cache_over_generation_steps_is_not_available() {
             std::slice::from_ref(&p),
         )
     };
-    let r = compile(Some(&policy)).unwrap_err();
-    assert_eq!(r.category, C::InvalidExecution, "{r:?}");
-    assert_eq!(
-        r.detail,
-        "decision_cache over generation steps is not available in this build"
+    let cached = compile(Some(&policy)).unwrap();
+    let rustev_contract::plan::PlanExecution::Declared(e) = &cached.plan.execution else {
+        panic!("a declared policy");
+    };
+    assert!(
+        e.decision_cache
+            .as_ref()
+            .unwrap()
+            .refresh_closure
+            .is_empty()
     );
-    // Without the member the same definition compiles.
-    compile(None).unwrap();
+    assert_ne!(cached.id, compile(None).unwrap().id);
 }

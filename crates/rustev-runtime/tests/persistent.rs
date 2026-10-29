@@ -1308,3 +1308,102 @@ async fn a_restarted_runtime_substitutes_a_stored_volatile_entry() {
         same_as_independent(&d, &p, supplied).await;
     }
 }
+
+/// Spec 044, 3.6.6 with spec 037, 3.14.2 (increment 5, part e): a decision
+/// over a generate step written to the store and served after a restart,
+/// with nothing dispatched, keeps each field's original origin, value and
+/// lineage, its source `served_from_cache` naming the original decision.
+#[tokio::test(flavor = "current_thread")]
+async fn a_restarted_runtime_serves_stored_generated_text() {
+    use rustev_contract::Identified;
+    use rustev_contract::definition::Operation;
+    use rustev_contract::descriptor::{OutputKind, TextStructure};
+    use rustev_contract::generation::PromptTemplate;
+    use rustev_contract::generation_result::TextSource;
+    use rustev_contract::output::{RawOutput, TextValue};
+    use serde_json::json;
+    let mut d = support_routing();
+    d.schema = schema::DEFINITION_V2.into();
+    d.inputs.clear();
+    d.policy = serde_json::from_value(json!({"on_unresolved":[],"rules":[{"id":"default",
+        "when":"always","then":{"propose":{"action":"recommend","params":[]}}}],"adjustments":[]}))
+    .unwrap();
+    let template: PromptTemplate =
+        serde_json::from_value(json!({"schema":"rustev.prompt-template/1",
+        "id":"item-text","version":"1.0.0","instructions":"Describe the item.","params":[]}))
+        .unwrap();
+    let mut g: serde_json::Value = serde_json::from_str(include_str!(
+        "../../rustev-contract/tests/fixtures/generate-step.json"
+    ))
+    .unwrap();
+    let body = &mut g["body"]["generate"];
+    body["for_each"] = json!("none");
+    body["template"] = json!({"id":"item-text","digest":template.id().unwrap(),"params":{}});
+    body["projection"] = json!([]);
+    body["carry"] = json!([]);
+    body["backstop"]["fields"] =
+        json!({"headline":{"text":"An option"},"why":{"text":"A choice."}});
+    d.steps = vec![serde_json::from_value(g).unwrap()];
+    let mut b = linear_head();
+    b.operations = vec![support(
+        Operation::Generate,
+        OutputKind::TextRecord {
+            structure: TextStructure::JsonSchema,
+            max_output_bytes: 4096,
+            languages: vec!["en-GB".into()],
+            streaming: false,
+        },
+        32,
+    )];
+    let text = RawOutput::TextRecord(BTreeMap::from([
+        ("headline".into(), TextValue::Text("Hello".into())),
+        ("why".into(), TextValue::Text("A useful choice".into())),
+        ("tags".into(), TextValue::List(vec!["quiet".into()])),
+    ]));
+    let backend = Scripted::new(b.clone(), move |_| {
+        Answer::Output(
+            text.clone(),
+            rustev_contract::run::Charge::Observed { units: 1 },
+        )
+    });
+    let policy = persistent_decisions();
+    let store = TestStore::new();
+    let decide = |id: &str| {
+        let rt = decision_runtime(&backend, &store);
+        let compiled = rustev_core::compile_with_templates(
+            &d,
+            std::slice::from_ref(&b),
+            &[],
+            &[],
+            Some(&policy),
+            std::slice::from_ref(&template),
+        )
+        .unwrap();
+        let mut req = request(id);
+        req.snapshot = snapshot(vec![]);
+        async move {
+            let plan = rt.prepare(compiled).unwrap();
+            rt.decide(&plan, req, &CancelSignal::new()).await.unwrap()
+        }
+    };
+    let cold = decide("cold").await;
+    assert_eq!(cold.decision_cache_write, Some(Ok(())));
+    let warm = decide("warm").await;
+    assert_eq!(backend.dispatched().len(), 1, "nothing dispatched again");
+    assert_eq!(dc(&warm).outcome, DecisionCacheOutcome::Hit);
+    assert!(dc(&warm).generations.is_some());
+    let (original, served) = (cold.text_result.unwrap(), warm.text_result.unwrap());
+    for (name, f) in &served.steps[0].items[0].generated {
+        let o = &original.steps[0].items[0].generated[name];
+        assert_eq!(
+            (&f.origin, &f.value, &f.lineage),
+            (&o.origin, &o.value, &o.lineage)
+        );
+        assert_eq!(
+            f.source,
+            TextSource::ServedFromCache {
+                original_decision_id: "cold".into()
+            }
+        );
+    }
+}

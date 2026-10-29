@@ -304,6 +304,10 @@ pub(crate) struct StageContext<'a> {
     pub principal: &'a [u8],
     pub evaluation_time: rustev_contract::Timestamp,
     pub streaming: Option<&'a Streaming>,
+    /// The decision-result cache's part in this decision: a generation,
+    /// repair or output screening request outside the refresh closure may be
+    /// supplied from the entry (spec 044, 3.6.3).
+    pub decision: Option<&'a crate::optimization::decision::DecisionRun>,
 }
 pub(crate) struct PendingWrite {
     key: RequestKey,
@@ -469,6 +473,9 @@ pub(crate) async fn run(
         let (step, item, future) = active.remove(index);
         drop(future);
         let Finished { out, source, write } = result?;
+        if let (Some(d), Some(Supplied::Output(raw))) = (cx.decision, &out.supplied) {
+            d.supplied(&out.step, &out.instance, raw);
+        }
         if let Some(supplied) = out.supplied {
             let attempt = out
                 .record
@@ -524,6 +531,16 @@ pub(crate) async fn run(
     ))
 }
 
+/// The decision an attempt id names: its first escaped component (spec 003,
+/// 3.9.2).
+fn original_decision(attempt_id: &str) -> String {
+    attempt_id
+        .split('/')
+        .next()
+        .map(crate::driver::unescape)
+        .unwrap_or_default()
+}
+
 async fn request(
     cx: &StageContext<'_>,
     stage: &Mutex<GenerationEvaluation<'_>>,
@@ -571,9 +588,29 @@ async fn request(
         // queue. Generation returns its pending write to the delivery gate.
         deferred_cache: None,
         persistent: None,
-        decision: None,
+        decision: cx.decision,
         live: None,
     };
+    // A request served from a decision entry, or refused with its decision,
+    // stands in for the attempt as a request-level hit does (spec 037,
+    // 3.14.1): its fields keep the original origin (spec 044, 3.6.6).
+    if let Some(out) = cx
+        .decision
+        .and_then(|d| crate::driver::from_decision(&drive_cx, d, &semantic))
+    {
+        item_clock.start(cx.rt.clock.now());
+        let source = out
+            .record
+            .optimization
+            .as_ref()
+            .and_then(|o| o.source_attempt_id.as_deref())
+            .map(original_decision);
+        return Ok(Finished {
+            out,
+            source,
+            write: None,
+        });
+    }
     let mut cache = None;
     let mut diagnostics = vec![];
     if !is_screen
@@ -614,12 +651,7 @@ async fn request(
             o.entry_id = Some(hit.entry_id);
             o.age_ms = hit.age_ms;
             o.source_attempt_id = Some(hit.source_attempt_id.clone());
-            let source = hit
-                .source_attempt_id
-                .split('/')
-                .next()
-                .map(crate::driver::unescape)
-                .unwrap_or_default();
+            let source = original_decision(&hit.source_attempt_id);
             let record = RequestRecord {
                 screen: None,
                 step: semantic.step.clone(),
