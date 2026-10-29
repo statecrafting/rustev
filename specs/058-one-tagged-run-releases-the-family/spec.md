@@ -497,6 +497,19 @@ check of 056 3.3, still tested per platform; `family_artifacts::collect`
 and its tests; and `bind` and `bound`, which the crate publisher reads
 until it leaves in a later part.
 
+Part c, the signed instruction and the journal: the crate publisher of
+`lifecycle` (`publish`, its owner-account check and visibility polls),
+the publication journal (`Journal` and `Entry`), the owner's instruction
+(`Instruction`, `authorize_file` and the `Authorized` event, with its
+continuation flag), and `bind` and `bound`. 0.1.0's authority (031
+3.11.1) is spent and unchanged (3.6): nothing reads the 0.1.0 instruction
+or its journal any longer, so the tests that exercised that path leave
+with it, and what remains of 0.1.0 is `FIRST_RELEASE_VERSION`, for which
+`TagAuthorized` is refused, with a test. The lifecycle tests now drive
+every state of 021 3.1 through the verified tag (`TagAuthorized`).
+`Registry`'s upload half and `FakeRegistry` stay until the crates.io
+upload adapter leaves in the next part.
+
 **Increment 4 (2026-10-28).** The owner settings of 3.8 are in place:
 crates.io trusted publishers for the twelve crates (workflow
 `release.yml`, Environment `crates-publish`); the `release` and

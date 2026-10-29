@@ -97,31 +97,6 @@ fn candidate_image_writes_no_manifest() {
     assert!(!dir.join("SHA256SUMS").exists());
 }
 #[test]
-fn candidate_publish_journals_nothing() {
-    use rustev_release::lifecycle::{self, FakeRegistry, Journal, Lifecycle, Outcome};
-    let dir = rustev_release::repro::fresh_dir("candidate-publish").unwrap();
-    let mut journal = Journal {
-        file: Some(dir.join("journal")),
-        ..Journal::default()
-    };
-    for tag_only in [false, true] {
-        let mut m = manifest();
-        if tag_only {
-            m.version = family_version();
-        }
-        let mut life = Lifecycle::new(m);
-        let result = lifecycle::publish(
-            &mut life,
-            &BTreeMap::new(),
-            &mut FakeRegistry::default(),
-            &mut journal,
-        );
-        assert!(matches!(result, Outcome::Stopped { reason } if reason.contains("053 3.4.2")));
-    }
-    assert!(journal.entries.is_empty());
-    assert!(!dir.join("journal").exists());
-}
-#[test]
 fn workflow_write_permissions_are_confined() {
     let workflow = include_str!("../../../.github/workflows/release.yml");
     let mut job = "";
