@@ -122,6 +122,19 @@ jobs:
         run: |
           test -x ~/semver-tools/bin/cargo-semver-checks || cargo install --locked --root ~/semver-tools cargo-semver-checks --version 0.51.0
           echo "$HOME/semver-tools/bin" >> "$GITHUB_PATH"
+      # Once @rustev/rustev-wasm has an npm baseline, semver.sh stages its
+      # declarations with wasm-bindgen (031 3.8), so the job needs the pins of
+      # 027 3.10.2, each under a root named by its version.
+      - name: Cache the pinned wasm-bindgen
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/wasm-tools/wasm-bindgen-0.2.129
+          key: wasm-bindgen-0.2.129-${{ runner.os }}
+      - name: Install the WebAssembly target and the pinned wasm-bindgen (027 3.10.2)
+        run: |
+          rustup target add wasm32-unknown-unknown
+          test -x ~/wasm-tools/wasm-bindgen-0.2.129/bin/wasm-bindgen || cargo install --locked --root ~/wasm-tools/wasm-bindgen-0.2.129 wasm-bindgen-cli --version 0.2.129
+          echo "$HOME/wasm-tools/wasm-bindgen-0.2.129/bin" >> "$GITHUB_PATH"
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22

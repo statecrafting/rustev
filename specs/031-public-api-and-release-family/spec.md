@@ -1070,6 +1070,9 @@ inside `type: module` directories (TS2834); the re-exports now name
 `./rustev_wasm.js`, and the owner deprecated 0.2.0 on npm, so the
 comparison's existing rule (the newest non-deprecated earlier version)
 leaves 0.3.0 with no baseline.
+The `semver` job of `release-checks.yml` installs the wasm32 target and
+wasm-bindgen 0.2.129 (cached under a root named by its version), so the
+staging runs in CI.
 
 ## Decisions at approval
 
