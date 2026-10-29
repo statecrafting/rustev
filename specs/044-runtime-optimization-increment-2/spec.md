@@ -1773,6 +1773,95 @@ Tests: the unit tests in `batch_qualification.rs`:
 - `malformed_members_are_refused` covers each refusal in `check` and `new`,
   the `unknown` of an unchecked report and a long reason cut, not refused.
 
+**Increment 6, part b (2026-10-29): stage 1 for the remote-http and Jev
+adapters.** Each adapter runs every stage 1 case (3.8 item 1) over
+loopback and builds a `rustev.batch-qualification/1` report (3.8 item 3).
+Every case passes on both adapters, and both verdicts are `unknown`,
+because stage 2 has not run.
+
+What part b adds:
+- `integrations/rustev-remote-http/tests/batch_qualification.rs` runs the
+  cases against a loopback `RemoteServer` hosting a scripted head with
+  shared-state batching (spec 009, 3.10.4), and against canned servers.
+- `integrations/rustev-jev/tests/batch_qualification.rs` runs them
+  against the loopback fake Gateway of spec 012's stage 1, with scripted
+  answers and the existing fixtures. Batching is on in the test bindings
+  only (R-28).
+- No library code changes, so no archive policy entry or byte budget
+  changes. `rustev-eval` is unchanged.
+
+Decisions within the spec:
+- **The harness is a test, and the report is not kept.** Each adapter's
+  test builds the report from its own results. It then checks that the
+  report holds every case of `Stage1Case::ALL` in order, all passed, with
+  verdict `unknown`, and that the report round-trips with a record digest.
+  A stage 1 report is not stored, because no production binding cites one
+  until stage 2 exists (3.8 item 4).
+- **A failed expectation fails its case, never the harness.** A case
+  returns its reason, which the report records as `failed`. The test then
+  fails on any case that did not pass. A broken expectation was checked
+  to be recorded this way on each adapter.
+- **Several cases share one exchange.** Member attribution and settlement
+  with a remainder are checked on one exchange of three members, and a
+  member cancelled after send and partial member liability on one
+  exchange. Each case still gets its own result.
+- **Binding identities.** The remote-http binding identity
+  (`rustev.remote-binding/1`) does not hold the batching switch, so its
+  batched and unbatched identities are equal. The Jev identity is the
+  `rustev.jev-binding/1` digest, which holds `batching` (spec 012, 3.6.1),
+  so its identities differ. The test checks that the two bindings differ
+  in the switch alone. Both reports record the batching configuration
+  that the batched identity names: `max_items` 3, `window_ms` 2000. The
+  batch bounds case uses `max_items` 2 so that three siblings must split.
+- **Failure classes cover each code the adapter can produce on a batched
+  request** (part a's reading of "every failure class"). Remote-http
+  produces all twelve codes of spec 009 3.6. Jev produces these:
+  - Transient: `transport_unsent`, `transport_interrupted` and
+    `remote_error`. Jev has no path that yields `remote_deadline`, and
+    spec 020's phase expiry maps to the transport codes.
+  - Overloaded: `rate_limited` and `overloaded`.
+  - Permanent: `unauthorized`, `capability` (a batched request over the
+    binding's request maximum, though each projection fits),
+    `malformed_request`, `malformed_response`, and `identity_mismatch`
+    (the direct transport with a version pin).
+  - Cancelled: `cancelled`.
+
+  Each code reaches both members of a two-member exchange with its code
+  and class.
+- **Jev's cancellation after send is `unconfirmed`.** Jev has no cancel
+  operation (spec 012). The member that left reports an unknown charge.
+  Its reservation in the spend journal is liability until the late
+  answer's offer of 0 reconciles it, and the receivers carry the whole
+  charge. The case checks the journal before and after the offer.
+- **Jev's per-item isolation case checks the descriptor.** Increment 1
+  recorded that the Jev adapter builds its own descriptor with no per-item
+  capability, so its batching has nothing to exclude. The case checks
+  that the descriptor declares none, with batching on and with it off. A
+  per-item capability added later fails the case until batching excludes
+  it.
+- **Timers are real and waits are bounded.** 3.8 item 1 runs over
+  loopback, so coalescing windows and member budgets run on Tokio's clock,
+  as the spec 009 and 012 batching tests do. Every wait is bounded. The
+  only fixed sleeps are short: on each adapter, one inside a coalescing
+  window, and on remote-http, one after its server stops so that the
+  request is never sent.
+- **The declared bound and minimum make the report well-formed. They
+  measure nothing.** Part a requires both members. Each report declares
+  `top_label` agreement at 19 of 20 over at least 20 comparable pairs. No
+  stage 2 means no pairs, so the verdict is `unknown` whatever the bound.
+  A stage 2 run declares its own bound and minimum before it runs (3.8
+  item 2) and builds its own report.
+
+Tests: `stage_1_passes_and_the_report_stays_unknown_without_stage_2` in
+`integrations/rustev-remote-http/tests/batch_qualification.rs` and in
+`integrations/rustev-jev/tests/batch_qualification.rs`. Each runs all
+fifteen cases and checks the report. The spec 009 and 012 batching tests
+are unchanged (3.10.5).
+
+What remains: stage 2 (3.8 item 2) for both adapters, run only under the
+work order's live scope and recorded here with its spend. 3.8 item 4 and
+`batch_unqualified` belong to increment 8, which is blocked on spec 022.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child
