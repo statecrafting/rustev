@@ -1688,6 +1688,91 @@ Tests:
   generation sources above.
 - The spec 017 tests and the earlier increments' tests are unchanged.
 
+**Increment 6, the plan (2026-10-28): two parts.** Stage 1 for both
+adapters and the report do not fit one review, so increment 6 lands in two
+parts:
+
+- (a) `rustev.batch-qualification/1` in `rustev-eval`: the report, its
+  checks and its verdict, run by no adapter yet.
+- (b) Stage 1 (3.8 item 1) for the remote-http and Jev adapters. Each
+  adapter's harness runs every stage 1 case over loopback with scripted or
+  recorded responses and builds a report, whose verdict stays `unknown`.
+
+Stage 2 (3.8 item 2) still runs only under the work order's live scope.
+
+**Increment 6, part a (2026-10-28): the batching qualification report.**
+`crates/rustev-eval/src/batch_qualification.rs` holds
+`rustev.batch-qualification/1` (3.8 item 3). No adapter builds one yet.
+
+What part a adds:
+- The report records the adapter, its binding identities with batching on
+  and off, the batching configuration (`max_items` and `window_ms`), the
+  declared agreement bound and minimum case count, a result for each stage
+  1 case, stage 2's paired answers and spend, and the verdict.
+- `BatchQualification::new` checks the members and derives the verdict.
+  `BatchQualification::parse` reads under `REPLAY_V1` and refuses a report
+  whose members do not check or whose recorded verdict is not the derived
+  one.
+- The archive policy lists the new source file. The crate stays inside its
+  archive byte budgets.
+
+Decisions within the spec:
+- **The verdict is derived, never supplied.** 3.8 item 3 defines it from
+  the measured values, so a host cannot record `qualified` over results
+  that do not support it. A report whose members do not check derives
+  `unknown`.
+- **The stage 1 cases.** 3.8 item 1's list becomes fifteen named cases:
+  batch bounds, member attribution, a missing member, a malformed member,
+  partial member liability, a member cancelled before send and after send,
+  member deadlines, settlement with a remainder, settlement with an unknown
+  charge, one case per failure class, and per-item isolation. "Every
+  failure class" means spec 003's four classes (`transient`, `overloaded`,
+  `permanent`, `cancelled`). Spec 009 3.6 maps every remote code to one of
+  them, so an adapter's case for a class covers each code of that class it
+  can produce.
+- **Stage 1 passes only when every case is recorded once and passed.**
+  Results are written in case order. A failed case makes the report
+  `not_qualified`, since a measured value failed. A case not recorded makes
+  it `unknown`, never `qualified`.
+- **How two answers agree is declared.** 3.8 names an agreement bound but
+  no comparison. The bound declares one of two criteria. `exact` compares
+  record canonical bytes, as spec 004 compares retained outputs.
+  `top_label` compares the unique top option of a label, distribution,
+  logits or scores, which spec 012's comparison of batched and unbatched
+  answers reported. An output without a unique top option never agrees.
+- **Failed answers.** A pair with a failure on one side is a disagreement,
+  so a batched path that fails more often cannot pass by being skipped. A
+  pair that failed on both sides is not comparable and does not count
+  toward the minimum.
+- **The bound is an integer ratio**, the least share of comparable pairs
+  that agree, so the comparison is exact. With fewer comparable pairs than
+  the declared minimum nothing is measured against the bound, and the
+  verdict is `unknown`.
+- **Spend** is stage 2's settlements in the journal's cost units: observed
+  and estimated units summed, and settlements with an unknown charge
+  counted, never summed.
+- **The report's identity is its record digest** (spec 004, 3.1.6),
+  because stage 2's answers hold binary64 numbers, which canonical bytes
+  refuse. This digest is what 3.8 item 4 cites (increment 8).
+- **The batching configuration is recorded beside the identities.** An
+  adapter whose binding identity does not hold the batching switch
+  records equal identities. The configuration still names what was
+  qualified.
+- **No schema or generated declarations.** The report is eval-owned, as
+  `rustev.qualification/1` is, not a contract document, so
+  `crates/rustev-contract/schema` and the Node and WebAssembly
+  declarations are unchanged.
+
+Tests: the unit tests in `batch_qualification.rs`:
+- `the_verdict_follows_both_stages` covers stage 1 alone, a stage 2 below
+  the minimum, on the bound and under it, a missing case and a failed case.
+- `pairs_compare_by_the_declared_criterion` covers both criteria, a tie,
+  failures on one side and on both, and pairs that do not count.
+- `a_report_round_trips_and_its_verdict_is_checked` covers parsing, the
+  record digest and a forged verdict.
+- `malformed_members_are_refused` covers each refusal in `check` and `new`,
+  the `unknown` of an unchecked report and a long reason cut, not refused.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

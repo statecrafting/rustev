@@ -11,6 +11,7 @@
 
 pub mod assemble;
 pub mod baseline;
+pub mod batch_qualification;
 pub mod bundle;
 pub mod compare;
 pub mod comparison;
