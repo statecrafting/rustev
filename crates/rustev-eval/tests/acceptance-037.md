@@ -20,7 +20,7 @@ Abbreviations:
 |---|---|
 | 1. Forced reasons, per-field origin, aggregate counts, proposal isolation | R `forced_failure_origins_counts_and_judgment_are_unchanged`; R `deadline_and_cancellation_end_generation`; G `withheld_reasons_and_bounded_attempts_are_separate_from_outcome`; G `selected_items_render_context_and_backstops_in_list_order_and_restore_ownership`. Screen blocked and screen unavailable: **pending 035 integration**. Core withholding tests prove representation only. Judgment comparisons against a different plan normalize the necessarily different `plan_id`; generation within a plan preserves the original judgment bytes. |
 | 2. Repair, preserve round-zero fields, never carry invalid text | G `bounded_repair_never_carries_bad_text_or_overwrites_a_valid_field`; R `repair_round_trip_preserves_valid_fields` |
-| 3. Request cache origin and source; pending F1 fixture | R `cache_hit_preserves_origin_and_cross_scope_misses`, `cache_revalidates_invalid_fields_and_preserves_cached_repair_origin`; E `repair_backstop_absent_and_cached_invalid_outputs_keep_origins`. E `result_cache_preserves_generation_origins_pending_f1` is ignored and deliberately fails if explicitly run before F1 implementation. `fixtures/generation-result-cache-pending.json` records F1's obligations, not a passed result-cache test. |
+| 3. Request cache origin and source; the F1 fixture | R `cache_hit_preserves_origin_and_cross_scope_misses`, `cache_revalidates_invalid_fields_and_preserves_cached_repair_origin`; E `repair_backstop_absent_and_cached_invalid_outputs_keep_origins`. E `decision_cache_preserves_generation_origins` serves `fixtures/generation-decision-cache.json` from spec 044's decision cache (amended under A-64: generated and repaired slots `served_from_cache`, a backstop slot rendered fresh, a decision with a failed generation request not admitted). |
 | 4. Generated output isolation | C `generated_outputs_never_flow_into_decisions_or_generation`, `generated_flow_is_refused_in_exact_semantic_threshold_and_acquisition` |
 | 5. Ownership violation and post-finish restoration | G `selected_items_render_context_and_backstops_in_list_order_and_restore_ownership` injects context and judgment mutations and checks source digest restoration; R `invalid_records_fall_back_and_keep_ownership_notices` |
 | 6. One-byte template edit changes identity and misses cache | C `generation_plan_identity_reload_and_compatibility`; R `sink_failure_prevents_cache_write_and_template_change_misses` |
@@ -88,7 +88,9 @@ change is needed. No commit, push or HEAD movement is performed.
 - PASS: `cargo test -p rustev-core -p rustev-eval --features parameterized --locked`.
 - PASS: `cargo clippy --workspace --all-targets --locked -- -D warnings`.
 - PASS: `cargo fmt --all --check` and `git diff --check`.
-- The F1 test is intentionally ignored; no result-cache implementation is claimed.
+- At this audit the F1 test was ignored and no result-cache implementation was
+  claimed. On 2026-10-29 it was replaced by `decision_cache_preserves_generation_origins`
+  over spec 044's decision cache, with the fixture amended under A-64 (item 3).
 - PASS: the authorized review follow-up ran
   `SEEDS_JOBS=1 crates/rustev-eval/mutation/seeds.sh "spec 037"` once on
   2026-10-24 and exited 0. Every seed compiled and was detected; no seed or

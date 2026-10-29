@@ -225,7 +225,7 @@
       }
     ],
     "sectionDigests": {
-      "037-generation-steps-with-deterministic-backstops-and-per-field-origin-amends-002-003-and-004": "3451337769aa29a374a09c3bca06d4e24a9ea06fa237a6cc27a9c44a1116b238",
+      "037-generation-steps-with-deterministic-backstops-and-per-field-origin-amends-002-003-and-004": "73fbe8ccce72b0149b2121418051344fd59992b5be0418ec9bc73739cab9077b",
       "1-purpose": "fd977d8728f79b78a4ff674b1c7b282b81d81e55d33fa1b6f5a0acaa74b0d67a",
       "2-1-binding-principles-of-76": "3283c54be2cf3f6145c468f26d5137fd9f5fd27da33381f700c2da9b56c605ac",
       "2-territory": "b187192acf63fcf1b853714f8ffcee7c92af61f0b3ef9d79f05a8ac4792f52ff",
@@ -252,8 +252,8 @@
       "5-observable-negative-cases": "07ade0bde8c2e802885d81bd91c32a2035bee945001b67f670d35e4f1d3c577c",
       "acceptance": "3361e2e563272e5c97d80ed2e597210b619e9d6a04bbcd5751b809ca049423cb",
       "decisions-at-approval": "87051abe667faddb7a55f289105a37bd7672d0a1af846e9ceef3fb488bffc08b",
-      "implementation-record": "17783ca935a8f06fcbf6ac76d712edcb3c504053e2a4e6e6c087e63631c47465",
-      "verification": "9e01d194b8330c30a9bbccdd9124ff53da4cd25be1ab80f0a9d3c9d80d53da5a"
+      "implementation-record": "59a9519de16f3a468692cfb694518798a7e222e1c1ea3eabd4efe56c130f47fd",
+      "verification": "b7a9c00de95db5fe286411f8fe5f0f7d779d8a46aa318c32149ef818de047046"
     },
     "sectionHeadings": [
       "037: Generation steps with deterministic backstops and per-field origin (amends 002, 003 and 004)",
@@ -291,6 +291,6 @@
     "summary": "An amendment of approved specs 002, 003 and 004 (R-16), for #76 child B5 (#63), under owner decisions R-41 (OD-2) and R-42 (OD-4). Defines the bounded model step envelope that later model steps reuse, and its first kind, `generate`: a declared, finite step that runs after selection and asks a backend for schema-bounded text fields per selected item, with a versioned prompt template bound into `PlanId`, a deterministic backstop for every required field written in a logic-less template language implemented in `rustev-core`, optional bounded repair, ownership checks, and per-field origin (`generated`, `repaired`, `backstop{reason}`) in the text result, the evidence, every capture and every cached copy. Generated text is model-derived and can never reach an exact operator, a policy control, an acquisition request or another model step. Generate steps add to the shared #76 versions `rustev.definition/2`, `rustev.plan/3` and `rustev.evidence/2`; plans without any #76 construct keep byte-identical identities and documents. Approved (A-34); implementation is complete; approval authorizes no live provider call, spend, release or real-user data.\n",
     "title": "Generation steps with deterministic backstops and per-field origin (amends 002, 003 and 004)"
   },
-  "shardHash": "a9eda28dc1774e106c1116ddc087773af279409c4a316e8968f75d2ba88d0286",
+  "shardHash": "b46ea0d7eec9e6d37afe3d03cafd25acadd799731a36943c1938c91bdcc2631b",
   "specVersion": "1.10.0"
 }

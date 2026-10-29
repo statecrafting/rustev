@@ -1,0 +1,29 @@
+{
+  "status": "decision cache (spec 044, A-64)",
+  "original_decision_id": "generation-original",
+  "fields": {
+    "headline": {
+      "value": { "text": "Generated" },
+      "origin": "generated",
+      "source": { "served_from_cache": { "original_decision_id": "generation-original" } }
+    },
+    "why": {
+      "value": { "text": "Repaired" },
+      "origin": "repaired",
+      "source": { "served_from_cache": { "original_decision_id": "generation-original" } }
+    },
+    "tags": {
+      "value": { "list": ["quiet"] },
+      "origin": { "backstop": { "reason": "invalid_output" } },
+      "source": "fresh"
+    }
+  },
+  "assertions": [
+    "values, origins and lineage equal the original decision's",
+    "slots rendered from reused outputs are served_from_cache naming generation-original",
+    "a backstop slot names no attempt and is rendered again with source fresh",
+    "no backend dispatch and no new charge",
+    "judgment unchanged",
+    "a decision with a failed generation request is not admitted, so the next identical decision is a miss"
+  ]
+}

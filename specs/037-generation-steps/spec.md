@@ -999,8 +999,8 @@ sh crates/rustev-eval/mutation/seeds.sh "spec 037"
 
 Externally blocked, reported as such and never as passed: identical
 backstop rendering compiled for `wasm32-wasip1` under a WASI runtime
-(#76 A1's toolchain), and the #76 F1 result-cache conformance fixture,
-committed as pending for F1 to pass.
+(#76 A1's toolchain). The #76 F1 result-cache conformance fixture,
+amended under A-64, passes in `generation_replay`.
 
 ## Implementation record
 
@@ -1182,6 +1182,30 @@ including the twelve seeded defects, each detected. The screening
 acceptance items, externally blocked until spec 035 was implemented, are
 met by increment 8. Two items remain externally blocked, as the
 Verification section states.
+
+**The F1 fixture (2026-10-29).** Spec 044's decision-result cache (#76
+F1) stores request outputs, never a text result, so for generated text it
+is a cache of outputs under 3.14.2 item 1, not a cache of whole results
+under item 2 (044 3.6.6). The pending fixture expected item 2's
+behavior: a `backstop{deadline}` slot served from the cache, and
+`served_from_cache` on every slot. Under 044 a decision with a failed
+generation request is never admitted, and a backstop slot names no
+attempt, so it is rendered again with source `fresh`. The owner chose to
+amend the fixture to 044's behavior rather than amend 3.14.2 (A-64).
+- `crates/rustev-eval/tests/fixtures/generation-decision-cache.json`
+  replaces `generation-result-cache-pending.json`. It holds a generated
+  and a repaired slot served from the cache with the original decision
+  id, and a `backstop{invalid_output}` slot rendered fresh.
+- `decision_cache_preserves_generation_origins` replaces the ignored
+  `result_cache_preserves_generation_origins_pending_f1` in
+  `crates/rustev-eval/tests/generation_replay.rs`. It serves the fixture
+  from a memory-tier decision cache with no dispatch, no new charge, the
+  judgment unchanged and each slot's lineage kept. It also shows that a
+  decision whose generation request failed is not admitted, so the next
+  identical decision is a miss.
+
+One item remains externally blocked: WASI byte parity of the template
+module.
 
 **Owner decision A-49 (2026-10-23): dependencies.** Spec 030 is no longer
 a declared dependency of this spec. No behavior or acceptance item here
