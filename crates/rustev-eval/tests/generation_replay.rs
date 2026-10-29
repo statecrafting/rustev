@@ -649,16 +649,129 @@ async fn multiple_steps_replay_in_order_and_have_separate_metrics() {
     }
 }
 
-#[test]
-#[ignore = "pending #76 F1 result-cache integration; request-cache tests do not prove this"]
-fn result_cache_preserves_generation_origins_pending_f1() {
-    let fixture: Value = serde_json::from_str(include_str!(
-        "fixtures/generation-result-cache-pending.json"
-    ))
-    .unwrap();
-    assert_eq!(fixture["status"], "pending F1 integration");
-    panic!(
-        "F1 must serve the fixture through its result cache and assert all retained fields and original decision identity"
+/// Spec 037 3.14 under spec 044's decision cache (A-64): a cache of
+/// outputs, so slots rendered from reused outputs keep their origin and
+/// name the original decision, and a backstop slot is rendered again.
+fn decision_cached() -> rustev_contract::execution::ExecutionPolicy {
+    let mut policy = common::unlimited();
+    policy.optimization = Some(
+        serde_json::from_value(json!({"key_schema_version":1,"cache_namespace_version":1,
+        "admission":"refuse","expiry":"injected_runtime_time","decision_cache":{"tiers":["memory"],
+        "max_entry_bytes":65536,"max_entries":8,"ttl_ms":60000,"volatile":[],"key_dimensions":[],
+        "on_refresh_failure":"unresolved"}}))
+        .unwrap(),
+    );
+    policy
+}
+fn with_tags_backstop(d: &mut Definition) {
+    let StepBody::Generate(g) = &mut d.steps[0].body else {
+        panic!()
+    };
+    g.backstop
+        .fields
+        .insert("tags".into(), BackstopField::List(vec!["quiet".into()]));
+}
+impl Harness {
+    async fn decide(&self, id: &str) -> rustev_runtime::Decided {
+        let plan = self.rt.prepare(self.fixture.compiled.clone()).unwrap();
+        self.rt
+            .decide(
+                &plan,
+                common::decision(id, snapshot(vec![])),
+                &CancelSignal::new(),
+            )
+            .await
+            .unwrap()
+    }
+}
+
+#[tokio::test]
+async fn decision_cache_preserves_generation_origins() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("fixtures/generation-decision-cache.json")).unwrap();
+    let original = fixture["original_decision_id"].as_str().unwrap();
+    let h = Harness::with_policy(
+        with_tags_backstop,
+        |c| {
+            let fields = if c.attempt_id.contains("repair:1") {
+                BTreeMap::from([("why".into(), TextValue::Text("Repaired".into()))])
+            } else {
+                BTreeMap::from([
+                    ("headline".into(), TextValue::Text("Generated".into())),
+                    ("why".into(), TextValue::Text("BAD\tTEXT".into())),
+                ])
+            };
+            Answer::Output(RawOutput::TextRecord(fields), Charge::Observed { units: 1 })
+        },
+        &decision_cached(),
+    );
+    let first = h.decide(original).await;
+    let dispatched = h.backend.dispatched().len();
+    let served = h.decide("generation-served").await;
+    assert_eq!(h.backend.dispatched().len(), dispatched, "a hit dispatched");
+    let dc = served.record.decision_cache.as_ref().unwrap();
+    assert_eq!(
+        dc.outcome,
+        rustev_contract::optimization::DecisionCacheOutcome::Hit
+    );
+    assert_eq!(served.record.cost.observed, 0);
+    let (CoreEvidence::Recorded(a), CoreEvidence::Recorded(b)) =
+        (&first.record.core, &served.record.core)
+    else {
+        panic!()
+    };
+    assert_eq!(
+        a.judgment.record_canonical().unwrap(),
+        b.judgment.record_canonical().unwrap()
+    );
+    let before = &first.text_result.unwrap().steps[0].items[0].generated;
+    let after = &served.text_result.unwrap().steps[0].items[0].generated;
+    let expected = fixture["fields"].as_object().unwrap();
+    assert_eq!(after.len(), expected.len());
+    for (name, want) in expected {
+        let got = &after[name];
+        assert_eq!(
+            serde_json::to_value(&got.value).unwrap(),
+            want["value"],
+            "{name}"
+        );
+        assert_eq!(
+            serde_json::to_value(&got.origin).unwrap(),
+            want["origin"],
+            "{name}"
+        );
+        assert_eq!(
+            serde_json::to_value(&got.source).unwrap(),
+            want["source"],
+            "{name}"
+        );
+        assert_eq!(got.lineage, before[name].lineage, "{name}");
+    }
+
+    // A decision with a failed generation request is never admitted
+    // (spec 044, 3.6.4), so its backstop is never served from an entry.
+    let h = Harness::with_policy(
+        with_tags_backstop,
+        |_| {
+            Answer::Fail(
+                AdapterFailure::Permanent,
+                "synthetic".into(),
+                Charge::Observed { units: 1 },
+            )
+        },
+        &decision_cached(),
+    );
+    let failed = h.decide("generation-failed").await;
+    assert!(matches!(
+        failed.text_result.unwrap().steps[0].items[0].generated["headline"].origin,
+        FieldOrigin::Backstop { .. }
+    ));
+    let dispatched = h.backend.dispatched().len();
+    let again = h.decide("generation-failed-again").await;
+    assert!(h.backend.dispatched().len() > dispatched);
+    assert_eq!(
+        again.record.decision_cache.as_ref().unwrap().outcome,
+        rustev_contract::optimization::DecisionCacheOutcome::Miss
     );
 }
 
