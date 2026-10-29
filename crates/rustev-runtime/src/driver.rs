@@ -621,7 +621,7 @@ pub(crate) fn cache_miss_detail(miss: CacheMiss) -> &'static str {
     }
 }
 
-fn cache_refusal_detail(refusal: CacheRefusal) -> &'static str {
+pub(crate) fn cache_refusal_detail(refusal: CacheRefusal) -> &'static str {
     match refusal {
         CacheRefusal::Uncanonical => "memory cache refused an output without canonical form",
         CacheRefusal::EntryTooLarge => "memory cache entry exceeds max_entry_bytes",
@@ -985,7 +985,8 @@ async fn persistent_read(
     key: &RequestKey,
     generation: u64,
 ) -> Result<RequestOutcome, Option<String>> {
-    use crate::store::{Expected, read_entry};
+    use crate::store::{EntryMiss, Expected, Served, read_entry};
+    use rustev_contract::cache_entry::{EntryKind, EntryPayload};
     use rustev_contract::optimization::StoreFailurePolicy;
     let (Some(policy), Some(store)) = (cx.optimization(), cx.rt.store.as_ref()) else {
         return Err(None);
@@ -1035,18 +1036,23 @@ async fn persistent_read(
     let miss = match read_entry(
         &bytes,
         Expected {
+            kind: EntryKind::Request,
             key,
             generations: stored.generations,
             now: cx.evaluation_time,
         },
     ) {
-        Ok(hit) => {
+        Ok(Served {
+            payload: EntryPayload::Request(payload),
+            age_ms,
+            ..
+        }) => {
             let valid = matches!(
                 cx.ev()
-                    .check_output(&req.step, &req.instance, &hit.payload.output),
+                    .check_output(&req.step, &req.instance, &payload.output),
                 Ok(Ok(()))
             );
-            if valid && hit.payload.target == 0 {
+            if valid && payload.target == 0 {
                 let mut o = observation(
                     policy,
                     OptimizationMechanism::PersistentCache,
@@ -1055,7 +1061,7 @@ async fn persistent_read(
                     vec![],
                 );
                 o.entry_id = Some(key.id.clone());
-                o.age_ms = hit.age_ms;
+                o.age_ms = age_ms;
                 // A persistent hit is admitted to the memory tier under its
                 // own bounds (3.3).
                 if let Some(memory) = policy.memory_cache.as_ref()
@@ -1063,9 +1069,9 @@ async fn persistent_read(
                         memory,
                         key.clone(),
                         CacheWrite {
-                            output: hit.payload.output.clone(),
-                            source_attempt_id: hit.payload.source_attempt_id.clone(),
-                            target: hit.payload.target,
+                            output: payload.output.clone(),
+                            source_attempt_id: payload.source_attempt_id.clone(),
+                            target: payload.target,
                             captured_generation: generation,
                             now: cx.now(),
                         },
@@ -1077,9 +1083,9 @@ async fn persistent_read(
                     cx,
                     req,
                     o,
-                    hit.payload.output,
-                    hit.payload.target,
-                    hit.payload.source_attempt_id,
+                    payload.output,
+                    payload.target,
+                    payload.source_attempt_id,
                 ));
             }
             return Err(Some(
@@ -1091,6 +1097,9 @@ async fn persistent_read(
                 .into(),
             ));
         }
+        // The read checked the kind, so a request key's entry holds a
+        // request payload.
+        Ok(_) => EntryMiss::Collision,
         Err(miss) => miss,
     };
     let mut diagnostic = miss.diagnostic().to_string();

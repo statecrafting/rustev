@@ -25,6 +25,19 @@ pub(crate) struct RequestKey {
     pub namespace: String,
 }
 
+impl RequestKey {
+    /// The request key over `material`, as a decision entry of the
+    /// persistent tier retains it (spec 044, 3.6.4).
+    pub(crate) fn from_material(material: Vec<u8>, scope_id: String, namespace: String) -> Self {
+        RequestKey {
+            id: tagged_digest(KEY_TAG, &material),
+            material,
+            scope_id,
+            namespace,
+        }
+    }
+}
+
 /// Every output-affecting member available at the runtime seam.
 ///
 /// The plan id transitively identifies operation, task, question, ordered
@@ -631,9 +644,12 @@ pub(crate) mod decision {
     use std::collections::{BTreeMap, BTreeSet};
     use std::sync::{Arc, Mutex, MutexGuard};
 
+    use rustev_contract::cache_entry::EntryGenerations;
     use rustev_contract::canonical::{record_canonical_bytes, tagged_digest};
     use rustev_contract::ids::{ContentDigest, PlanId};
-    use rustev_contract::optimization::{DecisionCachePolicy, OptimizationPolicy};
+    use rustev_contract::optimization::{
+        DecisionCachePolicy, DecisionCacheTier, OptimizationPolicy,
+    };
     use rustev_contract::output::RawOutput;
     use rustev_contract::scope::Handle;
     use rustev_contract::snapshot::Snapshot;
@@ -761,7 +777,7 @@ pub(crate) mod decision {
 
     /// A decision entry of the memory tier (spec 044, 3.6.4). It holds the
     /// reusable work and its lineage, never a judgment to serve.
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     pub(crate) struct DecisionEntry {
         pub requests: ReusedRequests,
         pub source_run_record: ContentDigest,
@@ -787,6 +803,16 @@ pub(crate) mod decision {
         pub entry: Arc<DecisionEntry>,
         pub entry_id: String,
         pub age_ms: u64,
+        /// The store's generations, for an entry of the persistent tier.
+        pub generations: Option<EntryGenerations>,
+    }
+
+    /// An entry's id: a digest of its key material and its source run
+    /// record's digest, the same in either tier.
+    pub(crate) fn decision_entry_id(key: &RequestKey, source: &ContentDigest) -> String {
+        let mut material = key.material.clone();
+        part(&mut material, source.as_str().as_bytes());
+        tagged_digest(DECISION_ENTRY_TAG, &material)
     }
 
     /// Why a decision lookup did not hit; each is a diagnostic (spec 044, 3.9).
@@ -867,6 +893,7 @@ pub(crate) mod decision {
                 entry: slot.entry.clone(),
                 entry_id: slot.entry_id.clone(),
                 age_ms,
+                generations: None,
             })
         }
 
@@ -915,12 +942,7 @@ pub(crate) mod decision {
                 ns.decision_fifo
                     .retain(|(id, seq)| decisions.get(id).is_some_and(|slot| slot.seq == *seq));
             }
-            let mut entry_material = key.material.clone();
-            part(
-                &mut entry_material,
-                entry.source_run_record.as_str().as_bytes(),
-            );
-            let entry_id = tagged_digest(DECISION_ENTRY_TAG, &entry_material);
+            let entry_id = decision_entry_id(&key, &entry.source_run_record);
             let seq = ns.next_seq;
             ns.next_seq += 1;
             ns.decision_fifo.push_back((key.id.clone(), seq));
@@ -966,6 +988,9 @@ pub(crate) mod decision {
         /// The namespace generation captured before the lookup; admission
         /// uses it (3.6.4).
         pub generation: u64,
+        /// The store's generations, captured by the persistent read before
+        /// the work began; a write needs them (3.4.3).
+        pub captured: Option<EntryGenerations>,
         pub hit: Option<DecisionHit>,
         /// Under `admission: refuse`, an unkeyed decision's requests are
         /// refused with this diagnostic and never dispatched.
@@ -976,8 +1001,9 @@ pub(crate) mod decision {
 
     impl DecisionRun {
         /// Derive the key and read the memory tier after admission and before
-        /// the core starts (spec 044, 3.6.3 item 1). `None` for a plan without
-        /// the decision cache.
+        /// the core starts (spec 044, 3.6.3 item 1); [`DecisionRun::read_store`]
+        /// reads the persistent tier next. `None` for a plan without the
+        /// decision cache.
         pub(crate) fn start(
             optimizer: &Optimizer,
             plan: &crate::PreparedPlan,
@@ -997,6 +1023,7 @@ pub(crate) mod decision {
                 closure: compiled.refresh_closure.iter().cloned().collect(),
                 key: None,
                 generation: 0,
+                captured: None,
                 hit: None,
                 refused: None,
                 outcome: DecisionCacheOutcome::Miss,
@@ -1032,14 +1059,85 @@ pub(crate) mod decision {
                 }
                 Ok(key) => {
                     run.generation = optimizer.generation(&key.namespace);
-                    match optimizer.lookup_decision(&key, req.evaluation_time, cache.ttl_ms) {
-                        Ok(hit) => run.hit = Some(hit),
-                        Err(miss) => log.diagnostics.push(miss.diagnostic().into()),
+                    if cache.tiers.contains(&DecisionCacheTier::Memory) {
+                        match optimizer.lookup_decision(&key, req.evaluation_time, cache.ttl_ms) {
+                            Ok(hit) => run.hit = Some(hit),
+                            Err(miss) => log.diagnostics.push(miss.diagnostic().into()),
+                        }
                     }
                     run.key = Some(key);
                 }
             }
             Some(run)
+        }
+
+        /// After a memory miss, the persistent tier (spec 044, 3.3). A served
+        /// entry is admitted to the memory tier under its bounds. A store
+        /// failure under `fail_closed` leaves the decision neither served
+        /// nor admitted, `refused` or `bypassed` under `admission`; under
+        /// `continue_without_cache` it is a miss (3.4.2 and 3.6.6).
+        pub(crate) async fn read_store(
+            &mut self,
+            optimizer: &Optimizer,
+            policy: &OptimizationPolicy,
+            cache: &DecisionCachePolicy,
+            calls: &crate::store::StoreCtx<'_>,
+            now: Timestamp,
+        ) {
+            use crate::store::{DecisionRead, read_decision};
+            use rustev_contract::optimization::{
+                DecisionCacheOutcome, OptimizationAdmission, StoreFailurePolicy,
+            };
+            if !cache.tiers.contains(&DecisionCacheTier::Persistent)
+                || self.hit.is_some()
+                || self.refused.is_some()
+            {
+                return;
+            }
+            let Some(key) = self.key.clone() else {
+                return;
+            };
+            match read_decision(calls, &key, now).await {
+                DecisionRead::Hit {
+                    entry,
+                    age_ms,
+                    generations,
+                } => {
+                    let entry_id = decision_entry_id(&key, &entry.source_run_record);
+                    let entry = Arc::new(entry);
+                    if cache.tiers.contains(&DecisionCacheTier::Memory)
+                        && let Err(refusal) =
+                            optimizer.insert_decision(cache, key, (*entry).clone(), self.generation)
+                    {
+                        self.diagnose(crate::driver::cache_refusal_detail(refusal).into());
+                    }
+                    self.hit = Some(DecisionHit {
+                        entry,
+                        entry_id,
+                        age_ms,
+                        generations: Some(generations),
+                    });
+                }
+                DecisionRead::Miss {
+                    captured,
+                    diagnostic,
+                } => {
+                    self.captured = captured;
+                    self.diagnose(diagnostic);
+                }
+                DecisionRead::Failed(detail) => {
+                    self.diagnose(detail.clone());
+                    if calls.persistent.on_store_failure == StoreFailurePolicy::FailClosed {
+                        self.key = None;
+                        if policy.admission == OptimizationAdmission::Refuse {
+                            self.outcome = DecisionCacheOutcome::Refused;
+                            self.refused = Some(detail);
+                        } else {
+                            self.outcome = DecisionCacheOutcome::Bypassed;
+                        }
+                    }
+                }
+            }
         }
 
         pub(crate) fn log(&self) -> MutexGuard<'_, DecisionLog> {
@@ -1097,6 +1195,7 @@ pub(crate) mod decision {
                 record.entry_id = Some(hit.entry_id.clone());
                 record.source_run_record = Some(hit.entry.source_run_record.clone());
                 record.age_ms = Some(hit.age_ms);
+                record.generations = hit.generations;
                 let mut failed: Vec<String> = unresolved_volatile
                     .iter()
                     .map(|v| format!("input {v:?}"))
