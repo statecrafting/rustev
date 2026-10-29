@@ -193,6 +193,7 @@
         "src/acquisition_replay.rs",
         "src/assemble.rs",
         "src/baseline.rs",
+        "src/batch_qualification.rs",
         "src/bundle.rs",
         "src/compare.rs",
         "src/comparison.rs",
