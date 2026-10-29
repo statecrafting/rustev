@@ -1102,9 +1102,7 @@ fn decision_cache_members_are_validated_and_unrun_parts_refused() {
         .ttl_ms += 1;
     assert_ne!(with_v2(&other).unwrap().id, compiled.id);
     // The persistent tier, alone or after the memory tier, compiles and is
-    // part of `PlanId` (increment 5, part c); the other refresh policies
-    // validate and are then refused as not yet available, never run
-    // without them.
+    // part of `PlanId` (increment 5, part c).
     let mut persistent = decision_cached();
     let o = persistent.optimization.as_mut().unwrap();
     o.persistent_cache = shared_and_persistent()
@@ -1125,30 +1123,24 @@ fn decision_cache_members_are_validated_and_unrun_parts_refused() {
     let both = with_v2(&both).unwrap();
     assert_ne!(alone.id, both.id);
     assert_ne!(alone.id, compiled.id);
+    // `serve_cached_within_freshness` compiles and is part of `PlanId`
+    // (increment 5, part d1); `recompute` validates and is then refused as
+    // not yet available, never run without it.
     let refresh = |on: rustev_contract::optimization::RefreshFailurePolicy| {
         let mut p = decision_cached();
         let o = p.optimization.as_mut().unwrap();
         o.decision_cache.as_mut().unwrap().on_refresh_failure = on;
-        p
+        with_v2(&p)
     };
     use rustev_contract::optimization::RefreshFailurePolicy as R;
-    for (policy, what) in [
-        (
-            refresh(R::Recompute),
-            "on_refresh_failure other than unresolved",
-        ),
-        (
-            refresh(R::ServeCachedWithinFreshness),
-            "on_refresh_failure other than unresolved",
-        ),
-    ] {
-        let r = with_v2(&policy).expect_err("unavailable");
-        assert_eq!(r.category, Category::InvalidExecution);
-        assert_eq!(
-            r.detail,
-            format!("decision_cache {what} is not available in this build")
-        );
-    }
+    let served = refresh(R::ServeCachedWithinFreshness).unwrap();
+    assert_ne!(served.id, compiled.id);
+    let r = refresh(R::Recompute).expect_err("unavailable");
+    assert_eq!(r.category, Category::InvalidExecution);
+    assert_eq!(
+        r.detail,
+        "decision_cache on_refresh_failure recompute is not available in this build"
+    );
     // A version 1 definition compiles to `rustev.plan/2`.
     let r = refused(&decision_cached(), "decision_cache requires rustev.plan/3");
     assert_eq!(r.subject, "execution.optimization");

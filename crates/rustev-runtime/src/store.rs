@@ -575,6 +575,7 @@ fn decision_entry(
     }
     Some(DecisionEntry {
         requests,
+        volatile: payload.volatile,
         source_run_record: payload.run_record,
         created,
     })

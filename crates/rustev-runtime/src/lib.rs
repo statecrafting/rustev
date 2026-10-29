@@ -1106,7 +1106,7 @@ impl Runtime {
         }
 
         let ledger = Ledger::new(plan.cost);
-        let ev = std::sync::Mutex::new(ev);
+        let mut ev = std::sync::Mutex::new(ev);
         let deferred_cache = Mutex::new(vec![]);
         // The persistent tier (spec 044, 3.4); live re-execution observes
         // fresh backend work and reads no tier.
@@ -1149,6 +1149,22 @@ impl Runtime {
             d.read_store(&i.optimizer, policy, cache, calls, req.evaluation_time)
                 .await;
         }
+        // A served decision's volatile inputs, as the core validated them
+        // from the new snapshot; under `serve_cached_within_freshness` the
+        // core starts again over the stored entries (spec 044, 3.6.5).
+        if let (Some(d), Some(cache)) = (decision.as_mut(), decision_policy)
+            && let Some(substituted) = d.refresh_inputs(
+                &cache.volatile,
+                ev.get_mut().unwrap_or_else(|e| e.into_inner()),
+                &req.snapshot,
+                capture.is_some(),
+            )
+        {
+            match Evaluation::start(compiled, &substituted, req.evaluation_time) {
+                Ok(fresh) => ev = std::sync::Mutex::new(fresh),
+                Err(e) => d.unsubstitute(e.to_string()),
+            }
+        }
         let has_generation = compiled
             .plan
             .steps
@@ -1179,19 +1195,6 @@ impl Runtime {
             driver::run_requests(&cx, capture.as_deref_mut()).await
         };
         let ev = ev.into_inner().unwrap_or_else(|e| e.into_inner());
-        // A volatile input the core did not accept from the new snapshot is
-        // a failed refresh (spec 044, 3.6.5).
-        let unresolved_volatile: Vec<String> = decision_policy
-            .filter(|_| decision.as_ref().is_some_and(|d| d.hit.is_some()))
-            .map(|p| {
-                p.volatile
-                    .iter()
-                    .filter(|v| !v.starts_with("step:"))
-                    .filter(|v| ev.status_of(&format!("input:{v}")).is_err())
-                    .cloned()
-                    .collect()
-            })
-            .unwrap_or_default();
         let stage_cx = generation::StageContext {
             rt: i,
             plan,
@@ -1302,9 +1305,21 @@ impl Runtime {
             (None, false)
         };
         // A judged miss may be admitted once its record exists, since the
-        // entry names the record's digest (spec 044, 3.6.4).
+        // entry names the record's digest (spec 044, 3.6.4). It stores the
+        // snapshot entries of its volatile inputs for a later failed refresh
+        // (3.6.5).
+        let volatile: Vec<_> = decision_policy
+            .map(|p| {
+                req.snapshot
+                    .entries
+                    .iter()
+                    .filter(|e| p.volatile.contains(&e.field))
+                    .cloned()
+                    .collect()
+            })
+            .unwrap_or_default();
         let admission = match (&decision, decision_policy) {
-            (Some(d), Some(policy)) if judged => match d.admissible(&requests, policy) {
+            (Some(d), Some(policy)) if judged => match d.admissible(&requests, &volatile, policy) {
                 Ok(admit) => admit,
                 Err(diagnostic) => {
                     d.diagnose(diagnostic);
@@ -1323,9 +1338,7 @@ impl Runtime {
                 });
         let mut record = RunRecord {
             acquisitions: (!acquisitions.is_empty()).then_some(acquisitions),
-            decision_cache: decision
-                .as_ref()
-                .map(|d| d.record(&requests, &unresolved_volatile)),
+            decision_cache: decision.as_ref().map(|d| d.record(&requests)),
             // A plan 3 decision's record holds evidence 2 (spec 032, 3.10.3).
             schema: if plan_3 {
                 schema::RUN_V3
@@ -1378,13 +1391,6 @@ impl Runtime {
                             }
                             _ => None,
                         };
-                        let volatile = req
-                            .snapshot
-                            .entries
-                            .iter()
-                            .filter(|e| policy.volatile.contains(&e.field))
-                            .cloned()
-                            .collect();
                         decision_cache_write = Some(match (digests, plan.optimization.as_ref()) {
                             (Some((judgment, evidence)), Some(optimization)) => {
                                 store::write_decision(
@@ -1393,7 +1399,7 @@ impl Runtime {
                                         key: &key,
                                         policy: optimization,
                                         requests: &requests,
-                                        volatile,
+                                        volatile: volatile.clone(),
                                         judgment,
                                         run_record: source.clone(),
                                         evidence,
@@ -1418,6 +1424,7 @@ impl Runtime {
                             key,
                             optimization::decision::DecisionEntry {
                                 requests,
+                                volatile,
                                 source_run_record: source,
                                 created: req.evaluation_time,
                             },
