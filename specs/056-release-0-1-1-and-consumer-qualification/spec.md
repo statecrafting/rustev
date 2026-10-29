@@ -326,3 +326,18 @@ said every consumer test runs offline. Only the declared example does; the
 partial-adoption subsets resolve from the registry and build with `--locked`
 after the lockfile is checked against the signed manifest. The README now
 says so (#342). Documentation only.
+
+**The harness on its first tagged run (2026-10-29, 3.3).** The `qualify`
+stage of the `v0.3.0` tag run (058) was the harness's first run against a
+published release, and every platform failed on three harness defects,
+none in the release: the published `rustev-cli`'s own `Cargo.lock` was
+refused as a path dependency, because the lockfile check admitted only a
+generated consumer as the root (it now names `rustev-cli` as that lock's
+root); npm refused one file loaded as both its user and its global
+configuration (each now has its own empty file); and the CLI smoke run of
+the `cli` kind found the `crates` kind's `plan.json` in the shared example
+directory, which the CLI never overwrites (each run now starts without its
+outputs). With these, a run against 0.3.0 on darwin-arm64 passes `crates`
+and `cli`; `npm` fails only on missing verified provenance, which 3.3
+requires and 0.3.0's npm packages lack (058 records why).
+

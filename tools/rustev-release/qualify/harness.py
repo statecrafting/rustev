@@ -47,13 +47,14 @@ def guard(work):
                 raise ValueError(f'compiler override: {path}')
 
 
-def lock_checks(lock, manifest, complete=False):
+def lock_checks(lock, manifest, complete=False, root=None):
     packages = tomllib.loads(lock.read_text())['package']
     # The generated consumer (adoption.sh's `rustev-adoption-*` or the
-    # harness's `rustev-qualification-*`) is the lockfile's only package
-    # without a source; any other is a path dependency.
+    # harness's `rustev-qualification-*`), or the published package whose
+    # own lockfile this is (`root`), is the lockfile's only package without
+    # a source; any other is a path dependency.
     roots = [p['name'] for p in packages if 'source' not in p]
-    if len(roots) != 1 or not roots[0].startswith(('rustev-adoption-', 'rustev-qualification-')):
+    if len(roots) != 1 or not (roots[0] == root if root else roots[0].startswith(('rustev-adoption-', 'rustev-qualification-'))):
         raise ValueError(f'path dependency: {", ".join(roots) or "no consumer root"}')
     checksums = {}
     expected = {p['name']: p['sha256'] for p in manifest['packages']}
@@ -95,8 +96,13 @@ class Harness:
             path = self.work / name
             path.mkdir()
             self.env[key] = str(path)
+        # Two distinct empty files: npm refuses one file loaded as both its
+        # user and its global configuration ("double-loading config").
+        for name in ('npmrc-user', 'npmrc-global'):
+            (self.work / name).write_text('')
         self.env.update(npm_config_registry='https://registry.npmjs.org',
-                        npm_config_userconfig=os.devnull, npm_config_globalconfig=os.devnull,
+                        npm_config_userconfig=str(self.work / 'npmrc-user'),
+                        npm_config_globalconfig=str(self.work / 'npmrc-global'),
                         TMPDIR=str(self.work), GIT_CONFIG_NOSYSTEM='1')
         self.env['RUSTUP_AUTO_INSTALL'] = '0'
         self.env['RUSTUP_TOOLCHAIN'] = tomllib.loads((HERE.parents[2] / 'rust-toolchain.toml').read_text())['toolchain']['channel']
@@ -212,6 +218,10 @@ class Harness:
         self.log.write(got)
         if got != f'rustev {self.version}\n'.encode():
             raise ValueError('CLI version mismatch')
+        # The example directory is shared by the crates and cli kinds, and the
+        # CLI never overwrites an output, so each smoke run starts without them.
+        for output in ('plan.json', 'record.json'):
+            (path / output).unlink(missing_ok=True)
         args = ['--definition', 'definition.json', '--rules', 'rules.json', '--calibration', 'calibration.json']
         self.run(binary, 'plan', 'check', *args, cwd=path)
         self.run(binary, 'plan', 'compile', *args, '--out', 'plan.json', cwd=path)
@@ -248,7 +258,7 @@ class Harness:
         cli_locks = list(cargo_home.glob('registry/src/*/rustev-cli-' + self.version + '/Cargo.lock'))
         if len(cli_locks) != 1:
             raise ValueError('published CLI locked install has no unique lockfile')
-        self.checksums.update(lock_checks(cli_locks[0], self.m))
+        self.checksums.update(lock_checks(cli_locks[0], self.m, root='rustev-cli'))
         example = self.example()
         for toolchain in toolchains:
             self.offline_run('cargo', '+' + toolchain, 'test', '--locked', '--offline', cwd=example)
