@@ -1387,6 +1387,105 @@ Tests:
   fix and the same definition refused without the member.
 - The spec 017 tests and increments 2 to 4's tests are unchanged.
 
+**Increment 5, part c (2026-10-28): decision entries in the persistent
+tier.** The compiler accepts a `decision_cache` whose tiers are
+`persistent`, or `memory` then `persistent`. It still refuses
+`on_refresh_failure` other than `unresolved` and plans with acquisition,
+widening, generation or extraction steps (parts d and e).
+
+What part c adds:
+- `rustev.cache-entry/1` gains the kind `decision` and its payload
+  `DecisionPayload` (3.6.4) in `crates/rustev-contract/src/cache_entry.rs`.
+  The schema and the Node and WebAssembly declarations are regenerated.
+- `DecisionRun::read_store` reads the store after a memory miss, before
+  the core starts (3.3). The read is `read_decision` in
+  `crates/rustev-runtime/src/store.rs`, under the decision's deadline and
+  signal. It makes every check of 3.4.3, in order, with its diagnostic,
+  and deletes only a corrupt entry. Each reused output is still validated
+  when it is supplied, as in part b.
+- A persistent hit is served as part b serves a memory hit, and the run
+  record member carries the store's `generations`. With a memory tier,
+  the entry is admitted to it under its bounds and the namespace
+  generation captured when the decision started.
+- `write_decision` writes a judged miss's entry under the generations its
+  read captured. Over `max_entry_bytes` the entry is not sent. The store's
+  budgets travel in `terms`. Every answer but `stored`, and every
+  failure, is an admission not made and changes no output or judgment.
+- `Decided.decision_cache_write` holds the write's answer.
+- A selection marked unavailable (3.10.3) is neither read nor written for
+  decisions. `Runtime::invalidate` reaches decision entries through the
+  store's own invalidation.
+
+Decisions within the spec:
+- **The payload's members.** Each request outside the closure holds its
+  step, instance, 017 key material (hexadecimal, as the entry's), output
+  and source attempt. Its derivation follows from the plan the key
+  names and its lineage is that attempt and the payload's `run_record`,
+  as part a of increment 4 decided for a request payload. The payload
+  also holds the source judgment's and run record's record digests. The
+  entry's `evidence` is the evidence record digest, as for request
+  entries.
+- **The volatile snapshot entries are stored now.** The payload holds
+  the source decision's snapshot entries of its volatile inputs, which
+  part d supplies under `serve_cached_within_freshness`. So entries
+  written by this part already serve part d. An acquisition is refreshed
+  by dispatch and is never substituted (3.6.5), so no page is stored.
+- **Kind checks.** A sealed entry whose payload is not of its `kind` was
+  written wrong and is `entry_corrupt`. An intact entry of the other kind
+  is another key's, `entry_collision`. A decision payload with key
+  material that is not lowercase hexadecimal, or with a request named
+  twice, is `entry_corrupt` and is deleted.
+- **The write follows delivery.** The entry names the delivered run
+  record's digest, as the memory tier's does (part b), so the record
+  cannot carry the write's answer. `Decided.decision_cache_write` holds it
+  (`Ok`, or the diagnostic), for a write failure under either
+  `on_store_failure` too (3.4.2). The write still runs under the
+  decision's deadline and signal. The section 5 row on a conflicting
+  `put` holds there for decision entries.
+- **Bounds and expiry.** The decision cache's `max_entry_bytes` applies
+  to every tier as part b measures it. The persistent tier's
+  `max_entry_bytes` also applies to the encoded entry (3.4.4). A decision
+  entry's `ttl_ms` is the decision cache's, not the persistent tier's.
+- **Where entries live.** A decision entry is stored in the plan's
+  namespace under its scope, beside the request entries, keyed by the
+  decision key's id. That id's digest tag differs from a request key's.
+  So the unavailable marks and the store's namespace and scope
+  invalidation cover both kinds with no new call.
+- **One entry id in both tiers.** A persistent entry's id is derived as
+  the memory tier's: a digest of the key material and the source run
+  record's digest. A persistent hit admitted to memory keeps its id.
+- **A store read failure.** Under `fail_closed` the decision's key is
+  dropped. Under `admission: refuse` it is `refused` and its requests are
+  refused as for an unkeyed decision (part b). Under
+  `execute_independent` it is `bypassed`. Neither is admitted to any
+  tier. Under `continue_without_cache` it is a `miss`. It captured no
+  generations, so it is not written to the store, as 4b decided for
+  requests. It may still be admitted to the memory tier.
+- **Diagnostics by tier.** A decision whose plan has no memory tier does
+  not read it. An absent persistent entry is `persistent decision cache
+  miss`. A memory miss before a persistent hit keeps its diagnostic.
+  `generations` is present only when the served entry came from the
+  store, as increment 2, part b decided.
+
+Tests:
+- The persistent tests in `crates/rustev-runtime/tests/persistent.rs`,
+  over the same test store as for requests:
+  - a restart served with nothing dispatched, equal to independent
+    execution, and another tenant
+  - both tiers, read memory first
+  - each store failure policy on read, and a write failure
+  - corrupt, future, expired, other-schema and older-generation entries,
+    with a conflicting write
+  - a generation that moves during the decision, and both budgets
+  - invalidation across tiers and scopes
+- `a_decision_entry_reads_back_and_checks_its_kind` in `store.rs`.
+- `a_cache_entry_is_sealed_over_its_body` in
+  `crates/rustev-contract/tests/documents.rs` covers the decision payload.
+- `decision_cache_members_are_validated_and_unrun_parts_refused` in
+  `crates/rustev-core/tests/execution.rs` shows the persistent tier, alone
+  and after the memory tier, accepted and part of `PlanId`.
+- The spec 017 tests and the earlier increments' tests are unchanged.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

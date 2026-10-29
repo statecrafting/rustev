@@ -1,5 +1,6 @@
-//! Spec 044, 3.3 and 3.4: the persistent tier behind a host store, one
-//! test per section 5 row it owns. SYNTHETIC fixtures only; the store is an
+//! Spec 044, 3.3 and 3.4: the persistent tier behind a host store, for
+//! request entries and decision entries (3.6), one test per section 5 row
+//! it owns. SYNTHETIC fixtures only; the store is an
 //! in-memory test double and the clock is manual. A restart is a new
 //! runtime over the same store.
 
@@ -13,16 +14,19 @@ use rustev_contract::cache_entry::EntryGenerations;
 use rustev_contract::execution::{CostPolicy, ExecutionPolicy};
 use rustev_contract::judgment::Unresolved;
 use rustev_contract::optimization::{
+    DecisionCacheOutcome, DecisionCachePolicy, DecisionCacheRecord, DecisionCacheTier,
     EvictionOrder, ExpiryBasis, MemoryCachePolicy, OptimizationAdmission, OptimizationMechanism,
     OptimizationOutcome, OptimizationPolicy, OptimizationRecord, PersistentCachePolicy,
-    StoreContract, StoreFailurePolicy,
+    RefreshFailurePolicy, StoreContract, StoreFailurePolicy,
 };
-use rustev_contract::run::{RequestRecord, RequestResult};
-use rustev_core::seams::{BoxFuture, CancelSignal};
+use rustev_contract::run::{RequestRecord, RequestResult, RunRecord};
+use rustev_contract::{Document, schema};
+use rustev_core::compile_with;
+use rustev_core::seams::{BoxFuture, CancelSignal, EvidenceSink};
 use rustev_runtime::{
     Completion, Decided, DecisionRequest, Invalidated, ManualClock, PersistentInvalidation,
-    PrepareError, PutAnswer, PutTerms, Runtime, RuntimeStore, StoreCall, StoreFailure,
-    StoreSelector, Stored,
+    PrepareError, PreparedPlan, PutAnswer, PutTerms, Runtime, RuntimeStore, StoreCall,
+    StoreFailure, StoreSelector, Stored,
 };
 
 fn contract() -> StoreContract {
@@ -801,4 +805,445 @@ async fn a_scope_invalidation_leaves_other_scopes() {
     assert_eq!((r.persistent, r.complete), (None, true));
     let plain = rt.prepare(support_compiled(None)).unwrap();
     assert_eq!(rt.invalidate(&plain, None).await, None);
+}
+
+// ---------------------------------------------------------------------------
+// Decision entries in the persistent tier (spec 044, 3.3, 3.4 and 3.6;
+// increment 5, part c)
+// ---------------------------------------------------------------------------
+
+/// A sink for the `rustev.run/3` records of a decision-cached plan.
+struct Run3Sink;
+
+impl EvidenceSink for Run3Sink {
+    fn deliver<'a>(&'a self, _: &'a RunRecord) -> BoxFuture<'a, Result<String, String>> {
+        Box::pin(async { Ok("receipt".to_string()) })
+    }
+
+    fn accepts(&self, s: &str) -> bool {
+        s == schema::RUN || s == schema::RUN_V3
+    }
+}
+
+fn decision_runtime(backend: &Arc<Scripted>, store: &Arc<TestStore>) -> Runtime {
+    Runtime::builder(
+        Arc::new(ManualClock::new()),
+        Arc::new(Run3Sink),
+        config(2, 0, 3),
+    )
+    .backend(Arc::new(Handle(backend.clone())), 3)
+    .store(store.clone())
+    .build()
+    .unwrap()
+}
+
+/// A decision cache over `tiers` with no volatile source, beside the
+/// persistent tier it needs (3.1).
+fn decisions(
+    tiers: &[DecisionCacheTier],
+    on_store_failure: StoreFailurePolicy,
+    admission: OptimizationAdmission,
+) -> ExecutionPolicy {
+    let mut p = policy_with(persistent(on_store_failure), None, admission);
+    p.optimization.as_mut().unwrap().decision_cache = Some(DecisionCachePolicy {
+        tiers: tiers.to_vec(),
+        max_entry_bytes: 65_536,
+        max_entries: tiers.contains(&DecisionCacheTier::Memory).then_some(8),
+        ttl_ms: 60_000,
+        volatile: vec![],
+        key_dimensions: vec![],
+        on_refresh_failure: RefreshFailurePolicy::Unresolved,
+    });
+    p
+}
+
+fn persistent_decisions() -> ExecutionPolicy {
+    decisions(
+        &[DecisionCacheTier::Persistent],
+        StoreFailurePolicy::ContinueWithoutCache,
+        OptimizationAdmission::Refuse,
+    )
+}
+
+/// Support routing as a version 2 definition, so its plan is
+/// `rustev.plan/3` (3.1).
+fn decision_plan(rt: &Runtime, policy: &ExecutionPolicy) -> PreparedPlan {
+    let mut def = support_routing();
+    def.schema = schema::DEFINITION_V2.into();
+    rt.prepare(compile_with(&def, &descriptors_with_fallbacks(), &cal(), policy).unwrap())
+        .unwrap()
+}
+
+async fn decide_cached(rt: &Runtime, policy: &ExecutionPolicy, req: DecisionRequest) -> Decided {
+    rt.decide(&decision_plan(rt, policy), req, &CancelSignal::new())
+        .await
+        .unwrap()
+}
+
+fn dc(d: &Decided) -> &DecisionCacheRecord {
+    d.record
+        .decision_cache
+        .as_ref()
+        .expect("a decision_cache member")
+}
+
+fn has(d: &Decided, needle: &str) -> bool {
+    dc(d).diagnostics.iter().any(|x| x.contains(needle))
+}
+
+/// The store's decision entries, by key id.
+fn decision_entries(store: &TestStore) -> Vec<String> {
+    store
+        .state()
+        .entries
+        .iter()
+        .filter(|(_, (_, b))| String::from_utf8_lossy(b).contains("\"kind\":\"decision\""))
+        .map(|((_, id), _)| id.clone())
+        .collect()
+}
+
+/// Edit the bytes of every stored decision entry.
+fn edit_decisions(store: &TestStore, f: impl Fn(String) -> String) {
+    for (_, bytes) in store.state().entries.values_mut() {
+        let text = String::from_utf8(bytes.clone()).unwrap();
+        if text.contains("\"kind\":\"decision\"") {
+            *bytes = f(text).into_bytes();
+        }
+    }
+}
+
+/// The served judgment and core evidence equal independent execution of
+/// the same request on a fresh runtime over an empty store (spec 044,
+/// 3.6.3 item 3).
+async fn same_as_independent(served: &Decided, policy: &ExecutionPolicy, req: DecisionRequest) {
+    let alone = decide_cached(
+        &decision_runtime(&answering(linear_head()), &TestStore::new()),
+        policy,
+        req,
+    )
+    .await;
+    assert!(matches!(served.completion, Completion::Judged(_)));
+    assert_eq!(served.completion, alone.completion);
+    assert_eq!(served.record.core, alone.record.core);
+}
+
+/// Section 5, "A runtime restarts with the same store", for a decision: a
+/// judged miss writes its entry after its record is delivered; a new
+/// runtime over the store serves it with nothing dispatched, the judgment
+/// recomputed and equal to independent execution, and the store's
+/// generations in the record. Another tenant never hits it.
+#[tokio::test(flavor = "current_thread")]
+async fn a_restarted_runtime_serves_a_stored_decision() {
+    let backend = answering(linear_head());
+    let store = TestStore::new();
+    let p = persistent_decisions();
+    let cold = decide_cached(&decision_runtime(&backend, &store), &p, request("cold")).await;
+    assert_eq!(dc(&cold).outcome, DecisionCacheOutcome::Miss);
+    assert!(has(&cold, "persistent decision cache miss"));
+    assert_eq!(cold.decision_cache_write, Some(Ok(())));
+    assert_eq!(decision_entries(&store).len(), 1);
+    assert_eq!(backend.dispatched().len(), 3);
+
+    let later = at("warm", NOW + 1_000);
+    let warm = decide_cached(&decision_runtime(&backend, &store), &p, later.clone()).await;
+    assert_eq!(backend.dispatched().len(), 3, "nothing dispatched again");
+    let m = dc(&warm);
+    assert_eq!(m.outcome, DecisionCacheOutcome::Hit);
+    assert_eq!(m.reused, [0, 1, 2]);
+    assert_eq!(m.age_ms, Some(1_000));
+    assert_eq!(
+        m.generations,
+        Some(EntryGenerations {
+            namespace: 0,
+            scope: 0
+        })
+    );
+    let source = cold.record.record_digest().unwrap();
+    assert_eq!(m.source_run_record.as_ref(), Some(&source));
+    let served = warm.served_from_cache.as_ref().unwrap();
+    assert_eq!(
+        (Some(&served.entry_id), &served.source_run_record),
+        (m.entry_id.as_ref(), &source)
+    );
+    assert_eq!(
+        warm.decision_cache_write, None,
+        "a served decision is never admitted"
+    );
+    for (r, earlier) in warm.record.requests.iter().zip(&cold.record.requests) {
+        let o = observation(r);
+        assert_eq!(
+            (o.mechanism, o.outcome),
+            (
+                OptimizationMechanism::DecisionCache,
+                OptimizationOutcome::Hit
+            )
+        );
+        assert_eq!(
+            r.supplied_from().unwrap().reused_from,
+            Some(earlier.attempts[0].attempt_id.as_str())
+        );
+    }
+    assert_eq!(warm.record.cost.observed, 0);
+    same_as_independent(&warm, &p, later).await;
+
+    let mut other = request("tenant-b");
+    other.principal_handle = b"tenant-b".to_vec();
+    let d = decide_cached(&decision_runtime(&backend, &store), &p, other).await;
+    assert_eq!(dc(&d).outcome, DecisionCacheOutcome::Miss);
+    assert_eq!(decision_entries(&store).len(), 2);
+}
+
+/// Spec 044, 3.3: with both tiers the memory tier is read first; a
+/// persistent hit is admitted to it, so the next equal decision on that
+/// runtime is served from memory without reading the store.
+#[tokio::test(flavor = "current_thread")]
+async fn both_tiers_read_memory_then_persistent() {
+    let backend = answering(linear_head());
+    let store = TestStore::new();
+    let p = decisions(
+        &[DecisionCacheTier::Memory, DecisionCacheTier::Persistent],
+        StoreFailurePolicy::ContinueWithoutCache,
+        OptimizationAdmission::Refuse,
+    );
+    decide_cached(&decision_runtime(&backend, &store), &p, request("cold")).await;
+    let rt = decision_runtime(&backend, &store);
+    let plan = decision_plan(&rt, &p);
+    let cancel = CancelSignal::new();
+    let run = |id: &str| rt.decide(&plan, request(id), &cancel);
+    let restart = run("restart").await.unwrap();
+    assert_eq!(dc(&restart).outcome, DecisionCacheOutcome::Hit);
+    assert!(dc(&restart).generations.is_some());
+    let gets = store.state().gets;
+    let memory = run("memory").await.unwrap();
+    assert_eq!(dc(&memory).outcome, DecisionCacheOutcome::Hit);
+    assert_eq!(dc(&memory).generations, None, "an entry of the memory tier");
+    assert_eq!(
+        dc(&memory).entry_id,
+        dc(&restart).entry_id,
+        "one id in both tiers"
+    );
+    assert_eq!(store.state().gets, gets);
+    assert_eq!(backend.dispatched().len(), 3);
+}
+
+/// Section 5, "The store fails under `fail_closed`", for a decision: a
+/// read failure is `refused` under `admission: refuse`, with nothing
+/// dispatched, and `bypassed` under `execute_independent`; under
+/// `continue_without_cache` it is a `miss`. None captured generations, so
+/// none writes. A write failure keeps the judgment.
+#[tokio::test(flavor = "current_thread")]
+async fn store_failures_decide_the_decision_outcome() {
+    use DecisionCacheOutcome as O;
+    use OptimizationAdmission::{ExecuteIndependent, Refuse};
+    use StoreFailurePolicy::{ContinueWithoutCache, FailClosed};
+    let tier = [DecisionCacheTier::Persistent];
+    let backend = answering(linear_head());
+    let store = TestStore::new();
+    store.state().fail_get = true;
+    let mut dispatched = 0;
+    for (on_failure, admission, outcome, runs) in [
+        (FailClosed, Refuse, O::Refused, false),
+        (FailClosed, ExecuteIndependent, O::Bypassed, true),
+        (ContinueWithoutCache, Refuse, O::Miss, true),
+    ] {
+        let p = decisions(&tier, on_failure, admission);
+        let d = decide_cached(&decision_runtime(&backend, &store), &p, request("failed")).await;
+        assert_eq!(dc(&d).outcome, outcome, "{on_failure:?} {admission:?}");
+        assert!(has(&d, "store_failed: SYNTHETIC get failure"));
+        assert!(matches!(d.completion, Completion::Judged(_)));
+        assert!(d.served_from_cache.is_none());
+        assert_eq!(d.decision_cache_write, None);
+        if runs {
+            dispatched += 3;
+        } else {
+            assert!(d.record.requests.iter().all(|r| matches!(
+                &r.result,
+                RequestResult::Failed(Unresolved::BackendUnavailable { detail })
+                    if detail.starts_with("store_failed")
+            )));
+        }
+        assert_eq!(backend.dispatched().len(), dispatched);
+    }
+    assert_eq!(store.state().puts, 0);
+
+    let store = TestStore::new();
+    store.state().fail_put = true;
+    let p = decisions(&tier, FailClosed, Refuse);
+    let d = decide_cached(&decision_runtime(&backend, &store), &p, request("write")).await;
+    assert!(matches!(d.completion, Completion::Judged(_)));
+    assert_eq!(dc(&d).outcome, O::Miss);
+    assert_eq!(
+        d.decision_cache_write,
+        Some(Err("store_failed: SYNTHETIC put failure".into()))
+    );
+}
+
+/// Section 5's entry rows for a decision entry: a corrupt entry is a miss
+/// and deleted, then written again; one from the future, expired, of
+/// another schema, or older than the store generation is a miss with its
+/// diagnostic and kept. A write over a kept entry answers `conflict`.
+#[tokio::test(flavor = "current_thread")]
+async fn failed_entry_checks_are_decision_misses() {
+    let backend = answering(linear_head());
+    let store = TestStore::new();
+    let rt = decision_runtime(&backend, &store);
+    let p = persistent_decisions();
+    decide_cached(&rt, &p, request("cold")).await;
+    let id = decision_entries(&store).pop().unwrap();
+
+    edit_decisions(&store, |t| {
+        t.replace("\"ttl_ms\":60000", "\"ttl_ms\":60001")
+    });
+    let d = decide_cached(&rt, &p, request("corrupt")).await;
+    assert_eq!(dc(&d).outcome, DecisionCacheOutcome::Miss);
+    assert!(has(&d, "entry_corrupt"));
+    assert!(store.state().deleted.contains(&id));
+    assert_eq!(d.decision_cache_write, Some(Ok(())), "written again");
+    let d = decide_cached(&rt, &p, request("again")).await;
+    assert_eq!(dc(&d).outcome, DecisionCacheOutcome::Hit);
+
+    for (req, diagnostic) in [
+        (at("past", NOW - 1), "entry_from_future"),
+        (at("late", NOW + 60_001), "entry_expired"),
+    ] {
+        let d = decide_cached(&rt, &p, req).await;
+        assert_eq!(dc(&d).outcome, DecisionCacheOutcome::Miss, "{diagnostic}");
+        assert!(has(&d, diagnostic));
+        assert_eq!(d.decision_cache_write, Some(Err("store_conflict".into())));
+    }
+    edit_decisions(&store, |t| {
+        t.replace("rustev.cache-entry/1", "rustev.cache-entry/2")
+    });
+    assert!(has(
+        &decide_cached(&rt, &p, request("schema")).await,
+        "entry_schema_unknown"
+    ));
+    edit_decisions(&store, |t| {
+        t.replace("rustev.cache-entry/2", "rustev.cache-entry/1")
+    });
+    {
+        let mut s = store.state();
+        let namespace = s.entries.keys().next().unwrap().0.clone();
+        *s.namespace_generation.entry(namespace).or_default() += 1;
+    }
+    let d = decide_cached(&rt, &p, request("generation")).await;
+    assert!(has(&d, "generation_advanced"));
+    assert_eq!(decision_entries(&store), [id]);
+    assert_eq!(store.state().deleted.len(), 1);
+}
+
+/// Section 5, "Invalidation advances the generation while a decision
+/// runs", for a decision entry: its write answers `generation_advanced`.
+/// Spec 044, 3.4.4: an entry over `max_entry_bytes` is never sent, and a
+/// store's `over_budget` is an admission not made.
+#[tokio::test(flavor = "current_thread")]
+async fn a_moved_generation_or_a_budget_refuses_the_write() {
+    let backend = answering(linear_head());
+    let store = TestStore::new();
+    store.state().advance_after_get = true;
+    let p = persistent_decisions();
+    let d = decide_cached(&decision_runtime(&backend, &store), &p, request("raced")).await;
+    assert_eq!(
+        d.decision_cache_write,
+        Some(Err("generation_advanced".into()))
+    );
+    assert!(decision_entries(&store).is_empty());
+
+    store.state().answer = Some(PutAnswer::OverBudget);
+    let d = decide_cached(&decision_runtime(&backend, &store), &p, request("full")).await;
+    assert_eq!(d.decision_cache_write, Some(Err("over_budget".into())));
+
+    let mut small = p.clone();
+    small
+        .optimization
+        .as_mut()
+        .unwrap()
+        .persistent_cache
+        .as_mut()
+        .unwrap()
+        .max_entry_bytes = 64;
+    let puts = store.state().puts;
+    let d = decide_cached(&decision_runtime(&backend, &store), &small, request("tiny")).await;
+    assert_eq!(
+        d.decision_cache_write,
+        Some(Err("over_budget: entry exceeds max_entry_bytes".into()))
+    );
+    assert_eq!(store.state().puts, puts);
+}
+
+/// Spec 044, 3.10.3: invalidation covers decision entries in every tier.
+/// While the namespace awaits its store invalidation, a decision neither
+/// reads nor writes the store; `Runtime::invalidate` removes its entries
+/// with the request entries, and a scope's invalidation leaves other
+/// scopes' decision entries.
+#[tokio::test(flavor = "current_thread")]
+async fn invalidation_covers_decision_entries() {
+    let backend = answering(linear_head());
+    let store = TestStore::new();
+    let rt = decision_runtime(&backend, &store);
+    let p = decisions(
+        &[DecisionCacheTier::Memory, DecisionCacheTier::Persistent],
+        StoreFailurePolicy::ContinueWithoutCache,
+        OptimizationAdmission::Refuse,
+    );
+    let plan = decision_plan(&rt, &p);
+    let cancel = CancelSignal::new();
+    let tenant = |id: &str, t: &[u8]| {
+        let mut r = request(id);
+        r.principal_handle = t.to_vec();
+        rt.decide(&plan, r, &cancel)
+    };
+    tenant("a", b"tenant-a").await.unwrap();
+    tenant("b", b"tenant-b").await.unwrap();
+    assert_eq!(decision_entries(&store).len(), 2);
+
+    assert!(!rt.invalidate_plan(&plan).unwrap().complete);
+    let gets_puts = |s: &TestStore| {
+        let s = s.state();
+        (s.gets, s.puts)
+    };
+    let before = gets_puts(&store);
+    let d = tenant("a2", b"tenant-a").await.unwrap();
+    assert_eq!(
+        dc(&d).outcome,
+        DecisionCacheOutcome::Miss,
+        "memory was invalidated"
+    );
+    assert!(has(
+        &d,
+        "persistent tier unavailable until invalidation completes"
+    ));
+    assert_eq!(
+        d.decision_cache_write, None,
+        "nothing captured, nothing written"
+    );
+    assert_eq!(gets_puts(&store), before);
+
+    let done = rt.invalidate(&plan, None).await.unwrap();
+    assert!(done.complete);
+    assert_eq!(
+        done.persistent,
+        Some(PersistentInvalidation::Done {
+            generation: 1,
+            removed: 8
+        })
+    );
+    assert!(decision_entries(&store).is_empty());
+    tenant("a3", b"tenant-a").await.unwrap();
+    tenant("b3", b"tenant-b").await.unwrap();
+    assert_eq!(decision_entries(&store).len(), 2);
+    assert!(
+        rt.invalidate(&plan, Some(b"tenant-a"))
+            .await
+            .unwrap()
+            .complete
+    );
+    assert_eq!(decision_entries(&store).len(), 1);
+    // The memory tier's scope invalidation advanced its namespace
+    // generation, so tenant b is served from the store again.
+    let b = tenant("b4", b"tenant-b").await.unwrap();
+    assert_eq!(dc(&b).outcome, DecisionCacheOutcome::Hit);
+    assert!(dc(&b).generations.is_some());
+    let a = tenant("a4", b"tenant-a").await.unwrap();
+    assert_eq!(dc(&a).outcome, DecisionCacheOutcome::Miss);
 }

@@ -51,12 +51,13 @@ pub struct EntryBody {
     pub evidence: ContentDigest,
 }
 
-/// `request` entries only in this increment; the decision-result cache
-/// (3.6.4) adds `decision`.
+/// A request-level entry, or a decision-result cache entry (3.6.4); the
+/// payload's variant is the kind's.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum EntryKind {
     Request,
+    Decision,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -70,6 +71,7 @@ pub struct EntryGenerations {
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum EntryPayload {
     Request(RequestPayload),
+    Decision(DecisionPayload),
 }
 
 /// A validated raw output and where it came from. Its derivation follows
@@ -80,6 +82,38 @@ pub enum EntryPayload {
 pub struct RequestPayload {
     /// The index of the target that answered: the primary, or a fallback.
     pub target: u32,
+    pub output: RawOutput,
+    pub source_attempt_id: String,
+}
+
+/// A judged decision's reusable work (spec 044, 3.6.4). It holds no
+/// judgment to serve: the core recomputes every served judgment (3.6.3).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DecisionPayload {
+    /// Each request outside the refresh closure, by step then instance.
+    pub requests: Vec<ReusedRequestPayload>,
+    /// The source decision's snapshot entries of its volatile inputs, as
+    /// supplied, for a failed refresh (3.6.5).
+    pub volatile: Vec<crate::snapshot::Entry>,
+    /// The record digest of the source decision's judgment.
+    pub judgment: ContentDigest,
+    /// The record digest of the source decision's run record.
+    pub run_record: ContentDigest,
+}
+
+/// A request outside the refresh closure: its 017 key, the validated
+/// output of target 0 and the attempt that produced it. As for a request
+/// payload, its derivation follows from the plan the entry's key names,
+/// and its lineage is the source attempt and the payload's `run_record`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ReusedRequestPayload {
+    pub step: String,
+    pub instance: Vec<String>,
+    /// The request's complete canonical key material, lowercase
+    /// hexadecimal.
+    pub key_material: String,
     pub output: RawOutput,
     pub source_attempt_id: String,
 }

@@ -444,7 +444,8 @@ fn a_run_record_parses_under_record_limits() {
 #[test]
 fn a_cache_entry_is_sealed_over_its_body() {
     use rustev_contract::cache_entry::{
-        CacheEntry, EntryBody, EntryGenerations, EntryKind, EntryPayload, RequestPayload,
+        CacheEntry, DecisionPayload, EntryBody, EntryGenerations, EntryKind, EntryPayload,
+        RequestPayload, ReusedRequestPayload,
     };
     use rustev_contract::canonical::{record_canonical_bytes, tagged_digest};
     use rustev_contract::ids::ContentDigest;
@@ -506,6 +507,59 @@ fn a_cache_entry_is_sealed_over_its_body() {
     ));
     assert!(refused(
         &|v| v["entry"]["generations"]["extra"] = serde_json::json!(1)
+    ));
+    assert!(!refused(&|_| {}));
+
+    // A decision entry (3.6.4) holds its reused requests, the volatile
+    // snapshot entries and the source digests, and refuses unknown members
+    // in each.
+    let digest = |c: &str| ContentDigest::parse(&format!("sha256:{}", c.repeat(64))).unwrap();
+    let decision = EntryBody {
+        kind: EntryKind::Decision,
+        payload: EntryPayload::Decision(DecisionPayload {
+            requests: vec![ReusedRequestPayload {
+                step: "topic".into(),
+                instance: vec!["0".into()],
+                key_material: "00ff".into(),
+                output: RawOutput::Label("billing".into()),
+                source_attempt_id: "att-1".into(),
+            }],
+            volatile: vec![rustev_contract::snapshot::Entry {
+                field: "payments.events".into(),
+                value: serde_json::json!(true),
+                provenance: rustev_contract::definition::ProvenanceClass::UserSupplied,
+                as_of_ms: rustev_contract::Timestamp::from_ms(900).unwrap(),
+                source: "SYNTHETIC".into(),
+                grade: None,
+                producer: None,
+            }],
+            judgment: digest("3"),
+            run_record: digest("4"),
+        }),
+        ..body
+    };
+    let bytes = CacheEntry::seal(decision)
+        .unwrap()
+        .record_canonical()
+        .unwrap();
+    let parsed = CacheEntry::parse(&bytes).unwrap();
+    assert!(parsed.intact());
+    assert_eq!(parsed.record_canonical().unwrap(), bytes);
+    let base: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let refused = |edit: &dyn Fn(&mut serde_json::Value)| {
+        let mut v = base.clone();
+        edit(&mut v);
+        CacheEntry::parse(&serde_json::to_vec(&v).unwrap()).is_err()
+    };
+    assert!(base["entry"]["payload"]["decision"].is_object());
+    assert!(refused(
+        &|v| v["entry"]["payload"]["decision"]["extra"] = serde_json::json!(1)
+    ));
+    assert!(refused(
+        &|v| v["entry"]["payload"]["decision"]["requests"][0]["extra"] = serde_json::json!(1)
+    ));
+    assert!(refused(
+        &|v| v["entry"]["payload"]["decision"]["volatile"][0]["extra"] = serde_json::json!(1)
     ));
     assert!(!refused(&|_| {}));
 }

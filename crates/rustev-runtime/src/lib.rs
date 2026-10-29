@@ -43,7 +43,7 @@ use rustev_contract::execution::{
 };
 use rustev_contract::ids::ArtifactId;
 use rustev_contract::judgment::Judgment;
-use rustev_contract::optimization::OptimizationPolicy;
+use rustev_contract::optimization::{DecisionCacheTier, OptimizationPolicy};
 use rustev_contract::plan::{PlanExecution, PlanStepDetail};
 use rustev_contract::replay::Capture;
 use rustev_contract::run::{
@@ -179,6 +179,13 @@ pub struct Decided {
     /// The decision-result cache entry the decision was served from, its
     /// judgment recomputed by the core (spec 044, 3.6.6).
     pub served_from_cache: Option<ServedFromCache>,
+    /// The persistent tier's answer to this decision's entry (spec 044,
+    /// 3.6.4): `Ok` when stored, otherwise the diagnostic of an admission
+    /// not made, a store failure under either `on_store_failure` included
+    /// (3.4.2). The entry names the delivered run record's digest, so it
+    /// is written after delivery and its answer is here, not in that
+    /// record. `None` when nothing was to be written.
+    pub decision_cache_write: Option<Result<(), String>>,
 }
 
 /// The entry a decision was served from (spec 044, 3.6.6), as its run
@@ -1111,13 +1118,37 @@ impl Runtime {
         let mut pending = store::Pending::default();
         // The decision-result cache reads its tier after admission and
         // before the core starts (spec 044, 3.6.3).
-        let decision = optimization::decision::DecisionRun::start(
+        let mut decision = optimization::decision::DecisionRun::start(
             &i.optimizer,
             plan,
             &req,
             dimensions,
             live.is_some(),
         );
+        let decision_policy = plan
+            .optimization
+            .as_ref()
+            .and_then(|o| o.decision_cache.as_ref());
+        // Then its persistent tier (spec 044, 3.3), on the decision's task.
+        let decision_store = match (persistent, i.store.as_deref()) {
+            (Some(persistent), Some(store)) => Some(store::StoreCtx {
+                rt: i,
+                store,
+                persistent,
+                cancel,
+                deadline,
+            }),
+            _ => None,
+        };
+        if let (Some(d), Some(calls), Some(policy), Some(cache)) = (
+            decision.as_mut(),
+            decision_store.as_ref(),
+            plan.optimization.as_ref(),
+            decision_policy,
+        ) {
+            d.read_store(&i.optimizer, policy, cache, calls, req.evaluation_time)
+                .await;
+        }
         let has_generation = compiled
             .plan
             .steps
@@ -1150,10 +1181,6 @@ impl Runtime {
         let ev = ev.into_inner().unwrap_or_else(|e| e.into_inner());
         // A volatile input the core did not accept from the new snapshot is
         // a failed refresh (spec 044, 3.6.5).
-        let decision_policy = plan
-            .optimization
-            .as_ref()
-            .and_then(|o| o.decision_cache.as_ref());
         let unresolved_volatile: Vec<String> = decision_policy
             .filter(|_| decision.as_ref().is_some_and(|d| d.hit.is_some()))
             .map(|p| {
@@ -1334,25 +1361,69 @@ impl Runtime {
         match delivery {
             Ok(delivery) => {
                 generation::write_cache(&stage_cx, writes);
+                let mut decision_cache_write = None;
                 if let (Some(d), Some(policy), Some((key, requests)), Ok(source)) = (
                     &decision,
                     decision_policy,
                     admission,
                     rustev_contract::Document::record_digest(&*record),
                 ) {
+                    if let (Some(calls), Some(generations)) = (&decision_store, d.captured)
+                        && policy.tiers.contains(&DecisionCacheTier::Persistent)
+                    {
+                        use rustev_contract::Document;
+                        let digests = match (&completion, &record.core) {
+                            (Completion::Judged(j), CoreEvidence::Recorded(e)) => {
+                                j.record_digest().ok().zip(e.record_digest().ok())
+                            }
+                            _ => None,
+                        };
+                        let volatile = req
+                            .snapshot
+                            .entries
+                            .iter()
+                            .filter(|e| policy.volatile.contains(&e.field))
+                            .cloned()
+                            .collect();
+                        decision_cache_write = Some(match (digests, plan.optimization.as_ref()) {
+                            (Some((judgment, evidence)), Some(optimization)) => {
+                                store::write_decision(
+                                    calls,
+                                    store::DecisionWrite {
+                                        key: &key,
+                                        policy: optimization,
+                                        requests: &requests,
+                                        volatile,
+                                        judgment,
+                                        run_record: source.clone(),
+                                        evidence,
+                                        generations,
+                                        created: req.evaluation_time,
+                                        ttl_ms: policy.ttl_ms,
+                                    },
+                                )
+                                .await
+                            }
+                            _ => {
+                                Err("persistent decision cache entry has no canonical form".into())
+                            }
+                        });
+                    }
                     // A refused admission (a generation advanced, or an
                     // equal digest over other material) is a miss for the
                     // next decision; this record is already delivered.
-                    let _ = i.optimizer.insert_decision(
-                        policy,
-                        key,
-                        optimization::decision::DecisionEntry {
-                            requests,
-                            source_run_record: source,
-                            created: req.evaluation_time,
-                        },
-                        d.generation,
-                    );
+                    if policy.tiers.contains(&DecisionCacheTier::Memory) {
+                        let _ = i.optimizer.insert_decision(
+                            policy,
+                            key,
+                            optimization::decision::DecisionEntry {
+                                requests,
+                                source_run_record: source,
+                                created: req.evaluation_time,
+                            },
+                            d.generation,
+                        );
+                    }
                 }
                 Ok(Decided {
                     text_result,
@@ -1360,6 +1431,7 @@ impl Runtime {
                     record,
                     delivery,
                     served_from_cache,
+                    decision_cache_write,
                 })
             }
             Err(failure) => Err(DecideError::EvidenceNotDelivered { record, failure }),

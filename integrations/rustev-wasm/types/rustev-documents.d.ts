@@ -266,13 +266,17 @@ export namespace RustevCacheEntry1 {
   export type Timestamp = number;
   export type ContentDigest = string;
   /**
-   * `request` entries only in this increment; the decision-result cache
-   * (3.6.4) adds `decision`.
+   * A request-level entry, or a decision-result cache entry (3.6.4); the
+   * payload's variant is the kind's.
    */
-  export type EntryKind = "request";
-  export type EntryPayload = {
-    request: RequestPayload;
-  };
+  export type EntryKind = "request" | "decision";
+  export type EntryPayload =
+    | {
+        request: RequestPayload;
+      }
+    | {
+        decision: DecisionPayload;
+      };
   /**
    * What a backend returned, before validation.
    */
@@ -352,6 +356,24 @@ export namespace RustevCacheEntry1 {
         list: string[];
       };
   export type LogprobItem = "none" | number;
+  /**
+   * The closed, ordered evidence grade. The derived order runs weakest to
+   * strongest, so `min` and `max` are the grade order of spec 032, 3.2.1.
+   */
+  export type Grade = "hint" | "estimated" | "cached" | "authoritative";
+  export type ArtifactId = string;
+  export type TemplateDigest = "none" | PromptTemplateId;
+  export type PromptTemplateId = string;
+  /**
+   * The closed set of provenance classes (spec 002, 3.7.1).
+   */
+  export type ProvenanceClass =
+    | "authenticated-app-field"
+    | "system-of-record"
+    | "user-supplied"
+    | "third-party"
+    | "attributed-claim"
+    | "model-derived";
 
   export interface RustevCacheEntry1 {
     entry: EntryBody;
@@ -422,6 +444,76 @@ export namespace RustevCacheEntry1 {
     values: {
       [k: string]: number | undefined;
     };
+  }
+  /**
+   * A judged decision's reusable work (spec 044, 3.6.4). It holds no
+   * judgment to serve: the core recomputes every served judgment (3.6.3).
+   */
+  export interface DecisionPayload {
+    /**
+     * The record digest of the source decision's judgment.
+     */
+    judgment: ContentDigest;
+    /**
+     * Each request outside the refresh closure, by step then instance.
+     */
+    requests: ReusedRequestPayload[];
+    /**
+     * The record digest of the source decision's run record.
+     */
+    run_record: ContentDigest;
+    /**
+     * The source decision's snapshot entries of its volatile inputs, as
+     * supplied, for a failed refresh (3.6.5).
+     */
+    volatile: Entry[];
+  }
+  /**
+   * A request outside the refresh closure: its 017 key, the validated
+   * output of target 0 and the attempt that produced it. As for a request
+   * payload, its derivation follows from the plan the entry's key names,
+   * and its lineage is the source attempt and the payload's `run_record`.
+   */
+  export interface ReusedRequestPayload {
+    instance: string[];
+    /**
+     * The request's complete canonical key material, lowercase
+     * hexadecimal.
+     */
+    key_material: string;
+    output: RawOutput;
+    source_attempt_id: string;
+    step: string;
+  }
+  export interface Entry {
+    as_of_ms: Timestamp;
+    /**
+     * The declared input name.
+     */
+    field: string;
+    /**
+     * Snapshot 2: the grade the supplier observed; it can lower a grade,
+     * never raise it (spec 032, 3.3.5).
+     */
+    grade?: Grade | null;
+    /**
+     * Host-declared model producer, retained as evidence, never authorization.
+     */
+    producer?: Producer | null;
+    provenance: ProvenanceClass;
+    /**
+     * Which source supplied it; recorded, never trusted as authority.
+     */
+    source: string;
+    /**
+     * Decoded strictly against the input's declared type.
+     */
+    value: unknown;
+  }
+  export interface Producer {
+    artifact_id: ArtifactId;
+    produced_at_ms: Timestamp;
+    template_digest: TemplateDigest;
   }
 }
 export type RustevCacheEntry1 = RustevCacheEntry1.RustevCacheEntry1;

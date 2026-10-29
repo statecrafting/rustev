@@ -982,7 +982,7 @@ fn decision_cached() -> ExecutionPolicy {
 }
 
 /// Spec 044, 3.9: one row per compile refusal of `decision_cache`, each
-/// against the complete neighbour. A memory tier compiles; what the
+/// against the complete neighbour. A memory or persistent tier compiles; what the
 /// runtime does not run yet is refused as not available after it
 /// validates (increment 5, part b), and only a `rustev.plan/3` may carry
 /// the member (3.1).
@@ -1101,8 +1101,10 @@ fn decision_cache_members_are_validated_and_unrun_parts_refused() {
         .unwrap()
         .ttl_ms += 1;
     assert_ne!(with_v2(&other).unwrap().id, compiled.id);
-    // The persistent tier and the other refresh policies validate and are
-    // then refused as not yet available, never run without them.
+    // The persistent tier, alone or after the memory tier, compiles and is
+    // part of `PlanId` (increment 5, part c); the other refresh policies
+    // validate and are then refused as not yet available, never run
+    // without them.
     let mut persistent = decision_cached();
     let o = persistent.optimization.as_mut().unwrap();
     o.persistent_cache = shared_and_persistent()
@@ -1114,6 +1116,15 @@ fn decision_cache_members_are_validated_and_unrun_parts_refused() {
     c.max_entries = None;
     c.volatile.clear();
     c.key_dimensions.clear();
+    let alone = with_v2(&persistent).unwrap();
+    let mut both = persistent.clone();
+    let c = both.optimization.as_mut().unwrap();
+    let c = c.decision_cache.as_mut().unwrap();
+    c.tiers = vec![T::Memory, T::Persistent];
+    c.max_entries = Some(8);
+    let both = with_v2(&both).unwrap();
+    assert_ne!(alone.id, both.id);
+    assert_ne!(alone.id, compiled.id);
     let refresh = |on: rustev_contract::optimization::RefreshFailurePolicy| {
         let mut p = decision_cached();
         let o = p.optimization.as_mut().unwrap();
@@ -1122,7 +1133,6 @@ fn decision_cache_members_are_validated_and_unrun_parts_refused() {
     };
     use rustev_contract::optimization::RefreshFailurePolicy as R;
     for (policy, what) in [
-        (persistent, "tier persistent"),
         (
             refresh(R::Recompute),
             "on_refresh_failure other than unresolved",

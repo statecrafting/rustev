@@ -11,7 +11,8 @@ use std::sync::Mutex;
 
 use rustev_contract::Document;
 use rustev_contract::cache_entry::{
-    CacheEntry, EntryBody, EntryGenerations, EntryKind, EntryPayload, RequestPayload,
+    CacheEntry, DecisionPayload, EntryBody, EntryGenerations, EntryKind, EntryPayload,
+    RequestPayload, ReusedRequestPayload,
 };
 use rustev_contract::canonical::CanonicalError;
 use rustev_contract::ids::ContentDigest;
@@ -25,6 +26,7 @@ use rustev_core::seams::{BoxFuture, CancelSignal};
 use crate::Inner;
 use crate::clock::Instant;
 use crate::optimization::RequestKey;
+use crate::optimization::decision::{DecisionEntry, ReusedRequest, ReusedRequests};
 
 /// What a store call made for a decision receives (3.4.1): the decision's
 /// remaining time and a signal raised on its cancellation or deadline.
@@ -191,6 +193,7 @@ impl EntryMiss {
 
 /// What a read is checked against.
 pub(crate) struct Expected<'a> {
+    pub kind: EntryKind,
     pub key: &'a RequestKey,
     /// The store's current generations, read with the entry.
     pub generations: EntryGenerations,
@@ -201,7 +204,8 @@ pub(crate) struct Expected<'a> {
 /// A served payload and the entry's age at the request's evaluation time.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Served {
-    pub payload: RequestPayload,
+    pub payload: EntryPayload,
+    pub created: Timestamp,
     pub age_ms: u64,
     pub evidence: ContentDigest,
 }
@@ -221,7 +225,16 @@ pub(crate) fn read_entry(bytes: &[u8], e: Expected<'_>) -> Result<Served, EntryM
         return Err(EntryMiss::Corrupt);
     }
     let body = entry.entry;
-    if body.key_material != hex(&e.key.material) {
+    // A payload of another kind than the entry names was written wrong.
+    if !matches!(
+        (body.kind, &body.payload),
+        (EntryKind::Request, EntryPayload::Request(_))
+            | (EntryKind::Decision, EntryPayload::Decision(_))
+    ) {
+        return Err(EntryMiss::Corrupt);
+    }
+    // An intact entry of the other kind is another key's.
+    if body.kind != e.kind || body.key_material != hex(&e.key.material) {
         return Err(EntryMiss::Collision);
     }
     // Equal material names one key id; an entry that pairs them otherwise
@@ -240,29 +253,32 @@ pub(crate) fn read_entry(bytes: &[u8], e: Expected<'_>) -> Result<Served, EntryM
     if age_ms > body.ttl_ms {
         return Err(EntryMiss::Expired);
     }
-    let EntryPayload::Request(payload) = body.payload;
     Ok(Served {
-        payload,
+        payload: body.payload,
+        created: body.created,
         age_ms,
         evidence: body.evidence,
     })
 }
 
-/// What a request-level entry is written from.
+/// What an entry is written from; its kind is its payload's.
 pub(crate) struct EntryWrite<'a> {
     pub key: &'a RequestKey,
     pub policy: &'a OptimizationPolicy,
     pub generations: EntryGenerations,
     pub created: Timestamp,
     pub ttl_ms: u64,
-    pub payload: RequestPayload,
+    pub payload: EntryPayload,
     pub evidence: ContentDigest,
 }
 
-/// The record canonical bytes of a sealed request-level entry.
+/// The record canonical bytes of a sealed entry.
 pub(crate) fn write_entry(w: EntryWrite<'_>) -> Result<Vec<u8>, CanonicalError> {
     let entry = CacheEntry::seal(EntryBody {
-        kind: EntryKind::Request,
+        kind: match w.payload {
+            EntryPayload::Request(_) => EntryKind::Request,
+            EntryPayload::Decision(_) => EntryKind::Decision,
+        },
         key_material: hex(&w.key.material),
         key_id: w.key.id.clone(),
         key_schema_version: w.policy.key_schema_version,
@@ -271,7 +287,7 @@ pub(crate) fn write_entry(w: EntryWrite<'_>) -> Result<Vec<u8>, CanonicalError> 
         generations: w.generations,
         created: w.created,
         ttl_ms: w.ttl_ms,
-        payload: EntryPayload::Request(w.payload),
+        payload: w.payload,
         evidence: w.evidence,
     })?;
     entry.record_canonical()
@@ -330,6 +346,67 @@ pub(crate) struct Writing<'a> {
     pub evidence: Option<ContentDigest>,
 }
 
+/// What a decision's store calls are made under: the store, the
+/// persistent tier's policy, and the decision's cancellation and
+/// deadline (3.4.2).
+pub(crate) struct StoreCtx<'a> {
+    pub rt: &'a Inner,
+    pub store: &'a dyn RuntimeStore,
+    pub persistent: &'a PersistentCachePolicy,
+    pub cancel: &'a CancelSignal,
+    pub deadline: Instant,
+}
+
+impl Writing<'_> {
+    fn calls(&self) -> StoreCtx<'_> {
+        StoreCtx {
+            rt: self.rt,
+            store: self.store,
+            persistent: self.persistent,
+            cancel: self.cancel,
+            deadline: self.deadline,
+        }
+    }
+}
+
+/// Seal and `put` one entry under the generations its read captured
+/// (3.4.3). A selection awaiting its store invalidation, an entry over
+/// `max_entry_bytes` (3.4.4), every answer but `stored` and a failure are
+/// an admission not made, answered with its diagnostic.
+async fn put_entry(p: &StoreCtx<'_>, e: EntryWrite<'_>) -> Result<(), String> {
+    let key = e.key;
+    if p.rt.persistent_unavailable(&key.namespace, &key.scope_id) {
+        return Err(crate::driver::UNAVAILABLE.into());
+    }
+    let (created, ttl_ms, generations) = (e.created, e.ttl_ms, e.generations);
+    let bytes =
+        write_entry(e).map_err(|_| "persistent cache entry has no canonical form".to_string())?;
+    if u64::try_from(bytes.len()).unwrap_or(u64::MAX) > p.persistent.max_entry_bytes {
+        return Err("over_budget: entry exceeds max_entry_bytes".into());
+    }
+    // A hint only: reads judge expiry from `created` and `ttl_ms`. Past
+    // the last representable time, the hint is that time.
+    let expires = created.checked_add(DurationMs(ttl_ms)).unwrap_or_else(|_| {
+        Timestamp::from_ms(rustev_contract::time::MAX_TIMESTAMP_MS)
+            .expect("the last representable time is a timestamp")
+    });
+    let terms = PutTerms {
+        scope: key.scope_id.clone(),
+        generations,
+        max_scope_bytes: p.persistent.max_scope_bytes,
+        max_namespace_bytes: p.persistent.max_namespace_bytes,
+        expires,
+    };
+    let answer = crate::driver::store_call(p.rt, p.cancel, p.deadline, |call| {
+        p.store.put(&key.namespace, &key.id, bytes, terms, call)
+    })
+    .await;
+    match answer {
+        Ok(answer) => answer.diagnostic().map_or(Ok(()), |d| Err(d.into())),
+        Err(failure) => Err(format!("store_failed: {}", failure.detail)),
+    }
+}
+
 /// Write each queued entry once, under the generations its read captured
 /// (3.4.3); a request whose store was never read has none and is not
 /// written. Every answer but `stored`, a failure and an entry over
@@ -354,12 +431,6 @@ pub(crate) async fn write_pending(pending: Pending, w: Writing<'_>) -> WriteDiag
             continue;
         }
         let at = (write.step.clone(), write.instance.clone());
-        if w.rt
-            .persistent_unavailable(&write.key.namespace, &write.key.scope_id)
-        {
-            diagnostics.push((at, crate::driver::UNAVAILABLE.into()));
-            continue;
-        }
         let Some(evidence) = w.evidence.clone() else {
             diagnostics.push((
                 at,
@@ -367,60 +438,209 @@ pub(crate) async fn write_pending(pending: Pending, w: Writing<'_>) -> WriteDiag
             ));
             continue;
         };
-        let bytes = match write_entry(EntryWrite {
+        let entry = EntryWrite {
             key: &write.key,
             policy: w.policy,
             generations,
             created: w.created,
             ttl_ms: w.persistent.ttl_ms,
-            payload: RequestPayload {
+            payload: EntryPayload::Request(RequestPayload {
                 target: 0,
                 output: write.output,
                 source_attempt_id: write.source_attempt_id,
-            },
+            }),
             evidence,
-        }) {
-            Ok(bytes) => bytes,
-            Err(_) => {
-                diagnostics.push((at, "persistent cache entry has no canonical form".into()));
-                continue;
-            }
         };
-        if u64::try_from(bytes.len()).unwrap_or(u64::MAX) > w.persistent.max_entry_bytes {
-            diagnostics.push((at, "over_budget: entry exceeds max_entry_bytes".into()));
-            continue;
-        }
-        // A hint only: reads judge expiry from `created` and `ttl_ms`. Past
-        // the last representable time, the hint is that time.
-        let expires = w
-            .created
-            .checked_add(DurationMs(w.persistent.ttl_ms))
-            .unwrap_or_else(|_| {
-                Timestamp::from_ms(rustev_contract::time::MAX_TIMESTAMP_MS)
-                    .expect("the last representable time is a timestamp")
-            });
-        let terms = PutTerms {
-            scope: write.key.scope_id.clone(),
-            generations,
-            max_scope_bytes: w.persistent.max_scope_bytes,
-            max_namespace_bytes: w.persistent.max_namespace_bytes,
-            expires,
-        };
-        let key = &write.key;
-        let answer = crate::driver::store_call(w.rt, w.cancel, w.deadline, |call| {
-            w.store.put(&key.namespace, &key.id, bytes, terms, call)
-        })
-        .await;
-        match answer {
-            Ok(answer) => {
-                if let Some(d) = answer.diagnostic() {
-                    diagnostics.push((at, d.into()));
-                }
-            }
-            Err(failure) => diagnostics.push((at, format!("store_failed: {}", failure.detail))),
+        if let Err(d) = put_entry(&w.calls(), entry).await {
+            diagnostics.push((at, d));
         }
     }
     diagnostics
+}
+
+/// What a decision's persistent read found (spec 044, 3.3 and 3.6.3).
+pub(crate) enum DecisionRead {
+    /// An entry that passed every check of 3.4.3, with the generations
+    /// read with it. Each reused output is validated when it is supplied
+    /// (3.6.3 item 2).
+    Hit {
+        entry: DecisionEntry,
+        age_ms: u64,
+        generations: EntryGenerations,
+    },
+    /// A miss with its diagnostic. The store's generations are captured
+    /// whenever it answered, for the decision's own write.
+    Miss {
+        captured: Option<EntryGenerations>,
+        diagnostic: String,
+    },
+    /// A store failure, timeout or cancellation (3.4.2).
+    Failed(String),
+}
+
+/// Read and check a decision key's entry in the order of 3.4.3; only a
+/// corrupt entry is deleted. A selection awaiting its store invalidation
+/// is not read and captures nothing (3.10.3).
+pub(crate) async fn read_decision(
+    p: &StoreCtx<'_>,
+    key: &RequestKey,
+    now: Timestamp,
+) -> DecisionRead {
+    if p.rt.persistent_unavailable(&key.namespace, &key.scope_id) {
+        return DecisionRead::Miss {
+            captured: None,
+            diagnostic: crate::driver::UNAVAILABLE.into(),
+        };
+    }
+    let stored = crate::driver::store_call(p.rt, p.cancel, p.deadline, |call| {
+        p.store.get(&key.namespace, &key.scope_id, &key.id, call)
+    })
+    .await;
+    let stored = match stored {
+        Ok(stored) => stored,
+        Err(failure) => return DecisionRead::Failed(format!("store_failed: {}", failure.detail)),
+    };
+    let captured = Some(stored.generations);
+    let Some(bytes) = stored.bytes else {
+        return DecisionRead::Miss {
+            captured,
+            diagnostic: "persistent decision cache miss".into(),
+        };
+    };
+    let read = read_entry(
+        &bytes,
+        Expected {
+            kind: EntryKind::Decision,
+            key,
+            generations: stored.generations,
+            now,
+        },
+    );
+    let miss = match read {
+        Ok(Served {
+            payload: EntryPayload::Decision(payload),
+            created,
+            age_ms,
+            ..
+        }) => match decision_entry(key, payload, created) {
+            Some(entry) => {
+                return DecisionRead::Hit {
+                    entry,
+                    age_ms,
+                    generations: stored.generations,
+                };
+            }
+            None => EntryMiss::Corrupt,
+        },
+        // The read checked the kind.
+        Ok(_) => EntryMiss::Collision,
+        Err(miss) => miss,
+    };
+    let mut diagnostic = miss.diagnostic().to_string();
+    if miss.deletes()
+        && let Err(failure) = crate::driver::store_call(p.rt, p.cancel, p.deadline, |call| {
+            p.store.delete(&key.namespace, &key.id, call)
+        })
+        .await
+    {
+        diagnostic = format!("{diagnostic}; store_failed: {}", failure.detail);
+    }
+    DecisionRead::Miss {
+        captured,
+        diagnostic,
+    }
+}
+
+/// A decision payload as the memory tier holds it. Key material that is
+/// not hexadecimal, or a request named twice, was written wrong: `None`.
+fn decision_entry(
+    key: &RequestKey,
+    payload: DecisionPayload,
+    created: Timestamp,
+) -> Option<DecisionEntry> {
+    let mut requests = ReusedRequests::new();
+    for r in payload.requests {
+        let reused = ReusedRequest {
+            key: RequestKey::from_material(
+                unhex(&r.key_material)?,
+                key.scope_id.clone(),
+                key.namespace.clone(),
+            ),
+            output: r.output,
+            source_attempt_id: r.source_attempt_id,
+        };
+        if requests.insert((r.step, r.instance), reused).is_some() {
+            return None;
+        }
+    }
+    Some(DecisionEntry {
+        requests,
+        source_run_record: payload.run_record,
+        created,
+    })
+}
+
+/// What a judged miss's decision entry is written from (spec 044, 3.6.4).
+pub(crate) struct DecisionWrite<'a> {
+    pub key: &'a RequestKey,
+    pub policy: &'a OptimizationPolicy,
+    pub requests: &'a ReusedRequests,
+    /// The decision's snapshot entries of its volatile inputs.
+    pub volatile: Vec<rustev_contract::snapshot::Entry>,
+    pub judgment: ContentDigest,
+    pub run_record: ContentDigest,
+    pub evidence: ContentDigest,
+    /// Captured by the decision's read, before the work began.
+    pub generations: EntryGenerations,
+    pub created: Timestamp,
+    /// The decision cache's `ttl_ms`.
+    pub ttl_ms: u64,
+}
+
+/// Write a decision entry once; `Err` is the diagnostic of an admission
+/// not made (3.4.1 and 3.4.4).
+pub(crate) async fn write_decision(p: &StoreCtx<'_>, w: DecisionWrite<'_>) -> Result<(), String> {
+    let requests = w
+        .requests
+        .iter()
+        .map(|((step, instance), r)| ReusedRequestPayload {
+            step: step.clone(),
+            instance: instance.clone(),
+            key_material: hex(&r.key.material),
+            output: r.output.clone(),
+            source_attempt_id: r.source_attempt_id.clone(),
+        })
+        .collect();
+    let entry = EntryWrite {
+        key: w.key,
+        policy: w.policy,
+        generations: w.generations,
+        created: w.created,
+        ttl_ms: w.ttl_ms,
+        payload: EntryPayload::Decision(DecisionPayload {
+            requests,
+            volatile: w.volatile,
+            judgment: w.judgment,
+            run_record: w.run_record,
+        }),
+        evidence: w.evidence,
+    };
+    put_entry(p, entry).await
+}
+
+fn unhex(s: &str) -> Option<Vec<u8>> {
+    let digit = |c: u8| match c {
+        b'0'..=b'9' => Some(c - b'0'),
+        b'a'..=b'f' => Some(c - b'a' + 10),
+        _ => None,
+    };
+    let s = s.as_bytes();
+    if !s.len().is_multiple_of(2) {
+        return None;
+    }
+    s.chunks(2)
+        .map(|pair| Some(digit(pair[0])? << 4 | digit(pair[1])?))
+        .collect()
 }
 
 fn hex(bytes: &[u8]) -> String {
@@ -494,11 +714,11 @@ mod tests {
             generations: GENS,
             created: at(1_000),
             ttl_ms: 500,
-            payload: RequestPayload {
+            payload: EntryPayload::Request(RequestPayload {
                 target: 0,
                 output: RawOutput::Label("billing".into()),
                 source_attempt_id: "att-1".into(),
-            },
+            }),
             evidence: ContentDigest::parse(&digest('d')).unwrap(),
         })
         .unwrap()
@@ -513,6 +733,7 @@ mod tests {
         read_entry(
             bytes,
             Expected {
+                kind: EntryKind::Request,
                 key: k,
                 generations: gens,
                 now: at(now),
@@ -528,6 +749,7 @@ mod tests {
         let served = read_entry(
             &bytes,
             Expected {
+                kind: EntryKind::Request,
                 key: &k,
                 generations: GENS,
                 now: at(1_200),
@@ -535,8 +757,12 @@ mod tests {
         )
         .unwrap();
         assert_eq!(served.age_ms, 200);
-        assert_eq!(served.payload.output, RawOutput::Label("billing".into()));
-        assert_eq!(served.payload.source_attempt_id, "att-1");
+        assert_eq!(served.created, at(1_000));
+        let EntryPayload::Request(payload) = served.payload else {
+            panic!("a request payload");
+        };
+        assert_eq!(payload.output, RawOutput::Label("billing".into()));
+        assert_eq!(payload.source_attempt_id, "att-1");
         // At exactly `ttl_ms` the entry is still current.
         assert_eq!(read(&bytes, &k, GENS, 1_500), Ok(500));
         // The entry is the record canonical bytes of the document.
@@ -624,6 +850,89 @@ mod tests {
         assert!(!m.deletes());
     }
 
+    /// Spec 044, 3.4.3 and 3.6.4: a decision entry carries its reused
+    /// requests, volatile entries and source digests, and reads back as
+    /// the memory tier holds it; a payload of another kind than the entry
+    /// names is corrupt, and an entry of the other kind is another key's.
+    #[test]
+    fn a_decision_entry_reads_back_and_checks_its_kind() {
+        let decision = key(b"tenant-a");
+        let reused = key(b"tenant-a");
+        let payload = DecisionPayload {
+            requests: vec![ReusedRequestPayload {
+                step: "topic".into(),
+                instance: vec![],
+                key_material: hex(&reused.material),
+                output: RawOutput::Label("billing".into()),
+                source_attempt_id: "att-1".into(),
+            }],
+            volatile: vec![],
+            judgment: ContentDigest::parse(&digest('e')).unwrap(),
+            run_record: ContentDigest::parse(&digest('f')).unwrap(),
+        };
+        let write = |payload: EntryPayload| {
+            write_entry(EntryWrite {
+                key: &decision,
+                policy: &policy(),
+                generations: GENS,
+                created: at(1_000),
+                ttl_ms: 500,
+                payload,
+                evidence: ContentDigest::parse(&digest('d')).unwrap(),
+            })
+            .unwrap()
+        };
+        let bytes = write(EntryPayload::Decision(payload.clone()));
+        assert!(String::from_utf8_lossy(&bytes).contains("\"kind\":\"decision\""));
+        let expected = |kind| Expected {
+            kind,
+            key: &decision,
+            generations: GENS,
+            now: at(1_100),
+        };
+        let served = read_entry(&bytes, expected(EntryKind::Decision)).unwrap();
+        let EntryPayload::Decision(read) = served.payload else {
+            panic!("a decision payload");
+        };
+        assert_eq!(read, payload);
+        let held = decision_entry(&decision, read, served.created).unwrap();
+        assert_eq!(held.created, at(1_000));
+        assert_eq!(held.source_run_record, payload.run_record);
+        let r = &held.requests[&("topic".to_string(), vec![])];
+        assert_eq!(r.key, reused);
+        assert_eq!(r.source_attempt_id, "att-1");
+        // A request key's read of a decision entry, and the reverse.
+        assert_eq!(
+            read_entry(&bytes, expected(EntryKind::Request)).unwrap_err(),
+            EntryMiss::Collision
+        );
+        assert_eq!(
+            read_entry(&entry(&decision), expected(EntryKind::Decision)).unwrap_err(),
+            EntryMiss::Collision
+        );
+        // A sealed entry whose kind is not its payload's was written wrong.
+        let mut doc = CacheEntry::parse(&bytes).unwrap();
+        doc.entry.kind = EntryKind::Request;
+        let mislabelled = CacheEntry::seal(doc.entry)
+            .unwrap()
+            .record_canonical()
+            .unwrap();
+        assert_eq!(
+            read_entry(&mislabelled, expected(EntryKind::Request)).unwrap_err(),
+            EntryMiss::Corrupt
+        );
+        // Key material that is not hexadecimal, or a request named twice.
+        let mut odd = payload.clone();
+        odd.requests[0].key_material.push('0');
+        assert!(decision_entry(&decision, odd, at(1_000)).is_none());
+        let mut upper = payload.clone();
+        upper.requests[0].key_material = upper.requests[0].key_material.to_uppercase();
+        assert!(decision_entry(&decision, upper, at(1_000)).is_none());
+        let mut twice = payload;
+        twice.requests.push(twice.requests[0].clone());
+        assert!(decision_entry(&decision, twice, at(1_000)).is_none());
+    }
+
     #[test]
     fn put_answers_name_their_diagnostics() {
         assert_eq!(PutAnswer::Stored.diagnostic(), None);
@@ -639,5 +948,10 @@ mod tests {
     fn hex_is_lowercase_and_two_digits_per_byte() {
         assert_eq!(hex(&[0x00, 0x0f, 0xa0, 0xff]), "000fa0ff");
         assert_eq!(hex(&[]), "");
+        assert_eq!(unhex("000fa0ff"), Some(vec![0x00, 0x0f, 0xa0, 0xff]));
+        assert_eq!(unhex(""), Some(vec![]));
+        for bad in ["0", "0g", "0F", "+1"] {
+            assert_eq!(unhex(bad), None, "{bad}");
+        }
     }
 }
