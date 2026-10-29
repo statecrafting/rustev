@@ -1206,6 +1206,7 @@ impl Runtime {
             principal: &req.principal_handle,
             evaluation_time: req.evaluation_time,
             streaming,
+            decision: decision.as_ref(),
         };
         let mut text_result = None;
         let mut writes = vec![];
@@ -1336,9 +1337,12 @@ impl Runtime {
                     entry_id: hit.entry_id.clone(),
                     source_run_record: hit.entry.source_run_record.clone(),
                 });
+        let decision_cache = decision
+            .as_ref()
+            .map(|d| d.record(&requests, &acquisitions));
         let mut record = RunRecord {
             acquisitions: (!acquisitions.is_empty()).then_some(acquisitions),
-            decision_cache: decision.as_ref().map(|d| d.record(&requests)),
+            decision_cache,
             // A plan 3 decision's record holds evidence 2 (spec 032, 3.10.3).
             schema: if plan_3 {
                 schema::RUN_V3

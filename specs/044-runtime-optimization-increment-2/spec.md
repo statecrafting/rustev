@@ -1574,6 +1574,120 @@ Tests:
   `recompute` refused.
 - The spec 017 tests and the earlier increments' tests are unchanged.
 
+**Increment 5, part e (2026-10-28): plans with acquisition, widening,
+generation or extraction steps.** The compiler accepts a `decision_cache`
+over plans with these steps. It refuses an acquisition or widening step
+outside the refresh closure, as `decision_cache over acquisition step
+"<id>" outside the refresh closure is not available in this build`, and
+still refuses `on_refresh_failure: recompute` (part d2). With this part,
+increment 5 is complete except part d2.
+
+What part e adds:
+- An extract request meets the decision cache before its step limits.
+  Outside the closure it is supplied from the entry, as part b supplies a
+  request. Inside the closure, on a miss or as a `closure_mismatch`, it is
+  driven within its deadline share and step ledger as before. A queued
+  extract whose step deadline has passed takes the same path.
+- `StageContext` in `crates/rustev-runtime/src/generation.rs` carries the
+  decision's `DecisionRun`. Each generate, repair and output screening
+  request goes through `from_decision` as a judgment-stage request does:
+  supplied from the entry outside the closure, dispatched again inside
+  it, refused with an unkeyed decision under `admission: refuse`. On a
+  miss its key and output are logged, so the entry holds the generation
+  stage's requests too.
+- A listed acquisition or widening step is dispatched again on every
+  served decision through its normal path, which may use spec 036's page
+  cache (3.6.2). The run record member names each failed one in
+  `refresh_failed`.
+- `DecisionRun::start` adds the output screening steps of a generate step
+  in the closure to the closure.
+
+Decisions within the spec:
+- **An acquisition outside the closure is refused.** 3.6.2 leaves an
+  acquisition that is not listed, and reads no volatile source, outside
+  the closure, where its pages would be supplied from the entry. 3.6.4
+  stores requests' outputs, and part c stored no page. Dispatching it
+  again would refresh a step outside the closure, which 3.6.3 does not
+  provide. So the compiler refuses it, as earlier parts refused what the
+  runtime would not run (017 3.1). Listing it in `volatile` as
+  `step:<id>` puts it, and every step reading it, in the closure. Storing
+  pages would need a decision of its own.
+- **A served decision that acquired is `refreshed`.** Each of its
+  acquisitions was dispatched again. 3.6.6's index lists are request
+  indices and an acquisition is not a request, so the lists stay request
+  indices; its pages are in the record's `acquisitions`, each with its
+  attempts or its page cache hit. As 3.6.6 says, `refreshed` does not
+  imply external work.
+- **A failed refreshed acquisition** is a page whose result is not a
+  page, named once per step as `acquisition step "<id>"`. Under both
+  policies it is supplied as it is: no page is stored to substitute
+  (3.6.5).
+- **Output screening follows its generate step.** An output screening
+  request reads the generated text, so by 3.6.2's rule it is inside the
+  closure exactly when its generate step is. Outside, it is reused as any
+  request is; its 017 key holds the screened text. A repair request
+  carries its generate step's id and follows it the same way.
+- **A stored record with an invalid field** passes the generation stage's
+  record check, so it is supplied and goes to repair as the original did
+  (037 3.14.1); the repair request is then served from the entry too. A
+  record that fails that check is a `closure_mismatch`, as in part b.
+- **Generated text keeps its origin (3.6.6).** A reused model field keeps
+  its origin, value and lineage, which names the original attempt. Its
+  source is `served_from_cache{original_decision_id}`, the decision the
+  source attempt id names, as for a request-level hit (037 3.14.1). A
+  backstop slot is rendered again by the core: its origin is unchanged
+  and its source is `fresh`, since it names no attempt and 3.6.6 keeps a
+  deterministic backstop deterministic. 037 3.14.2 puts
+  `served_from_cache` on every slot of a cache that stores whole text
+  results; this one stores none (section 4). Apart from those sources,
+  the core evidence equals independent execution.
+- **What is stored per request (3.6.4) is unchanged.** Every request
+  outside the closure, whether of the judgment stage, an extract, a
+  generate, a repair or an output screening step, is stored with its key,
+  output and source attempt. Nothing is stored for an acquisition. A
+  decision with a failed generation request, including one that ends in
+  a deadline backstop or a failed repair, is not admitted, so a backstop
+  caused by a failure is never served from an entry.
+- **Extracted fields keep their origin.** The core validates the reused
+  output, so each field is `extracted` with its lineage (template
+  identity and backend artifact, 038 3.5), and the request record names
+  the source attempt. A reused output is neither dispatched nor charged,
+  so neither step limit is bypassed (038's increment 6, part b).
+- **The pending 037 result-cache fixture stays pending.**
+  `result_cache_preserves_generation_origins_pending_f1` in
+  `crates/rustev-eval/tests/generation_replay.rs` expects a
+  `backstop{deadline}` slot served and `served_from_cache` on every
+  slot. Under 3.6.4 such a decision is not admitted, and a backstop names
+  no attempt. Amending that fixture is the owner's decision under spec
+  037.
+
+Tests:
+- `a_volatile_acquisition_is_refreshed_by_dispatch` and
+  `a_failed_refreshed_acquisition_is_supplied_as_it_is` in
+  `crates/rustev-runtime/tests/acquisition.rs`: the refusal outside the
+  closure, an acquisition and a widening refreshed, and a failed refresh
+  under both policies (section 5, a refreshed acquisition failing under
+  `serve_cached_within_freshness`).
+- `a_decision_entry_serves_generated_text_with_its_original_origin` and
+  `a_generate_step_reading_a_volatile_input_is_refreshed` in
+  `crates/rustev-runtime/tests/generation.rs`: generated, repaired and
+  backstop slots with output screening served with no dispatch, and a
+  changed volatile input refreshing a generate step and its screening
+  (section 5, a volatile input changing).
+- `a_decision_entry_serves_extracted_fields_with_their_origin` in
+  `crates/rustev-runtime/tests/extraction.rs`, outside and inside the
+  closure.
+- `a_restarted_runtime_serves_stored_generated_text` in
+  `crates/rustev-runtime/tests/persistent.rs`, from the store after a
+  restart (section 5, a runtime restarting with the same store).
+- `a_decision_cache_over_generation_steps_compiles` in
+  `crates/rustev-core/tests/generation_compile.rs`, formerly
+  `a_decision_cache_over_generation_steps_is_not_available`.
+- In each runtime test, the served judgment and its core evidence equal
+  independent execution given the same outputs or pages, apart from the
+  generation sources above.
+- The spec 017 tests and the earlier increments' tests are unchanged.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child
