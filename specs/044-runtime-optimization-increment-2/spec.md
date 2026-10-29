@@ -566,7 +566,33 @@ snapshot, a refreshed acquisition fails, or a refreshed request fails.
   yields `Unresolved` exactly as independent execution would.
 - `recompute`: the hit is abandoned and the decision runs again with no
   reuse from the entry, within the same deadline and budget; the abandoned
-  attempts stay in the run record with their charges.
+  attempts stay in the run record with their charges, as follows:
+  1. The runtime abandons the served run only after every request it
+     dispatched has ended; no attempt is cancelled to start the rerun.
+     The rerun is a full independent run over the same request, snapshot
+     and evaluation time: nothing is supplied from the entry or from the
+     served run, and request-level caches and shared calls apply as they
+     would to any decision.
+  2. The rerun's attempts have their own namespace. This amends spec 003
+     3.9.2 item 2 for a rerun only: its attempt ids are
+     `<decision id>/<step>/<instance ids joined by ','>/r<n>`, with `n`
+     counting that request's attempts in the rerun from 1 across targets,
+     and an acquisition attempt's last component (spec 036) is likewise
+     `r<n>`, so no adapter or source sees an idempotency key of the served
+     run again.
+  3. The run record's requests, transitions, supplied values, capture and
+     core evidence are the rerun's alone, exactly as an independent run
+     would record them, so replay (spec 004) reads them as it reads any
+     record, and the record's `acquisitions` are the rerun's. The
+     abandoned attempts are in the `decision_cache` member's `abandoned`
+     (3.6.6) and are never supplied to the core or to replay.
+  4. The record's cost summary covers both runs: the served run's charges
+     and retained liability count against the decision's budget before
+     the rerun reserves anything, and a late charge for an abandoned
+     attempt reconciles by its attempt id (003 3.5.5).
+  5. Under `recompute` the compiler counts the plan's worst-case attempts
+     twice against `max_attempts_per_decision` (spec 003's check), so a
+     record's attempts, abandoned and recomputed together, stay within it.
 - `serve_cached_within_freshness`: for a volatile input only, the stored
   snapshot entry is supplied with its original as-of time, and the core's
   freshness check decides. Inside its declared maximum age the value is
@@ -584,7 +610,17 @@ The run record gains an optional `decision_cache` member (in
 generations, the reused request indices, the refreshed request indices
 (inside the closure), the mismatched request indices (`closure_mismatch`,
 3.6.3), any substituted volatile inputs with their entry digests, the
-refresh-failure policy applied and diagnostics (bounded as 017's). The
+refresh-failure policy applied, the abandoned served run under
+`recompute` (3.6.5) and diagnostics (bounded as 017's). `abandoned` holds
+`requests`: for each request the abandoned served run dispatched (its
+`refreshed` and `mismatched` requests), that request's record as spec 003
+3.9 would have written it (step, instance, result, attempts with their
+charges, and transitions); and `acquisitions`: the served run's
+acquisition records as spec 036 writes them. Each list is omitted when
+empty and `abandoned` is omitted when both are. `requests` holds at most
+the plan's requests and its attempts count toward the record's
+`max_attempts_per_decision` (3.6.5 item 5); `acquisitions` is bounded by
+the plan's acquisition limits, as the record's own `acquisitions` is. The
 outcome is exactly one of:
 
 - `hit`: served from an entry (3.6.3) with no request dispatched again,
@@ -613,6 +649,14 @@ The runtime's decision result gains `served_from_cache` with the same entry id a
 Reused outputs name their source attempts, so per-field origin computed by
 the core from them (including the origin of generated text under spec 037) is the original origin, and a deterministic backstop stays
 deterministic. A hit has zero new charge for reused requests.
+The decision-result cache stores request outputs, never a text result,
+so for generated text it is a cache of outputs under spec 037 3.14.2
+item 1, not a cache of whole results under item 2. A slot rendered from
+a reused output carries `served_from_cache` with the source decision id;
+a backstop slot, which names no attempt, is rendered again by the core
+with its backstop origin and source `fresh`. A decision with a failed
+generation request is never admitted (3.6.4), so a backstop caused by a
+failure is never served from an entry.
 
 ### 3.7 Per-item isolation
 
@@ -714,7 +758,7 @@ latency, cost or quality claim.
 | A volatile input changes between two identical decisions | Hit; the closure is dispatched again; the judgment reflects the new value. |
 | Refresh fails under `serve_cached_within_freshness`, value inside its maximum age | Served with `refresh_failed`; past the maximum age it is `stale_evidence`. |
 | A refreshed request or acquisition fails under `serve_cached_within_freshness` | Nothing stored is supplied for it; the failure is supplied as under `unresolved`, and the core yields `Unresolved`. |
-| Refresh fails under `recompute` | Full independent run; abandoned attempts and charges stay recorded. |
+| Refresh fails under `recompute` | Full independent run with `r<n>` attempt ids; outcome `miss` with `refresh_failed`; the served run's requests and acquisitions are in `abandoned` with their charges, counted in the cost summary; requests, capture and core evidence equal independent execution. |
 | A stored request key differs from the new one outside the closure | That request alone is dispatched, the others are supplied from the entry; `closure_mismatch`; the decision is not admitted. |
 | A persistent entry is corrupt (integrity digest mismatch) | Miss with `entry_corrupt`; the entry is deleted. |
 | A persistent entry is from the future, of an old schema, or older than the store generation | Miss with its diagnostic; the entry is kept (expiry and generations are the store's to reclaim). |
@@ -794,8 +838,8 @@ those specs' own declared verification.
 
 Open, reported as such and never as passed:
 - `on_refresh_failure: recompute` (3.6.5) and section 5's row "Refresh
-  fails under `recompute`": increment 5, part d2, which waits for an owner
-  decision on how abandoned attempts sit in the run record. The compiler
+  fails under `recompute`": increment 5, part d2, built on the
+  representation the owner chose (A-64). Until it lands the compiler
   refuses the policy as not available in this build.
 - Stage 2 of 3.8 (item 2): it runs only under the work order's live scope,
   so both stage 1 reports keep the verdict `unknown`.
@@ -816,6 +860,19 @@ this spec made after spec 022 is complete, and this spec is not recorded
 `complete` until that increment lands. Until then no binding enables
 adapter-scoped batching in production (R-28 unchanged). Every other item,
 including stage 1 of 3.8 for the Jev adapter, is unchanged.
+
+**Owner decision A-64 (2026-10-29): `recompute`, the 037 fixture and the
+stage 2 bound.**
+1. `recompute` keeps the abandoned attempts beside the rerun, not inside
+   it: the rerun gets its own attempt namespace and the abandoned served
+   run goes in a bounded `abandoned` member of the `decision_cache` record
+   (3.6.5, 3.6.6). The alternatives were a charge and count only, which loses
+   per-attempt evidence, and leaving `recompute` refused.
+2. Spec 037's pending result-cache fixture is amended to this spec's
+   behavior (3.6.6), under spec 037, rather than amending 037 3.14.2.
+3. Stage 2 of 3.8 declares `top_label` agreement at 19 of 20 over at
+   least 20 comparable pairs, the bound and minimum the stage 1 reports
+   already carry (increment 6, part b).
 
 ## Implementation record
 
@@ -1983,6 +2040,31 @@ when they are rebuilt, well inside the acceptance group's 45 minutes.
 
 Still open, as the Verification section states: `recompute` (part d2),
 stage 2 of 3.8, and increment 8.
+
+**Increment 5, part d2, the plan (2026-10-29).** The owner chose the
+representation above (A-64), and 3.6.5 and 3.6.6 now say it. Part d2
+builds it:
+- `rustev-contract`: `DecisionCacheRecord` gains `abandoned`, with
+  request and acquisition records, omitted when empty, so every existing
+  record keeps its bytes; the run schema and the Node and WebAssembly
+  declarations are regenerated.
+- `rustev-core`: the compiler accepts `on_refresh_failure: recompute`
+  and counts the worst-case attempts twice against
+  `max_attempts_per_decision` for it (3.6.5 item 5), refusing as spec 003
+  does when they exceed it.
+- `rustev-runtime`: on a failed refresh under `recompute` the runtime
+  waits for the served run's requests to end, moves its request and
+  acquisition records to `abandoned`, and runs the decision again with
+  `r<n>` attempt ids and the
+  remaining deadline and budget; the rerun is a `miss` with
+  `refresh_failed` and may be admitted (3.6.4).
+- Tests: section 5's row "Refresh fails under `recompute`" for each of the
+  three refresh failures of 3.6.5, the attempt ids an adapter sees, the
+  cost summary and a late charge for an abandoned attempt, replay of the
+  record, a refusal golden for the doubled attempt bound, and admission of
+  the rerun.
+
+The spec 037 fixture amendment (A-64 item 2) is spec 037's own change.
 
 ## Decisions at approval
 
