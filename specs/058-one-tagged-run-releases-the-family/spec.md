@@ -462,6 +462,29 @@ release (increment 5) shows. A crates.io token from trusted publishing
 lives 30 minutes; a `publish-crates` job that outlives it fails and is
 resumed by rerunning it (3.5.1).
 
+**Increment 3 (2026-10-28).** The retirements of 3.9 leave
+`tools/rustev-release/` in parts, each a pull request that builds and
+passes on its own. Part a, the entry points: `rustev-release` no longer
+has `publish` (local crates publication under a signed instruction and an
+outside-Git journal), `hosted-release`, the four-argument `qualify
+<release-dir> <evidence-dir> <instruction> <journal>`, `prerelease` and
+`candidate-manifest` (the signed-manifest pre-release of the retired `bind`
+job), `verify-artifacts` and `observe-crates` (checks against an input
+manifest) or `verify-release` (the owner-signed manifest and
+`SHA256SUMS`); `artifacts.sh` no longer has `dispatch` (the rehearsal and
+`publish-npm` inputs), `tag-manifest` or `npm-guard`. `prerelease::run`,
+`publish_prerelease` and `candidate::check_manifest` go with them; the
+`gh` adapter stays for `github-release`, with `create_release` its one
+creating method. A candidate without the run's artifacts is refused under
+3.7 rather than 053 3.1.3. Stays: every command a workflow, script or the
+Makefile calls (`tag`, `run-manifest`, `manifest`, `field`, `compare`,
+`compare-artifacts`, `npm-audit`, `sbom-check`, `main-sbom`,
+`candidate-version`, `publish-crates`, `publish-npm`, `github-release`,
+`verify-assets`, `observe-registries`, the two-argument `qualify` and the
+candidate-evidence commands of `candidate.sh`), and the `qualify.sh`
+harness, which still verifies a downloaded `.sig` when a release before
+this spec carries one, so 0.1.x and 0.2.0 stay requalifiable (3.4.3).
+
 **Increment 4 (2026-10-28).** The owner settings of 3.8 are in place:
 crates.io trusted publishers for the twelve crates (workflow
 `release.yml`, Environment `crates-publish`); the `release` and

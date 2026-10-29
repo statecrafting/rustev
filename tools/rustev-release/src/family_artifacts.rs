@@ -1,4 +1,4 @@
-//! Spec 031 3.1, 3.9 and 3.11.2: the rehearsal bytes bind the tag build.
+//! Spec 031 3.1 and 3.9, 058 3.2: the run's artifacts, bound into its manifest.
 use crate::{
     ReleaseSet,
     archive::sha256_hex,
@@ -170,15 +170,15 @@ fn path(a: &WorkflowArtifact) -> String {
 pub fn collect(
     set: &ReleaseSet,
     evidence: &Path,
-    rehearsal: Option<&Path>,
+    artifacts: Option<&Path>,
 ) -> Result<Vec<WorkflowArtifact>, String> {
     let mut result = Vec::new();
     let mut rest = Vec::new();
-    // 053 3.1.3: candidates use rehearsal SBOMs, not crate packaging or
-    // release changelog evidence. Candidate notes state their limitations.
+    // 058 3.7: a candidate uses the run's artifact SBOMs, not crate
+    // packaging or release changelog evidence. Its notes state its limitations.
     let candidate = crate::candidate::is_candidate_version(&set.version);
-    if candidate && rehearsal.is_none() {
-        return Err("053 3.1.3: candidate requires rehearsal artifacts".into());
+    if candidate && artifacts.is_none() {
+        return Err("058 3.7: a candidate requires the run's artifacts".into());
     }
     for name in set
         .upload_order
@@ -198,7 +198,7 @@ pub fn collect(
             &b,
         ));
     }
-    if let Some(dir) = rehearsal {
+    if let Some(dir) = artifacts {
         let files = workflow_files(dir)?;
         let mut expected = Vec::new();
         for n in &set.npm {
@@ -328,9 +328,9 @@ pub fn verify(m: &ReleaseManifest, dir: &Path) -> Vec<String> {
     }
 }
 
-/// Spec 031 3.11.2: flatten the signed release assets beside the crates.
-pub fn stage(m: &ReleaseManifest, evidence: &Path, rehearsal: Option<&Path>) -> Result<(), String> {
-    if let Some(dir) = rehearsal {
+/// Spec 031 3.11.2: flatten the release assets beside the crates.
+pub fn stage(m: &ReleaseManifest, evidence: &Path, artifacts: Option<&Path>) -> Result<(), String> {
+    if let Some(dir) = artifacts {
         for a in &m.artifacts {
             let source = dir.join(path(a));
             if source.is_file() {

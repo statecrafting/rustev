@@ -695,7 +695,7 @@ fn candidate_collect_requires_rehearsal_and_binds_candidate_names() {
     assert!(
         fa::collect(&set, &absent, None)
             .unwrap_err()
-            .contains("053 3.1.3")
+            .contains("058 3.7")
     );
     m.version = set.version.clone();
     m.tag = set.tag.clone();
