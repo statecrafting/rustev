@@ -559,11 +559,13 @@ fn refresh_closure(
 
 /// A mechanism the runtime of this build does not run is refused rather
 /// than silently run independently (spec 017, 3.1). The decision-result
-/// cache runs its memory and persistent tiers over exact and semantic
-/// steps with the `unresolved` and `serve_cached_within_freshness` refresh
-/// policies (spec 044, 3.6.5); `recompute`, and plans with acquisition,
-/// widening, generation or extraction steps, join with later parts of
-/// spec 044's increment 5.
+/// cache runs its memory and persistent tiers with the `unresolved` and
+/// `serve_cached_within_freshness` refresh policies (spec 044, 3.6.5);
+/// `recompute` joins with a later part of spec 044's increment 5. An
+/// acquisition or widening step outside the refresh closure is refused:
+/// its pages are never stored in an entry, so it could only be dispatched
+/// again, which 3.6.2 reserves for steps inside the closure (spec 044,
+/// increment 5, part e).
 pub(crate) fn available(execution: &PlanExecution, def: &Definition) -> Result<(), Refusal> {
     let PlanExecution::Declared(d) = execution else {
         return Ok(());
@@ -585,14 +587,17 @@ pub(crate) fn available(execution: &PlanExecution, def: &Definition) -> Result<(
     if p.on_refresh_failure == RefreshFailurePolicy::Recompute {
         return unavailable("on_refresh_failure recompute");
     }
-    for s in &def.steps {
-        let kind = match s.body {
-            StepBody::Acquire(_) | StepBody::Widen(_) => "acquisition",
-            StepBody::Generate(_) => "generation",
-            StepBody::Extract(_) => "extraction",
-            _ => continue,
-        };
-        return unavailable(&format!("over {kind} steps"));
+    let closure = d
+        .decision_cache
+        .as_ref()
+        .map_or(&[][..], |c| &c.refresh_closure[..]);
+    if let Some(s) = def.steps.iter().find(|s| {
+        matches!(s.body, StepBody::Acquire(_) | StepBody::Widen(_)) && !closure.contains(&s.id)
+    }) {
+        return unavailable(&format!(
+            "over acquisition step {:?} outside the refresh closure",
+            s.id
+        ));
     }
     Ok(())
 }

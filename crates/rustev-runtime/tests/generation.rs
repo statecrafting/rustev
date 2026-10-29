@@ -1191,3 +1191,205 @@ async fn output_screening_verdicts_and_repair_request_count() {
         assert_eq!(RunRecord::parse(&bytes).unwrap(), *result.record);
     }
 }
+
+fn decision_policy(volatile: &[&str]) -> ExecutionPolicy {
+    let mut p = execution(CostPolicy::Hard { max_units: 100 }, vec![]);
+    p.optimization = Some(serde_json::from_value(json!({"key_schema_version":1,"cache_namespace_version":1,
+        "admission":"refuse","expiry":"injected_runtime_time","decision_cache":{"tiers":["memory"],
+        "max_entry_bytes":65536,"max_entries":8,"ttl_ms":60000,"volatile":volatile,"key_dimensions":[],
+        "on_refresh_failure":"unresolved"}})).unwrap());
+    p
+}
+
+/// A first record with an invalid `why` and no `tags`, then the repair
+/// round's answer: `tags` takes its backstop.
+fn repaired(c: &Call) -> Answer {
+    if c.attempt_id.contains("repair:1") {
+        Answer::Output(
+            RawOutput::TextRecord(BTreeMap::from([(
+                "why".into(),
+                TextValue::Text("Fixed".into()),
+            )])),
+            Charge::Observed { units: 1 },
+        )
+    } else {
+        let mut first = output("Keep", "BAD\tTEXT");
+        if let RawOutput::TextRecord(fields) = &mut first {
+            fields.remove("tags");
+        }
+        Answer::Output(first, Charge::Observed { units: 1 })
+    }
+}
+
+/// Output screening passes; anything else is answered by `f`.
+fn screened(f: fn(&Call) -> Answer) -> impl Fn(&Call) -> Answer + Send + Sync + 'static {
+    move |c| {
+        if c.task() == "rustev.screen/1" {
+            Answer::Output(
+                RawOutput::Screen {
+                    blocked: false,
+                    categories: vec![],
+                    units: rustev_contract::output::ScreenUnits::NotReported,
+                },
+                Charge::Observed { units: 1 },
+            )
+        } else {
+            f(c)
+        }
+    }
+}
+
+fn screen_output(d: &mut Definition) {
+    let StepBody::Generate(g) = &mut d.steps[0].body else {
+        panic!("a generate step");
+    };
+    g.screen.output = ScreenOutput::Screener {
+        backend: g.backend.clone(),
+    };
+}
+
+/// Every slot's source made `fresh`: what independent execution records.
+fn as_fresh(d: &rustev_runtime::Decided) -> rustev_contract::run::CoreEvidence {
+    let mut core = d.record.core.clone();
+    if let rustev_contract::run::CoreEvidence::Recorded(e) = &mut core {
+        for step in e.generation.iter_mut().flatten() {
+            for item in &mut step.items {
+                for f in item.generated.values_mut() {
+                    f.source = TextSource::Fresh;
+                }
+            }
+        }
+    }
+    core
+}
+
+/// Spec 044, 3.6.3 and 3.6.6, with spec 037, 3.14 (increment 5, part e): a
+/// generate step outside the refresh closure is served from the entry, its
+/// repair round and output screening too, with no dispatch. Each field
+/// keeps its original origin and lineage. A model field is
+/// `served_from_cache` naming the original decision; a backstop is rendered
+/// again by the core, so it stays a deterministic backstop and names no
+/// attempt. Apart from that source, the judgment, evidence and text equal
+/// independent execution given the same outputs.
+#[tokio::test]
+async fn a_decision_entry_serves_generated_text_with_its_original_origin() {
+    let policy = decision_policy(&[]);
+    let set = || {
+        let edit = |d: &mut Definition| {
+            screen_output(d);
+            let StepBody::Generate(g) = &mut d.steps[0].body else {
+                panic!("a generate step");
+            };
+            let tags = BackstopField::List(vec!["quiet".into()]);
+            g.backstop.fields.insert("tags".into(), tags);
+        };
+        setup_with(
+            Some(&policy),
+            screened(repaired),
+            false,
+            edit,
+            Arc::new(Sink),
+        )
+    };
+    let (rt, p, b, _) = set();
+    let cancel = CancelSignal::new();
+    let first = rt.decide(&p, req("source/id%"), &cancel).await.unwrap();
+    let served = rt.decide(&p, req("served"), &cancel).await.unwrap();
+    assert_eq!(b.dispatched().len(), 4);
+    let dc = served.record.decision_cache.as_ref().unwrap();
+    assert_eq!(
+        dc.outcome,
+        rustev_contract::optimization::DecisionCacheOutcome::Hit
+    );
+    assert_eq!(dc.reused, vec![0, 1, 2, 3]);
+    assert_eq!(served.record.cost.observed, 0);
+    let (rt2, p2, _, _) = set();
+    let alone = rt2
+        .decide(&p2, req("served"), &CancelSignal::new())
+        .await
+        .unwrap();
+    assert_eq!(served.completion, alone.completion);
+    assert_eq!(as_fresh(&served), alone.record.core);
+    let original = first.text_result.unwrap();
+    let text = served.text_result.unwrap();
+    let independent = alone.text_result.unwrap();
+    let item = &text.steps[0].items[0].generated;
+    assert_eq!(item["why"].origin, FieldOrigin::Repaired);
+    assert!(matches!(item["tags"].origin, FieldOrigin::Backstop { .. }));
+    for (name, f) in item {
+        let o = &original.steps[0].items[0].generated[name];
+        assert_eq!(
+            f.source,
+            if name == "tags" {
+                TextSource::Fresh
+            } else {
+                TextSource::ServedFromCache {
+                    original_decision_id: "source/id%".into(),
+                }
+            }
+        );
+        assert_eq!(f.lineage, o.lineage);
+        let i = &independent.steps[0].items[0].generated[name];
+        assert_eq!((&f.origin, &f.value), (&i.origin, &i.value));
+    }
+}
+
+/// Spec 044, 3.6.2: a generate step that projects a volatile input is in
+/// the refresh closure, so a served decision dispatches it again, with its
+/// output screening request, and its text is fresh.
+#[tokio::test]
+async fn a_generate_step_reading_a_volatile_input_is_refreshed() {
+    let policy = decision_policy(&["preferences"]);
+    let edit = |d: &mut Definition| {
+        d.inputs.push(InputDecl {
+            name: "preferences".into(),
+            ty: TypeDecl::Text { max_bytes: 64 },
+            provenance: vec![ProvenanceClass::SystemOfRecord],
+            freshness: Freshness::MaxAgeMs(60_000),
+            evidence: None,
+            on_disagreement: None,
+        });
+        let StepBody::Generate(g) = &mut d.steps[0].body else {
+            panic!("a generate step");
+        };
+        g.projection = vec!["input:preferences".into()];
+        screen_output(d);
+    };
+    let (rt, p, b, _) = setup_with(
+        Some(&policy),
+        screened(|_| answer()),
+        false,
+        edit,
+        Arc::new(Sink),
+    );
+    let at = |id: &str, preferences: &str| {
+        let mut r = req(id);
+        r.snapshot = snapshot(vec![entry(
+            "preferences",
+            json!(preferences),
+            ProvenanceClass::SystemOfRecord,
+            0,
+        )]);
+        r
+    };
+    rt.decide(&p, at("first", "quiet"), &CancelSignal::new())
+        .await
+        .unwrap();
+    let before = b.dispatched().len();
+    let served = rt
+        .decide(&p, at("served", "busy"), &CancelSignal::new())
+        .await
+        .unwrap();
+    assert_eq!(b.dispatched().len(), 2 * before);
+    let dc = served.record.decision_cache.as_ref().unwrap();
+    assert_eq!(
+        dc.outcome,
+        rustev_contract::optimization::DecisionCacheOutcome::Refreshed
+    );
+    assert!(dc.reused.is_empty());
+    assert_eq!(dc.refreshed.len(), served.record.requests.len());
+    let text = served.text_result.unwrap();
+    for f in text.steps[0].items[0].generated.values() {
+        assert_eq!(f.source, TextSource::Fresh);
+    }
+}

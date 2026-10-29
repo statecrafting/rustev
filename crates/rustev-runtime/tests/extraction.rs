@@ -607,3 +607,79 @@ async fn screening_controls_dispatch_and_exact_fallback_reads_original_text() {
         }
     }
 }
+
+fn decision_cached(volatile: &[&str]) -> ExecutionPolicy {
+    let mut p = execution(CostPolicy::Unlimited, vec![]);
+    p.optimization = Some(serde_json::from_value(json!({"key_schema_version":1,"cache_namespace_version":1,
+        "admission":"refuse","expiry":"injected_runtime_time","decision_cache":{"tiers":["memory"],
+        "max_entry_bytes":65536,"max_entries":8,"ttl_ms":60000,"volatile":volatile,"key_dimensions":[],
+        "on_refresh_failure":"unresolved"}})).unwrap());
+    p
+}
+
+/// Spec 044, 3.6.3 and 3.6.6 (increment 5, part e): an extract request
+/// outside the refresh closure is supplied from the entry with no dispatch
+/// and no charge, its fields keep origin `extracted` and its record names
+/// the source attempt; inside the closure it is dispatched again. Each
+/// served judgment and its core evidence equal independent execution given
+/// the same output.
+#[tokio::test]
+async fn a_decision_entry_serves_extracted_fields_with_their_origin() {
+    for volatile in [&[][..], &["message"]] {
+        let mut d = definition();
+        d.inputs[0].freshness = rustev_contract::definition::Freshness::MaxAgeMs(60_000);
+        let policy = decision_cached(volatile);
+        let decide = |b: &Arc<Scripted>, id: &str| {
+            let (rt, _) = runtime(std::slice::from_ref(b), 1);
+            let plan = rt
+                .prepare(compiled(&d, &[descriptor()], Some(&policy)))
+                .unwrap();
+            let id = id.to_string();
+            async move {
+                let mut r = req();
+                r.decision_id = id.clone();
+                let first = rt.decide(&plan, r, &CancelSignal::new()).await.unwrap();
+                let mut r = req();
+                r.decision_id = format!("{id}-again");
+                let again = rt.decide(&plan, r, &CancelSignal::new()).await.unwrap();
+                (first, again)
+            }
+        };
+        let b = Scripted::new(descriptor(), |_| answer());
+        let (first, served) = decide(&b, "source").await;
+        let dc = served.record.decision_cache.as_ref().unwrap();
+        let alone = Scripted::new(descriptor(), |_| answer());
+        let (independent, _) = decide(&alone, "source-again").await;
+        assert_eq!(served.completion, independent.completion);
+        assert_eq!(served.record.core, independent.record.core);
+        let e = &evidence(&served).extraction.as_ref().unwrap()[0];
+        assert!(
+            e.fields
+                .iter()
+                .any(|f| f.origin == ExtractionOrigin::Extracted)
+        );
+        let request = &served.record.requests[0];
+        if volatile.is_empty() {
+            assert_eq!(
+                dc.outcome,
+                rustev_contract::optimization::DecisionCacheOutcome::Hit
+            );
+            assert_eq!(dc.reused, vec![0]);
+            assert_eq!(b.dispatched().len(), 1);
+            let source = &first.record.requests[0].attempts[0].attempt_id;
+            assert_eq!(
+                request.supplied_from().unwrap().reused_from,
+                Some(&source[..])
+            );
+            assert_eq!(served.record.cost.observed, 0);
+        } else {
+            assert_eq!(
+                dc.outcome,
+                rustev_contract::optimization::DecisionCacheOutcome::Refreshed
+            );
+            assert_eq!(dc.refreshed, vec![0]);
+            assert_eq!(b.dispatched().len(), 2);
+            assert!(request.attempts[0].attempt_id.starts_with("source-again/"));
+        }
+    }
+}

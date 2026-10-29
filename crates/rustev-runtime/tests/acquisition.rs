@@ -3,8 +3,9 @@ mod common;
 use rustev_contract::Document;
 use rustev_contract::acquisition_record::*;
 use rustev_contract::definition::{Definition, StepBody};
-use rustev_contract::execution::{CostPolicy, FailureClass};
+use rustev_contract::execution::{CostPolicy, ExecutionPolicy, FailureClass};
 use rustev_contract::judgment::Unresolved;
+use rustev_contract::optimization::DecisionCacheOutcome;
 use rustev_contract::run::{
     CancelAnswer, Cancellation, Charge, CoreEvidence, CostBound, RemoteState, RunRecord,
 };
@@ -932,4 +933,116 @@ async fn gated_live_acquisitions_refuse_before_any_source_call() {
         Err(rustev_runtime::LiveRefusal::SpendAcquisitionUnsupported)
     ));
     assert!(source.seen.lock().unwrap().is_empty());
+}
+
+fn decision_cached(volatile: &[&str], on_refresh_failure: &str) -> ExecutionPolicy {
+    let mut policy = common::execution(CostPolicy::Unlimited, vec![]);
+    policy.optimization = Some(serde_json::from_value(json!({"key_schema_version":1,"cache_namespace_version":1,
+        "admission":"refuse","expiry":"injected_runtime_time","decision_cache":{"tiers":["memory"],
+        "max_entry_bytes":65536,"max_entries":8,"ttl_ms":60000,"volatile":volatile,"key_dimensions":[],
+        "on_refresh_failure":on_refresh_failure}})).unwrap());
+    policy
+}
+
+/// Two decisions on one runtime: the first a miss, the second served.
+async fn twice(
+    d: &Definition,
+    policy: &ExecutionPolicy,
+    actions: Vec<Action>,
+) -> (RunRecord, rustev_runtime::Decided, Arc<Source>) {
+    let src = Source::new(source(), actions);
+    let rt = runtime(&ManualClock::new(), std::slice::from_ref(&src), 1);
+    let plan = prepare(&rt, d, std::slice::from_ref(&src), Some(policy));
+    let cancel = CancelSignal::new();
+    let first = rt.decide(&plan, request("first"), &cancel).await.unwrap();
+    let served = rt.decide(&plan, request("served"), &cancel).await.unwrap();
+    ((*first.record).clone(), served, src)
+}
+
+/// Spec 044, 3.6.2 (increment 5, part e): an acquisition or widening step
+/// outside the refresh closure is refused at compile, since its pages are
+/// never stored; one listed in `volatile` is refreshed by dispatching it
+/// again, so the served decision is `refreshed`. Its judgment and core
+/// evidence equal independent execution given the same pages.
+#[tokio::test]
+async fn a_volatile_acquisition_is_refreshed_by_dispatch() {
+    for (d, step) in [(definition(), "lookup"), (widening_definition(), "pool")] {
+        let r = compile_with_sources(
+            &d,
+            &[],
+            &[],
+            &[source()],
+            Some(&decision_cached(&[], "unresolved")),
+        )
+        .unwrap_err();
+        assert_eq!(
+            r.detail,
+            format!(
+                "decision_cache over acquisition step {step:?} outside the refresh closure is not available in this build"
+            )
+        );
+        let policy = decision_cached(&[&format!("step:{step}")], "unresolved");
+        let (first, served, src) = twice(&d, &policy, vec![]).await;
+        assert_eq!(
+            first.decision_cache.as_ref().unwrap().outcome,
+            DecisionCacheOutcome::Miss
+        );
+        let calls = first.acquisitions.as_ref().unwrap().len();
+        assert_eq!(src.calls(), 2 * calls);
+        let dc = served.record.decision_cache.as_ref().unwrap();
+        assert_eq!(dc.outcome, DecisionCacheOutcome::Refreshed);
+        assert!(dc.reused.is_empty() && dc.refreshed.is_empty() && dc.diagnostics.is_empty());
+        assert!(served.served_from_cache.is_some());
+        assert!(
+            records(&served.record)[0].attempts[0]
+                .attempt_id
+                .starts_with("served/")
+        );
+        let alone = Source::new(source(), vec![]);
+        let rt = runtime(&ManualClock::new(), std::slice::from_ref(&alone), 1);
+        let plan = prepare(&rt, &d, std::slice::from_ref(&alone), Some(&policy));
+        let independent = rt
+            .decide(&plan, request("served"), &CancelSignal::new())
+            .await
+            .unwrap();
+        assert_eq!(served.completion, independent.completion);
+        assert_eq!(served.record.core, independent.record.core);
+    }
+}
+
+/// Spec 044, 3.6.5 and section 5: a refreshed acquisition that fails is a
+/// failed refresh. Under `unresolved`, and under
+/// `serve_cached_within_freshness` where nothing stored stands in for a
+/// page, the failure is supplied as it is and the core judges as
+/// independent execution would.
+#[tokio::test]
+async fn a_failed_refreshed_acquisition_is_supplied_as_it_is() {
+    let fail = || Action::Fail(AcquisitionFailure::Permanent);
+    for on in ["unresolved", "serve_cached_within_freshness"] {
+        let policy = decision_cached(&["step:lookup"], on);
+        let page = Action::Page(vec![1], json!("none"));
+        let (_, served, _) = twice(&definition(), &policy, vec![page, fail()]).await;
+        let dc = served.record.decision_cache.as_ref().unwrap();
+        assert_eq!(dc.outcome, DecisionCacheOutcome::Refreshed);
+        assert!(dc.substituted.is_empty());
+        assert_eq!(
+            dc.diagnostics,
+            vec!["refresh_failed: acquisition step \"lookup\"".to_string()]
+        );
+        assert!(dc.on_refresh_failure.is_some());
+        let alone = Source::new(source(), vec![fail()]);
+        let rt = runtime(&ManualClock::new(), std::slice::from_ref(&alone), 1);
+        let plan = prepare(
+            &rt,
+            &definition(),
+            std::slice::from_ref(&alone),
+            Some(&policy),
+        );
+        let independent = rt
+            .decide(&plan, request("served"), &CancelSignal::new())
+            .await
+            .unwrap();
+        assert_eq!(served.completion, independent.completion);
+        assert_eq!(served.record.core, independent.record.core);
+    }
 }

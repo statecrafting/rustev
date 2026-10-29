@@ -644,6 +644,7 @@ pub(crate) mod decision {
     use std::collections::{BTreeMap, BTreeSet};
     use std::sync::{Arc, Mutex, MutexGuard};
 
+    use rustev_contract::acquisition_record::AcquisitionRecord;
     use rustev_contract::cache_entry::EntryGenerations;
     use rustev_contract::canonical::{record_canonical_bytes, tagged_digest};
     use rustev_contract::ids::{ContentDigest, PlanId};
@@ -1028,7 +1029,9 @@ pub(crate) mod decision {
         failed_inputs: &[String],
         log: &DecisionLog,
         requests: &[rustev_contract::run::RequestRecord],
+        acquisitions: &[AcquisitionRecord],
     ) -> Vec<String> {
+        use rustev_contract::acquisition_record::AcquisitionResult;
         use rustev_contract::run::RequestResult;
         let mut failed: Vec<String> = failed_inputs
             .iter()
@@ -1046,6 +1049,16 @@ pub(crate) mod decision {
                 })
                 .map(|r| format!("step {:?}", r.step))
         }));
+        // Every acquisition of a served decision is refreshed (3.6.2), and
+        // one that fails is named once per step.
+        let mut steps = BTreeSet::new();
+        failed.extend(
+            acquisitions
+                .iter()
+                .filter(|a| !matches!(a.result, AcquisitionResult::Page))
+                .filter(|a| steps.insert(&a.step))
+                .map(|a| format!("acquisition step {:?}", a.step)),
+        );
         failed
     }
 
@@ -1069,8 +1082,23 @@ pub(crate) mod decision {
                 return None;
             };
             let compiled = d.decision_cache.as_ref()?;
+            let mut closure: BTreeSet<String> = compiled.refresh_closure.iter().cloned().collect();
+            // A generate step's output screening requests are its own, so
+            // they follow it into the closure (spec 044, 3.6.2, increment 5
+            // part e).
+            for s in &plan.compiled.plan.steps {
+                if let rustev_contract::plan::PlanStepDetail::Generate(g) = &s.detail
+                    && closure.contains(&s.id)
+                {
+                    closure.extend(
+                        g.output.fields.iter().map(|f| {
+                            rustev_contract::generation::output_screen_step(&s.id, &f.name)
+                        }),
+                    );
+                }
+            }
             let mut run = DecisionRun {
-                closure: compiled.refresh_closure.iter().cloned().collect(),
+                closure,
                 key: None,
                 generation: 0,
                 captured: None,
@@ -1197,6 +1225,16 @@ pub(crate) mod decision {
             self.log.lock().unwrap_or_else(|e| e.into_inner())
         }
 
+        /// An output supplied to the core or the generation stage, which a
+        /// judged miss may store (spec 044, 3.6.4).
+        pub(crate) fn supplied(&self, step: &str, instance: &[String], output: &RawOutput) {
+            if self.hit.is_none() {
+                self.log()
+                    .outputs
+                    .insert((step.to_string(), instance.to_vec()), output.clone());
+            }
+        }
+
         /// The volatile inputs of a served decision, once the core has
         /// validated the new snapshot (spec 044, 3.6.5): each one it did not
         /// accept is a failed refresh. Under `serve_cached_within_freshness`
@@ -1271,10 +1309,15 @@ pub(crate) mod decision {
         }
 
         /// The run record member (spec 044, 3.6.6). A served decision's failed
-        /// refresh names the policy applied, which is the plan's (3.6.5).
+        /// refresh names the policy applied, which is the plan's (3.6.5). An
+        /// acquisition is always inside the closure (the compiler refuses one
+        /// outside it), so a served decision that acquired is `refreshed`; its
+        /// pages are listed in the record's `acquisitions`, not in the request
+        /// indices.
         pub(crate) fn record(
             &self,
             requests: &[rustev_contract::run::RequestRecord],
+            acquisitions: &[AcquisitionRecord],
         ) -> rustev_contract::optimization::DecisionCacheRecord {
             use rustev_contract::optimization::{
                 DecisionCacheOutcome, DecisionCacheRecord, MAX_OPTIMIZATION_DIAGNOSTICS,
@@ -1308,7 +1351,10 @@ pub(crate) mod decision {
             };
             let mut diagnostics = log.diagnostics.clone();
             if let Some(hit) = &self.hit {
-                record.outcome = if record.refreshed.is_empty() && record.mismatched.is_empty() {
+                record.outcome = if record.refreshed.is_empty()
+                    && record.mismatched.is_empty()
+                    && acquisitions.is_empty()
+                {
                     DecisionCacheOutcome::Hit
                 } else {
                     DecisionCacheOutcome::Refreshed
@@ -1318,7 +1364,7 @@ pub(crate) mod decision {
                 record.age_ms = Some(hit.age_ms);
                 record.generations = hit.generations;
                 record.substituted = self.substituted.clone();
-                let failed = failures(&self.failed_inputs, &log, requests);
+                let failed = failures(&self.failed_inputs, &log, requests, acquisitions);
                 if !failed.is_empty() {
                     record.on_refresh_failure = Some(self.on_refresh_failure);
                     diagnostics.push(format!("refresh_failed: {}", failed.join(", ")));

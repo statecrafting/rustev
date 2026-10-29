@@ -305,7 +305,7 @@ pub(crate) async fn run_requests(
             if let Some(&deadline) = extraction_deadlines.get(&r.step)
                 && cx.now() >= deadline
             {
-                active.push(Box::pin(drive_extraction(cx, r, deadline)));
+                active.push(extraction(cx, r, deadline));
             } else {
                 remaining.push_back(r);
             }
@@ -318,7 +318,7 @@ pub(crate) async fn run_requests(
         {
             let Some(r) = waiting.pop_front() else { break };
             if let Some(deadline) = extraction_deadlines.get(&r.step) {
-                active.push(Box::pin(drive_extraction(cx, r, *deadline)));
+                active.push(extraction(cx, r, *deadline));
                 continue;
             }
             if let Some(out) = cx.decision.and_then(|d| from_decision(cx, d, &r)) {
@@ -424,12 +424,8 @@ pub(crate) async fn run_requests(
             // Even discarded results retain optimization charge attribution;
             // absent supplied output prevents cache admission.
             admit_to_cache(cx, &mut out);
-            if let (Some(d), Some(Supplied::Output(raw))) = (cx.decision, &out.supplied)
-                && d.hit.is_none()
-            {
-                d.log()
-                    .outputs
-                    .insert((out.step.clone(), out.instance.clone()), raw.clone());
+            if let (Some(d), Some(Supplied::Output(raw))) = (cx.decision, &out.supplied) {
+                d.supplied(&out.step, &out.instance, raw);
             }
             match out.supplied {
                 Some(s) => {
@@ -799,8 +795,10 @@ fn key_of(
 /// equals the stored one, or a refusal of an unkeyed decision under
 /// `admission: refuse`. `None` runs it through the normal path: inside the
 /// closure, on a miss (whose key is kept for admission), or as a
-/// `closure_mismatch`.
-fn from_decision(
+/// `closure_mismatch`. The generation stage calls it too, where a
+/// generate step's output screening requests follow the step (spec 044,
+/// increment 5 part e).
+pub(crate) fn from_decision(
     cx: &DecisionCtx<'_, '_>,
     d: &crate::optimization::decision::DecisionRun,
     req: &SemanticRequest,
@@ -850,12 +848,21 @@ fn from_decision(
         .requests
         .get(&at)
         .filter(|stored| stored.key.material == key.material);
+    // The generation stage validates a record as it does an attempt's, so a
+    // stored record with an invalid field goes to repair as the original did
+    // (spec 037, 3.14.1).
     let valid = stored.is_some_and(|stored| {
-        matches!(
-            cx.ev()
+        let checked = match cx.generation {
+            Some(g) => g.lock().unwrap_or_else(|e| e.into_inner()).check_output(
+                &req.step,
+                &req.instance,
+                &stored.output,
+            ),
+            None => cx
+                .ev()
                 .check_output(&req.step, &req.instance, &stored.output),
-            Ok(Ok(()))
-        )
+        };
+        matches!(checked, Ok(Ok(())))
     });
     let Some(stored) = stored.filter(|_| valid) else {
         let mut log = d.log();
@@ -2051,6 +2058,21 @@ pub(crate) fn step_ledger(limit: &rustev_contract::generation::CostLimit) -> Led
         CostLimit::None => CostPolicy::Unlimited,
         CostLimit::Units { n } => CostPolicy::Hard { max_units: *n },
     })
+}
+
+/// An extract request under the decision-result cache is supplied from the
+/// entry as any request outside the refresh closure is (spec 044, 3.6.3): a
+/// reused output is neither dispatched nor charged, so neither step limit
+/// is bypassed. Otherwise it is driven within its limits.
+fn extraction<'a>(
+    cx: &'a DecisionCtx<'_, '_>,
+    req: SemanticRequest,
+    deadline: Instant,
+) -> Driving<'a> {
+    match cx.decision.and_then(|d| from_decision(cx, d, &req)) {
+        Some(out) => Box::pin(std::future::ready(out)),
+        None => Box::pin(drive_extraction(cx, req, deadline)),
+    }
 }
 
 /// Extraction uses the ordinary attempt driver with its own clock window and
