@@ -40,6 +40,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "scripts/acceptance/",
+        "source": "spec-edge"
+      },
+      {
         "path": "tools/rustev-boundaries/",
         "source": "spec-edge"
       },
@@ -73,6 +77,19 @@
         "unit": {
           "kind": "directory",
           "path": "integrations/rustev-jev/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "scripts/acceptance/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "scripts/acceptance/"
         }
       },
       {
@@ -171,5 +188,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "79b87e3c6615b81e663438b3a0c90128e0d8829ce40f672ccd6c6bd8df901da2"
+  "shardHash": "44806285fed84fae37db3df08fdecb953c506013ede02aa7a2a6bb4544ef0565"
 }

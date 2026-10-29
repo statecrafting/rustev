@@ -62,20 +62,37 @@ The host must refresh declarations against the profile for its source region.
 
 ## Manual live calls
 
-No smoke runs under tests. No live response has been recorded by this change.
-Use synthetic fixtures or spec 023 admitted data and the SAME persistent testing
+No smoke runs under tests. Use synthetic fixtures or spec 023 admitted data and the SAME persistent testing
 journal already used by other providers. Do not create a new journal to obtain
 another budget. R-29's cap is USD 5 total across providers; unknown charges retain
 liability. Production budgeting belongs to the host runtime.
 
+The `aws-config` feature reads credentials only from `AWS_ACCESS_KEY_ID`,
+`AWS_SECRET_ACCESS_KEY` and `AWS_SESSION_TOKEN` (spec 030 3.5 item 2): it
+does not read profiles, single sign-on or instance metadata. Export
+short-lived credentials into the same command, and unset `AWS_ENDPOINT_URL`
+so a local endpoint emulator cannot capture the calls:
+
 ```sh
-RUSTEV_BEDROCK_LIVE=1 cargo run -p rustev-bedrock --locked --features aws-config -- probe \
+eval "$(aws configure export-credentials --profile <profile> --format env)" && \
+env -u AWS_ENDPOINT_URL RUSTEV_BEDROCK_LIVE=1 \
+  cargo run -p rustev-bedrock --locked --features aws-config -- probe \
   --binding /path/to/binding.json --policy /path/to/policy.json \
-  --materials /path/to/materials.json --journal /path/to/shared-testing.jsonl
-RUSTEV_BEDROCK_LIVE=1 cargo run -p rustev-bedrock --locked --features aws-config --example bedrock-smoke -- \
+  --materials /path/to/materials.json --journal /path/to/shared-testing.jsonl \
+  --out /path/to/new-evidence-dir
+eval "$(aws configure export-credentials --profile <profile> --format env)" && \
+env -u AWS_ENDPOINT_URL RUSTEV_BEDROCK_LIVE=1 \
+  cargo run -p rustev-bedrock --locked --features aws-config --example bedrock-smoke -- \
   --binding /path/to/binding.json --policy /path/to/policy.json \
-  --materials /path/to/materials.json --journal /path/to/shared-testing.jsonl
+  --materials /path/to/materials.json --journal /path/to/shared-testing.jsonl \
+  --out /path/to/new-evidence-dir
 ```
+
+Both print the journal summary before and after. `--out` (absent or empty)
+retains the request and response bodies and writes one `exchange-<n>.json`
+per call; nothing is written when any part carries a credential value. Strip
+the AWS request id (`generation_id`) and check for account ids and ARNs before
+committing a recorded fixture.
 
 The probe selects the first bound operation and sends only a synthetic question.
 A reachable result requires every sequential call to return a mapped output;
@@ -93,6 +110,17 @@ checks binding changes propagate into descriptor/plan identity. The constructor
 has a compile-fail policy-omission test. `tests/spend.rs` tests journal persistence
 and live/probe refusal gates. Signing fixtures are vendored from the cached,
 pinned AWS crate, with their source in `fixtures/sigv4/PROVENANCE.md`.
+`tests/credentials.rs` checks the `aws-config` provider reads only the
+environment and fails without panicking. `tests/recorded.rs` replays the
+recorded fixtures in `fixtures/recorded/` offline.
+
+Recorded responses (`fixtures/recorded/`) are four live Converse exchanges of
+2026-10-29: three probe calls and one smoke call to
+`us.anthropic.claude-haiku-5-5` from `ca-central-1` through the `us.`
+geographic profile, with synthetic content only. `binding.json` and
+`policy.json` there are the live binding and policy; the AWS request ids are
+redacted. No Responses exchange has been recorded: that model does not serve
+the Responses API on `bedrock-runtime`.
 
 Documented-shape responses are synthetic, not live recordings. AWS references
 rechecked during implementation on 2026-10-22:
@@ -109,5 +137,5 @@ rechecked during implementation on 2026-10-22:
 
 No token log-probability field is declared by the reviewed Converse contract;
 the Responses integration remains label-only. Recorded Responses behavior
-and account-specific model access remain live-stage evidence. The reviewed model
+remains live-stage evidence. The reviewed model
 card confirms `jp.` and `au.` prefixes; it does not prove this account can use them.

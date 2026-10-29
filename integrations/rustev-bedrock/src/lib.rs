@@ -8,6 +8,7 @@ pub mod budget;
 pub mod cancel;
 #[path = "../../rustev-remote-http/src/cost.rs"]
 pub mod cost;
+pub mod evidence;
 #[path = "../../rustev-remote-http/src/exchange.rs"]
 pub mod exchange;
 #[path = "../../rustev-remote-http/src/http.rs"]

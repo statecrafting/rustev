@@ -48,8 +48,7 @@ fn probe_without_live_flag_refuses_before_reading_files_or_credentials() {
 #[test]
 fn probe_over_cap_refuses_before_credential_discovery_or_dispatch() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-    let path = root
-        .join("../../../target")
+    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR"))
         .join(format!("bedrock-probe-cap-{}.jsonl", std::process::id()));
     {
         let journal =
