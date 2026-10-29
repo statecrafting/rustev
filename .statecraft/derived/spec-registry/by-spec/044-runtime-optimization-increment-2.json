@@ -209,7 +209,7 @@
       }
     ],
     "sectionDigests": {
-      "044-runtime-optimization-increment-2-amends-017-003-002-009-012-and-020": "e83ecfb3dd1cf6d71572a5c19c64229ed4dc5abaffdf55b38440825ae3218dc6",
+      "044-runtime-optimization-increment-2-amends-017-003-002-009-012-and-020": "659257bcda6f024e2d7081a68bbe96f6b4e95aa08a3b7ba9a55ad4f6f99ea945",
       "1-purpose": "ea80bf0f3f36a7db47061ac339b96e60d520ebbcc03c92a97ed01ffbc636bba3",
       "2-1-binding-principles-of-76": "fa0b4f40e2c3a80864d8c109330c03767c14d25dbdc6379f5666ffd220addf77",
       "2-territory": "4f44666fa2f2dffb9d94fca73faed5147c92ad9e431868f211db198a0ffbf84c",
@@ -232,19 +232,19 @@
       "3-6-2-volatile-sources-and-the-refresh-closure": "9e6d375fb0aefaf62d4d93de86b56edcf280160fbb328405dd5f96dedf59a653",
       "3-6-3-lookup-and-serving": "ee2eada15a8ebed80e033a69f425cc237254d94789887b07c0787d027b30b600",
       "3-6-4-admission": "1e9d2ad525c0a107c18e481ed63771855d0150affd719d38fe1d459e3f5ee8af",
-      "3-6-5-refresh-failure": "be47fbc06b7f2a62426c2e1b314f1b511ad3c07234d9538f05033d48c1b81e36",
-      "3-6-6-evidence-and-origins": "9154bf2849c275bf5d9313880608acbcdc165ddff3e2bcdc6584a26ee64e3f40",
-      "3-6-decision-result-cache": "a9c5d962c5af19b431c28edcbd70f95ea0812b2bf8121cd0a630db79832620d6",
+      "3-6-5-refresh-failure": "ff75735cde4494a5618f75faba4d499e9eae3b5ecc583df544ce90fddbd49a7d",
+      "3-6-6-evidence-and-origins": "6d9bc4222e748a382d5cda90afaac31c22d89a4d97b08730239b60ca38a9eacc",
+      "3-6-decision-result-cache": "5b771cd8e3b2396d20700ef0fd4be997295a837e260a22363b7c73c8009b1521",
       "3-7-per-item-isolation": "5e2cbd11bad364062ead24c432aaa5abaee37c23485d0d3501fc7f633f438110",
       "3-8-adapter-scoped-batching-qualification": "bee071c6014446e25317db78048a6f032ef5ad920593027f617c8e35aa7a4adc",
       "3-9-refusal-and-diagnostic-codes": "c867fd96610a06e3a25b6ca071e49708849095336ee69f9d88861111ab2dafb8",
-      "3-behavior": "c4d26ec792265838ea5916183cc60ed89a247d62718eb4a3b06b96096ab0b9c8",
+      "3-behavior": "85407aeac8ab3e3e8a5fd72724315200e3b2a54f9940d3123fb2208512a922c8",
       "4-out-of-scope": "e61b9a31ae2244ab1ca8775ba2cc8bce6e1e01d5197af9531323c5883e294e33",
-      "5-observable-negative-cases": "58ddc61ec6d5fb36906d88e5794f5e3057d0e7f498d04a9450a221b55290b094",
+      "5-observable-negative-cases": "c653937453576e9ce359f14155800abc24d4923e1e011fec999f1bad17962d00",
       "acceptance": "4fc00601fae7e454380245eb44b604e7b8d5dc1376bde84c5e15d663ec91a0c8",
       "decisions-at-approval": "07d8eec0785d785c4dec888d094e4ed84e5c519f1e57d0d7385b4f64aa91ba9c",
-      "implementation-record": "8e8ebaeca9905137706fa3a40774d12b674ae18eb349812d9f93af68ac66ad2f",
-      "verification": "d55d8545f2ccd19355ca7623658157f157f5a2befb3e85352ec55199cb8a27b9"
+      "implementation-record": "07d146a3dc814c9272274124320ff4f981a83b66c863f89f12943bb0f3a2d65c",
+      "verification": "6f7b0134228e3974fbf8988bd87227e5f9100a6215486285fbe7d1bb520041af"
     },
     "sectionHeadings": [
       "044: Runtime optimization increment 2 (amends 017, 003, 002, 009, 012 and 020)",
@@ -289,6 +289,6 @@
     "summary": "An amendment of approved spec 017 (and, through it, of spec 003's concurrency and cancellation rules) for #76 child F1, which also amends specs 002, 009, 012 and 020 where its members and batching rules reach them. Completes 017 increment 2 and adds a decision-result cache. Concurrent duplicate suppression keeps spec 003's rule that the runtime spawns no task per request: a shared attempt lives in a runtime-owned slot that is driven by whichever waiter is polled, a waiter that cancels returns at once and hands charge ownership to the oldest remaining waiter, and the last waiter to leave cancels the attempt under spec 003's existing rules. Persistent caches sit behind a host-implemented `RuntimeStore` seam with durable generations, conditional writes, byte budgets and integrity-checked `rustev.cache-entry/1` entries. The decision-result cache reuses a whole decision's semantic work under a compiler-derived key that always holds plan identity, the complete authorized scope, the profile and declared upstream-origin dimensions; on a hit the core recomputes the judgment and the runtime re-runs the compiler-derived dependency closure of every declared volatile source, with a declared policy when refresh fails that never serves stale evidence as a value. Capabilities may declare `isolation: per_item`, which every batching path honours, and adapter-scoped batching gains a qualification procedure and report (`rustev.batch-qualification/1`). Plans, descriptors and records that use none of this keep their bytes and identities. Approved (A-41); implementation is in progress.\n",
     "title": "Runtime optimization increment 2: duplicate suppression, persistent and decision-result caches, batching qualification (amends 017, 003, 002, 009, 012 and 020)"
   },
-  "shardHash": "473b21852e3db88a908cd0333389014479929b776790fdeccea350dd652bcf3c",
+  "shardHash": "8854853989606740c4ad9fe12f7ec32df47fa91c788d9901d8154803d94e7fd6",
   "specVersion": "1.10.0"
 }
