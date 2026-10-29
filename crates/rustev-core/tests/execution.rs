@@ -1123,24 +1123,45 @@ fn decision_cache_members_are_validated_and_unrun_parts_refused() {
     let both = with_v2(&both).unwrap();
     assert_ne!(alone.id, both.id);
     assert_ne!(alone.id, compiled.id);
-    // `serve_cached_within_freshness` compiles and is part of `PlanId`
-    // (increment 5, part d1); `recompute` validates and is then refused as
-    // not yet available, never run without it.
-    let refresh = |on: rustev_contract::optimization::RefreshFailurePolicy| {
+    // `serve_cached_within_freshness` (increment 5, part d1) and
+    // `recompute` (part d2) compile and are part of `PlanId`.
+    let refresh = |on: rustev_contract::optimization::RefreshFailurePolicy, max: Option<u64>| {
         let mut p = decision_cached();
+        if let Some(max) = max {
+            p.max_attempts_per_decision = max;
+        }
         let o = p.optimization.as_mut().unwrap();
         o.decision_cache.as_mut().unwrap().on_refresh_failure = on;
         with_v2(&p)
     };
     use rustev_contract::optimization::RefreshFailurePolicy as R;
-    let served = refresh(R::ServeCachedWithinFreshness).unwrap();
+    let served = refresh(R::ServeCachedWithinFreshness, None).unwrap();
     assert_ne!(served.id, compiled.id);
-    let r = refresh(R::Recompute).expect_err("unavailable");
+    let recompute = refresh(R::Recompute, None).unwrap();
+    assert_ne!(recompute.id, compiled.id);
+    assert_ne!(recompute.id, served.id);
+    // Under `recompute` the worst case counts twice against
+    // `max_attempts_per_decision` (spec 044, 3.6.5 item 5).
+    let r = refresh(R::Unresolved, Some(0)).expect_err("no attempts allowed");
+    let worst: u64 = r
+        .detail
+        .strip_prefix("worst case ")
+        .and_then(|d| d.split(' ').next())
+        .and_then(|n| n.parse().ok())
+        .unwrap();
+    assert!(worst > 0);
+    refresh(R::Unresolved, Some(worst)).unwrap();
+    let r = refresh(R::Recompute, Some(worst)).expect_err("twice the worst case");
     assert_eq!(r.category, Category::InvalidExecution);
     assert_eq!(
         r.detail,
-        "decision_cache on_refresh_failure recompute is not available in this build"
+        format!(
+            "worst case {} attempts (twice the plan's, under on_refresh_failure recompute) \
+             exceeds max_attempts_per_decision {worst}",
+            2 * worst
+        )
     );
+    refresh(R::Recompute, Some(2 * worst)).unwrap();
     // A version 1 definition compiles to `rustev.plan/2`.
     let r = refused(&decision_cached(), "decision_cache requires rustev.plan/3");
     assert_eq!(r.subject, "execution.optimization");

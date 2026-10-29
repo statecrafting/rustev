@@ -16012,18 +16012,6 @@ export namespace RustevRun1 {
   export type FinalCost = "known" | "includes_estimates" | "unknown";
   export type CostMode = "unlimited" | "hard" | "estimated";
   /**
-   * What a failed refresh supplies (spec 044, 3.6.5). No policy supplies a
-   * value older than its declared freshness or turns a failure into a value.
-   */
-  export type RefreshFailurePolicy = "unresolved" | "recompute" | "serve_cached_within_freshness";
-  export type DecisionCacheOutcome = "hit" | "refreshed" | "miss" | "bypassed" | "refused";
-  export type RecordedExecution =
-    | "none"
-    | {
-        declared: ExecutionPolicyId;
-      };
-  export type ExecutionPolicyId = string;
-  /**
    * What is known about cancelling an attempt (spec 003, 3.7.3).
    */
   export type Cancellation =
@@ -16064,6 +16052,31 @@ export namespace RustevRun1 {
           units: number;
         };
       };
+  export type AcquisitionAttemptEnd =
+    | "page"
+    | "invalid_page"
+    | "transient"
+    | "overloaded"
+    | "permanent"
+    | "denied"
+    | "timed_out"
+    | "adapter_fault"
+    | "deadline"
+    | "cancelled";
+  export type RemoteState = "finished" | "stopped" | "possibly_continuing";
+  export type AcquisitionCache =
+    | ("none" | "stored")
+    | {
+        hit: {
+          age_ms: number;
+        };
+      };
+  export type AcquisitionRequestId = string;
+  export type AcquisitionResult =
+    | ("page" | "not_supplied")
+    | {
+        failed: Unresolved;
+      };
   export type AttemptEnd =
     | "output"
     | {
@@ -16080,7 +16093,6 @@ export namespace RustevRun1 {
    * or a fallback trigger.
    */
   export type FailureClass = "invalid_output" | "transient" | "overloaded" | "permanent" | "timed_out" | "adapter_fault";
-  export type RemoteState = "finished" | "stopped" | "possibly_continuing";
   export type OptimizationMechanism =
     ("independent" | "batch" | "memory_cache") | "shared_call" | "persistent_cache" | "decision_cache";
   export type OptimizationOutcome = "bypassed" | "miss" | "hit" | "batched" | "refused";
@@ -16120,6 +16132,18 @@ export namespace RustevRun1 {
           reason: string;
         };
       };
+  /**
+   * What a failed refresh supplies (spec 044, 3.6.5). No policy supplies a
+   * value older than its declared freshness or turns a failure into a value.
+   */
+  export type RefreshFailurePolicy = "unresolved" | "recompute" | "serve_cached_within_freshness";
+  export type DecisionCacheOutcome = "hit" | "refreshed" | "miss" | "bypassed" | "refused";
+  export type RecordedExecution =
+    | "none"
+    | {
+        declared: ExecutionPolicyId;
+      };
+  export type ExecutionPolicyId = string;
   export type Termination = "judged" | "cancelled";
 
   export interface RustevRun1 {
@@ -16547,6 +16571,11 @@ export namespace RustevRun1 {
    */
   export interface DecisionCacheRecord {
     /**
+     * The served run abandoned under `recompute` (3.6.5); never supplied
+     * to the core or to replay.
+     */
+    abandoned?: AbandonedRun | null;
+    /**
      * By evaluation time, as for a persistent entry.
      */
     age_ms?: number | null;
@@ -16589,17 +16618,76 @@ export namespace RustevRun1 {
      */
     substituted?: SubstitutedInput[];
   }
-  export interface EntryGenerations {
-    namespace: number;
-    scope: number;
-  }
   /**
-   * A volatile input's stored snapshot entry supplied after a failed
-   * refresh (spec 044, 3.6.5).
+   * A served run abandoned under `on_refresh_failure: recompute` (spec 044,
+   * 3.6.6): the records its dispatched requests and its acquisitions would
+   * have had, with their attempts and charges.
    */
-  export interface SubstitutedInput {
-    entry_digest: ContentDigest;
-    input: string;
+  export interface AbandonedRun {
+    acquisitions?: AcquisitionRecord[];
+    requests?: RequestRecord[];
+  }
+  export interface AcquisitionRecord {
+    /**
+     * @maxItems 8
+     */
+    attempts:
+      | []
+      | [AcquisitionAttempt]
+      | [AcquisitionAttempt, AcquisitionAttempt]
+      | [AcquisitionAttempt, AcquisitionAttempt, AcquisitionAttempt]
+      | [AcquisitionAttempt, AcquisitionAttempt, AcquisitionAttempt, AcquisitionAttempt]
+      | [AcquisitionAttempt, AcquisitionAttempt, AcquisitionAttempt, AcquisitionAttempt, AcquisitionAttempt]
+      | [
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt
+        ]
+      | [
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt
+        ]
+      | [
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt
+        ];
+    cache: AcquisitionCache;
+    page: number;
+    request: AcquisitionRequestId;
+    result: AcquisitionResult;
+    step: string;
+    tier: number;
+  }
+  export interface AcquisitionAttempt {
+    /**
+     * Escaped decision/step/tier,page/ordinal (spec 036, 3.14.2).
+     */
+    attempt_id: string;
+    cancellation: Cancellation;
+    cost: AttemptCost;
+    dispatched_ms: number;
+    end: AcquisitionAttemptEnd;
+    ended_ms: number;
+    remote: RemoteState;
+  }
+  export interface AttemptCost {
+    bound: CostBound;
+    charge: Charge;
+    reserved: number;
   }
   export interface RequestRecord {
     attempts: AttemptRecord[];
@@ -16627,11 +16715,6 @@ export namespace RustevRun1 {
     ended_ms: number;
     remote: RemoteState;
     target: number;
-  }
-  export interface AttemptCost {
-    bound: CostBound;
-    charge: Charge;
-    reserved: number;
   }
   /**
    * Per-logical-request runtime observations. Secret key material and cached
@@ -16679,6 +16762,18 @@ export namespace RustevRun1 {
     role: SharedRole;
     shared_call_id: string;
     waiter_id: string;
+  }
+  export interface EntryGenerations {
+    namespace: number;
+    scope: number;
+  }
+  /**
+   * A volatile input's stored snapshot entry supplied after a failed
+   * refresh (spec 044, 3.6.5).
+   */
+  export interface SubstitutedInput {
+    entry_digest: ContentDigest;
+    input: string;
   }
   /**
    * Monotonic milliseconds from submission; never wall-clock time.
@@ -17264,6 +17359,127 @@ export namespace RustevRun2 {
   export type FinalCost = "known" | "includes_estimates" | "unknown";
   export type CostMode = "unlimited" | "hard" | "estimated";
   /**
+   * What is known about cancelling an attempt (spec 003, 3.7.3).
+   */
+  export type Cancellation =
+    | "not_requested"
+    | {
+        requested: {
+          answer: CancelAnswer;
+        };
+      };
+  export type CancelAnswer = "stopped" | "unconfirmed" | "not_observed";
+  /**
+   * A backend's per-call cost disclosure, before dispatch.
+   */
+  export type CostBound =
+    | "unknown"
+    | {
+        bounded: {
+          max_units: number;
+        };
+      }
+    | {
+        estimated: {
+          units: number;
+        };
+      };
+  /**
+   * What an attempt cost, as far as is known when it ends.
+   */
+  export type Charge =
+    | "unknown"
+    | {
+        observed: {
+          units: number;
+        };
+      }
+    | {
+        estimated: {
+          units: number;
+        };
+      };
+  export type AcquisitionAttemptEnd =
+    | "page"
+    | "invalid_page"
+    | "transient"
+    | "overloaded"
+    | "permanent"
+    | "denied"
+    | "timed_out"
+    | "adapter_fault"
+    | "deadline"
+    | "cancelled";
+  export type RemoteState = "finished" | "stopped" | "possibly_continuing";
+  export type AcquisitionCache =
+    | ("none" | "stored")
+    | {
+        hit: {
+          age_ms: number;
+        };
+      };
+  export type AcquisitionRequestId = string;
+  export type AcquisitionResult =
+    | ("page" | "not_supplied")
+    | {
+        failed: Unresolved;
+      };
+  export type AttemptEnd =
+    | "output"
+    | {
+        failed: {
+          class: FailureClass;
+          detail: string;
+        };
+      }
+    | "deadline"
+    | "cancelled";
+  /**
+   * How a dispatched attempt failed (spec 003, 3.6.1). Deadline and
+   * cancellation are not classes: they end a request, and are never retried
+   * or a fallback trigger.
+   */
+  export type FailureClass = "invalid_output" | "transient" | "overloaded" | "permanent" | "timed_out" | "adapter_fault";
+  export type OptimizationMechanism =
+    ("independent" | "batch" | "memory_cache") | "shared_call" | "persistent_cache" | "decision_cache";
+  export type OptimizationOutcome = "bypassed" | "miss" | "hit" | "batched" | "refused";
+  /**
+   * Why a waiter left before the shared attempt ended.
+   */
+  export type SharedLeave = "cancelled" | "deadline";
+  export type SharedRole = "led" | "joined";
+  export type RequestResult =
+    | {
+        output: {
+          target: number;
+        };
+      }
+    | {
+        failed: Unresolved;
+      }
+    | "not_supplied";
+  export type Transition =
+    | {
+        retry: {
+          after: number;
+          class: FailureClass;
+          delay_ms: number;
+        };
+      }
+    | {
+        fallback: {
+          after: number;
+          class: FailureClass;
+          to: number;
+        };
+      }
+    | {
+        stop: {
+          after: number;
+          reason: string;
+        };
+      };
+  /**
    * What a failed refresh supplies (spec 044, 3.6.5). No policy supplies a
    * value older than its declared freshness or turns a failure into a value.
    */
@@ -17332,107 +17548,10 @@ export namespace RustevRun2 {
    * never reconstructed.
    */
   export type EvidenceUnavailable = "no_exchange" | "pending" | "not_delivered" | "no_locator";
-  export type RemoteState = "finished" | "stopped" | "possibly_continuing";
   /**
    * What a served identity is worth (spec 009, 3.7).
    */
   export type Disclosure = "pinned" | "reported" | "unknown";
-  /**
-   * What is known about cancelling an attempt (spec 003, 3.7.3).
-   */
-  export type Cancellation =
-    | "not_requested"
-    | {
-        requested: {
-          answer: CancelAnswer;
-        };
-      };
-  export type CancelAnswer = "stopped" | "unconfirmed" | "not_observed";
-  /**
-   * A backend's per-call cost disclosure, before dispatch.
-   */
-  export type CostBound =
-    | "unknown"
-    | {
-        bounded: {
-          max_units: number;
-        };
-      }
-    | {
-        estimated: {
-          units: number;
-        };
-      };
-  /**
-   * What an attempt cost, as far as is known when it ends.
-   */
-  export type Charge =
-    | "unknown"
-    | {
-        observed: {
-          units: number;
-        };
-      }
-    | {
-        estimated: {
-          units: number;
-        };
-      };
-  export type AttemptEnd =
-    | "output"
-    | {
-        failed: {
-          class: FailureClass;
-          detail: string;
-        };
-      }
-    | "deadline"
-    | "cancelled";
-  /**
-   * How a dispatched attempt failed (spec 003, 3.6.1). Deadline and
-   * cancellation are not classes: they end a request, and are never retried
-   * or a fallback trigger.
-   */
-  export type FailureClass = "invalid_output" | "transient" | "overloaded" | "permanent" | "timed_out" | "adapter_fault";
-  export type OptimizationMechanism =
-    ("independent" | "batch" | "memory_cache") | "shared_call" | "persistent_cache" | "decision_cache";
-  export type OptimizationOutcome = "bypassed" | "miss" | "hit" | "batched" | "refused";
-  /**
-   * Why a waiter left before the shared attempt ended.
-   */
-  export type SharedLeave = "cancelled" | "deadline";
-  export type SharedRole = "led" | "joined";
-  export type RequestResult =
-    | {
-        output: {
-          target: number;
-        };
-      }
-    | {
-        failed: Unresolved;
-      }
-    | "not_supplied";
-  export type Transition =
-    | {
-        retry: {
-          after: number;
-          class: FailureClass;
-          delay_ms: number;
-        };
-      }
-    | {
-        fallback: {
-          after: number;
-          class: FailureClass;
-          to: number;
-        };
-      }
-    | {
-        stop: {
-          after: number;
-          reason: string;
-        };
-      };
   export type Termination = "judged" | "cancelled";
 
   export interface RustevRun2 {
@@ -17870,6 +17989,11 @@ export namespace RustevRun2 {
    */
   export interface DecisionCacheRecord {
     /**
+     * The served run abandoned under `recompute` (3.6.5); never supplied
+     * to the core or to replay.
+     */
+    abandoned?: AbandonedRun | null;
+    /**
      * By evaluation time, as for a persistent entry.
      */
     age_ms?: number | null;
@@ -17911,6 +18035,151 @@ export namespace RustevRun2 {
      * `serve_cached_within_freshness`.
      */
     substituted?: SubstitutedInput[];
+  }
+  /**
+   * A served run abandoned under `on_refresh_failure: recompute` (spec 044,
+   * 3.6.6): the records its dispatched requests and its acquisitions would
+   * have had, with their attempts and charges.
+   */
+  export interface AbandonedRun {
+    acquisitions?: AcquisitionRecord[];
+    requests?: RequestRecord[];
+  }
+  export interface AcquisitionRecord {
+    /**
+     * @maxItems 8
+     */
+    attempts:
+      | []
+      | [AcquisitionAttempt]
+      | [AcquisitionAttempt, AcquisitionAttempt]
+      | [AcquisitionAttempt, AcquisitionAttempt, AcquisitionAttempt]
+      | [AcquisitionAttempt, AcquisitionAttempt, AcquisitionAttempt, AcquisitionAttempt]
+      | [AcquisitionAttempt, AcquisitionAttempt, AcquisitionAttempt, AcquisitionAttempt, AcquisitionAttempt]
+      | [
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt
+        ]
+      | [
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt
+        ]
+      | [
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt,
+          AcquisitionAttempt
+        ];
+    cache: AcquisitionCache;
+    page: number;
+    request: AcquisitionRequestId;
+    result: AcquisitionResult;
+    step: string;
+    tier: number;
+  }
+  export interface AcquisitionAttempt {
+    /**
+     * Escaped decision/step/tier,page/ordinal (spec 036, 3.14.2).
+     */
+    attempt_id: string;
+    cancellation: Cancellation;
+    cost: AttemptCost;
+    dispatched_ms: number;
+    end: AcquisitionAttemptEnd;
+    ended_ms: number;
+    remote: RemoteState;
+  }
+  export interface AttemptCost {
+    bound: CostBound;
+    charge: Charge;
+    reserved: number;
+  }
+  export interface RequestRecord {
+    attempts: AttemptRecord[];
+    instance: string[];
+    /**
+     * Absent for unoptimized execution, preserving existing record bytes.
+     */
+    optimization?: OptimizationRecord | null;
+    result: RequestResult;
+    step: string;
+    transitions: Transition[];
+  }
+  export interface AttemptRecord {
+    artifact: ArtifactId;
+    /**
+     * `<decision id>/<step>/<instance ids joined by ','>/<n>`, each
+     * component with `%`, `/` and `,` percent-escaped.
+     */
+    attempt_id: string;
+    backend_id: string;
+    cancellation: Cancellation;
+    cost: AttemptCost;
+    dispatched_ms: number;
+    end: AttemptEnd;
+    ended_ms: number;
+    remote: RemoteState;
+    target: number;
+  }
+  /**
+   * Per-logical-request runtime observations. Secret key material and cached
+   * content are deliberately absent.
+   */
+  export interface OptimizationRecord {
+    age_ms: number;
+    allocated_charge_units: number;
+    batch_id?: string | null;
+    batch_member?: number | null;
+    charge_owner: boolean;
+    /**
+     * Every refusal or diagnostic, in the order observed, at most
+     * [`MAX_OPTIMIZATION_DIAGNOSTICS`].
+     */
+    diagnostics?: string[];
+    entry_id?: string | null;
+    invalidation_generation: number;
+    key_schema_version: number;
+    mechanism: OptimizationMechanism;
+    outcome: OptimizationOutcome;
+    /**
+     * This request's part in a shared call (spec 044, 3.2.5).
+     */
+    shared?: SharedRecord | null;
+    shared_liability_units: number;
+    /**
+     * The attempt that produced the supplied output. For a cache hit it is
+     * an attempt of an earlier decision, and the record has no attempt of
+     * its own; replay takes it as the output's origin.
+     */
+    source_attempt_id?: string | null;
+  }
+  /**
+   * One waiter's view of a shared call. Waiter ids are opaque and
+   * runtime-generated, never decision ids, so a tenant-only scope exposes no
+   * principal's decisions to another (spec 044, decision 5).
+   */
+  export interface SharedRecord {
+    attempt_id: string;
+    final_owner: boolean;
+    handed_off_to?: string | null;
+    left?: SharedLeave | null;
+    received_from?: string | null;
+    role: SharedRole;
+    shared_call_id: string;
+    waiter_id: string;
   }
   export interface EntryGenerations {
     namespace: number;
@@ -17981,85 +18250,6 @@ export namespace RustevRun2 {
   export interface ServedIdentity {
     disclosure: Disclosure;
     identity?: string | null;
-  }
-  export interface RequestRecord {
-    attempts: AttemptRecord[];
-    instance: string[];
-    /**
-     * Absent for unoptimized execution, preserving existing record bytes.
-     */
-    optimization?: OptimizationRecord | null;
-    result: RequestResult;
-    step: string;
-    transitions: Transition[];
-  }
-  export interface AttemptRecord {
-    artifact: ArtifactId;
-    /**
-     * `<decision id>/<step>/<instance ids joined by ','>/<n>`, each
-     * component with `%`, `/` and `,` percent-escaped.
-     */
-    attempt_id: string;
-    backend_id: string;
-    cancellation: Cancellation;
-    cost: AttemptCost;
-    dispatched_ms: number;
-    end: AttemptEnd;
-    ended_ms: number;
-    remote: RemoteState;
-    target: number;
-  }
-  export interface AttemptCost {
-    bound: CostBound;
-    charge: Charge;
-    reserved: number;
-  }
-  /**
-   * Per-logical-request runtime observations. Secret key material and cached
-   * content are deliberately absent.
-   */
-  export interface OptimizationRecord {
-    age_ms: number;
-    allocated_charge_units: number;
-    batch_id?: string | null;
-    batch_member?: number | null;
-    charge_owner: boolean;
-    /**
-     * Every refusal or diagnostic, in the order observed, at most
-     * [`MAX_OPTIMIZATION_DIAGNOSTICS`].
-     */
-    diagnostics?: string[];
-    entry_id?: string | null;
-    invalidation_generation: number;
-    key_schema_version: number;
-    mechanism: OptimizationMechanism;
-    outcome: OptimizationOutcome;
-    /**
-     * This request's part in a shared call (spec 044, 3.2.5).
-     */
-    shared?: SharedRecord | null;
-    shared_liability_units: number;
-    /**
-     * The attempt that produced the supplied output. For a cache hit it is
-     * an attempt of an earlier decision, and the record has no attempt of
-     * its own; replay takes it as the output's origin.
-     */
-    source_attempt_id?: string | null;
-  }
-  /**
-   * One waiter's view of a shared call. Waiter ids are opaque and
-   * runtime-generated, never decision ids, so a tenant-only scope exposes no
-   * principal's decisions to another (spec 044, decision 5).
-   */
-  export interface SharedRecord {
-    attempt_id: string;
-    final_owner: boolean;
-    handed_off_to?: string | null;
-    left?: SharedLeave | null;
-    received_from?: string | null;
-    role: SharedRole;
-    shared_call_id: string;
-    waiter_id: string;
   }
   /**
    * Monotonic milliseconds from submission; never wall-clock time.
@@ -18880,18 +19070,6 @@ export namespace RustevRun3 {
       };
   export type FinalCost = "known" | "includes_estimates" | "unknown";
   export type CostMode = "unlimited" | "hard" | "estimated";
-  /**
-   * What a failed refresh supplies (spec 044, 3.6.5). No policy supplies a
-   * value older than its declared freshness or turns a failure into a value.
-   */
-  export type RefreshFailurePolicy = "unresolved" | "recompute" | "serve_cached_within_freshness";
-  export type DecisionCacheOutcome = "hit" | "refreshed" | "miss" | "bypassed" | "refused";
-  export type RecordedExecution =
-    | "none"
-    | {
-        declared: ExecutionPolicyId;
-      };
-  export type ExecutionPolicyId = string;
   export type AttemptEnd =
     | "output"
     | {
@@ -18956,6 +19134,18 @@ export namespace RustevRun3 {
           reason: string;
         };
       };
+  /**
+   * What a failed refresh supplies (spec 044, 3.6.5). No policy supplies a
+   * value older than its declared freshness or turns a failure into a value.
+   */
+  export type RefreshFailurePolicy = "unresolved" | "recompute" | "serve_cached_within_freshness";
+  export type DecisionCacheOutcome = "hit" | "refreshed" | "miss" | "bypassed" | "refused";
+  export type RecordedExecution =
+    | "none"
+    | {
+        declared: ExecutionPolicyId;
+      };
+  export type ExecutionPolicyId = string;
   export type Termination = "judged" | "cancelled";
 
   export interface RustevRun3 {
@@ -19764,6 +19954,11 @@ export namespace RustevRun3 {
    */
   export interface DecisionCacheRecord {
     /**
+     * The served run abandoned under `recompute` (3.6.5); never supplied
+     * to the core or to replay.
+     */
+    abandoned?: AbandonedRun | null;
+    /**
      * By evaluation time, as for a persistent entry.
      */
     age_ms?: number | null;
@@ -19806,17 +20001,14 @@ export namespace RustevRun3 {
      */
     substituted?: SubstitutedInput[];
   }
-  export interface EntryGenerations {
-    namespace: number;
-    scope: number;
-  }
   /**
-   * A volatile input's stored snapshot entry supplied after a failed
-   * refresh (spec 044, 3.6.5).
+   * A served run abandoned under `on_refresh_failure: recompute` (spec 044,
+   * 3.6.6): the records its dispatched requests and its acquisitions would
+   * have had, with their attempts and charges.
    */
-  export interface SubstitutedInput {
-    entry_digest: ContentDigest;
-    input: string;
+  export interface AbandonedRun {
+    acquisitions?: AcquisitionRecord[];
+    requests?: RequestRecord[];
   }
   export interface RequestRecord {
     attempts: AttemptRecord[];
@@ -19922,6 +20114,18 @@ export namespace RustevRun3 {
   export interface ScreenUnitBoundViolation {
     computed: number;
     reported: number;
+  }
+  export interface EntryGenerations {
+    namespace: number;
+    scope: number;
+  }
+  /**
+   * A volatile input's stored snapshot entry supplied after a failed
+   * refresh (spec 044, 3.6.5).
+   */
+  export interface SubstitutedInput {
+    entry_digest: ContentDigest;
+    input: string;
   }
   /**
    * Monotonic milliseconds from submission; never wall-clock time.

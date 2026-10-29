@@ -308,6 +308,8 @@ pub(crate) struct StageContext<'a> {
     /// repair or output screening request outside the refresh closure may be
     /// supplied from the entry (spec 044, 3.6.3).
     pub decision: Option<&'a crate::optimization::decision::DecisionRun>,
+    /// A rerun under `recompute` (spec 044, 3.6.5 item 2).
+    pub rerun: bool,
 }
 pub(crate) struct PendingWrite {
     key: RequestKey,
@@ -590,6 +592,7 @@ async fn request(
         persistent: None,
         decision: cx.decision,
         live: None,
+        rerun: cx.rerun,
     };
     // A request served from a decision entry, or refused with its decision,
     // stands in for the attempt as a request-level hit does (spec 037,

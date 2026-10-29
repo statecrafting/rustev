@@ -305,7 +305,8 @@ fn shared_and_persistent_members_round_trip_and_are_omitted_when_absent() {
 fn decision_cache_members_round_trip_and_are_omitted_when_absent() {
     use rustev_contract::canonical::canonical_value_bytes;
     use rustev_contract::optimization::{
-        DecisionCacheRecord, OptimizationPolicy, RefreshFailurePolicy,
+        AbandonedRun, DecisionCacheOutcome, DecisionCacheRecord, OptimizationPolicy,
+        RefreshFailurePolicy,
     };
     use rustev_contract::run::RunRecord;
     let policy = serde_json::json!({
@@ -383,9 +384,47 @@ fn decision_cache_members_round_trip_and_are_omitted_when_absent() {
     let over = RunRecord {
         schema: "rustev.run/3".into(),
         decision_cache: Some(noisy),
-        ..base
+        ..base.clone()
     };
     assert!(RunRecord::parse(&serde_json::to_vec(&over).unwrap()).is_err());
+    // The served run abandoned under `recompute` (spec 044, 3.6.6): its
+    // request records round-trip, and an empty one is refused, since it is
+    // omitted when empty.
+    let with_abandoned = |abandoned: AbandonedRun| RunRecord {
+        schema: "rustev.run/3".into(),
+        decision_cache: Some(DecisionCacheRecord {
+            outcome: DecisionCacheOutcome::Miss,
+            on_refresh_failure: Some(RefreshFailurePolicy::Recompute),
+            abandoned: Some(abandoned),
+            ..r.clone()
+        }),
+        ..base.clone()
+    };
+    let kept = with_abandoned(AbandonedRun {
+        requests: vec![rustev_contract::run::RequestRecord {
+            step: "frustration".into(),
+            instance: vec![],
+            result: rustev_contract::run::RequestResult::NotSupplied,
+            attempts: vec![],
+            transitions: vec![],
+            optimization: None,
+            screen: None,
+        }],
+        acquisitions: vec![],
+    });
+    let bytes = serde_json::to_vec(&kept).unwrap();
+    assert!(!String::from_utf8_lossy(&bytes).contains("\"acquisitions\":[]"));
+    assert_eq!(RunRecord::parse(&bytes).unwrap(), kept);
+    let empty = with_abandoned(AbandonedRun {
+        requests: vec![],
+        acquisitions: vec![],
+    });
+    let e = RunRecord::parse(&serde_json::to_vec(&empty).unwrap()).unwrap_err();
+    assert!(
+        e.to_string()
+            .contains("an abandoned run is omitted when empty"),
+        "{e}"
+    );
 }
 
 fn run_record_bytes() -> Vec<u8> {

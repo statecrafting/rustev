@@ -95,6 +95,15 @@ pub(crate) struct Capturing<'a> {
 }
 
 impl<'a> Capturing<'a> {
+    /// Start over for the rerun of a decision abandoned under `recompute`:
+    /// the capture holds the rerun's supplies alone (spec 044, 3.6.5 item 3).
+    pub(crate) fn restart(&mut self) {
+        self.bytes = 0;
+        self.exceeded = false;
+        self.supplies.clear();
+        self.pages.clear();
+    }
+
     pub fn new(config: &'a CaptureConfig) -> Self {
         Capturing {
             config,

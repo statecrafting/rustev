@@ -1013,6 +1013,10 @@ pub(crate) mod decision {
         /// Stored volatile entries supplied under
         /// `serve_cached_within_freshness` (3.6.5).
         substituted: Vec<SubstitutedInput>,
+        /// The served run abandoned under `recompute` (3.6.5), omitted when
+        /// it dispatched nothing; `recomputed` says a rerun followed.
+        abandoned: Option<rustev_contract::optimization::AbandonedRun>,
+        recomputed: bool,
     }
 
     /// The digest the run record names a substituted volatile entry by
@@ -1109,6 +1113,8 @@ pub(crate) mod decision {
                 on_refresh_failure: cache.on_refresh_failure,
                 failed_inputs: vec![],
                 substituted: vec![],
+                abandoned: None,
+                recomputed: false,
             };
             let log = run.log.get_mut().unwrap_or_else(|e| e.into_inner());
             // A live re-execution observes fresh backend work (spec 026, 3.4).
@@ -1266,7 +1272,8 @@ pub(crate) mod decision {
                 return None;
             }
             match self.on_refresh_failure {
-                // The compiler refuses `recompute` in this build.
+                // Under `recompute` the decision runs again once the served
+                // run has ended (3.6.5).
                 RefreshFailurePolicy::Unresolved | RefreshFailurePolicy::Recompute => None,
                 RefreshFailurePolicy::ServeCachedWithinFreshness if capturing => {
                     self.diagnose(
@@ -1299,6 +1306,49 @@ pub(crate) mod decision {
                     (!self.substituted.is_empty()).then_some(substituted)
                 }
             }
+        }
+
+        /// Whether a served run's refresh failed under `recompute`, so the
+        /// decision runs again (spec 044, 3.6.5). A rerun never recomputes.
+        pub(crate) fn recomputes(
+            &self,
+            requests: &[rustev_contract::run::RequestRecord],
+            acquisitions: &[AcquisitionRecord],
+        ) -> bool {
+            self.on_refresh_failure == RefreshFailurePolicy::Recompute
+                && self.hit.is_some()
+                && !failures(&self.failed_inputs, &self.log(), requests, acquisitions).is_empty()
+        }
+
+        /// Abandon the served run once every request it dispatched has ended
+        /// (spec 044, 3.6.5): its refreshed and mismatched requests and its
+        /// acquisitions are kept with their attempts, and the rerun is a
+        /// miss with nothing supplied from the entry, which it may then
+        /// admit (3.6.4).
+        pub(crate) fn abandon(
+            &mut self,
+            requests: Vec<rustev_contract::run::RequestRecord>,
+            acquisitions: Vec<AcquisitionRecord>,
+        ) {
+            let log = std::mem::take(&mut *self.log());
+            let failed = failures(&self.failed_inputs, &log, &requests, &acquisitions);
+            let dispatched: BTreeSet<&At> = log.refreshed.iter().chain(&log.mismatched).collect();
+            let requests: Vec<_> = requests
+                .into_iter()
+                .filter(|r| dispatched.contains(&(r.step.clone(), r.instance.clone())))
+                .collect();
+            self.abandoned = (!requests.is_empty() || !acquisitions.is_empty()).then_some(
+                rustev_contract::optimization::AbandonedRun {
+                    requests,
+                    acquisitions,
+                },
+            );
+            self.hit = None;
+            self.recomputed = true;
+            self.outcome = rustev_contract::optimization::DecisionCacheOutcome::Miss;
+            self.failed_inputs.clear();
+            self.substituted.clear();
+            self.diagnose(format!("refresh_failed: {}", failed.join(", ")));
         }
 
         /// The core refused the substituted snapshot; the failure is supplied
@@ -1347,8 +1397,12 @@ pub(crate) mod decision {
                 mismatched: index(&log.mismatched),
                 substituted: vec![],
                 on_refresh_failure: None,
+                abandoned: self.abandoned.clone(),
                 diagnostics: vec![],
             };
+            if self.recomputed {
+                record.on_refresh_failure = Some(RefreshFailurePolicy::Recompute);
+            }
             let mut diagnostics = log.diagnostics.clone();
             if let Some(hit) = &self.hit {
                 record.outcome = if record.refreshed.is_empty()

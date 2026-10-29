@@ -377,7 +377,8 @@ impl Scripted {
         let n = id
             .rsplit('/')
             .next()
-            .and_then(|x| x.parse().ok())
+            // A rerun under `recompute` numbers its attempts `r<n>`.
+            .and_then(|x| x.trim_start_matches('r').parse().ok())
             .unwrap_or(0);
         let projection: Json = serde_json::from_slice(projection).unwrap_or(Json::Null);
         self.principals.lock().unwrap().push(principal.to_vec());

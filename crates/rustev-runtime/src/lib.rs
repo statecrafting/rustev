@@ -1170,31 +1170,97 @@ impl Runtime {
             .steps
             .iter()
             .any(|s| matches!(s.detail, PlanStepDetail::Generate(_)));
-        let (mut requests, acquisitions, mut cancelled) = {
-            let cx = driver::DecisionCtx {
-                rt: i,
-                plan,
-                deadline,
-                submitted,
-                cancel,
-                ledger: &ledger,
-                decision_id: &req.decision_id,
-                principal: &req.principal_handle,
-                evaluation_time: req.evaluation_time,
-                ev: Some(&ev),
-                generation: None,
-                step_ledger: None,
-                stream: None,
-                item_clock: None,
-                deferred_cache: has_generation.then_some(&deferred_cache),
-                persistent: persistent.map(|_| &pending),
-                decision: decision.as_ref(),
-                live,
-                observing: observing.as_ref(),
+        // Under `recompute` a served decision whose refresh failed runs
+        // again once every request of the served run has ended: a second
+        // pass with nothing reused and `r<n>` attempt ids, within the same
+        // deadline and ledger (spec 044, 3.6.5).
+        let mut rerun = false;
+        let (mut requests, acquisitions, cancelled, stage, pending_writes) = loop {
+            let (mut requests, acquisitions, mut cancelled) = {
+                let cx = driver::DecisionCtx {
+                    rt: i,
+                    plan,
+                    deadline,
+                    submitted,
+                    cancel,
+                    ledger: &ledger,
+                    decision_id: &req.decision_id,
+                    principal: &req.principal_handle,
+                    evaluation_time: req.evaluation_time,
+                    ev: Some(&ev),
+                    generation: None,
+                    step_ledger: None,
+                    stream: None,
+                    item_clock: None,
+                    deferred_cache: has_generation.then_some(&deferred_cache),
+                    persistent: persistent.map(|_| &pending),
+                    decision: decision.as_ref(),
+                    live,
+                    observing: observing.as_ref(),
+                    rerun,
+                };
+                driver::run_requests(&cx, capture.as_deref_mut()).await
             };
-            driver::run_requests(&cx, capture.as_deref_mut()).await
+            let mut stage = None;
+            let mut pending_writes = vec![];
+            if !cancelled {
+                let generating = ev
+                    .into_inner()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .begin_generation(&req.decision_id)
+                    .map_err(|e| DecideError::GenerationFailed(e.to_string()))?;
+                let generating = Mutex::new(generating);
+                let stage_cx = generation::StageContext {
+                    rt: i,
+                    plan,
+                    deadline,
+                    submitted,
+                    cancel,
+                    ledger: &ledger,
+                    decision_id: &req.decision_id,
+                    principal: &req.principal_handle,
+                    evaluation_time: req.evaluation_time,
+                    streaming,
+                    decision: decision.as_ref(),
+                    rerun,
+                };
+                // Spec 003 3.9.1 permits only judged or cancelled records; spec
+                // 037 3.12.6 requires generation to complete before judged. An
+                // invariant failure has no specified run-record termination, so
+                // this path returns GenerationFailed without delivery or cache
+                // writes. Ordinary backend failures resolve through backstops
+                // and still deliver evidence (037 3.10.2, 3.12.7, 3.15.2); they
+                // do not take this error path.
+                let (generation_requests, writes, was_cancelled) =
+                    generation::run(&stage_cx, &generating, capture.as_deref_mut())
+                        .await
+                        .map_err(|e| DecideError::GenerationFailed(e.to_string()))?;
+                requests.extend(generation_requests);
+                cancelled = was_cancelled;
+                pending_writes = writes;
+                stage = Some(generating);
+            }
+            if !cancelled
+                && let Some(d) = decision.as_mut()
+                && d.recomputes(&requests, &acquisitions)
+            {
+                // The served run began over this snapshot, so the core
+                // accepts it again.
+                match Evaluation::start(compiled, &req.snapshot, req.evaluation_time) {
+                    Ok(fresh) => {
+                        d.abandon(requests, acquisitions);
+                        if let Some(c) = capture.as_deref_mut() {
+                            c.restart();
+                        }
+                        ev = std::sync::Mutex::new(fresh);
+                        rerun = true;
+                        continue;
+                    }
+                    Err(e) => d.diagnose(format!("recompute not started: {e}")),
+                }
+            }
+            break (requests, acquisitions, cancelled, stage, pending_writes);
         };
-        let ev = ev.into_inner().unwrap_or_else(|e| e.into_inner());
         let stage_cx = generation::StageContext {
             rt: i,
             plan,
@@ -1207,6 +1273,7 @@ impl Runtime {
             evaluation_time: req.evaluation_time,
             streaming,
             decision: decision.as_ref(),
+            rerun,
         };
         let mut text_result = None;
         let mut writes = vec![];
@@ -1214,28 +1281,8 @@ impl Runtime {
         // Spec 037 3.13.1 permits Complete only after final verification and
         // defines no failure event. Both cancellation paths close the stream
         // without Complete: cancellation has no text result (3.12.6).
-        let (completion, core) = if cancelled {
-            (Completion::Cancelled, CoreEvidence::NotProduced)
-        } else {
-            let stage = ev
-                .begin_generation(&req.decision_id)
-                .map_err(|e| DecideError::GenerationFailed(e.to_string()))?;
-            let stage = Mutex::new(stage);
-            // Spec 003 3.9.1 permits only judged or cancelled records; spec 037
-            // 3.12.6 requires generation to complete before judged. An invariant
-            // failure has no specified run-record termination, so this path
-            // returns GenerationFailed without delivery or cache writes. Ordinary
-            // backend failures resolve through backstops and still deliver evidence
-            // (037 3.10.2, 3.12.7, 3.15.2); they do not take this error path.
-            let (generation_requests, pending_writes, was_cancelled) =
-                generation::run(&stage_cx, &stage, capture)
-                    .await
-                    .map_err(|e| DecideError::GenerationFailed(e.to_string()))?;
-            requests.extend(generation_requests);
-            cancelled = was_cancelled;
-            if cancelled {
-                (Completion::Cancelled, CoreEvidence::NotProduced)
-            } else {
+        let (completion, core) = match stage {
+            Some(stage) if !cancelled => {
                 let (judgment, evidence) = {
                     let stage = stage.lock().unwrap_or_else(|e| e.into_inner());
                     let (mut judgment, evidence, mut text) = stage
@@ -1293,6 +1340,7 @@ impl Runtime {
                     CoreEvidence::Recorded(Box::new(evidence)),
                 )
             }
+            _ => (Completion::Cancelled, CoreEvidence::NotProduced),
         };
         let elapsed_ms = i.clock.now().saturating_sub(submitted);
         let plan_3 = plan.compiled.plan.schema == schema::PLAN_V3;

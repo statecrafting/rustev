@@ -129,6 +129,23 @@ impl RunRecord {
                     "too many decision cache diagnostics",
                 ));
             }
+            if let Some(a) = &d.abandoned {
+                if a.requests.is_empty() && a.acquisitions.is_empty() {
+                    return Err(RunVersionError::Members(
+                        "an abandoned run is omitted when empty",
+                    ));
+                }
+                if a.acquisitions
+                    .iter()
+                    .map(|p| p.attempts.len())
+                    .sum::<usize>()
+                    > 4096
+                {
+                    return Err(RunVersionError::Members(
+                        "too many abandoned acquisition attempts",
+                    ));
+                }
+            }
         }
         let v2 = self.schema == schema::RUN_V2;
         match &self.remote_evidence {
