@@ -1056,6 +1056,21 @@ its `main`, `types`, `typings` or `exports` (every condition) names, or
 naming a wildcard, which the comparison also refuses. The fix reaches
 consumers in the next family version.
 
+**The WebAssembly package's declaration comparison (2026-10-28, 3.8).**
+`@rustev/rustev-wasm` had no npm baseline until 0.2.0, so `semver.sh`
+never compared it; the 0.3.0 bump was its first comparison, and it found
+two defects. The repository holds no built package, so `semver.sh` read
+`./bundler/index.d.ts` as missing: it now stages the package's
+declarations as `make bindings` does (wasm-bindgen for each target, the
+per-target `package.json`, `wrap-wasm.mjs`; wasm-opt is skipped, since it
+changes no declaration), only once a baseline exists. And the published
+0.2.0 declarations do not compile under node16/nodenext resolution,
+because `index.d.ts` re-exported `./rustev_wasm` without an extension
+inside `type: module` directories (TS2834); the re-exports now name
+`./rustev_wasm.js`, and the owner deprecated 0.2.0 on npm, so the
+comparison's existing rule (the newest non-deprecated earlier version)
+leaves 0.3.0 with no baseline.
+
 ## Decisions at approval
 
 1. **Crate and package names** (left to the implementer by #58): decided

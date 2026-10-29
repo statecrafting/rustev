@@ -13,7 +13,7 @@ export function stageWrappers(pkg) {
     copyFileSync(new URL('../../../integrations/rustev-wasm/index.d.ts', import.meta.url), resolve(pkg, target, 'index.d.ts'));
     if (target === 'web') {
       // wasm-bindgen's web target also exposes asynchronous initialization.
-      appendFileSync(resolve(pkg, target, 'index.d.ts'), "export { default } from './rustev_wasm';\n");
+      appendFileSync(resolve(pkg, target, 'index.d.ts'), "export { default } from './rustev_wasm.js';\n");
     }
   }
 }

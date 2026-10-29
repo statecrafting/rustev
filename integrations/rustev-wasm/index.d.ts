@@ -1,5 +1,5 @@
-export * from './rustev_wasm';
-export { Engine } from './rustev_wasm';
+export * from './rustev_wasm.js';
+export { Engine } from './rustev_wasm.js';
 export class RustevError extends Error {
   readonly code: string;
   readonly detail: unknown;

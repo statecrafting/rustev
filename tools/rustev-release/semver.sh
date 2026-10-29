@@ -10,7 +10,10 @@
 #
 # Reads the public sparse index only; never uploads or reads a credential.
 # Needs git, cargo, curl, Node (to read the index's JSON lines; 20 or later,
-# as `make bindings` does) and the pinned cargo-semver-checks.
+# as `make bindings` does) and the pinned cargo-semver-checks; once
+# @rustev/rustev-wasm has an npm baseline, also the wasm32-unknown-unknown
+# target and the pinned wasm-bindgen (027 3.10.2), which emit its
+# declarations.
 set -eu
 
 PIN=0.51.0
@@ -56,6 +59,29 @@ index_path() {
     3) printf '3/%s/%s' "$(printf '%s' "$n" | cut -c1)" "$n" ;;
     *) printf '%s/%s/%s' "$(printf '%s' "$n" | cut -c1-2)" "$(printf '%s' "$n" | cut -c3-4)" "$n" ;;
   esac
+}
+
+# Stage @rustev/rustev-wasm's published declarations in <dir> as `make
+# bindings` does: its entry points exist only once wasm-bindgen has emitted
+# each target. wasm-opt is skipped; it changes no declaration. "$target" is
+# the cargo target directory assigned above (`rustev-release field target`).
+stage_wasm() {
+  have=$(wasm-bindgen --version 2>/dev/null || true)
+  if [ "$have" != "wasm-bindgen 0.2.129" ]; then
+    echo "031 3.8: need wasm-bindgen 0.2.129 (cargo install wasm-bindgen-cli --version 0.2.129 --locked), found '${have}'" >&2
+    return 1
+  fi
+  cargo build --quiet --locked -p rustev-wasm --target wasm32-unknown-unknown --profile wasm || return 1
+  for t in web bundler nodejs; do
+    d=$t
+    [ "$t" = nodejs ] && d=node
+    wasm-bindgen --target "$t" --out-dir "$1/$d" "$target/wasm32-unknown-unknown/wasm/rustev_wasm.wasm" || return 1
+    ty=module
+    [ "$t" = nodejs ] && ty=commonjs
+    printf '{ "type": "%s" }\n' "$ty" > "$1/$d/package.json"
+  done
+  cp -R integrations/rustev-wasm/package.json integrations/rustev-wasm/types "$1/" &&
+    node tools/rustev-conformance/js/wrap-wasm.mjs "$1"
 }
 
 : > "$report"
@@ -146,6 +172,13 @@ for pkg in @rustev/rustev @rustev/rustev-wasm; do
     echo "031 3.8: $pkg: npm tarball verification or extraction failed; no verdict" >&2
     exit 1
   }
+  if [ "$pkg" = @rustev/rustev-wasm ]; then
+    package_dir="$scratch/rustev-wasm-current"
+    stage_wasm "$package_dir" || {
+      echo "031 3.8: $pkg: could not stage its declarations; no verdict" >&2
+      exit 1
+    }
+  fi
   diff_report="$scratch/npm-diff.json"
   status=0
   node tools/rustev-release/npm-api-diff.mjs "$old_dir/package" "$package_dir" > "$diff_report" || status=$?

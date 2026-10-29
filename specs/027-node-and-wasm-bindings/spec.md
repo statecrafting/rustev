@@ -1220,6 +1220,14 @@ against their schemas in their own contract tests.
   cases, and regenerated only the CLI cases, so it left the explain cases
   deleted (#349). The recipe now blesses `--test explain` after the CLI
   harvest and before the manifest. No case changes.
+- 2026-10-28: the WebAssembly package's `index.d.ts` (and the `web`
+  target's appended default export) re-exported `./rustev_wasm` without
+  an extension. Each target directory is `type: module` (or CommonJS for
+  `node`), and under TypeScript's node16/nodenext resolution an ESM
+  declaration's relative import needs its extension (TS2834), so those
+  consumers lost the package's types in 0.2.0. The re-exports now name
+  `./rustev_wasm.js`, which every resolution mode accepts; spec 031's
+  declaration comparison found it.
 
 ## Decisions at approval
 
