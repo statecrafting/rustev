@@ -554,6 +554,29 @@ conformance cases and fixtures that carry one are regenerated through
 their bless and harvest paths, and the `rustev-serve` Sigstore fixture is
 re-signed with its throwaway keys. No behavior changes.
 
+**The 0.3.0 release (2026-10-29, increment 5, not closing).** The signed
+tag `v0.3.0` first named `c97a5f8`; that run's `crates` job refused two
+members over their reviewed unpacked bounds (021 3.5) before `approve`,
+nothing was published, and after the bounds were raised by review (#380)
+the unpublished tag was deleted and signed again on `6a864fc` (3.1.4,
+A-62). Run 40804954767 then built every artifact once, reproduced them,
+generated and attested the manifest and published the twelve crates
+through crates.io trusted publishing. `publish-npm` failed with
+`ENEEDAUTH`: npm's token exchange rejects the immutable OIDC subject
+GitHub issues for this repository (`repo:statecrafting@249214329/rustev@1383811482...`;
+npm/cli#9969, open), although the trusted publisher names the
+repository, `release.yml` and `npm-publish` with publish permission, and
+the repository setting cannot be reverted to the classic subject. The
+owner published the run's nine tarballs from its attested release
+artifact, each checked against the manifest's SHA-256 and integrity
+first; rerunning the failed jobs then recorded each as `present` (3.5.1,
+3.5.2), created the GitHub release and passed `verify-release`. The
+`qualify` stage failed on three harness defects (fixed by #384, 056) and,
+with them fixed, fails `npm` only on missing verified provenance, which
+056 3.3 requires. So 0.3.0 is `released`, not `qualified`, and its npm
+packages carry no provenance: the Acceptance's closing release is still
+to come, once npm accepts the immutable subject.
+
 ## Open questions for the owner
 
 Settled at ratification (A-61): the `release` Environment has no
