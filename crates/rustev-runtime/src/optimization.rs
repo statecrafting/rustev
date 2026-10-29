@@ -648,11 +648,12 @@ pub(crate) mod decision {
     use rustev_contract::canonical::{record_canonical_bytes, tagged_digest};
     use rustev_contract::ids::{ContentDigest, PlanId};
     use rustev_contract::optimization::{
-        DecisionCachePolicy, DecisionCacheTier, OptimizationPolicy,
+        DecisionCachePolicy, DecisionCacheTier, OptimizationPolicy, RefreshFailurePolicy,
+        SubstitutedInput,
     };
     use rustev_contract::output::RawOutput;
     use rustev_contract::scope::Handle;
-    use rustev_contract::snapshot::Snapshot;
+    use rustev_contract::snapshot::{Entry, Snapshot};
     use rustev_contract::time::Timestamp;
 
     use super::{CacheRefusal, Optimizer, RequestKey, namespace, part, profile_of, scope_id};
@@ -780,6 +781,9 @@ pub(crate) mod decision {
     #[derive(Debug, Clone)]
     pub(crate) struct DecisionEntry {
         pub requests: ReusedRequests,
+        /// The source decision's snapshot entries of its volatile inputs, as
+        /// supplied, for `serve_cached_within_freshness` (3.6.5).
+        pub volatile: Vec<Entry>,
         pub source_run_record: ContentDigest,
         /// The source decision's evaluation time: decision entries expire by
         /// evaluation time (spec 044, decision 6).
@@ -838,13 +842,18 @@ pub(crate) mod decision {
     }
 
     /// The bytes a decision entry counts against `max_entry_bytes`: its key
-    /// material, and each reused request's key material, canonical output and
-    /// source attempt id.
+    /// material, each reused request's key material, canonical output and
+    /// source attempt id, and each stored volatile entry's canonical bytes.
     pub(crate) fn decision_entry_bytes(
         key: &RequestKey,
         requests: &ReusedRequests,
+        volatile: &[Entry],
     ) -> Result<u64, CacheRefusal> {
         let mut bytes = key.material.len() as u64;
+        for e in volatile {
+            let entry = record_canonical_bytes(e).map_err(|_| CacheRefusal::Uncanonical)?;
+            bytes = bytes.saturating_add(entry.len() as u64);
+        }
         for r in requests.values() {
             let output =
                 record_canonical_bytes(&r.output).map_err(|_| CacheRefusal::Uncanonical)?;
@@ -907,7 +916,7 @@ pub(crate) mod decision {
             entry: DecisionEntry,
             captured_generation: u64,
         ) -> Result<String, CacheRefusal> {
-            let bytes = decision_entry_bytes(&key, &entry.requests)?;
+            let bytes = decision_entry_bytes(&key, &entry.requests, &entry.volatile)?;
             if bytes > policy.max_entry_bytes {
                 return Err(CacheRefusal::EntryTooLarge);
             }
@@ -997,6 +1006,47 @@ pub(crate) mod decision {
         pub refused: Option<String>,
         outcome: rustev_contract::optimization::DecisionCacheOutcome,
         log: Mutex<DecisionLog>,
+        on_refresh_failure: RefreshFailurePolicy,
+        /// Volatile inputs the core did not accept from the new snapshot.
+        failed_inputs: Vec<String>,
+        /// Stored volatile entries supplied under
+        /// `serve_cached_within_freshness` (3.6.5).
+        substituted: Vec<SubstitutedInput>,
+    }
+
+    /// The digest the run record names a substituted volatile entry by
+    /// (spec 044, 3.6.6): the one the decision key takes of a snapshot entry.
+    fn entry_digest(e: &Entry) -> Option<ContentDigest> {
+        let bytes = record_canonical_bytes(e).ok()?;
+        ContentDigest::parse(&tagged_digest(DECISION_INPUT_TAG, &bytes)).ok()
+    }
+
+    /// What failed in a served decision's refresh (spec 044, 3.6.5): each
+    /// volatile input the core did not accept from the new snapshot, and
+    /// each refreshed request that failed or was not supplied.
+    fn failures(
+        failed_inputs: &[String],
+        log: &DecisionLog,
+        requests: &[rustev_contract::run::RequestRecord],
+    ) -> Vec<String> {
+        use rustev_contract::run::RequestResult;
+        let mut failed: Vec<String> = failed_inputs
+            .iter()
+            .map(|v| format!("input {v:?}"))
+            .collect();
+        failed.extend(log.refreshed.iter().filter_map(|(step, instance)| {
+            requests
+                .iter()
+                .find(|r| &r.step == step && &r.instance == instance)
+                .filter(|r| {
+                    matches!(
+                        r.result,
+                        RequestResult::Failed(_) | RequestResult::NotSupplied
+                    )
+                })
+                .map(|r| format!("step {:?}", r.step))
+        }));
+        failed
     }
 
     impl DecisionRun {
@@ -1028,6 +1078,9 @@ pub(crate) mod decision {
                 refused: None,
                 outcome: DecisionCacheOutcome::Miss,
                 log: Mutex::default(),
+                on_refresh_failure: cache.on_refresh_failure,
+                failed_inputs: vec![],
+                substituted: vec![],
             };
             let log = run.log.get_mut().unwrap_or_else(|e| e.into_inner());
             // A live re-execution observes fresh backend work (spec 026, 3.4).
@@ -1144,20 +1197,88 @@ pub(crate) mod decision {
             self.log.lock().unwrap_or_else(|e| e.into_inner())
         }
 
-        /// The run record member (spec 044, 3.6.6). `unresolved_volatile` names
-        /// each volatile input the core did not accept from the new snapshot; it
-        /// and any refreshed request without an output are a failed refresh,
-        /// supplied as it is under `unresolved` (3.6.5).
+        /// The volatile inputs of a served decision, once the core has
+        /// validated the new snapshot (spec 044, 3.6.5): each one it did not
+        /// accept is a failed refresh. Under `serve_cached_within_freshness`
+        /// an input with no accepted entry is given the entry's stored
+        /// snapshot entries with their original as-of times, and the snapshot
+        /// to restart the core over is returned, so the core's freshness check
+        /// decides. Any other failure is supplied as it is. A decision under
+        /// capture is never substituted: its capture could not carry the
+        /// stored entries a replay would need.
+        pub(crate) fn refresh_inputs(
+            &mut self,
+            volatile: &[String],
+            ev: &rustev_core::evaluate::Evaluation<'_>,
+            snapshot: &Snapshot,
+            capturing: bool,
+        ) -> Option<Snapshot> {
+            use rustev_contract::judgment::Unresolved;
+            let entry = self.hit.as_ref()?.entry.clone();
+            let mut missing = vec![];
+            for v in volatile.iter().filter(|v| !v.starts_with("step:")) {
+                if let Err(u) = ev.status_of(&format!("input:{v}")) {
+                    if matches!(u, Unresolved::MissingEvidence { .. }) {
+                        missing.push(v);
+                    }
+                    self.failed_inputs.push(v.clone());
+                }
+            }
+            if self.failed_inputs.is_empty() {
+                return None;
+            }
+            match self.on_refresh_failure {
+                // The compiler refuses `recompute` in this build.
+                RefreshFailurePolicy::Unresolved | RefreshFailurePolicy::Recompute => None,
+                RefreshFailurePolicy::ServeCachedWithinFreshness if capturing => {
+                    self.diagnose(
+                        "stored volatile entries are not substituted under capture".into(),
+                    );
+                    None
+                }
+                RefreshFailurePolicy::ServeCachedWithinFreshness => {
+                    let mut substituted = snapshot.clone();
+                    for input in missing {
+                        let stored: Vec<&Entry> = entry
+                            .volatile
+                            .iter()
+                            .filter(|e| &e.field == input)
+                            .collect();
+                        let digests: Option<Vec<_>> =
+                            stored.iter().map(|e| entry_digest(e)).collect();
+                        // An input the entry holds nothing for, or nothing
+                        // canonical, stays as the new snapshot supplies it.
+                        let Some(digests) = digests.filter(|d| !d.is_empty()) else {
+                            continue;
+                        };
+                        self.substituted
+                            .extend(digests.into_iter().map(|entry_digest| SubstitutedInput {
+                                input: input.clone(),
+                                entry_digest,
+                            }));
+                        substituted.entries.extend(stored.into_iter().cloned());
+                    }
+                    (!self.substituted.is_empty()).then_some(substituted)
+                }
+            }
+        }
+
+        /// The core refused the substituted snapshot; the failure is supplied
+        /// as it is (spec 044, 3.6.5).
+        pub(crate) fn unsubstitute(&mut self, detail: String) {
+            self.substituted.clear();
+            self.diagnose(format!("stored volatile entries not substituted: {detail}"));
+        }
+
+        /// The run record member (spec 044, 3.6.6). A served decision's failed
+        /// refresh names the policy applied, which is the plan's (3.6.5).
         pub(crate) fn record(
             &self,
             requests: &[rustev_contract::run::RequestRecord],
-            unresolved_volatile: &[String],
         ) -> rustev_contract::optimization::DecisionCacheRecord {
             use rustev_contract::optimization::{
                 DecisionCacheOutcome, DecisionCacheRecord, MAX_OPTIMIZATION_DIAGNOSTICS,
-                RefreshFailurePolicy,
             };
-            use rustev_contract::run::RequestResult;
             let log = self.log();
             let index = |list: &[At]| {
                 let mut found: Vec<u32> = list
@@ -1196,20 +1317,10 @@ pub(crate) mod decision {
                 record.source_run_record = Some(hit.entry.source_run_record.clone());
                 record.age_ms = Some(hit.age_ms);
                 record.generations = hit.generations;
-                let mut failed: Vec<String> = unresolved_volatile
-                    .iter()
-                    .map(|v| format!("input {v:?}"))
-                    .collect();
-                failed.extend(record.refreshed.iter().filter_map(|&n| {
-                    let r = &requests[n as usize];
-                    matches!(
-                        r.result,
-                        RequestResult::Failed(_) | RequestResult::NotSupplied
-                    )
-                    .then(|| format!("step {:?}", r.step))
-                }));
+                record.substituted = self.substituted.clone();
+                let failed = failures(&self.failed_inputs, &log, requests);
                 if !failed.is_empty() {
-                    record.on_refresh_failure = Some(RefreshFailurePolicy::Unresolved);
+                    record.on_refresh_failure = Some(self.on_refresh_failure);
                     diagnostics.push(format!("refresh_failed: {}", failed.join(", ")));
                 }
             }
@@ -1236,6 +1347,7 @@ pub(crate) mod decision {
         pub(crate) fn admissible(
             &self,
             requests: &[rustev_contract::run::RequestRecord],
+            volatile: &[Entry],
             policy: &rustev_contract::optimization::DecisionCachePolicy,
         ) -> Result<Option<(RequestKey, ReusedRequests)>, String> {
             use rustev_contract::run::{RequestResult, Transition};
@@ -1277,7 +1389,7 @@ pub(crate) mod decision {
                     }
                 }
             }
-            match decision_entry_bytes(key, &reused) {
+            match decision_entry_bytes(key, &reused, volatile) {
                 Ok(bytes) if bytes <= policy.max_entry_bytes => Ok(Some((key.clone(), reused))),
                 Ok(_) | Err(CacheRefusal::EntryTooLarge) => {
                     Err("decision cache not admitted: entry exceeds max_entry_bytes".into())
@@ -1407,6 +1519,7 @@ pub(crate) mod decision {
             };
             DecisionEntry {
                 requests: BTreeMap::from([(("topic".to_string(), vec![]), reused)]),
+                volatile: vec![],
                 source_run_record: ContentDigest::parse(&format!("sha256:{}", "2".repeat(64)))
                     .unwrap(),
                 created: at(created),
@@ -1522,10 +1635,17 @@ pub(crate) mod decision {
         fn admission_is_bounded_and_checked() {
             let o = Optimizer::default();
             let a = key(b"tenant-a");
-            let small = decision_entry_bytes(&a, &entry(0, 1).requests).unwrap();
+            let small = decision_entry_bytes(&a, &entry(0, 1).requests, &[]).unwrap();
             let policy = cache(2, small);
             assert_eq!(
                 o.insert_decision(&policy, a.clone(), entry(0, 2), 0),
+                Err(CacheRefusal::EntryTooLarge)
+            );
+            // Stored volatile snapshot entries count too (spec 044, 3.6.5).
+            let mut with_volatile = entry(0, 1);
+            with_volatile.volatile = snapshot(1, 2).entries;
+            assert_eq!(
+                o.insert_decision(&policy, a.clone(), with_volatile, 0),
                 Err(CacheRefusal::EntryTooLarge)
             );
             for max_entries in [None, Some(0)] {
@@ -1582,7 +1702,7 @@ pub(crate) mod decision {
                 .unwrap();
             o.insert_decision(&policy, b.clone(), entry(0, 1), 0)
                 .unwrap();
-            let bytes = decision_entry_bytes(&a, &entry(0, 1).requests).unwrap();
+            let bytes = decision_entry_bytes(&a, &entry(0, 1).requests, &[]).unwrap();
             let result = o.invalidate(&InvalidationSelector::Scope {
                 namespace: a.namespace.clone(),
                 scope_id: a.scope_id.clone(),

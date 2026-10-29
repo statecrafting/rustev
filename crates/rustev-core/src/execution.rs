@@ -560,8 +560,10 @@ fn refresh_closure(
 /// A mechanism the runtime of this build does not run is refused rather
 /// than silently run independently (spec 017, 3.1). The decision-result
 /// cache runs its memory and persistent tiers over exact and semantic
-/// steps with the `unresolved` refresh policy; its other parts join with
-/// the later parts of spec 044's increment 5.
+/// steps with the `unresolved` and `serve_cached_within_freshness` refresh
+/// policies (spec 044, 3.6.5); `recompute`, and plans with acquisition,
+/// widening, generation or extraction steps, join with later parts of
+/// spec 044's increment 5.
 pub(crate) fn available(execution: &PlanExecution, def: &Definition) -> Result<(), Refusal> {
     let PlanExecution::Declared(d) = execution else {
         return Ok(());
@@ -580,8 +582,8 @@ pub(crate) fn available(execution: &PlanExecution, def: &Definition) -> Result<(
             format!("decision_cache {what} is not available in this build"),
         )
     };
-    if p.on_refresh_failure != RefreshFailurePolicy::Unresolved {
-        return unavailable("on_refresh_failure other than unresolved");
+    if p.on_refresh_failure == RefreshFailurePolicy::Recompute {
+        return unavailable("on_refresh_failure recompute");
     }
     for s in &def.steps {
         let kind = match s.body {

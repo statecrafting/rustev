@@ -1,5 +1,5 @@
-//! Spec 044, 3.5 and 3.6: the decision-result cache's memory tier, one test
-//! per section 5 row it owns. SYNTHETIC fixtures only; the clock is manual
+//! Spec 044, 3.5 and 3.6: the decision-result cache's memory tier and its
+//! refresh-failure policies, one test per section 5 row it owns. SYNTHETIC fixtures only; the clock is manual
 //! and every served judgment is compared with independent execution of the
 //! same request on a fresh runtime (3.6.3 item 3).
 
@@ -10,22 +10,29 @@ use std::sync::Arc;
 
 use common::*;
 use rustev_contract::Document;
+use rustev_contract::canonical::{record_canonical_bytes, tagged_digest};
 use rustev_contract::definition::{
     Definition, Freshness, InputDecl, ProvenanceClass, StepBody, TypeDecl,
 };
 use rustev_contract::execution::{CostPolicy, ExecutionPolicy};
+use rustev_contract::ids::ContentDigest;
+use rustev_contract::judgment::{Outcome, Unresolved};
 use rustev_contract::optimization::{
     DecisionCacheOutcome, DecisionCachePolicy, DecisionCacheRecord, DecisionCacheTier, ExpiryBasis,
     OptimizationAdmission, OptimizationMechanism, OptimizationOutcome, OptimizationPolicy,
-    RefreshFailurePolicy,
+    RefreshFailurePolicy, SubstitutedInput,
 };
 use rustev_contract::run::{Charge, RequestResult, RunRecord};
 use rustev_contract::schema;
-use rustev_contract::scope::Handle as Dimension;
+use rustev_contract::scope::{Handle as Dimension, Scope};
+use rustev_contract::snapshot::Entry;
 use rustev_core::builder::e;
 use rustev_core::ops::{OpArgs, TimestampDiff};
 use rustev_core::seams::{AdapterFailure, BoxFuture, CancelSignal, EvidenceSink};
-use rustev_runtime::{Completion, Decided, DecisionRequest, ManualClock, PreparedPlan, Runtime};
+use rustev_runtime::{
+    CaptureConfig, Completion, Decided, DecisionRequest, MAX_CAPTURE_BYTES, ManualClock,
+    PreparedPlan, Runtime,
+};
 
 const MINUTE: i64 = 60_000;
 
@@ -504,4 +511,213 @@ async fn a_failed_refresh_is_supplied_as_it_is() {
             .any(|x| x.starts_with("refresh_failed: input \"payments.events\""))
     );
     same_judgment(&d, &independent(&volatile_payments(), stale).await);
+}
+
+fn outcome(c: &Completion) -> Option<&Outcome> {
+    match c {
+        Completion::Judged(j) => Some(&j.outcome),
+        Completion::Cancelled => None,
+    }
+}
+
+/// The payment events as the volatile source, under
+/// `serve_cached_within_freshness` (spec 044, 3.6.5).
+fn serving_stored() -> ExecutionPolicy {
+    let mut p = volatile_payments();
+    let o = p.optimization.as_mut().unwrap();
+    o.decision_cache.as_mut().unwrap().on_refresh_failure =
+        RefreshFailurePolicy::ServeCachedWithinFreshness;
+    p
+}
+
+/// `req` with no payment events in its snapshot: the volatile input has no
+/// accepted entry.
+fn without_payments(mut req: DecisionRequest) -> DecisionRequest {
+    req.snapshot
+        .entries
+        .retain(|e| e.field != "payments.events");
+    req
+}
+
+fn payments(req: &DecisionRequest) -> Entry {
+    req.snapshot
+        .entries
+        .iter()
+        .find(|e| e.field == "payments.events")
+        .unwrap()
+        .clone()
+}
+
+/// `req` given the stored entry, as the substitution supplies it.
+fn with_entry(mut req: DecisionRequest, entry: Entry) -> DecisionRequest {
+    req.snapshot.entries.push(entry);
+    req
+}
+
+/// The entry digest the run record names a substituted input by (3.6.6).
+fn entry_digest(e: &Entry) -> ContentDigest {
+    let bytes = record_canonical_bytes(e).unwrap();
+    ContentDigest::parse(&tagged_digest("rustev.decision-input/1", &bytes)).unwrap()
+}
+
+/// Section 5: refresh fails under `serve_cached_within_freshness` with the
+/// value inside its maximum age. The volatile input has no accepted entry in
+/// the new snapshot, so the stored entry is supplied with its original as-of
+/// time; it is fresh, so its closure is dispatched and the decision is
+/// served with `refresh_failed`. The judgment equals independent execution
+/// given the same supplied values, never the failure turned into a value.
+#[tokio::test(flavor = "current_thread")]
+async fn a_missing_volatile_input_is_served_from_the_entry_within_its_max_age() {
+    let c = cached(&serving_stored());
+    let source = request("d1");
+    decide(&c, source.clone()).await;
+    let later = without_payments(at("d2", NOW + MINUTE));
+    let d = decide(&c, later.clone()).await;
+    let m = dc(&d);
+    assert_eq!(m.outcome, DecisionCacheOutcome::Refreshed);
+    assert_eq!(m.refreshed, [index(&d, "frustration")]);
+    assert_eq!(
+        m.on_refresh_failure,
+        Some(RefreshFailurePolicy::ServeCachedWithinFreshness)
+    );
+    let stored = payments(&source);
+    assert_eq!(
+        m.substituted,
+        [SubstitutedInput {
+            input: "payments.events".into(),
+            entry_digest: entry_digest(&stored),
+        }]
+    );
+    assert!(
+        m.diagnostics
+            .iter()
+            .any(|x| x == "refresh_failed: input \"payments.events\"")
+    );
+    assert!(d.served_from_cache.is_some());
+    same_judgment(
+        &d,
+        &independent(&serving_stored(), with_entry(later.clone(), stored)).await,
+    );
+    // Supplied as it is, the failure is `missing_evidence`.
+    assert_eq!(
+        outcome(&d.completion).map(|o| matches!(o, Outcome::Unresolved(_))),
+        Some(false)
+    );
+    assert_eq!(
+        outcome(&independent(&serving_stored(), later).await.completion),
+        Some(&Outcome::Unresolved(Unresolved::MissingEvidence {
+            fields: vec!["payments.events".into()]
+        }))
+    );
+}
+
+/// Section 5: past its maximum age the stored entry is `stale_evidence`, as
+/// for any stale input: the core's freshness check decides, so the closure
+/// is not requested and nothing older than the declared freshness is
+/// supplied as a value.
+#[tokio::test(flavor = "current_thread")]
+async fn a_stored_entry_past_its_max_age_is_stale_evidence() {
+    let c = cached(&serving_stored());
+    // Fresh at the source decision: 250 s of a 300 s bound.
+    let mut source = request("d1");
+    source.snapshot = support_snapshot("pro", &[2, 5], 250_000);
+    let first = decide(&c, source.clone()).await;
+    assert!(
+        first
+            .record
+            .requests
+            .iter()
+            .any(|r| r.step == "frustration")
+    );
+    // A minute later the stored entry is 310 s old.
+    let later = without_payments(at("d2", NOW + MINUTE));
+    let d = decide(&c, later.clone()).await;
+    let m = dc(&d);
+    let stored = payments(&source);
+    assert_eq!(m.substituted.len(), 1);
+    assert_eq!(m.substituted[0].entry_digest, entry_digest(&stored));
+    assert_eq!(m.outcome, DecisionCacheOutcome::Hit);
+    assert!(d.record.requests.iter().all(|r| r.step != "frustration"));
+    let stale = independent(&serving_stored(), with_entry(later.clone(), stored)).await;
+    same_judgment(&d, &stale);
+    assert_eq!(
+        outcome(&stale.completion),
+        Some(&Outcome::Unresolved(Unresolved::StaleEvidence {
+            fields: vec!["payments.events".into()]
+        })),
+        "stale_evidence, as for any stale input"
+    );
+}
+
+/// Section 5: a refreshed request fails under
+/// `serve_cached_within_freshness`. Nothing stored is supplied for it; the
+/// failure is supplied as under `unresolved` and the core yields what
+/// independent execution yields.
+#[tokio::test(flavor = "current_thread")]
+async fn a_failed_refreshed_request_is_supplied_as_it_is() {
+    // `frustration` fails for the second decision only.
+    let failing = || {
+        Scripted::new(linear_head(), |c| {
+            if c.task() == "support.frustration" && c.attempt_id.starts_with("d2/") {
+                Answer::Fail(
+                    AdapterFailure::Transient,
+                    "down".into(),
+                    Charge::Observed { units: 0 },
+                )
+            } else {
+                ok(c.task(), 1)
+            }
+        })
+    };
+    let c = cached_with(&serving_stored(), failing());
+    decide(&c, request("d1")).await;
+    let mut changed = request("d2");
+    changed.snapshot = support_snapshot("pro", &[2], 0);
+    let d = decide(&c, changed.clone()).await;
+    let m = dc(&d);
+    assert_eq!(m.outcome, DecisionCacheOutcome::Refreshed);
+    assert!(m.substituted.is_empty());
+    assert_eq!(
+        m.on_refresh_failure,
+        Some(RefreshFailurePolicy::ServeCachedWithinFreshness)
+    );
+    assert!(
+        m.diagnostics
+            .iter()
+            .any(|x| x == "refresh_failed: step \"frustration\"")
+    );
+    let frustration = &d.record.requests[index(&d, "frustration") as usize];
+    assert!(matches!(frustration.result, RequestResult::Failed(_)));
+    let alone = decide(&cached_with(&serving_stored(), failing()), changed).await;
+    same_judgment(&d, &alone);
+}
+
+/// Spec 044, 3.6.5: a decision under capture is not substituted, since its
+/// capture could not carry the stored entries a replay needs; the failure
+/// is supplied as it is.
+#[tokio::test(flavor = "current_thread")]
+async fn a_captured_decision_is_never_substituted() {
+    let c = cached(&serving_stored());
+    decide(&c, request("d1")).await;
+    let later = without_payments(at("d2", NOW + MINUTE));
+    let config = CaptureConfig {
+        scope: Scope::tenant_only(
+            Dimension::new("tenant-a").unwrap(),
+            Dimension::new("rev-1").unwrap(),
+        ),
+        max_bytes: MAX_CAPTURE_BYTES,
+    };
+    let captured =
+        c.rt.decide_with_capture(&c.plan, later.clone(), &CancelSignal::new(), &config)
+            .await
+            .unwrap();
+    let d = captured.result.unwrap();
+    let m = dc(&d);
+    assert!(m.substituted.is_empty());
+    assert!(
+        m.diagnostics
+            .iter()
+            .any(|x| x == "stored volatile entries are not substituted under capture")
+    );
+    same_judgment(&d, &independent(&serving_stored(), later).await);
 }

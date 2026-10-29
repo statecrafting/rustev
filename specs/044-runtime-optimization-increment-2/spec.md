@@ -1486,6 +1486,94 @@ Tests:
   and after the memory tier, accepted and part of `PlanId`.
 - The spec 017 tests and the earlier increments' tests are unchanged.
 
+**Increment 5, part d (2026-10-28): serving a stored volatile entry.**
+Part d lands in two parts. Part d1, this one, is
+`serve_cached_within_freshness` in both tiers. The compiler accepts it and
+still refuses `on_refresh_failure: recompute`, now as `decision_cache
+on_refresh_failure recompute is not available in this build`, and plans
+with acquisition, widening, generation or extraction steps (part e). Part
+d2 holds `recompute`; why it waits is below.
+
+What part d1 adds:
+- The memory tier's decision entries now hold the source decision's
+  snapshot entries of its volatile inputs, as part c's persistent payload
+  already did, so both tiers can serve them.
+- `DecisionRun::refresh_inputs` in
+  `crates/rustev-runtime/src/optimization.rs` runs on a served decision
+  after the core has validated the new snapshot and before any request.
+  It records each volatile input the core did not accept as a failed
+  refresh.
+- Under `serve_cached_within_freshness`, an input with no accepted entry
+  is given the entry's stored snapshot entries with their original as-of
+  times, and the core starts again over that snapshot. The core's
+  freshness check decides: inside the maximum age the value is served,
+  and outside it the input is `stale_evidence`.
+- The run record member lists each substituted entry in `substituted`
+  with its digest, names the policy in `on_refresh_failure`, and carries
+  `refresh_failed` naming each failure.
+
+Decisions within the spec:
+- **Only an input with no accepted entry is substituted**, as 3.6.5 words
+  the failure. A new entry that is stale, conflicting, dated after the
+  evaluation time or of the wrong type is new evidence about the input. It
+  is supplied as it is, as is a failed refreshed request. It is still a
+  failed refresh for the record, as part b decided.
+- **The stored entries join the new snapshot.** They are appended to the
+  host's entries, so nothing the host supplied is removed, and the core's
+  evidence names that snapshot. An input the entry holds nothing for stays
+  as supplied. If the core refuses the joined snapshot (for example a
+  graded entry in a `rustev.snapshot/1`), nothing is substituted and a
+  diagnostic says why.
+- **An entry digest** is the digest the decision key takes of a snapshot
+  entry: `rustev.decision-input/1` over its record canonical bytes. An
+  input with several stored entries is listed once per entry.
+- **`on_refresh_failure` names the plan's policy** whenever a refresh
+  failed, including a failed refreshed request supplied as it is under
+  `serve_cached_within_freshness`. `substituted` says whether a stored
+  entry was used.
+- **A decision under capture is never substituted.** Its capture holds
+  supplied outputs, not snapshot entries, so a replay over the host's
+  snapshot could not reproduce it. The failure is supplied as it is, with
+  a diagnostic.
+- **`max_entry_bytes` counts the stored volatile entries** (their record
+  canonical bytes) in both tiers.
+- A served decision is never admitted (3.6.4), so a substituted value
+  never enters an entry.
+
+**Why `recompute` waits (part d2).** Under `recompute` a refreshed request
+can fail only after it was dispatched, so the decision runs again and
+3.6.5 keeps the abandoned attempts in the run record. Spec 003 (3.9.2
+items 2 and 3) makes an attempt id `<decision id>/<step>/<instance>/<n>`
+with `n` counting attempts of that request. That id is the adapter's
+idempotency key. It also bounds a record to the plan's requests and
+`max_attempts_per_decision` attempts. Replay (spec 004) also compares the
+record's requests with the core's request order. Neither spec says how the
+abandoned attempts sit beside the recomputed ones. A second record per
+request breaks the request bound and replay. Attempts that continue one
+record misattribute a request the second run serves from a request-level
+cache or a shared call, since `supplied_from` then names the abandoned
+attempt. Either way the attempt bound can be exceeded. Part d2 follows a
+decision on that representation.
+
+Tests:
+- In `crates/rustev-runtime/tests/decision_cache.rs`:
+  - a missing volatile input served from the entry inside its maximum age
+  - a stored entry past its maximum age yielding `stale_evidence`
+  - a failed refreshed request supplied as it is
+  - a decision under capture, not substituted
+  Each served judgment and its core evidence equal independent execution
+  given the same supplied values.
+- `a_restarted_runtime_substitutes_a_stored_volatile_entry` in
+  `crates/rustev-runtime/tests/persistent.rs`, inside and past the
+  maximum age, from the store.
+- `admission_is_bounded_and_checked` in `optimization.rs` counts stored
+  volatile entries.
+- `decision_cache_members_are_validated_and_unrun_parts_refused` in
+  `crates/rustev-core/tests/execution.rs` shows
+  `serve_cached_within_freshness` accepted and part of `PlanId`, and
+  `recompute` refused.
+- The spec 017 tests and the earlier increments' tests are unchanged.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

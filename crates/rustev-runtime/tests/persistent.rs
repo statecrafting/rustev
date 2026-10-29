@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use common::*;
 use rustev_contract::cache_entry::EntryGenerations;
 use rustev_contract::execution::{CostPolicy, ExecutionPolicy};
-use rustev_contract::judgment::Unresolved;
+use rustev_contract::judgment::{Outcome, Unresolved};
 use rustev_contract::optimization::{
     DecisionCacheOutcome, DecisionCachePolicy, DecisionCacheRecord, DecisionCacheTier,
     EvictionOrder, ExpiryBasis, MemoryCachePolicy, OptimizationAdmission, OptimizationMechanism,
@@ -1246,4 +1246,65 @@ async fn invalidation_covers_decision_entries() {
     assert!(dc(&b).generations.is_some());
     let a = tenant("a4", b"tenant-a").await.unwrap();
     assert_eq!(dc(&a).outcome, DecisionCacheOutcome::Miss);
+}
+
+/// Spec 044, 3.6.5 in the persistent tier (increment 5, part d1): a stored
+/// decision entry carries its volatile snapshot entries, so a restarted
+/// runtime whose new snapshot has no accepted payment events supplies the
+/// stored entry with its original as-of time under
+/// `serve_cached_within_freshness`. Inside the maximum age it is served;
+/// past it the core yields `stale_evidence`. Each equals independent
+/// execution given the same supplied values.
+#[tokio::test(flavor = "current_thread")]
+async fn a_restarted_runtime_substitutes_a_stored_volatile_entry() {
+    let mut p = persistent_decisions();
+    let o = p.optimization.as_mut().unwrap();
+    let c = o.decision_cache.as_mut().unwrap();
+    c.volatile = vec!["payments.events".into()];
+    c.on_refresh_failure = RefreshFailurePolicy::ServeCachedWithinFreshness;
+    // At the warm decision, a second later, the stored events are 1 s and
+    // then 300.5 s old, against a 300 s bound.
+    for (age_ms, fresh) in [(0, true), (299_500, false)] {
+        let backend = answering(linear_head());
+        let store = TestStore::new();
+        let mut cold = request("cold");
+        cold.snapshot = support_snapshot("pro", &[2, 5], age_ms);
+        let stored = cold
+            .snapshot
+            .entries
+            .iter()
+            .find(|e| e.field == "payments.events")
+            .unwrap()
+            .clone();
+        decide_cached(&decision_runtime(&backend, &store), &p, cold).await;
+        let mut warm = at("warm", NOW + 1_000);
+        warm.snapshot
+            .entries
+            .retain(|e| e.field != "payments.events");
+        let d = decide_cached(&decision_runtime(&backend, &store), &p, warm.clone()).await;
+        let m = dc(&d);
+        assert!(m.generations.is_some(), "served from the store");
+        assert_eq!(m.outcome, DecisionCacheOutcome::Hit);
+        assert_eq!(m.substituted.len(), 1);
+        assert_eq!(m.substituted[0].input, "payments.events");
+        assert_eq!(
+            m.on_refresh_failure,
+            Some(RefreshFailurePolicy::ServeCachedWithinFreshness)
+        );
+        assert!(has(&d, "refresh_failed: input \"payments.events\""));
+        let Completion::Judged(j) = &d.completion else {
+            panic!("judged");
+        };
+        assert_eq!(
+            matches!(
+                j.outcome,
+                Outcome::Unresolved(Unresolved::StaleEvidence { .. })
+            ),
+            !fresh
+        );
+        assert_eq!(backend.dispatched().len(), 3, "nothing dispatched again");
+        let mut supplied = warm;
+        supplied.snapshot.entries.push(stored);
+        same_as_independent(&d, &p, supplied).await;
+    }
 }
