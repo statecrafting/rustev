@@ -485,6 +485,18 @@ candidate-evidence commands of `candidate.sh`), and the `qualify.sh`
 harness, which still verifies a downloaded `.sig` when a release before
 this spec carries one, so 0.1.x and 0.2.0 stay requalifiable (3.4.3).
 
+Part b, the hosted-release and journaled qualification paths: the layer 6
+to 8 publisher of `family_lifecycle` (its items, `FamilyRegistry`,
+publisher, journaled `qualify` and fake), `hosted::run`, `HostedRelease`
+and `journal_path`, `qualification::run` and `restore_released`, the
+later-instruction check `instruction_verified`, and
+`family_artifacts::verify` (artifacts against an input manifest). Stays:
+`hosted::observe_crates` and the npm lookup, which `publish-npm` and
+`observe-registries` read; `qualification::evidence` with every step
+check of 056 3.3, still tested per platform; `family_artifacts::collect`
+and its tests; and `bind` and `bound`, which the crate publisher reads
+until it leaves in a later part.
+
 **Increment 4 (2026-10-28).** The owner settings of 3.8 are in place:
 crates.io trusted publishers for the twelve crates (workflow
 `release.yml`, Environment `crates-publish`); the `release` and

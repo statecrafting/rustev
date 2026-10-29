@@ -1,9 +1,10 @@
-//! Spec 031 3.1, 3.7, 3.9 and 3.11: no network or credentials.
+//! Spec 031 3.1, 3.7 and 3.9 and 056 3.3: the family manifest, its
+//! artifacts and the qualification evidence; no network or credentials.
 use rustev_release::{
     ReleaseSet,
     archive::sha256_hex,
-    family_artifacts as fa, family_lifecycle as fl,
-    lifecycle::{Entry, Event, Instruction, Journal, Lifecycle, Lookup, State, Upload},
+    family_artifacts as fa,
+    lifecycle::Lookup,
     manifest::{self, Inputs, ReleaseManifest, Toolchain},
     repro::{Scratch, fresh_dir},
 };
@@ -13,18 +14,11 @@ fn write(path: &Path, b: &[u8]) {
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     std::fs::write(path, b).unwrap();
 }
-fn fixture() -> (
-    Scratch,
-    ReleaseSet,
-    ReleaseManifest,
-    BTreeMap<String, Vec<u8>>,
-) {
+fn fixture() -> (Scratch, ReleaseSet, ReleaseManifest) {
     let root = fresh_dir("rustev-family-test").unwrap();
     let mut set = ReleaseSet::parse(include_bytes!("../release-set.json")).unwrap();
-    // Spec 031 3.11.1: publication authorizes exactly the first release, so
-    // the publication path runs on the release set at that version. A later
-    // version's authority (056 3.4) is tested on its own.
-    set.version = rustev_release::lifecycle::FIRST_RELEASE_VERSION.into();
+    // A fixed version, so the artifact names below stay literal.
+    set.version = "0.1.0".into();
     set.tag = format!("v{}", set.version);
     set.upload_order = vec!["rustev-contract".into()];
     set.layers = vec![set.upload_order.clone()];
@@ -78,55 +72,12 @@ fn fixture() -> (
     m.edition = "2024".into();
     m.plan_ids.insert("reference".into(), "plan-id".into());
     fa::stage(&m, &evidence, Some(&artifacts)).unwrap();
-    let mut files = BTreeMap::new();
-    for n in m
-        .packages
-        .iter()
-        .map(|p| &p.crate_file)
-        .chain(m.artifacts.iter().map(|a| &a.name))
-    {
-        files.insert(n.clone(), std::fs::read(evidence.join(n)).unwrap());
-    }
-    files.insert("release-manifest.json".into(), m.canonical());
-    files.insert("SHA256SUMS".into(), manifest::sha256sums(&m).into_bytes());
-    for n in ["release-manifest.json.sig", "SHA256SUMS.sig"] {
-        files.insert(n.into(), b"fixture signature".to_vec());
-    }
-    files.insert("journal-summary.jsonl".into(), b"fixture journal".to_vec());
-    (root, set, m, files)
-}
-fn instruction(m: &ReleaseManifest) -> Instruction {
-    Instruction {
-        version: m.version.clone(),
-        commit: m.commit.clone(),
-        registry: m.registry.clone(),
-        packages: m.upload_order.clone(),
-        account: rustev_release::lifecycle::FAKE_ACCOUNT.into(),
-        registries: m.registries.clone(),
-        artifacts: m.artifacts.iter().map(|a| a.name.clone()).collect(),
-        continuation: false,
-        action: "publish".into(),
-    }
-}
-fn authorized(m: &ReleaseManifest) -> Lifecycle {
-    let mut l = Lifecycle::new(m.clone());
-    l.apply(Event::GatesPass).unwrap();
-    l.apply(Event::CandidateVerified {
-        commit: m.commit.clone(),
-    })
-    .unwrap();
-    l.apply(Event::Authorized(instruction(m))).unwrap();
-    l
-}
-fn journal(m: &ReleaseManifest) -> Journal {
-    let mut j = Journal::default();
-    fl::bind(m, "fixture signature", &mut j).unwrap();
-    j
+    (root, set, m)
 }
 
 #[test]
 fn manifest_two_is_deterministic_complete_and_refuses_old_schema() {
-    let (root, set, m, _) = fixture();
+    let (root, set, m) = fixture();
     let mut again = m.clone();
     again.artifacts =
         fa::collect(&set, &root.join("evidence"), Some(&root.join("artifacts"))).unwrap();
@@ -136,7 +87,6 @@ fn manifest_two_is_deterministic_complete_and_refuses_old_schema() {
     for a in &m.artifacts {
         assert!(manifest::sha256sums(&m).contains(&a.name));
     }
-    assert!(fa::verify(&m, &root.join("artifacts")).is_empty());
     again.schema = "rustev.release-manifest/1".into();
     assert!(ReleaseManifest::parse(&again.canonical()).is_err());
     let platforms: Vec<_> = m
@@ -159,20 +109,15 @@ fn manifest_two_is_deterministic_complete_and_refuses_old_schema() {
 }
 
 #[test]
-fn artifact_verification_names_all_changes_and_builder_refusals() {
-    let (root, set, m, _) = fixture();
+fn collection_names_all_changes_and_refuses_a_missing_sbom() {
+    let (root, set, _) = fixture();
     let dir = root.join("artifacts");
-    let name = &m.artifacts[0].name;
-    write(&dir.join("npm").join(name), b"changed");
-    std::fs::remove_file(dir.join("sbom").join(format!("{name}.cdx.json"))).unwrap();
     write(&dir.join("npm/unexpected.tgz"), b"unexpected");
-    let errors = fa::verify(&m, &dir).join("\n");
-    assert!(
-        errors.contains("bytes differ")
-            && errors.contains("missing sbom/")
-            && errors.contains("unexpected npm/unexpected"),
-        "{errors}"
-    );
+    let errors = fa::collect(&set, &root.join("evidence"), Some(&dir)).unwrap_err();
+    assert!(errors.contains("unexpected npm/unexpected"), "{errors}");
+    std::fs::remove_file(dir.join("npm/unexpected.tgz")).unwrap();
+    let name = "rustev-rustev-wasm-0.1.0.tgz";
+    std::fs::remove_file(dir.join("sbom").join(format!("{name}.cdx.json"))).unwrap();
     assert!(
         fa::collect(&set, &root.join("evidence"), Some(&dir))
             .unwrap_err()
@@ -182,7 +127,7 @@ fn artifact_verification_names_all_changes_and_builder_refusals() {
 
 #[test]
 fn every_expected_tarball_and_binary_is_required_and_absence_is_enforced() {
-    let (root, mut set, _, _) = fixture();
+    let (root, mut set, _) = fixture();
     let dir = root.join("artifacts");
     assert_eq!(fa::PLATFORMS.len(), 7);
     assert!(!set.absent.iter().any(|a| a.kind == "binary"));
@@ -212,7 +157,7 @@ fn every_expected_tarball_and_binary_is_required_and_absence_is_enforced() {
     }
     let artifacts = fa::collect(&set, &root.join("evidence"), Some(&dir)).unwrap();
     assert!(artifacts.iter().all(|a| a.kind != "binary"));
-    let (root, set, _, _) = fixture();
+    let (root, set, _) = fixture();
     std::fs::remove_file(root.join("artifacts/npm/rustev-rustev-wasm-0.1.0.tgz")).unwrap();
     assert!(
         fa::collect(&set, &root.join("evidence"), Some(&root.join("artifacts")))
@@ -223,7 +168,7 @@ fn every_expected_tarball_and_binary_is_required_and_absence_is_enforced() {
 
 #[test]
 fn slsa_three_missing_sbom_unknown_kinds_and_paths_are_refused() {
-    let (_, _, m, _) = fixture();
+    let (_, _, m) = fixture();
     for case in 0..5 {
         let mut x = m.clone();
         match case {
@@ -241,216 +186,8 @@ fn slsa_three_missing_sbom_unknown_kinds_and_paths_are_refused() {
 }
 
 #[test]
-fn family_reaches_released_only_after_all_layers_and_qualification_is_recorded() {
-    let (_, _, m, files) = fixture();
-    let mut l = authorized(&m);
-    let mut j = journal(&m);
-    let mut r = fl::FakeHostedRelease::default();
-    r.registry.lag = 2;
-    assert!(l.apply(Event::Observed { complete: true }).is_err());
-    fl::publish(&mut l, &files, &mut r, &mut j).unwrap();
-    assert_eq!(l.state, State::Released);
-    assert!(l.apply(Event::ConsumerQualified).is_err());
-    assert!(fl::qualify(&mut l, BTreeMap::new(), &mut j).is_err());
-    let evidence = rustev_release::qualification::required_files(&m)
-        .into_iter()
-        .map(|name| (name, "b".repeat(64)))
-        .collect();
-    fl::qualify(&mut l, evidence, &mut j).unwrap();
-    assert_eq!(l.state, State::Qualified);
-    assert!(matches!(
-        j.entries.first(),
-        Some(Entry::SignedManifest { .. })
-    ));
-    assert!(matches!(
-        j.entries.last(),
-        Some(Entry::Qualification { .. })
-    ));
-    let items = fl::items(&m, &files).unwrap();
-    for (ix, e) in j.entries.iter().enumerate() {
-        if let Entry::Attempt { package, .. } = e {
-            let item = items.iter().find(|i| i.name == *package).unwrap();
-            for p in items.iter().filter(|p| p.layer < item.layer) {
-                assert!(j.entries[..ix].iter().any(|e|matches!(e,Entry::Query {package,observed:Lookup::Visible {checksum}} if *package==p.name && *checksum==p.checksum)));
-            }
-        }
-    }
-}
-
-#[test]
-fn no_upload_without_signed_manifest_or_writable_journal() {
-    let (root, _, m, files) = fixture();
-    for case in 0..3 {
-        let mut l = authorized(&m);
-        let mut j = Journal::default();
-        let mut r = fl::FakeHostedRelease::default();
-        if case == 1 {
-            j.file = Some(root.to_path_buf());
-            assert!(fl::bind(&m, "sig", &mut j).is_err());
-        }
-        if case == 2 {
-            assert!(fl::bind(&m, "", &mut j).is_err());
-        }
-        assert!(fl::publish(&mut l, &files, &mut r, &mut j).is_err());
-        assert!(r.registry.uploads.is_empty());
-    }
-}
-
-#[test]
-fn instruction_binds_every_registry_and_artifact_and_refuses_yank_second_version() {
-    let (_, _, m, _) = fixture();
-    for case in 0..7 {
-        let mut l = Lifecycle::new(m.clone());
-        l.apply(Event::GatesPass).unwrap();
-        l.apply(Event::CandidateVerified {
-            commit: m.commit.clone(),
-        })
-        .unwrap();
-        let mut i = instruction(&m);
-        match case {
-            0 => i.version = "0.2.0".into(),
-            1 => i.commit = "d".repeat(40),
-            2 => i.registries.pop().map(|_| ()).unwrap(),
-            3 => i.artifacts.pop().map(|_| ()).unwrap(),
-            4 => i.action = "yank".into(),
-            5 => i.registry = "other".into(),
-            _ => i.packages.clear(),
-        }
-        assert!(l.apply(Event::Authorized(i)).is_err());
-    }
-    let mut j = journal(&m);
-    let mut other = m.clone();
-    other.artifacts.pop();
-    assert!(fl::bind(&other, "sig", &mut j).is_err());
-    other = m.clone();
-    other.version = "0.2.0".into();
-    assert!(fl::bind(&other, "sig", &mut j).is_err());
-}
-
-#[test]
-fn refusals_ambiguity_and_spent_versions_stop_at_each_layer() {
-    for kind in ["crate", "npm", "binary", "changelog"] {
-        for ambiguous in [false, true] {
-            let (_, _, m, files) = fixture();
-            let item = fl::items(&m, &files)
-                .unwrap()
-                .into_iter()
-                .find(|i| i.kind == kind)
-                .unwrap();
-            let mut l = authorized(&m);
-            let mut j = journal(&m);
-            let mut r = fl::FakeHostedRelease::default();
-            r.registry.script.insert(
-                item.name.clone(),
-                if ambiguous {
-                    Upload::Ambiguous {
-                        detail: "lost".into(),
-                    }
-                } else {
-                    Upload::Refused {
-                        reason: "refused".into(),
-                    }
-                },
-            );
-            assert!(fl::publish(&mut l, &files, &mut r, &mut j).is_err());
-            if ambiguous || kind != "crate" {
-                assert_eq!(l.state, State::PartiallyPublished);
-            }
-            assert_eq!(r.registry.uploads.last(), Some(&item.name));
-            if ambiguous {
-                assert!(
-                    j.entries
-                        .iter()
-                        .rev()
-                        .nth(1)
-                        .is_some_and(|e| matches!(e, Entry::Query { .. }))
-                );
-            }
-        }
-    }
-    let (_, _, m, files) = fixture();
-    let mut l = authorized(&m);
-    let mut j = journal(&m);
-    let mut r = fl::FakeHostedRelease::default();
-    r.registry.index.insert(
-        ("rustev-contract".into(), m.version.clone()),
-        ("wrong".into(), 0),
-    );
-    assert!(
-        fl::publish(&mut l, &files, &mut r, &mut j)
-            .unwrap_err()
-            .contains("spent")
-    );
-    assert!(r.registry.uploads.is_empty());
-}
-
-#[test]
-fn accepted_but_not_visible_is_partial_and_blocks_later_layers() {
-    let (_, _, m, files) = fixture();
-    let mut l = authorized(&m);
-    let mut j = journal(&m);
-    let mut r = fl::FakeHostedRelease::default();
-    r.registry.lag = 100;
-    assert!(
-        fl::publish(&mut l, &files, &mut r, &mut j)
-            .unwrap_err()
-            .contains("not visible")
-    );
-    assert_eq!(l.state, State::PartiallyPublished);
-    assert_eq!(r.registry.uploads.len(), 1);
-}
-
-#[test]
-fn continuation_requires_fresh_instruction_and_skips_matching_public_bytes() {
-    for accepted in [false, true] {
-        let (_, _, m, files) = fixture();
-        let mut l = authorized(&m);
-        let mut j = journal(&m);
-        let mut r = fl::FakeHostedRelease::default();
-        // The fake scripts by `Item::name`, an artifact's package name.
-        let name = fl::items(&m, &files)
-            .unwrap()
-            .into_iter()
-            .find(|i| i.file == m.artifacts[0].name)
-            .unwrap()
-            .name;
-        r.registry.script.insert(
-            name.clone(),
-            Upload::Ambiguous {
-                detail: "lost".into(),
-            },
-        );
-        if accepted {
-            r.registry.ambiguous_accepts.push(name.clone());
-        }
-        assert!(fl::publish(&mut l, &files, &mut r, &mut j).is_err());
-        assert!(j.entries.iter().any(|e| matches!(
-            e,
-            Entry::Result {
-                outcome: Upload::Ambiguous { .. },
-                ..
-            }
-        )));
-        let before = r.registry.uploads.len();
-        assert!(
-            fl::publish(&mut l, &files, &mut r, &mut j)
-                .unwrap_err()
-                .contains("continuation")
-        );
-        assert_eq!(r.registry.uploads.len(), before);
-        l.instruction.as_mut().unwrap().continuation = true;
-        r.registry.script.clear();
-        fl::publish(&mut l, &files, &mut r, &mut j).unwrap();
-        assert_eq!(
-            r.registry.uploads.iter().filter(|n| **n == name).count(),
-            if accepted { 1 } else { 2 }
-        );
-    }
-}
-
-#[test]
 fn observations_report_all_missing_and_mismatched_and_npm_errors_stay_unknown() {
-    let (_, _, mut m, _) = fixture();
+    let (_, _, mut m) = fixture();
     let mut p = m.packages[0].clone();
     p.name = "second".into();
     m.packages.push(p);
@@ -475,198 +212,8 @@ fn observations_report_all_missing_and_mismatched_and_npm_errors_stay_unknown() 
 }
 
 #[test]
-fn incomplete_rehearsal_and_tampered_terminal_assets_refuse_publication() {
-    let (root, set, mut m, mut files) = fixture();
-    assert!(
-        !fa::collect(&set, &root.join("evidence"), None)
-            .unwrap()
-            .is_empty()
-    );
-    m.limitations.push(fa::MISSING.into());
-    let mut l = authorized(&m);
-    let mut j = journal(&m);
-    let mut r = fl::FakeHostedRelease::default();
-    assert!(
-        fl::publish(&mut l, &files, &mut r, &mut j)
-            .unwrap_err()
-            .contains("not publishable")
-    );
-    assert!(r.registry.uploads.is_empty());
-    m.limitations.clear();
-    files.insert("SHA256SUMS".into(), b"wrong".to_vec());
-    let mut l = authorized(&m);
-    let mut j = journal(&m);
-    assert!(
-        fl::publish(&mut l, &files, &mut r, &mut j)
-            .unwrap_err()
-            .contains("terminal assets")
-    );
-}
-
-#[test]
-fn journal_cannot_live_in_repository_even_through_symlink() {
-    let root = fresh_dir("rustev-journal-path").unwrap();
-    let repo = root.join("repo");
-    std::fs::create_dir(&repo).unwrap();
-    assert!(rustev_release::hosted::journal_path(&repo.join("journal"), &repo).is_err());
-    #[cfg(unix)]
-    {
-        let target = repo.join("journal");
-        write(&target, b"");
-        let link = root.join("link");
-        std::os::unix::fs::symlink(target, &link).unwrap();
-        assert!(rustev_release::hosted::journal_path(&link, &repo).is_err());
-    }
-    assert!(rustev_release::hosted::journal_path(&root.join("external"), &repo).is_ok());
-}
-
-#[cfg(unix)]
-#[test]
-fn real_gh_adapter_is_exercised_only_with_a_fake_process() {
-    use fl::FamilyRegistry;
-    use std::os::unix::fs::PermissionsExt;
-    let root = fresh_dir("rustev-fake-gh").unwrap();
-    let script = root.join("gh");
-    write(
-        &script,
-        br##"#!/bin/sh
-set -eu
-base=$(dirname "$0")
-printf '%s\n' "$*" >> "$base/calls"
-# The adapter prefixes every call with its fixed repository (hosted.rs).
-test "$1 $2" = "--repo statecrafting/rustev" || exit 8
-shift 2
-case "$1:$2" in
-release:view)
-  if [ ! -d "$base/public" ]; then echo 'release not found' >&2; exit 1; fi
-  printf '{"assets":['
-  sep=''
-  for f in "$base/public/"*; do printf '%s{"name":"%s"}' "$sep" "$(basename "$f")"; sep=,; done
-  printf ']}'
-  ;;
-release:create|release:upload)
-  for arg do last=$arg; done
-  mkdir -p "$base/public"
-  cp "$last" "$base/public/"
-  ;;
-release:download)
-  shift 3
-  test "$1" = --pattern
-  name=$2
-  shift 2
-  test "$1" = --dir
-  cp "$base/public/$name" "$2/$name"
-  ;;
-*) exit 9 ;;
-esac
-"##,
-    );
-    std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o700)).unwrap();
-    let staging = root.join("staging");
-    std::fs::create_dir(&staging).unwrap();
-    let notes = root.join("changelog.md");
-    write(&notes, b"notes");
-    let mut adapter = rustev_release::hosted::HostedRelease {
-        gh: script,
-        tag: "v0.1.0".into(),
-        changelog: notes,
-        staging,
-    };
-    let item = fl::Item {
-        kind: "binary".into(),
-        name: "cli.tar.gz".into(),
-        file: "cli.tar.gz".into(),
-        layer: 7,
-        checksum: sha256_hex(b"binary"),
-        bytes: b"binary".to_vec(),
-    };
-    assert_eq!(adapter.lookup(&item, "0.1.0"), Lookup::Absent);
-    assert_eq!(adapter.upload(&item, "0.1.0"), Upload::Accepted);
-    assert_eq!(
-        adapter.lookup(&item, "0.1.0"),
-        Lookup::Visible {
-            checksum: item.checksum.clone()
-        }
-    );
-    let mut sbom = item.clone();
-    sbom.kind = "sbom".into();
-    sbom.name = "cli.cdx.json".into();
-    sbom.file = sbom.name.clone();
-    sbom.layer = 8;
-    assert_eq!(adapter.upload(&sbom, "0.1.0"), Upload::Accepted);
-    assert_eq!(
-        adapter.lookup(&sbom, "0.1.0"),
-        Lookup::Visible {
-            checksum: sbom.checksum
-        }
-    );
-    let calls = std::fs::read_to_string(root.join("calls")).unwrap();
-    assert!(calls.contains("release create v0.1.0 --verify-tag --title v0.1.0 --notes-file"));
-    assert!(calls.contains("release upload v0.1.0"));
-    assert!(!calls.contains("--clobber"));
-    let mut image = item;
-    image.kind = "image".into();
-    assert!(matches!(
-        adapter.upload(&image, "0.1.0"),
-        Upload::Refused { .. }
-    ));
-}
-
-// Spec 031 3.1: an earlier acceptance cannot substitute for current visibility.
-#[test]
-fn disappearing_earlier_layer_blocks_later_uploads() {
-    struct Disappearing {
-        inner: fl::FakeHostedRelease,
-        crate_queries: usize,
-    }
-    impl fl::FamilyRegistry for Disappearing {
-        fn lookup(&mut self, i: &fl::Item, v: &str) -> Lookup {
-            if i.kind == "crate" {
-                self.crate_queries += 1;
-                if self.crate_queries > 2 {
-                    return Lookup::Absent;
-                }
-            }
-            fl::FamilyRegistry::lookup(&mut self.inner, i, v)
-        }
-        fn upload(&mut self, i: &fl::Item, v: &str) -> Upload {
-            fl::FamilyRegistry::upload(&mut self.inner, i, v)
-        }
-        fn wait(&mut self) {}
-    }
-    let (_root, _, m, files) = fixture();
-    let mut l = authorized(&m);
-    let mut j = journal(&m);
-    let mut r = Disappearing {
-        inner: Default::default(),
-        crate_queries: 0,
-    };
-    assert!(
-        fl::publish(&mut l, &files, &mut r, &mut j)
-            .unwrap_err()
-            .contains("earlier layer")
-    );
-    assert_eq!(r.inner.registry.uploads, m.upload_order);
-    assert_eq!(l.state, State::PartiallyPublished);
-}
-
-// Spec 031 3.11.2: crate-only callers also need the immutable signed binding.
-#[test]
-fn crate_upload_without_signed_manifest_is_refused() {
-    let (_root, _, mut m, files) = fixture();
-    m.artifacts.clear();
-    let mut l = authorized(&m);
-    let mut r = rustev_release::lifecycle::FakeRegistry::default();
-    assert!(
-        matches!(rustev_release::lifecycle::publish(&mut l, &files, &mut r, &mut Journal::default()),
-        rustev_release::lifecycle::Outcome::Stopped { reason } if reason.contains("signed manifest"))
-    );
-    assert!(r.uploads.is_empty());
-}
-
-#[test]
 fn candidate_collect_requires_rehearsal_and_binds_candidate_names() {
-    let (root, mut set, mut m, _) = fixture();
+    let (root, mut set, mut m) = fixture();
     // Spec 053 3.2.2: a candidate is of the workspace's family version, so
     // the fixture's first-release names move to that version's first
     // candidate.
@@ -702,76 +249,16 @@ fn candidate_collect_requires_rehearsal_and_binds_candidate_names() {
     m.packages.clear();
     m.artifacts = fa::collect(&set, &absent, Some(&artifacts)).unwrap();
     assert!(m.artifacts.iter().all(|a| a.name.contains(&rc)));
-    assert!(fa::verify(&m, &artifacts).is_empty());
-    write(
-        &artifacts.join(format!("npm/rustev-rustev-wasm-{rc}.tgz")),
-        b"changed",
-    );
-    assert!(
-        fa::verify(&m, &artifacts)
-            .iter()
-            .any(|e| e.contains("bytes differ"))
-    );
-}
-
-fn qualification_steps(m: &ReleaseManifest, dir: &Path) {
-    use rustev_release::qualification::{self as q, Status, Step};
-    for platform in fa::PLATFORMS {
-        for kind in q::KINDS {
-            let step = Step {
-                schema: q::SCHEMA.into(),
-                manifest_sha256: m.digest(),
-                platform: (*platform).into(),
-                kind: (*kind).into(),
-                command: vec!["consumer-check".into()],
-                exit_status: Some(0),
-                output_digest: sha256_hex(b"output"),
-                lockfile_or_install_record: "Cargo.lock".into(),
-                checksums: BTreeMap::from([("artifact".into(), sha256_hex(b"artifact"))]),
-                host: "fixture-host".into(),
-                os: "fixture-os".into(),
-                architecture: "fixture-arch".into(),
-                toolchain: "rustc fixture".into(),
-                node: "node fixture".into(),
-                status: if q::required(m, kind) {
-                    Status::Passed
-                } else {
-                    Status::Excluded {
-                        reason: "signed manifest names no image".into(),
-                    }
-                },
-            };
-            write(
-                &dir.join(format!("{platform}.{kind}.json")),
-                &serde_json::to_vec(&step).unwrap(),
-            );
-        }
-    }
 }
 
 #[test]
-fn qualification_validates_every_platform_before_writing_the_journal() {
+fn qualification_evidence_is_validated_for_every_platform() {
     use rustev_release::qualification as q;
     for case in [
         "complete", "missing", "failed", "not_run", "excluded", "exit", "identity", "unknown",
         "output", "checksum",
     ] {
-        let (root, _, m, files) = fixture();
-        let mut life = authorized(&m);
-        let mut j = journal(&m);
-        let path = root.join("publication.jsonl");
-        std::fs::write(&path, j.to_lines()).unwrap();
-        j.file = Some(path.clone());
-        fl::publish(
-            &mut life,
-            &files,
-            &mut fl::FakeHostedRelease::default(),
-            &mut j,
-        )
-        .unwrap();
-        let mut restored = authorized(&m);
-        q::restore_released(&mut restored, &files, &j).unwrap();
-        assert_eq!(restored.state, State::Released);
+        let (root, _, m) = fixture();
         let dir = root.join("qualification");
         qualification_steps(&m, &dir);
         // Last matrix member catches accidental validation of only the host.
@@ -798,47 +285,50 @@ fn qualification_validates_every_platform_before_writing_the_journal() {
             }
             std::fs::write(&step_path, serde_json::to_vec(&step).unwrap()).unwrap();
         }
-        let before = std::fs::read(&path).unwrap();
-        let entries = j.entries.clone();
-        let result = q::evidence(&m, &dir).and_then(|e| fl::qualify(&mut restored, e, &mut j));
+        let result = q::evidence(&m, &dir);
         if case == "complete" {
-            result.unwrap();
-            assert_eq!(restored.state, State::Qualified);
-            let Entry::Qualification { evidence } = j.entries.last().unwrap() else {
-                panic!("missing qualification")
-            };
-            for (name, digest) in evidence {
+            let evidence = result.unwrap();
+            for (name, digest) in &evidence {
                 assert_eq!(*digest, sha256_hex(&std::fs::read(dir.join(name)).unwrap()));
             }
             assert_eq!(evidence.len(), fa::PLATFORMS.len() * 4);
         } else {
             assert!(result.is_err(), "{case}");
-            assert_eq!(restored.state, State::Released);
-            assert_eq!(j.entries, entries, "{case}");
-            assert_eq!(std::fs::read(&path).unwrap(), before, "{case}");
         }
     }
 }
 
-#[test]
-fn qualification_refuses_incomplete_or_conflicting_publication() {
-    use rustev_release::qualification as q;
-    let (_, _, m, files) = fixture();
-    let mut life = authorized(&m);
-    let mut j = journal(&m);
-    assert!(q::restore_released(&mut life, &files, &j).is_err());
-    fl::publish(
-        &mut life,
-        &files,
-        &mut fl::FakeHostedRelease::default(),
-        &mut j,
-    )
-    .unwrap();
-    j.record(Entry::Query {
-        package: m.upload_order[0].clone(),
-        observed: Lookup::Absent,
-    });
-    let before = j.entries.clone();
-    assert!(q::restore_released(&mut authorized(&m), &files, &j).is_err());
-    assert_eq!(j.entries, before);
+fn qualification_steps(m: &ReleaseManifest, dir: &Path) {
+    use rustev_release::qualification::{self as q, Status, Step};
+    for platform in fa::PLATFORMS {
+        for kind in q::KINDS {
+            let step = Step {
+                schema: q::SCHEMA.into(),
+                manifest_sha256: m.digest(),
+                platform: (*platform).into(),
+                kind: (*kind).into(),
+                command: vec!["consumer-check".into()],
+                exit_status: Some(0),
+                output_digest: sha256_hex(b"output"),
+                lockfile_or_install_record: "Cargo.lock".into(),
+                checksums: BTreeMap::from([("artifact".into(), sha256_hex(b"artifact"))]),
+                host: "fixture-host".into(),
+                os: "fixture-os".into(),
+                architecture: "fixture-arch".into(),
+                toolchain: "rustc fixture".into(),
+                node: "node fixture".into(),
+                status: if q::required(m, kind) {
+                    Status::Passed
+                } else {
+                    Status::Excluded {
+                        reason: "the manifest names no image".into(),
+                    }
+                },
+            };
+            write(
+                &dir.join(format!("{platform}.{kind}.json")),
+                &serde_json::to_vec(&step).unwrap(),
+            );
+        }
+    }
 }
