@@ -144,10 +144,16 @@ The Gateway's OpenAI-, Anthropic- and Cohere-compatible endpoints do not
 support Jev (C-09) and are not transports. The credential is read by the
 host and passed to the adapter at construction; it is never logged, never
 in the binding identity and never in an exchange record. For development and
-qualification (R-27) the harness reads `AI_GATEWAY_API_KEY` at runtime from
-`/Users/bart/.config/statecrafting/infra/vercel/.env`; the key is never
-copied into a repository, log, fixture or evidence, and recorded fixtures
-keep no request headers. For production, see 3.6.2. Switching
+qualification (R-27) the harness reads the transport's key at runtime from
+a key file the owner names with `--key-file`, never from the environment:
+`AI_GATEWAY_API_KEY` for `gateway` and `gateway_typesafe_base`, and
+`TYPESAFE_API_KEY` for `direct` (amended 2026-10-29, A-66; R-27 first named
+`/Users/bart/.config/statecrafting/infra/vercel/.env`). The key file is
+outside version control; the key is never copied into a repository, log,
+fixture or evidence, and recorded fixtures keep no request headers. The
+smoke harness's `--transport` selects the transport, `gateway` by default;
+`direct` also takes the version pin of 3.2 and runs only under spec 022
+3.7 stage 2's owner authorization. For production, see 3.6.2. Switching
 transport, or falling back from one to another, is a runtime fallback
 between two adapter instances declared in the plan's execution policy, so
 it is in plan identity (R-10) and never happens inside an adapter.
@@ -699,6 +705,15 @@ holding the recorded testing spend carries it. The owner chose to narrow
 I-5 to exempt exactly that identifier: the acceptance grep removes it
 before matching, so any other mention of Jev, TypeSafe or Vercel outside
 `integrations/`, including one on the same line, still fails.
+
+**The smoke harness key (2026-10-29, A-66).** 3.2 is amended so the stage 2
+smoke harness reads the key from a file the owner names (`--key-file`):
+R-27's file no longer exists on the owner's machine, and the owner asked
+that the same smoke also use `TYPESAFE_API_KEY`. `--transport` selects
+`gateway` (the default, `AI_GATEWAY_API_KEY`) or `direct`
+(`TYPESAFE_API_KEY`, with a version pin), so the harness can run spec 022
+3.7 stage 2 once the owner authorizes it. Pending implementation in
+`examples/smoke.rs`; no stage 2 or 3 result changes.
 
 ## Verification
 
