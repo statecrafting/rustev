@@ -362,7 +362,8 @@ async fn a_persistent_tier_needs_a_store_with_the_plans_contract() {
 
 /// Section 5, "A runtime restarts with the same store": every request of
 /// a cold decision is written; a new runtime over the store serves each
-/// from it without dispatch, with the same judgment and core evidence.
+/// from it without dispatch, with the same judgment and core evidence. A
+/// generation advanced before a third runtime makes every entry a miss.
 #[tokio::test(flavor = "current_thread")]
 async fn a_restarted_runtime_hits_the_same_store() {
     let backend = answering(linear_head());
@@ -411,6 +412,33 @@ async fn a_restarted_runtime_hits_the_same_store() {
     }
     // Nothing is written twice: hits make no new entry.
     assert_eq!(store.state().puts, 3);
+    // Differential: the hit's judgment and core evidence equal independent
+    // execution of the same request over an empty store.
+    let alone = decide(
+        &runtime(&answering(linear_head()), Some(TestStore::new())),
+        &policy(),
+        at("warm", NOW + 1_000),
+    )
+    .await;
+    assert_eq!(warm.completion, alone.completion);
+    assert_eq!(warm.record.core, alone.record.core);
+
+    // A generation advanced between two runtimes (another process's
+    // invalidation): the next runtime misses every entry and dispatches.
+    {
+        let mut s = store.state();
+        let namespace = s.entries.keys().next().unwrap().0.clone();
+        *s.namespace_generation.entry(namespace).or_default() += 1;
+    }
+    let after = decide(
+        &runtime(&backend, Some(store.clone())),
+        &policy(),
+        at("after", NOW + 2_000),
+    )
+    .await;
+    assert!(every(&after, OptimizationOutcome::Miss));
+    assert!(diagnosed(&after, "generation_advanced"));
+    assert_eq!(backend.dispatched().len(), 6);
 }
 
 /// Section 5, "Two tenants send identical requests": no hit across scopes.
@@ -1406,4 +1434,160 @@ async fn a_restarted_runtime_serves_stored_generated_text() {
             }
         );
     }
+}
+
+/// Section 5, "Same tenant, different profile", at every tier (Acceptance,
+/// cross-profile isolation): two plans that differ only by their profile
+/// never share an attempt in flight, a memory or persistent request entry,
+/// or a decision entry in either tier; each still hits its own.
+#[tokio::test(flavor = "current_thread")]
+async fn another_profile_never_hits_at_any_tier() {
+    use rustev_contract::optimization::{SharedCallPolicy, SharedChargeAllocation};
+    let head = gate_all(linear_head());
+    let store = TestStore::new();
+    let mut p = decisions(
+        &[DecisionCacheTier::Memory, DecisionCacheTier::Persistent],
+        StoreFailurePolicy::ContinueWithoutCache,
+        OptimizationAdmission::Refuse,
+    );
+    let o = p.optimization.as_mut().unwrap();
+    o.memory_cache = Some(memory());
+    o.shared_calls = Some(SharedCallPolicy {
+        max_shared_calls: 8,
+        max_waiters_per_call: 4,
+        allocation: SharedChargeAllocation::FinalOwner,
+    });
+    let runtime = || {
+        Arc::new(
+            Runtime::builder(
+                Arc::new(ManualClock::new()),
+                Arc::new(Run3Sink),
+                config(4, 0, 3),
+            )
+            .backend(Arc::new(Handle(head.clone())), 8)
+            .store(store.clone())
+            .build()
+            .unwrap(),
+        )
+    };
+    assert_ne!(
+        support_profiled(&p, "profile-a").id,
+        support_profiled(&p, "profile-b").id
+    );
+    let rt = runtime();
+    let plan =
+        |rt: &Runtime, profile: &str| Arc::new(rt.prepare(support_profiled(&p, profile)).unwrap());
+    let (a, b, c) = (
+        plan(&rt, "profile-a"),
+        plan(&rt, "profile-b"),
+        plan(&rt, "profile-c"),
+    );
+    let run = |rt: &Arc<Runtime>, plan: &Arc<PreparedPlan>, id: &str| {
+        let (rt, plan, req) = (rt.clone(), plan.clone(), request(id));
+        tokio::spawn(async move { rt.decide(&plan, req, &CancelSignal::new()).await })
+    };
+    let miss = |d: &Decided| {
+        assert!(matches!(d.completion, Completion::Judged(_)));
+        assert_eq!(dc(d).outcome, DecisionCacheOutcome::Miss);
+        assert!(
+            d.record
+                .requests
+                .iter()
+                .all(|r| observation(r).outcome != OptimizationOutcome::Hit)
+        );
+    };
+
+    // Shared calls: B's equal requests start while A's are in flight, and
+    // lead their own attempts.
+    let da = run(&rt, &a, "a");
+    until(|| head.gated().len() == 3).await;
+    let db = run(&rt, &b, "b");
+    until(|| head.gated().len() == 6).await;
+    assert_eq!(release_all(&head), 6);
+    miss(&decided(done(da).await));
+    miss(&decided(done(db).await));
+
+    // The memory and persistent tiers, request and decision entries: C
+    // finds A's and B's in both and is served none of them.
+    let dc_ = run(&rt, &c, "c");
+    until(|| head.gated().len() == 3).await;
+    assert_eq!(release_all(&head), 3);
+    miss(&decided(done(dc_).await));
+    assert_eq!(head.dispatched().len(), 9);
+    assert_eq!(decision_entries(&store).len(), 3);
+
+    // Each profile hits its own entries: A from memory, and B after a
+    // restart from the store, with nothing dispatched.
+    let again = decided(done(run(&rt, &a, "a-again")).await);
+    assert_eq!(dc(&again).outcome, DecisionCacheOutcome::Hit);
+    let restarted = runtime();
+    let b = plan(&restarted, "profile-b");
+    let again = decided(done(run(&restarted, &b, "b-again")).await);
+    assert_eq!(dc(&again).outcome, DecisionCacheOutcome::Hit);
+    assert!(dc(&again).generations.is_some(), "served from the store");
+    assert_eq!(head.dispatched().len(), 9);
+}
+
+/// Acceptance, differential tests for the persistent tier: a request that
+/// fails on its primary and is answered by a fallback target is never
+/// written, so after a restart it runs again as it did, and the decision,
+/// partly served from the store, ends as independent execution does.
+#[tokio::test(flavor = "current_thread")]
+async fn a_fallback_output_is_never_written_and_runs_again_after_a_restart() {
+    use rustev_contract::execution::{Delay, FailureClass};
+    use rustev_core::seams::AdapterFailure;
+    let mut p = policy();
+    p.steps = vec![step_exec(
+        "topic",
+        1,
+        &[],
+        Delay::None,
+        &["synthetic-linear-head-replica"],
+        &[FailureClass::Permanent],
+    )];
+    let store = TestStore::new();
+    let head = Scripted::new(linear_head(), |c| match c.task() {
+        "support.topic" => Answer::Fail(
+            AdapterFailure::Permanent,
+            "SYNTHETIC outage".into(),
+            rustev_contract::run::Charge::Observed { units: 1 },
+        ),
+        task => ok(task, 1),
+    });
+    let runtime = |store: &Arc<TestStore>| {
+        let sink = ScriptedSink::new(SinkAnswer::Ack);
+        Runtime::builder(
+            Arc::new(ManualClock::new()),
+            Arc::new(SinkHandle(sink)),
+            config(2, 0, 3),
+        )
+        .backend(Arc::new(Handle(head.clone())), 3)
+        .backend(Arc::new(Handle(answering(linear_head_replica()))), 3)
+        .store(store.clone())
+        .build()
+        .unwrap()
+    };
+    let cold = decide(&runtime(&store), &p, request("cold")).await;
+    let topic = |d: &Decided| {
+        d.record
+            .requests
+            .iter()
+            .find(|r| r.step == "topic")
+            .cloned()
+    };
+    assert_eq!(
+        topic(&cold).unwrap().result,
+        RequestResult::Output { target: 1 }
+    );
+    assert_eq!(store.state().entries.len(), 2, "only target 0 outputs");
+
+    let warm = decide(&runtime(&store), &p, request("warm")).await;
+    let t = topic(&warm).unwrap();
+    assert_eq!(observation(&t).outcome, OptimizationOutcome::Miss);
+    assert_eq!(t.result, RequestResult::Output { target: 1 });
+    assert_eq!(head.dispatched().len(), 4, "only topic dispatched again");
+    let alone = decide(&runtime(&TestStore::new()), &p, request("warm")).await;
+    assert_eq!(warm.completion, alone.completion);
+    assert_eq!(warm.record.core, alone.record.core);
+    assert_eq!(t.transitions, topic(&alone).unwrap().transitions);
 }

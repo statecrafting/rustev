@@ -60,6 +60,8 @@ extends:
   - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: additive }
   # Adds 044 to `make verify` when the implementation is complete.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  # Places 044 in a CI acceptance group.
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "002-decision-contract-and-pure-core"
@@ -126,7 +128,7 @@ obligations:
 
 Approved by the owner (A-41, 2026-10-17, under the 2026-10-16 delivery work
 order) as its own reviewable change before any code (R-16); implementation
-is pending. This spec implements #76 child F1 (#75) and covers backlog
+is in progress. This spec implements #76 child F1 (#75) and covers backlog
 RUSTEV-005. The approved texts of specs 017 and 003 are not edited; this
 spec records what changes, as 013 does for 003. It also amends spec 002
 (contract members, the cache entry document, compiled key schemas and
@@ -754,9 +756,54 @@ latency, cost or quality claim.
 
 ## Verification
 
-Pending with implementation. The implementing change adds 044 to `make
-verify` with repository-local deterministic verification for every
-acceptance item. Approval satisfies no acceptance item.
+Declared for `spec-spine verify 044`; 044 is in `make verify` and in CI's
+`runtime-evidence` acceptance group. Every command is repository-local and
+deterministic: the clock is manual, a store is an in-memory test double,
+and stage 1 of 3.8 runs over loopback. No live provider call is part of
+it. `crates/rustev-runtime/tests/acceptance-044.md` maps each Acceptance
+item and section 5 row to its test, and lists the items still open.
+Approval satisfies no acceptance item.
+
+```verify:cli
+# 3.1, 3.2.5, 3.4.3, 3.6.6, 3.10: the policy, record, plan and cache entry members, omitted when absent.
+cargo test -p rustev-contract --locked --test documents
+# 3.1, 3.5, 3.6.1, 3.6.2, 3.9, 3.10: validation, each compile refusal with its neighbour, the key schema, the refresh closure and the identity goldens.
+cargo test -p rustev-core --locked --test execution --test generation_compile --test identity --test reference_plans
+cargo test -p rustev-core --locked --lib execution::tests
+# 3.2.2, 3.2.3, 3.4.3, 3.5, 3.6: the shared slot, the entry checks, the request and decision keys and the memory tier.
+cargo test -p rustev-runtime --locked --lib -- shared::tests store::tests optimization::
+# 3.2, section 5's waiter rows: shared calls, each leave reason and cancellation answer, differential tests, no task spawned.
+cargo test -p rustev-runtime --locked --test shared_calls
+# 3.3 to 3.6, 3.10.3, section 5's store and decision rows: the persistent tier, the decision cache, restarts, and cross-tenant and cross-profile isolation at every tier.
+cargo test -p rustev-runtime --locked --test persistent --test decision_cache
+# 3.6.2, 3.6.6: decision entries over acquisition, generation and extraction steps.
+cargo test -p rustev-runtime --locked --test acquisition --test generation --test extraction
+# 3.7, 3.10.5: per-item isolation on every batching path; the spec 017 batching and memory tier tests, unchanged.
+cargo test -p rustev-runtime --locked --test optimization
+cargo test -p rustev-remote-http --locked --test isolation
+# 3.8 items 1 and 3: the report, and stage 1 for the remote-http and Jev adapters.
+cargo test -p rustev-eval --locked --lib batch_qualification
+cargo test -p rustev-remote-http --locked --test batch_qualification
+cargo test -p rustev-jev --locked --test batch_qualification
+# Acceptance, benchmarks: cold and warm figures for each mechanism, reported without a threshold.
+cargo test -p rustev-runtime --locked --test optimization_benchmark_044 -- --ignored --nocapture
+```
+
+The spec 009, 012 and 017 tests are unchanged (3.10.5) and run under
+those specs' own declared verification.
+
+Open, reported as such and never as passed:
+- `on_refresh_failure: recompute` (3.6.5) and section 5's row "Refresh
+  fails under `recompute`": increment 5, part d2, which waits for an owner
+  decision on how abandoned attempts sit in the run record. The compiler
+  refuses the policy as not available in this build.
+- Stage 2 of 3.8 (item 2): it runs only under the work order's live scope,
+  so both stage 1 reports keep the verdict `unknown`.
+- 3.8 item 4, R-2's construction check `batch_unqualified` and section 5's
+  row "A production binding enables batching without a qualified report":
+  increment 8, externally blocked on spec 022 (A-49).
+
+This spec stays `in-progress` until those land.
 
 **Owner decision A-49 (2026-10-23): dependencies.** Spec 022 is no longer
 a declared dependency of this spec; spec 012 remains one. Only the
@@ -1861,6 +1908,81 @@ are unchanged (3.10.5).
 What remains: stage 2 (3.8 item 2) for both adapters, run only under the
 work order's live scope and recorded here with its spend. 3.8 item 4 and
 `batch_unqualified` belong to increment 8, which is blocked on spec 022.
+
+**Increment 7 (2026-10-29): benchmarks and declared verification.** 044
+joins `make verify` and CI's `runtime-evidence` acceptance group, and stays
+`in-progress`.
+
+What increment 7 adds:
+- `crates/rustev-runtime/tests/optimization_benchmark_044.rs` reports cold
+  and warm p50, p95 and p99 latency and throughput for shared calls, the
+  persistent tier and the decision cache, each with the admission and
+  concurrency limits it ran under, as spec 017's
+  `optimization_benchmark.rs` does.
+- `crates/rustev-runtime/tests/acceptance-044.md` maps each Acceptance item
+  and section 5 row to its test, and lists the open ones.
+- The tests the mapping found missing:
+  - `another_profile_never_hits_at_any_tier` in `persistent.rs`, for
+    section 5's row "Same tenant, different profile" at every tier. The
+    helper `support_profiled` in `tests/common/mod.rs` instantiates support
+    routing from a spec 034 template under a named profile.
+  - `shared_execution_ends_as_independent_execution_does` in
+    `shared_calls.rs`, the differential test for shared calls: outputs, a
+    failure and a fallback.
+  - `a_fallback_output_is_never_written_and_runs_again_after_a_restart` in
+    `persistent.rs`, the differential test for a persistent hit.
+  - In existing tests: the `unconfirmed` cancellation answer for the last
+    waiter, and in `a_restarted_runtime_hits_the_same_store` a generation
+    advanced between two runtimes and a comparison with independent
+    execution.
+- The Verification section's `verify:cli` block, 044 in `VERIFIED_SPECS`,
+  and the `extends` edge on `scripts/acceptance/` (spec 001).
+
+Decisions within the spec:
+- **What cold and warm mean per mechanism.** Shared calls: a cohort of four
+  concurrent decisions over a backend that holds every attempt until the
+  whole cohort has started. Cold is four tenants, so each decision leads its
+  own attempts. Warm is one tenant, so one decision leads and three join.
+  The persistent tier: cold is a new tenant per decision, read, dispatched
+  and written. Warm is one tenant's repeats on a restarted runtime, each
+  served from the store. The decision cache (memory tier): cold is a new
+  tenant per decision, a miss that is admitted. Warm is repeats of one
+  seeded decision, each a `hit` with its judgment recomputed.
+- **Figures are reported, never asserted.** Latency is the host's elapsed
+  time in a debug build; the runtime's clock is manual and never advanced.
+  Each test asserts only what is deterministic: dispatch counts, store calls,
+  live tasks and judgment equivalence. So the benchmarks run in declared
+  verification without a threshold (017 3.8, R-34), ignored by default as
+  spec 017's is, and selected with `--ignored`.
+- **The store is an in-memory test double** with no I/O. The persistent
+  figures measure the runtime's encoding and checks, never a store.
+- **Profiles are isolated by plan as well as by key.** A profile changes
+  `PlanId` (spec 034), so two profiles also differ in namespace and in
+  shared-call registry. The test shows the observable result at every tier.
+  The key member itself is shown by `the_profile_is_a_key_member` and
+  `the_decision_key_follows_its_schema`.
+- **A joiner's transitions are not compared.** It has no attempt of its own
+  (3.2.5), so a stop counts no attempt. Its result, judgment and core
+  evidence equal independent execution, and the leader's transitions do
+  too.
+- **No mutation seed is added.** 3.10.5 and the Acceptance name none, and
+  spec 035's per-item seed already covers the batching rule (increment 1).
+
+Results of one local run (debug build, Apple silicon, SYNTHETIC; no claim
+follows from them, section 4):
+
+| Mechanism | Cold p50 / p95 / p99 (us) | Cold per second | Warm p50 / p95 / p99 (us) | Warm per second | Dispatches cold / warm |
+|---|---|---|---|---|---|
+| Shared calls | 4867 / 7637 / 9334 | 611.90 | 3639 / 5280 / 5310 | 756.55 | 300 / 75 |
+| Persistent tier | 2542 / 3431 / 4112 | 370.41 | 2064 / 2142 / 2176 | 488.86 | 300 / 0 |
+| Decision cache | 2033 / 2830 / 3514 | 455.66 | 1742 / 1788 / 1814 | 571.71 | 300 / 0 |
+
+`spec-spine verify 044` runs its thirteen commands (246 tests) in about
+9 seconds when its test targets are already built, and about 70 seconds
+when they are rebuilt, well inside the acceptance group's 45 minutes.
+
+Still open, as the Verification section states: `recompute` (part d2),
+stage 2 of 3.8, and increment 8.
 
 ## Decisions at approval
 

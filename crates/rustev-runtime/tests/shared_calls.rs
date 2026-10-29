@@ -8,7 +8,7 @@ mod common;
 use std::sync::Arc;
 
 use common::*;
-use rustev_contract::execution::{CostPolicy, ExecutionPolicy};
+use rustev_contract::execution::{CostPolicy, Delay, ExecutionPolicy, FailureClass};
 use rustev_contract::optimization::{
     OptimizationAdmission, OptimizationMechanism, OptimizationOutcome, OptimizationPolicy,
     SharedCallPolicy, SharedChargeAllocation, SharedLeave, SharedRecord, SharedRole,
@@ -17,7 +17,7 @@ use rustev_contract::run::{
     AttemptEnd, CancelAnswer, Cancellation, Charge, CostBound, CostModel, RemoteState,
     RequestRecord, RequestResult,
 };
-use rustev_core::seams::CancelSignal;
+use rustev_core::seams::{AdapterFailure, CancelSignal};
 use rustev_runtime::{Completion, Decided};
 
 fn policy(max_waiters: u32, admission: OptimizationAdmission) -> ExecutionPolicy {
@@ -204,6 +204,22 @@ async fn the_last_waiter_cancels_polls_once_and_records_the_answer() {
     }
     assert_eq!(d.record.cost.observed, 6);
 
+    // An answer that confirms no remote stop: possibly continuing, unknown
+    // liability.
+    let d = last_waiter(OnCancel::Unconfirmed, false).await;
+    for r in &d.record.requests {
+        let a = &r.attempts[0];
+        assert_eq!(
+            a.cancellation,
+            Cancellation::Requested {
+                answer: CancelAnswer::Unconfirmed
+            }
+        );
+        assert_eq!(a.remote, RemoteState::PossiblyContinuing);
+        assert_eq!(a.cost.charge, Charge::Unknown);
+    }
+    assert_eq!(d.record.cost.liability, 15);
+
     // No answer to the one poll: possibly continuing, unknown liability.
     let d = last_waiter(OnCancel::Ignore, false).await;
     for r in &d.record.requests {
@@ -385,4 +401,89 @@ async fn a_full_call_is_refused_under_admission_refuse() {
     release_all(&s.head);
     judged(&decided(done(d1).await));
     judged(&decided(done(d2).await));
+}
+
+/// Acceptance, differential tests: a shared attempt's leader and joiner each
+/// end as their independent execution does, for outputs, a failure and a
+/// fallback: the same judgment, core evidence, request results and
+/// transitions. Cancellation and deadlines are the waiter tests above,
+/// whose outcomes are spec 003's for an independent decision.
+#[tokio::test(flavor = "current_thread")]
+async fn shared_execution_ends_as_independent_execution_does() {
+    const REPLICA: &str = "synthetic-linear-head-replica";
+    type Script = fn(&str) -> Answer;
+    fn permanent() -> Answer {
+        Answer::Fail(
+            AdapterFailure::Permanent,
+            "SYNTHETIC".into(),
+            Charge::Observed { units: 1 },
+        )
+    }
+    let cases: [(&str, Script); 3] = [
+        ("outputs", |task| ok(task, 1)),
+        ("failure", |task| match task {
+            "support.frustration" => permanent(),
+            task => ok(task, 1),
+        }),
+        ("fallback", |task| match task {
+            "support.topic" => permanent(),
+            task => ok(task, 1),
+        }),
+    ];
+    let mut p = policy(4, OptimizationAdmission::Refuse);
+    p.steps = vec![step_exec(
+        "topic",
+        1,
+        &[],
+        Delay::None,
+        &[REPLICA],
+        &[FailureClass::Permanent],
+    )];
+    let compiled = || support_compiled(Some(&p));
+    for (name, script) in cases {
+        let head = gate_all(linear_head());
+        let replica = answering(linear_head_replica());
+        let shared_rig = rig(config(4, 0, 3), &[(head.clone(), 8), (replica, 8)]);
+        let plan = Arc::new(shared_rig.rt.prepare(compiled()).unwrap());
+        let c = CancelSignal::new();
+        let d1 = start(&shared_rig, &plan, "d1", &c);
+        until(|| head.gated().len() == 3).await;
+        let d2 = start(&shared_rig, &plan, "d2", &c);
+        settle().await;
+        assert_eq!(head.gated().len(), 3, "{name}: d2 joined");
+        for id in head.gated() {
+            assert!(head.release(&id, script(task_of(&id))));
+        }
+        for (id, shared) in [("d1", done(d1).await), ("d2", done(d2).await)] {
+            let shared = decided(shared);
+            let alone_head = Scripted::new(linear_head(), move |c| script(c.task()));
+            let alone_rig = rig(
+                config(4, 0, 3),
+                &[(alone_head, 8), (answering(linear_head_replica()), 8)],
+            );
+            let alone_plan = alone_rig.rt.prepare(compiled()).unwrap();
+            let alone = alone_rig
+                .rt
+                .decide(&alone_plan, request(id), &CancelSignal::new())
+                .await
+                .unwrap();
+            if name == "fallback" {
+                let topic = shared.record.requests.iter().find(|r| r.step == "topic");
+                assert_eq!(
+                    topic.unwrap().result,
+                    RequestResult::Output { target: 1 },
+                    "{id}"
+                );
+            }
+            assert_eq!(shared.completion, alone.completion, "{name} {id}");
+            assert_eq!(shared.record.core, alone.record.core, "{name} {id}");
+            for (a, b) in shared.record.requests.iter().zip(&alone.record.requests) {
+                assert_eq!(a.result, b.result, "{name} {id} {}", a.step);
+                // A joiner's transitions count no attempt of its own (3.2.5).
+                if id == "d1" {
+                    assert_eq!(a.transitions, b.transitions, "{name} {id} {}", a.step);
+                }
+            }
+        }
+    }
 }
