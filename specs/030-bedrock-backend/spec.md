@@ -322,10 +322,17 @@ than `false` on `responses`) and sends nothing.
    returning `aws_credential_types::Credentials` asynchronously, with the
    attempt's cancellation signal and remaining budget). A TypeScript host
    implements it through the Node binding of #76 A1. The optional
-   `aws-config` feature adds a provider over the standard AWS default
-   credential chain for hosts that want it. Without that feature the crate
-   reads no environment variable, profile file or instance metadata
-   endpoint, and the region comes only from the binding.
+   `aws-config` feature adds a provider that reads only the environment
+   variables `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and
+   `AWS_SESSION_TOKEN`; their absence is a credential failure, never a
+   panic. It is not the full AWS default credential chain: that chain
+   builds an instance metadata client, which needs an HTTP client that
+   `aws-config` is built without, because Rustev's one HTTPS stack is the
+   transport of item 4 (amended 2026-10-29, A-65). A host that needs
+   profiles, single sign-on, role assumption or instance metadata supplies
+   its own provider under this item. Without that feature the crate reads
+   no environment variable, profile file or instance metadata endpoint, and
+   the region comes only from the binding.
 3. **Secrecy.** Credentials and session tokens appear only in the signed
    request. Identity, exchange records, logs and error details carry at most
    a domain-separated digest of the access key id (the credential identity
@@ -616,6 +623,7 @@ claims (R-04, R-37).
 | Response without `usage` | Charge `unknown`, never zero. |
 | Responses `model` equals the requested id | `served: unknown`, reason `echo_of_requested`. |
 | Built without `aws-config`, with `AWS_ACCESS_KEY_ID` set and no provider | Construction refused; no environment read. |
+| Built with `aws-config`, no credential environment variables set | Credential failure, unsent; no panic and no profile, SSO or instance metadata read. |
 | Live smoke without `RUSTEV_BEDROCK_LIVE=1`, or reservation over the cap | No request is sent. |
 | `rustev-core` gains an `aws-*` dependency | `make boundaries` fails naming 001 3.4.1. |
 
@@ -667,6 +675,9 @@ version, not this contract.
   `aws-config`, a test with AWS environment variables set shows they are not
   read, and no `std::env` access exists outside the feature module and the
   smoke example.
+- With the `aws-config` feature: absent credential environment variables
+  are a credential failure, never a panic, tested in declared verification
+  under that feature (3.5 item 2, A-65).
 - Cancellation before and after the first request byte; one total budget;
   credentials absent from every record and error detail.
 - `make boundaries` unit tests for the cloud SDK family (3.13).
@@ -676,10 +687,21 @@ version, not this contract.
 
 ## Verification
 
-Pending with implementation. The implementing change adds `030` to `make
-verify` with repository-local deterministic verification for every
-acceptance item; live smoke results, if any, are recorded with their
-journal totals and are not part of declared verification.
+Repository-local and deterministic; no command contacts AWS. `030` joins
+`make verify` with the change that lands the recorded fixtures. Live probe
+and smoke results are recorded with their journal totals in the
+implementation record and are not part of declared verification.
+
+```verify:cli
+# 3.2 to 3.14 without network: documents, policy, residency, mappings,
+# signing, the loopback transport, identity goldens, spend, and the
+# documented-shape and recorded fixtures replayed offline.
+cargo test -p rustev-bedrock --locked
+# 3.5 item 2 (A-65): the aws-config feature's environment-only provider.
+cargo test -p rustev-bedrock --locked --features aws-config
+# 3.13: the cloud SDK family in the boundary check.
+cargo test -p rustev-boundaries --locked
+```
 
 ## Implementation record
 
@@ -728,6 +750,19 @@ Not done, and blocked on the owner: the live probe and smoke against AWS
 (3.11, 3.14), which need the owner's AWS credentials within R-29's cap,
 and therefore the recorded live fixtures; `030` joins `VERIFIED_SPECS` with
 its declared verification once those exist.
+
+**The `aws-config` provider (2026-10-29).** The first live probe run
+reached no endpoint. `src/aws_config_provider.rs` called
+`aws_config::defaults(..).load()`, which builds the default region chain
+and with it an instance metadata client; `aws-config` is built with
+`default-features = false`, so it has no HTTP client and panicked
+before any credential was read. The panic came after the probe had
+reserved its first call (641,190 units) against the testing journal;
+nothing was sent, and the reservation stays unsettled, counted as
+liability as 3.9 requires. The owner chose an environment-only provider
+over enabling a second HTTPS client (A-65), and 3.5 item 2 is amended to
+say so. The owner may add the full default chain later as a separate
+feature, with its own decision on a second HTTPS client.
 
 ## Decisions at approval
 
