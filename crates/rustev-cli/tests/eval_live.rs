@@ -101,7 +101,7 @@ impl Fixture {
         ] {
             args.extend([format!("--{flag}"), path(file)]);
         }
-        Self { s, args }
+        Self { s, args }.with_reporting()
     }
     fn run(&self) -> Exit {
         execute(&self.args, &Context::default())
@@ -434,5 +434,224 @@ fn bad_live_config_and_probe_are_refused_before_journal() {
         );
         assert!(!f.s.exists("journal.jsonl"));
         assert!(!f.s.exists("out"));
+    }
+}
+
+#[test]
+fn evaluated_outputs_are_consumable_repeat_sets_and_rendered_comparison() {
+    let f = Fixture::new();
+    expect(&f.run(), 0, "evaluated_live");
+    for name in [
+        "dataset",
+        "config",
+        "adapter",
+        "repeat-config",
+        "repeat",
+        "run-0.report",
+        "run-0.detail",
+        "run-0.cases",
+    ] {
+        assert!(f.s.exists(&format!("out/a/{name}.json")), "{name}");
+    }
+    let comparison =
+        rustev_eval::comparison::Comparison::parse(&f.s.read("out/comparison.json")).unwrap();
+    assert_eq!(
+        f.s.read("out/comparison.md"),
+        rustev_eval::comparison::render_markdown(&comparison).as_bytes()
+    );
+    assert_eq!(f.json("out/a/repeat.json")["source"], "live");
+    let adapter =
+        rustev_surface::adapter::TaskAdapterDoc::parse(&f.s.read("adapter.json")).unwrap();
+    assert_eq!(f.s.read("out/a/adapter.json"), adapter.canonical().unwrap());
+}
+
+#[test]
+fn capped_run_publishes_no_repeat_outputs() {
+    let f = Fixture::new();
+    f.change("live.json", |c| {
+        c["bindings"][0]["cost_unit"] = json!("nano_usd")
+    });
+    expect(&f.run(), 14, "spend_capped");
+    for path in [
+        "out/a",
+        "out/comparison.json",
+        "out/comparison.md",
+        "out/adapter.json",
+    ] {
+        assert!(!f.s.exists(path), "{path}");
+    }
+    assert_eq!(f.json("out/live-run.json")["repeat_reports"], json!([]));
+}
+
+#[test]
+fn source_comparison_refuses_snapshots_before_journal() {
+    let f = Fixture::new();
+    f.change("live.json", |c| c["compare_with_source"] = json!(true));
+    expect(&f.run(), 4, "live-config");
+    assert!(!f.s.exists("journal.jsonl"));
+}
+
+#[test]
+fn retained_source_comparison_completes_after_fresh_execution() {
+    let mut f = Fixture::new();
+    let mut args: Vec<String> = [
+        "run",
+        "--decision-id",
+        "historical",
+        "--evaluation-time",
+        "1790164800000",
+        "--now-ms",
+        "1790164800000",
+        "--scope",
+        "tenant-only",
+        "--tenant",
+        "synthetic",
+        "--context-revision",
+        "1",
+        "--capture-bytes",
+        "16777216",
+        "--retain",
+        "embedded",
+    ]
+    .map(String::from)
+    .to_vec();
+    for (flag, file) in [
+        ("plan", "candidates/a/plan.json"),
+        ("rules", "candidates/a/rules/support.json"),
+        ("calibration", "candidates/a/calibrations/topic.json"),
+        ("snapshot", "snapshots/one.json"),
+        ("record-out", "source.run.json"),
+        ("bundle-out", "source.bundle.json"),
+    ] {
+        args.extend([format!("--{flag}"), f.s.path(file).to_str().unwrap().into()]);
+    }
+    expect(&execute(&args, &Context::default()), 0, "judged");
+    let bundle = f.s.read("source.bundle.json");
+    f.bundles();
+    for id in ["one", "two"] {
+        f.s.write(&format!("bundles/{id}.json"), &bundle);
+    }
+    f.change("live.json", |c| c["compare_with_source"] = json!(true));
+    let result = f.run();
+    assert!(
+        String::from_utf8_lossy(&result.stdout).contains("completed=2"),
+        "{result:?} {}",
+        f.json("out/checkpoint.json")
+    );
+    let live = f.json("out/cases/a.1.one.live.json");
+    assert!(live["comparison"].is_object(), "{live}");
+    assert!(
+        !live["comparison"].to_string().contains("incomparable"),
+        "{live}"
+    );
+}
+
+#[test]
+fn captured_page_is_loaded_and_used_without_a_source_backend() {
+    use rustev_contract::acquisition::{AcquisitionPage, AcquisitionRequest};
+    use rustev_contract::source::SourceDescriptor;
+    use rustev_core::seams::DecisionBackend;
+    let mut f = Fixture::new();
+    let source: SourceDescriptor = serde_json::from_value(json!({
+        "schema":"rustev.source/1", "name":"catalog", "version":"1.0.0", "operations":[{
+            "name":"search", "cancellation":"acknowledges", "request":[], "max_request_bytes":2048,
+            "item":[{"name":"id", "type":"integer", "provenance":"system-of-record", "max_grade":"cached", "reliability":"reliable", "freshness":"not_required"}],
+            "max_page_items":4, "max_page_bytes":1024, "paging":"offset", "cost":{"bounded":{"max_units":3}}, "idempotent":true, "cache":"not_cacheable"
+        }]})).unwrap();
+    let (mut definition, calibration) = common::support_definition();
+    definition.schema = "rustev.definition/2".into();
+    definition.limits.acquisition = Some(
+        serde_json::from_value(json!({"max_calls":8,"max_items":20,"max_bytes":16384})).unwrap(),
+    );
+    definition.steps.push(serde_json::from_value(json!({"id":"lookup", "body":{"acquire":{
+        "source":"catalog", "operation":"search", "request":{}, "when":"always",
+        "limits":{"max_pages":1,"max_items":4,"max_attempts":1,"retry_on":[],"delay":"none","deadline_share":"0.5","as_of_skew_ms":100},
+        "stop":"none", "on_failure":"unresolved"
+    }}})).unwrap());
+    let backend = common::support_rules();
+    let compiled = rustev_core::compile_with_sources(
+        &definition,
+        &[backend.descriptor().clone()],
+        &[calibration],
+        std::slice::from_ref(&source),
+        None,
+    )
+    .unwrap();
+    f.s.write(
+        "candidates/a/plan.json",
+        &compiled.plan.canonical().unwrap(),
+    );
+    f.s.write(
+        "candidates/a/sources/catalog.json",
+        &source.canonical().unwrap(),
+    );
+    f.change("live.json", |c| {
+        c["acquisitions"] = json!({source.id().unwrap().to_string(): "captured"})
+    });
+    let request: AcquisitionRequest = serde_json::from_value(json!({"schema":"rustev.acquisition-request/1", "source":source.id().unwrap(), "operation":"search", "fields":[], "page":"first"})).unwrap();
+    let page: AcquisitionPage = serde_json::from_value(json!({"schema":"rustev.acquisition-page/1", "request":request.id().unwrap(), "as_of_ms":common::NOW, "items":[{"id":1}], "next":"none"})).unwrap();
+    f.s.write("captures/page.json", &page.record_canonical().unwrap());
+    f.args.extend([
+        "--captures".into(),
+        f.s.path("captures").to_str().unwrap().into(),
+    ]);
+    let result = f.run();
+    assert_eq!(result.code, 0, "{result:?}");
+    let case = f.json("out/cases/a.1.one.case.json");
+    let acquisition = &case["acquisitions"][source.id().unwrap().to_string()];
+    assert_eq!(
+        acquisition["captured"]["capture_digests"],
+        json!([page.record_digest().unwrap()])
+    );
+    let checkpoint = f.json("out/checkpoint.json");
+    assert!(
+        checkpoint["bindings"]["input_digests"]
+            .get(f.s.path("captures/page.json").to_str().unwrap())
+            .is_some()
+    );
+}
+
+#[test]
+fn resume_refuses_conflicting_rendered_output_without_partial_publication() {
+    let mut f = Fixture::new();
+    expect(&f.run(), 0, "evaluated_live");
+    std::fs::remove_file(f.s.path("out/a/adapter.json")).unwrap();
+    f.s.write("out/comparison.md", b"existing evidence");
+    f.args.push("--resume".into());
+    expect(&f.run(), 3, "io_error");
+    assert!(!f.s.exists("out/a/adapter.json"));
+    assert_eq!(f.s.read("out/comparison.md"), b"existing evidence");
+}
+
+impl Fixture {
+    fn with_reporting(self) -> Self {
+        use rustev_eval::metrics::TaskAdapter;
+        let f = self;
+        let adapter =
+            rustev_surface::adapter::TaskAdapterDoc::parse(&f.s.read("adapter.json")).unwrap();
+        f.change("config.json", |c| {
+            c["schema"] = json!("rustev.evaluator-config/2");
+            c["adapter"] = serde_json::to_value(rustev_eval::config::ConfigAdapter::v2(adapter.adapter(), adapter.rules())).unwrap();
+            c["metrics"] = json!([
+                {"name":"coverage","formula":"comparable cases / all cases"},
+                {"name":"acceptance_coverage","formula":"proposals / comparable cases"},
+                {"name":"labeled_proposal_coverage","formula":"labeled proposals / proposals"},
+                {"name":"error_among_accepted","formula":"wrong labeled proposals / labeled proposals"},
+                {"name":"candidate_outcome_change","formula":"changed outcomes / comparable cases"},
+                {"name":"mean_log_loss","formula":"mean negative log probability of label"},
+                {"name":"brier","formula":"mean sum of squared probability errors"},
+                {"name":"reliability","formula":"per bin mean confidence and accuracy"},
+                {"name":"latency_ms","formula":"quantile of elapsed minus queued"},
+                {"name":"queue_ms","formula":"quantile of queued"},
+                {"name":"cost_observed_units","formula":"sum of observed units"},
+                {"name":"cost_estimated_units","formula":"sum of estimated units"},
+                {"name":"cost_unknown_attempts","formula":"attempts with unknown charge"},
+                {"name":"cost_liability_units","formula":"units kept as liability"}
+            ]);
+        });
+        f.change("repeat.json", |c| {
+            c["stability_metrics"] = json!(["coverage"])
+        });
+        f
     }
 }
