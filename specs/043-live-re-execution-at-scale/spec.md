@@ -897,6 +897,30 @@ completed item's live document and run record digests in work order.
 `repeat_reports` stays empty until the repeat outputs of 3.11.2 exist.
 `run::exit_code` maps the statuses to 3.14's provisional numbers (0,
 14, 15, 16). Tests: `crates/rustev-live/tests/run.rs`.
+**Increment 8 (2026-10-29): repeat outputs.** With `RunSpec::reports`
+(the dataset manifest and split, evaluator configuration, adapter,
+repeat configuration and optional top-k), a run that ends
+`evaluated_live` builds each candidate's spec 029 repeat set with source
+`live` (3.11.2): per repeat, `evaluate_observed_with_cases` over the
+run's cases, completed items from their judgments and run records (read
+back from `cases/` on resume) and every other item incomparable with its
+reason (3.11.3), then `repeat` over the N runs and `compare_candidates`
+across candidates, the first candidate by name as the comparison
+baseline (`crates/rustev-live/src/reports.rs`). The canonical repeat
+reports and comparison are staged and renamed only when all are ready,
+then `live-run.json` lists their digests; any other end status writes
+none. A staging directory left by an ended process is removed
+before staging anew; it holds no evidence, since every staged file is
+rebuilt from the checkpoint and the per-case files. `rustev-eval`'s `repeat` no longer refuses `Source::Live`
+(`live-source-unavailable` is kept in the public enum, never returned),
+so spec 029's baseline record, comparison and selection accept live
+repeat sets; candidate comparison and selection do not require a live
+candidate's runs to equal the baseline's retained runs or to carry
+candidate outcome changes, since each live candidate's runs are its own.
+`adapter.json` and `comparison.md` are left to the CLI, which renders
+them for `eval candidates`. Tests: `crates/rustev-live/tests/run.rs`,
+`crates/rustev-eval/tests/observed.rs`, `crates/rustev-eval/tests/reports.rs`,
+`crates/rustev-cli/tests/repeat.rs`.
 
 ## Decisions at approval
 

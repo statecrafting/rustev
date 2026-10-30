@@ -9,7 +9,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::baseline::{Baseline, record};
 use crate::config::AdapterRules;
-use crate::repeat::{FigureDoc, IntervalDoc, Observation, RepeatInputs, RepeatReport, repeat};
+use crate::repeat::{
+    FigureDoc, IntervalDoc, Observation, RepeatInputs, RepeatReport, Source, repeat,
+};
 
 pub const COMPARISON: &str = "rustev.comparison/1";
 pub const MAX_CANDIDATES: usize = 64;
@@ -147,7 +149,7 @@ pub(crate) fn compatible(b: &RepeatEvidence<'_>, c: &RepeatEvidence<'_>) -> Resu
     if br.repeat_config != cr.repeat_config {
         return Err("repeat configuration mismatch".into());
     }
-    if !cr.candidate {
+    if !cr.candidate && cr.source != Source::Live {
         return Err("candidate is not a candidate evaluation".into());
     }
     if br.source != cr.source || br.runs.len() != cr.runs.len() {
@@ -160,7 +162,8 @@ pub(crate) fn compatible(b: &RepeatEvidence<'_>, c: &RepeatEvidence<'_>) -> Resu
             return Err("case lists differ".into());
         }
         for (b, c) in b.cases.cases.iter().zip(&c.cases.cases) {
-            if b.case != c.case || (c.run.is_some() && b.run != c.run) {
+            if b.case != c.case || (cr.source != Source::Live && c.run.is_some() && b.run != c.run)
+            {
                 return Err("case order or retained run records differ".into());
             }
         }

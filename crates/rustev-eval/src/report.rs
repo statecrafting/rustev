@@ -262,6 +262,33 @@ pub fn evaluate_observed(inputs: &ObservedInputs<'_>) -> Result<Evaluated, EvalE
     .map(|(e, _, _)| e)
 }
 
+/// Evaluate observed results with reconciled per-case measures for repeat sets.
+pub fn evaluate_observed_with_cases(
+    inputs: &ObservedInputs<'_>,
+    top_k: Option<&TopK>,
+) -> Result<(Evaluated, EvalCases), EvalError> {
+    let (evaluated, cases, _) = evaluate_source(
+        &Evaluation {
+            manifest: inputs.manifest,
+            split: inputs.split,
+            config: inputs.config,
+            adapter: inputs.adapter,
+            candidate: None,
+            source: CaseSource::Observed(inputs),
+        },
+        Some(top_k),
+        None,
+    )?;
+    let cases = EvalCases {
+        schema: EVAL_CASES.into(),
+        report: evaluated.detail.report.clone(),
+        top_k: top_k.cloned(),
+        cases: cases.unwrap_or_default(),
+    };
+    eval_cases::reconcile(&evaluated, &cases).map_err(EvalError::Reconcile)?;
+    Ok((evaluated, cases))
+}
+
 /// A candidate plan with the calibration artifacts it binds.
 #[derive(Clone, Copy)]
 pub struct Candidate<'a> {

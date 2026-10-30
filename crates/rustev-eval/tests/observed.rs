@@ -408,3 +408,95 @@ async fn latency_uses_observed_runs_and_probabilities_validate_raw_output() {
     assert_eq!(count.breakdown.values().sum::<u64>(), 2);
     assert!(!count.breakdown.contains_key("no-output"));
 }
+
+#[tokio::test]
+async fn observed_cases_reconcile_and_live_reports_enter_downstream_consumers() {
+    use rustev_eval::comparison::{NamedCandidate, RepeatEvidence};
+    use rustev_eval::repeat::{RepeatInputs, Run, Source, repeat};
+    use rustev_eval::report::evaluate_observed_with_cases;
+    struct BoundSupport;
+    impl TaskAdapter for BoundSupport {
+        fn adapter(&self) -> AdapterRef {
+            Support.adapter()
+        }
+        fn rules(&self) -> AdapterRules {
+            AdapterRules::Bound(
+                rustev_contract::ids::ContentDigest::parse(&format!("sha256:{}", "a".repeat(64)))
+                    .unwrap(),
+            )
+        }
+        fn check_label(&self, label: &str) -> Result<(), String> {
+            Support.check_label(label)
+        }
+        fn correct(&self, action: &str, params: &BTreeMap<String, OutValue>, label: &str) -> bool {
+            Support.correct(action, params, label)
+        }
+    }
+    let (mut manifest, _, observations) = fixture().await;
+    for case in &mut manifest.cases {
+        case.split = Split::ModelSelection;
+    }
+    let mut config = config();
+    config.adapter = ConfigAdapter::v2(BoundSupport.adapter(), BoundSupport.rules());
+    let plan = plan(&observations);
+    let inputs = ObservedInputs {
+        manifest: &manifest,
+        split: Split::ModelSelection,
+        config: &config,
+        adapter: &BoundSupport,
+        observations: &observations,
+        plan: &plan,
+    };
+    let (evaluated, cases) = evaluate_observed_with_cases(&inputs, None).unwrap();
+    rustev_eval::eval_cases::reconcile(&evaluated, &cases).unwrap();
+    assert_eq!(evaluated.report, evaluate_observed(&inputs).unwrap().report);
+    let config = rustev_eval::repeat_config::RepeatConfig::parse(br#"{
+        "schema":"rustev.repeat-config/1",
+        "bootstrap":{"method":"percentile-cluster/1","prng":"xoshiro256starstar-splitmix64/1","level":"0.9","resamples":1000,"seed":"29"},
+        "noise":{"rule":{"k_sd":{"k":"2"}},"floor":"0","overrides":{}},
+        "slices":[],"stability_metrics":["coverage"],"top_k":null
+    }"#).unwrap();
+    let runs = [Run {
+        evaluated: &evaluated,
+        cases: &cases,
+    }];
+    let inputs = || RepeatInputs {
+        source: Source::Live,
+        config: &config,
+        manifest: &manifest,
+        runs: &runs,
+    };
+    let report = repeat(&inputs()).unwrap();
+    let baseline = rustev_eval::baseline::record("base", &inputs(), &report, 0).unwrap();
+    assert_eq!(baseline.source, Source::Live);
+    let diff = rustev_eval::diff(&baseline, &report, &config, &[&cases], &[&cases]).unwrap();
+    assert!(matches!(
+        diff.result,
+        rustev_eval::diff::DiffResult::Compared { .. }
+    ));
+    let gate = rustev_eval::SelectionGate::parse(br#"{
+        "schema":"rustev.selection-gate/1","gate":"SYNTHETIC","per":"variant",
+        "metrics":{"coverage":"higher_is_better"},"min_comparable_coverage":"0","min_labeled_coverage":"0",
+        "require":[{"metric":"coverage","not_worse_than":"baseline","within":{"absolute":"0"}}],"rank_by":[]
+    }"#).unwrap();
+    let selection = rustev_eval::evaluate_selection(
+        &gate,
+        &baseline,
+        &RepeatEvidence {
+            report: &report,
+            inputs: inputs(),
+        },
+        &[NamedCandidate {
+            name: "candidate",
+            evidence: RepeatEvidence {
+                report: &report,
+                inputs: inputs(),
+            },
+        }],
+    )
+    .unwrap();
+    assert_eq!(
+        selection.candidates[0].verdict,
+        rustev_eval::selection::Verdict::Qualifies
+    );
+}

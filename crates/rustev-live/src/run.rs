@@ -24,7 +24,10 @@ use crate::documents::*;
 use crate::journal::{RunSpend, SpendJournal, SpendSummary};
 use crate::probe::{self, ProbeInputs, ProbeReport, ProbeSnapshot, ProbeStatus};
 
+pub use crate::reports::ReportInputs;
+
 pub struct RunSpec {
+    pub reports: Option<ReportInputs>,
     pub config: LiveConfig,
     pub mode: Mode,
     pub run_id: String,
@@ -71,6 +74,7 @@ pub struct PreparedRun {
     opts: RunOptions,
     snapshots: BTreeMap<String, Snapshot>,
     checkpoint: LiveCheckpoint,
+    completed: BTreeMap<usize, Result<rustev_eval::report::Observation, LiveError>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -96,6 +100,10 @@ pub fn exit_code(status: RunStatus) -> u8 {
 #[derive(Debug, Serialize)]
 pub struct RunOutcome {
     pub live_run: LiveRun,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub repeat_reports: BTreeMap<String, rustev_eval::repeat::RepeatReport>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub comparison: Option<rustev_eval::comparison::Comparison>,
     pub status: RunStatus,
     pub probe: ProbeReport,
     /// Base decision id and last checkpoint state, in manifest order.
@@ -108,6 +116,9 @@ pub struct RunOutcome {
 
 /// Validate all resolved inputs before the caller opens a journal.
 pub fn prepare(spec: RunSpec, opts: RunOptions) -> Result<PreparedRun, LiveError> {
+    if let Some(reports) = &spec.reports {
+        reports.check(&spec)?;
+    }
     let reached: Candidates = spec
         .candidates
         .iter()
@@ -231,6 +242,7 @@ pub fn prepare(spec: RunSpec, opts: RunOptions) -> Result<PreparedRun, LiveError
         opts,
         snapshots,
         checkpoint,
+        completed: BTreeMap::new(),
     })
 }
 
@@ -422,6 +434,23 @@ impl PreparedRun {
             };
             *counts.get_mut(name).expect("known state") += 1;
         }
+        let reports = if status == RunStatus::EvaluatedLive {
+            self.spec
+                .reports
+                .as_ref()
+                .map(|inputs| {
+                    crate::reports::build(
+                        inputs,
+                        &self.spec,
+                        &self.opts,
+                        &self.checkpoint,
+                        &self.completed,
+                    )
+                })
+                .transpose()?
+        } else {
+            None
+        };
         let live_run = LiveRun {
             schema: LiveRun::SCHEMA.into(),
             identities: self.checkpoint.bindings.clone(),
@@ -433,10 +462,23 @@ impl PreparedRun {
             journal_before: before.clone(),
             journal_after: journal.summary(),
             cases,
-            repeat_reports: Vec::new(),
+            repeat_reports: reports
+                .as_ref()
+                .map(|r| r.digests())
+                .transpose()?
+                .unwrap_or_default(),
         };
         live_run.check()?;
+        let live_run_bytes = live_run.record_canonical().map_err(LiveError::io)?;
+        if let Some(reports) = &reports {
+            reports.publish(&self.opts.out)?;
+        }
+        let (repeat_reports, comparison) = reports
+            .map(|r| (r.reports, Some(r.comparison)))
+            .unwrap_or_default();
         let outcome = RunOutcome {
+            repeat_reports,
+            comparison,
             run_spend: live_run.run_spend.clone(),
             journal_after: live_run.journal_after.clone(),
             live_run,
@@ -456,10 +498,7 @@ impl PreparedRun {
                 .collect(),
             journal_before: before,
         };
-        write_atomic(
-            &self.opts.out.join("live-run.json"),
-            &outcome.live_run.record_canonical().map_err(LiveError::io)?,
-        )?;
+        write_atomic(&self.opts.out.join("live-run.json"), &live_run_bytes)?;
         Ok(outcome)
     }
 
@@ -703,7 +742,21 @@ impl PreparedRun {
                         }
                     } else {
                         match save_case(&self.opts, item, &r) {
-                            Ok(s) => s,
+                            Ok(s) => {
+                                if self.spec.reports.is_some() {
+                                    let observation = crate::reports::completed(
+                                        &r.document,
+                                        &r.record,
+                                        &self.spec.candidates[&item.candidate].plan,
+                                        match &r.completion {
+                                            Completion::Judged(j) => Some(j.as_ref()),
+                                            Completion::Cancelled => None,
+                                        },
+                                    );
+                                    self.completed.insert(index, observation);
+                                }
+                                s
+                            }
                             Err(e) => {
                                 error.get_or_insert(e);
                                 continue;

@@ -2139,9 +2139,9 @@ async fn captured_sets_vary_and_differing_replays_are_refused() {
     // Replay of the same retained bundles must reproduce: refused otherwise.
     let err = repeat_of(&s, Source::Replay, &config, &[full.clone(), partial]).unwrap_err();
     assert_eq!(err.code(), "not-reproducible");
-    // The live source is unavailable.
-    let err = repeat_of(&s, Source::Live, &config, std::slice::from_ref(&full)).unwrap_err();
-    assert_eq!(err, RepeatError::LiveSourceUnavailable);
+    // Live execution now supplies repeat sets (spec 043).
+    let live = repeat_of(&s, Source::Live, &config, std::slice::from_ref(&full)).unwrap();
+    assert_eq!(live.source, Source::Live);
     // N outside 1 to 64.
     assert_eq!(
         repeat_of(&s, Source::Captured, &config, &[]).unwrap_err(),
