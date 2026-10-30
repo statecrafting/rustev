@@ -271,6 +271,7 @@
         "LICENSE",
         "README.md",
         "src/budget.rs",
+        "src/callback_server.rs",
         "src/cancel.rs",
         "src/client.rs",
         "src/cost.rs",
@@ -281,6 +282,7 @@
         "src/phases.rs",
         "src/pool.rs",
         "src/principal.rs",
+        "src/seam_queue.rs",
         "src/server.rs",
         "src/taxonomy.rs",
         "src/wire.rs"

@@ -1066,6 +1066,35 @@ the image acceptance item stays externally blocked. In
 reason updated. This change adds the `extends` edge on
 `integrations/rustev-serve/` that section 2 calls for.
 
+**Increment 4 part 1: the callback host server and the seam queue
+(2026-10-29).** `integrations/rustev-remote-http/src/callback_server.rs`
+is the host-side HTTP server of both callback protocols: it hosts any
+`ContextSource` behind `POST /rustev/remote-context/1/{describe,fetch,
+cancel,invalidations}` and any `EvidenceSink` behind
+`POST /rustev/remote-sink/1/{describe,deliver}`, plain HTTP on loopback
+only, TLS otherwise, or a Unix socket. A fetch runs an attempt id at most
+once inside the idempotency window (identical content gets the recorded
+answer, other content `malformed_request` with `attempt_id_conflict`), a
+fetch naming another describe digest is `describe_mismatch`, and a fetch
+whose budget is spent never starts. Cancel answers `stopped` only under
+`confirmed` cancellation, by dropping the hosted fetch; `best_effort` and
+`none` answer `unconfirmed`, and an unknown id `unknown_attempt` (3.10.4).
+Under `poll` invalidation the server keeps a bounded log with one sequence
+across its sources; the first poll gets the current sequence and no items,
+and items dropped from the log show to a poller as a gap (3.10.6). A
+delivery is `accepted` once, then `duplicate` for the same digest and
+`conflict` for another inside the deduplication window; a `rejected`
+delivery is not remembered (3.11.2). Every table is bounded, and a full
+one with nothing expired answers `503`.
+`integrations/rustev-remote-http/src/seam_queue.rs` is the bounded queue of
+3.12: an in-flight limit and a queue capacity, each 1 to 65,536 with no
+default, refusal at once with `remote_seam_queue_full` when full, a queued
+call waiting no longer than its deadline, and counters for depth, refusals
+and late responses. Tests: `tests/callback_server.rs` and the module's unit
+tests. The clients of both protocols, which use the queue, follow in part 2.
+No existing module of the crate changes; `tools/rustev-release/
+archive-policy.json` lists the two new files.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child
