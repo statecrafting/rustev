@@ -833,6 +833,39 @@ because neither the run record nor the attempt report carries one; the
 section 5 row is marked deferred. This amends text only; it marks no
 increment complete and authorizes no live run or spend.
 
+**Increment 5 part b (2026-10-29): the run engine.** `rustev_live::run`
+(`crates/rustev-live/src/run.rs`) runs resolved inputs in two phases.
+`prepare` refuses before any journal is opened: the configuration check,
+every decision id of 3.3.4, each case snapshot parsed and identified anew
+(`identity-mismatch`), `evaluation_time: source` without a case time
+(`evaluation-time-unavailable`), a probe snapshot equal to a case's
+(`probe-snapshot`), an existing `--out` without resume (`io_error`), and
+on resume a checkpoint whose bindings or work items differ
+(`checkpoint-mismatch`); a new run writes `live-config.json` and a
+checkpoint of `pending` items in the order of 3.8.1. `execute` classifies
+items first: a pending item with journal reservations under its decision
+id is `interrupted`, never re-sent unless `rerun_interrupted`, which
+records `rerun{k}` durably before the first reservation (`rerun-limit`
+above 99). It then runs the probe on every run, stopping with no case sent
+unless the probe passed (`probe_only` stops there with `probed`), and
+dispatches through `reexecute_live_with_gate` under a per-binding
+scheduler: an item holds every binding its candidate reaches, so attempts
+in flight per binding never exceed `max_in_flight`, and starts are spaced
+by `min_interval_ms` on the injected clock; the case deadline is the least
+`case_deadline_ms` of those bindings. The first spend refusal stops
+admission and the run ends `spend_capped`; an item with no dispatched
+attempt and a refused authorization is `refused{authorization_refused}`
+and the run continues; the run deadline or the caller's signal cancels
+in-flight work and ends `interrupted`, keeping any judgment reached
+before it. Each completed item's live document and run record are
+written under `cases/` by temporary file, `fsync` and rename, and the
+checkpoint is rewritten after every item. Not yet delivered:
+`rustev.live-run/1`, `evaluate_observed` and the repeat outputs of 3.11;
+input loading and the CLI of 3.13 and 3.14; captured acquisitions and
+`compare_with_source`; and the per-case `rustev.live-case/1` document of
+3.9.1 (A-67). The rate-limit pause of 3.8.2 is deferred (A-67). Tests:
+`crates/rustev-live/tests/run.rs`.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child
