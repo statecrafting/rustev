@@ -563,6 +563,57 @@ async fn run_deadline_cancels_in_flight_and_leaves_a_resumable_checkpoint() {
     assert!(prepare(spec(), opts).is_ok());
 }
 
+/// The recorded stop reason is the cause that raised the signal first, not
+/// the clock when the run stops.
+async fn interrupted_cause(caller_first: bool) -> Option<String> {
+    let dir = Dir::new();
+    let head = Scripted::new(linear_head(), |c| {
+        if dataset(&c.attempt_id) {
+            Answer::Gate
+        } else {
+            ok(c.task(), 1)
+        }
+    })
+    .with_on_cancel(OnCancel::Stop(Charge::Unknown));
+    let r = rig(config(8, 0, 1), &[(head.clone(), 8)]);
+    let mut opts = dir.options();
+    opts.run_deadline_ms = Some(100);
+    let p = prepare(spec(), opts).unwrap();
+    let j = dir.journal();
+    let h = Host(None);
+    let cancel = CancelSignal::new();
+    let driver = async {
+        until(|| !head.gated().is_empty()).await;
+        if caller_first {
+            // The caller cancels, then the deadline passes before the run stops.
+            cancel.raise();
+            r.clock.advance(100);
+        } else {
+            // The deadline raises the signal, then the caller cancels too.
+            r.clock.advance(100);
+            until(|| head.gated().is_empty() || r.clock.pending_delays().is_empty()).await;
+            cancel.raise();
+        }
+    };
+    let (out, ()) = tokio::join!(p.execute(&r.rt, j, &h, &r.clock, &cancel), driver);
+    let out = out.unwrap();
+    assert_eq!(out.status, RunStatus::Interrupted);
+    out.live_run.stop_reason
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn a_caller_cancel_stays_cancelled_when_the_deadline_then_passes() {
+    assert_eq!(interrupted_cause(true).await.as_deref(), Some("cancelled"));
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn a_deadline_stays_the_cause_when_the_caller_then_cancels() {
+    assert_eq!(
+        interrupted_cause(false).await.as_deref(),
+        Some("run-deadline")
+    );
+}
+
 #[test]
 fn input_refusals_precede_journal_creation() {
     for (kind, expected) in [
@@ -679,4 +730,244 @@ async fn output_failure_drains_in_flight_work_and_stops_admission() {
         dir.checkpoint().items[2].states.last(),
         Some(&ItemState::Pending)
     );
+}
+
+fn read_live_run(dir: &Dir) -> rustev_live::documents::LiveRun {
+    let bytes = std::fs::read(dir.0.join("out/live-run.json")).unwrap();
+    let doc = rustev_live::documents::LiveRun::parse(&bytes).unwrap();
+    doc.check().unwrap();
+    assert_eq!(bytes, doc.record_canonical().unwrap());
+    doc
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn live_run_probe_end_states_and_write_failure() {
+    use rustev_live::documents::ProbeProvenance;
+    use rustev_live::probe::IdentityVerdict;
+    for mode in 0..5 {
+        let dir = Dir::new();
+        let head = Scripted::new(linear_head(), move |c| {
+            if mode == 1 {
+                Answer::Fail(
+                    AdapterFailure::Permanent,
+                    "SYNTHETIC".into(),
+                    Charge::Observed { units: 0 },
+                )
+            } else {
+                ok(c.task(), 1)
+            }
+        });
+        let r = rig(config(8, 0, 1), &[(head, 8)]);
+        let mut opts = dir.options();
+        opts.probe_only = mode != 1;
+        if mode == 3 {
+            opts.run_deadline_ms = Some(0);
+        }
+        let s = spec();
+        let digest = s.config.probe.digest.clone();
+        let p = prepare(s, opts).unwrap();
+        if mode == 4 {
+            std::fs::create_dir(dir.0.join("out/live-run.json")).unwrap();
+        }
+        let cancel = CancelSignal::new();
+        if mode == 2 {
+            cancel.raise();
+        }
+        let result = p
+            .execute(&r.rt, dir.journal(), &Host(None), &r.clock, &cancel)
+            .await;
+        if mode == 4 {
+            assert_eq!(result.unwrap_err().status, "io_error");
+            continue;
+        }
+        let out = result.unwrap();
+        let doc = read_live_run(&dir);
+        assert_eq!(doc, out.live_run);
+        assert_eq!(doc.probe.snapshot_digest, digest);
+        assert_eq!(doc.probe.provenance, ProbeProvenance::Synthetic);
+        assert!(doc.cases.is_empty());
+        assert_eq!(doc.counts["pending"], 2);
+        match mode {
+            0 => {
+                assert_eq!(doc.status, RunStatus::Probed);
+                assert_eq!(doc.stop_reason, None);
+                assert_eq!(doc.probe.bindings.len(), 1);
+                assert!(doc.probe.bindings[0].reachable);
+                assert_eq!(
+                    doc.probe.bindings[0].served_identity,
+                    Some(IdentityVerdict::Unverified)
+                );
+            }
+            1 => {
+                assert_eq!(doc.status, RunStatus::ProbeFailed);
+                assert_eq!(
+                    doc.stop_reason.as_deref(),
+                    Some(
+                        doc.probe.bindings[0]
+                            .failure
+                            .as_ref()
+                            .unwrap()
+                            .code
+                            .as_str()
+                    )
+                );
+            }
+            _ => {
+                assert_eq!(doc.status, RunStatus::Interrupted);
+                assert_eq!(
+                    doc.stop_reason.as_deref(),
+                    Some(if mode == 2 {
+                        "cancelled"
+                    } else {
+                        "run-deadline"
+                    })
+                );
+            }
+        }
+    }
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn live_run_records_digests_counts_spend_and_deterministic_bytes() {
+    use rustev_contract::live::LiveReexecution;
+    use rustev_contract::run::RunRecord;
+    use rustev_live::documents::LiveRun;
+    let mut previous = None;
+    for _ in 0..2 {
+        let dir = Dir::new();
+        let head = answering(linear_head());
+        let r = rig(config(8, 0, 1), &[(head, 8)]);
+        let mut s = spec();
+        s.config.repeats = 2;
+        s.candidates.insert("b".into(), support_compiled(None));
+        s.cases.push(LiveCase {
+            case_id: "missing".into(),
+            input: CaseInput::Unavailable {
+                reason: "missing".into(),
+            },
+        });
+        let journal = dir.journal();
+        let out = prepare(s, dir.options())
+            .unwrap()
+            .execute(
+                &r.rt,
+                journal.clone(),
+                &Host(None),
+                &r.clock,
+                &CancelSignal::new(),
+            )
+            .await
+            .unwrap();
+        let doc = read_live_run(&dir);
+        assert_eq!(doc, out.live_run);
+        assert_eq!(doc.status, RunStatus::EvaluatedLive);
+        assert_eq!(doc.stop_reason, None);
+        assert_eq!(doc.identities, dir.checkpoint().bindings);
+        assert_eq!(doc.counts.values().sum::<u64>(), out.items.len() as u64);
+        assert_eq!(doc.counts["completed"], 8);
+        assert_eq!(doc.counts["unavailable"], 4);
+        assert_eq!(doc.cases.len(), 8);
+        assert!(doc.repeat_reports.is_empty());
+        let spend = &doc.run_spend;
+        assert_eq!(
+            spend.observed + spend.estimated + spend.unknown + spend.liability,
+            journal.run_spend("run")
+        );
+        assert_eq!(doc.run_spend, out.run_spend);
+        assert_eq!(doc.journal_before, out.journal_before);
+        assert_eq!(doc.journal_after, journal.summary());
+        let expected: Vec<_> = out
+            .items
+            .iter()
+            .filter(|(_, s)| matches!(s, ItemState::Completed { .. }))
+            .map(|(id, _)| id.clone())
+            .collect();
+        assert_eq!(
+            doc.cases
+                .iter()
+                .map(|c| format!("live/run/{}/{}/{}", c.candidate, c.repeat, c.case_id))
+                .collect::<Vec<_>>(),
+            expected
+        );
+        for case in &doc.cases {
+            assert_eq!(case.rerun, None);
+            let stem = format!("{}.{}.{}", case.candidate, case.repeat, case.case_id);
+            let live = LiveReexecution::parse(
+                &std::fs::read(dir.0.join(format!("out/cases/{stem}.live.json"))).unwrap(),
+            )
+            .unwrap();
+            let record = RunRecord::parse(
+                &std::fs::read(dir.0.join(format!("out/cases/{stem}.run.json"))).unwrap(),
+            )
+            .unwrap();
+            assert_eq!(case.live_document_digest, live.record_digest().unwrap());
+            assert_eq!(case.run_record_digest, record.record_digest().unwrap());
+        }
+        let bytes = doc.record_canonical().unwrap();
+        if let Some(previous) = previous {
+            assert_eq!(bytes, previous);
+        }
+        previous = Some(bytes);
+        let mut invalid = doc.clone();
+        invalid.cases.push(invalid.cases[0].clone());
+        assert!(invalid.check().is_err());
+        invalid = doc.clone();
+        invalid.schema = "rustev.live-run/2".into();
+        assert!(invalid.check().is_err());
+        assert!(LiveRun::parse(&invalid.record_canonical().unwrap()).is_err());
+        for pointer in [
+            "",
+            "/probe",
+            "/probe/bindings/0",
+            "/probe/bindings/0/calls/0",
+            "/cases/0",
+            "/journal_before",
+            "/journal_after",
+            "/run_spend",
+        ] {
+            let mut value = serde_json::to_value(&doc).unwrap();
+            value
+                .pointer_mut(pointer)
+                .unwrap()
+                .as_object_mut()
+                .unwrap()
+                .insert("unexpected".into(), json!(true));
+            assert!(LiveRun::parse(&serde_json::to_vec(&value).unwrap()).is_err());
+        }
+    }
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn live_run_spend_cap_and_exit_codes() {
+    for cap in [1, 3] {
+        let dir = Dir::new();
+        let head = answering(linear_head());
+        let r = rig(config(8, 0, 1), &[(head, 8)]);
+        let mut s = spec();
+        s.config.run_cap_units = cap;
+        let out = prepare(s, dir.options())
+            .unwrap()
+            .execute(
+                &r.rt,
+                dir.journal(),
+                &Host(None),
+                &r.clock,
+                &CancelSignal::new(),
+            )
+            .await
+            .unwrap();
+        let doc = read_live_run(&dir);
+        assert_eq!(doc, out.live_run);
+        assert_eq!(doc.status, RunStatus::SpendCapped);
+        assert_eq!(doc.stop_reason.as_deref(), Some("run-cap-exceeded"));
+    }
+    for (status, code) in [
+        (RunStatus::EvaluatedLive, 0),
+        (RunStatus::Probed, 0),
+        (RunStatus::SpendCapped, 14),
+        (RunStatus::ProbeFailed, 15),
+        (RunStatus::Interrupted, 16),
+    ] {
+        assert_eq!(rustev_live::run::exit_code(status), code);
+    }
 }

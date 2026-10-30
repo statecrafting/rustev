@@ -26,7 +26,7 @@ use rustev_runtime::{
     Clock, LiveAuthorizer, LiveRefusal, LiveRequest, LiveResult, LiveSpend, PreparedPlan, Runtime,
     SpendBinding, SpendUnit,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::JournalGate;
 use crate::documents::{BindingIdentity, CostUnit, LiveConfig, LiveError, Probe, ProbeProvenance};
@@ -103,8 +103,8 @@ pub struct ProbeInputs<'a> {
     pub clock: &'a dyn Clock,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum ProbeStatus {
     Probed,
     ProbeFailed,
@@ -114,8 +114,8 @@ pub enum ProbeStatus {
     Interrupted,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum IdentityVerdict {
     Matched,
     Unverified,
@@ -123,14 +123,16 @@ pub enum IdentityVerdict {
 }
 
 /// The first failing call (1-based), or `None` for a static check.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ProbeFailure {
     pub call: Option<u64>,
     pub code: String,
 }
 
 /// One probe decision, whose purpose is `probe` (3.9).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ProbeCall {
     pub decision_id: String,
     /// Attempts to the probed binding and their served identities, as the
@@ -140,7 +142,8 @@ pub struct ProbeCall {
     pub code: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct BindingProbe {
     pub identity: BindingIdentity,
     pub candidate: String,
@@ -152,7 +155,8 @@ pub struct BindingProbe {
 }
 
 /// The probe section of `rustev.live-run/1` (3.11.4).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ProbeReport {
     pub snapshot_digest: SnapshotId,
     pub provenance: ProbeProvenance,

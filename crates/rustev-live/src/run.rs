@@ -1,5 +1,6 @@
 //! Dataset-scale execution over resolved inputs (spec 043).
 
+use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::future::{Future, poll_fn};
 use std::path::PathBuf;
@@ -16,7 +17,7 @@ use rustev_core::seams::CancelSignal;
 use rustev_runtime::{
     Clock, Completion, LiveAuthorizer, LiveRefusal, LiveRequest, LiveResult, LiveSpend, Runtime,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::JournalGate;
 use crate::documents::*;
@@ -72,7 +73,7 @@ pub struct PreparedRun {
     checkpoint: LiveCheckpoint,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RunStatus {
     EvaluatedLive,
@@ -82,8 +83,19 @@ pub enum RunStatus {
     Interrupted,
 }
 
+/// Exit numbers are provisional under spec 043, 3.14; the status names never change.
+pub fn exit_code(status: RunStatus) -> u8 {
+    match status {
+        RunStatus::EvaluatedLive | RunStatus::Probed => 0,
+        RunStatus::SpendCapped => 14,
+        RunStatus::ProbeFailed => 15,
+        RunStatus::Interrupted => 16,
+    }
+}
+
 #[derive(Debug, Serialize)]
 pub struct RunOutcome {
+    pub live_run: LiveRun,
     pub status: RunStatus,
     pub probe: ProbeReport,
     /// Base decision id and last checkpoint state, in manifest order.
@@ -222,6 +234,15 @@ pub fn prepare(spec: RunSpec, opts: RunOptions) -> Result<PreparedRun, LiveError
     })
 }
 
+/// The first writer wins: the deadline is the cause only when it raises a
+/// signal nobody had raised yet.
+fn raise_for_deadline(signal: &CancelSignal, deadline_hit: &Cell<bool>) {
+    if !signal.is_raised() {
+        deadline_hit.set(true);
+        signal.raise();
+    }
+}
+
 fn rerun(item: &CheckpointItem) -> Option<u64> {
     item.states
         .iter()
@@ -312,6 +333,9 @@ impl PreparedRun {
             scope: self.spec.scope.clone(),
             clock,
         };
+        // Set only when the deadline raises the signal first; a caller's
+        // earlier cancel keeps its own cause even if the deadline then passes.
+        let deadline_hit = Cell::new(false);
         let report = {
             let mut probing = Box::pin(probe::probe(inputs, authorizer, &gate, &signal));
             let mut timer = deadline.map(|d| clock.sleep_until(d));
@@ -322,7 +346,7 @@ impl PreparedRun {
                     .is_some_and(|t| t.as_mut().poll(cx).is_ready())
                 {
                     timer = None;
-                    signal.raise();
+                    raise_for_deadline(&signal, &deadline_hit);
                 }
                 probing.as_mut().poll(cx)
             })
@@ -338,12 +362,84 @@ impl PreparedRun {
         if signal.is_raised() && status != RunStatus::SpendCapped {
             status = RunStatus::Interrupted;
         }
+        let mut spend_refusal = report.spend_refusal.clone();
         if status == RunStatus::EvaluatedLive {
-            status = self
-                .dispatch(runtime, authorizer, clock, &signal, deadline, &gate)
+            (status, spend_refusal) = self
+                .dispatch(
+                    runtime,
+                    authorizer,
+                    clock,
+                    &signal,
+                    (deadline, &deadline_hit),
+                    &gate,
+                )
                 .await?;
         }
-        Ok(RunOutcome {
+        let stop_reason = match status {
+            RunStatus::EvaluatedLive | RunStatus::Probed => None,
+            RunStatus::SpendCapped => spend_refusal,
+            RunStatus::ProbeFailed => report
+                .bindings
+                .iter()
+                .find_map(|b| b.failure.as_ref().map(|f| f.code.clone())),
+            RunStatus::Interrupted => Some(
+                if deadline_hit.get() {
+                    "run-deadline"
+                } else {
+                    "cancelled"
+                }
+                .into(),
+            ),
+        };
+        let mut counts = BTreeMap::from([
+            ("pending".into(), 0),
+            ("completed".into(), 0),
+            ("unavailable".into(), 0),
+            ("refused".into(), 0),
+            ("interrupted".into(), 0),
+        ]);
+        let mut cases = Vec::new();
+        for item in &self.checkpoint.items {
+            let name = match item.states.last().expect("nonempty history") {
+                ItemState::Pending | ItemState::Rerun { .. } => "pending",
+                ItemState::Completed {
+                    live_document_digest,
+                    run_record_digest,
+                } => {
+                    cases.push(LiveRunCase {
+                        candidate: item.candidate.clone(),
+                        repeat: item.repeat,
+                        case_id: item.case_id.clone(),
+                        rerun: rerun(item),
+                        live_document_digest: live_document_digest.clone(),
+                        run_record_digest: run_record_digest.clone(),
+                    });
+                    "completed"
+                }
+                ItemState::Unavailable { .. } => "unavailable",
+                ItemState::Refused { .. } => "refused",
+                ItemState::Interrupted { .. } => "interrupted",
+            };
+            *counts.get_mut(name).expect("known state") += 1;
+        }
+        let live_run = LiveRun {
+            schema: LiveRun::SCHEMA.into(),
+            identities: self.checkpoint.bindings.clone(),
+            status,
+            stop_reason,
+            probe: report.clone(),
+            counts,
+            run_spend: journal.run_split(&self.spec.run_id),
+            journal_before: before.clone(),
+            journal_after: journal.summary(),
+            cases,
+            repeat_reports: Vec::new(),
+        };
+        live_run.check()?;
+        let outcome = RunOutcome {
+            run_spend: live_run.run_spend.clone(),
+            journal_after: live_run.journal_after.clone(),
+            live_run,
             status,
             probe: report,
             items: self
@@ -358,10 +454,13 @@ impl PreparedRun {
                     )
                 })
                 .collect(),
-            run_spend: journal.run_split(&self.spec.run_id),
             journal_before: before,
-            journal_after: journal.summary(),
-        })
+        };
+        write_atomic(
+            &self.opts.out.join("live-run.json"),
+            &outcome.live_run.record_canonical().map_err(LiveError::io)?,
+        )?;
+        Ok(outcome)
     }
 
     async fn dispatch(
@@ -370,9 +469,9 @@ impl PreparedRun {
         authorizer: &dyn LiveAuthorizer,
         clock: &dyn Clock,
         signal: &CancelSignal,
-        deadline: Option<u64>,
+        (deadline, deadline_hit): (Option<u64>, &Cell<bool>),
         gate: &JournalGate,
-    ) -> Result<RunStatus, LiveError> {
+    ) -> Result<(RunStatus, Option<String>), LiveError> {
         let spend = probe::spend_bindings(&self.spec.config);
         let reach: BTreeMap<_, _> = self
             .spec
@@ -386,9 +485,10 @@ impl PreparedRun {
         let mut next = 0;
         let mut status = RunStatus::EvaluatedLive;
         let mut error = None;
+        let mut spend_refusal = None;
         loop {
             if deadline.is_some_and(|d| clock.now() >= d) {
-                signal.raise();
+                raise_for_deadline(signal, deadline_hit);
             }
             if signal.is_raised() && status != RunStatus::SpendCapped {
                 status = RunStatus::Interrupted;
@@ -533,7 +633,7 @@ impl PreparedRun {
                     return Poll::Ready(None);
                 }
                 if deadline.is_some_and(|d| clock.now() >= d) && !signal.is_raised() {
-                    signal.raise();
+                    raise_for_deadline(signal, deadline_hit);
                     return Poll::Ready(None);
                 }
                 for (slot, f) in work.iter_mut().enumerate() {
@@ -579,6 +679,7 @@ impl PreparedRun {
                 },
                 Ok(r) => {
                     if let Some(s) = r.spend_refusal {
+                        spend_refusal.get_or_insert_with(|| s.code.clone());
                         status = RunStatus::SpendCapped;
                         ItemState::Refused { code: s.code }
                     } else if signal.is_raised() && matches!(r.completion, Completion::Cancelled) {
@@ -619,7 +720,7 @@ impl PreparedRun {
         if let Some(e) = error {
             return Err(e);
         }
-        Ok(status)
+        Ok((status, spend_refusal))
     }
 }
 

@@ -187,6 +187,7 @@ pub struct Reservation {
 
 /// The run's settled charges and exposure, across all periods.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RunSpend {
     pub observed: u64,
     pub estimated: u64,
@@ -195,7 +196,8 @@ pub struct RunSpend {
 }
 
 /// The journal's totals for one period, in units.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SpendSummary {
     pub budget: BudgetKind,
     pub period: String,
