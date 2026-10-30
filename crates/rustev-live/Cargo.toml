@@ -14,6 +14,9 @@ publish = false
 [package.metadata.spec-spine]
 spec = "043-live-re-execution-at-scale"
 
+[features]
+fault-injection = []
+
 [dependencies]
 rustev-contract.workspace = true
 rustev-core.workspace = true
@@ -23,6 +26,7 @@ serde.workspace = true
 serde_json.workspace = true
 
 [dev-dependencies]
+rustev-live = { path = ".", features = ["fault-injection"] }
 tokio = { workspace = true, features = ["sync", "time", "rt", "macros"] }
 
 [lints]

@@ -348,8 +348,19 @@ fn append(file: &mut File, line: &[u8]) -> std::io::Result<()> {
     let mut buf = Vec::with_capacity(line.len() + 1);
     buf.extend_from_slice(line);
     buf.push(b'\n');
+    #[cfg(feature = "fault-injection")]
+    let entry: serde_json::Value = serde_json::from_slice(line).expect("journal entry");
+    #[cfg(feature = "fault-injection")]
+    let name = entry["op"].as_str().unwrap_or("header");
+    #[cfg(feature = "fault-injection")]
+    crate::fault_injection::point("journal", name, "before-write")?;
     file.write_all(&buf)?;
-    file.sync_data()
+    #[cfg(feature = "fault-injection")]
+    crate::fault_injection::point("journal", name, "before-sync")?;
+    file.sync_data()?;
+    #[cfg(feature = "fault-injection")]
+    crate::fault_injection::point("journal", name, "after-sync")?;
+    Ok(())
 }
 
 impl SpendJournal {
