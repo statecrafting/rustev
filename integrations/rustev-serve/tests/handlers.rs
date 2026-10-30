@@ -1935,3 +1935,141 @@ async fn disconnect_preserves_uncertain_remote_charge_and_delivery_record() {
     assert_eq!(backend.dispatched().len(), dispatched);
     assert_eq!(sink.calls.load(Ordering::SeqCst), 1);
 }
+
+#[tokio::test]
+async fn pushed_invalidations_ack_in_order_and_report_gaps_and_erasures() {
+    struct Never;
+    impl rustev_core::seams::ContextSource for Never {
+        fn fetch<'a>(
+            &'a self,
+            _fields: &'a [String],
+            _cx: &'a rustev_core::seams::CallContext,
+        ) -> BoxFuture<'a, Result<rustev_contract::snapshot::Snapshot, String>> {
+            Box::pin(async { Err("unused".into()) })
+        }
+    }
+    let mut cfg = config_value();
+    let endpoint = json!({
+        "address":"https://localhost:9443", "credentials_file":"none",
+        "max_in_flight":1, "queue_capacity":1, "readiness_affecting":true
+    });
+    cfg["context_sources"] = json!({"pushed": endpoint.clone(), "polled": endpoint});
+    let s = Service::new(
+        ServeConfig::parse(&serde_json::to_vec(&cfg).unwrap()).unwrap(),
+        Host {
+            backends: BTreeMap::new(),
+            contexts: BTreeMap::from([
+                (
+                    "pushed".into(),
+                    Arc::new(Never) as Arc<dyn rustev_core::seams::ContextSource>,
+                ),
+                (
+                    "polled".into(),
+                    Arc::new(Never) as Arc<dyn rustev_core::seams::ContextSource>,
+                ),
+            ]),
+            sink: Arc::new(Sink::default()),
+            replay_scopes: BTreeMap::new(),
+        },
+    )
+    .unwrap();
+    use rustev_contract::remote_context::InvalidationSupport;
+    s.describe_context_invalidation("pushed", vec!["f".into()], &InvalidationSupport::Push)
+        .unwrap();
+    s.describe_context_invalidation(
+        "polled",
+        vec!["f".into()],
+        &InvalidationSupport::Poll {
+            interval_ms: 1000,
+            max_lag_ms: 5000,
+        },
+    )
+    .unwrap();
+    assert!(
+        s.describe_context_invalidation("other", vec![], &InvalidationSupport::Push)
+            .is_err()
+    );
+    // A retained response for principal "opaque".
+    let id = register(&s);
+    assert_eq!(
+        s.decide(&id, b"opaque".to_vec(), &body("retained"), None)
+            .await
+            .status,
+        200
+    );
+    let batch = |source: &str, items: &[(u64, &str, Value)]| {
+        let items: Vec<Value> = items
+            .iter()
+            .map(|(n, kind, scope)| {
+                json!({"schema":"rustev.remote-context-invalidation/1","source_id":source,
+                    "sequence":n,"kind":kind,"fields":["f"],"scope":scope})
+            })
+            .collect();
+        serde_json::to_vec(&json!({"schema":"rustev.serve-invalidations/1",
+            "source_id":source,"items":items}))
+        .unwrap()
+    };
+    let ack = |reply: Reply| {
+        assert_eq!(
+            reply.status,
+            200,
+            "{}",
+            String::from_utf8_lossy(&reply.body)
+        );
+        ServeInvalidationsAck::parse(&reply.body)
+            .unwrap()
+            .highest_sequence
+    };
+    let gaps = |s: &Service| {
+        String::from_utf8(s.metrics().body)
+            .unwrap()
+            .lines()
+            .find(|l| l.contains("invalidation_gaps") && l.contains("pushed"))
+            .map(str::to_owned)
+    };
+    let principal = json!({"principal": b"opaque".to_vec()});
+    // First batch after startup: a baseline, not a gap.
+    assert_eq!(
+        ack(s.invalidations(&batch("pushed", &[(4, "erasure", principal.clone())]))),
+        4
+    );
+    // A replayed item is skipped; the next contiguous one applies.
+    assert_eq!(
+        ack(s.invalidations(&batch(
+            "pushed",
+            &[
+                (4, "erasure", principal.clone()),
+                (5, "correction", json!("all_scopes"))
+            ]
+        ))),
+        5
+    );
+    assert!(
+        gaps(&s).is_some_and(|l| l.ends_with(" 0")),
+        "{:?}",
+        gaps(&s)
+    );
+    // A gap: applied conservatively, counted, degraded until contiguous.
+    assert_eq!(
+        ack(s.invalidations(&batch("pushed", &[(9, "revocation", json!("all_scopes"))]))),
+        9
+    );
+    assert!(
+        gaps(&s).is_some_and(|l| l.ends_with(" 1")),
+        "{:?}",
+        gaps(&s)
+    );
+    let metrics = String::from_utf8(s.metrics().body).unwrap();
+    assert!(metrics.contains("rustev_context_erasures_while_retained_total 1"));
+    assert_eq!(ack(s.invalidations(&batch("pushed", &[]))), 9);
+    // A polled source takes no pushes; an unknown one is unavailable.
+    code(
+        &s.invalidations(&batch("polled", &[(1, "correction", json!("all_scopes"))])),
+        RefusalCode::InvalidRequest,
+    );
+    code(
+        &s.invalidations(&batch("billing", &[(1, "correction", json!("all_scopes"))])),
+        RefusalCode::ContextUnavailable,
+    );
+    code(&s.invalidations(b"{}"), RefusalCode::InvalidDocument);
+}

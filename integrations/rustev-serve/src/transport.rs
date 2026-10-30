@@ -341,9 +341,7 @@ where
     let Ok(id) = id else {
         return respond(service.refuse(RefusalCode::InvalidRequest));
     };
-    if !listener.groups.as_slice().contains(&op.group)
-        || matches!(op.operation, Operation::Explain | Operation::Invalidations)
-    {
+    if !listener.groups.as_slice().contains(&op.group) || op.operation == Operation::Explain {
         return respond(service.refuse(RefusalCode::EndpointUnavailable));
     }
     let mut headers = BTreeMap::new();
@@ -410,7 +408,11 @@ where
     }
     let has_body = matches!(
         op.operation,
-        Operation::Register | Operation::Decide | Operation::Replay | Operation::Evaluate
+        Operation::Register
+            | Operation::Decide
+            | Operation::Replay
+            | Operation::Evaluate
+            | Operation::Invalidations
     );
     if has_body
         && headers
@@ -492,6 +494,7 @@ where
         },
         Operation::Readiness => service.readiness(),
         Operation::Metrics => service.metrics(),
+        Operation::Invalidations => service.invalidations(&bytes),
         Operation::Replay | Operation::Evaluate => {
             crate::offline::run(service.clone(), op.operation, principal, bytes, deadline).await
         }

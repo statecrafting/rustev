@@ -32,25 +32,7 @@ impl RemoteSink {
         endpoint: &rustev_contract::serve::RemoteEndpoint,
         timeout_ms: u64,
     ) -> Result<Self, String> {
-        let bearer = match &endpoint.credentials_file {
-            Maybe::None => None,
-            Maybe::Some(path) => {
-                let bytes = crate::transport::read_file(path.as_str(), 4096)?;
-                if bytes.is_empty() || !bytes.iter().all(u8::is_ascii_graphic) {
-                    return Err("sink credential must be nonempty visible ASCII".into());
-                }
-                Some(Secret::new(
-                    String::from_utf8(bytes).map_err(|e| e.to_string())?,
-                ))
-            }
-        };
-        let transport = HttpTransport::new(
-            Endpoint::parse(endpoint.address.as_str()).map_err(|e| e.to_string())?,
-            None,
-            bearer,
-            None,
-        )
-        .map_err(|e| e.to_string())?;
+        let transport = transport(endpoint)?;
         let request = DescribeRequest {
             schema: DESCRIBE.into(),
             versions: vec![1],
@@ -117,6 +99,31 @@ impl RemoteSink {
         }
         receipt(&reply.body, &request.record_digest, &self.description)
     }
+}
+/// The HTTP transport of a configured endpoint, with its bearer credential
+/// read from the configured file.
+pub(crate) fn transport(
+    endpoint: &rustev_contract::serve::RemoteEndpoint,
+) -> Result<HttpTransport, String> {
+    let bearer = match &endpoint.credentials_file {
+        Maybe::None => None,
+        Maybe::Some(path) => {
+            let bytes = crate::transport::read_file(path.as_str(), 4096)?;
+            if bytes.is_empty() || !bytes.iter().all(u8::is_ascii_graphic) {
+                return Err("endpoint credential must be nonempty visible ASCII".into());
+            }
+            Some(Secret::new(
+                String::from_utf8(bytes).map_err(|e| e.to_string())?,
+            ))
+        }
+    };
+    HttpTransport::new(
+        Endpoint::parse(endpoint.address.as_str()).map_err(|e| e.to_string())?,
+        None,
+        bearer,
+        None,
+    )
+    .map_err(|e| e.to_string())
 }
 fn validate_description(d: &DescribeResponse) -> Result<(), String> {
     if d.version != 1
@@ -273,11 +280,12 @@ pub async fn standalone(config: ServeConfig) -> Result<Arc<Service>, String> {
         service: OnceLock::new(),
         sinks: remotes,
     });
+    let mut contexts = crate::contexts::connect(&config).await?;
     let service = Service::new(
         config,
         Host {
             backends: BTreeMap::new(),
-            contexts: BTreeMap::new(),
+            contexts: std::mem::take(&mut contexts.sources),
             sink: sinks.clone(),
             replay_scopes: BTreeMap::new(),
         },
@@ -286,6 +294,7 @@ pub async fn standalone(config: ServeConfig) -> Result<Arc<Service>, String> {
         .service
         .set(Arc::downgrade(&service))
         .map_err(|_| "sink already attached")?;
+    crate::contexts::start_reporting(&service, contexts);
     for (name, _) in &sinks.sinks {
         service.report_component_health(
             crate::health::ComponentKind::Sink,

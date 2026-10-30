@@ -30,8 +30,8 @@ The optional runtime observer has byte-equivalence and panic-containment tests i
 | Remote context queue full | Handler propagation tested by `context_extra_fields_and_failed_fetch_never_dispatch_a_decision`; remote queue implementation remains in remote HTTP binding |
 | Late context response | Remote callback client accounting remains outside this increment |
 | Unrequested context field | Context negative test |
-| Third-party endpoint, unknown describe version | Remote sink startup rejects unknown describe versions; remote context construction remains outside this increment; readiness requires host-confirmed describe completion |
-| Invalidation gap/erasure | Remote invalidation implementation remains outside this increment; readiness degradation reporting is tested |
+| Third-party endpoint, unknown describe version | Remote sink startup rejects unknown describe versions; remote context: `contexts::tests::described_sources_fetch_and_undescribed_ones_are_unavailable` and `rustev-remote-http` `construction_refuses_an_undescribed_source`; readiness requires host-confirmed describe completion |
+| Invalidation gap/erasure | `pushed_invalidations_ack_in_order_and_report_gaps_and_erasures` (push: baseline, replay skipped, gap counted and degraded, erasure while retained counted); poll: `contexts::tests::a_polled_source_sets_its_baseline_applies_items_and_degrades_on_failure` |
 | Stalled stream | `stalled_decision_stream_retains_final_and_counts_actual_step_drops`; live steps and disconnect: `http_stream_emits_admission_and_steps_before_final_and_disconnect_keeps_work` |
 | HTTP/gRPC differential | `grpc_differential` covers success, refusals, retained streaming and evidence failure/lookup over HTTP/2 in memory and loopback; `grpc::tests` checks all 31 refusal mappings. Shared family conformance remains separate. |
 | Explain unavailable | `in_memory_http1_and_http2_use_the_same_handlers` |

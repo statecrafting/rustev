@@ -29,7 +29,9 @@ submissions until expiry. Memory retention is lost on restart.
 
 Replay and evaluation use `rustev-surface` with bounded blocking work and
 host-installed replay scopes. Artifact reads are confined to configured roots.
-Explanation and invalidation endpoints are unavailable pending spec 040.
+The explanation endpoint is unavailable until its documents are implemented.
+`POST /v1/context/invalidations` applies pushed invalidations of sources whose
+describe declared `push` (`src/invalidations.rs`).
 
 Live lookup distinguishes queued and running work using the runtime admission
 callback. Cancellation preserves actual backend stop acknowledgements, including
@@ -120,8 +122,10 @@ These gaps are not claims of spec acceptance:
   canonical record bytes, digest, registration, signer and service build. Receipts
   must match the digest and advertised durability states. Delivery uses the
   configured fail-decision, backpressure or drop-counted runtime policy. No sink
-  configured means explicit delivery failure. Ecosystem backends and context
-  clients still require host construction. OpenTelemetry startup is refused
+  configured means explicit delivery failure. It also builds one
+  `rustev.remote-context/1` client per configured context source (`src/contexts.rs`);
+  a source whose describe fails is installed as unavailable and reported not
+  described. Ecosystem backends still require host construction. OpenTelemetry startup is refused
   because no exporter feature is built.
 - The shared conformance suite, remote HTTP context bindings, and specs 034/036
   integration are not implemented yet.
