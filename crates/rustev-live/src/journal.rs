@@ -166,6 +166,7 @@ enum ResState {
     Observed(u64),
     Estimated(u64),
     Liability,
+    Unknown,
     Released,
 }
 
@@ -182,6 +183,15 @@ struct Res {
 pub struct Reservation {
     pub seq: u64,
     pub units: u64,
+}
+
+/// The run's settled charges and exposure, across all periods.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RunSpend {
+    pub observed: u64,
+    pub estimated: u64,
+    pub liability: u64,
+    pub unknown: u64,
 }
 
 /// The journal's totals for one period, in units.
@@ -609,7 +619,11 @@ impl SpendJournal {
             return false;
         }
         let mut s = self.lock();
-        if s.res.get(&seq).map(|x| x.state) != Some(ResState::Liability) {
+        if s.res
+            .get(&seq)
+            .map(|x| x.state)
+            .is_none_or(|s| !matches!(s, ResState::Liability | ResState::Unknown))
+        {
             return false;
         }
         if !self.write(
@@ -650,7 +664,9 @@ impl SpendJournal {
             .res
             .get(&billing.reservation)
             .ok_or(Unresolved("billing reservation is missing"))?;
-        if reservation.period != billing.period || reservation.state != ResState::Liability {
+        if reservation.period != billing.period
+            || !matches!(reservation.state, ResState::Liability | ResState::Unknown)
+        {
             return Err(Unresolved(
                 "billing month conflicts or reservation is not liability",
             ));
@@ -687,6 +703,57 @@ impl SpendJournal {
         run_total(&self.lock().res, run_id)
     }
 
+    /// Runtime attempt ids in reservation sequence order, including releases.
+    pub fn reservations_for(&self, decision_id: &str) -> Vec<String> {
+        let prefix = format!(
+            "{decision_id}/{}",
+            rustev_contract::live::attempt_prefix(decision_id)
+        );
+        self.lock()
+            .res
+            .values()
+            .filter(|r| r.attempt.starts_with(&prefix))
+            .map(|r| r.attempt[decision_id.len() + 1..].to_string())
+            .collect()
+    }
+
+    pub fn run_split(&self, run_id: &str) -> RunSpend {
+        let prefix = format!("live/{run_id}/");
+        let mut split = RunSpend::default();
+        for r in self
+            .lock()
+            .res
+            .values()
+            .filter(|r| r.attempt.starts_with(&prefix))
+        {
+            let (total, units) = match r.state {
+                ResState::Observed(u) => (&mut split.observed, u),
+                ResState::Estimated(u) => (&mut split.estimated, u),
+                ResState::Unknown => (&mut split.unknown, r.units),
+                ResState::Outstanding | ResState::Liability => (&mut split.liability, r.units),
+                ResState::Released => continue,
+            };
+            *total = total.saturating_add(units);
+        }
+        split
+    }
+
+    /// Schema-tagged digest of the serialized testing header, including newline.
+    pub fn testing_header_digest() -> rustev_contract::ids::ContentDigest {
+        let header = Header {
+            schema: JOURNAL_SCHEMA.into(),
+            budget: BudgetKind::Testing,
+            cap: BudgetKind::Testing.cap(),
+        };
+        let mut bytes = serde_json::to_vec(&header).expect("header serializes");
+        bytes.push(b'\n');
+        rustev_contract::ids::ContentDigest::parse(&rustev_contract::canonical::tagged_digest(
+            JOURNAL_SCHEMA,
+            &bytes,
+        ))
+        .expect("computed digest")
+    }
+
     /// Units still available in the current period.
     pub fn headroom(&self) -> u64 {
         self.summary().headroom
@@ -717,7 +784,7 @@ fn run_total(res: &BTreeMap<u64, Res>, run_id: &str) -> u64 {
         .fold(0_u64, |total, r| {
             let units = match r.state {
                 ResState::Observed(u) | ResState::Estimated(u) => u,
-                ResState::Outstanding | ResState::Liability => r.units,
+                ResState::Outstanding | ResState::Liability | ResState::Unknown => r.units,
                 ResState::Released => 0,
             };
             total.saturating_add(units)
@@ -728,7 +795,7 @@ fn settled(charge: Charge) -> ResState {
     match charge {
         Charge::Observed { units } => ResState::Observed(units),
         Charge::Estimated { units } => ResState::Estimated(units),
-        Charge::Unknown => ResState::Liability,
+        Charge::Unknown => ResState::Unknown,
     }
 }
 
@@ -748,7 +815,9 @@ fn totals(res: &BTreeMap<u64, Res>, kind: BudgetKind, period: &str) -> SpendSumm
             ResState::Outstanding => t.outstanding = t.outstanding.saturating_add(r.units),
             ResState::Observed(u) => t.observed = t.observed.saturating_add(u),
             ResState::Estimated(u) => t.estimated = t.estimated.saturating_add(u),
-            ResState::Liability => t.liability = t.liability.saturating_add(r.units),
+            ResState::Liability | ResState::Unknown => {
+                t.liability = t.liability.saturating_add(r.units)
+            }
             ResState::Released => {}
         }
     }
