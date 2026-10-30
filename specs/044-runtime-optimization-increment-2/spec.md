@@ -837,8 +837,9 @@ The spec 009, 012 and 017 tests are unchanged (3.10.5) and run under
 those specs' own declared verification.
 
 Open, reported as such and never as passed:
-- Stage 2 of 3.8 (item 2): it runs only under the work order's live scope,
-  so both stage 1 reports keep the verdict `unknown`.
+- Stage 2 of 3.8 (item 2) for the remote-http adapter, whose report keeps
+  the verdict `unknown`. The Jev adapter's stage 2 ran on 2026-10-29 and
+  measured `not_qualified` (below).
 - 3.8 item 4, R-2's construction check `batch_unqualified` and section 5's
   row "A production binding enables batching without a qualified report":
   increment 8, externally blocked on spec 022 (A-49).
@@ -2034,8 +2035,30 @@ follows from them, section 4):
 9 seconds when its test targets are already built, and about 70 seconds
 when they are rebuilt, well inside the acceptance group's 45 minutes.
 
-Still open, as the Verification section states: stage 2 of 3.8, and
-increment 8.
+Still open, as the Verification section states: stage 2 of 3.8 for the
+remote-http adapter, and increment 8.
+
+**Stage 2 of 3.8 for the Jev adapter (2026-10-29).** Run live under the
+owner's authorization of 2026-10-29 (A-68), within R-29's testing cap and
+the shared testing journal, on spec 012's stage 3 synthetic-provenance set.
+The unbatched answers are spec 022 stage 3's, on its production binding
+`sha256:12897cdf3796818833af333769e913d1a1f65a267532ea4de2ec3b144fd40bd4`
+(direct transport, pin `jev-1.14.0`). The batched answers come from the same
+binding with only the batching switch on, at stage 1's configuration (3
+items, 2,000 ms): 23 requests, each asking relevance and message_kind as two
+questions on one state, all HTTP 200 and attributed `shared_state`. That
+gives 46 pairs under A-64's declared bound, `top_label` at 19 of 20 over at
+least 20. 43 agree (0.935), so the measured verdict is `not_qualified`. Two
+of the disagreements are near ties that flipped (0.52 against 0.47, and 0.52
+against 0.49). The third is a batched tie at 0.43, which never agrees.
+Spend: 1,035,888 units estimated, with no unknown settlement. The pairs and
+the binding are recorded in
+`integrations/rustev-jev/tests/fixtures/recorded-044-direct-stage2.json`
+(case ids and distributions only). `stage_2_on_the_direct_binding_measures_not_qualified`
+runs stage 1, derives the report from both stages, and asserts `(43, 46)`
+and `not_qualified`. No binding enables adapter-scoped batching in
+production (R-28): this measured result is the evidence for keeping it
+off.
 
 **Increment 5, part d2, the plan (2026-10-29).** The owner chose the
 representation above (A-64), and 3.6.5 and 3.6.6 now say it. Part d2

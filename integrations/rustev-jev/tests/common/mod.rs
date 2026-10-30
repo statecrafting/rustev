@@ -57,9 +57,11 @@ pub fn fixture(name: &str) -> Json {
     let prov = v["provenance"].as_str().unwrap_or_default();
     if name.starts_with("recorded-") {
         // The Gateway's recordings cite R-27; the direct API's, spec 022's
-        // owner-authorized stage 2.
+        // owner-authorized stage 2 or spec 044's stage 2 of 3.8.
         assert!(
-            prov.contains("R-27") || prov.contains("spec 022 3.7 stage 2"),
+            prov.contains("R-27")
+                || prov.contains("spec 022 3.7 stage 2")
+                || prov.contains("spec 044 3.8 stage 2"),
             "{name}: {prov}"
         );
     } else {

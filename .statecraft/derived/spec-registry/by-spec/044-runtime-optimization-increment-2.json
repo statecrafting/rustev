@@ -209,7 +209,7 @@
       }
     ],
     "sectionDigests": {
-      "044-runtime-optimization-increment-2-amends-017-003-002-009-012-and-020": "7c90de4ee870bf6bb01fd5cadc3a155476d6e0f9029fd601aa8572498a795463",
+      "044-runtime-optimization-increment-2-amends-017-003-002-009-012-and-020": "ea498d4c17e72671e22d1165334c5cf75a466dcfc7f570aa6deac66e64122c9d",
       "1-purpose": "ea80bf0f3f36a7db47061ac339b96e60d520ebbcc03c92a97ed01ffbc636bba3",
       "2-1-binding-principles-of-76": "fa0b4f40e2c3a80864d8c109330c03767c14d25dbdc6379f5666ffd220addf77",
       "2-territory": "4f44666fa2f2dffb9d94fca73faed5147c92ad9e431868f211db198a0ffbf84c",
@@ -243,8 +243,8 @@
       "5-observable-negative-cases": "c653937453576e9ce359f14155800abc24d4923e1e011fec999f1bad17962d00",
       "acceptance": "4fc00601fae7e454380245eb44b604e7b8d5dc1376bde84c5e15d663ec91a0c8",
       "decisions-at-approval": "07d8eec0785d785c4dec888d094e4ed84e5c519f1e57d0d7385b4f64aa91ba9c",
-      "implementation-record": "879741457568c59c235b2b991402fd0acc24e17fab422cf91078788e3b1fa2bd",
-      "verification": "656cbc6f7418b69f10c68577ba8c7cd2249fb859be8d9760e17652b2a6640858"
+      "implementation-record": "3bb4d43a83a15ee4e39ef239204f8c073750d1584ef2de7a212cd0452bc7c1b5",
+      "verification": "4a8dcd6a3ea1bd50619f88504bce7e0783140d43e2d44c59ad26a331a55e417d"
     },
     "sectionHeadings": [
       "044: Runtime optimization increment 2 (amends 017, 003, 002, 009, 012 and 020)",
@@ -289,6 +289,6 @@
     "summary": "An amendment of approved spec 017 (and, through it, of spec 003's concurrency and cancellation rules) for #76 child F1, which also amends specs 002, 009, 012 and 020 where its members and batching rules reach them. Completes 017 increment 2 and adds a decision-result cache. Concurrent duplicate suppression keeps spec 003's rule that the runtime spawns no task per request: a shared attempt lives in a runtime-owned slot that is driven by whichever waiter is polled, a waiter that cancels returns at once and hands charge ownership to the oldest remaining waiter, and the last waiter to leave cancels the attempt under spec 003's existing rules. Persistent caches sit behind a host-implemented `RuntimeStore` seam with durable generations, conditional writes, byte budgets and integrity-checked `rustev.cache-entry/1` entries. The decision-result cache reuses a whole decision's semantic work under a compiler-derived key that always holds plan identity, the complete authorized scope, the profile and declared upstream-origin dimensions; on a hit the core recomputes the judgment and the runtime re-runs the compiler-derived dependency closure of every declared volatile source, with a declared policy when refresh fails that never serves stale evidence as a value. Capabilities may declare `isolation: per_item`, which every batching path honours, and adapter-scoped batching gains a qualification procedure and report (`rustev.batch-qualification/1`). Plans, descriptors and records that use none of this keep their bytes and identities. Approved (A-41); implementation is in progress.\n",
     "title": "Runtime optimization increment 2: duplicate suppression, persistent and decision-result caches, batching qualification (amends 017, 003, 002, 009, 012 and 020)"
   },
-  "shardHash": "28afd39a1447af3c5d69df34a8d48b1a1f61c168319ad14f64f25df903abdfaf",
+  "shardHash": "ee1c755ac98f0e184b211aa9f4abbf2bd0925b70e0f70fd6c21d501d8d7334ee",
   "specVersion": "1.10.0"
 }
