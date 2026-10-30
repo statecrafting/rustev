@@ -48,3 +48,10 @@ mod taxonomy;
 mod wire;
 
 pub mod grpc;
+
+// Shared conformance through the service (spec 042, 3.17). A unit-test
+// module, not an integration test: it drives the service on a manual clock
+// through a constructor that exists only in this crate's test build.
+#[cfg(all(test, unix))]
+#[path = "../tests/conformance/runner.rs"]
+mod conformance;

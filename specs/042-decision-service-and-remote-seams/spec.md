@@ -1257,6 +1257,36 @@ round-trip contract and
 `explain_requests_take_either_evidence_form_and_name_their_bundle_sides`
 in `crates/rustev-contract/tests/042_serve_documents.rs`.
 
+**Increment 5 part 1: shared conformance through the service (2026-10-29).**
+`integrations/rustev-serve/tests/conformance/runner.rs` runs every `run`
+golden of the suite's manifest (the four `actionable.run-*` cases and
+`lodging.run`) through `serve-http` and `serve-grpc`, each over a
+mutual-TLS TCP listener and a Unix socket (3.17.1). The plan is registered
+as an unsigned bundle, the case's snapshot is served by a
+`rustev.remote-context/1` source and the run record is delivered to a
+`rustev.remote-sink/1` sink, both hosted by `rustev-remote-http`'s callback
+server and reached through the service's `RemoteContextClient` and
+`RemoteSink`. The judgment equals the stdout golden's, `plan_id` is
+asserted, and the delivered record equals the record golden under its
+normalizations. Per listener the HTTP and gRPC decision documents are
+compared byte for byte, `run_record_digest` and `evidence` included
+(3.17.2). `make conformance` runs the test (3.17.4). The remote sink now
+delivers every run record schema the sink described rather than
+`rustev.run/1` only, and the service's sinks accept a schema only when
+every configured sink described it: an actionable plan's record is
+`rustev.run/3`. A test seam, not API: `Service::with_clock` and
+`sinks::standalone_with_clock` hand a caller's `Clock` to the runtime and
+exist only under `cfg(test)`, so the runner is a unit-test module of the
+crate (`src/lib.rs` includes it by path) rather than an integration test.
+A non-default cargo feature would need the crate to dev-depend on itself
+to reach its integration tests, an edge 001 3.4.4's check refuses. The
+runner uses a manual clock. The service measures its own budget accounting
+for a decision (the context fetch's elapsed time and timeout, and the
+remaining deadline handed to the runtime) on that same clock rather than
+on a separate real-time source, so under the manual clock a fetch takes
+0 ms and the record's `deadline_ms` is the CLI's. The default clock
+(`TokioClock`) keeps the earlier behavior.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

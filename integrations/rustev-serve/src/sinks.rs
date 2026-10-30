@@ -64,8 +64,12 @@ impl RemoteSink {
             ),
         })
     }
+    /// Whether the sink described `schema` (3.11.1).
+    fn accepts(&self, schema: RecordSchema) -> bool {
+        self.description.record_schemas.contains(&schema)
+    }
     async fn send(&self, request: DeliverRequest) -> Result<String, String> {
-        if request.record_schema != RecordSchema::V1
+        if !self.accepts(request.record_schema)
             || request.record.len() as u64 > self.description.max_record_bytes
         {
             return Err(
@@ -198,7 +202,21 @@ struct Sinks {
     service: OnceLock<Weak<Service>>,
     sinks: Vec<(Handle, RemoteSink)>,
 }
+/// The remote-sink name of a run record schema.
+fn record_schema(schema: &str) -> Option<RecordSchema> {
+    [RecordSchema::V1, RecordSchema::V2, RecordSchema::V3]
+        .into_iter()
+        .find(|s| s.as_str() == schema)
+}
 impl EvidenceSink for Sinks {
+    /// A schema every configured sink described (spec 032 3.11.2, 042
+    /// 3.11.1); with no sink, the default.
+    fn accepts(&self, schema: &str) -> bool {
+        if self.sinks.is_empty() {
+            return schema == rustev_contract::schema::RUN;
+        }
+        record_schema(schema).is_some_and(|s| self.sinks.iter().all(|(_, sink)| sink.accepts(s)))
+    }
     fn deliver<'a>(&'a self, record: &'a RunRecord) -> BoxFuture<'a, Result<String, String>> {
         Box::pin(async move {
             let service = self
@@ -213,7 +231,8 @@ impl EvidenceSink for Sinks {
                 schema: DELIVER.into(),
                 version: 1,
                 decision_id: Handle::new(&record.decision_id).map_err(|e| e.to_string())?,
-                record_schema: RecordSchema::V1,
+                record_schema: record_schema(&record.schema)
+                    .ok_or("record schema not deliverable; may_have_received: false")?,
                 record: String::from_utf8(record.record_canonical().map_err(|e| e.to_string())?)
                     .map_err(|e| e.to_string())?,
                 record_digest: record.record_digest().map_err(|e| e.to_string())?,
@@ -253,6 +272,33 @@ impl EvidenceSink for Sinks {
 /// Construct and describe configured remote sinks before exposing listeners.
 /// OpenTelemetry remains unavailable unless its exporter feature is built.
 pub async fn standalone(config: ServeConfig) -> Result<Arc<Service>, String> {
+    standalone_with_backends(config, BTreeMap::new()).await
+}
+/// As [`standalone`], with host-constructed backends for `backend_bindings`.
+pub async fn standalone_with_backends(
+    config: ServeConfig,
+    backends: BTreeMap<String, Arc<dyn rustev_core::seams::DecisionBackend>>,
+) -> Result<Arc<Service>, String> {
+    connect(config, backends, Service::new).await
+}
+/// As [`standalone_with_backends`], on a caller's clock (see
+/// [`Service::with_clock`]); only in this crate's own test build.
+#[cfg(test)]
+pub(crate) async fn standalone_with_clock(
+    config: ServeConfig,
+    backends: BTreeMap<String, Arc<dyn rustev_core::seams::DecisionBackend>>,
+    clock: Arc<dyn rustev_runtime::Clock>,
+) -> Result<Arc<Service>, String> {
+    connect(config, backends, |config, host| {
+        Service::with_clock(config, host, clock)
+    })
+    .await
+}
+async fn connect(
+    config: ServeConfig,
+    backends: BTreeMap<String, Arc<dyn rustev_core::seams::DecisionBackend>>,
+    construct: impl FnOnce(ServeConfig, Host) -> Result<Arc<Service>, String>,
+) -> Result<Arc<Service>, String> {
     let timeout_ms = match config.sink_policy {
         SinkPolicy::FailDecision { timeout_ms } => timeout_ms.get(),
         SinkPolicy::Backpressure {
@@ -281,10 +327,10 @@ pub async fn standalone(config: ServeConfig) -> Result<Arc<Service>, String> {
         sinks: remotes,
     });
     let mut contexts = crate::contexts::connect(&config).await?;
-    let service = Service::new(
+    let service = construct(
         config,
         Host {
-            backends: BTreeMap::new(),
+            backends,
             contexts: std::mem::take(&mut contexts.sources),
             sink: sinks.clone(),
             replay_scopes: BTreeMap::new(),
