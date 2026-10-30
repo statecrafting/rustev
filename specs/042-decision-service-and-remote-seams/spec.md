@@ -443,9 +443,14 @@ may be implemented before that record; `rustev-serve` may not.
    bounded parser. Connection count, HTTP/2 concurrent streams and
    per-connection request rate are bounded by configuration with stated
    ranges; exceeding them refuses the connection or stream.
-4. **Runtime bounds.** `max_in_flight`, `max_queued` and the per-backend
-   concurrency of spec 003 3.4 are configuration. The service adds no
-   queue of its own in front of runtime admission.
+4. **Runtime bounds.** `max_in_flight`, `max_queued`,
+   `max_parallel_requests` (the requests in progress within one decision,
+   spec 003 3.4.2) and the per-backend concurrency of spec 003 3.4 are
+   configuration. `max_parallel_requests` is optional, from 1 to 65,536;
+   absent, it is 1, the service's behavior before the member existed. A
+   configuration without it keeps its configuration digest; one that
+   states it, 1 included, is a different configuration. The service adds
+   no queue of its own in front of runtime admission.
 
 ### 3.6 Idempotency, lookup and cancellation
 
@@ -814,7 +819,9 @@ unflushed. No record leaves the accounting.
 
 `rustev.serve-config/1` (identity-bearing, parsed under declared bounds,
 refused whole when any member is out of range or unknown) holds: listeners
-and their groups, TLS and authentication; limits; runtime configuration;
+and their groups, TLS and authentication; limits; runtime configuration
+(`max_in_flight`, `max_queued`, the optional `max_parallel_requests` and
+`per_backend_concurrency`, 3.5.4);
 backend bindings by name, each a backend compiled into the binary (by
 feature, for example the reference rules backend) or a `rustev.remote/1`
 or `/2` endpoint, with its expected `DescriptorId`; context sources and
