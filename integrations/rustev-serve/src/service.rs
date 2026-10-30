@@ -55,11 +55,11 @@ impl Reply {
         )
     }
 }
-struct Registration {
+pub(crate) struct Registration {
     record: PlanRegistration,
-    plan: PreparedPlan,
+    pub(crate) plan: PreparedPlan,
 }
-struct Entry {
+pub(crate) struct Entry {
     plan_id: rustev_contract::ids::PlanId,
     running: Arc<AtomicBool>,
     digest: ContentDigest,
@@ -102,10 +102,10 @@ impl rustev_runtime::ProgressObserver for Progress {
         }
     }
 }
-type Key = (ContentDigest, String);
-struct State {
-    plans: BTreeMap<String, Arc<Registration>>,
-    entries: BTreeMap<Key, Entry>,
+pub(crate) type Key = (ContentDigest, String);
+pub(crate) struct State {
+    pub(crate) plans: BTreeMap<String, Arc<Registration>>,
+    pub(crate) entries: BTreeMap<Key, Entry>,
     bytes: usize,
     failed_ids: Vec<Handle>,
     failed_total: u64,
@@ -114,23 +114,25 @@ pub struct Service {
     pub config: ServeConfig,
     pub digest: ContentDigest,
     pub build: Handle,
-    runtime: Runtime,
+    pub(crate) runtime: Runtime,
     host: Host,
     trust: Trust,
-    state: Mutex<State>,
+    pub(crate) state: Mutex<State>,
     stopping: AtomicBool,
     stop_signal: tokio::sync::watch::Sender<bool>,
     refused: Mutex<BTreeMap<String, u64>>,
     health: Mutex<crate::health::Health>,
     pub(crate) stream_drops: Arc<AtomicU64>,
+    pub(crate) invalidation: Mutex<BTreeMap<String, crate::invalidations::Source>>,
+    pub(crate) erasures_while_retained: AtomicU64,
     pub(crate) blocking: Arc<Semaphore>,
     pub(crate) blocking_slots: Arc<Semaphore>,
 }
 const RESERVED: usize = 9 * MIB + 71;
-fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+pub(crate) fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(|p| p.into_inner())
 }
-fn scope_key(principal: &[u8], id: &str) -> Key {
+pub(crate) fn scope_key(principal: &[u8], id: &str) -> Key {
     (
         digest_id(tagged_digest("rustev.serve-principal/1", principal)),
         id.into(),
@@ -223,6 +225,8 @@ impl Service {
             refused: Mutex::new(BTreeMap::new()),
             health: Mutex::new(crate::health::configured(&config)),
             stream_drops: Arc::new(AtomicU64::new(0)),
+            invalidation: Mutex::new(BTreeMap::new()),
+            erasures_while_retained: AtomicU64::new(0),
             blocking: Arc::new(Semaphore::new(config.blocking_threads.get() as usize)),
             blocking_slots: Arc::new(Semaphore::new(
                 (config.blocking_threads.get() + config.blocking_queue.get()) as usize,
@@ -844,9 +848,7 @@ impl Service {
                 available_endpoints: List::new(
                     operation_table()
                         .into_iter()
-                        .filter(|o| {
-                            !matches!(o.operation, Operation::Explain | Operation::Invalidations)
-                        })
+                        .filter(|o| !matches!(o.operation, Operation::Explain))
                         .map(|o| o.operation)
                         .collect(),
                 )
@@ -952,6 +954,10 @@ impl Service {
             ("sink_in_delivery", gauges.sink.in_delivery),
             ("sink_dropped", gauges.sink.dropped),
             ("sink_queued", gauges.sink.queued),
+            (
+                "context_erasures_while_retained_total",
+                self.erasures_while_retained.load(Ordering::Relaxed),
+            ),
         ];
         let mut body = String::new();
         for (name, value) in values {

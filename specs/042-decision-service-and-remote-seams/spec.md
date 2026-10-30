@@ -1157,6 +1157,58 @@ against the host server of part 1. In
 unpacked bound becomes 393,216 bytes (384 KiB), as `rustev-runtime`'s did
 in #330: the package unpacks to 332.6 KiB against the earlier 320 KiB.
 
+**Increment 4 part 3: remote context sources in the service (2026-10-29).**
+`integrations/rustev-serve/src/contexts.rs` builds one
+`RemoteContextClient` per entry of `context_sources` when the standalone
+binary starts, the entry's key being the source id the endpoint describes,
+with the entry's in-flight limit and queue capacity (3.12.1). A source
+whose describe fails is installed as unavailable: each fetch from it fails
+`context_unavailable`, and it is reported not described, so readiness
+reflects it when the endpoint is readiness-affecting (3.10.1). Queue depth
+(queued calls, beyond those in flight), refusals and late discards are
+reported to the health table every second (3.12.4). The bearer credential
+is read as for sinks (`sinks::transport`). The crate compiles the shared
+sources `callback_server.rs`, `context_client.rs`, `seam_queue.rs` and
+`taxonomy.rs` of `rustev-remote-http` by path, as it does the others.
+Engineering choices made by the implementing agent where 3.10.2 names a
+value the configuration document has no member for, not by the owner: the
+transit margin is 25 ms; the principal reference is the caller's principal
+handle unchanged, with mapping version `rustev-serve/principal-handle/1`
+and scope `rustev-serve`; the describe budget is 10 seconds; a source is
+described once at startup and not again. Test: the module's unit test
+(a described source fetches through the client; an undescribed one is
+unavailable).
+
+**Increment 4 part 3, pushed invalidations (2026-10-29).**
+`integrations/rustev-serve/src/invalidations.rs` serves
+`POST /v1/context/invalidations` (admin group) for sources whose describe
+declared `push` (3.10.6); the context client records each source's fields
+and terms after describe (`Service::describe_context_invalidation`). Each
+item is applied before the acknowledgement, for every registered plan
+reading a named field: `invalidate_scope` for a named principal,
+`invalidate_plan` for `all_scopes`; the three kinds alike. Items at or
+below the last applied sequence are skipped. The first batch after startup
+and any batch not contiguous with the last applied item first invalidate
+every plan reading the source's fields; a gap is counted, marks the
+source `invalidation_degraded` in readiness and metrics, and the next
+contiguous batch clears it. An erasure applied while a response for its
+scope is retained is counted (`rustev_context_erasures_while_retained_total`).
+The acknowledgement names the highest sequence applied. A source that is
+not configured is `context_unavailable`, one that does not declare `push`
+`invalid_request`. `rustev.serve-service/1` now lists the operation. A
+`poll` source is polled every `interval_ms` by `src/contexts.rs`: it is
+`invalidation_degraded` until its baseline poll (no sequence) succeeds;
+items apply as pushed ones do, and an answer whose sequence passes its
+last item is a gap; a failed poll invalidates every plan reading the
+source, counts one gap per outage and needs a fresh baseline; lag beyond
+`max_lag_ms` invalidates and degrades likewise, and the lag is reported.
+A polled principal reference is a principal handle only under this
+service's mapping version; any other applies to every scope. Tests:
+`pushed_invalidations_ack_in_order_and_report_gaps_and_erasures` in
+`tests/handlers.rs` and
+`contexts::tests::a_polled_source_sets_its_baseline_applies_items_and_degrades_on_failure`;
+`tests/COVERAGE.md` updated.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child
