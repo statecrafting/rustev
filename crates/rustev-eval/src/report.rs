@@ -16,10 +16,11 @@ use rustev_contract::eval_report::{
     DatasetRef, EvalReport, Metric, MetricValue, ReportStatus, Split,
 };
 use rustev_contract::ids::{
-    ArtifactId, CalibrationId, ContentDigest, DatasetId, EvaluatorConfigId, PlanId,
+    ArtifactId, CalibrationId, ContentDigest, DatasetId, EvaluatorConfigId, PlanId, SnapshotId,
 };
-use rustev_contract::judgment::{Derivation, Notice, OutValue};
+use rustev_contract::judgment::{Derivation, Judgment, Notice, OutValue};
 use rustev_contract::limits::REPLAY_V1;
+use rustev_contract::output::RawOutput;
 use rustev_contract::plan::{BoundCalibration, Plan, PlanExecution, PlanStepDetail};
 use rustev_contract::run::{Charge, RunRecord};
 use rustev_contract::scope::Scope;
@@ -128,6 +129,137 @@ pub struct Inputs<'a> {
     pub replay: &'a ReplayConfig,
     /// A candidate plan to compare; none for a baseline report.
     pub candidate: Option<Candidate<'a>>,
+}
+
+/// A host-supplied result of executing a dataset case (spec 043, 3.11).
+#[derive(Debug, Clone)]
+#[allow(clippy::large_enum_variant)]
+pub enum Observation {
+    Completed {
+        judgment: Judgment,
+        run: RunRecord,
+        plan: Plan,
+        scope: Scope,
+        snapshot_id: SnapshotId,
+        calibrations: Vec<CalibrationArtifact>,
+        /// Raw output of the configured probability step, if retained.
+        probability_output: Option<RawOutput>,
+    },
+    Incomparable {
+        reason: String,
+        scope: Option<Scope>,
+    },
+}
+
+/// Inputs to pure, synchronous evaluation of observed results.
+pub struct ObservedInputs<'a> {
+    pub manifest: &'a DatasetManifest,
+    pub split: Split,
+    pub config: &'a EvaluatorConfig,
+    pub adapter: &'a dyn TaskAdapter,
+    pub observations: &'a BTreeMap<String, Observation>,
+    /// Identifies the evaluated plan when no case is comparable.
+    pub plan: &'a Plan,
+}
+
+struct Evaluation<'a> {
+    manifest: &'a DatasetManifest,
+    split: Split,
+    config: &'a EvaluatorConfig,
+    adapter: &'a dyn TaskAdapter,
+    candidate: Option<Candidate<'a>>,
+    source: CaseSource<'a>,
+}
+
+enum CaseSource<'a> {
+    Replay(&'a Inputs<'a>),
+    Observed(&'a ObservedInputs<'a>),
+}
+
+impl Evaluation<'_> {
+    fn case<'a>(&self, case: &'a DatasetCase) -> CaseResult<'a> {
+        match self.source {
+            CaseSource::Replay(inputs) => evaluate_case(inputs, case),
+            CaseSource::Observed(inputs) => observed_case(inputs, case),
+        }
+    }
+
+    fn fallback_plan(&self) -> Result<PlanId, EvalError> {
+        match self.source {
+            CaseSource::Replay(inputs) => inputs
+                .bundles
+                .values()
+                .find_map(|b| match b {
+                    BundleInput::Loaded(b) => Some(b.plan_id.clone()),
+                    BundleInput::Failed(_) => None,
+                })
+                .ok_or(EvalError::EmptySplit),
+            CaseSource::Observed(inputs) => inputs.plan.id().map_err(|_| EvalError::NotCanonical),
+        }
+    }
+}
+
+fn observed_case<'a>(inputs: &ObservedInputs<'_>, case: &'a DatasetCase) -> CaseResult<'a> {
+    let incomparable = |scope, reason: &str| CaseResult {
+        case,
+        scope,
+        status: Status::Incomparable(reason.into()),
+    };
+    match inputs.observations.get(&case.id) {
+        None => incomparable(None, "live-missing"),
+        Some(Observation::Incomparable { reason, scope }) => incomparable(scope.clone(), reason),
+        Some(Observation::Completed {
+            judgment,
+            run,
+            plan,
+            scope,
+            snapshot_id,
+            calibrations,
+            probability_output,
+        }) => {
+            let scope = Some(scope.clone());
+            if snapshot_id != &case.snapshot {
+                return incomparable(scope, "dataset-mismatch");
+            }
+            let probabilities = match inputs.config.probability_step.as_deref() {
+                None => Err("no-probability-step".into()),
+                Some(step) => probability_output
+                    .as_ref()
+                    .ok_or_else(|| "no-output".to_string())
+                    .and_then(|raw| probabilities(plan, calibrations, step, raw)),
+            };
+            CaseResult {
+                case,
+                scope,
+                status: Status::Comparable {
+                    outcome: CaseOutcome::of(judgment, &inputs.config.agreement),
+                    historical: None,
+                    probabilities,
+                    run: Box::new(run.clone()),
+                    plan: Box::new(plan.clone()),
+                    judged: Box::new((judgment.derivation, judgment.notices.clone())),
+                },
+            }
+        }
+    }
+}
+
+/// Evaluate new judgments and run records without replay or external work.
+/// The report is baseline-shaped: latency and cost belong to these runs.
+pub fn evaluate_observed(inputs: &ObservedInputs<'_>) -> Result<Evaluated, EvalError> {
+    evaluate_source(
+        &Evaluation {
+            manifest: inputs.manifest,
+            split: inputs.split,
+            config: inputs.config,
+            adapter: inputs.adapter,
+            candidate: None,
+            source: CaseSource::Observed(inputs),
+        },
+        None,
+        None,
+    )
+    .map(|(e, _, _)| e)
 }
 
 /// A candidate plan with the calibration artifacts it binds.
@@ -417,6 +549,25 @@ fn evaluate_inner(
     cases_for: Option<Option<&TopK>>,
     measured: Option<Measured<'_>>,
 ) -> Result<Inner, EvalError> {
+    evaluate_source(
+        &Evaluation {
+            manifest: inputs.manifest,
+            split: inputs.split,
+            config: inputs.config,
+            adapter: inputs.adapter,
+            candidate: inputs.candidate,
+            source: CaseSource::Replay(inputs),
+        },
+        cases_for,
+        measured,
+    )
+}
+
+fn evaluate_source(
+    inputs: &Evaluation<'_>,
+    cases_for: Option<Option<&TopK>>,
+    measured: Option<Measured<'_>>,
+) -> Result<Inner, EvalError> {
     let config = inputs.config;
     config.check().map_err(EvalError::Config)?;
     let measures = measures_of(inputs, config, measured)?;
@@ -439,7 +590,7 @@ fn evaluate_inner(
     if cases.is_empty() {
         return Err(EvalError::EmptySplit);
     }
-    let results: Vec<CaseResult<'_>> = cases.iter().map(|c| evaluate_case(inputs, c)).collect();
+    let results: Vec<CaseResult<'_>> = cases.iter().map(|c| inputs.case(c)).collect();
 
     // Accounting.
     let total = results.len() as u64;
@@ -762,14 +913,7 @@ fn evaluate_inner(
     let plan_id = match (inputs.candidate, plans.iter().next()) {
         (Some(c), _) => c.plan.id.clone(),
         (None, Some(p)) => p.clone(),
-        (None, None) => inputs
-            .bundles
-            .values()
-            .find_map(|b| match b {
-                BundleInput::Loaded(b) => Some(b.plan_id.clone()),
-                BundleInput::Failed(_) => None,
-            })
-            .ok_or(EvalError::EmptySplit)?,
+        (None, None) => inputs.fallback_plan()?,
     };
     let dataset = inputs.manifest.id().map_err(|_| EvalError::NotCanonical)?;
     let config_id = config.id().map_err(|_| EvalError::NotCanonical)?;
@@ -894,7 +1038,7 @@ fn evaluate_inner(
 /// A version 3 configuration's measure declarations, checked against the
 /// digest it binds (spec 041, 3.4.1); none under versions 1 and 2.
 fn measures_of(
-    inputs: &Inputs<'_>,
+    inputs: &Evaluation<'_>,
     config: &EvaluatorConfig,
     measured: Option<Measured<'_>>,
 ) -> Result<Option<Measures>, EvalError> {
@@ -999,7 +1143,7 @@ fn check_scores(
 /// function adds for it.
 fn case_measures_of(
     measures: &mut BTreeMap<String, CaseMeasure>,
-    inputs: &Inputs<'_>,
+    inputs: &Evaluation<'_>,
     case: &DatasetCase,
     outcome: &CaseOutcome,
     historical: Option<&CaseOutcome>,

@@ -865,6 +865,24 @@ input loading and the CLI of 3.13 and 3.14; captured acquisitions and
 `compare_with_source`; and the per-case `rustev.live-case/1` document of
 3.9.1 (A-67). The rate-limit pause of 3.8.2 is deferred (A-67). Tests:
 `crates/rustev-live/tests/run.rs`.
+**Increment 6 (2026-10-29): evaluation of observed results.**
+`rustev_eval::report::evaluate_observed` (3.11.1) computes the spec 004
+report and detail from new judgments and run records, per case an
+`Observation` (`completed` with its judgment, run record, plan, scope,
+snapshot id, calibrations and the probability step's raw output, or
+`incomparable` with its reason), through the same accounting and metric
+code as `evaluate`, which is refactored behind a private case source and
+keeps its output byte for byte. The report is baseline-shaped: latency
+and cost are the observed runs' own. A case with no observation is
+incomparable `live-missing`; one whose snapshot differs from the case's
+is `dataset-mismatch`. It is pure and synchronous and performs no
+external work. The dependency test of 3.1.2 reads
+`crates/rustev-eval/Cargo.toml` and fails if a normal dependency, target
+specific or renamed, names `rustev-runtime`, `rustev-live` or `tokio`.
+The spec 004 mutation seed that drops unusable bundles from the coverage
+denominator now anchors on the shared case source in
+`crates/rustev-eval/mutation/seeds.py`, with the same mutant. Tests: `crates/rustev-eval/tests/observed.rs`,
+`crates/rustev-eval/tests/live_separation.rs`.
 
 ## Decisions at approval
 

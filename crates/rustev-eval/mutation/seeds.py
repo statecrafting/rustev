@@ -83,8 +83,8 @@ SEEDS = [
         "unusable bundles",
         "an unusable bundle leaves the coverage denominator (spec 015)",
         E + "report.rs",
-        "let results: Vec<CaseResult<'_>> = cases.iter().map(|c| evaluate_case(inputs, c)).collect();",
-        "let results: Vec<CaseResult<'_>> = cases.iter().map(|c| evaluate_case(inputs, c)).filter(|r| !matches!(&r.status, Status::Incomparable(c) if c.starts_with(\"bundle-\") && c != \"bundle-missing\")).collect();",
+        "let results: Vec<CaseResult<'_>> = cases.iter().map(|c| inputs.case(c)).collect();",
+        "let results: Vec<CaseResult<'_>> = cases.iter().map(|c| inputs.case(c)).filter(|r| !matches!(&r.status, Status::Incomparable(c) if c.starts_with(\"bundle-\") && c != \"bundle-missing\")).collect();",
         EVAL,
     ),
     (
