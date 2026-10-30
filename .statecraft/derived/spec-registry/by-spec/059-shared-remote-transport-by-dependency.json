@@ -1,0 +1,138 @@
+{
+  "record": {
+    "amends": [
+      "001-boundaries-and-authority",
+      "010-integrations",
+      "012-jev-integration",
+      "030-bedrock-backend",
+      "049-opentelemetry-through-the-node-binding"
+    ],
+    "created": "2026-10-29",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "009-remote-adapter-protocol",
+      "010-integrations",
+      "012-jev-integration",
+      "030-bedrock-backend",
+      "031-public-api-and-release-family",
+      "049-opentelemetry-through-the-node-binding"
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "012-jev-integration",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-jev/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "030-bedrock-backend",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-bedrock/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "010-integrations",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-serve/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-boundaries/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      }
+    ],
+    "id": "059-shared-remote-transport-by-dependency",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-1-the-boundary-exception",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "Apart from the facade's exception of spec 031 3.3 and rustev-node's edge to rustev-otel of spec 049 3.1, the only dependencies of a crate on an integration crate are the normal dependencies of rustev-jev, rustev-bedrock and rustev-serve on rustev-remote-http; make boundaries refuses every other edge, including these three as build or dev dependencies, any of them on another integration, and any other crate on rustev-remote-http."
+      },
+      {
+        "anchor": "3-2-the-source-links-become-a-dependency",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "No source file of rustev-jev, rustev-bedrock or rustev-serve is compiled from outside that crate's own directory; each uses spec 009's Part A machinery through its dependency on rustev-remote-http."
+      },
+      {
+        "anchor": "3-3-what-does-not-change",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "The change alters no behavior: every existing test, conformance case, golden, PlanId, recorded fixture and exchange record of the three crates and of rustev-remote-http is unchanged, and the public module paths of rustev-jev and rustev-bedrock still resolve."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "059-shared-remote-transport-by-dependency-not-by-source-link-amends-001-010-012-030-and-049": "aad1973c49aa932157355fe9612be67f7c636749ba96e8f1a0a8f7677d7c4ead",
+      "1-purpose": "0c31f265d63b381a4d89960cce6090ddc50dfada3433937b89e5bfaaa794fb01",
+      "2-territory": "61fc4fd63f3a4a070bd81e277ec7dcad642ffc67df42e8c8b6c76f34bf15c5d5",
+      "3-1-the-boundary-exception": "aa26175638d34e18776db1c8f729a7164eb869ccb8f283e0bcc085157e4d9eb1",
+      "3-2-the-source-links-become-a-dependency": "e79b298a4a8cfe5731e6d8c9f952cd5733098292c4d1b141b30972283e02bfb3",
+      "3-3-what-does-not-change": "a531e4e65b443d8d7aa6fcecdb2cb33ba9468dfaac002f15330222a951bc15f8",
+      "3-behavior": "6dd1aa237aba613a975b167c7c56a79438514a2ff9741d8d1109f78fb4915406",
+      "4-out-of-scope": "988c11d12f3e9e427462940d30c2d465b3cc154e31a5ffacf9b228c74a041ccf",
+      "5-observable-negative-cases": "84f0bf9e9b2e6bd68c2da452a1ed1edc942e9d6e689fced0278e33eb70ce2f75",
+      "acceptance": "8358b19803478d8ac44ab7d5d0d4829deeea31ba5ed647d9d5f35fb9d321c857",
+      "decisions-at-approval": "ffb99a2038858f61d17c157b1df141154ee61f5a7787b900bcf08c9d9dd802e2",
+      "implementation-record": "032033001e01567d85dd8c07e9f287cdef8b54e363db597a3af2f700f9f43b34",
+      "verification": "afaf85d14d46156e8a62e0a66f4572c358a8d7958ab5413ccc61464d5aa7609b"
+    },
+    "sectionHeadings": [
+      "059: Shared remote transport by dependency, not by source link (amends 001, 010, 012, 030 and 049)",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 The boundary exception",
+      "3.2 The source links become a dependency",
+      "3.3 What does not change",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Implementation record",
+      "Decisions at approval"
+    ],
+    "specPath": "specs/059-shared-remote-transport-by-dependency/spec.md",
+    "status": "approved",
+    "summary": "An amendment of approved specs 001 (3.4.4), 010 (I-2 and the `rustev-serve` note), 012, 030 and 049 (I-3). `rustev-jev`, `rustev-bedrock` and `rustev-serve` compile spec 009's Part A machinery from `integrations/rustev-remote-http/src/` through `#[path]`, because 001 3.4.4 forbids a crate depending on an integration crate. A crate whose sources sit outside its own directory cannot be packaged, so spec 031 3.4 keeps `rustev-jev` (and, for the same reason, `rustev-bedrock`) out of the release family until a reviewed change removes the source link, and leaves open how. This spec chooses the boundary amendment: those three crates may depend on `rustev-remote-http`, only as a normal dependency, and re-export or use its modules instead of compiling copies. No behavior, record, document or public path of any crate changes. Admission of any crate to the release family stays with a later change.\n",
+    "title": "Shared remote transport by dependency, not by source link (amends 001, 010, 012, 030 and 049)"
+  },
+  "shardHash": "e27411184fa1485c8d5a427b583a4a30afdd6d381c7c58f1713e84bae7f18a3c",
+  "specVersion": "1.10.0"
+}
