@@ -1,4 +1,5 @@
 //! Durable-write and poll-boundary crash coverage, SYNTHETIC only.
+#[path = "../../tests/support/mod.rs"]
 mod support;
 
 use std::collections::{BTreeMap, BTreeSet};

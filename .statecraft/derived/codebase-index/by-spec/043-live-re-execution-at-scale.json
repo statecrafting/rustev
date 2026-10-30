@@ -53,6 +53,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rustev-live/crash",
+        "source": "manifest-metadata"
+      },
+      {
         "path": "crates/rustev-runtime/",
         "source": "spec-edge"
       },
@@ -244,5 +248,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "e26f837c812dbdb3419d179f7478cc961029e7d3ffb95c5fbda65385dc2cca23"
+  "shardHash": "edaddf9e09cbf21467938b29bda801872c5e66af83428b89ec84700d9e7dea47"
 }

@@ -1,0 +1,10 @@
+{
+  "package": {
+    "kind": "rust-lib",
+    "name": "rustev-live-crash",
+    "path": "crates/rustev-live/crash",
+    "specRef": "043-live-re-execution-at-scale"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "ba8091196d65721755e37f8d8c42039b034b760d86a8cbfe191fc8c898c9403a"
+}

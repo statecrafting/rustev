@@ -332,6 +332,7 @@
         "src/host.rs",
         "src/io.rs",
         "src/lib.rs",
+        "src/live.rs",
         "src/main.rs",
         "src/plan.rs",
         "src/repeat.rs",
@@ -405,6 +406,26 @@
       ],
       "max_archive_bytes": 65536,
       "max_unpacked_bytes": 196608
+    },
+    "rustev-live": {
+      "files": [
+        ".cargo_vcs_info.json",
+        "Cargo.lock",
+        "Cargo.toml",
+        "Cargo.toml.orig",
+        "LICENSE",
+        "README.md",
+        "src/documents.rs",
+        "src/fault_injection.rs",
+        "src/gate.rs",
+        "src/journal.rs",
+        "src/lib.rs",
+        "src/probe.rs",
+        "src/reports.rs",
+        "src/run.rs"
+      ],
+      "max_archive_bytes": 98304,
+      "max_unpacked_bytes": 327680
     },
     "rustev-otel": {
       "files": [
