@@ -115,6 +115,9 @@ pub struct Service {
     pub digest: ContentDigest,
     pub build: Handle,
     pub(crate) runtime: Runtime,
+    /// The clock handed to the runtime; the service's own budget accounting
+    /// for a decision (context fetch time, remaining deadline) reads it too.
+    clock: Arc<dyn rustev_runtime::Clock>,
     host: Host,
     trust: Trust,
     pub(crate) state: Mutex<State>,
@@ -147,6 +150,24 @@ fn prune(state: &mut State) {
 }
 impl Service {
     pub fn new(config: ServeConfig, host: Host) -> Result<Arc<Self>, String> {
+        Self::construct(config, host, Arc::new(rustev_runtime::TokioClock::new()))
+    }
+    /// As [`Service::new`], on a caller's clock: a test seam for the shared
+    /// conformance runner's manual clock (spec 042, 3.17.1), compiled only
+    /// into this crate's own test build.
+    #[cfg(test)]
+    pub(crate) fn with_clock(
+        config: ServeConfig,
+        host: Host,
+        clock: Arc<dyn rustev_runtime::Clock>,
+    ) -> Result<Arc<Self>, String> {
+        Self::construct(config, host, clock)
+    }
+    fn construct(
+        config: ServeConfig,
+        host: Host,
+        clock: Arc<dyn rustev_runtime::Clock>,
+    ) -> Result<Arc<Self>, String> {
         // Revalidate typed construction as well as parsed configuration.
         ServeConfig::parse(&config.canonical().map_err(|e| e.to_string())?)
             .map_err(|e| e.to_string())?;
@@ -172,7 +193,7 @@ impl Service {
             },
         };
         let mut builder = Runtime::builder(
-            Arc::new(rustev_runtime::TokioClock::new()),
+            clock.clone(),
             host.sink.clone(),
             rustev_runtime::RuntimeConfig {
                 max_in_flight: config.runtime.max_in_flight.get() as usize,
@@ -215,6 +236,7 @@ impl Service {
             digest: config.configuration_digest().map_err(|e| e.to_string())?,
             build: Handle::new(concat!("rustev-serve/", env!("CARGO_PKG_VERSION"))).unwrap(),
             runtime: builder.build().map_err(|e| format!("{e:?}"))?,
+            clock,
             trust,
             host,
             state: Mutex::new(State {
@@ -540,7 +562,7 @@ impl Service {
         cancel: &CancelSignal,
         progress: &Progress,
     ) -> Reply {
-        let started = Instant::now();
+        let started = self.clock.now();
         let budget = deadline.unwrap_or(u64::MAX).min(
             registration
                 .plan
@@ -589,7 +611,8 @@ impl Service {
                 };
                 let result = tokio::select! {
                     _ = cancel.raised() => return self.refuse(RefusalCode::CancelledBeforeAdmission),
-                    result = tokio::time::timeout(Duration::from_millis(budget), source.fetch(&fields, &cx)) => result,
+                    _ = self.clock.sleep_until(started.saturating_add(budget)) => Err(()),
+                    result = source.fetch(&fields, &cx) => Ok(result),
                 };
                 match result {
                     Ok(Ok(snapshot))
@@ -613,7 +636,7 @@ impl Service {
                 }
             }
         };
-        let remaining = budget.saturating_sub(started.elapsed().as_millis() as u64);
+        let remaining = budget.saturating_sub(self.clock.now().saturating_sub(started));
         if remaining == 0 {
             return self.refuse(RefusalCode::QueueDeadline);
         }

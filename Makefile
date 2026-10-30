@@ -97,10 +97,11 @@ changelog:
 semver:
 	sh tools/rustev-release/semver.sh
 
-# Spec 027, 3.12: the shared conformance suite's Rust runner. Needs no Node
-# toolchain.
+# Spec 027, 3.12: the shared conformance suite's Rust runner, and the
+# service's (spec 042, 3.17.4). Needs no Node toolchain.
 conformance:
 	cargo test -p rustev-conformance --locked
+	cargo test -p rustev-serve --locked --lib conformance::
 
 # Spec 027, 3.12.2: rebuild the CLI cases and their fixtures from the CLI
 # tests that pin each golden (`RUSTEV_HARVEST`), then the explain cases from

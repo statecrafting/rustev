@@ -4303,6 +4303,8 @@ dependencies = [
  "prost",
  "rcgen",
  "ring",
+ "rustev-backend-rules",
+ "rustev-conformance",
  "rustev-contract",
  "rustev-core",
  "rustev-eval",
