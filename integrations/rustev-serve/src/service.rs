@@ -177,7 +177,11 @@ impl Service {
             rustev_runtime::RuntimeConfig {
                 max_in_flight: config.runtime.max_in_flight.get() as usize,
                 max_queued: config.runtime.max_queued.get() as usize,
-                max_parallel_requests: 1,
+                // Absent, 1 (3.5.4).
+                max_parallel_requests: config
+                    .runtime
+                    .max_parallel_requests
+                    .map_or(1, |n| n.get() as usize),
                 sink,
             },
         );

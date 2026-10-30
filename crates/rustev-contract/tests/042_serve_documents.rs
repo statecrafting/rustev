@@ -631,3 +631,33 @@ fn generation_compile_refusal_category_bound() {
         assert_eq!(parse::<ServeRefusal>(&v).is_ok(), category <= 24);
     }
 }
+#[test]
+fn parallel_requests_are_optional_bounded_and_absent_keeps_the_digest() {
+    let digest = |v: &Value| {
+        parse::<ServeConfig>(v)
+            .unwrap()
+            .configuration_digest()
+            .unwrap()
+    };
+    let base = config();
+    let absent = parse::<ServeConfig>(&base).unwrap();
+    assert_eq!(absent.runtime.max_parallel_requests, None);
+    for (value, ok) in [
+        (json!(1), true),
+        (json!(65536), true),
+        (json!(0), false),
+        (json!(65537), false),
+        (Value::Null, false),
+    ] {
+        let mut v = config();
+        v["runtime"]["max_parallel_requests"] = value.clone();
+        assert_eq!(parse::<ServeConfig>(&v).is_ok(), ok, "{value}");
+        if ok {
+            // Stated, even as 1, it is a different configuration.
+            assert_ne!(digest(&v), digest(&base), "{value}");
+        }
+    }
+    // Absent, the canonical form omits it, so the digest is unchanged.
+    let canonical: Value = serde_json::from_slice(&absent.canonical().unwrap()).unwrap();
+    assert!(canonical["runtime"].get("max_parallel_requests").is_none());
+}

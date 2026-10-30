@@ -1340,6 +1340,15 @@ pub struct Listener {
 pub struct RuntimeConfig {
     pub max_in_flight: Number<1, 65536>,
     pub max_queued: Number<0, 65536>,
+    /// Requests in progress within one decision (3.5.4, spec 003 3.4.2).
+    /// Optional; absent is 1, and a configuration without it keeps its
+    /// digest.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "present"
+    )]
+    pub max_parallel_requests: Option<Number<1, 65536>>,
     #[schemars(extend("maxProperties" = 1024))]
     pub per_backend_concurrency: BTreeMap<Handle, Number<1, 65536>>,
 }
