@@ -554,15 +554,50 @@ may be implemented before that record; `rustev-serve` may not.
    escaping or unresolvable reference is reported as spec 004 reports
    `inaccessible`.
    Output is the bytes `rustev-surface` renders.
-3. **Explanation.** `POST /v1/explain` takes the evidence and query of
-   the spec implementing D2 (proposed as spec 040), with evidence as
-   documents or resolver references, and returns that spec's explanation
-   record canonical bytes unchanged and its Markdown rendering, computed
-   by the same library function through `rustev-surface` (3.1.4). The
-   caller's redaction policy is the one configuration names for that
-   listener; a reference resolves only within the caller's principal
-   scope, and evidence of another scope is `decision_not_found`, never
-   explained (spec 010 3.7.2).
+3. **Explanation.** `POST /v1/explain` takes `rustev.serve-explain/1`
+   and answers `rustev.serve-explanation/1`. They are the envelope spec
+   040 3.15.3 leaves to this spec ("its transport, authentication, bounds
+   and envelope"), meeting its requirements: the route "takes this spec's
+   evidence and query, with evidence as documents or host-resolved
+   references; it returns the explanation's record canonical bytes
+   unchanged and the Markdown rendering of 3.14, computed by the same
+   library function; it applies the redaction policy the host configures
+   for the caller (3.13); and it never explains evidence outside the
+   caller's authorized scope (spec 010, 3.7.2)."
+   - **Request** (`rustev.serve-explain/1`): `evidence`, `query` and
+     `options`, in the shape spec 040 3.15.2 gives the bindings
+     (`engine.explain(evidence, query, { nowMs?, scope?, resolve?,
+     redaction? })`, "where `evidence` is `{ record, plan? }` or
+     `{ bundle }` as bytes and `query` is the query of 3.3 or
+     `{ diff: { other: evidence } }`"). Each evidence member (`record`,
+     `plan`, `bundle`) is a document embedded as its own bytes or a
+     resolver reference, as 3.8.2 resolves references, and is parsed under
+     the limits spec 040 3.1.2 states. `query` is spec 040 3.3's query, or
+     `{ diff: { other } }` with `other` an evidence set of the same shape.
+     `options` holds `scope` and `now_ms` exactly when a side is in bundle
+     form, following spec 040 3.16.2 ("When either side is a bundle ...
+     `--now-ms` is required and the scope flags follow spec 006, 3.1.4;
+     when neither is, all of them are refused"); given when no side is a
+     bundle, or missing when one is, the request is `invalid_request`.
+     The request carries no redaction policy and no store resolver.
+   - **Scope.** `options.scope` must equal the scope the host resolves for
+     the caller's principal, as for replay (3.8.1); otherwise the answer
+     is `decision_not_found` and nothing is resolved or explained. A
+     bundle's external items resolve only through the host's resolver for
+     that scope, and a reference only within the caller's principal
+     scope.
+   - **Redaction.** The policy is the `redaction_policy` the configuration
+     names for the listener the request arrived on (3.15); a listener
+     with none explains unredacted, as the library does without a policy.
+   - **Answer** (`rustev.serve-explanation/1`): `explanation`, the
+     `rustev.explanation/1` record canonical bytes the library returns,
+     carried unchanged as an embedded document (3.1.4), and `markdown`, its
+     spec 040 3.14 rendering, both from one call of
+     `rustev_eval::explain::{explain, explain_diff, render_markdown}`
+     through `rustev-surface`. A spec 040 refusal (3.17) is
+     `invalid_document` carrying the refusal code string in `detail`.
+   - **gRPC.** As every operation (3.9.2): the request and the answer are
+     the `bytes document` of the generated messages.
 4. These operations run on a bounded blocking pool (1 to 64 threads, queue
    1 to 4,096; full is `overloaded`) and honor `rustev-deadline-ms`.
 
