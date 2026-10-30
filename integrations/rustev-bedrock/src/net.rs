@@ -149,3 +149,25 @@ pub fn model_path(model: &str) -> String {
     }
     format!("/model/{encoded}/converse")
 }
+/// The `host` header that is sent and signed: the URI's authority without
+/// the scheme's default port. The SDKs sign `host` that way, and
+/// bedrock-runtime refuses a signature over `host:443` with
+/// `InvalidSignatureException` (live probe, 2026-10-29).
+pub fn host_header(uri: &hyper::Uri) -> Option<String> {
+    let authority = uri.authority()?;
+    let default = match uri.scheme_str() {
+        Some("https") => 443,
+        Some("http") => 80,
+        _ => return Some(authority.to_string()),
+    };
+    // Strip the suffix rather than rebuild from `host()`, so an IPv6
+    // literal keeps its brackets.
+    let text = authority.as_str();
+    Some(match authority.port_u16() {
+        Some(port) if port == default => text
+            .strip_suffix(&format!(":{port}"))
+            .unwrap_or(text)
+            .to_string(),
+        _ => text.to_string(),
+    })
+}

@@ -51,6 +51,14 @@
         "spec": "001-boundaries-and-authority",
         "unit": {
           "kind": "directory",
+          "path": "scripts/acceptance/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "directory",
           "path": "tools/rustev-boundaries/"
         }
       },
@@ -164,9 +172,9 @@
       }
     ],
     "sectionDigests": {
-      "030-hosted-model-platform-backend-aws-bedrock": "9632b48ab8382eb3eb663d0169544bbe4f265d8a82ba8d753f518e311eb14a2f",
+      "030-hosted-model-platform-backend-aws-bedrock": "20b4467bc9556f39820b580e062239306cadb83c8b71fe523e8f6141083d444f",
       "1-purpose": "c8803f461f533a8c51de7505c7fdc8318afacf16f61e71ad6926686529d8e9b6",
-      "2-territory": "5e34925b0ff05fffd186fdf11d173e08c3f855b37a0e27e51cf52683d46f442c",
+      "2-territory": "7d4751307d37297721238b2b652edb8ecf1dda6059dd0f908430591f684330db",
       "3-1-position-authority-and-provenance": "665f12655de73b292d7c48e4b1b5c874c14a4d45b63b1c5d9f9b4e6506c4f020",
       "3-10-failure-taxonomy": "25a759835d30100c423332abecf92c510dc0af0612cbb25a685489560244c3f3",
       "3-11-reachability-probe": "a00d5f74528a5882fb2f4db81c6e00a9ac69bca188b71d769ac13ed49ee03b56",
@@ -188,7 +196,7 @@
       "acceptance": "28a95830d44bbaab57f8a1a87586cc7c907835e1c429c379e44e4f89fbf28b42",
       "decisions-at-approval": "3f7cf9bf7573b20c050abe01faca21294f95b5ffcf50068c3319858806c371fb",
       "facts-relied-on": "3d991387232049fac357bbc0b12eddb16a39dd34d682f58554f39f8d8cb4e1f7",
-      "implementation-record": "15f7d7be8326ed153857b05f0d2ac988236b545bbd130a0d65779bc8a17882d6",
+      "implementation-record": "f7ea1e28e1908a52e756b9383395b97ff9134e8ea8e99ded27a6a9531d027932",
       "verification": "fd0d986284e03f6da835cb55ea9721df4b590ccee6b8a19bf63fdafba3ce88f4"
     },
     "sectionHeadings": [
@@ -224,6 +232,6 @@
     "summary": "A remote decision backend under `integrations/rustev-bedrock/` for Amazon Bedrock over two wires on the `bedrock-runtime` endpoint, Converse and the OpenAI-compatible Responses API, signed with SigV4 over Rustev's existing hyper and rustls stack. A versioned binding document puts wire, region, model or inference profile, declared destination regions, residency policy, parameters, structured output mode, price table and reserved members for later operations into the artifact identity. A host-supplied `ModelPolicy` (deny wins, no default allowlist) is evaluated at bind time and again at runtime start. Wave 1 serves `classify`, `proposition` and `rubric` as `Label` outputs, because neither wire documents token log-probabilities; `rank`, `generate`, `extract` and Guardrails screening are added by their own specs into members reserved here. Amends spec 001 only by adding a cloud SDK dependency family to the boundary check. Approved (A-26) under the 2026-10-16 delivery work order; implementation is pending. The work order authorizes paid Bedrock smoke and probe calls on synthetic or spec 023 admitted data within R-29's USD 5 total testing cap across all providers; the owner supplies AWS credentials, whose absence blocks only the live stage. Approval makes no quality, residency-compliance or production claim.\n",
     "title": "Hosted model platform backend: AWS Bedrock"
   },
-  "shardHash": "79b87e3c6615b81e663438b3a0c90128e0d8829ce40f672ccd6c6bd8df901da2",
+  "shardHash": "44806285fed84fae37db3df08fdecb953c506013ede02aa7a2a6bb4544ef0565",
   "specVersion": "1.10.0"
 }

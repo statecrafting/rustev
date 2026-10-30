@@ -1,0 +1,152 @@
+{
+  "provenance": "recorded; live bedrock-runtime Converse call on 2026-10-29 from ca-central-1, model us.anthropic.claude-haiku-5-5 through the us. geographic profile; synthetic content only (3.14 item 3); probe (3.11); the AWS request id (generation_id) is redacted",
+  "exchange_record": {
+    "attribution": "single",
+    "binding": "sha256:c47989d048a7c0e12a1e486bf1ee1bd6eb12962c31fd1878a27eb749191ccc7d",
+    "bytes_sent": true,
+    "exchange_charge": {
+      "estimated": {
+        "units": 86130
+      }
+    },
+    "generation_id": "redacted:aws-request-id",
+    "late": false,
+    "members": [
+      {
+        "attempt_id": "bedrock-probe-1793304831239613000-2",
+        "charge": {
+          "estimated": {
+            "units": 86130
+          }
+        },
+        "outcome": {
+          "output": {
+            "digest": "sha256:18075ef537674060ac9efe2d914d11dc0c300b1fef10bae2aba74010353d826e"
+          }
+        }
+      }
+    ],
+    "privacy_requested": {},
+    "protocol": "rustev-bedrock-mapping/1",
+    "provider_extras": {
+      "destination_regions": "{\"as_of\":\"2026-10-29\",\"regions\":[\"ca-central-1\",\"us-east-1\",\"us-east-2\",\"us-west-2\"]}",
+      "inference_profile": "\"geo\"",
+      "policy_digest": "sha256:b8b275e86e534a802c8d99427fc5ae2fc7ef4a52b6e5d35a42e2b7922a885284",
+      "provider.metrics": "{\"latencyMs\":1063}",
+      "provider.stopReason": "\"tool_use\"",
+      "raw_usage": "{\"cacheReadInputTokenCount\":0,\"cacheReadInputTokens\":0,\"cacheWriteInputTokenCount\":0,\"cacheWriteInputTokens\":0,\"inputTokens\":613,\"outputTokens\":34,\"serverToolUsage\":{},\"totalTokens\":647}",
+      "region": "\"ca-central-1\"",
+      "served_reason": "not_disclosed_by_wire",
+      "served_region": "unknown:not_disclosed_by_wire"
+    },
+    "reported_cost": null,
+    "request_digest": "sha256:b1e455827b60c48ec2c50ac5b0a704e7d185fc7dcb0adb1a0689acdf32cf5262",
+    "requested_model": "us.anthropic.claude-haiku-5-5",
+    "response_digest": "sha256:dcad0bf073efb29d0cf2f8df6d05499c39ed609fc2bf8902b5d3dbd855a0ab27",
+    "retry_after": null,
+    "route": [],
+    "schema": "rustev.remote-exchange/1",
+    "served": {
+      "disclosure": "unknown",
+      "identity": null
+    },
+    "status": 200,
+    "truncated": false,
+    "usage": {
+      "cacheReadInputTokenCount": 0,
+      "cacheReadInputTokens": 0,
+      "cacheWriteInputTokenCount": 0,
+      "cacheWriteInputTokens": 0,
+      "inputTokens": 613,
+      "outputTokens": 34,
+      "totalTokens": 647
+    }
+  },
+  "request_body": {
+    "inferenceConfig": {
+      "maxTokens": 1024,
+      "stopSequences": []
+    },
+    "messages": [
+      {
+        "content": [
+          {
+            "text": "{\"instance\":{\"text\":\"apple\"},\"values\":{}}"
+          }
+        ],
+        "role": "user"
+      }
+    ],
+    "system": [
+      {
+        "text": "Choose exactly one key using the supplied evidence.\nThe supplied word is apple. Choose the matching key.\nOptions in declared order: [{\"description\":\"apple\",\"key\":\"apple\"},{\"description\":\"pear\",\"key\":\"pear\"}]"
+      }
+    ],
+    "toolConfig": {
+      "toolChoice": {
+        "tool": {
+          "name": "rustev_answer"
+        }
+      },
+      "tools": [
+        {
+          "toolSpec": {
+            "description": "Return one choice",
+            "inputSchema": {
+              "json": {
+                "additionalProperties": false,
+                "properties": {
+                  "choice": {
+                    "enum": [
+                      "apple",
+                      "pear"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "choice"
+                ],
+                "type": "object"
+              }
+            },
+            "name": "rustev_answer"
+          }
+        }
+      ]
+    }
+  },
+  "response_body": {
+    "metrics": {
+      "latencyMs": 1063
+    },
+    "output": {
+      "message": {
+        "content": [
+          {
+            "toolUse": {
+              "input": {
+                "choice": "apple"
+              },
+              "name": "rustev_answer",
+              "toolUseId": "tooluse_M4nqDRSLgPWFT0u3CPyrzZ",
+              "type": "tool_use"
+            }
+          }
+        ],
+        "role": "assistant"
+      }
+    },
+    "stopReason": "tool_use",
+    "usage": {
+      "cacheReadInputTokenCount": 0,
+      "cacheReadInputTokens": 0,
+      "cacheWriteInputTokenCount": 0,
+      "cacheWriteInputTokens": 0,
+      "inputTokens": 613,
+      "outputTokens": 34,
+      "serverToolUsage": {},
+      "totalTokens": 647
+    }
+  }
+}

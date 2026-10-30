@@ -37,6 +37,8 @@ extends:
   # (Makefile) with its declared verification, which waits for the live
   # stages (implementation record, increment 2).
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  # 030 joins the integrations-base acceptance group with `make verify`.
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
   # Adds the cloud SDK family to the boundary check (3.13).
   - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "tools/rustev-boundaries/" }, nature: additive }
   # Lists the crate as excluded from the release set (spec 031).
@@ -160,6 +162,8 @@ Nothing is claimed until the implementing change. Then this spec claims:
   (3.13).
 - `Makefile` (spec 001, additive): `030` joins `VERIFIED_SPECS` with the
   implementation.
+- `scripts/acceptance/` (spec 001, additive): `030` joins the
+  `integrations-base` acceptance group with it.
 
 **Amendment of spec 001.** Spec 001 3.5 says that adding a forbidden family
 is a change to that spec. This spec makes exactly that change: 3.5's list
@@ -763,6 +767,44 @@ liability as 3.9 requires. The owner chose an environment-only provider
 over enabling a second HTTPS client (A-65), and 3.5 item 2 is amended to
 say so. The owner may add the full default chain later as a separate
 feature, with its own decision on a second HTTPS client.
+
+**Increment 3 (live probe and smoke, recorded fixtures; 2026-10-29).**
+Model `us.anthropic.claude-haiku-5-5` on the Converse wire, source region
+`ca-central-1`, `geo` profile, declared destinations `ca-central-1`,
+`us-east-1`, `us-east-2` and `us-west-2` as the AWS model card lists them
+for that source (the testing role may not call `GetInferenceProfile`),
+under the owner's residency decision (A-65). Prices are AWS's public price
+list for `ca-central-1`, geographic standard rate (USD 0.11 input, 0.55
+output, 0.011 cache read, 0.1375 cache write per million tokens).
+`max_tokens` is 1024. The probe (3.11) was reachable on three sequential
+calls and the smoke (3.14 item 4) returned a mapped output on one; each
+answered `apple`, with 613 input and 34 output tokens charged at 86,130
+units estimated.
+
+- Two defects found by the live stage are fixed. The `aws-config`
+  provider panicked (see above). The `host` header carried the default
+  port (`:443`), and bedrock-runtime refused the signature with
+  `InvalidSignatureException` on two calls; `host_header` now drops the
+  scheme's default port, as the SDKs sign it, and a control-plane request
+  signed both ways confirmed the cause without invoking a model.
+- The probe and smoke gain `--out DIR`, which retains request and response
+  bodies and refuses to write any part that carries a credential value, and
+  print the journal summary before and after. `fixtures/recorded/` holds
+  the live binding and policy and the four exchanges, labeled recorded,
+  synthetic content only, AWS request ids redacted; `tests/recorded.rs`
+  replays them on loopback with the recorded request digest, output digest
+  and charge. `tests/credentials.rs` covers the provider; `tests/spend.rs`
+  now writes its scratch journal under `CARGO_TARGET_TMPDIR`.
+- Testing journal (budget `testing`, nano-USD units): 12,499,578 committed
+  before (1,421,364 observed, 11,078,214 liability); 14,767,668 after
+  (1,421,364 observed, 344,520 estimated, 13,001,784 liability). Bedrock's
+  share is 2,268,090 units (USD 0.002268): 344,520 estimated for the four
+  answered calls, and 1,923,570 liability for three calls whose charge is
+  unknown (the reservation left by the panic, sent nothing; the two refused
+  signatures, which reached AWS).
+- Not done: a recorded Responses exchange. The model used does not serve
+  the Responses API on bedrock-runtime, so recording one needs another
+  model and binding, and therefore another paid run.
 
 ## Decisions at approval
 

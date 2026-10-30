@@ -1,4 +1,5 @@
-//! Optional standard credential chain. Only this feature module discovers credentials.
+//! Optional environment credentials (3.5 item 2, A-65). Only this feature
+//! module reads credentials from the environment.
 use crate::{
     budget::Budget,
     signing::{CredentialError, CredentialProvider},
@@ -16,14 +17,11 @@ impl CredentialProvider for StandardCredentials {
     ) -> BoxFuture<'a, Result<aws_credential_types::Credentials, CredentialError>> {
         // Discovery runs inside the attempt's one budget and stops on cancel
         // (3.5): an expired budget or a cancel is a credential failure.
+        // Only the environment is read: the default chain builds an instance
+        // metadata client, which panics without an HTTP client (A-65).
         Box::pin(async move {
             let discover = async {
-                let config = aws_config::defaults(aws_config::BehaviorVersion::latest())
-                    .load()
-                    .await;
-                config
-                    .credentials_provider()
-                    .ok_or(CredentialError)?
+                aws_config::environment::credentials::EnvironmentVariableCredentialsProvider::new()
                     .provide_credentials()
                     .await
                     .map_err(|_| CredentialError)
@@ -42,7 +40,7 @@ pub fn run_cli(smoke: bool) -> Result<(), String> {
     }
     let args: Vec<String> = std::env::args().skip(1).collect();
     if !smoke && args.first().map(String::as_str) != Some("probe") {
-        return Err("usage: rustev-bedrock probe --binding FILE --policy FILE --materials FILE --journal FILE [--calls 3 --interval-ms 1000 --budget-ms 30000]".into());
+        return Err("usage: rustev-bedrock probe --binding FILE --policy FILE --materials FILE --journal FILE [--out DIR --calls 3 --interval-ms 1000 --budget-ms 30000]".into());
     }
     let flags = if smoke { args.as_slice() } else { &args[1..] };
     let mut options = std::collections::BTreeMap::new();
@@ -54,6 +52,7 @@ pub fn run_cli(smoke: bool) -> Result<(), String> {
                 | "--policy"
                 | "--materials"
                 | "--journal"
+                | "--out"
                 | "--calls"
                 | "--interval-ms"
                 | "--budget-ms"
@@ -101,16 +100,7 @@ pub fn run_cli(smoke: bool) -> Result<(), String> {
         .ok_or("no bound operation")?
         .operation
         .clone();
-    let options = if operation == "proposition" {
-        vec!["false", "true"]
-    } else {
-        vec!["apple", "pear"]
-    };
-    let projection = serde_json::to_vec(&serde_json::json!({
-        "operation":operation, "question":"The supplied word is apple. Choose the matching key.",
-        "options":options,"instance":{"text":"apple"},"values":{}
-    }))
-    .map_err(|_| "synthetic projection")?;
+    let projection = crate::evidence::probe_projection(&operation)?;
     let unit = binding.pricing.unit_nano_usd;
     let journal = crate::spend::SpendJournal::open(
         value("--journal")?,
@@ -118,13 +108,30 @@ pub fn run_cli(smoke: bool) -> Result<(), String> {
         Arc::new(crate::spend::SystemClock),
     )
     .map_err(|e| e.to_string())?;
+    println!(
+        "journal before: {}",
+        serde_json::to_string(&journal.summary()).map_err(|e| e.to_string())?
+    );
+    // `--out` retains request and response bodies for recorded fixtures
+    // (3.14 item 3); without it the record stays digest-only (R-19).
+    let out = value("--out").ok().map(std::path::PathBuf::from);
+    let kept = Arc::new(crate::evidence::KeepExchanges::default());
+    // The name prefixes each attempt id, so a recorded exchange says which
+    // entry point sent it.
+    let name = if smoke {
+        "bedrock-smoke"
+    } else {
+        "bedrock-probe"
+    };
     let backend = crate::BedrockBackend::new(
-        "bedrock-probe".into(),
+        name.into(),
         binding,
         policy,
         materials,
         crate::adapter::Config {
             credentials: Some(Arc::new(StandardCredentials)),
+            sink: kept.clone(),
+            retain_bytes: out.is_some(),
             ..Default::default()
         },
     )?;
@@ -132,12 +139,12 @@ pub fn run_cli(smoke: bool) -> Result<(), String> {
         .enable_all()
         .build()
         .map_err(|e| e.to_string())?;
-    runtime.block_on(async {
+    let result = runtime.block_on(async {
         use rustev_core::seams::{DecisionBackend,AttemptCall,CallContext};
         use rustev_contract::run::{CostBound,Charge};
         for i in 0..count {
             let units=match backend.cost_bound(&projection){CostBound::Estimated{units}=>units.checked_mul(unit).ok_or("cost overflow")?,_=>return Err("unknown reservation".into())};
-            let attempt=format!("bedrock-probe-{}-{i}",std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(|_|"clock")?.as_nanos());
+            let attempt=format!("{name}-{}-{i}",std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(|_|"clock")?.as_nanos());
             let reservation=journal.reserve(&attempt,units).map_err(|e|e.to_string())?;
             let cx=CallContext{remaining_ms:rustev_contract::time::DurationMs(budget),trace_id:String::new(),principal_handle:vec![]};
             let report=backend.infer(AttemptCall{projection:&projection,attempt_id:&attempt,cancel:CancelSignal::new(),cx:&cx}).await;
@@ -148,5 +155,33 @@ pub fn run_cli(smoke: bool) -> Result<(), String> {
         }
         println!("reachable: {count} successful sequential calls; interval_ms={interval}; budget_ms={budget}; reachability only");
         Ok(())
-    })
+    });
+    println!(
+        "journal after: {}",
+        serde_json::to_string(&journal.summary()).map_err(|e| e.to_string())?
+    );
+    // The probe's own result is reported before any evidence refusal.
+    if let Err(error) = &result {
+        eprintln!("{error}");
+    }
+    if let Some(dir) = out {
+        let secrets: Vec<(&str, Vec<u8>)> = [
+            "AWS_ACCESS_KEY_ID",
+            "AWS_SECRET_ACCESS_KEY",
+            "AWS_SESSION_TOKEN",
+        ]
+        .iter()
+        .filter_map(|k| std::env::var(k).ok().map(|v| (*k, v.into_bytes())))
+        .collect();
+        let secrets: Vec<(&str, &[u8])> = secrets.iter().map(|(k, v)| (*k, v.as_slice())).collect();
+        let kept = kept.0.lock().map_err(|_| "evidence sink poisoned")?;
+        let provenance = if smoke {
+            "live Bedrock smoke, synthetic fixture (3.14)"
+        } else {
+            "live Bedrock probe, synthetic fixture (3.11)"
+        };
+        let n = crate::evidence::write_evidence(&dir, &kept, provenance, &secrets)?;
+        println!("evidence: {n} exchange(s) written");
+    }
+    result
 }

@@ -7,7 +7,7 @@ use crate::{
         DiscardExchanges, ExchangeSink, Exchanges, RetainedBytes, blank_record, output_digest,
     },
     mapping::{self, Materials},
-    net::{Reply, Transport, model_path},
+    net::{Reply, Transport, host_header, model_path},
     policy::ModelPolicy,
     signing::{Clock, CredentialProvider, SystemClock, sign_request},
     taxonomy::{RemoteFailure, code_of_detail},
@@ -236,10 +236,8 @@ impl BedrockBackend {
             let uri: hyper::Uri = url
                 .parse()
                 .map_err(|_| fail(RemoteCode::TransportUnsent, "endpoint", false))?;
-            let authority = uri
-                .authority()
-                .ok_or_else(|| fail(RemoteCode::TransportUnsent, "endpoint", false))?
-                .to_string();
+            let authority = host_header(&uri)
+                .ok_or_else(|| fail(RemoteCode::TransportUnsent, "endpoint", false))?;
             let mut request = hyper::Request::post(uri)
                 .header("host", authority)
                 .header("content-type", "application/json")

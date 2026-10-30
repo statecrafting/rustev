@@ -1,0 +1,86 @@
+{
+  "schema": "rustev.bedrock-binding/1",
+  "wire": "converse",
+  "endpoint": "bedrock-runtime",
+  "region": "ca-central-1",
+  "model_id": "us.anthropic.claude-haiku-5-5",
+  "inference_profile": "geo",
+  "destination_regions": {
+    "as_of": "2026-10-29",
+    "regions": [
+      "ca-central-1",
+      "us-east-1",
+      "us-east-2",
+      "us-west-2"
+    ]
+  },
+  "residency_policy": {
+    "allowed_source_regions": [
+      "ca-central-1"
+    ],
+    "allowed_destination_regions": [
+      "ca-central-1",
+      "us-east-1",
+      "us-east-2",
+      "us-west-2"
+    ],
+    "allowed_profile_kinds": [
+      "geo"
+    ]
+  },
+  "operations": [
+    {
+      "operation": "classify",
+      "mapping_version": "rustev-bedrock-mapping/1",
+      "max_options": 256
+    },
+    {
+      "operation": "proposition",
+      "mapping_version": "rustev-bedrock-mapping/1",
+      "max_options": 256
+    },
+    {
+      "operation": "rubric",
+      "mapping_version": "rustev-bedrock-mapping/1",
+      "max_options": 256
+    }
+  ],
+  "mapping": {
+    "version": "rustev-bedrock-mapping/1",
+    "prompt_template_digest": "sha256:e5358347cb6121088483e6d201fa8782a11219beececc318ccf9b073fb139c07",
+    "option_description_digest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+  },
+  "parameters": {
+    "max_tokens": 1024,
+    "temperature": "none",
+    "top_p": "none",
+    "stop_sequences": [],
+    "reasoning_effort": "none",
+    "additional_model_request_fields": "none",
+    "service_tier": "none",
+    "performance_latency": "none"
+  },
+  "structured_output": "tool_use",
+  "logprobs": "none",
+  "pricing": {
+    "table_id": "aws-price-list-ca-central-1-claude-haiku-5-5-standard",
+    "as_of": "2026-10-29",
+    "currency": "USD",
+    "unit_nano_usd": 1,
+    "input_per_mtok": "0.11",
+    "output_per_mtok": "0.55",
+    "cache_read_per_mtok": "0.011",
+    "cache_write_per_mtok": "0.1375"
+  },
+  "guardrail": "none",
+  "provider_store": "not_applicable",
+  "request_limits": {
+    "max_projection_bytes": 49152,
+    "max_request_bytes": 262144,
+    "max_response_bytes": 262144
+  },
+  "transport_phase_policy": "disabled",
+  "connection_pool_policy": "disabled",
+  "batch_dispatch": "disabled",
+  "principal_wire": "omitted"
+}

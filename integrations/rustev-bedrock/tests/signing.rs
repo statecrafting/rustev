@@ -100,3 +100,21 @@ fn bedrock_request_signs_payload_service_region_token_and_fixed_time() {
     );
     assert_eq!(request.headers()["x-amz-date"], "20150830T123600Z");
 }
+
+/// The signed `host` drops the scheme's default port (bedrock-runtime refused
+/// a signature over `host:443`, live probe 2026-10-29) and keeps any other.
+#[test]
+fn host_header_drops_only_the_default_port() {
+    use rustev_bedrock::net::host_header;
+    let host = |u: &str| host_header(&u.parse().unwrap()).unwrap();
+    assert_eq!(
+        host("https://bedrock-runtime.ca-central-1.amazonaws.com:443/model/x/converse"),
+        "bedrock-runtime.ca-central-1.amazonaws.com"
+    );
+    assert_eq!(host("http://127.0.0.1:80/x"), "127.0.0.1");
+    assert_eq!(host("https://example.test:8443/x"), "example.test:8443");
+    assert_eq!(host("http://127.0.0.1:39001/x"), "127.0.0.1:39001");
+    assert_eq!(host("https://[::1]:443/x"), "[::1]");
+    assert_eq!(host("https://example.test/x"), "example.test");
+    assert_eq!(host_header(&"/relative".parse().unwrap()), None);
+}
