@@ -459,6 +459,7 @@ fn stable(b: &RepeatEvidence<'_>, c: &RepeatEvidence<'_>) -> Result<(), String> 
     if b.report.stable_cohort != c.report.stable_cohort {
         return Err("stable cohorts differ".into());
     }
+    let live = c.report.source == crate::repeat::Source::Live;
     for (b, c) in b.inputs.runs.iter().zip(c.inputs.runs) {
         let comparable = |e: &crate::report::Evaluated| -> BTreeSet<String> {
             e.detail
@@ -477,10 +478,11 @@ fn stable(b: &RepeatEvidence<'_>, c: &RepeatEvidence<'_>) -> Result<(), String> 
             .detail
             .count("candidate_outcome_change")
             .is_some()
-            || c.evaluated
-                .detail
-                .count("candidate_outcome_change")
-                .is_none()
+            || (!live
+                && c.evaluated
+                    .detail
+                    .count("candidate_outcome_change")
+                    .is_none())
         {
             return Err("run baseline and candidate roles do not hold".into());
         }

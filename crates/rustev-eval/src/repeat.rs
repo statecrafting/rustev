@@ -39,8 +39,7 @@ pub enum Source {
     Replay,
     /// N bundle sets, each captured from a separate execution.
     Captured,
-    /// N fresh executions: unavailable until live re-execution reaches
-    /// dataset scale (#76 E3).
+    /// N fresh executions, including dataset-scale live runs (spec 043).
     Live,
 }
 
@@ -334,9 +333,6 @@ fn observation(metric: &str, candidate: bool) -> Option<Observation> {
 pub fn repeat(inputs: &RepeatInputs<'_>) -> Result<RepeatReport, RepeatError> {
     let config = inputs.config;
     config.check().map_err(RepeatError::Config)?;
-    if inputs.source == Source::Live {
-        return Err(RepeatError::LiveSourceUnavailable);
-    }
     let runs = inputs.runs;
     let n = runs.len();
     if !(1..=repeat_stats::MAX_RUNS).contains(&n) {

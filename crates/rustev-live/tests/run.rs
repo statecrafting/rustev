@@ -94,6 +94,7 @@ fn spec() -> RunSpec {
     let snapshot =
         ProbeSnapshot::from_bytes(&config.probe, &probe.canonical().unwrap(), &[]).unwrap();
     RunSpec {
+        reports: None,
         config,
         mode: Mode::Library,
         run_id: "run".into(),
@@ -970,4 +971,312 @@ async fn live_run_spend_cap_and_exit_codes() {
     ] {
         assert_eq!(rustev_live::run::exit_code(status), code);
     }
+}
+
+struct ReportAdapter;
+impl rustev_eval::metrics::TaskAdapter for ReportAdapter {
+    fn adapter(&self) -> rustev_eval::dataset::AdapterRef {
+        rustev_eval::dataset::AdapterRef {
+            name: "SYNTHETIC".into(),
+            version: "1".into(),
+        }
+    }
+    fn rules(&self) -> rustev_eval::config::AdapterRules {
+        rustev_eval::config::AdapterRules::Bound(
+            rustev_contract::ids::ContentDigest::parse(&format!("sha256:{}", "a".repeat(64)))
+                .unwrap(),
+        )
+    }
+    fn check_label(&self, _: &str) -> Result<(), String> {
+        Ok(())
+    }
+    fn correct(
+        &self,
+        _: &str,
+        _: &BTreeMap<String, rustev_contract::judgment::OutValue>,
+        _: &str,
+    ) -> bool {
+        true
+    }
+}
+
+fn reporting_spec() -> RunSpec {
+    use rustev_contract::eval_report::{DatasetProvenance, Split};
+    use rustev_eval::dataset::{DatasetCase, DatasetManifest, Label};
+    use rustev_eval::metrics::TaskAdapter;
+    let mut s = spec();
+    s.config.repeats = 2;
+    s.split = "model_selection".into();
+    s.candidates.insert("b".into(), support_compiled(None));
+    let CaseInput::Available { snapshot_id, .. } = &s.cases[0].input else {
+        unreachable!()
+    };
+    let snapshot = snapshot_id.clone();
+    s.cases.push(LiveCase {
+        case_id: "missing".into(),
+        input: CaseInput::Unavailable {
+            reason: "snapshot-missing".into(),
+        },
+    });
+    let manifest = DatasetManifest {
+        schema: rustev_eval::dataset::DATASET.into(),
+        name: "SYNTHETIC live repeats".into(),
+        provenance: DatasetProvenance::Synthetic {
+            generator: "live tests".into(),
+        },
+        adapter: ReportAdapter.adapter(),
+        cases: s
+            .cases
+            .iter()
+            .map(|c| DatasetCase {
+                id: c.case_id.clone(),
+                source: format!("synthetic:{}", c.case_id),
+                snapshot: snapshot.clone(),
+                split: Split::ModelSelection,
+                label: Label::Missing,
+                subgroups: vec![],
+                gold: None,
+            })
+            .collect(),
+    };
+    s.dataset_id = manifest.id().unwrap();
+    let config = rustev_eval::config::EvaluatorConfig::parse(&serde_json::to_vec(&json!({
+        "schema":"rustev.evaluator-config/2",
+        "adapter":rustev_eval::config::ConfigAdapter::v2(ReportAdapter.adapter(), ReportAdapter.rules()),
+        "label_interpretation":"SYNTHETIC", "agreement":{"params":[]},
+        "probability_step":null,"reliability_bins":["0","1"],"subgroups":[],
+        "latency_quantiles":["0.5","0.95"],"cost_units_comparable":true,
+        "metrics": report_formulas(),
+        "gates":[],"temperature_grid":[]
+    })).unwrap()).unwrap();
+    let repeat_config = rustev_eval::repeat_config::RepeatConfig::parse(br#"{
+        "schema":"rustev.repeat-config/1",
+        "bootstrap":{"method":"percentile-cluster/1","prng":"xoshiro256starstar-splitmix64/1","level":"0.9","resamples":1000,"seed":"29"},
+        "noise":{"rule":{"k_sd":{"k":"2"}},"floor":"0","overrides":{}},
+        "slices":[],"stability_metrics":["coverage"],"top_k":null
+    }"#).unwrap();
+    s.reports = Some(ReportInputs {
+        manifest,
+        split: Split::ModelSelection,
+        config,
+        adapter: Box::new(ReportAdapter),
+        repeat_config,
+        top_k: None,
+    });
+    s
+}
+
+fn report_bytes(dir: &Dir) -> BTreeMap<String, Vec<u8>> {
+    let mut files = BTreeMap::new();
+    for name in ["a", "b"] {
+        for entry in std::fs::read_dir(dir.0.join("out").join(name)).unwrap() {
+            let path = entry.unwrap().path();
+            files.insert(
+                format!("{name}/{}", path.file_name().unwrap().to_str().unwrap()),
+                std::fs::read(path).unwrap(),
+            );
+        }
+    }
+    for file in ["comparison.json", "live-run.json"] {
+        files.insert(
+            file.into(),
+            std::fs::read(dir.0.join("out").join(file)).unwrap(),
+        );
+    }
+    files
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn live_repeat_outputs_are_deterministic_reconciled_and_resume_from_cases() {
+    use rustev_eval::comparison::ComparisonResult;
+    let mut previous = None;
+    for _ in 0..2 {
+        let dir = Dir::new();
+        let head = answering(linear_head());
+        let r = rig(config(8, 0, 1), &[(head.clone(), 8)]);
+        let journal = dir.journal();
+        let outcome = prepare(reporting_spec(), dir.options())
+            .unwrap()
+            .execute(
+                &r.rt,
+                journal.clone(),
+                &Host(None),
+                &r.clock,
+                &CancelSignal::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(outcome.status, RunStatus::EvaluatedLive);
+        assert_eq!(outcome.repeat_reports.len(), 2);
+        for report in outcome.repeat_reports.values() {
+            assert_eq!(report.source, rustev_eval::repeat::Source::Live);
+            assert_eq!(report.runs.len(), 2);
+            assert_eq!(report.stable_cohort, ["x", "y"]);
+            for metric in &report.cohorts[0].metrics {
+                if metric.name.starts_with("latency_ms/") || metric.name.starts_with("cost_") {
+                    assert_eq!(
+                        metric.observation,
+                        Some(rustev_eval::repeat::Observation::Candidate)
+                    );
+                }
+            }
+        }
+        assert_eq!(
+            read_live_run(&dir).repeat_reports,
+            outcome
+                .repeat_reports
+                .values()
+                .map(|r| r.record_digest().unwrap())
+                .collect::<Vec<_>>()
+        );
+        let comparison = outcome.comparison.unwrap();
+        assert_eq!(comparison.rows.len(), 2);
+        for row in comparison.rows {
+            let ComparisonResult::Measured { incomparable, .. } = row.result else {
+                panic!("measured comparison")
+            };
+            assert_eq!(incomparable["snapshot-missing"], 2);
+        }
+        let bytes = report_bytes(&dir);
+        if let Some(previous) = previous {
+            assert_eq!(bytes, previous);
+        }
+        previous = Some(bytes.clone());
+        // A staging directory left by a killed process does not block
+        // publication on resume.
+        let stale = dir.options().out.join(".repeat-staging");
+        std::fs::create_dir_all(stale.join("left")).unwrap();
+        std::fs::write(stale.join("left/partial.json"), b"{").unwrap();
+        let mut options = dir.options();
+        options.resume = true;
+        let before = head.dispatched().iter().filter(|id| dataset(id)).count();
+        let resumed = prepare(reporting_spec(), options)
+            .unwrap()
+            .execute(&r.rt, journal, &Host(None), &r.clock, &CancelSignal::new())
+            .await
+            .unwrap();
+        assert_eq!(resumed.repeat_reports, outcome.repeat_reports);
+        assert_eq!(
+            head.dispatched().iter().filter(|id| dataset(id)).count(),
+            before
+        );
+        for (file, value) in report_bytes(&dir) {
+            if file != "live-run.json" {
+                assert_eq!(value, bytes[&file]);
+            }
+        }
+    }
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn spend_capped_runs_publish_no_repeat_outputs() {
+    let dir = Dir::new();
+    let head = answering(linear_head());
+    let r = rig(config(8, 0, 1), &[(head, 8)]);
+    let mut s = reporting_spec();
+    s.config.run_cap_units = 3;
+    let outcome = prepare(s, dir.options())
+        .unwrap()
+        .execute(
+            &r.rt,
+            dir.journal(),
+            &Host(None),
+            &r.clock,
+            &CancelSignal::new(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(outcome.status, RunStatus::SpendCapped);
+    assert!(outcome.repeat_reports.is_empty());
+    assert!(outcome.comparison.is_none());
+    assert!(read_live_run(&dir).repeat_reports.is_empty());
+    for file in ["a", "b", "comparison.json", ".repeat-staging"] {
+        assert!(!dir.0.join("out").join(file).exists());
+    }
+}
+
+fn report_formulas() -> Vec<rustev_eval::config::MetricFormula> {
+    [
+        ("coverage", "comparable cases / all cases"),
+        ("acceptance_coverage", "proposals / comparable cases"),
+        ("labeled_proposal_coverage", "labeled proposals / proposals"),
+        (
+            "error_among_accepted",
+            "wrong labeled proposals / labeled proposals",
+        ),
+        (
+            "candidate_outcome_change",
+            "cases whose outcome key changed / comparable cases",
+        ),
+        (
+            "mean_log_loss",
+            "-sum(ln(p[label])) / n over labeled scored cases",
+        ),
+        ("brier", "sum_case sum_class (p - y)^2 / n"),
+        (
+            "reliability",
+            "per bin: mean top-label confidence and accuracy",
+        ),
+        (
+            "latency_ms",
+            "nearest-rank quantile of elapsed minus queued",
+        ),
+        ("queue_ms", "nearest-rank quantile of queued"),
+        ("cost_observed_units", "sum of observed units"),
+        ("cost_estimated_units", "sum of estimated units"),
+        ("cost_unknown_attempts", "attempts with an unknown charge"),
+        ("cost_liability_units", "units kept as liability"),
+    ]
+    .iter()
+    .map(|(n, f)| rustev_eval::config::MetricFormula {
+        name: n.to_string(),
+        formula: f.to_string(),
+    })
+    .collect()
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn repeat_publication_failure_keeps_outputs_absent_and_resume_checks_digests() {
+    let dir = Dir::new();
+    let head = answering(linear_head());
+    let r = rig(config(8, 0, 1), &[(head, 8)]);
+    let journal = dir.journal();
+    let prepared = prepare(reporting_spec(), dir.options()).unwrap();
+    // A parent collision forces failure after staging, before any publication.
+    std::fs::write(dir.0.join("out/b"), b"SYNTHETIC keep").unwrap();
+    assert!(
+        prepared
+            .execute(
+                &r.rt,
+                journal.clone(),
+                &Host(None),
+                &r.clock,
+                &CancelSignal::new()
+            )
+            .await
+            .is_err()
+    );
+    assert_eq!(
+        std::fs::read(dir.0.join("out/b")).unwrap(),
+        b"SYNTHETIC keep"
+    );
+    for file in ["a", "comparison.json", "live-run.json", ".repeat-staging"] {
+        assert!(!dir.0.join("out").join(file).exists());
+    }
+    std::fs::remove_file(dir.0.join("out/b")).unwrap();
+    let path = dir.0.join("out/cases/a.1.x.run.json");
+    let original = std::fs::read(&path).unwrap();
+    let mut record = rustev_contract::run::RunRecord::parse(&original).unwrap();
+    record.timing.elapsed_ms += 1;
+    std::fs::write(&path, record.record_canonical().unwrap()).unwrap();
+    let mut options = dir.options();
+    options.resume = true;
+    let error = prepare(reporting_spec(), options)
+        .unwrap()
+        .execute(&r.rt, journal, &Host(None), &r.clock, &CancelSignal::new())
+        .await
+        .err()
+        .unwrap();
+    assert!(error.detail.contains("differs from checkpoint"));
+    assert!(!dir.0.join("out/comparison.json").exists());
 }

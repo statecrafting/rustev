@@ -289,7 +289,7 @@ fn baseline_binding_is_checked_before_diff_or_reproducibility() {
 }
 
 #[test]
-fn repeat_document_refusals_do_not_publish_a_baseline() {
+fn repeat_document_refusals_and_live_source_acceptance() {
     let s = Scratch::new("repeat-document-refusals");
     let f = setup(&s);
     let args = [
@@ -321,13 +321,22 @@ fn repeat_document_refusals_do_not_publish_a_baseline() {
         assert!(!s.exists("recorded.json"));
         s.write(&path, &bytes);
     }
-    let mut report = f.reports().1;
-    report.source = rustev_eval::repeat::Source::Live;
+    let report = rustev_eval::repeat::repeat(&rustev_eval::repeat::RepeatInputs {
+        source: rustev_eval::repeat::Source::Live,
+        config: &f.config,
+        manifest: &f.manifest,
+        runs: &[rustev_eval::repeat::Run {
+            evaluated: &f.b,
+            cases: &f.bc,
+        }],
+    })
+    .unwrap();
     s.write("base/repeat.json", &report.record_canonical().unwrap());
     let result = s.rustev(&args);
-    result.expect(4, "invalid_input");
-    assert!(result.stdout_str().contains("live-source-unavailable"));
-    assert!(!s.exists("recorded.json"));
+    result.expect(0, "recorded");
+    let recorded = rustev_eval::baseline::Baseline::parse(&s.read("recorded.json")).unwrap();
+    assert_eq!(recorded.source, rustev_eval::repeat::Source::Live);
+    std::fs::remove_file(s.path("recorded.json")).unwrap();
     std::fs::remove_file(s.path("base/repeat.json")).unwrap();
     s.rustev(&args).expect(3, "io_error");
 }
