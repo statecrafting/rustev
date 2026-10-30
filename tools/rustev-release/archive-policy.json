@@ -274,6 +274,7 @@
         "src/callback_server.rs",
         "src/cancel.rs",
         "src/client.rs",
+        "src/context_client.rs",
         "src/cost.rs",
         "src/exchange.rs",
         "src/http.rs",
@@ -288,7 +289,7 @@
         "src/wire.rs"
       ],
       "max_archive_bytes": 163840,
-      "max_unpacked_bytes": 327680
+      "max_unpacked_bytes": 393216
     },
     "rustev-surface": {
       "files": [

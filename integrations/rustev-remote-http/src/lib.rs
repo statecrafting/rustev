@@ -9,13 +9,15 @@
 //! and bounded, isolation-keyed connection reuse ([`pool`]). Spec 042's
 //! callback protocols: the host-side server of `rustev.remote-context/1` and
 //! `rustev.remote-sink/1` ([`callback_server`]) and the bounded queue every
-//! callback client goes through ([`seam_queue`]).
+//! callback client goes through ([`seam_queue`]), and the context client
+//! ([`context_client`]).
 #![forbid(unsafe_code)]
 
 pub mod budget;
 pub mod callback_server;
 pub mod cancel;
 pub mod client;
+pub mod context_client;
 pub mod cost;
 pub mod exchange;
 pub mod http;
