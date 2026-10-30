@@ -566,3 +566,64 @@ async fn stage_1_passes_and_the_report_stays_unknown_without_stage_2() {
     assert!(report.record_digest().is_ok());
     assert_loopback_only();
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn stage_2_on_the_direct_binding_measures_not_qualified() {
+    // Spec 044 3.8 stage 2, recorded live on 2026-10-29: the spec 022 stage
+    // 3 production binding unbatched, and the same binding with only the
+    // batching switch on, at stage 1's configuration. A-64's bound is
+    // declared here as it was before the run.
+    let recorded = fixture("recorded-044-direct-stage2.json");
+    let unbatched = rustev_jev::production::ProductionBinding::parse(
+        &serde_json::to_vec(&recorded["binding"]).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(unbatched.decision.batching, Batching::Off);
+    let mut batched = unbatched.clone();
+    batched.decision.batching = Batching::SharedState {
+        max_items: MAX_ITEMS,
+        window_ms: WINDOW_MS,
+    };
+    let bindings = Bindings {
+        batched: batched.artifact().unwrap(),
+        unbatched: unbatched.artifact().unwrap(),
+    };
+    assert_eq!(
+        bindings.unbatched.to_string(),
+        "sha256:12897cdf3796818833af333769e913d1a1f65a267532ea4de2ec3b144fd40bd4"
+    );
+    let stage2: rustev_eval::batch_qualification::Stage2 =
+        serde_json::from_value(recorded["stage2"].clone()).unwrap();
+    let report = BatchQualification::new(
+        "rustev-jev",
+        bindings,
+        BatchingConfig {
+            max_items: MAX_ITEMS,
+            window_ms: WINDOW_MS,
+        },
+        AgreementBound {
+            criterion: Agreement::TopLabel,
+            min_agreeing: Ratio {
+                numerator: 19,
+                denominator: 20,
+            },
+        },
+        20,
+        stage1().await,
+        Some(stage2),
+    )
+    .unwrap();
+    assert!(
+        report
+            .stage1
+            .iter()
+            .all(|r| r.outcome == CaseOutcome::Passed)
+    );
+    // 43 of 46 agree on the top label: under 19 of 20, so measured, not
+    // qualified. Production batching stays off (R-28).
+    assert_eq!(report.agreement(), Some((43, 46)));
+    assert_eq!(report.verdict, Verdict::NotQualified);
+    let bytes = report.record_canonical().unwrap();
+    assert_eq!(BatchQualification::parse(&bytes).unwrap(), report);
+    assert_loopback_only();
+}

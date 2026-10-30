@@ -1,0 +1,1321 @@
+{
+ "recorded_at": "2026-10-29",
+ "provenance": "live direct-API calls (TypeSafe /v1/systemone, pin jev-1.14.0) under spec 044 3.8 stage 2 and spec 022 3.7 stage 3's binding, owner-authorized 2026-10-29 (A-68), within R-29's testing cap; the spec 012 stage 3 synthetic-provenance set. The unbatched answers are stage 3's; the batched ones are the same binding with only the batching switch on (3 items, 2,000 ms).",
+ "binding": {
+  "accepted_versions": [],
+  "decision": {
+   "batching": "off",
+   "limits": {
+    "max_input_bytes": 49152,
+    "max_request_bytes": 262144,
+    "max_response_bytes": 1048576,
+    "on_excess": "refuse"
+   },
+   "mapping_version": "rustev-jev-mapping/2 (direct shapes of 022 stage 2)",
+   "model": "typesafe-ai/jev",
+   "option_descriptions": {},
+   "provider_options": {
+    "only": [
+     "typesafe-ai"
+    ],
+    "zero_data_retention": true
+   },
+   "schema": "rustev.jev-binding/1",
+   "transport": "direct",
+   "version_pin": "jev-1.14.0"
+  },
+  "facts": {
+   "api_version": "v1",
+   "connections_reused": false,
+   "credential_custody_class": "host-callback",
+   "endpoint": "https://api.typesafe.ai/v1/systemone",
+   "follow_redirects": false,
+   "host_certificate_pinning": false,
+   "input_usd_per_million": "0.042",
+   "isolation_key": "one-connection-per-attempt",
+   "output_usd_per_million": "0",
+   "per_response_charge_reported": false,
+   "phases": {
+    "cancellation_ack_ms": 1000,
+    "connect_ms": 5000,
+    "first_response_byte_ms": 30000,
+    "request_write_ms": 5000,
+    "resolution_ms": 5000,
+    "response_body_ms": 10000,
+    "secure_handshake_ms": 5000
+   },
+   "price_source": {
+    "recorded_on": "2026-10-29",
+    "reference": "https://docs.typesafe.ai/models.md: jev-1.13.0 and jev-1.14.0 at USD 42 per billion input tokens, output tokens free",
+    "valid_through": "2026-11-28"
+   },
+   "privacy_terms": {
+    "recorded_on": "2026-10-29",
+    "reference": "https://typesafe.ai/privacy (last updated 2025-11-19); https://docs.typesafe.ai/legal.md (zero data retention for enterprise customers only); hosted in the United States",
+    "valid_through": "2026-11-28"
+   },
+   "retention_terms": "personal data retained \"for as long as reasonably necessary to provide you with the Services\"; no stated period for API inputs (TypeSafe Privacy Policy, last updated 2025-11-19)",
+   "retries": 0,
+   "root_store": "webpki",
+   "tls_minimum": "TLS1.2",
+   "training_terms": "\"We will not train or fine tune any artificial intelligence or machine learning models on your prompts or other Input.\" (TypeSafe Privacy Policy, last updated 2025-11-19)",
+   "units_per_usd": 1000000000,
+   "zero_retention_options": null
+  },
+  "gateway_pinning": null,
+  "mapping": "rustev-jev-mapping/2 (direct shapes of 022 stage 2)",
+  "schema": "rustev.jev-binding/2",
+  "usage": "production"
+ },
+ "stage2": {
+  "pairs": [
+   {
+    "case": "message_kind.01",
+    "batched": {
+     "output": {
+      "distribution": {
+       "booking": 0.99,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.0,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.01
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "booking": 0.99,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.0,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.01
+      }
+     }
+    }
+   },
+   {
+    "case": "message_kind.02",
+    "batched": {
+     "output": {
+      "distribution": {
+       "booking": 0.0,
+       "cancellation": 0.0,
+       "change": 1.0,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.0,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.0
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "booking": 0.0,
+       "cancellation": 0.0,
+       "change": 1.0,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.0,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.0
+      }
+     }
+    }
+   },
+   {
+    "case": "message_kind.03",
+    "batched": {
+     "output": {
+      "distribution": {
+       "booking": 0.0,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.0,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 1.0
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "booking": 0.0,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.0,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 1.0
+      }
+     }
+    }
+   },
+   {
+    "case": "message_kind.04",
+    "batched": {
+     "output": {
+      "distribution": {
+       "booking": 0.99,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.0,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.01
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "booking": 0.99,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.0,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.01
+      }
+     }
+    }
+   },
+   {
+    "case": "message_kind.05",
+    "batched": {
+     "output": {
+      "distribution": {
+       "booking": 0.01,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.05,
+       "payment_notice": 0.88,
+       "preference_statement": 0.02,
+       "receipt_or_folio": 0.04
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "booking": 0.02,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.05,
+       "payment_notice": 0.88,
+       "preference_statement": 0.02,
+       "receipt_or_folio": 0.03
+      }
+     }
+    }
+   },
+   {
+    "case": "message_kind.06",
+    "batched": {
+     "output": {
+      "distribution": {
+       "booking": 0.93,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.0,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.07
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "booking": 0.94,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.0,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.06
+      }
+     }
+    }
+   },
+   {
+    "case": "message_kind.07",
+    "batched": {
+     "output": {
+      "distribution": {
+       "booking": 0.52,
+       "cancellation": 0.0,
+       "change": 0.47,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.01,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.0
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "booking": 0.37,
+       "cancellation": 0.0,
+       "change": 0.62,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.01,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.0
+      }
+     }
+    }
+   },
+   {
+    "case": "message_kind.08",
+    "batched": {
+     "output": {
+      "distribution": {
+       "booking": 0.0,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 1.0,
+       "marketing": 0.0,
+       "other": 0.0,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.0
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "booking": 0.0,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 1.0,
+       "marketing": 0.0,
+       "other": 0.0,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.0
+      }
+     }
+    }
+   },
+   {
+    "case": "message_kind.09",
+    "batched": {
+     "output": {
+      "distribution": {
+       "booking": 0.0,
+       "cancellation": 1.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.0,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.0
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "booking": 0.0,
+       "cancellation": 1.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.0,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.0
+      }
+     }
+    }
+   },
+   {
+    "case": "message_kind.10",
+    "batched": {
+     "output": {
+      "distribution": {
+       "booking": 0.16,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.15,
+       "payment_notice": 0.06,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.63
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "booking": 0.16,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.17,
+       "payment_notice": 0.06,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.61
+      }
+     }
+    }
+   },
+   {
+    "case": "message_kind.11",
+    "batched": {
+     "output": {
+      "distribution": {
+       "booking": 0.26,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.0,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.74
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "booking": 0.28,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.0,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.72
+      }
+     }
+    }
+   },
+   {
+    "case": "message_kind.12",
+    "batched": {
+     "output": {
+      "distribution": {
+       "booking": 0.0,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.0,
+       "payment_notice": 0.0,
+       "preference_statement": 1.0,
+       "receipt_or_folio": 0.0
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "booking": 0.0,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.0,
+       "payment_notice": 0.0,
+       "preference_statement": 1.0,
+       "receipt_or_folio": 0.0
+      }
+     }
+    }
+   },
+   {
+    "case": "message_kind.13",
+    "batched": {
+     "output": {
+      "distribution": {
+       "booking": 0.0,
+       "cancellation": 0.0,
+       "change": 0.01,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.13,
+       "payment_notice": 0.01,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.85
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "booking": 0.0,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.09,
+       "payment_notice": 0.01,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.9
+      }
+     }
+    }
+   },
+   {
+    "case": "message_kind.14",
+    "batched": {
+     "output": {
+      "distribution": {
+       "booking": 0.0,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 0.03,
+       "other": 0.97,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.0
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "booking": 0.0,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 0.04,
+       "other": 0.96,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.0
+      }
+     }
+    }
+   },
+   {
+    "case": "message_kind.15",
+    "batched": {
+     "output": {
+      "distribution": {
+       "booking": 0.0,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.0,
+       "payment_notice": 0.05,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.95
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "booking": 0.0,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.0,
+       "payment_notice": 0.04,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.96
+      }
+     }
+    }
+   },
+   {
+    "case": "message_kind.16",
+    "batched": {
+     "output": {
+      "distribution": {
+       "booking": 0.0,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 0.98,
+       "other": 0.02,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.0
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "booking": 0.0,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 0.97,
+       "other": 0.03,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.0
+      }
+     }
+    }
+   },
+   {
+    "case": "message_kind.17",
+    "batched": {
+     "output": {
+      "distribution": {
+       "booking": 0.0,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 0.88,
+       "other": 0.12,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.0
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "booking": 0.0,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 0.83,
+       "other": 0.17,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.0
+      }
+     }
+    }
+   },
+   {
+    "case": "message_kind.18",
+    "batched": {
+     "output": {
+      "distribution": {
+       "booking": 0.0,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 1.0,
+       "other": 0.0,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.0
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "booking": 0.0,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 1.0,
+       "other": 0.0,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.0
+      }
+     }
+    }
+   },
+   {
+    "case": "message_kind.19",
+    "batched": {
+     "output": {
+      "distribution": {
+       "booking": 0.99,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.01,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.0
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "booking": 0.99,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.01,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.0
+      }
+     }
+    }
+   },
+   {
+    "case": "message_kind.20",
+    "batched": {
+     "output": {
+      "distribution": {
+       "booking": 0.02,
+       "cancellation": 0.0,
+       "change": 0.01,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.52,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.45
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "booking": 0.02,
+       "cancellation": 0.0,
+       "change": 0.01,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.48,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.49
+      }
+     }
+    }
+   },
+   {
+    "case": "message_kind.21",
+    "batched": {
+     "output": {
+      "distribution": {
+       "booking": 0.28,
+       "cancellation": 0.01,
+       "change": 0.03,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.65,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.03
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "booking": 0.34,
+       "cancellation": 0.01,
+       "change": 0.03,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.57,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.05
+      }
+     }
+    }
+   },
+   {
+    "case": "message_kind.22",
+    "batched": {
+     "output": {
+      "distribution": {
+       "booking": 0.16,
+       "cancellation": 0.01,
+       "change": 0.11,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.67,
+       "payment_notice": 0.0,
+       "preference_statement": 0.04,
+       "receipt_or_folio": 0.01
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "booking": 0.11,
+       "cancellation": 0.01,
+       "change": 0.09,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.74,
+       "payment_notice": 0.0,
+       "preference_statement": 0.04,
+       "receipt_or_folio": 0.01
+      }
+     }
+    }
+   },
+   {
+    "case": "message_kind.23",
+    "batched": {
+     "output": {
+      "distribution": {
+       "booking": 0.77,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.23,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.0
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "booking": 0.76,
+       "cancellation": 0.0,
+       "change": 0.0,
+       "delay": 0.0,
+       "marketing": 0.0,
+       "other": 0.24,
+       "payment_notice": 0.0,
+       "preference_statement": 0.0,
+       "receipt_or_folio": 0.0
+      }
+     }
+    }
+   },
+   {
+    "case": "relevance.01",
+    "batched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.0,
+       "not_travel": 0.0,
+       "travel_relevant": 1.0
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.0,
+       "not_travel": 0.0,
+       "travel_relevant": 1.0
+      }
+     }
+    }
+   },
+   {
+    "case": "relevance.02",
+    "batched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.0,
+       "not_travel": 0.0,
+       "travel_relevant": 1.0
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.0,
+       "not_travel": 0.0,
+       "travel_relevant": 1.0
+      }
+     }
+    }
+   },
+   {
+    "case": "relevance.03",
+    "batched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.0,
+       "not_travel": 0.01,
+       "travel_relevant": 0.99
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.0,
+       "not_travel": 0.01,
+       "travel_relevant": 0.99
+      }
+     }
+    }
+   },
+   {
+    "case": "relevance.04",
+    "batched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.0,
+       "not_travel": 0.0,
+       "travel_relevant": 1.0
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.0,
+       "not_travel": 0.0,
+       "travel_relevant": 1.0
+      }
+     }
+    }
+   },
+   {
+    "case": "relevance.05",
+    "batched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.01,
+       "not_travel": 0.01,
+       "travel_relevant": 0.98
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.02,
+       "not_travel": 0.01,
+       "travel_relevant": 0.97
+      }
+     }
+    }
+   },
+   {
+    "case": "relevance.06",
+    "batched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.0,
+       "not_travel": 0.0,
+       "travel_relevant": 1.0
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.0,
+       "not_travel": 0.0,
+       "travel_relevant": 1.0
+      }
+     }
+    }
+   },
+   {
+    "case": "relevance.07",
+    "batched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.0,
+       "not_travel": 0.0,
+       "travel_relevant": 1.0
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.0,
+       "not_travel": 0.0,
+       "travel_relevant": 1.0
+      }
+     }
+    }
+   },
+   {
+    "case": "relevance.08",
+    "batched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.0,
+       "not_travel": 0.0,
+       "travel_relevant": 1.0
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.0,
+       "not_travel": 0.0,
+       "travel_relevant": 1.0
+      }
+     }
+    }
+   },
+   {
+    "case": "relevance.09",
+    "batched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.0,
+       "not_travel": 0.0,
+       "travel_relevant": 1.0
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.0,
+       "not_travel": 0.0,
+       "travel_relevant": 1.0
+      }
+     }
+    }
+   },
+   {
+    "case": "relevance.10",
+    "batched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.0,
+       "not_travel": 0.0,
+       "travel_relevant": 1.0
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.0,
+       "not_travel": 0.0,
+       "travel_relevant": 1.0
+      }
+     }
+    }
+   },
+   {
+    "case": "relevance.11",
+    "batched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.0,
+       "not_travel": 0.0,
+       "travel_relevant": 1.0
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.0,
+       "not_travel": 0.0,
+       "travel_relevant": 1.0
+      }
+     }
+    }
+   },
+   {
+    "case": "relevance.12",
+    "batched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.04,
+       "not_travel": 0.0,
+       "travel_relevant": 0.96
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.03,
+       "not_travel": 0.0,
+       "travel_relevant": 0.97
+      }
+     }
+    }
+   },
+   {
+    "case": "relevance.13",
+    "batched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.0,
+       "not_travel": 1.0,
+       "travel_relevant": 0.0
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.0,
+       "not_travel": 1.0,
+       "travel_relevant": 0.0
+      }
+     }
+    }
+   },
+   {
+    "case": "relevance.14",
+    "batched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.01,
+       "not_travel": 0.98,
+       "travel_relevant": 0.01
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.01,
+       "not_travel": 0.98,
+       "travel_relevant": 0.01
+      }
+     }
+    }
+   },
+   {
+    "case": "relevance.15",
+    "batched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.0,
+       "not_travel": 1.0,
+       "travel_relevant": 0.0
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.0,
+       "not_travel": 1.0,
+       "travel_relevant": 0.0
+      }
+     }
+    }
+   },
+   {
+    "case": "relevance.16",
+    "batched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.02,
+       "not_travel": 0.71,
+       "travel_relevant": 0.27
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.01,
+       "not_travel": 0.76,
+       "travel_relevant": 0.23
+      }
+     }
+    }
+   },
+   {
+    "case": "relevance.17",
+    "batched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.06,
+       "not_travel": 0.84,
+       "travel_relevant": 0.1
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.07,
+       "not_travel": 0.85,
+       "travel_relevant": 0.08
+      }
+     }
+    }
+   },
+   {
+    "case": "relevance.18",
+    "batched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.03,
+       "not_travel": 0.83,
+       "travel_relevant": 0.14
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.03,
+       "not_travel": 0.86,
+       "travel_relevant": 0.11
+      }
+     }
+    }
+   },
+   {
+    "case": "relevance.19",
+    "batched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.0,
+       "not_travel": 1.0,
+       "travel_relevant": 0.0
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.0,
+       "not_travel": 1.0,
+       "travel_relevant": 0.0
+      }
+     }
+    }
+   },
+   {
+    "case": "relevance.20",
+    "batched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.0,
+       "not_travel": 1.0,
+       "travel_relevant": 0.0
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.0,
+       "not_travel": 1.0,
+       "travel_relevant": 0.0
+      }
+     }
+    }
+   },
+   {
+    "case": "relevance.21",
+    "batched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.05,
+       "not_travel": 0.01,
+       "travel_relevant": 0.94
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.04,
+       "not_travel": 0.01,
+       "travel_relevant": 0.95
+      }
+     }
+    }
+   },
+   {
+    "case": "relevance.22",
+    "batched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.0,
+       "not_travel": 0.0,
+       "travel_relevant": 1.0
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.01,
+       "not_travel": 0.0,
+       "travel_relevant": 0.99
+      }
+     }
+    }
+   },
+   {
+    "case": "relevance.23",
+    "batched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.14,
+       "not_travel": 0.43,
+       "travel_relevant": 0.43
+      }
+     }
+    },
+    "unbatched": {
+     "output": {
+      "distribution": {
+       "ambiguous": 0.14,
+       "not_travel": 0.44,
+       "travel_relevant": 0.42
+      }
+     }
+    }
+   }
+  ],
+  "spend": {
+   "observed_units": 0,
+   "estimated_units": 1035888,
+   "unknown_settlements": 0
+  }
+ }
+}
