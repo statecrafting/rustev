@@ -68,7 +68,7 @@ impl RemoteSink {
     fn accepts(&self, schema: RecordSchema) -> bool {
         self.description.record_schemas.contains(&schema)
     }
-    async fn send(&self, request: DeliverRequest) -> Result<String, String> {
+    pub(crate) async fn send(&self, request: DeliverRequest) -> Result<String, String> {
         if !self.accepts(request.record_schema)
             || request.record.len() as u64 > self.description.max_record_bytes
         {

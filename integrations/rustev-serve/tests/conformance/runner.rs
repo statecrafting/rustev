@@ -16,6 +16,10 @@
 #[path = "../support/mod.rs"]
 mod support;
 
+// Callback protocol conformance (3.17.3).
+#[path = "callback.rs"]
+mod callback;
+
 use crate::grpc::generated::Document as Envelope;
 use http_body_util::{BodyExt, Full};
 use hyper::{Request, body::Bytes};
