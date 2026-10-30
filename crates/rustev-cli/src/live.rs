@@ -22,7 +22,8 @@ use rustev_live::documents::{CostUnit, EvaluationTime, LiveConfig, LiveError, Mo
 use rustev_live::journal::{BudgetKind, JournalError, SpendJournal, SystemClock};
 use rustev_live::probe::ProbeSnapshot;
 use rustev_live::run::{
-    CaseInput, CaseOrigin, LiveCase, RunOptions, RunSpec, RunStatus, exit_code, prepare,
+    CaseInput, CaseOrigin, LiveCase, ReportInputs, RunOptions, RunSpec, RunStatus,
+    SourceComparison, exit_code, prepare,
 };
 use rustev_runtime::{
     DispatchAnswer, LiveAuthorizer, Runtime, RuntimeConfig, SinkPolicy, TokioClock,
@@ -153,12 +154,47 @@ impl EvidenceSink for ReturnedRecord {
     }
 }
 
+// The runtime requires source descriptors when preparing acquisition plans.
+// Captured pages are supplied by the live engine; this host has no live source transport.
+struct RetainedSource(rustev_contract::source::SourceDescriptor);
+impl rustev_core::seams::AcquisitionSource for RetainedSource {
+    fn descriptor(&self) -> &rustev_contract::source::SourceDescriptor {
+        &self.0
+    }
+    fn cost_bound(
+        &self,
+        _: &rustev_contract::acquisition::AcquisitionRequest,
+    ) -> rustev_contract::run::CostBound {
+        rustev_contract::run::CostBound::Unknown
+    }
+    fn acquire<'a>(
+        &'a self,
+        _: rustev_core::seams::AcquireCall<'a>,
+    ) -> BoxFuture<'a, rustev_core::seams::AcquireReport> {
+        Box::pin(async {
+            rustev_core::seams::AcquireReport {
+                result: Err((
+                    rustev_core::seams::AcquisitionFailure::Denied,
+                    "live acquisition source is not linked".into(),
+                )),
+                charge: rustev_contract::run::Charge::Unknown,
+                cancel: rustev_core::seams::CancelAck::NotRequested,
+            }
+        })
+    }
+}
+
 pub fn run(p: &Parsed, cx: &Context) -> Result<Exit, Usage> {
     p.forbid(
         &["repeat"],
         "is not accepted by eval live; use live-config repeats",
     )?;
-    p.forbid(&["captures"], "is not yet available")?;
+    if p.one("captures")
+        .is_some_and(|dir| !std::path::Path::new(dir).is_dir())
+    {
+        return usage("--captures must name a directory of acquisition page documents");
+    }
+    let replay = crate::replay::replay_config(p)?;
     if p.has("snapshots") == p.has("bundles") {
         return usage("give exactly one of --snapshots and --bundles");
     }
@@ -178,7 +214,7 @@ pub fn run(p: &Parsed, cx: &Context) -> Result<Exit, Usage> {
         if p.has("ledger") == p.has("ledger-new") {
             return usage("give exactly one of --ledger and --ledger-new");
         }
-        // Repeat reports, which bind ledger exposure, are not delivered by the engine yet.
+        // The engine binds report digests before the host can record counted exposure.
         return usage("final_test live exposure recording is not yet available");
     }
     p.forbid(
@@ -198,12 +234,6 @@ pub fn run(p: &Parsed, cx: &Context) -> Result<Exit, Usage> {
             return Err(invalid(
                 "evaluation-time-unavailable",
                 "snapshot files carry no source time",
-            ));
-        }
-        if config.compare_with_source || !config.acquisitions.is_empty() {
-            return Err(invalid(
-                "live-config",
-                "source comparison and acquisitions are not yet available",
             ));
         }
         let manifest: DatasetManifest =
@@ -280,6 +310,7 @@ pub fn run(p: &Parsed, cx: &Context) -> Result<Exit, Usage> {
                 ));
             }
         }
+        let mut sources_by_name = BTreeMap::new();
         let mut candidates = BTreeMap::new();
         let mut backends = BTreeMap::new();
         let mut rules_by_id = BTreeMap::new();
@@ -292,17 +323,28 @@ pub fn run(p: &Parsed, cx: &Context) -> Result<Exit, Usage> {
             )
             .map_err(|e| invalid("live-config", format!("{e:?}")))?;
             let plan = rustev_surface::plan::read_plan(COMMAND, &inputs, &c.plan)?;
-            if plan
-                .acquisitions
-                .as_ref()
-                .is_some_and(|items| !items.is_empty())
-            {
-                return Err(invalid(
-                    "live-config",
-                    "plans with acquisitions are not yet available",
-                ));
+            let sources = documents::<rustev_contract::source::SourceDescriptor>(
+                &inputs,
+                &join(&join(p.req("candidates"), &c.name), "sources"),
+                DESCRIPTOR_V1.max_bytes,
+                crate::io::MAX_DESCRIPTOR_FILES,
+                true,
+            )?;
+            let compiled = rustev_core::Compiled::load_checked_with_sources(
+                &plan,
+                &deps.descriptors,
+                &deps.calibrations,
+                &sources,
+            )
+            .map_err(|e| invalid("live-config", format!("{e:?}")))?;
+            for source in sources {
+                if sources_by_name
+                    .insert(source.name.clone(), source.clone())
+                    .is_some_and(|old| old != source)
+                {
+                    return Err(invalid("live-config", "conflicting source descriptors"));
+                }
             }
-            let compiled = rustev_surface::plan::load_plan(COMMAND, &plan, &deps)?;
             for backend in rules {
                 use rustev_core::seams::DecisionBackend;
                 let id = backend.descriptor().backend_id.clone();
@@ -317,6 +359,11 @@ pub fn run(p: &Parsed, cx: &Context) -> Result<Exit, Usage> {
             }
             candidates.insert(c.name, compiled);
         }
+        let acquisition_pages = p
+            .one("captures")
+            .map(|dir| documents(&inputs, dir, SNAPSHOT_V1.max_bytes, 4096, false))
+            .transpose()?
+            .unwrap_or_default();
         let tokio = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
@@ -341,6 +388,9 @@ pub fn run(p: &Parsed, cx: &Context) -> Result<Exit, Usage> {
                     sink: SinkPolicy::FailDecision { timeout_ms: 5_000 },
                 },
             );
+            for source in sources_by_name.into_values() {
+                builder = builder.acquisition_source(Arc::new(RetainedSource(source)), 64);
+            }
             for backend in rules_by_id.into_values() {
                 builder = builder.backend(Arc::new(backend), 64);
             }
@@ -477,10 +527,24 @@ pub fn run(p: &Parsed, cx: &Context) -> Result<Exit, Usage> {
                 EvaluationTime::Fixed { ms } => ms,
                 EvaluationTime::Source => now,
             };
+            let source_comparison =
+                (config.compare_with_source && p.has("bundles")).then(|| SourceComparison {
+                    adapter: adapter.adapter(),
+                    agreement: evaluator.agreement.clone(),
+                    replay: Box::new(move || replay.clone()),
+                    resolver: crate::replay::resolver(p),
+                });
             let spec = RunSpec {
-                acquisition_pages: Vec::new(),
-                source_comparison: None,
-                reports: None,
+                acquisition_pages,
+                source_comparison,
+                reports: Some(ReportInputs {
+                    manifest: manifest.clone(),
+                    split,
+                    config: evaluator,
+                    adapter: Box::new(adapter.clone()),
+                    top_k: repeat.top_k.clone(),
+                    repeat_config: repeat,
+                }),
                 config,
                 mode: Mode::Cli,
                 run_id: p.req("run-id").into(),
@@ -543,6 +607,15 @@ pub fn run(p: &Parsed, cx: &Context) -> Result<Exit, Usage> {
                 )
                 .await
                 .map_err(live_error)?;
+            if outcome.status == RunStatus::EvaluatedLive {
+                crate::repeat::publish_live_outputs(
+                    COMMAND,
+                    p.req("out"),
+                    &adapter,
+                    &outcome.repeat_reports,
+                    outcome.comparison.as_ref().expect("evaluated reports"),
+                )?;
+            }
             let status = match outcome.status {
                 RunStatus::EvaluatedLive => "evaluated_live",
                 RunStatus::Probed => "probed",
@@ -565,4 +638,40 @@ pub fn run(p: &Parsed, cx: &Context) -> Result<Exit, Usage> {
         stdout: e.out.bytes(),
         stderr: String::new(),
     }))
+}
+
+// Directory names are only labels; page request identities come from parsed documents.
+fn documents<T: Document>(
+    inputs: &Inputs,
+    dir: &str,
+    max_bytes: usize,
+    max_files: usize,
+    optional: bool,
+) -> Result<Vec<T>, Done> {
+    let entries = match std::fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(e) if optional && e.kind() == std::io::ErrorKind::NotFound => return Ok(vec![]),
+        Err(e) => return Err(invalid(dir, e)),
+    };
+    let mut paths = Vec::new();
+    for entry in entries {
+        let entry = entry.map_err(|e| invalid(dir, e))?;
+        if !entry.file_type().map_err(|e| invalid(dir, e))?.is_file() {
+            return Err(invalid(dir, "expected regular document files"));
+        }
+        let path = entry
+            .path()
+            .into_os_string()
+            .into_string()
+            .map_err(|_| invalid(dir, "non UTF-8 document name"))?;
+        paths.push(path);
+        if paths.len() > max_files {
+            return Err(invalid(dir, "too many documents"));
+        }
+    }
+    paths.sort();
+    paths
+        .iter()
+        .map(|path| read_doc(COMMAND, inputs, path, max_bytes))
+        .collect()
 }

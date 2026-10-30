@@ -643,6 +643,56 @@ pub fn eval(p: &Parsed) -> Result<Res, Usage> {
     })())
 }
 
+/// Render the host-owned parts of live repeat sets after engine publication.
+pub(crate) fn publish_live_outputs(
+    command: &str,
+    out: &str,
+    adapter: &TaskAdapterDoc,
+    reports: &std::collections::BTreeMap<String, RepeatReport>,
+    comparison: &comparison::Comparison,
+) -> Result<(), Done> {
+    let bytes = adapter
+        .canonical()
+        .map_err(|e| Done::invalid(command, "adapter", e.to_string()))?;
+    let mut files: Vec<_> = reports
+        .keys()
+        .map(|name| (join(&join(out, name), "adapter.json"), bytes.clone()))
+        .collect();
+    files.push((
+        join(out, "comparison.md"),
+        comparison::render_markdown(comparison).into_bytes(),
+    ));
+    // Resume accepts identical published files, but never overwrites conflicting evidence.
+    let reads = Reads::default();
+    let mut pending = Vec::new();
+    for (path, bytes) in files {
+        match reads.read_classified(&path, bytes.len().saturating_add(1)) {
+            Ok(Some(existing)) if existing == bytes => {}
+            Ok(None) => pending.push((path, bytes)),
+            Ok(Some(_)) => {
+                return Err(Done::io(
+                    command,
+                    io::IoFail {
+                        path,
+                        detail: "output already exists with different bytes".into(),
+                    },
+                ));
+            }
+            Err(e) => {
+                return Err(Done::io(
+                    command,
+                    match e {
+                        rustev_surface::host::ReadFail::File(e)
+                        | rustev_surface::host::ReadFail::Budget(e) => e,
+                    },
+                ));
+            }
+        }
+    }
+    publish_outputs(&pending, &[], |temp, path| std::fs::hard_link(temp, path))
+        .map_err(|e| Done::io(command, e))
+}
+
 // Stage the entire set before publishing. Hard links provide the no-clobber
 // publication required by spec 006, including when a path appears after preflight.
 fn publish_outputs(

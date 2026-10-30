@@ -20,12 +20,14 @@ ROOT = Path(__file__).resolve().parents[2]
 # 70 seconds with its test targets rebuilt, 2026-10-29).
 # 030 joins integrations-base (about 17 to 22 minutes; integrations-core is
 # near its 45-minute limit).
+# 043 joins runtime-evidence beside 026, which it amends (about 3.5 minutes
+# with its test targets rebuilt locally, 2026-10-30).
 GROUPS = {
     "evaluation": "004".split(),
     "cli-backends": "001 005 006 014 029 041".split(),
     "integrations-base": "002 010 012 015 017 019 020 030 033 038 040".split(),
     "integrations-core": "022 034 035 036 037 045".split(),
-    "runtime-evidence": "003 007 008 009 013 023 026 027 028 039 044 049".split(),
+    "runtime-evidence": "003 007 008 009 013 023 026 027 028 039 043 044 049".split(),
 }
 
 

@@ -159,7 +159,7 @@ pub const COMMANDS: &[CommandSpec] = &[
                       "repeat-config": One, "candidates": One, "snapshots": One,
                       "bundles": One, "captures": One, "admission": One, "out": One,
                       "now-ms": One, "scope": One, "tenant": One, "context-revision": One,
-                      "principal-scope": One, "store": One, "run-deadline-ms": One,
+                      "principal-scope": One, "store": One, "host-cap-ms": One, "run-deadline-ms": One,
                       "probe-only": Switch, "resume": Switch, "rerun-interrupted": Switch,
                       "repeat": One, "purpose": One, "lineage": One, "ledger": One,
                       "ledger-new": Switch, "ledger-out": One),

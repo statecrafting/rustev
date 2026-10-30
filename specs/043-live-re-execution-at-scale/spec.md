@@ -48,6 +48,8 @@ extends:
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.toml" }, nature: additive }
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.lock" }, nature: additive }
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  # 043 in exactly one acceptance group at completion (scripts/acceptance/verify.py).
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "002-decision-contract-and-pure-core"
@@ -717,8 +719,35 @@ objective API (#76 future).
 
 ## Verification
 
-Pending with implementation. Approval satisfies no acceptance item, and no
-live run has been made under this spec.
+Run by `make verify` (043 is in `VERIFIED_SPECS`, in CI's
+`runtime-evidence` group beside 026, which it amends). Every command is
+deterministic, with scripted backends, a manual clock and temporary
+journals; none contacts a provider. The live provider stage (manual, not
+in CI) is not part of declared verification: until a host program runs it
+under the work order's terms and its journal totals are recorded in the
+implementation record, it is reported as externally blocked, never as
+passed.
+
+```verify:cli
+# 3.5 to 3.11 and section 5: the journal and its move, the spend gate,
+# the probe, the run engine, scheduling, checkpoints and resumption,
+# per-case and run documents, acquisitions, source comparison and repeat
+# outputs; the spend property test.
+cargo test -p rustev-live --locked
+# Resumption: a crash at every durable write point, then resume with and
+# without --rerun-interrupted.
+cargo test -p rustev-live-crash --locked
+# 3.4 and 3.6: the runtime's gated live entry points.
+cargo test -p rustev-runtime --locked --test live --test acquisition
+# 3.1.2 and 3.11: observed evaluation, the dependency test, live repeat sets.
+cargo test -p rustev-eval --locked --test observed --test live_separation --test reports
+# Journal move: spec 012's spend tests through the re-export.
+cargo test -p rustev-jev --locked --test spend
+# 3.13 and 3.14: `rustev eval live` end to end, and live repeat sets in
+# spec 029's commands.
+cargo test -p rustev-cli --locked --test eval_live --test repeat
+cargo clippy -p rustev-live -p rustev-live-crash -p rustev-cli --all-targets --locked -- -D warnings
+```
 
 ## Implementation record
 
@@ -1050,6 +1079,27 @@ versions), so the crash test of increment 9 moves to the unpublished
 workspace crate `rustev-live-crash` (`crates/rustev-live/crash/`,
 excluded from the release set as a test harness), which enables the
 feature from outside; `rustev-live`'s own tests no longer build it.
+
+**Increment 7 part b (2026-10-30): the remaining CLI inputs and
+declared verification.** `rustev eval live` now passes the run's report
+inputs (dataset and split, evaluator configuration, adapter, repeat
+configuration and its top-k), so an `evaluated_live` run writes the
+repeat outputs of 3.11.2, and then renders `adapter.json` and
+`comparison.md` as `rustev eval candidates` does, published together with
+no clobbering and only after the engine's outputs exist; any other end
+status writes none. `--captures <dir>` supplies retained acquisition pages
+(3.4.2), each candidate's source descriptors come from
+`--candidates/<candidate>/sources/` (an engineering choice, since 3.13
+names no location for them; accepted by the owner on 2026-10-30), and
+plans with acquisitions are no longer refused by the CLI
+(the engine refuses `acquisition-undeclared`). With `compare_with_source`
+and `--bundles` the comparison context comes from the adapter, the
+evaluator's agreement and the replay flags; with `--snapshots` it is
+`invalid_input` `live-config`. Spec 029's final-test exposure recording
+is still refused as a usage error, because the engine exposes no counted
+exposure to record. 043 joins `VERIFIED_SPECS` and the `runtime-evidence`
+acceptance group, and its Verification block declares the commands.
+Tests: `crates/rustev-cli/tests/eval_live.rs`.
 
 ## Decisions at approval
 
