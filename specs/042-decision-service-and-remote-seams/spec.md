@@ -31,6 +31,9 @@ extends:
   - { spec: "003-runtime-execution-and-evidence", unit: { kind: directory, path: "crates/rustev-runtime/" }, nature: additive }
   # HTTP binding (client and host-side server) of the two callback protocols.
   - { spec: "009-remote-adapter-protocol", unit: { kind: directory, path: "integrations/rustev-remote-http/" }, nature: additive }
+  # The service crate, established by spec 010 (section 2: the change that
+  # first writes it under this spec adds the edge).
+  - { spec: "010-integrations", unit: { kind: directory, path: "integrations/rustev-serve/" }, nature: additive }
   # gRPC and Sigstore dependency families (integration-only).
   - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "tools/rustev-boundaries/" }, nature: additive }
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.toml" }, nature: additive }
@@ -1029,6 +1032,39 @@ judgment for an exact and a model-backed step.
 `prost-types`) and the Sigstore family (`sigstore`, `sigstore-verify`,
 `sigstore-protobuf-specs`) of 3.18; the transitive purity check of
 `rustev-contract` and `rustev-core` refuses both, with tests.
+
+**`rustev-serve` increments 1 and 2 (2026-10-22, recorded in spec 010).**
+The service over HTTP/1.1 and HTTP/2 (#190, #191) and the gRPC transport
+of 3.9 (#187) are recorded in spec 010's implementation record, with
+`integrations/rustev-serve/tests/COVERAGE.md` mapping section 5. The gRPC
+transport is complete: the `.proto` and its Rust code are generated from
+the operation table and drift-checked (`tests/grpc_generation.rs`), and
+`grpc_differential` compares HTTP and gRPC documents for success, each
+refusal class, streaming and `evidence_not_delivered`. Not yet delivered:
+the HTTP binding of the two callback protocols in `rustev-remote-http`
+(3.10 to 3.12), and the shared conformance surfaces (3.17).
+
+**Increment 3: the image definition (2026-10-29).**
+`integrations/rustev-serve/image/Dockerfile` defines the image of 3.16.1:
+a builder stage on the Linux gnu toolchain image spec 031's `artifacts.sh`
+uses, and a runtime stage on spec 010's recorded base,
+`gcr.io/distroless/cc-debian12:nonroot` pinned by its index digest, holding
+only the binary, as user and group 65532, with entrypoint
+`/usr/local/bin/rustev-serve --config /etc/rustev/serve.json`; nothing in
+the runtime stage writes to the filesystem, so it runs with a read-only
+root. `Dockerfile.dockerignore` sends sources only.
+`integrations/rustev-serve/tests/image.rs` checks the definition: both
+bases pinned by digest, the runtime base equal to the binding record's
+index, the builder equal to `artifacts.sh`'s, and the runtime stage
+exactly the copy, the user and the entrypoint. `image/check.sh <image>
+<platform>` checks a built image: platform, user, entrypoint, no shell,
+and that the binary starts on a read-only root filesystem. Building it for
+`linux/amd64` and `linux/arm64` in the candidate workflow, and the rest of
+3.16.2, are spec 031's (3.1 layer 7); until that workflow builds the image,
+the image acceptance item stays externally blocked. In
+`tools/rustev-release/release-set.json` the image stays `absent`, with its
+reason updated. This change adds the `extends` edge on
+`integrations/rustev-serve/` that section 2 calls for.
 
 ## Decisions at approval
 
