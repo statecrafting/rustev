@@ -259,13 +259,20 @@ pub fn golden(name: &str, bytes: &[u8]) {
         // Spec 034 increment 5 exposes parameterized commands only through
         // the CLI; binding exposure belongs to a later increment.
         let parameterized = name.starts_with("parameterized.");
-        let surfaces = if repeat || parameterized {
+        let mut surfaces = if repeat || parameterized {
             json!(["cli"])
         } else if pure {
             json!(["cli", "native", "wasm"])
         } else {
             json!(["cli", "native"])
         };
+        // Spec 042, 3.17.1: the decision service runs every `run` case
+        // through its HTTP and gRPC surfaces.
+        if command_of(&seen.args) == "run" && !(repeat || parameterized) {
+            let s = surfaces.as_array_mut().unwrap();
+            s.push(json!("serve-grpc"));
+            s.push(json!("serve-http"));
+        }
         let path = root().join(format!("tools/rustev-conformance/cases/cli/{id}.json"));
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         let command = command_of(&seen.args);

@@ -61,6 +61,8 @@
   ],
   "surfaces": [
     "cli",
-    "native"
+    "native",
+    "serve-grpc",
+    "serve-http"
   ]
 }

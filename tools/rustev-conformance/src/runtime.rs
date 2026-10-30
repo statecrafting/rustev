@@ -181,13 +181,34 @@ fn doc<T: Document>(inputs: &Inputs, name: &str) -> Result<T, String> {
     T::parse(b).map_err(|e| format!("{name}: {e}"))
 }
 
-struct Scripted {
+/// A backend answering from its script. Public so that every runner hosting
+/// Rust seams binds the same backend: the decision service's runner (spec
+/// 042, 3.17.1) registers it as a service backend.
+pub struct Scripted {
     descriptor: BackendDescriptor,
     script: BackendScript,
     gates: Mutex<BTreeMap<String, (String, oneshot::Sender<Answer>)>>,
 }
 
 impl Scripted {
+    pub fn new(descriptor: BackendDescriptor, script: BackendScript) -> Arc<Self> {
+        Arc::new(Scripted {
+            descriptor,
+            script,
+            gates: Mutex::new(BTreeMap::new()),
+        })
+    }
+
+    /// The backend seam, sharing this script's gates.
+    pub fn backend(self: &Arc<Self>) -> Arc<dyn DecisionBackend> {
+        Arc::new(Handle(self.clone()))
+    }
+
+    /// Attempts waiting at a gate.
+    pub fn gated(&self) -> usize {
+        self.gates.lock().unwrap().len()
+    }
+
     fn answer(&self, task: &str, n: usize) -> Answer {
         let list = self
             .script
@@ -210,7 +231,7 @@ impl Scripted {
     /// the gates (whatever its backend does next), so releasing after a
     /// cancellation finds nothing, and a script that expects otherwise is
     /// told so.
-    fn release_all(&self) -> usize {
+    pub fn release_all(&self) -> usize {
         let gates = std::mem::take(&mut *self.gates.lock().unwrap());
         let mut n = 0;
         for (_, (task, tx)) in gates {
@@ -383,6 +404,18 @@ impl EvidenceSink for Ack {
 /// (the record canonical bytes).
 pub type Outputs = BTreeMap<String, Vec<u8>>;
 
+/// A request's `<decision>.result.json` bytes: its status and, for a
+/// rejection, its kind.
+pub fn result_line(decision_id: &str, status: &str, rejection: Option<&str>) -> Vec<u8> {
+    let mut v = json!({ "decision_id": decision_id, "status": status });
+    if let Some(r) = rejection {
+        v["rejection"] = json!(r);
+    }
+    let mut b = serde_json::to_vec(&v).expect("a JSON object");
+    b.push(b'\n');
+    b
+}
+
 /// Run `case` with Rust seams on a manual clock.
 pub fn run(case: &RuntimeCase, inputs: &Inputs) -> Result<Outputs, String> {
     let plan: Plan = doc(inputs, &case.plan)?;
@@ -413,12 +446,8 @@ pub fn run(case: &RuntimeCase, inputs: &Inputs) -> Result<Outputs, String> {
     );
     let mut scripted = vec![];
     for b in &case.backends {
-        let s = Arc::new(Scripted {
-            descriptor: doc(inputs, &b.descriptor)?,
-            script: b.clone(),
-            gates: Mutex::new(BTreeMap::new()),
-        });
-        builder = builder.backend(Arc::new(Handle(s.clone())), b.max_concurrency);
+        let s = Scripted::new(doc(inputs, &b.descriptor)?, b.clone());
+        builder = builder.backend(s.backend(), b.max_concurrency);
         scripted.push(s);
     }
     let rt = Arc::new(builder.build().map_err(|e| format!("{e:?}"))?);
@@ -465,7 +494,7 @@ pub fn run(case: &RuntimeCase, inputs: &Inputs) -> Result<Outputs, String> {
                 }
                 Step::WaitGated { backend, count } => {
                     let s = scripted.get(*backend).ok_or("no such backend")?;
-                    until("gated attempts", || s.gates.lock().unwrap().len() >= *count).await?;
+                    until("gated attempts", || s.gated() >= *count).await?;
                 }
                 Step::WaitQueued { count } => {
                     until("queued decisions", || rt.gauges().queued >= *count).await?;
@@ -505,30 +534,36 @@ pub fn run(case: &RuntimeCase, inputs: &Inputs) -> Result<Outputs, String> {
                 .map_err(|e| format!("{id}: {e}"))?;
             let (status, record) = match r {
                 Ok(d) => (
-                    json!({ "decision_id": id, "status": match d.completion {
-                        Completion::Judged(_) => "judged",
-                        Completion::Cancelled => "cancelled",
-                    }}),
+                    result_line(
+                        id,
+                        match d.completion {
+                            Completion::Judged(_) => "judged",
+                            Completion::Cancelled => "cancelled",
+                        },
+                        None,
+                    ),
                     Some(d.record),
                 ),
                 Err(DecideError::GenerationFailed(detail)) => return Err(detail),
                 Err(DecideError::Rejected(r)) => (
-                    json!({ "decision_id": id, "status": "rejected", "rejection": match r {
-                        Rejection::Overloaded => "overloaded",
-                        Rejection::QueueDeadline => "queue_deadline",
-                        Rejection::Cancelled => "cancelled",
-                        Rejection::InvalidRequest(_) => "invalid_request",
-                    }}),
+                    result_line(
+                        id,
+                        "rejected",
+                        Some(match r {
+                            Rejection::Overloaded => "overloaded",
+                            Rejection::QueueDeadline => "queue_deadline",
+                            Rejection::Cancelled => "cancelled",
+                            Rejection::InvalidRequest(_) => "invalid_request",
+                        }),
+                    ),
                     None,
                 ),
                 Err(DecideError::EvidenceNotDelivered { record, .. }) => (
-                    json!({ "decision_id": id, "status": "evidence_not_delivered" }),
+                    result_line(id, "evidence_not_delivered", None),
                     Some(record),
                 ),
             };
-            let mut b = serde_json::to_vec(&status).map_err(|e| e.to_string())?;
-            b.push(b'\n');
-            out.insert(format!("{id}.result.json"), b);
+            out.insert(format!("{id}.result.json"), status);
             if let Some(rec) = record {
                 let mut b = rec.record_canonical().map_err(|e| e.to_string())?;
                 b.push(b'\n');
