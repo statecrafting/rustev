@@ -1,7 +1,8 @@
 //! The recorded fixtures (3.14 item 3): four live Converse exchanges of
-//! 2026-10-29, replayed offline against a loopback server. Each replay sends
-//! the recorded request byte for byte (by digest), supplies the recorded
-//! output (by digest) with the recorded charge, and contacts only loopback.
+//! 2026-10-29 and one live Responses exchange of 2026-10-30, replayed
+//! offline against a loopback server. Each replay sends the recorded request
+//! byte for byte (by digest), supplies the recorded output (by digest) with
+//! the recorded charge, and contacts only loopback.
 use rustev_bedrock::{
     BedrockBackend,
     adapter::Config,
@@ -17,22 +18,42 @@ use serde_json::Value;
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-const RECORDED: [(&str, &str); 4] = [
+const CONVERSE_BINDING: &[u8] = include_bytes!("../fixtures/recorded/binding.json");
+const CONVERSE_POLICY: &[u8] = include_bytes!("../fixtures/recorded/policy.json");
+const RESPONSES_BINDING: &[u8] = include_bytes!("../fixtures/recorded/responses-binding.json");
+const RESPONSES_POLICY: &[u8] = include_bytes!("../fixtures/recorded/responses-policy.json");
+
+/// Each recorded exchange with the binding and policy it was recorded under.
+const RECORDED: [(&str, &str, &[u8], &[u8]); 5] = [
     (
         "probe-0",
         include_str!("../fixtures/recorded/converse-probe-0.json"),
+        CONVERSE_BINDING,
+        CONVERSE_POLICY,
     ),
     (
         "probe-1",
         include_str!("../fixtures/recorded/converse-probe-1.json"),
+        CONVERSE_BINDING,
+        CONVERSE_POLICY,
     ),
     (
         "probe-2",
         include_str!("../fixtures/recorded/converse-probe-2.json"),
+        CONVERSE_BINDING,
+        CONVERSE_POLICY,
     ),
     (
         "smoke-0",
         include_str!("../fixtures/recorded/converse-smoke-0.json"),
+        CONVERSE_BINDING,
+        CONVERSE_POLICY,
+    ),
+    (
+        "responses-smoke-0",
+        include_str!("../fixtures/recorded/responses-smoke-0.json"),
+        RESPONSES_BINDING,
+        RESPONSES_POLICY,
     ),
 ];
 
@@ -95,10 +116,9 @@ async fn serve(body: String) -> (String, tokio::task::JoinHandle<Vec<u8>>) {
 
 #[tokio::test]
 async fn recorded_exchanges_replay_offline() {
-    let binding =
-        BedrockBinding::parse(include_bytes!("../fixtures/recorded/binding.json")).unwrap();
-    let projection = probe_projection(&binding.operations[0].operation).unwrap();
-    for (name, text) in RECORDED {
+    for (name, text, binding, policy) in RECORDED {
+        let binding = BedrockBinding::parse(binding).unwrap();
+        let projection = probe_projection(&binding.operations[0].operation).unwrap();
         let fixture: Value = serde_json::from_str(text).unwrap();
         assert!(
             fixture["provenance"]
@@ -112,8 +132,8 @@ async fn recorded_exchanges_replay_offline() {
         let sink = Arc::new(KeepExchanges::default());
         let backend = BedrockBackend::new(
             "recorded".into(),
-            binding.clone(),
-            ModelPolicy::parse(include_bytes!("../fixtures/recorded/policy.json")).unwrap(),
+            binding,
+            ModelPolicy::parse(policy).unwrap(),
             serde_json::from_slice(include_bytes!("../fixtures/materials.json")).unwrap(),
             Config {
                 endpoint: Some(url),

@@ -802,9 +802,47 @@ units estimated.
   answered calls, and 1,923,570 liability for three calls whose charge is
   unknown (the reservation left by the panic, sent nothing; the two refused
   signatures, which reached AWS).
-- Not done: a recorded Responses exchange. The model used does not serve
-  the Responses API on bedrock-runtime, so recording one needs another
-  model and binding, and therefore another paid run.
+- Not done in this increment: a recorded Responses exchange. The model used
+  does not serve the Responses API on bedrock-runtime, so recording one
+  needs another model and binding, and therefore another paid run
+  (increment 4).
+
+**Increment 4 (recorded Responses exchange; 2026-10-30).** Model
+`us.openai.gpt-5.6-luna` on the Responses wire, source region
+`ca-central-1`, `geo` profile, the same declared destinations and residency
+decision as increment 3 (A-65), as that model's card lists them for that
+source. `store` is `false`, `structured_output` is `json_schema`,
+`reasoning_effort` is `low` and `max_tokens` is 1024. Prices are AWS's
+public price list for `ca-central-1`, geographic rate, read on 2026-10-29
+(USD 0.22 input, 1.32 output per million tokens; no cache rates bound).
+
+- On 2026-10-29 the testing role was refused `bedrock:InvokeModel` for this
+  model before any model ran, so the run waited on the owner's model access.
+  On 2026-10-30 a request with an invalid `input` type was rejected for its
+  body (HTTP 400) rather than for authorization, and the smoke then ran.
+- The smoke (3.14 item 4) returned a mapped output on one call: HTTP 200,
+  `status: completed`, `{"choice":"apple"}` under the strict JSON schema,
+  mapped to `Label("apple")`. Usage was 95 input and 27 output tokens (11 of
+  them reasoning, charged as output), estimated at 56,540 units. Served
+  identity is `unknown` with reason `echo_of_requested` (3.8), and the
+  served region is not disclosed by the wire. The record's `truncated` is
+  `true`: the response's provider extras exceed the room
+  `MAX_ENTRIES` leaves, as the adapter reports.
+- This confirms Fact 2's response shape against a recorded response
+  (`model`, `id`, `usage.input_tokens`, `usage.output_tokens`, and `store`
+  echoed `false`), and is consistent with Fact 3: the closed-weight GPT
+  model was served through the `us.` cross-region profile.
+- `fixtures/recorded/` adds `responses-binding.json`, `responses-policy.json`
+  and `responses-smoke-0.json`, labeled recorded, synthetic content only.
+  The provider response id (the record's `generation_id`) and the output
+  item ids are redacted, and so is the encrypted reasoning item's opaque
+  content, which the mapping ignores. `tests/recorded.rs` replays each
+  recorded exchange under the binding and policy it was recorded with.
+- Testing journal (budget `testing`, nano-USD units): 1,421,364 observed,
+  3,465,372 estimated and 18,075,006 liability before; 3,521,912 estimated
+  after, the rest unchanged. Headroom USD 4.976982 of R-29's USD 5.
+
+With this increment both wires have a recorded live exchange (3.14 item 3).
 
 ## Decisions at approval
 

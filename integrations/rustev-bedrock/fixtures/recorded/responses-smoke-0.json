@@ -1,0 +1,202 @@
+{
+  "exchange_record": {
+    "attribution": "single",
+    "binding": "sha256:dbc48d49a93e881ae2350dff511069fc898368918848a657794efd93081e52b5",
+    "bytes_sent": true,
+    "exchange_charge": {
+      "estimated": {
+        "units": 56540
+      }
+    },
+    "generation_id": "redacted:provider-response-id",
+    "late": false,
+    "members": [
+      {
+        "attempt_id": "bedrock-smoke-1793385808401961000-0",
+        "charge": {
+          "estimated": {
+            "units": 56540
+          }
+        },
+        "outcome": {
+          "output": {
+            "digest": "sha256:18075ef537674060ac9efe2d914d11dc0c300b1fef10bae2aba74010353d826e"
+          }
+        }
+      }
+    ],
+    "privacy_requested": {},
+    "protocol": "rustev-bedrock-mapping/1",
+    "provider_extras": {
+      "destination_regions": "{\"as_of\":\"2026-10-29\",\"regions\":[\"ca-central-1\",\"us-east-1\",\"us-east-2\",\"us-west-2\"]}",
+      "inference_profile": "\"geo\"",
+      "policy_digest": "sha256:5092bd5d7f4eb7ab8792481d300fc8cd82c7ff44106079f99bd16dd694f4dbd1",
+      "provider.background": "false",
+      "provider.billing": "{\"payer\":\"developer\"}",
+      "provider.completed_at": "1793385809",
+      "provider.created_at": "1793385809",
+      "provider.error": "null",
+      "provider.frequency_penalty": "0.0",
+      "provider.id": "\"redacted:provider-response-id\"",
+      "provider.incomplete_details": "null",
+      "provider.instructions.digest": "sha256:ffd196ff5913d0c009fb6c3137eedfd4fd9accc0c10083472b0b54aff80e917f",
+      "raw_usage": "{\"input_tokens\":95,\"input_tokens_details\":{\"cache_write_tokens\":0,\"cached_tokens\":0},\"output_tokens\":27,\"output_tokens_details\":{\"reasoning_tokens\":11},\"total_tokens\":122}",
+      "region": "\"ca-central-1\"",
+      "served_reason": "echo_of_requested",
+      "served_region": "unknown:not_disclosed_by_wire"
+    },
+    "reported_cost": null,
+    "request_digest": "sha256:1e13f84a7669bb08772f5f7b6ed878b1a29796b215a8a3b89b211a4eb89e3b16",
+    "requested_model": "us.openai.gpt-5.6-luna",
+    "response_digest": "sha256:8c3f9aba3d7f5c0492c34d082650419214678f42325a8917070bf11448923ee6",
+    "retry_after": null,
+    "route": [],
+    "schema": "rustev.remote-exchange/1",
+    "served": {
+      "disclosure": "unknown",
+      "identity": null
+    },
+    "status": 200,
+    "truncated": true,
+    "usage": {
+      "input_tokens": 95,
+      "output_tokens": 27,
+      "total_tokens": 122
+    }
+  },
+  "provenance": "recorded; live bedrock-runtime Responses call on 2026-10-30 from ca-central-1, model us.openai.gpt-5.6-luna through the us. geographic profile, store false; synthetic content only (3.14 item 3); smoke (3.14 item 4); the provider response id (generation_id) and output item ids are redacted, and the encrypted reasoning item's content is redacted",
+  "request_body": {
+    "input": "{\"instance\":{\"text\":\"apple\"},\"values\":{}}",
+    "instructions": "Choose exactly one key using the supplied evidence.\nThe supplied word is apple. Choose the matching key.\nOptions in declared order: [{\"description\":\"apple\",\"key\":\"apple\"},{\"description\":\"pear\",\"key\":\"pear\"}]",
+    "max_output_tokens": 1024,
+    "model": "us.openai.gpt-5.6-luna",
+    "reasoning": {
+      "effort": "low"
+    },
+    "store": false,
+    "text": {
+      "format": {
+        "name": "rustev_answer",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "choice": {
+              "enum": [
+                "apple",
+                "pear"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "choice"
+          ],
+          "type": "object"
+        },
+        "strict": true,
+        "type": "json_schema"
+      }
+    }
+  },
+  "response_body": {
+    "background": false,
+    "billing": {
+      "payer": "developer"
+    },
+    "completed_at": 1793385809,
+    "created_at": 1793385809,
+    "error": null,
+    "frequency_penalty": 0.0,
+    "id": "redacted:provider-response-id",
+    "incomplete_details": null,
+    "instructions": "Choose exactly one key using the supplied evidence.\nThe supplied word is apple. Choose the matching key.\nOptions in declared order: [{\"description\":\"apple\",\"key\":\"apple\"},{\"description\":\"pear\",\"key\":\"pear\"}]",
+    "max_output_tokens": 1024,
+    "max_tool_calls": null,
+    "metadata": {},
+    "model": "us.openai.gpt-5.6-luna",
+    "moderation": null,
+    "object": "response",
+    "output": [
+      {
+        "content": [],
+        "encrypted_content": "redacted:encrypted-reasoning",
+        "id": "redacted:provider-item-id",
+        "summary": [],
+        "type": "reasoning"
+      },
+      {
+        "content": [
+          {
+            "annotations": [],
+            "logprobs": [],
+            "text": "{\"choice\":\"apple\"}",
+            "type": "output_text"
+          }
+        ],
+        "id": "redacted:provider-item-id",
+        "phase": "final_answer",
+        "role": "assistant",
+        "status": "completed",
+        "type": "message"
+      }
+    ],
+    "parallel_tool_calls": true,
+    "presence_penalty": 0.0,
+    "previous_response_id": null,
+    "prompt_cache_key": null,
+    "prompt_cache_retention": "in_memory",
+    "reasoning": {
+      "context": "all_turns",
+      "effort": "low",
+      "summary": null
+    },
+    "safety_identifier": null,
+    "service_tier": "default",
+    "status": "completed",
+    "store": false,
+    "temperature": 1.0,
+    "text": {
+      "format": {
+        "description": null,
+        "name": "rustev_answer",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "choice": {
+              "enum": [
+                "apple",
+                "pear"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "choice"
+          ],
+          "type": "object"
+        },
+        "strict": true,
+        "type": "json_schema"
+      },
+      "verbosity": "medium"
+    },
+    "tool_choice": "auto",
+    "tools": [],
+    "top_logprobs": 0,
+    "top_p": 0.98,
+    "truncation": "disabled",
+    "usage": {
+      "input_tokens": 95,
+      "input_tokens_details": {
+        "cache_write_tokens": 0,
+        "cached_tokens": 0
+      },
+      "output_tokens": 27,
+      "output_tokens_details": {
+        "reasoning_tokens": 11
+      },
+      "total_tokens": 122
+    },
+    "user": null
+  }
+}
