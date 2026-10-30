@@ -11,7 +11,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io::Read;
 use std::sync::Arc;
 
-use rustev_contract::ids::{ArtifactId, SnapshotId};
+use rustev_contract::ids::{ArtifactId, ContentDigest, SnapshotId};
 use rustev_contract::live::AuthorizationOutcome;
 use rustev_contract::plan::{PlanExecution, PlanStepDetail};
 use rustev_contract::remote::Disclosure;
@@ -134,6 +134,7 @@ pub struct ProbeFailure {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProbeCall {
+    pub case_digest: Option<ContentDigest>,
     pub decision_id: String,
     /// Attempts to the probed binding and their served identities, as the
     /// backend reported them (`None` is `unknown`).
@@ -209,6 +210,16 @@ pub async fn probe(
     authorizer: &dyn LiveAuthorizer,
     gate: &JournalGate,
     cancel: &CancelSignal,
+) -> Result<ProbeReport, LiveError> {
+    probe_recorded(inputs, authorizer, gate, cancel, |_, _, _, _| Ok(None)).await
+}
+
+pub(crate) async fn probe_recorded(
+    inputs: ProbeInputs<'_>,
+    authorizer: &dyn LiveAuthorizer,
+    gate: &JournalGate,
+    cancel: &CancelSignal,
+    mut record: impl FnMut(usize, u64, &str, &LiveResult) -> Result<Option<ContentDigest>, LiveError>,
 ) -> Result<ProbeReport, LiveError> {
     let ProbeInputs {
         runtime: rt,
@@ -338,7 +349,14 @@ pub async fn probe(
                 )
                 .await;
             last_end = Some(inputs.clock.now());
-            let observed = observe(&p.identity, &decision_id, result);
+            let case_digest = result
+                .as_ref()
+                .ok()
+                .map(|r| record(index + 1, call, &p.candidate, r))
+                .transpose()?
+                .flatten();
+            let mut observed = observe(&p.identity, &decision_id, result);
+            observed.call.case_digest = case_digest;
             if let Some(code) = &observed.spend_refusal {
                 report.spend_refusal = Some(code.clone());
                 stopped = Some(ProbeStatus::SpendCapped);
@@ -391,6 +409,7 @@ fn observe(
     result: Result<LiveResult, LiveRefusal>,
 ) -> Observed {
     let mut call = ProbeCall {
+        case_digest: None,
         decision_id: decision_id.to_string(),
         attempts: 0,
         served: vec![],

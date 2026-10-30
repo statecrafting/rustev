@@ -358,10 +358,346 @@ pub struct LiveCheckpoint {
 }
 live_document!(LiveCheckpoint, "rustev.live-checkpoint/1");
 
+/// The companion evidence for one evaluation item or probe (spec 043, 3.9.1).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LiveCaseDocument {
+    pub schema: String,
+    pub mode: CaseMode,
+    pub purpose: CasePurpose,
+    pub source: CaseSource,
+    pub run: CaseRun,
+    pub evaluation_time: CaseEvaluationTime,
+    pub acquisitions: BTreeMap<String, CaseAcquisition>,
+    pub spend: Vec<CaseSpend>,
+    pub declared_no_spend: Vec<BindingIdentity>,
+    pub live_document_digest: ContentDigest,
+    pub run_record_digest: ContentDigest,
+}
+live_document!(LiveCaseDocument, "rustev.live-case/1");
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CaseMode {
+    LiveReexecution,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CasePurpose {
+    Evaluation,
+    Probe,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum CaseSource {
+    None,
+    DatasetCase {
+        dataset_id: DatasetId,
+        case_id: String,
+        split: String,
+    },
+    ReplayBundle {
+        bundle_digest: ContentDigest,
+        decision_id: String,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CaseRun {
+    pub run_id: String,
+    pub live_config_id: LiveConfigId,
+    pub candidate: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub repeat: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rerun: Option<u64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CaseEvaluationTime {
+    Source,
+    Fixed,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum CaseAcquisition {
+    Live,
+    Captured { capture_digests: Vec<ContentDigest> },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum CaseSettlement {
+    Observed { units: u64 },
+    Estimated { units: u64 },
+    Unknown,
+    Released,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CaseRefusal {
+    pub code: String,
+}
+
+/// Untagged on the wire. Serde does not apply `deny_unknown_fields` to an
+/// untagged enum, so parsing goes through [`CaseSpendWire`], whose variant
+/// structs each refuse unknown fields.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged, from = "CaseSpendWire")]
+pub enum CaseSpend {
+    Reserved {
+        attempt_id: String,
+        seq: u64,
+        reserved_units: u64,
+        settlement: CaseSettlement,
+    },
+    Refused {
+        attempt_id: String,
+        refused: CaseRefusal,
+    },
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ReservedWire {
+    attempt_id: String,
+    seq: u64,
+    reserved_units: u64,
+    settlement: CaseSettlement,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RefusedWire {
+    attempt_id: String,
+    refused: CaseRefusal,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum CaseSpendWire {
+    Reserved(ReservedWire),
+    Refused(RefusedWire),
+}
+
+impl From<CaseSpendWire> for CaseSpend {
+    fn from(wire: CaseSpendWire) -> Self {
+        match wire {
+            CaseSpendWire::Reserved(r) => CaseSpend::Reserved {
+                attempt_id: r.attempt_id,
+                seq: r.seq,
+                reserved_units: r.reserved_units,
+                settlement: r.settlement,
+            },
+            CaseSpendWire::Refused(r) => CaseSpend::Refused {
+                attempt_id: r.attempt_id,
+                refused: r.refused,
+            },
+        }
+    }
+}
+
+impl LiveCaseDocument {
+    pub fn check(&self) -> Result<(), LiveError> {
+        use rustev_contract::live::{MAX_EFFECTS, MAX_TEXT_BYTES};
+        let invalid = || LiveError::invalid("live-case", "invalid identity, purpose or bound");
+        let text = |s: &str| !s.is_empty() && s.len() <= MAX_TEXT_BYTES;
+        if self.schema != Self::SCHEMA
+            || self.spend.len() > MAX_EFFECTS
+            || self.acquisitions.len() > MAX_EFFECTS
+            || self.declared_no_spend.len() > MAX_EFFECTS
+            || self.run.repeat.is_some_and(|n| !(1..=64).contains(&n))
+            || self.run.rerun.is_some_and(|n| !(1..=99).contains(&n))
+        {
+            return Err(invalid());
+        }
+        component(&self.run.run_id, 64, false).map_err(|_| invalid())?;
+        component(&self.run.candidate, 32, true).map_err(|_| invalid())?;
+        match (&self.purpose, &self.source) {
+            (CasePurpose::Probe, CaseSource::None)
+                if self.run.repeat.is_none() && self.run.rerun.is_none() => {}
+            (CasePurpose::Evaluation, CaseSource::DatasetCase { case_id, split, .. })
+                if self.run.repeat.is_some() && text(split) =>
+            {
+                component(case_id, 128, true).map_err(|_| invalid())?;
+            }
+            (CasePurpose::Evaluation, CaseSource::ReplayBundle { decision_id, .. })
+                if self.run.repeat.is_some() && text(decision_id) => {}
+            _ => return Err(invalid()),
+        }
+        let mut seqs = BTreeSet::new();
+        let mut refusals = BTreeSet::new();
+        for entry in &self.spend {
+            let attempt = match entry {
+                CaseSpend::Reserved {
+                    attempt_id, seq, ..
+                } => {
+                    if !seqs.insert(seq) {
+                        return Err(invalid());
+                    }
+                    attempt_id
+                }
+                CaseSpend::Refused {
+                    attempt_id,
+                    refused,
+                } => {
+                    if !text(&refused.code) {
+                        return Err(invalid());
+                    }
+                    attempt_id
+                }
+            };
+            if attempt.is_empty() || attempt.len() > 4 * MAX_TEXT_BYTES {
+                return Err(invalid());
+            }
+        }
+        // A refusal is listed once, and never for an attempt with a
+        // reservation. Reservations are keyed by journal sequence: a probe
+        // decision repeated on resume can reserve the same attempt id again.
+        let reserved: BTreeSet<&str> = self
+            .spend
+            .iter()
+            .filter_map(|s| match s {
+                CaseSpend::Reserved { attempt_id, .. } => Some(attempt_id.as_str()),
+                CaseSpend::Refused { .. } => None,
+            })
+            .collect();
+        for entry in &self.spend {
+            if let CaseSpend::Refused { attempt_id, .. } = entry
+                && (reserved.contains(attempt_id.as_str()) || !refusals.insert(attempt_id))
+            {
+                return Err(invalid());
+            }
+        }
+        for (source, acquisition) in &self.acquisitions {
+            if !text(source)
+                || matches!(acquisition, CaseAcquisition::Captured { capture_digests } if capture_digests.len() > MAX_EFFECTS)
+            {
+                return Err(invalid());
+            }
+        }
+        let mut bindings = BTreeSet::new();
+        for binding in &self.declared_no_spend {
+            if !text(&binding.backend_id) || !bindings.insert(binding) {
+                return Err(invalid());
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn from_result(
+        config: &LiveConfig,
+        run: CaseRun,
+        source: CaseSource,
+        journal: &crate::journal::SpendJournal,
+        result: &rustev_runtime::LiveResult,
+    ) -> Result<Self, LiveError> {
+        use rustev_contract::live::{AuthorizationOutcome, Dispatch};
+        let mut spend = journal.reservations_detail(&result.document.decision_id);
+        for effect in &result.document.effects {
+            if spend.iter().any(|s| matches!(s, CaseSpend::Reserved { attempt_id, .. } if attempt_id == &effect.attempt_id)) {
+                continue;
+            }
+            let code = match &effect.authorization {
+                AuthorizationOutcome::Refused { .. } => Some("authorization_refused"),
+                AuthorizationOutcome::Allowed { .. }
+                    if effect.dispatch == Dispatch::NotDispatched =>
+                {
+                    result.spend_refusal.as_ref().map(|r| r.code.as_str())
+                }
+                _ => None,
+            };
+            if let Some(code) = code {
+                spend.push(CaseSpend::Refused {
+                    attempt_id: effect.attempt_id.clone(),
+                    refused: CaseRefusal { code: code.into() },
+                });
+            }
+        }
+        let doc = Self {
+            schema: Self::SCHEMA.into(),
+            mode: CaseMode::LiveReexecution,
+            purpose: if source == CaseSource::None {
+                CasePurpose::Probe
+            } else {
+                CasePurpose::Evaluation
+            },
+            source,
+            run,
+            evaluation_time: match config.evaluation_time {
+                EvaluationTime::Source => CaseEvaluationTime::Source,
+                EvaluationTime::Fixed { .. } => CaseEvaluationTime::Fixed,
+            },
+            // The gated runtime refuses plans with acquisitions before returning a result.
+            acquisitions: BTreeMap::new(),
+            spend,
+            declared_no_spend: config
+                .bindings
+                .iter()
+                .filter(|b| b.cost_unit == CostUnit::None)
+                .map(|b| b.identity.clone())
+                .collect(),
+            live_document_digest: result.document.record_digest().map_err(LiveError::io)?,
+            run_record_digest: result.record.record_digest().map_err(LiveError::io)?,
+        };
+        doc.check()?;
+        Ok(doc)
+    }
+
+    pub(crate) fn write_result(
+        &self,
+        stem: &Path,
+        result: &rustev_runtime::LiveResult,
+    ) -> Result<ContentDigest, LiveError> {
+        self.check()?;
+        let bytes = self.record_canonical().map_err(LiveError::io)?;
+        Self::parse(&bytes).map_err(LiveError::io)?;
+        for (suffix, bytes) in [
+            (
+                "live",
+                result.document.record_canonical().map_err(LiveError::io)?,
+            ),
+            (
+                "run",
+                result.record.record_canonical().map_err(LiveError::io)?,
+            ),
+            ("case", bytes),
+        ] {
+            let name = format!(
+                "{}.{suffix}.json",
+                stem.file_name().expect("file stem").to_string_lossy()
+            );
+            write_atomic(&stem.with_file_name(name), &bytes)?;
+        }
+        self.record_digest().map_err(LiveError::io)
+    }
+
+    pub(crate) fn read(path: &Path) -> Result<Self, LiveError> {
+        let mut bytes = Vec::new();
+        File::open(path)
+            .map_err(LiveError::io)?
+            // One byte past the document's own parse bound, so an oversized
+            // file is refused by `parse`, never truncated into a valid one.
+            .take(<Self as Document>::LIMITS.max_bytes as u64 + 1)
+            .read_to_end(&mut bytes)
+            .map_err(LiveError::io)?;
+        let doc = Self::parse(&bytes).map_err(LiveError::io)?;
+        doc.check()?;
+        Ok(doc)
+    }
+}
+
 /// A completed work item's record digests, in work order.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LiveRunCase {
+    pub case_document_digest: ContentDigest,
     pub candidate: String,
     pub repeat: u64,
     pub case_id: String,
@@ -371,10 +707,13 @@ pub struct LiveRunCase {
 }
 
 /// Record-canonical summary of a live run (spec 043, 3.11.4).
+// Record canonical bytes sort object keys, so declaration order never
+// changes them.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LiveRun {
     pub schema: String,
+    pub declared_no_spend: Vec<BindingIdentity>,
     pub identities: CheckpointBindings,
     pub status: crate::run::RunStatus,
     pub stop_reason: Option<String>,
@@ -452,7 +791,9 @@ impl LiveCheckpoint {
         let mut bytes = Vec::new();
         File::open(path)
             .map_err(LiveError::io)?
-            .take(REPLAY_V1.max_bytes as u64 + 1)
+            // One byte past the document's own parse bound, so an oversized
+            // file is refused by `parse`, never truncated into a valid one.
+            .take(<Self as Document>::LIMITS.max_bytes as u64 + 1)
             .read_to_end(&mut bytes)
             .map_err(LiveError::io)?;
         let doc = Self::parse(&bytes).map_err(|e| LiveError::invalid("checkpoint-mismatch", e))?;

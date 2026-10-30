@@ -105,6 +105,7 @@ pub fn spec() -> RunSpec {
             .map(|id| LiveCase {
                 case_id: id.into(),
                 input: CaseInput::Available {
+                    source: rustev_live::run::CaseOrigin::DatasetCase,
                     snapshot_bytes: case.canonical().unwrap(),
                     snapshot_id: case.id().unwrap(),
                     source_time: Some(ts(NOW)),
