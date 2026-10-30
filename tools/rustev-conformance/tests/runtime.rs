@@ -411,15 +411,17 @@ fn every_runtime_case_produces_its_expected_bytes() {
             "id": id,
             "command": "decide",
             // The native runner interprets the same data with TypeScript
-            // scripted seams (3.12.4).
+            // scripted seams (3.12.4); the decision service's runner binds
+            // the Rust scripted seams as service backends (spec 042, 3.17.1).
             "surfaces": if id == "runtime.cancel-stop" {
                 // The runtime polls a cancelled attempt once for its answer
                 // (spec 003, 3.7.3); a host seam answers across threads and
                 // can never be ready then, so a host backend's confirmed stop
                 // is recorded honestly as not observed (`runtime.cancel`).
-                json!(["rust-api"])
+                // The service's backends are Rust seams, polled in process.
+                json!(["rust-api", "serve-grpc", "serve-http"])
             } else {
-                json!(["rust-api", "native"])
+                json!(["rust-api", "native", "serve-grpc", "serve-http"])
             },
             "mirrors": mirrored,
             "inputs": names.iter().map(|n| json!({

@@ -29,7 +29,8 @@ pub struct Manifest {
 pub struct Case {
     pub id: String,
     pub command: String,
-    /// The surfaces the case applies to (`cli`; the bindings add theirs).
+    /// The surfaces the case applies to (`cli`; the bindings add theirs, and
+    /// the decision service `serve-http` and `serve-grpc`).
     pub surfaces: Vec<String>,
     /// The CLI's argument vector; inputs and outputs are named relative to
     /// the directory the case runs in. Absent for a runtime case.

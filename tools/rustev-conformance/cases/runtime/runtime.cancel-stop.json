@@ -127,6 +127,8 @@
     ]
   },
   "surfaces": [
-    "rust-api"
+    "rust-api",
+    "serve-grpc",
+    "serve-http"
   ]
 }

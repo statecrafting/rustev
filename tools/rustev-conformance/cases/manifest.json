@@ -62,7 +62,9 @@
       ],
       "surfaces": [
         "cli",
-        "native"
+        "native",
+        "serve-grpc",
+        "serve-http"
       ]
     },
     {
@@ -127,7 +129,9 @@
       ],
       "surfaces": [
         "cli",
-        "native"
+        "native",
+        "serve-grpc",
+        "serve-http"
       ]
     },
     {
@@ -192,7 +196,9 @@
       ],
       "surfaces": [
         "cli",
-        "native"
+        "native",
+        "serve-grpc",
+        "serve-http"
       ]
     },
     {
@@ -257,7 +263,9 @@
       ],
       "surfaces": [
         "cli",
-        "native"
+        "native",
+        "serve-grpc",
+        "serve-http"
       ]
     },
     {
@@ -7968,7 +7976,9 @@
       ],
       "surfaces": [
         "cli",
-        "native"
+        "native",
+        "serve-grpc",
+        "serve-http"
       ]
     },
     {
@@ -11490,7 +11500,9 @@
       },
       "surfaces": [
         "rust-api",
-        "native"
+        "native",
+        "serve-grpc",
+        "serve-http"
       ]
     },
     {
@@ -11643,7 +11655,9 @@
       },
       "surfaces": [
         "rust-api",
-        "native"
+        "native",
+        "serve-grpc",
+        "serve-http"
       ]
     },
     {
@@ -11768,7 +11782,9 @@
       },
       "surfaces": [
         "rust-api",
-        "native"
+        "native",
+        "serve-grpc",
+        "serve-http"
       ]
     },
     {
@@ -11900,7 +11916,9 @@
         ]
       },
       "surfaces": [
-        "rust-api"
+        "rust-api",
+        "serve-grpc",
+        "serve-http"
       ]
     },
     {
@@ -12026,7 +12044,9 @@
       },
       "surfaces": [
         "rust-api",
-        "native"
+        "native",
+        "serve-grpc",
+        "serve-http"
       ]
     },
     {
@@ -12217,7 +12237,9 @@
       },
       "surfaces": [
         "rust-api",
-        "native"
+        "native",
+        "serve-grpc",
+        "serve-http"
       ]
     },
     {
@@ -12435,7 +12457,9 @@
       ],
       "surfaces": [
         "cli",
-        "native"
+        "native",
+        "serve-grpc",
+        "serve-http"
       ]
     },
     {

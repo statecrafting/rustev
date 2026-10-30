@@ -43,6 +43,8 @@ extends:
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-node/" }, nature: additive }
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-wasm/" }, nature: additive }
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "tools/rustev-conformance/" }, nature: additive }
+  # The CLI harvest names the service's conformance surfaces on `run` cases (3.17.1).
+  - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/tests/common/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "002-decision-contract-and-pure-core"
@@ -1286,6 +1288,37 @@ remaining deadline handed to the runtime) on that same clock rather than
 on a separate real-time source, so under the manual clock a fetch takes
 0 ms and the record's `deadline_ms` is the CLI's. The default clock
 (`TokioClock`) keeps the earlier behavior.
+
+**Increment 5 part 2: the serve surfaces and the runtime cases through the
+service (2026-10-30).** The suite's manifest names the service as the
+surfaces `serve-http` and `serve-grpc` (3.17.1): every `run` case the CLI
+harvest writes (`crates/rustev-cli/tests/common/harvest.rs`) and every
+runtime case (`tools/rustev-conformance/tests/runtime.rs`) carries both, and
+`cases/manifest.json` and the case files are rebuilt with them; this change
+adds the `extends` edge on the harvest. The runner
+in `integrations/rustev-serve/tests/conformance/runner.rs` selects cases by
+surface and runs each through the surfaces it names, over the mutual-TLS
+TCP listener and the Unix socket. A runtime case binds the suite's scripted
+backends (`rustev_conformance::runtime::Scripted`, now public, with
+`result_line`) under their backend ids, the case's other descriptors inert,
+so the service compiles the plan against the descriptors the case compiled
+it against; the plan is registered with its declared execution policy and
+calibrations. The service runs with the case's `max_in_flight`,
+`max_queued` and `max_parallel_requests`, per-backend concurrency and
+`fail_decision` sink timeout, on the manual clock. The case's steps drive
+it: a start sends the decision request and waits until the runtime has the
+decision in hand (admitted, queued or rejected), since the service fetches
+the context first; a cancel is the service's cancel operation. Each
+decision's answer maps to the case's result (the refusals `overloaded`,
+`queue_deadline` and `cancelled_before_admission` are the rejections
+`overloaded`, `queue_deadline` and `cancelled` the runtime case records,
+spec 003's `Rejection` kinds), the delivered record is compared unnormalized, every decision
+asserts `plan_id`, and per listener the HTTP and gRPC answers are
+byte-identical. `runtime.cancel-stop` runs here too: the service's backends
+are Rust seams polled in process, as on `rust-api`. Tests:
+`every_runtime_case_through_both_transports_and_listeners`,
+`every_run_golden_through_both_transports_and_listeners` and
+`every_serve_case_is_a_run_or_a_runtime_case`.
 
 ## Decisions at approval
 
