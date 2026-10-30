@@ -1187,6 +1187,17 @@ reading of the seed "a model metric pooled into a deterministic one":
 metric names are unique, so the seed is a model rubric metric reported
 among the deterministic ones.
 
+**Fix (2026-10-30): repeat evaluation applies the measures.** `rustev
+eval --repeat-config` evaluated each run with `evaluate_with_cases`,
+which carries no adapter measures, so a version 3 configuration was
+refused (`Adapter`) and 3.11's metrics never joined spec 029's repeat
+statistics. Each run is now evaluated with `evaluate_measured_with_cases`
+and the adapter (no scores document, since `--scores` is refused with
+`--repeat-config`); versions 1 and 2 evaluate byte for byte as before
+(`crates/rustev-cli/src/repeat.rs`;
+`version_3_repeat_evaluates_the_measures_in_every_run` in
+`crates/rustev-cli/tests/eval.rs`). Found by spec 039's Bedrock swap test.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child faithfully

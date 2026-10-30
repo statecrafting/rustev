@@ -1387,6 +1387,60 @@ fn metric<'a>(report: &'a Json, name: &str) -> &'a Json {
         .unwrap_or_else(|| panic!("no metric {name} in {report}"))
 }
 
+/// Spec 041 3.11 and spec 029 3.4: `eval --repeat-config` evaluates each
+/// run with the adapter's measures, so a version 3 configuration is
+/// accepted and the ranking metrics join every run's report and the case
+/// measures the repeat reconciles.
+#[test]
+fn version_3_repeat_evaluates_the_measures_in_every_run() {
+    let s = Scratch::new("eval-041-repeat");
+    run_inputs(&s);
+    v3_setup(&s, &format!("sha256:{}", "e".repeat(64)));
+    s.write("repeat-config.json", json!({"schema":"rustev.repeat-config/1","bootstrap":{"method":"percentile-cluster/1","prng":"xoshiro256starstar-splitmix64/1","level":"0.95","resamples":1000,"seed":"41"},"noise":{"rule":{"k_sd":{"k":"2"}},"floor":"0","overrides":{}},"slices":[],"stability_metrics":["coverage"],"top_k":null}).to_string().as_bytes());
+    std::fs::create_dir(s.path("repeated")).unwrap();
+    let mut a = eval_args(
+        "lodging.dataset.json",
+        "final_test",
+        "lodging.config.json",
+        "lodging.adapter.json",
+        "repeated",
+    );
+    a.extend(
+        [
+            "--repeat-config",
+            "repeat-config.json",
+            "--repeat",
+            "2",
+            "--lineage",
+            "release",
+            "--ledger-new",
+            "--ledger-out",
+            "ledger.json",
+        ]
+        .map(str::to_owned),
+    );
+    let j = s.rustev_owned(&a).expect(0, "reported");
+    assert_eq!(
+        (j["n"].as_u64(), j["source"].as_str()),
+        (Some(2), Some("replay"))
+    );
+    for run in 0..2 {
+        let report: Json =
+            serde_json::from_slice(&s.read(&format!("repeated/run-{run}.report.json"))).unwrap();
+        assert!(
+            metric(&report, "ranking/offers/precision@2")["value"]["measured"].is_object(),
+            "{report}"
+        );
+        let cases = String::from_utf8(s.read(&format!("repeated/run-{run}.cases.json"))).unwrap();
+        assert!(cases.contains("ranking/offers/precision@2"), "{cases}");
+    }
+    assert!(
+        String::from_utf8(s.read("repeated/repeat.json"))
+            .unwrap()
+            .contains("ranking/offers/ndcg@3")
+    );
+}
+
 /// Spec 041, 3.10.2 and 3.10.3: `eval views` writes the views `eval`
 /// computes; `eval --scores` reads a scorer's document and adds
 /// `views.json` to `out`; a declared scorer without a document is unknown.

@@ -13,10 +13,11 @@ use rustev_eval::config::EvaluatorConfig;
 use rustev_eval::dataset::DatasetManifest;
 use rustev_eval::eval_cases::EvalCases;
 use rustev_eval::holdout::HoldoutLedger;
+use rustev_eval::measured::Measured;
 use rustev_eval::metrics::TaskAdapter;
 use rustev_eval::repeat::{self, RepeatInputs, RepeatReport, Run, Source};
 use rustev_eval::repeat_config::RepeatConfig;
-use rustev_eval::report::{Candidate, Evaluated, Inputs, evaluate_with_cases};
+use rustev_eval::report::{Candidate, Evaluated, Inputs, evaluate_measured_with_cases};
 use rustev_surface::adapter::TaskAdapterDoc;
 use rustev_surface::eval::{check_case_ids, read_bundles, read_doc};
 use rustev_surface::host::Host;
@@ -492,8 +493,13 @@ pub fn eval(p: &Parsed) -> Result<Res, Usage> {
             };
             let mut runs = vec![];
             for i in 0..n {
+                // Under a version 3 configuration the adapter's measures
+                // are evaluated in every run, so spec 041's metrics join the
+                // repeat statistics (041 3.11, 029 3.4); `--scores` is
+                // refused with `--repeat-config`, so no scorer document is
+                // supplied. Versions 1 and 2 evaluate byte for byte as before.
                 runs.push(
-                    evaluate_with_cases(
+                    evaluate_measured_with_cases(
                         &Inputs {
                             manifest: &manifest,
                             split,
@@ -505,6 +511,10 @@ pub fn eval(p: &Parsed) -> Result<Res, Usage> {
                             candidate: candidate
                                 .as_ref()
                                 .map(|(plan, calibrations)| Candidate { plan, calibrations }),
+                        },
+                        Measured {
+                            adapter: &adapter,
+                            scores: &[],
                         },
                         repeat_config.top_k.as_ref(),
                     )
