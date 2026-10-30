@@ -30,7 +30,7 @@ amends:
 establishes:
   - { kind: directory, path: "crates/rustev-live/" }
 extends:
-  # `rustev.live-reexecution/1` gains mode, purpose, source and run members (3.9).
+  # The `LiveConfigId` identity (3.2); `rustev.live-reexecution/1` is not changed (3.9, A-67).
   - { spec: "002-decision-contract-and-pure-core", unit: { kind: directory, path: "crates/rustev-contract/" }, nature: amending }
   # The spend gate seam on the live entry point (3.6).
   - { spec: "003-runtime-execution-and-evidence", unit: { kind: directory, path: "crates/rustev-runtime/" }, nature: amending }
@@ -80,7 +80,7 @@ obligations:
     anchor: "3-10-checkpoints-and-resumption"
   - id: "I-4"
     kind: invariant
-    text: "Every live result is a new run record plus a `rustev.live-reexecution/1` document with `mode` `live_reexecution` and a link to its source case or record; no dataset, bundle, capture, run record, judgment or report used as a source is modified."
+    text: "Every live result of a `rustev_live::run` work item (a dataset case or retained bundle, never a probe call) is a new run record plus a `rustev.live-reexecution/1` document and a `rustev.live-case/1` document with `mode` `live_reexecution` and a link to its source case or record; no dataset, bundle, capture, run record, judgment or report used as a source is modified."
     anchor: "3-9-evidence-of-live-re-execution"
   - id: "I-5"
     kind: invariant
@@ -135,9 +135,9 @@ When delivered:
   `sha2` and `tokio` (features `sync`, `time`, `rt`). No HTTP stack, cloud
   SDK or telemetry exporter, so it is not under `integrations/`; it does
   file I/O only on paths its caller names.
-- `crates/rustev-contract/` (owner spec 002): the members 3.9 adds to
-  `rustev.live-reexecution/1`, which spec 026 places there and which is
-  not yet implemented.
+- `crates/rustev-contract/` (owner spec 002): the `LiveConfigId`
+  identity (3.2). `rustev.live-reexecution/1`, which spec 026 places
+  there, is not changed (3.9.1).
 - `crates/rustev-runtime/` (owner spec 003): the spend gate seam of 3.6,
   consulted only on the `reexecute_live` path.
 - `crates/rustev-eval/` (owner spec 004): `evaluate_observed` (3.11), a
@@ -373,8 +373,8 @@ plans without acquisitions.
    `cost_unit: none` declares that the binding's cost units are not money
    and that it causes no provider spend (for example spec 005's rules
    backend, whose units count work); it is reserved at zero in the
-   journal, and the declaration is recorded in every live document and in
-   `rustev.live-run/1` as `declared_no_spend`. The CLI accepts `none` only
+   journal, and the declaration is recorded in every per-case document
+   (3.9.1) and in `rustev.live-run/1` as `declared_no_spend`. The CLI accepts `none` only
    for the backends it links (3.13.2); the library accepts it on the
    host's declaration, which is the host's statement, not Rustev's. A
    binding whose descriptor's cost model is `unknown` is refused
@@ -442,7 +442,12 @@ plans without acquisitions.
 2. A `rate_limited` answer with a retry-after pauses new dispatches to
    that binding for the stated time, capped at
    `rate_limit_pause_max_ms`; the retry itself follows the plan's
-   execution policy (spec 003 3.6), with a new reservation.
+   execution policy (spec 003 3.6), with a new reservation. **Deferred
+   (amended 2026-10-29, A-67):** the run record and the attempt report
+   carry no retry-after, so the pause waits for a seam that delivers one
+   to the run engine, in its own spec change. Until then no answer pauses
+   dispatch, `rate_limit_pause_max_ms` is validated and recorded but has
+   no effect, and every retry is still reserved anew.
 3. Each case runs under `case_deadline_ms` as its end-to-end deadline
    (spec 003). An optional `--run-deadline-ms` bounds the run; on expiry
    no new attempt starts, in-flight work is cancelled under spec 026 3.5,
@@ -452,23 +457,36 @@ plans without acquisitions.
 
 ### 3.9 Evidence of live re-execution
 
-1. **Amends spec 026 3.6.** `rustev.live-reexecution/1` gains, as
-   required members, `mode` (always `live_reexecution`), `purpose`
-   (`single`, `evaluation` or `probe`), `source` (`none`,
+1. **The per-case document (amended 2026-10-29, A-67).**
+   `rustev-live` writes, per evaluation work item and per probe call
+   (3.7.2), a `rustev.live-case/1` document (`REPLAY_V1`, record canonical) with
+   `mode` (always `live_reexecution`), `purpose` (`evaluation`, or
+   `probe` for a probe call), `source` (`none` for a probe call,
    `dataset_case{dataset_id, case_id, split}`, or
-   `replay_bundle{bundle_digest, decision_id}`), `run` (`null`, or
-   `{run_id, live_config_id, candidate, repeat}`), `evaluation_time`
-   (`source` or `fixed`), `acquisitions` (per source, `live` or
-   `captured` with capture digests) and `spend` (per attempt, the journal
-   sequence number, reserved units and settlement, or the refusal code).
-   Spec 026's document is not yet implemented, so no existing bytes
-   change.
+   `replay_bundle{bundle_digest, decision_id}`), `run`
+   (`{run_id, live_config_id, candidate, repeat}`, with the rerun number
+   when there is one and no `repeat` for a probe call), `evaluation_time` (`source` or `fixed`),
+   `acquisitions` (per source, `live` or `captured` with capture
+   digests), `spend` (per attempt, the journal sequence number, reserved
+   units and settlement, or the refusal code), `declared_no_spend` per
+   binding (3.6.3), and the record digests of the case's
+   `rustev.live-reexecution/1` document and run record. Spec 026's
+   `rustev.live-reexecution/1` is not changed: it was implemented by
+   #150 and published in `rustev-contract` before this spec's members
+   were, so the members this paragraph first added to it as required
+   would have changed its bytes and its public type (I-5, spec 031's
+   semver check). The per-case document carries them instead and binds
+   the live document by digest. The `single` purpose and the `null` run,
+   which the first text gave spec 026's single re-executions, are not
+   carried over: a single re-execution through spec 026 keeps
+   `rustev.live-reexecution/1` alone and has no per-case document.
 2. The run record is the ordinary record the runtime writes
    (`rustev.run/1`, or `rustev.run/3` for a plan using #76 constructs,
    introduced by spec 036), delivered through
-   the host's sink. It is linked from the live document by digest and is
-   not altered to mark the mode; the live document is the mark, and it is
-   delivered beside the run record and written per case under `--out`.
+   the host's sink. It is linked from the live and per-case documents by
+   digest and is not altered to mark the mode; the per-case document is
+   the mark, and the three are delivered together and written per case
+   under `--out`.
 3. Spec 026 3.6's other members, 3.7's retention rules and 3.8's
    comparison apply per case. With `compare_with_source` and bundle
    inputs, each case gets the spec 026 comparison; a changed proposal is
@@ -530,11 +548,13 @@ plans without acquisitions.
    their reason, outside the stable cohort (spec 029 3.1.3).
 4. `rustev.live-run/1` (`REPLAY_V1`, record canonical) summarizes the
    run: identities as in 3.10.1, the probe section (the probe snapshot's
-   digest and declared provenance, and per binding its verdict), counts
+   digest and declared provenance, per binding its verdict, and the
+   digest of each probe call's per-case document), counts
    per status,
    run spend split into observed, estimated, liability and unknown, the
    journal's totals before and after, the stop reason, and the digests of
-   every per-case live document and repeat report.
+   every per-case document, live document, run record and repeat
+   report.
 
 ### 3.12 Authorization in the CLI
 
@@ -571,8 +591,11 @@ statistics of spec 029; the repeat count is the live configuration's
    with `rustev_live::run` by a host program, the Node binding or the
    service; `rustev-cli` still depends on no crate under `integrations/`.
 3. `--out` receives `live-config.json`, `checkpoint.json`, `cases/` with
-   one `<candidate>.<repeat>.<case_id>.live.json` and `.run.json` per
-   completed item, and at the end `live-run.json` plus the repeat outputs
+   one `<candidate>.<repeat>.<case_id>.case.json`, `.live.json` and
+   `.run.json` per completed item (`.rerun-<k>` before the extension for
+   a rerun), `probe/` with one `<binding index>.<call>.case.json`,
+   `.live.json` and `.run.json` per probe call that returned a result,
+   and at the end `live-run.json` plus the repeat outputs
    of 3.11.2, all or none for the final files. An existing `--out`
    without `--resume` is `io_error`.
 4. stdout is one line: the status, the run id, the run spend and the
@@ -606,10 +629,11 @@ No existing code or status changes meaning.
 3. No plan or definition construct is added: every plan golden keeps its
    bytes and `PlanId`. A live run records the candidate's `PlanId`; the
    `LiveConfigId` and run id identify the run, not the plan.
-4. `rustev.live-reexecution/1` gains members before its first
-   implementation (3.9.1); `rustev.live-config/1`,
-   `rustev.live-checkpoint/1` and `rustev.live-run/1` are new.
-   `rustev.live-run/1` joins spec 004 5.6's record-canonical list.
+4. `rustev.live-reexecution/1` is unchanged (3.9.1, A-67);
+   `rustev.live-config/1`, `rustev.live-checkpoint/1`,
+   `rustev.live-case/1` and `rustev.live-run/1` are new.
+   `rustev.live-case/1` and `rustev.live-run/1` join spec 004 5.6's
+   record-canonical list.
 
 ## 4. Out of scope
 
@@ -649,7 +673,7 @@ objective API (#76 future).
 | Live run of the source plan with captured acquisitions and a backend scripted to return the source outputs | Proposal equal to replay's; only run observations differ. |
 | `real` dataset without `--admission` | `invalid_input`, `data-not-admitted`, no journal opened. |
 | Authorization rule absent for a binding | `authorization_refused` per attempt, nothing sent, run continues. |
-| `rate_limited` with retry-after above the cap | Pause capped; retry reserved anew. |
+| `rate_limited` with retry-after above the cap | Deferred (3.8.2, A-67): no pause until a retry-after seam exists; retry reserved anew. |
 | Offline `rustev eval` and spec 029 commands | Byte-identical outputs; zero backend calls. |
 
 ## Acceptance
@@ -672,8 +696,9 @@ objective API (#76 future).
   spec 036. Until spec 036 is implemented, this is tested with the
   initial snapshot only and the acquisition part is reported as
   externally blocked, never as passed.
-- Evidence: every live document carries `mode: live_reexecution` and its
-  source link; mutation tests prove no source file changes.
+- Evidence: every per-case document carries `mode: live_reexecution`,
+  its source link and the digests of its live document and run record;
+  mutation tests prove no source file changes.
 - Separation: the `rustev-eval` dependency test of 3.1.2; spec 026's
   compile-time tests; existing offline tests keep a backend-call count of
   zero.
@@ -793,6 +818,20 @@ estimated, liability left unsettled by an ended process, and unknown
 charges, whose sum is `run_spend` (3.11.4); and `testing_header_digest()`,
 so a checkpoint can bind the journal header before the journal is opened
 (3.10.1, 3.10.2). Tests: `crates/rustev-live/tests/journal.rs`.
+**Amendment (2026-10-29, A-67).** The owner decided two points the
+increments raised. The members 3.9.1 first added to
+`rustev.live-reexecution/1` move to a new per-case document,
+`rustev.live-case/1`, written by `rustev-live` beside the live document
+and the run record and binding both by digest (without the `single`
+purpose and the `null` run, which only marked spec 026's single
+re-executions; those get no per-case document); spec 026's document,
+implemented by #150 and published in `rustev-contract`, is not changed
+(I-4, territory, 3.6.3, 3.9.1, 3.9.2, 3.11.4, 3.13.3, 3.15.4, the
+Evidence acceptance item, Decision 10). The rate-limit pause of
+3.8.2 is deferred until a seam delivers a retry-after to the run engine,
+because neither the run record nor the attempt report carries one; the
+section 5 row is marked deferred. This amends text only; it marks no
+increment complete and authorizes no live run or spend.
 
 ## Decisions at approval
 
@@ -837,8 +876,10 @@ decided by the implementer within this spec, as written:
    (amending spec 026 3.2) so a run can isolate a model change; every
    other identity and observation stays new, and the choice is recorded.
 10. **Marking.** The run record (`rustev.run/1` or `/3`) is not changed; the
-    `live_reexecution` mark is in spec 026's live document, extended
-    before its first implementation, and delivered beside the run record.
+    `live_reexecution` mark is in the per-case document of 3.9.1
+    (amended 2026-10-29, A-67: spec 026's live document had already
+    shipped, so it is not extended), delivered beside the run record and
+    the live document.
 11. **Reports.** Live outputs are spec 029 repeat sets with source `live`,
     so E1 and E2 need no change.
 12. **Live activity (settled by the work order).** The 2026-10-16
