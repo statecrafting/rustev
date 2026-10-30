@@ -20951,6 +20951,212 @@ export namespace RustevServeEvent1 {
 }
 export type RustevServeEvent1 = RustevServeEvent1.RustevServeEvent1;
 
+export namespace RustevServeExplain1 {
+  /**
+   * One side's evidence for an explanation (3.8.3): `{ record, plan? }` or
+   * `{ bundle }`, the shape spec 040 3.15.2 gives the bindings. serde ignores
+   * `deny_unknown_fields` on an untagged enum, so each arm refuses unknown
+   * members itself.
+   */
+  export type ExplainEvidence = RecordEvidence | BundleEvidence;
+  export type DocumentInput2 =
+    | {
+        document: EmbeddedRustevPlan_2;
+      }
+    | {
+        reference: Reference;
+      };
+  /**
+   * Resolver references are prefix:relative/path, never URLs or absolute paths.
+   * Filesystem containment and scope are checked by the host resolver.
+   */
+  export type Reference = Text_1_4096;
+  /**
+   * Length is enforced in decoded UTF-8 bytes by the parser.
+   */
+  export type Text_1_4096 = string;
+  export type DocumentInput =
+    | {
+        document: EmbeddedRustevRun_1;
+      }
+    | {
+        reference: Reference;
+      };
+  export type DocumentInput3 =
+    | {
+        document: EmbeddedRustevReplay_1;
+      }
+    | {
+        reference: Reference;
+      };
+  export type Timestamp = number;
+  /**
+   * The isolation scope of a capture, a bundle and every request identity.
+   */
+  export type Scope =
+    | {
+        context_revision: Handle;
+        mode: "tenant_only";
+        tenant: Handle;
+      }
+    | {
+        context_revision: Handle;
+        mode: "principal";
+        principal_scope: Handle;
+        tenant: Handle;
+      };
+  export type Handle = string;
+  /**
+   * Spec 040 3.3's query, or `{ diff: { other } }` with `other` an evidence
+   * set of the same shape.
+   */
+  export type ExplainQuery = DiffQuery | Query;
+  export type Query =
+    | ("why_outcome" | "text_origin" | "models" | "diff")
+    | {
+        why_selected: {
+          item: Item;
+        };
+      }
+    | {
+        why_excluded: {
+          item: Item;
+        };
+      }
+    | {
+        why_order: {
+          a: Item;
+          b: Item;
+        };
+      };
+  export type Item = string | Withheld;
+  export type Unavailable =
+    | {
+        facet?: Facet | null;
+        reason: "not-recorded";
+      }
+    | {
+        reason: "plan-not-supplied";
+      }
+    | {
+        availability: ItemAvailability;
+        item: EvidencePath;
+        reason: "retention";
+      }
+    | {
+        reason: "not-produced";
+      }
+    | {
+        action: WithholdingAction;
+        field_class: FieldClass;
+        policy: RedactionPolicyId;
+        reason: "redacted";
+      }
+    | {
+        reason: "not-in-record";
+      };
+  export type Facet =
+    | "tier"
+    | "relaxation"
+    | "presence"
+    | "addressed_to"
+    | "remediation"
+    | "caused_by"
+    | "field_origin"
+    | "origin"
+    | "served_identity";
+  export type ItemAvailability = "missing" | "expired" | "erased" | "inaccessible" | "digest_only";
+  /**
+   * A validated evidence path, ordered by the bytes of its complete wire string (3.2).
+   */
+  export type EvidencePath = string;
+  export type WithholdingAction = "drop" | "digest";
+  /**
+   * Field classes (3.3.1). Every exportable field belongs to exactly one.
+   */
+  export type FieldClass =
+    | (
+        | "user-supplied"
+        | "third-party"
+        | "attributed-claim"
+        | "authenticated-app-field"
+        | "system-of-record"
+        | "model-derived"
+      )
+    | "generated-text"
+    | "free-text-detail"
+    | "id"
+    | "content-digest"
+    | "enum"
+    | "number"
+    | "plan-metadata"
+    | "model-identity";
+  export type RedactionPolicyId = string;
+
+  export interface RustevServeExplain1 {
+    evidence: ExplainEvidence;
+    options: ExplainOptions;
+    query: ExplainQuery;
+    schema: "rustev.serve-explain/1";
+  }
+  export interface RecordEvidence {
+    plan?: DocumentInput2 | null;
+    record: DocumentInput;
+  }
+  /**
+   * An embedded `rustev.plan/2` document, carried as its original bytes and checked by that document's own bounded parser.
+   */
+  export interface EmbeddedRustevPlan_2 {}
+  /**
+   * An embedded `rustev.run/1` document, carried as its original bytes and checked by that document's own bounded parser.
+   */
+  export interface EmbeddedRustevRun_1 {}
+  export interface BundleEvidence {
+    bundle: DocumentInput3;
+  }
+  /**
+   * An embedded `rustev.replay/1` document, carried as its original bytes and checked by that document's own bounded parser.
+   */
+  export interface EmbeddedRustevReplay_1 {}
+  /**
+   * `scope` and `now_ms` are given exactly when a side is in bundle form
+   * (spec 040 3.16.2); the service refuses any other combination as
+   * `invalid_request`, so the parser admits each alone.
+   */
+  export interface ExplainOptions {
+    now_ms?: Timestamp | null;
+    scope?: Scope | null;
+  }
+  export interface DiffQuery {
+    diff: DiffOther;
+  }
+  export interface DiffOther {
+    other: ExplainEvidence;
+  }
+  export interface Withheld {
+    not_available: Unavailable;
+  }
+}
+export type RustevServeExplain1 = RustevServeExplain1.RustevServeExplain1;
+
+export namespace RustevServeExplanation1 {
+  /**
+   * Length is enforced in decoded UTF-8 bytes by the parser.
+   */
+  export type Text_0_16777216 = string;
+
+  export interface RustevServeExplanation1 {
+    explanation: EmbeddedRustevExplanation_1;
+    markdown: Text_0_16777216;
+    schema: "rustev.serve-explanation/1";
+  }
+  /**
+   * An embedded `rustev.explanation/1` document, carried as its original bytes and checked by that document's own bounded parser.
+   */
+  export interface EmbeddedRustevExplanation_1 {}
+}
+export type RustevServeExplanation1 = RustevServeExplanation1.RustevServeExplanation1;
+
 export namespace RustevServeInvalidations1 {
   /**
    * @minItems 1

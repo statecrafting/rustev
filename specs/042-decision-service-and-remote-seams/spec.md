@@ -1234,6 +1234,29 @@ document types are regenerated. Test:
 `parallel_requests_are_optional_bounded_and_absent_keeps_the_digest` in
 `crates/rustev-contract/tests/042_serve_documents.rs`.
 
+**Increment 6 part 1: explanation documents (2026-10-30).**
+`crates/rustev-contract/src/serve.rs` defines `rustev.serve-explain/1`
+(`ServeExplain`: `evidence`, `query`, `options`) and
+`rustev.serve-explanation/1` (`ServeExplanation`: `explanation`, the
+embedded `rustev.explanation/1` record, and `markdown`) under 3.8.3.
+Evidence is `{ record, plan? }` or `{ bundle }`, each member a
+`DocumentInput` (embedded bytes or a resolver reference) of
+`rustev.run`, `rustev.plan` and the replay bundle. The query is spec 040
+3.3's query or `{ diff: { other } }`. `options` holds the optional
+`scope` and `now_ms`. The parser admits either member alone, and the
+handler refuses a combination that does not match the bundle sides as
+`invalid_request`, as 3.8.3 states. `ServeExplain::has_bundle` names
+whether either side is a bundle. The answer parses under
+`EXPLANATION_LIMITS` (33 MiB, strings up to 16 MiB): an explanation is
+bounded as a replay bundle is, and its Markdown by the same byte count.
+The operation table's `explain` entry now names the two schemas, and its
+answer is a document. The JSON Schemas, the TypeScript document types and
+the gRPC stub's operation comments are regenerated. Until the handler
+lands, the service still answers `explain` as unavailable. Tests: the
+round-trip contract and
+`explain_requests_take_either_evidence_form_and_name_their_bundle_sides`
+in `crates/rustev-contract/tests/042_serve_documents.rs`.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

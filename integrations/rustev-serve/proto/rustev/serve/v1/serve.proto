@@ -27,7 +27,7 @@ service Serve {
   rpc Replay(Document) returns (Document);
   // {"operation":"evaluate","method":"POST","route":"/v1/evaluate","group":"decide","request_schema":{"some":"rustev.serve-evaluate/1"},"response_schemas":[],"streaming":false,"response_format":"surface_output"}
   rpc Evaluate(Document) returns (Document);
-  // {"operation":"explain","method":"POST","route":"/v1/explain","group":"decide","request_schema":"none","response_schemas":["rustev.explanation/1"],"streaming":false,"response_format":"explanation"}
+  // {"operation":"explain","method":"POST","route":"/v1/explain","group":"decide","request_schema":{"some":"rustev.serve-explain/1"},"response_schemas":["rustev.serve-explanation/1"],"streaming":false,"response_format":"document"}
   rpc Explain(Document) returns (Document);
   // {"operation":"invalidations","method":"POST","route":"/v1/context/invalidations","group":"admin","request_schema":{"some":"rustev.serve-invalidations/1"},"response_schemas":["rustev.serve-invalidations-ack/1"],"streaming":false,"response_format":"document"}
   rpc Invalidations(Document) returns (Document);
