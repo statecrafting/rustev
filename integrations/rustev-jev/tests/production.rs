@@ -161,7 +161,7 @@ fn missing_stale_conflicting_and_invalid_facts_refuse_construction() {
         base.production_eligible(TODAY, 5000)
             .unwrap_err()
             .0
-            .contains("stage 2")
+            .contains("stage 3")
     );
 }
 
