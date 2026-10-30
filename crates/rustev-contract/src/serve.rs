@@ -950,6 +950,98 @@ service_document!(ServeEvaluate,EvaluateSchema,"rustev.serve-evaluate/1",SERVICE
 });
 impl Validate for ServeEvaluate {}
 
+/// One side's evidence for an explanation (3.8.3): `{ record, plan? }` or
+/// `{ bundle }`, the shape spec 040 3.15.2 gives the bindings. serde ignores
+/// `deny_unknown_fields` on an untagged enum, so each arm refuses unknown
+/// members itself.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum ExplainEvidence {
+    Record(RecordEvidence),
+    Bundle(BundleEvidence),
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RecordEvidence {
+    pub record: DocumentInput<crate::run::RunRecord>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "present"
+    )]
+    pub plan: Option<DocumentInput<crate::plan::Plan>>,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct BundleEvidence {
+    pub bundle: DocumentInput<crate::replay::ReplayBundle>,
+}
+impl ExplainEvidence {
+    pub fn is_bundle(&self) -> bool {
+        matches!(self, Self::Bundle(_))
+    }
+}
+/// Spec 040 3.3's query, or `{ diff: { other } }` with `other` an evidence
+/// set of the same shape.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum ExplainQuery {
+    Diff(DiffQuery),
+    Query(crate::explanation::Query),
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DiffQuery {
+    pub diff: DiffOther,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DiffOther {
+    pub other: ExplainEvidence,
+}
+/// `scope` and `now_ms` are given exactly when a side is in bundle form
+/// (spec 040 3.16.2); the service refuses any other combination as
+/// `invalid_request`, so the parser admits each alone.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ExplainOptions {
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "present"
+    )]
+    pub scope: Option<crate::scope::Scope>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "present"
+    )]
+    pub now_ms: Option<Timestamp>,
+}
+service_document!(ServeExplain,ExplainSchema,"rustev.serve-explain/1",SERVICE_LIMITS,{
+    pub evidence:ExplainEvidence,pub query:ExplainQuery,pub options:ExplainOptions,
+});
+impl Validate for ServeExplain {}
+impl ServeExplain {
+    /// Whether either side is in bundle form.
+    pub fn has_bundle(&self) -> bool {
+        self.evidence.is_bundle()
+            || matches!(&self.query, ExplainQuery::Diff(d) if d.diff.other.is_bundle())
+    }
+}
+/// The answer's bounds: an explanation is bounded as a replay bundle is
+/// (`rustev.explanation/1` parses under `REPLAY_V1`), and its Markdown
+/// rendering by the same byte count.
+pub const EXPLANATION_LIMITS: ParseLimits = ParseLimits {
+    max_bytes: 33 * MIB,
+    max_string_bytes: 16 * MIB,
+    ..SERVICE_LIMITS
+};
+service_document!(ServeExplanation,ExplanationSchema,"rustev.serve-explanation/1",EXPLANATION_LIMITS,{
+    pub explanation:Embedded<crate::explanation::Explanation>,pub markdown:Text<0,16777216>,
+});
+impl Validate for ServeExplanation {}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum RouteGroup {
@@ -1107,10 +1199,10 @@ pub fn operation_table() -> Vec<OperationDescription> {
             POST,
             "/v1/explain",
             Decide,
-            None,
-            &["rustev.explanation/1"],
+            Some("rustev.serve-explain/1"),
+            &["rustev.serve-explanation/1"],
             false,
-            Explanation,
+            Document,
         ),
         (
             Invalidations,

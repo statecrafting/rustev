@@ -28,6 +28,12 @@ fn replay_options() -> Value {
 fn config() -> Value {
     json!({"schema":"rustev.serve-config/1","listeners":[{"name":"local","groups":["decide"],"transport":{"unix":{"path":"/tmp/test.sock","mode":384,"auth":"filesystem"}},"limits":{"max_header_bytes":4096,"registration_body_bytes":16777216,"other_body_bytes":4194304,"max_connections":65536,"max_http2_streams":1024,"requests_per_second":10000},"redaction_policy":"none"}],"max_plans":4096,"runtime":{"max_in_flight":1,"max_queued":0,"per_backend_concurrency":{}},"backend_bindings":{},"context_sources":{},"sinks":{},"sink_policy":{"fail_decision":{"timeout_ms":1}},"signing_mode":"allow_unsigned","signing_keys":{"ed25519":{},"sigstore":[]},"preload_bundles":[],"resolver_roots":{},"idempotency_window_ms":60000,"max_retained":1,"max_retained_bytes":16777216u64,"stream_queue":16,"blocking_threads":1,"blocking_queue":1,"drain_ms":0,"flush_ms":0})
 }
+fn explanation() -> Value {
+    serde_json::from_str(include_str!(
+        "../../rustev-cli/tests/golden/explain/backend-changed.explanation.json"
+    ))
+    .unwrap()
+}
 fn parse<T: Document>(v: &Value) -> Result<T, rustev_contract::DocumentError> {
     T::parse(&serde_json::to_vec(v).unwrap())
 }
@@ -95,6 +101,15 @@ fn every_document_round_trips_refuses_unknown_and_wrong_schema_and_obeys_body_bo
     );
     contract::<ServeEvaluate>(
         json!({"schema":"rustev.serve-evaluate/1","split":"training","replay":replay_options(),"dataset":"data:dataset.json","config":"data:config.json","adapter":"data:adapter.json","bundles":"data:bundles","candidate_plan":"none","deps":{"descriptors":[],"rules":[],"calibrations":[]},"repeat":"none"}),
+    );
+    contract::<ServeExplain>(
+        json!({"schema":"rustev.serve-explain/1","evidence":{"record":{"reference":"data:run.json"},"plan":{"reference":"data:plan.json"}},"query":"why_outcome","options":{}}),
+    );
+    contract::<ServeExplain>(
+        json!({"schema":"rustev.serve-explain/1","evidence":{"record":{"reference":"data:run.json"}},"query":{"diff":{"other":{"bundle":{"reference":"data:bundle.json"}}}},"options":{"scope":replay_options()["scope"],"now_ms":0}}),
+    );
+    contract::<ServeExplanation>(
+        json!({"schema":"rustev.serve-explanation/1","explanation":explanation(),"markdown":"# Explanation\n"}),
     );
     contract::<ServeReadiness>(
         json!({"schema":"rustev.serve-readiness/1","failing_items":[],"signing_mode":"require_signed","development_bearer_listeners":[]}),
@@ -660,4 +675,49 @@ fn parallel_requests_are_optional_bounded_and_absent_keeps_the_digest() {
     // Absent, the canonical form omits it, so the digest is unchanged.
     let canonical: Value = serde_json::from_slice(&absent.canonical().unwrap()).unwrap();
     assert!(canonical["runtime"].get("max_parallel_requests").is_none());
+}
+
+#[test]
+fn explain_requests_take_either_evidence_form_and_name_their_bundle_sides() {
+    let record = json!({"record":{"reference":"data:run.json"}});
+    let bundle = json!({"bundle":{"reference":"data:bundle.json"}});
+    let request = |evidence: &Value, query: Value| {
+        parse::<ServeExplain>(
+            &json!({"schema":"rustev.serve-explain/1","evidence":evidence,"query":query,"options":{}}),
+        )
+    };
+    assert!(!request(&record, json!("models")).unwrap().has_bundle());
+    assert!(request(&bundle, json!("models")).unwrap().has_bundle());
+    assert!(
+        request(&record, json!({"diff":{"other":bundle}}))
+            .unwrap()
+            .has_bundle()
+    );
+    assert!(matches!(
+        request(&record, json!({"why_selected":{"item":"a"}}))
+            .unwrap()
+            .query,
+        ExplainQuery::Query(_)
+    ));
+    // Each evidence arm refuses unknown members and mixed forms.
+    let mut mixed = record.clone();
+    mixed["bundle"] = bundle["bundle"].clone();
+    assert!(request(&mixed, json!("models")).is_err());
+    assert!(
+        request(
+            &json!({"plan":{"reference":"data:plan.json"}}),
+            json!("models")
+        )
+        .is_err()
+    );
+    assert!(request(&record, json!({"diff":{"other":record,"extra":1}})).is_err());
+    assert!(request(&record, json!("unknown_query")).is_err());
+    // An explicit null is not an absent optional member.
+    assert!(
+        request(
+            &json!({"record":{"reference":"data:run.json"},"plan":null}),
+            json!("models")
+        )
+        .is_err()
+    );
 }

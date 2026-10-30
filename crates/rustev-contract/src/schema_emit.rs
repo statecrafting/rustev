@@ -421,6 +421,8 @@ pub fn document_schemas() -> Vec<EmittedSchema> {
         emit::<crate::serve::ServeRefusal>(crate::serve::ServeRefusal::SCHEMA, None),
         emit::<crate::serve::ServeReplay>(crate::serve::ServeReplay::SCHEMA, None),
         emit::<crate::serve::ServeEvaluate>(crate::serve::ServeEvaluate::SCHEMA, None),
+        emit::<crate::serve::ServeExplain>(crate::serve::ServeExplain::SCHEMA, None),
+        emit::<crate::serve::ServeExplanation>(crate::serve::ServeExplanation::SCHEMA, None),
         emit::<crate::serve::ServeReadiness>(crate::serve::ServeReadiness::SCHEMA, None),
         emit::<crate::serve::ServeShutdown>(crate::serve::ServeShutdown::SCHEMA, None),
         emit::<crate::serve::ServeInvalidations>(crate::serve::ServeInvalidations::SCHEMA, None),
