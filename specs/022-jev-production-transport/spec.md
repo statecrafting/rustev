@@ -218,7 +218,46 @@ A production binding records, and its artifact identity covers:
       production.
    4. It grants no production eligibility. `JevBackend::new_production`
       still refuses until a stage 3 record is accepted. Accepting one, and
-      the construction it then permits, is a later change.
+      the construction it then permits, is 3.7.5.
+5. **Accepting stage 3 and constructing a production binding (amended
+   2026-10-29, A-69).**
+   1. A stage 3 record is accepted only as a `Qualification` document (its
+      binding's artifact identity, the dated calls, the owner's
+      authorization, the dataset with its admission or stated limitation,
+      and the report and spend journal references with their totals) that
+      passes `Qualification::check`. It must name the binding's exact
+      identity (3.6.2), and its calls fact must not be stale. The owner's
+      authorization names the decision row that accepted it. Recording a
+      record is not accepting it, and the adapter accepts nothing on the
+      host's word: the check runs at construction.
+   2. `ProductionBinding::production_eligible` takes the accepted
+      `Qualification`. It holds only when 3.4's facts pass for the day, the
+      use is `production`, the transport is `direct` with a pin, the binding's
+      `mapping` and its decision binding's mapping version are the direct
+      mapping recorded under stage 2, and the qualification passes 1. A
+      Gateway binding stays ineligible here: 3.3's evidence path is not
+      delivered.
+   3. `JevBackend::new_production` takes the binding, the host's
+      credential callback, the accepted `Qualification`, a spend journal
+      and the day. It constructs only when 2 holds and the journal is the
+      production journal (R-29's production cap). Otherwise it refuses
+      before any credential lookup. It then behaves as 3.7.4's construction
+      does, at the binding's endpoint, with the binding's prices and
+      privacy record, and with `qualification` recording the accepted
+      record's digest instead of `stage 3`. It keeps no request or response
+      bytes (spec 009 R-19), since production content is not synthetic.
+   4. A binding that enables adapter-scoped batching is constructed only as
+      spec 044 3.8 item 4 allows. Until spec 044's increment 8 delivers that
+      check, `new_production` refuses any binding whose batching is not
+      `off`.
+   5. `check_production_plan` takes the accepted qualifications and calls 2
+      for each binding a plan reaches.
+   6. Eligibility is not deployment. 3.1.4's acts (a privacy decision for
+      the data sent, the production spend cap, and deployment approval)
+      stay the owner's, and none of them is implied by an accepted record.
+      Facts that go stale (their `valid_through` passes) make the binding
+      ineligible until they are re-read and requalified where 3.6.2
+      requires it.
 
 ### 3.8 Additions from the tracking issue (C3)
 
@@ -274,7 +313,9 @@ A Jev wire-compatible surface (R-05). Qualifying adapter-scoped batching
 | A report cites the Gateway stage 3 record as production evidence | Rejected by review; the binding identities differ (I-3). |
 | The billing record exceeds the journal's observed total | Reported as a signed difference; journal entries unchanged. |
 | `new_qualification` with a production journal, a Gateway transport, a mapping other than the direct mapping, a non-HTTPS endpoint, or facts that fail 3.4 | Refused at construction; no credential lookup, no request sent. |
-| A stage 3 exchange's record | Names the production binding's identity and `qualification: stage 3`; `new_production` still refuses. |
+| A stage 3 exchange's record | Names the production binding's identity and `qualification: stage 3`. |
+| `new_production` with no qualification, one for another identity, one without the owner's authorization, report or spend references, stale facts or calls, a testing journal, a Gateway binding, a mapping other than the direct mapping, or batching on | Refused at construction; no credential lookup, no request sent. |
+| A production plan reaching a binding without an accepted qualification | Refused when the plan is prepared. |
 
 ## Acceptance
 
@@ -290,7 +331,8 @@ A Jev wire-compatible surface (R-05). Qualifying adapter-scoped batching
 - The adapter reads no environment variable or file for a credential.
 - Stages 2 and 3 run only under the owner's spend authority and are
   recorded, with spend, in this spec's implementation record. Stage 3 runs
-  only through 3.7.4's qualification construction.
+  only through 3.7.4's qualification construction, and a production binding
+  is constructed only through 3.7.5.
 - `make code`, declared verification, and `make gate` pass.
 
 ## Verification
@@ -442,6 +484,12 @@ loopback. The facts the first stage 3 binding records were read on
 2026-10-29 from TypeSafe's public pages, and the owner accepted them
 (A-68). That binding pins `jev-1.14.0`, by the owner's choice, so a stage
 2 smoke at that pin comes first. Pending implementation.
+
+**Production acceptance (2026-10-29, A-69).** 3.7.5 is amended in, so a
+recorded stage 3 can be accepted and a production-eligible binding
+constructed, as 3.7.4.4 left to a later change. Pending implementation.
+Accepting the first record, for the stage 3 binding of A-68, is the owner's
+act in its own decision row; this amendment accepts none.
 
 ## Questions settled at approval
 
