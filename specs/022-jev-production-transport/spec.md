@@ -198,6 +198,27 @@ A production binding records, and its artifact identity covers:
 3. **Qualification (owner-authorized).** Spec 012 3.8 stage 3's metrics on
    the production binding, on a dataset admitted under spec 023 or the
    synthetic-provenance set with that limit stated.
+4. **Running stage 3 (amended 2026-10-29, A-68).** Stage 3's calls are made
+   through `JevBackend::new_qualification`, which builds an adapter from a
+   schema-2 production binding and is never a production construction:
+   1. It refuses, before any credential lookup or dispatch, unless the
+      binding's facts pass the checks of 3.4 for the day, the transport is
+      `direct`, the binding's `mapping` and its decision binding's mapping
+      version are the direct mapping recorded under stage 2
+      (`rustev-jev-mapping/2`), the endpoint is the facts' HTTPS endpoint,
+      and the spend journal is the testing journal (R-29).
+   2. Every exchange record names the production binding's artifact
+      identity and protocol, and its requested privacy carries the binding's
+      zero-retention options, or the recorded fact that none is available,
+      plus `qualification: stage 3`. So the evidence is evidence for that
+      binding (3.6.2) and is never mistaken for production traffic.
+   3. The credential is obtained only at dispatch through the host's
+      callback (3.8.1). Prices come from the binding's facts. The served
+      identity is checked against the pin and any declared tolerance, as in
+      production.
+   4. It grants no production eligibility. `JevBackend::new_production`
+      still refuses until a stage 3 record is accepted. Accepting one, and
+      the construction it then permits, is a later change.
 
 ### 3.8 Additions from the tracking issue (C3)
 
@@ -252,6 +273,8 @@ A Jev wire-compatible surface (R-05). Qualifying adapter-scoped batching
 | A production plan falls back to a development Gateway instance | Refused when the plan is prepared. |
 | A report cites the Gateway stage 3 record as production evidence | Rejected by review; the binding identities differ (I-3). |
 | The billing record exceeds the journal's observed total | Reported as a signed difference; journal entries unchanged. |
+| `new_qualification` with a production journal, a Gateway transport, a mapping other than the direct mapping, a non-HTTPS endpoint, or facts that fail 3.4 | Refused at construction; no credential lookup, no request sent. |
+| A stage 3 exchange's record | Names the production binding's identity and `qualification: stage 3`; `new_production` still refuses. |
 
 ## Acceptance
 
@@ -266,7 +289,8 @@ A Jev wire-compatible surface (R-05). Qualifying adapter-scoped batching
   every batching setting.
 - The adapter reads no environment variable or file for a credential.
 - Stages 2 and 3 run only under the owner's spend authority and are
-  recorded, with spend, in this spec's implementation record.
+  recorded, with spend, in this spec's implementation record. Stage 3 runs
+  only through 3.7.4's qualification construction.
 - `make code`, declared verification, and `make gate` pass.
 
 ## Verification
@@ -410,6 +434,14 @@ within R-29's cap and which has not run. Until it is recorded here with its
 spend, `JevBackend::new_production` refuses construction ("direct API
 mapping awaits owner-authorized qualification (stage 3)"), so no binding is
 production-eligible, and 022 is not `complete`.
+
+**The stage 3 construction (2026-10-29, A-68).** 3.7.4 is amended in, so
+stage 3 has a construction to run through: before it, `new_production`
+refused until stage 3 was recorded, and `new_mechanics` reaches only
+loopback. The facts the first stage 3 binding records were read on
+2026-10-29 from TypeSafe's public pages, and the owner accepted them
+(A-68). That binding pins `jev-1.14.0`, by the owner's choice, so a stage
+2 smoke at that pin comes first. Pending implementation.
 
 ## Questions settled at approval
 
