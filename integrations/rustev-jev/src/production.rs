@@ -15,6 +15,9 @@ use crate::http::{Endpoint, Scheme, Secret};
 use crate::spend::{BudgetKind, SpendSummary};
 
 pub const SCHEMA: &str = "rustev.jev-binding/2";
+/// The synthetic stage 1 mapping a production binding names for
+/// `JevBackend::new_mechanics` only: never a direct API shape (3.7.1).
+pub const SYNTHETIC_MECHANICS_MAPPING: &str = "rustev-jev-direct-synthetic/1";
 
 /// Supplied by the host; invoked at dispatch, never at construction.
 pub type CredentialCallback = Arc<dyn Fn() -> Result<Secret, Unresolved> + Send + Sync>;

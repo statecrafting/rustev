@@ -290,6 +290,32 @@ fn transport_code(e: &TransportError) -> (RemoteCode, String) {
     }
 }
 
+/// The body a production binding sends. Only the synthetic mechanics
+/// mapping carries a `privacy` member: it is never a direct API shape, and
+/// the direct mapping recorded in stage 2 has none (zero data retention is
+/// an account term, A-68), so its body is spec 012's mapping unchanged.
+pub fn production_body(binding: &crate::production::ProductionBinding, body: Vec<u8>) -> Vec<u8> {
+    if binding.mapping != crate::production::SYNTHETIC_MECHANICS_MAPPING {
+        return body;
+    }
+    let mut value: serde_json::Value = serde_json::from_slice(&body).expect("generated JSON");
+    value["privacy"] =
+        serde_json::to_value(&binding.facts.zero_retention_options).expect("string map");
+    serde_json::to_vec(&value).expect("generated JSON")
+}
+
+/// `endpoint` without its path: `https://host[:port]`. A production
+/// binding names its full endpoint (3.4); the adapter's client takes the
+/// origin and the binding's path apart.
+pub fn origin(endpoint: &str) -> Result<String, EndpointError> {
+    let parsed = Endpoint::parse(endpoint)?;
+    let trimmed = endpoint.trim_end_matches('/');
+    Ok(trimmed
+        .strip_suffix(parsed.base_path.as_str())
+        .unwrap_or(trimmed)
+        .to_string())
+}
+
 impl JevBackend {
     /// Build the adapter. Validates the binding (refusing any provider
     /// allowlist but exactly `["typesafe-ai"]`), the endpoint and the
@@ -438,15 +464,79 @@ impl JevBackend {
             .parse::<std::net::IpAddr>()
             .is_ok_and(|ip| ip.is_loopback())
             || journal.budget() != crate::spend::BudgetKind::Testing
-            || binding.mapping != "rustev-jev-direct-synthetic/1"
+            || binding.mapping != crate::production::SYNTHETIC_MECHANICS_MAPPING
             || binding.decision.transport != Transport::Direct
         {
             return Err(SetupError::Production(Unresolved(
                 "mechanics requires loopback, a testing journal and the synthetic direct mapping",
             )));
         }
+        Self::over_production_binding(
+            backend_id,
+            binding,
+            endpoint,
+            credential,
+            sink,
+            journal,
+            "synthetic mechanics only",
+            false,
+        )
+    }
+
+    /// Spec 022 3.7.4: stage 3's calls, at the production binding's own
+    /// HTTPS endpoint, under the direct mapping recorded in stage 2 and the
+    /// testing journal only. Every record names the production binding's
+    /// identity and `qualification: stage 3`, and keeps its request and
+    /// response bytes. This grants no production
+    /// eligibility; [`JevBackend::new_production`] still refuses.
+    pub fn new_qualification(
+        backend_id: &str,
+        binding: crate::production::ProductionBinding,
+        credential: crate::production::CredentialCallback,
+        sink: Arc<dyn ExchangeSink>,
+        journal: SpendJournal,
+        today: &str,
+    ) -> Result<Self, SetupError> {
+        use crate::production::Unresolved;
+        binding
+            .check_facts(today, 5_000)
+            .map_err(SetupError::Production)?;
+        if binding.decision.transport != Transport::Direct
+            || binding.mapping != crate::binding::DIRECT_MAPPING_VERSION
+            || binding.decision.mapping_version != crate::binding::DIRECT_MAPPING_VERSION
+            || journal.budget() != crate::spend::BudgetKind::Testing
+        {
+            return Err(SetupError::Production(Unresolved(
+                "qualification requires the direct transport, the direct mapping and a testing journal",
+            )));
+        }
+        let endpoint = origin(&binding.facts.endpoint).map_err(SetupError::Endpoint)?;
+        Self::over_production_binding(
+            backend_id, binding, &endpoint, credential, sink, journal, "stage 3", true,
+        )
+    }
+
+    /// The adapter both constructions above share: the production binding's
+    /// identity, protocol, prices, privacy record, path and credential
+    /// callback over a development adapter at `endpoint`, an origin with no
+    /// path: the binding's path is set separately, and the client prefixes
+    /// an endpoint's own path to it.
+    #[allow(clippy::too_many_arguments)]
+    fn over_production_binding(
+        backend_id: &str,
+        binding: crate::production::ProductionBinding,
+        endpoint: &str,
+        credential: crate::production::CredentialCallback,
+        sink: Arc<dyn ExchangeSink>,
+        journal: SpendJournal,
+        qualification: &str,
+        retain_bytes: bool,
+    ) -> Result<Self, SetupError> {
         let mut config = JevConfig::new(backend_id, binding.decision.clone(), Secret::new(""));
         config.endpoint = Some(endpoint.to_owned());
+        // Stage 3 keeps its request and response bytes as evidence (synthetic
+        // content only); mechanics stays digest-only (spec 009 R-19).
+        config.retain_bytes = retain_bytes;
         config.cost.input_usd_per_million = binding.facts.input_usd_per_million;
         config.cost.output_usd_per_million = binding.facts.output_usd_per_million;
         let mut backend = Self::new(config, sink, Some(journal))?;
@@ -465,7 +555,7 @@ impl JevBackend {
         }
         inner
             .privacy
-            .insert("qualification".into(), "synthetic mechanics only".into());
+            .insert("qualification".into(), qualification.into());
         inner.path = Endpoint::parse(&binding.facts.endpoint)
             .map_err(SetupError::Endpoint)?
             .base_path;
@@ -867,11 +957,7 @@ async fn run_exchange(
     let refs: Vec<&Question> = questions.iter().collect();
     let mut body = request_body(&inner.binding, &ex.body_state, &refs);
     if let Some(binding) = &inner.production {
-        // Synthetic mapping only, never asserted to be a direct API shape.
-        let mut value: serde_json::Value = serde_json::from_slice(&body).expect("generated JSON");
-        value["privacy"] =
-            serde_json::to_value(&binding.facts.zero_retention_options).expect("string map");
-        body = serde_json::to_vec(&value).expect("generated JSON");
+        body = production_body(binding, body);
     }
     let mut record = blank_record(&inner.protocol, inner.artifact.clone(), vec![]);
     record.privacy_requested = inner.privacy.clone();
