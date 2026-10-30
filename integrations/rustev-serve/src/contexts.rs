@@ -169,6 +169,7 @@ async fn poll(
             return;
         };
         let sequence = service.invalidation_sequence(&name);
+        let mut failed = false;
         match client.invalidations(sequence, interval_ms.max(1_000)).await {
             Ok(answer) => {
                 last_ok = tokio::time::Instant::now();
@@ -201,23 +202,65 @@ async fn poll(
                     }
                 }
             }
-            Err(_) => {
-                let lag = last_ok.elapsed().as_millis() as u64;
-                // A failed poll is a gap once per outage.
-                service.invalidation_lost(&name, lag, sequence.is_some());
-            }
+            Err(_) => failed = true,
         }
         let lag = last_ok.elapsed().as_millis() as u64;
-        if lag > max_lag_ms && !lagging {
-            lagging = true;
-            service.invalidation_lost(&name, lag, false);
+        if let Some((lag, count)) = loss(failed, sequence.is_some(), lag, max_lag_ms, &mut lagging)
+        {
+            service.invalidation_lost(&name, lag, count);
         }
     }
+}
+
+/// The one `invalidation_lost` call a poll's tick needs, if any: a failed
+/// poll (a gap once per outage, counted only while a sequence was held), or
+/// lag first passing `max_lag_ms`. A failure on the tick where lag first
+/// passes the bound is one invalidation pass, not two.
+fn loss(
+    failed: bool,
+    counted: bool,
+    lag: u64,
+    max_lag_ms: u64,
+    lagging: &mut bool,
+) -> Option<(u64, bool)> {
+    let over = lag > max_lag_ms && !*lagging;
+    if over {
+        *lagging = true;
+    }
+    (failed || over).then_some((lag, failed && counted))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_tick_invalidates_at_most_once_even_when_failure_and_lag_coincide() {
+        let mut lagging = false;
+        // Failure on the tick where lag first passes the bound: one pass,
+        // one gap counted, and lag now reported.
+        assert_eq!(
+            loss(true, true, 5_001, 5_000, &mut lagging),
+            Some((5_001, true))
+        );
+        assert!(lagging);
+        // Later failed ticks: one pass each, no further gap counted once the
+        // sequence is dropped.
+        assert_eq!(
+            loss(true, false, 6_000, 5_000, &mut lagging),
+            Some((6_000, false))
+        );
+        // Lag alone, already reported: nothing.
+        assert_eq!(loss(false, false, 7_000, 5_000, &mut lagging), None);
+        // Lag alone, first time: one uncounted pass.
+        let mut fresh = false;
+        assert_eq!(
+            loss(false, true, 5_001, 5_000, &mut fresh),
+            Some((5_001, false))
+        );
+        // Healthy tick: nothing.
+        assert_eq!(loss(false, true, 0, 5_000, &mut false), None);
+    }
     use crate::callback_server::{CallbackConfig, CallbackServer, HostedContext};
     use rustev_contract::Document;
     use rustev_contract::definition::{ProvenanceClass, TypeDecl};

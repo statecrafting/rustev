@@ -1209,6 +1209,13 @@ service's mapping version; any other applies to every scope. Tests:
 `contexts::tests::a_polled_source_sets_its_baseline_applies_items_and_degrades_on_failure`;
 `tests/COVERAGE.md` updated.
 
+**Increment 4 part 3, follow-up: one invalidation pass per poll tick
+(2026-10-30).** In `integrations/rustev-serve/src/contexts.rs` a poll tick
+now makes at most one `invalidation_lost` call. Before, a failed poll on
+the tick where lag first passed `max_lag_ms` invalidated the source's plans
+twice; the gap was counted once either way. Test:
+`contexts::tests::a_tick_invalidates_at_most_once_even_when_failure_and_lag_coincide`.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child
