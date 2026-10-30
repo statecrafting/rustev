@@ -27,8 +27,8 @@ relative to the named crate. `core` = `crates/rustev-core`, `runtime` =
 | 3.9.1 compile-fail conversions | core, `src/ranking/mod.rs` doctests: ModelRanking and Selection, each direction against all six other kinds (24 cases) |
 | Derivation and lineage per position and step | core, `tests/ranking_select.rs`, `backfill_exclusions_positions_derivation_lineage_and_determinism`, `selection_unions_producers_from_both_sources`; `tests/ranking_value.rs`, `ranking_preserves_input_producers_on_success_and_failure`; `tests/ranking_evaluate.rs`, `five_positions_and_stale_candidate_evidence`, `selection_is_a_mixed_derived_proposal_parameter` |
 | Rules pointwise tasks and refusals | rules, `tests/ranking.rs`, `pointwise_decimal_contributions_and_descriptor`, `unsupported_modes_and_invalid_candidate_envelopes_are_capability_failures`, `plan_check_validates_presented_item_fields_and_task_identity` |
-| Bedrock fixtures, both wires, all modes | deferred by A-49 |
-| Rules/Bedrock swap and comparable evaluation reports | deferred by A-49 |
+| Bedrock fixtures, both wires, all modes | bedrock (`integrations/rustev-bedrock`), `tests/ranking.rs`, `documented_fixtures_map_on_both_wires_for_the_three_modes`, `fixtures_answer_through_the_signed_adapter_on_loopback_only`, `answers_are_supplied_as_received_or_malformed_never_repaired` |
+| Rules/Bedrock swap and comparable evaluation reports | deferred by A-49 to the Bedrock increment's part b |
 | Compatibility goldens | core, `tests/reference_plans.rs`, `goldens_pin_both_definitions_plans_and_plan_ids`; contract, `tests/ranking_wire.rs`, `existing_descriptor_goldens_keep_bytes_and_descriptor_ids`; `tests/ranking_results.rs`, `existing_goldens_keep_bytes_and_identities`; rules, `tests/identity.rs`, `an_unchanged_program_reproduces_every_identity` |
 | make code, declared verification, make gate | Not claimed here. This brief requests four package suites, core doctests, workspace clippy and fmt; adding 039 to Makefile verification is outside this increment's authorized paths. |
 
@@ -59,7 +59,7 @@ relative to the named crate. `core` = `crates/rustev-core`, `runtime` =
 | Seed changes identity and presentations | core, `tests/ranking_evaluate.rs`, `permutations_change_with_seed_and_survive_backend_swap` |
 | Backend swap preserves presentations, changes binding identity | core, `tests/ranking_evaluate.rs`, `permutations_change_with_seed_and_survive_backend_swap` |
 | Rules listwise rank request refused | rules, `tests/ranking.rs`, `unsupported_modes_and_invalid_candidate_envelopes_are_capability_failures` |
-| Bedrock rank without structured output | deferred by A-49 |
+| Bedrock rank without structured output | bedrock, `tests/ranking.rs`, `construction_refuses_rank_without_structured_output_and_invalid_rank_bindings` |
 | Existing goldens recompiled unchanged | Compatibility mappings above; existing package suites retain their golden assertions. Full corpus verification is not claimed by this bounded test increment. |
 
 ## Jev composition and remaining A-49 scope
@@ -68,7 +68,7 @@ relative to the named crate. `core` = `crates/rustev-core`, `runtime` =
 |---|---|
 | 3.16: Jev proposition/rubric fan-out plus weighted_rank feeds select, including failure detection | jev, `tests/runtime.rs`, `jev_composed_ranking_selects_and_detects_total_backend_failure` (loopback); `offline_jev_mapping_composes_selection_and_propagates_failures` (actual Jev wire mapping, no sockets) |
 | No rank operation, no ranking descriptor member, no synthesized scores | jev, `tests/adapter.rs`, `the_descriptor_declares_three_distribution_operations_and_no_rank`; offline composition above asserts distribution outputs |
-| 3.18.1 Bedrock bindings without rank | deferred by A-49 |
+| 3.18.1 Bedrock bindings without rank | bedrock, `tests/ranking.rs`, `bindings_without_rank_keep_their_bytes_and_identities`; `tests/identity.rs` |
 | Paid live Bedrock smoke | deferred by A-49 |
 
 The captured pairwise replay regression (`crates/rustev-eval/tests/ranking_replay.rs`)

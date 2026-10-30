@@ -46,7 +46,7 @@ fn strict_documents_require_every_member_and_reject_unknowns() {
                 .contains("reserved_by_spec")
         );
     }
-    for op in ["rank", "generate", "extract", "screen"] {
+    for op in ["generate", "extract", "screen"] {
         assert!(
             changed(
                 "operations",

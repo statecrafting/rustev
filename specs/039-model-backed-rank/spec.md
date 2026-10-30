@@ -936,6 +936,27 @@ requires. The Bedrock `rank` admission (3.15), parked on its own branch,
 lands after spec 030 is complete with the acceptance A-49 lists; those
 items remain externally blocked, as the Verification section states.
 
+**Bedrock `rank`, part a (2026-10-30): the admission.** Spec 030 is
+complete (#420), so the increment A-49 defers begins, as a change to
+`rustev-bedrock` under 030 3.12 with 3.15 binding it unchanged. A binding
+admits `rank` with `rank/1` or `rank-scored/1` and `max_options` 1 to 100;
+with `structured_output: none` construction refuses it naming
+`rank_requires_structured_output`, so no backend or descriptor exists. The
+descriptor declares `ranking` (`listwise_scores` `never` or `always`,
+`listwise_partial` `possible`) and lists no `rank` operation; a binding
+without `rank` keeps its bytes, digest and descriptor id. Requests carry
+3.15.2's schemas on both carriers; what parses is supplied as received
+(duplicates, unknown ids, a `scores` list of another length, a pairwise
+choice outside `first` and `second`) for the core to judge, and a missing
+or wrongly typed member is `malformed_response`
+(`integrations/rustev-bedrock/src/mapping.rs`). Documented-shape SYNTHETIC
+fixtures on both wires for the three modes map offline and through the
+signed adapter on loopback only
+(`integrations/rustev-bedrock/fixtures/rank/`,
+`integrations/rustev-bedrock/tests/ranking.rs`). The swap test with
+Bedrock fixtures is part b; the paid live smoke stays outside this
+increment.
+
 ## Decisions at approval
 
 Decided within the binding principles under the work order.

@@ -1,6 +1,6 @@
 //! Explicit host-constructed decision backend. No retry, batching or authority.
 use crate::{
-    binding::{BedrockBinding, Wire},
+    binding::{BedrockBinding, RANK_SCORED_MAPPING, Wire},
     budget::Budget,
     cancel::{cancel_outcome, cancelled_report},
     exchange::{
@@ -16,7 +16,10 @@ use crate::{
 use rustev_contract::Identified;
 use rustev_contract::{
     definition::{Determinism, Operation},
-    descriptor::{BackendDescriptor, InputExcess, InputLimit, OperationSupport, OutputKind},
+    descriptor::{
+        BackendDescriptor, InputExcess, InputLimit, ListwisePartial, ListwiseScores,
+        OperationSupport, OutputKind, Ranking, RankingMode,
+    },
     remote::{
         CancelSupport, Disclosure, ExchangeMember, MemberOutcome, RemoteCode, ServedIdentity,
     },
@@ -80,13 +83,32 @@ impl BedrockBackend {
             .unwrap_or_else(|| format!("https://bedrock-runtime.{}.amazonaws.com", binding.region));
         let transport = Transport::new(&endpoint)?;
         let descriptor = BackendDescriptor {
-            ranking: None,
+            ranking: binding
+                .operations
+                .iter()
+                .find(|o| o.operation == "rank")
+                .map(|o| Ranking {
+                    modes: vec![
+                        RankingMode::Listwise,
+                        RankingMode::Pointwise,
+                        RankingMode::Pairwise,
+                    ],
+                    max_candidates: o.max_options,
+                    listwise_scores: if o.mapping_version == RANK_SCORED_MAPPING {
+                        ListwiseScores::Always
+                    } else {
+                        ListwiseScores::Never
+                    },
+                    listwise_partial: ListwisePartial::Possible,
+                }),
             schema: schema::BACKEND.into(),
             backend_id,
             artifact: binding.artifact()?,
             operations: binding
                 .operations
                 .iter()
+                // Spec 039 3.15.3: `rank` is declared by `ranking` alone.
+                .filter(|o| o.operation != "rank")
                 .map(|o| OperationSupport {
                     isolation: None,
                     screen: None,
@@ -136,9 +158,18 @@ impl BedrockBackend {
             .evaluate(&self.binding)?;
         let id = self.descriptor.id().map_err(|e| e.to_string())?;
         for step in &plan.steps {
-            if let rustev_contract::plan::PlanStepDetail::Semantic(b) = &step.detail
-                && b.backend_id == self.descriptor.backend_id
-                && b.descriptor != id
+            let bound = match &step.detail {
+                rustev_contract::plan::PlanStepDetail::Semantic(b) => {
+                    Some((&b.backend_id, &b.descriptor))
+                }
+                rustev_contract::plan::PlanStepDetail::Rank(b) => {
+                    Some((&b.backend_id, &b.descriptor))
+                }
+                _ => None,
+            };
+            if let Some((backend_id, descriptor)) = bound
+                && *backend_id == self.descriptor.backend_id
+                && *descriptor != id
             {
                 return Err("descriptor_mismatch".into());
             }
@@ -292,7 +323,7 @@ impl BedrockBackend {
                 )
                 .report());
             }
-            let mapped = mapping::response(&self.binding, &r.body)
+            let mapped = mapping::response_for(&self.binding, call.projection, &r.body)
                 .map_err(|_| fail(RemoteCode::MalformedResponse, "response", true))?;
             match mapped.output {
                 Ok(output) => Ok(AttemptReport {
