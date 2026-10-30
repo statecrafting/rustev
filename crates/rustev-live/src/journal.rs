@@ -730,6 +730,34 @@ impl SpendJournal {
             .collect()
     }
 
+    /// Reservation evidence for exactly this decision, in journal sequence order.
+    /// Unsettled and crash liability remain unknown, never an inferred charge.
+    pub fn reservations_detail(&self, decision_id: &str) -> Vec<crate::documents::CaseSpend> {
+        use crate::documents::{CaseSettlement, CaseSpend};
+        let prefix = format!(
+            "{decision_id}/{}",
+            rustev_contract::live::attempt_prefix(decision_id)
+        );
+        self.lock()
+            .res
+            .iter()
+            .filter(|(_, r)| r.attempt.starts_with(&prefix))
+            .map(|(seq, r)| CaseSpend::Reserved {
+                attempt_id: r.attempt[decision_id.len() + 1..].to_string(),
+                seq: *seq,
+                reserved_units: r.units,
+                settlement: match r.state {
+                    ResState::Observed(units) => CaseSettlement::Observed { units },
+                    ResState::Estimated(units) => CaseSettlement::Estimated { units },
+                    ResState::Released => CaseSettlement::Released,
+                    ResState::Unknown | ResState::Outstanding | ResState::Liability => {
+                        CaseSettlement::Unknown
+                    }
+                },
+            })
+            .collect()
+    }
+
     pub fn run_split(&self, run_id: &str) -> RunSpend {
         let prefix = format!("live/{run_id}/");
         let mut split = RunSpend::default();

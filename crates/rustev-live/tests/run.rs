@@ -9,7 +9,10 @@ use rustev_contract::run::Charge;
 use rustev_contract::scope::{Handle as Subject, Scope};
 use rustev_contract::{Document, Identified};
 use rustev_core::seams::{AdapterFailure, CancelSignal};
-use rustev_live::documents::{EvaluationTime, ItemState, LiveCheckpoint, LiveConfig, Mode};
+use rustev_live::documents::{
+    CasePurpose, CaseSettlement, CaseSource, CaseSpend, CostUnit, EvaluationTime, ItemState,
+    LiveCaseDocument, LiveCheckpoint, LiveConfig, Mode,
+};
 use rustev_live::journal::{BudgetKind, SetClock, SpendJournal};
 use rustev_live::probe::ProbeSnapshot;
 use rustev_live::*;
@@ -106,6 +109,7 @@ fn spec() -> RunSpec {
             .map(|id| LiveCase {
                 case_id: id.into(),
                 input: CaseInput::Available {
+                    source: rustev_live::run::CaseOrigin::DatasetCase,
                     snapshot_bytes: case.canonical().unwrap(),
                     snapshot_id: case.id().unwrap(),
                     source_time: Some(ts(NOW)),
@@ -217,6 +221,14 @@ async fn outputs_resume_and_source_preservation() {
         };
         assert_eq!(run_record_digest, &record.record_digest().unwrap());
     }
+    let retained: Vec<_> = std::fs::read_dir(dir.0.join("out/cases"))
+        .unwrap()
+        .map(|e| {
+            let path = e.unwrap().path();
+            let bytes = std::fs::read(&path).unwrap();
+            (path, bytes)
+        })
+        .collect();
     let calls = head.dispatched().len();
     let mut s = spec();
     s.config.repeats = 2;
@@ -235,6 +247,9 @@ async fn outputs_resume_and_source_preservation() {
         .await
         .unwrap();
     assert_eq!(resumed.status, RunStatus::EvaluatedLive);
+    for (path, bytes) in retained {
+        assert_eq!(std::fs::read(path).unwrap(), bytes);
+    }
     assert_eq!(head.dispatched().len(), calls + 3, "only the probe repeats");
     assert_eq!(std::fs::read(source.clone()).unwrap(), bytes);
     assert_eq!(
@@ -494,6 +509,10 @@ async fn crash_classification_reruns_and_old_liability_count_once() {
             .any(|id| id.contains("%2Frerun-2/"))
     );
     assert!(dir.0.join("out/cases/a.1.x.rerun-2.live.json").exists());
+    assert_eq!(
+        check_case(&dir, "cases/a.1.x.rerun-2", &j).run.rerun,
+        Some(2)
+    );
     let split = j.run_split("run");
     assert_eq!(
         split.observed + split.estimated + split.unknown + split.liability,
@@ -641,6 +660,7 @@ fn input_refusals_precede_journal_creation() {
             2 => {
                 let snapshot = support_snapshot("pro", &[2, 5], 0);
                 s.cases[0].input = CaseInput::Available {
+                    source: rustev_live::run::CaseOrigin::DatasetCase,
                     snapshot_bytes: snapshot.canonical().unwrap(),
                     snapshot_id: snapshot.id().unwrap(),
                     source_time: Some(ts(NOW)),
@@ -903,8 +923,46 @@ async fn live_run_records_digests_counts_spend_and_deterministic_bytes() {
             .unwrap();
             assert_eq!(case.live_document_digest, live.record_digest().unwrap());
             assert_eq!(case.run_record_digest, record.record_digest().unwrap());
+            let evidence = check_case(&dir, &format!("cases/{stem}"), &journal);
+            assert_eq!(case.case_document_digest, evidence.record_digest().unwrap());
+            assert_eq!(evidence.purpose, CasePurpose::Evaluation);
+            assert_eq!(
+                evidence.source,
+                CaseSource::DatasetCase {
+                    dataset_id: doc.identities.dataset_id.clone(),
+                    case_id: case.case_id.clone(),
+                    split: doc.identities.split.clone(),
+                }
+            );
+            assert_eq!(evidence.run.run_id, doc.identities.run_id);
+            assert_eq!(evidence.run.live_config_id, doc.identities.live_config_id);
+            assert_eq!(evidence.run.candidate, case.candidate);
+            assert_eq!(evidence.run.repeat, Some(case.repeat));
+            assert_eq!(evidence.run.rerun, case.rerun);
         }
-        let bytes = doc.record_canonical().unwrap();
+        for (b, binding) in doc.probe.bindings.iter().enumerate() {
+            for (c, call) in binding.calls.iter().enumerate() {
+                let evidence = check_case(&dir, &format!("probe/{}.{}", b + 1, c + 1), &journal);
+                assert_eq!(call.case_digest, Some(evidence.record_digest().unwrap()));
+                assert_eq!(evidence.purpose, CasePurpose::Probe);
+                assert_eq!(evidence.source, CaseSource::None);
+                assert_eq!(evidence.run.repeat, None);
+                assert_eq!(evidence.run.candidate, binding.candidate);
+                let value = serde_json::to_value(&evidence).unwrap();
+                assert!(value["run"].get("repeat").is_none());
+            }
+        }
+        let mut bytes = doc.record_canonical().unwrap();
+        for folder in ["cases", "probe"] {
+            let mut paths: Vec<_> = std::fs::read_dir(dir.0.join("out").join(folder))
+                .unwrap()
+                .map(|e| e.unwrap().path())
+                .collect();
+            paths.sort();
+            for path in paths {
+                bytes.extend(std::fs::read(path).unwrap());
+            }
+        }
         if let Some(previous) = previous {
             assert_eq!(bytes, previous);
         }
@@ -1279,4 +1337,296 @@ async fn repeat_publication_failure_keeps_outputs_absent_and_resume_checks_diges
         .unwrap();
     assert!(error.detail.contains("differs from checkpoint"));
     assert!(!dir.0.join("out/comparison.json").exists());
+}
+
+// Compare evidence with the independent on-disk reservation entries, not just
+// the query used by the writer. Also verify record digests and canonical bytes.
+fn check_case(dir: &Dir, stem: &str, journal: &SpendJournal) -> LiveCaseDocument {
+    let root = dir.0.join("out");
+    let bytes = std::fs::read(root.join(format!("{stem}.case.json"))).unwrap();
+    let doc = LiveCaseDocument::parse(&bytes).unwrap();
+    doc.check().unwrap();
+    assert_eq!(bytes, doc.record_canonical().unwrap());
+    assert_eq!(
+        serde_json::to_value(&doc).unwrap()["mode"],
+        "live_reexecution"
+    );
+    let live = rustev_contract::live::LiveReexecution::parse(
+        &std::fs::read(root.join(format!("{stem}.live.json"))).unwrap(),
+    )
+    .unwrap();
+    let record = rustev_contract::run::RunRecord::parse(
+        &std::fs::read(root.join(format!("{stem}.run.json"))).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(doc.live_document_digest, live.record_digest().unwrap());
+    assert_eq!(doc.run_record_digest, record.record_digest().unwrap());
+    assert!(doc.acquisitions.is_empty());
+    let prefix = format!("{}/{}", live.decision_id, attempt_prefix(&live.decision_id));
+    let reservations: Vec<serde_json::Value> = std::fs::read_to_string(journal.path())
+        .unwrap()
+        .lines()
+        .map(|s| serde_json::from_str(s).unwrap())
+        .filter(|v: &serde_json::Value| {
+            v["op"] == "reserve" && v["attempt"].as_str().unwrap().starts_with(&prefix)
+        })
+        .collect();
+    let reserved: Vec<_> = doc
+        .spend
+        .iter()
+        .filter_map(|s| match s {
+            CaseSpend::Reserved {
+                attempt_id,
+                seq,
+                reserved_units,
+                ..
+            } => Some((attempt_id, seq, reserved_units)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(reserved.len(), reservations.len());
+    for ((attempt, seq, units), entry) in reserved.iter().zip(&reservations) {
+        assert_eq!(entry["seq"], **seq);
+        assert_eq!(entry["units"], **units);
+        assert_eq!(
+            entry["attempt"],
+            format!("{}/{}", live.decision_id, attempt)
+        );
+    }
+    assert_eq!(
+        doc.spend
+            .iter()
+            .filter(|s| matches!(s, CaseSpend::Reserved { .. }))
+            .cloned()
+            .collect::<Vec<_>>(),
+        journal.reservations_detail(&live.decision_id)
+    );
+    doc
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn bundle_source_no_spend_and_case_document_validation() {
+    let dir = Dir::new();
+    let mut s = spec();
+    s.config.bindings[0].cost_unit = CostUnit::None;
+    s.config.evaluation_time = EvaluationTime::Fixed { ms: ts(NOW) };
+    let binding = s.config.bindings[0].identity.clone();
+    let digest = s.config.record_digest().unwrap();
+    if let CaseInput::Available { source, .. } = &mut s.cases[0].input {
+        *source = run::CaseOrigin::ReplayBundle {
+            bundle_digest: digest.clone(),
+            decision_id: "historical".into(),
+        };
+    }
+    let r = rig(config(8, 0, 1), &[(answering(linear_head()), 8)]);
+    let journal = dir.journal();
+    let out = prepare(s, dir.options())
+        .unwrap()
+        .execute(
+            &r.rt,
+            journal.clone(),
+            &Host(None),
+            &r.clock,
+            &CancelSignal::new(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(out.live_run.declared_no_spend, vec![binding.clone()]);
+    let doc = check_case(&dir, "cases/a.1.x", &journal);
+    assert_eq!(
+        doc.source,
+        CaseSource::ReplayBundle {
+            bundle_digest: digest,
+            decision_id: "historical".into()
+        }
+    );
+    for stem in ["cases/a.1.x", "cases/a.1.y", "probe/1.1"] {
+        let doc = check_case(&dir, stem, &journal);
+        assert_eq!(doc.declared_no_spend, vec![binding.clone()]);
+        assert_eq!(
+            serde_json::to_value(&doc).unwrap()["evaluation_time"],
+            "fixed"
+        );
+        assert!(doc.spend.iter().all(|s| matches!(
+            s,
+            CaseSpend::Reserved {
+                reserved_units: 0,
+                settlement: CaseSettlement::Observed { units: 0 },
+                ..
+            }
+        )));
+    }
+    for pointer in [
+        "",
+        "/run",
+        "/source/replay_bundle",
+        "/spend/0",
+        "/spend/0/settlement/observed",
+        "/declared_no_spend/0",
+    ] {
+        let mut value = serde_json::to_value(&doc).unwrap();
+        value
+            .pointer_mut(pointer)
+            .unwrap()
+            .as_object_mut()
+            .unwrap()
+            .insert("unexpected".into(), json!(true));
+        assert!(
+            LiveCaseDocument::parse(&serde_json::to_vec(&value).unwrap()).is_err(),
+            "{pointer}"
+        );
+    }
+    // Each spend variant refuses an unknown field on its own, whether or
+    // not the document's canonical check would also catch it.
+    let reserved = json!({
+        "attempt_id": "a/1",
+        "seq": 1,
+        "reserved_units": 2,
+        "settlement": {"observed": {"units": 2}},
+    });
+    let refused = json!({"attempt_id": "a/1", "refused": {"code": "run-cap-exceeded"}});
+    for (variant, good) in [("reserved", reserved), ("refused", refused)] {
+        let parsed: CaseSpend = serde_json::from_value(good.clone()).unwrap();
+        assert_eq!(serde_json::to_value(&parsed).unwrap(), good, "{variant}");
+        let mut extra = good.clone();
+        extra
+            .as_object_mut()
+            .unwrap()
+            .insert("unexpected".into(), json!(true));
+        assert!(
+            serde_json::from_value::<CaseSpend>(extra.clone()).is_err(),
+            "{variant}"
+        );
+        let mut value = serde_json::to_value(&doc).unwrap();
+        value["spend"] = json!([extra]);
+        assert!(
+            LiveCaseDocument::parse(&serde_json::to_vec(&value).unwrap()).is_err(),
+            "{variant} in a document"
+        );
+    }
+    // A refusal listed twice, or for a reserved attempt, is refused.
+    let refusal = CaseSpend::Refused {
+        attempt_id: "a/9".into(),
+        refused: rustev_live::documents::CaseRefusal {
+            code: "run-cap-exceeded".into(),
+        },
+    };
+    let mut twice = doc.clone();
+    twice.spend.push(refusal.clone());
+    assert!(twice.check().is_ok());
+    twice.spend.push(refusal);
+    assert!(twice.check().is_err());
+    let mut bad = doc.clone();
+    bad.spend.push(CaseSpend::Refused {
+        attempt_id: match &doc.spend[0] {
+            CaseSpend::Reserved { attempt_id, .. } | CaseSpend::Refused { attempt_id, .. } => {
+                attempt_id.clone()
+            }
+        },
+        refused: rustev_live::documents::CaseRefusal {
+            code: "run-cap-exceeded".into(),
+        },
+    });
+    assert!(bad.check().is_err(), "refusal of a reserved attempt");
+    for defect in 0..6 {
+        let mut bad = doc.clone();
+        match defect {
+            0 => bad.spend = vec![bad.spend[0].clone(); rustev_contract::live::MAX_EFFECTS + 1],
+            1 => bad.run.repeat = None,
+            2 => bad.source = CaseSource::None,
+            3 => bad.run.rerun = Some(100),
+            4 => bad.declared_no_spend[0].backend_id = "x".repeat(257),
+            _ => bad.run.candidate = "x".repeat(33),
+        }
+        assert!(bad.check().is_err());
+    }
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn probe_results_record_authorization_and_spend_refusals() {
+    for cap in [0, 1] {
+        let dir = Dir::new();
+        let mut s = spec();
+        if cap == 1 {
+            s.config.run_cap_units = 1;
+        }
+        let host = Host((cap == 0).then_some("/1"));
+        let r = rig(config(8, 0, 1), &[(answering(linear_head()), 8)]);
+        let journal = dir.journal();
+        let out = prepare(s, dir.options())
+            .unwrap()
+            .execute(
+                &r.rt,
+                journal.clone(),
+                &host,
+                &r.clock,
+                &CancelSignal::new(),
+            )
+            .await
+            .unwrap();
+        let doc = check_case(&dir, "probe/1.1", &journal);
+        assert_eq!(
+            out.probe.bindings[0].calls[0].case_digest,
+            Some(doc.record_digest().unwrap())
+        );
+        let code = if cap == 0 {
+            "authorization_refused"
+        } else {
+            "run-cap-exceeded"
+        };
+        assert!(
+            doc.spend
+                .iter()
+                .any(|s| matches!(s, CaseSpend::Refused { refused, .. } if refused.code == code))
+        );
+        // An attempt is listed once: reserved, or refused before reserving.
+        let ids: Vec<&str> =
+            doc.spend
+                .iter()
+                .map(|s| match s {
+                    CaseSpend::Reserved { attempt_id, .. }
+                    | CaseSpend::Refused { attempt_id, .. } => attempt_id.as_str(),
+                })
+                .collect();
+        let distinct: std::collections::BTreeSet<_> = ids.iter().collect();
+        assert_eq!(distinct.len(), ids.len(), "{ids:?}");
+    }
+}
+
+#[test]
+fn reservation_details_preserve_all_settlements_and_exact_decision_scope() {
+    let dir = Dir::new();
+    let journal = dir.journal();
+    let decision = "live/run/a/1/x";
+    let key = |decision: &str, n| format!("{decision}/{}{n}", attempt_prefix(decision));
+    for n in 0..5 {
+        let ticket = journal.reserve(&key(decision, n), 10).unwrap();
+        match n {
+            0 => journal.settle(ticket, Charge::Observed { units: 2 }),
+            1 => journal.settle(ticket, Charge::Estimated { units: 3 }),
+            2 => journal.settle(ticket, Charge::Unknown),
+            3 => journal.release(ticket),
+            _ => {}
+        }
+    }
+    journal
+        .reserve(&key("live/run/a/1/x/rerun-1", 0), 20)
+        .unwrap();
+    let before = std::fs::read(journal.path()).unwrap();
+    let details = journal.reservations_detail(decision);
+    assert_eq!(details.len(), 5);
+    for (entry, expected) in details.iter().zip([
+        CaseSettlement::Observed { units: 2 },
+        CaseSettlement::Estimated { units: 3 },
+        CaseSettlement::Unknown,
+        CaseSettlement::Released,
+        CaseSettlement::Unknown,
+    ]) {
+        assert!(
+            matches!(entry, CaseSpend::Reserved { reserved_units: 10, settlement, .. } if *settlement == expected)
+        );
+    }
+    assert_eq!(std::fs::read(journal.path()).unwrap(), before);
+    drop(journal);
+    assert_eq!(dir.journal().reservations_detail(decision), details);
 }

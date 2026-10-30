@@ -956,6 +956,28 @@ bounds; a backend that reports an observed charge above its declared
 bound can take the totals past a cap, which the gate cannot prevent
 after the fact (3.6.3 reserves the bound before sending).
 
+**Increment 10 (2026-10-29): the per-case document.** `rustev-live`
+writes `rustev.live-case/1` (3.9.1, A-67; `LiveCaseDocument` in
+`crates/rustev-live/src/documents.rs`, record canonical, bounded by
+`check`) for every completed evaluation item as
+`cases/<candidate>.<repeat>.<case_id>[.rerun-<k>].case.json`, and for
+every probe call that returned a result under `probe/` beside its live
+document and run record (3.13.3), each before the checkpoint records the
+item. It carries `mode`, `purpose`, the source link (the case's dataset
+case or retained bundle, which the caller now states per case; `none`
+for a probe call), the run identity (no `repeat` for a probe call), the
+evaluation time choice, acquisitions, per-attempt spend from the
+journal's reservations under the decision (sequence number, reserved
+units and settlement) or the refusal code, the `cost_unit: none`
+bindings as `declared_no_spend`, and the record digests of the case's
+`rustev.live-reexecution/1` document, which is unchanged, and run
+record. `rustev.live-run/1` lists each case's per-case document digest
+and each probe call's (3.11.4), and records the run's
+`declared_no_spend` (3.6.3). Acquisition entries are defined but stay
+empty while the gated entry point refuses plans with acquisitions. The
+crash test covers the added writes (123 write points). Tests:
+`crates/rustev-live/tests/run.rs`, `crates/rustev-live/tests/crash.rs`.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

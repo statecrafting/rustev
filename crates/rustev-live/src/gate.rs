@@ -45,6 +45,10 @@ impl JournalGate {
         })
     }
 
+    pub(crate) fn journal(&self) -> &SpendJournal {
+        &self.journal
+    }
+
     pub fn run_id(&self) -> &str {
         &self.run_id
     }

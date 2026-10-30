@@ -48,8 +48,18 @@ pub struct LiveCase {
     pub input: CaseInput,
 }
 
+/// Dataset identity and split come from `RunSpec`; bundles retain their source link.
+pub enum CaseOrigin {
+    DatasetCase,
+    ReplayBundle {
+        bundle_digest: ContentDigest,
+        decision_id: String,
+    },
+}
+
 pub enum CaseInput {
     Available {
+        source: CaseOrigin,
         snapshot_bytes: Vec<u8>,
         snapshot_id: SnapshotId,
         source_time: Option<Timestamp>,
@@ -237,6 +247,10 @@ pub fn prepare(spec: RunSpec, opts: RunOptions) -> Result<PreparedRun, LiveError
         if cases.try_exists().map_err(LiveError::io)? {
             clean_temps(&cases)?;
         }
+        let probes = opts.out.join("probe");
+        if probes.try_exists().map_err(LiveError::io)? {
+            clean_temps(&probes)?;
+        }
         let staging = opts.out.join(".repeat-staging");
         if staging.try_exists().map_err(LiveError::io)? {
             std::fs::remove_dir_all(staging).map_err(LiveError::io)?;
@@ -380,7 +394,31 @@ impl PreparedRun {
         // earlier cancel keeps its own cause even if the deadline then passes.
         let deadline_hit = Cell::new(false);
         let report = {
-            let mut probing = Box::pin(probe::probe(inputs, authorizer, &gate, &signal));
+            let probe_dir = self.opts.out.join("probe");
+            std::fs::create_dir_all(&probe_dir).map_err(LiveError::io)?;
+            let mut probing = Box::pin(probe::probe_recorded(
+                inputs,
+                authorizer,
+                &gate,
+                &signal,
+                |index, call, candidate, result| {
+                    let doc = LiveCaseDocument::from_result(
+                        &self.spec.config,
+                        CaseRun {
+                            run_id: self.spec.run_id.clone(),
+                            live_config_id: self.checkpoint.bindings.live_config_id.clone(),
+                            candidate: candidate.into(),
+                            repeat: None,
+                            rerun: None,
+                        },
+                        CaseSource::None,
+                        &journal,
+                        result,
+                    )?;
+                    doc.write_result(&probe_dir.join(format!("{index}.{call}")), result)
+                        .map(Some)
+                },
+            ));
             let mut timer = deadline.map(|d| clock.sleep_until(d));
             poll_fn(|cx| {
                 // A completed timer is dropped, never polled again.
@@ -449,7 +487,17 @@ impl PreparedRun {
                     live_document_digest,
                     run_record_digest,
                 } => {
+                    let case_document_digest = LiveCaseDocument::read(
+                        &self
+                            .opts
+                            .out
+                            .join("cases")
+                            .join(format!("{}.case.json", case_name(item))),
+                    )?
+                    .record_digest()
+                    .map_err(LiveError::io)?;
                     cases.push(LiveRunCase {
+                        case_document_digest,
                         candidate: item.candidate.clone(),
                         repeat: item.repeat,
                         case_id: item.case_id.clone(),
@@ -483,6 +531,14 @@ impl PreparedRun {
             None
         };
         let live_run = LiveRun {
+            declared_no_spend: self
+                .spec
+                .config
+                .bindings
+                .iter()
+                .filter(|b| b.cost_unit == CostUnit::None)
+                .map(|b| b.identity.clone())
+                .collect(),
             schema: LiveRun::SCHEMA.into(),
             identities: self.checkpoint.bindings.clone(),
             status,
@@ -772,7 +828,7 @@ impl PreparedRun {
                             code: "authorization_refused".into(),
                         }
                     } else {
-                        match save_case(&self.opts, item, &r) {
+                        match save_case(&self.opts, &self.spec, gate.journal(), item, &r) {
                             Ok(s) => {
                                 if self.spec.reports.is_some() {
                                     let observation = crate::reports::completed(
@@ -808,32 +864,61 @@ impl PreparedRun {
     }
 }
 
-fn save_case(
-    opts: &RunOptions,
-    item: &CheckpointItem,
-    r: &LiveResult,
-) -> Result<ItemState, LiveError> {
+fn case_name(item: &CheckpointItem) -> String {
     let suffix = rerun(item)
         .map(|k| format!(".rerun-{k}"))
         .unwrap_or_default();
-    let name = format!(
+    format!(
         "{}.{}.{}{suffix}",
         item.candidate, item.repeat, item.case_id
-    );
-    let live = r.document.record_canonical().map_err(LiveError::io)?;
-    let record = r.record.record_canonical().map_err(LiveError::io)?;
-    write_atomic(
-        &opts.out.join("cases").join(format!("{name}.live.json")),
-        &live,
+    )
+}
+
+fn save_case(
+    opts: &RunOptions,
+    spec: &RunSpec,
+    journal: &SpendJournal,
+    item: &CheckpointItem,
+    r: &LiveResult,
+) -> Result<ItemState, LiveError> {
+    let case = spec
+        .cases
+        .iter()
+        .find(|c| c.case_id == item.case_id)
+        .expect("validated case");
+    let CaseInput::Available { source, .. } = &case.input else {
+        unreachable!()
+    };
+    let source = match source {
+        CaseOrigin::DatasetCase => CaseSource::DatasetCase {
+            dataset_id: spec.dataset_id.clone(),
+            case_id: case.case_id.clone(),
+            split: spec.split.clone(),
+        },
+        CaseOrigin::ReplayBundle {
+            bundle_digest,
+            decision_id,
+        } => CaseSource::ReplayBundle {
+            bundle_digest: bundle_digest.clone(),
+            decision_id: decision_id.clone(),
+        },
+    };
+    let doc = LiveCaseDocument::from_result(
+        &spec.config,
+        CaseRun {
+            run_id: spec.run_id.clone(),
+            live_config_id: spec.config.id().map_err(LiveError::io)?,
+            candidate: item.candidate.clone(),
+            repeat: Some(item.repeat),
+            rerun: rerun(item),
+        },
+        source,
+        journal,
+        r,
     )?;
-    write_atomic(
-        &opts.out.join("cases").join(format!("{name}.run.json")),
-        &record,
-    )?;
-    // Document::record_digest uses schema-tagged record canonical bytes for
-    // both documents, including the version-aware run record implementation.
+    doc.write_result(&opts.out.join("cases").join(case_name(item)), r)?;
     Ok(ItemState::Completed {
-        live_document_digest: r.document.record_digest().map_err(LiveError::io)?,
-        run_record_digest: r.record.record_digest().map_err(LiveError::io)?,
+        live_document_digest: doc.live_document_digest,
+        run_record_digest: doc.run_record_digest,
     })
 }

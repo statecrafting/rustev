@@ -318,8 +318,12 @@ fn crash_at_every_durable_write_then_resume_with_and_without_reruns() {
         "journal:release:",
         "atomic:checkpoint.json:",
         "atomic:live-config.json:",
+        "atomic:1.1.live.json:",
+        "atomic:1.1.run.json:",
+        "atomic:1.1.case.json:",
         "atomic:a.1.x.live.json:",
         "atomic:a.1.x.run.json:",
+        "atomic:a.1.x.case.json:",
         "staging:",
         "publish:",
         "atomic:live-run.json:",
@@ -331,7 +335,7 @@ fn crash_at_every_durable_write_then_resume_with_and_without_reruns() {
     }
     assert_eq!(
         baseline.len(),
-        107,
+        123,
         "all durable phases remain instrumented"
     );
     eprintln!("exhaustive durable write points: {}", baseline.len());
@@ -431,7 +435,11 @@ fn crash_at_every_durable_write_then_resume_with_and_without_reruns() {
                                 }
                             }
                         }
-                        for path in [dir.0.join("out"), dir.0.join("out/cases")] {
+                        for path in [
+                            dir.0.join("out"),
+                            dir.0.join("out/cases"),
+                            dir.0.join("out/probe"),
+                        ] {
                             assert!(std::fs::read_dir(path).unwrap().all(|e| {
                                 !e.unwrap()
                                     .file_name()
