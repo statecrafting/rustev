@@ -8,6 +8,11 @@ use serde_json::Value;
 
 pub const SCHEMA: &str = "rustev.bedrock-binding/1";
 pub const MAPPING_VERSION: &str = "rustev-bedrock-mapping/1";
+/// `rank`'s mappings (spec 039 3.15.1): listwise ids without scores, or
+/// with one score per returned id. Both serve pointwise and pairwise.
+pub const RANK_MAPPING: &str = "rank/1";
+pub const RANK_SCORED_MAPPING: &str = "rank-scored/1";
+const RANK_MAPPING_VERSIONS: [&str; 2] = [RANK_MAPPING, RANK_SCORED_MAPPING];
 pub const LIMITS: ParseLimits = ParseLimits {
     max_bytes: 1_048_576,
     max_depth: 16,
@@ -222,18 +227,29 @@ impl BedrockBinding {
         if self.mapping.version != MAPPING_VERSION {
             return Err("unsupported_mapping_version".into());
         }
-        if self.operations.is_empty() || self.operations.len() > 3 {
+        if self.operations.is_empty() || self.operations.len() > 4 {
             return Err("invalid_operations".into());
         }
         let mut seen = std::collections::BTreeSet::new();
         for op in &self.operations {
-            if !matches!(op.operation.as_str(), "classify" | "proposition" | "rubric") {
+            if !matches!(
+                op.operation.as_str(),
+                "classify" | "proposition" | "rubric" | "rank"
+            ) {
                 return Err("reserved_by_spec:operation".into());
             }
-            if !seen.insert(&op.operation)
-                || op.mapping_version != MAPPING_VERSION
-                || !(2..=256).contains(&op.max_options)
-            {
+            // Spec 039 3.15.1: `rank` answers only through a schema, so a
+            // binding without structured output cannot serve it.
+            let valid = if op.operation == "rank" {
+                if self.structured_output == StructuredOutput::None {
+                    return Err("rank_requires_structured_output".into());
+                }
+                RANK_MAPPING_VERSIONS.contains(&op.mapping_version.as_str())
+                    && (1..=100).contains(&op.max_options)
+            } else {
+                op.mapping_version == MAPPING_VERSION && (2..=256).contains(&op.max_options)
+            };
+            if !seen.insert(&op.operation) || !valid {
                 return Err("invalid_operation_binding".into());
             }
         }

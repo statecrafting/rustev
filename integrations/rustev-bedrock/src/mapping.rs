@@ -1,8 +1,10 @@
 //! Pure, bounded mapping shared by live calls and offline replay.
-use crate::binding::{BedrockBinding, LIMITS, StructuredOutput, Wire};
+use crate::binding::{
+    BedrockBinding, LIMITS, OperationBinding, RANK_SCORED_MAPPING, StructuredOutput, Wire,
+};
 use crate::wire::digest_bytes;
 use rustev_contract::bounded::parse_bounded;
-use rustev_contract::output::RawOutput;
+use rustev_contract::output::{RankingScores, RawOutput};
 use rustev_contract::remote::RemoteCode;
 use rustev_contract::run::Charge;
 use serde::{Deserialize, Serialize};
@@ -40,6 +42,13 @@ struct Projection {
     options: Vec<String>,
     instance: Value,
     values: Value,
+    // Spec 039 3.4's rank request members; absent from other operations.
+    #[serde(default)]
+    mode: Option<String>,
+    #[serde(default)]
+    candidates: Vec<String>,
+    #[serde(default)]
+    presented: Vec<Value>,
 }
 pub fn request(b: &BedrockBinding, m: &Materials, projection: &[u8]) -> Result<Vec<u8>, String> {
     m.validate(b)?;
@@ -55,15 +64,19 @@ pub fn request(b: &BedrockBinding, m: &Materials, projection: &[u8]) -> Result<V
     if p.operation == "proposition" && p.options != ["false", "true"] {
         return Err("invalid_options".into());
     }
-    let options = p.options;
-    if options.iter().any(|key| key.is_empty() || key.len() > 1024)
-        || options.len() < 2
-        || options.len() as u64 > op.max_options
-        || options
-            .iter()
-            .collect::<std::collections::BTreeSet<_>>()
-            .len()
-            != options.len()
+    let rank = (p.operation == "rank")
+        .then(|| rank_schema(&p, op))
+        .transpose()?;
+    let options = &p.options;
+    if rank.is_none()
+        && (options.iter().any(|key| key.is_empty() || key.len() > 1024)
+            || options.len() < 2
+            || options.len() as u64 > op.max_options
+            || options
+                .iter()
+                .collect::<std::collections::BTreeSet<_>>()
+                .len()
+                != options.len())
     {
         return Err("invalid_options".into());
     }
@@ -77,9 +90,18 @@ pub fn request(b: &BedrockBinding, m: &Materials, projection: &[u8]) -> Result<V
         p.question,
         serde_json::to_string(&criteria).map_err(|_| "invalid_criteria")?
     );
-    let input = serde_json::to_string(&json!({"instance":p.instance,"values":p.values}))
-        .map_err(|_| "invalid_state")?;
-    let schema = json!({"type":"object","properties":{"choice":{"type":"string","enum":options}},"required":["choice"],"additionalProperties":false});
+    let mut input = json!({"instance":p.instance,"values":p.values});
+    let schema = match rank {
+        Some(schema) => {
+            input["mode"] = json!(p.mode);
+            input["presented"] = json!(p.presented);
+            schema
+        }
+        None => {
+            json!({"type":"object","properties":{"choice":{"type":"string","enum":options}},"required":["choice"],"additionalProperties":false})
+        }
+    };
+    let input = serde_json::to_string(&input).map_err(|_| "invalid_state")?;
     let parameters = &b.parameters;
     let mut body = match b.wire {
         Wire::Converse => {
@@ -155,14 +177,21 @@ pub fn response(b: &BedrockBinding, bytes: &[u8]) -> Result<MappedResponse, Stri
     }
     let raw: Value = parse_bounded(bytes, &LIMITS).map_err(|_| "malformed_response")?;
     let charge = charge(b, &raw);
-    let output = answer(b, &raw).map(RawOutput::Label);
+    let output = answer(b, &raw).and_then(|a| {
+        a["choice"]
+            .as_str()
+            .map(|s| RawOutput::Label(s.into()))
+            .ok_or(RemoteCode::MalformedResponse)
+    });
     Ok(MappedResponse {
         output,
         charge,
         raw,
     })
 }
-fn answer(b: &BedrockBinding, v: &Value) -> Result<String, RemoteCode> {
+/// The answer object of the one admitted carrier; `none`'s text is its
+/// `choice`.
+fn answer(b: &BedrockBinding, v: &Value) -> Result<Value, RemoteCode> {
     let malformed = RemoteCode::MalformedResponse;
     match b.wire {
         Wire::Converse => match v["stopReason"].as_str() {
@@ -241,17 +270,13 @@ fn answer(b: &BedrockBinding, v: &Value) -> Result<String, RemoteCode> {
             if answers.len() != 1 || !texts.is_empty() {
                 return Err(malformed);
             }
-            answers[0]["choice"]
-                .as_str()
-                .map(str::to_owned)
-                .ok_or(malformed)
+            Ok(answers.remove(0))
         }
         StructuredOutput::JsonSchema => {
             if !answers.is_empty() || texts.len() != 1 {
                 return Err(malformed);
             }
-            let a: Value = parse_bounded(texts[0].as_bytes(), &LIMITS).map_err(|_| malformed)?;
-            a["choice"].as_str().map(str::to_owned).ok_or(malformed)
+            parse_bounded(texts[0].as_bytes(), &LIMITS).map_err(|_| malformed)
         }
         StructuredOutput::None => {
             if !answers.is_empty() || texts.len() != 1 {
@@ -261,7 +286,7 @@ fn answer(b: &BedrockBinding, v: &Value) -> Result<String, RemoteCode> {
             if text.is_empty() {
                 return Err(malformed);
             }
-            Ok(text.to_owned())
+            Ok(json!({"choice":text}))
         }
     }
 }
@@ -447,4 +472,129 @@ pub fn reported_extras(b: &BedrockBinding, raw: &Value) -> BTreeMap<String, Stri
         );
     }
     extras
+}
+
+/// Maps a response for the request whose projection it answers: a `rank`
+/// answer needs the presented ids and mode (spec 039 3.15.2); any other
+/// operation maps as [`response`] does.
+pub fn response_for(
+    b: &BedrockBinding,
+    projection: &[u8],
+    bytes: &[u8],
+) -> Result<MappedResponse, String> {
+    if projection.len() as u64 > b.request_limits.max_projection_bytes {
+        return Err("projection_limit".into());
+    }
+    let p: Projection = parse_bounded(projection, &LIMITS).map_err(|_| "invalid_projection")?;
+    let mut mapped = response(b, bytes)?;
+    if p.operation == "rank" {
+        let op = b
+            .operations
+            .iter()
+            .find(|o| o.operation == "rank")
+            .ok_or("unsupported_operation")?;
+        rank_schema(&p, op)?;
+        mapped.output = answer(b, &mapped.raw).and_then(|a| rank_answer(&p, op, &a));
+    }
+    Ok(mapped)
+}
+
+/// The answer schema for one rank request (spec 039 3.15.2), after checking
+/// the request is one the core issues: the presented ids are the candidates,
+/// distinct, within `max_options`, with the mode's count and options.
+fn rank_schema(p: &Projection, op: &OperationBinding) -> Result<Value, String> {
+    let ids = p
+        .presented
+        .iter()
+        .map(|v| v.get("id").and_then(Value::as_str))
+        .collect::<Option<Vec<_>>>()
+        .ok_or("invalid_presented")?;
+    if ids.is_empty()
+        || ids.len() as u64 > op.max_options
+        || ids.iter().any(|id| id.is_empty() || id.len() > 1024)
+        || ids.iter().collect::<std::collections::BTreeSet<_>>().len() != ids.len()
+        || ids != p.candidates.iter().map(String::as_str).collect::<Vec<_>>()
+        || p.presented.iter().any(|v| {
+            v.as_object().is_none_or(|o| o.len() != 2)
+                || !matches!(v.get("item"), Some(Value::Null | Value::Object(_)))
+        })
+    {
+        return Err("invalid_presented".into());
+    }
+    let (properties, required) = match p.mode.as_deref() {
+        Some("listwise") if p.options.is_empty() => {
+            let ranking = json!({"type":"array","items":{"type":"string","enum":ids}});
+            if op.mapping_version == RANK_SCORED_MAPPING {
+                (
+                    json!({"ranking":ranking,"scores":{"type":"array","items":{"type":"number"}}}),
+                    json!(["ranking", "scores"]),
+                )
+            } else {
+                (json!({"ranking":ranking}), json!(["ranking"]))
+            }
+        }
+        Some("pointwise") if ids.len() == 1 && p.options.is_empty() => {
+            (json!({"score":{"type":"number"}}), json!(["score"]))
+        }
+        Some("pairwise") if ids.len() == 2 && p.options == ["first", "second"] => (
+            json!({"choice":{"type":"string","enum":["first","second"]}}),
+            json!(["choice"]),
+        ),
+        _ => return Err("invalid_rank_mode".into()),
+    };
+    Ok(
+        json!({"type":"object","properties":properties,"required":required,"additionalProperties":false}),
+    )
+}
+
+/// One rank answer as `RawOutput` (spec 039 3.15.2). What parses is
+/// supplied as received, so the core judges duplicates, unknown ids, a
+/// `scores` list of another length than `ranking` (039 3.5.2) and choices
+/// outside `first` and `second` (spec 030 3.7.4); the adapter never
+/// repairs, reorders or completes an answer. A missing member or one of the
+/// wrong type, including `rank-scored/1` scores that are not a non-empty
+/// list of finite numbers (the `rustev.backend-output/1` bound), is
+/// `malformed_response`. Any other member, such as a self-reported
+/// confidence or scores under `rank/1`, stays in the exchange record and
+/// is never supplied.
+fn rank_answer(p: &Projection, op: &OperationBinding, a: &Value) -> Result<RawOutput, RemoteCode> {
+    let bad = RemoteCode::MalformedResponse;
+    let number = |v: &Value| v.as_f64().filter(|n| n.is_finite()).ok_or(bad);
+    match p.mode.as_deref() {
+        Some("listwise") => {
+            let ids = a["ranking"]
+                .as_array()
+                .ok_or(bad)?
+                .iter()
+                .map(|v| v.as_str().map(str::to_owned).ok_or(bad))
+                .collect::<Result<Vec<_>, _>>()?;
+            if ids.len() > 1024 {
+                return Err(bad);
+            }
+            let scores = if op.mapping_version == RANK_SCORED_MAPPING {
+                let scores = a["scores"]
+                    .as_array()
+                    .ok_or(bad)?
+                    .iter()
+                    .map(number)
+                    .collect::<Result<Vec<_>, _>>()?;
+                if scores.is_empty() || scores.len() > 1024 {
+                    return Err(bad);
+                }
+                RankingScores::List(scores)
+            } else {
+                RankingScores::None
+            };
+            Ok(RawOutput::Ranking { ids, scores })
+        }
+        Some("pointwise") => Ok(RawOutput::Scores(BTreeMap::from([(
+            p.candidates[0].clone(),
+            number(&a["score"])?,
+        )]))),
+        Some("pairwise") => a["choice"]
+            .as_str()
+            .map(|s| RawOutput::Label(s.into()))
+            .ok_or(bad),
+        _ => Err(bad),
+    }
 }
