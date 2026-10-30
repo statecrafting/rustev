@@ -139,3 +139,63 @@ fn mixed_attempt_ids_track_settlement_release_and_restart() {
     drop(j);
     assert_eq!(fixture.open().run_spend("run"), 19);
 }
+
+#[test]
+fn split_and_exact_decision_queries_survive_replay() {
+    use rustev_contract::live::attempt_prefix;
+    let fixture = Fixture::new();
+    let j = fixture.open();
+    let decision = "live/run/a/1/a";
+    let reserve = |decision: &str, suffix: &str, units| {
+        let attempt = format!("{}{suffix}", attempt_prefix(decision));
+        (
+            j.reserve(&format!("{decision}/{attempt}"), units).unwrap(),
+            attempt,
+        )
+    };
+    let (observed, a) = reserve(decision, "one", 10);
+    j.settle(observed, Charge::Observed { units: 3 });
+    let (estimated, b) = reserve(decision, "two", 10);
+    j.settle(estimated, Charge::Estimated { units: 4 });
+    let (unknown, c) = reserve(decision, "three", 11);
+    j.settle(unknown, Charge::Unknown);
+    let (unsettled, d) = reserve(decision, "four", 12);
+    let (released, e) = reserve(decision, "five", 13);
+    j.release(released);
+    let (rerun, _) = reserve("live/run/a/1/a/rerun-1", "one", 20);
+    j.release(rerun);
+    assert_eq!(j.reservations_for(decision), vec![a, b, c, d, e]);
+    let split = j.run_split("run");
+    assert_eq!(
+        (
+            split.observed,
+            split.estimated,
+            split.unknown,
+            split.liability
+        ),
+        (3, 4, 11, 12)
+    );
+    assert_eq!(j.run_spend("run"), 30);
+    let bytes = std::fs::read(j.path()).unwrap();
+    let before = j.summary();
+    assert_eq!(before.outstanding, 12);
+    drop(j);
+    let j = fixture.open();
+    assert_eq!(j.run_split("run"), split);
+    assert_eq!(j.summary().liability, 23);
+    assert_eq!(j.summary().outstanding, 0);
+    assert_eq!(j.summary().committed(), before.committed());
+    assert_eq!(std::fs::read(j.path()).unwrap(), bytes);
+    assert!(j.reconcile(unknown.seq, 2));
+    assert!(j.reconcile(unsettled.seq, 1));
+    assert_eq!(j.run_spend("run"), 10);
+}
+
+#[test]
+fn testing_header_digest_matches_the_written_header_including_newline() {
+    let fixture = Fixture::new();
+    let j = fixture.open();
+    let bytes = std::fs::read(j.path()).unwrap();
+    let digest = rustev_contract::canonical::tagged_digest("rustev-jev.spend-journal/1", &bytes);
+    assert_eq!(SpendJournal::testing_header_digest().as_str(), digest);
+}

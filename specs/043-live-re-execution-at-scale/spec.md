@@ -783,6 +783,17 @@ writing them into `rustev.live-reexecution/1` and `rustev.live-run/1`,
 and `--probe-only` with its exit codes (3.7.5), come with the run engine
 and the CLI. Tests: `crates/rustev-live/tests/probe.rs`.
 
+**Increment 5 part a (2026-10-29): journal queries for the run
+engine.** The journal gains read-only queries, its file format, public
+signatures and existing totals unchanged (3.5.1):
+`reservations_for(decision_id)`, the attempt ids reserved under exactly
+that decision id, which resumption uses to find interrupted items
+(3.10.4); `run_split(run_id)`, the run spend of 3.5.3 split into observed,
+estimated, liability left unsettled by an ended process, and unknown
+charges, whose sum is `run_spend` (3.11.4); and `testing_header_digest()`,
+so a checkpoint can bind the journal header before the journal is opened
+(3.10.1, 3.10.2). Tests: `crates/rustev-live/tests/journal.rs`.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child
