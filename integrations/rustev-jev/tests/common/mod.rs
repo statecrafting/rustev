@@ -56,7 +56,12 @@ pub fn fixture(name: &str) -> Json {
     let v: Json = serde_json::from_slice(&bytes).unwrap();
     let prov = v["provenance"].as_str().unwrap_or_default();
     if name.starts_with("recorded-") {
-        assert!(prov.contains("R-27"), "{name}: {prov}");
+        // The Gateway's recordings cite R-27; the direct API's, spec 022's
+        // owner-authorized stage 2.
+        assert!(
+            prov.contains("R-27") || prov.contains("spec 022 3.7 stage 2"),
+            "{name}: {prov}"
+        );
     } else {
         assert!(prov.starts_with("SYNTHETIC"), "{name}: {prov}");
     }
@@ -307,7 +312,7 @@ pub fn metadata(cost: Option<&str>) -> Json {
 }
 
 /// A deterministic answer to every question of `request`, in the shape of
-/// C-11: `boolean` 0.8; `choice` 0.7 on the first label and the rest shared;
+/// C-11: `boolean` 0.8 (`noul` on the direct transport); `choice` 0.7 on the first label and the rest shared;
 /// `score` 0.6 on the top level and the rest shared. SYNTHETIC.
 pub fn answers_for(request: &Json) -> Json {
     let mut answers = serde_json::Map::new();
@@ -315,6 +320,8 @@ pub fn answers_for(request: &Json) -> Json {
         for (k, q) in qs {
             let a = match q["type"].as_str().unwrap_or_default() {
                 "boolean" => json!({"type": "boolean", "probability": 0.8}),
+                // The direct API's proposition (spec 022 3.2.3).
+                "noul" => json!({"type": "noul", "noul": 0.8}),
                 "choice" => {
                     let labels: Vec<&String> = q["criteria"].as_object().unwrap().keys().collect();
                     let rest = 0.3 / (labels.len() - 1) as f64;

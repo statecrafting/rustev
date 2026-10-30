@@ -43,6 +43,8 @@ pub const RESPONSE_LIMITS: ParseLimits = ParseLimits {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QuestionType {
     Boolean,
+    /// A proposition on the direct transport (spec 022 3.2.3).
+    Noul,
     Choice,
     Score,
 }
@@ -51,6 +53,7 @@ impl QuestionType {
     pub const fn as_str(self) -> &'static str {
         match self {
             QuestionType::Boolean => "boolean",
+            QuestionType::Noul => "noul",
             QuestionType::Choice => "choice",
             QuestionType::Score => "score",
         }
@@ -142,7 +145,10 @@ pub fn check_options(operation: Operation, options: &[String]) -> Result<Questio
 pub fn step_request(binding: &JevBinding, projection: &[u8]) -> Result<StepRequest, StepError> {
     let head: Head = parse_bounded(projection, &REMOTE_V1)
         .map_err(|e| StepError::NotAProjection(format!("the projection is not JSON: {e}")))?;
-    let kind = check_options(head.operation, &head.options).map_err(StepError::Unsupported)?;
+    let kind = match check_options(head.operation, &head.options).map_err(StepError::Unsupported)? {
+        QuestionType::Boolean if binding.transport == Transport::Direct => QuestionType::Noul,
+        kind => kind,
+    };
     let state = canonical_value_bytes(&json!({
         "instance": head.instance,
         "values": head.values,
@@ -233,7 +239,7 @@ pub fn request_body(binding: &JevBinding, state: &[u8], questions: &[&Question])
         push_json_str(&mut out, &question_key(i));
         out.extend_from_slice(b":{\"criteria\":");
         match q.kind {
-            QuestionType::Boolean | QuestionType::Choice => {
+            QuestionType::Boolean | QuestionType::Noul | QuestionType::Choice => {
                 out.push(b'{');
                 for (j, (o, d)) in q.options.iter().zip(&q.descriptions).enumerate() {
                     if j > 0 {
@@ -418,7 +424,10 @@ pub fn parse_answered(body: &[u8]) -> Result<Answered, String> {
     for (key, answer) in &reply.answers.0 {
         if let Json::Object(a) = answer {
             for (field, v) in a {
-                if !matches!(field.as_str(), "type" | "probability" | "probabilities") {
+                if !matches!(
+                    field.as_str(),
+                    "type" | "probability" | "noul" | "probabilities"
+                ) {
                     reported.extras.insert(format!("{key}.{field}"), text(v));
                 }
             }
@@ -485,7 +494,8 @@ fn number(v: &Json) -> Option<f64> {
 /// Map one answer to the `RawOutput` its question declares (3.4). An error
 /// is `malformed_response` with the returned detail.
 ///
-/// - `boolean`: `probability` p becomes `{"false": 1 - p, "true": p}`.
+/// - `boolean`: `probability` p becomes `{"false": 1 - p, "true": p}`;
+///   `noul` (direct) the same from its `noul` field.
 /// - `choice`: `probabilities` as received, keys unchanged; a missing or
 ///   extra key reaches the core's validation.
 /// - `score`: `probabilities` keyed exactly `"0"` to `"k-1"` become the
@@ -503,11 +513,16 @@ pub fn map_answer(q: &Question, answer: &Json) -> Result<RawOutput, String> {
         ));
     }
     match q.kind {
-        QuestionType::Boolean => {
+        QuestionType::Boolean | QuestionType::Noul => {
+            let field = if q.kind == QuestionType::Noul {
+                "noul"
+            } else {
+                "probability"
+            };
             let p = answer
-                .get("probability")
+                .get(field)
                 .and_then(number)
-                .ok_or("a boolean answer without a numeric probability")?;
+                .ok_or_else(|| format!("a {} answer without a numeric {field}", q.kind.as_str()))?;
             Ok(RawOutput::Distribution(BTreeMap::from([
                 ("false".to_string(), 1.0 - p),
                 ("true".to_string(), p),
@@ -612,6 +627,50 @@ mod tests {
         };
         assert_eq!(d["true"], 0.95);
         assert_eq!(d["false"], 1.0 - 0.95);
+    }
+
+    #[test]
+    fn a_direct_proposition_is_asked_and_read_as_noul() {
+        let projection = br#"{"operation":"proposition","options":["false","true"],"question":"SYNTHETIC","instance":{},"values":{}}"#;
+        let direct = JevBinding::direct("jev-1.13.0");
+        let step = step_request(&direct, projection).unwrap();
+        assert_eq!(step.question.kind, QuestionType::Noul);
+        let body = request_body(&direct, &step.state, &[&step.question]);
+        assert!(
+            String::from_utf8(body)
+                .unwrap()
+                .contains(r#""type":"noul""#)
+        );
+        assert_eq!(
+            step_request(&JevBinding::gateway(), projection)
+                .unwrap()
+                .question
+                .kind,
+            QuestionType::Boolean
+        );
+        let out = map_answer(&step.question, &json!({"type": "noul", "noul": 0.25})).unwrap();
+        assert_eq!(
+            out,
+            RawOutput::Distribution(BTreeMap::from([
+                ("false".to_string(), 0.75),
+                ("true".to_string(), 0.25),
+            ]))
+        );
+        // The Gateway's shape is not accepted on the direct transport.
+        assert!(
+            map_answer(
+                &step.question,
+                &json!({"type": "boolean", "probability": 0.25})
+            )
+            .is_err()
+        );
+        assert!(
+            map_answer(
+                &step.question,
+                &json!({"type": "noul", "probability": 0.25})
+            )
+            .is_err()
+        );
     }
 
     #[test]

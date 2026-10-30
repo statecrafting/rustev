@@ -1,5 +1,5 @@
 {
-  "provenance": "SYNTHETIC spec 022 mechanics only. Not observed direct API shapes or provider evidence.",
+  "provenance": "SYNTHETIC spec 022 mechanics only. Not observed direct API shapes or provider evidence. Propositions are answered as `noul`, the direct API's shape recorded under 3.7 stage 2.",
   "mapping": "rustev-jev-direct-synthetic/1",
   "cases": [
     {
@@ -9,8 +9,8 @@
         "model": "jev-1.13.0",
         "answers": {
           "q0": {
-            "type": "boolean",
-            "probability": 0.25
+            "type": "noul",
+            "noul": 0.25
           }
         },
         "providerMetadata": {
@@ -42,8 +42,8 @@
         "model": "jev-other",
         "answers": {
           "q0": {
-            "type": "boolean",
-            "probability": 0.25
+            "type": "noul",
+            "noul": 0.25
           }
         },
         "providerMetadata": {
@@ -75,8 +75,8 @@
         "model": "jev-other",
         "answers": {
           "q0": {
-            "type": "boolean",
-            "probability": 0.25
+            "type": "noul",
+            "noul": 0.25
           }
         },
         "providerMetadata": {
@@ -107,8 +107,8 @@
       "response_body": {
         "answers": {
           "q0": {
-            "type": "boolean",
-            "probability": 0.25
+            "type": "noul",
+            "noul": 0.25
           }
         },
         "providerMetadata": {
@@ -140,8 +140,8 @@
         "model": "jev-1.13.0",
         "answers": {
           "q0": {
-            "type": "boolean",
-            "probability": 0.25
+            "type": "noul",
+            "noul": 0.25
           }
         }
       }

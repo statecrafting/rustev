@@ -1,0 +1,37 @@
+{
+ "recorded_at": "2026-10-30T01:58:53.769000Z",
+ "provenance": "synthetic fixture, live direct-API call (TypeSafe /v1/systemone, pin jev-1.13.0) under spec 022 3.7 stage 2, owner-authorized 2026-10-29, within R-29's testing cap",
+ "request_body": {
+  "model": "jev-1.13.0",
+  "questions": {
+   "q0": {
+    "criteria": {
+     "false": "false",
+     "true": "true"
+    },
+    "instructions": "Does the message confirm a flight booking?",
+    "type": "noul"
+   }
+  },
+  "state": {
+   "instance": {},
+   "values": {
+    "message": "SYNTHETIC FIXTURE. Your booking is confirmed. Flight AC 123 from Toronto (YYZ) to Lisbon (LIS), departing 2027-03-14 18:05, arriving 2027-03-15 06:40. Confirmation code QX7P2L. Passenger: Test Traveler."
+   }
+  }
+ },
+ "status": 200,
+ "response_body": {
+  "answers": {
+   "q0": {
+    "noul": 0.96,
+    "type": "noul"
+   }
+  },
+  "model": "jev-1.13.0",
+  "usage": {
+   "input_tokens": 395,
+   "output_tokens": 21
+  }
+ }
+}

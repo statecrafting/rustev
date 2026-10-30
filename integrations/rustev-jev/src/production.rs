@@ -281,9 +281,10 @@ impl ProductionBinding {
         f.privacy_terms.check(today)?;
         f.price_source.check(today)
     }
-    /// No external direct mapping is verified in this repository. In
-    /// particular, a supplied reference or vendor document cannot bypass
-    /// stage 2. This refusal precedes credential lookup and dispatch.
+    /// The direct mapping is recorded (stage 2) but not qualified: no
+    /// binding is production-eligible until stage 3 is recorded. A supplied
+    /// reference or vendor document cannot bypass either stage. This
+    /// refusal precedes credential lookup and dispatch.
     pub fn production_eligible(&self, today: &str, budget_ms: u64) -> Result<(), Unresolved> {
         self.check_facts(today, budget_ms)?;
         if self.usage != BindingUse::Production {
@@ -292,7 +293,7 @@ impl ProductionBinding {
             ));
         }
         Err(Unresolved(
-            "direct API mapping awaits owner-authorized recorded exchanges (stage 2)",
+            "direct API mapping awaits owner-authorized qualification (stage 3)",
         ))
     }
     pub fn served(&self, version: Option<&str>) -> Result<ServedIdentity, Unresolved> {

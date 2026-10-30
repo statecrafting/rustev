@@ -282,6 +282,8 @@ evidence. The two live tests are ignored and never run here.
 # tolerance, error codes, cost, reconciliation, evidence, plan preparation,
 # over loopback only (the tests assert no external host is reached).
 cargo test -p rustev-jev --test production --locked
+# 3.2.3 and 3.7 stage 2: the direct mapping against the recorded exchanges.
+cargo test -p rustev-jev --test direct_recorded --locked
 # Spec 012's development bindings keep their bytes and identities.
 cargo test -p rustev-jev --locked
 # 3.8.1: the adapter reads no environment variable for a credential.
@@ -341,7 +343,7 @@ item:
   synthetic mapping and spec 012's recorded Gateway exchanges
   (`http_failures_and_no_cost_are_local_fixtures`,
   `tests/fixtures/synthetic-022-direct.json`). Fixtures recorded from the
-  direct API are externally blocked (below).
+  direct API: stage 2 (below).
 - Served identity on every attempt and the mismatch path: the pin and
   matrix tests above.
 - Screening (3.8.4): not applicable as built. Spec 035's seam is not
@@ -352,15 +354,62 @@ item:
   and the declared verification refuses any environment read in the
   crate's sources.
 
-Externally blocked, never reported as passed: stage 2 (live smoke on the
-direct API, which yields the recorded direct-API fixtures and a verified
-mapping) and stage 3 (qualification of a production binding). Both need
-an owner-provided direct-API credential and spend under R-29's USD 5
-testing cap; neither ran, and no money was spent. Until they run,
-`JevBackend::new_production` refuses construction, so no binding is
-production-eligible. Delivering them needs a new mapping version and its
-recorded fixtures, which change the binding identity (3.6.2). 022 becomes
-`complete` only when both are recorded here with their spend.
+**Stage 2, the direct smoke (2026-10-29).** Authorized by the owner on
+2026-10-29, with the owner's `TYPESAFE_API_KEY` read through spec 012's
+smoke harness (`--transport direct --pin jev-1.13.0`, A-66) and every
+attempt reserved against the shared testing journal (R-29). Two runs of
+the harness's four synthetic cases (two propositions, one `classify`, one
+`rubric`), at `https://api.typesafe.ai/v1/systemone`:
+
+1. Under spec 012's mapping (`rustev-jev-mapping/1`), `classify` and
+   `rubric` were answered in the Gateway's shapes, and each response
+   reported `model: jev-1.13.0`, the pin. Both propositions were HTTP 400
+   (`api_usage_error`, "Invalid request."): the direct API has no
+   `boolean` question type. Every charge was `unknown`, because the
+   response reports usage as `input_tokens` and `output_tokens`, which the
+   Gateway price table did not name.
+2. Under the direct mapping below, all four were answered; the
+   propositions as `{"type": "noul", "noul": p}` (0.96 for the flight
+   confirmation, 0.02 for the hotel), and every charge was `estimated`
+   from reported usage.
+
+Spend: the journal went from 1,421,364 observed, 344,520 estimated and
+13,001,784 liability units (nano-USD) to 1,421,364, 411,552 and
+13,079,694. The first run's `unknown` charges stay liability at their
+full reservations (77,910 units); the second run's were 67,032 estimated.
+About USD 0.00015 in all.
+
+The direct mapping (3.2.3), from these exchanges:
+`DIRECT_MAPPING_VERSION`, `rustev-jev-mapping/2 (direct shapes of 022
+stage 2)`, is the only mapping version a direct binding accepts and the one
+`JevBinding::direct` sets; a Gateway binding still accepts only
+`rustev-jev-mapping/1` (`each_transport_accepts_only_its_mapping_version`).
+It changes the direct binding identity (3.6.2). A proposition is asked as
+`noul` with spec 012's `{"false": d, "true": d}` criteria, and its `noul`
+field `p` becomes `{"false": 1 - p, "true": p}`; a `boolean` answer, or a
+`noul` answer without a numeric `noul`, is `malformed_response`.
+`classify` and `rubric` keep spec 012's shapes. The price table also names
+`input_tokens` and `output_tokens` at the same rates, so a direct charge is
+estimated from reported usage. The response reports no cost, so a direct
+charge is never `observed`. Recorded fixtures:
+`tests/fixtures/recorded-direct-{boolean-flight,boolean-hotel,choice-hotel,score-flight}-200.json`
+and `recorded-direct-boolean-type-400.json` (the refused `boolean`
+request), replayed by `tests/direct_recorded.rs`: each recorded request is
+the body the mapping sends, the refused request differs from it only in
+its type, and each recorded answer replays on loopback to the live output,
+an estimated charge and served `jev-1.13.0`. The hand-written direct
+fixtures (`synthetic-022-direct.json`,
+`synthetic-direct-{pinned,other}-version-200.json`) now answer
+propositions as `noul`; their cost members stay synthetic, for the
+reconciliation mechanics. The recorded exchanges keep no request headers
+and were checked for the key before they were written.
+
+Externally blocked, never reported as passed: stage 3 (qualification of a
+production binding, 3.7.3), which the owner authorized on 2026-10-29
+within R-29's cap and which has not run. Until it is recorded here with its
+spend, `JevBackend::new_production` refuses construction ("direct API
+mapping awaits owner-authorized qualification (stage 3)"), so no binding is
+production-eligible, and 022 is not `complete`.
 
 ## Questions settled at approval
 

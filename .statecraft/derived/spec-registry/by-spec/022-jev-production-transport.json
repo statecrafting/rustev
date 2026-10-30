@@ -91,7 +91,7 @@
       }
     ],
     "sectionDigests": {
-      "022-production-transport-and-served-identity-for-the-jev-adapter-amends-012": "34cf040f33252d55c9a596a39e09b3de1d17387a1f46cb5d91c630e37a2e4067",
+      "022-production-transport-and-served-identity-for-the-jev-adapter-amends-012": "05f525a0c32e8f57cda7912babe361f07d732942ea83c131beda459253d82f9d",
       "1-purpose": "70685a3a8f2e016c3a9760e89eae9aa998656191292f5b263ff26808718464e3",
       "2-territory": "4a45c86e472a6db4261c0e696c9dc2bfa1bae8537cea3019838eb88ef89b9ac9",
       "3-1-production-eligibility": "5bbe7c4185d15c476faa590abf8439f6d499f73705640f322f9e0a4a76c3697d",
@@ -106,9 +106,9 @@
       "4-out-of-scope": "faec5ae3c40f8d5a9c745c348c9220a55d9e7664134a1e287c82c2111276cc6d",
       "5-observable-negative-cases": "5b99adb770ee25dd51d6cc1b4ede93768054d4733c8844340056c7001bd524d1",
       "acceptance": "127f5e5a31574b48797ce57290177b3f7c74aedf4a8f1a6df5779d2590ac247d",
-      "implementation-record": "ffc28c0d22ddcef45357d2cd3d3f04d312438e6facbdd5558944f3b6318995f5",
+      "implementation-record": "22a3ba209b9deb4648f18472a3a206fb8bb44b7ad9d8b3c0dcc4fe0af2555016",
       "questions-settled-at-approval": "bbb44939011f2ecd900f8a50706b4d52fc0027562980e9aae1562f38e72eebd9",
-      "verification": "64f13a26fea90d8daac2f92e922c6450997597c9d5ad4379ea2447954c0aa7ca"
+      "verification": "873fb073566951f457661aed3ce95a86990b294fe78a2c6141758d2ca38cc0e3"
     },
     "sectionHeadings": [
       "022: Production transport and served identity for the Jev adapter (amends 012)",
@@ -135,6 +135,6 @@
     "summary": "The separately reviewable spec 012 amendment that backlog item RUSTEV-010 and spec 012 R-3 require before production use: a Jev binding is production-eligible only when its transport pins a model version and every answered exchange proves the served identity against that pin. Defines the qualification of TypeSafe's direct API with a pinned version, the evidence under which Gateway pinning could be accepted instead, and the transport, TLS, timeout, connection, privacy and cost-reconciliation facts a production binding records. Development evidence with `served: unknown` is never relabeled as production evidence. Approved (A-21) with the additions of tracking issue #76 child C3 (section 3.8). Approval authorizes implementation of the no-network stage; live stages stay inside R-29's testing cap, and no deployment is authorized.\n",
     "title": "Production transport and served identity for the Jev adapter (amends 012)"
   },
-  "shardHash": "6e04950c256de133cef829643d17ef77dbaad75343e8293fcdcbe947d24ced53",
+  "shardHash": "4b1c8f859c055812425232f9a60a5a03185fe46218dc38ae6353e6f9f766272b",
   "specVersion": "1.10.0"
 }

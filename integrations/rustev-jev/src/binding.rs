@@ -31,6 +31,11 @@ pub const PROVIDER: &str = "typesafe-ai";
 /// The mapping of 3.3.3, 3.3.4 and 3.4 with the request and answer shapes
 /// observed in C-11. A change of shape is a new mapping version.
 pub const MAPPING_VERSION: &str = "rustev-jev-mapping/1 (gateway shapes of C-11)";
+/// The direct transport's mapping (spec 022 3.2.3), from the exchanges
+/// recorded under 3.7 stage 2: a proposition is asked as `noul`, not
+/// `boolean`, and answered in a `noul` field; `choice` and `score` keep the
+/// Gateway shapes.
+pub const DIRECT_MAPPING_VERSION: &str = "rustev-jev-mapping/2 (direct shapes of 022 stage 2)";
 /// The default input limit in canonical projection bytes (3.3.1).
 pub const DEFAULT_MAX_INPUT_BYTES: u64 = 49_152;
 /// `choice`: 2 to 255 labels; `score`: 2 to 10 levels (3.3.1, C-09, C-11).
@@ -227,7 +232,7 @@ impl fmt::Display for BindingError {
                 write!(f, "binding: the direct transport requires a version pin")
             }
             BindingError::MappingVersion(v) => {
-                write!(f, "binding: mapping version `{v}` is not {MAPPING_VERSION}")
+                write!(f, "binding: mapping version `{v}` is not the transport's")
             }
             BindingError::InputLimit(n) => write!(
                 f,
@@ -242,6 +247,14 @@ impl fmt::Display for BindingError {
 }
 
 impl std::error::Error for BindingError {}
+
+/// The only mapping version a binding on `transport` accepts.
+pub const fn mapping_version(transport: Transport) -> &'static str {
+    match transport {
+        Transport::Gateway | Transport::GatewayTypesafeBase => MAPPING_VERSION,
+        Transport::Direct => DIRECT_MAPPING_VERSION,
+    }
+}
 
 impl JevBinding {
     /// The default Gateway binding: zero data retention and the provider
@@ -260,11 +273,13 @@ impl JevBinding {
         }
     }
 
-    /// A direct-transport binding with a version pin (unverified, 3.2).
+    /// A direct-transport binding with a version pin and the direct
+    /// mapping (spec 022 3.2).
     pub fn direct(pin: &str) -> Self {
         JevBinding {
             transport: Transport::Direct,
             version_pin: Some(pin.to_string()),
+            mapping_version: DIRECT_MAPPING_VERSION.to_string(),
             ..Self::gateway()
         }
     }
@@ -299,7 +314,7 @@ impl JevBinding {
             (t, Some(_)) if t.is_gateway() => return Err(BindingError::PinOnGateway),
             _ => {}
         }
-        if self.mapping_version != MAPPING_VERSION {
+        if self.mapping_version != mapping_version(self.transport) {
             return Err(BindingError::MappingVersion(self.mapping_version.clone()));
         }
         let l = &self.limits;
@@ -418,17 +433,16 @@ impl CostConfig {
     }
 
     /// The price table in deployment units per reported usage unit, keyed
-    /// by the Gateway's usage names (C-11).
+    /// by the Gateway's usage names (C-11) and the direct API's (spec 022
+    /// 3.7 stage 2), each at the same rate.
     pub fn price_table(&self) -> PriceTable {
+        let input = self.per_token(self.input_usd_per_million);
+        let output = self.per_token(self.output_usd_per_million);
         PriceTable(BTreeMap::from([
-            (
-                "inputTokens".to_string(),
-                self.per_token(self.input_usd_per_million),
-            ),
-            (
-                "outputTokens".to_string(),
-                self.per_token(self.output_usd_per_million),
-            ),
+            ("inputTokens".to_string(), input),
+            ("outputTokens".to_string(), output),
+            ("input_tokens".to_string(), input),
+            ("output_tokens".to_string(), output),
         ]))
     }
 
@@ -543,6 +557,23 @@ mod tests {
     }
 
     #[test]
+    fn each_transport_accepts_only_its_mapping_version() {
+        assert!(JevBinding::direct("jev-1.13.0").validate().is_ok());
+        let mut direct = JevBinding::direct("jev-1.13.0");
+        direct.mapping_version = MAPPING_VERSION.into();
+        assert!(matches!(
+            direct.validate(),
+            Err(BindingError::MappingVersion(_))
+        ));
+        let mut gateway = JevBinding::gateway();
+        gateway.mapping_version = DIRECT_MAPPING_VERSION.into();
+        assert!(matches!(
+            gateway.validate(),
+            Err(BindingError::MappingVersion(_))
+        ));
+    }
+
+    #[test]
     fn unknown_fields_are_refused() {
         let mut v: serde_json::Value =
             serde_json::from_slice(&JevBinding::gateway().canonical().unwrap()).unwrap();
@@ -563,6 +594,23 @@ mod tests {
         // C-11: 516 input tokens were priced USD 0.000021672.
         let usage = BTreeMap::from([("inputTokens".to_string(), 516)]);
         assert_eq!(t.estimate_units(&usage), Ok(21_672));
+        // The direct API's usage names (spec 022 3.7 stage 2) take the
+        // Gateway names' rates, so a direct exchange is estimated, not
+        // unpriced. Output is priced here (USD 0.5 per million, 500 units
+        // a token) so the output name is exercised too.
+        let priced = CostConfig {
+            output_usd_per_million: Decimal::from_units(500_000_000),
+            ..CostConfig::default()
+        };
+        let t = priced.price_table();
+        assert_eq!(t.0["input_tokens"], t.0["inputTokens"]);
+        assert_eq!(t.0["output_tokens"], t.0["outputTokens"]);
+        assert_eq!(t.0["output_tokens"], Decimal::from_i64(500));
+        let direct = BTreeMap::from([
+            ("input_tokens".to_string(), 516),
+            ("output_tokens".to_string(), 49),
+        ]);
+        assert_eq!(t.estimate_units(&direct), Ok(516 * 42 + 49 * 500));
         // 1,000 bytes at 2 bytes per token plus 256 overhead: 756 tokens.
         assert_eq!(c.estimate_units(1_000), 756 * 42);
     }
