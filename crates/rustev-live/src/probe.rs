@@ -285,18 +285,7 @@ pub async fn probe(
         return Ok(report);
     }
 
-    let spend_bindings: Vec<SpendBinding> = config
-        .bindings
-        .iter()
-        .map(|b| SpendBinding {
-            backend_id: b.identity.backend_id.clone(),
-            artifact: b.identity.artifact.clone(),
-            cost_unit: match b.cost_unit {
-                CostUnit::NanoUsd => SpendUnit::NanoUsd,
-                CostUnit::None => SpendUnit::None,
-            },
-        })
-        .collect();
+    let spend_bindings = spend_bindings(config);
     let mut stopped = None;
     'bindings: for (index, (p, b)) in probes.iter_mut().zip(&config.bindings).enumerate() {
         let Ok(plan) = prepared[&p.candidate].clone() else {
@@ -305,10 +294,16 @@ pub async fn probe(
         let mut last_end = None;
         for call in 1..=config.probe.calls {
             if let Some(end) = last_end {
-                inputs
+                let mut sleep = inputs
                     .clock
-                    .sleep_until(u64::saturating_add(end, config.probe.interval_ms))
-                    .await;
+                    .sleep_until(u64::saturating_add(end, config.probe.interval_ms));
+                std::future::poll_fn(|cx| {
+                    if cancel.poll_raised(cx).is_ready() {
+                        return std::task::Poll::Ready(());
+                    }
+                    sleep.as_mut().poll(cx)
+                })
+                .await;
             }
             if cancel.is_raised() {
                 stopped = Some(ProbeStatus::Interrupted);
@@ -482,7 +477,7 @@ fn verdict(p: &BindingProbe) -> Option<IdentityVerdict> {
     }
 }
 
-fn refusal_code(e: &LiveRefusal) -> &'static str {
+pub(crate) fn refusal_code(e: &LiveRefusal) -> &'static str {
     match e {
         LiveRefusal::SpendAcquisitionUnsupported => "acquisition-unsupported",
         LiveRefusal::Rejected(_) => "rejected",
@@ -492,4 +487,19 @@ fn refusal_code(e: &LiveRefusal) -> &'static str {
         }
         _ => "live-refused",
     }
+}
+
+pub(crate) fn spend_bindings(config: &LiveConfig) -> Vec<SpendBinding> {
+    config
+        .bindings
+        .iter()
+        .map(|b| SpendBinding {
+            backend_id: b.identity.backend_id.clone(),
+            artifact: b.identity.artifact.clone(),
+            cost_unit: match b.cost_unit {
+                CostUnit::NanoUsd => SpendUnit::NanoUsd,
+                CostUnit::None => SpendUnit::None,
+            },
+        })
+        .collect()
 }

@@ -36,7 +36,7 @@ impl LiveError {
         Self::invalid("live-config", detail)
     }
 
-    fn io(detail: impl fmt::Display) -> Self {
+    pub(crate) fn io(detail: impl fmt::Display) -> Self {
         Self {
             status: "io_error",
             subject: "checkpoint",
@@ -427,41 +427,44 @@ impl LiveCheckpoint {
         let bytes = self.canonical().map_err(LiveError::io)?;
         // Refuse an output our bounded reader could not read.
         Self::parse(&bytes).map_err(|e| LiveError::invalid("checkpoint-mismatch", e))?;
-        let path = path.as_ref();
-        let parent = path
-            .parent()
-            .filter(|p| !p.as_os_str().is_empty())
-            .unwrap_or(Path::new("."));
-        static NEXT: AtomicU64 = AtomicU64::new(0);
-        let (temp, mut file) = loop {
-            let temp = parent.join(format!(
-                ".rustev-checkpoint-{}-{}.tmp",
-                std::process::id(),
-                NEXT.fetch_add(1, Ordering::Relaxed)
-            ));
-            match OpenOptions::new().write(true).create_new(true).open(&temp) {
-                Ok(file) => break (temp, file),
-                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
-                Err(e) => return Err(LiveError::io(e)),
-            }
-        };
-        let written = (|| {
-            file.write_all(&bytes)?;
-            file.sync_all()?;
-            drop(file);
-            std::fs::rename(&temp, path)
-        })();
-        if let Err(e) = written {
-            // Before the rename the previous checkpoint is untouched.
-            let _ = std::fs::remove_file(&temp);
-            return Err(LiveError::io(e));
-        }
-        // After the rename the new checkpoint is in place, but it is not
-        // durable until its directory entry is: a failed directory sync is
-        // still an error, since the caller may not rely on the checkpoint
-        // surviving a crash. There is no temporary file left to remove.
-        File::open(parent)
-            .and_then(|d| d.sync_all())
-            .map_err(LiveError::io)
+        write_atomic(path.as_ref(), &bytes)
     }
+}
+
+pub(crate) fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), LiveError> {
+    let parent = path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    let (temp, mut file) = loop {
+        let temp = parent.join(format!(
+            ".rustev-checkpoint-{}-{}.tmp",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        match OpenOptions::new().write(true).create_new(true).open(&temp) {
+            Ok(file) => break (temp, file),
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(LiveError::io(e)),
+        }
+    };
+    let written = (|| {
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        drop(file);
+        std::fs::rename(&temp, path)
+    })();
+    if let Err(e) = written {
+        // Before the rename the previous checkpoint is untouched.
+        let _ = std::fs::remove_file(&temp);
+        return Err(LiveError::io(e));
+    }
+    // After the rename the new checkpoint is in place, but it is not
+    // durable until its directory entry is: a failed directory sync is
+    // still an error, since the caller may not rely on the checkpoint
+    // surviving a crash. There is no temporary file left to remove.
+    File::open(parent)
+        .and_then(|d| d.sync_all())
+        .map_err(LiveError::io)
 }

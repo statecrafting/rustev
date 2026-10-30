@@ -1,0 +1,654 @@
+//! Dataset-scale execution over resolved inputs (spec 043).
+
+use std::collections::{BTreeMap, BTreeSet};
+use std::future::{Future, poll_fn};
+use std::path::PathBuf;
+use std::pin::Pin;
+use std::task::Poll;
+
+use rustev_contract::ids::{ContentDigest, DatasetId, SnapshotId};
+use rustev_contract::live::AuthorizationOutcome;
+use rustev_contract::scope::{Handle, Scope};
+use rustev_contract::snapshot::Snapshot;
+use rustev_contract::{Document, Identified, Timestamp};
+use rustev_core::Compiled;
+use rustev_core::seams::CancelSignal;
+use rustev_runtime::{
+    Clock, Completion, LiveAuthorizer, LiveRefusal, LiveRequest, LiveResult, LiveSpend, Runtime,
+};
+use serde::Serialize;
+
+use crate::JournalGate;
+use crate::documents::*;
+use crate::journal::{RunSpend, SpendJournal, SpendSummary};
+use crate::probe::{self, ProbeInputs, ProbeReport, ProbeSnapshot, ProbeStatus};
+
+pub struct RunSpec {
+    pub config: LiveConfig,
+    pub mode: Mode,
+    pub run_id: String,
+    pub dataset_id: DatasetId,
+    pub split: String,
+    pub candidates: BTreeMap<String, Compiled>,
+    pub cases: Vec<LiveCase>,
+    pub probe_snapshot: ProbeSnapshot,
+    pub probe_time: Timestamp,
+    pub principal_handle: Vec<u8>,
+    pub subject: Handle,
+    pub scope: Scope,
+    pub input_digests: BTreeMap<String, ContentDigest>,
+}
+
+pub struct LiveCase {
+    pub case_id: String,
+    pub input: CaseInput,
+}
+
+pub enum CaseInput {
+    Available {
+        snapshot_bytes: Vec<u8>,
+        snapshot_id: SnapshotId,
+        source_time: Option<Timestamp>,
+        scope: Option<Scope>,
+    },
+    Unavailable {
+        reason: String,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub struct RunOptions {
+    pub out: PathBuf,
+    pub resume: bool,
+    pub rerun_interrupted: bool,
+    pub probe_only: bool,
+    pub run_deadline_ms: Option<u64>,
+}
+
+pub struct PreparedRun {
+    spec: RunSpec,
+    opts: RunOptions,
+    snapshots: BTreeMap<String, Snapshot>,
+    checkpoint: LiveCheckpoint,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RunStatus {
+    EvaluatedLive,
+    Probed,
+    ProbeFailed,
+    SpendCapped,
+    Interrupted,
+}
+
+#[derive(Debug, Serialize)]
+pub struct RunOutcome {
+    pub status: RunStatus,
+    pub probe: ProbeReport,
+    /// Base decision id and last checkpoint state, in manifest order.
+    /// Interrupted items have the reporting reason `live-interrupted`.
+    pub items: Vec<(String, ItemState)>,
+    pub run_spend: RunSpend,
+    pub journal_before: SpendSummary,
+    pub journal_after: SpendSummary,
+}
+
+/// Validate all resolved inputs before the caller opens a journal.
+pub fn prepare(spec: RunSpec, opts: RunOptions) -> Result<PreparedRun, LiveError> {
+    let reached: Candidates = spec
+        .candidates
+        .iter()
+        .map(|(n, c)| (n.clone(), probe::reached(c).into_iter().collect()))
+        .collect();
+    spec.config.check(spec.mode, &reached)?;
+    let mut items = Vec::new();
+    for repeat in 1..=spec.config.repeats {
+        for candidate in spec.candidates.keys() {
+            for case in &spec.cases {
+                decision_id(&spec.run_id, candidate, repeat, &case.case_id, None)?;
+                items.push(CheckpointItem {
+                    candidate: candidate.clone(),
+                    repeat,
+                    case_id: case.case_id.clone(),
+                    states: vec![ItemState::Pending],
+                });
+            }
+        }
+    }
+    let mut snapshots = BTreeMap::new();
+    let mut names = BTreeSet::new();
+    for case in &spec.cases {
+        if !names.insert(&case.case_id) {
+            return Err(LiveError::invalid("live-config", "duplicate case id"));
+        }
+        if let CaseInput::Available {
+            snapshot_bytes,
+            snapshot_id,
+            source_time,
+            ..
+        } = &case.input
+        {
+            let snapshot = Snapshot::parse(snapshot_bytes)
+                .map_err(|e| LiveError::invalid("identity-mismatch", e))?;
+            if snapshot
+                .id()
+                .map_err(|e| LiveError::invalid("identity-mismatch", e))?
+                != *snapshot_id
+            {
+                return Err(LiveError::invalid(
+                    "identity-mismatch",
+                    "case snapshot digest differs",
+                ));
+            }
+            if spec.config.evaluation_time == EvaluationTime::Source && source_time.is_none() {
+                return Err(LiveError::invalid(
+                    "evaluation-time-unavailable",
+                    &case.case_id,
+                ));
+            }
+            snapshots.insert(case.case_id.clone(), snapshot);
+        }
+    }
+    if spec.probe_snapshot.id() != &spec.config.probe.digest {
+        return Err(LiveError::invalid(
+            "probe-snapshot",
+            "the probe snapshot is not the one probe.digest names",
+        ));
+    }
+    if spec.cases.iter().any(|c| {
+        matches!(&c.input, CaseInput::Available { snapshot_id, .. } if snapshot_id == spec.probe_snapshot.id())
+    }) {
+        return Err(LiveError::invalid(
+            "probe-snapshot",
+            "the probe snapshot is a case snapshot",
+        ));
+    }
+    let bindings = CheckpointBindings {
+        run_id: spec.run_id.clone(),
+        live_config_id: spec.config.id().map_err(LiveError::io)?,
+        dataset_id: spec.dataset_id.clone(),
+        split: spec.split.clone(),
+        candidates: spec
+            .candidates
+            .iter()
+            .map(|(name, c)| CandidateBinding {
+                name: name.clone(),
+                plan_id: c.id.clone(),
+                bindings: reached[name].clone(),
+            })
+            .collect(),
+        journal_header_digest: SpendJournal::testing_header_digest(),
+        input_digests: spec.input_digests.clone(),
+    };
+    let mut checkpoint = LiveCheckpoint {
+        schema: LiveCheckpoint::SCHEMA.into(),
+        bindings,
+        items,
+    };
+    checkpoint.check()?;
+    let path = opts.out.join("checkpoint.json");
+    if opts.resume {
+        let saved = LiveCheckpoint::read(&path, &checkpoint.bindings)?;
+        if saved.items.len() != checkpoint.items.len()
+            || saved.items.iter().zip(&checkpoint.items).any(|(a, b)| {
+                (&a.candidate, a.repeat, &a.case_id) != (&b.candidate, b.repeat, &b.case_id)
+            })
+        {
+            return Err(LiveError::invalid(
+                "checkpoint-mismatch",
+                "work items differ",
+            ));
+        }
+        checkpoint = saved;
+    } else {
+        std::fs::create_dir(&opts.out).map_err(|e| LiveError {
+            status: "io_error",
+            subject: "out",
+            detail: e.to_string(),
+        })?;
+        std::fs::create_dir(opts.out.join("cases")).map_err(LiveError::io)?;
+        write_atomic(
+            &opts.out.join("live-config.json"),
+            &spec.config.canonical().map_err(LiveError::io)?,
+        )?;
+        checkpoint.write_atomic(&path)?;
+    }
+    Ok(PreparedRun {
+        spec,
+        opts,
+        snapshots,
+        checkpoint,
+    })
+}
+
+fn rerun(item: &CheckpointItem) -> Option<u64> {
+    item.states
+        .iter()
+        .filter_map(|s| match s {
+            ItemState::Rerun { k } => Some(*k),
+            _ => None,
+        })
+        .max()
+}
+fn current_id(run: &str, item: &CheckpointItem) -> String {
+    decision_id(
+        run,
+        &item.candidate,
+        item.repeat,
+        &item.case_id,
+        rerun(item),
+    )
+    .expect("validated checkpoint item")
+}
+fn pending(item: &CheckpointItem) -> bool {
+    matches!(
+        item.states.last(),
+        Some(ItemState::Pending | ItemState::Rerun { .. })
+    )
+}
+
+type Work<'a> = Pin<Box<dyn Future<Output = (usize, Result<LiveResult, LiveRefusal>)> + 'a>>;
+
+impl PreparedRun {
+    fn save(&self) -> Result<(), LiveError> {
+        self.checkpoint
+            .write_atomic(self.opts.out.join("checkpoint.json"))
+    }
+
+    /// Each admitted item holds every binding reached by its plan until it
+    /// settles. This conservatively bounds concurrent items per binding;
+    /// scheduling of attempts within an item remains the runtime's job.
+    pub async fn execute(
+        mut self,
+        runtime: &Runtime,
+        journal: SpendJournal,
+        authorizer: &dyn LiveAuthorizer,
+        clock: &dyn Clock,
+        cancel: &CancelSignal,
+    ) -> Result<RunOutcome, LiveError> {
+        let deadline = self
+            .opts
+            .run_deadline_ms
+            .map(|d| clock.now().saturating_add(d));
+        let signal = cancel.child();
+        let gate = JournalGate::new(
+            journal.clone(),
+            &self.spec.run_id,
+            self.spec.config.run_cap_units,
+        )
+        .map_err(|e| LiveError::invalid("journal-budget", e.code))?;
+        let before = journal.summary();
+        for item in &mut self.checkpoint.items {
+            if pending(item) {
+                let ids = journal.reservations_for(&current_id(&self.spec.run_id, item));
+                if !ids.is_empty() {
+                    item.states
+                        .push(ItemState::Interrupted { attempt_ids: ids });
+                }
+            }
+            if matches!(item.states.last(), Some(ItemState::Interrupted { .. }))
+                && self.opts.rerun_interrupted
+            {
+                let k = rerun(item).unwrap_or(0) + 1;
+                item.states.push(if k > 99 {
+                    ItemState::Refused {
+                        code: "rerun-limit".into(),
+                    }
+                } else {
+                    ItemState::Rerun { k }
+                });
+            }
+        }
+        self.save()?;
+        let inputs = ProbeInputs {
+            runtime,
+            config: &self.spec.config,
+            candidates: &self.spec.candidates,
+            snapshot: &self.spec.probe_snapshot,
+            evaluation_time: self.spec.probe_time,
+            principal_handle: self.spec.principal_handle.clone(),
+            subject: self.spec.subject.clone(),
+            scope: self.spec.scope.clone(),
+            clock,
+        };
+        let report = {
+            let mut probing = Box::pin(probe::probe(inputs, authorizer, &gate, &signal));
+            let mut timer = deadline.map(|d| clock.sleep_until(d));
+            poll_fn(|cx| {
+                // A completed timer is dropped, never polled again.
+                if timer
+                    .as_mut()
+                    .is_some_and(|t| t.as_mut().poll(cx).is_ready())
+                {
+                    timer = None;
+                    signal.raise();
+                }
+                probing.as_mut().poll(cx)
+            })
+            .await?
+        };
+        let mut status = match report.status {
+            ProbeStatus::Probed if self.opts.probe_only => RunStatus::Probed,
+            ProbeStatus::Probed => RunStatus::EvaluatedLive,
+            ProbeStatus::ProbeFailed => RunStatus::ProbeFailed,
+            ProbeStatus::SpendCapped => RunStatus::SpendCapped,
+            ProbeStatus::Interrupted => RunStatus::Interrupted,
+        };
+        if signal.is_raised() && status != RunStatus::SpendCapped {
+            status = RunStatus::Interrupted;
+        }
+        if status == RunStatus::EvaluatedLive {
+            status = self
+                .dispatch(runtime, authorizer, clock, &signal, deadline, &gate)
+                .await?;
+        }
+        Ok(RunOutcome {
+            status,
+            probe: report,
+            items: self
+                .checkpoint
+                .items
+                .iter()
+                .map(|i| {
+                    (
+                        decision_id(&self.spec.run_id, &i.candidate, i.repeat, &i.case_id, None)
+                            .expect("validated id"),
+                        i.states.last().expect("nonempty history").clone(),
+                    )
+                })
+                .collect(),
+            run_spend: journal.run_split(&self.spec.run_id),
+            journal_before: before,
+            journal_after: journal.summary(),
+        })
+    }
+
+    async fn dispatch(
+        &mut self,
+        runtime: &Runtime,
+        authorizer: &dyn LiveAuthorizer,
+        clock: &dyn Clock,
+        signal: &CancelSignal,
+        deadline: Option<u64>,
+        gate: &JournalGate,
+    ) -> Result<RunStatus, LiveError> {
+        let spend = probe::spend_bindings(&self.spec.config);
+        let reach: BTreeMap<_, _> = self
+            .spec
+            .candidates
+            .iter()
+            .map(|(n, c)| (n.clone(), probe::reached(c)))
+            .collect();
+        let mut held: BTreeMap<BindingIdentity, u64> = BTreeMap::new();
+        let mut last: BTreeMap<BindingIdentity, u64> = BTreeMap::new();
+        let mut work: Vec<Work<'_>> = Vec::new();
+        let mut next = 0;
+        let mut status = RunStatus::EvaluatedLive;
+        let mut error = None;
+        loop {
+            if deadline.is_some_and(|d| clock.now() >= d) {
+                signal.raise();
+            }
+            if signal.is_raised() && status != RunStatus::SpendCapped {
+                status = RunStatus::Interrupted;
+            }
+            let mut wake_at = None;
+            if status == RunStatus::EvaluatedLive && error.is_none() {
+                while next < self.checkpoint.items.len() {
+                    let item = &self.checkpoint.items[next];
+                    if !pending(item) {
+                        next += 1;
+                        continue;
+                    }
+                    let case = self
+                        .spec
+                        .cases
+                        .iter()
+                        .find(|c| c.case_id == item.case_id)
+                        .expect("validated case");
+                    if let CaseInput::Unavailable { reason } = &case.input {
+                        self.checkpoint.items[next]
+                            .states
+                            .push(ItemState::Unavailable {
+                                reason: reason.clone(),
+                            });
+                        if let Err(e) = self.save() {
+                            error = Some(e);
+                            break;
+                        }
+                        next += 1;
+                        continue;
+                    }
+                    let bindings = &reach[&item.candidate];
+                    let rules: Vec<_> = self
+                        .spec
+                        .config
+                        .bindings
+                        .iter()
+                        .filter(|b| bindings.contains(&b.identity))
+                        .collect();
+                    if rules
+                        .iter()
+                        .any(|b| held.get(&b.identity).copied().unwrap_or(0) >= b.max_in_flight)
+                    {
+                        break;
+                    }
+                    let start = rules
+                        .iter()
+                        .filter_map(|b| {
+                            last.get(&b.identity)
+                                .map(|t| t.saturating_add(b.min_interval_ms))
+                        })
+                        .max()
+                        .unwrap_or(0);
+                    if start > clock.now() {
+                        wake_at = Some(start);
+                        break;
+                    }
+                    let CaseInput::Available {
+                        snapshot_id,
+                        source_time,
+                        scope,
+                        ..
+                    } = &case.input
+                    else {
+                        unreachable!()
+                    };
+                    let request = LiveRequest {
+                        decision_id: current_id(&self.spec.run_id, item),
+                        snapshot: self.snapshots[&case.case_id].clone(),
+                        expected_snapshot_id: Some(snapshot_id.clone()),
+                        evaluation_time: match self.spec.config.evaluation_time {
+                            EvaluationTime::Fixed { ms } => ms,
+                            EvaluationTime::Source => source_time.expect("checked source time"),
+                        },
+                        deadline_ms: rules.iter().map(|b| b.case_deadline_ms).min(),
+                        principal_handle: self.spec.principal_handle.clone(),
+                        subject: self.spec.subject.clone(),
+                        scope: scope.clone().unwrap_or_else(|| self.spec.scope.clone()),
+                        capture: None,
+                        historical: None,
+                    };
+                    let plan = match runtime.prepare(self.spec.candidates[&item.candidate].clone())
+                    {
+                        Ok(plan) => plan,
+                        Err(_) => {
+                            self.checkpoint.items[next].states.push(ItemState::Refused {
+                                code: "check-plan".into(),
+                            });
+                            if let Err(e) = self.save() {
+                                error = Some(e);
+                                break;
+                            }
+                            next += 1;
+                            continue;
+                        }
+                    };
+                    for b in bindings {
+                        *held.entry(b.clone()).or_default() += 1;
+                        last.insert(b.clone(), clock.now());
+                    }
+                    let index = next;
+                    let spend = &spend;
+                    work.push(Box::pin(async move {
+                        let result = runtime
+                            .reexecute_live_with_gate(
+                                &plan,
+                                request,
+                                authorizer,
+                                signal,
+                                LiveSpend {
+                                    gate,
+                                    bindings: spend,
+                                },
+                            )
+                            .await;
+                        (index, result)
+                    }));
+                    next += 1;
+                    // Poll admitted work before admitting another item, so an immediate
+                    // spend refusal stops admission at its first observable result.
+                    break;
+                }
+            }
+            if work.is_empty()
+                && (next == self.checkpoint.items.len()
+                    || status != RunStatus::EvaluatedLive
+                    || error.is_some())
+            {
+                break;
+            }
+            let more = status == RunStatus::EvaluatedLive
+                && error.is_none()
+                && next < self.checkpoint.items.len()
+                && wake_at.is_none();
+            let mut timer = wake_at
+                .into_iter()
+                .chain(deadline.filter(|_| !signal.is_raised()))
+                .min()
+                .map(|d| clock.sleep_until(d));
+            let event = poll_fn(|cx| {
+                if status == RunStatus::EvaluatedLive && signal.poll_raised(cx).is_ready() {
+                    return Poll::Ready(None);
+                }
+                if deadline.is_some_and(|d| clock.now() >= d) && !signal.is_raised() {
+                    signal.raise();
+                    return Poll::Ready(None);
+                }
+                for (slot, f) in work.iter_mut().enumerate() {
+                    if let Poll::Ready(result) = f.as_mut().poll(cx) {
+                        return Poll::Ready(Some((slot, result)));
+                    }
+                }
+                if timer
+                    .as_mut()
+                    .is_some_and(|t| t.as_mut().poll(cx).is_ready())
+                {
+                    return Poll::Ready(None);
+                }
+                if more {
+                    // Continue only if the next item can acquire all its bindings.
+                    let item = &self.checkpoint.items[next];
+                    if !pending(item)
+                        || self
+                            .spec
+                            .config
+                            .bindings
+                            .iter()
+                            .filter(|b| reach[&item.candidate].contains(&b.identity))
+                            .all(|b| held.get(&b.identity).copied().unwrap_or(0) < b.max_in_flight)
+                    {
+                        return Poll::Ready(None);
+                    }
+                }
+                Poll::Pending
+            })
+            .await;
+            let Some((slot, (index, result))) = event else {
+                continue;
+            };
+            drop(work.remove(slot));
+            let item = &mut self.checkpoint.items[index];
+            for b in &reach[&item.candidate] {
+                *held.get_mut(b).expect("held binding") -= 1;
+            }
+            let state = match result {
+                Err(e) => ItemState::Refused {
+                    code: probe::refusal_code(&e).into(),
+                },
+                Ok(r) => {
+                    if let Some(s) = r.spend_refusal {
+                        status = RunStatus::SpendCapped;
+                        ItemState::Refused { code: s.code }
+                    } else if signal.is_raised() && matches!(r.completion, Completion::Cancelled) {
+                        // A judgment reached before the signal is kept.
+                        ItemState::Interrupted {
+                            attempt_ids: r
+                                .record
+                                .requests
+                                .iter()
+                                .flat_map(|q| &q.attempts)
+                                .map(|a| a.attempt_id.clone())
+                                .collect(),
+                        }
+                    } else if r.record.requests.iter().all(|q| q.attempts.is_empty())
+                        && r.document.effects.iter().any(|e| {
+                            matches!(e.authorization, AuthorizationOutcome::Refused { .. })
+                        })
+                    {
+                        ItemState::Refused {
+                            code: "authorization_refused".into(),
+                        }
+                    } else {
+                        match save_case(&self.opts, item, &r) {
+                            Ok(s) => s,
+                            Err(e) => {
+                                error.get_or_insert(e);
+                                continue;
+                            }
+                        }
+                    }
+                }
+            };
+            item.states.push(state);
+            if let Err(e) = self.save() {
+                error.get_or_insert(e);
+            }
+        }
+        if let Some(e) = error {
+            return Err(e);
+        }
+        Ok(status)
+    }
+}
+
+fn save_case(
+    opts: &RunOptions,
+    item: &CheckpointItem,
+    r: &LiveResult,
+) -> Result<ItemState, LiveError> {
+    let suffix = rerun(item)
+        .map(|k| format!(".rerun-{k}"))
+        .unwrap_or_default();
+    let name = format!(
+        "{}.{}.{}{suffix}",
+        item.candidate, item.repeat, item.case_id
+    );
+    let live = r.document.record_canonical().map_err(LiveError::io)?;
+    let record = r.record.record_canonical().map_err(LiveError::io)?;
+    write_atomic(
+        &opts.out.join("cases").join(format!("{name}.live.json")),
+        &live,
+    )?;
+    write_atomic(
+        &opts.out.join("cases").join(format!("{name}.run.json")),
+        &record,
+    )?;
+    // Document::record_digest uses schema-tagged record canonical bytes for
+    // both documents, including the version-aware run record implementation.
+    Ok(ItemState::Completed {
+        live_document_digest: r.document.record_digest().map_err(LiveError::io)?,
+        run_record_digest: r.record.record_digest().map_err(LiveError::io)?,
+    })
+}
