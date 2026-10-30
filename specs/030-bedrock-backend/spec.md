@@ -2,7 +2,7 @@
 id: "030-bedrock-backend"
 title: "Hosted model platform backend: AWS Bedrock"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-10-16"
 summary: >
   A remote decision backend under `integrations/rustev-bedrock/` for Amazon
@@ -19,7 +19,7 @@ summary: >
   are added by their own specs into members reserved here. Amends spec 001
   only by adding a cloud SDK dependency family to the boundary check.
   Approved (A-26) under the 2026-10-16 delivery work order; implementation
-  is pending. The work order authorizes paid Bedrock smoke and probe calls
+  is complete, with a recorded live exchange on each wire. The work order authorizes paid Bedrock smoke and probe calls
   on synthetic or spec 023 admitted data within R-29's USD 5 total testing
   cap across all providers; the owner supplies AWS credentials, whose
   absence blocks only the live stage. Approval makes no quality,
@@ -843,6 +843,66 @@ public price list for `ca-central-1`, geographic rate, read on 2026-10-29
   after, the rest unchanged. Headroom USD 4.976982 of R-29's USD 5.
 
 With this increment both wires have a recorded live exchange (3.14 item 3).
+
+**Closure (2026-10-30).** `implementation: complete`: every acceptance
+item is met. The "Not done, and blocked on the owner" paragraph after
+increment 2 is resolved: increments 3 and 4 ran the live probe and smoke
+on the owner's credentials within R-29's cap, the recorded fixtures exist
+for both wires, and `030` is in `VERIFIED_SPECS`. Each item and its tests:
+
+- Documented-shape and recorded fixtures, no network, both wires:
+  `both_wires_all_operations_and_modes_replay_verbatim` (the three
+  operations under each `structured_output` mode, including an answer
+  outside the options, supplied as received),
+  `all_stops_missing_duplicate_answers_and_usage`, `error_taxonomy_table`
+  (every 3.10 row, throttling, model-not-ready and Marketplace pending),
+  `documented_shapes_replay_and_extras_never_become_output`
+  (`tests/contract.rs`) and `recorded_exchanges_replay_offline`
+  (`tests/recorded.rs`).
+- The `rank`, `generate`, `extract` and screening fixtures are acceptance
+  of their own specs (3.12.3), not of this one.
+- Allowlist and residency refusals: `policy_denies_win_and_name_first_rule`,
+  `exact_policy_negative_cases_name_the_admission_failure`,
+  `residency_and_profile_mismatches_refuse` (`tests/contract.rs`) and
+  `policy_replacement_and_precancel_never_obtain_credentials_or_send`
+  (`tests/loopback.rs`).
+- Identity and goldens: `version_one_binding_digest_is_fixed`,
+  `all_output_affecting_members_enter_identity`,
+  `binding_changes_propagate_to_descriptor_and_plan_but_policy_does_not`,
+  `existing_reference_plan_bytes_and_ids_remain_identical` and
+  `reference_builders_still_compile_to_original_goldens`
+  (`tests/identity.rs`).
+- Signing: `published_aws_vectors` (the six cases of Fact 11) and
+  `bedrock_request_signs_payload_service_region_token_and_fixed_time`
+  (`tests/signing.rs`).
+- Without `aws-config`: `aws_config_is_optional_and_enabled_only_by_its_feature`
+  and `no_environment_access_outside_the_feature_module_and_the_smoke`
+  (`tests/environment.rs`, added by this closure, since neither half had a
+  test), with `environment_credentials_do_not_enable_the_probe_without_the_feature`
+  and `no_provider_is_refused_and_cleartext_remote_endpoints_are_refused`
+  (`tests/loopback.rs`) for the variables not being read.
+- With `aws-config`: `absent_environment_is_a_credential_failure_not_a_panic`
+  (`tests/credentials.rs`), declared under that feature.
+- Cancellation, one budget and credentials absent from records:
+  `cancellation_after_write_is_unconfirmed`,
+  `credential_acquisition_is_inside_the_total_budget` and
+  `signed_loopback_success_records_identity_and_does_not_leak_credentials`
+  (`tests/loopback.rs`).
+- The boundary check: `cloud_sdk_family_obeys_both_rules`
+  (`tools/rustev-boundaries`).
+- The live smoke and probe gates: `probe_without_live_flag_refuses_before_reading_files_or_credentials`
+  and `probe_over_cap_refuses_before_credential_discovery_or_dispatch`
+  (`tests/spend.rs`).
+- Section 5: the missing-policy row is the `compile_fail` doctest on
+  `BedrockBackend::new`; the distribution row is
+  `label_descriptor_never_satisfies_a_distribution_requirement`; the
+  Responses echo row is `responses_echo_stays_unknown_and_a_different_model_is_reported`;
+  the remaining rows are in the tests above.
+
+Nothing here makes a quality, residency-compliance or production claim.
+Spec 039's Bedrock `rank` items (A-49) can now be built: its offline
+fixtures and swap test, and its optional paid live `rank` smoke under
+Decision 18.
 
 ## Decisions at approval
 
