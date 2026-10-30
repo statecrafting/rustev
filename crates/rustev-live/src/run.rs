@@ -8,7 +8,8 @@ use std::pin::Pin;
 use std::task::Poll;
 
 use rustev_contract::ids::{ContentDigest, DatasetId, SnapshotId};
-use rustev_contract::live::AuthorizationOutcome;
+use rustev_contract::live::{AuthorizationOutcome, HistoricalLink};
+use rustev_contract::replay::ReplayBundle;
 use rustev_contract::scope::{Handle, Scope};
 use rustev_contract::snapshot::Snapshot;
 use rustev_contract::{Document, Identified, Timestamp};
@@ -26,7 +27,17 @@ use crate::probe::{self, ProbeInputs, ProbeReport, ProbeSnapshot, ProbeStatus};
 
 pub use crate::reports::ReportInputs;
 
+/// Host inputs for spec 026 comparison, used only after live execution.
+pub struct SourceComparison {
+    pub adapter: rustev_eval::dataset::AdapterRef,
+    pub agreement: rustev_eval::config::Agreement,
+    /// Called after each live result for trusted scope and current host time.
+    pub replay: Box<dyn Fn() -> rustev_eval::replay::ReplayConfig>,
+    pub resolver: Box<dyn rustev_eval::resolve::Resolver>,
+}
+
 pub struct RunSpec {
+    pub source_comparison: Option<SourceComparison>,
     pub reports: Option<ReportInputs>,
     pub config: LiveConfig,
     pub mode: Mode,
@@ -60,6 +71,8 @@ pub enum CaseOrigin {
 pub enum CaseInput {
     Available {
         source: CaseOrigin,
+        /// Retained source for optional offline comparison, never live supplies.
+        bundle: Option<Box<ReplayBundle>>,
         snapshot_bytes: Vec<u8>,
         snapshot_id: SnapshotId,
         source_time: Option<Timestamp>,
@@ -128,6 +141,60 @@ pub struct RunOutcome {
 pub fn prepare(spec: RunSpec, opts: RunOptions) -> Result<PreparedRun, LiveError> {
     if let Some(reports) = &spec.reports {
         reports.check(&spec)?;
+    }
+    if spec.config.compare_with_source {
+        let context = spec.source_comparison.as_ref().ok_or_else(|| {
+            LiveError::invalid("live-config", "source comparison context is required")
+        })?;
+        use rustev_contract::live::{MAX_NOTES, MAX_TEXT_BYTES};
+        if context.adapter.name.is_empty()
+            || context.adapter.version.is_empty()
+            || context.agreement.params.len() > MAX_NOTES
+            || [&context.adapter.name, &context.adapter.version]
+                .into_iter()
+                .chain(&context.agreement.params)
+                .any(|s| s.len() > MAX_TEXT_BYTES)
+        {
+            return Err(LiveError::invalid(
+                "live-config",
+                "invalid source comparison definition",
+            ));
+        }
+        for case in &spec.cases {
+            match &case.input {
+                CaseInput::Available {
+                    source:
+                        CaseOrigin::ReplayBundle {
+                            bundle_digest,
+                            decision_id,
+                        },
+                    bundle: Some(bundle),
+                    snapshot_id,
+                    ..
+                } => {
+                    let link = HistoricalLink::of(bundle)
+                        .map_err(|e| LiveError::invalid("live-config", e))?;
+                    if link.bundle_digest != *bundle_digest
+                        || link.decision_id != *decision_id
+                        || link.snapshot_id != *snapshot_id
+                    {
+                        return Err(LiveError::invalid(
+                            "live-config",
+                            "source bundle identity differs",
+                        ));
+                    }
+                }
+                // An unavailable bundle is that case's own outcome (spec 015),
+                // never a reason to refuse the run.
+                CaseInput::Unavailable { .. } => {}
+                _ => {
+                    return Err(LiveError::invalid(
+                        "live-config",
+                        "source comparison requires bundle inputs",
+                    ));
+                }
+            }
+        }
     }
     let reached: Candidates = spec
         .candidates
@@ -674,6 +741,7 @@ impl PreparedRun {
                     }
                     let CaseInput::Available {
                         snapshot_id,
+                        bundle,
                         source_time,
                         scope,
                         ..
@@ -694,7 +762,14 @@ impl PreparedRun {
                         subject: self.spec.subject.clone(),
                         scope: scope.clone().unwrap_or_else(|| self.spec.scope.clone()),
                         capture: None,
-                        historical: None,
+                        historical: if self.spec.config.compare_with_source {
+                            Some(
+                                HistoricalLink::of(bundle.as_ref().expect("checked bundle"))
+                                    .expect("checked historical link"),
+                            )
+                        } else {
+                            None
+                        },
                     };
                     let plan = match runtime.prepare(self.spec.candidates[&item.candidate].clone())
                     {
@@ -803,7 +878,7 @@ impl PreparedRun {
                 Err(e) => ItemState::Refused {
                     code: probe::refusal_code(&e).into(),
                 },
-                Ok(r) => {
+                Ok(mut r) => {
                     if let Some(s) = r.spend_refusal {
                         spend_refusal.get_or_insert_with(|| s.code.clone());
                         status = RunStatus::SpendCapped;
@@ -828,6 +903,42 @@ impl PreparedRun {
                             code: "authorization_refused".into(),
                         }
                     } else {
+                        if self.spec.config.compare_with_source {
+                            let context = self
+                                .spec
+                                .source_comparison
+                                .as_ref()
+                                .expect("checked comparison");
+                            let case = self
+                                .spec
+                                .cases
+                                .iter()
+                                .find(|c| c.case_id == item.case_id)
+                                .expect("validated case");
+                            let CaseInput::Available {
+                                bundle: Some(bundle),
+                                ..
+                            } = &case.input
+                            else {
+                                unreachable!("checked bundle")
+                            };
+                            let (comparison, retention) =
+                                rustev_eval::live::compare_live(&rustev_eval::live::LiveCase {
+                                    bundle,
+                                    resolver: context.resolver.as_ref(),
+                                    config: &(context.replay)(),
+                                    live: &r.document,
+                                    live_run: &r.record,
+                                    live_plan: &self.spec.candidates[&item.candidate].plan,
+                                    adapter: &context.adapter,
+                                    agreement: &context.agreement,
+                                });
+                            r.document = rustev_eval::live::with_comparison(
+                                &r.document,
+                                comparison,
+                                retention,
+                            );
+                        }
                         match save_case(&self.opts, &self.spec, gate.journal(), item, &r) {
                             Ok(s) => {
                                 if self.spec.reports.is_some() {
