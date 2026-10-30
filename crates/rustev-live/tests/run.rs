@@ -97,6 +97,7 @@ fn spec() -> RunSpec {
     let snapshot =
         ProbeSnapshot::from_bytes(&config.probe, &probe.canonical().unwrap(), &[]).unwrap();
     RunSpec {
+        acquisition_pages: vec![],
         source_comparison: None,
         reports: None,
         config,

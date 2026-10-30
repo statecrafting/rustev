@@ -597,6 +597,7 @@ impl LiveCaseDocument {
         source: CaseSource,
         journal: &crate::journal::SpendJournal,
         result: &rustev_runtime::LiveResult,
+        sources: &rustev_runtime::SourceOutcome,
     ) -> Result<Self, LiveError> {
         use rustev_contract::live::{AuthorizationOutcome, Dispatch};
         let mut spend = journal.reservations_detail(&result.document.decision_id);
@@ -620,6 +621,15 @@ impl LiveCaseDocument {
                 });
             }
         }
+        spend.extend(
+            sources
+                .refusals
+                .iter()
+                .map(|(attempt_id, code)| CaseSpend::Refused {
+                    attempt_id: attempt_id.clone(),
+                    refused: CaseRefusal { code: code.clone() },
+                }),
+        );
         let doc = Self {
             schema: Self::SCHEMA.into(),
             mode: CaseMode::LiveReexecution,
@@ -634,8 +644,25 @@ impl LiveCaseDocument {
                 EvaluationTime::Source => CaseEvaluationTime::Source,
                 EvaluationTime::Fixed { .. } => CaseEvaluationTime::Fixed,
             },
-            // The gated runtime refuses plans with acquisitions before returning a result.
-            acquisitions: BTreeMap::new(),
+            acquisitions: config
+                .acquisitions
+                .iter()
+                .map(|(source, mode)| {
+                    (
+                        source.clone(),
+                        match mode {
+                            AcquisitionMode::Live => CaseAcquisition::Live,
+                            AcquisitionMode::Captured => CaseAcquisition::Captured {
+                                capture_digests: sources
+                                    .captures
+                                    .get(source)
+                                    .cloned()
+                                    .unwrap_or_default(),
+                            },
+                        },
+                    )
+                })
+                .collect(),
             spend,
             declared_no_spend: config
                 .bindings

@@ -71,6 +71,53 @@ pub enum DispatchAnswer {
 /// them prevents dispatch.
 pub trait LiveAuthorizer: Send + Sync {
     fn authorize(&self, request: &AuthorizationRequest) -> Result<Option<DispatchAnswer>, String>;
+
+    /// Source dispatch is independently authorized. Existing hosts refuse it.
+    fn authorize_acquisition(
+        &self,
+        _request: &AcquisitionAuthorizationRequest,
+    ) -> Result<Option<DispatchAnswer>, String> {
+        Ok(None)
+    }
+}
+
+/// The exact source attempt presented to the host, with its own digest domain.
+#[derive(Debug, Clone)]
+pub struct AcquisitionAuthorizationRequest {
+    pub attempt: crate::AcquisitionSpendAttempt,
+    pub subject: Handle,
+    pub scope: Scope,
+    pub step: String,
+    pub tier: u32,
+    pub page: u32,
+    pub reserved_units: u64,
+    pub remaining_ms: u64,
+}
+impl AcquisitionAuthorizationRequest {
+    pub fn digest(&self) -> Result<ContentDigest, rustev_contract::canonical::CanonicalError> {
+        use rustev_contract::canonical::{canonical_bytes, tagged_digest};
+        let a = &self.attempt;
+        let bytes = canonical_bytes(&serde_json::json!({
+            "decision_id": a.decision_id, "attempt_id": a.attempt_id,
+            "source": a.source, "operation": a.operation, "request": a.request,
+            "bound": a.bound, "subject": self.subject, "scope": self.scope,
+            "step": self.step, "tier": self.tier, "page": self.page,
+            "reserved_units": self.reserved_units, "remaining_ms": self.remaining_ms,
+        }))?;
+        Ok(ContentDigest::parse(&tagged_digest(
+            "rustev.live-acquisition-authorization/1",
+            &bytes,
+        ))
+        .expect("computed digest"))
+    }
+}
+
+/// Source observations kept separate from the published live result.
+#[derive(Debug, Clone, Default)]
+pub struct SourceOutcome {
+    pub incomparable: Option<String>,
+    pub captures: BTreeMap<String, Vec<ContentDigest>>,
+    pub refusals: Vec<(String, String)>,
 }
 
 /// One live re-execution to run. Nothing here is taken from a replay bundle.
@@ -104,8 +151,7 @@ pub struct LiveRequest {
 /// or spent.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LiveRefusal {
-    /// Source operations need their own authorization and spend identities.
-    /// This backend-only gated entry point refuses them before admission.
+    /// A declared source has no unique posture in the gated request.
     SpendAcquisitionUnsupported,
     /// The decision id is the historical decision's.
     HistoricalDecisionId,
@@ -197,7 +243,11 @@ struct Presented {
 pub(crate) struct LiveCtx<'l> {
     authorizer: &'l dyn LiveAuthorizer,
     spend: Option<crate::LiveSpend<'l>>,
+    sources: crate::LiveSources<'l>,
     spend_refusal: Mutex<Option<crate::SpendRefusal>>,
+    acquisition_incomparable: Mutex<Option<String>>,
+    acquisition_captures: Mutex<BTreeMap<String, Vec<ContentDigest>>>,
+    acquisition_refusals: Mutex<Vec<(String, String)>>,
     subject: &'l Handle,
     scope: &'l Scope,
     operations: BTreeMap<String, Operation>,
@@ -216,6 +266,148 @@ pub(crate) struct Proposal<'p> {
 }
 
 impl LiveCtx<'_> {
+    pub(crate) fn captured_page(
+        &self,
+        r: &rustev_core::evaluate::PendingAcquisition,
+    ) -> Option<Result<Vec<u8>, ()>> {
+        self.spend?;
+        let posture = self
+            .sources
+            .acquisitions
+            .iter()
+            .find(|p| p.source == r.request.source)?;
+        if posture.posture != crate::AcquisitionPosture::Captured {
+            return None;
+        }
+        let id = r.request.id().ok();
+        let mut pages = self
+            .sources
+            .pages
+            .iter()
+            .filter(|p| Some(&p.request) == id.as_ref());
+        let first = pages.next().and_then(|p| p.record_canonical().ok());
+        let ambiguous = first
+            .as_ref()
+            .is_some_and(|b| pages.any(|p| p.record_canonical().ok().as_ref() != Some(b)));
+        if let Some(bytes) = first.filter(|_| !ambiguous) {
+            let digest = rustev_contract::acquisition::AcquisitionPage::parse(&bytes)
+                .expect("canonical page")
+                .record_digest()
+                .expect("canonical page digest");
+            let mut captures = self
+                .acquisition_captures
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            let digests = captures.entry(r.request.source.to_string()).or_default();
+            if !digests.contains(&digest) {
+                digests.push(digest);
+                digests.sort();
+            }
+            Some(Ok(bytes))
+        } else {
+            let mut reason = self
+                .acquisition_incomparable
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            if reason.is_none() || ambiguous {
+                *reason = Some(
+                    if ambiguous {
+                        "ambiguous-output"
+                    } else {
+                        "acquisition-not-captured"
+                    }
+                    .into(),
+                );
+            }
+            Some(Err(()))
+        }
+    }
+
+    pub(crate) fn source_spend(
+        &self,
+        cx: &DecisionCtx<'_, '_>,
+        r: &rustev_core::evaluate::PendingAcquisition,
+        attempt_id: &str,
+        bound: CostBound,
+        reserved: u64,
+    ) -> Result<Option<crate::spend::HeldSpend<'_>>, ()> {
+        let Some(spend) = self.spend else {
+            return Ok(None);
+        };
+        let refuse = |code: &str| {
+            self.acquisition_refusals
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .push((attempt_id.into(), code.into()));
+        };
+        if let Some(r) = self.spend_refusal() {
+            refuse(&r.code);
+            return Err(());
+        }
+        let attempt = crate::AcquisitionSpendAttempt {
+            decision_id: cx.decision_id.into(),
+            attempt_id: attempt_id.into(),
+            source: r.request.source.clone(),
+            operation: r.operation.clone(),
+            request: r.request.id().map_err(|_| ())?,
+            bound,
+        };
+        let now = cx.rt.clock.now();
+        let asked = AcquisitionAuthorizationRequest {
+            attempt,
+            subject: self.subject.clone(),
+            scope: self.scope.clone(),
+            step: r.step.clone(),
+            tier: r.tier_index,
+            page: r.page_index,
+            reserved_units: reserved,
+            remaining_ms: cx.deadline.saturating_sub(now),
+        };
+        let digest = asked.digest().map_err(|_| ())?;
+        let until = match catch_unwind(AssertUnwindSafe(|| {
+            self.authorizer.authorize_acquisition(&asked)
+        })) {
+            Ok(Ok(Some(DispatchAnswer::Allow {
+                answers,
+                valid_for_ms,
+                ..
+            }))) if answers == digest && cx.rt.clock.now() < now.saturating_add(valid_for_ms) => {
+                now.saturating_add(valid_for_ms)
+            }
+            _ => {
+                refuse("authorization_refused");
+                return Err(());
+            }
+        };
+        let mut refusal = self.spend_refusal.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(r) = &*refusal {
+            refuse(&r.code);
+            return Err(());
+        }
+        let result = if bound == CostBound::Unknown {
+            Err(crate::SpendRefusal::new("spend-exposure-unknown"))
+        } else {
+            spend.gate.reserve_acquisition(&asked.attempt)
+        };
+        match result {
+            Ok(ticket) => {
+                let held = crate::spend::HeldSpend::new(spend.gate, ticket);
+                if cx.rt.clock.now() >= until {
+                    held.release();
+                    refuse("authorization_refused");
+                    Err(())
+                } else {
+                    Ok(Some(held))
+                }
+            }
+            Err(r) => {
+                refuse(&r.code);
+                *refusal = Some(r);
+                Err(())
+            }
+        }
+    }
+
     pub(crate) fn spend_refusal(&self) -> Option<crate::SpendRefusal> {
         self.spend_refusal
             .lock()
@@ -454,14 +646,22 @@ impl Runtime {
         authorizer: &dyn LiveAuthorizer,
         cancel: &CancelSignal,
     ) -> Result<LiveResult, LiveRefusal> {
-        self.reexecute_live_inner(plan, req, authorizer, cancel, None)
-            .await
+        self.reexecute_live_inner(
+            plan,
+            req,
+            authorizer,
+            cancel,
+            None,
+            crate::LiveSources::default(),
+        )
+        .await
+        .map(|(result, _)| result)
     }
 
     /// Live re-execution with a durable spend gate, after budget and host
     /// authorization on every attempt. Existing ungated callers are unchanged.
-    /// Plans with acquisitions are refused before admission until source
-    /// authorization and spend identities are supported.
+    /// Plans with acquisitions are refused before admission.
+    /// Use `reexecute_live_with_sources` to supply source postures.
     pub async fn reexecute_live_with_gate(
         &self,
         plan: &PreparedPlan,
@@ -470,7 +670,38 @@ impl Runtime {
         cancel: &CancelSignal,
         spend: crate::LiveSpend<'_>,
     ) -> Result<LiveResult, LiveRefusal> {
-        self.reexecute_live_inner(plan, req, authorizer, cancel, Some(spend))
+        if plan
+            .compiled()
+            .plan
+            .acquisitions
+            .as_ref()
+            .is_some_and(|a| !a.is_empty())
+        {
+            return Err(LiveRefusal::SpendAcquisitionUnsupported);
+        }
+        self.reexecute_live_with_sources(
+            plan,
+            req,
+            authorizer,
+            cancel,
+            spend,
+            crate::LiveSources::default(),
+        )
+        .await
+        .map(|(result, _)| result)
+    }
+
+    /// Gated live execution with explicit source postures and separate observations.
+    pub async fn reexecute_live_with_sources(
+        &self,
+        plan: &PreparedPlan,
+        req: LiveRequest,
+        authorizer: &dyn LiveAuthorizer,
+        cancel: &CancelSignal,
+        spend: crate::LiveSpend<'_>,
+        sources: crate::LiveSources<'_>,
+    ) -> Result<(LiveResult, SourceOutcome), LiveRefusal> {
+        self.reexecute_live_inner(plan, req, authorizer, cancel, Some(spend), sources)
             .await
     }
 
@@ -481,15 +712,24 @@ impl Runtime {
         authorizer: &dyn LiveAuthorizer,
         cancel: &CancelSignal,
         spend: Option<crate::LiveSpend<'_>>,
-    ) -> Result<LiveResult, LiveRefusal> {
-        if spend.is_some()
-            && plan
-                .compiled()
+        sources: crate::LiveSources<'_>,
+    ) -> Result<(LiveResult, SourceOutcome), LiveRefusal> {
+        if spend.is_some_and(|_| {
+            plan.compiled()
                 .plan
                 .acquisitions
-                .as_ref()
-                .is_some_and(|a| !a.is_empty())
-        {
+                .iter()
+                .flatten()
+                .flat_map(|a| &a.sources)
+                .any(|a| {
+                    sources
+                        .acquisitions
+                        .iter()
+                        .filter(|p| p.source == a.source.id)
+                        .count()
+                        != 1
+                })
+        }) {
             return Err(LiveRefusal::SpendAcquisitionUnsupported);
         }
         if req
@@ -546,7 +786,11 @@ impl Runtime {
         let live = LiveCtx {
             authorizer,
             spend,
+            sources,
             spend_refusal: Mutex::new(None),
+            acquisition_incomparable: Mutex::new(None),
+            acquisition_captures: Mutex::new(BTreeMap::new()),
+            acquisition_refusals: Mutex::new(vec![]),
             subject: &req.subject,
             scope: &req.scope,
             operations,
@@ -600,14 +844,31 @@ impl Runtime {
             }
             _ => Completion::Cancelled,
         };
-        Ok(LiveResult {
-            spend_refusal,
-            completion,
-            record,
-            delivery,
-            capture,
-            document,
-        })
+        let sources = SourceOutcome {
+            incomparable: live
+                .acquisition_incomparable
+                .into_inner()
+                .unwrap_or_else(|e| e.into_inner()),
+            captures: live
+                .acquisition_captures
+                .into_inner()
+                .unwrap_or_else(|e| e.into_inner()),
+            refusals: live
+                .acquisition_refusals
+                .into_inner()
+                .unwrap_or_else(|e| e.into_inner()),
+        };
+        Ok((
+            LiveResult {
+                spend_refusal,
+                completion,
+                record,
+                delivery,
+                capture,
+                document,
+            },
+            sources,
+        ))
     }
 }
 

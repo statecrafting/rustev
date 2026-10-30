@@ -873,7 +873,7 @@ fn acquisition_execution_timeout_validation() {
 }
 
 #[tokio::test]
-async fn gated_live_acquisitions_refuse_before_any_source_call() {
+async fn gated_live_acquisitions_without_posture_refuse_before_any_source_call() {
     struct NoCalls;
     impl rustev_runtime::LiveAuthorizer for NoCalls {
         fn authorize(

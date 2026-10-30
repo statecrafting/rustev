@@ -54,6 +54,13 @@ impl SpendRefusal {
 /// failures must retain liability. Implementations must not panic.
 pub trait SpendGate: Send + Sync {
     fn reserve(&self, attempt: &SpendAttempt) -> Result<SpendTicket, SpendRefusal>;
+    /// Source costs are monetary units. Older gates refuse source attempts.
+    fn reserve_acquisition(
+        &self,
+        _attempt: &AcquisitionSpendAttempt,
+    ) -> Result<SpendTicket, SpendRefusal> {
+        Err(SpendRefusal::new("acquisition-unsupported"))
+    }
     fn settle(&self, ticket: SpendTicket, charge: &Charge);
     fn release(&self, ticket: SpendTicket);
 }
@@ -63,6 +70,37 @@ pub trait SpendGate: Send + Sync {
 pub struct LiveSpend<'a> {
     pub gate: &'a dyn SpendGate,
     pub bindings: &'a [SpendBinding],
+}
+
+/// Source posture and retained pages for the source-aware live entry point.
+#[derive(Clone, Copy, Default)]
+pub struct LiveSources<'a> {
+    pub acquisitions: &'a [LiveAcquisition],
+    pub pages: &'a [rustev_contract::acquisition::AcquisitionPage],
+}
+
+/// Explicit source posture for a gated decision. Identities are descriptor ids.
+#[derive(Debug, Clone)]
+pub struct LiveAcquisition {
+    pub source: rustev_contract::ids::SourceId,
+    pub posture: AcquisitionPosture,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AcquisitionPosture {
+    Captured,
+    Live,
+}
+
+/// Source attempts have their own identity, never a fabricated backend artifact.
+#[derive(Debug, Clone)]
+pub struct AcquisitionSpendAttempt {
+    pub decision_id: String,
+    pub attempt_id: String,
+    pub source: rustev_contract::ids::SourceId,
+    pub operation: String,
+    pub request: rustev_contract::ids::AcquisitionRequestId,
+    pub bound: CostBound,
 }
 
 pub(crate) struct HeldSpend<'a> {

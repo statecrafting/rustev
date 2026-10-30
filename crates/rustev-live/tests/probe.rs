@@ -271,6 +271,7 @@ async fn run(
     )
     .unwrap();
     let inputs = ProbeInputs {
+        acquisition_pages: &[],
         runtime: &rig.rt,
         config,
         candidates,

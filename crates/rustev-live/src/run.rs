@@ -16,7 +16,8 @@ use rustev_contract::{Document, Identified, Timestamp};
 use rustev_core::Compiled;
 use rustev_core::seams::CancelSignal;
 use rustev_runtime::{
-    Clock, Completion, LiveAuthorizer, LiveRefusal, LiveRequest, LiveResult, LiveSpend, Runtime,
+    Clock, Completion, LiveAuthorizer, LiveRefusal, LiveRequest, LiveResult, LiveSources,
+    LiveSpend, Runtime, SourceOutcome,
 };
 use serde::{Deserialize, Serialize};
 
@@ -37,6 +38,8 @@ pub struct SourceComparison {
 }
 
 pub struct RunSpec {
+    /// Host-resolved retained page documents, also used by the synthetic probe.
+    pub acquisition_pages: Vec<rustev_contract::acquisition::AcquisitionPage>,
     pub source_comparison: Option<SourceComparison>,
     pub reports: Option<ReportInputs>,
     pub config: LiveConfig,
@@ -138,7 +141,21 @@ pub struct RunOutcome {
 }
 
 /// Validate all resolved inputs before the caller opens a journal.
-pub fn prepare(spec: RunSpec, opts: RunOptions) -> Result<PreparedRun, LiveError> {
+pub fn prepare(mut spec: RunSpec, opts: RunOptions) -> Result<PreparedRun, LiveError> {
+    probe::check_acquisitions(&spec.config, &spec.candidates)?;
+    for (i, page) in spec.acquisition_pages.iter().enumerate() {
+        let key = format!("live-acquisition-capture/{i}");
+        if spec
+            .input_digests
+            .insert(key, page.record_digest().map_err(LiveError::io)?)
+            .is_some()
+        {
+            return Err(LiveError::invalid(
+                "live-config",
+                "reserved capture digest key",
+            ));
+        }
+    }
     if let Some(reports) = &spec.reports {
         reports.check(&spec)?;
     }
@@ -393,7 +410,8 @@ fn pending(item: &CheckpointItem) -> bool {
     )
 }
 
-type Work<'a> = Pin<Box<dyn Future<Output = (usize, Result<LiveResult, LiveRefusal>)> + 'a>>;
+type Work<'a> =
+    Pin<Box<dyn Future<Output = (usize, Result<(LiveResult, SourceOutcome), LiveRefusal>)> + 'a>>;
 
 impl PreparedRun {
     fn save(&self) -> Result<(), LiveError> {
@@ -447,6 +465,7 @@ impl PreparedRun {
         }
         self.save()?;
         let inputs = ProbeInputs {
+            acquisition_pages: &self.spec.acquisition_pages,
             runtime,
             config: &self.spec.config,
             candidates: &self.spec.candidates,
@@ -468,7 +487,7 @@ impl PreparedRun {
                 authorizer,
                 &gate,
                 &signal,
-                |index, call, candidate, result| {
+                |index, call, candidate, result, sources| {
                     let doc = LiveCaseDocument::from_result(
                         &self.spec.config,
                         CaseRun {
@@ -481,6 +500,7 @@ impl PreparedRun {
                         CaseSource::None,
                         &journal,
                         result,
+                        sources,
                     )?;
                     doc.write_result(&probe_dir.join(format!("{index}.{call}")), result)
                         .map(Some)
@@ -666,6 +686,7 @@ impl PreparedRun {
         gate: &JournalGate,
     ) -> Result<(RunStatus, Option<String>), LiveError> {
         let spend = probe::spend_bindings(&self.spec.config);
+        let acquisitions = probe::acquisition_postures(&self.spec.config)?;
         let reach: BTreeMap<_, _> = self
             .spec
             .candidates
@@ -790,11 +811,30 @@ impl PreparedRun {
                         *held.entry(b.clone()).or_default() += 1;
                         last.insert(b.clone(), clock.now());
                     }
+                    let mut pages = self.spec.acquisition_pages.clone();
+                    if let Some(bundle) = bundle {
+                        for entry in bundle.acquisition_pages.iter().flatten() {
+                            if let rustev_contract::retention::Retention::Retained {
+                                bytes,
+                                digest,
+                                ..
+                            } = &entry.value.retention
+                                && let Ok(page) =
+                                    rustev_contract::acquisition::AcquisitionPage::parse(
+                                        bytes.as_bytes(),
+                                    )
+                                && page.record_digest().ok().as_ref() == Some(digest)
+                            {
+                                pages.push(page);
+                            }
+                        }
+                    }
+                    let acquisitions = &acquisitions;
                     let index = next;
                     let spend = &spend;
                     work.push(Box::pin(async move {
                         let result = runtime
-                            .reexecute_live_with_gate(
+                            .reexecute_live_with_sources(
                                 &plan,
                                 request,
                                 authorizer,
@@ -802,6 +842,10 @@ impl PreparedRun {
                                 LiveSpend {
                                     gate,
                                     bindings: spend,
+                                },
+                                LiveSources {
+                                    acquisitions,
+                                    pages: &pages,
                                 },
                             )
                             .await;
@@ -878,11 +922,26 @@ impl PreparedRun {
                 Err(e) => ItemState::Refused {
                     code: probe::refusal_code(&e).into(),
                 },
-                Ok(mut r) => {
-                    if let Some(s) = r.spend_refusal {
+                Ok((mut r, sources)) => {
+                    if let Some(s) = &r.spend_refusal {
+                        if !sources.refusals.is_empty() {
+                            save_case(&self.opts, &self.spec, gate.journal(), item, &r, &sources)?;
+                        }
                         spend_refusal.get_or_insert_with(|| s.code.clone());
                         status = RunStatus::SpendCapped;
-                        ItemState::Refused { code: s.code }
+                        ItemState::Refused {
+                            code: s.code.clone(),
+                        }
+                    } else if let Some(reason) = &sources.incomparable {
+                        save_case(&self.opts, &self.spec, gate.journal(), item, &r, &sources)?;
+                        ItemState::Refused {
+                            code: reason.clone(),
+                        }
+                    } else if !sources.refusals.is_empty() {
+                        save_case(&self.opts, &self.spec, gate.journal(), item, &r, &sources)?;
+                        ItemState::Refused {
+                            code: sources.refusals[0].1.clone(),
+                        }
                     } else if signal.is_raised() && matches!(r.completion, Completion::Cancelled) {
                         // A judgment reached before the signal is kept.
                         ItemState::Interrupted {
@@ -939,7 +998,8 @@ impl PreparedRun {
                                 retention,
                             );
                         }
-                        match save_case(&self.opts, &self.spec, gate.journal(), item, &r) {
+                        match save_case(&self.opts, &self.spec, gate.journal(), item, &r, &sources)
+                        {
                             Ok(s) => {
                                 if self.spec.reports.is_some() {
                                     let observation = crate::reports::completed(
@@ -991,6 +1051,7 @@ fn save_case(
     journal: &SpendJournal,
     item: &CheckpointItem,
     r: &LiveResult,
+    sources: &SourceOutcome,
 ) -> Result<ItemState, LiveError> {
     let case = spec
         .cases
@@ -1026,6 +1087,7 @@ fn save_case(
         source,
         journal,
         r,
+        sources,
     )?;
     doc.write_result(&opts.out.join("cases").join(case_name(item)), r)?;
     Ok(ItemState::Completed {
