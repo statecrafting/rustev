@@ -123,8 +123,26 @@ These gaps are not claims of spec acceptance:
   configured means explicit delivery failure. Ecosystem backends and context
   clients still require host construction. OpenTelemetry startup is refused
   because no exporter feature is built.
-- Container packaging, the shared conformance suite, remote HTTP context
-  bindings, and specs 034/036 integration are intentionally outside this increment.
+- The shared conformance suite, remote HTTP context bindings, and specs 034/036
+  integration are not implemented yet.
+
+## Image
+
+`image/Dockerfile` builds the binary on the pinned Rust toolchain image and
+copies it alone onto the pinned `gcr.io/distroless/cc-debian12:nonroot` base,
+as user and group 65532, with entrypoint
+`/usr/local/bin/rustev-serve --config /etc/rustev/serve.json`. Mount the
+configuration there; the root filesystem can be read-only. From the
+repository root:
+
+```sh
+docker buildx build --platform linux/arm64 --load -t rustev-serve:dev \
+  -f integrations/rustev-serve/image/Dockerfile .
+integrations/rustev-serve/image/check.sh rustev-serve:dev linux/arm64
+```
+
+Release builds, SBOMs, signatures and publication belong to the release
+tooling (spec 031), not this file.
 
 ## Verification
 
