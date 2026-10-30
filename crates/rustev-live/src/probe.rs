@@ -23,8 +23,8 @@ use rustev_contract::{Document, Identified};
 use rustev_core::Compiled;
 use rustev_core::seams::CancelSignal;
 use rustev_runtime::{
-    Clock, LiveAuthorizer, LiveRefusal, LiveRequest, LiveResult, LiveSpend, PreparedPlan, Runtime,
-    SpendBinding, SpendUnit,
+    Clock, LiveAuthorizer, LiveRefusal, LiveRequest, LiveResult, LiveSources, LiveSpend,
+    PreparedPlan, Runtime, SourceOutcome, SpendBinding, SpendUnit,
 };
 use serde::{Deserialize, Serialize};
 
@@ -87,6 +87,7 @@ impl ProbeSnapshot {
 
 /// Everything one probe needs besides the authorizer, gate and signal.
 pub struct ProbeInputs<'a> {
+    pub acquisition_pages: &'a [rustev_contract::acquisition::AcquisitionPage],
     pub runtime: &'a Runtime,
     /// The checked configuration (`LiveConfig::check`).
     pub config: &'a LiveConfig,
@@ -211,7 +212,7 @@ pub async fn probe(
     gate: &JournalGate,
     cancel: &CancelSignal,
 ) -> Result<ProbeReport, LiveError> {
-    probe_recorded(inputs, authorizer, gate, cancel, |_, _, _, _| Ok(None)).await
+    probe_recorded(inputs, authorizer, gate, cancel, |_, _, _, _, _| Ok(None)).await
 }
 
 pub(crate) async fn probe_recorded(
@@ -219,7 +220,13 @@ pub(crate) async fn probe_recorded(
     authorizer: &dyn LiveAuthorizer,
     gate: &JournalGate,
     cancel: &CancelSignal,
-    mut record: impl FnMut(usize, u64, &str, &LiveResult) -> Result<Option<ContentDigest>, LiveError>,
+    mut record: impl FnMut(
+        usize,
+        u64,
+        &str,
+        &LiveResult,
+        &SourceOutcome,
+    ) -> Result<Option<ContentDigest>, LiveError>,
 ) -> Result<ProbeReport, LiveError> {
     let ProbeInputs {
         runtime: rt,
@@ -300,6 +307,8 @@ pub(crate) async fn probe_recorded(
         return Ok(report);
     }
 
+    check_acquisitions(config, candidates)?;
+    let acquisitions = acquisition_postures(config)?;
     let spend_bindings = spend_bindings(config);
     let mut stopped = None;
     'bindings: for (index, (p, b)) in probes.iter_mut().zip(&config.bindings).enumerate() {
@@ -326,7 +335,7 @@ pub(crate) async fn probe_recorded(
             }
             let decision_id = format!("live/{}/{PURPOSE}/{}/{call}", gate.run_id(), index + 1);
             let result = rt
-                .reexecute_live_with_gate(
+                .reexecute_live_with_sources(
                     &plan,
                     LiveRequest {
                         decision_id: decision_id.clone(),
@@ -346,13 +355,17 @@ pub(crate) async fn probe_recorded(
                         gate,
                         bindings: &spend_bindings,
                     },
+                    LiveSources {
+                        acquisitions: &acquisitions,
+                        pages: inputs.acquisition_pages,
+                    },
                 )
                 .await;
             last_end = Some(inputs.clock.now());
             let case_digest = result
                 .as_ref()
                 .ok()
-                .map(|r| record(index + 1, call, &p.candidate, r))
+                .map(|(r, sources)| record(index + 1, call, &p.candidate, r, sources))
                 .transpose()?
                 .flatten();
             let mut observed = observe(&p.identity, &decision_id, result);
@@ -406,7 +419,7 @@ struct Observed {
 fn observe(
     binding: &BindingIdentity,
     decision_id: &str,
-    result: Result<LiveResult, LiveRefusal>,
+    result: Result<(LiveResult, SourceOutcome), LiveRefusal>,
 ) -> Observed {
     let mut call = ProbeCall {
         case_digest: None,
@@ -415,7 +428,7 @@ fn observe(
         served: vec![],
         code: None,
     };
-    let r = match result {
+    let (r, sources) = match result {
         Ok(r) => r,
         Err(e) => {
             call.code = Some(refusal_code(&e).into());
@@ -443,6 +456,10 @@ fn observe(
     let spend_refusal = r.spend_refusal.map(|s| s.code);
     call.code = if let Some(code) = &spend_refusal {
         Some(code.clone())
+    } else if let Some(reason) = sources.incomparable {
+        Some(reason)
+    } else if !sources.refusals.is_empty() {
+        Some(sources.refusals[0].1.clone())
     } else if refused_authorization {
         Some("authorization_refused".into())
     } else if let Some(end) = ends.iter().find(|e| **e != AttemptEnd::Output) {
@@ -502,7 +519,7 @@ fn verdict(p: &BindingProbe) -> Option<IdentityVerdict> {
 
 pub(crate) fn refusal_code(e: &LiveRefusal) -> &'static str {
     match e {
-        LiveRefusal::SpendAcquisitionUnsupported => "acquisition-unsupported",
+        LiveRefusal::SpendAcquisitionUnsupported => "acquisition-undeclared",
         LiveRefusal::Rejected(_) => "rejected",
         LiveRefusal::GenerationFailed(_) => "generation-failed",
         LiveRefusal::SnapshotIdentity { .. } | LiveRefusal::InvalidSnapshot(_) => {
@@ -523,6 +540,49 @@ pub(crate) fn spend_bindings(config: &LiveConfig) -> Vec<SpendBinding> {
                 CostUnit::NanoUsd => SpendUnit::NanoUsd,
                 CostUnit::None => SpendUnit::None,
             },
+        })
+        .collect()
+}
+
+/// Configuration keys name the exact SourceId, not a mutable source alias.
+pub(crate) fn check_acquisitions(
+    config: &LiveConfig,
+    candidates: &BTreeMap<String, Compiled>,
+) -> Result<(), LiveError> {
+    let declared: BTreeSet<_> = candidates
+        .values()
+        .flat_map(|c| c.plan.acquisitions.iter().flatten())
+        .flat_map(|a| &a.sources)
+        .map(|s| s.source.id.to_string())
+        .collect();
+    if declared != config.acquisitions.keys().cloned().collect() {
+        return Err(LiveError::invalid(
+            "acquisition-undeclared",
+            "configured sources differ from candidate sources",
+        ));
+    }
+    Ok(())
+}
+
+pub(crate) fn acquisition_postures(
+    config: &LiveConfig,
+) -> Result<Vec<rustev_runtime::LiveAcquisition>, LiveError> {
+    config
+        .acquisitions
+        .iter()
+        .map(|(source, posture)| {
+            Ok(rustev_runtime::LiveAcquisition {
+                source: rustev_contract::ids::SourceId::parse(source)
+                    .map_err(|e| LiveError::invalid("acquisition-undeclared", e))?,
+                posture: match posture {
+                    crate::documents::AcquisitionMode::Live => {
+                        rustev_runtime::AcquisitionPosture::Live
+                    }
+                    crate::documents::AcquisitionMode::Captured => {
+                        rustev_runtime::AcquisitionPosture::Captured
+                    }
+                },
+            })
         })
         .collect()
 }
