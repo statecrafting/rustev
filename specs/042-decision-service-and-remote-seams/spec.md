@@ -1223,6 +1223,17 @@ the tick where lag first passed `max_lag_ms` invalidated the source's plans
 twice; the gap was counted once either way. Test:
 `contexts::tests::a_tick_invalidates_at_most_once_even_when_failure_and_lag_coincide`.
 
+**Per-decision parallel requests (2026-10-30).** As ratified in 3.5.4 and
+3.15: `rustev.serve-config/1`'s `runtime` gains the optional
+`max_parallel_requests` (`RuntimeConfig` in
+`crates/rustev-contract/src/serve.rs`, 1 to 65,536, never null, omitted
+from the canonical form when absent so such a configuration keeps its
+digest), and `integrations/rustev-serve/src/service.rs` hands it to the
+runtime, 1 when absent. The configuration's JSON Schema and the TypeScript
+document types are regenerated. Test:
+`parallel_requests_are_optional_bounded_and_absent_keeps_the_digest` in
+`crates/rustev-contract/tests/042_serve_documents.rs`.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

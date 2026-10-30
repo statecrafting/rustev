@@ -20526,6 +20526,12 @@ export namespace RustevServeConfig1 {
   }
   export interface RuntimeConfig {
     max_in_flight: Number_1_65536;
+    /**
+     * Requests in progress within one decision (3.5.4, spec 003 3.4.2).
+     * Optional; absent is 1, and a configuration without it keeps its
+     * digest.
+     */
+    max_parallel_requests?: Number_1_65536 | null;
     max_queued: Number_0_65536;
     per_backend_concurrency: {
       [k: string]: Number_1_65536 | undefined;
