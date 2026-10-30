@@ -884,6 +884,20 @@ denominator now anchors on the shared case source in
 `crates/rustev-eval/mutation/seeds.py`, with the same mutant. Tests: `crates/rustev-eval/tests/observed.rs`,
 `crates/rustev-eval/tests/live_separation.rs`.
 
+**Increment 5 part c (2026-10-29): the run summary.** `PreparedRun::execute`
+ends every run, probe-only included, by writing `live-run.json`, the
+record canonical bytes of `rustev.live-run/1` (3.11.4), by temporary
+file, `fsync` and rename: the identities of 3.10.1, the status and its
+stop reason (the first spend refusal code, `run-deadline`, `cancelled`,
+or the first failing probe code), the probe section (the probe
+snapshot's digest and declared provenance and each binding's verdict, so
+`--probe-only` writes it as 3.7.5 requires), counts per item status, the
+run spend split, the journal's totals before and after, and each
+completed item's live document and run record digests in work order.
+`repeat_reports` stays empty until the repeat outputs of 3.11.2 exist.
+`run::exit_code` maps the statuses to 3.14's provisional numbers (0,
+14, 15, 16). Tests: `crates/rustev-live/tests/run.rs`.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

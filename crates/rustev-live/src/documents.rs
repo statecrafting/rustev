@@ -358,6 +358,52 @@ pub struct LiveCheckpoint {
 }
 live_document!(LiveCheckpoint, "rustev.live-checkpoint/1");
 
+/// A completed work item's record digests, in work order.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LiveRunCase {
+    pub candidate: String,
+    pub repeat: u64,
+    pub case_id: String,
+    pub rerun: Option<u64>,
+    pub live_document_digest: ContentDigest,
+    pub run_record_digest: ContentDigest,
+}
+
+/// Record-canonical summary of a live run (spec 043, 3.11.4).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LiveRun {
+    pub schema: String,
+    pub identities: CheckpointBindings,
+    pub status: crate::run::RunStatus,
+    pub stop_reason: Option<String>,
+    pub probe: crate::probe::ProbeReport,
+    pub counts: BTreeMap<String, u64>,
+    pub run_spend: crate::journal::RunSpend,
+    pub journal_before: crate::journal::SpendSummary,
+    pub journal_after: crate::journal::SpendSummary,
+    pub cases: Vec<LiveRunCase>,
+    /// Empty until repeat outputs exist.
+    pub repeat_reports: Vec<ContentDigest>,
+}
+live_document!(LiveRun, "rustev.live-run/1");
+
+impl LiveRun {
+    pub fn check(&self) -> Result<(), LiveError> {
+        if self.schema != Self::SCHEMA {
+            return Err(LiveError::invalid("live-run", "wrong schema"));
+        }
+        let mut cases = BTreeSet::new();
+        for case in &self.cases {
+            if !cases.insert((&case.candidate, case.repeat, &case.case_id, case.rerun)) {
+                return Err(LiveError::invalid("live-run", "duplicate case"));
+            }
+        }
+        Ok(())
+    }
+}
+
 impl LiveCheckpoint {
     pub fn check(&self) -> Result<(), LiveError> {
         let invalid = |detail: &str| LiveError::invalid("checkpoint-mismatch", detail);
