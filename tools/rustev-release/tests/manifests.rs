@@ -85,8 +85,9 @@ fn the_release_set_fixes_the_first_family() {
                 "rustev-remote-http",
                 "rustev-runtime"
             ],
-            // Spec 045: the command surface the CLI depends on (spec 027).
-            vec!["rustev-otel", "rustev-surface"],
+            // Spec 045: the command surface the CLI depends on (spec 027), and
+            // the live run engine it depends on (spec 043, under 045 3.1.2).
+            vec!["rustev-live", "rustev-otel", "rustev-surface"],
             vec!["rustev-cli"],
             // Spec 031 3.1: the facade, always the last crate layer.
             vec!["rustev"],

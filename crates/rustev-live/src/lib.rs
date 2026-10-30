@@ -12,6 +12,9 @@ pub use run::{
     prepare,
 };
 
+/// Test-only crash injection behind the non-default `fault-injection`
+/// feature (spec 043 increment 9). Not supported API: it may change or
+/// disappear in any release.
 #[cfg(feature = "fault-injection")]
 #[doc(hidden)]
 pub mod fault_injection;

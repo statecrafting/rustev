@@ -34,7 +34,7 @@
       "contentHash": "278d5561b60c28ddab7090f42c51c3d7ffd02720f6296e8e1b8a5189766890e2"
     },
     "Cargo.toml": {
-      "contentHash": "b4e1d330404f0a7fa3fea9111bcbd1407e49fdf72668e9e0777d1aff0b7f0f75"
+      "contentHash": "2eeb5d36b4592c8f7437e364925b3d062df7e60bad2328ac00a8b7a7aef5a611"
     },
     "Makefile": {
       "contentHash": "741e482ab276b08e25c3b2791dc78faf23d318d8a46647af61ac1a0993653167"
@@ -56,6 +56,9 @@
     },
     "crates/rustev-eval/LICENSE": {
       "contentHash": "64b3a80b501a616ac9b8f8eeaf80a20921a4901e935359e93a3f46c721b3de20"
+    },
+    "crates/rustev-live/LICENSE": {
+      "contentHash": "56b0d59dc83b2372d73ed0f7818e790b464b1c12378ff8d8057842e499d2c7d2"
     },
     "crates/rustev-runtime/LICENSE": {
       "contentHash": "555c3777d1cf0db4a55bbd7a553f6301d4271644504d7f83b13d414186fd73c6"

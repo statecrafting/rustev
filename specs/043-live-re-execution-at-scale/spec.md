@@ -1020,6 +1020,37 @@ against offline replay of the same bundle, with captured, missing and
 ambiguous pages), `crates/rustev-runtime/tests/live.rs`,
 `crates/rustev-runtime/tests/acquisition.rs`.
 
+**Increment 7 part a (2026-10-30): `rustev eval live`.** `crates/rustev-cli/src/live.rs`
+adds the command of 3.13, matched before `rustev eval` (3.1.3): usage
+errors before any file is read (no `--live`, `--live-config` or
+`--journal`, a `--repeat` flag, not exactly one of `--snapshots` and
+`--bundles`); inputs read and digested before the journal is opened
+(`data-not-admitted` for a `real` dataset without `--admission`;
+snapshot files identified anew, missing ones `snapshot-missing`; bundle
+inputs read for 3.3.2's members only, expired or invalid ones
+unavailable with spec 015's reason); the rules backend as the only
+linked backend (3.13.2); the authorizer of 3.12 from `authorize`; the
+journal opened after every input check (`journal-locked`, exit 3;
+`journal-budget`); the run on the injected Tokio clock with Ctrl-C as
+the cancel signal; one stdout line (3.13.4); and exit codes 14, 15 and 16
+(3.14). Refused in this increment: `--captures`, `compare_with_source`,
+plans with acquisitions and final-test exposure recording. Tests:
+`crates/rustev-cli/tests/eval_live.rs`.
+Because the published CLI now depends on `rustev-live`, the crate joins
+the release family under spec 045 3.1.2 (a crate a release member depends
+on is admitted once it exists and passes its checks): `publish =
+["crates-io"]`, the family metadata, `LICENSE` and an `include` of its
+source; crate layer 4 beside `rustev-otel` and `rustev-surface`, uploaded
+after `rustev-eval` (045 3.2); its archive allowlist and bounds; the
+release-set test's member list; and a `member_features` allowance for
+`fault-injection`, citing increment 9 (owner decision of 2026-10-30: off
+by default, documented as test-only and not supported API). A release
+member cannot dev-depend on itself (spec 021 3.2's exact internal
+versions), so the crash test of increment 9 moves to the unpublished
+workspace crate `rustev-live-crash` (`crates/rustev-live/crash/`,
+excluded from the release set as a test harness), which enables the
+feature from outside; `rustev-live`'s own tests no longer build it.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

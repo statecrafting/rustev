@@ -15,6 +15,7 @@ mod eval;
 mod explain;
 mod host;
 pub mod io;
+mod live;
 /// Command output, shared with every host (spec 027, 3.1).
 pub use rustev_surface::out;
 mod plan;
@@ -66,8 +67,13 @@ pub fn execute(argv: &[String], cx: &Context) -> Exit {
         Ok(Invocation::Command(p)) => p,
         Err(u) => return usage_exit(u),
     };
-    // Besides `version`, `trace tail --text` is the one command whose stdout
-    // is not one JSON object (spec 028, 3.11.4).
+    if parsed.spec.path == ["eval", "live"] {
+        return match live::run(&parsed, cx) {
+            Ok(exit) => exit,
+            Err(u) => usage_exit(u),
+        };
+    }
+    // `trace tail --text` also uses plain text (spec 028, 3.11.4).
     if parsed.spec.path == ["trace", "tail"] {
         return match trace::tail(&parsed) {
             Ok(exit) => exit,
