@@ -26,7 +26,7 @@ fn binding() -> ProductionBinding {
         schema: SCHEMA.into(),
         usage: BindingUse::Production,
         decision: JevBinding::direct("jev-1.13.0"),
-        mapping: "rustev-jev-direct-synthetic/1".into(),
+        mapping: SYNTHETIC_MECHANICS_MAPPING.into(),
         facts: TransportFacts {
             endpoint: "https://synthetic.invalid/v1/evaluate".into(),
             api_version: "synthetic/1".into(),
@@ -354,11 +354,6 @@ fn billing_differences_are_signed_and_do_not_rewrite_the_journal() {
 }
 
 #[test]
-#[ignore = "stage 2 needs owner-supplied credential, direct API access, recorded shapes and shared USD 5 spend authority"]
-fn live_direct_smoke() {
-    panic!("No verified direct API mapping; must not dispatch");
-}
-#[test]
 #[ignore = "stage 3 needs stage 2 mapping, owner authority, admitted dataset or explicitly limited synthetic provenance, metrics and spend record"]
 fn live_production_qualification() {
     panic!("No production qualification evidence");
@@ -669,4 +664,135 @@ async fn reuse_off_is_explicit_and_each_exchange_opens_a_connection() {
     }
     assert_eq!(g.hits(), 2);
     assert_eq!(g.connections.load(Ordering::SeqCst), 2);
+}
+
+/// A stage 3 binding (3.7.4): the direct mapping, at `endpoint`.
+fn qualification_binding(endpoint: &str) -> ProductionBinding {
+    let mut b = binding();
+    b.mapping = rustev_jev::binding::DIRECT_MAPPING_VERSION.into();
+    b.facts.endpoint = endpoint.into();
+    b
+}
+
+fn qualification(
+    b: ProductionBinding,
+    journal: SpendJournal,
+    count: Arc<AtomicUsize>,
+) -> Result<(JevBackend, Arc<KeepExchanges>), rustev_jev::adapter::SetupError> {
+    let sink = Arc::new(KeepExchanges::default());
+    let callback = Arc::new(move || {
+        count.fetch_add(1, Ordering::SeqCst);
+        Ok(Secret::new(KEY))
+    });
+    JevBackend::new_qualification("qualification", b, callback, sink.clone(), journal, TODAY)
+        .map(|backend| (backend, sink))
+}
+
+#[test]
+fn qualification_refuses_everything_3_7_4_forbids_before_any_credential() {
+    let endpoint = "https://api.typesafe.invalid/v1/systemone";
+    let count = Arc::new(AtomicUsize::new(0));
+    let refused = |b: ProductionBinding, journal: SpendJournal| {
+        qualification(b, journal, count.clone()).is_err()
+    };
+    let testing = || Journal::new();
+    // The direct mapping and a testing journal: built, no credential read.
+    let j = testing();
+    assert!(
+        qualification(
+            qualification_binding(endpoint),
+            j.journal.clone(),
+            count.clone()
+        )
+        .is_ok()
+    );
+    // A production journal.
+    let path = std::env::temp_dir().join(format!("rustev-022-q-{}.jsonl", std::process::id()));
+    let production =
+        SpendJournal::open(&path, BudgetKind::Production, Arc::new(SetClock::new(0))).unwrap();
+    assert!(refused(qualification_binding(endpoint), production));
+    let _ = std::fs::remove_file(&path);
+    // The synthetic mechanics mapping, or a decision binding on mapping/1.
+    let j = testing();
+    assert!(refused(binding(), j.journal.clone()));
+    let mut b = qualification_binding(endpoint);
+    b.decision.mapping_version = rustev_jev::binding::MAPPING_VERSION.into();
+    assert!(refused(b, j.journal.clone()));
+    // A Gateway decision binding.
+    let mut b = qualification_binding(endpoint);
+    b.decision.transport = Transport::Gateway;
+    assert!(refused(b, j.journal.clone()));
+    // A plaintext endpoint, or facts that fail 3.4.
+    assert!(refused(
+        qualification_binding("http://api.typesafe.invalid/v1/systemone"),
+        j.journal.clone()
+    ));
+    let mut b = qualification_binding(endpoint);
+    b.facts.retention_terms = String::new();
+    assert!(refused(b, j.journal.clone()));
+    assert_eq!(count.load(Ordering::SeqCst), 0, "no credential lookup");
+}
+
+#[test]
+fn only_the_synthetic_mapping_adds_a_privacy_member() {
+    use rustev_jev::adapter::production_body;
+    let body = br#"{"model":"jev-1.14.0","questions":{},"state":{}}"#.to_vec();
+    // The direct mapping sends spec 012's body unchanged: a `privacy`
+    // member made every request of the second stage 3 run HTTP 400.
+    let direct = qualification_binding("https://api.typesafe.invalid/v1/systemone");
+    assert_eq!(production_body(&direct, body.clone()), body);
+    let synthetic: serde_json::Value =
+        serde_json::from_slice(&production_body(&binding(), body)).unwrap();
+    assert_eq!(synthetic["privacy"]["zero_retention"], "true");
+}
+
+#[test]
+fn a_qualification_adapter_takes_the_endpoint_origin() {
+    use rustev_jev::adapter::origin;
+    // The client prefixes an endpoint's own path, so the binding's full
+    // endpoint must not be the base: that sent `/v1/systemone/v1/systemone`
+    // (HTTP 404) in the first stage 3 run.
+    assert_eq!(
+        origin("https://api.typesafe.ai/v1/systemone").unwrap(),
+        "https://api.typesafe.ai"
+    );
+    assert_eq!(
+        origin("https://127.0.0.1:8443/v1/systemone/").unwrap(),
+        "https://127.0.0.1:8443"
+    );
+    assert_eq!(
+        origin("https://api.typesafe.ai").unwrap(),
+        "https://api.typesafe.ai"
+    );
+}
+
+#[tokio::test]
+async fn a_qualification_record_names_the_production_binding_and_stage_3() {
+    // A loopback port nothing listens on: the attempt fails at connect, so
+    // no request leaves the machine, and the record is still delivered.
+    let dead = dead_url().await;
+    let endpoint = format!("{}/v1/systemone", dead.replacen("http://", "https://", 1));
+    let b = qualification_binding(&endpoint);
+    let artifact = b.artifact().unwrap();
+    let j = Journal::new();
+    let count = Arc::new(AtomicUsize::new(0));
+    let (backend, sink) = qualification(b.clone(), j.journal.clone(), count.clone()).unwrap();
+    assert_eq!(backend.artifact(), &artifact);
+    let r = call(
+        &backend,
+        "qualification/1",
+        &boolean_projection(),
+        5_000,
+        &CancelSignal::new(),
+    )
+    .await;
+    assert!(r.result.is_err());
+    let rec = &sink.until_records(1).await[0];
+    assert_eq!(rec.binding, artifact);
+    assert_eq!(rec.protocol, rustev_jev::binding::DIRECT_MAPPING_VERSION);
+    assert_eq!(rec.privacy_requested["qualification"], "stage 3");
+    assert_eq!(rec.privacy_requested["zero_retention"], "true");
+    // Still never a production construction.
+    assert!(b.production_eligible(TODAY, 5_000).is_err());
+    assert_loopback_only();
 }

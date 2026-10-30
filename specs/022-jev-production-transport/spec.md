@@ -470,20 +470,88 @@ propositions as `noul`; their cost members stay synthetic, for the
 reconciliation mechanics. The recorded exchanges keep no request headers
 and were checked for the key before they were written.
 
-Externally blocked, never reported as passed: stage 3 (qualification of a
-production binding, 3.7.3), which the owner authorized on 2026-10-29
-within R-29's cap and which has not run. Until it is recorded here with its
-spend, `JevBackend::new_production` refuses construction ("direct API
-mapping awaits owner-authorized qualification (stage 3)"), so no binding is
-production-eligible, and 022 is not `complete`.
-
 **The stage 3 construction (2026-10-29, A-68).** 3.7.4 is amended in, so
 stage 3 has a construction to run through: before it, `new_production`
 refused until stage 3 was recorded, and `new_mechanics` reaches only
 loopback. The facts the first stage 3 binding records were read on
 2026-10-29 from TypeSafe's public pages, and the owner accepted them
 (A-68). That binding pins `jev-1.14.0`, by the owner's choice, so a stage
-2 smoke at that pin comes first. Pending implementation.
+2 smoke at that pin comes first.
+
+Implemented: `JevBackend::new_qualification` refuses everything 3.7.4.1
+names before any credential lookup
+(`qualification_refuses_everything_3_7_4_forbids_before_any_credential`),
+and its record names the production binding's identity and protocol,
+`qualification: stage 3` and the zero-retention fact
+(`a_qualification_record_names_the_production_binding_and_stage_3`). It
+shares its construction with `new_mechanics`, and it keeps request and
+response bytes, since its content is synthetic. Two defects surfaced only
+live, and each now has a test. Passing the binding's full endpoint as the
+client's base doubled the path (HTTP 404), so the client now takes its
+`origin` (`a_qualification_adapter_takes_the_endpoint_origin`). The
+synthetic mechanics `privacy` member was sent under the direct mapping
+(HTTP 400), so it is now sent only under the synthetic mapping
+(`only_the_synthetic_mapping_adds_a_privacy_member`). The `live_direct_smoke`
+placeholder test, which said no direct mapping was verified, is removed.
+
+**Stage 2 at `jev-1.14.0` (2026-10-29).** The harness's four synthetic
+cases at the new pin were all answered in the direct mapping's shapes, each
+reporting `model: jev-1.14.0`. Their fixtures,
+`tests/fixtures/recorded-direct-114-*-200.json`, replay in
+`tests/direct_recorded.rs` beside the `jev-1.13.0` recordings, which stay as
+that pin's evidence. Spend: 67,032 units estimated.
+
+**Stage 3, qualification (2026-10-29).** This ran on the production binding
+`sha256:12897cdf3796818833af333769e913d1a1f65a267532ea4de2ec3b144fd40bd4`:
+schema 2, direct transport, pin `jev-1.14.0`, `rustev-jev-mapping/2`, and
+A-68's facts, constructed through `new_qualification` and run with this
+change's code.
+
+- Set: spec 012's stage 3 synthetic-provenance set, with that limitation
+  stated (no spec 023 dataset is admitted, 3.8.7). It has the same dataset
+  ids, read from that run's retained canonical documents and snapshots, and
+  each file was checked against its recorded checksum. 50 cases: 23
+  relevance, 23 message_kind and 4 preference_scope.
+- Calls: one request per question. All 50 exchanges were HTTP 200, and every
+  served identity was reported `jev-1.14.0`. There were 47 proposals and 3
+  escalations. Charges were estimated from reported usage.
+- Spec 004 reports, with spec 005's rules baseline over the same snapshots
+  as its own report (as in spec 012's record). Error among accepted, mean
+  log loss and Brier score, Jev against rules:
+
+  | Split, task | n | Jev | Rules |
+  |---|---|---|---|
+  | final_test relevance | 11 | 0.00, 0.031, 0.010 | 0.27, 0.75, 0.46 |
+  | final_test message_kind | 11 | 0.30 (10 accepted), unknown, 0.50 | 0.375 (8 accepted), 1.29, 0.58 |
+  | calibration relevance | 12 | 0.00 (11 accepted), 0.101, 0.048 | 0.42, 1.00, 0.65 |
+  | calibration message_kind | 12 | 0.30 (10 accepted), 0.56, 0.40 | 0.67 (9 accepted), 2.12, 0.94 |
+  | calibration preference_scope | 4 | 0.33 (3 accepted), unknown, 0.85 | 1.00 (1 accepted), 2.24, 1.10 |
+
+  `unknown` log loss means a true class was given probability 0 (infinite
+  loss), which spec 004 reports as unknown rather than as a number.
+  final_test has no preference_scope case. Provider confidence is a
+  provider statistic only. The content is of synthetic provenance, so none
+  of this is evidence about real user data (R-04, R-28).
+- Two earlier runs failed on the defects above: 50 exchanges at HTTP 404,
+  then 50 at HTTP 400. One one-case check passed before the run recorded
+  here. The failed runs' charges are `unknown` and stay liability at their
+  full reservations (4,995,312 units).
+- Spend for stage 3, its check and the failed runs: estimated 1,950,900
+  units and liability 4,995,312 units. The shared testing journal now
+  stands at 1,421,364 observed, 3,465,372 estimated (including spec 044's
+  batching run) and 18,075,006 liability units: USD 0.023 of R-29's
+  USD 5.
+- The raw records (the binding document, bundles, exchanges, reports and
+  the evidence index with checksums) stay outside this repository, in the
+  host application's retained evidence store beside spec 012's.
+
+Stage 3 is recorded. Still open, so 022 stays `in-progress`: 3.7.5's
+implementation, which accepts a stage 3 record and lets `new_production`
+construct a production-eligible binding, and the owner's acceptance of this
+record in its own decision row. `JevBackend::new_production` still
+refuses ("direct API mapping awaits owner-authorized qualification (stage
+3)"), so no binding is production-eligible yet. Production use also stays
+the owner's separate acts (3.1.4).
 
 **Production acceptance (2026-10-29, A-69).** 3.7.5 is amended in, so a
 recorded stage 3 can be accepted and a production-eligible binding
