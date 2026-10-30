@@ -11,3 +11,7 @@ pub use run::{
     CaseInput, LiveCase, PreparedRun, ReportInputs, RunOptions, RunOutcome, RunSpec, RunStatus,
     prepare,
 };
+
+#[cfg(feature = "fault-injection")]
+#[doc(hidden)]
+pub mod fault_injection;

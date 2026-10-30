@@ -326,8 +326,17 @@ impl Reports {
                 let path = staging.join(name);
                 std::fs::create_dir_all(path.parent().expect("parent")).map_err(LiveError::io)?;
                 let mut file = std::fs::File::create(&path).map_err(LiveError::io)?;
+                #[cfg(feature = "fault-injection")]
+                crate::fault_injection::point("staging", name, "before-write")
+                    .map_err(LiveError::io)?;
                 file.write_all(bytes).map_err(LiveError::io)?;
+                #[cfg(feature = "fault-injection")]
+                crate::fault_injection::point("staging", name, "before-sync")
+                    .map_err(LiveError::io)?;
                 file.sync_all().map_err(LiveError::io)?;
+                #[cfg(feature = "fault-injection")]
+                crate::fault_injection::point("staging", name, "after-sync")
+                    .map_err(LiveError::io)?;
                 let target = out.join(name);
                 if target.exists() && std::fs::read(&target).map_err(LiveError::io)? != *bytes {
                     return Err(LiveError::io(
@@ -345,7 +354,13 @@ impl Reports {
                     std::fs::create_dir(parent).map_err(LiveError::io)?;
                     directories.push(parent.to_path_buf());
                 }
+                #[cfg(feature = "fault-injection")]
+                crate::fault_injection::point("publish", name, "before-rename")
+                    .map_err(LiveError::io)?;
                 std::fs::rename(staging.join(name), &target).map_err(LiveError::io)?;
+                #[cfg(feature = "fault-injection")]
+                crate::fault_injection::point("publish", name, "after-rename")
+                    .map_err(LiveError::io)?;
                 published.push(target);
             }
             Ok(())

@@ -922,6 +922,40 @@ them for `eval candidates`. Tests: `crates/rustev-live/tests/run.rs`,
 `crates/rustev-eval/tests/observed.rs`, `crates/rustev-eval/tests/reports.rs`,
 `crates/rustev-cli/tests/repeat.rs`.
 
+**Increment 9 (2026-10-29): crash injection and the spend property.**
+A test-only fault hook (`rustev-live`'s non-default `fault-injection`
+feature, enabled only for the crate's own tests through a self
+dev-dependency, `#[doc(hidden)]` and absent from the published surface;
+owner decision of 2026-10-29) simulates a process kill at every durable
+write point: before a journal line is written, before and after its
+`fsync`; before an atomic file's write, before its rename, before and
+after its directory `fsync`; and at each repeat-output staging and
+publication step. `crates/rustev-live/tests/crash.rs` crashes a run at
+each of the 107 write points of its uncrashed run, releases the journal
+and resumes, once without and once with `rerun_interrupted`: no case
+decision is sent twice without the flag, reruns use `/rerun-<k>` ids
+only, every checkpoint on disk parses as a complete document, and the
+run spend equals the committed units of the distinct reservations in the
+journal file. A crash inside `prepare` before the first checkpoint
+exists leaves nothing sent (the journal is not yet open); `--resume` then
+refuses (`io_error`, `checkpoint`, saying so and that a fresh run is
+safe), and the test shows a fresh run into a removed `--out` completes.
+3.10.2 does not state that refusal; it is recorded here as a gap for a
+later amendment, not as new behavior. On resume, leftover temporary
+files of the crate's atomic writes and an unfinished repeat-output
+staging directory are removed (publication also clears the latter,
+increment 8), so a resumed run that ends before publishing leaves no
+stale staging; neither is evidence, since the
+checkpoint and the per-case files are the record and the repeat outputs
+are rebuilt from them. `crates/rustev-live/tests/spend_property.rs` runs 200 seeded
+cases of random bounds, charges, retries, run caps and journal headroom:
+unknown exposure is refused with no send, a refused reservation leaves
+the journal's bytes unchanged, and the run and journal totals stay
+within both caps whenever settled charges stay within their reserved
+bounds; a backend that reports an observed charge above its declared
+bound can take the totals past a cap, which the gate cannot prevent
+after the fact (3.6.3 reserves the bound before sending).
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

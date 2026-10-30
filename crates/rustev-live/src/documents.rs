@@ -495,10 +495,16 @@ pub(crate) fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), LiveError> {
             Err(e) => return Err(LiveError::io(e)),
         }
     };
+    #[cfg(feature = "fault-injection")]
+    let name = path.file_name().unwrap().to_string_lossy();
     let written = (|| {
+        #[cfg(feature = "fault-injection")]
+        crate::fault_injection::point("atomic", &name, "before-write")?;
         file.write_all(bytes)?;
         file.sync_all()?;
         drop(file);
+        #[cfg(feature = "fault-injection")]
+        crate::fault_injection::point("atomic", &name, "before-rename")?;
         std::fs::rename(&temp, path)
     })();
     if let Err(e) = written {
@@ -510,7 +516,14 @@ pub(crate) fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), LiveError> {
     // durable until its directory entry is: a failed directory sync is
     // still an error, since the caller may not rely on the checkpoint
     // surviving a crash. There is no temporary file left to remove.
+    #[cfg(feature = "fault-injection")]
+    crate::fault_injection::point("atomic", &name, "before-directory-sync")
+        .map_err(LiveError::io)?;
     File::open(parent)
         .and_then(|d| d.sync_all())
-        .map_err(LiveError::io)
+        .map_err(LiveError::io)?;
+    #[cfg(feature = "fault-injection")]
+    crate::fault_injection::point("atomic", &name, "after-directory-sync")
+        .map_err(LiveError::io)?;
+    Ok(())
 }

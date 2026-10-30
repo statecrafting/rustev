@@ -212,6 +212,13 @@ pub fn prepare(spec: RunSpec, opts: RunOptions) -> Result<PreparedRun, LiveError
     checkpoint.check()?;
     let path = opts.out.join("checkpoint.json");
     if opts.resume {
+        if !path.try_exists().map_err(LiveError::io)? {
+            return Err(LiveError {
+                status: "io_error",
+                subject: "checkpoint",
+                detail: "no checkpoint exists; nothing was sent because the journal is opened only after the checkpoint exists; a fresh run without resume is safe after removing --out or choosing a new --out".into(),
+            });
+        }
         let saved = LiveCheckpoint::read(&path, &checkpoint.bindings)?;
         if saved.items.len() != checkpoint.items.len()
             || saved.items.iter().zip(&checkpoint.items).any(|(a, b)| {
@@ -224,6 +231,16 @@ pub fn prepare(spec: RunSpec, opts: RunOptions) -> Result<PreparedRun, LiveError
             ));
         }
         checkpoint = saved;
+        // Staged reports are rebuilt from the checkpoint and retained case files.
+        clean_temps(&opts.out)?;
+        let cases = opts.out.join("cases");
+        if cases.try_exists().map_err(LiveError::io)? {
+            clean_temps(&cases)?;
+        }
+        let staging = opts.out.join(".repeat-staging");
+        if staging.try_exists().map_err(LiveError::io)? {
+            std::fs::remove_dir_all(staging).map_err(LiveError::io)?;
+        }
     } else {
         std::fs::create_dir(&opts.out).map_err(|e| LiveError {
             status: "io_error",
@@ -253,6 +270,20 @@ fn raise_for_deadline(signal: &CancelSignal, deadline_hit: &Cell<bool>) {
         deadline_hit.set(true);
         signal.raise();
     }
+}
+
+// Only the crate's atomic-write leftovers are disposable. Retained outputs
+// and unrelated files are never used as staging or removed by recovery.
+fn clean_temps(dir: &std::path::Path) -> Result<(), LiveError> {
+    for entry in std::fs::read_dir(dir).map_err(LiveError::io)? {
+        let entry = entry.map_err(LiveError::io)?;
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if name.starts_with(".rustev-checkpoint-") && name.ends_with(".tmp") {
+            std::fs::remove_file(entry.path()).map_err(LiveError::io)?;
+        }
+    }
+    Ok(())
 }
 
 fn rerun(item: &CheckpointItem) -> Option<u64> {
