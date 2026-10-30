@@ -119,8 +119,11 @@ Recorded responses (`fixtures/recorded/`) are four live Converse exchanges of
 `us.anthropic.claude-haiku-5-5` from `ca-central-1` through the `us.`
 geographic profile, with synthetic content only. `binding.json` and
 `policy.json` there are the live binding and policy; the AWS request ids are
-redacted. No Responses exchange has been recorded: that model does not serve
-the Responses API on `bedrock-runtime`.
+redacted. `responses-smoke-0.json` is one live Responses exchange of
+2026-10-30, a smoke call to `us.openai.gpt-5.6-luna` from `ca-central-1`
+through the `us.` geographic profile with `store: false`, recorded under
+`responses-binding.json` and `responses-policy.json`; its provider response
+and item ids and its encrypted reasoning content are redacted.
 
 Documented-shape responses are synthetic, not live recordings. AWS references
 rechecked during implementation on 2026-10-22:
