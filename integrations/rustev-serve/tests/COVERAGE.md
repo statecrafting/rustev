@@ -28,7 +28,7 @@ The optional runtime observer has byte-equivalence and panic-containment tests i
 | Sink fail-decision rejection | `delivery_failure_is_a_retained_decision_and_replays_500` |
 | Remote sink timeout/conflict/wrong digest | `standalone_remote_sink_describes_delivers_and_rejects_bad_receipts`; sink unit tests check digest, durability, conflict and transport uncertainty |
 | Remote context queue full | Handler propagation tested by `context_extra_fields_and_failed_fetch_never_dispatch_a_decision`; remote queue implementation remains in remote HTTP binding |
-| Late context response | Remote callback client accounting remains outside this increment |
+| Late context response | `conformance::callback::context_client_discards_a_late_answer_and_cancels_the_attempt` |
 | Unrequested context field | Context negative test |
 | Third-party endpoint, unknown describe version | Remote sink startup rejects unknown describe versions; remote context: `contexts::tests::described_sources_fetch_and_undescribed_ones_are_unavailable` and `rustev-remote-http` `construction_refuses_an_undescribed_source`; readiness requires host-confirmed describe completion |
 | Invalidation gap/erasure | `pushed_invalidations_ack_in_order_and_report_gaps_and_erasures` (push: baseline, replay skipped, gap counted and degraded, erasure while retained counted); poll: `contexts::tests::a_polled_source_sets_its_baseline_applies_items_and_degrades_on_failure` |

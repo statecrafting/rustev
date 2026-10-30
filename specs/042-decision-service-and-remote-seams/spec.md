@@ -1320,6 +1320,55 @@ are Rust seams polled in process, as on `rust-api`. Tests:
 `every_run_golden_through_both_transports_and_listeners` and
 `every_serve_case_is_a_run_or_a_runtime_case`.
 
+**Increment 5 part 3: callback protocol conformance (2026-10-30).** 3.17.3
+reads: "Protocol conformance for `rustev.remote-context/1` and
+`rustev.remote-sink/1` runs against any endpoint (the Rust host server,
+and a host's own endpoint by URL), with positive and negative cases:
+timeouts at each phase, cancellation (`stopped`, `unconfirmed`, late
+answer), oversized bodies both ways, idempotency windows (repeat,
+conflict, expiry), unknown and unsupported versions, invalidation gaps,
+and duplicate and conflicting deliveries." The owner decided (2026-10-30)
+how it splits, without an amendment: by who is tested. URL mode runs every
+case that checks the endpoint's own behavior (bounds, idempotency windows,
+versions, invalidation gaps, duplicate and conflicting deliveries);
+client-side cases (timeouts at each phase, late answers, oversized
+responses, cancellation outcomes) run against a scripted test endpoint
+inside the crate. `integrations/rustev-serve/tests/conformance/callback.rs`,
+a submodule of the conformance runner (so `make conformance` runs it,
+3.17.4, and both clients, the context client and the service's
+`RemoteSink`, are in reach), holds both. The endpoint suite covers describe
+and its unknown versions (refused) and a fetch or delivery naming version 2
+(a capability failure), an unknown document version, a request above the
+declared request bound (refused with a 4xx), every answer read within the
+declared response bound and holding only the fields asked for, a foreign
+describe digest (`describe_mismatch`), repeat (same bytes, dispatched once
+where countable), conflict (`attempt_id_conflict`) and expiry of the
+idempotency window, cancel of an unknown attempt (`unknown_attempt`) and of
+a finished one (never `stopped`), the baseline poll and contiguous items
+and a visible gap when items leave the endpoint's log, a delivery accepted
+once with its digest and a described durability, then `duplicate`, then
+`conflict` for another digest, a record above the record bound refused,
+and the deduplication window's expiry. It runs against the Rust host
+server twice (with a driver that publishes invalidations and counts
+dispatches, and without, as a host endpoint by URL runs), and by URL with
+`RUSTEV_CALLBACK_ENDPOINT` (and `RUSTEV_CALLBACK_BEARER_FILE`) in an
+ignored test, whose preconditions the module states: windows of at most
+5,000 ms and a record bound below the larger fixture record. Without a
+driver the invalidation case checks the structure of the polls the
+endpoint answers. The client suite, against a raw HTTP/1.1 scripted
+endpoint, covers a wait for an in-flight slot (`transport_unsent`, nothing
+sent), the first response byte under a phase ceiling and a stalled body
+under the budget (`remote_deadline`), a budget spent by the transit margin
+(nothing sent), a late answer discarded, counted and recorded with the
+attempt cancelled at the endpoint (and no cancel under `none`), `stopped`
+accepted only under confirmed cancellation, oversized bodies both ways
+(`malformed_response`, and a request above the source's bound never sent),
+an unknown describe version or a third-party class refused at
+construction, and for the sink client a timeout after sending
+(`may_have_received: true`, no receipt), a full queue
+(`may_have_received: false`), a stalled or oversized answer, and an unknown
+describe version. `RemoteSink::send` becomes crate-visible for these tests.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child
