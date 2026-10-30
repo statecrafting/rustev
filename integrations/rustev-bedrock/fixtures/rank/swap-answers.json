@@ -1,0 +1,16 @@
+{
+  "provenance": "documented-shape; synthetic; not a live recording",
+  "source": "https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_Converse.html",
+  "note": "Pointwise `rank` answers by presented candidate id for the spec 039 swap test; every `c-` answer lacks `score`, so that case's model ranking fails.",
+  "answers": {
+    "a-1": {"score": 0.9},
+    "a-2": {"score": 0.2},
+    "a-3": {"score": 0.6, "confidence": 0.8},
+    "b-1": {"score": 0.7},
+    "b-2": {"score": 0.8},
+    "b-3": {"score": 0.1},
+    "c-1": {"rating": 1},
+    "c-2": {"rating": 2},
+    "c-3": {"rating": 3}
+  }
+}
