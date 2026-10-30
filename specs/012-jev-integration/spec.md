@@ -712,8 +712,16 @@ R-27's file no longer exists on the owner's machine, and the owner asked
 that the same smoke also use `TYPESAFE_API_KEY`. `--transport` selects
 `gateway` (the default, `AI_GATEWAY_API_KEY`) or `direct`
 (`TYPESAFE_API_KEY`, with a version pin), so the harness can run spec 022
-3.7 stage 2 once the owner authorizes it. Pending implementation in
-`examples/smoke.rs`; no stage 2 or 3 result changes.
+3.7 stage 2 once the owner authorizes it. Implemented in
+`examples/smoke.rs`: `--key-file` is required and the variable follows
+`--transport` (`gateway_typesafe_base` is accepted too, with the Gateway
+key); `direct` refuses to start without `--pin`, takes `--endpoint`
+(`https://api.typesafe.ai` by default), and sends no Gateway provider
+options, so R-30's omission applies only to the Gateway; `--pin` and
+`--endpoint` are refused on the Gateway transports. `--out` must be absent
+or empty, and every file is checked for the key before any is written.
+Each refusal happens before the journal is opened or any call is sent. No
+stage 2 or 3 result changes.
 
 ## Verification
 

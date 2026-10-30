@@ -1,20 +1,31 @@
-//! Stage 2 of spec 012 3.8: a bounded live smoke against the Vercel AI
-//! Gateway, under R-27, R-29 and R-30. Never run by `cargo test` or CI.
+//! Stage 2 of spec 012 3.8 on the Vercel AI Gateway (R-27, R-29, R-30),
+//! and of spec 022 3.7 on TypeSafe's direct API: a bounded live smoke.
+//! Never run by `cargo test` or CI.
 //!
 //! ```text
 //! RUSTEV_JEV_LIVE=1 cargo run -p rustev-jev --example smoke -- \
-//!     --journal <testing spend journal> --out <evidence directory>
+//!     --journal <testing spend journal> --out <evidence directory> \
+//!     --key-file <owner's key file> \
+//!     [--transport gateway|gateway_typesafe_base|direct] \
+//!     [--pin <version, direct only>] [--endpoint <base, direct only>]
 //! ```
 //!
-//! - The key is read at runtime from the owner's file ([`KEY_FILE`]) and is
+//! - `--transport` is `gateway` by default. `direct` needs `--pin` and runs
+//!   only under spec 022 3.7 stage 2's owner authorization; its base is
+//!   `--endpoint`, by default [`DIRECT_BASE`].
+//! - The key is read at runtime from the owner's `--key-file` (012 3.2,
+//!   A-66): `AI_GATEWAY_API_KEY` for the Gateway transports and
+//!   `TYPESAFE_API_KEY` for `direct`, never from the environment. It is
 //!   never printed, logged or written; every written byte is checked for it.
 //! - Every attempt reserves against the persistent testing journal (USD 5
 //!   in total, R-29) before dispatch; a refusal stops the run.
 //! - Only SYNTHETIC fixtures are sent. The binding keeps the provider
 //!   allowlist `["typesafe-ai"]` and omits zero data retention, which the
 //!   Gateway refuses on the Hobby plan (R-30, C-11).
-//! - Each exchange is written to `--out` as a fixture-shaped file: the
-//!   exchange record, the request body and the response body. No headers.
+//! - Each exchange is written to `--out`, which must be absent or empty, as
+//!   a fixture-shaped file: the exchange record, the request body and the
+//!   response body. No headers. Nothing is written if any file would carry
+//!   the key.
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -23,14 +34,14 @@ use rustev_contract::remote::ExchangeRecord;
 use rustev_contract::time::DurationMs;
 use rustev_core::seams::{AttemptCall, CallContext, CancelSignal, DecisionBackend};
 use rustev_jev::adapter::{JevBackend, JevConfig};
-use rustev_jev::binding::JevBinding;
+use rustev_jev::binding::{JevBinding, Transport};
 use rustev_jev::exchange::{ExchangeSink, RetainedBytes};
 use rustev_jev::http::Secret;
 use rustev_jev::spend::{BudgetKind, SpendJournal, SystemClock};
 use serde_json::{Value as Json, json};
 
-const KEY_FILE: &str = "/Users/bart/.config/statecrafting/infra/vercel/.env";
-const KEY_NAME: &str = "AI_GATEWAY_API_KEY";
+/// TypeSafe's direct API base (012 3.2), the default for `--endpoint`.
+const DIRECT_BASE: &str = "https://api.typesafe.ai";
 const BUDGET_MS: u64 = 30_000;
 
 #[derive(Default)]
@@ -43,21 +54,26 @@ impl ExchangeSink for Keep {
     }
 }
 
-fn read_key() -> Result<Secret, String> {
-    let text = std::fs::read_to_string(KEY_FILE).map_err(|e| format!("{KEY_FILE}: {e}"))?;
+/// The key file's variable for `transport` (012 3.2, A-66).
+fn key_name(transport: Transport) -> &'static str {
+    match transport {
+        Transport::Gateway | Transport::GatewayTypesafeBase => "AI_GATEWAY_API_KEY",
+        Transport::Direct => "TYPESAFE_API_KEY",
+    }
+}
+
+fn read_key(file: &std::path::Path, name: &str) -> Result<Secret, String> {
+    let text = std::fs::read_to_string(file).map_err(|e| format!("{}: {e}", file.display()))?;
     for line in text.lines() {
         let line = line.trim().trim_start_matches("export ").trim();
-        if let Some(v) = line
-            .strip_prefix(KEY_NAME)
-            .and_then(|r| r.strip_prefix('='))
-        {
+        if let Some(v) = line.strip_prefix(name).and_then(|r| r.strip_prefix('=')) {
             let v = v.trim().trim_matches('"').trim_matches('\'');
             if !v.is_empty() {
                 return Ok(Secret::new(v));
             }
         }
     }
-    Err(format!("{KEY_NAME} not found in {KEY_FILE}"))
+    Err(format!("{name} not found in {}", file.display()))
 }
 
 fn projection(
@@ -126,17 +142,47 @@ fn cases() -> Vec<(&'static str, Vec<u8>)> {
     ]
 }
 
-fn arg(name: &str) -> Result<PathBuf, String> {
+fn opt(name: &str) -> Result<Option<String>, String> {
     let mut it = std::env::args();
     while let Some(a) = it.next() {
         if a == name {
-            return it
-                .next()
-                .map(PathBuf::from)
-                .ok_or(format!("{name} needs a value"));
+            return it.next().map(Some).ok_or(format!("{name} needs a value"));
         }
     }
-    Err(format!("missing {name}"))
+    Ok(None)
+}
+
+fn arg(name: &str) -> Result<PathBuf, String> {
+    opt(name)?
+        .map(PathBuf::from)
+        .ok_or(format!("missing {name}"))
+}
+
+/// The binding and endpoint `--transport`, `--pin` and `--endpoint` select.
+fn binding() -> Result<(JevBinding, Option<String>), String> {
+    let transport = opt("--transport")?;
+    let pin = opt("--pin")?;
+    let endpoint = opt("--endpoint")?;
+    let mut binding = match transport.as_deref().unwrap_or("gateway") {
+        "gateway" => JevBinding::gateway(),
+        "gateway_typesafe_base" => JevBinding {
+            transport: Transport::GatewayTypesafeBase,
+            ..JevBinding::gateway()
+        },
+        "direct" => {
+            let pin = pin.as_deref().ok_or("--transport direct needs --pin")?;
+            return Ok((
+                JevBinding::direct(pin),
+                Some(endpoint.unwrap_or_else(|| DIRECT_BASE.into())),
+            ));
+        }
+        other => return Err(format!("unknown --transport `{other}`")),
+    };
+    if pin.is_some() || endpoint.is_some() {
+        return Err("--pin and --endpoint are for --transport direct only".into());
+    }
+    binding.provider_options.zero_data_retention = false; // R-30
+    Ok((binding, None))
 }
 
 async fn run() -> Result<(), String> {
@@ -145,8 +191,17 @@ async fn run() -> Result<(), String> {
     }
     let journal_path = arg("--journal")?;
     let out = arg("--out")?;
-    std::fs::create_dir_all(&out).map_err(|e| e.to_string())?;
-    let key = read_key()?;
+    if out.exists()
+        && std::fs::read_dir(&out)
+            .map_err(|e| e.to_string())?
+            .next()
+            .is_some()
+    {
+        return Err("--out must be absent or empty".into());
+    }
+    let (binding, endpoint) = binding()?;
+    let transport = binding.transport;
+    let key = read_key(&arg("--key-file")?, key_name(transport))?;
     let key_bytes = key.expose().as_bytes().to_vec();
 
     let journal = SpendJournal::open(&journal_path, BudgetKind::Testing, Arc::new(SystemClock))
@@ -156,9 +211,13 @@ async fn run() -> Result<(), String> {
         serde_json::to_string(&journal.summary()).unwrap()
     );
 
-    let mut binding = JevBinding::gateway();
-    binding.provider_options.zero_data_retention = false; // R-30
-    let mut config = JevConfig::new("jev-gateway", binding, key);
+    let backend_id = if transport == Transport::Direct {
+        "jev-direct"
+    } else {
+        "jev-gateway"
+    };
+    let mut config = JevConfig::new(backend_id, binding, key);
+    config.endpoint = endpoint;
     config.retain_bytes = true;
     let sink = Arc::new(Keep::default());
     let backend = JevBackend::new(config, sink.clone(), Some(journal))
@@ -195,7 +254,14 @@ async fn run() -> Result<(), String> {
         }
     }
 
-    for (i, (record, bytes)) in sink.0.lock().unwrap().iter().enumerate() {
+    let provenance = match transport {
+        Transport::Direct => {
+            "live direct-API call, SYNTHETIC fixture, spec 022 3.7 stage 2 smoke under R-29"
+        }
+        _ => "live Gateway call, SYNTHETIC fixture, spec 012 stage 2 smoke under R-27, R-29, R-30",
+    };
+    let mut docs = Vec::new();
+    for (record, bytes) in sink.0.lock().unwrap().iter() {
         let parse = |b: &Option<Vec<u8>>| {
             b.as_ref().map(|b| {
                 serde_json::from_slice::<Json>(b)
@@ -204,7 +270,7 @@ async fn run() -> Result<(), String> {
         };
         let doc = json!({
             "recorded_at": chrono_free_now(),
-            "provenance": "live Gateway call, SYNTHETIC fixture, spec 012 stage 2 smoke under R-27, R-29, R-30",
+            "provenance": provenance,
             "exchange_record": record,
             "request_body": bytes.as_ref().map(|b| parse(&Some(b.request.clone()))),
             "response_body": bytes.as_ref().map(|b| parse(&b.response.clone())),
@@ -216,6 +282,10 @@ async fn run() -> Result<(), String> {
         {
             return Err("an exchange carried the credential; nothing written".into());
         }
+        docs.push(text);
+    }
+    std::fs::create_dir_all(&out).map_err(|e| e.to_string())?;
+    for (i, text) in docs.iter().enumerate() {
         std::fs::write(out.join(format!("smoke-{i}.json")), text).map_err(|e| e.to_string())?;
     }
     let summary = backend.journal().unwrap().summary();
