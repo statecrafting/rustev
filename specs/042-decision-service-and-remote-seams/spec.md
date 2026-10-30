@@ -1130,6 +1130,33 @@ tests. The clients of both protocols, which use the queue, follow in part 2.
 No existing module of the crate changes; `tools/rustev-release/
 archive-policy.json` lists the two new files.
 
+**Increment 4 part 2: the remote context client (2026-10-29).**
+`integrations/rustev-remote-http/src/context_client.rs` is the
+`rustev.remote-context/1` client of 3.10: `RemoteContextClient` implements
+`ContextSource`. It describes the endpoint once at construction, and an
+unknown version, an undescribed source or an endpoint class other than
+`host_operated` (which does not parse) is a capability failure there. Each
+fetch goes through its `SeamQueue` (3.12.1): a full queue fails at once
+with `remote_seam_queue_full` and is counted. A fetch carries the remaining
+budget less the declared transit margin, the describe digest, the call's
+principal handle as the spec 020 principal reference with the configured
+mapping version and scope, and the attempt id
+`<escaped decision id>/context/<n>`, numbered per decision; it is sent at
+most once, with no retry. An answer naming a field not requested, or a
+local-only code, is `malformed_response`. When the caller stops waiting,
+the client asks the endpoint to cancel (unless the source declares `none`)
+and an answer that still arrives is discarded and counted in
+`late_responses_discarded` (3.12.3). Each exchange yields a digest-only
+`rustev.remote-context-exchange/1` record to an optional host exchange
+sink, whose failures are counted and change no result (3.10.5). `cancel`
+rejects a `stopped` answer from a source without confirmed cancellation,
+and `invalidations` polls (baseline with no sequence) and refuses a
+sequence that does not increase. Tests: `tests/context_client.rs`
+against the host server of part 1. In
+`tools/rustev-release/archive-policy.json` the crate lists the file and its
+unpacked bound becomes 393,216 bytes (384 KiB), as `rustev-runtime`'s did
+in #330: the package unpacks to 332.6 KiB against the earlier 320 KiB.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child
