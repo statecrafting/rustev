@@ -133,7 +133,7 @@
         "anchor": "3-9-evidence-of-live-re-execution",
         "id": "I-4",
         "kind": "invariant",
-        "text": "Every live result is a new run record plus a `rustev.live-reexecution/1` document with `mode` `live_reexecution` and a link to its source case or record; no dataset, bundle, capture, run record, judgment or report used as a source is modified."
+        "text": "Every live result of a `rustev_live::run` work item (a dataset case or retained bundle, never a probe call) is a new run record plus a `rustev.live-reexecution/1` document and a `rustev.live-case/1` document with `mode` `live_reexecution` and a link to its source case or record; no dataset, bundle, capture, run record, judgment or report used as a source is modified."
       },
       {
         "anchor": "3-15-compatibility-and-identities",
@@ -171,31 +171,31 @@
       }
     ],
     "sectionDigests": {
-      "043-live-re-execution-at-dataset-scale-with-spend-caps-amends-026-and-006": "7faaeea3aafa69b7b4a460946cfd2166e415f21c268475a99d1b189a981ce566",
+      "043-live-re-execution-at-dataset-scale-with-spend-caps-amends-026-and-006": "3fb07b2e0a2d99c897b71e94f24cb07ed5f656ac62a9b326920e7638bc325594",
       "1-purpose": "f8308a238da2306c3966a393ec83f0643cabd38dca9ffdcca0e7fbf8750f4570",
       "2-1-binding-principles-of-76": "87111785b33e7f2733f46980c7b5fb5f9b1073903e042fb3f0c9d9ed82b3e3a4",
-      "2-territory": "8416a98e73e57096995429fa249b3a82ec5eaf93100814d9cc52e6f0c8d8e823",
+      "2-territory": "2d833e656d1ba92a697924abfa111b8aa693ec20ab5fa044b62595d40c8f9ab5",
       "3-1-live-evaluation-entry-points": "676966088c242f7fba7a67b140497949a4e7fbfbc87f00a4c1ea1531015a6dad",
       "3-10-checkpoints-and-resumption": "b3f1b9815fdd58ad9934c49360cf254c5e38195ea7675d31dc7ca035af2fc070",
-      "3-11-reports-into-e1-and-e2": "f0fa4f29cce6118e3445ce0143f187bfb47109019078273dcd7e2d72aed99c6a",
+      "3-11-reports-into-e1-and-e2": "076796f8456144938131cd0fb611d0a2777b7db66e72999ea71ae66e668a05aa",
       "3-12-authorization-in-the-cli": "d6952bc3296d2dd0333d20b51db8350dbcc23fb6de4520e65ca487b89ac9ad5d",
-      "3-13-cli-surface-amends-spec-006": "b82c58adb128db8d73563955c3e2c98228b540ed4625ddcb78e8183f88a43bcb",
+      "3-13-cli-surface-amends-spec-006": "955216e08fdb1d139efbc2349138db74f210ed0a7951829dddda5a34369d6302",
       "3-14-exit-codes": "6fe7a2f2e09b5cbb1c83d7c15cb9794b1ec8bbfb4d382bad9afb0a72929c409a",
-      "3-15-compatibility-and-identities": "66d0d0c5fa590f8b011045d66092d14a314359909b012bc34f8eefc50f7842c3",
+      "3-15-compatibility-and-identities": "dfc0fa49cf7f94ddea8649d933792c62a35828af2d5b12f9674ed2bf1ea2938c",
       "3-2-live-configuration": "e8a76429ecff38a3fc1c61761a10befc3f09567acada5850a6ed1a06875c7bc2",
       "3-3-inputs-and-snapshots": "196abf80756f1499b5518210ec2cb3634f1bf2d82e1557cea0b00e28026fc7cb",
       "3-4-live-or-captured-acquisitions": "aa50f3d337b0b3d75f22b4ff12adbe3186abdc11b018dbcca46c076846e44b20",
       "3-5-the-persistent-spend-journal": "23db76e85470383b5786055a19caf2434f8634aa0939ac1f3a11603621424063",
-      "3-6-spend-gate-and-refusal-before-sending": "9f2de5b74101383cd4a51a108aebd0b900138d6317d888c98b7211c6648c7d52",
+      "3-6-spend-gate-and-refusal-before-sending": "744d70557ab21a450736c42ce0522f27c14a49aa23b5f139ea97133d48228ddf",
       "3-7-probe": "b36781c9b3c5df095506aa95e1cb000a297277c57246efca680fb589f9bdbb8b",
-      "3-8-scheduling-concurrency-rate-limits-and-deadlines": "370542774f5bd63ced4c21df61fbe5a82ae0cb85692577400a6c9b6660449f03",
-      "3-9-evidence-of-live-re-execution": "a3a0882e4878cb923d9d11eb56d52cb02c01a450953dc81d5e832365359e6d3a",
-      "3-behavior": "6a93fde2b84d6b64c54f827fa9524dcb52a7270ce213c31415eac1bcc31b1fb7",
+      "3-8-scheduling-concurrency-rate-limits-and-deadlines": "ccb9694309797e3ad196142c2b112e8e7cac4d837393159c78e1803f163bf1c7",
+      "3-9-evidence-of-live-re-execution": "9ac6d36e87e56460c666af30f39fa1c6979d5e2648367fe7dfa8f946b0b51941",
+      "3-behavior": "20a586f8b8617e6f1606e425999e890a054fc3b4c2bc54f32cf63e47e4e9569d",
       "4-out-of-scope": "c4a9ea39406fb6e4d0b7c84bd20e015859b5eb7d822a8f3ceb14eb3529857904",
-      "5-observable-negative-cases": "24bbe68e47592ac743957a3a31f1860f95b50622970edf300f34ceeab7ed1779",
-      "acceptance": "d80f8793a1219353b658fc4e0c7dc01d88744f1a46a759407293d6761a017cd3",
-      "decisions-at-approval": "90de7cd4c46f95e2e71454b82226e9331c57e0bee5327cba1c2b771e51f91bf9",
-      "implementation-record": "cc4ce2380b3cff4d2318a9fd0ecc7ba824bfd71e25f5ecaba558610c7e5a3c42",
+      "5-observable-negative-cases": "783c3d373882296d6bdab3a637db01395d08d426cdd77683350079f23576dcd3",
+      "acceptance": "29cbf4f778dd168bdf55a94f5e6f0ce7616035fbb17105190316e6597adecdce",
+      "decisions-at-approval": "60639ac671f8836f2afe218b441784c351305b32947a59f1f8479b666d38e7b1",
+      "implementation-record": "aeb0bb017782142bc6ef0e5c114d0318cf2d186177158da65b3608be49cdcd4e",
       "verification": "ad509ca94f7e47bc12c1639a62ba57d10eab3b2297900f04f85b3a99684f5df5"
     },
     "sectionHeadings": [
@@ -231,6 +231,6 @@
     "summary": "An amendment of approved spec 026 (live re-execution) and of spec 006 (CLI), for #76 child E3 (#74). A new crate `rustev-live` runs a dataset, or the inputs (never the outputs) of retained replay bundles, through one or more candidate plans live, through spec 026's `reexecute_live`, under an explicit `--live` opt-in, a per-run spend cap and the persistent spend journal of spec 012, generalized to any backend with a cost model and moved into `rustev-live`. A runtime spend gate durably reserves every attempt's full worst-case exposure before any byte is sent and refuses an attempt that would pass the run cap or the journal's cap (R-29: USD 5 in total for all testing across providers). Acquisitions are declared live or captured per source; a probe checks reachability and served identity of every candidate binding before any dataset case is sent; scheduling is bounded per binding; runs resume from a checkpoint without re-sending a completed case or counting a charge twice. Every result is new evidence marked `live_reexecution` with a link to its source case or record, and per-run outputs are spec 029 repeat outputs with source `live`, so E1 and E2 consume them unchanged. Approved (A-40); approval authorizes no live run, provider call or spend by itself, raises no cap, and makes no quality claim.\n",
     "title": "Live re-execution at dataset scale with spend caps (amends 026 and 006)"
   },
-  "shardHash": "e0bce9fd529226eb4db4cfef3e7e5a8c92f60565d9a15d7865d3b61761ea47ac",
+  "shardHash": "8ae74f6f75c838ec879d3312983c9bcdd2df9069de00b32ec3718e34c08efb5b",
   "specVersion": "1.10.0"
 }
