@@ -402,6 +402,14 @@ pub fn document_schemas() -> Vec<EmittedSchema> {
             Some("response"),
         ),
         emit::<crate::remote_context::ExchangeRecord>(crate::remote_context::EXCHANGE, None),
+        emit::<crate::remote_context::AcquireRequest>(
+            crate::remote_context::ACQUIRE,
+            Some("request"),
+        ),
+        emit::<crate::remote_context::AcquireResponse>(
+            crate::remote_context::ACQUIRE,
+            Some("response"),
+        ),
         emit::<crate::remote_sink::DescribeRequest>(crate::remote_sink::DESCRIBE, Some("request")),
         emit::<crate::remote_sink::DescribeResponse>(
             crate::remote_sink::DESCRIBE,

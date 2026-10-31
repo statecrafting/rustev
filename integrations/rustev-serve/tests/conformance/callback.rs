@@ -934,6 +934,7 @@ impl Scripted {
                             invalidation: InvalidationSupport::None,
                             endpoint_class: EndpointClass::HostOperated,
                         },
+                        descriptor: None,
                     }],
                 };
                 let mut text = with_version(d.record_canonical().unwrap(), s.context_version);

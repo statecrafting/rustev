@@ -491,7 +491,12 @@ fn absent_fields_reject_null_and_held_extensions_are_unknown() {
     assert!(
         serde_json::from_value::<SigningMode>(json!({"deny_unsigned_for_profiles":[]})).is_err()
     );
-    assert!(serde_json::from_value::<StepOutcome>(json!("skipped")).is_err());
+    // Spec 036 is implemented: a skipped step is an outcome (3.7.1).
+    assert_eq!(
+        serde_json::from_value::<StepOutcome>(json!("skipped")).unwrap(),
+        StepOutcome::Skipped
+    );
+    assert!(serde_json::from_value::<StepOutcome>(json!({"skipped":{}})).is_err());
 }
 
 #[test]

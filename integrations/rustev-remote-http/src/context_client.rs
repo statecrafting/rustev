@@ -22,7 +22,7 @@ use rustev_contract::Document;
 use rustev_contract::ids::ContentDigest;
 use rustev_contract::remote::{CancelSupport, RemoteCode, WirePrincipal};
 use rustev_contract::remote_context::{
-    self as rc, CancelItem, ContextCode, FetchResult, HostedSource, InvalidationsResponse,
+    self as rc, CancelItem, FetchResult, HostedSource, InvalidationsResponse,
 };
 use rustev_contract::snapshot::Snapshot;
 use rustev_core::seams::{BoxFuture, CallContext, ContextSource};
@@ -304,7 +304,7 @@ impl RemoteContextClient {
             attempt_id: attempt_id.into(),
             request_digest: request,
             response_digest: response,
-            code: code.map(ContextCode),
+            code: code.map(rc::AcquireCode::from),
             phases: vec![],
             late,
         };
