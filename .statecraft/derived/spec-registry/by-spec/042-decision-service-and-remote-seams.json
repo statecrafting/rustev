@@ -202,7 +202,7 @@
       }
     ],
     "sectionDigests": {
-      "042-decision-service-sidecar-and-remote-context-and-sink-protocols-amends-010": "8e82fdc5f46bc7e25d7a6c673a7fd32cb001e8e4ee95fe71af15140f4915885f",
+      "042-decision-service-sidecar-and-remote-context-and-sink-protocols-amends-010": "681907e390505f89e805592a7217f06a0ac4080fc18a1cdf642b9ea24a3b7692",
       "1-purpose": "ff7983dfa100f7656f25eca5742c5a2871bed14513bce1a1b61748760a6b2840",
       "2-1-binding-principles-of-76": "fb78e4bf06930e7788cf73a75e3943a4e9ebe77673de71b2eec54f5ce6127896",
       "2-2-relation-to-spec-010-and-the-binding-record-gate": "686daeca68b7adec5084445de04ac9aa275c36c9fc1ca680756c6ba5a97c0059",
@@ -219,16 +219,16 @@
       "3-18-dependency-boundaries": "f49b788ab4d3781adf8a5a33ae166d57645b677b47f283d8d1a4de3989486085",
       "3-19-compatibility": "d2a9463bd6484c5b97a67e5795f6b0d468ca3c68d2676df153446b82def634bb",
       "3-2-caller-authentication-and-the-principal-handle": "fd04f4973f2a44075a9684483de1894d6fe70ea07ca2fa7bf1ea8565b6ca8cdc",
-      "3-3-plan-registration-and-signed-bundles": "683843cae38c99a8c285ce42a275955da2e4ea29fccc0e3c2824caf327d23667",
+      "3-3-plan-registration-and-signed-bundles": "87acb68ece60773e788abfdd7c8aa1bdfe0c1205bbdd19339dc9663cddccff29",
       "3-4-running-decisions": "6074016cb99b417b966644a94e226dee5e0bc32d8d84b1bd2846362460c27f86",
       "3-5-admission-refusals-and-limits": "2cfc5e4cdffa531ee5779267ed7549d39c97e1bec53d01c0d589bb6b081f7248",
       "3-6-idempotency-lookup-and-cancellation": "52a3a8838ac3291088f63f7c6eae50161644b9898e6cc28adc2bffa2b99af60f",
       "3-7-streaming": "4bb63244558e1c3a19118fe6123836a6d64f27e710229d3049f54aae1fc3e530",
       "3-8-replay-evaluation-and-explanation": "c5ca6af59f7a5498a19b3f73f4114ba6ccf9a1ac1a720699327d7a7bf5215117",
       "3-9-the-grpc-transport": "42824be56a3bd655595daa90226bbfc3c9674f116bedab1e8647be92e1d7f411",
-      "3-behavior": "8ff8fbcc8e4bbb1e827085f9dbd8ad02c7532bb0f632ffa7bc2c1366bae4f118",
+      "3-behavior": "575ef407fdfeef2acbe16c5e14920d9f1c342e6dd96275b59ba5c3ab87e7258b",
       "4-out-of-scope": "7d2fd43ef8fa068cfc83ca548c3fac36fe35089f12c6d9a30003ec4d56bee396",
-      "5-observable-negative-cases": "e2a66b42e6933ba5a01787a0b63dde9c606e11b3ab9a972c87d3271203502f11",
+      "5-observable-negative-cases": "5a870e598e8b2516d1b9e9a63b8b7cd074021a56e5c4beb2d1d795611a7c1c7c",
       "acceptance": "cf6a6046487b594adf5d88d0cdb5e5fd8cc7e0b249ec1546afaff2f765667458",
       "decisions-at-approval": "b2cc55ca8f777ed1ccf05f15c22b44845b99c34e7792a010e727b7dd1ff2fe04",
       "implementation-record": "f30adf1cbf5f3b8f4878cabce1469346b6fb172393f503447ea3c091c2047fe7",
@@ -272,6 +272,6 @@
     "summary": "An amendment of approved spec 010 (R-16), for #76 child A2 (#57). Makes the `rustev-serve` service API concrete as `rustev.serve/1`: plan registration by content identity from plain or signed plan bundles, decisions, cancellation, lookup, server-sent event streaming, offline replay, evaluation and explanation, health, readiness and OpenMetrics, served over HTTP/1.1 and HTTP/2 with JSON and over gRPC from one handler layer, on TCP and Unix domain socket listeners. Defines two new transport-neutral callback protocols with an HTTP binding, `rustev.remote-context/1` (describe, fetch, acquire, cancel and invalidation by push or poll) and `rustev.remote-sink/1` (describe and deliver with receipts), behind bounded queues with deadlines, cancellation and typed refusals when full. Adds no plan construct: every `PlanId`, run record and judgment byte is unchanged. Approved (A-39) under the 2026-10-16 delivery work order; implementation is pending, and `rustev-serve` implementation still waits for the owner's approval of its spec 010 section 3.4 binding record (R-34 in the founding decisions).\n",
     "title": "Decision service sidecar and remote context and sink protocols (amends 010)"
   },
-  "shardHash": "74273198d14cad94b102b8cb0baa1d33fa42db9adcb12f5266811271fbf8a333",
+  "shardHash": "9f60a5d1b3e96d473218a7136f2091a191506aeaf3bd097ade87d04a59b79362",
   "specVersion": "1.10.0"
 }

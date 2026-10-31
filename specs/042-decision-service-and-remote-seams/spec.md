@@ -285,6 +285,8 @@ may be implemented before that record; `rustev-serve` may not.
    (3.15); and `compile_report`, the compile output `rustev-surface` renders
    for these inputs, including `plan_id`. Bindings name configured backends
    only; a bundle cannot carry an endpoint, credential or code.
+   Two optional members carry the rest of spec 034's instantiation inputs
+   (3.3.8): `variant` and `profile_bases`.
 2. **Registration.** `PUT /v1/plans/{planId}` takes
    `rustev.serve-register/1` (`bundle`, and `signature` or `none`). The
    service compiles the bundle with the existing compiler against the
@@ -328,6 +330,50 @@ may be implemented before that record; `rustev-serve` may not.
    `rustev.remote-sink/1` delivery (3.11) carries the `RegistrationId`,
    signer and key id or identity of the plan it ran. Run record bytes are
    unchanged: the join is the decision id and `PlanId`.
+8. **Variant and base profiles.** Spec 034 makes a variant and a profile's
+   `extends` chain inputs of instantiation: "A definition that declares
+   variants is instantiated for exactly one of them; a definition that
+   declares none is instantiated with variant `none`" (034 3.4.2), and
+   "The host names one profile (the leaf) and supplies 0 to 64 further
+   profiles available to `extends`. The chain is built from the leaf by
+   following `extends` to the profile with exactly that name and version"
+   (034 3.7.1). The bundle carries both:
+   - `variant`: `{ "named": <name> }`, absent for the variant `none`,
+     the name matching `[a-z][a-z0-9_]{0,63}` (034 3.1.3). It is the variant the bundle is
+     instantiated for, as `plan compile --variant` names it (034 3.14.1),
+     with or without a profile.
+   - `profile_bases`: a list of 1 to 64 `rustev.profile/1` documents
+     (spec 034 3.7.1 admits 0 to 64; none is spelled by omission), each
+     checked by its own bounded parser (`DESCRIPTOR_V1`) and carried as its
+     original bytes, available to the leaf profile's `extends` chain as
+     `plan compile --profile-base` supplies them. A non-empty list without a
+     profile is `invalid_document`, as `--profile-base` without
+     `--profile` is a usage error (034 3.14.1).
+   Both are omitted when unused, so a bundle without them keeps its
+   canonical bytes, bundle digest and `RegistrationId`. Absence is the
+   only spelling of unused: a bundle that states `"variant": "none"` or an
+   empty `profile_bases` is `invalid_document`, so one set of inputs has
+   exactly one bundle digest. The bundle still carries one definition: no version
+   range selects among definitions and no `--definition-version` pin
+   applies, so a profile whose range does not admit that definition's
+   version is refused `definition-unsatisfied` (034 3.6.3). The service
+   instantiates with exactly these inputs (034 3.8.1) and compiles the
+   result as 3.3.2 states. Every instantiation refusal of 034 3.9
+   (`variant-required`, `variant-unknown`, `profile-missing`,
+   `profile-duplicate`, `profile-cycle`, `profile-chain-too-deep`, the
+   parameter codes and the others) is `compile_refused` (422) with
+   `compile_refusal` the refusal document `rustev-surface` renders for
+   it, bounded as 3.5.1 states; no new refusal code is added. Digest
+   effects: the bundle digest covers `variant` and every base profile's
+   bytes when present, so two bundles that differ only in a base profile
+   the chain never reaches have the same `PlanId` (034 3.10.2: the other
+   profiles supplied "are not recorded and do not affect it") but
+   different bundle digests and `RegistrationId`s, and the second is
+   `registration_conflict`, as 3.3.4 states for any `PlanId` registered
+   again with other bundle bytes, whoever signed it. The registration record's profile id
+   is the leaf's `ProfileId`; `deny_unsigned_for_profiles` (3.3.6) refuses
+   an unsigned bundle when any profile of its resolved chain, leaf or
+   base, is listed.
 
 ### 3.4 Running decisions
 
@@ -932,7 +978,13 @@ workflows; deployment; live provider calls or spend; real-user data.
 | Bundle bytes changed after signing | `bundle_tampered`. |
 | Unsigned bundle under `require_signed` | `unsigned_refused`. |
 | Unsigned bundle with a listed profile under `deny_unsigned_for_profiles` | `unsigned_refused`; without a listed profile, registered as `unsigned`. |
+| Bundle whose definition declares variants, with `variant: none` | `compile_refused`, instantiation code `variant-required`. |
+| Bundle whose profile `extends` a profile not in `profile_bases` | `compile_refused`, instantiation code `profile-missing`. |
+| Bundle with `profile_bases` and no profile | `invalid_document`. |
+| Bundle stating `"variant": "none"` or an empty `profile_bases` | `invalid_document`. |
+| Unsigned bundle whose listed profile is a base of its chain under `deny_unsigned_for_profiles` | `unsigned_refused`. |
 | Same `PlanId` registered with another signer | `registration_conflict`. |
+| Same `PlanId` registered with other bundle bytes, for example a base profile its chain never reaches (3.3.4, 3.3.8) | `registration_conflict`. |
 | Registration on a listener without the admin group | `endpoint_unavailable`. |
 | Missing `rustev-principal` | `principal_invalid`; nothing admitted. |
 | `rustev.serve-decide/1` with both or neither of `snapshot` and `context` | `invalid_document`; nothing admitted. |
