@@ -8,6 +8,11 @@
 //! `context_unavailable`, it is reported not described, and readiness
 //! reflects that when the endpoint is readiness-affecting. Queue depth,
 //! refusals and late discards are reported to the health table.
+//!
+//! A described source whose describe carries its `rustev.source/1`
+//! descriptor also serves acquisitions (3.10.3): its client is installed as
+//! an acquisition source for every plan, bounded by the endpoint's
+//! `max_in_flight` (3.4.2), and shares the client's seam queue with fetch.
 use crate::invalidations::Item;
 use crate::{
     Service,
@@ -16,7 +21,7 @@ use crate::{
 };
 use rustev_contract::remote_context::{InvalidationKind, InvalidationScope, InvalidationSupport};
 use rustev_contract::{scope::Handle, serve::ServeConfig, snapshot::Snapshot};
-use rustev_core::seams::{BoxFuture, CallContext, ContextSource};
+use rustev_core::seams::{AcquisitionSource, BoxFuture, CallContext, ContextSource};
 use std::{
     collections::BTreeMap,
     sync::{Arc, Weak},
@@ -54,6 +59,9 @@ impl ContextSource for Unavailable {
 /// describe succeeded.
 pub struct Connected {
     pub sources: BTreeMap<String, Arc<dyn ContextSource>>,
+    /// Per described source that carries a descriptor, its acquisitions and
+    /// their attempt bound.
+    pub acquisitions: BTreeMap<String, (Arc<dyn AcquisitionSource>, usize)>,
     clients: Vec<(Handle, Option<(RemoteContextClient, u64)>)>,
 }
 
@@ -62,6 +70,7 @@ pub struct Connected {
 pub async fn connect(config: &ServeConfig) -> Result<Connected, String> {
     let mut connected = Connected {
         sources: BTreeMap::new(),
+        acquisitions: BTreeMap::new(),
         clients: Vec::new(),
     };
     for (name, endpoint) in &config.context_sources {
@@ -85,6 +94,15 @@ pub async fn connect(config: &ServeConfig) -> Result<Connected, String> {
             Err(_) => Arc::new(Unavailable),
         };
         connected.sources.insert(name.as_str().into(), installed);
+        if let Some(acquisitions) = client.as_ref().ok().and_then(|c| c.acquisition_source()) {
+            connected.acquisitions.insert(
+                name.as_str().into(),
+                (
+                    Arc::new(acquisitions),
+                    endpoint.max_in_flight.get() as usize,
+                ),
+            );
+        }
         connected.clients.push((
             name.clone(),
             client.ok().map(|c| (c, endpoint.max_in_flight.get())),

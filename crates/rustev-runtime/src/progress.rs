@@ -17,6 +17,15 @@ pub struct StepProgress {
     pub derivation: Derivation,
 }
 
+/// A step a guard or tiered widening skipped (spec 036 3.8): no value and
+/// no reason, only the compiled derivation bound of the step.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SkippedStep {
+    pub step_id: String,
+    pub instance_ids: Vec<String>,
+    pub derivation: Derivation,
+}
+
 /// Synchronous, non-blocking callbacks. Implementations must perform no I/O,
 /// acquire no contended locks, and never wait for a consumer. Panics are counted
 /// and contained by the runtime. Observation cannot alter evidence.
@@ -24,6 +33,9 @@ pub trait ProgressObserver: Send + Sync {
     /// Admission was acquired; this decision is no longer queued.
     fn admitted(&self) {}
     fn step(&self, progress: StepProgress);
+    /// A recorded step was skipped (spec 042 3.7.1). Ignored by default, so
+    /// an observer written before skipped steps existed is unchanged.
+    fn skipped(&self, _step: SkippedStep) {}
 }
 
 pub(crate) struct Observing<'a> {
@@ -50,19 +62,29 @@ impl Observing<'_> {
             {
                 continue;
             }
+            // Unresolved and skipped steps have no dynamic derivation in core
+            // evidence: report the compiled, conservative derivation bound.
+            let compiled = || {
+                plan.steps
+                    .iter()
+                    .find(|s| s.id == step.step)
+                    .expect("recorded step belongs to plan")
+                    .derivation
+            };
             let (outcome, derivation) = match &step.status {
-                StepStatus::Skipped { .. } => continue,
+                StepStatus::Skipped { .. } => {
+                    let derivation = compiled();
+                    self.call(|o| {
+                        o.skipped(SkippedStep {
+                            step_id: step.step.clone(),
+                            instance_ids: step.instance.clone(),
+                            derivation,
+                        })
+                    });
+                    continue;
+                }
                 StepStatus::Resolved { derivation, .. } => (Ok(()), *derivation),
-                // Unresolved values have no dynamic derivation in core evidence.
-                // Report the compiled, conservative derivation bound.
-                StepStatus::Unresolved(reason) => (
-                    Err(reason.clone()),
-                    plan.steps
-                        .iter()
-                        .find(|s| s.id == step.step)
-                        .expect("recorded step belongs to plan")
-                        .derivation,
-                ),
+                StepStatus::Unresolved(reason) => (Err(reason.clone()), compiled()),
             };
             self.call(|o| {
                 o.step(StepProgress {
