@@ -957,6 +957,24 @@ signed adapter on loopback only
 Bedrock fixtures is part b; the paid live smoke stays outside this
 increment.
 
+**Bedrock `rank`, part b (2026-10-30): the swap test.** One definition
+(pointwise `rank`, `select` k 2 backfilled from the pool's exact order)
+compiles against the rules backend (3.14) and against Bedrock answering
+from documented-shape SYNTHETIC fixtures on loopback; the plans differ
+only by the binding. Every case proposes through the same policy rule
+with the same trace; where every Bedrock answer of a case lacks `score`,
+`backfill_all` fills both positions from the exact order. The captured
+runs give comparable spec 004 reports (same dataset, configuration and
+adapter digests), spec 041's ranking measures including `backfill@p1`
+under a version 3 configuration, and spec 029 repeat reports
+(`integrations/rustev-bedrock/tests/rank_swap.rs`). `rustev eval
+--repeat-config` evaluates each run without the adapter's measures and so
+refuses a version 3 configuration; the repeat runs under the same
+configuration at version 2 until that path passes the measures. With
+parts a and b, A-49's offline Bedrock items have tests
+(`crates/rustev-core/tests/RANKING_ACCEPTANCE.md`); only the optional
+paid live smoke (Decision 18) remains.
+
 ## Decisions at approval
 
 Decided within the binding principles under the work order.
