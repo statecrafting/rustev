@@ -993,6 +993,33 @@ unavailable with its reason (spec 015) and does not refuse the run. Without the 
 and `supplies` are never read as the new judgment (section 5).
 Tests: `crates/rustev-live/tests/run.rs`.
 
+**Increment 12 (2026-10-29): live or captured acquisitions.**
+`rustev-runtime` gains `Runtime::reexecute_live_with_sources`, which
+takes the per-source posture (`LiveSources`: each declared source `live`
+or `captured`, plus the retained pages) and returns a `SourceOutcome`
+beside the unchanged `LiveResult`; `reexecute_live_with_gate` keeps its
+signature and still refuses plans with acquisitions, and every published
+type keeps its definition (spec 031's semver check). A captured page is
+served only from a retained page whose recomputed `AcquisitionRequestId`
+equals the request's; one identity with different bytes makes the case
+`incomparable{ambiguous-output}`; no equal identity or a digest-only page
+is supplied as `missing_evidence` and the case is
+`incomparable{acquisition-not-captured}`, with no source call and no
+reservation (3.4.2). A live acquisition passes the decision budget, the
+shared ledger, host authorization (`LiveAuthorizer::authorize_acquisition`,
+defaulted to no answer) and the spend gate
+(`SpendGate::reserve_acquisition`, defaulted to a refusal) before the
+source is called; its `cost_bound` is reserved, `unknown` is refused
+`spend-exposure-unknown`, and each retry reserves anew (3.4.3).
+`rustev-live` refuses `acquisition-undeclared` before the journal is
+opened (3.4.5), serves each bundle's `acquisition_pages` and a
+host-supplied capture set, and fills the per-case document's
+`acquisitions` and source spend. Tests:
+`crates/rustev-live/tests/acquisitions.rs` (including the run of 3.4.4
+against offline replay of the same bundle, with captured, missing and
+ambiguous pages), `crates/rustev-runtime/tests/live.rs`,
+`crates/rustev-runtime/tests/acquisition.rs`.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

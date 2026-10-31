@@ -63,7 +63,10 @@ pub use clock::{Clock, Instant, ManualClock, TokioClock};
 /// Dynamic questions (spec 019): the only execution entry point.
 pub use dynamic::{DynamicAsked, DynamicBounds, DynamicDelivery, ask_dynamic};
 pub use ledger::Ledger;
-pub use live::{DispatchAnswer, LiveAuthorizer, LiveRefusal, LiveRequest, LiveResult};
+pub use live::{
+    AcquisitionAuthorizationRequest, DispatchAnswer, LiveAuthorizer, LiveRefusal, LiveRequest,
+    LiveResult, SourceOutcome,
+};
 pub use optimization::{InvalidationResult, PersistentInvalidation};
 pub use sink::{DeliveryFailure, DeliveryTicket, SinkPolicy, SinkStats};
 
@@ -1624,5 +1627,6 @@ fn fit_remote_evidence(record: &mut RunRecord) {
 
 mod spend;
 pub use spend::{
-    LiveSpend, SpendAttempt, SpendBinding, SpendGate, SpendRefusal, SpendTicket, SpendUnit,
+    AcquisitionPosture, AcquisitionSpendAttempt, LiveAcquisition, LiveSources, LiveSpend,
+    SpendAttempt, SpendBinding, SpendGate, SpendRefusal, SpendTicket, SpendUnit,
 };

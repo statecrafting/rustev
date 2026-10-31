@@ -201,6 +201,14 @@ pub(crate) async fn drive(
     calls: &AtomicU64,
 ) -> Outcome {
     let mut out = Outcome::new(&r);
+    if let Some(page) = cx.live.and_then(|live| live.captured_page(&r)) {
+        return match page {
+            Ok(bytes) => out.page(bytes),
+            Err(()) => out.fail(Unresolved::MissingEvidence {
+                fields: vec![r.step.clone()],
+            }),
+        };
+    }
     let Some(source) = cx.rt.sources.get(&r.source) else {
         return out.fail(unavailable(&r, "permanent", "source absent"));
     };
@@ -325,10 +333,35 @@ pub(crate) async fn drive(
             r.page_index,
             cx.attempt_number(n)
         );
+        let spend = match cx
+            .live
+            .map(|live| live.source_spend(cx, &r, &id, bound, reserved))
+            .transpose()
+        {
+            Ok(held) => held.flatten(),
+            Err(()) => {
+                cx.release(reserved);
+                return out.fail(unavailable(&r, "refused", "live acquisition refused"));
+            }
+        };
+        if spend.is_some() && (cx.cancel.is_raised() || cx.now() >= close) {
+            if let Some(spend) = spend {
+                spend.release();
+            }
+            cx.release(reserved);
+            return if cx.cancel.is_raised() {
+                out
+            } else {
+                out.fail(Unresolved::DeadlineExceeded)
+            };
+        }
         let held = cx.hold(&id, reserved, matches!(bound, CostBound::Bounded { .. }));
         let mut a = attempt(cx, &r, source, op, close, &id).await;
         drop(permit);
         held.settle(a.charge);
+        if let Some(spend) = spend {
+            spend.settle(&a.charge);
+        }
         if a.bytes
             .as_ref()
             .is_some_and(|bytes| !valid_page(cx, &r, op, lim, bytes))

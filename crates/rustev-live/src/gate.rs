@@ -54,23 +54,26 @@ impl JournalGate {
     }
 }
 
-impl SpendGate for JournalGate {
-    fn reserve(&self, attempt: &SpendAttempt) -> Result<SpendTicket, SpendRefusal> {
-        if !attempt
-            .decision_id
-            .starts_with(&format!("live/{}/", self.run_id))
-        {
+impl JournalGate {
+    fn reserve_attempt(
+        &self,
+        decision_id: &str,
+        attempt_id: &str,
+        bound: CostBound,
+        no_spend: bool,
+    ) -> Result<SpendTicket, SpendRefusal> {
+        if !decision_id.starts_with(&format!("live/{}/", self.run_id)) {
             return Err(SpendRefusal::new("live-config"));
         }
-        let units = match attempt.bound {
+        let units = match bound {
             CostBound::Bounded { max_units } => max_units,
             CostBound::Estimated { units } => units,
             CostBound::Unknown => return Err(SpendRefusal::new("spend-exposure-unknown")),
         };
-        let no_spend = attempt.cost_unit == SpendUnit::None;
+
         // The runtime's attempt id escapes separators. Prefix with the
         // original decision identity to retain exact run attribution.
-        let key = format!("{}/{}", attempt.decision_id, attempt.attempt_id);
+        let key = format!("{decision_id}/{attempt_id}");
         let reservation = self
             .journal
             .reserve_checked(
@@ -90,7 +93,28 @@ impl SpendGate for JournalGate {
             no_spend,
         }))
     }
+}
 
+impl SpendGate for JournalGate {
+    fn reserve(&self, attempt: &SpendAttempt) -> Result<SpendTicket, SpendRefusal> {
+        self.reserve_attempt(
+            &attempt.decision_id,
+            &attempt.attempt_id,
+            attempt.bound,
+            attempt.cost_unit == SpendUnit::None,
+        )
+    }
+    fn reserve_acquisition(
+        &self,
+        attempt: &rustev_runtime::AcquisitionSpendAttempt,
+    ) -> Result<SpendTicket, SpendRefusal> {
+        self.reserve_attempt(
+            &attempt.decision_id,
+            &attempt.attempt_id,
+            attempt.bound,
+            false,
+        )
+    }
     fn settle(&self, ticket: SpendTicket, charge: &Charge) {
         if let Ok(ticket) = ticket.downcast::<Ticket>() {
             // Work units of a declared no-spend binding are not money.
