@@ -93,6 +93,7 @@ pub fn spec() -> RunSpec {
     let snapshot =
         ProbeSnapshot::from_bytes(&config.probe, &probe.canonical().unwrap(), &[]).unwrap();
     RunSpec {
+        source_comparison: None,
         reports: None,
         config,
         mode: Mode::Library,
@@ -105,6 +106,7 @@ pub fn spec() -> RunSpec {
             .map(|id| LiveCase {
                 case_id: id.into(),
                 input: CaseInput::Available {
+                    bundle: None,
                     source: rustev_live::run::CaseOrigin::DatasetCase,
                     snapshot_bytes: case.canonical().unwrap(),
                     snapshot_id: case.id().unwrap(),

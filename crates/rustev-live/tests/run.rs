@@ -97,6 +97,7 @@ fn spec() -> RunSpec {
     let snapshot =
         ProbeSnapshot::from_bytes(&config.probe, &probe.canonical().unwrap(), &[]).unwrap();
     RunSpec {
+        source_comparison: None,
         reports: None,
         config,
         mode: Mode::Library,
@@ -109,6 +110,7 @@ fn spec() -> RunSpec {
             .map(|id| LiveCase {
                 case_id: id.into(),
                 input: CaseInput::Available {
+                    bundle: None,
                     source: rustev_live::run::CaseOrigin::DatasetCase,
                     snapshot_bytes: case.canonical().unwrap(),
                     snapshot_id: case.id().unwrap(),
@@ -660,6 +662,7 @@ fn input_refusals_precede_journal_creation() {
             2 => {
                 let snapshot = support_snapshot("pro", &[2, 5], 0);
                 s.cases[0].input = CaseInput::Available {
+                    bundle: None,
                     source: rustev_live::run::CaseOrigin::DatasetCase,
                     snapshot_bytes: snapshot.canonical().unwrap(),
                     snapshot_id: snapshot.id().unwrap(),
@@ -1629,4 +1632,321 @@ fn reservation_details_preserve_all_settlements_and_exact_decision_scope() {
     assert_eq!(std::fs::read(journal.path()).unwrap(), before);
     drop(journal);
     assert_eq!(dir.journal().reservations_detail(decision), details);
+}
+
+fn source_comparison(scope: &Scope) -> run::SourceComparison {
+    let scope = scope.clone();
+    run::SourceComparison {
+        adapter: rustev_eval::dataset::AdapterRef {
+            name: "support-routing".into(),
+            version: "1".into(),
+        },
+        agreement: rustev_eval::config::Agreement {
+            params: vec!["queue".into()],
+        },
+        replay: Box::new(move || rustev_eval::replay::ReplayConfig {
+            scope: scope.clone(),
+            now_ms: ts(NOW + 1),
+            host_cap_ms: None,
+        }),
+        resolver: Box::new(rustev_eval::resolve::NoExternal),
+    }
+}
+
+async fn retained_source() -> rustev_contract::replay::ReplayBundle {
+    use rustev_eval::assemble::{AssemblyInput, Content, RetentionChoice, assemble};
+    use rustev_runtime::{CaptureConfig, CaptureOutcome, MAX_CAPTURE_BYTES};
+    let s = spec();
+    let r = rig(config(8, 0, 1), &[(answering(linear_head()), 8)]);
+    let compiled = support_compiled(None);
+    let plan = r.rt.prepare(compiled.clone()).unwrap();
+    let snapshot = support_snapshot("free", &[1], 0);
+    let mut req = request("historical");
+    req.snapshot = snapshot.clone();
+    let captured =
+        r.rt.decide_with_capture(
+            &plan,
+            req,
+            &CancelSignal::new(),
+            &CaptureConfig {
+                scope: s.scope.clone(),
+                max_bytes: MAX_CAPTURE_BYTES,
+            },
+        )
+        .await
+        .unwrap();
+    let CaptureOutcome::Captured(capture) = &captured.capture else {
+        panic!("captured source")
+    };
+    let record = &captured.result.as_ref().unwrap().record;
+    assemble(
+        &AssemblyInput {
+            capture: Some(capture),
+            scope: &s.scope,
+            plan: &compiled.plan,
+            descriptors: &descriptors_with_fallbacks(),
+            calibrations: &cal(),
+            snapshot: &snapshot,
+            run: record,
+            evaluation_time: ts(NOW),
+            created_at_ms: ts(NOW),
+        },
+        &RetentionChoice {
+            content: Content::Embedded,
+            ..RetentionChoice::default()
+        },
+    )
+    .unwrap()
+}
+
+fn bundle_spec(bundle: rustev_contract::replay::ReplayBundle, compare: bool) -> RunSpec {
+    let mut s = spec();
+    s.cases.truncate(1);
+    s.config.compare_with_source = compare;
+    s.source_comparison = Some(source_comparison(&s.scope));
+    let CaseInput::Available {
+        source,
+        bundle: retained,
+        ..
+    } = &mut s.cases[0].input
+    else {
+        unreachable!()
+    };
+    *source = run::CaseOrigin::ReplayBundle {
+        bundle_digest: bundle.record_digest().unwrap(),
+        decision_id: bundle.decision_id.clone(),
+    };
+    *retained = Some(Box::new(bundle));
+    s
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn bundle_comparison_uses_fresh_outputs_and_preserves_source_file() {
+    use rustev_contract::live::{
+        ComparisonOutcome, ComparisonSection, Historical, HistoricalRetention, LiveReexecution,
+    };
+    use rustev_contract::run::{CoreEvidence, RunRecord};
+    use rustev_eval::replay::{ReplayOutcome, reproduce};
+    let bundle = retained_source().await;
+    let context = source_comparison(&bundle.scope);
+    let ReplayOutcome::Reproduced(historical) =
+        reproduce(&bundle, context.resolver.as_ref(), &(context.replay)())
+    else {
+        panic!("source reproduces")
+    };
+    assert!(!bundle.supplies.is_empty());
+    for compare in [false, true] {
+        for changed in [false, true] {
+            let dir = Dir::new();
+            let path = dir.0.join("source.json");
+            let bytes = bundle.record_canonical().unwrap();
+            std::fs::write(&path, &bytes).unwrap();
+            let modified = std::fs::metadata(&path).unwrap().modified().unwrap();
+            let loaded =
+                rustev_contract::replay::ReplayBundle::parse(&std::fs::read(&path).unwrap())
+                    .unwrap();
+            let head = Scripted::new(linear_head(), move |c| {
+                if changed && c.task() == "support.topic" {
+                    Answer::Output(
+                        logits(&[
+                            ("billing", 0.0),
+                            ("integration_defect", 8.0),
+                            ("account_access", 0.0),
+                            ("other", 0.0),
+                        ]),
+                        Charge::Observed { units: 1 },
+                    )
+                } else {
+                    ok(c.task(), 1)
+                }
+            });
+            let r = rig(config(8, 0, 1), &[(head.clone(), 8)]);
+            let journal = dir.journal();
+            let out = prepare(bundle_spec(loaded, compare), dir.options())
+                .unwrap()
+                .execute(
+                    &r.rt,
+                    journal.clone(),
+                    &Host(None),
+                    &r.clock,
+                    &CancelSignal::new(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(out.status, RunStatus::EvaluatedLive);
+            assert!(matches!(out.items[0].1, ItemState::Completed { .. }));
+            assert!(head.dispatched().iter().any(|id| dataset(id)));
+            let live = LiveReexecution::parse(
+                &std::fs::read(dir.0.join("out/cases/a.1.x.live.json")).unwrap(),
+            )
+            .unwrap();
+            let record =
+                RunRecord::parse(&std::fs::read(dir.0.join("out/cases/a.1.x.run.json")).unwrap())
+                    .unwrap();
+            live.check().unwrap();
+            assert!(live.binds(&record));
+            check_case(&dir, "cases/a.1.x", &journal);
+            let CoreEvidence::Recorded(evidence) = &record.core else {
+                panic!("new judgment")
+            };
+            let new = rustev_eval::metrics::CaseOutcome::of(&evidence.judgment, &context.agreement)
+                .name();
+            let old =
+                rustev_eval::metrics::CaseOutcome::of(historical.judgment(), &context.agreement)
+                    .name();
+            assert_eq!(
+                new == old,
+                !changed,
+                "only backend outputs determine the new judgment"
+            );
+            if compare {
+                assert!(matches!(live.historical, Historical::Linked(_)));
+                assert!(matches!(
+                    live.retention.historical,
+                    HistoricalRetention::Observed { .. }
+                ));
+                let ComparisonSection::Completed(c) = live.comparison else {
+                    panic!("completed comparison")
+                };
+                assert_eq!(
+                    c.outcome,
+                    if changed {
+                        ComparisonOutcome::LiveDiverged
+                    } else {
+                        ComparisonOutcome::Agreement
+                    }
+                );
+            } else {
+                assert_eq!(live.historical, Historical::None);
+                assert_eq!(live.comparison, ComparisonSection::NotRequested);
+            }
+            assert_eq!(std::fs::read(&path).unwrap(), bytes);
+            assert_eq!(
+                std::fs::metadata(&path).unwrap().modified().unwrap(),
+                modified
+            );
+        }
+    }
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn source_comparison_requires_context_and_retained_bundle_before_output() {
+    let bundle = retained_source().await;
+    for defect in 0..6 {
+        let dir = Dir::new();
+        let mut s = bundle_spec(bundle.clone(), true);
+        match defect {
+            0 => s.source_comparison = None,
+            1 => {
+                s.cases = spec().cases;
+                s.config.evaluation_time = EvaluationTime::Fixed { ms: ts(NOW) };
+            }
+            2 => {
+                if let CaseInput::Available { bundle, .. } = &mut s.cases[0].input {
+                    *bundle = None;
+                }
+            }
+            3 => {
+                if let CaseInput::Available {
+                    source: run::CaseOrigin::ReplayBundle { decision_id, .. },
+                    ..
+                } = &mut s.cases[0].input
+                {
+                    *decision_id = "different".into();
+                }
+            }
+            4 => s
+                .source_comparison
+                .as_mut()
+                .unwrap()
+                .adapter
+                .version
+                .clear(),
+            _ => s.source_comparison.as_mut().unwrap().agreement.params = vec!["queue".into(); 65],
+        }
+        let error = prepare(s, dir.options()).err().expect("refused");
+        assert_eq!(
+            (error.status, error.subject),
+            ("invalid_input", "live-config")
+        );
+        assert!(!dir.0.join("out").exists());
+        assert!(!dir.0.join("journal").exists());
+    }
+    // An unavailable bundle stays that case's outcome; the run prepares.
+    let dir = Dir::new();
+    let mut s = bundle_spec(bundle, true);
+    s.cases.push(LiveCase {
+        case_id: "gone".into(),
+        input: CaseInput::Unavailable {
+            reason: "expired".into(),
+        },
+    });
+    assert!(prepare(s, dir.options()).is_ok());
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn comparison_observes_retention_after_execution_and_is_unused_without_flag() {
+    use rustev_contract::live::{ComparisonOutcome, ComparisonSection, LiveReexecution};
+    use rustev_contract::retention::{Availability, Retention};
+    let original = retained_source().await;
+    for compare in [false, true] {
+        let dir = Dir::new();
+        let mut bundle = original.clone();
+        if !compare {
+            // Invalid retained output bytes must not be parsed or resolved.
+            if let Retention::Retained { bytes, .. } = &mut bundle.run.retention {
+                *bytes = "not a run record".into();
+            }
+            for supply in &mut bundle.supplies {
+                if let Retention::Retained { bytes, .. } = &mut supply.value.retention {
+                    *bytes = "not an output".into();
+                }
+            }
+        }
+        let mut s = bundle_spec(bundle, compare);
+        let head = answering(linear_head());
+        let r = rig(config(8, 0, 1), &[(head.clone(), 8)]);
+        let scope = s.scope.clone();
+        let expired_at = original.expires_at_ms;
+        s.source_comparison.as_mut().unwrap().replay = Box::new(move || {
+            assert!(compare, "comparison context is unused without the flag");
+            assert!(head.dispatched().iter().any(|id| dataset(id)));
+            rustev_eval::replay::ReplayConfig {
+                scope: scope.clone(),
+                now_ms: expired_at,
+                host_cap_ms: None,
+            }
+        });
+        let out = prepare(s, dir.options())
+            .unwrap()
+            .execute(
+                &r.rt,
+                dir.journal(),
+                &Host(None),
+                &r.clock,
+                &CancelSignal::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(out.status, RunStatus::EvaluatedLive);
+        assert!(matches!(out.items[0].1, ItemState::Completed { .. }));
+        let live = LiveReexecution::parse(
+            &std::fs::read(dir.0.join("out/cases/a.1.x.live.json")).unwrap(),
+        )
+        .unwrap();
+        if compare {
+            let ComparisonSection::Completed(c) = live.comparison else {
+                panic!("completed comparison")
+            };
+            assert_eq!(
+                c.outcome,
+                ComparisonOutcome::Unavailable {
+                    location: "plan".into(),
+                    availability: Availability::Expired
+                }
+            );
+        } else {
+            assert_eq!(live.comparison, ComparisonSection::NotRequested);
+        }
+    }
 }

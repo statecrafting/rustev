@@ -978,6 +978,21 @@ empty while the gated entry point refuses plans with acquisitions. The
 crash test covers the added writes (123 write points). Tests:
 `crates/rustev-live/tests/run.rs`, `crates/rustev-live/tests/crash.rs`.
 
+**Increment 11 (2026-10-29): comparison with the source.** With
+`compare_with_source` (3.2.1, 3.9.3), a retained bundle input passes its
+`HistoricalLink` to `reexecute_live_with_gate`, and after the live
+result spec 026's own `rustev_eval::live::compare_live` and
+`with_comparison` complete the case's live document's comparison: a
+changed proposal is `live-diverged`, and the item is still completed.
+The comparison context (adapter, agreement, replay configuration and
+resolver) is a new optional `RunSpec` member; `prepare` refuses
+`live-config` when the flag is set without it, when a bundle's stated
+identity differs from its recomputed link, or when an available input
+is not a retained bundle; a case whose bundle is unavailable stays
+unavailable with its reason (spec 015) and does not refuse the run. Without the flag nothing changes, and a bundle's `run`
+and `supplies` are never read as the new judgment (section 5).
+Tests: `crates/rustev-live/tests/run.rs`.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child
