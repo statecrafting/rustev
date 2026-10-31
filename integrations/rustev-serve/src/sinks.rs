@@ -332,6 +332,7 @@ async fn connect(
         Host {
             backends,
             contexts: std::mem::take(&mut contexts.sources),
+            acquisitions: std::mem::take(&mut contexts.acquisitions),
             sink: sinks.clone(),
             replay_scopes: BTreeMap::new(),
         },

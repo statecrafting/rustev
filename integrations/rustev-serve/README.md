@@ -7,12 +7,13 @@ Responses are proposals and evidence, never execution authorization.
 ## Embedding
 
 Construct `Service::new(config, Host { ... })` with host-owned backend,
-context-source and evidence-sink implementations. The service validates the
-`rustev.serve-config/1` document, expected backend descriptor identities, signing
-trust and preloaded registrations before accepting work. `transport::listen`
-serves a configured listener. The transport-neutral service methods also support
-hosts with their own transport. `serve_authenticated_connection` requires its
-caller to authenticate the stream before handing it over.
+context-source, acquisition-source and evidence-sink implementations. The
+service validates the `rustev.serve-config/1` document, expected backend
+descriptor identities, signing trust and preloaded registrations before
+accepting work. `transport::listen` serves a configured listener. The
+transport-neutral service methods also support hosts with their own transport.
+`serve_authenticated_connection` requires its caller to authenticate the stream
+before handing it over.
 
 TCP uses mandatory client certificates, TLS 1.3, the binding's three ring cipher
 suites and ALPN for HTTP/1.1 and HTTP/2. Unix listeners reject existing paths and

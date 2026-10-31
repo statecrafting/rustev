@@ -1093,3 +1093,59 @@ async fn a_failed_refreshed_acquisition_is_recomputed() {
     assert_eq!(served.completion, independent.completion);
     assert_eq!(served.record.core, independent.record.core);
 }
+
+/// Spec 042 3.7.1: a step its guard skipped reaches the progress observer as
+/// skipped, with the step's compiled derivation, and observation changes no
+/// record or judgment byte.
+#[tokio::test]
+async fn a_guard_skipped_step_is_observed_as_skipped() {
+    use rustev_contract::definition::Predicate;
+    use rustev_runtime::{ProgressObserver, SkippedStep, StepProgress};
+    #[derive(Default)]
+    struct Seen(Mutex<(Vec<StepProgress>, Vec<SkippedStep>)>);
+    impl ProgressObserver for Seen {
+        fn step(&self, step: StepProgress) {
+            self.0.lock().unwrap().0.push(step);
+        }
+        fn skipped(&self, step: SkippedStep) {
+            self.0.lock().unwrap().1.push(step);
+        }
+    }
+    let source = Source::new(source(), vec![]);
+    let rt = runtime(&ManualClock::new(), std::slice::from_ref(&source), 1);
+    let mut d = definition();
+    acquisition(&mut d).when = rustev_contract::acquisition_step::Guard::Predicate(Predicate::Not(
+        Box::new(Predicate::All(vec![])),
+    ));
+    d.policy = serde_json::from_value(json!({"on_unresolved":[{"target":"step:lookup",
+        "reasons":"any","action":{"escalate":{"reason":"review"}}}],
+        "rules":[{"id":"fallback","when":"always","then":{"escalate":{"reason":"review"}}}],
+        "adjustments":[]}))
+    .unwrap();
+    let plan = prepare(&rt, &d, std::slice::from_ref(&source), None);
+    let plain = rt
+        .decide(&plan, request("skip"), &CancelSignal::new())
+        .await
+        .unwrap();
+    let seen = Seen::default();
+    let observed = rt
+        .decide_observed(&plan, request("skip"), &CancelSignal::new(), &seen)
+        .await
+        .unwrap();
+    assert_eq!(source.calls(), 0);
+    assert_eq!(
+        plain.record.record_canonical().unwrap(),
+        observed.record.record_canonical().unwrap()
+    );
+    let (steps, skipped) = seen.0.into_inner().unwrap();
+    assert!(steps.is_empty(), "{steps:?}");
+    let derivation = plan.compiled().plan.steps[0].derivation;
+    assert_eq!(
+        skipped,
+        [SkippedStep {
+            step_id: "lookup".into(),
+            instance_ids: vec![],
+            derivation,
+        }]
+    );
+}
