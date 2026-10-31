@@ -342,33 +342,12 @@ fn write_inputs(dir: &Path) {
         "reliability_bins":["0","0.5","1"],"subgroups":[],"latency_quantiles":["0.5"],"cost_units_comparable":false,
         "metrics":metrics,
         "gates":[],"temperature_grid":[],"scorers":[],"rubric_metrics":[],"human_scales":[],"agreements":[],"origin":[]});
-    // `rustev eval --repeat-config` evaluates each run without the
-    // adapter's measures, so a version 3 configuration is refused there;
-    // the repeat runs under the same configuration at version 2.
-    let mut config_v2 = config.clone();
-    config_v2["schema"] = json!("rustev.evaluator-config/2");
-    let c = config_v2.as_object_mut().unwrap();
-    c["adapter"].as_object_mut().unwrap().remove("measures");
-    for k in [
-        "scorers",
-        "rubric_metrics",
-        "human_scales",
-        "agreements",
-        "origin",
-    ] {
-        c.remove(k);
-    }
-    c["metrics"]
-        .as_array_mut()
-        .unwrap()
-        .retain(|m| m["name"] != "ranking");
     let repeat = json!({"schema":"rustev.repeat-config/1",
         "bootstrap":{"method":"percentile-cluster/1","prng":"xoshiro256starstar-splitmix64/1","level":"0.95","resamples":1000,"seed":"39"},
         "noise":{"rule":{"k_sd":{"k":"2"}},"floor":"0","overrides":{}},"slices":[],"stability_metrics":["coverage"],"top_k":null});
     for (name, doc) in [
         ("adapter", adapter),
         ("dataset", dataset),
-        ("config-v2", config_v2),
         ("config", config),
         ("repeat-config", repeat),
     ] {
@@ -388,14 +367,7 @@ fn eval(inputs: &Path, bundles: &Path, out: &Path, repeat: bool) -> (u8, Value) 
     for (flag, value) in [
         ("--dataset", p(&inputs.join("dataset.json"))),
         ("--split", "calibration".into()),
-        (
-            "--config",
-            p(&inputs.join(if repeat {
-                "config-v2.json"
-            } else {
-                "config.json"
-            })),
-        ),
+        ("--config", p(&inputs.join("config.json"))),
         ("--adapter", p(&inputs.join("adapter.json"))),
         ("--bundles", p(bundles)),
         ("--now-ms", reference::NOW.to_string()),
@@ -509,8 +481,32 @@ fn swapping_rules_for_bedrock_fixtures_keeps_one_authority_path_and_comparable_r
             (summary["n"].as_u64(), summary["source"].as_str()),
             (Some(2), Some("replay"))
         );
+        // The repeat runs under the same version 3 configuration: every
+        // run's report carries the ranking measures (spec 041 3.11).
+        for run in 0..2 {
+            let run_report: Value = serde_json::from_slice(
+                &std::fs::read(repeated.join(format!("run-{run}.report.json"))).unwrap(),
+            )
+            .unwrap();
+            assert_eq!(
+                run_report["evaluator_config"], report["config"],
+                "{name} run {run}"
+            );
+            for metric in ["precision@2", "ndcg@2", "mrr", "backfill@p1"] {
+                assert_eq!(
+                    measured(&run_report, &format!("ranking/chosen/{metric}")),
+                    measured(&report, &format!("ranking/chosen/{metric}")),
+                    "{name} run {run} {metric}"
+                );
+            }
+        }
         let repeat: Value =
             serde_json::from_slice(&std::fs::read(repeated.join("repeat.json")).unwrap()).unwrap();
+        assert_eq!(repeat["evaluator_config"], report["config"], "{name}");
+        assert!(
+            repeat.to_string().contains("ranking/chosen/ndcg@2"),
+            "{name}: {repeat}"
+        );
         reports.push((report, repeat));
     }
     let ((rules, rules_repeat), (bedrock, bedrock_repeat)) = (&reports[0], &reports[1]);
