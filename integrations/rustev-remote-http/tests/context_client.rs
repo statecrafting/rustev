@@ -243,8 +243,10 @@ async fn abandoning_a_fetch_cancels_it_and_counts_the_late_answer() {
     let record = kept.lock().unwrap()[0].clone();
     assert!(record.late);
     assert_eq!(
-        record.code.map(|c| c.0),
-        Some(rustev_contract::remote::RemoteCode::Cancelled)
+        record.code,
+        Some(rc::AcquireCode::from(
+            rustev_contract::remote::RemoteCode::Cancelled
+        ))
     );
     until(|| client.counters().depth == 0).await;
 }

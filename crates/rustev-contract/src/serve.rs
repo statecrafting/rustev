@@ -773,8 +773,11 @@ impl Validate for ServeRefusal {
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum StepOutcome {
     Supplied,
-    Unresolved { reason: crate::judgment::Unresolved },
-    // Extension point: spec 036 (skipped by tiered widening).
+    Unresolved {
+        reason: crate::judgment::Unresolved,
+    },
+    /// Skipped by a guard or tiered widening (spec 036 3.8); no value.
+    Skipped,
 }
 /// Spec 037 field events are described now; the service must advertise
 /// their absence until generation is implemented. Values remain provisional.

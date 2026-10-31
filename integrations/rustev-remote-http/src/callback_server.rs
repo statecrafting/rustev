@@ -433,6 +433,7 @@ fn describe_response(state: &State) -> rc::DescribeResponse {
                     invalidation: c.invalidation.clone(),
                     endpoint_class: EndpointClass::HostOperated,
                 },
+                descriptor: None,
             })
             .collect(),
     }

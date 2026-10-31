@@ -1,6 +1,8 @@
 //! Spec 042 remote contract documents, with synthetic content only.
+use rustev_contract::acquisition::AcquisitionRequest;
 use rustev_contract::bounded::{BoundError, ParseError, scan};
-use rustev_contract::{Document, DocumentError};
+use rustev_contract::source::SourceDescriptor;
+use rustev_contract::{Document, DocumentError, Identified};
 use rustev_contract::{remote_context as c, remote_sink as s};
 use serde_json::{Value, json};
 
@@ -307,9 +309,182 @@ fn snapshot_parser_and_deferred_members_cannot_be_bypassed() {
     d["sources"][0]["terms"]["endpoint_class"] = json!("third_party");
     assert!(parse::<c::DescribeResponse>(&d).is_err());
     d["sources"][0]["terms"]["endpoint_class"] = json!("host_operated");
+    // A descriptor is carried with its identity, never as a bare document.
     d["sources"][0]["descriptor"] = json!({"schema":"rustev.source/1"});
     assert!(parse::<c::DescribeResponse>(&d).is_err());
     let mut f = fetch();
     f["attempt_id"] = json!("d%2F%2C%25/context/1");
     assert!(parse::<c::FetchRequest>(&f).is_ok());
+}
+
+fn source_descriptor() -> Value {
+    json!({"schema":"rustev.source/1","name":"catalog","version":"1.0.0",
+        "operations":[{"name":"search","cancellation":"acknowledges",
+            "request":[{"name":"q","type":{"text":{"max_bytes":64}},"required":true}],
+            "max_request_bytes":65536,
+            "item":[{"name":"id","type":"integer","provenance":"system-of-record",
+                "max_grade":"hint","reliability":"reliable","freshness":"not_required"}],
+            "max_page_items":10,"max_page_bytes":4096,"paging":"offset",
+            "cost":{"bounded":{"max_units":3}},"idempotent":true,"cache":"not_cacheable"}]})
+}
+fn descriptor() -> SourceDescriptor {
+    parse(&source_descriptor()).unwrap()
+}
+fn acquisition_request() -> AcquisitionRequest {
+    parse(
+        &json!({"schema":"rustev.acquisition-request/1","source":descriptor().id().unwrap(),
+        "operation":"search","fields":[{"set":{"value":"tea"}}],"page":"first"}),
+    )
+    .unwrap()
+}
+fn acquire() -> Value {
+    let r = acquisition_request();
+    json!({"schema":c::ACQUIRE,"version":1,"source":r.source,"operation":"search",
+        "request":serde_json::from_slice::<Value>(&r.canonical().unwrap()).unwrap(),
+        "request_id":r.id().unwrap(),"attempt_id":"d/lookup/0,0/1","budget_ms":1,
+        "trace_id":"t","principal":principal()})
+}
+fn page() -> Value {
+    json!({"schema":"rustev.acquisition-page/1","request":acquisition_request().id().unwrap(),
+        "as_of_ms":0,"items":[{"id":1}],"next":{"offset":{"integer":1}}})
+}
+
+#[test]
+fn acquire_documents_round_trip_and_close_their_envelopes() {
+    check::<c::AcquireRequest>(acquire(), Some("request"));
+    let mut traced = acquire();
+    traced["traceparent"] = json!("00-0123456789abcdef0123456789abcdef-0123456789abcdef-01");
+    check::<c::AcquireRequest>(traced, Some("request"));
+    check::<c::AcquireResponse>(
+        json!({"schema":c::ACQUIRE,"result":{"page":page()},"charge":{"observed":{"units":2}}}),
+        Some("response"),
+    );
+    for code in ["denied", "unauthorized", "describe_mismatch", "overloaded"] {
+        check::<c::AcquireResponse>(
+            json!({"schema":c::ACQUIRE,"result":{"failure":{"code":code,"detail":"synthetic"}},"charge":"unknown"}),
+            Some("response"),
+        );
+    }
+    check::<c::ExchangeRecord>(
+        json!({"schema":c::EXCHANGE,"attempt_id":"d/lookup/0,0/1","request_digest":DIGEST,"response_digest":DIGEST,"code":"denied","phases":[],"late":false}),
+        None,
+    );
+    let hosted = c::HostedDescriptor::new(&descriptor()).unwrap();
+    assert_eq!(hosted.id, descriptor().id().unwrap());
+    let source = json!({"source_id":"s","fields":[],"terms":{
+        "cancellation":"none","idempotency_window_ms":0,"max_request_bytes":1,"max_response_bytes":1,
+        "invalidation":"none","endpoint_class":"host_operated"
+    },"descriptor":hosted});
+    check::<c::DescribeResponse>(
+        json!({"schema":c::DESCRIBE,"version":1,"sources":[source]}),
+        Some("response"),
+    );
+}
+
+#[test]
+fn acquire_pages_keep_their_bytes_and_are_not_validated_here() {
+    // Spec 036 3.3.4 is the runtime's: a page that would fail it, even one
+    // that is no acquisition page at all, crosses as its bytes.
+    let text = r#"{"schema":"rustev.acquisition-page/1","request":"x","items":[1.50]}"#;
+    let body = format!(
+        r#"{{"schema":"{}","result":{{"page":{text}}},"charge":"unknown"}}"#,
+        c::ACQUIRE
+    );
+    let doc = c::AcquireResponse::parse(body.as_bytes()).unwrap();
+    let c::AcquireResult::Page(bytes) = &doc.result else {
+        panic!("page expected")
+    };
+    assert_eq!(bytes.bytes(), text.as_bytes());
+    assert_eq!(c::PageBytes::new(text.as_bytes()).unwrap(), *bytes);
+    for page in [json!([1]), json!("page"), json!(null)] {
+        let v = json!({"schema":c::ACQUIRE,"result":{"page":page},"charge":"unknown"});
+        assert!(parse::<c::AcquireResponse>(&v).is_err(), "{v}");
+    }
+    let v = json!({"schema":c::ACQUIRE,"result":{"failure":{"code":"bogus","detail":""}},"charge":"unknown"});
+    assert!(parse::<c::AcquireResponse>(&v).is_err());
+    // `denied` is an acquire code only: a fetch failure never carries it.
+    let v = json!({"schema":c::FETCH,"result":{"failure":{"code":"denied","detail":""}}});
+    assert!(parse::<c::FetchResponse>(&v).is_err());
+}
+
+#[test]
+fn acquire_requests_match_their_embedded_request_and_attempt_form() {
+    for attempt in [
+        "d/lookup/0,0/1",
+        "d/lookup/2,10/3",
+        "d/lookup/0,0/r1",
+        "d%2F%2C%25/s%2F/0,0/1",
+    ] {
+        let mut v = acquire();
+        v["attempt_id"] = json!(attempt);
+        assert!(parse::<c::AcquireRequest>(&v).is_ok(), "{attempt}");
+    }
+    for attempt in [
+        "d/context/1",
+        "d/lookup/0/1",
+        "d/lookup/00,0/1",
+        "d/lookup/0,0/0",
+        "d/lookup/0,0/r0",
+        "d/lookup/0,0/1/2",
+        "/lookup/0,0/1",
+        "d//0,0/1",
+        "d%2/lookup/0,0/1",
+        "d,e/lookup/0,0/1",
+    ] {
+        let mut v = acquire();
+        v["attempt_id"] = json!(attempt);
+        assert!(parse::<c::AcquireRequest>(&v).is_err(), "{attempt}");
+    }
+    let mut v = acquire();
+    v["request_id"] = json!(DIGEST);
+    assert!(parse::<c::AcquireRequest>(&v).is_err());
+    let mut v = acquire();
+    v["operation"] = json!("other");
+    assert!(parse::<c::AcquireRequest>(&v).is_err());
+    let mut v = acquire();
+    v["source"] = json!(DIGEST);
+    assert!(parse::<c::AcquireRequest>(&v).is_err());
+    let mut v = acquire();
+    v["principal"]["reference"] = json!("not hex");
+    assert!(parse::<c::AcquireRequest>(&v).is_err());
+    let mut v = acquire();
+    v["traceparent"] = json!("00-00000000000000000000000000000000-0123456789abcdef-01");
+    assert!(parse::<c::AcquireRequest>(&v).is_err());
+    // The request's bytes are carried verbatim, so they must be canonical.
+    let r = acquisition_request();
+    let canonical = String::from_utf8(r.canonical().unwrap()).unwrap();
+    let spaced = canonical.replacen(',', ", ", 1);
+    let mut body = serde_json::to_string(&acquire()).unwrap();
+    body = body.replace(&canonical, &spaced);
+    assert!(body.contains(&spaced));
+    assert!(c::AcquireRequest::parse(body.as_bytes()).is_err());
+}
+
+#[test]
+fn hosted_descriptors_are_identified_by_exactly_their_bytes() {
+    let hosted = serde_json::to_value(c::HostedDescriptor::new(&descriptor()).unwrap()).unwrap();
+    let describe = |h: &Value| {
+        json!({"schema":c::DESCRIBE,"version":1,"sources":[{"source_id":"s","fields":[],"terms":{
+            "cancellation":"none","idempotency_window_ms":0,"max_request_bytes":1,"max_response_bytes":1,
+            "invalidation":"none","endpoint_class":"host_operated"},"descriptor":h}]})
+    };
+    assert!(parse::<c::DescribeResponse>(&describe(&hosted)).is_ok());
+    let mut wrong = hosted.clone();
+    wrong["id"] = json!(DIGEST);
+    assert!(parse::<c::DescribeResponse>(&describe(&wrong)).is_err());
+    let mut other = hosted.clone();
+    other["document"]["version"] = json!("1.0.1");
+    assert!(parse::<c::DescribeResponse>(&describe(&other)).is_err());
+    let mut invalid = hosted.clone();
+    invalid["document"]["operations"][0]["max_page_items"] = json!(0);
+    assert!(parse::<c::DescribeResponse>(&describe(&invalid)).is_err());
+    // Non-canonical bytes (member order) are refused, not re-encoded.
+    let text = serde_json::to_string(&describe(&hosted)).unwrap();
+    let reordered = text.replacen(r#""name":"catalog","#, "", 1).replacen(
+        r#""version":"1.0.0""#,
+        r#""version":"1.0.0","name":"catalog""#,
+        1,
+    );
+    assert_ne!(text, reordered);
+    assert!(c::DescribeResponse::parse(reordered.as_bytes()).is_err());
 }

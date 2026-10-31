@@ -1469,6 +1469,37 @@ in `crates/rustev-contract/tests/042_serve_documents.rs`. Section 5's
 "Explain before D2 is implemented" row no longer applies: spec 040 is
 implemented.
 
+**Increment 7 part 1: the acquire documents (2026-10-30).** Spec 036 is
+implemented, so the members 3.10.1 and 3.10.3 held back in increment 1
+(remote half) are defined in `crates/rustev-contract/src/remote_context.rs`.
+`rustev.remote-context-acquire/1` request: version, `source` (the
+`SourceId`), `operation`, `request` (the `rustev.acquisition-request/1`
+document as its canonical bytes), `request_id` (its
+`AcquisitionRequestId`), the attempt id spec 036 assigns
+(`<decision id>/<step id>/<tier>,<page>/<n>`, `r<n>` on a rerun, each
+component escaped as for fetch), budget, trace id, `traceparent` and the
+principal handle. Its parser refuses request bytes that are not canonical,
+a `request_id` that is not their identity, and a `source` or `operation`
+other than the request's. Response: `page` (the page document's bytes
+exactly as sent) or `failure{code, detail}`, and `charge` (the run record's
+`Charge`: observed, estimated or unknown). The failure codes are the
+context codes and `denied`, and the exchange record's `code` admits
+`denied` (`AcquireCode`). The response parser checks only that a page is a
+JSON object: parsing it and spec 036 3.3.4's validation are the runtime's,
+so an invalid page reaches the runtime and is classified there. The
+response envelope is bounded at 4 MiB, as the fetch response is. A
+described source may carry `descriptor`: `id` (its `SourceId`) and
+`document` (its `rustev.source/1` bytes verbatim); describe refuses bytes
+that are not canonical and an `id` that is not their identity. The
+service's `step` event gains the `skipped` outcome of 3.7.1 (spec 036 3.8).
+Each addition is optional or a new value, so no existing document's bytes
+change. Tests in `tests/042_remote_documents.rs`:
+`acquire_documents_round_trip_and_close_their_envelopes`,
+`acquire_pages_keep_their_bytes_and_are_not_validated_here`,
+`acquire_requests_match_their_embedded_request_and_attempt_form` and
+`hosted_descriptors_are_identified_by_exactly_their_bytes`; the `skipped`
+outcome in `tests/042_serve_documents.rs`.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

@@ -13857,6 +13857,101 @@ export namespace RustevRemoteCancel1Response {
 }
 export type RustevRemoteCancel1Response = RustevRemoteCancel1Response.RustevRemoteCancel1Response;
 
+export namespace RustevRemoteContextAcquire1Request {
+  export type AcquisitionRequestId = string;
+  export type SourceId = string;
+
+  /**
+   * An acquisition attempt sent to a remote source (3.10.3): spec 036's
+   * request document and its identity, carried verbatim.
+   */
+  export interface RustevRemoteContextAcquire1Request {
+    attempt_id: string;
+    budget_ms: number;
+    operation: string;
+    principal: WirePrincipal;
+    request: EmbeddedRustevAcquisitionRequest_1;
+    request_id: AcquisitionRequestId;
+    schema: "rustev.remote-context-acquire/1";
+    source: SourceId;
+    trace_id: string;
+    traceparent?: string | null;
+    version: number;
+  }
+  /**
+   * An opaque principal reference on the wire (spec 020, 3.6): the host's
+   * bytes as lowercase hexadecimal, the host's mapping version, and the
+   * declared scope. Rustev never interprets, authenticates, authorizes or
+   * expands it.
+   */
+  export interface WirePrincipal {
+    mapping_version: string;
+    reference: string;
+    scope: string;
+  }
+  /**
+   * An embedded `rustev.acquisition-request/1` document, carried as its original bytes and checked by that document's own bounded parser.
+   */
+  export interface EmbeddedRustevAcquisitionRequest_1 {}
+}
+export type RustevRemoteContextAcquire1Request = RustevRemoteContextAcquire1Request.RustevRemoteContextAcquire1Request;
+
+export namespace RustevRemoteContextAcquire1Response {
+  /**
+   * What an attempt cost, as far as is known when it ends.
+   */
+  export type Charge =
+    | "unknown"
+    | {
+        observed: {
+          units: number;
+        };
+      }
+    | {
+        estimated: {
+          units: number;
+        };
+      };
+  export type AcquireResult =
+    | {
+        page: PageBytes;
+      }
+    | {
+        failure: {
+          code: AcquireCode;
+          detail: string;
+        };
+      };
+  export type AcquireCode =
+    | "transport_unsent"
+    | "transport_interrupted"
+    | "rate_limited"
+    | "overloaded"
+    | "unauthorized"
+    | "capability"
+    | "malformed_request"
+    | "malformed_response"
+    | "describe_mismatch"
+    | "remote_deadline"
+    | "remote_error"
+    | "cancelled"
+    | "denied";
+
+  /**
+   * A source's answer to one acquisition attempt, with its charge.
+   */
+  export interface RustevRemoteContextAcquire1Response {
+    charge: Charge;
+    result: AcquireResult;
+    schema: "rustev.remote-context-acquire/1";
+  }
+  /**
+   * A `rustev.acquisition-page/1` document carried as its original bytes; the runtime parses and validates it.
+   */
+  export interface PageBytes {}
+}
+export type RustevRemoteContextAcquire1Response = RustevRemoteContextAcquire1Response.RustevRemoteContextAcquire1Response;
+
 export namespace RustevRemoteContextCancel1Request {
   export interface RustevRemoteContextCancel1Request {
     attempt_ids: string[];
@@ -13888,6 +13983,7 @@ export namespace RustevRemoteContextDescribe1Request {
 export type RustevRemoteContextDescribe1Request = RustevRemoteContextDescribe1Request.RustevRemoteContextDescribe1Request;
 
 export namespace RustevRemoteContextDescribe1Response {
+  export type SourceId = string;
   export type Freshness =
     | {
         observation: {
@@ -14000,10 +14096,26 @@ export namespace RustevRemoteContextDescribe1Response {
     version: number;
   }
   export interface HostedSource {
+    /**
+     * The source's spec 036 descriptor, absent when it declares none.
+     */
+    descriptor?: HostedDescriptor | null;
     fields: ContextField[];
     source_id: string;
     terms: ContextTerms;
   }
+  /**
+   * A `rustev.source/1` descriptor carried verbatim with its `SourceId`
+   * (3.10.1). The id must be the identity of exactly these bytes.
+   */
+  export interface HostedDescriptor {
+    document: EmbeddedRustevSource_1;
+    id: SourceId;
+  }
+  /**
+   * An embedded `rustev.source/1` document, carried as its original bytes and checked by that document's own bounded parser.
+   */
+  export interface EmbeddedRustevSource_1 {}
   export interface ContextField {
     freshness: Freshness;
     grade?: Grade | null;
@@ -14027,7 +14139,7 @@ export namespace RustevRemoteContextDescribe1Response {
 export type RustevRemoteContextDescribe1Response = RustevRemoteContextDescribe1Response.RustevRemoteContextDescribe1Response;
 
 export namespace RustevRemoteContextExchange1 {
-  export type ContextCode =
+  export type AcquireCode =
     | "transport_unsent"
     | "transport_interrupted"
     | "rate_limited"
@@ -14039,7 +14151,8 @@ export namespace RustevRemoteContextExchange1 {
     | "describe_mismatch"
     | "remote_deadline"
     | "remote_error"
-    | "cancelled";
+    | "cancelled"
+    | "denied";
   /**
    * A transport phase with its own ceiling inside the one attempt budget
    * (spec 020, 3.4), in the order an exchange passes through them.
@@ -14059,7 +14172,7 @@ export namespace RustevRemoteContextExchange1 {
    */
   export interface RustevRemoteContextExchange1 {
     attempt_id: string;
-    code?: ContextCode | null;
+    code?: AcquireCode | null;
     late: boolean;
     phases: TransportPhase[];
     request_digest?: ContentDigest | null;
@@ -20816,7 +20929,8 @@ export namespace RustevServeEvent1 {
         unresolved: {
           reason: Unresolved;
         };
-      };
+      }
+    | "skipped";
   /**
    * The closed set of unresolved reasons (spec 002, 3.5.6). Field and fact
    * lists are sorted and deduplicated.
