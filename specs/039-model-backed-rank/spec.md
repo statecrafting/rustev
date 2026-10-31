@@ -757,15 +757,19 @@ cargo test -p rustev-eval --locked --test ranking_replay
 cargo test -p rustev-backend-rules --locked --test ranking
 # 3.16: Jev composition; the adapter declares no rank.
 cargo test -p rustev-jev --locked --test adapter --test runtime
+# A-49 offline Bedrock items: rank fixtures on both wires and the refusal (3.15),
+# unchanged bindings without rank (3.18 item 1) and the swap test (3.17).
+cargo test -p rustev-bedrock --locked --test ranking --test rank_swap
 ```
 
-Externally blocked until spec 030 is complete, reported as such and never
-as passed: the Bedrock items owner decision A-49 moves to the Bedrock
-`rank` increment, namely section 5's row "Bedrock binding `rank` with
-`structured_output: none`", the Bedrock `rank` fixtures on both wires for
-the three modes (3.15, 030 3.12.3), the swap test run with the rules
-backend and with Bedrock fixtures, 3.18 item 1 for Bedrock bindings
-without `rank`, and any paid live Bedrock `rank` smoke call (Decision 18).
+The offline Bedrock items that owner decision A-49 moves to the Bedrock
+`rank` increment are delivered (#422, #424) and declared above: section 5's row
+"Bedrock binding `rank` with `structured_output: none`", the Bedrock
+`rank` fixtures on both wires for the three modes (3.15, 030 3.12.3), the
+swap test run with the rules backend and with Bedrock fixtures, and 3.18
+item 1 for Bedrock bindings without `rank`. Any paid live Bedrock `rank`
+smoke call (Decision 18) stays outside declared verification; its result,
+when one is made, is recorded with its journal total outside it.
 
 **Owner decision A-49 (2026-10-23): dependencies.** Specs 022 and 030 are
 no longer declared dependencies of this spec; spec 012 remains one. Spec
