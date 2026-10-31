@@ -975,6 +975,17 @@ parts a and b, A-49's offline Bedrock items have tests
 (`crates/rustev-core/tests/RANKING_ACCEPTANCE.md`); only the optional
 paid live smoke (Decision 18) remains.
 
+**Bedrock `rank`, part b follow-up (2026-10-30): the repeat under version
+3.** `rustev eval --repeat-config` now evaluates each run with the
+adapter's measures (spec 041's record, #425), so part b's caveat is
+lifted: the swap test's repeat runs under the same version 3
+configuration as its single-run reports, with no version 2 copy. For both
+backends every repeated run's report names that configuration's digest
+and carries the same `ranking/chosen/*` measures (`precision@2`,
+`ndcg@2`, `mrr`, `backfill@p1`) as the single-run report, and the repeat
+report names the same configuration and includes the ranking metrics
+(`integrations/rustev-bedrock/tests/rank_swap.rs`).
+
 ## Decisions at approval
 
 Decided within the binding principles under the work order.
