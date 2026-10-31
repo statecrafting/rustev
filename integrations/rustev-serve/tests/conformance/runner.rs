@@ -942,7 +942,12 @@ async fn every_run_golden_through_both_transports_and_listeners() {
     }
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+// One thread, as the suite's native runner drives these cases: the driver
+// then reads the runtime's gauges and the clock's sleepers only between the
+// decision's polls. On a worker pool it could read them in the middle of one
+// (an attempt answered and its permit released, the next attempt not yet
+// dispatched) and step the clock early, moving that dispatch to a later time.
+#[tokio::test]
 async fn every_runtime_case_through_both_transports_and_listeners() {
     let pki = TestPki::new();
     let cases: Vec<Case> = serve_cases()

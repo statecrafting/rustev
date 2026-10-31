@@ -1369,6 +1369,19 @@ construction, and for the sink client a timeout after sending
 (`may_have_received: false`), a stalled or oversized answer, and an unknown
 describe version. `RemoteSink::send` becomes crate-visible for these tests.
 
+**Increment 5 part 2, follow-up: the runtime cases run on one thread
+(2026-10-30).** `every_runtime_case_through_both_transports_and_listeners`
+failed now and then under load: `runtime.retry` recorded
+`explicit_deadline` as dispatched or ended at 10 ms rather than 0. On a
+worker pool the driver could read the runtime's gauges in the middle of
+the decision's poll, after one attempt answered and released its permit
+and before the next was dispatched, and so advance the manual clock past
+the retry delay early. The test now runs on a current-thread runtime, as
+the suite's native runner (`tools/rustev-conformance/src/runtime.rs`)
+drives the same cases, so the driver reads the gauges and the clock's
+sleepers only between the decision's polls. The byte comparison is
+unchanged.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child
