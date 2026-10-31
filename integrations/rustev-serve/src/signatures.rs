@@ -40,14 +40,23 @@ impl Trust {
     pub fn verify(
         &self,
         request: &ServeRegister,
-        mode: SigningMode,
+        mode: &SigningMode,
     ) -> Result<Signer, RefusalCode> {
         let bundle = request
             .bundle
             .document()
             .map_err(|_| RefusalCode::InvalidDocument)?;
         let signature = match &request.signature {
-            Maybe::None if mode == SigningMode::AllowUnsigned => return Ok(Signer::Unsigned),
+            // Under `deny_unsigned_for_profiles` the registration checks the
+            // bundle's resolved profile chain (3.3.6, 3.3.8).
+            Maybe::None
+                if matches!(
+                    mode,
+                    SigningMode::AllowUnsigned | SigningMode::DenyUnsignedForProfiles(_)
+                ) =>
+            {
+                return Ok(Signer::Unsigned);
+            }
             Maybe::None => return Err(RefusalCode::UnsignedRefused),
             Maybe::Some(s) => s.document().map_err(|_| RefusalCode::InvalidDocument)?,
         };
@@ -173,7 +182,7 @@ mod tests {
                 )],
             };
             assert_eq!(
-                trust.verify(&request, SigningMode::RequireSigned),
+                trust.verify(&request, &SigningMode::RequireSigned),
                 Err(RefusalCode::SignatureInvalid)
             );
         }
@@ -201,7 +210,7 @@ mod tests {
                 )],
             };
             assert_eq!(
-                trust.verify(&request, SigningMode::RequireSigned),
+                trust.verify(&request, &SigningMode::RequireSigned),
                 Err(RefusalCode::SignatureUntrusted)
             );
             // Invalid cryptography takes precedence over an identity mismatch.
@@ -214,7 +223,7 @@ mod tests {
                     serde_json::json!("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
                 let invalid = ServeRegister::parse(&serde_json::to_vec(&invalid).unwrap()).unwrap();
                 assert_eq!(
-                    trust.verify(&invalid, SigningMode::RequireSigned),
+                    trust.verify(&invalid, &SigningMode::RequireSigned),
                     Err(RefusalCode::SignatureInvalid)
                 );
             }
