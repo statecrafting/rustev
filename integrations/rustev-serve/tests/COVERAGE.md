@@ -34,7 +34,7 @@ The optional runtime observer has byte-equivalence and panic-containment tests i
 | Invalidation gap/erasure | `pushed_invalidations_ack_in_order_and_report_gaps_and_erasures` (push: baseline, replay skipped, gap counted and degraded, erasure while retained counted); poll: `contexts::tests::a_polled_source_sets_its_baseline_applies_items_and_degrades_on_failure` |
 | Stalled stream | `stalled_decision_stream_retains_final_and_counts_actual_step_drops`; live steps and disconnect: `http_stream_emits_admission_and_steps_before_final_and_disconnect_keeps_work` |
 | HTTP/gRPC differential | `grpc_differential` covers success, refusals, retained streaming and evidence failure/lookup over HTTP/2 in memory and loopback; `grpc::tests` checks all 31 refusal mappings. Shared family conformance remains separate. |
-| Explain unavailable | `in_memory_http1_and_http2_use_the_same_handlers` |
+| Explain unavailable | No longer reachable: spec 040 (D2) is implemented and `POST /v1/explain` is served; `grpc_differential::every_explain_golden_through_both_transports`, `grpc_differential::explain_checks_scope_and_resolves_references_under_roots` |
 | Shutdown unflushed records | `immediate_shutdown_reports_every_pending_record`, `queued_sink_policies_preserve_tickets_drops_and_shutdown_accounting` |
 | Forbidden dependency families | `make boundaries` |
 

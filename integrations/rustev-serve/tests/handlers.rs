@@ -585,9 +585,10 @@ async fn in_memory_http1_and_http2_use_the_same_handlers() {
     )
     .await;
     assert!(reply.contains("unauthenticated"));
-    let unavailable = send(s.clone(), "POST /v1/explain HTTP/1.1\r\nHost: local\r\nConnection: close\r\nContent-Length: 0\r\n\r\n".into(), None).await;
-    assert!(unavailable.starts_with("HTTP/1.1 404"));
-    assert!(unavailable.contains("endpoint_unavailable"));
+    // Explanation is served (3.8.3): without a principal it is refused as
+    // every scoped operation is.
+    let explain = send(s.clone(), "POST /v1/explain HTTP/1.1\r\nHost: local\r\nConnection: close\r\nContent-Length: 0\r\n\r\n".into(), None).await;
+    assert!(explain.contains("principal_invalid"), "{explain}");
     let payload = String::from_utf8(body("stream-in-memory")).unwrap();
     let request = format!(
         "POST /v1/plans/{id}/decisions?stream=1 HTTP/1.1\r\nHost: local\r\nConnection: close\r\nrustev-principal: YQ\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{payload}",
@@ -1542,6 +1543,258 @@ mod grpc_differential {
             rustev_contract::canonical::tagged_digest("transport-test", b)
         );
     }
+    /// The answer's document: the body, or a gRPC refusal's trailer.
+    fn answer(documents: Vec<Vec<u8>>, headers: hyper::HeaderMap) -> Vec<u8> {
+        if let Some(d) = documents.into_iter().next() {
+            return d;
+        }
+        tonic::metadata::MetadataMap::from_headers(headers)
+            .get_bin("rustev-refusal-bin")
+            .expect("a refusal trailer")
+            .to_bytes()
+            .unwrap()
+            .to_vec()
+    }
+    /// The service for explain cases: principal `a` (`YQ`) resolves to
+    /// `scope`, the first listener carries `redaction`, and the reference
+    /// prefix `golden` reads the explain goldens.
+    fn explain_service(scope: &Value, redaction: Option<Value>) -> Arc<Service> {
+        let mut config = config_value();
+        if let Some(policy) = redaction {
+            config["listeners"][0]["redaction_policy"] = json!({ "some": policy });
+        }
+        let golden = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../crates/rustev-cli/tests/golden/explain"
+        );
+        config["resolver_roots"] = json!({ "golden": golden });
+        Service::new(
+            ServeConfig::parse(&serde_json::to_vec(&config).unwrap()).unwrap(),
+            Host {
+                backends: BTreeMap::new(),
+                contexts: BTreeMap::new(),
+                sink: Arc::new(Sink::default()),
+                replay_scopes: BTreeMap::from([(
+                    b"a".to_vec(),
+                    serde_json::from_value(scope.clone()).unwrap(),
+                )]),
+            },
+        )
+        .unwrap()
+    }
+    async fn explain_both(s: &Arc<Service>, body: &str) -> Vec<u8> {
+        let (http, _) = exchange(
+            s.clone(),
+            false,
+            Operation::Explain,
+            "",
+            body.into(),
+            Some("YQ"),
+        )
+        .await;
+        let (grpc, headers) = exchange(
+            s.clone(),
+            true,
+            Operation::Explain,
+            "",
+            body.into(),
+            Some("YQ"),
+        )
+        .await;
+        let grpc = answer(grpc, headers);
+        compare(&http[0], &grpc);
+        grpc
+    }
+    fn refused(answer: &[u8], code: RefusalCode, detail: &str) {
+        let refusal = ServeRefusal::parse(answer)
+            .unwrap_or_else(|e| panic!("{e}: {}", String::from_utf8_lossy(answer)));
+        assert_eq!((refusal.code, refusal.detail.as_str()), (code, detail));
+    }
+    /// Every explain golden of the shared suite (spec 040's cases) through
+    /// `POST /v1/explain` and gRPC `Explain` (3.8.3): the explanation bytes
+    /// and Markdown equal the goldens, the redaction policy is the
+    /// listener's, a spec 040 refusal is `invalid_document` naming its code,
+    /// `scope` and `now_ms` outside bundle form are `invalid_request`, and
+    /// both transports answer the same bytes. Cases that hand the library a
+    /// resolver are not requests the service accepts: it resolves a bundle's
+    /// external items itself.
+    #[tokio::test]
+    async fn every_explain_golden_through_both_transports() {
+        SOCKET.scope(false, explain_goldens()).await;
+    }
+    async fn explain_goldens() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let mut paths: Vec<_> = std::fs::read_dir(root.join("tools/rustev-conformance/cases/cli"))
+            .unwrap()
+            .map(|e| e.unwrap().path())
+            .filter(|p| {
+                p.file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .starts_with("explain.")
+            })
+            .collect();
+        paths.sort();
+        let default_scope = json!({"mode": "tenant_only", "tenant": "t", "context_revision": "r"});
+        let mut ran = 0;
+        for path in paths {
+            let case: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+            let e = &case["explain"];
+            if e["resolve"] == true || e["probeResolve"] == true {
+                continue;
+            }
+            let read = |name: &str| {
+                let input = case["inputs"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .find(|i| i["name"] == name)
+                    .unwrap();
+                std::fs::read_to_string(root.join(input["path"].as_str().unwrap())).unwrap()
+            };
+            // Each member embedded as its file's own bytes.
+            let side = |v: &Value| {
+                let members: Vec<String> = v
+                    .as_object()
+                    .unwrap()
+                    .iter()
+                    .map(|(k, f)| format!(r#""{k}":{{"document":{}}}"#, read(f.as_str().unwrap())))
+                    .collect();
+                (
+                    format!("{{{}}}", members.join(",")),
+                    v.get("bundle").is_some(),
+                )
+            };
+            let args = &e["args"];
+            let (evidence, a_bundle) = side(&args["evidence"]);
+            let (query, b_bundle) = match args["query"].get("diff") {
+                Some(d) => {
+                    let (other, bundle) = side(&d["other"]);
+                    (format!(r#"{{"diff":{{"other":{other}}}}}"#), bundle)
+                }
+                None => (args["query"].to_string(), false),
+            };
+            let o = &args["options"];
+            let mut options = serde_json::Map::new();
+            for (from, to) in [
+                ("scope", "scope"),
+                ("nowMs", "now_ms"),
+                ("hostCapMs", "host_cap_ms"),
+            ] {
+                if let Some(v) = o.get(from) {
+                    options.insert(to.into(), v.clone());
+                }
+            }
+            let body = format!(
+                r#"{{"schema":"rustev.serve-explain/1","evidence":{evidence},"query":{query},"options":{}}}"#,
+                Value::Object(options)
+            );
+            let redaction = o
+                .get("redaction")
+                .map(|p| serde_json::from_str(&read(p.as_str().unwrap())).unwrap());
+            let s = explain_service(o.get("scope").unwrap_or(&default_scope), redaction);
+            let answer = explain_both(&s, &body).await;
+            let id = case["id"].as_str().unwrap();
+            let bundle = a_bundle || b_bundle;
+            let given = (o.get("scope").is_some(), o.get("nowMs").is_some());
+            // Evidence is `{ record, plan? }` or `{ bundle }` (3.8.3); the
+            // request document refuses any other member set.
+            let form = |v: &Value| {
+                // Sorted, so the check holds whatever map order serde_json keeps.
+                let mut keys: Vec<&str> =
+                    v.as_object().unwrap().keys().map(String::as_str).collect();
+                keys.sort_unstable();
+                matches!(
+                    keys.as_slice(),
+                    ["bundle"] | ["record"] | ["plan", "record"]
+                )
+            };
+            let forms = form(&args["evidence"])
+                && args["query"].get("diff").is_none_or(|d| form(&d["other"]));
+            if o.get("hostCapMs").is_some() || !forms {
+                refused(&answer, RefusalCode::InvalidDocument, "");
+            } else if given != (bundle, bundle) {
+                refused(&answer, RefusalCode::InvalidRequest, "");
+            } else if let Some(code) = e["refusal"].as_str() {
+                refused(&answer, RefusalCode::InvalidDocument, code);
+            } else {
+                let golden = |file: &str| {
+                    let output = case["outputs"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .find(|o| o["file"] == file)
+                        .unwrap();
+                    std::fs::read(root.join(output["golden"].as_str().unwrap())).unwrap()
+                };
+                let explained = ServeExplanation::parse(&answer)
+                    .unwrap_or_else(|e| panic!("{id}: {e}: {}", String::from_utf8_lossy(&answer)));
+                assert_eq!(explained.explanation.bytes(), golden("explanation"), "{id}");
+                assert_eq!(
+                    explained.markdown.as_str().as_bytes(),
+                    golden("markdown"),
+                    "{id}"
+                );
+            }
+            ran += 1;
+        }
+        assert!(ran >= 140, "{ran} explain cases ran");
+    }
+    /// A bundle under another scope than the caller's is `decision_not_found`
+    /// before anything is resolved; evidence may be a reference under a
+    /// configured root; a parent component does not parse, and an
+    /// unresolvable reference explains nothing.
+    #[tokio::test]
+    async fn explain_checks_scope_and_resolves_references_under_roots() {
+        SOCKET.scope(false, explain_scope_and_references()).await;
+    }
+    async fn explain_scope_and_references() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let case: Value = serde_json::from_slice(
+            &std::fs::read(root.join(
+                "tools/rustev-conformance/cases/cli/explain.escalated-bundle-why-outcome.json",
+            ))
+            .unwrap(),
+        )
+        .unwrap();
+        let scope = &case["explain"]["args"]["options"]["scope"];
+        let bundle = std::fs::read_to_string(
+            root.join("crates/rustev-cli/tests/golden/explain/escalated.bundle.json"),
+        )
+        .unwrap();
+        let request = |evidence: &str| {
+            format!(
+                r#"{{"schema":"rustev.serve-explain/1","evidence":{evidence},"query":"why_outcome","options":{{"scope":{scope},"now_ms":1800000000001}}}}"#
+            )
+        };
+        let embedded = request(&format!(r#"{{"bundle":{{"document":{bundle}}}}}"#));
+        let other = json!({"mode": "tenant_only", "tenant": "t", "context_revision": "r"});
+        let s = explain_service(&other, None);
+        refused(
+            &explain_both(&s, &embedded).await,
+            RefusalCode::DecisionNotFound,
+            "",
+        );
+        let s = explain_service(scope, None);
+        let direct = explain_both(&s, &embedded).await;
+        assert!(ServeExplanation::parse(&direct).is_ok());
+        let referenced = request(r#"{"bundle":{"reference":"golden:escalated.bundle.json"}}"#);
+        assert_eq!(explain_both(&s, &referenced).await, direct);
+        let parent =
+            request(r#"{"bundle":{"reference":"golden:../explain/escalated.bundle.json"}}"#);
+        refused(
+            &explain_both(&s, &parent).await,
+            RefusalCode::InvalidDocument,
+            "",
+        );
+        let absent = request(r#"{"bundle":{"reference":"golden:absent.bundle.json"}}"#);
+        refused(
+            &explain_both(&s, &absent).await,
+            RefusalCode::DecisionNotFound,
+            "",
+        );
+    }
     trait Io: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send {}
     impl<T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send> Io for T {}
     #[tokio::test]
@@ -1632,7 +1885,7 @@ mod grpc_differential {
                     Operation::Explain,
                     None,
                     vec![],
-                    RefusalCode::EndpointUnavailable,
+                    RefusalCode::PrincipalInvalid,
                 ),
             ] {
                 let (http, _) =

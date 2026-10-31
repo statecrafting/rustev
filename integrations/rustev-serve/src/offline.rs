@@ -116,12 +116,16 @@ fn bytes<T: Document>(input: DocumentInput<T>, roots: &Roots) -> Result<Vec<u8>,
         },
     }
 }
+/// Run replay, evaluation or explanation on the bounded blocking pool
+/// (3.8.4). `redaction` is the policy the request's listener names (3.8.3);
+/// only explanation reads it.
 pub async fn run(
     service: Arc<Service>,
     operation: Operation,
     principal: Vec<u8>,
     body: Vec<u8>,
     deadline: Option<u64>,
+    redaction: Option<Vec<u8>>,
 ) -> Reply {
     if service.is_stopping() {
         return Reply::refusal(RefusalCode::ShuttingDown);
@@ -148,7 +152,12 @@ pub async fn run(
     };
     let work = tokio::task::spawn_blocking(move || {
         let (_permit, _slot) = (permit, slot);
-        execute(operation, body, roots, scope).unwrap_or_else(Reply::refusal)
+        if operation == Operation::Explain {
+            explain(&body, &roots, scope, redaction.as_deref())
+        } else {
+            execute(operation, body, roots, scope)
+        }
+        .unwrap_or_else(Reply::refusal)
     });
     match tokio::time::timeout(limit.saturating_sub(started.elapsed()), work).await {
         Ok(Ok(r)) => r,
@@ -243,6 +252,106 @@ fn execute(
     })
 }
 
+/// One side's evidence as the surface's named byte inputs: each member is
+/// embedded bytes or a reference resolved under the configured roots.
+fn side(
+    evidence: &ExplainEvidence,
+    name: &str,
+    files: &mut BTreeMap<String, Vec<u8>>,
+    roots: &Roots,
+) -> Result<serde_json::Value, RefusalCode> {
+    let mut put = |member: &str, bytes: Vec<u8>| {
+        let key = format!("{name}.{member}");
+        files.insert(key.clone(), bytes);
+        key
+    };
+    Ok(match evidence {
+        ExplainEvidence::Record(r) => {
+            let record = put("record", bytes(r.record.clone(), roots)?);
+            match &r.plan {
+                None => serde_json::json!({ "record": record }),
+                Some(plan) => {
+                    let plan = put("plan", bytes(plan.clone(), roots)?);
+                    serde_json::json!({ "record": record, "plan": plan })
+                }
+            }
+        }
+        ExplainEvidence::Bundle(b) => {
+            serde_json::json!({ "bundle": put("bundle", bytes(b.bundle.clone(), roots)?) })
+        }
+    })
+}
+
+/// A spec 040 refusal (3.17) as `invalid_document` naming its code.
+fn explain_refusal(code: rustev_contract::explanation::RefusalCode) -> Reply {
+    let mut reply = Reply::refusal(RefusalCode::InvalidDocument);
+    if let Ok(mut refusal) = ServeRefusal::parse(&reply.body) {
+        refusal.detail = Text::new(code.as_str()).expect("a refusal code is short text");
+        reply = Reply::document(reply.status, &refusal);
+    }
+    reply
+}
+
+/// Explanation (3.8.3): one call of the library through `rustev-surface`,
+/// whose explanation bytes are carried unchanged with their Markdown.
+fn explain(
+    body: &[u8],
+    roots: &Roots,
+    scope: rustev_contract::scope::Scope,
+    redaction: Option<&[u8]>,
+) -> Result<Reply, RefusalCode> {
+    let request = ServeExplain::parse(body).map_err(|_| RefusalCode::InvalidDocument)?;
+    let bundle = request.has_bundle();
+    // `scope` and `now_ms` exactly when a side is a bundle (spec 040
+    // 3.16.2); the scope must be the caller's before anything is resolved.
+    let now_ms = match (bundle, &request.options.scope, request.options.now_ms) {
+        (true, Some(given), Some(now_ms)) if *given == scope => Some(now_ms),
+        (true, Some(_), Some(_)) => return Err(RefusalCode::DecisionNotFound),
+        (false, None, None) => None,
+        _ => return Err(RefusalCode::InvalidRequest),
+    };
+    let mut files = BTreeMap::new();
+    let evidence = side(&request.evidence, "a", &mut files, roots)?;
+    let query = match &request.query {
+        ExplainQuery::Diff(d) => {
+            serde_json::json!({ "diff": { "other": side(&d.diff.other, "b", &mut files, roots)? } })
+        }
+        ExplainQuery::Query(q) => {
+            serde_json::to_value(q).map_err(|_| RefusalCode::InvalidDocument)?
+        }
+    };
+    let mut options = serde_json::Map::new();
+    if let Some(now_ms) = now_ms {
+        let scope = serde_json::to_value(&scope).map_err(|_| RefusalCode::InternalError)?;
+        options.insert("scope".into(), scope);
+        options.insert("nowMs".into(), now_ms.as_ms().into());
+    }
+    if let Some(policy) = redaction {
+        files.insert("redaction".into(), policy.to_vec());
+        options.insert("redaction".into(), "redaction".into());
+    }
+    let args = serde_json::json!({ "evidence": evidence, "query": query, "options": options });
+    // A bundle's external items resolve only through the host's resolver.
+    let resolver: Option<&dyn Resolver> = if bundle { Some(roots) } else { None };
+    match rustev_surface::explain::explain(&files, &args, resolver) {
+        Ok(done) => {
+            let answer = ServeExplanation {
+                schema: ExplanationSchema::V1,
+                explanation: Embedded::parse(&done.explanation)
+                    .map_err(|_| RefusalCode::InternalError)?,
+                markdown: Text::new(done.markdown).map_err(|_| RefusalCode::InternalError)?,
+            };
+            if answer.record_canonical().is_err() {
+                return Ok(explain_refusal(
+                    rustev_contract::explanation::RefusalCode::ExplanationTooLarge,
+                ));
+            }
+            Ok(Reply::document(200, &answer))
+        }
+        Err(e) => Ok(explain_refusal(e.code)),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -282,6 +391,7 @@ mod tests {
             b"a".to_vec(),
             vec![],
             None,
+            None,
         )
         .await;
         assert_eq!(
@@ -295,6 +405,7 @@ mod tests {
             b"a".to_vec(),
             vec![],
             Some(1),
+            None,
         )
         .await;
         assert_eq!(

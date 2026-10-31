@@ -721,3 +721,35 @@ fn explain_requests_take_either_evidence_form_and_name_their_bundle_sides() {
         .is_err()
     );
 }
+
+#[test]
+fn explain_evidence_embeds_documents_on_either_side_and_keeps_their_bytes() {
+    let plan = include_str!("../../rustev-cli/tests/golden/explain/lodging.plan.json");
+    let record = include_str!("../../rustev-cli/tests/golden/explain/lodging.record.json");
+    let evidence = format!(r#"{{"record":{{"document":{record}}},"plan":{{"document":{plan}}}}}"#);
+    for query in [
+        r#""models""#.to_string(),
+        r#"{"why_order":{"a":"c-1","b":"c-2"}}"#.to_string(),
+        format!(r#"{{"diff":{{"other":{evidence}}}}}"#),
+    ] {
+        let body = format!(
+            r#"{{"schema":"rustev.serve-explain/1","evidence":{evidence},"query":{query},"options":{{}}}}"#
+        );
+        let parsed = ServeExplain::parse(body.as_bytes()).unwrap();
+        let ExplainEvidence::Record(r) = &parsed.evidence else {
+            panic!("record evidence")
+        };
+        let DocumentInput::Document(embedded) = &r.record else {
+            panic!("an embedded record")
+        };
+        assert_eq!(embedded.bytes(), record.as_bytes());
+        if let ExplainQuery::Diff(d) = &parsed.query {
+            assert!(matches!(&d.diff.other, ExplainEvidence::Record(_)));
+        }
+    }
+    let twice = format!(r#"{{"diff":{{"other":{evidence}}},"models":null}}"#);
+    let body = format!(
+        r#"{{"schema":"rustev.serve-explain/1","evidence":{evidence},"query":{twice},"options":{{}}}}"#
+    );
+    assert!(ServeExplain::parse(body.as_bytes()).is_err());
+}

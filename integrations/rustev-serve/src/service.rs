@@ -873,11 +873,7 @@ impl Service {
                 configuration_digest: self.digest.clone(),
                 protocol: Protocol::V1,
                 available_endpoints: List::new(
-                    operation_table()
-                        .into_iter()
-                        .filter(|o| !matches!(o.operation, Operation::Explain))
-                        .map(|o| o.operation)
-                        .collect(),
+                    operation_table().into_iter().map(|o| o.operation).collect(),
                 )
                 .unwrap(),
                 signing_mode: self.config.signing_mode,

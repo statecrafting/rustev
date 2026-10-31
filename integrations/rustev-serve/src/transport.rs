@@ -341,7 +341,7 @@ where
     let Ok(id) = id else {
         return respond(service.refuse(RefusalCode::InvalidRequest));
     };
-    if !listener.groups.as_slice().contains(&op.group) || op.operation == Operation::Explain {
+    if !listener.groups.as_slice().contains(&op.group) {
         return respond(service.refuse(RefusalCode::EndpointUnavailable));
     }
     let mut headers = BTreeMap::new();
@@ -368,6 +368,7 @@ where
             | Operation::Cancel
             | Operation::Replay
             | Operation::Evaluate
+            | Operation::Explain
     );
     let principal = if needs_principal {
         match principal(headers.get("rustev-principal").map_or("", String::as_str)) {
@@ -412,6 +413,7 @@ where
             | Operation::Decide
             | Operation::Replay
             | Operation::Evaluate
+            | Operation::Explain
             | Operation::Invalidations
     );
     if has_body
@@ -495,8 +497,20 @@ where
         Operation::Readiness => service.readiness(),
         Operation::Metrics => service.metrics(),
         Operation::Invalidations => service.invalidations(&bytes),
-        Operation::Replay | Operation::Evaluate => {
-            crate::offline::run(service.clone(), op.operation, principal, bytes, deadline).await
+        Operation::Replay | Operation::Evaluate | Operation::Explain => {
+            let redaction = match &listener.redaction_policy {
+                Maybe::None => None,
+                Maybe::Some(policy) => Some(policy.bytes().to_vec()),
+            };
+            crate::offline::run(
+                service.clone(),
+                op.operation,
+                principal,
+                bytes,
+                deadline,
+                redaction,
+            )
+            .await
         }
         _ => service.refuse(RefusalCode::EndpointUnavailable),
     };
