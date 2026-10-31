@@ -950,11 +950,14 @@ service_document!(ServeEvaluate,EvaluateSchema,"rustev.serve-evaluate/1",SERVICE
 });
 impl Validate for ServeEvaluate {}
 
+// Parsed by member name (the `Deserialize` below) rather than as an
+// untagged enum: an untagged enum buffers its input, and an embedded
+// document (a raw value that keeps its bytes) cannot be read from a buffer.
 /// One side's evidence for an explanation (3.8.3): `{ record, plan? }` or
 /// `{ bundle }`, the shape spec 040 3.15.2 gives the bindings. serde ignores
 /// `deny_unknown_fields` on an untagged enum, so each arm refuses unknown
 /// members itself.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
 #[serde(untagged)]
 pub enum ExplainEvidence {
     Record(RecordEvidence),
@@ -981,13 +984,74 @@ impl ExplainEvidence {
         matches!(self, Self::Bundle(_))
     }
 }
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct EvidenceMembers {
+    #[serde(default, deserialize_with = "present")]
+    record: Option<DocumentInput<crate::run::RunRecord>>,
+    #[serde(default, deserialize_with = "present")]
+    plan: Option<DocumentInput<crate::plan::Plan>>,
+    #[serde(default, deserialize_with = "present")]
+    bundle: Option<DocumentInput<crate::replay::ReplayBundle>>,
+}
+impl<'de> Deserialize<'de> for ExplainEvidence {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let m = EvidenceMembers::deserialize(d)?;
+        match (m.record, m.plan, m.bundle) {
+            (Some(record), plan, None) => Ok(Self::Record(RecordEvidence { record, plan })),
+            (None, None, Some(bundle)) => Ok(Self::Bundle(BundleEvidence { bundle })),
+            _ => Err(serde::de::Error::custom(
+                "evidence is { record, plan? } or { bundle }",
+            )),
+        }
+    }
+}
+// Parsed by its member (the `Deserialize` below) rather than as an untagged
+// enum, for the reason `ExplainEvidence` gives.
 /// Spec 040 3.3's query, or `{ diff: { other } }` with `other` an evidence
 /// set of the same shape.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
 #[serde(untagged)]
 pub enum ExplainQuery {
     Diff(DiffQuery),
     Query(crate::explanation::Query),
+}
+impl<'de> Deserialize<'de> for ExplainQuery {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        use serde::de::{Error, IntoDeserializer, MapAccess, Visitor};
+        struct Shape;
+        impl<'de> Visitor<'de> for Shape {
+            type Value = ExplainQuery;
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a query or { diff: { other } }")
+            }
+            fn visit_str<E: Error>(self, v: &str) -> Result<ExplainQuery, E> {
+                crate::explanation::Query::deserialize(v.into_deserializer())
+                    .map(ExplainQuery::Query)
+            }
+            fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<ExplainQuery, A::Error> {
+                let Some(key) = map.next_key::<String>()? else {
+                    return Err(A::Error::custom("a query names one member"));
+                };
+                let query = if key == "diff" {
+                    ExplainQuery::Diff(DiffQuery {
+                        diff: map.next_value()?,
+                    })
+                } else {
+                    let value: serde_json::Value = map.next_value()?;
+                    let query = serde_json::Value::Object([(key, value)].into_iter().collect());
+                    ExplainQuery::Query(
+                        crate::explanation::Query::deserialize(query).map_err(A::Error::custom)?,
+                    )
+                };
+                if map.next_key::<serde::de::IgnoredAny>()?.is_some() {
+                    return Err(A::Error::custom("a query names one member"));
+                }
+                Ok(query)
+            }
+        }
+        d.deserialize_any(Shape)
+    }
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

@@ -1382,6 +1382,41 @@ drives the same cases, so the driver reads the gauges and the clock's
 sleepers only between the decision's polls. The byte comparison is
 unchanged.
 
+**Increment 6 part 2: the explanation handler (2026-10-30).** `POST
+/v1/explain` and gRPC `Explain` are served (3.8.3), and the service's
+`available_endpoints` now lists `explain`. The request needs the
+`rustev-principal` header as every scoped operation does. The handler
+(`integrations/rustev-serve/src/offline.rs`) runs on the bounded blocking
+pool and honors `rustev-deadline-ms` as replay and evaluation do (3.8.4).
+The caller must have the scope the host resolves for its principal; with a
+bundle side, `options.scope` must equal it, or the answer is
+`decision_not_found` before anything is resolved; `scope` and `now_ms`
+given without a bundle side, or missing with one, are `invalid_request`.
+Each evidence member is its embedded bytes or a reference read under the
+configured resolver roots as 3.8.2 reads one (an unresolvable reference
+is `decision_not_found`, as for replay), handed to `rustev-surface`'s
+explain as named byte inputs, with the configured roots as the resolver of
+a bundle's external items and no resolver otherwise. The redaction policy
+is the one the request's listener names, and none when it names none. The
+answer carries the library's explanation bytes unchanged and its Markdown;
+a spec 040 refusal is `invalid_document` with the refusal code (for
+example `plan-mismatch`) in `detail`. The contract parsed `evidence` and a
+`diff` query as untagged enums, which buffer their input, so an embedded
+document (a raw value keeping its bytes) never parsed; both now parse by
+member name, with the same accepted shapes and the same JSON Schema.
+Tests: `every_explain_golden_through_both_transports` runs every explain
+case of the shared suite that hands the library no resolver of its own
+(the request carries none) through HTTP/2 JSON and gRPC: explanation and
+Markdown bytes equal the goldens, the two redaction cases take their
+policy from the listener, refusals map as above, and the transports answer
+the same bytes; `explain_checks_scope_and_resolves_references_under_roots`
+covers the scope mismatch, a referenced bundle equal to the embedded one,
+a parent component and an absent file; and
+`explain_evidence_embeds_documents_on_either_side_and_keeps_their_bytes`
+in `crates/rustev-contract/tests/042_serve_documents.rs`. Section 5's
+"Explain before D2 is implemented" row no longer applies: spec 040 is
+implemented.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child
