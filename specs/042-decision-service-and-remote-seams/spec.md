@@ -1500,6 +1500,37 @@ change. Tests in `tests/042_remote_documents.rs`:
 `hosted_descriptors_are_identified_by_exactly_their_bytes`; the `skipped`
 outcome in `tests/042_serve_documents.rs`.
 
+**Increment 7 part 2: acquire over the callback protocol (2026-10-30).**
+`integrations/rustev-remote-http/src/context_client.rs`: when describe
+carries a source's descriptor, `RemoteContextClient::acquisition_source`
+yields a `RemoteAcquisitionSource`, an ordinary `AcquisitionSource` whose
+descriptor is exactly the described one (3.10.3, spec 036 3.12). An
+attempt goes through the client's seam queue, so fetches and acquisitions
+share its in-flight limit; a full queue is the `overloaded` class with
+reason `remote_seam_queue_full` and nothing charged (3.12.1). It sends the
+runtime's request bytes, request id and attempt id unchanged, with the
+remaining budget less the transit margin, and hands the runtime the page
+bytes and the reported charge as received. `denied` and `unauthorized` are
+the `denied` class; the other codes take spec 009 3.6's classes, a remote
+`cancelled` the caller did not ask for being transient. On the runtime's
+cancel signal, an attempt whose bytes never left is `stopped` with nothing
+charged; otherwise the endpoint is asked to cancel (unless its terms say
+`none`) and only its `stopped` under confirmed cancellation is reported as
+`stopped`, the rest `unconfirmed`. An answer after the caller stopped
+waiting is discarded and recorded late, as for fetch. `cost_bound` is the
+operation's declared `bounded` cost and otherwise `unknown`, because an
+estimated or unknown cost model states no units (engineering choice).
+`integrations/rustev-remote-http/src/callback_server.rs`:
+`CallbackServer::host_acquisition` serves a hosted `AcquisitionSource` for
+a hosted context source (one `SourceId` per server), describe carries its
+descriptor, and `POST /rustev/remote-context/1/acquire` runs each attempt
+id at most once inside the idempotency window under the fetch rules
+(repeat answered from the record, other content `attempt_id_conflict`);
+an unknown version, source or operation is `capability`. A hosted failure
+is sent as `denied`, as the code its detail names when that code has the
+failure's class, or as the class's code (`remote_error`, `overloaded`,
+`capability`). Tests: `integrations/rustev-remote-http/tests/acquire.rs`.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

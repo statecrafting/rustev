@@ -10,6 +10,11 @@
 //! for the same digest and `conflict` for another. Every table is bounded;
 //! a full one with nothing expired refuses with `503`. A receipt or a
 //! snapshot is evidence, never authorization.
+//!
+//! A source hosted with [`CallbackServer::host_acquisition`] is described
+//! with its spec 036 descriptor and serves
+//! `POST /rustev/remote-context/1/acquire` under the same attempt rules; the
+//! page bytes the hosted `AcquisitionSource` returns are sent unchanged.
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::convert::Infallible;
@@ -29,14 +34,17 @@ use rustev_contract::Document;
 use rustev_contract::ids::ContentDigest;
 use rustev_contract::remote::{CancelSupport, MAX_TEXT_BYTES, RemoteCode, cut_to};
 use rustev_contract::remote_context::{
-    self as rc, CancelAnswer, CancelItem, ContextCode, ContextField, ContextTerms, EndpointClass,
-    FetchResult, HostedSource, Invalidation, InvalidationKind, InvalidationScope,
-    InvalidationSupport,
+    self as rc, AcquireCode, AcquireResult, CancelAnswer, CancelItem, ContextCode, ContextField,
+    ContextTerms, EndpointClass, FetchResult, HostedDescriptor, HostedSource, Invalidation,
+    InvalidationKind, InvalidationScope, InvalidationSupport, PageBytes,
 };
 use rustev_contract::remote_sink::{self as rs, DeliveryResult, RecordSchema};
-use rustev_contract::run::RunRecord;
+use rustev_contract::run::{Charge, RunRecord};
 use rustev_contract::time::DurationMs;
-use rustev_core::seams::{CallContext, ContextSource, EvidenceSink};
+use rustev_core::seams::{
+    AcquireCall, AcquisitionFailure, AcquisitionSource, CallContext, CancelSignal, ContextSource,
+    EvidenceSink,
+};
 use tokio::net::TcpListener;
 use tokio::sync::watch;
 use tokio::task::JoinHandle;
@@ -50,6 +58,7 @@ pub const CONTEXT_DESCRIBE_PATH: &str = "/rustev/remote-context/1/describe";
 pub const CONTEXT_FETCH_PATH: &str = "/rustev/remote-context/1/fetch";
 pub const CONTEXT_CANCEL_PATH: &str = "/rustev/remote-context/1/cancel";
 pub const CONTEXT_INVALIDATIONS_PATH: &str = "/rustev/remote-context/1/invalidations";
+pub const CONTEXT_ACQUIRE_PATH: &str = "/rustev/remote-context/1/acquire";
 pub const SINK_DESCRIBE_PATH: &str = "/rustev/remote-sink/1/describe";
 pub const SINK_DELIVER_PATH: &str = "/rustev/remote-sink/1/deliver";
 
@@ -108,6 +117,13 @@ pub struct HostedSink {
     pub max_record_bytes: u64,
 }
 
+#[derive(Clone)]
+struct HostedAcquisition {
+    source: Arc<dyn AcquisitionSource>,
+    descriptor: HostedDescriptor,
+}
+
+/// One remembered attempt: a fetch or an acquisition.
 struct Fetch {
     content: String,
     cancel: watch::Sender<bool>,
@@ -130,6 +146,7 @@ struct InvalidationLog {
 struct State {
     config: CallbackConfig,
     contexts: Mutex<BTreeMap<String, HostedContext>>,
+    acquisitions: Mutex<BTreeMap<String, HostedAcquisition>>,
     sink: Mutex<Option<HostedSink>>,
     fetches: Mutex<HashMap<String, Fetch>>,
     deliveries: Mutex<HashMap<String, Delivery>>,
@@ -187,6 +204,7 @@ impl CallbackServer {
             state: Arc::new(State {
                 config,
                 contexts: Mutex::new(BTreeMap::new()),
+                acquisitions: Mutex::new(BTreeMap::new()),
                 sink: Mutex::new(None),
                 fetches: Mutex::new(HashMap::new()),
                 deliveries: Mutex::new(HashMap::new()),
@@ -208,6 +226,40 @@ impl CallbackServer {
         Ok(())
     }
 
+    /// Serve acquisitions for the context source hosted under `source_id`,
+    /// replacing any served there: describe then carries the source's
+    /// descriptor with its `SourceId` (3.10.1), so the describe digest
+    /// changes. The context source must be hosted first, and no other hosted
+    /// source may carry the same `SourceId`.
+    pub fn host_acquisition(
+        &self,
+        source_id: &str,
+        source: Arc<dyn AcquisitionSource>,
+    ) -> Result<(), String> {
+        if !lock(&self.state.contexts).contains_key(source_id) {
+            return Err("no context source is hosted under that id".into());
+        }
+        let descriptor = HostedDescriptor::new(source.descriptor()).map_err(|e| e.to_string())?;
+        if descriptor
+            .document
+            .document()
+            .map_err(|e| e.to_string())?
+            .operations
+            .is_none()
+        {
+            return Err("the source descriptor declares no operation".into());
+        }
+        let mut acquisitions = lock(&self.state.acquisitions);
+        if acquisitions
+            .iter()
+            .any(|(id, a)| id != source_id && a.descriptor.id == descriptor.id)
+        {
+            return Err("another hosted source carries that SourceId".into());
+        }
+        acquisitions.insert(source_id.into(), HostedAcquisition { source, descriptor });
+        Ok(())
+    }
+
     /// Host the evidence sink, replacing any hosted before.
     pub fn host_sink(&self, hosted: HostedSink) -> Result<(), String> {
         if hosted.record_schemas.is_empty()
@@ -225,7 +277,7 @@ impl CallbackServer {
         Ok(())
     }
 
-    /// Hosted calls started so far: fetches plus deliveries.
+    /// Hosted calls started so far: fetches, acquisitions and deliveries.
     pub fn dispatched(&self) -> u64 {
         self.state.dispatched.load(Ordering::SeqCst)
     }
@@ -405,6 +457,7 @@ async fn handle(state: Arc<State>, req: Request<Incoming>) -> Response<Full<Byte
         CONTEXT_FETCH_PATH => fetch(&state, &body).await,
         CONTEXT_CANCEL_PATH => cancel(&state, &body),
         CONTEXT_INVALIDATIONS_PATH => invalidations(&state, &body),
+        CONTEXT_ACQUIRE_PATH => acquire(&state, &body).await,
         SINK_DESCRIBE_PATH => sink_describe(&state, &body),
         SINK_DELIVER_PATH => deliver(&state, &body).await,
         _ => return refuse(StatusCode::NOT_FOUND, "no such document"),
@@ -417,6 +470,7 @@ async fn handle(state: Arc<State>, req: Request<Incoming>) -> Response<Full<Byte
 
 fn describe_response(state: &State) -> rc::DescribeResponse {
     let c = &state.config;
+    let acquisitions = lock(&state.acquisitions);
     rc::DescribeResponse {
         schema: rc::DESCRIBE.into(),
         version: 1,
@@ -433,7 +487,7 @@ fn describe_response(state: &State) -> rc::DescribeResponse {
                     invalidation: c.invalidation.clone(),
                     endpoint_class: EndpointClass::HostOperated,
                 },
-                descriptor: None,
+                descriptor: acquisitions.get(id).map(|a| a.descriptor.clone()),
             })
             .collect(),
     }
@@ -480,30 +534,55 @@ async fn fetch(state: &Arc<State>, body: &[u8]) -> Result<Vec<u8>, Refusal> {
         keyed.budget_ms = 0;
         digest_bytes(&keyed.record_canonical().map_err(internal)?)
     };
+    let Some(principal) = req.principal.reference_bytes() else {
+        return Err(bad("invalid principal reference"));
+    };
+    let (attempt_id, budget_ms) = (req.attempt_id.clone(), req.budget_ms);
+    once(
+        state,
+        &attempt_id,
+        content,
+        budget_ms,
+        fetch_failure,
+        |cancel, tx| {
+            tokio::spawn(run_fetch(state.clone(), hosted, req, principal, cancel, tx));
+        },
+    )
+    .await
+}
+
+/// Starts an attempt id at most once inside the idempotency window and
+/// waits for its answer: a repeat with the same content waits for the
+/// recorded answer, with other content it is `attempt_id_conflict`.
+async fn once(
+    state: &Arc<State>,
+    attempt_id: &str,
+    content: String,
+    budget_ms: u64,
+    failure: fn(RemoteCode, &str) -> Result<Vec<u8>, Refusal>,
+    start: impl FnOnce(watch::Receiver<bool>, watch::Sender<Option<Vec<u8>>>),
+) -> Result<Vec<u8>, Refusal> {
     let window = Duration::from_millis(state.config.idempotency_window_ms);
     let mut done = {
         let mut fetches = lock(&state.fetches);
         let now = Instant::now();
         fetches.retain(|_, e| e.finished_at.is_none_or(|t| now.duration_since(t) < window));
-        if let Some(e) = fetches.get(&req.attempt_id) {
+        if let Some(e) = fetches.get(attempt_id) {
             if e.content != content {
-                return fetch_failure(RemoteCode::MalformedRequest, "attempt_id_conflict");
+                return failure(RemoteCode::MalformedRequest, "attempt_id_conflict");
             }
             e.done.clone()
         } else {
-            if req.budget_ms == 0 {
-                return fetch_failure(RemoteCode::RemoteDeadline, "budget expired");
+            if budget_ms == 0 {
+                return failure(RemoteCode::RemoteDeadline, "budget expired");
             }
             if fetches.len() >= state.config.max_remembered {
                 return Err(overloaded());
             }
-            let Some(principal) = req.principal.reference_bytes() else {
-                return Err(bad("invalid principal reference"));
-            };
             let (tx, rx) = watch::channel(None);
             let (cancel_tx, cancel_rx) = watch::channel(false);
             fetches.insert(
-                req.attempt_id.clone(),
+                attempt_id.into(),
                 Fetch {
                     content,
                     cancel: cancel_tx,
@@ -512,14 +591,7 @@ async fn fetch(state: &Arc<State>, body: &[u8]) -> Result<Vec<u8>, Refusal> {
                 },
             );
             state.dispatched.fetch_add(1, Ordering::SeqCst);
-            tokio::spawn(run_fetch(
-                state.clone(),
-                hosted,
-                req.clone(),
-                principal,
-                cancel_rx,
-                tx,
-            ));
+            start(cancel_rx, tx);
             rx
         }
     };
@@ -530,6 +602,180 @@ async fn fetch(state: &Arc<State>, body: &[u8]) -> Result<Vec<u8>, Refusal> {
         .clone()
         .expect("waited for Some");
     Ok(answer)
+}
+
+fn finish(state: &State, attempt_id: &str, done: watch::Sender<Option<Vec<u8>>>, bytes: Vec<u8>) {
+    if let Some(e) = lock(&state.fetches).get_mut(attempt_id) {
+        e.finished_at = Some(Instant::now());
+    }
+    let _ = done.send(Some(bytes));
+}
+
+fn acquire_failure(code: AcquireCode, detail: &str, charge: Charge) -> Result<Vec<u8>, Refusal> {
+    rc::AcquireResponse {
+        schema: rc::ACQUIRE.into(),
+        result: AcquireResult::Failure {
+            code,
+            detail: cut_to(detail, MAX_TEXT_BYTES),
+        },
+        charge,
+    }
+    .record_canonical()
+    .map_err(internal)
+}
+
+fn acquire_refusal(code: RemoteCode, detail: &str) -> Result<Vec<u8>, Refusal> {
+    acquire_failure(code.into(), detail, Charge::Observed { units: 0 })
+}
+
+async fn acquire(state: &Arc<State>, body: &[u8]) -> Result<Vec<u8>, Refusal> {
+    let req = rc::AcquireRequest::parse(body).map_err(|e| bad(e.to_string()))?;
+    if req.version != 1 {
+        return acquire_refusal(RemoteCode::Capability, "unsupported version");
+    }
+    let hosted = lock(&state.acquisitions)
+        .values()
+        .find(|a| a.descriptor.id == req.source)
+        .cloned();
+    let Some(hosted) = hosted else {
+        return acquire_refusal(RemoteCode::Capability, "unknown source");
+    };
+    let declared = hosted
+        .source
+        .descriptor()
+        .operations
+        .iter()
+        .flatten()
+        .any(|o| o.name == req.operation);
+    if !declared {
+        return acquire_refusal(RemoteCode::Capability, "unknown operation");
+    }
+    let content = {
+        let mut keyed = req.clone();
+        keyed.budget_ms = 0;
+        digest_bytes(&keyed.record_canonical().map_err(internal)?)
+    };
+    let Some(principal) = req.principal.reference_bytes() else {
+        return Err(bad("invalid principal reference"));
+    };
+    let (attempt_id, budget_ms) = (req.attempt_id.clone(), req.budget_ms);
+    once(
+        state,
+        &attempt_id,
+        content,
+        budget_ms,
+        acquire_refusal,
+        |cancel, tx| {
+            tokio::spawn(run_acquire(
+                state.clone(),
+                hosted,
+                req,
+                principal,
+                cancel,
+                tx,
+            ));
+        },
+    )
+    .await
+}
+
+/// The code an acquisition failure is sent with: `denied` as itself, a
+/// detail naming a code of the failure's class keeps it, and otherwise the
+/// class's own code.
+fn acquire_code(class: AcquisitionFailure, detail: &str) -> AcquireCode {
+    let default = match class {
+        AcquisitionFailure::Denied => return AcquireCode::Denied,
+        AcquisitionFailure::Transient => RemoteCode::RemoteError,
+        AcquisitionFailure::Overloaded => RemoteCode::Overloaded,
+        AcquisitionFailure::Permanent => RemoteCode::Capability,
+    };
+    let class_of = |code| crate::taxonomy::failure_class(code);
+    code_of_detail(detail)
+        .filter(|c| class_of(*c) == class_of(default) && !crate::taxonomy::is_local_only(*c))
+        .unwrap_or(default)
+        .into()
+}
+
+async fn run_acquire(
+    state: Arc<State>,
+    hosted: HostedAcquisition,
+    req: rc::AcquireRequest,
+    principal: Vec<u8>,
+    mut cancel: watch::Receiver<bool>,
+    done: watch::Sender<Option<Vec<u8>>>,
+) {
+    let cx = CallContext {
+        remaining_ms: DurationMs(req.budget_ms),
+        trace_id: req.trace_id.clone(),
+        principal_handle: principal,
+    };
+    let bytes = match req.request.document() {
+        Err(e) => acquire_failure(
+            RemoteCode::RemoteError.into(),
+            &e.to_string(),
+            Charge::Unknown,
+        ),
+        Ok(request) => {
+            let signal = CancelSignal::new();
+            let call = AcquireCall {
+                operation: &req.operation,
+                request: &request,
+                request_id: &req.request_id,
+                attempt_id: &req.attempt_id,
+                cancel: signal.child(),
+                cx: &cx,
+            };
+            let budget = Duration::from_millis(req.budget_ms);
+            let report = tokio::select! {
+                r = tokio::time::timeout(budget, hosted.source.acquire(call)) => r.ok(),
+                _ = cancel.wait_for(|c| *c) => {
+                    signal.raise();
+                    None
+                }
+            };
+            match report {
+                Some(report) => match report.result {
+                    Ok(page) => match PageBytes::new(&page) {
+                        Ok(page) => rc::AcquireResponse {
+                            schema: rc::ACQUIRE.into(),
+                            result: AcquireResult::Page(page),
+                            charge: report.charge,
+                        }
+                        .record_canonical()
+                        .map_err(internal)
+                        .and_then(|b| {
+                            if b.len() as u64 <= state.config.max_response_bytes {
+                                Ok(b)
+                            } else {
+                                acquire_failure(
+                                    RemoteCode::RemoteError.into(),
+                                    "response exceeds its bound",
+                                    report.charge,
+                                )
+                            }
+                        }),
+                        Err(e) => acquire_failure(
+                            RemoteCode::RemoteError.into(),
+                            &e.to_string(),
+                            report.charge,
+                        ),
+                    },
+                    Err((class, detail)) => {
+                        acquire_failure(acquire_code(class, &detail), &detail, report.charge)
+                    }
+                },
+                None if *cancel.borrow() => {
+                    acquire_failure(RemoteCode::Cancelled.into(), "cancelled", Charge::Unknown)
+                }
+                None => acquire_failure(
+                    RemoteCode::RemoteDeadline.into(),
+                    "budget expired",
+                    Charge::Unknown,
+                ),
+            }
+        }
+    };
+    finish(&state, &req.attempt_id, done, bytes.unwrap_or_default());
 }
 
 async fn run_fetch(
@@ -571,11 +817,7 @@ async fn run_fetch(
         None if cancelled => fetch_failure(RemoteCode::Cancelled, "cancelled"),
         None => fetch_failure(RemoteCode::RemoteDeadline, "budget expired"),
     };
-    let bytes = bytes.unwrap_or_default();
-    if let Some(e) = lock(&state.fetches).get_mut(&req.attempt_id) {
-        e.finished_at = Some(Instant::now());
-    }
-    let _ = done.send(Some(bytes));
+    finish(&state, &req.attempt_id, done, bytes.unwrap_or_default());
 }
 
 fn cancel(state: &State, body: &[u8]) -> Result<Vec<u8>, Refusal> {

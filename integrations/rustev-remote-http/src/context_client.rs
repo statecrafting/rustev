@@ -13,24 +13,37 @@
 //! counted and recorded as late; it never reaches a snapshot. Each exchange
 //! yields a digest-only `rustev.remote-context-exchange/1` record to the
 //! host's exchange sink, whose failures are counted and change nothing.
+//!
+//! When describe carries a source's spec 036 descriptor, the client also
+//! yields a [`RemoteAcquisitionSource`]: an ordinary installed
+//! `AcquisitionSource` sending `acquire` through the same queue (3.10.3).
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use rustev_contract::Document;
+use rustev_contract::acquisition::{AcquisitionRequest, OperationCost};
 use rustev_contract::ids::ContentDigest;
-use rustev_contract::remote::{CancelSupport, RemoteCode, WirePrincipal};
+use rustev_contract::remote::{CancelSupport, MAX_TEXT_BYTES, RemoteCode, WirePrincipal, cut_to};
 use rustev_contract::remote_context::{
-    self as rc, CancelItem, FetchResult, HostedSource, InvalidationsResponse,
+    self as rc, AcquireCode, AcquireResult, CancelItem, FetchResult, HostedSource,
+    InvalidationsResponse,
 };
+use rustev_contract::run::{Charge, CostBound};
+use rustev_contract::serve::Embedded;
 use rustev_contract::snapshot::Snapshot;
-use rustev_core::seams::{BoxFuture, CallContext, ContextSource};
+use rustev_contract::source::SourceDescriptor;
+use rustev_core::seams::{
+    AcquireCall, AcquireReport, AcquisitionFailure, AcquisitionSource, AdapterFailure, BoxFuture,
+    CallContext, CancelAck, ContextSource,
+};
 use tokio::sync::oneshot;
 
 use crate::budget::Budget;
 use crate::callback_server::{
-    CONTEXT_CANCEL_PATH, CONTEXT_DESCRIBE_PATH, CONTEXT_FETCH_PATH, CONTEXT_INVALIDATIONS_PATH,
+    CONTEXT_ACQUIRE_PATH, CONTEXT_CANCEL_PATH, CONTEXT_DESCRIBE_PATH, CONTEXT_FETCH_PATH,
+    CONTEXT_INVALIDATIONS_PATH,
 };
 use crate::http::{HttpTransport, TransportError};
 use crate::seam_queue::{QUEUE_FULL, SeamCounters, SeamQueue};
@@ -293,7 +306,7 @@ impl RemoteContextClient {
         attempt_id: &str,
         request: Option<ContentDigest>,
         response: Option<ContentDigest>,
-        code: Option<RemoteCode>,
+        code: Option<AcquireCode>,
         late: bool,
     ) {
         let Some(sink) = &self.inner.exchanges else {
@@ -304,7 +317,7 @@ impl RemoteContextClient {
             attempt_id: attempt_id.into(),
             request_digest: request,
             response_digest: response,
-            code: code.map(rc::AcquireCode::from),
+            code,
             phases: vec![],
             late,
         };
@@ -398,6 +411,7 @@ impl RemoteContextClient {
                 }
                 Err(_) => false,
             };
+            let code = code.map(AcquireCode::from);
             client.record(&id, request_digest, response_digest, code, late);
         });
         let mut guard = Abandon {
@@ -462,5 +476,394 @@ impl ContextSource for RemoteContextClient {
         cx: &'a CallContext,
     ) -> BoxFuture<'a, Result<Snapshot, String>> {
         Box::pin(self.fetch_once(fields, cx))
+    }
+}
+
+/// One described source's acquisitions (3.10.3): an ordinary installed
+/// `AcquisitionSource` whose descriptor is exactly the one describe
+/// returned. It validates nothing spec 036 3.3.4 validates: a page's bytes
+/// go to the runtime as the endpoint sent them. Clones share the client's
+/// queue, so fetches and acquisitions share its in-flight limit (3.12.1).
+#[derive(Clone)]
+pub struct RemoteAcquisitionSource {
+    client: RemoteContextClient,
+    descriptor: Arc<SourceDescriptor>,
+}
+
+impl RemoteContextClient {
+    /// The source's acquisitions, when describe carried its descriptor.
+    pub fn acquisition_source(&self) -> Option<RemoteAcquisitionSource> {
+        let hosted = self.inner.source.descriptor.as_ref()?;
+        // Describe parsing already checked the document and its identity.
+        let descriptor = hosted.document.document().ok()?;
+        Some(RemoteAcquisitionSource {
+            client: self.clone(),
+            descriptor: Arc::new(descriptor),
+        })
+    }
+}
+
+/// The failure class an acquire code maps to (3.10.3): `unauthorized` and
+/// `denied` are `denied`, never retried; the others as spec 009 3.6 maps
+/// them (a remote `cancelled` the caller did not ask for is transient).
+fn acquire_class(code: AcquireCode) -> AcquisitionFailure {
+    match code {
+        AcquireCode::Denied | AcquireCode::Context(rc::ContextCode(RemoteCode::Unauthorized)) => {
+            AcquisitionFailure::Denied
+        }
+        AcquireCode::Context(rc::ContextCode(code)) => match crate::taxonomy::failure_class(code) {
+            AdapterFailure::Overloaded => AcquisitionFailure::Overloaded,
+            AdapterFailure::Permanent => AcquisitionFailure::Permanent,
+            _ => AcquisitionFailure::Transient,
+        },
+    }
+}
+
+fn acquire_detail(code: AcquireCode, detail: &str) -> String {
+    match code {
+        AcquireCode::Context(rc::ContextCode(code)) => failure_detail(code, detail),
+        AcquireCode::Denied if detail.is_empty() => "remote:denied".into(),
+        AcquireCode::Denied => cut_to(&format!("remote:denied: {detail}"), MAX_TEXT_BYTES),
+    }
+}
+
+/// A failed attempt, before it becomes a report.
+struct Failed {
+    code: AcquireCode,
+    detail: String,
+    charge: Charge,
+}
+
+impl Failed {
+    fn local(code: RemoteCode, detail: &str, sent: bool) -> Self {
+        Failed {
+            code: code.into(),
+            detail: detail.into(),
+            // Nothing that never left the process was charged.
+            charge: if sent {
+                crate::taxonomy::charge_for(code, None, true)
+            } else {
+                Charge::Observed { units: 0 }
+            },
+        }
+    }
+    fn report(self) -> AcquireReport {
+        AcquireReport {
+            result: Err((
+                acquire_class(self.code),
+                acquire_detail(self.code, &self.detail),
+            )),
+            charge: self.charge,
+            cancel: CancelAck::NotRequested,
+        }
+    }
+}
+
+type Answer = Result<(Vec<u8>, Charge), Failed>;
+
+/// The answer's page bytes and charge, or the failure it names.
+fn judge_acquire(body: &[u8]) -> (Answer, Option<ContentDigest>) {
+    let Ok(answer) = rc::AcquireResponse::parse(body) else {
+        return (
+            Err(Failed::local(
+                RemoteCode::MalformedResponse,
+                "unparsable answer",
+                true,
+            )),
+            None,
+        );
+    };
+    let digest = answer.record_digest().ok();
+    let result = match answer.result {
+        AcquireResult::Failure {
+            code: AcquireCode::Context(rc::ContextCode(code)),
+            ..
+        } if is_local_only(code) => Err(Failed::local(
+            RemoteCode::MalformedResponse,
+            "a local-only code from the endpoint",
+            true,
+        )),
+        AcquireResult::Failure { code, detail } => Err(Failed {
+            code,
+            detail,
+            charge: answer.charge,
+        }),
+        AcquireResult::Page(page) => Ok((page.bytes().to_vec(), answer.charge)),
+    };
+    (result, digest)
+}
+
+impl RemoteAcquisitionSource {
+    pub fn descriptor_id(&self) -> &rustev_contract::ids::SourceId {
+        &self
+            .client
+            .inner
+            .source
+            .descriptor
+            .as_ref()
+            .expect("an acquisition source has a descriptor")
+            .id
+    }
+
+    /// The shared client queue's depth, refusals and late discards.
+    pub fn counters(&self) -> SeamCounters {
+        self.client.counters()
+    }
+
+    async fn acquire_once(&self, call: AcquireCall<'_>) -> AcquireReport {
+        let inner = &self.client.inner;
+        let Ok(slot) = inner.queue.try_enter() else {
+            // Spec 036's unavailable outcome with the queue's reason (3.12.1).
+            return AcquireReport {
+                result: Err((AcquisitionFailure::Overloaded, QUEUE_FULL.into())),
+                charge: Charge::Observed { units: 0 },
+                cancel: CancelAck::NotRequested,
+            };
+        };
+        let Some(principal) = WirePrincipal::encode(
+            &call.cx.principal_handle,
+            &inner.config.mapping_version,
+            &inner.config.principal_scope,
+        ) else {
+            return Failed::local(
+                RemoteCode::MalformedRequest,
+                "no principal reference",
+                false,
+            )
+            .report();
+        };
+        let budget = Budget::start(call.cx.remaining_ms);
+        let told = budget.told_ms(inner.config.transit_margin_ms);
+        if told == 0 {
+            return Failed::local(
+                RemoteCode::RemoteDeadline,
+                "budget spent before sending",
+                false,
+            )
+            .report();
+        }
+        let request = match call
+            .request
+            .canonical()
+            .map_err(|e| e.to_string())
+            .and_then(|b| Embedded::<AcquisitionRequest>::parse(&b).map_err(|e| e.to_string()))
+        {
+            Ok(r) => r,
+            Err(e) => return Failed::local(RemoteCode::MalformedRequest, &e, false).report(),
+        };
+        let request = rc::AcquireRequest {
+            schema: rc::ACQUIRE.into(),
+            version: 1,
+            source: call.request.source.clone(),
+            operation: call.operation.into(),
+            request,
+            request_id: call.request_id.clone(),
+            attempt_id: call.attempt_id.into(),
+            budget_ms: told,
+            trace_id: call.cx.trace_id.clone(),
+            traceparent: None,
+            principal,
+        };
+        let request_digest = request.record_digest().ok();
+        let body = match request.record_canonical() {
+            Ok(b) if b.len() as u64 <= inner.source.terms.max_request_bytes => b,
+            Ok(_) => {
+                return Failed::local(
+                    RemoteCode::MalformedRequest,
+                    "request exceeds the source's bound",
+                    false,
+                )
+                .report();
+            }
+            Err(e) => {
+                return Failed::local(RemoteCode::MalformedRequest, &e.to_string(), false).report();
+            }
+        };
+        let (tx, rx) = oneshot::channel::<Answer>();
+        let client = self.client.clone();
+        let id = call.attempt_id.to_string();
+        let sent = SentTracker::new();
+        let tracker = sent.clone();
+        tokio::spawn(async move {
+            let inner = &client.inner;
+            let Ok(_running) = slot.start(budget.deadline()).await else {
+                let _ = tx.send(Err(Failed::local(
+                    RemoteCode::TransportUnsent,
+                    "queue_deadline",
+                    false,
+                )));
+                return;
+            };
+            let max = inner.source.terms.max_response_bytes.min(usize::MAX as u64) as usize;
+            let reply = inner
+                .transport
+                .post(CONTEXT_ACQUIRE_PATH, body, max, &budget, &tracker)
+                .await;
+            let (result, response_digest, answered) = match reply {
+                Err(e) => {
+                    let code = transport_code(&e);
+                    (
+                        Err(Failed::local(code, "", tracker.may_have_sent())),
+                        None,
+                        false,
+                    )
+                }
+                Ok(r) => match classify_status(r.status) {
+                    Some(code) => (Err(Failed::local(code, "", true)), None, true),
+                    None => {
+                        let (result, digest) = judge_acquire(&r.body);
+                        (result, digest, true)
+                    }
+                },
+            };
+            let code = result.as_ref().err().map(|f| f.code);
+            let late = match tx.send(result) {
+                Ok(()) => false,
+                Err(_) if answered => {
+                    inner.queue.count_late();
+                    true
+                }
+                Err(_) => false,
+            };
+            client.record(&id, request_digest, response_digest, code, late);
+        });
+        let mut guard = Abandon {
+            client: self.client.clone(),
+            attempt_id: call.attempt_id.to_string(),
+            armed: true,
+        };
+        let answer = tokio::select! {
+            answer = rx => answer.unwrap_or_else(|_| {
+                Err(Failed::local(RemoteCode::RemoteError, "exchange ended", true))
+            }),
+            () = call.cancel.raised() => {
+                guard.armed = false;
+                return self.cancelled(&sent, call.attempt_id).await;
+            }
+        };
+        guard.armed = false;
+        match answer {
+            Ok((page, charge)) => AcquireReport {
+                result: Ok(page),
+                charge,
+                cancel: CancelAck::NotRequested,
+            },
+            Err(failed) => failed.report(),
+        }
+    }
+
+    /// The caller cancelled: nothing was sent, or the endpoint is asked to
+    /// stop and only a confirmed `stopped` is reported as one (3.10.4).
+    async fn cancelled(&self, sent: &SentTracker, attempt_id: &str) -> AcquireReport {
+        let report = |cancel, charge| AcquireReport {
+            result: Err((
+                AcquisitionFailure::Transient,
+                failure_detail(RemoteCode::Cancelled, ""),
+            )),
+            charge,
+            cancel,
+        };
+        if sent.try_abort() {
+            return report(CancelAck::Stopped, Charge::Observed { units: 0 });
+        }
+        if self.client.inner.source.terms.cancellation == CancelSupport::None {
+            return report(CancelAck::Unconfirmed, Charge::Unknown);
+        }
+        let support = self.client.inner.source.terms.cancellation;
+        let ack = match self
+            .client
+            .cancel(vec![attempt_id.to_string()], 1_000)
+            .await
+        {
+            Ok(answers) => remote_cancel_ack(support, &answers, attempt_id),
+            Err(_) => CancelAck::Unconfirmed,
+        };
+        report(ack, Charge::Unknown)
+    }
+}
+
+/// The acknowledgement of a sent attempt's cancel: `stopped` only when the
+/// endpoint declared `confirmed` cancellation and answered `stopped` for
+/// this attempt; `best_effort` never yields `stopped` (3.10.4).
+fn remote_cancel_ack(
+    support: CancelSupport,
+    answers: &[CancelItem],
+    attempt_id: &str,
+) -> CancelAck {
+    let stopped = answers
+        .iter()
+        .any(|a| a.attempt_id == attempt_id && a.answer == rc::CancelAnswer::Stopped);
+    if support == CancelSupport::Confirmed && stopped {
+        CancelAck::Stopped
+    } else {
+        CancelAck::Unconfirmed
+    }
+}
+
+impl AcquisitionSource for RemoteAcquisitionSource {
+    fn descriptor(&self) -> &SourceDescriptor {
+        &self.descriptor
+    }
+
+    /// The operation's declared bound; an estimated or unknown cost model
+    /// states no units, so it is `unknown`.
+    fn cost_bound(&self, request: &AcquisitionRequest) -> CostBound {
+        let declared = self
+            .descriptor
+            .operations
+            .iter()
+            .flatten()
+            .find(|o| o.name == request.operation)
+            .map(|o| &o.cost);
+        match declared {
+            Some(OperationCost::Bounded { max_units }) => CostBound::Bounded {
+                max_units: *max_units,
+            },
+            _ => CostBound::Unknown,
+        }
+    }
+
+    fn acquire<'a>(&'a self, call: AcquireCall<'a>) -> BoxFuture<'a, AcquireReport> {
+        Box::pin(self.acquire_once(call))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn answer(id: &str, answer: rc::CancelAnswer) -> CancelItem {
+        CancelItem {
+            attempt_id: id.into(),
+            answer,
+        }
+    }
+
+    #[test]
+    fn stopped_needs_confirmed_support_and_this_attempts_stop() {
+        let stopped = [answer("a", rc::CancelAnswer::Stopped)];
+        assert_eq!(
+            remote_cancel_ack(CancelSupport::Confirmed, &stopped, "a"),
+            CancelAck::Stopped
+        );
+        // Best effort never yields stopped, even when the endpoint says so.
+        assert_eq!(
+            remote_cancel_ack(CancelSupport::BestEffort, &stopped, "a"),
+            CancelAck::Unconfirmed
+        );
+        assert_eq!(
+            remote_cancel_ack(CancelSupport::None, &stopped, "a"),
+            CancelAck::Unconfirmed
+        );
+        // Another attempt's stop says nothing about this one.
+        assert_eq!(
+            remote_cancel_ack(CancelSupport::Confirmed, &stopped, "b"),
+            CancelAck::Unconfirmed
+        );
+        let unconfirmed = [answer("a", rc::CancelAnswer::Unconfirmed)];
+        assert_eq!(
+            remote_cancel_ack(CancelSupport::Confirmed, &unconfirmed, "a"),
+            CancelAck::Unconfirmed
+        );
     }
 }
