@@ -372,6 +372,7 @@ mod tests {
             crate::Host {
                 backends: BTreeMap::new(),
                 contexts: BTreeMap::new(),
+                acquisitions: BTreeMap::new(),
                 sink: Arc::new(Sink),
                 replay_scopes: BTreeMap::from([(
                     b"a".to_vec(),

@@ -4,7 +4,9 @@ use rustev_contract::{
     Document, Identified, Timestamp, canonical::tagged_digest, ids::ContentDigest, plan_bundle::*,
     scope::Handle, serve::*,
 };
-use rustev_core::seams::{CancelSignal, ContextSource, DecisionBackend, EvidenceSink};
+use rustev_core::seams::{
+    AcquisitionSource, CancelSignal, ContextSource, DecisionBackend, EvidenceSink,
+};
 use rustev_runtime::{
     Completion, DecideError, DecisionRequest, Delivery, PreparedPlan, Rejection, Runtime,
 };
@@ -22,6 +24,11 @@ use tokio::sync::{Notify, Semaphore};
 pub struct Host {
     pub backends: BTreeMap<String, Arc<dyn DecisionBackend>>,
     pub contexts: BTreeMap<String, Arc<dyn ContextSource>>,
+    /// Per configured context source whose source serves acquisitions, that
+    /// acquisition source and its attempt bound. Every one is installed in
+    /// the runtime for every plan (3.4.2); no two may describe the same
+    /// `SourceId`.
+    pub acquisitions: BTreeMap<String, (Arc<dyn AcquisitionSource>, usize)>,
     pub sink: Arc<dyn EvidenceSink>,
     /// Replay scopes are resolved by the host, never trusted from a body.
     pub replay_scopes: BTreeMap<Vec<u8>, rustev_contract::scope::Scope>,
@@ -83,21 +90,41 @@ impl rustev_runtime::ProgressObserver for Progress {
         }
     }
     fn step(&self, step: rustev_runtime::StepProgress) {
+        let outcome = match step.outcome {
+            Ok(()) => StepOutcome::Supplied,
+            Err(reason) => StepOutcome::Unresolved { reason },
+        };
+        self.offer_step(step.step_id, step.instance_ids, outcome, step.derivation);
+    }
+    fn skipped(&self, step: rustev_runtime::SkippedStep) {
+        self.offer_step(
+            step.step_id,
+            step.instance_ids,
+            StepOutcome::Skipped,
+            step.derivation,
+        );
+    }
+}
+impl Progress {
+    fn offer_step(
+        &self,
+        step_id: String,
+        instance_ids: Vec<String>,
+        outcome: StepOutcome,
+        derivation: rustev_contract::judgment::Derivation,
+    ) {
         if let Some(events) = &self.events {
             events.offer(EventKind::Step {
-                step_id: Handle::new(step.step_id).expect("validated step id"),
+                step_id: Handle::new(step_id).expect("validated step id"),
                 instance_ids: List::new(
-                    step.instance_ids
+                    instance_ids
                         .into_iter()
                         .map(|id| Handle::new(id).expect("validated instance id"))
                         .collect(),
                 )
                 .expect("bounded instances"),
-                outcome: match step.outcome {
-                    Ok(()) => StepOutcome::Supplied,
-                    Err(reason) => StepOutcome::Unresolved { reason },
-                },
-                derivation: step.derivation,
+                outcome,
+                derivation,
             });
         }
     }
@@ -115,6 +142,9 @@ pub struct Service {
     pub digest: ContentDigest,
     pub build: Handle,
     pub(crate) runtime: Runtime,
+    /// The descriptors of every installed acquisition source, which every
+    /// registration compiles against (3.3.2, 3.4.2).
+    sources: Vec<rustev_contract::source::SourceDescriptor>,
     /// The clock handed to the runtime; the service's own budget accounting
     /// for a decision (context fetch time, remaining deadline) reads it too.
     clock: Arc<dyn rustev_runtime::Clock>,
@@ -231,11 +261,16 @@ impl Service {
                 return Err("configured context source has no host implementation".into());
             }
         }
+        let sources = install_acquisitions(&config, &host)?;
+        for (source, limit) in host.acquisitions.values() {
+            builder = builder.acquisition_source(source.clone(), *limit);
+        }
         let trust = Trust::load(&config.signing_keys)?;
         let result = Arc::new(Self {
             digest: config.configuration_digest().map_err(|e| e.to_string())?,
             build: Handle::new(concat!("rustev-serve/", env!("CARGO_PKG_VERSION"))).unwrap(),
             runtime: builder.build().map_err(|e| format!("{e:?}"))?,
+            sources,
             clock,
             trust,
             host,
@@ -335,10 +370,15 @@ impl Service {
             Maybe::Some(e) => Some(e.document().unwrap()),
             Maybe::None => None,
         };
-        let compiled = match &execution {
-            Some(e) => rustev_core::compile_with(&definition, &descriptors, &calibrations, e),
-            None => rustev_core::compile(&definition, &descriptors, &calibrations),
-        };
+        // Every installed source's descriptor: a plan binds only those its
+        // definition names, so the others change no `PlanId` (3.4.2).
+        let compiled = rustev_core::compile_with_sources(
+            &definition,
+            &descriptors,
+            &calibrations,
+            &self.sources,
+            execution.as_ref(),
+        );
         let compiled = match compiled {
             Ok(c) => c,
             Err(e) => {
@@ -1115,6 +1155,47 @@ impl Service {
             exit,
         )
     }
+}
+/// Check the host's acquisition sources (3.4.2): each belongs to a
+/// configured context source, and no two describe the same `SourceId` or,
+/// because a plan binds a source by name, the same source name. Returns
+/// their descriptors.
+fn install_acquisitions(
+    config: &ServeConfig,
+    host: &Host,
+) -> Result<Vec<rustev_contract::source::SourceDescriptor>, String> {
+    let mut seen: BTreeMap<String, (&str, String)> = BTreeMap::new();
+    let mut out = vec![];
+    for (name, (source, limit)) in &host.acquisitions {
+        if !config.context_sources.keys().any(|k| k.as_str() == name) {
+            return Err(format!(
+                "acquisition source {name} is not a configured context source"
+            ));
+        }
+        if *limit == 0 {
+            return Err(format!(
+                "acquisition source {name} has a zero attempt bound"
+            ));
+        }
+        let descriptor = source.descriptor().clone();
+        let id = descriptor.id().map_err(|e| e.to_string())?;
+        if let Some((other, other_id)) = seen.get(&descriptor.name) {
+            return Err(if *other_id == id.as_str() {
+                format!(
+                    "context sources {other} and {name} describe the same source id {}",
+                    id.as_str()
+                )
+            } else {
+                format!(
+                    "context sources {other} and {name} describe the same source name {}",
+                    descriptor.name
+                )
+            });
+        }
+        seen.insert(descriptor.name.clone(), (name, id.as_str().to_string()));
+        out.push(descriptor);
+    }
+    Ok(out)
 }
 fn bounded_text(value: &str) -> Text<0, 256> {
     let mut end = value.len().min(256);

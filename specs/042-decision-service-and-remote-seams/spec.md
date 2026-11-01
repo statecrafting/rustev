@@ -1531,6 +1531,35 @@ is sent as `denied`, as the code its detail names when that code has the
 failure's class, or as the class's code (`remote_error`, `overloaded`,
 `capability`). Tests: `integrations/rustev-remote-http/tests/acquire.rs`.
 
+**Increment 7 part 3: acquisitions in the service (2026-10-30).** 3.4.2
+states: "Once spec 036 is implemented, a plan's declared acquisitions go
+through the same source's `acquire` during the decision." The owner's
+reading (no amendment): every configured context source whose
+describe carries its `rustev.source/1` descriptor is installed as an
+acquisition source service-wide, for every plan, and startup is refused when
+two configured sources describe the same `SourceId`. A plan binds a source by
+name and `SourceId`, and the runtime installs one source per name, so two
+configured sources describing the same source name are refused at startup
+too. `integrations/rustev-serve/src/contexts.rs` installs each described
+client's `RemoteAcquisitionSource` (3.10.3) with the endpoint's
+`max_in_flight` as its attempt bound; `Host` gains `acquisitions` (per
+configured context source, an acquisition source and its bound), so an
+embedding host supplies its own the same way. A registration compiles
+against the descriptors of every installed source (3.3.2); a plan binds only
+the sources its definition names, so the others change no `PlanId`. A plan
+naming a source that serves no acquisitions is `compile_refused`. The
+runtime's progress observer gains `skipped` (a defaulted method with the
+step's compiled derivation, additive to `rustev-runtime`'s API), and the
+service streams it as the `skipped` outcome of 3.7.1. Tests:
+`a_guard_skipped_step_is_observed_as_skipped` in
+`crates/rustev-runtime/tests/acquisition.rs`, and
+`integrations/rustev-serve/tests/conformance/acquire.rs` (an acquiring plan
+through HTTP/2 JSON and gRPC over TCP and Unix, byte-identical per listener,
+the hosted source's `acquire` called once and the delivered record carrying
+the acquisition; a guard-skipped acquisition streamed as `skipped` over both
+transports; duplicate `SourceId` refused at startup; a source without a
+descriptor installs none).
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

@@ -20,6 +20,10 @@ mod support;
 #[path = "callback.rs"]
 mod callback;
 
+// Acquisitions through the service (3.4.2), on this harness.
+#[path = "acquire.rs"]
+mod acquire;
+
 use crate::grpc::generated::Document as Envelope;
 use http_body_util::{BodyExt, Full};
 use hyper::{Request, body::Bytes};
@@ -185,11 +189,13 @@ fn free_port() -> std::net::SocketAddr {
 }
 
 /// What a case binds: backends (binding name, seam, concurrency), context
-/// sources (source id, the snapshot served), and the runtime bounds and sink
-/// timeout (the fixture configuration's when absent).
+/// sources (source id, the snapshot served), the acquisitions a context
+/// source also serves (source id, the hosted source), and the runtime bounds
+/// and sink timeout (the fixture configuration's when absent).
 struct Setup {
     backends: Vec<(String, Arc<dyn DecisionBackend>, Option<usize>)>,
     sources: Vec<(String, Snapshot)>,
+    acquisitions: Vec<(String, Arc<dyn rustev_core::seams::AcquisitionSource>)>,
     runtime: Option<(Json, u64)>,
 }
 
@@ -201,6 +207,7 @@ fn run_setup(case: &Case) -> Setup {
     Setup {
         backends: vec![("rules".into(), Arc::new(rules), None)],
         sources: vec![("case".into(), snapshot)],
+        acquisitions: vec![],
         runtime: None,
     }
 }
@@ -225,6 +232,9 @@ async fn start(
                 },
             )
             .unwrap();
+    }
+    for (id, source) in &setup.acquisitions {
+        callbacks.host_acquisition(id, source.clone()).unwrap();
     }
     let sink = Arc::new(Keep::default());
     callbacks
@@ -685,6 +695,7 @@ async fn drive(
     let setup = Setup {
         backends,
         sources,
+        acquisitions: vec![],
         runtime: Some((
             json!({"max_in_flight": rc.config.max_in_flight,
                 "max_queued": rc.config.max_queued,

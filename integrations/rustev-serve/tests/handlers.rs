@@ -55,6 +55,7 @@ fn service(config: Value, sink: Arc<Sink>) -> Arc<Service> {
         Host {
             backends: BTreeMap::new(),
             contexts: BTreeMap::new(),
+            acquisitions: BTreeMap::new(),
             sink,
             replay_scopes: BTreeMap::new(),
         },
@@ -804,6 +805,7 @@ async fn context_extra_fields_and_failed_fetch_never_dispatch_a_decision() {
                     "context".into(),
                     Arc::new(Source(fail)) as Arc<dyn ContextSource>,
                 )]),
+                acquisitions: BTreeMap::new(),
                 sink: sink.clone(),
                 replay_scopes: BTreeMap::new(),
             },
@@ -923,6 +925,7 @@ fn semantic_service_with_sink(
                     as Arc<dyn rustev_core::seams::DecisionBackend>,
             )]),
             contexts: BTreeMap::new(),
+            acquisitions: BTreeMap::new(),
             sink,
             replay_scopes: BTreeMap::new(),
         },
@@ -1573,6 +1576,7 @@ mod grpc_differential {
             Host {
                 backends: BTreeMap::new(),
                 contexts: BTreeMap::new(),
+                acquisitions: BTreeMap::new(),
                 sink: Arc::new(Sink::default()),
                 replay_scopes: BTreeMap::from([(
                     b"a".to_vec(),
@@ -2221,6 +2225,7 @@ async fn pushed_invalidations_ack_in_order_and_report_gaps_and_erasures() {
                     Arc::new(Never) as Arc<dyn rustev_core::seams::ContextSource>,
                 ),
             ]),
+            acquisitions: BTreeMap::new(),
             sink: Arc::new(Sink::default()),
             replay_scopes: BTreeMap::new(),
         },

@@ -31,7 +31,7 @@ pub use store::{
     Invalidated, PutAnswer, PutTerms, RuntimeStore, StoreCall, StoreFailure, StoreSelector, Stored,
 };
 mod sink;
-pub use progress::{ProgressObserver, StepProgress};
+pub use progress::{ProgressObserver, SkippedStep, StepProgress};
 mod wait;
 
 use std::collections::{BTreeMap, BTreeSet};
