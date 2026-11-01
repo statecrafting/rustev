@@ -1,0 +1,10 @@
+{
+  "package": {
+    "kind": "rust-lib",
+    "name": "rustev-backend-embed-linear",
+    "path": "backends/rustev-backend-embed-linear",
+    "specRef": "011-semantic-backend"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "194a3db1950d1161943821daa6caea07d57872d7c8e331f039a050011c9f51a2"
+}

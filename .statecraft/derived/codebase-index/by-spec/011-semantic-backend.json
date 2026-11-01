@@ -29,13 +29,29 @@
         "source": "spec-edge"
       },
       {
+        "path": "backends/rustev-backend-embed-linear",
+        "source": "manifest-metadata"
+      },
+      {
+        "path": "backends/rustev-backend-embed-linear/",
+        "source": "spec-edge"
+      },
+      {
         "path": "tools/rustev-boundaries/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "tools/rustev-release/",
         "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "backends/rustev-backend-embed-linear/"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -54,6 +70,19 @@
         "unit": {
           "kind": "directory",
           "path": "tools/rustev-boundaries/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "tools/rustev-release/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-release/"
         }
       },
       {
@@ -139,5 +168,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "dc08be503cbb8c74b5c5ab7dd93375e37b18017152771ee105adfd859ea6e4b3"
+  "shardHash": "b5a539e8a7a75edc8e72bcc0c4fc8c0e9d8a3a1e40150b6b1ea8b590dfd61840"
 }

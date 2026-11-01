@@ -72,6 +72,10 @@
   ],
   "excluded": [
     {
+      "name": "rustev-backend-embed-linear",
+      "reason": "spec 011 is in progress and its feasibility gate (3.2) has not passed; admission to the release family is spec 031's act (011 3.17.4); publish = false"
+    },
+    {
       "name": "rustev-live-crash",
       "reason": "test harness for rustev-live's test-only fault-injection feature (spec 043), not a product crate"
     },

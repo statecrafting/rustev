@@ -19,8 +19,7 @@
     "establishes": [
       {
         "kind": "directory",
-        "path": "backends/rustev-backend-embed-linear/",
-        "planned": true
+        "path": "backends/rustev-backend-embed-linear/"
       }
     ],
     "extends": [
@@ -54,6 +53,14 @@
         "unit": {
           "kind": "directory",
           "path": "tools/rustev-boundaries/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-public-api-and-release-family",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-release/"
         }
       }
     ],
@@ -139,7 +146,7 @@
       }
     ],
     "sectionDigests": {
-      "011-local-semantic-backend-frozen-embeddings-and-a-linear-head": "e54c5cefc79191a2fa7ab607b537dfaf5573dd84e8c6d220274fba861b9331f5",
+      "011-local-semantic-backend-frozen-embeddings-and-a-linear-head": "5b4f294c14a313393a83786ec4c2d42df5e25073049be2a7eefdac96825e23c6",
       "1-purpose": "0d3569d95796599deb0bc6feaa4e062fd4a3dfe85a184f8086c973c56415a386",
       "2-1-binding-principles-of-76": "e104a153715a456e6f6b0969c1f41c2c25e36a50e4544767fe3bae305d52a565",
       "2-territory": "5d61b2c53484919461ca3b3927123f08cd4559d0494401ba1fc4091c220e5b6a",
@@ -169,6 +176,7 @@
       "acceptance": "849036fd83aeafe74e21f0db8b8da9f224f5ae90b0e71ed9d346697f08bf549d",
       "decisions-at-approval": "2fbadfeaa0d340fe0a2464cea9006893a256784d301218d5f0c1e597dd8ee8a7",
       "facts-relied-on": "d58aa3f7f5589622c6dbb96230f847757925403b900085a5ce72d2b4132ca18a",
+      "implementation-record": "56d1060a65c708cca9d2f6eb1979f3192c8fa7c3d3492a5bcfa4da5256ea7fea",
       "verification": "08de6a906e75445bb1f7290eaca32c56b3953ce1e46941f45cee6596cae40b46"
     },
     "sectionHeadings": [
@@ -202,6 +210,7 @@
       "Facts relied on",
       "Acceptance",
       "Verification",
+      "Implementation record",
       "Decisions at approval"
     ],
     "specPath": "specs/011-semantic-backend/spec.md",
@@ -209,6 +218,6 @@
     "summary": "The first local model backend, `backends/rustev-backend-embed-linear/`: an ordinary `DecisionBackend` that embeds projected text with a frozen, host-provisioned sentence encoder run by ONNX Runtime through `ort`, and answers `classify`, `proposition` and `rubric` with logits from an externally produced, identified task-specific linear head. One canonical `rustev.embed-linear/1` manifest binds checkpoint, graph, tokenizer, preprocessing, truncation, pooling, precision, runtime, heads, labels, cost and tolerance into the artifact identity. Implementation is gated by a staged feasibility record (`rustev.embed-feasibility/1`) that passes or refuses each selection of #69 against measured limits before any inference dependency lands. No network, no download, no training, no provider; repeatability is a declared tolerance, not bitwise. Optional `local-embed` features in the Node binding, the service and the facade, and an opt-in in-process embedding cache. Amends spec 001 only by adding a local inference runtime family and one placement rule to the boundary check. Ratified (A-28) under R-36, which amends R-17 for this spec; R-43 authorizes the feasibility stages and pins the revision that ships an ONNX graph; implementation is pending.\n",
     "title": "Local semantic backend: frozen embeddings and a linear head"
   },
-  "shardHash": "dc08be503cbb8c74b5c5ab7dd93375e37b18017152771ee105adfd859ea6e4b3",
+  "shardHash": "b5a539e8a7a75edc8e72bcc0c4fc8c0e9d8a3a1e40150b6b1ea8b590dfd61840",
   "specVersion": "1.10.0"
 }

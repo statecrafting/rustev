@@ -26,7 +26,7 @@ summary: >
 amends:
   - "001-boundaries-and-authority"
 establishes:
-  - { kind: directory, path: "backends/rustev-backend-embed-linear/", planned: true }
+  - { kind: directory, path: "backends/rustev-backend-embed-linear/" }
 extends:
   # The crate as a workspace member and its pinned dependencies (2).
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.toml" }, nature: additive }
@@ -35,6 +35,8 @@ extends:
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
   # The local inference runtime family and placement rule (3.18).
   - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "tools/rustev-boundaries/" }, nature: additive }
+  # The crate is excluded from the release set until spec 031 admits it (3.17.4).
+  - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "002-decision-contract-and-pure-core"
@@ -798,6 +800,62 @@ verify` with deterministic, offline verification over synthetic bundles for
 every acceptance item that does not need the real artifacts; the
 feasibility record and hand-run real-bundle results are evidence, not
 declared verification.
+
+## Implementation record
+
+Delivered in increments, each its own pull request; nothing here claims an
+acceptance item before the increment that satisfies it.
+
+**Gate status (2026-10-31).** The feasibility gate (3.2) has not passed for
+any platform: an unreviewed attempt on `macos-aarch64` measured a warm p95
+above the 100 ms limit of 3.3, did not run the stage 3 Node `local-embed`
+linking check, and measured no Linux platform. Under 3.2.3 no `ort`,
+ONNX Runtime or `tokenizers` dependency enters the workspace, and the
+ONNX encoder waits on the gate. Under Decision 18 the parts that need no
+real artifact proceed now, in this order:
+
+1. The crate, the `rustev.embed-linear/1` manifest and its checks (3.4),
+   bundle verification and the setup codes it can reach (3.7), identity
+   (3.5), the derived descriptor and cost bound (3.10.1 to 3.10.3),
+   pooling and head arithmetic (3.9), and the synthetic encoder and head
+   formula behind the `synthetic` feature (3.19.1).
+2. The boundary check extension (3.18) with its unit tests.
+3. Text assembly and task matching (3.8.1, 3.8.2), `check_plan` (3.10.4)
+   and the `DecisionBackend` over the synthetic encoder: workers, queue,
+   charges, cancellation and slot accounting (3.11, 3.12). Token ids come
+   from the bundle's tokenizer (3.8.3), whose crate is gated, so this
+   increment needs the tokenizer question settled first.
+4. The embedding cache (3.14).
+5. The committed synthetic support-routing heads (3.19.2), and the
+   evidence, replay, swap and plan-golden tests (3.15, 3.20).
+6. The Node binding's `local-embed` feature and synthetic conformance
+   parity (3.17.1, 3.17.5).
+
+After stages 1 to 3 pass for a platform: the pinned `ort` and `tokenizers`
+dependencies, runtime loading and the qualified platform table (3.6), the
+ONNX encoder, tokenization and truncation (3.8.3, 3.8.4), the committed
+feasibility record, and `011` in `make verify`.
+
+**Increment 1 (2026-10-31): the crate, the manifest and the synthetic
+encoder.** `backends/rustev-backend-embed-linear` is established
+(`publish = false`, with a release-set exclusion until spec 031 admits
+it) and depends only on `rustev-contract`, `serde`, `serde_json` and
+`sha2`. `manifest` defines `rustev.embed-linear/1` with every member of
+3.4.2 and `deny_unknown_fields`, and `check` refuses each 3.4.3 case
+(duplicate or wrong proposition options, zero threads, `max_tokens` above
+512, an ONNX graph whose `source` is not a checkpoint file with its
+SHA-256), path, size and syntax bounds, and tolerance bounds other than
+those of 3.3. `verify_bundle` reads an absolute bundle directory, refuses
+symbolic links on every path component, bounds every read by its
+declared length, checks lengths and SHA-256 before use, the 150 MiB
+bundle bound and the expected `ArtifactId`, and parses the head weights
+(`bundle_missing`, `bundle_too_large`, `manifest_invalid`,
+`digest_mismatch`, `artifact_mismatch`, `head_invalid`). The descriptor
+declares `logits`, `tolerance` and no `rank`. `head` holds `mean_masked`
+pooling with optional L2 normalization and the f64 head product;
+`synthetic` holds the SplitMix64 encoder and head formula of 3.19.
+Tests: `backends/rustev-backend-embed-linear/tests/bundle.rs`, over
+synthetic bundles written to a temporary directory.
 
 ## Decisions at approval
 
