@@ -179,7 +179,7 @@
       }
     ],
     "sectionDigests": {
-      "043-live-re-execution-at-dataset-scale-with-spend-caps-amends-026-and-006": "e1578fd5f8de8883dc0ccc494717a2d49ca977b2c85a0197a52d6bd105bccfd9",
+      "043-live-re-execution-at-dataset-scale-with-spend-caps-amends-026-and-006": "dce41e72ba5e1c96554acc56cd7b67a4205aaa642b106677c9c8f8fe73fbf4dd",
       "1-purpose": "f8308a238da2306c3966a393ec83f0643cabd38dca9ffdcca0e7fbf8750f4570",
       "2-1-binding-principles-of-76": "87111785b33e7f2733f46980c7b5fb5f9b1073903e042fb3f0c9d9ed82b3e3a4",
       "2-territory": "2d833e656d1ba92a697924abfa111b8aa693ec20ab5fa044b62595d40c8f9ab5",
@@ -203,7 +203,7 @@
       "5-observable-negative-cases": "783c3d373882296d6bdab3a637db01395d08d426cdd77683350079f23576dcd3",
       "acceptance": "29cbf4f778dd168bdf55a94f5e6f0ce7616035fbb17105190316e6597adecdce",
       "decisions-at-approval": "60639ac671f8836f2afe218b441784c351305b32947a59f1f8479b666d38e7b1",
-      "implementation-record": "b337805d507fd06804c08a35944763db4ffcc716605e70209cf32c9f10fc5fb2",
+      "implementation-record": "448e077511ed30a5e6e1a48e031dd778ef70ed8a58bfde71bf2003b32dc92d75",
       "verification": "6a092c47f4554a60be684e622b60e9bf85ce12434835f02ee383fb7e4702c519"
     },
     "sectionHeadings": [
@@ -239,6 +239,6 @@
     "summary": "An amendment of approved spec 026 (live re-execution) and of spec 006 (CLI), for #76 child E3 (#74). A new crate `rustev-live` runs a dataset, or the inputs (never the outputs) of retained replay bundles, through one or more candidate plans live, through spec 026's `reexecute_live`, under an explicit `--live` opt-in, a per-run spend cap and the persistent spend journal of spec 012, generalized to any backend with a cost model and moved into `rustev-live`. A runtime spend gate durably reserves every attempt's full worst-case exposure before any byte is sent and refuses an attempt that would pass the run cap or the journal's cap (R-29: USD 5 in total for all testing across providers). Acquisitions are declared live or captured per source; a probe checks reachability and served identity of every candidate binding before any dataset case is sent; scheduling is bounded per binding; runs resume from a checkpoint without re-sending a completed case or counting a charge twice. Every result is new evidence marked `live_reexecution` with a link to its source case or record, and per-run outputs are spec 029 repeat outputs with source `live`, so E1 and E2 consume them unchanged. Approved (A-40); approval authorizes no live run, provider call or spend by itself, raises no cap, and makes no quality claim.\n",
     "title": "Live re-execution at dataset scale with spend caps (amends 026 and 006)"
   },
-  "shardHash": "b2c1b1b4524a2628359f69a37949cf9caeeb6061e9561a01d730165ffe98bdcd",
+  "shardHash": "95c02c9e079af497385f12f779defcae907fed5fb8a4fcb25f4c3b5ee07a60f1",
   "specVersion": "1.10.0"
 }

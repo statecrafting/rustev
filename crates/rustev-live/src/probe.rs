@@ -167,10 +167,38 @@ pub struct ProbeReport {
     pub spend_refusal: Option<String>,
 }
 
-/// Probe decisions are `live/<run_id>/.probe/<binding>/<call>`: run spend
+/// Probe decisions retain `.probe` before any resume sequence: run spend
 /// (3.5.3) counts them, and no candidate name starts with `.` (3.3.4).
 const PURPOSE: &str = ".probe";
 const MISMATCH: &str = "served-identity-mismatch";
+
+/// Choose the next resume sequence from every reservation, including released
+/// and crash-liability attempts. All calls in this probe share the sequence.
+fn decision_prefix(gate: &JournalGate, resume: bool) -> Result<String, LiveError> {
+    let prefix = format!("live/{}/{PURPOSE}/", gate.run_id());
+    if !resume {
+        return Ok(prefix);
+    }
+    let largest = gate
+        .journal()
+        .attempts_with_prefix(&prefix)
+        .iter()
+        .filter_map(|attempt| {
+            attempt
+                .strip_prefix(&prefix)?
+                .strip_prefix("resume-")?
+                .split_once('/')?
+                .0
+                .parse::<u64>()
+                .ok()
+        })
+        .max()
+        .unwrap_or(0);
+    let next = largest
+        .checked_add(1)
+        .ok_or_else(|| LiveError::invalid("probe-sequence", "probe resume sequence exhausted"))?;
+    Ok(format!("{prefix}resume-{next}/"))
+}
 
 /// The bindings a plan reaches: every primary and fallback target.
 pub fn reached(compiled: &Compiled) -> BTreeSet<BindingIdentity> {
@@ -212,7 +240,10 @@ pub async fn probe(
     gate: &JournalGate,
     cancel: &CancelSignal,
 ) -> Result<ProbeReport, LiveError> {
-    probe_recorded(inputs, authorizer, gate, cancel, |_, _, _, _, _| Ok(None)).await
+    probe_recorded(inputs, authorizer, gate, cancel, false, |_, _, _, _, _| {
+        Ok(None)
+    })
+    .await
 }
 
 pub(crate) async fn probe_recorded(
@@ -220,6 +251,7 @@ pub(crate) async fn probe_recorded(
     authorizer: &dyn LiveAuthorizer,
     gate: &JournalGate,
     cancel: &CancelSignal,
+    resume: bool,
     mut record: impl FnMut(
         usize,
         u64,
@@ -310,6 +342,7 @@ pub(crate) async fn probe_recorded(
     check_acquisitions(config, candidates)?;
     let acquisitions = acquisition_postures(config)?;
     let spend_bindings = spend_bindings(config);
+    let decision_prefix = decision_prefix(gate, resume)?;
     let mut stopped = None;
     'bindings: for (index, (p, b)) in probes.iter_mut().zip(&config.bindings).enumerate() {
         let Ok(plan) = prepared[&p.candidate].clone() else {
@@ -333,7 +366,7 @@ pub(crate) async fn probe_recorded(
                 stopped = Some(ProbeStatus::Interrupted);
                 break 'bindings;
             }
-            let decision_id = format!("live/{}/{PURPOSE}/{}/{call}", gate.run_id(), index + 1);
+            let decision_id = format!("{decision_prefix}{}/{call}", index + 1);
             let result = rt
                 .reexecute_live_with_sources(
                     &plan,

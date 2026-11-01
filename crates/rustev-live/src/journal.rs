@@ -730,6 +730,17 @@ impl SpendJournal {
             .collect()
     }
 
+    /// Full journal attempt keys with this prefix, including released and
+    /// crash-liability reservations, in reservation sequence order.
+    pub(crate) fn attempts_with_prefix(&self, prefix: &str) -> Vec<String> {
+        self.lock()
+            .res
+            .values()
+            .filter(|r| r.attempt.starts_with(prefix))
+            .map(|r| r.attempt.clone())
+            .collect()
+    }
+
     /// Reservation evidence for exactly this decision, in journal sequence order.
     /// Unsettled and crash liability remain unknown, never an inferred charge.
     pub fn reservations_detail(&self, decision_id: &str) -> Vec<crate::documents::CaseSpend> {

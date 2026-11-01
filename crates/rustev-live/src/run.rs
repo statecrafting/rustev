@@ -487,6 +487,7 @@ impl PreparedRun {
                 authorizer,
                 &gate,
                 &signal,
+                self.opts.resume,
                 |index, call, candidate, result, sources| {
                     let doc = LiveCaseDocument::from_result(
                         &self.spec.config,
