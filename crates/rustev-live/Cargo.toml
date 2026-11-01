@@ -1,20 +1,28 @@
 [package]
 name = "rustev-live"
 version.workspace = true
-description = "Persistent spend accounting for Rustev live decision execution."
+description = "Live re-execution of Rustev decisions at dataset scale under spend caps and a persistent spend journal."
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
+documentation = "https://docs.rs/rustev-live"
 readme.workspace = true
-# Increment 1 is not admitted to the release family.
-publish = false
+keywords = ["decision-engine", "evaluation", "spend"]
+categories = ["development-tools"]
+# Spec 045 3.1.2: a release family member (the published CLI depends on it).
+publish = ["crates-io"]
+# Spec 021, 3.5: the archive holds the library source; the reviewed file list
+# is tools/rustev-release/archive-policy.json.
+include = ["/src/**/*.rs", "/LICENSE"]
 
 [package.metadata.spec-spine]
 spec = "043-live-re-execution-at-scale"
 
 [features]
+# Test-only crash injection (spec 043 increment 9): off by default, hidden
+# from the documentation and not supported API.
 fault-injection = []
 
 [dependencies]
@@ -26,7 +34,6 @@ serde.workspace = true
 serde_json.workspace = true
 
 [dev-dependencies]
-rustev-live = { path = ".", features = ["fault-injection"] }
 tokio = { workspace = true, features = ["sync", "time", "rt", "macros"] }
 
 [lints]

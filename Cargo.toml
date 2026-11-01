@@ -12,6 +12,9 @@ members = [
   # The differential floating-point corpus (spec 027, 3.11.3), a crate of
   # its own inside the conformance suite's directory.
   "tools/rustev-conformance/fp-corpus",
+  # The crash-injection tests of spec 043, which enable rustev-live's
+  # test-only feature from outside the published crate.
+  "crates/rustev-live/crash",
 ]
 
 [workspace.package]

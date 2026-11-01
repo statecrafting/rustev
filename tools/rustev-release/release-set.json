@@ -15,7 +15,7 @@
       "rustev-remote-http",
       "rustev-runtime"
     ],
-    ["rustev-otel", "rustev-surface"],
+    ["rustev-live", "rustev-otel", "rustev-surface"],
     ["rustev-cli"],
     ["rustev"]
   ],
@@ -25,6 +25,7 @@
     "rustev-runtime",
     "rustev-backend-rules",
     "rustev-eval",
+    "rustev-live",
     "rustev-otel",
     "rustev-remote-http",
     "rustev-surface",
@@ -37,7 +38,8 @@
     { "package": "rustev-otel", "features": ["otlp", "otlp-grpc", "otlp-http"], "spec": "028 3.2.3" },
     { "package": "rustev-core", "features": ["parameterized"], "spec": "050 3.5" },
     { "package": "rustev-eval", "features": ["parameterized"], "spec": "050 3.5" },
-    { "package": "rustev-surface", "features": ["parameterized"], "spec": "050 3.5" }
+    { "package": "rustev-surface", "features": ["parameterized"], "spec": "050 3.5" },
+    { "package": "rustev-live", "features": ["fault-injection"], "spec": "043 increment 9" }
   ],
   "binaries": [{ "package": "rustev-cli", "name": "rustev" }],
   "npm": [
@@ -70,8 +72,8 @@
   ],
   "excluded": [
     {
-      "name": "rustev-live",
-      "reason": "spec 043 increment 1 establishes the journal; not yet admitted to the release family"
+      "name": "rustev-live-crash",
+      "reason": "test harness for rustev-live's test-only fault-injection feature (spec 043), not a product crate"
     },
     {
       "name": "rustev-bedrock",

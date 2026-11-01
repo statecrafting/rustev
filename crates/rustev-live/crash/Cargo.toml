@@ -1,0 +1,30 @@
+[package]
+name = "rustev-live-crash"
+version.workspace = true
+description = "The crash-injection tests of spec 043: rustev-live built with its test-only fault-injection feature."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+# Test harness (spec 043 increment 9): never published. A release member
+# cannot dev-depend on itself to enable its own test-only feature (spec 021
+# 3.2), so the crash tests live in this crate instead.
+publish = false
+
+[package.metadata.spec-spine]
+spec = "043-live-re-execution-at-scale"
+
+[lib]
+path = "lib.rs"
+
+[dev-dependencies]
+rustev-contract.workspace = true
+rustev-core.workspace = true
+rustev-eval.workspace = true
+rustev-live = { workspace = true, features = ["fault-injection"] }
+rustev-runtime.workspace = true
+serde_json.workspace = true
+tokio = { workspace = true, features = ["sync", "time", "rt", "macros"] }
+
+[lints]
+workspace = true

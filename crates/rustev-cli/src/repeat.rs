@@ -343,21 +343,56 @@ fn dependency_files(s: &Session<'_>, dir: &str, max: usize) -> Result<Vec<String
     Ok(files)
 }
 
-struct CandidateFiles {
-    name: String,
-    plan: String,
-    descriptors: Vec<String>,
-    rules: Vec<String>,
-    calibrations: Vec<String>,
+pub(crate) struct CandidateFiles {
+    pub name: String,
+    pub plan: String,
+    pub descriptors: Vec<String>,
+    pub rules: Vec<String>,
+    pub calibrations: Vec<String>,
 }
 impl CandidateFiles {
-    fn deps(&self) -> crate::deps::DepArgs<'_> {
+    pub fn deps(&self) -> crate::deps::DepArgs<'_> {
         crate::deps::DepArgs {
             descriptors: &self.descriptors,
             rules: &self.rules,
             calibrations: &self.calibrations,
         }
     }
+}
+
+pub(crate) fn candidate_files(
+    command: &str,
+    reads: &Reads,
+    dir: &str,
+    out: Option<&str>,
+) -> Result<Vec<CandidateFiles>, Done> {
+    let s = Session {
+        command: command.into(),
+        reads,
+    };
+    directories(&s, dir)?
+        .into_iter()
+        .map(|(name, dir)| {
+            if let Some(out) = out {
+                s.absent(&join(out, &name))?;
+            }
+            Ok(CandidateFiles {
+                name,
+                plan: join(&dir, "plan.json"),
+                descriptors: dependency_files(
+                    &s,
+                    &join(&dir, "descriptors"),
+                    io::MAX_DESCRIPTOR_FILES,
+                )?,
+                rules: dependency_files(&s, &join(&dir, "rules"), io::MAX_RULES_FILES)?,
+                calibrations: dependency_files(
+                    &s,
+                    &join(&dir, "calibrations"),
+                    io::MAX_CALIBRATION_FILES,
+                )?,
+            })
+        })
+        .collect()
 }
 
 pub fn eval(p: &Parsed) -> Result<Res, Usage> {
@@ -378,24 +413,8 @@ pub fn eval(p: &Parsed) -> Result<Res, Usage> {
                 join(p.req("out"), "comparison.json"),
                 join(p.req("out"), "comparison.md"),
             ]);
-            for (name, dir) in directories(&s, p.req("candidates"))? {
-                s.absent(&join(p.req("out"), &name))?;
-                candidates.push(CandidateFiles {
-                    name,
-                    plan: join(&dir, "plan.json"),
-                    descriptors: dependency_files(
-                        &s,
-                        &join(&dir, "descriptors"),
-                        io::MAX_DESCRIPTOR_FILES,
-                    )?,
-                    rules: dependency_files(&s, &join(&dir, "rules"), io::MAX_RULES_FILES)?,
-                    calibrations: dependency_files(
-                        &s,
-                        &join(&dir, "calibrations"),
-                        io::MAX_CALIBRATION_FILES,
-                    )?,
-                });
-            }
+            candidates =
+                candidate_files(&s.command, &reads, p.req("candidates"), Some(p.req("out")))?;
         }
         for (count, max) in [
             (
