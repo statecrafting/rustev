@@ -857,6 +857,23 @@ pooling with optional L2 normalization and the f64 head product;
 Tests: `backends/rustev-backend-embed-linear/tests/bundle.rs`, over
 synthetic bundles written to a temporary directory.
 
+**Increment 2 (2026-11-01): the boundary check extension (3.18).**
+`tools/rustev-boundaries` gains the local inference runtime family, matched
+by package name (`ort`, `ort-sys`, `onnxruntime`, `onnxruntime-sys`,
+`tokenizers`, `tract-*`, `candle-*`, `tch`, `torch-sys`) and `hf-hub` as a
+model hub client. The family is refused in the normal and build graphs of
+`rustev-contract` and `rustev-core` under 001 3.4.1's existing message. A
+workspace crate outside `backends/rustev-backend-embed-linear/` that
+reaches a family member is refused (001 3.4.6), including through a helper
+crate, and a dependency on `rustev-backend-embed-linear` without
+`optional = true` is refused (001 3.4.6). `hf-hub` and `ort`'s
+`download-binaries`, `copy-dylibs` and `fetch-models` features, declared or
+resolved, are refused everywhere (3.18.2(c)), the backend included. No
+crate depends on the family yet, so the workspace run reports no
+violation. Unit tests in `tools/rustev-boundaries/src/lib.rs` over
+synthetic metadata: a violating case for each rule and download feature,
+and a passing optional dependency of `rustev-node` on the backend.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

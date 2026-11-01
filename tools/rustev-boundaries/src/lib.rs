@@ -91,6 +91,22 @@ pub const TELEMETRY_PREFIX: &str = "opentelemetry";
 /// Members of the telemetry exporter family named exactly (spec 028, 3.12.1).
 pub const TELEMETRY_NAMES: &[&str] = &["tracing-opentelemetry"];
 
+/// Local inference runtimes and the model hub client (spec 011, 3.18.1).
+pub const LOCAL_INFERENCE_NAMES: &[&str] = &[
+    "ort",
+    "ort-sys",
+    "onnxruntime",
+    "onnxruntime-sys",
+    "tokenizers",
+    "tch",
+    "torch-sys",
+    "hf-hub",
+];
+pub const LOCAL_INFERENCE_PREFIXES: &[&str] = &["tract-", "candle-"];
+pub const LOCAL_BACKEND: &str = "rustev-backend-embed-linear";
+pub const LOCAL_BACKEND_DIR: &str = "backends/rustev-backend-embed-linear";
+pub const ORT_DOWNLOAD_FEATURES: &[&str] = &["download-binaries", "copy-dylibs", "fetch-models"];
+
 /// The crates whose whole normal and build dependency graph is checked; the
 /// shared command surface joins the contract and core (spec 027, 3.14.2).
 pub const PURE_CRATES: &[&str] = &["rustev-contract", "rustev-core", "rustev-surface"];
@@ -132,6 +148,8 @@ pub struct Dependency {
     pub path: Option<String>,
     #[serde(default)]
     pub optional: bool,
+    #[serde(default)]
+    pub features: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -143,6 +161,8 @@ pub struct Resolve {
 pub struct Node {
     pub id: String,
     pub deps: Vec<NodeDep>,
+    #[serde(default)]
+    pub features: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -159,6 +179,15 @@ pub struct DepKind {
 /// One broken rule, named by the spec 001 clause it breaks.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Violation {
+    /// Spec 011 3.18.2(b), extending 001 3.4.6.
+    LocalInferencePlacement { krate: String, path: Vec<String> },
+    /// 001 3.4.6: the local backend dependency must be optional.
+    LocalBackendRequired { krate: String },
+    /// Spec 011 3.18.2(c): model hub clients and downloads are forbidden.
+    ModelDownload {
+        package: String,
+        feature: Option<String>,
+    },
     /// 3.4.2: a crate outside `integrations/` depends on an ecosystem or HTTP family.
     ForbiddenFamily { krate: String, dependency: String },
     /// 3.4.1: a pure crate reaches a forbidden family through its graph.
@@ -196,6 +225,29 @@ pub enum Violation {
 impl fmt::Display for Violation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Violation::LocalInferencePlacement { krate, path } => write!(
+                f,
+                "001 3.4.6: `{krate}` reaches the local inference family outside `{LOCAL_BACKEND_DIR}/`: {}",
+                path.join(" -> ")
+            ),
+            Violation::LocalBackendRequired { krate } => write!(
+                f,
+                "001 3.4.6: `{krate}` depends on `{LOCAL_BACKEND}` without `optional = true`"
+            ),
+            Violation::ModelDownload {
+                package,
+                feature: None,
+            } => write!(
+                f,
+                "011 3.18.2(c): model hub client `{package}` is forbidden everywhere"
+            ),
+            Violation::ModelDownload {
+                package,
+                feature: Some(feature),
+            } => write!(
+                f,
+                "011 3.18.2(c): `{package}` feature `{feature}` is forbidden everywhere"
+            ),
             Violation::ForbiddenFamily { krate, dependency } => write!(
                 f,
                 "001 3.4.2: `{krate}` is outside integrations/ and depends on `{dependency}`"
@@ -243,6 +295,36 @@ impl fmt::Display for Violation {
                 "028 3.12.2: `{krate}` is outside integrations/ and reaches the telemetry exporter family: {}",
                 path.join(" -> ")
             ),
+        }
+    }
+}
+
+fn is_local_inference(name: &str) -> bool {
+    LOCAL_INFERENCE_NAMES.contains(&name)
+        || LOCAL_INFERENCE_PREFIXES.iter().any(|p| name.starts_with(p))
+}
+
+fn is_local_backend(meta: &Metadata, pkg: &Package) -> bool {
+    pkg.name == LOCAL_BACKEND
+        && relative_dir(&meta.workspace_root, &pkg.manifest_path) == LOCAL_BACKEND_DIR
+}
+
+fn check_downloads(out: &mut BTreeSet<Violation>, name: &str, features: &[String]) {
+    if name == "hf-hub" {
+        out.insert(Violation::ModelDownload {
+            package: name.into(),
+            feature: None,
+        });
+    }
+    if name == "ort" {
+        for feature in features
+            .iter()
+            .filter(|f| ORT_DOWNLOAD_FEATURES.contains(&f.as_str()))
+        {
+            out.insert(Violation::ModelDownload {
+                package: name.into(),
+                feature: Some(feature.clone()),
+            });
         }
     }
 }
@@ -346,11 +428,38 @@ pub fn check(meta: &Metadata) -> Vec<Violation> {
         }
     }
 
+    for pkg in &meta.packages {
+        check_downloads(&mut out, &pkg.name, &[]);
+    }
+
     for pkg in &members {
         let rel = relative_dir(&meta.workspace_root, &pkg.manifest_path);
         let in_integrations = under_integrations(&rel);
         let in_packages = under_packages(&rel);
         for dep in &pkg.dependencies {
+            // Workspace declarations count even when optional or target-specific.
+            // External packages' unused optional dependencies are not our graph.
+            check_downloads(&mut out, &dep.name, &dep.features);
+            if !is_local_backend(meta, pkg) && is_local_inference(&dep.name) {
+                out.insert(Violation::LocalInferencePlacement {
+                    krate: pkg.name.clone(),
+                    path: vec![pkg.name.clone(), dep.name.clone()],
+                });
+            }
+            if matches!(pkg.name.as_str(), "rustev-contract" | "rustev-core")
+                && dep.kind.as_deref() != Some("dev")
+                && is_local_inference(&dep.name)
+            {
+                out.insert(Violation::ForbiddenTransitive {
+                    krate: pkg.name.clone(),
+                    path: vec![pkg.name.clone(), dep.name.clone()],
+                });
+            }
+            if !is_local_backend(meta, pkg) && dep.name == LOCAL_BACKEND && !dep.optional {
+                out.insert(Violation::LocalBackendRequired {
+                    krate: pkg.name.clone(),
+                });
+            }
             let dep_under_integrations = dep
                 .path
                 .as_deref()
@@ -462,6 +571,11 @@ pub fn check(meta: &Metadata) -> Vec<Violation> {
     }
 
     if let Some(resolve) = &meta.resolve {
+        for node in &resolve.nodes {
+            if let Some(pkg) = by_id.get(node.id.as_str()) {
+                check_downloads(&mut out, &pkg.name, &node.features);
+            }
+        }
         let graph: BTreeMap<&str, Vec<&str>> = resolve
             .nodes
             .iter()
@@ -475,6 +589,30 @@ pub fn check(meta: &Metadata) -> Vec<Violation> {
                 (n.id.as_str(), deps)
             })
             .collect();
+        // Cut only the approved backend's outgoing edges. Any family still
+        // reachable bypasses that backend, including through external helpers.
+        let mut outside_backend = graph.clone();
+        for pkg in members.iter().filter(|p| is_local_backend(meta, p)) {
+            outside_backend.remove(pkg.id.as_str());
+        }
+        for pkg in &members {
+            if let Some(path) =
+                forbidden_path(&outside_backend, &by_id, &pkg.id, is_local_inference)
+            {
+                out.insert(Violation::LocalInferencePlacement {
+                    krate: pkg.name.clone(),
+                    path,
+                });
+            }
+            if matches!(pkg.name.as_str(), "rustev-contract" | "rustev-core")
+                && let Some(path) = forbidden_path(&graph, &by_id, &pkg.id, is_local_inference)
+            {
+                out.insert(Violation::ForbiddenTransitive {
+                    krate: pkg.name.clone(),
+                    path,
+                });
+            }
+        }
         // Packages are as pure as the core (spec 007, 3.3.2), and so is the
         // facade with no features (spec 031, 3.3.4): `cargo metadata`
         // resolves members with their default features, which for the
@@ -518,7 +656,9 @@ pub fn check(meta: &Metadata) -> Vec<Violation> {
 /// transitive.
 pub fn own_graph_of(v: &Violation) -> Option<(&str, &'static str)> {
     match v {
-        Violation::ForbiddenTransitive { krate, .. } => Some((krate.as_str(), "all")),
+        Violation::ForbiddenTransitive { krate, path } if path.len() > 2 => {
+            Some((krate.as_str(), "all"))
+        }
         Violation::WasmGraph { .. } => Some((WASM_CRATE, "wasm32-unknown-unknown")),
         _ => None,
     }
@@ -534,7 +674,11 @@ pub fn own_graph_of(v: &Violation) -> Option<(&str, &'static str)> {
 /// Every other violation stands as found.
 pub fn confirmed(v: &Violation, own_graph: &[&str]) -> bool {
     match v {
-        Violation::ForbiddenTransitive { .. } => own_graph.iter().any(|n| forbidden_for_pure(n)),
+        Violation::ForbiddenTransitive { krate, .. } => own_graph.iter().any(|n| {
+            forbidden_for_pure(n)
+                || (matches!(krate.as_str(), "rustev-contract" | "rustev-core")
+                    && is_local_inference(n))
+        }),
         Violation::WasmGraph { .. } => own_graph.iter().any(|n| forbidden_for_wasm(n)),
         _ => true,
     }
@@ -592,6 +736,204 @@ fn forbidden_path(
 mod tests {
     use super::*;
     use serde_json::json;
+
+    const EMBED: Member<'static> = (LOCAL_BACKEND, LOCAL_BACKEND_DIR, &[("ort", None, None)]);
+
+    #[test]
+    fn local_inference_family_matches_exact_names_and_prefixes() {
+        for name in LOCAL_INFERENCE_NAMES
+            .iter()
+            .copied()
+            .chain(["tract-core", "candle-core"])
+        {
+            assert!(is_local_inference(name), "{name}");
+        }
+        for name in [
+            "ort-helper",
+            "tokenizers-extra",
+            "tract",
+            "candle",
+            "my-tch",
+        ] {
+            assert!(!is_local_inference(name), "{name}");
+        }
+    }
+
+    #[test]
+    fn local_inference_is_forbidden_in_contract_and_core_graphs() {
+        for family in LOCAL_INFERENCE_NAMES
+            .iter()
+            .copied()
+            .chain(["tract-core", "candle-core"])
+        {
+            for kind in [None, Some("build")] {
+                let m = meta(
+                    &[CONTRACT, CORE],
+                    &["helper", family],
+                    &[
+                        ("rustev-core", "rustev-contract", None),
+                        ("rustev-contract", "helper", kind),
+                        ("helper", family, kind),
+                    ],
+                );
+                for krate in ["rustev-contract", "rustev-core"] {
+                    let v = check(&m)
+                        .into_iter()
+                        .find(|v| {
+                            matches!(v,
+                        Violation::ForbiddenTransitive { krate: k, .. } if k == krate)
+                        })
+                        .unwrap();
+                    assert!(confirmed(&v, &[family]));
+                    assert!(!confirmed(&v, &["serde"]));
+                    assert_eq!(own_graph_of(&v), Some((krate, "all")));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn local_inference_direct_edges_require_the_backend_directory() {
+        for family in LOCAL_INFERENCE_NAMES
+            .iter()
+            .copied()
+            .chain(["tract-core", "candle-core"])
+        {
+            for kind in [None, Some("build"), Some("dev")] {
+                for (name, dir) in [
+                    ("rustev-runtime", "crates/rustev-runtime"),
+                    ("rustev-node", "integrations/rustev-node"),
+                    (LOCAL_BACKEND, "backends/impostor"),
+                ] {
+                    let m = meta(&[(name, dir, &[(family, kind, None)])], &[family], &[]);
+                    assert!(check(&m).contains(&Violation::LocalInferencePlacement {
+                        krate: name.into(),
+                        path: vec![name.into(), family.into()],
+                    }));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn local_inference_cannot_bypass_backend_through_a_helper() {
+        for kind in [None, Some("build")] {
+            let m = meta(
+                &[("rustev-node", "integrations/rustev-node", &[])],
+                &["helper", "ort"],
+                &[("rustev-node", "helper", kind), ("helper", "ort", kind)],
+            );
+            assert_eq!(
+                check(&m),
+                vec![Violation::LocalInferencePlacement {
+                    krate: "rustev-node".into(),
+                    path: vec!["rustev-node".into(), "helper".into(), "ort".into()],
+                }]
+            );
+        }
+    }
+
+    #[test]
+    fn node_optional_local_backend_passes_but_required_dependency_fails() {
+        let mut m = meta(
+            &[
+                (
+                    "rustev-node",
+                    "integrations/rustev-node",
+                    &[(LOCAL_BACKEND, None, Some(LOCAL_BACKEND_DIR))],
+                ),
+                EMBED,
+            ],
+            &["ort"],
+            &[
+                ("rustev-node", LOCAL_BACKEND, None),
+                (LOCAL_BACKEND, "ort", None),
+            ],
+        );
+        assert_eq!(
+            check(&m),
+            vec![Violation::LocalBackendRequired {
+                krate: "rustev-node".into()
+            }]
+        );
+        m.packages[0].dependencies[0].optional = true;
+        assert!(check(&m).is_empty());
+        // The backend may enable its own synthetic feature for dev tests.
+        let self_dev = meta(
+            &[(
+                LOCAL_BACKEND,
+                LOCAL_BACKEND_DIR,
+                &[(LOCAL_BACKEND, Some("dev"), Some(LOCAL_BACKEND_DIR))],
+            )],
+            &[],
+            &[],
+        );
+        assert!(check(&self_dev).is_empty());
+    }
+
+    #[test]
+    fn hf_hub_is_forbidden_even_in_the_backend_or_external_packages() {
+        let m = meta(
+            &[(
+                LOCAL_BACKEND,
+                LOCAL_BACKEND_DIR,
+                &[("hf-hub", Some("dev"), None)],
+            )],
+            &[],
+            &[],
+        );
+        let expected = vec![Violation::ModelDownload {
+            package: "hf-hub".into(),
+            feature: None,
+        }];
+        assert_eq!(check(&m), expected);
+        assert_eq!(check(&meta(&[], &["hf-hub"], &[])), expected);
+    }
+
+    #[test]
+    fn every_ort_download_feature_is_forbidden_declared_or_resolved() {
+        for feature in ORT_DOWNLOAD_FEATURES {
+            let mut m = meta(&[EMBED], &["ort"], &[(LOCAL_BACKEND, "ort", None)]);
+            // Feature definitions alone are not activation.
+            m.packages[1].features.insert((*feature).into(), vec![]);
+            assert!(check(&m).is_empty());
+            let expected = vec![Violation::ModelDownload {
+                package: "ort".into(),
+                feature: Some((*feature).into()),
+            }];
+            m.packages[0].dependencies[0].features = vec![(*feature).into()];
+            assert_eq!(check(&m), expected);
+            m.packages[0].dependencies[0].features.clear();
+            let node = m
+                .resolve
+                .as_mut()
+                .unwrap()
+                .nodes
+                .iter_mut()
+                .find(|n| n.id == "ort 0.1.0")
+                .unwrap();
+            node.features = vec![(*feature).into()];
+            assert_eq!(check(&m), expected);
+        }
+    }
+
+    #[test]
+    fn direct_local_inference_purity_violation_needs_no_confirmation() {
+        let m = meta(
+            &[(
+                "rustev-core",
+                "crates/rustev-core",
+                &[("ort", Some("build"), None)],
+            )],
+            &[],
+            &[],
+        );
+        let v = check(&m)
+            .into_iter()
+            .find(|v| matches!(v, Violation::ForbiddenTransitive { .. }))
+            .unwrap();
+        assert_eq!(own_graph_of(&v), None);
+    }
 
     #[test]
     fn service_families_are_integration_only_and_transitively_impure() {
@@ -1438,6 +1780,7 @@ mod tests {
                         kind: kind.map(str::to_string),
                         path: Some("/ws/integrations/rustev".into()),
                         optional: false,
+                        features: vec![],
                     }],
                     features: BTreeMap::new(),
                 });
@@ -1483,6 +1826,7 @@ mod tests {
             r.nodes.push(Node {
                 id: "tokio 0.1.0".into(),
                 deps: vec![],
+                features: vec![],
             });
             let core = r
                 .nodes
@@ -1508,6 +1852,7 @@ mod tests {
                 kind: None,
                 path: None,
                 optional: true,
+                features: vec![],
             });
         });
         assert_eq!(
@@ -1575,6 +1920,7 @@ mod tests {
                     kind: None,
                     path: Some("/ws/integrations/rustev-remote-http".into()),
                     optional: true,
+                    features: vec![],
                 }],
                 features: BTreeMap::new(),
             });
