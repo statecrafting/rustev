@@ -423,20 +423,42 @@ impl JevBackend {
         })
     }
 
-    /// Production construction fails closed until the repository has a
-    /// verified direct mapping. Eligibility never grants deployment authority.
+    /// Spec 022 3.7.5: construct only with a checked acceptance record and
+    /// the production journal. No credential is read until dispatch.
+    #[allow(clippy::too_many_arguments)]
     pub fn new_production(
+        backend_id: &str,
         binding: crate::production::ProductionBinding,
-        _credential: crate::production::CredentialCallback,
+        credential: crate::production::CredentialCallback,
+        qualification: Option<&crate::production::Qualification>,
+        sink: Arc<dyn ExchangeSink>,
+        journal: SpendJournal,
         today: &str,
-        budget_ms: u64,
     ) -> Result<Self, SetupError> {
+        use crate::production::Unresolved;
         binding
-            .production_eligible(today, budget_ms)
+            .production_eligible(qualification, today, 5_000)
             .map_err(SetupError::Production)?;
-        Err(SetupError::Production(crate::production::Unresolved(
-            "production mapping is not implemented without recorded stage 2 exchanges",
-        )))
+        if journal.budget() != crate::spend::BudgetKind::Production {
+            return Err(SetupError::Production(Unresolved(
+                "production requires the production spend journal",
+            )));
+        }
+        if binding.decision.batching != crate::binding::Batching::Off {
+            return Err(SetupError::Production(Unresolved(
+                "production batching requires spec 044 increment 8",
+            )));
+        }
+        let digest = qualification
+            .ok_or(SetupError::Production(Unresolved(
+                "accepted qualification is missing",
+            )))?
+            .digest()
+            .map_err(SetupError::Production)?;
+        let endpoint = origin(&binding.facts.endpoint).map_err(SetupError::Endpoint)?;
+        Self::over_production_binding(
+            backend_id, binding, &endpoint, credential, sink, journal, &digest, false,
+        )
     }
 
     /// Stage 1 only: replay the explicitly synthetic schema-1 direct shape
@@ -488,7 +510,7 @@ impl JevBackend {
     /// testing journal only. Every record names the production binding's
     /// identity and `qualification: stage 3`, and keeps its request and
     /// response bytes. This grants no production
-    /// eligibility; [`JevBackend::new_production`] still refuses.
+    /// eligibility; production requires a separately accepted qualification.
     pub fn new_qualification(
         backend_id: &str,
         binding: crate::production::ProductionBinding,
@@ -516,7 +538,7 @@ impl JevBackend {
         )
     }
 
-    /// The adapter both constructions above share: the production binding's
+    /// The adapter these constructions share: the production binding's
     /// identity, protocol, prices, privacy record, path and credential
     /// callback over a development adapter at `endpoint`, an origin with no
     /// path: the binding's path is set separately, and the client prefixes

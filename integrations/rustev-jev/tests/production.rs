@@ -145,23 +145,27 @@ fn missing_stale_conflicting_and_invalid_facts_refuse_construction() {
         let copy = called.clone();
         assert!(
             JevBackend::new_production(
+                "production-refusal",
                 b,
                 Arc::new(move || {
                     copy.fetch_add(1, Ordering::SeqCst);
                     Ok(Secret::new(KEY))
                 }),
+                None,
+                Arc::new(KeepExchanges::default()),
+                Journal::new().journal.clone(),
                 TODAY,
-                5000
             )
             .is_err()
         );
         assert_eq!(called.load(Ordering::SeqCst), 0);
     }
     assert!(
-        base.production_eligible(TODAY, 5000)
+        qualification_binding("https://127.0.0.1:1/v1/systemone")
+            .production_eligible(None, TODAY, 5000)
             .unwrap_err()
             .0
-            .contains("stage 3")
+            .contains("accepted qualification is missing")
     );
 }
 
@@ -178,7 +182,7 @@ fn gateway_documentation_or_claimed_observations_cannot_enable_unverified_mappin
         unavailable_version_refused: true,
         typesafe_only_observed: true,
     });
-    assert!(b.production_eligible(TODAY, 5000).is_err());
+    assert!(b.production_eligible(None, TODAY, 5000).is_err());
     b.gateway_pinning
         .as_mut()
         .unwrap()
@@ -395,7 +399,7 @@ fn production_preparation_refuses_a_development_gateway_fallback() {
     // Keep only the fallback to prove that it is independently examined.
     plan.steps.clear();
     assert!(
-        check_production_plan(&plan, &[binding()], TODAY, 5000)
+        check_production_plan(&plan, &[binding()], &[], TODAY, 5000)
             .unwrap_err()
             .0
             .contains("development")
@@ -793,6 +797,316 @@ async fn a_qualification_record_names_the_production_binding_and_stage_3() {
     assert_eq!(rec.privacy_requested["qualification"], "stage 3");
     assert_eq!(rec.privacy_requested["zero_retention"], "true");
     // Still never a production construction.
-    assert!(b.production_eligible(TODAY, 5_000).is_err());
+    assert!(b.production_eligible(None, TODAY, 5_000).is_err());
+    assert_loopback_only();
+}
+
+fn accepted_record(b: &ProductionBinding) -> Qualification {
+    Qualification {
+        binding: b.artifact().unwrap(),
+        calls: fact(),
+        owner_authorization: "synthetic-decisions/accept-stage-3".into(),
+        dataset: QualificationDataset::SyntheticProvenance {
+            dataset: "synthetic-set/1".into(),
+            limitation: "Synthetic provenance only, no real-data quality claim".into(),
+        },
+        report_reference: "synthetic-reports/1".into(),
+        spend_journal_reference: "synthetic-journals/1".into(),
+        observed_units: 10,
+        estimated_units: 20,
+        unresolved_liability_units: 30,
+    }
+}
+
+fn production_journal() -> Journal {
+    static NEXT: AtomicUsize = AtomicUsize::new(0);
+    let path = std::env::temp_dir().join(format!(
+        "rustev-022-production-{}-{}.jsonl",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::SeqCst)
+    ));
+    let journal =
+        SpendJournal::open(&path, BudgetKind::Production, Arc::new(SetClock::new(0))).unwrap();
+    Journal { journal, path }
+}
+
+fn production(
+    b: ProductionBinding,
+    record: Option<&Qualification>,
+    journal: SpendJournal,
+    count: Arc<AtomicUsize>,
+) -> Result<(JevBackend, Arc<KeepExchanges>), rustev_jev::adapter::SetupError> {
+    let sink = Arc::new(KeepExchanges::default());
+    let callback = Arc::new(move || {
+        count.fetch_add(1, Ordering::SeqCst);
+        Ok(Secret::new(KEY))
+    });
+    JevBackend::new_production(
+        "production",
+        b,
+        callback,
+        record,
+        sink.clone(),
+        journal,
+        TODAY,
+    )
+    .map(|backend| (backend, sink))
+}
+
+#[test]
+fn production_refuses_each_invalid_acceptance_before_credentials() {
+    let base = qualification_binding("https://127.0.0.1:1/v1/systemone");
+    let j = production_journal();
+    let count = Arc::new(AtomicUsize::new(0));
+    type Change = (&'static str, fn(&mut Qualification));
+    let changes: Vec<Change> = vec![
+        ("wrong identity", |q| {
+            q.binding = JevBinding::gateway().artifact().unwrap()
+        }),
+        ("stale calls", |q| {
+            q.calls.valid_through = "2026-10-21".into()
+        }),
+        ("future calls", |q| {
+            q.calls.recorded_on = "2026-10-23".into()
+        }),
+        ("missing calls", |q| q.calls.reference.clear()),
+        ("no owner decision", |q| q.owner_authorization.clear()),
+        ("no report", |q| q.report_reference.clear()),
+        ("no journal reference", |q| {
+            q.spend_journal_reference.clear()
+        }),
+        ("no dataset", |q| {
+            q.dataset = QualificationDataset::SyntheticProvenance {
+                dataset: String::new(),
+                limitation: "synthetic".into(),
+            }
+        }),
+        ("no limitation", |q| {
+            q.dataset = QualificationDataset::SyntheticProvenance {
+                dataset: "set".into(),
+                limitation: String::new(),
+            }
+        }),
+        ("stale admission", |q| {
+            q.dataset = QualificationDataset::Admitted {
+                dataset: "set".into(),
+                admission: Fact {
+                    valid_through: "2026-10-21".into(),
+                    ..fact()
+                },
+            }
+        }),
+    ];
+    for (name, change) in changes {
+        let mut q = accepted_record(&base);
+        change(&mut q);
+        assert!(
+            production(base.clone(), Some(&q), j.journal.clone(), count.clone()).is_err(),
+            "{name}"
+        );
+        assert_eq!(count.load(Ordering::SeqCst), 0, "{name}");
+    }
+    assert!(production(base, None, j.journal.clone(), count.clone()).is_err());
+    assert_eq!(count.load(Ordering::SeqCst), 0);
+    assert_loopback_only();
+}
+
+#[test]
+fn production_refuses_each_ineligible_binding_before_credentials() {
+    let base = qualification_binding("https://127.0.0.1:1/v1/systemone");
+    let j = production_journal();
+    let count = Arc::new(AtomicUsize::new(0));
+    type Change = (&'static str, fn(&mut ProductionBinding));
+    let changes: Vec<Change> = vec![
+        ("gateway", |b| b.decision = JevBinding::gateway()),
+        ("gateway base", |b| {
+            b.decision.transport = Transport::GatewayTypesafeBase
+        }),
+        ("no pin", |b| b.decision.version_pin = None),
+        ("outer mapping", |b| {
+            b.mapping = SYNTHETIC_MECHANICS_MAPPING.into()
+        }),
+        ("decision mapping", |b| {
+            b.decision.mapping_version = rustev_jev::binding::MAPPING_VERSION.into()
+        }),
+        ("development", |b| b.usage = BindingUse::Development),
+        ("batching", |b| {
+            b.decision.batching = rustev_jev::binding::Batching::SharedState {
+                max_items: 2,
+                window_ms: 1,
+            }
+        }),
+        ("no privacy", |b| b.facts.privacy_terms.reference.clear()),
+        ("stale privacy", |b| {
+            b.facts.privacy_terms.valid_through = "2026-10-21".into()
+        }),
+        ("stale prices", |b| {
+            b.facts.price_source.valid_through = "2026-10-21".into()
+        }),
+        ("plaintext", |b| {
+            b.facts.endpoint = "http://127.0.0.1:1/v1/systemone".into()
+        }),
+    ];
+    for (name, change) in changes {
+        let mut b = base.clone();
+        change(&mut b);
+        let q = accepted_record(&b);
+        assert!(
+            production(b, Some(&q), j.journal.clone(), count.clone()).is_err(),
+            "{name}"
+        );
+        assert_eq!(count.load(Ordering::SeqCst), 0, "{name}");
+    }
+    let testing = Journal::new();
+    let q = accepted_record(&base);
+    assert!(production(base, Some(&q), testing.journal.clone(), count.clone()).is_err());
+    assert_eq!(count.load(Ordering::SeqCst), 0);
+    assert_loopback_only();
+}
+
+#[test]
+fn qualification_checks_admission_identity_dates_and_complete_digest() {
+    let b = qualification_binding("https://127.0.0.1:1/v1/systemone");
+    let q = accepted_record(&b);
+    q.check(&b, false, TODAY).unwrap();
+    assert!(q.check(&b, true, TODAY).is_err());
+    q.check(&b, false, "2026-10-23").unwrap();
+    assert!(q.check(&b, false, "2026-10-24").is_err());
+    let mut admitted = q.clone();
+    admitted.dataset = QualificationDataset::Admitted {
+        dataset: "set".into(),
+        admission: fact(),
+    };
+    admitted.check(&b, true, TODAY).unwrap();
+    let bytes = serde_json::to_vec(&q).unwrap();
+    let roundtrip: Qualification = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(roundtrip, q);
+    assert_eq!(roundtrip.digest().unwrap(), q.digest().unwrap());
+    for change in [
+        |q: &mut Qualification| q.observed_units += 1,
+        |q: &mut Qualification| q.estimated_units += 1,
+        |q: &mut Qualification| q.unresolved_liability_units += 1,
+        |q: &mut Qualification| q.owner_authorization.push('2'),
+        |q: &mut Qualification| q.report_reference.push('2'),
+        |q: &mut Qualification| q.spend_journal_reference.push('2'),
+    ] {
+        let mut changed = q.clone();
+        change(&mut changed);
+        assert_ne!(q.digest().unwrap(), changed.digest().unwrap());
+    }
+}
+
+#[tokio::test]
+async fn production_records_acceptance_digest_without_retaining_bytes() {
+    let dead = dead_url().await;
+    let endpoint = format!("{}/v1/systemone", dead.replacen("http://", "https://", 1));
+    let b = qualification_binding(&endpoint);
+    let q = accepted_record(&b);
+    let j = production_journal();
+    let count = Arc::new(AtomicUsize::new(0));
+    let (backend, sink) =
+        production(b.clone(), Some(&q), j.journal.clone(), count.clone()).unwrap();
+    assert_eq!(count.load(Ordering::SeqCst), 0);
+    assert_eq!(backend.artifact(), &b.artifact().unwrap());
+    assert_eq!(
+        backend.journal().unwrap().summary().cap,
+        rustev_jev::spend::PRODUCTION_CAP_UNITS
+    );
+    let report = call(
+        &backend,
+        "production/1",
+        &boolean_projection(),
+        5000,
+        &CancelSignal::new(),
+    )
+    .await;
+    assert!(report.result.is_err());
+    let records = sink.until_records(1).await;
+    assert_eq!(records[0].binding, b.artifact().unwrap());
+    assert_eq!(
+        records[0].protocol,
+        rustev_jev::binding::DIRECT_MAPPING_VERSION
+    );
+    assert_eq!(
+        records[0].privacy_requested["qualification"],
+        q.digest().unwrap()
+    );
+    assert_eq!(records[0].privacy_requested["zero_retention"], "true");
+    assert!(sink.retained().is_empty());
+    assert!(!serde_json::to_string(&records).unwrap().contains(KEY));
+    assert_eq!(count.load(Ordering::SeqCst), 1);
+    assert_loopback_only();
+}
+
+#[test]
+fn production_plan_checks_every_primary_and_fallback_qualification() {
+    use rustev_contract::Identified;
+    use rustev_contract::descriptor::OutputKind;
+    use rustev_contract::plan::{
+        DeclaredExecution, FallbackBinding, PlanExecution, PlanStepDetail,
+    };
+    let primary = qualification_binding("https://127.0.0.1:1/v1/systemone");
+    let mut fallback = primary.clone();
+    fallback.decision.version_pin = Some("jev-other".into());
+    let mut plan = support_compiled(None).plan;
+    for step in &mut plan.steps {
+        if let PlanStepDetail::Semantic(b) = &mut step.detail {
+            b.artifact = primary.artifact().unwrap();
+        }
+    }
+    let policy = execution(rustev_contract::execution::CostPolicy::Unlimited, vec![]);
+    plan.execution = PlanExecution::Declared(Box::new(DeclaredExecution {
+        id: policy.id().unwrap(),
+        policy,
+        fallbacks: vec![FallbackBinding {
+            step: "topic".into(),
+            target: 1,
+            backend_id: "fallback".into(),
+            artifact: fallback.artifact().unwrap(),
+            descriptor: descriptors()[0].id().unwrap(),
+            output: OutputKind::Distribution,
+        }],
+        decision_cache: None,
+    }));
+    let records = [accepted_record(&primary), accepted_record(&fallback)];
+    let bindings = [primary, fallback];
+    check_production_plan(&plan, &bindings, &records, TODAY, 5000).unwrap();
+    for missing in 0..2 {
+        assert!(
+            check_production_plan(
+                &plan,
+                &bindings,
+                &records[missing..missing + 1],
+                TODAY,
+                5000
+            )
+            .is_err()
+        );
+        let mut stale = records.clone();
+        stale[missing].calls.valid_through = "2026-10-21".into();
+        assert!(check_production_plan(&plan, &bindings, &stale, TODAY, 5000).is_err());
+    }
+    assert!(check_production_plan(&plan, &bindings, &[], TODAY, 5000).is_err());
+    let duplicates = [records[0].clone(), records[0].clone(), records[1].clone()];
+    assert!(check_production_plan(&plan, &bindings, &duplicates, TODAY, 5000).is_err());
+}
+
+#[test]
+fn production_construction_checks_acceptance_without_reading_credentials() {
+    let b = qualification_binding("https://127.0.0.1:1/v1/systemone");
+    let q = accepted_record(&b);
+    let j = production_journal();
+    let count = Arc::new(AtomicUsize::new(0));
+    let (backend, sink) =
+        production(b.clone(), Some(&q), j.journal.clone(), count.clone()).unwrap();
+    assert_eq!(backend.artifact(), &b.artifact().unwrap());
+    assert_eq!(backend.journal().unwrap().budget(), BudgetKind::Production);
+    assert_eq!(
+        backend.journal().unwrap().summary().cap,
+        rustev_jev::spend::PRODUCTION_CAP_UNITS
+    );
+    assert_eq!(count.load(Ordering::SeqCst), 0);
+    assert!(sink.records().is_empty());
+    assert!(sink.retained().is_empty());
     assert_loopback_only();
 }

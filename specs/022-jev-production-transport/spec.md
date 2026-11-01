@@ -559,6 +559,36 @@ constructed, as 3.7.4.4 left to a later change. Pending implementation.
 Accepting the first record, for the stage 3 binding of A-68, is the owner's
 act in its own decision row; this amendment accepts none.
 
+**Production acceptance implemented (2026-10-31, 3.7.5).**
+`Qualification` gains `estimated_units` beside the observed and liability
+totals, and `Qualification::digest` identifies the complete document
+(`rustev.jev-qualification/1`). `Qualification::check` checks only the
+record: its binding's exact identity (3.6.2), a calls fact that is not
+stale, a non-empty owner authorization, report and spend-journal
+references, and the dataset's admission or stated limitation.
+`ProductionBinding::production_eligible` takes the accepted
+`Qualification` and holds only when 3.4's facts pass for the day, the use
+is `production`, the transport is `direct`, the binding's `mapping` and its
+decision binding's mapping version are `rustev-jev-mapping/2`, and the
+record passes its check; a Gateway binding stays ineligible.
+`JevBackend::new_production` takes the backend id, the binding, the
+credential callback, the accepted `Qualification`, the exchange sink, the
+spend journal and the day, and refuses before any credential lookup unless
+that holds, the journal is the production journal, and the binding's
+batching is `off` (3.7.5.4, until spec 044's increment 8). It then
+constructs as `new_qualification` does, with `qualification` recording the
+accepted record's digest and no request or response bytes kept.
+`check_production_plan` takes the accepted qualifications and refuses a
+binding with none or with two. The stage 3 record of A-68 is not accepted
+by this change; accepting it remains the owner's act in its own decision
+row. Tests in `integrations/rustev-jev/tests/production.rs`:
+`production_refuses_each_invalid_acceptance_before_credentials`,
+`production_refuses_each_ineligible_binding_before_credentials`,
+`qualification_checks_admission_identity_dates_and_complete_digest`,
+`production_records_acceptance_digest_without_retaining_bytes`,
+`production_plan_checks_every_primary_and_fallback_qualification` and
+`production_construction_checks_acceptance_without_reading_credentials`.
+
 ## Questions settled at approval
 
 The owner settled the draft's open questions in the 2026-10-16 delivery work

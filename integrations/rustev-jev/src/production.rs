@@ -1,6 +1,5 @@
-//! Spec 022 production contracts. Provider mappings remain unverified until
-//! owner-authorized recorded exchanges exist. Synthetic mechanics are not
-//! production qualification and cannot enable external dispatch.
+//! Spec 022 production contracts. Production requires an accepted stage 3
+//! qualification for the exact binding. Eligibility is not deployment authority.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -284,20 +283,29 @@ impl ProductionBinding {
         f.privacy_terms.check(today)?;
         f.price_source.check(today)
     }
-    /// The direct mapping is recorded (stage 2) but not qualified: no
-    /// binding is production-eligible until stage 3 is recorded. A supplied
-    /// reference or vendor document cannot bypass either stage. This
-    /// refusal precedes credential lookup and dispatch.
-    pub fn production_eligible(&self, today: &str, budget_ms: u64) -> Result<(), Unresolved> {
+    /// Recheck the accepted record and transport facts for this day.
+    /// Eligibility never grants deployment authority.
+    pub fn production_eligible(
+        &self,
+        qualification: Option<&Qualification>,
+        today: &str,
+        budget_ms: u64,
+    ) -> Result<(), Unresolved> {
         self.check_facts(today, budget_ms)?;
         if self.usage != BindingUse::Production {
             return Err(Unresolved(
                 "development evidence is not production evidence",
             ));
         }
-        Err(Unresolved(
-            "direct API mapping awaits owner-authorized qualification (stage 3)",
-        ))
+        if self.decision.transport != Transport::Direct
+            || self.mapping != crate::binding::DIRECT_MAPPING_VERSION
+            || self.decision.mapping_version != crate::binding::DIRECT_MAPPING_VERSION
+        {
+            return Err(Unresolved("production requires the stage 2 direct mapping"));
+        }
+        qualification
+            .ok_or(Unresolved("accepted qualification is missing"))?
+            .check(self, false, today)
     }
     pub fn served(&self, version: Option<&str>) -> Result<ServedIdentity, Unresolved> {
         let version = version
@@ -390,6 +398,7 @@ impl Reconciliation {
 pub fn check_production_plan(
     plan: &rustev_contract::plan::Plan,
     bindings: &[ProductionBinding],
+    qualifications: &[Qualification],
     today: &str,
     budget_ms: u64,
 ) -> Result<(), Unresolved> {
@@ -413,7 +422,12 @@ pub fn check_production_plan(
         if found.next().is_some() {
             return Err(Unresolved("conflicting binding registry"));
         }
-        binding.production_eligible(today, budget_ms)?;
+        let mut records = qualifications.iter().filter(|q| &q.binding == artifact);
+        let qualification = records.next();
+        if records.next().is_some() {
+            return Err(Unresolved("conflicting qualification registry"));
+        }
+        binding.production_eligible(qualification, today, budget_ms)?;
     }
     Ok(())
 }
@@ -426,21 +440,30 @@ pub enum QualificationDataset {
 }
 
 /// A stage-3 claim always names its exact binding, provenance and spend.
-/// Recording a claim is not accepting it; validation below refuses stages
-/// that cannot yet be supported by this repository's mapping evidence.
+/// The authorization references the owner decision row accepting the record.
+/// Construction rechecks the document, never trusting a host eligibility flag.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Qualification {
     pub binding: ArtifactId,
     pub calls: Fact,
+    /// Reference to the owner decision row accepting this stage 3 record.
     pub owner_authorization: String,
     pub dataset: QualificationDataset,
     pub report_reference: String,
     pub spend_journal_reference: String,
     pub observed_units: u64,
+    pub estimated_units: u64,
     pub unresolved_liability_units: u64,
 }
 impl Qualification {
+    /// Digest of the complete accepted document, including evidence and totals.
+    pub fn digest(&self) -> Result<String, Unresolved> {
+        let bytes =
+            canonical_bytes(self).map_err(|_| Unresolved("invalid canonical qualification"))?;
+        Ok(tagged_digest("rustev.jev-qualification/1", &bytes))
+    }
+
     pub fn check(
         &self,
         binding: &ProductionBinding,
@@ -473,7 +496,7 @@ impl Qualification {
                 ));
             }
         }
-        binding.production_eligible(today, 5_000)
+        Ok(())
     }
 }
 
