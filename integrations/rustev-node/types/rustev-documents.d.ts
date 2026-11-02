@@ -13219,6 +13219,11 @@ export namespace RustevPlanBundle1 {
     | {
         some: EmbeddedRustevExecution_1;
       };
+  /**
+   * @minItems 1
+   * @maxItems 64
+   */
+  export type List_EmbeddedRustevProfile_1_1_64 = [EmbeddedRustevProfile_1, ...EmbeddedRustevProfile_1[]];
 
   export interface RustevPlanBundle1 {
     bindings: {
@@ -13228,7 +13233,21 @@ export namespace RustevPlanBundle1 {
     compile_report: CompileReport;
     definition: EmbeddedRustevDefinition_1;
     execution_policy: Maybe;
+    /**
+     * The tenant profile, the leaf of the chain (spec 034); omitted for
+     * none, so a bundle without one keeps its bytes (3.3.8).
+     */
+    profile?: EmbeddedRustevProfile_1;
+    /**
+     * 1 to 64 profiles available to the leaf's `extends` chain; omitted
+     * for none, and only with a profile.
+     */
+    profile_bases?: List_EmbeddedRustevProfile_1_1_64;
     schema: "rustev.plan-bundle/1";
+    /**
+     * The variant the bundle is instantiated for; omitted for `none`.
+     */
+    variant?: BundleVariant;
   }
   /**
    * An embedded `rustev.calibration/1` document, carried as its original bytes and checked by that document's own bounded parser.
@@ -13252,6 +13271,18 @@ export namespace RustevPlanBundle1 {
    * An embedded `rustev.execution/1` document, carried as its original bytes and checked by that document's own bounded parser.
    */
   export interface EmbeddedRustevExecution_1 {}
+  /**
+   * An embedded `rustev.profile/1` document, carried as its original bytes and checked by that document's own bounded parser.
+   */
+  export interface EmbeddedRustevProfile_1 {}
+  /**
+   * The variant a bundle is instantiated for (3.3.8): `{"named": <name>}`,
+   * the name matching `[a-z][a-z0-9_]{0,63}` (034 3.1.3). The variant `none`
+   * is spelled by omitting the member.
+   */
+  export interface BundleVariant {
+    named: string;
+  }
 }
 export type RustevPlanBundle1 = RustevPlanBundle1.RustevPlanBundle1;
 
@@ -13684,6 +13715,7 @@ export namespace RustevPlanRegistration1 {
       };
   export type ExecutionPolicyId = string;
   export type PlanId = string;
+  export type ProfileId = string;
   export type Timestamp = number;
   export type Handle = string;
   export type Signer =
@@ -13703,13 +13735,27 @@ export namespace RustevPlanRegistration1 {
    * Length is enforced in decoded UTF-8 bytes by the parser.
    */
   export type Text_1_4096 = string;
-  export type SigningMode = "require_signed" | "allow_unsigned";
+  export type SigningMode =
+    | ("require_signed" | "allow_unsigned")
+    | {
+        deny_unsigned_for_profiles: List_ProfileId_1_1024;
+      };
+  /**
+   * @minItems 1
+   * @maxItems 1024
+   */
+  export type List_ProfileId_1_1024 = [ProfileId, ...ProfileId[]];
 
   export interface RustevPlanRegistration1 {
     bundle_digest: ContentDigest;
     configuration_digest: ContentDigest;
     execution_policy_id: Maybe;
     plan_id: PlanId;
+    /**
+     * The leaf profile's `ProfileId` (3.3.3, 3.3.8); omitted for none, so
+     * a registration without a profile keeps its `RegistrationId`.
+     */
+    profile_id?: ProfileId;
     registered_at_ms: Timestamp;
     schema: "rustev.plan-registration/1";
     service_build: Handle;
@@ -20538,7 +20584,17 @@ export namespace RustevServeConfig1 {
    * @maxItems 1024
    */
   export type List_SigstoreTrust_0_1024 = SigstoreTrust[];
-  export type SigningMode = "require_signed" | "allow_unsigned";
+  export type SigningMode =
+    | ("require_signed" | "allow_unsigned")
+    | {
+        deny_unsigned_for_profiles: List_ProfileId_1_1024;
+      };
+  /**
+   * @minItems 1
+   * @maxItems 1024
+   */
+  export type List_ProfileId_1_1024 = [ProfileId, ...ProfileId[]];
+  export type ProfileId = string;
   export type SinkPolicy =
     | {
         fail_decision: {
@@ -21338,7 +21394,17 @@ export namespace RustevServeReadiness1 {
    * @maxItems 4096
    */
   export type List_ReadinessFailure_0_4096 = ReadinessFailure[];
-  export type SigningMode = "require_signed" | "allow_unsigned";
+  export type SigningMode =
+    | ("require_signed" | "allow_unsigned")
+    | {
+        deny_unsigned_for_profiles: List_ProfileId_1_1024;
+      };
+  /**
+   * @minItems 1
+   * @maxItems 1024
+   */
+  export type List_ProfileId_1_1024 = [ProfileId, ...ProfileId[]];
+  export type ProfileId = string;
 
   export interface RustevServeReadiness1 {
     development_bearer_listeners: List_Handle_0_64;
@@ -21392,7 +21458,7 @@ export namespace RustevServeRefusal1 {
    */
   export type CompileRefusal =
     | {
-        document: CompilerRefusalFields;
+        document: CompilerRefusal;
       }
     | {
         digest: {
@@ -21400,6 +21466,13 @@ export namespace RustevServeRefusal1 {
           length: Number_2049_18446744073709551615;
         };
       };
+  /**
+   * The refusal documents `rustev-surface` renders for a bundle (3.3.2,
+   * 3.3.8): a compile refusal; a compile refusal of an instantiated template
+   * (stage `compile` and the parameters it named); or an instantiation
+   * refusal of spec 034 3.9 (stage `instantiate` and its code).
+   */
+  export type CompilerRefusal = CompilerRefusalFields | ProfiledCompileFields | InstantiationFields;
   /**
    * Length is enforced in decoded UTF-8 bytes by the parser.
    */
@@ -21504,6 +21577,17 @@ export namespace RustevServeRefusal1 {
    */
   export type List_CompilerShortfall_0_1024 = CompilerShortfall[];
   export type Refused = "refused";
+  /**
+   * @minItems 0
+   * @maxItems 1024
+   */
+  export type List_Text_1_2048_0_1024 = Text_1_2048[];
+  export type CompileStage = "compile";
+  /**
+   * Length is enforced in decoded UTF-8 bytes by the parser.
+   */
+  export type Text_1_64 = string;
+  export type InstantiateStage = "instantiate";
   export type Number_2049_18446744073709551615 = number;
   /**
    * Only false is representable. A refusal never claims a decision ran.
@@ -21533,6 +21617,28 @@ export namespace RustevServeRefusal1 {
   export interface CompilerShortfall {
     backend_id: Handle;
     reasons: List_CompilerReason_0_1024;
+  }
+  export interface ProfiledCompileFields {
+    category: number | 28;
+    category_name: Text_1_2048;
+    command: Text_1_2048;
+    detail: Text_0_2048;
+    parameters: List_Text_1_2048_0_1024;
+    shortfalls: List_CompilerShortfall_0_1024;
+    stage: CompileStage;
+    status: Refused;
+    subject: Text_0_2048;
+  }
+  export interface InstantiationFields {
+    /**
+     * A spec 034 3.9 code; a wire check only, as `category_name` is.
+     */
+    code: Text_1_64;
+    command: Text_1_2048;
+    detail: Text_0_2048;
+    stage: InstantiateStage;
+    status: Refused;
+    subject: Text_0_2048;
   }
 }
 export type RustevServeRefusal1 = RustevServeRefusal1.RustevServeRefusal1;
@@ -21850,7 +21956,17 @@ export namespace RustevServeService1 {
   export type Number_60000_86400000 = number;
   export type Protocol = "rustev.serve/1";
   export type Retention = "memory_lost_on_restart";
-  export type SigningMode = "require_signed" | "allow_unsigned";
+  export type SigningMode =
+    | ("require_signed" | "allow_unsigned")
+    | {
+        deny_unsigned_for_profiles: List_ProfileId_1_1024;
+      };
+  /**
+   * @minItems 1
+   * @maxItems 1024
+   */
+  export type List_ProfileId_1_1024 = [ProfileId, ...ProfileId[]];
+  export type ProfileId = string;
 
   export interface RustevServeService1 {
     available_endpoints: List_Operation_0_14;
