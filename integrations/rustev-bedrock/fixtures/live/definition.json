@@ -1,0 +1,73 @@
+{
+  "schema": "rustev.definition/1",
+  "name": "synthetic-live-classify",
+  "version": "1.0.0",
+  "package": "rustev-bedrock-live-stage",
+  "inputs": [
+    {
+      "name": "text",
+      "type": {
+        "text": {
+          "max_bytes": 256
+        }
+      },
+      "provenance": [
+        "user-supplied"
+      ],
+      "freshness": "not_required"
+    }
+  ],
+  "steps": [
+    {
+      "id": "fruit",
+      "body": {
+        "semantic": {
+          "operation": "classify",
+          "task": "fruit",
+          "question": "The supplied text describes one fruit. Choose the matching key.",
+          "options": [
+            "apple",
+            "pear",
+            "plum"
+          ],
+          "candidates": "none",
+          "requires": "label",
+          "project": [
+            "input:text"
+          ],
+          "for_each": [],
+          "backend": {
+            "min_determinism": "unspecified",
+            "artifact": "any",
+            "binding": "auto"
+          },
+          "calibration": "none",
+          "fallback": "none"
+        }
+      }
+    }
+  ],
+  "policy": {
+    "on_unresolved": [],
+    "rules": [
+      {
+        "id": "result",
+        "when": "always",
+        "then": {
+          "propose": {
+            "action": "synthetic",
+            "params": []
+          }
+        }
+      }
+    ],
+    "adjustments": []
+  },
+  "limits": {
+    "max_semantic_requests": 1,
+    "on_excess": "refuse",
+    "max_projection_bytes": 65536,
+    "distribution_tolerance": "0.000001",
+    "deadline_ms": 2000
+  }
+}

@@ -1116,6 +1116,26 @@ fixed only in increment 4's record above. Tests in
 `resumed_completed_probe_reserves_fresh_ids` and
 `crash_mid_resumed_probe_advances_reserved_sequence`.
 
+**Live provider stage (2026-11-02).** The manual stage of section 5 ran
+once, outside declared verification, under the work order's terms (Decision
+12). The host program is `integrations/rustev-bedrock/examples/live_run.rs`
+(`bedrock-live-run`, feature `aws-config`, `RUSTEV_BEDROCK_LIVE=1`). It
+composes spec 030's Bedrock backend with `rustev_live::run` in library mode.
+The plan classifies a SYNTHETIC text into one of three keys; its dataset is
+the three cases and the probe snapshot in
+`integrations/rustev-bedrock/fixtures/live/`. The host's authorizer allows only
+`classify` on that one binding. The binding is spec 030's recorded Converse
+binding (`us.anthropic.claude-haiku-5-5` from `ca-central-1` through the `us.`
+geographic profile). Run `live-043-stage-1` ended `evaluated_live`: the
+probe's one call passed, and the 3 cases completed with none refused,
+unavailable or interrupted, each resolving a model-derived label. The run
+spent 364,540 nano-USD against a run cap of 20,000,000: 90,750 for the probe
+and 91,190, 90,970 and 91,630 for the cases, all estimated from reported
+usage. The R-29 testing journal moved from estimated 3,722,662 to 4,087,202
+nano-USD, with observed 1,421,364, liability 18,075,006 and headroom
+4,976,416,428 of the USD 5 cap after the run. The run shows a provider
+backend driven end to end by the live engine; it is not a quality claim.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

@@ -33,6 +33,16 @@ impl CredentialProvider for StandardCredentials {
         })
     }
 }
+/// The arguments of a manual live entry point, only with
+/// `RUSTEV_BEDROCK_LIVE=1`; the live host of spec 043 3.13.2 reads them
+/// here so no other source touches the environment. No invocation from tests.
+pub fn live_args() -> Result<Vec<String>, String> {
+    if std::env::var("RUSTEV_BEDROCK_LIVE").as_deref() != Ok("1") {
+        return Err("RUSTEV_BEDROCK_LIVE=1 required; sent nothing".into());
+    }
+    Ok(std::env::args().skip(1).collect())
+}
+
 /// Manual synthetic smoke/probe entry point. No invocation from tests.
 pub fn run_cli(smoke: bool) -> Result<(), String> {
     if std::env::var("RUSTEV_BEDROCK_LIVE").as_deref() != Ok("1") {
