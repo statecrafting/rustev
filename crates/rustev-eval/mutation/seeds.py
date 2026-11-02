@@ -807,13 +807,16 @@ def main():
                 # that fails (a full runner disk) drops that worker and the
                 # rest instead of the run: fewer workers is only slower.
                 kept = [trees[0]]
-                for other_src, other in trees[1:]:
+                for j, (other_src, other) in enumerate(trees[1:], start=1):
                     try:
                         shutil.copytree(env["CARGO_TARGET_DIR"], other["CARGO_TARGET_DIR"], symlinks=True,
                                         ignore=shutil.ignore_patterns("incremental"))
                     except OSError as e:
-                        shutil.rmtree(other["CARGO_TARGET_DIR"], ignore_errors=True)
-                        shutil.rmtree(other_src, ignore_errors=True)
+                        # Free this worker's tree and every tree not yet
+                        # attempted now, on the disk that just filled.
+                        for dropped_src, dropped in trees[j:]:
+                            shutil.rmtree(dropped["CARGO_TARGET_DIR"], ignore_errors=True)
+                            shutil.rmtree(dropped_src, ignore_errors=True)
                         first = e.args[0][0][2] if isinstance(e, shutil.Error) and e.args and e.args[0] else str(e)
                         print(f"seeds: copying the warm target failed ({first}); running on {len(kept)} worker(s)", flush=True)
                         break
