@@ -29,8 +29,10 @@ extends:
   - { spec: "012-jev-integration", unit: { kind: directory, path: "integrations/rustev-jev/" }, nature: amending }
   - { spec: "030-bedrock-backend", unit: { kind: directory, path: "integrations/rustev-bedrock/" }, nature: amending }
   - { spec: "010-integrations", unit: { kind: directory, path: "integrations/rustev-serve/" }, nature: amending }
-  # The allowed edges (3.1).
+  # The allowed edges (3.1): the boundary check, and the shared transport's
+  # manifest, which lists its permitted dependents.
   - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "tools/rustev-boundaries/" }, nature: amending }
+  - { spec: "009-remote-adapter-protocol", unit: { kind: file, path: "integrations/rustev-remote-http/Cargo.toml" }, nature: additive }
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.lock" }, nature: additive }
   # Adds 059 to `make verify` at completion.
   # Spec 049 is amended only in its own text (I-3, see 3.1.1): it
@@ -239,16 +241,25 @@ cargo test -p rustev-serve --locked --all-features
 
 **2026-11-02: complete, in one change.**
 
-- 3.1: `tools/rustev-boundaries` admits `REMOTE_TRANSPORT_EDGES`, the three
-  normal edges to `rustev-remote-http`, beside 049's `NODE_TELEMETRY_EDGE`.
-  `remote_transport_exception_is_three_normal_edges` covers each allowed
-  edge, each as a build and as a dev dependency, each of the three on
-  another integration crate and on `rustev-otel`, and `rustev-node` and
-  `rustev-otel` on `rustev-remote-http`;
-  `a_crate_outside_integrations_on_the_shared_transport_fails` covers a
-  crate outside `integrations/` with each kind. The facade test that used
-  `rustev-serve` on `rustev-remote-http` as its refused integration edge now
-  uses `rustev-otel`, since the former is allowed.
+- 3.1: `rustev-remote-http`'s manifest lists the three crates under
+  `[package.metadata.rustev] dependents`, and `tools/rustev-boundaries`
+  admits a normal dependency on `rustev-remote-http` only from an
+  integration crate on that list, beside 049's `NODE_TELEMETRY_EDGE`. The
+  check reads the list instead of naming the crates because spec 012 I-5's
+  acceptance forbids any mention of Jev in a `.rs` file under `tools/`;
+  the first attempt named them and failed that check in the merge queue.
+  The list sits in a manifest owned by spec 009, so changing it is a
+  coupled spec change. `the_shared_transport_admits_its_declared_dependents_only`
+  covers, with neutral crate names, each declared dependent as a normal
+  dependency, each as a build and as a dev dependency, an undeclared
+  integration crate, `rustev-node` and `rustev-otel` on the transport, a
+  declared crate on another integration crate (only the transport's list
+  counts), and a declared crate outside `integrations/`;
+  `a_declaration_outside_integrations_admits_nothing` and
+  `a_crate_outside_integrations_on_the_shared_transport_fails` cover the
+  rest. The facade test that used `rustev-serve` on `rustev-remote-http`
+  as its refused integration edge now uses `rustev-otel`, since the former
+  is allowed.
 - 3.2: the 31 `#[path]` modules become the dependency. `rustev-jev` and
   `rustev-bedrock` re-export their eleven modules by name. Since spec 042,
   `rustev-serve` linked nine modules, not the five that section 1's table

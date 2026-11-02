@@ -20,6 +20,11 @@ include = ["/src/**/*.rs", "/LICENSE"]
 [package.metadata.spec-spine]
 spec = "009-remote-adapter-protocol"
 
+# Spec 059 3.1: the only integration crates that may depend on this one,
+# each as a normal dependency. `make boundaries` reads this list.
+[package.metadata.rustev]
+dependents = ["rustev-jev", "rustev-bedrock", "rustev-serve"]
+
 [dependencies]
 rustev-contract.workspace = true
 rustev-core = { workspace = true, features = ["parameterized"] }
