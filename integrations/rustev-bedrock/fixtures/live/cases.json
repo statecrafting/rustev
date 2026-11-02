@@ -1,0 +1,10 @@
+{
+  "provenance": "SYNTHETIC; spec 043 live provider stage; each text names its fruit plainly",
+  "as_of_ms": 1767225600000,
+  "probe": "SYNTHETIC: a small round red fruit, an apple.",
+  "cases": {
+    "f-1": "SYNTHETIC: a green fruit narrow at the top, a pear.",
+    "f-2": "SYNTHETIC: a small purple stone fruit, a plum.",
+    "f-3": "SYNTHETIC: a crisp red fruit from an orchard tree, an apple."
+  }
+}

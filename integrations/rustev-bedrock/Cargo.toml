@@ -58,3 +58,9 @@ aws-config = ["dep:aws-config"]
 [[example]]
 name = "bedrock-smoke"
 path = "examples/smoke.rs"
+
+# Spec 043's live provider stage (3.13.2): a host composing this backend
+# with `rustev_live::run` over a synthetic dataset. Manual only.
+[[example]]
+name = "bedrock-live-run"
+path = "examples/live_run.rs"

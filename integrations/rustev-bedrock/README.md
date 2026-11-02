@@ -101,6 +101,14 @@ A reachable result requires every sequential call to return a mapped output;
 it is not quality qualification. Missing live flag, journal, valid binding,
 policy admission or spend headroom prevents dispatch.
 
+`bedrock-live-run` (feature `aws-config`, `RUSTEV_BEDROCK_LIVE=1`) is spec
+043's live provider stage: a host composing this backend with
+`rustev_live::run` over the SYNTHETIC dataset in `fixtures/live/`. It takes
+`--binding`, `--policy`, `--materials`, `--journal`, `--out`, `--run-id` and
+`--run-cap-units` (no default cap), and `--resume`. Its authorizer allows only
+`classify` on the given binding. It prints the run status, the run spend and
+the journal summary before and after.
+
 ## Evidence
 
 `tests/contract.rs` covers both wires, all three operations and output modes,
