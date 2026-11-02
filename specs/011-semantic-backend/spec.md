@@ -959,6 +959,24 @@ backends. Tests in `tests/requests/mod.rs` over synthetic bundles with a
 generated WordPiece tokenizer. The `DecisionBackend` itself (workers,
 queue, charges, cancellation) is part b.
 
+**Increment 3 part b (2026-11-02): the `DecisionBackend` over the
+synthetic encoder.** `src/backend.rs` implements `rustev-core`'s
+`DecisionBackend` for synthetic bundles: setup from the 3.7.1
+configuration needs no runtime path, and a synthetic bundle constructs on
+any target, while an `onnx` bundle is refused `unqualified_platform`
+before any runtime is loaded, since the committed record qualifies no
+platform (3.6.3). Requests are prepared on the caller (part a), then run
+on a bounded pool of worker threads behind a FIFO queue of the configured
+capacity (`queue_full` at the bound, 3.11). Charges follow 3.11.4: a
+refusal before handoff and a cancellation of queued work cost nothing;
+work handed to a worker is charged for the tokens it received, on output,
+failure and cancellation alike. Cancellation follows 3.12: queued work is
+removed and acknowledged `stopped`; after handoff, `stopped` only when the
+run's end is observed by the next poll, otherwise `unconfirmed`, with the
+worker slot held until the run ends and its late result discarded. Tests
+in `tests/backend/mod.rs`, with a blocking synthetic encoder for the
+cancellation cases.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child
