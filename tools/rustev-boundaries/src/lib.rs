@@ -656,9 +656,18 @@ pub fn check(meta: &Metadata) -> Vec<Violation> {
 /// transitive.
 pub fn own_graph_of(v: &Violation) -> Option<(&str, &'static str)> {
     match v {
-        Violation::ForbiddenTransitive { krate, path } if path.len() > 2 => {
-            Some((krate.as_str(), "all"))
+        // A direct local-inference edge of a pure crate is a declared
+        // non-dev dependency (the dependency loop, and the resolved graph,
+        // both leave dev edges out), so feature unification cannot have
+        // introduced it and it stands as found. Every other transitive
+        // violation, including a direct path to another family, needs the
+        // crate's own graph to confirm it.
+        Violation::ForbiddenTransitive { path, .. }
+            if path.len() == 2 && is_local_inference(&path[1]) =>
+        {
+            None
         }
+        Violation::ForbiddenTransitive { krate, .. } => Some((krate.as_str(), "all")),
         Violation::WasmGraph { .. } => Some((WASM_CRATE, "wasm32-unknown-unknown")),
         _ => None,
     }
@@ -933,6 +942,49 @@ mod tests {
             .find(|v| matches!(v, Violation::ForbiddenTransitive { .. }))
             .unwrap();
         assert_eq!(own_graph_of(&v), None);
+    }
+
+    #[test]
+    fn a_direct_dev_local_inference_dependency_of_a_pure_crate_is_allowed() {
+        for krate in ["rustev-contract", "rustev-core"] {
+            let m = meta(
+                &[(krate, "crates/x", &[("ort", Some("dev"), None)])],
+                &["ort"],
+                &[(krate, "ort", Some("dev"))],
+            );
+            assert!(
+                !check(&m)
+                    .iter()
+                    .any(|v| matches!(v, Violation::ForbiddenTransitive { .. })),
+                "{krate}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_resolved_direct_local_inference_edge_stands_unconfirmed() {
+        let m = meta(
+            &[("rustev-core", "crates/rustev-core", &[("ort", None, None)])],
+            &["ort"],
+            &[("rustev-core", "ort", None)],
+        );
+        let found: Vec<_> = check(&m)
+            .into_iter()
+            .filter(|v| matches!(v, Violation::ForbiddenTransitive { .. }))
+            .collect();
+        assert!(!found.is_empty());
+        for v in &found {
+            assert_eq!(own_graph_of(v), None);
+        }
+    }
+
+    #[test]
+    fn a_direct_path_to_another_family_still_needs_confirmation() {
+        let v = Violation::ForbiddenTransitive {
+            krate: "rustev-core".into(),
+            path: vec!["rustev-core".into(), "tokio".into()],
+        };
+        assert_eq!(own_graph_of(&v), Some(("rustev-core", "all")));
     }
 
     #[test]
