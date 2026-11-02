@@ -1101,6 +1101,21 @@ exposure to record. 043 joins `VERIFIED_SPECS` and the `runtime-evidence`
 acceptance group, and its Verification block declares the commands.
 Tests: `crates/rustev-cli/tests/eval_live.rs`.
 
+**Resumed probes take fresh decision ids (2026-10-31).** A resumed run
+probes again, and its probe decisions used the first run's ids
+`live/<run_id>/.probe/<binding>/<call>`, so the journal held a repeat
+reservation of the same attempt id. A resumed probe's decisions are now
+`live/<run_id>/.probe/resume-<n>/<binding>/<call>`, with `n` one more than
+the largest `resume-<n>` the journal holds under the run's probe prefix
+(0 if none), read from every reservation including released and crash
+liability, so a probe interrupted during a resume is found and the next
+takes `n + 1`. The first run's ids and the `probe/` file names of 3.13.3
+are unchanged. This needs no normative change: probe decision ids are
+fixed only in increment 4's record above. Tests in
+`crates/rustev-live/tests/run.rs`:
+`resumed_completed_probe_reserves_fresh_ids` and
+`crash_mid_resumed_probe_advances_reserved_sequence`.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child
