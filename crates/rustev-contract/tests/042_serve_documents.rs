@@ -758,3 +758,88 @@ fn explain_evidence_embeds_documents_on_either_side_and_keeps_their_bytes() {
     );
     assert!(ServeExplain::parse(body.as_bytes()).is_err());
 }
+
+/// Spec 034 members of 3.3 (A-71, 3.3.8): profile, variant and base
+/// profiles in the bundle, the leaf `ProfileId` in the registration, the
+/// profile-dependent signing mode, and the instantiation refusal shapes.
+#[test]
+fn bundles_carry_profiles_variants_and_bases_and_omit_them_when_unused() {
+    let profile = |name: &str| {
+        json!({"schema":"rustev.profile/1","profile":name,"version":"1.0.0",
+            "definition":{"name":"d","version":">=1.0.0"},"extends":"none","values":{}})
+    };
+    let mut v = bundle();
+    v["profile"] = profile("leaf");
+    v["variant"] = json!({"named": "batch_2"});
+    v["profile_bases"] = json!([profile("base")]);
+    contract::<PlanBundle>(v.clone());
+    let parsed: PlanBundle = parse(&v).unwrap();
+    assert_eq!(parsed.variant.unwrap().named, "batch_2");
+    // Unused members are omitted, so a bundle without them keeps its bytes.
+    let plain: PlanBundle = parse(&bundle()).unwrap();
+    assert_eq!(
+        serde_json::to_value(&plain).unwrap(),
+        serde_json::to_value(parse::<PlanBundle>(&bundle()).unwrap()).unwrap()
+    );
+    assert!(
+        !String::from_utf8(plain.canonical().unwrap())
+            .unwrap()
+            .contains("profile")
+    );
+    for (member, value) in [
+        ("variant", json!("none")),
+        ("variant", json!({"named": "Batch"})),
+        ("variant", json!({"named": "x".repeat(65)})),
+        ("profile_bases", json!([])),
+        ("profile_bases", json!(vec![profile("b"); 65])),
+        ("profile", json!("none")),
+        ("profile", Value::Null),
+    ] {
+        let mut bad = v.clone();
+        bad[member] = value;
+        assert!(parse::<PlanBundle>(&bad).is_err(), "{member}");
+    }
+    let mut orphan = bundle();
+    orphan["profile_bases"] = json!([profile("base")]);
+    assert!(
+        parse::<PlanBundle>(&orphan).is_err(),
+        "bases without a profile"
+    );
+    // A template (definition/2 declaring parameters or variants) is carried
+    // for instantiation; any other invalid definition is still refused.
+    let mut template = bundle();
+    template["definition"]["schema"] = json!("rustev.definition/2");
+    template["definition"]["variants"] = json!(["batch"]);
+    assert!(parse::<PlanBundle>(&template).is_ok());
+    template["definition"]["schema"] = json!("rustev.definition/1");
+    assert!(parse::<PlanBundle>(&template).is_err());
+    let mut r = registration();
+    r["profile_id"] = json!(digest());
+    r["signing_mode"] = json!({"deny_unsigned_for_profiles": [digest()]});
+    contract::<PlanRegistration>(r.clone());
+    let with: PlanRegistration = parse(&r).unwrap();
+    let without: PlanRegistration = parse(&registration()).unwrap();
+    assert_ne!(
+        with.registration_id().unwrap(),
+        without.registration_id().unwrap()
+    );
+    assert!(
+        !String::from_utf8(without.canonical().unwrap())
+            .unwrap()
+            .contains("profile_id")
+    );
+    let mut refusal = refusal();
+    refusal["code"] = json!("compile_refused");
+    for compiler in [
+        json!({"command":"plan compile","status":"refused","stage":"instantiate",
+            "code":"variant-required","subject":"definition:d@2.0.0","detail":"pick one"}),
+        json!({"command":"plan compile","status":"refused","category":3,"category_name":"structure",
+            "subject":"s","detail":"d","shortfalls":[],"stage":"compile","parameters":["cutoff"]}),
+    ] {
+        refusal["compile_refusal"] = json!({"document": compiler});
+        contract::<ServeRefusal>(refusal.clone());
+    }
+    refusal["compile_refusal"] = json!({"document": {"command":"plan compile","status":"refused",
+        "stage":"instantiate","code":"variant-required","subject":"s","detail":"d","extra":1}});
+    assert!(parse::<ServeRefusal>(&refusal).is_err());
+}

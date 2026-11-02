@@ -254,6 +254,10 @@ pub(crate) fn document_shape(schema: &mut Schema) {
             "run_record",
             "attempts",
             "compile_refusal",
+            "profile",
+            "variant",
+            "profile_bases",
+            "profile_id",
         ] {
             if let Some(property) = properties
                 .get_mut(name)
@@ -660,7 +664,7 @@ impl Serialize for CompilerRefusal {
 impl<'de> Deserialize<'de> for CompilerRefusal {
     fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         let raw = Box::<serde_json::value::RawValue>::deserialize(d)?;
-        let _: CompilerRefusalFields = parse_bounded(
+        let _: CompilerRefusalShape = parse_bounded(
             raw.get().as_bytes(),
             &ParseLimits {
                 max_bytes: 2048,
@@ -670,6 +674,53 @@ impl<'de> Deserialize<'de> for CompilerRefusal {
         .map_err(serde::de::Error::custom)?;
         Ok(Self(raw))
     }
+}
+/// The refusal documents `rustev-surface` renders for a bundle (3.3.2,
+/// 3.3.8): a compile refusal; a compile refusal of an instantiated template
+/// (stage `compile` and the parameters it named); or an instantiation
+/// refusal of spec 034 3.9 (stage `instantiate` and its code).
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(untagged)]
+enum CompilerRefusalShape {
+    Compile(CompilerRefusalFields),
+    Profiled(ProfiledCompileFields),
+    Instantiate(InstantiationFields),
+}
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct ProfiledCompileFields {
+    command: Text<1, 2048>,
+    status: Refused,
+    #[serde(deserialize_with = "compiler_category")]
+    #[schemars(schema_with = "compiler_category_schema")]
+    category: u64,
+    category_name: Text<1, 2048>,
+    subject: Text<0, 2048>,
+    detail: Text<0, 2048>,
+    shortfalls: List<CompilerShortfall, 0, 1024>,
+    stage: CompileStage,
+    parameters: List<Text<1, 2048>, 0, 1024>,
+}
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+enum CompileStage {
+    #[serde(rename = "compile")]
+    Compile,
+}
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct InstantiationFields {
+    command: Text<1, 2048>,
+    status: Refused,
+    stage: InstantiateStage,
+    /// A spec 034 3.9 code; a wire check only, as `category_name` is.
+    code: Text<1, 64>,
+    subject: Text<0, 2048>,
+    detail: Text<0, 2048>,
+}
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+enum InstantiateStage {
+    #[serde(rename = "instantiate")]
+    Instantiate,
 }
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -751,7 +802,7 @@ impl JsonSchema for CompilerRefusal {
         "CompilerRefusal".into()
     }
     fn json_schema(g: &mut SchemaGenerator) -> Schema {
-        g.subschema_for::<CompilerRefusalFields>()
+        g.subschema_for::<CompilerRefusalShape>()
     }
 }
 service_document!(ServeRefusal,RefusalSchema,"rustev.serve-refusal/1",REFUSAL_LIMITS,{

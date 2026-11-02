@@ -1560,6 +1560,44 @@ the acquisition; a guard-skipped acquisition streamed as `skipped` over both
 transports; duplicate `SourceId` refused at startup; a source without a
 descriptor installs none).
 
+**Increment 8: spec 034 bundles and signing (2026-10-30).** Spec 034 is
+implemented, so the members increment 1 held back for it are defined
+(3.3.1, 3.3.3, 3.3.6, 3.3.8). `crates/rustev-contract/src/plan_bundle.rs`:
+the bundle carries `profile` (the leaf `rustev.profile/1`, its bytes kept),
+`variant` (`{"named": <name>}`) and `profile_bases` (1 to 64 profiles, only
+with a profile), each omitted when unused; the registration record carries
+`profile_id`, the leaf's `ProfileId`, omitted for none; `signing_mode`
+admits `deny_unsigned_for_profiles` with 1 to 1 024 `ProfileId`s
+(engineering bound: an empty list would be `allow_unsigned` by another
+name). Absence is the only spelling of no profile. 3.3.1 states "a tenant
+profile or `none`", 3.3.3 states "profile id or `none`", and 3.3.8 states
+"Both are omitted when unused, so a bundle without them keeps its canonical
+bytes, bundle digest and `RegistrationId`. Absence is the only spelling of
+unused." The owner's reading (no amendment): `none` is spelled by omission
+for `profile` and `profile_id` too, so `"profile": "none"` is
+`invalid_document`, and existing bundles and `RegistrationId`s are
+unchanged. The bundle's definition is a definition
+document or a spec 034 template (a `rustev.definition/2` document declaring
+`parameters` or `variants`), carried as its bytes; anything else is
+refused as before. A compile refusal document may also be the
+instantiation refusal `rustev-surface` renders (stage `instantiate` and the
+034 3.9 code) or a compile refusal of an instantiated template (stage
+`compile` and its parameters). `integrations/rustev-serve/src/service.rs`
+compiles a concrete definition with no profile or variant as before and
+otherwise instantiates with exactly the bundle's inputs and no version pin
+(`compile_profiled_with`). Under `deny_unsigned_for_profiles` an unsigned
+bundle whose leaf is listed is `unsigned_refused` before compilation, and
+one whose resolved chain (the plan's instantiation evidence) holds a listed
+profile after it. `profile_unsupported` is no longer produced. Tests:
+`bundles_carry_profiles_variants_and_bases_and_omit_them_when_unused` in
+`crates/rustev-contract/tests/042_serve_documents.rs`, and
+`integrations/rustev-serve/tests/profiles.rs`: the section 5 rows
+(`variant-required`, `profile-missing`, bases without a profile, `"variant":
+"none"` and an empty `profile_bases`, a listed base under
+`deny_unsigned_for_profiles`, an unreached base profile's
+`registration_conflict`), the leaf `ProfileId` in the record, and a
+listed leaf.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

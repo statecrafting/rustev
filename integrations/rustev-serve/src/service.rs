@@ -341,7 +341,7 @@ impl Service {
             Ok(r) => r,
             Err(_) => return self.refuse(RefusalCode::InvalidDocument),
         };
-        let signer = match self.trust.verify(&request, self.config.signing_mode) {
+        let signer = match self.trust.verify(&request, &self.config.signing_mode) {
             Ok(s) => s,
             Err(c) => return self.refuse(c),
         };
@@ -359,7 +359,17 @@ impl Service {
             }
             descriptors.push(backend.descriptor().clone());
         }
-        let definition = bundle.definition.document().unwrap();
+        // The leaf profile's identity; a listed leaf refuses an unsigned
+        // bundle before anything is compiled (3.3.6, 3.3.8).
+        let profile_id = bundle
+            .profile
+            .as_ref()
+            .map(|p| p.document().unwrap().id().unwrap());
+        if let Some(id) = &profile_id
+            && self.unsigned_refused(&signer, std::slice::from_ref(id))
+        {
+            return self.refuse(RefusalCode::UnsignedRefused);
+        }
         let calibrations: Vec<_> = bundle
             .calibrations
             .as_slice()
@@ -372,19 +382,15 @@ impl Service {
         };
         // Every installed source's descriptor: a plan binds only those its
         // definition names, so the others change no `PlanId` (3.4.2).
-        let compiled = rustev_core::compile_with_sources(
-            &definition,
+        let compiled = match compile(
+            &bundle,
             &descriptors,
             &calibrations,
             &self.sources,
             execution.as_ref(),
-        );
-        let compiled = match compiled {
+        ) {
             Ok(c) => c,
-            Err(e) => {
-                let raw = rustev_surface::plan::refused("plan compile", &e)
-                    .out
-                    .bytes();
+            Err(raw) => {
                 let refusal = if raw.len() <= 2048 {
                     CompileRefusal::Document(
                         serde_json::from_slice(&raw).expect("surface compiler refusal"),
@@ -407,6 +413,15 @@ impl Service {
                 );
             }
         };
+        // Every profile of the resolved chain, leaf or base (3.3.8).
+        if let Some(rustev_contract::plan::ProfileChain::Chain(chain)) =
+            compiled.plan.instantiation.as_ref().map(|i| &i.profile)
+        {
+            let ids: Vec<_> = chain.iter().map(|e| e.id.clone()).collect();
+            if self.unsigned_refused(&signer, &ids) {
+                return self.refuse(RefusalCode::UnsignedRefused);
+            }
+        }
         if compiled.id.as_str() != path_id || compiled.id != bundle.compile_report.plan_id {
             return self.refuse(RefusalCode::PlanIdMismatch);
         }
@@ -416,9 +431,10 @@ impl Service {
             execution_policy_id: execution
                 .as_ref()
                 .map_or(Maybe::None, |e| Maybe::Some(e.id().unwrap())),
+            profile_id,
             bundle_digest: bundle.digest().unwrap(),
             signer,
-            signing_mode: self.config.signing_mode,
+            signing_mode: self.config.signing_mode.clone(),
             service_build: self.build.clone(),
             configuration_digest: self.digest.clone(),
             registered_at_ms: Timestamp::from_ms(
@@ -453,6 +469,17 @@ impl Service {
             .plans
             .insert(path_id.into(), Arc::new(Registration { record, plan }));
         reply
+    }
+    /// Whether `deny_unsigned_for_profiles` refuses an unsigned bundle
+    /// carrying any of `profiles` (3.3.6).
+    fn unsigned_refused(
+        &self,
+        signer: &Signer,
+        profiles: &[rustev_contract::ids::ProfileId],
+    ) -> bool {
+        matches!(signer, Signer::Unsigned)
+            && matches!(&self.config.signing_mode, SigningMode::DenyUnsignedForProfiles(listed)
+                if profiles.iter().any(|p| listed.as_slice().contains(p)))
     }
     fn replayed(reply: &Reply) -> Reply {
         if let Ok(mut doc) = ServeDecision::parse(&reply.body) {
@@ -916,7 +943,7 @@ impl Service {
                     operation_table().into_iter().map(|o| o.operation).collect(),
                 )
                 .unwrap(),
-                signing_mode: self.config.signing_mode,
+                signing_mode: self.config.signing_mode.clone(),
                 development_bearer_listeners: List::new(self.bearer_listeners()).unwrap(),
                 idempotency_window_ms: self.config.idempotency_window_ms,
                 retention: Retention::MemoryLostOnRestart,
@@ -986,7 +1013,7 @@ impl Service {
             &ServeReadiness {
                 schema: ReadinessSchema::V1,
                 failing_items: List::new(failing).unwrap(),
-                signing_mode: self.config.signing_mode,
+                signing_mode: self.config.signing_mode.clone(),
                 development_bearer_listeners: List::new(self.bearer_listeners()).unwrap(),
             },
         )
@@ -1155,6 +1182,56 @@ impl Service {
             exit,
         )
     }
+}
+/// Compile a bundle (3.3.2, 3.3.8): a concrete definition with no profile
+/// or variant as before; otherwise instantiated with exactly the bundle's
+/// inputs (034 3.8.1) and compiled. A refusal is the document
+/// `rustev-surface` renders for it.
+fn compile(
+    bundle: &PlanBundle,
+    descriptors: &[rustev_contract::descriptor::BackendDescriptor],
+    calibrations: &[rustev_contract::calibration::CalibrationArtifact],
+    sources: &[rustev_contract::source::SourceDescriptor],
+    execution: Option<&rustev_contract::execution::ExecutionPolicy>,
+) -> Result<rustev_core::Compiled, Vec<u8>> {
+    const COMMAND: &str = "plan compile";
+    let definition = bundle.definition.bytes();
+    let concrete = rustev_contract::definition::Definition::parse(definition).ok();
+    if let (Some(d), None, None) = (&concrete, &bundle.profile, &bundle.variant) {
+        return rustev_core::compile_with_sources(d, descriptors, calibrations, sources, execution)
+            .map_err(|e| rustev_surface::plan::refused(COMMAND, &e).out.bytes());
+    }
+    let bases: Vec<&[u8]> = bundle
+        .profile_bases
+        .as_ref()
+        .map(|l| l.as_slice().iter().map(|p| p.bytes()).collect())
+        .unwrap_or_default();
+    rustev_core::instantiate::compile_profiled_with(
+        &[definition],
+        bundle.profile.as_ref().map(|p| p.bytes()),
+        &bases,
+        bundle.variant.as_ref().map(|v| v.named.as_str()),
+        None,
+        descriptors,
+        calibrations,
+        sources,
+        execution,
+    )
+    .map_err(|e| match e {
+        rustev_core::instantiate::ProfiledRefusal::Instantiate(r) => {
+            rustev_surface::profile::refused(COMMAND, &r).out.bytes()
+        }
+        rustev_core::instantiate::ProfiledRefusal::Compile {
+            refusal,
+            parameters,
+        } => {
+            let d = rustev_surface::plan::refused(COMMAND, &refusal);
+            d.out
+                .set("stage", "compile")
+                .set("parameters", &parameters)
+                .bytes()
+        }
+    })
 }
 /// Check the host's acquisition sources (3.4.2): each belongs to a
 /// configured context source, and no two describe the same `SourceId` or,
