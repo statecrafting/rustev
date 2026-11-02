@@ -17,6 +17,8 @@ spec = "012-jev-integration"
 # therefore repeated here.
 [dependencies]
 rustev-live.workspace = true
+# The batch qualification report a production binding cites (spec 044 3.8).
+rustev-eval.workspace = true
 rustev-contract = { path = "../../crates/rustev-contract" }
 rustev-core = { path = "../../crates/rustev-core", features = ["parameterized"] }
 rustev-runtime = { path = "../../crates/rustev-runtime" }
@@ -31,7 +33,7 @@ rustls.workspace = true
 tokio-rustls.workspace = true
 webpki-roots.workspace = true
 
-# The eval crate, the support-routing swap crates and a multi-threaded Tokio
+# The eval crate's `parameterized` feature, the support-routing swap crates and a multi-threaded Tokio
 # are for the tests and the smoke harness only; hyper's server side serves
 # the loopback fake Gateway.
 [dev-dependencies]

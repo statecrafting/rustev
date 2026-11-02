@@ -11,6 +11,11 @@ price source and rates, credential custody class, and explicit version tolerance
 Schema 1 is unchanged; its default canonical bytes and digest have a golden test.
 Missing, invalid, conflicting and expired facts return `Unresolved`.
 
+A production binding with batching on also needs a cited
+`rustev.batch-qualification/1` report whose verdict is `qualified` for that
+binding and its batching configuration (spec 044 3.8 item 4); otherwise
+construction fails with `batch_unqualified`.
+
 `JevBackend::new_production` refuses before credential lookup or dispatch. No
 recorded, owner-authorized direct API exchanges or accepted Gateway pinning fact
 are available in the repository. Supplying a string claiming such evidence does

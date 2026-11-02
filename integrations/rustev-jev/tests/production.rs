@@ -2,9 +2,16 @@
 mod common;
 use common::*;
 use rustev_contract::Decimal;
+use rustev_contract::Document;
+use rustev_contract::output::RawOutput;
 use rustev_contract::run::Charge;
 use rustev_core::seams::CancelSignal;
+use rustev_eval::batch_qualification::{
+    Agreement, AgreementBound, Answer, BatchQualification, BatchingConfig, Bindings, PairedAnswer,
+    Ratio, Spend, Stage1Case, Stage1Result, Stage2, Verdict,
+};
 use rustev_jev::adapter::JevBackend;
+use rustev_jev::binding::Batching;
 use rustev_jev::binding::{JevBinding, Transport};
 use rustev_jev::http::Secret;
 use rustev_jev::production::*;
@@ -151,6 +158,7 @@ fn missing_stale_conflicting_and_invalid_facts_refuse_construction() {
                     copy.fetch_add(1, Ordering::SeqCst);
                     Ok(Secret::new(KEY))
                 }),
+                None,
                 None,
                 Arc::new(KeepExchanges::default()),
                 Journal::new().journal.clone(),
@@ -836,6 +844,16 @@ fn production(
     journal: SpendJournal,
     count: Arc<AtomicUsize>,
 ) -> Result<(JevBackend, Arc<KeepExchanges>), rustev_jev::adapter::SetupError> {
+    batched_production(b, record, None, journal, count)
+}
+
+fn batched_production(
+    b: ProductionBinding,
+    record: Option<&Qualification>,
+    batch: Option<&BatchQualification>,
+    journal: SpendJournal,
+    count: Arc<AtomicUsize>,
+) -> Result<(JevBackend, Arc<KeepExchanges>), rustev_jev::adapter::SetupError> {
     let sink = Arc::new(KeepExchanges::default());
     let callback = Arc::new(move || {
         count.fetch_add(1, Ordering::SeqCst);
@@ -846,6 +864,7 @@ fn production(
         b,
         callback,
         record,
+        batch,
         sink.clone(),
         journal,
         TODAY,
@@ -1108,5 +1127,214 @@ fn production_construction_checks_acceptance_without_reading_credentials() {
     assert_eq!(count.load(Ordering::SeqCst), 0);
     assert!(sink.records().is_empty());
     assert!(sink.retained().is_empty());
+    assert_loopback_only();
+}
+
+/// A production binding with spec 009's shared-state batching on.
+fn batched_binding(endpoint: &str) -> ProductionBinding {
+    let mut b = qualification_binding(endpoint);
+    b.decision.batching = Batching::SharedState {
+        max_items: 3,
+        window_ms: 2000,
+    };
+    b
+}
+
+/// A report for `b` with batching on and off, at `b`'s configuration, that
+/// derives `qualified` when `agree` and `not_qualified` otherwise.
+fn batch_report(b: &ProductionBinding, agree: bool) -> BatchQualification {
+    let mut off = b.clone();
+    off.decision.batching = Batching::Off;
+    let label = |l: &str| Answer::Output(RawOutput::Label(l.into()));
+    BatchQualification::new(
+        "rustev-jev",
+        Bindings {
+            batched: b.artifact().unwrap(),
+            unbatched: off.artifact().unwrap(),
+        },
+        BatchingConfig {
+            max_items: 3,
+            window_ms: 2000,
+        },
+        AgreementBound {
+            criterion: Agreement::Exact,
+            min_agreeing: Ratio {
+                numerator: 1,
+                denominator: 1,
+            },
+        },
+        1,
+        Stage1Case::ALL
+            .iter()
+            .map(|c| Stage1Result::passed(*c))
+            .collect(),
+        Some(Stage2 {
+            pairs: vec![PairedAnswer {
+                case: "synthetic-1".into(),
+                batched: label(if agree { "yes" } else { "no" }),
+                unbatched: label("yes"),
+            }],
+            spend: Spend {
+                observed_units: 0,
+                estimated_units: 0,
+                unknown_settlements: 0,
+            },
+        }),
+    )
+    .unwrap()
+}
+
+#[test]
+fn production_batching_requires_a_cited_qualified_report_before_credentials() {
+    let base = batched_binding("https://127.0.0.1:1/v1/systemone");
+    let q = accepted_record(&base);
+    let j = production_journal();
+    let count = Arc::new(AtomicUsize::new(0));
+    let qualified = batch_report(&base, true);
+    assert_eq!(qualified.verdict, Verdict::Qualified);
+    let mut unknown = qualified.clone();
+    unknown.stage2 = None;
+    unknown.verdict = Verdict::Unknown;
+    let mut forged = batch_report(&base, false);
+    assert_eq!(forged.verdict, Verdict::NotQualified);
+    forged.verdict = Verdict::Qualified;
+    let mut other = base.clone();
+    other.decision.version_pin = Some("jev-1.14.0".into());
+    let other_binding = batch_report(&other, true);
+    let mut swapped = qualified.clone();
+    swapped.bindings.unbatched = swapped.bindings.batched.clone();
+    let mut items = qualified.clone();
+    items.batching.max_items = 2;
+    let mut window = qualified.clone();
+    window.batching.window_ms = 1;
+    let not_qualified = batch_report(&base, false);
+    let cases: Vec<(&str, Option<&BatchQualification>, &str)> = vec![
+        ("no report", None, "no batch qualification report is cited"),
+        ("unknown", Some(&unknown), "verdict is not qualified"),
+        (
+            "not qualified",
+            Some(&not_qualified),
+            "verdict is not qualified",
+        ),
+        ("forged verdict", Some(&forged), "does not check"),
+        ("another binding", Some(&other_binding), "another binding"),
+        (
+            "another unbatched identity",
+            Some(&swapped),
+            "another binding",
+        ),
+        (
+            "another item cap",
+            Some(&items),
+            "another batching configuration",
+        ),
+        (
+            "another window",
+            Some(&window),
+            "another batching configuration",
+        ),
+    ];
+    for (name, report, detail) in cases {
+        let error = batched_production(
+            base.clone(),
+            Some(&q),
+            report,
+            j.journal.clone(),
+            count.clone(),
+        )
+        .err()
+        .unwrap_or_else(|| panic!("{name}"))
+        .to_string();
+        assert!(error.contains("batch_unqualified"), "{name}: {error}");
+        assert!(error.contains(detail), "{name}: {error}");
+        assert_eq!(count.load(Ordering::SeqCst), 0, "{name}");
+    }
+    // A cited report never stands in for the acceptance record (spec 022).
+    assert!(
+        batched_production(
+            base,
+            None,
+            Some(&qualified),
+            j.journal.clone(),
+            count.clone()
+        )
+        .is_err()
+    );
+    assert_eq!(count.load(Ordering::SeqCst), 0);
+    assert_loopback_only();
+}
+
+#[tokio::test]
+async fn production_batching_records_the_cited_report_digest() {
+    let dead = dead_url().await;
+    let endpoint = format!("{}/v1/systemone", dead.replacen("http://", "https://", 1));
+    let b = batched_binding(&endpoint);
+    let q = accepted_record(&b);
+    let report = batch_report(&b, true);
+    let j = production_journal();
+    let count = Arc::new(AtomicUsize::new(0));
+    let (backend, sink) = batched_production(
+        b.clone(),
+        Some(&q),
+        Some(&report),
+        j.journal.clone(),
+        count.clone(),
+    )
+    .unwrap();
+    assert_eq!(count.load(Ordering::SeqCst), 0);
+    assert_eq!(backend.binding().batch(), Some((3, 2000)));
+    let answer = call(
+        &backend,
+        "production/1",
+        &boolean_projection(),
+        5000,
+        &CancelSignal::new(),
+    )
+    .await;
+    assert!(answer.result.is_err());
+    let records = sink.until_records(1).await;
+    assert_eq!(records[0].binding, b.artifact().unwrap());
+    assert_eq!(
+        records[0].privacy_requested["batch_qualification"],
+        report.record_digest().unwrap().as_str()
+    );
+    assert_eq!(
+        records[0].privacy_requested["qualification"],
+        q.digest().unwrap()
+    );
+    assert_loopback_only();
+}
+
+#[tokio::test]
+async fn production_without_batching_ignores_a_report_and_records_none() {
+    let dead = dead_url().await;
+    let endpoint = format!("{}/v1/systemone", dead.replacen("http://", "https://", 1));
+    let b = qualification_binding(&endpoint);
+    let q = accepted_record(&b);
+    let report = batch_report(&batched_binding(&endpoint), true);
+    assert_eq!(check_batch_qualification(&b, Some(&report)), Ok(None));
+    let j = production_journal();
+    let (backend, sink) = batched_production(
+        b,
+        Some(&q),
+        Some(&report),
+        j.journal.clone(),
+        Arc::new(AtomicUsize::new(0)),
+    )
+    .unwrap();
+    let _ = call(
+        &backend,
+        "production/1",
+        &boolean_projection(),
+        5000,
+        &CancelSignal::new(),
+    )
+    .await;
+    let records = sink.until_records(1).await;
+    assert!(
+        !records[0]
+            .privacy_requested
+            .contains_key("batch_qualification")
+    );
     assert_loopback_only();
 }

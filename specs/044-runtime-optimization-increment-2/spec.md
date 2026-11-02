@@ -829,6 +829,8 @@ cargo test -p rustev-remote-http --locked --test isolation
 cargo test -p rustev-eval --locked --lib batch_qualification
 cargo test -p rustev-remote-http --locked --test batch_qualification
 cargo test -p rustev-jev --locked --test batch_qualification
+# 3.8 item 4, R-2, section 5's production batching row: `batch_unqualified` at production construction.
+cargo test -p rustev-jev --locked --test production
 # Acceptance, benchmarks: cold and warm figures for each mechanism, reported without a threshold.
 cargo test -p rustev-runtime --locked --test optimization_benchmark_044 -- --ignored --nocapture
 ```
@@ -840,11 +842,11 @@ Open, reported as such and never as passed:
 - Stage 2 of 3.8 (item 2) for the remote-http adapter, whose report keeps
   the verdict `unknown`. The Jev adapter's stage 2 ran on 2026-10-29 and
   measured `not_qualified` (below).
-- 3.8 item 4, R-2's construction check `batch_unqualified` and section 5's
-  row "A production binding enables batching without a qualified report":
-  increment 8, externally blocked on spec 022 (A-49).
 
-This spec stays `in-progress` until those land.
+3.8 item 4, R-2's construction check `batch_unqualified` and section 5's
+row "A production binding enables batching without a qualified report"
+landed in increment 8 (below). This spec stays `in-progress` until stage 2
+for the remote-http adapter lands.
 
 **Owner decision A-49 (2026-10-23): dependencies.** Spec 022 is no longer
 a declared dependency of this spec; spec 012 remains one. Only the
@@ -2154,6 +2156,39 @@ Not separately tested:
   unambiguous.
 - **A generation stream across both passes.** It follows spec 037's
   existing supersession at `Complete`.
+
+**Increment 8 (2026-11-02): the production batching posture.** Spec 022
+is complete, so A-49's later increment lands: 3.8 item 4, R-2's
+construction check and section 5's row "A production binding enables
+batching without a qualified report".
+- `JevBackend::new_production` takes the cited batch qualification report
+  beside the accepted qualification. A production binding whose batching
+  is not `off` constructs only when the report checks (its recorded
+  verdict is the derived one), its verdict is `qualified`, its `batched`
+  identity is this binding's, its `unbatched` identity is this binding's
+  with only the batching switch `off`, and its batching configuration is
+  this binding's item cap and window. Otherwise construction fails with
+  `batch_unqualified` as the detail's first token, before any credential
+  lookup (3.9). This replaces spec 022 3.7.5 item 4's interim refusal of
+  every production binding with batching on.
+- A constructed backend names the cited report's record digest in each
+  exchange record's `privacy_requested`, as `batch_qualification`, beside
+  the acceptance digest. A binding with batching `off` needs no report,
+  ignores one supplied, and its records are unchanged.
+- The check is `rustev_jev::production::check_batch_qualification`, so
+  `rustev-jev` now depends on `rustev-eval` outside its tests.
+- Citing a report grants nothing. No report in the repository is
+  `qualified`: the Jev adapter's stage 2 measured `not_qualified` (above),
+  so no production binding can enable adapter-scoped batching today, and
+  enabling it stays the owner's act (R-28).
+
+Tests in `integrations/rustev-jev/tests/production.rs`, now in the
+Verification block:
+`production_batching_requires_a_cited_qualified_report_before_credentials`,
+`production_batching_records_the_cited_report_digest` and
+`production_without_batching_ignores_a_report_and_records_none`.
+`production_refuses_each_ineligible_binding_before_credentials` keeps its
+batching case, now refused as `batch_unqualified` with no report cited.
 
 ## Decisions at approval
 

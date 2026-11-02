@@ -424,13 +424,16 @@ impl JevBackend {
     }
 
     /// Spec 022 3.7.5: construct only with a checked acceptance record and
-    /// the production journal. No credential is read until dispatch.
+    /// the production journal. A binding with batching on also cites its
+    /// batch qualification report (spec 044 3.8 item 4), whose digest each
+    /// exchange record names. No credential is read until dispatch.
     #[allow(clippy::too_many_arguments)]
     pub fn new_production(
         backend_id: &str,
         binding: crate::production::ProductionBinding,
         credential: crate::production::CredentialCallback,
         qualification: Option<&crate::production::Qualification>,
+        batch_qualification: Option<&rustev_eval::batch_qualification::BatchQualification>,
         sink: Arc<dyn ExchangeSink>,
         journal: SpendJournal,
         today: &str,
@@ -444,11 +447,8 @@ impl JevBackend {
                 "production requires the production spend journal",
             )));
         }
-        if binding.decision.batching != crate::binding::Batching::Off {
-            return Err(SetupError::Production(Unresolved(
-                "production batching requires spec 044 increment 8",
-            )));
-        }
+        let cited = crate::production::check_batch_qualification(&binding, batch_qualification)
+            .map_err(SetupError::Production)?;
         let digest = qualification
             .ok_or(SetupError::Production(Unresolved(
                 "accepted qualification is missing",
@@ -456,9 +456,16 @@ impl JevBackend {
             .digest()
             .map_err(SetupError::Production)?;
         let endpoint = origin(&binding.facts.endpoint).map_err(SetupError::Endpoint)?;
-        Self::over_production_binding(
+        let mut backend = Self::over_production_binding(
             backend_id, binding, &endpoint, credential, sink, journal, &digest, false,
-        )
+        )?;
+        if let Some(cited) = cited {
+            Arc::get_mut(&mut backend.inner)
+                .expect("new instance")
+                .privacy
+                .insert("batch_qualification".into(), cited);
+        }
+        Ok(backend)
     }
 
     /// Stage 1 only: replay the explicitly synthetic schema-1 direct shape

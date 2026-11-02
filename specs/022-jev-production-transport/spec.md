@@ -596,6 +596,16 @@ decision row, A-72, which a host names as that record's authorization. With
 `complete`. No code changes. Production use, deployment and real-user data
 stay the owner's separate acts (3.1.4).
 
+**Spec 044 increment 8 (2026-11-02, 3.7.5 item 4).** Spec 044's increment
+8 delivers the check 3.7.5 item 4 names, so `new_production` no longer
+refuses every binding with batching on: it constructs one only with a cited
+`rustev.batch-qualification/1` report that 044 3.8 item 4 allows, and
+otherwise refuses with `batch_unqualified` before any credential lookup.
+Section 5's row "`new_production` ... or batching on" holds as 3.7.5 item 4
+reads it, for batching on without such a report; no report in the
+repository is `qualified`, so no production binding enables batching (R-28).
+The record and its tests are in spec 044's implementation record.
+
 ## Questions settled at approval
 
 The owner settled the draft's open questions in the 2026-10-16 delivery work
