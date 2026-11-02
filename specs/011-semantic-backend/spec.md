@@ -883,6 +883,15 @@ violation. Unit tests in `tools/rustev-boundaries/src/lib.rs` over
 synthetic metadata: a violating case for each rule and download feature,
 and a passing optional dependency of `rustev-node` on the backend.
 
+**Increment 2 follow-up (2026-11-01).** Only a direct edge from
+`rustev-contract` or `rustev-core` to a local inference family member
+stands without own-graph confirmation; every other direct family path
+(for example `rustev-core` to `tokio`) is confirmed against the crate's
+own graph, as before increment 2. A direct dev dependency on the family
+produces no violation, because neither the dependency loop nor the
+resolved graph carries dev edges. Tests in
+`tools/rustev-boundaries/src/lib.rs`.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child
