@@ -8,8 +8,9 @@
 //! it ([`derive_descriptor`]), pooling and head arithmetic ([`head`]),
 //! the in-process embedding cache ([`cache`]), and,
 //! behind the `synthetic` feature, the synthetic encoder of 3.19. The ONNX
-//! encoder and its inference dependencies wait on the feasibility gate
-//! (3.2.3).
+//! encoder remains pending. [`RequestPreparer`] adds text assembly, task
+//! matching, offline tokenization and host-side plan checks (3.8, 3.10.4);
+//! worker dispatch and the `DecisionBackend` implementation remain pending.
 //!
 //! Nothing here is authorization or an input fact (3.1): every value the
 //! backend will supply is `model-derived` logits over a head's trained
@@ -18,8 +19,10 @@
 
 pub mod bundle;
 pub mod cache;
+mod check;
 pub mod head;
 pub mod manifest;
+pub mod request;
 #[cfg(feature = "synthetic")]
 pub mod synthetic;
 
@@ -32,7 +35,9 @@ use rustev_contract::run::CostBound;
 use rustev_contract::schema;
 
 pub use bundle::{EmbedSetupError, SetupCode, VerifiedBundle, verify_bundle};
+pub use check::{PlanMismatch, PlanMismatchKind};
 pub use manifest::{EmbedManifest, ManifestError};
+pub use request::{PreparedRequest, RequestCode, RequestError, RequestPreparer};
 
 /// The descriptor of a checked manifest (3.10.1): one entry per operation
 /// with at least one head, in the order `classify`, `proposition`,

@@ -61,7 +61,7 @@ fn base_manifest(graph: &[u8], tokenizer: &[u8], route: &[u8], urgent: &[u8]) ->
     let mut g = file_entry("graph.bin", graph);
     g["source"] = json!("synthetic");
     let mut t = file_entry("tokenizer.json", tokenizer);
-    t["implementation"] = json!("tokenizers@0.21.1");
+    t["implementation"] = json!("tokenizers@1.0.0-rc.3");
     t["max_tokens"] = json!(256);
     t["truncation"] = json!("refuse");
     json!({
@@ -99,7 +99,7 @@ fn new_bundle() -> Bundle {
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(dir.join("heads")).unwrap();
     let graph = b"rustev synthetic encoder\n".to_vec();
-    let tokenizer = b"{}".to_vec();
+    let tokenizer = tokenizer_bytes();
     let route = head_weights(1, 3, HIDDEN);
     let urgent = head_weights(2, 2, HIDDEN);
     for (p, b) in [
@@ -772,4 +772,26 @@ mod cache_tests {
         manifest.runtime.intra_op_threads += 1;
         refused(&manifest, &passing);
     }
+}
+
+#[path = "requests/mod.rs"]
+mod requests;
+
+// A generated, offline WordPiece tokenizer. The legacy format deliberately
+// exercises the same pinned reader upgrade as the feasibility probe.
+fn tokenizer_bytes() -> Vec<u8> {
+    serde_json::to_vec(&json!({
+        "version": "1.0", "truncation": null, "padding": null,
+        "added_tokens": [], "normalizer": null,
+        "pre_tokenizer": {"type": "WhitespaceSplit"},
+        "post_processor": {"type": "BertProcessing", "cls": ["[CLS]", 1],
+                           "sep": ["[SEP]", 2]},
+        "decoder": null,
+        "model": {"type": "WordPiece", "unk_token": "[UNK]",
+                  "continuing_subword_prefix": "##", "max_input_chars_per_word": 100,
+                  "vocab": {"[UNK]": 0, "[CLS]": 1, "[SEP]": 2, "hello": 3,
+                            "world": 4, "Subject:": 5, "hello|world": 6,
+                            "HELLO": 7, "café": 8}}
+    }))
+    .unwrap()
 }

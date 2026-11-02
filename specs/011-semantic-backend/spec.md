@@ -941,6 +941,24 @@ probe as measured, is kept byte-identical and not built: it reads the
 runtime version through `dlopen`, which the workspace's
 `unsafe_code = "forbid"` refuses.
 
+**Increment 3 part a (2026-11-02): text, tasks, tokenization and
+`check_plan`.** `src/request.rs` prepares a request on the caller before
+any handoff: the projection's byte bound, task matching on operation,
+task, question and options in order (3.8.2), text assembly from the head's
+template with `input:` and `bind:` references and an optional member,
+strings only and nothing coerced (3.8.1), and one sequence with special
+tokens from the bundle's verified `tokenizer.json` through the pinned
+`tokenizers` crate, loaded once and never from a hub (3.8.3). The
+tokenizer file's own truncation and padding are overridden off, so only
+the manifest's `refuse` or `truncate_end` applies (3.8.4). Refusals are
+typed (`projection_too_large`, `task_not_found`, `field_missing`,
+`field_type`, `text_empty`, `text_too_long`, `too_many_tokens`) and incur
+no charge. `src/check.rs` implements `check_plan` (3.10.4), reporting each
+mismatch kind, covering fallbacks and ignoring steps bound to other
+backends. Tests in `tests/requests/mod.rs` over synthetic bundles with a
+generated WordPiece tokenizer. The `DecisionBackend` itself (workers,
+queue, charges, cancellation) is part b.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child
