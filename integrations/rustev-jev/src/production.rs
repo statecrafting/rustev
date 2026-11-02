@@ -456,6 +456,55 @@ pub struct Qualification {
     pub estimated_units: u64,
     pub unresolved_liability_units: u64,
 }
+/// Spec 044 3.8 item 4 (R-2): a production binding that enables
+/// adapter-scoped batching is constructed only when it cites a checked
+/// `rustev.batch-qualification/1` report whose verdict is `qualified`, for
+/// this binding with batching on and with it off, at this binding's batching
+/// configuration. Returns the cited report's record digest, or `None` for a
+/// binding with batching off, which needs no report. Citing a report grants
+/// nothing: enabling production batching stays the owner's act (R-28).
+pub fn check_batch_qualification(
+    binding: &ProductionBinding,
+    report: Option<&rustev_eval::batch_qualification::BatchQualification>,
+) -> Result<Option<String>, Unresolved> {
+    use rustev_contract::Document;
+    use rustev_eval::batch_qualification::Verdict;
+    let Some((max_items, window_ms)) = binding.decision.batch() else {
+        return Ok(None);
+    };
+    let report = report.ok_or(Unresolved(
+        "batch_unqualified: no batch qualification report is cited",
+    ))?;
+    report
+        .check()
+        .map_err(|_| Unresolved("batch_unqualified: the cited report does not check"))?;
+    if report.verdict != Verdict::Qualified {
+        return Err(Unresolved(
+            "batch_unqualified: the cited report's verdict is not qualified",
+        ));
+    }
+    let mut unbatched = binding.clone();
+    unbatched.decision.batching = crate::binding::Batching::Off;
+    if report.bindings.batched != binding.artifact()?
+        || report.bindings.unbatched != unbatched.artifact()?
+    {
+        return Err(Unresolved(
+            "batch_unqualified: the cited report qualifies another binding",
+        ));
+    }
+    if usize::try_from(report.batching.max_items).ok() != Some(max_items)
+        || report.batching.window_ms != window_ms
+    {
+        return Err(Unresolved(
+            "batch_unqualified: the cited report qualifies another batching configuration",
+        ));
+    }
+    let digest = report
+        .record_digest()
+        .map_err(|_| Unresolved("batch_unqualified: the cited report has no digest"))?;
+    Ok(Some(digest.as_str().to_owned()))
+}
+
 impl Qualification {
     /// Digest of the complete accepted document, including evidence and totals.
     pub fn digest(&self) -> Result<String, Unresolved> {
