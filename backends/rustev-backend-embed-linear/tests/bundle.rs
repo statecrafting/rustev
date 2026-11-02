@@ -533,3 +533,243 @@ fn the_encoder_and_heads_follow_the_documented_formula() {
     assert!(head.logits(&e[..2]).is_none());
     assert!(LinearHead::from_bytes(&bytes[..bytes.len() - 4], 2, 3).is_err());
 }
+
+mod cache_tests {
+    use super::*;
+    use rustev_backend_embed_linear::cache::{
+        CacheConfig, CacheLimits, CacheLookup, CacheMiss, EmbeddingCache, RepeatabilityEvidence,
+        RunOutcome,
+    };
+
+    fn manifest() -> EmbedManifest {
+        parse(&base_manifest(b"graph", b"{}", &[0; 128], &[0; 128])).unwrap()
+    }
+
+    fn config(entries: usize, bytes: usize) -> CacheConfig {
+        CacheConfig {
+            embedding_cache: Some(CacheLimits {
+                max_entries: entries,
+                max_bytes: bytes,
+            }),
+        }
+    }
+
+    fn cache(entries: usize, bytes: usize) -> EmbeddingCache {
+        EmbeddingCache::new(
+            config(entries, bytes),
+            &manifest(),
+            "test-platform",
+            &RepeatabilityEvidence::Synthetic,
+        )
+        .unwrap()
+    }
+
+    fn miss(cache: &mut EmbeddingCache, principal: &[u8], token: u32) -> CacheMiss {
+        match cache.lookup(principal, &[token], &[1]) {
+            CacheLookup::Miss(ticket) => ticket,
+            CacheLookup::Hit(_) => panic!("expected miss"),
+        }
+    }
+
+    fn store(cache: &mut EmbeddingCache, principal: &[u8], token: u32) {
+        let ticket = miss(cache, principal, token);
+        assert!(cache.admit(ticket, &[0.5; HIDDEN], RunOutcome::Completed));
+    }
+
+    fn hit(cache: &mut EmbeddingCache, principal: &[u8], token: u32) -> Vec<f32> {
+        match cache.lookup(principal, &[token], &[1]) {
+            CacheLookup::Hit(embedding) => embedding,
+            CacheLookup::Miss(_) => panic!("expected hit"),
+        }
+    }
+
+    #[test]
+    fn cache_off_by_default() {
+        let config: CacheConfig = serde_json::from_str("{}").unwrap();
+        assert_eq!(config, CacheConfig::default());
+        let mut cache = EmbeddingCache::new(
+            config,
+            &manifest(),
+            "test-platform",
+            &RepeatabilityEvidence::Unproven,
+        )
+        .unwrap();
+        let ticket = miss(&mut cache, b"alice", 1);
+        assert!(!cache.admit(ticket, &[1.; HIDDEN], RunOutcome::Completed));
+        miss(&mut cache, b"alice", 1);
+        assert_eq!(cache.cache_stats().misses, 2);
+        assert_eq!(cache.cache_stats().bytes, 0);
+    }
+
+    #[test]
+    fn cache_hit_preserves_synthetic_and_signed_zero_bits() {
+        let mut cache = cache(2, usize::MAX);
+        let encoder = SyntheticEncoder::new(HIDDEN).unwrap();
+        let mut embedding = pool(&encoder.encode(&[42]), &[1], HIDDEN, Normalize::None).unwrap();
+        embedding[0] = -0.0;
+        let ticket = miss(&mut cache, b"alice", 42);
+        assert!(cache.admit(ticket, &embedding, RunOutcome::Completed));
+        assert_eq!(
+            hit(&mut cache, b"alice", 42)
+                .iter()
+                .map(|v| v.to_bits())
+                .collect::<Vec<_>>(),
+            embedding.iter().map(|v| v.to_bits()).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn cache_key_isolates_principals_tokens_masks_and_array_boundaries() {
+        let mut cache = cache(8, usize::MAX);
+        store(&mut cache, b"alice", 1);
+        miss(&mut cache, b"bob", 1);
+        miss(&mut cache, b"alice", 2);
+        for (ids, mask) in [
+            (&[1][..], &[0][..]),
+            (&[1, 1][..], &[][..]),
+            (&[][..], &[1, 1][..]),
+        ] {
+            assert!(matches!(
+                cache.lookup(b"alice", ids, mask),
+                CacheLookup::Miss(_)
+            ));
+        }
+        hit(&mut cache, b"alice", 1);
+    }
+
+    #[test]
+    fn cache_rejects_nonfinite_cancelled_incomplete_and_wrong_dimensions() {
+        let mut cache = cache(8, usize::MAX);
+        for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let ticket = miss(&mut cache, b"alice", 1);
+            assert!(!cache.admit(ticket, &[value; HIDDEN], RunOutcome::Completed));
+        }
+        for outcome in [RunOutcome::Cancelled, RunOutcome::Incomplete] {
+            let ticket = miss(&mut cache, b"alice", 1);
+            assert!(!cache.admit(ticket, &[0.; HIDDEN], outcome));
+        }
+        for embedding in [&[][..], &[0.][..]] {
+            let ticket = miss(&mut cache, b"alice", 1);
+            assert!(!cache.admit(ticket, embedding, RunOutcome::Completed));
+        }
+        assert_eq!(cache.cache_stats().admitted, 0);
+        assert_eq!(cache.cache_stats().bytes, 0);
+    }
+
+    #[test]
+    fn cache_lru_entry_and_byte_limits() {
+        let mut probe = cache(1, usize::MAX);
+        store(&mut probe, b"alice", 1);
+        let entry_bytes = probe.cache_stats().bytes;
+        assert!(entry_bytes > HIDDEN * size_of::<f32>());
+        for (entries, bytes) in [(2, usize::MAX), (10, 2 * entry_bytes)] {
+            let mut cache = cache(entries, bytes);
+            store(&mut cache, b"alice", 1);
+            store(&mut cache, b"alice", 2);
+            hit(&mut cache, b"alice", 1);
+            store(&mut cache, b"alice", 3);
+            miss(&mut cache, b"alice", 2);
+            hit(&mut cache, b"alice", 1);
+            hit(&mut cache, b"alice", 3);
+            let stats = cache.cache_stats();
+            assert_eq!(
+                (stats.hits, stats.misses, stats.admitted, stats.evicted),
+                (3, 4, 3, 1)
+            );
+            assert_eq!(stats.bytes, 2 * entry_bytes);
+        }
+        for (entries, bytes) in [(0, usize::MAX), (1, 0), (1, entry_bytes - 1)] {
+            let mut cache = cache(entries, bytes);
+            let ticket = miss(&mut cache, b"alice", 1);
+            assert!(!cache.admit(ticket, &[0.; HIDDEN], RunOutcome::Completed));
+            assert_eq!(cache.cache_stats().bytes, 0);
+        }
+    }
+
+    #[test]
+    fn cache_clear_and_erase_block_all_stale_stores() {
+        let mut cache = cache(8, usize::MAX);
+        store(&mut cache, b"alice", 1);
+        store(&mut cache, b"alice", 2);
+        store(&mut cache, b"bob", 1);
+        let one_entry = cache.cache_stats().bytes / 3;
+        let alice = miss(&mut cache, b"alice", 3);
+        let bob = miss(&mut cache, b"bob", 3);
+        cache.erase_principal(b"alice");
+        assert!(!cache.admit(alice, &[0.; HIDDEN], RunOutcome::Completed));
+        assert!(!cache.admit(bob, &[0.; HIDDEN], RunOutcome::Completed));
+        assert_eq!(cache.cache_stats().bytes, one_entry);
+        miss(&mut cache, b"alice", 1);
+        miss(&mut cache, b"alice", 2);
+        hit(&mut cache, b"bob", 1);
+        let stale = miss(&mut cache, b"bob", 2);
+        cache.clear();
+        assert!(!cache.admit(stale, &[0.; HIDDEN], RunOutcome::Completed));
+        miss(&mut cache, b"bob", 1);
+        assert_eq!(cache.cache_stats().bytes, 0);
+        store(&mut cache, b"alice", 1);
+        cache.erase_principal(b"absent");
+        hit(&mut cache, b"alice", 1);
+        assert_eq!(cache.cache_stats().invalidations, 3);
+        assert_eq!(cache.cache_stats().evicted, 0);
+    }
+
+    #[test]
+    fn cache_tickets_cannot_cross_instances_or_replace_duplicate_runs() {
+        let mut first = cache(3, usize::MAX);
+        let mut second = cache(3, usize::MAX);
+        let ticket = miss(&mut first, b"alice", 1);
+        assert!(!second.admit(ticket, &[0.; HIDDEN], RunOutcome::Completed));
+        let duplicate = miss(&mut first, b"alice", 1);
+        store(&mut first, b"alice", 1);
+        assert!(!first.admit(duplicate, &[1.; HIDDEN], RunOutcome::Completed));
+        assert_eq!(hit(&mut first, b"alice", 1), vec![0.5; HIDDEN]);
+        assert_eq!(first.cache_stats().admitted, 1);
+    }
+
+    #[test]
+    fn cache_equivalence_requires_matching_platform_artifact_and_record() {
+        let mut manifest = manifest();
+        manifest.encoder.kind = manifest::EncoderKind::Onnx;
+        manifest.tolerance.feasibility_record = format!("sha256:{}", "a".repeat(64));
+        let config = config(1, 1024);
+        let refused = |manifest: &EmbedManifest, evidence: &RepeatabilityEvidence| {
+            let error =
+                EmbeddingCache::new(config, manifest, "test-platform", evidence).unwrap_err();
+            assert_eq!(error.code, SetupCode::CacheNotEquivalent);
+            assert_eq!(error.code.as_str(), "cache_not_equivalent");
+        };
+        refused(&manifest, &RepeatabilityEvidence::Unproven);
+        refused(&manifest, &RepeatabilityEvidence::Synthetic);
+        let passing = RepeatabilityEvidence::Measured {
+            artifact: manifest.artifact_id().unwrap(),
+            platform: "test-platform".into(),
+            feasibility_record: manifest.tolerance.feasibility_record.clone(),
+            bitwise_in_process: true,
+        };
+        assert!(EmbeddingCache::new(config, &manifest, "test-platform", &passing).is_ok());
+        for field in 0..4 {
+            let mut evidence = passing.clone();
+            if let RepeatabilityEvidence::Measured {
+                artifact,
+                platform,
+                feasibility_record,
+                bitwise_in_process,
+            } = &mut evidence
+            {
+                match field {
+                    0 => {
+                        *artifact =
+                            ArtifactId::parse(&format!("sha256:{}", "b".repeat(64))).unwrap()
+                    }
+                    1 => *platform = "other-platform".into(),
+                    2 => *feasibility_record = "none".into(),
+                    _ => *bitwise_in_process = false,
+                }
+            }
+            refused(&manifest, &evidence);
+        }
+        manifest.runtime.intra_op_threads += 1;
+        refused(&manifest, &passing);
+    }
+}

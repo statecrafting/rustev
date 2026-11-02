@@ -874,6 +874,27 @@ violation. Unit tests in `tools/rustev-boundaries/src/lib.rs` over
 synthetic metadata: a violating case for each rule and download feature,
 and a passing optional dependency of `rustev-node` on the backend.
 
+**Increment 4 (2026-11-01): the embedding cache (3.14), before increment 3.**
+`src/cache.rs` is the backend-internal memo the backend of increment 3
+will call; nothing constructs it yet. It is off unless
+`embedding_cache: {max_entries, max_bytes}` is given and lives in process
+memory only. Its key is the `ArtifactId`, a domain-separated SHA-256 of
+the principal handle and the SHA-256 of the token ids and attention mask
+after truncation, so entries never cross principal handles (spec 017's
+principal isolation). Enabling it is refused `cache_not_equivalent`
+unless the repeatability evidence for the platform, artifact and manifest
+settings shows bitwise run-to-run repeatability in one process: the
+synthetic encoder has it (3.19.1); an `onnx` encoder needs a passing
+feasibility record, which no platform has. Only finite embeddings of the
+manifest's dimension from completed, non-cancelled runs are admitted;
+eviction is least recently used, bounded by entries and by bytes
+(counted as the embedding payload, the key and entry metadata, without
+allocator overhead). `clear()` and `erase_principal(handle)` advance a
+generation, so a run started under an earlier one is not stored, and
+erasure removes every entry of the handle before returning.
+`cache_stats()` reports `hits`, `misses`, `admitted`, `evicted`, `bytes`
+and `invalidations`. Tests in `tests/bundle.rs` (`cache_tests`).
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

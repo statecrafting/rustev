@@ -146,7 +146,7 @@
       }
     ],
     "sectionDigests": {
-      "011-local-semantic-backend-frozen-embeddings-and-a-linear-head": "0ea07ca143c509b980e080cf78fec1a64e342cade330236c61ea89079fa7288e",
+      "011-local-semantic-backend-frozen-embeddings-and-a-linear-head": "edff6f88a16a5a835bd995b356c7c0dc12e3b5a15e8d44ec39f58fbec5bc5112",
       "1-purpose": "0d3569d95796599deb0bc6feaa4e062fd4a3dfe85a184f8086c973c56415a386",
       "2-1-binding-principles-of-76": "e104a153715a456e6f6b0969c1f41c2c25e36a50e4544767fe3bae305d52a565",
       "2-territory": "5d61b2c53484919461ca3b3927123f08cd4559d0494401ba1fc4091c220e5b6a",
@@ -176,7 +176,7 @@
       "acceptance": "849036fd83aeafe74e21f0db8b8da9f224f5ae90b0e71ed9d346697f08bf549d",
       "decisions-at-approval": "2fbadfeaa0d340fe0a2464cea9006893a256784d301218d5f0c1e597dd8ee8a7",
       "facts-relied-on": "d58aa3f7f5589622c6dbb96230f847757925403b900085a5ce72d2b4132ca18a",
-      "implementation-record": "3659ff221916d7c67d5e4d965a89f6b24a86a77927992063e2cb7c338f7fd7f4",
+      "implementation-record": "a9ed584591bb37bfb5a928db3955011868f14960a49d69176ad689249579413a",
       "verification": "08de6a906e75445bb1f7290eaca32c56b3953ce1e46941f45cee6596cae40b46"
     },
     "sectionHeadings": [
@@ -218,6 +218,6 @@
     "summary": "The first local model backend, `backends/rustev-backend-embed-linear/`: an ordinary `DecisionBackend` that embeds projected text with a frozen, host-provisioned sentence encoder run by ONNX Runtime through `ort`, and answers `classify`, `proposition` and `rubric` with logits from an externally produced, identified task-specific linear head. One canonical `rustev.embed-linear/1` manifest binds checkpoint, graph, tokenizer, preprocessing, truncation, pooling, precision, runtime, heads, labels, cost and tolerance into the artifact identity. Implementation is gated by a staged feasibility record (`rustev.embed-feasibility/1`) that passes or refuses each selection of #69 against measured limits before any inference dependency lands. No network, no download, no training, no provider; repeatability is a declared tolerance, not bitwise. Optional `local-embed` features in the Node binding, the service and the facade, and an opt-in in-process embedding cache. Amends spec 001 only by adding a local inference runtime family and one placement rule to the boundary check. Ratified (A-28) under R-36, which amends R-17 for this spec; R-43 authorizes the feasibility stages and pins the revision that ships an ONNX graph; implementation is pending.\n",
     "title": "Local semantic backend: frozen embeddings and a linear head"
   },
-  "shardHash": "b8ce58af7be2db3a1a3258f7307091f7b99a323f51436a849d092f4668b722f8",
+  "shardHash": "082d5c55c44252dfc984fb952cbcbc0f706e55f84a8310ed8657f3d617093549",
   "specVersion": "1.10.0"
 }
