@@ -15,7 +15,7 @@ summary: >
   ships the package's SYNTHETIC example as package data, adds the
   qualification harness and its workflow, and defines how the owner
   authorizes a release after `0.1.0`, so that the next family version is
-  published through the existing pipeline with npm provenance and qualified. Ratified by the
+  published through the existing pipeline and qualified. Ratified by the
   owner on 2026-10-26 (A-58). Revised the same day (A-59): the work is
   folded into the next family version (`0.2.0`); there is no separate
   `0.1.1`.
@@ -156,8 +156,9 @@ configuration, and runs:
   on the pinned toolchain and on the MSRV.
 - **npm** (031 3.9.7 (b)): a fresh Node project installs `@rustev/rustev`
   and `@rustev/rustev-wasm` at `<version>`, runs `npm audit signatures`
-  and requires a verified provenance attestation for every installed
-  `@rustev/*` package, and runs a smoke test of each (version, plan check
+  and requires, for every installed `@rustev/*` package, a verified
+  registry signature and an integrity equal to the signed manifest; npm
+  provenance is not required (031 3.9.6, A-74). It runs a smoke test of each (version, plan check
   of the declared example, and the WebAssembly module's load).
 - **CLI** (031 3.9.7 (d)): the host's CLI archive is downloaded from the
   hosted release, its checksum compared with its `.sha256` file and the
@@ -218,8 +219,15 @@ to that version in lockstep (021 3.2), including members whose bytes do
 not otherwise change. The release
 follows spec 053 (rehearsal on `release/next`, candidate evidence, owner
 signature and tag) and 031 3.9.6: the npm job publishes through trusted
-publishing with provenance, which also validates the trusted publishers
-attached after `0.1.0`.
+publishing, with provenance where the registry accepts it.
+
+A published release is qualified by the qualification workflow run against
+its tag, by the release run's `qualify` stage or by a later run, which
+takes the harness from the default branch and the release, its manifest,
+its signature, its release set, its adoption subsets and its toolchain pin
+from the tag, so a corrected harness can qualify an earlier release
+(A-74). Every step still runs against the public
+registries and the signed manifest.
 
 ## 4. Observable negative cases
 
@@ -228,7 +236,7 @@ attached after `0.1.0`.
 | `rustev version extra` | Usage error, nonzero exit. |
 | The package's rules copy differs from the backend fixture | The workspace test fails. |
 | A consumer resolves a crate through a path, Git source or warm cache | The harness refuses the run as not fresh. |
-| An npm package installs without a verified provenance attestation | The npm step fails; not `qualified`. |
+| An installed `@rustev/*` package's registry signature does not verify, or its integrity differs from the signed manifest | The npm step fails; not `qualified`. |
 | A platform's step is `not_run` | `rustev-release qualify` refuses. |
 | An instruction for a version after `0.1.0` without a valid owner signature | `publish` refuses before any journal entry or upload. |
 | An instruction for `0.1.0` today | Still governed by 031 3.11.1; no signature is required. |
@@ -246,7 +254,8 @@ attached after `0.1.0`.
   `not_run`, never as passing.
 - After the next family version is published under a signed instruction, the workflow's
   matrix passes and `rustev-release qualify` records the lifecycle as
-  `qualified`.
+  `qualified`; a later run of the workflow against the published tag
+  satisfies this (3.5, A-74).
 
 ## Verification
 
@@ -341,3 +350,16 @@ outputs). With these, a run against 0.3.0 on darwin-arm64 passes `crates`
 and `cli`; `npm` fails only on missing verified provenance, which 3.3
 requires and 0.3.0's npm packages lack (058 records why).
 
+**The npm step without provenance (2026-11-02, 3.3, A-74).**
+`tools/rustev-release/qualify/harness.py` no longer requires npm
+provenance. `npm audit signatures --json` lists only failing packages
+(`invalid` and `missing`) and exits nonzero on any; the earlier check read
+a `verified` list the command does not emit, so it could not pass even
+for a package with provenance. The step now fails when the command fails
+or when an installed `@rustev/*` package is listed as invalid or missing,
+and keeps the check that each package's integrity equals the signed
+manifest. The README says so. The harness reads the release set, the
+adoption subsets and the toolchain pin from `RUSTEV_QUALIFY_RELEASE_TREE`
+when it names a released tree's checkout, otherwise from its own tree, so
+the default branch's harness can qualify an earlier tag whose release set
+differs (3.5).

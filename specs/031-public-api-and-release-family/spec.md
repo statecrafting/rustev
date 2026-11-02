@@ -13,8 +13,8 @@ summary: >
   Fixes one compatibility policy for every public surface (Rust API,
   documents, protocols, npm packages, service API, PlanId, MSRV), a supply
   chain of CycloneDX SBOMs, `cargo deny`, reproducible package checks,
-  signed tags, signed artifacts with stated SLSA build provenance and npm
-  provenance, a changelog generated from the governed corpus, and
+  signed tags, signed artifacts with stated SLSA build provenance, npm
+  provenance where the registry accepts it, a changelog generated from the governed corpus, and
   `cargo semver-checks` against the previous release. Narrowly amends spec
   001 3.4.4, spec 010 I-2 and spec 008 for the facade and lodging. Approved
   (A-27) under R-39. Approval authorizes implementation and candidate
@@ -467,9 +467,14 @@ lodging. Each artifact kind adds:
    release manifest records the level per artifact. These attestations are
    in addition to the owner's detached signatures over the manifest and
    `SHA256SUMS` required by spec 021 3.8.
-6. **npm provenance.** Every npm package is published with npm provenance
-   attestations from the release workflow; a package without verifiable
-   provenance is not published.
+6. **npm provenance.** The release workflow publishes every npm package
+   through npm trusted publishing with provenance when the registry accepts
+   it. While it does not (npm/cli#9969: npm's token exchange refuses the
+   repository's immutable OIDC subject), the owner publishes the run's
+   verified tarballs by hand and the run records them (058 3.3.2); those
+   packages carry no npm provenance. Provenance is not a condition of
+   publication or of qualification (A-74). A package is published only as
+   the run's verified tarball, whose integrity equals the signed manifest.
 7. **Fresh-consumer qualification** (spec 021 3.10, all six steps kept)
    adds: (a) a fresh consumer resolves `rustev =X.Y.Z` from the registry with
    no path, Git or patch override and builds each subset of 3.5; (b) a
@@ -590,7 +595,7 @@ Environment; approval of this spec is not that approval.
 | `cargo semver-checks` finds a break with only a patch bump | CI fails. |
 | No previous release exists | `semver` reports `no-baseline`, recorded as not applicable, not as passed. |
 | Two image builds produce different platform digests | Release blocked and explained. |
-| An npm package lacks provenance | Not published; release not `released`. |
+| An npm tarball's integrity differs from the signed manifest | Not published; release not `released`. |
 | An artifact lacks an SBOM | Candidate fails. |
 | Publication starts before every check passes, or before the manifest is journaled | Not authorized by 3.11; the operator stops. |
 | A second version or a yank is attempted under the work order | Not authorized; needs a fresh owner instruction. |
@@ -606,7 +611,8 @@ Environment; approval of this spec is not that approval.
 - `cargo semver-checks` (or equivalent for npm and the service API) runs in
   CI against the previous release (3.8).
 - Signed tags and verified artifacts; SBOMs attached; build provenance with
-  the SLSA level stated per artifact; npm provenance (3.9).
+  the SLSA level stated per artifact; npm packages equal to the signed
+  manifest, with npm provenance where the registry accepts it (3.9.6).
 - The release-set file fixes members, layers, absences with reasons, and the
   feature map; its check matches `cargo metadata`.
 - Boundary-tool fixtures cover each rule of 3.3; the facade public-items

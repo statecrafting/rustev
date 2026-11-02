@@ -12,7 +12,13 @@ data only. Python 3.11 or later handles TOML and JSON; Cargo, rustup, npm, Node,
 GitHub CLI and ssh-keygen are needed for the relevant live steps. The pinned Rust
 toolchain and manifest MSRV must already be installed. No toolchain is installed
 implicitly. npm must support `audit signatures --json --include-attestations`.
-A registry signature alone does not satisfy the per-package provenance check.
+Every installed `@rustev/*` package needs a verified registry signature and an
+integrity equal to the signed manifest; npm provenance is not required (056
+3.3, A-74).
+
+To qualify an earlier tag with this harness, set `RUSTEV_QUALIFY_RELEASE_TREE`
+to a checkout of that tag: the release set, the adoption subsets and the
+toolchain pin come from there (056 3.5).
 
 The shell creates and removes a new temporary directory. Its resolved ancestors
 must contain neither Cargo.toml nor package.json. Visible Cargo source, patch,

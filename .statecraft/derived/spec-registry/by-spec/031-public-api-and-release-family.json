@@ -258,7 +258,7 @@
       }
     ],
     "sectionDigests": {
-      "031-public-api-facade-compatibility-policy-and-release-family-amends-021": "f1e02aada556afa65816048386321e2f717337b6f6440f671101f3839e0306de",
+      "031-public-api-facade-compatibility-policy-and-release-family-amends-021": "75ce98f65d95dd600842dce11d1d2edb3db5c3ba770ce0e350010d842c69ecde",
       "1-purpose": "53645ebab7cc475ba8fc536cdce04fddf0d0569614ce5f6bbc533989bffb8d61",
       "2-1-current-state-observed-2026-10-16": "a1a51aac02a5730ea5c747f68e58ad678b70c55c2145338cdabd173aa38a24ab",
       "2-2-what-changes": "5d90fff50199ede2dcf9ab7a4e4373b3a53495aaabd045cf1bec9dd718e7d456",
@@ -276,11 +276,11 @@
       "3-6-compatibility-policy": "3216991a263ae3ad4523244d86cb768bd9c396e6febee3b6fab471421264fc2e",
       "3-7-plan-identity-stability": "7fe38dc86e298ad55cbded8ca88679b0c786a9d25227c2d0ac6546965eb496ae",
       "3-8-api-compatibility-checks": "de3e91c6c4a662ffb47f09fd1e171d0707807033ee917fa7260436d1c1ffd70b",
-      "3-9-supply-chain": "262a414f0e9c7d45e4aef686f6d8df075f2421ae7031063730ec007af5844c21",
-      "3-behavior": "6f1553dce748d0b5f6b61c259bb616f374fd6b396504fc9a6889fb98478e44bb",
+      "3-9-supply-chain": "a4f28690bad583259506531db2abcdd23941f29b44927f3f7d51c88b82bf33c4",
+      "3-behavior": "1ee6f6fc2434eb8e64f76282af4b440fc437244c4943bae1b07df7ca78343b2b",
       "4-out-of-scope": "7c0063bbd37428a2102f50e351db1c3477afd93cc9a838b598d59768abebe10b",
-      "5-observable-negative-cases": "3b087c351903622ff440c3ddd139f3f991cc0ecc6ef0dd616e533ce932657060",
-      "acceptance": "5248842f5b83e47172353e94ec868d3d34afeb2b4d9e0b205ce1fbe7f280a4c6",
+      "5-observable-negative-cases": "d8fa1339a025b49865a0b5657efb0d04567297e59325b13d273549362d0c1c70",
+      "acceptance": "acdb55d2e7e7e17298fd47c5528d782bfdb248673c030b1b6ff62d0eef2a7a2d",
       "decisions-at-approval": "2528f31a1a63416de80bfc31f78caf08d3b487baf2e3a70d834909cd9c978001",
       "implementation-record": "44b83037a3a6866ca2b63282e238390e1714165c78f9917c84556800c8ceb2eb",
       "verification": "170a9fee422adb915e1ae9092ac37fb6111a95a946616dc45ab0c1136bc66fda"
@@ -315,9 +315,9 @@
     ],
     "specPath": "specs/031-public-api-and-release-family/spec.md",
     "status": "approved",
-    "summary": "Amends spec 021 so the first public release becomes a release family: the existing eight crates plus `rustev-pkg-lodging`, a facade crate `rustev` with no default features and one optional feature per adoptable slice, further integration crates as each lands, native and WebAssembly npm packages, a multi-arch service container image and prebuilt CLI binaries. Fixes one compatibility policy for every public surface (Rust API, documents, protocols, npm packages, service API, PlanId, MSRV), a supply chain of CycloneDX SBOMs, `cargo deny`, reproducible package checks, signed tags, signed artifacts with stated SLSA build provenance and npm provenance, a changelog generated from the governed corpus, and `cargo semver-checks` against the previous release. Narrowly amends spec 001 3.4.4, spec 010 I-2 and spec 008 for the facade and lodging. Approved (A-27) under R-39. Approval authorizes implementation and candidate evidence; publication of the first release is authorized only by the conditional owner act quoted in section 3.11, and no other release, yank, repair version, workflow change without the owner's environment approval, or availability claim is authorized.\n",
+    "summary": "Amends spec 021 so the first public release becomes a release family: the existing eight crates plus `rustev-pkg-lodging`, a facade crate `rustev` with no default features and one optional feature per adoptable slice, further integration crates as each lands, native and WebAssembly npm packages, a multi-arch service container image and prebuilt CLI binaries. Fixes one compatibility policy for every public surface (Rust API, documents, protocols, npm packages, service API, PlanId, MSRV), a supply chain of CycloneDX SBOMs, `cargo deny`, reproducible package checks, signed tags, signed artifacts with stated SLSA build provenance, npm provenance where the registry accepts it, a changelog generated from the governed corpus, and `cargo semver-checks` against the previous release. Narrowly amends spec 001 3.4.4, spec 010 I-2 and spec 008 for the facade and lodging. Approved (A-27) under R-39. Approval authorizes implementation and candidate evidence; publication of the first release is authorized only by the conditional owner act quoted in section 3.11, and no other release, yank, repair version, workflow change without the owner's environment approval, or availability claim is authorized.\n",
     "title": "Public API facade, compatibility policy and release family (amends 021)"
   },
-  "shardHash": "b64668e63710c6d4c660b10695ee1cf64fe19ce99076334bdb2e3a8e78b7bf32",
+  "shardHash": "f0b930899ceeed6eea4edd86846b4a1ecf15f77ad645ea80b3dcbf58a0eb9269",
   "specVersion": "1.10.0"
 }
