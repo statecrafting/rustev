@@ -2,7 +2,7 @@
 id: "022-jev-production-transport"
 title: "Production transport and served identity for the Jev adapter (amends 012)"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-09-27"
 summary: >
   The separately reviewable spec 012 amendment that backlog item RUSTEV-010
@@ -588,6 +588,13 @@ row. Tests in `integrations/rustev-jev/tests/production.rs`:
 `production_records_acceptance_digest_without_retaining_bytes`,
 `production_plan_checks_every_primary_and_fallback_qualification` and
 `production_construction_checks_acceptance_without_reading_credentials`.
+
+**Stage 3 record accepted (2026-11-01, A-72).** The owner accepted the
+stage 3 record of A-68's binding as the first `Qualification` in its own
+decision row, A-72, which a host names as that record's authorization. With
+3.7.5 implemented (2026-10-31), every acceptance item holds, so 022 is
+`complete`. No code changes. Production use, deployment and real-user data
+stay the owner's separate acts (3.1.4).
 
 ## Questions settled at approval
 
