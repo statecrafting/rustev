@@ -107,7 +107,7 @@
         "anchor": "3-2-the-feasibility-gate",
         "id": "R-1",
         "kind": "requirement",
-        "text": "No inference dependency enters the workspace until the feasibility record passes stages 1 to 3 for at least one platform; a platform is supported only when all four stages pass for it, and a refusal is recorded, never hidden."
+        "text": "No inference dependency enters the workspace until the feasibility record passes stages 1 to 3 for at least one platform; a platform is supported only when all four stages pass for it and the Node binding builds with `local-embed` on its native matrix target, and a refusal is recorded, never hidden."
       },
       {
         "anchor": "3-14-embedding-cache",
@@ -146,7 +146,7 @@
       }
     ],
     "sectionDigests": {
-      "011-local-semantic-backend-frozen-embeddings-and-a-linear-head": "0ea07ca143c509b980e080cf78fec1a64e342cade330236c61ea89079fa7288e",
+      "011-local-semantic-backend-frozen-embeddings-and-a-linear-head": "3eeebabf5530786120928c626a3b98ff8046aa39263533c8ca6bd062fca84058",
       "1-purpose": "0d3569d95796599deb0bc6feaa4e062fd4a3dfe85a184f8086c973c56415a386",
       "2-1-binding-principles-of-76": "e104a153715a456e6f6b0969c1f41c2c25e36a50e4544767fe3bae305d52a565",
       "2-territory": "5d61b2c53484919461ca3b3927123f08cd4559d0494401ba1fc4091c220e5b6a",
@@ -161,20 +161,20 @@
       "3-17-optional-features-in-bindings-service-and-facade": "e2e1bc07ff599652b1f0ef1031632b972988eb18ac22448663fa47996a460ed4",
       "3-18-boundary-check-extension": "5b7f60b9bb89ca17d8c72660e0126a56ff1da676eccc26252ad43160bb1f3f90",
       "3-19-synthetic-encoder-and-test-bundles": "df206b7e1a82166169df3d8414b9fd23e6ea1e451bdc24305c0ecab0ca2fd738",
-      "3-2-the-feasibility-gate": "b4a8ad9c018c55cfd77941cfbf3d074115cf2f5ef8d49cdb7ad55c4a060ca789",
+      "3-2-the-feasibility-gate": "b8667a6e3febd999c74dbdddf95de327af877e809b55c015e6f805d03b2a6bb3",
       "3-20-compatibility": "db27c65d6a0dad446a86f8b806e0fa8ce21799853e28434185ee8fc713aed07a",
       "3-3-selections": "21d08b72b9642bf0db2527fa17078e32db60e9779f0049ed3ba3c531b2f5efed",
       "3-4-the-bundle-and-manifest": "78a9c19fe2177508ad3bd1bdad571c10898639da3d8aab9417686b262098c5b7",
       "3-5-identity": "ee5155b723a500e1a5d3991eebfbe7e4d465e90fd8f195112515e71c149c79bc",
-      "3-6-runtime-loading-and-platforms": "d27a1d06d24b664b5557e711110157d6ba87b93fb77b12790682fa3cafbb79db",
-      "3-7-setup-and-refusals": "e87e74572996c777540143c4e961a2110003d2d3c67e4b417ca41d50d4ffc8ac",
+      "3-6-runtime-loading-and-platforms": "1acbd8eb33c7bfc4ba262e090c1271607040a75fcf9fe6fe1514b37768d48e5e",
+      "3-7-setup-and-refusals": "92dd9942e2a236800e10c60cde570e1ab3e3377742a275e6bae36ac5e479b1ae",
       "3-8-text-tokenization-and-truncation": "32a1aada3820375c60416bf0c48a8d7f2ad81af8df943192ef3302d161fe6b40",
       "3-9-encoder-pooling-and-the-linear-head": "545e72eb34886b149137a05a3c9ed85f775c048f9f17604ef48b7ce3a96abd52",
-      "3-behavior": "1df9797d4c13bb04bb22e79068654ac39266f3b7680c1125cc2c1d187520d810",
+      "3-behavior": "baf2caa66895316ab167660e1fababe1861605021f530fa0ee91ea0d5eb00cda",
       "4-out-of-scope": "f275e77d9523117145c5a97a08720da1a6e573b843faa17c855651043bf0a4c0",
-      "5-observable-negative-cases": "fd47616f6359eb3c535ba15cc915968ed1a77533e3427fb70c70d44ab2163dd4",
+      "5-observable-negative-cases": "566d52b81dffcd534849da726c1c81157327e10bea29d721d4ff1659edc2bbe7",
       "acceptance": "849036fd83aeafe74e21f0db8b8da9f224f5ae90b0e71ed9d346697f08bf549d",
-      "decisions-at-approval": "2fbadfeaa0d340fe0a2464cea9006893a256784d301218d5f0c1e597dd8ee8a7",
+      "decisions-at-approval": "435cac81a46634cef69c8e591961e4196f76d963734418943b475d7aaca664e4",
       "facts-relied-on": "d58aa3f7f5589622c6dbb96230f847757925403b900085a5ce72d2b4132ca18a",
       "implementation-record": "3659ff221916d7c67d5e4d965a89f6b24a86a77927992063e2cb7c338f7fd7f4",
       "verification": "08de6a906e75445bb1f7290eaca32c56b3953ce1e46941f45cee6596cae40b46"
@@ -218,6 +218,6 @@
     "summary": "The first local model backend, `backends/rustev-backend-embed-linear/`: an ordinary `DecisionBackend` that embeds projected text with a frozen, host-provisioned sentence encoder run by ONNX Runtime through `ort`, and answers `classify`, `proposition` and `rubric` with logits from an externally produced, identified task-specific linear head. One canonical `rustev.embed-linear/1` manifest binds checkpoint, graph, tokenizer, preprocessing, truncation, pooling, precision, runtime, heads, labels, cost and tolerance into the artifact identity. Implementation is gated by a staged feasibility record (`rustev.embed-feasibility/1`) that passes or refuses each selection of #69 against measured limits before any inference dependency lands. No network, no download, no training, no provider; repeatability is a declared tolerance, not bitwise. Optional `local-embed` features in the Node binding, the service and the facade, and an opt-in in-process embedding cache. Amends spec 001 only by adding a local inference runtime family and one placement rule to the boundary check. Ratified (A-28) under R-36, which amends R-17 for this spec; R-43 authorizes the feasibility stages and pins the revision that ships an ONNX graph; implementation is pending.\n",
     "title": "Local semantic backend: frozen embeddings and a linear head"
   },
-  "shardHash": "b8ce58af7be2db3a1a3258f7307091f7b99a323f51436a849d092f4668b722f8",
+  "shardHash": "27d6d9d54d0bcc559f78e5e4133b6209fa20b1650f945031892d3801ec2f96be",
   "specVersion": "1.10.0"
 }
