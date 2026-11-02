@@ -118,8 +118,24 @@ pub const PACKAGE_DEPENDENCIES: &[&str] = &["rustev-contract", "rustev-core"];
 /// crate under `integrations/`, and only optionally (3.3).
 pub const FACADE: &str = "rustev";
 
-/// 049 3.1: only this normal dependency crosses between integrations.
+/// 049 3.1: the Node binding's normal dependency on the telemetry crate.
 pub const NODE_TELEMETRY_EDGE: (&str, &str) = ("rustev-node", "rustev-otel");
+
+/// 059 3.1: the remote integrations' normal dependencies on the shared
+/// transport, spec 009's Part A machinery.
+pub const REMOTE_TRANSPORT_EDGES: &[(&str, &str)] = &[
+    ("rustev-jev", "rustev-remote-http"),
+    ("rustev-bedrock", "rustev-remote-http"),
+    ("rustev-serve", "rustev-remote-http"),
+];
+
+/// The only dependencies that cross between integration crates: each a
+/// normal dependency (049 3.1, 059 3.1).
+fn integration_edge_allowed(krate: &str, dependency: &str, kind: Option<&str>) -> bool {
+    kind.is_none()
+        && ((krate, dependency) == NODE_TELEMETRY_EDGE
+            || REMOTE_TRANSPORT_EDGES.contains(&(krate, dependency)))
+}
 
 /// The subset of `cargo metadata` output this check reads.
 #[derive(Debug, Deserialize)]
@@ -502,9 +518,7 @@ pub fn check(meta: &Metadata) -> Vec<Violation> {
                             detail,
                         });
                     }
-                } else if !((pkg.name.as_str(), dep.name.as_str()) == NODE_TELEMETRY_EDGE
-                    && dep.kind.is_none())
-                {
+                } else if !integration_edge_allowed(&pkg.name, &dep.name, dep.kind.as_deref()) {
                     out.insert(Violation::DependsOnIntegration {
                         krate: pkg.name.clone(),
                         dependency: dep.name.clone(),
@@ -1905,16 +1919,95 @@ mod tests {
         }
     }
 
+    // 059 3.1.3: three normal edges to the shared transport, and nothing else.
+    #[test]
+    fn remote_transport_exception_is_three_normal_edges() {
+        for (from, to, kind, allowed) in [
+            ("rustev-jev", "rustev-remote-http", None, true),
+            ("rustev-bedrock", "rustev-remote-http", None, true),
+            ("rustev-serve", "rustev-remote-http", None, true),
+            ("rustev-jev", "rustev-remote-http", Some("build"), false),
+            ("rustev-jev", "rustev-remote-http", Some("dev"), false),
+            ("rustev-bedrock", "rustev-remote-http", Some("build"), false),
+            ("rustev-bedrock", "rustev-remote-http", Some("dev"), false),
+            ("rustev-serve", "rustev-remote-http", Some("build"), false),
+            ("rustev-serve", "rustev-remote-http", Some("dev"), false),
+            ("rustev-jev", "rustev-bedrock", None, false),
+            ("rustev-bedrock", "rustev-jev", None, false),
+            ("rustev-serve", "rustev-jev", None, false),
+            ("rustev-jev", "rustev-otel", None, false),
+            ("rustev-bedrock", "rustev-otel", None, false),
+            ("rustev-serve", "rustev-otel", None, false),
+            ("rustev-node", "rustev-remote-http", None, false),
+            ("rustev-otel", "rustev-remote-http", None, false),
+        ] {
+            let from_dir = format!("integrations/{from}");
+            let to_dir = format!("integrations/{to}");
+            let m = meta(
+                &[
+                    (from, &from_dir, &[(to, kind, Some(&to_dir))]),
+                    (to, &to_dir, &[]),
+                ],
+                &[],
+                &[(from, to, kind)],
+            );
+            let violations = check(&m);
+            assert_eq!(
+                violations.contains(&Violation::DependsOnIntegration {
+                    krate: from.into(),
+                    dependency: to.into(),
+                }),
+                !allowed,
+                "{from} -> {to} ({kind:?})"
+            );
+            if allowed {
+                assert!(violations.is_empty(), "{violations:?}");
+            }
+        }
+    }
+
+    // 059 3.1.3 and 001 3.4.2: a crate outside `integrations/` on the shared
+    // transport, as any kind of dependency, still fails.
+    #[test]
+    fn a_crate_outside_integrations_on_the_shared_transport_fails() {
+        for kind in [None, Some("build"), Some("dev")] {
+            let m = meta(
+                &[
+                    (
+                        "rustev-runtime",
+                        "crates/rustev-runtime",
+                        &[(
+                            "rustev-remote-http",
+                            kind,
+                            Some("integrations/rustev-remote-http"),
+                        )],
+                    ),
+                    ("rustev-remote-http", "integrations/rustev-remote-http", &[]),
+                ],
+                &[],
+                &[("rustev-runtime", "rustev-remote-http", kind)],
+            );
+            assert!(
+                check(&m).contains(&Violation::DependsOnIntegration {
+                    krate: "rustev-runtime".into(),
+                    dependency: "rustev-remote-http".into(),
+                }),
+                "{kind:?}"
+            );
+        }
+    }
+
     #[test]
     fn another_integration_depending_on_an_integration_still_fails() {
-        // The exception names the facade alone (3.3): a second integration
-        // crate depending on the remote binding still breaks 001 3.4.4.
+        // The facade's exception (3.3) is the facade's alone: an integration
+        // crate outside the named edges (049 3.1, 059 3.1) depending on the
+        // remote binding still breaks 001 3.4.4.
         let v = facade_ws(|m| {
-            m.workspace_members.push("rustev-serve 0.1.0".into());
+            m.workspace_members.push("rustev-otel 0.1.0".into());
             m.packages.push(Package {
-                id: "rustev-serve 0.1.0".into(),
-                name: "rustev-serve".into(),
-                manifest_path: "/ws/integrations/rustev-serve/Cargo.toml".into(),
+                id: "rustev-otel 0.1.0".into(),
+                name: "rustev-otel".into(),
+                manifest_path: "/ws/integrations/rustev-otel/Cargo.toml".into(),
                 dependencies: vec![Dependency {
                     name: "rustev-remote-http".into(),
                     kind: None,
@@ -1928,7 +2021,7 @@ mod tests {
         assert_eq!(
             v,
             vec![Violation::DependsOnIntegration {
-                krate: "rustev-serve".into(),
+                krate: "rustev-otel".into(),
                 dependency: "rustev-remote-http".into()
             }]
         );

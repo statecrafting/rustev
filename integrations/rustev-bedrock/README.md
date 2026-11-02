@@ -1,7 +1,8 @@
 # rustev-bedrock
 
-Spec 030's explicit host-constructed remote backend, using the spec 009 sources
-and spec 012 spend journal by path. The core and contract are unchanged.
+Spec 030's explicit host-constructed remote backend, using spec 009's Part A
+machinery through its dependency on `rustev-remote-http` (spec 059) and the
+spend journal of `rustev-live`. The core and contract are unchanged.
 
 Construct `BedrockBackend::new` with a parsed `BedrockBinding`, a host-owned
 `ModelPolicy`, matching `Materials`, and `adapter::Config` containing a

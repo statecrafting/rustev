@@ -2,7 +2,7 @@
 id: "059-shared-remote-transport-by-dependency"
 title: "Shared remote transport by dependency, not by source link (amends 001, 010, 012, 030 and 049)"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-29"
 summary: >
   An amendment of approved specs 001 (3.4.4), 010 (I-2 and the
@@ -37,6 +37,8 @@ extends:
   # establishes no unit, so the `amends` edge carries that amendment and no
   # `extends` entry names 049.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  # 059 in exactly one acceptance group at completion (scripts/acceptance/verify.py).
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "009-remote-adapter-protocol"
@@ -208,7 +210,10 @@ fixture; the release set and the facade's features.
   directory (I-2). A `#[path]` that stays inside the crate, such as a test
   module included from the crate's `tests/`, is not a source link.
 - `cargo test` of the three crates and of `rustev-remote-http`, with all
-  features, passes with no test changed.
+  features, passes with no test changed, except that `rustev-bedrock`'s
+  environment scan (`tests/environment.rs`) follows each re-exported module
+  into `integrations/rustev-remote-http/src/` as it followed each `#[path]`
+  link, so it scans the same files as before.
 - `make code`, the declared verification and `make gate` pass.
 
 ## Verification
@@ -232,10 +237,39 @@ cargo test -p rustev-serve --locked --all-features
 
 ## Implementation record
 
-Not started. A prototype of 3.2 on 2026-10-29 (not committed) built all
-three crates, with every target and feature, after replacing the 27
-`#[path]` modules. Its only change beyond 3.2 was dropping two imports
-`rustev-serve` did not use (`phases`, `pool`).
+**2026-11-02: complete, in one change.**
+
+- 3.1: `tools/rustev-boundaries` admits `REMOTE_TRANSPORT_EDGES`, the three
+  normal edges to `rustev-remote-http`, beside 049's `NODE_TELEMETRY_EDGE`.
+  `remote_transport_exception_is_three_normal_edges` covers each allowed
+  edge, each as a build and as a dev dependency, each of the three on
+  another integration crate and on `rustev-otel`, and `rustev-node` and
+  `rustev-otel` on `rustev-remote-http`;
+  `a_crate_outside_integrations_on_the_shared_transport_fails` covers a
+  crate outside `integrations/` with each kind. The facade test that used
+  `rustev-serve` on `rustev-remote-http` as its refused integration edge now
+  uses `rustev-otel`, since the former is allowed.
+- 3.2: the 31 `#[path]` modules become the dependency. `rustev-jev` and
+  `rustev-bedrock` re-export their eleven modules by name. Since spec 042,
+  `rustev-serve` linked nine modules, not the five that section 1's table
+  lists (`callback_server`, `context_client`, `seam_queue` and `taxonomy`
+  joined); it now imports the four its library uses (`budget`,
+  `context_client`, `http`, `wire`) and, for its conformance runner only, the
+  three that runner uses (`callback_server`, `phases`, `taxonomy`). `pool`
+  and `seam_queue` were compiled in unused and are no longer named. No file
+  under `integrations/rustev-remote-http/src/` changes. Its own test-only
+  `#[path]` link (`../tests/conformance/runner.rs`) stays inside the crate.
+- 3.3: every existing test of the four crates passes with all features:
+  `rustev-remote-http` 156, `rustev-jev` 92, `rustev-bedrock` 53 and
+  `rustev-serve` 79. One test changed, as the Acceptance now states:
+  `rustev-bedrock`'s `no_environment_access_outside_the_feature_module_and_the_smoke`
+  scanned the files its `#[path]` links named and asserted more than twenty;
+  with the links gone it found eleven. Its walk now also follows each
+  `pub use rustev_remote_http::<module>;` to that module's file, so the
+  scan covers the same sources the crate runs and the assertion is
+  unchanged.
+- `059` joins `VERIFIED_SPECS` and the `integrations-base` acceptance group,
+  beside 010, 012 and 030, the specs it amends.
 
 ## Decisions at approval
 

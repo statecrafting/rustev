@@ -51,9 +51,10 @@ fn rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-/// Every source file that can be compiled into the crate: each `.rs` file
-/// under `src/` and `examples/`, and each file a `#[path]` attribute in one
-/// of them names (spec 009's sources), followed transitively. Scanning a
+/// Every source file that can be compiled into the crate or run by it: each
+/// `.rs` file under `src/` and `examples/`, each file a `#[path]` attribute
+/// in one of them names, and each spec 009 module the crate re-exports from
+/// `rustev-remote-http` (spec 059 3.2.2), followed transitively. Scanning a
 /// file that is not compiled only makes the check stricter.
 fn compiled_sources() -> Vec<PathBuf> {
     let root = Path::new(ROOT);
@@ -83,6 +84,16 @@ fn compiled_sources() -> Vec<PathBuf> {
             // nothing; the compiler refuses a real one.
             let target = file.parent().unwrap().join(target);
             if target.is_file() {
+                queue.push(target);
+            }
+        }
+        for line in text.lines().map(str::trim) {
+            if let Some(module) = line
+                .strip_prefix("pub use rustev_remote_http::")
+                .and_then(|rest| rest.strip_suffix(';'))
+            {
+                let target = root.join(format!("../rustev-remote-http/src/{module}.rs"));
+                assert!(target.is_file(), "{}", target.display());
                 queue.push(target);
             }
         }
