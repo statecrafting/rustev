@@ -208,7 +208,9 @@ async fn a_full_queue_refuses_without_enqueueing() {
             async move { c.fetch(&w, &cx(d, 5_000)).await },
         ));
     }
-    until(|| client.counters().depth == 2).await;
+    // Depth counts the in-flight call as soon as it is dispatched, before the
+    // source has received it; wait for both so the call count is settled.
+    until(|| client.counters().depth == 2 && s.source.calls.load(Ordering::SeqCst) == 1).await;
     let error = client.fetch(&want, &cx("d3", 5_000)).await.unwrap_err();
     assert_eq!(error, "remote_seam_queue_full");
     assert_eq!(client.counters().refused, 1);
