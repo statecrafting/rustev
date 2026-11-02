@@ -454,6 +454,114 @@ fn crash(j: &SpendJournal, decision: &str) -> String {
     attempt
 }
 
+fn unique_reservations(journal: &SpendJournal) -> usize {
+    let entries = std::fs::read_to_string(journal.path()).unwrap();
+    let mut ids = std::collections::BTreeSet::new();
+    for line in entries.lines() {
+        let entry: serde_json::Value = serde_json::from_str(line).unwrap();
+        if entry["op"] == "reserve" {
+            assert!(ids.insert(entry["attempt"].as_str().unwrap().to_owned()));
+        }
+    }
+    ids.len()
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn resumed_completed_probe_reserves_fresh_ids() {
+    let dir = Dir::new();
+    let head = answering(linear_head());
+    let r = rig(config(8, 0, 1), &[(head, 8)]);
+    for (resume, prefix, reservations) in [
+        (false, "live/run/.probe/", 3),
+        (true, "live/run/.probe/resume-1/", 6),
+        (true, "live/run/.probe/resume-2/", 9),
+    ] {
+        let mut options = dir.options();
+        options.resume = resume;
+        options.probe_only = true;
+        let journal = dir.journal();
+        let out = prepare(spec(), options)
+            .unwrap()
+            .execute(
+                &r.rt,
+                journal.clone(),
+                &Host(None),
+                &r.clock,
+                &CancelSignal::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(out.status, RunStatus::Probed);
+        assert_eq!(
+            out.probe.bindings[0].calls[0].decision_id,
+            format!("{prefix}1/1")
+        );
+        assert_eq!(unique_reservations(&journal), reservations);
+        let record = rustev_contract::run::RunRecord::parse(
+            &std::fs::read(dir.0.join("out/probe/1.1.run.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(record.decision_id, format!("{prefix}1/1"));
+    }
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn crash_mid_resumed_probe_advances_reserved_sequence() {
+    for previous in [1, 10] {
+        let dir = Dir::new();
+        drop(prepare(spec(), dir.options()).unwrap());
+        let journal = dir.journal();
+        // Model durable reservations left by a crash, as in the case crash tests.
+        // Several bindings and calls still constitute only one original sequence.
+        for id in [
+            "live/run/.probe/1/1",
+            "live/run/.probe/2/1",
+            "live/run/.probe/2/2",
+        ] {
+            crash(&journal, id);
+        }
+        crash(&journal, &format!("live/run/.probe/resume-{previous}/1/1"));
+        // A released sequence also counts; numeric 10 must sort after 9.
+        if previous == 10 {
+            let decision = "live/run/.probe/resume-9/1/1";
+            let key = format!("{decision}/{}topic/1", attempt_prefix(decision));
+            let reservation = journal.reserve(&key, 7).unwrap();
+            journal.release(reservation);
+        }
+        // Other runs and dataset decisions must not affect the probe sequence.
+        crash(&journal, "live/other/.probe/resume-3/1/1");
+        crash(&journal, "live/run/a/1/x");
+        drop(journal);
+        let head = answering(linear_head());
+        let r = rig(config(8, 0, 1), &[(head, 8)]);
+        let mut options = dir.options();
+        options.resume = true;
+        options.probe_only = true;
+        let journal = dir.journal();
+        let out = prepare(spec(), options)
+            .unwrap()
+            .execute(
+                &r.rt,
+                journal.clone(),
+                &Host(None),
+                &r.clock,
+                &CancelSignal::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(out.status, RunStatus::Probed);
+        assert_eq!(
+            out.probe.bindings[0].calls[0].decision_id,
+            format!("live/run/.probe/resume-{}/1/1", previous + 1)
+        );
+        assert_eq!(
+            unique_reservations(&journal),
+            if previous == 10 { 10 } else { 9 }
+        );
+        assert_eq!(out.run_spend.liability, 35);
+    }
+}
+
 #[tokio::test(flavor = "current_thread")]
 async fn crash_classification_reruns_and_old_liability_count_once() {
     let dir = Dir::new();
