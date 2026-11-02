@@ -363,3 +363,13 @@ adoption subsets and the toolchain pin from `RUSTEV_QUALIFY_RELEASE_TREE`
 when it names a released tree's checkout, otherwise from its own tree, so
 the default branch's harness can qualify an earlier tag whose release set
 differs (3.5).
+
+**A default-branch harness for a published tag (2026-11-02, 3.5, A-74).**
+`.github/workflows/qualify.yml` takes a dispatch input
+`harness_from_default_branch` (default false). When set, the workflow
+checks out the tag as before, for the release's manifest, toolchain pin and
+MSRV, and the default branch into `harness/`, and runs that branch's
+`qualify.sh` with `RUSTEV_QUALIFY_RELEASE_TREE` naming the tag's checkout,
+from which the harness reads the release set, the adoption subsets and the
+toolchain pin. The release run's call is unchanged and runs the tag's
+harness.
