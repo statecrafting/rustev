@@ -57,7 +57,7 @@ obligations:
     anchor: "3-2-one-run"
   - id: "R-3"
     kind: requirement
-    text: "Crates are published to crates.io and npm packages to the npm registry from the run through trusted publishing (OIDC), npm packages with provenance; no long-lived registry token is read when trusted publishing is configured."
+    text: "Crates are published to crates.io and npm packages to the npm registry from the run through trusted publishing (OIDC), npm packages with provenance where the registry accepts it; when npm refuses the exchange, the owner publishes the run's verified tarballs and the run records them; no long-lived registry token is read."
     anchor: "3-3-publication"
   - id: "R-4"
     kind: requirement
@@ -216,7 +216,14 @@ Publication starts only after every job of 3.2 and `approve` pass.
    first, then `@rustev/rustev` and `@rustev/rustev-wasm`), with
    `npm publish --provenance` through npm trusted publishing (OIDC, the
    `npm-publish` Environment its publishers are bound to). It publishes
-   the run's verified tarballs, never a repack.
+   the run's verified tarballs, never a repack. When npm refuses the
+   trusted-publishing exchange (npm/cli#9969, open since 2026-10-28: the
+   immutable OIDC subject is rejected), the job fails before any upload;
+   the owner publishes the run's verified tarballs by hand, each checked
+   first against the manifest's SHA-512 integrity, and rerunning the failed
+   jobs records each as `present` (3.5.2). Those packages carry no npm
+   provenance, which is accepted (031 3.9.6, A-74); no npm token enters the
+   run.
 3. **GitHub release.** `github-release` creates the release `vX.Y.Z`
    holding the CLI archives, the npm tarballs, the `.crate` archives,
    every SBOM and bundle, the manifest, `SHA256SUMS`, the changelog and
@@ -351,10 +358,12 @@ publishers for the nine packages (workflow `release.yml`, Environments
   `publish-crates`, `publish-npm` and `github-release` follow every job
   of 3.2, that `qualify` is the last job, and that no job holds
   `packages: write` and only `github-release` holds `contents: write`.
-- The first release after 0.2.0 is published by one tagged run, every
-  npm package with verified provenance, and that run's `qualify` stage
-  records the lifecycle as `qualified`. Its run id, tag and release URL
-  are recorded here.
+- The first release after 0.2.0 is published by one tagged run (its npm
+  packages by the run or, under 3.3.2, by the owner from the run's
+  verified tarballs), and its lifecycle is recorded as `qualified` by
+  that run's `qualify` stage or by a later qualification run against its
+  tag (056 3.5, A-74). Its run ids, tag and release URL are recorded
+  here.
 - `make gate` passes.
 
 ## Verification

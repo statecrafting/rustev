@@ -13,6 +13,12 @@ import sys
 import tomllib
 
 HERE = Path(__file__).resolve().parent
+# The release's own data (release set, adoption subsets, toolchain pin) come
+# from the released tree. A later harness qualifying an earlier tag is given
+# that tree's checkout; by default it is the harness's own tree (056 3.5).
+RELEASE_TREE = Path(os.environ.get('RUSTEV_QUALIFY_RELEASE_TREE') or HERE.parents[2]).resolve()
+if not (RELEASE_TREE / 'tools/rustev-release/release-set.json').is_file():
+    sys.exit('qualify: RUSTEV_QUALIFY_RELEASE_TREE is not a checkout of a released tree')
 INDEX = 'registry+https://github.com/rust-lang/crates.io-index'
 REPO = 'statecrafting/rustev'
 
@@ -105,7 +111,7 @@ class Harness:
                         npm_config_globalconfig=str(self.work / 'npmrc-global'),
                         TMPDIR=str(self.work), GIT_CONFIG_NOSYSTEM='1')
         self.env['RUSTUP_AUTO_INSTALL'] = '0'
-        self.env['RUSTUP_TOOLCHAIN'] = tomllib.loads((HERE.parents[2] / 'rust-toolchain.toml').read_text())['toolchain']['channel']
+        self.env['RUSTUP_TOOLCHAIN'] = tomllib.loads((RELEASE_TREE / 'rust-toolchain.toml').read_text())['toolchain']['channel']
         self.os = self.identity('uname', '-s')
         self.arch = self.identity('uname', '-m')
         arch = {'aarch64': 'arm64', 'arm64': 'arm64', 'x86_64': 'x64', 'AMD64': 'x64'}.get(self.arch, self.arch)
@@ -242,7 +248,7 @@ class Harness:
                 self.run('rustc', '+' + toolchain, '--version')
             except subprocess.CalledProcessError as error:
                 raise NotRun('required toolchain unavailable: ' + toolchain) from error
-        names = json.loads((HERE.parent / 'release-set.json').read_text())['upload_order']
+        names = json.loads((RELEASE_TREE / 'tools/rustev-release/release-set.json').read_text())['upload_order']
         if set(names) != {p['name'] for p in self.m['packages']}:
             raise ValueError('manifest crate set differs from release set')
         path = self.project('all', names)
@@ -267,7 +273,7 @@ class Harness:
             self.env['RUSTEV_ADOPTION_EVIDENCE'] = str(self.evidence / (self.platform + '.crates.adoption-' + toolchain))
             previous = self.env['RUSTUP_TOOLCHAIN']
             self.env['RUSTUP_TOOLCHAIN'] = toolchain
-            self.run('sh', HERE.parent / 'adoption.sh')
+            self.run('sh', RELEASE_TREE / 'tools/rustev-release/adoption.sh')
             self.env['RUSTUP_TOOLCHAIN'] = previous
         self.run('cargo', 'install', 'rustev-cli', '--version', '=' + self.version, '--locked')
         executable = 'rustev.exe' if self.platform.startswith('win32') else 'rustev'
@@ -286,7 +292,10 @@ class Harness:
             subprocess.run(['npm', 'audit', 'signatures', '--json', '--include-attestations'], cwd=path,
                            env=self.env, stdout=output, stderr=self.log, check=True)
         self.log.write(audit.read_bytes())
-        verified = read(audit).get('verified', [])
+        # `npm audit signatures --json` lists only failures; it exits nonzero on
+        # any, and every installed package is then signature-verified.
+        report = read(audit)
+        unverified = {v.get('name') for key in ('invalid', 'missing') for v in report.get(key, [])}
         artifacts = {a.get('package'): a for a in self.m['artifacts'] if a['kind'] == 'npm'}
         installed = set()
         for location, p in read(path / 'package-lock.json')['packages'].items():
@@ -300,9 +309,10 @@ class Harness:
                 a = artifacts.get(name)
                 if not a or p['version'] != self.version or p['integrity'] != a['integrity']:
                     raise ValueError('npm manifest integrity mismatch: ' + name)
-                if not any(v['name'] == name and v['version'] == self.version and
-                           v.get('attestations', {}).get('provenance') for v in verified):
-                    raise ValueError('missing verified npm provenance: ' + name)
+                # The registry signature must verify; npm provenance is not
+                # required (056 3.3, 031 3.9.6, A-74).
+                if name in unverified:
+                    raise ValueError('npm registry signature not verified: ' + name)
                 self.checksums[name] = p['integrity']
         if not {'@rustev/rustev', '@rustev/rustev-wasm'}.issubset(installed):
             raise ValueError('required npm package is not installed')
