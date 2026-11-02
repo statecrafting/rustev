@@ -521,6 +521,12 @@ sh crates/rustev-eval/mutation/seeds.sh
 
 ## Implementation record
 
+- 2026-11-02: the parallel seed run fits the runner's disk. The warm
+  target copy leaves out incremental state (it belongs to the workspace
+  crates, which every worker rebuilds), and a copy that fails drops that
+  worker and the rest, so the run continues on fewer workers. On 2026-11-02
+  "Disk quota exceeded" in that copy failed two merge-queue entries (spec
+  029's seeds). Seeds and verdicts are unchanged.
 - 2026-10-24: the leave-out rule below is general. A spec whose acceptance
   runs its own seed filter joins `OWN_RUNS` in `crates/rustev-eval/mutation/seeds.py`
   when that acceptance lands, and the negative control leaves those seeds

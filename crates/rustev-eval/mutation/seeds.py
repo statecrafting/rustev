@@ -802,8 +802,24 @@ def main():
                 tail = "\n".join((warm.stdout or "").strip().splitlines()[-20:])
                 print(f"seeds: the warm build failed (exit {warm.returncode}); each worker builds cold\n{tail}", flush=True)
             else:
-                for _, other in trees[1:]:
-                    shutil.copytree(env["CARGO_TARGET_DIR"], other["CARGO_TARGET_DIR"], symlinks=True)
+                # Incremental state belongs to the workspace crates, which
+                # every worker rebuilds anyway, so it is not copied. A copy
+                # that fails (a full runner disk) drops that worker and the
+                # rest instead of the run: fewer workers is only slower.
+                kept = [trees[0]]
+                for other_src, other in trees[1:]:
+                    try:
+                        shutil.copytree(env["CARGO_TARGET_DIR"], other["CARGO_TARGET_DIR"], symlinks=True,
+                                        ignore=shutil.ignore_patterns("incremental"))
+                    except OSError as e:
+                        shutil.rmtree(other["CARGO_TARGET_DIR"], ignore_errors=True)
+                        shutil.rmtree(other_src, ignore_errors=True)
+                        first = e.args[0][0][2] if isinstance(e, shutil.Error) and e.args and e.args[0] else str(e)
+                        print(f"seeds: copying the warm target failed ({first}); running on {len(kept)} worker(s)", flush=True)
+                        break
+                    kept.append((other_src, other))
+                trees = kept
+                n = len(trees)
         queue = list(enumerate(chosen))
         results = {}
         lock = threading.Lock()
