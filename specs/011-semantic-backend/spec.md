@@ -79,7 +79,7 @@ obligations:
     anchor: "3-13-numerical-repeatability"
   - id: "R-1"
     kind: requirement
-    text: "No inference dependency enters the workspace until the feasibility record passes stages 1 to 3 for at least one platform; a platform is supported only when all four stages pass for it, and a refusal is recorded, never hidden."
+    text: "No inference dependency enters the workspace until the feasibility record passes stages 1 to 3 for at least one platform; a platform is supported only when all four stages pass for it and the Node binding builds with `local-embed` on its native matrix target, and a refusal is recorded, never hidden."
     anchor: "3-2-the-feasibility-gate"
   - id: "R-2"
     kind: requirement
@@ -104,6 +104,9 @@ R-25's condition (the spec 006 workflow is usable; spec 006 is complete)
 are both satisfied. R-43 (2026-10-17) authorizes acquisition and local
 inference for the feasibility record (Decision 18) and moves the pinned
 revision of #69's checkpoint to one that ships an ONNX graph (Decision 2).
+A-73 (2026-11-01) moves the Node binding's `local-embed` build from stage 3
+to platform qualification and limits `unqualified_platform` to `onnx`
+bundles (Decision 19).
 Approval makes no quality, calibration, usefulness, release or
 publication claim.
 
@@ -252,13 +255,17 @@ construct, document consumed by the core or operator is added.
       chosen features, which passes `make boundaries` and contains no HTTP
       family, `hf-hub` or download feature; the runtime library's SHA-256
       per platform; dynamic loading from an absolute path works and the
-      library reports the pinned version; the Node binding (spec 027 3.13)
-      builds with `local-embed` on each native matrix target (3.17).
+      library reports the pinned version. The Node binding's build with
+      `local-embed` is not part of this stage: it needs the backend that
+      the inference dependencies make possible, so it counts toward
+      qualifying a platform (3.2.3, 3.6.3) instead.
    4. *Performance and numerics:* the limits of 3.3 measured per platform
       with the protocol of 3.13.
 3. **Gate.** No change that adds the inference dependencies merges
-   before stages 1 to 3 pass for at least one platform, and may list a
-   platform as qualified (3.6.3) only when all four pass for it. A failed
+   before stages 1 to 3 pass for at least one platform. A platform is
+   listed as qualified (3.6.3) only when all four stages pass for it and
+   the Node binding (spec 027 3.13) builds with `local-embed` on that
+   platform's native matrix target (3.17). A failed
    runtime selects another runtime through an amendment of this spec
    without reopening R-01 (R-01: "subject to a later bounded check").
    Thresholds are never relaxed after measurement; a threshold change is a
@@ -369,10 +376,12 @@ each subject to the measured pass or refusal of 3.2.
    refused `runtime_conflict`; an equal digest reuses the loaded runtime.
 3. **Platforms.** A platform key is the target's architecture, OS and C
    library: `linux-x86_64-gnu`, `linux-aarch64-gnu`, `macos-aarch64`. The
-   crate compiles a table of platforms the committed feasibility record
-   qualifies; construction on any other target, including musl, Windows
-   and `darwin-x64`, is refused `unqualified_platform`. The crate still
-   compiles there (3.17).
+   crate compiles a table of the platforms qualified under 3.2.3 by the
+   committed feasibility record. Constructing a backend whose bundle has
+   `encoder.kind: onnx` on any other target, including musl, Windows and
+   `darwin-x64`, is refused `unqualified_platform`; a synthetic bundle
+   (3.19) needs no runtime and constructs on any target. The crate still
+   compiles everywhere (3.17).
 4. **Session.** CPU execution provider only, the manifest's graph
    optimization level and thread counts, no profiling, no custom operator
    library, no execution-provider plugin, no external initializer file. The
@@ -403,7 +412,7 @@ each subject to the measured pass or refusal of 3.2.
 | `manifest_invalid` | parse, limit or consistency failure (3.4.3) |
 | `digest_mismatch` | a file's length or SHA-256 differs from the manifest |
 | `artifact_mismatch` | the computed `ArtifactId` differs from `expected_artifact` |
-| `unqualified_platform` | the target is not in the qualified table |
+| `unqualified_platform` | an `onnx` bundle on a target not in the qualified table |
 | `runtime_missing` | the path is relative, absent or unreadable |
 | `runtime_digest_mismatch` | the library's SHA-256 is not the manifest's entry for this platform |
 | `runtime_version_mismatch` | the loaded library reports another version |
@@ -718,7 +727,7 @@ claims (R-04, R-37); release and publication (spec 021, 031).
 | Relative runtime path, or `ORT_DYLIB_PATH` set and no path | `runtime_missing`; the environment is not read. |
 | Runtime library of another version or digest | `runtime_digest_mismatch` or `runtime_version_mismatch`. |
 | Second backend with another runtime digest in one process | `runtime_conflict`. |
-| Opened on `x86_64-unknown-linux-musl` or Windows | `unqualified_platform`. |
+| An `onnx` bundle opened on `x86_64-unknown-linux-musl` or Windows | `unqualified_platform`; a synthetic bundle opens there. |
 | A symbolic link or `..` in the bundle | `bundle_missing` or `manifest_invalid`. |
 | Graph needing a custom operator | `graph_rejected`. |
 | Hidden size in manifest differs from the graph | `graph_signature_mismatch`. |
@@ -943,3 +952,12 @@ open and are decided by the implementer within this spec, as written.
     downloaded byte. Everything that needs no real artifact (manifest,
     verification, synthetic encoder, cache, bindings, boundaries) may
     proceed independently.
+19. **The gate amendment (A-73).** The owner decided on 2026-11-01 that
+    the Node binding's `local-embed` build counts toward qualifying a
+    platform (3.2.3, 3.6.3) rather than toward stage 3 and the dependency
+    gate: the build needs the backend, the backend needs the inference
+    dependencies, and the gate admitted them only after the build, so no
+    platform could ever pass. Stage 3 keeps every other linking check. The
+    same decision limits `unqualified_platform` to `onnx` bundles (3.6.3):
+    a synthetic bundle loads no runtime, so the platform table says
+    nothing about it. The 100 ms p95 threshold of stage 4 is unchanged.
