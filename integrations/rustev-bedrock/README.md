@@ -94,7 +94,9 @@ per call; nothing is written when any part carries a credential value. Strip
 the AWS request id (`generation_id`) and check for account ids and ARNs before
 committing a recorded fixture.
 
-The probe selects the first bound operation and sends only a synthetic question.
+The probe selects the first bound operation and sends only a synthetic question;
+for `rank` it is a listwise ranking of three synthetic candidates (spec 039
+3.15 item 4).
 A reachable result requires every sequential call to return a mapped output;
 it is not quality qualification. Missing live flag, journal, valid binding,
 policy admission or spend headroom prevents dispatch.
@@ -124,6 +126,10 @@ redacted. `responses-smoke-0.json` is one live Responses exchange of
 through the `us.` geographic profile with `store: false`, recorded under
 `responses-binding.json` and `responses-policy.json`; its provider response
 and item ids and its encrypted reasoning content are redacted.
+`converse-rank-smoke-0.json` and `responses-rank-smoke-0.json` are one live
+listwise `rank` smoke call on each wire of 2026-11-02 (spec 039 Decision 18),
+to the same two models, recorded under `converse-rank-binding.json` and
+`responses-rank-binding.json` with the same policies and redacted the same way.
 
 Documented-shape responses are synthetic, not live recordings. AWS references
 rechecked during implementation on 2026-10-22:

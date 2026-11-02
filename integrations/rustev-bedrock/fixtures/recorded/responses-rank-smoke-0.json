@@ -1,0 +1,210 @@
+{
+  "exchange_record": {
+    "attribution": "single",
+    "binding": "sha256:3fb4b026e737524064f6cb1109cb654198cb16d98a509b55b34f900ec6222930",
+    "bytes_sent": true,
+    "exchange_charge": {
+      "estimated": {
+        "units": 97020
+      }
+    },
+    "generation_id": "redacted:provider-response-id",
+    "late": false,
+    "members": [
+      {
+        "attempt_id": "bedrock-smoke-1793612334800460000-0",
+        "charge": {
+          "estimated": {
+            "units": 97020
+          }
+        },
+        "outcome": {
+          "output": {
+            "digest": "sha256:6ef6a6df333963058f1b4c769cbd86344632bd401b3654e625eb0722f29bd033"
+          }
+        }
+      }
+    ],
+    "privacy_requested": {},
+    "protocol": "rustev-bedrock-mapping/1",
+    "provider_extras": {
+      "destination_regions": "{\"as_of\":\"2026-10-29\",\"regions\":[\"ca-central-1\",\"us-east-1\",\"us-east-2\",\"us-west-2\"]}",
+      "inference_profile": "\"geo\"",
+      "policy_digest": "sha256:5092bd5d7f4eb7ab8792481d300fc8cd82c7ff44106079f99bd16dd694f4dbd1",
+      "provider.answer_annotations": "[{\"ranking\":[\"apple\",\"pear\",\"plum\"]}]",
+      "provider.background": "false",
+      "provider.billing": "{\"payer\":\"developer\"}",
+      "provider.completed_at": "1793612335",
+      "provider.created_at": "1793612335",
+      "provider.error": "null",
+      "provider.frequency_penalty": "0.0",
+      "provider.id": "\"redacted:provider-response-id\"",
+      "provider.incomplete_details": "null",
+      "raw_usage": "{\"input_tokens\":153,\"input_tokens_details\":{\"cache_write_tokens\":0,\"cached_tokens\":0},\"output_tokens\":48,\"output_tokens_details\":{\"reasoning_tokens\":26},\"total_tokens\":201}",
+      "region": "\"ca-central-1\"",
+      "served_reason": "echo_of_requested",
+      "served_region": "unknown:not_disclosed_by_wire"
+    },
+    "reported_cost": null,
+    "request_digest": "sha256:a1b5ecd9b69516606d04113aec189334a469372848a7290c287b88fd63da28c2",
+    "requested_model": "us.openai.gpt-5.6-luna",
+    "response_digest": "sha256:a945c97e20d01e1735f6e9f77a78e13d7bebf679d9cdab1411961cc7473774a9",
+    "retry_after": null,
+    "route": [],
+    "schema": "rustev.remote-exchange/1",
+    "served": {
+      "disclosure": "unknown",
+      "identity": null
+    },
+    "status": 200,
+    "truncated": true,
+    "usage": {
+      "input_tokens": 153,
+      "output_tokens": 48,
+      "total_tokens": 201
+    }
+  },
+  "provenance": "recorded; live bedrock-runtime Responses call on 2026-11-02 from ca-central-1, model us.openai.gpt-5.6-luna through the us. geographic profile, store false; synthetic content only (spec 030 3.14 item 3); listwise rank smoke (spec 039 3.15 item 4, Decision 18); the provider response id (generation_id) and output item ids are redacted, and the encrypted reasoning item's content is redacted; truncated is as recorded live, set because the provider extras exceed MAX_ENTRIES, not by the redaction",
+  "request_body": {
+    "input": "{\"instance\":{\"text\":\"apple\"},\"mode\":\"listwise\",\"presented\":[{\"id\":\"apple\",\"item\":{\"description\":\"SYNTHETIC fruit apple\"}},{\"id\":\"pear\",\"item\":{\"description\":\"SYNTHETIC fruit pear\"}},{\"id\":\"plum\",\"item\":{\"description\":\"SYNTHETIC fruit plum\"}}],\"values\":{}}",
+    "instructions": "Choose exactly one key using the supplied evidence.\nThe supplied word is apple. Rank the candidates by how well they match it.\nOptions in declared order: []",
+    "max_output_tokens": 1024,
+    "model": "us.openai.gpt-5.6-luna",
+    "reasoning": {
+      "effort": "low"
+    },
+    "store": false,
+    "text": {
+      "format": {
+        "name": "rustev_answer",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "ranking": {
+              "items": {
+                "enum": [
+                  "apple",
+                  "pear",
+                  "plum"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "ranking"
+          ],
+          "type": "object"
+        },
+        "strict": true,
+        "type": "json_schema"
+      }
+    }
+  },
+  "response_body": {
+    "background": false,
+    "billing": {
+      "payer": "developer"
+    },
+    "completed_at": 1793612335,
+    "created_at": 1793612335,
+    "error": null,
+    "frequency_penalty": 0.0,
+    "id": "redacted:provider-response-id",
+    "incomplete_details": null,
+    "instructions": "Choose exactly one key using the supplied evidence.\nThe supplied word is apple. Rank the candidates by how well they match it.\nOptions in declared order: []",
+    "max_output_tokens": 1024,
+    "max_tool_calls": null,
+    "metadata": {},
+    "model": "us.openai.gpt-5.6-luna",
+    "moderation": null,
+    "object": "response",
+    "output": [
+      {
+        "content": [],
+        "encrypted_content": "redacted:encrypted-reasoning",
+        "id": "redacted:provider-item-id",
+        "summary": [],
+        "type": "reasoning"
+      },
+      {
+        "content": [
+          {
+            "annotations": [],
+            "logprobs": [],
+            "text": "{\"ranking\":[\"apple\",\"pear\",\"plum\"]}",
+            "type": "output_text"
+          }
+        ],
+        "id": "redacted:provider-item-id",
+        "phase": "final_answer",
+        "role": "assistant",
+        "status": "completed",
+        "type": "message"
+      }
+    ],
+    "parallel_tool_calls": true,
+    "presence_penalty": 0.0,
+    "previous_response_id": null,
+    "prompt_cache_key": null,
+    "prompt_cache_retention": "in_memory",
+    "reasoning": {
+      "context": "all_turns",
+      "effort": "low",
+      "summary": null
+    },
+    "safety_identifier": null,
+    "service_tier": "default",
+    "status": "completed",
+    "store": false,
+    "temperature": 1.0,
+    "text": {
+      "format": {
+        "description": null,
+        "name": "rustev_answer",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "ranking": {
+              "items": {
+                "enum": [
+                  "apple",
+                  "pear",
+                  "plum"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "ranking"
+          ],
+          "type": "object"
+        },
+        "strict": true,
+        "type": "json_schema"
+      },
+      "verbosity": "medium"
+    },
+    "tool_choice": "auto",
+    "tools": [],
+    "top_logprobs": 0,
+    "top_p": 0.98,
+    "truncation": "disabled",
+    "usage": {
+      "input_tokens": 153,
+      "input_tokens_details": {
+        "cache_write_tokens": 0,
+        "cached_tokens": 0
+      },
+      "output_tokens": 48,
+      "output_tokens_details": {
+        "reasoning_tokens": 26
+      },
+      "total_tokens": 201
+    },
+    "user": null
+  }
+}

@@ -771,6 +771,21 @@ item 1 for Bedrock bindings without `rank`. Any paid live Bedrock `rank`
 smoke call (Decision 18) stays outside declared verification; its result,
 when one is made, is recorded with its journal total outside it.
 
+**Bedrock `rank` smoke (2026-11-02, Decision 18).** One paid listwise `rank`
+call on each wire, outside declared verification, with synthetic content
+only (three synthetic candidates, 3.15 item 4) and reserved against the R-29
+testing journal. The Responses call to `us.openai.gpt-5.6-luna` with
+`json_schema` used 153 input and 48 output tokens (26 reasoning), charged
+97,020 nano-USD; the Converse call to `us.anthropic.claude-haiku-5-5` with
+`tool_use` used 713 input and 46 output tokens, charged 103,730 nano-USD. Both
+are from `ca-central-1` through the `us.` geographic profile, and both returned
+the ranking `apple`, `pear`, `plum` with no scores under `rank/1`. The journal
+after both calls: observed 1,421,364, estimated 3,722,662, liability
+18,075,006 and headroom 4,976,780,968 nano-USD of the USD 5 cap. The two
+exchanges are recorded, redacted, in `integrations/rustev-bedrock/fixtures/recorded/`
+and replay offline in `tests/recorded.rs`. The smoke shows reachability and
+the mapping on live bytes only; it is not a quality claim.
+
 **Owner decision A-49 (2026-10-23): dependencies.** Specs 022 and 030 are
 no longer declared dependencies of this spec; spec 012 remains one. Spec
 022 changes nothing here: 3.16 states that its production transport

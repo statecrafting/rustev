@@ -1,5 +1,6 @@
 //! The recorded fixtures (3.14 item 3): four live Converse exchanges of
-//! 2026-10-29 and one live Responses exchange of 2026-10-30, replayed
+//! 2026-10-29, one live Responses exchange of 2026-10-30 and one listwise
+//! `rank` exchange on each wire of 2026-11-02 (spec 039 3.15 item 4), replayed
 //! offline against a loopback server. Each replay sends the recorded request
 //! byte for byte (by digest), supplies the recorded output (by digest) with
 //! the recorded charge, and contacts only loopback.
@@ -12,7 +13,10 @@ use rustev_bedrock::{
     policy::ModelPolicy,
     signing::{CredentialError, CredentialProvider},
 };
-use rustev_contract::{output::RawOutput, time::DurationMs};
+use rustev_contract::{
+    output::{RankingScores, RawOutput},
+    time::DurationMs,
+};
 use rustev_core::seams::{AttemptCall, BoxFuture, CallContext, CancelSignal, DecisionBackend};
 use serde_json::Value;
 use std::sync::Arc;
@@ -22,9 +26,13 @@ const CONVERSE_BINDING: &[u8] = include_bytes!("../fixtures/recorded/binding.jso
 const CONVERSE_POLICY: &[u8] = include_bytes!("../fixtures/recorded/policy.json");
 const RESPONSES_BINDING: &[u8] = include_bytes!("../fixtures/recorded/responses-binding.json");
 const RESPONSES_POLICY: &[u8] = include_bytes!("../fixtures/recorded/responses-policy.json");
+const CONVERSE_RANK_BINDING: &[u8] =
+    include_bytes!("../fixtures/recorded/converse-rank-binding.json");
+const RESPONSES_RANK_BINDING: &[u8] =
+    include_bytes!("../fixtures/recorded/responses-rank-binding.json");
 
 /// Each recorded exchange with the binding and policy it was recorded under.
-const RECORDED: [(&str, &str, &[u8], &[u8]); 5] = [
+const RECORDED: [(&str, &str, &[u8], &[u8]); 7] = [
     (
         "probe-0",
         include_str!("../fixtures/recorded/converse-probe-0.json"),
@@ -53,6 +61,18 @@ const RECORDED: [(&str, &str, &[u8], &[u8]); 5] = [
         "responses-smoke-0",
         include_str!("../fixtures/recorded/responses-smoke-0.json"),
         RESPONSES_BINDING,
+        RESPONSES_POLICY,
+    ),
+    (
+        "converse-rank-smoke-0",
+        include_str!("../fixtures/recorded/converse-rank-smoke-0.json"),
+        CONVERSE_RANK_BINDING,
+        CONVERSE_POLICY,
+    ),
+    (
+        "responses-rank-smoke-0",
+        include_str!("../fixtures/recorded/responses-rank-smoke-0.json"),
+        RESPONSES_RANK_BINDING,
         RESPONSES_POLICY,
     ),
 ];
@@ -118,7 +138,8 @@ async fn serve(body: String) -> (String, tokio::task::JoinHandle<Vec<u8>>) {
 async fn recorded_exchanges_replay_offline() {
     for (name, text, binding, policy) in RECORDED {
         let binding = BedrockBinding::parse(binding).unwrap();
-        let projection = probe_projection(&binding.operations[0].operation).unwrap();
+        let operation = binding.operations[0].operation.clone();
+        let projection = probe_projection(&operation).unwrap();
         let fixture: Value = serde_json::from_str(text).unwrap();
         assert!(
             fixture["provenance"]
@@ -157,11 +178,15 @@ async fn recorded_exchanges_replay_offline() {
                 },
             })
             .await;
-        assert_eq!(
-            report.result.unwrap(),
-            RawOutput::Label("apple".into()),
-            "{name}"
-        );
+        let expected = if operation == "rank" {
+            RawOutput::Ranking {
+                ids: vec!["apple".into(), "pear".into(), "plum".into()],
+                scores: RankingScores::None,
+            }
+        } else {
+            RawOutput::Label("apple".into())
+        };
+        assert_eq!(report.result.unwrap(), expected, "{name}");
         let request = handle.await.unwrap();
         let kept = sink.0.lock().unwrap();
         let (record, retained) = &kept[0];
@@ -174,6 +199,9 @@ async fn recorded_exchanges_replay_offline() {
             "members",
             "served",
             "status",
+            // As recorded live: a Responses record sets it when the provider
+            // extras exceed `MAX_ENTRIES`, never because of the redaction.
+            "truncated",
         ] {
             assert_eq!(replayed[member], recorded[member], "{name}: {member}");
         }

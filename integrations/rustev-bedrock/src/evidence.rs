@@ -10,6 +10,22 @@ use std::sync::Mutex;
 /// The synthetic question the probe and smoke send for `operation`; the
 /// recorded fixtures replay it.
 pub fn probe_projection(operation: &str) -> Result<Vec<u8>, String> {
+    // Spec 039 3.15 item 4: a listwise `rank` over three synthetic candidates.
+    // This is the core's projection (3.4), not the wire body: the mapping
+    // sends only the instance, mode, presented items and question, and
+    // `tests/recorded.rs` checks the sent body and its digest against the
+    // recorded exchange.
+    if operation == "rank" {
+        let ids = ["apple", "pear", "plum"];
+        return serde_json::to_vec(&serde_json::json!({
+            "operation":"rank","mode":"listwise",
+            "presented":ids.iter().map(|id| serde_json::json!({"id":id,"item":{"description":format!("SYNTHETIC fruit {id}")}})).collect::<Vec<_>>(),
+            "candidates":ids,"options":[],"instance":{"text":"apple"},"task":"match",
+            "question":"The supplied word is apple. Rank the candidates by how well they match it.",
+            "values":{}
+        }))
+        .map_err(|_| "synthetic projection".into());
+    }
     let options = if operation == "proposition" {
         vec!["false", "true"]
     } else {
