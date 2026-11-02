@@ -1598,6 +1598,14 @@ profile after it. `profile_unsupported` is no longer produced. Tests:
 `registration_conflict`), the leaf `ProfileId` in the record, and a
 listed leaf.
 
+**Test fix: the full-queue context client test (2026-11-01).**
+`a_full_queue_refuses_without_enqueueing` in
+`integrations/rustev-remote-http/tests/context_client.rs` now waits until
+the source has received the in-flight call as well as until the queue
+depth is 2. The client counts a call in its depth when it dispatches it,
+so the source's call count could still read 0, and the test failed
+intermittently in the merge queue. No behavior changes.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child
