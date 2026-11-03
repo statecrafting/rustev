@@ -221,6 +221,7 @@
         "src/generator.rs",
         "src/gold.rs",
         "src/holdout.rs",
+        "src/host_run.rs",
         "src/judge.rs",
         "src/lib.rs",
         "src/live.rs",

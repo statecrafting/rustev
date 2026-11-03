@@ -26,6 +26,9 @@ amends:
 extends:
   - { spec: "004-evaluation-and-replay", unit: { kind: directory, path: "crates/rustev-eval/" }, nature: amending }
   - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: amending }
+  # Each new source file of a release member joins the reviewed archive
+  # list (spec 021, 3.5).
+  - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
 depends_on:
   - "004-evaluation-and-replay"
   - "006-cli-surface"
@@ -425,7 +428,64 @@ under `make verify`.
 
 ## Implementation record
 
-None yet.
+Planned increments, each a separately reviewed pull request of about
+1,000 lines; nothing here claims an acceptance item before the increment
+that satisfies it: (1) `rustev.host-run/1` with its field rules (3.1),
+the per-run binding checks of 3.2.2 and `rustev.host-cases/1` with the
+score and `host/` measures of 3.3, as a library module not yet reachable
+from the CLI; (2) the host repeat report: the cross-run checks of 3.2.3,
+`top-k-not-observed`, the statistics, sources and labels of 3.4 and 3.5,
+re-assembly (3.3.4), and `rustev eval repeat import` with its goldens;
+(3) `rustev.host-baseline/1`, the reproducibility check and
+`rustev.host-selection/1` in the library (3.7, 3.8), with the
+`mixed-provenance` classification of 3.6; (4) `baseline record`, `eval
+reproducibility` and `gate select` over host sets in the CLI, their
+`mixed-provenance` refusals and goldens; (5) the mutation seeds, declared
+verification, 061 in `VERIFIED_SPECS` and an acceptance group, and
+closure. The host documents live in `crates/rustev-eval/` beside spec
+029's (`rustev.repeat-report/1` and the others are eval documents with no
+JSON Schema), and no binding surface changes (3.10), so the contract
+crate, its schemas and the generated binding types are untouched. The
+`extends` edge on `tools/rustev-release/` (031, additive) was added with
+increment 1: each new source file of `rustev-eval` and `rustev-cli`
+joins the reviewed archive list.
+
+**Increment 1 (2026-11-03): host run records and case measures.**
+`crates/rustev-eval/src/host_run.rs` holds `rustev.host-run/1` (record
+canonical, unknown fields and duplicate keys refused by the parser) and
+`HostRun::check`, which refuses (`host-run`) a case count other than
+`dataset.cases`, a case id outside spec 006 3.9.1's rule or repeated
+ignoring ASCII case, a malformed reason or unit, a latency above 2^53
+microseconds, a negative cost, a cost without a unit, more than 16 or
+repeated scores digests. `bind` applies 3.2.2: the views and every scores
+document must be the ones the record names, and every named digest must
+have its document (`host-binding`); the views must name the `--config`
+identity and the record's split and list exactly the `answered` cases in
+record order with the record's subgroups (`host-binding`); then spec 041
+3.7.5's checks, through the same function evaluation uses
+(`scores_refusal` in `report.rs`, which `check_scores` now calls).
+`measure` writes `rustev.host-cases/1` (with `assertion: "host"` and the
+record digest in place of a run report digest): the four `host/` count
+ratios over every case, the two latency samples over `answered` and
+`abstained` cases (a failed case has no sample), `host/cost_per_1000`
+over every case, and the score metrics of 041 by `rubric_metrics` and
+`agreement_metrics` over a scope in which only `answered` cases are
+proposals, with each metric's derivation and whether an opaque scorer
+produces it. Decisions within the spec: a null cost under a declared
+unit is refused (`host-run`), never read as zero (I-3); a case's
+subgroups are unique names of 1 to 256 bytes; each views entry's
+`subject` must be the digest of its proposal view (`host-binding`), since
+the host, not eval, computed the views; two documents for one scorer keep
+041's code, `scores-duplicate`; a configuration other than version 3 is
+refused (`config`); `host/cost_per_1000`'s contribution is 1000 times
+the cost multiplied exactly in Decimal, then rounded once to binary64.
+Tests: `crates/rustev-eval/tests/host_run.rs` (every field rule of 3.1,
+every 3.2.2 refusal, and the measures, including the section 5 rows on a
+views digest naming no file, views not listing the answered cases, a
+scores file over other views and a case count differing from
+`dataset.cases`), over the synthetic fixture
+`crates/rustev-eval/tests/host_support/mod.rs`, which later increments
+and the CLI tests share.
 
 ## Decisions at approval
 
