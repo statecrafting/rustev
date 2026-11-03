@@ -109,7 +109,15 @@ fn fields(task: &Head, decl: &SemanticDecl, plan: &Plan) -> Vec<PlanMismatchKind
     let mut out = vec![];
     for (index, f) in task.text.fields.iter().enumerate() {
         let reference = f.reference.clone();
-        let (key, member) = field_ref(&reference).expect("checked manifest field");
+        // The manifest parser admits only parseable references; one that is
+        // not is reported, never a panic.
+        let Some((key, member)) = field_ref(&reference) else {
+            out.push(PlanMismatchKind::Incompatible {
+                field: format!("text.fields[{index}]"),
+                reference,
+            });
+            continue;
+        };
         if !decl.project.iter().any(|r| r == key) {
             out.push(PlanMismatchKind::NotProjected {
                 field: format!("text.fields[{index}]"),
