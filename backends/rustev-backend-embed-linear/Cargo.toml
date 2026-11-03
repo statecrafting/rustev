@@ -28,6 +28,7 @@ synthetic = []
 # stages 1 to 3 for macos-aarch64 (spec 011, 3.2.3; A-73).
 [dependencies]
 rustev-contract.workspace = true
+rustev-core.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
