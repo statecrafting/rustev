@@ -44,9 +44,25 @@ pub fn required(m: &ReleaseManifest, kind: &str) -> bool {
     match kind {
         "crates" => !m.packages.is_empty(),
         "cli" => m.artifacts.iter().any(|a| a.kind == "binary"),
-        "npm" | "image" => m.artifacts.iter().any(|a| a.kind == kind),
+        "npm" => m.artifacts.iter().any(|a| a.kind == kind),
+        // Spec 060 3.4.1: the image is named under `image`, never as an artifact.
+        "image" => m.image.is_some(),
         _ => false,
     }
+}
+
+/// Spec 060 3.4.3: the platforms of the release matrix that qualify the
+/// image, as the image platforms they run.
+pub const IMAGE_PLATFORMS: &[(&str, &str)] = &[
+    ("linux-x64-gnu", "linux/amd64"),
+    ("linux-arm64-gnu", "linux/arm64"),
+];
+
+/// [`required`] on one platform: a named image is qualified on the
+/// platforms of [`IMAGE_PLATFORMS`] only, and excluded with a reason on the
+/// others.
+pub fn required_on(m: &ReleaseManifest, kind: &str, platform: &str) -> bool {
+    required(m, kind) && (kind != "image" || IMAGE_PLATFORMS.iter().any(|(p, _)| *p == platform))
 }
 
 /// Reuse the release set's native CLI/npm matrix from artifact collection.
@@ -57,7 +73,7 @@ pub fn required_files(m: &ReleaseManifest) -> Vec<String> {
         .flat_map(|platform| {
             KINDS
                 .iter()
-                .filter(|kind| required(m, kind))
+                .filter(move |kind| required_on(m, kind, platform))
                 .map(move |kind| format!("{platform}.{kind}.json"))
         })
         .collect()
@@ -85,9 +101,10 @@ pub fn evidence(m: &ReleaseManifest, dir: &Path) -> Result<BTreeMap<String, Stri
     for platform in PLATFORMS {
         for kind in KINDS {
             let name = format!("{platform}.{kind}.json");
+            let required = required_on(m, kind, platform);
             let bytes = match std::fs::read(dir.join(&name)) {
                 Ok(b) => b,
-                Err(e) if !required(m, kind) && e.kind() == std::io::ErrorKind::NotFound => {
+                Err(e) if !required && e.kind() == std::io::ErrorKind::NotFound => {
                     continue;
                 }
                 Err(e) => return Err(format!("{name}: missing or unreadable step: {e}")),
@@ -100,7 +117,7 @@ pub fn evidence(m: &ReleaseManifest, dir: &Path) -> Result<BTreeMap<String, Stri
             {
                 return Err(format!("{name}: step identity differs from release"));
             }
-            if !required(m, kind) {
+            if !required {
                 if !matches!(&step.status, Status::Excluded { reason } if !reason.trim().is_empty())
                 {
                     return Err(format!(

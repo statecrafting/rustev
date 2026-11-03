@@ -1,0 +1,9 @@
+{
+  "decision_id": "SYNTHETIC-image-qualification",
+  "evaluation_time": 0,
+  "schema": "rustev.serve-decide/1",
+  "snapshot": {
+    "entries": [],
+    "schema": "rustev.snapshot/1"
+  }
+}

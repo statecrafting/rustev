@@ -1,0 +1,59 @@
+{
+  "backend_bindings": {},
+  "blocking_queue": 1,
+  "blocking_threads": 1,
+  "context_sources": {},
+  "drain_ms": 100,
+  "flush_ms": 100,
+  "idempotency_window_ms": 60000,
+  "listeners": [
+    {
+      "groups": [
+        "decide",
+        "admin",
+        "ops"
+      ],
+      "limits": {
+        "max_connections": 64,
+        "max_header_bytes": 4096,
+        "max_http2_streams": 16,
+        "other_body_bytes": 4194304,
+        "registration_body_bytes": 16777216,
+        "requests_per_second": 10000
+      },
+      "name": "qualification",
+      "redaction_policy": "none",
+      "transport": {
+        "unix": {
+          "auth": "filesystem",
+          "mode": 384,
+          "path": "/run/rustev/serve.sock"
+        }
+      }
+    }
+  ],
+  "max_plans": 4096,
+  "max_retained": 16,
+  "max_retained_bytes": 67108864,
+  "preload_bundles": [],
+  "resolver_roots": {},
+  "runtime": {
+    "max_in_flight": 1,
+    "max_queued": 0,
+    "per_backend_concurrency": {}
+  },
+  "schema": "rustev.serve-config/1",
+  "signing_keys": {
+    "ed25519": {},
+    "sigstore": []
+  },
+  "signing_mode": "allow_unsigned",
+  "sink_policy": {
+    "drop_counted": {
+      "delivery_timeout_ms": 1000,
+      "max_pending": 1
+    }
+  },
+  "sinks": {},
+  "stream_queue": 16
+}
