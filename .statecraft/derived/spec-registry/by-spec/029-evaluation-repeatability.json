@@ -120,14 +120,14 @@
       }
     ],
     "sectionDigests": {
-      "029-evaluation-repeatability-baselines-diffs-and-selection-gates-amends-004-and-006": "246081aba03ce73e7dabac5ff979d9ec7b449cb1ccf91274600ea7c1ee3d3c4c",
+      "029-evaluation-repeatability-baselines-diffs-and-selection-gates-amends-004-and-006": "b114b3ef345ad9145f9cc444cae3b318a1ee7b17722bf209c2f52edc547c4037",
       "1-purpose": "d449fae2d1de8e8a8c41c542a297d8a49fb9545657b3f63561187af50711374c",
       "2-1-binding-principles-of-76": "a110d5d3149238be1c887d7b7d9b3167396c9b1fa459117127ceef54afa71fda",
       "2-territory": "11e099d675019e2d266ecf3db1769d4907561360a5ce0399b6843975b56b2516",
       "3-1-repeat-sources-and-runs": "2cfb17bcea76d2ba74207c37d27b9cbc65b2a4e3ac53083f10dbab4643262b24",
       "3-10-diffs": "411bc64d1c3924f79285f5d64e83a97e3b3d4aa6282828abcefee3ea92af6d40",
       "3-11-multi-candidate-comparison": "c798d26177fa8624f59d3b1925e451deeb8d49d9d881b430a91616ef39fe762e",
-      "3-12-selection-gates": "e2e47b0e9d3719ab0b8adfef8bdcaaa9ea46763746dded0ba911022e0189b517",
+      "3-12-selection-gates": "e41306ff1aef623ad48f88c2098c95d20efb7440fb4fff72fb04046265b44edb",
       "3-13-cli-surface-amends-spec-006": "9ac78406b4f2e1103ed6b48381bee77cb38921de99bfb4e93768acbea767837e",
       "3-14-exit-codes": "c8b8bcab598ac50f31c769df71e354be2de061dbe3d370b056eda776ee6fb901",
       "3-15-compatibility": "5372c0718b19f58a6160c30d9ce3e09159863bea4268c90c01f9466db8452427",
@@ -139,12 +139,12 @@
       "3-7-split-roles-and-held-out-discipline": "81ec61aadc06dadb958da085795d5c041800d61d7b57d86b43c7cae45a55d769",
       "3-8-baselines": "129371affd722f146899691846b83215016cd140bc03b0d40986f5e1e9f421ed",
       "3-9-reproducibility-check": "161be5c242cdbabcc9a1b31cc5ff47b46f48ea9a99bd663dd121f29357e3f4bf",
-      "3-behavior": "945584a1408d2652d577045fdd34ef93557d35d71e8050f3b8e222ff90362a4b",
+      "3-behavior": "56397435e1427c99e68e7d3d5dc0b79944661a50f7c590c93bcbf49128547284",
       "4-out-of-scope": "2389ec50e687562ad7db5feb10e828a5ab3253bb9a22d11c27869251987a2375",
       "5-observable-negative-cases": "df67b3a9be6b92138b614495e64e251596c2bb618de6ed68f03e87ee7285d7e6",
       "acceptance": "76283fa6de5f0f70a192e9ff1efd4d01ef0f109a306c55a0ae769e53ae761ac9",
       "decisions-at-approval": "d0ac1a2e717a3997b1ef13e5ea47e1223510fbf8ed6dad6135d297703d49ccfb",
-      "implementation-record": "9ffd724cae0555fbb7ad67bc2c32213a4db3eb90090ace4b23908a2f7ee570f4",
+      "implementation-record": "358e987a8db04d880bb78f5ba8691ef09bb9fdcf95e1800f2137c61c7a647c9e",
       "verification": "0149e77787a269a8f11080a1758166b1808f6d161e2eb7f9a4a7644d0a568cef"
     },
     "sectionHeadings": [
@@ -180,6 +180,6 @@
     "summary": "An amendment of approved specs 004 and 006 (R-16), for #76 child E2. Evaluation runs each configuration N times from a declared repeat source (deterministic replay, captured historical run sets, or live runs once spec 026 is implemented), reports per metric and per slice the mean, standard deviation, minimum, maximum, a pooled estimate and a case-clustered percentile bootstrap interval computed with a named, versioned, seeded generator, and derives declared noise bands. Adds named baselines (`rustev.baseline/1`), a reproducibility check, diffs in JSON and Markdown, multi-candidate comparison, held-out accounting against a host-kept ledger file, and a declarative selection gate (`rustev.selection-gate/1`) with stated CI exit codes. Every existing document, gate and CLI output keeps its bytes. Answers spec 023's open question 3. Approved (A-25); approval authorizes no live run, provider call or spend, no quality claim, and no change to `rustev.eval-report/1` or any plan identity.\n",
     "title": "Evaluation repeatability, baselines, diffs and selection gates (amends 004 and 006)"
   },
-  "shardHash": "68f48ba9affb40c1c0d7fff31f9ef7cbdd36c4d90ee5b7e0e51aaa900eea9e10",
+  "shardHash": "0d43c76a7f0728bd6cc09f3f1eee38d95db37a3408740a5e9c2a717bc651f1a4",
   "specVersion": "1.10.0"
 }

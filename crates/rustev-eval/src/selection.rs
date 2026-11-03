@@ -524,6 +524,109 @@ fn band(m: &MetricReport) -> Result<f64, String> {
         _ => Err("invalid band".into()),
     }
 }
+/// An exact decimal `(-1)^negative * digits * 10^exponent`, its digits most
+/// significant first.
+struct Exact {
+    negative: bool,
+    digits: Vec<u8>,
+    exponent: i32,
+}
+/// The shortest decimal that round-trips to `v` (what `{}` prints), exactly.
+/// `value` already refuses a non-finite pooled value, so the clause is
+/// unknown (spec 029, 3.12.4: "A clause is unknown when a value ... it needs
+/// is unknown"); NaN and the infinities are refused here too, never read as
+/// a number.
+fn shortest(v: f64) -> Result<Exact, String> {
+    if !v.is_finite() {
+        return Err("non-finite value".into());
+    }
+    let s = format!("{v:e}");
+    let (mantissa, exponent) = s
+        .split_once('e')
+        .ok_or_else(|| format!("no decimal exponent in {s}"))?;
+    let exponent: i32 = exponent
+        .parse()
+        .map_err(|_| format!("invalid decimal exponent in {s}"))?;
+    let (negative, mantissa) = match mantissa.strip_prefix('-') {
+        Some(m) => (true, m),
+        None => (false, mantissa),
+    };
+    let fraction = mantissa.split_once('.').map_or(0, |(_, f)| f.len());
+    let fraction = i32::try_from(fraction).map_err(|_| format!("mantissa too long in {s}"))?;
+    Ok(Exact {
+        negative,
+        digits: mantissa
+            .bytes()
+            .filter(u8::is_ascii_digit)
+            .map(|d| d - b'0')
+            .collect(),
+        exponent: exponent - fraction,
+    })
+}
+fn exact(t: Decimal) -> Exact {
+    Exact {
+        negative: t.is_negative(),
+        digits: t
+            .units()
+            .unsigned_abs()
+            .to_string()
+            .bytes()
+            .map(|d| d - b'0')
+            .collect(),
+        exponent: -i32::try_from(rustev_contract::decimal::SCALE).expect("small scale"),
+    }
+}
+/// Compares `sum(lhs)` with `sum(rhs)` exactly. Binary64 exponents bound the
+/// aligned magnitudes to under 700 digits.
+fn exact_sum_cmp(lhs: &[Exact], rhs: &[Exact]) -> std::cmp::Ordering {
+    let terms = lhs
+        .iter()
+        .map(|t| (t, false))
+        .chain(rhs.iter().map(|t| (t, true)));
+    let low = lhs.iter().chain(rhs).map(|t| t.exponent).min().unwrap_or(0);
+    // Positive and negative contributions, least significant digit first.
+    let (mut pos, mut neg) = (Vec::new(), Vec::new());
+    for (t, subtract) in terms {
+        let shift = usize::try_from(t.exponent - low).expect("aligned to the lowest exponent");
+        let mut m = vec![0u8; shift];
+        m.extend(t.digits.iter().rev());
+        add_digits(
+            if t.negative != subtract {
+                &mut neg
+            } else {
+                &mut pos
+            },
+            &m,
+        );
+    }
+    let trim = |v: &mut Vec<u8>| {
+        while v.last() == Some(&0) {
+            v.pop();
+        }
+    };
+    trim(&mut pos);
+    trim(&mut neg);
+    pos.len()
+        .cmp(&neg.len())
+        .then_with(|| pos.iter().rev().cmp(neg.iter().rev()))
+}
+fn add_digits(acc: &mut Vec<u8>, m: &[u8]) {
+    if acc.len() < m.len() {
+        acc.resize(m.len(), 0);
+    }
+    let mut carry = 0;
+    for (i, a) in acc.iter_mut().enumerate() {
+        let sum = *a + m.get(i).copied().unwrap_or(0) + carry;
+        *a = sum % 10;
+        carry = sum / 10;
+        if carry == 0 && i >= m.len() {
+            break;
+        }
+    }
+    if carry > 0 {
+        acc.push(carry);
+    }
+}
 fn metric_clause(
     clause: &MetricClause,
     gate: &SelectionGate,
@@ -536,28 +639,30 @@ fn metric_clause(
         let cm = metric(c, cohort, clause.metric())?;
         let bv = value(bm, false)?;
         let cv = value(cm, true)?;
+        let higher = gate.metrics[clause.metric()] == Direction::HigherIsBetter;
+        let better = matches!(clause, MetricClause::Better { .. });
+        // Spec 029, 3.12.3: every band, a noise band or an absolute
+        // tolerance, is compared in exact decimal against the shortest
+        // round-trip decimals of `b` and `c` (and of a binary64 band), so a
+        // candidate exactly on the boundary is decided by the rule as
+        // written, never by binary64 rounding (#474).
         let tolerance = match clause {
             MetricClause::NotWorse {
                 within: Within::Absolute(t),
                 ..
-            } => t.to_f64_nearest(),
-            _ => band(bm)?.max(band(cm)?),
+            } => exact(*t),
+            _ => shortest(band(bm)?.max(band(cm)?))?,
         };
-        let higher = gate.metrics[clause.metric()] == Direction::HigherIsBetter;
-        let better = matches!(clause, MetricClause::Better { .. });
-        let threshold = if higher == better {
-            bv + tolerance
-        } else {
-            bv - tolerance
-        };
-        if !threshold.is_finite() {
-            return Err("non-finite comparison threshold".into());
-        }
+        let (b, c) = (shortest(bv)?, shortest(cv)?);
         Ok(match (higher, better) {
-            (true, true) => cv > threshold,
-            (false, true) => cv < threshold,
-            (true, false) => cv >= threshold,
-            (false, false) => cv <= threshold,
+            // c > b + band.
+            (true, true) => exact_sum_cmp(&[c], &[b, tolerance]).is_gt(),
+            // c < b - band, that is b > c + band.
+            (false, true) => exact_sum_cmp(&[b], &[c, tolerance]).is_gt(),
+            // c >= b - band, that is c + band >= b.
+            (true, false) => exact_sum_cmp(&[c, tolerance], &[b]).is_ge(),
+            // c <= b + band, that is b + band >= c.
+            (false, false) => exact_sum_cmp(&[b, tolerance], &[c]).is_ge(),
         })
     };
     match compare() {
@@ -629,5 +734,37 @@ fn evaluate_clause(
                 slices,
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cmp::Ordering::{Equal, Greater, Less};
+
+    fn cmp(l: &[f64], t: &str, r: &[f64]) -> std::cmp::Ordering {
+        let mut lhs: Vec<_> = l.iter().map(|v| shortest(*v).unwrap()).collect();
+        lhs.push(exact(Decimal::parse(t).unwrap()));
+        let rhs: Vec<_> = r.iter().map(|v| shortest(*v).unwrap()).collect();
+        exact_sum_cmp(&lhs, &rhs)
+    }
+
+    #[test]
+    fn non_finite_values_are_refused_not_read() {
+        for v in [f64::NAN, -f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert_eq!(shortest(v).err().as_deref(), Some("non-finite value"));
+        }
+    }
+
+    #[test]
+    fn exact_sums_over_signs_and_the_binary64_range() {
+        assert_eq!(cmp(&[0.2], "0.1", &[0.3]), Equal);
+        assert_eq!(cmp(&[0.7], "0.2", &[0.9]), Equal);
+        assert_eq!(cmp(&[-0.3], "0.1", &[-0.2]), Equal);
+        assert_eq!(cmp(&[-0.0], "0", &[0.0]), Equal);
+        assert_eq!(cmp(&[f64::MAX], "1", &[f64::MAX]), Greater);
+        assert_eq!(cmp(&[5e-324], "0", &[1e-323]), Less);
+        assert_eq!(cmp(&[-f64::MAX], "0.000000001", &[f64::MIN_POSITIVE]), Less);
+        assert_eq!(cmp(&[9.999_999_999], "0.000000001", &[10.0]), Equal);
     }
 }

@@ -528,6 +528,14 @@ specs' work.
      uses `t` instead of the band, so needs no band.
    - `better_than`: higher is better passes when `c > b + band`; lower is
      better when `c < b - band`. An improvement within noise is not a win.
+   - Every comparison above, with a noise band or an absolute `t`, is
+     computed in exact decimal: `b`, `c` and a binary64 band (as 3.5
+     computed it) are taken as the shortest decimals that round-trip to
+     their binary64 values (what Rust's `{}` prints), `t` as its exact
+     decimal, and `b - band`, `b + band` and the comparison are computed
+     exactly, never in binary64. A candidate exactly on a boundary is
+     decided by the comparison as written: it passes `>=` and `<=` and
+     fails `>` and `<`. How a band is computed (3.5) is unchanged.
    - `all_slices`: the inner clause holds for every declared slice; a
      `below_minimum` slice makes it unknown.
    - `held_out`: on a held-out split, passes when the candidate's lineage
@@ -1009,6 +1017,25 @@ interval is unknown, never approximated. Options: (a) keep it so (Brier
 is not case-decomposable); (b) reconcile Brier within a stated tolerance;
 (c) amend spec 004 to sum per case first, which changes Brier's bits in
 existing reports.
+
+**Exact decimal boundaries (2026-11-03, #474).** `metric_clause` converted
+an absolute tolerance `t` to binary64 and computed `b - t` or `b + t` there,
+and did the same with a noise band, so a candidate exactly on a non-dyadic
+boundary qualified or was rejected by rounding (lower is better, `b = 0.7`,
+`c = 0.9`, `t = 0.2` was rejected; higher is better, `b = 0.3`, `c = 0.2`,
+`t = 0.1` qualified only because `0.3 - 0.1` rounds down). The owner
+decided "exact decimal" on 2026-11-03: 3.12.3 now computes every clause
+comparison, with an absolute tolerance or a noise band, in exact decimal
+over the shortest round-trip decimals of `b`, `c` and the band, so a
+candidate on the boundary passes `not_worse_than` and fails `better_than`,
+and the next binary64 value past it flips the result (`tests/selection.rs`,
+`absolute_tolerance_edges_compare_in_exact_decimal` and
+`noise_band_edges_compare_in_exact_decimal`). The arithmetic is local to
+the selection module (no new dependency). A threshold that would overflow
+binary64 is no longer unknown, since none is formed; a non-finite value or
+band is still refused and leaves the clause unknown (3.12.4). Band
+computation (3.5) is unchanged, and coverage minima were already compared
+exactly in integers.
 
 Engineering choices made by the implementing agent, not by the owner:
 
