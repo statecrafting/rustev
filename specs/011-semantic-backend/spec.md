@@ -913,6 +913,34 @@ erasure removes every entry of the handle before returning.
 `cache_stats()` reports `hits`, `misses`, `admitted`, `evicted`, `bytes`
 and `invalidations`. Tests in `tests/bundle.rs` (`cache_tests`).
 
+**After the gate, part 1 (2026-11-02): the feasibility record and the
+inference dependencies (3.2).** Decision 4 of the owner's 2026-11-01
+answers commits the record. `backends/rustev-backend-embed-linear/qualification/`
+holds `feasibility.json` (`rustev.embed-feasibility/1`, contract digest
+`sha256:6a85fb28eba4222e75d1efde7cbd25c1869eda60403d695a6d137c12d09899e5`
+in `feasibility.sha256`) and its evidence, each bound by SHA-256 in the
+record: the reference implementation's output, the probe's output, resource
+usage, stderr, the dependency tree and the scripts. The record was measured
+on 2026-10-22 and re-recorded on 2026-11-02 under A-73 by `rerecord.py`,
+with no new measurement. On `macos-aarch64`, stages 1 and 2 pass; stage 3
+passes under the amended 3.2.2 (the native probe loads the digest-verified
+runtime from an absolute path and reads version 1.31.0; the resolved graph
+with the pinned `ort` and `tokenizers` passes `make boundaries` with the
+3.18 rules and holds no HTTP family, `hf-hub` or download feature); stage 4
+refuses (encoder p95 105.4 ms against 100 ms, and the complete-backend items
+of 3.13 were not measured). Both Linux platforms are not measured. No
+platform is qualified; every verdict is `refuse`. Because stages 1 to 3 pass
+for one platform, the crate now depends on `ort` `=2.0.0-rc.15` (no default
+features; `std`, `load-dynamic`, `api-31`) and `tokenizers` `=1.0.0-rc.3`
+(no default features; `serialize`, `normalizers`, `wordpiece`, `regex`)
+(3.2.3). `tests/feasibility_record.rs` checks the record's closed
+envelope, canonical encoding and contract digest, every evidence file's
+length and SHA-256, and that stages 1 to 3 pass on `macos-aarch64` with no
+platform qualified. `examples/feasibility.rs`, the
+probe as measured, is kept byte-identical and not built: it reads the
+runtime version through `dlopen`, which the workspace's
+`unsafe_code = "forbid"` refuses.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

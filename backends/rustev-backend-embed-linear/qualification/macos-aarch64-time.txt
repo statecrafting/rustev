@@ -1,0 +1,3 @@
+Error: Error { code: GenericFailure, message: "Error compiling model: Failed to create a working directory appropriate for URL: file:///var/folders/f0/0y6j5wp95z13jkn5f9g6hybr0000gn/T/", ptr: 0x9c39252c0 }
+        7.00 real         0.50 user         0.14 sys
+time: sysctl kern.clockrate: Operation not permitted

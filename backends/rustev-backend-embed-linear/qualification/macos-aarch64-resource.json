@@ -1,0 +1,8 @@
+{
+  "exit_code": 0,
+  "peak_rss_bytes": 361512960,
+  "user_seconds": "84.563755",
+  "system_seconds": "3.378119",
+  "collector": "resource.getrusage(RUSAGE_CHILDREN); fresh parent, one child; macOS bytes",
+  "probe_sha256": "a1668f4f58bddbb6c7894e55e29e7dd1a6fa4a39919cab58ad23e14606a555a0"
+}
