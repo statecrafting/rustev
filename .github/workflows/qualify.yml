@@ -48,9 +48,12 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
     # Explicit, so a caller's wider ceiling never reaches this job (060 3.7.3).
+    # packages: read, to pull the image before the owner makes it public
+    # (060 3.4.3).
     permissions:
       contents: read
       attestations: read
+      packages: read
     strategy:
       fail-fast: false
       matrix:
@@ -133,6 +136,9 @@ jobs:
           printf '#!/bin/sh\nexec python "$@"\n' > "$RUNNER_TEMP/shim/python3"
           chmod +x "$RUNNER_TEMP/shim/python3"
           echo "$RUNNER_TEMP/shim" >> "$GITHUB_PATH"
+      - name: Registry login for the image's pull and attestations (060 3.4.3)
+        if: ${{ runner.os == 'Linux' && !matrix.alpine }}
+        run: printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
       - name: Qualify (056 3.3)
         if: ${{ !matrix.alpine }}
         env:

@@ -10,13 +10,13 @@
       "contentHash": "5da4d3c3f91a1fa6998458fcd41df060c53431a6e8ffabcbc57b1586e18c77a4"
     },
     ".github/workflows/qualify.yml": {
-      "contentHash": "7ade60b06df0d509c687acda177953c818844a77d9f61d83e9241cd7cebdc94e"
+      "contentHash": "3335b747ef4b1b221aec3913bf09ffd604db8c4fec457d6b0045f14b52262d61"
     },
     ".github/workflows/release-checks.yml": {
       "contentHash": "1afec06c15e920a8e8d2b6a4148a556dcb9cf104bb8cf25ccedbf6e26aa72517"
     },
     ".github/workflows/release.yml": {
-      "contentHash": "73ef791199afb31c726817d1ad4e70be31e34894c379737cf6f4487fb794e1e3"
+      "contentHash": "92201ec35587799296a46b85679ffdb6ccc5405aa31ea55d6fd4181f06f026ac"
     },
     ".github/workflows/statecraft-ai-review.yml": {
       "contentHash": "00e0438f07e2aab27c453329df15a86b268ca5b60b7566d6ac6c05460bb18f5a"
