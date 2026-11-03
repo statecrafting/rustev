@@ -136,7 +136,7 @@
       }
     ],
     "id": "042-decision-service-and-remote-seams",
-    "implementation": "in-progress",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "2-1-binding-principles-of-76",
@@ -210,7 +210,7 @@
       }
     ],
     "sectionDigests": {
-      "042-decision-service-sidecar-and-remote-context-and-sink-protocols-amends-010": "aa3fc8c276a3242b288fba2ca91accc8f1936399540e2ce3a93fdefa128bf72c",
+      "042-decision-service-sidecar-and-remote-context-and-sink-protocols-amends-010": "c850e20ba3d92355b981411642e992831e984fc234e0a4d35b8df878620dc451",
       "1-purpose": "ff7983dfa100f7656f25eca5742c5a2871bed14513bce1a1b61748760a6b2840",
       "2-1-binding-principles-of-76": "fb78e4bf06930e7788cf73a75e3943a4e9ebe77673de71b2eec54f5ce6127896",
       "2-2-relation-to-spec-010-and-the-binding-record-gate": "686daeca68b7adec5084445de04ac9aa275c36c9fc1ca680756c6ba5a97c0059",
@@ -239,7 +239,7 @@
       "5-observable-negative-cases": "5db3d183804ca0b6c7f8fee127b835c4fad3a4c028b6a79216994b3c3530f4e4",
       "acceptance": "cf6a6046487b594adf5d88d0cdb5e5fd8cc7e0b249ec1546afaff2f765667458",
       "decisions-at-approval": "b2cc55ca8f777ed1ccf05f15c22b44845b99c34e7792a010e727b7dd1ff2fe04",
-      "implementation-record": "8416c76787526cc6c670d50ae55e60b219909d9af16912cc9e3db39172d282e3",
+      "implementation-record": "2c2634a731014c34567e5d68bd5b9c6a6209a7a253202c4354039d8eaa97a6ae",
       "verification": "0a75bf7b4443e8a178a5e74bfc3009053ed6c1f9d5a7aed7395cee55575f71cd"
     },
     "sectionHeadings": [
@@ -277,9 +277,9 @@
     ],
     "specPath": "specs/042-decision-service-and-remote-seams/spec.md",
     "status": "approved",
-    "summary": "An amendment of approved spec 010 (R-16), for #76 child A2 (#57). Makes the `rustev-serve` service API concrete as `rustev.serve/1`: plan registration by content identity from plain or signed plan bundles, decisions, cancellation, lookup, server-sent event streaming, offline replay, evaluation and explanation, health, readiness and OpenMetrics, served over HTTP/1.1 and HTTP/2 with JSON and over gRPC from one handler layer, on TCP and Unix domain socket listeners. Defines two new transport-neutral callback protocols with an HTTP binding, `rustev.remote-context/1` (describe, fetch, acquire, cancel and invalidation by push or poll) and `rustev.remote-sink/1` (describe and deliver with receipts), behind bounded queues with deadlines, cancellation and typed refusals when full. Adds no plan construct: every `PlanId`, run record and judgment byte is unchanged. Approved (A-39) under the 2026-10-16 delivery work order; implementation is pending, and `rustev-serve` implementation still waits for the owner's approval of its spec 010 section 3.4 binding record (R-34 in the founding decisions).\n",
+    "summary": "An amendment of approved spec 010 (R-16), for #76 child A2 (#57). Makes the `rustev-serve` service API concrete as `rustev.serve/1`: plan registration by content identity from plain or signed plan bundles, decisions, cancellation, lookup, server-sent event streaming, offline replay, evaluation and explanation, health, readiness and OpenMetrics, served over HTTP/1.1 and HTTP/2 with JSON and over gRPC from one handler layer, on TCP and Unix domain socket listeners. Defines two new transport-neutral callback protocols with an HTTP binding, `rustev.remote-context/1` (describe, fetch, acquire, cancel and invalidation by push or poll) and `rustev.remote-sink/1` (describe and deliver with receipts), behind bounded queues with deadlines, cancellation and typed refusals when full. Adds no plan construct: every `PlanId`, run record and judgment byte is unchanged. Approved (A-39) under the 2026-10-16 delivery work order; implementation is complete (2026-11-03), after the owner approved `rustev-serve`'s spec 010 section 3.4 binding record (R-44).\n",
     "title": "Decision service sidecar and remote context and sink protocols (amends 010)"
   },
-  "shardHash": "945857a1494eea2d9e698b606dd7e6d81ba3f63ecbeaa8cb5cf302ea6d45ab4d",
+  "shardHash": "6e52db6efd9c14afa2d5ce370b73e9f47be9fdd0a1e8f6d89f3a3a9eede7b3ae",
   "specVersion": "1.10.0"
 }

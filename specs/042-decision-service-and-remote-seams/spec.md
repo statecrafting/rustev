@@ -2,7 +2,7 @@
 id: "042-decision-service-and-remote-seams"
 title: "Decision service sidecar and remote context and sink protocols (amends 010)"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-10-17"
 summary: >
   An amendment of approved spec 010 (R-16), for #76 child A2 (#57). Makes
@@ -18,9 +18,9 @@ summary: >
   deliver with receipts), behind bounded queues with deadlines,
   cancellation and typed refusals when full. Adds no plan construct: every
   `PlanId`, run record and judgment byte is unchanged. Approved (A-39)
-  under the 2026-10-16 delivery work order; implementation is pending, and
-  `rustev-serve` implementation still waits for the owner's approval of its
-  spec 010 section 3.4 binding record (R-34 in the founding decisions).
+  under the 2026-10-16 delivery work order; implementation is complete
+  (2026-11-03), after the owner approved `rustev-serve`'s spec 010
+  section 3.4 binding record (R-44).
 amends:
   - "010-integrations"
 extends:
@@ -1685,6 +1685,36 @@ row amended). No contract type changes. Tests:
 (`panicking_decision_task_answers_internal_error_and_keeps_serving`, a
 SYNTHETIC context source that panics, over the handler and an HTTP
 stream).
+
+**Complete (2026-11-03).** Every Acceptance item is met; the image is
+built and checked, not released (0.4.0 ships without it; its publication
+is spec 060's, for a later version). Item by item:
+
+- Binding record: the owner approved `rustev-serve`'s spec 010 3.4
+  binding record (R-44) before any `rustev-serve` code landed.
+- Shared conformance, the transport differential and the runtime cases
+  through `serve-http` and `serve-grpc` over TCP and a Unix socket:
+  increment 5 parts 1 and 2 above.
+- Callback protocol conformance (3.17.3): increment 5 part 3.
+- Shutdown under load under each sink policy, admission refusals and
+  bounded queues: the `rustev-serve` increments recorded in spec 010 and
+  increment 4 above, mapped row by row in
+  `integrations/rustev-serve/tests/COVERAGE.md` (for example
+  `queued_sink_policies_preserve_tickets_drops_and_shutdown_accounting`).
+- Signed bundles under the three modes: increment 8.
+- Compatibility with and without a progress observer: the runtime
+  progress observer paragraph and `cargo test -p rustev-runtime --test
+  progress`.
+- `.proto` and JSON Schema drift: the contract's schema tests and the
+  generated gRPC surface's check, in declared verification.
+- The image (3.16): increment 9 (#459); dry run 41566109051 built each
+  platform twice with identical archives and `check.sh` passed for
+  `linux/amd64` and `linux/arm64`, non-root 65532.
+- Section 5: every row has a deterministic loopback test
+  (`COVERAGE.md`); the last open row, a panicking decision task, is
+  closed by the paragraph above (#466).
+- `make code`, `make conformance`, declared verification (#468) and
+  `make gate`: CI push run 41669913327 on `main` at `cf3ae8d7` passed.
 
 ## Decisions at approval
 
