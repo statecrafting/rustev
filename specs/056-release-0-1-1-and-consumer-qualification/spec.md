@@ -373,3 +373,11 @@ MSRV, and the default branch into `harness/`, and runs that branch's
 from which the harness reads the release set, the adoption subsets and the
 toolchain pin. The release run's call is unchanged and runs the tag's
 harness.
+
+**npm on Windows (2026-11-03, 3.3).** The dispatched run of 2026-11-03
+(`harness_from_default_branch`, tag `v0.3.0`) passed every kind on six
+platforms; on win32-x64-msvc `npm` failed before npm ran, with `[WinError 2]`,
+as it had in the `v0.3.0` tag run. Windows installs npm as `npm.cmd`, which
+a process starts only by its full path. The harness now resolves each
+command's program on the consumer environment's `PATH` before starting it;
+the recorded commands are unchanged.

@@ -143,11 +143,17 @@ class Harness:
         except FileNotFoundError:
             return 'unavailable: ' + cmd[0]
 
+    def program(self, name):
+        # Windows installs npm as npm.cmd, which a process starts only by its
+        # full path; resolve every program on the consumer environment's PATH.
+        return shutil.which(str(name), path=self.env.get('PATH')) or str(name)
+
     def run(self, *cmd, cwd=None):
         self.commands.append(' '.join(map(str, cmd)))
         self.log.write(('$ ' + self.commands[-1] + '\n').encode())
         self.log.flush()
-        subprocess.run(list(map(str, cmd)), cwd=cwd or self.work, env=self.env,
+        argv = list(map(str, cmd))
+        subprocess.run([self.program(argv[0])] + argv[1:], cwd=cwd or self.work, env=self.env,
                        stdout=self.log, stderr=subprocess.STDOUT, check=True)
 
     def offline_run(self, *cmd, cwd=None):
@@ -289,7 +295,7 @@ class Harness:
         audit = path / 'audit.json'
         self.commands.append('npm audit signatures --json --include-attestations')
         with audit.open('wb') as output:
-            subprocess.run(['npm', 'audit', 'signatures', '--json', '--include-attestations'], cwd=path,
+            subprocess.run([self.program('npm'), 'audit', 'signatures', '--json', '--include-attestations'], cwd=path,
                            env=self.env, stdout=output, stderr=self.log, check=True)
         self.log.write(audit.read_bytes())
         # `npm audit signatures --json` lists only failures; it exits nonzero on
