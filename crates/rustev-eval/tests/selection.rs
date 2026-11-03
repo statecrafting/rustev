@@ -2,7 +2,7 @@
 mod support;
 use rustev_contract::{Document, Identified};
 use rustev_eval::comparison::{NamedCandidate, RepeatEvidence};
-use rustev_eval::repeat::{HeldOut, Source};
+use rustev_eval::repeat::{BandDoc, FigureDoc, HeldOut, Source};
 use rustev_eval::selection::*;
 use serde_json::json;
 use support::*;
@@ -106,6 +106,109 @@ fn exact_edges_both_directions_absolute_and_both_bands() {
         v["require"][0]["within"] = json!({"absolute":"0.125"})
     });
     assert_eq!(f.select(&g).exit_code(), 0);
+}
+/// #474: an absolute tolerance is compared in exact decimal against the
+/// shortest round-trip decimals of the pooled values, so a candidate exactly
+/// on a non-dyadic boundary qualifies whichever way binary64 would round
+/// `b - t` or `b + t`, and the next binary64 value past it is rejected.
+#[test]
+fn absolute_tolerance_edges_compare_in_exact_decimal() {
+    for (higher, b, c, t) in [
+        (false, 0.5, 0.75, "0.25"),
+        (false, 0.7, 0.9, "0.2"),
+        (true, 10.9, 9.7, "1.2"),
+        (true, 0.3, 0.2, "0.1"),
+    ] {
+        let mut f = Fixture::new();
+        let g = edit_gate(&gate(), |v| {
+            v["metrics"]["mean_log_loss"] = json!(if higher {
+                "higher_is_better"
+            } else {
+                "lower_is_better"
+            });
+            v["require"][0]["within"] = json!({ "absolute": t });
+        });
+        f.loss(false, b, b);
+        f.loss(true, c, c);
+        let (_, br, cr) = f.reports();
+        for (r, v) in [(&br, b), (&cr, c)] {
+            let all = r.cohorts.iter().find(|c| c.name == "all").unwrap();
+            let m = all.metrics.iter().find(|m| m.name == "mean_log_loss");
+            assert_eq!(m.unwrap().pooled, FigureDoc::Value(v), "pooled {v}");
+        }
+        assert_eq!(f.select(&g).exit_code(), 0, "{b} {c} {t} on the boundary");
+        let past = f64::from_bits(if higher {
+            c.to_bits() - 1
+        } else {
+            c.to_bits() + 1
+        });
+        f.loss(true, past, past);
+        assert_eq!(
+            f.select(&g).exit_code(),
+            11,
+            "{b} {past} {t} past the boundary"
+        );
+    }
+}
+/// #474: a noise band is compared the same way. With a deterministic
+/// replay band of exactly 0.1 between 87.5 and 87.6, `not_worse_than` passes
+/// on the boundary and `better_than` (strict) fails on it, in both
+/// directions; the next binary64 value past each boundary flips the result.
+#[test]
+fn noise_band_edges_compare_in_exact_decimal() {
+    for higher in [false, true] {
+        for better in [false, true] {
+            let mut f = Fixture::new();
+            f.config.noise.floor = dec("0.1");
+            let g = edit_gate(&gate(), |v| {
+                v["metrics"]["mean_log_loss"] = json!(if higher {
+                    "higher_is_better"
+                } else {
+                    "lower_is_better"
+                });
+                if better {
+                    v["require"] = json!([{"metric":"mean_log_loss","better_than":"baseline"}]);
+                }
+            });
+            // The candidate sits on the boundary: b - band or b + band.
+            let (b, c) = if higher == better {
+                (87.5, 87.6)
+            } else {
+                (87.6, 87.5)
+            };
+            f.loss(false, b, b);
+            f.loss(true, c, c);
+            let (_, br, cr) = f.reports();
+            for (r, v) in [(&br, b), (&cr, c)] {
+                let all = r.cohorts.iter().find(|c| c.name == "all").unwrap();
+                let m = all
+                    .metrics
+                    .iter()
+                    .find(|m| m.name == "mean_log_loss")
+                    .unwrap();
+                assert_eq!(m.pooled, FigureDoc::Value(v), "pooled {v}");
+                assert!(
+                    matches!(m.band, BandDoc::Value { value, .. } if value == 0.1),
+                    "band {:?}",
+                    m.band
+                );
+            }
+            let name = format!("higher {higher} better {better} b {b} c {c}");
+            assert_eq!(
+                f.select(&g).exit_code(),
+                if better { 11 } else { 0 },
+                "{name}"
+            );
+            // One binary64 step in the candidate's favour, then against it.
+            let up = f64::from_bits(c.to_bits() + 1);
+            let down = f64::from_bits(c.to_bits() - 1);
+            let (favour, against) = if higher { (up, down) } else { (down, up) };
+            f.loss(true, favour, favour);
+            assert_eq!(f.select(&g).exit_code(), 0, "{name} favour {favour}");
+            f.loss(true, against, against);
+            assert_eq!(f.select(&g).exit_code(), 11, "{name} against {against}");
+        }
+    }
 }
 #[test]
 fn failure_dominates_unknown_and_or_truth_table() {
