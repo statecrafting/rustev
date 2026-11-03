@@ -105,7 +105,6 @@ fn the_release_set_fixes_the_npm_members_and_the_absences() {
     assert_eq!(
         absent,
         [
-            ("image", "ghcr.io/statecrafting/rustev-serve"),
             ("crate", "rustev-bedrock"),
             ("crate", "rustev-backend-embed-linear"),
         ]
@@ -301,11 +300,13 @@ fn absences_carry_a_known_kind_and_a_reason_and_are_not_members() {
     s.absent[0].kind = "service".into();
     assert!(set_detail(&s).contains("unknown kind"));
     let mut s = set();
-    s.absent[2].name = "rustev-cli".into();
+    let last = s.absent.len() - 1;
+    s.absent[last].name = "rustev-cli".into();
     assert!(set_detail(&s).contains("both a member and absent"));
     let mut s = set();
-    s.absent[2].kind = "npm".into();
-    s.absent[2].name = "@rustev/rustev-wasm".into();
+    let last = s.absent.len() - 1;
+    s.absent[last].kind = "npm".into();
+    s.absent[last].name = "@rustev/rustev-wasm".into();
     assert!(set_detail(&s).contains("both a member and absent"));
     let mut s = set();
     let dup = s

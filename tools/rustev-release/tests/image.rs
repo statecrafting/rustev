@@ -353,14 +353,11 @@ fn a_candidate_manifest_never_names_an_image() {
 fn the_release_set_names_the_image_once_with_its_fixed_repository_and_platforms() {
     let set = member_set();
     let mut both = set.clone();
-    both.absent.push(
-        ReleaseSet::parse(include_bytes!("../release-set.json"))
-            .unwrap()
-            .absent
-            .into_iter()
-            .find(|a| a.kind == "image")
-            .unwrap(),
-    );
+    both.absent.push(rustev_release::npm::Absent {
+        kind: "image".into(),
+        name: image::REPOSITORY.into(),
+        reason: "not released".into(),
+    });
     let all: Vec<String> = check_set(&both).iter().map(|v| v.to_string()).collect();
     assert!(
         all.iter().any(|v| v.contains("both a member and absent")),

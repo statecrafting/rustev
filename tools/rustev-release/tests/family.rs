@@ -17,6 +17,8 @@ fn write(path: &Path, b: &[u8]) {
 fn fixture() -> (Scratch, ReleaseSet, ReleaseManifest) {
     let root = fresh_dir("rustev-family-test").unwrap();
     let mut set = ReleaseSet::parse(include_bytes!("../release-set.json")).unwrap();
+    // The image's own fixture is tests/image.rs (060 3.4.1).
+    set.image = None;
     // A fixed version, so the artifact names below stay literal.
     set.version = "0.1.0".into();
     set.tag = format!("v{}", set.version);

@@ -491,6 +491,20 @@ day after, and an empty scan to leave all 44 unused. While the image is
 absent from the release set (and on the cc-debian12 base, until the base
 move merges) the scan's verdict is recorded without gating.
 
+**Increment 5, 2026-11-05 (3.1, membership).**
+`tools/rustev-release/release-set.json` names the image under `image`
+(`ghcr.io/statecrafting/rustev-serve`, `linux/amd64` and `linux/arm64`)
+and drops its `absent` entry. This is the switch that makes the next
+release name, scan-gate, push, attest, verify and qualify the image. The
+test fixtures that are not about the image (`tests/family.rs`,
+`tests/tagged.rs`) set `image` to none, and `tests/npm.rs` and
+`tests/image.rs` no longer read an image absence from the committed set.
+It merged after 0.4.1 was cut, so 0.5.0 is the first release to carry
+the image. Its conditions hold: the base is
+`gcr.io/distroless/cc-debian13:nonroot` with the 44 accepted exceptions
+(increment 3b, A-80), 3.4.3's image qualification is in `qualify.yml`,
+and spec 042 is complete (#477), so 3.1.1's condition on it holds.
+
 ## Decisions at approval
 
 Ratified by the owner on 2026-11-03 (A-76: "I ratify 060"), as proposed:

@@ -394,6 +394,8 @@ fn unknown_state_a_refused_upload_or_no_visibility_fails() {
 fn release() -> (Scratch, ReleaseManifest, PathBuf) {
     let root = fresh_dir("rustev-tagged-release").unwrap();
     let mut set = ReleaseSet::parse(include_bytes!("../release-set.json")).unwrap();
+    // The image's own fixture is tests/image.rs (060 3.4.1).
+    set.image = None;
     set.version = "0.3.0".into();
     set.tag = "v0.3.0".into();
     set.upload_order = vec!["rustev-contract".into()];
