@@ -118,8 +118,34 @@ pub const PACKAGE_DEPENDENCIES: &[&str] = &["rustev-contract", "rustev-core"];
 /// crate under `integrations/`, and only optionally (3.3).
 pub const FACADE: &str = "rustev";
 
-/// 049 3.1: only this normal dependency crosses between integrations.
+/// 049 3.1: the Node binding's normal dependency on the telemetry crate.
 pub const NODE_TELEMETRY_EDGE: (&str, &str) = ("rustev-node", "rustev-otel");
+
+/// 059 3.1: the shared transport, spec 009's Part A machinery. The
+/// integration crates that may depend on it are the ones its own manifest
+/// lists under `[package.metadata.rustev] dependents`: spec 012 I-5 keeps
+/// provider names out of `tools/`, so this check names none of them.
+pub const SHARED_TRANSPORT: &str = "rustev-remote-http";
+
+/// The dependents the workspace's shared transport declares (059 3.1),
+/// read only from the member under `integrations/` of that name.
+fn transport_dependents<'a>(members: &[&'a Package], root: &str) -> BTreeSet<&'a str> {
+    members
+        .iter()
+        .filter(|p| {
+            p.name == SHARED_TRANSPORT && under_integrations(&relative_dir(root, &p.manifest_path))
+        })
+        .filter_map(|p| {
+            p.metadata
+                .as_ref()?
+                .get("rustev")?
+                .get("dependents")?
+                .as_array()
+        })
+        .flatten()
+        .filter_map(|v| v.as_str())
+        .collect()
+}
 
 /// The subset of `cargo metadata` output this check reads.
 #[derive(Debug, Deserialize)]
@@ -139,6 +165,9 @@ pub struct Package {
     /// The package's Cargo features, each with what it enables.
     #[serde(default)]
     pub features: BTreeMap<String, Vec<String>>,
+    /// The manifest's `[package.metadata]` table, if any.
+    #[serde(default)]
+    pub metadata: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -420,6 +449,7 @@ pub fn check(meta: &Metadata) -> Vec<Violation> {
         .filter(|p| under_integrations(&relative_dir(&meta.workspace_root, &p.manifest_path)))
         .map(|p| p.name.as_str())
         .collect();
+    let dependents = transport_dependents(&members, &meta.workspace_root);
 
     if let Some(facade) = members.iter().find(|p| p.name == FACADE) {
         let enables = facade.features.get("default").cloned().unwrap_or_default();
@@ -502,8 +532,11 @@ pub fn check(meta: &Metadata) -> Vec<Violation> {
                             detail,
                         });
                     }
-                } else if !((pkg.name.as_str(), dep.name.as_str()) == NODE_TELEMETRY_EDGE
-                    && dep.kind.is_none())
+                } else if !(dep.kind.is_none()
+                    && ((pkg.name.as_str(), dep.name.as_str()) == NODE_TELEMETRY_EDGE
+                        || (dep.name == SHARED_TRANSPORT
+                            && integration_names.contains(pkg.name.as_str())
+                            && dependents.contains(pkg.name.as_str()))))
                 {
                     out.insert(Violation::DependsOnIntegration {
                         krate: pkg.name.clone(),
@@ -1835,6 +1868,7 @@ mod tests {
                         features: vec![],
                     }],
                     features: BTreeMap::new(),
+                    metadata: None,
                 });
             });
             // Exactly one violation, named by 031 3.3.2.
@@ -1873,6 +1907,7 @@ mod tests {
                 manifest_path: "/registry/tokio/Cargo.toml".into(),
                 dependencies: vec![],
                 features: BTreeMap::new(),
+                metadata: None,
             });
             let r = m.resolve.as_mut().unwrap();
             r.nodes.push(Node {
@@ -1957,16 +1992,167 @@ mod tests {
         }
     }
 
+    // 059 3.1.3: the shared transport's declared dependents, each as a
+    // normal dependency only, and nothing else. Neutral names: spec 012 I-5
+    // keeps provider names out of `tools/`.
+    fn transport_ws(from: &str, from_dir: &str, to: &str, kind: Option<&str>) -> Metadata {
+        let to_dir = format!("integrations/{to}");
+        let mut members = vec![(from, from_dir, vec![(to, kind, Some(to_dir.as_str()))])];
+        members.push((to, to_dir.as_str(), vec![]));
+        if to != SHARED_TRANSPORT {
+            members.push((SHARED_TRANSPORT, "integrations/rustev-remote-http", vec![]));
+        }
+        let members: Vec<Member<'_>> = members
+            .iter()
+            .map(|(n, d, deps)| (*n, *d, deps.as_slice()))
+            .collect();
+        let mut m = meta(&members, &[], &[(from, to, kind)]);
+        for p in &mut m.packages {
+            if p.name == SHARED_TRANSPORT || p.name == "rustev-otel" {
+                p.metadata = Some(json!({"rustev": {"dependents": ["remote-a", "remote-b"]}}));
+            }
+        }
+        m
+    }
+
+    #[test]
+    fn the_shared_transport_admits_its_declared_dependents_only() {
+        for (from, from_dir, to, kind, allowed) in [
+            (
+                "remote-a",
+                "integrations/remote-a",
+                SHARED_TRANSPORT,
+                None,
+                true,
+            ),
+            (
+                "remote-b",
+                "integrations/remote-b",
+                SHARED_TRANSPORT,
+                None,
+                true,
+            ),
+            (
+                "remote-a",
+                "integrations/remote-a",
+                SHARED_TRANSPORT,
+                Some("build"),
+                false,
+            ),
+            (
+                "remote-a",
+                "integrations/remote-a",
+                SHARED_TRANSPORT,
+                Some("dev"),
+                false,
+            ),
+            // Not declared.
+            (
+                "remote-c",
+                "integrations/remote-c",
+                SHARED_TRANSPORT,
+                None,
+                false,
+            ),
+            (
+                "rustev-node",
+                "integrations/rustev-node",
+                SHARED_TRANSPORT,
+                None,
+                false,
+            ),
+            (
+                "rustev-otel",
+                "integrations/rustev-otel",
+                SHARED_TRANSPORT,
+                None,
+                false,
+            ),
+            // Declared, but on another integration: only the shared
+            // transport's declaration counts.
+            ("remote-a", "integrations/remote-a", "remote-b", None, false),
+            (
+                "remote-a",
+                "integrations/remote-a",
+                "rustev-otel",
+                None,
+                false,
+            ),
+            // Declared, but outside `integrations/` (001 3.4.2).
+            ("remote-a", "crates/remote-a", SHARED_TRANSPORT, None, false),
+        ] {
+            let violations = check(&transport_ws(from, from_dir, to, kind));
+            assert_eq!(
+                violations.contains(&Violation::DependsOnIntegration {
+                    krate: from.into(),
+                    dependency: to.into(),
+                }),
+                !allowed,
+                "{from} ({from_dir}) -> {to} ({kind:?})"
+            );
+            if allowed {
+                assert!(violations.is_empty(), "{violations:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn a_declaration_outside_integrations_admits_nothing() {
+        let mut m = transport_ws("remote-a", "integrations/remote-a", SHARED_TRANSPORT, None);
+        for p in &mut m.packages {
+            if p.name == SHARED_TRANSPORT {
+                p.manifest_path = "/ws/crates/rustev-remote-http/Cargo.toml".into();
+            }
+        }
+        // Only the shared transport under `integrations/` declares dependents.
+        assert!(
+            transport_dependents(&m.packages.iter().collect::<Vec<_>>(), &m.workspace_root)
+                .is_empty()
+        );
+    }
+
+    // 059 3.1.3 and 001 3.4.2: a crate outside `integrations/` on the shared
+    // transport, as any kind of dependency, still fails.
+    #[test]
+    fn a_crate_outside_integrations_on_the_shared_transport_fails() {
+        for kind in [None, Some("build"), Some("dev")] {
+            let m = meta(
+                &[
+                    (
+                        "rustev-runtime",
+                        "crates/rustev-runtime",
+                        &[(
+                            "rustev-remote-http",
+                            kind,
+                            Some("integrations/rustev-remote-http"),
+                        )],
+                    ),
+                    ("rustev-remote-http", "integrations/rustev-remote-http", &[]),
+                ],
+                &[],
+                &[("rustev-runtime", "rustev-remote-http", kind)],
+            );
+            assert!(
+                check(&m).contains(&Violation::DependsOnIntegration {
+                    krate: "rustev-runtime".into(),
+                    dependency: "rustev-remote-http".into(),
+                }),
+                "{kind:?}"
+            );
+        }
+    }
+
     #[test]
     fn another_integration_depending_on_an_integration_still_fails() {
-        // The exception names the facade alone (3.3): a second integration
-        // crate depending on the remote binding still breaks 001 3.4.4.
+        // The facade's exception (3.3) is the facade's alone: an integration
+        // crate outside the named edges (049 3.1, 059 3.1) depending on the
+        // remote binding still breaks 001 3.4.4.
         let v = facade_ws(|m| {
-            m.workspace_members.push("rustev-serve 0.1.0".into());
+            m.workspace_members.push("rustev-otel 0.1.0".into());
             m.packages.push(Package {
-                id: "rustev-serve 0.1.0".into(),
-                name: "rustev-serve".into(),
-                manifest_path: "/ws/integrations/rustev-serve/Cargo.toml".into(),
+                id: "rustev-otel 0.1.0".into(),
+                name: "rustev-otel".into(),
+                manifest_path: "/ws/integrations/rustev-otel/Cargo.toml".into(),
                 dependencies: vec![Dependency {
                     name: "rustev-remote-http".into(),
                     kind: None,
@@ -1975,12 +2161,13 @@ mod tests {
                     features: vec![],
                 }],
                 features: BTreeMap::new(),
+                metadata: None,
             });
         });
         assert_eq!(
             v,
             vec![Violation::DependsOnIntegration {
-                krate: "rustev-serve".into(),
+                krate: "rustev-otel".into(),
                 dependency: "rustev-remote-http".into()
             }]
         );

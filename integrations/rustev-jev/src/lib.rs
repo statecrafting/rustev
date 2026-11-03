@@ -17,34 +17,22 @@
 //! (3.1.1). Nothing Jev returns is authorization; provider confidence is
 //! recorded as provider-reported and never supplied (I-1, I-2).
 //!
-//! The remaining modules are spec 009's Part A machinery, compiled from its
-//! source files in `integrations/rustev-remote-http/src/`. They are included
-//! rather than depended on because spec 001 3.4.4 forbids any crate
-//! depending on a crate under `integrations/`; there is one source of them.
+//! The remaining modules are spec 009's Part A machinery, re-exported from
+//! `rustev-remote-http`, on which this crate depends under the boundary
+//! exception of spec 059 (3.1); their paths under `rustev_jev` still resolve.
 #![forbid(unsafe_code)]
 
-#[path = "../../rustev-remote-http/src/budget.rs"]
-pub mod budget;
-#[path = "../../rustev-remote-http/src/cancel.rs"]
-pub mod cancel;
-#[path = "../../rustev-remote-http/src/cost.rs"]
-pub mod cost;
-#[path = "../../rustev-remote-http/src/exchange.rs"]
-pub mod exchange;
-#[path = "../../rustev-remote-http/src/http.rs"]
-pub mod http;
-#[path = "../../rustev-remote-http/src/identity.rs"]
-pub mod identity;
-#[path = "../../rustev-remote-http/src/phases.rs"]
-pub mod phases;
-#[path = "../../rustev-remote-http/src/pool.rs"]
-pub mod pool;
-#[path = "../../rustev-remote-http/src/principal.rs"]
-pub mod principal;
-#[path = "../../rustev-remote-http/src/taxonomy.rs"]
-pub mod taxonomy;
-#[path = "../../rustev-remote-http/src/wire.rs"]
-pub mod wire;
+pub use rustev_remote_http::budget;
+pub use rustev_remote_http::cancel;
+pub use rustev_remote_http::cost;
+pub use rustev_remote_http::exchange;
+pub use rustev_remote_http::http;
+pub use rustev_remote_http::identity;
+pub use rustev_remote_http::phases;
+pub use rustev_remote_http::pool;
+pub use rustev_remote_http::principal;
+pub use rustev_remote_http::taxonomy;
+pub use rustev_remote_http::wire;
 
 pub mod adapter;
 pub mod binding;

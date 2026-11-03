@@ -12,6 +12,8 @@ repository.workspace = true
 spec = "010-integrations"
 
 [dependencies]
+# Spec 009's Part A machinery (spec 059 3.2.1).
+rustev-remote-http.workspace = true
 rustev-contract = { path = "../../crates/rustev-contract" }
 rustev-core = { path = "../../crates/rustev-core", features = ["parameterized"] }
 rustev-runtime = { path = "../../crates/rustev-runtime" }

@@ -11,11 +11,9 @@ repository.workspace = true
 [package.metadata.spec-spine]
 spec = "030-bedrock-backend"
 
-# Spec 009's Part A machinery is compiled in from its source files (see
-# src/lib.rs), not taken as a Cargo dependency: spec 001 3.4.4 forbids any
-# crate depending on a crate under integrations/. Its dependencies are
-# therefore repeated here.
 [dependencies]
+# Spec 009's Part A machinery, re-exported from src/lib.rs (spec 059 3.2).
+rustev-remote-http.workspace = true
 rustev-live.workspace = true
 rustev-contract = { path = "../../crates/rustev-contract" }
 rustev-core = { path = "../../crates/rustev-core", features = ["parameterized"] }

@@ -2,34 +2,23 @@
 #![forbid(unsafe_code)]
 pub mod adapter;
 pub mod binding;
-#[path = "../../rustev-remote-http/src/budget.rs"]
-pub mod budget;
-#[path = "../../rustev-remote-http/src/cancel.rs"]
-pub mod cancel;
-#[path = "../../rustev-remote-http/src/cost.rs"]
-pub mod cost;
+pub use rustev_remote_http::budget;
+pub use rustev_remote_http::cancel;
+pub use rustev_remote_http::cost;
 pub mod evidence;
-#[path = "../../rustev-remote-http/src/exchange.rs"]
-pub mod exchange;
-#[path = "../../rustev-remote-http/src/http.rs"]
-pub mod http;
-#[path = "../../rustev-remote-http/src/identity.rs"]
-pub mod identity;
+pub use rustev_remote_http::exchange;
+pub use rustev_remote_http::http;
+pub use rustev_remote_http::identity;
 pub mod mapping;
 pub mod net;
-#[path = "../../rustev-remote-http/src/phases.rs"]
-pub mod phases;
+pub use rustev_remote_http::phases;
 pub mod policy;
-#[path = "../../rustev-remote-http/src/pool.rs"]
-pub mod pool;
-#[path = "../../rustev-remote-http/src/principal.rs"]
-pub mod principal;
+pub use rustev_remote_http::pool;
+pub use rustev_remote_http::principal;
 pub mod signing;
-pub use rustev_live::journal as spend;
-#[path = "../../rustev-remote-http/src/taxonomy.rs"]
-pub mod taxonomy;
-#[path = "../../rustev-remote-http/src/wire.rs"]
-pub mod wire;
 pub use adapter::BedrockBackend;
+pub use rustev_live::journal as spend;
+pub use rustev_remote_http::taxonomy;
+pub use rustev_remote_http::wire;
 #[cfg(feature = "aws-config")]
 pub mod aws_config_provider;
