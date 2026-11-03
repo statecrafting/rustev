@@ -23,7 +23,7 @@ use rustev_surface::eval::{check_case_ids, read_bundles, read_doc};
 use rustev_surface::host::Host;
 use std::collections::BTreeSet;
 
-const NOT_REPRODUCIBLE: u8 = 13;
+pub(crate) const NOT_REPRODUCIBLE: u8 = 13;
 
 pub fn validate(p: &Parsed) -> Result<usize, Usage> {
     let split = crate::eval::split(p)?;
@@ -273,7 +273,7 @@ fn output_names(dir: &str, n: usize) -> Vec<String> {
 }
 
 // Enumeration never follows symlinks. Names are validated before becoming output paths.
-fn directories(s: &Session<'_>, dir: &str) -> Result<Vec<(String, String)>, Done> {
+pub(crate) fn directories(s: &Session<'_>, dir: &str) -> Result<Vec<(String, String)>, Done> {
     let entries = std::fs::read_dir(dir).map_err(|e| s.invalid(dir, e))?;
     let mut result = vec![];
     let mut names = BTreeSet::new();
@@ -781,6 +781,10 @@ fn rollback_outputs(
 
 pub fn baseline(p: &Parsed) -> Result<Res, Usage> {
     let now = crate::host::now(p)?.as_ms();
+    // Spec 061: a host import output records a host baseline.
+    if let Some(r) = crate::host_sets::baseline(p, now) {
+        return Ok(r);
+    }
     let reads = Reads::default();
     let s = Session {
         command: p.name(),
@@ -810,6 +814,13 @@ fn bound_baseline(s: &Session<'_>, p: &Parsed) -> Result<(Baseline, Set), Done> 
 }
 
 pub fn compare(p: &Parsed) -> Res {
+    // Spec 061: host sets have their own check; `eval diff` refuses a
+    // host document by schema.
+    if p.spec.path == ["eval", "reproducibility"]
+        && let Some(r) = crate::host_sets::reproducibility(p)
+    {
+        return r;
+    }
     let reads = Reads::default();
     let s = Session {
         command: p.name(),
@@ -890,6 +901,10 @@ fn reproducibility_output(command: &str, result: Reproducibility) -> Done {
 }
 
 pub fn select(p: &Parsed) -> Res {
+    // Spec 061: host candidates against a host baseline.
+    if let Some(r) = crate::host_sets::select(p) {
+        return r;
+    }
     let reads = Reads::default();
     let s = Session {
         command: p.name(),
