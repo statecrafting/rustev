@@ -397,6 +397,33 @@ it as the harness does). `a_named_image_is_qualified_on_amd64_and_arm64_linux_on
 in `tests/image.rs` covers the per-platform rule. `qualify.yml`'s change
 (the registry login and `packages: read`) follows in its own pull request.
 
+**Increment 2b, 2026-11-03 (3.7.3, workflow).** `qualify.yml`'s `record`
+job, once `rustev-release qualify` has written a record, packs each
+platform's `qualify-<platform>` artifact unchanged into
+`qualification-vX.Y.Z-<platform>.tar.gz` (fixed order, times and owners),
+copies the record to `qualification-vX.Y.Z.json` and uploads them as the
+artifact `qualification-assets`. A new job `attach`, run only when `record`
+recorded `qualified`, is the workflow's one job with `contents: write`: it
+checks out the workflow's own commit (so a dispatch can attach evidence of
+a tag released before this change) and runs `attach-qualification`, which
+uploads only names not yet present. release.yml's `qualify` call now grants
+`contents: write` as the ceiling of qualify.yml's jobs; only `attach` takes
+it (`qualify` and `record` declare their read permissions explicitly, so
+the wider ceiling never reaches them), and `github-release` stays the only job of release.yml itself that
+writes contents. A release made before spec 058 records no lifecycle here,
+so nothing is attached for it. 058 3.3.3 names `github-release` as the
+only job with `contents: write`; the owner accepted on 2026-11-03 the
+reading that the `contents: write` this change adds applies only to
+qualify.yml's `attach` job, only on tag runs through release.yml (and on a
+hand dispatch of qualify.yml for a published tag), and only adds missing
+`qualification-` assets to an existing release, never replacing one.
+The workflow tests change with it: `qualify_reads_and_only_attach_may_write_contents`
+in `tools/rustev-release/tests/release_workflow.rs` requires `qualify.yml`'s
+top-level permissions to read only and only its `attach` job to hold
+`contents: write`, and lets release.yml's `qualify` call grant it;
+`workflow_write_permissions_are_confined` in `tests/candidate.rs` skips
+comment lines and admits that call beside `github-release`.
+
 ## Decisions at approval
 
 Ratified by the owner on 2026-11-03 (A-76: "I ratify 060"), as proposed:

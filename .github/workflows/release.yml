@@ -42,7 +42,8 @@
 #   set's order, through crates.io and npm trusted publishing (OIDC), npm with
 #   provenance; `publication.json` records each item.
 # - `github-release`: the release (a candidate: the pre-release), created
-#   once; the only job that writes contents. No job writes packages.
+#   once; the only job of this file that writes contents. No job writes
+#   packages.
 # - `verify-release`: the downloaded release against the manifest, every
 #   attestation against its bundle and the attestation store, and the
 #   registries against the manifest.
@@ -52,7 +53,9 @@
 #   no publication job needs these, and `qualify` waits for them without
 #   depending on their result.
 # - `qualify`: qualify.yml, the last stage; its failure fails the run and
-#   leaves the lifecycle at `released`.
+#   leaves the lifecycle at `released`. Its `contents: write` reaches only
+#   qualify.yml's `attach`, which adds the `qualification-` assets to the
+#   release and replaces nothing (060 3.7.3).
 name: release
 
 on:
@@ -884,8 +887,10 @@ jobs:
     # holding back qualification while the image is absent.
     needs: [tag, verify-release, image-checks]
     if: ${{ !cancelled() && github.event_name == 'push' && needs.tag.outputs.candidate == 'false' && needs.verify-release.result == 'success' }}
+    # The ceiling of qualify.yml's jobs: only its `attach` takes
+    # `contents: write` (060 3.7.3); the others read.
     permissions:
-      contents: read
+      contents: write
       attestations: read
     uses: ./.github/workflows/qualify.yml
     with:

@@ -100,21 +100,28 @@ fn candidate_image_writes_no_manifest() {
 fn workflow_write_permissions_are_confined() {
     let workflow = include_str!("../../../.github/workflows/release.yml");
     let mut job = "";
-    let mut writes = 0;
+    let mut writes = Vec::new();
     for line in workflow.lines() {
+        if line.trim_start().starts_with('#') {
+            continue;
+        }
         if line.starts_with("  ") && !line.starts_with("   ") && line.ends_with(':') {
             job = line.trim().trim_end_matches(':');
         }
         // 060 3.3.1: `publish-image` alone may push the image.
         assert!(!line.contains("packages: write") || job == "publish-image");
         if line.contains("contents: write") {
-            writes += 1;
-            // 058 3.3.3: the pre-release is created by `github-release`.
-            assert_eq!(job, "github-release");
+            writes.push(job);
         }
     }
-    // Exactly one: the `github-release` job holds it and no other job does.
-    assert_eq!(writes, 1);
+    // 058 3.3.3: the pre-release is created by `github-release`, the one job
+    // of this file that writes contents. The `qualify` call may pass the
+    // permission as the ceiling of qualify.yml's `attach` (060 3.7.3), which
+    // `release_workflow.rs` confines to that job.
+    assert!(
+        writes == ["github-release"] || writes == ["github-release", "qualify"],
+        "{writes:?}"
+    );
 }
 
 #[test]

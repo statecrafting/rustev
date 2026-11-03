@@ -1,7 +1,8 @@
 //! Spec 058 acceptance: the workflow test. `release.yml` runs on a pushed
 //! tag; `approve`, `publish-crates`, `publish-npm` and `github-release`
 //! follow every job of 3.2; `qualify` is the last job; no job writes
-//! packages and only `github-release` writes contents. Read as text (no YAML
+//! packages and only `github-release` writes contents, beside qualify.yml's
+//! `attach` (spec 060 3.7.3), reached through the `qualify` call. Read as text (no YAML
 //! dependency): each job is a two-space key under `jobs:`, and its `needs`,
 //! `environment` and `permissions` are four-space keys.
 
@@ -158,12 +159,54 @@ fn only_github_release_writes_contents_and_nothing_writes_packages() {
             assert_eq!(job.permissions, want);
         }
         let contents = job.permissions.get("contents").map(String::as_str);
+        if name == "qualify" {
+            // 060 3.7.3: the call's ceiling may reach qualify.yml, where only
+            // `attach` holds `contents: write` (checked below).
+            if contents == Some("write") {
+                assert!(qualify_writers().contains(&"attach".to_string()));
+            }
+            continue;
+        }
         assert_eq!(
             contents == Some("write"),
             name == "github-release",
             "{name}: contents {contents:?}"
         );
     }
+}
+
+/// qualify.yml's jobs that hold `contents: write`.
+fn qualify_writers() -> Vec<String> {
+    jobs(QUALIFY)
+        .into_iter()
+        .filter(|(_, j)| j.permissions.get("contents").map(String::as_str) == Some("write"))
+        .map(|(n, _)| n)
+        .collect()
+}
+
+#[test]
+fn qualify_reads_and_only_attach_may_write_contents() {
+    let top = QUALIFY
+        .split_once("\npermissions:\n")
+        .unwrap()
+        .1
+        .split_once("\n\n")
+        .unwrap()
+        .0;
+    assert_eq!(
+        top.lines().map(str::trim).collect::<Vec<_>>(),
+        ["contents: read", "attestations: read"]
+    );
+    for (name, job) in jobs(QUALIFY) {
+        for (k, v) in &job.permissions {
+            assert!(
+                v != "write" || (name == "attach" && k == "contents"),
+                "{name}: {k}: {v}"
+            );
+        }
+    }
+    // 060 3.7.3: at most the one job `attach` writes contents.
+    assert!(qualify_writers().iter().all(|n| n == "attach"));
 }
 
 #[test]

@@ -8,8 +8,11 @@
 # release made before spec 058 has no publication.json, and `record` says
 # so). A dispatch may take the harness from the default branch while the
 # release, its manifest and toolchains still come from the tag, so a
-# corrected harness can qualify an earlier release (056 3.5, A-74). Not a
-# required check (spec 056 3.3).
+# corrected harness can qualify an earlier release (056 3.5, A-74). Spec 060
+# 3.7.3: a run that recorded `qualified` keeps its record and each platform's
+# evidence on the tag's release as `qualification-` assets; `attach` is the
+# one job that holds `contents: write`, and it uploads only names not yet
+# present, never replacing one. Not a required check (spec 056 3.3).
 name: qualify
 
 on:
@@ -44,6 +47,10 @@ jobs:
     name: qualify ${{ matrix.platform }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
+    # Explicit, so a caller's wider ceiling never reaches this job (060 3.7.3).
+    permissions:
+      contents: read
+      attestations: read
     strategy:
       fail-fast: false
       matrix:
@@ -162,6 +169,11 @@ jobs:
     needs: qualify
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    # Explicit, so a caller's wider ceiling never reaches this job (060 3.7.3).
+    permissions:
+      contents: read
+    outputs:
+      qualified: ${{ steps.record.outputs.qualified }}
     env:
       GH_TOKEN: ${{ github.token }}
       TAG: ${{ inputs.tag }}
@@ -179,6 +191,7 @@ jobs:
           path: evidence
           merge-multiple: true
       - name: Record the lifecycle from the run's release (058 3.4.2)
+        id: record
         run: |
           set -eu
           if ! gh release view "$TAG" --json assets --jq '.assets[].name' | grep -qx publication.json; then
@@ -189,8 +202,62 @@ jobs:
           gh release download "$TAG" -p release-manifest.json -p SHA256SUMS -p publication.json -D release
           cargo run --quiet --locked -p rustev-release -- qualify release evidence > qualification.json
           cat qualification.json
+          echo "qualified=true" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: qualification
           path: qualification.json
           if-no-files-found: ignore
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: steps.record.outputs.qualified == 'true'
+        with:
+          pattern: qualify-*
+          path: bundles
+      - name: The record and one bundle per platform, as release assets (060 3.7.1)
+        if: steps.record.outputs.qualified == 'true'
+        run: |
+          set -eu
+          mkdir assets
+          cp qualification.json "assets/qualification-$TAG.json"
+          # Each bundle holds that platform's qualify-<platform> artifact
+          # unchanged, packed with fixed order, times and owners.
+          for d in bundles/qualify-*; do
+            platform=${d#bundles/qualify-}
+            tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -C bundles -cf - "qualify-$platform" \
+              | gzip -n > "assets/qualification-$TAG-$platform.tar.gz"
+          done
+          ls -l assets
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: steps.record.outputs.qualified == 'true'
+        with:
+          name: qualification-assets
+          path: assets
+          if-no-files-found: error
+
+  attach:
+    name: attach
+    needs: record
+    if: needs.record.outputs.qualified == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # The only job of this workflow that may write contents (060 3.7.3). It
+    # adds assets to the tag's release and never replaces one.
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ inputs.tag }}
+    steps:
+      - name: The tag is a stable release tag, checked before any checkout
+        run: |
+          printf '%s\n' "$TAG" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' \
+            || { echo "qualify: tag must be v<major>.<minor>.<patch>" >&2; exit 2; }
+      # The workflow's own commit, which carries `attach-qualification`
+      # even when a dispatch qualifies a tag released before it.
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: qualification-assets
+          path: ${{ runner.temp }}/assets
+      - name: Attach the names not yet present; nothing is replaced (060 3.7.3)
+        run: cargo run --quiet --locked -p rustev-release -- attach-qualification "$TAG" "$RUNNER_TEMP/assets"
