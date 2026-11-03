@@ -2,7 +2,7 @@
 id: "031-public-api-and-release-family"
 title: "Public API facade, compatibility policy and release family (amends 021)"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-10-16"
 summary: >
   Amends spec 021 so the first public release becomes a release family: the
@@ -121,7 +121,7 @@ obligations:
 
 Approved by the owner (A-27, 2026-10-16, under the 2026-10-16 delivery work
 order) as its own reviewable change before any code (R-16); implementation is
-in progress (see the Implementation record). It records owner decision OD-6 of tracking issue #76 as R-39 and
+complete (see the Implementation record). It records owner decision OD-6 of tracking issue #76 as R-39 and
 implements #76 child A3 (#58). Approval authorizes the facade crate, the
 release tooling, manifest changes and candidate evidence. It does not by
 itself publish, tag, upload, reserve a name, create a hosted release, change
@@ -1129,6 +1129,45 @@ scan's findings and the crate's bans are recorded, not gating. Pushing by digest
 SBOM attestation, provenance and 3.9.7 (c) belong to a draft amendment
 of 058 and 053 for 0.4.1, with an owner-approved, expiry-bounded
 exception rule for image findings (3.9.2).
+
+**Complete (2026-11-03, 3.9.7, 3.11).** Every Acceptance item is met for
+the published `v0.3.0` (tag on commit `6a864fc`, tagged run 40804954767,
+manifest SHA-256 `8104aedc...66f8`); the image stays absent with its
+reason, as the paragraph above records, and its publication belongs to a
+later version. Item by item:
+
+- Fresh consumer and subsets (3.5, 3.9.7 (a)), and fresh Node projects
+  (3.9.7 (b)): qualify run 41580879690 of `.github/workflows/qualify.yml`
+  (spec 056) passed `crates`, `npm` and `cli` on all seven platforms
+  against the public registries, `image` excluded because the signed
+  manifest names none; spec 056's record: "passed every qualification
+  step (`crates`, `npm`, `cli`; `image` excluded, the signed manifest
+  naming no container image) on all seven platforms against the
+  published `v0.3.0`", and its `record` job recorded the lifecycle
+  `qualified` (`qualification.json`, SHA-256 `efc687cb...4692`).
+- `cargo semver-checks` and the npm declaration comparison (3.8), the
+  MSRV job and the partial-adoption subset jobs: `release-checks /
+  semver`, `release-checks / msrv` and every `release-checks / adoption`
+  job passed in CI push run 40804863495 at `6a864fc`, and run in every
+  merge-queue entry since.
+- Signed tags and verified artifacts (3.9.6, as amended by 058): the
+  `v0.3.0` tag carries a good ssh signature by the owner's key, the
+  tagged run bound every artifact to the signed manifest, SBOMs are
+  release assets, and provenance is stated per artifact. npm provenance
+  is absent by owner decision A-74.
+- Release-set file, boundary fixtures, facade public items, PlanId
+  golden, changelog determinism and the dry-run state machine with the
+  fake registry: declared verification above (#467), `cargo test -p
+  rustev-release --locked`, `cargo test -p rustev --locked` and `cargo
+  test -p rustev-boundaries --locked`.
+- Every acceptance item of spec 021 for the extended family: spec 021's
+  audit (#470) finds every item met against `v0.3.0`, with 3.10's
+  evidence retained as `qualification-` assets of the `v0.3.0` release.
+- `make code`, declared verification and `make gate`: the `code`,
+  `verify` and governance jobs passed in run 40804863495 at `6a864fc` and
+  pass on this change.
+
+The image build checks of 3.9 for layer 7 run in `release.yml` (#459).
 
 ## Decisions at approval
 
