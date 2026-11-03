@@ -469,6 +469,25 @@ ghcr.io starts private; the owner decided on 2026-11-03 to make
 `ghcr.io/statecrafting/rustev-serve` public by hand after its first push,
 so anonymous consumers (and 3.4.3's qualification) can pull it.
 
+**Increment 3b, 2026-11-03 (3.2.1, the exceptions).** The owner moved the
+base to `gcr.io/distroless/cc-debian13:nonroot` (decision 2; spec 010's
+binding record) and ruled on its findings on 2026-11-03: "accept all 44"
+(A-80). `tools/rustev-release/image-exceptions.json` lists the 44
+(vulnerability, package) pairs grype 0.120.1 reported on both platforms of
+that base, each naming A-80 and expiring on 2027-02-01, 90 days after the
+row. 43 are not reached (the binary links only libc, libm and libgcc_s,
+and TLS is statically linked rustls); CVE-2026-8674 in libc6 is reachable
+only through the container's `resolv.conf` or `LOCALDOMAIN`, which the
+operator controls, and the `rustev-serve` README says so. The same day the
+owner amended 3.4.3 ("amend 3.4.3 as recommended", A-79). Both rows are in
+`docs/decisions/00-founding-decisions.md`.
+`the_committed_exceptions_name_owner_rows_and_cover_their_findings` in
+`tests/image_scan.rs` requires every entry's decision row to exist, every
+entry to cover its finding through 2027-02-01, every entry to expire the
+day after, and an empty scan to leave all 44 unused. While the image is
+absent from the release set (and on the cc-debian12 base, until the base
+move merges) the scan's verdict is recorded without gating.
+
 ## Decisions at approval
 
 Ratified by the owner on 2026-11-03 (A-76: "I ratify 060"), as proposed:

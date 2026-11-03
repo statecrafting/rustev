@@ -1734,6 +1734,13 @@ entrypoint, no shell, start on a read-only root), and the arm64 image,
 started read-only with no network and a configuration on a Unix socket,
 registered an exact synthetic plan and answered a decision `judged`.
 
+**Image operator note (2026-11-03).** `integrations/rustev-serve/README.md`
+tells operators to keep the container's `/etc/resolv.conf` and
+`LOCALDOMAIN` under their control: glibc's resolver aborts on a search
+domain of about 200 characters (CVE-2026-8674), the one image finding
+that `rustev-serve` can reach, accepted as an image exception until
+2027-02-01 (spec 060, A-80).
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child
