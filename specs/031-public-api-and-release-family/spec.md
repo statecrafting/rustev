@@ -37,6 +37,8 @@ extends:
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.toml" }, nature: amending }
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.lock" }, nature: amending }
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  # 031 in exactly one acceptance group at completion (scripts/acceptance/verify.py).
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
   - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "tools/rustev-boundaries/" }, nature: amending }
   - { spec: "002-decision-contract-and-pure-core", unit: { kind: file, path: "crates/rustev-contract/Cargo.toml" }, nature: amending }
   - { spec: "002-decision-contract-and-pure-core", unit: { kind: file, path: "crates/rustev-core/Cargo.toml" }, nature: amending }
@@ -627,9 +629,26 @@ Environment; approval of this spec is not that approval.
 
 ## Verification
 
-Pending with implementation. Approval authorizes the facade, release tooling,
-manifest changes, CI changes through 3.12's path, and candidate evidence.
-Upload, tag push and hosted release creation happen only under 3.11.
+Run by `make verify` (031 is in `VERIFIED_SPECS`, in CI's
+`integrations-core` group beside 045). Every command is offline: the
+release tooling's tests use the fake registry and committed fixtures, and
+none uploads, pushes a tag or creates a hosted release, which happen only
+under 3.11. The registry install and the npm smoke on each platform
+(3.9.7) are qualification evidence (spec 056's qualify run), and the MSRV,
+semver and changelog checks are CI jobs (`release-checks`); none is part of
+declared verification.
+
+```verify:cli
+# 3.1, 3.2, 3.6, 3.9 to 3.11: the release-set file against cargo metadata,
+# manifests, archives, npm packages, artifacts, the candidate and tagged
+# workflows, the dry-run state machine and the fake-registry harness.
+cargo test -p rustev-release --locked
+# 3.5 and 3.7: the facade's public items and the PlanId golden.
+cargo test -p rustev --locked
+# 3.3: the boundary tool's fixtures.
+cargo test -p rustev-boundaries --locked
+cargo clippy -p rustev-release -p rustev -p rustev-boundaries --all-targets --locked -- -D warnings
+```
 
 ## Implementation record
 
