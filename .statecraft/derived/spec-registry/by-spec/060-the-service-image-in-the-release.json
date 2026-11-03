@@ -1,0 +1,112 @@
+{
+  "record": {
+    "amends": [
+      "031-public-api-and-release-family",
+      "058-one-tagged-run-releases-the-family"
+    ],
+    "created": "2026-11-02",
+    "dependsOn": [
+      "010-integrations",
+      "031-public-api-and-release-family",
+      "042-decision-service-and-remote-seams",
+      "053-signed-release-candidates",
+      "056-release-0-1-1-and-consumer-qualification",
+      "058-one-tagged-run-releases-the-family"
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "031-public-api-and-release-family",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-release/"
+        }
+      }
+    ],
+    "id": "060-the-service-image-in-the-release",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-3-the-push",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "Only the `publish-image` job holds `packages: write`, and it pushes nothing unless the run is for a release tag `vX.Y.Z` that passed 058 3.1.1, the release set names the image as a member, and every image archive equals the bytes the run built, compared and scanned; a candidate tag or a dry run pushes nothing."
+      },
+      {
+        "anchor": "3-3-the-push",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "A tag `X.Y.Z` already present in the image repository is skipped when it names exactly the run's index digest and fails the run otherwise; no tag is moved, deleted or overwritten, and no `latest` tag is written."
+      },
+      {
+        "anchor": "3-6-what-stays",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "No image digest, attestation, signature or registry state produced by the release is an authorization accepted by any action executor; they are release evidence only (spec 001, 031 3.13, 058 I-3)."
+      },
+      {
+        "anchor": "3-2-the-scan-gate",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "When the image is a member, any vulnerability finding of the pinned scanner over a platform's SBOM fails the run unless an unexpired entry of `tools/rustev-release/image-exceptions.json`, naming the owner's decision row, covers its vulnerability id and package; an expired or unused entry also fails."
+      },
+      {
+        "anchor": "3-4-manifest-verification-and-qualification",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "The release manifest names the image index digest, each platform manifest digest, each platform's SBOM and the SLSA build level claimed; `verify-release` checks the registry against them, and qualification pulls the image by digest on amd64 and arm64, verifies its attestations and serves one synthetic decision (031 3.9.7 (c))."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "060-the-service-image-in-the-release-amends-031-and-058": "6a8e9352206c2247628abb526a4fdb669191fa0b4ff31ec0a2adb7839e259ede",
+      "1-purpose": "7b419ba5ed5b51d61f71b8c0d718274a3c1b803b4bbc61a66becb98b3b743db3",
+      "2-territory": "18bb5251eba599178422b44c5c74fa4ef6b61bdba0ca354a9e7b0db711c78a83",
+      "3-1-membership": "d2d7140280c9042bb19994825d4bef2565e3c35c055827bad4ef9a0d18d78fa7",
+      "3-2-the-scan-gate": "c136a936c1d0a2e6b3c5b6b24023181173e4b4b9bb02445ea2645abdcb667dbf",
+      "3-3-the-push": "1db8fdd92b319bdb7df95d700cf5c3cbb6d603f0e90f2cea7a979332b996786e",
+      "3-4-manifest-verification-and-qualification": "626e885c979a396ae8d7371c577ea69bcf2f632265fd03783cd3d84d50d7247d",
+      "3-5-failure-and-resume": "dc123f60258ad3302398fe8f352ce07ec06e78198fb2ea268801f8d79a53b5c9",
+      "3-6-what-stays": "016bea14dbed32acf0659e98015c1967732750dc820dfc2044e5c7c846b84a9d",
+      "3-behavior": "20d8a81b24e23cc01c65916ee10e135532f2a2d48fa86436bcba7c8004c33bd0",
+      "4-out-of-scope": "6c37974af4cb7416710a6fb1517c506f2ee7c38cf3c1f58743b7e256fa900d4a",
+      "5-observable-negative-cases": "808b37f843d23082270eaaf551e017818ec151cba318c74379e2dcfa79d5335a",
+      "acceptance": "f6da4243ede7a07ee0e9b91de6659e6a83d773c4154cf5281d81dac815301818",
+      "decisions-at-approval": "2e67ace97774a19b276271cd74e10083243581ac6f11188752f24deb99d220bd",
+      "implementation-record": "77cf3efb53117f96c8e950f58cd60a13d5133c6b878252c2161c648a1003fb12",
+      "verification": "3bf4b8ec88d123be805a717a1c93492d47f532b1373a4411d8227fc4448b746b"
+    },
+    "sectionHeadings": [
+      "060: The service image in the release (amends 031 and 058)",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 Membership",
+      "3.2 The scan gate",
+      "3.3 The push",
+      "3.4 Manifest, verification and qualification",
+      "3.5 Failure and resume",
+      "3.6 What stays",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Implementation record",
+      "Decisions at approval"
+    ],
+    "specPath": "specs/060-the-service-image-in-the-release/spec.md",
+    "status": "draft",
+    "summary": "A proposed amendment of approved specs 031 (3.1 layer 7, 3.9) and 058 (3.3.4), for the release after 0.4.0. Spec 042 3.16's `rustev-serve` image is built, checked, compared, described and scanned in every release run, and is not published: 058 3.3.4 gives no job `packages: write`, and the owner decided on 2026-11-02 that 0.4.0 ships without the image. This spec admits the image as a release member. One job, `publish-image`, holds `packages: write` and runs only for a release tag, never for a candidate or a dry run. It pushes the run's verified OCI archives by digest to `ghcr.io/statecrafting/rustev-serve`, joins them in one index tagged with the family version, and attests the SLSA build provenance and each platform's SBOM. The manifest names the index and platform digests, the vulnerability scan gates through an owner-approved, expiry-bounded exception file, and qualification runs 031 3.9.7 (c). Spec 053's candidate refusals are unchanged.\n",
+    "title": "The service image in the release (amends 031 and 058)"
+  },
+  "shardHash": "820be013ef7f0a08e8aa0d8d734508c4d2b02a15f7f1ab0c81c147513f6a667e",
+  "specVersion": "1.10.0"
+}
