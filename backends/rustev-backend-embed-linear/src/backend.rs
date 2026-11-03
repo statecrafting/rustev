@@ -21,13 +21,17 @@ use crate::cache::{
     RepeatabilityEvidence, RunOutcome,
 };
 use crate::manifest::EncoderKind;
-use crate::{EmbedSetupError, PlanMismatch, PreparedRequest, RequestPreparer, SetupCode};
+use crate::onnx::OnnxEncoder;
+use crate::{
+    EmbedSetupError, PlanMismatch, PreparedRequest, RequestPreparer, SetupCode, VerifiedBundle,
+};
 
 /// The host's configuration (3.7.1). None of it is identity (3.5.2).
 #[derive(Debug, Clone)]
 pub struct EmbedConfig {
     pub bundle_dir: PathBuf,
-    /// Used only by ONNX bundles, whose encoder is not implemented yet.
+    /// The absolute path of the ONNX Runtime library (3.6.1); unused by a
+    /// synthetic bundle.
     pub runtime_path: Option<PathBuf>,
     pub expected_artifact: ArtifactId,
     pub workers: usize,
@@ -60,8 +64,11 @@ fn setup(code: SetupCode, item: &str, detail: &str) -> EmbedSetupError {
 
 impl EmbedLinearBackend {
     pub fn open(config: EmbedConfig) -> Result<Self, EmbedSetupError> {
-        let preparer = Self::prepare(&config)?;
-        let run = default_run(&preparer)?;
+        let (preparer, onnx) = Self::prepare(&config)?;
+        let run = match onnx {
+            Some(run) => run,
+            None => default_run(&preparer)?,
+        };
         Self::start(config, preparer, run)
     }
 
@@ -73,11 +80,13 @@ impl EmbedLinearBackend {
         config: EmbedConfig,
         runner: impl Fn(&[u32], &CancelSignal) -> Result<Vec<f32>, ()> + Send + Sync + 'static,
     ) -> Result<Self, EmbedSetupError> {
-        let preparer = Self::prepare(&config)?;
+        let (preparer, _) = Self::prepare(&config)?;
         Self::start(config, preparer, Arc::new(runner))
     }
 
-    fn prepare(config: &EmbedConfig) -> Result<Arc<RequestPreparer>, EmbedSetupError> {
+    fn prepare(
+        config: &EmbedConfig,
+    ) -> Result<(Arc<RequestPreparer>, Option<Arc<Run>>), EmbedSetupError> {
         if !(1..=16).contains(&config.workers) || config.max_queued > 1024 {
             return Err(setup(
                 SetupCode::ManifestInvalid,
@@ -85,17 +94,12 @@ impl EmbedLinearBackend {
                 "invalid worker or queue limit",
             ));
         }
-        let bundle = crate::verify_bundle(&config.bundle_dir, &config.expected_artifact)?;
-        if bundle.manifest.encoder.kind == EncoderKind::Onnx {
-            // The record passes native feasibility stages 1 to 3 on macOS,
-            // but qualifies no ONNX platform (stage 4 and Node are pending).
-            return Err(setup(
-                SetupCode::UnqualifiedPlatform,
-                "encoder.kind",
-                "no ONNX platform is qualified; ONNX encoder is not implemented",
-            ));
-        }
-        Ok(Arc::new(RequestPreparer::new(bundle)?))
+        let mut bundle = crate::verify_bundle(&config.bundle_dir, &config.expected_artifact)?;
+        let onnx = match bundle.manifest.encoder.kind {
+            EncoderKind::Onnx => Some(onnx_run(config, &mut bundle)?),
+            EncoderKind::Synthetic => None,
+        };
+        Ok((Arc::new(RequestPreparer::new(bundle)?), onnx))
     }
 
     fn start(
@@ -491,6 +495,27 @@ fn cancelled(units: u64, running: bool) -> AttemptReport {
             RemoteEnd::Finished
         },
     }
+}
+
+/// The ONNX encoder of an `onnx` bundle (3.6, 3.9.1): the platform must be
+/// in the qualified table before any runtime is touched, then the runtime
+/// is verified and loaded and the session created from the verified graph
+/// bytes, which are released afterwards. A single unpadded sequence has an
+/// attention mask of ones.
+fn onnx_run(
+    config: &EmbedConfig,
+    bundle: &mut VerifiedBundle,
+) -> Result<Arc<Run>, EmbedSetupError> {
+    let platform = crate::runtime::qualified_platform()?;
+    let environment =
+        crate::runtime::load(config.runtime_path.as_deref(), &bundle.manifest, platform)?;
+    let encoder = OnnxEncoder::new(&environment, &bundle.graph, &bundle.manifest)?;
+    bundle.graph = Vec::new();
+    Ok(Arc::new(move |ids, cancel| {
+        encoder
+            .encode(ids, &vec![1; ids.len()], cancel)
+            .map_err(|_| ())
+    }))
 }
 
 fn default_run(preparer: &RequestPreparer) -> Result<Arc<Run>, EmbedSetupError> {

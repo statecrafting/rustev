@@ -138,3 +138,27 @@ fn encoder_limits_are_met_on_linux_aarch64_and_refused_on_macos() {
         .unwrap();
     assert_eq!(reasons.len(), 1);
 }
+
+#[test]
+fn the_crates_platform_table_is_the_records_passing_verdicts() {
+    let (_, record) = record();
+    let mut passing: Vec<String> = record
+        .verdict
+        .iter()
+        .filter(|(_, v)| v["verdict"] == "pass")
+        .map(|(k, _)| k.clone())
+        .collect();
+    let mut table: Vec<String> = rustev_backend_embed_linear::runtime::QUALIFIED_PLATFORMS
+        .iter()
+        .map(|p| {
+            serde_json::to_value(p)
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .to_owned()
+        })
+        .collect();
+    passing.sort();
+    table.sort();
+    assert_eq!(table, passing, "3.6.3: the table is the record's");
+}

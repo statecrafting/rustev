@@ -497,7 +497,7 @@ fn onnx_is_refused_before_runtime_loading_on_every_current_target() {
     b.write();
     let e = EmbedLinearBackend::open(config(&b, 1, 0)).err().unwrap();
     assert_eq!(e.code, SetupCode::UnqualifiedPlatform);
-    assert!(e.detail.contains("ONNX encoder is not implemented"));
+    assert_eq!(e.item, "platform");
 }
 
 #[test]
