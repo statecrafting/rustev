@@ -50,13 +50,12 @@ impl RequestPreparer {
         }
         if let PlanExecution::Declared(d) = &plan.execution {
             for f in d.fallbacks.iter().filter(|f| &f.backend_id == me) {
-                let entry = (
-                    f.step.as_str(),
-                    Some(&f.descriptor) == my_descriptor.as_ref(),
-                );
-                // A step is checked once however often it reaches this backend.
-                if !bound.contains(&entry) {
-                    bound.push(entry);
+                let same = Some(&f.descriptor) == my_descriptor.as_ref();
+                // A step is checked once however often it reaches this
+                // backend; any binding to another descriptor is reported.
+                match bound.iter_mut().find(|(step, _)| *step == f.step) {
+                    Some((_, matches)) => *matches &= same,
+                    None => bound.push((f.step.as_str(), same)),
                 }
             }
         }

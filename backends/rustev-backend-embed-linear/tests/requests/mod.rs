@@ -295,6 +295,25 @@ fn check_plan_covers_fallbacks_and_ignores_other_backends() {
     let errors = p.check_plan(&plan).unwrap_err();
     assert_eq!(errors.len(), 1);
     assert_eq!(errors[0].kind, M::TaskDiffers("question"));
+    // The step also reaches this backend as its primary binding, and the
+    // fallback names another descriptor: one descriptor mismatch, and the
+    // step's task is still checked once.
+    let s = plan.steps.iter_mut().find(|s| s.id == "topic").unwrap();
+    if let PlanStepDetail::Semantic(b) = &mut s.detail {
+        b.backend_id = descriptor.backend_id.clone();
+    }
+    if let PlanExecution::Declared(d) = &mut plan.execution {
+        d.fallbacks[0].descriptor =
+            rustev_contract::ids::DescriptorId::parse(&format!("sha256:{}", "0".repeat(64)))
+                .unwrap();
+    }
+    let kinds: Vec<_> = p
+        .check_plan(&plan)
+        .unwrap_err()
+        .into_iter()
+        .map(|m| m.kind)
+        .collect();
+    assert_eq!(kinds, [M::Descriptor, M::TaskDiffers("question")]);
 }
 
 #[test]
