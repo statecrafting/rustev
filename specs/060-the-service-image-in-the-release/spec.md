@@ -245,6 +245,41 @@ holds its `qualification-` assets, would find the release present again.
 3.7.3 (`qualify.yml`) follows in its own pull request; the image (3.1 to
 3.5) follows for the release after 0.4.0.
 
+**Increment 4a, 2026-11-03 (3.1.1, 3.3.2, 3.4.1, the manifest's image).**
+The release set takes an optional `image` entry (`image::ImageMember`:
+`repository`, `platforms`); `check_set` refuses one whose repository is
+not `ghcr.io/statecrafting/rustev-serve`, whose platforms are not
+`linux/amd64`, `linux/arm64` in that order, or that stands beside an
+`absent` entry of kind `image`. The committed set is unchanged: the image
+stays absent until the membership change (section 3.1). The manifest
+(`rustev.release-manifest/2`) takes an optional `image`
+(`image::ImageRelease`): repository, tag (the family version), layer 7,
+the index digest, each platform's manifest media type, digest, size,
+optional variant and SBOM file, and SLSA build level 2. It is serialized
+only when present, so every earlier manifest keeps its bytes and digest.
+`image::platform_manifest` reads a verified OCI archive (a ustar reader,
+no new dependency): `index.json` must name exactly one image manifest
+whose blob hashes to its digest and size, and whose config names the
+platform. `image::index_bytes` is the OCI index of the two descriptors in
+the fixed order, as compact JSON in field order (the platform object as
+`os`, `architecture`, then `variant`, the OCI image-spec order), so the
+index digest is a pure function of the platform digests (3.3.2) and is
+known when the manifest is attested, before anything is pushed. With the
+image a member of a release run given its artifacts, `collect_family`
+requires `image/<archive>` with its `.sha256` sidecar and
+`sbom/<archive>.cdx.json` for each platform, names the image, and makes
+the two SBOMs `sbom` artifacts at layer 8 (release assets in
+`SHA256SUMS`); the archives are checked, never release assets. A member
+without them is refused. `family_artifacts::validate` refuses a manifest
+image lacking a platform digest or SBOM, out of order, at another tag,
+repository or build level, or whose index digest is not the index of its
+platform descriptors, and refuses any candidate manifest naming an image
+(053 3.4.2); an image as a plain artifact stays refused. The tests in
+`tools/rustev-release/tests/image.rs` cover section 5's manifest row and
+the candidate refusal. `verify-release` against the registry follows in
+its own pull request; the workflow that hands `manifest` the image files
+follows with `publish-image`.
+
 ## Decisions at approval
 
 Ratified by the owner on 2026-11-03 (A-76: "I ratify 060"), as proposed:

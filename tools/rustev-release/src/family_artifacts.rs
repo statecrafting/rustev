@@ -2,6 +2,7 @@
 use crate::{
     ReleaseSet,
     archive::sha256_hex,
+    image::ImageRelease,
     manifest::{ReleaseManifest, WorkflowArtifact},
 };
 use sha2::{Digest, Sha512};
@@ -94,10 +95,9 @@ pub fn validate(m: &ReleaseManifest) -> Result<(), String> {
             "npm" => 6,
             "binary" => 7,
             "sbom" | "changelog" => 8,
-            "image" => return Err(
-                "031 3.9.5; 053 3.4.2: no container image is released or carried by a candidate"
-                    .into(),
-            ),
+            "image" => {
+                return Err("060 3.4.1; 053 3.4.2: the image is named under `image`, never as an artifact, and a candidate carries none".into());
+            }
             _ => return Err(format!("unknown artifact kind {}", a.kind)),
         };
         if a.layer != layer {
@@ -126,6 +126,19 @@ pub fn validate(m: &ReleaseManifest) -> Result<(), String> {
         {
             return Err(format!("{}: missing npm identity or integrity", a.name));
         }
+    }
+    if let Some(image) = &m.image {
+        // 053 3.4.2, unchanged: a candidate never carries an image.
+        if candidate {
+            return Err("053 3.4.2: a candidate manifest never names an image".into());
+        }
+        let sboms: Vec<&str> = m
+            .artifacts
+            .iter()
+            .filter(|a| a.kind == "sbom")
+            .map(|a| a.name.as_str())
+            .collect();
+        crate::image::validate(image, &m.version, &sboms)?;
     }
     Ok(())
 }
@@ -167,11 +180,25 @@ fn path(a: &WorkflowArtifact) -> String {
 }
 
 /// Spec 031 3.11.2: candidate evidence also supplies crate SBOMs and notes.
+/// The image, if a member, is [`collect_family`]'s.
 pub fn collect(
     set: &ReleaseSet,
     evidence: &Path,
     artifacts: Option<&Path>,
 ) -> Result<Vec<WorkflowArtifact>, String> {
+    collect_family(set, evidence, artifacts).map(|(a, _)| a)
+}
+
+/// [`collect`], and with the image a member of a release (not a candidate)
+/// whose artifacts are given, the manifest's image from
+/// `image/<archive>` (with its `.sha256` sidecar) and `sbom/<archive>.cdx.json`
+/// of each platform (060 3.4.1): a member without them is refused.
+pub fn collect_family(
+    set: &ReleaseSet,
+    evidence: &Path,
+    artifacts: Option<&Path>,
+) -> Result<(Vec<WorkflowArtifact>, Option<ImageRelease>), String> {
+    let mut image = None;
     let mut result = Vec::new();
     let mut rest = Vec::new();
     // 058 3.7: a candidate uses the run's artifact SBOMs, not crate
@@ -241,27 +268,66 @@ pub fn collect(
             result.push(a);
             rest.push(artifact("sbom", sbom, sb));
         }
+        let mut also = BTreeSet::new();
+        if crate::image::member(set)?.is_some() && !candidate {
+            let mut archives = Vec::new();
+            for p in crate::image::PLATFORMS {
+                let name = crate::image::archive_name(p);
+                let key = format!("image/{name}");
+                let bytes = files
+                    .get(&key)
+                    .ok_or_else(|| format!("060 3.4.1: the image is a member; missing {key}"))?;
+                let sidecar = format!("{key}.sha256");
+                if files.get(&sidecar).map(Vec::as_slice)
+                    != Some(format!("{}  {name}\n", sha256_hex(bytes)).as_bytes())
+                {
+                    return Err(format!("060 3.4.1: {sidecar}: missing or differs"));
+                }
+                let sbom = crate::image::sbom_name(p);
+                let sb = files.get(&format!("sbom/{sbom}")).ok_or_else(|| {
+                    format!("060 3.4.1: the image is a member; missing SBOM {sbom}")
+                })?;
+                let value: serde_json::Value =
+                    serde_json::from_slice(sb).map_err(|e| format!("{sbom}: {e}"))?;
+                if value["bomFormat"] != "CycloneDX" || value["specVersion"] != "1.5" {
+                    return Err(format!("{sbom}: expected CycloneDX 1.5"));
+                }
+                rest.push(artifact("sbom", sbom, sb));
+                also.insert(key);
+                also.insert(sidecar);
+                archives.push((*p, bytes.as_slice()));
+            }
+            image = Some(crate::image::release(&set.version, &archives)?);
+        }
         let mut m = result.clone();
         m.extend(
             rest.iter()
                 .filter(|a| {
-                    a.name.ends_with(".tgz.cdx.json") || a.name.ends_with(".tar.gz.cdx.json")
+                    a.name.ends_with(".tgz.cdx.json")
+                        || a.name.ends_with(".tar.gz.cdx.json")
+                        || a.name.ends_with(".oci.tar.cdx.json")
                 })
                 .cloned(),
         );
-        let errors = compare_files(&m, &files);
+        let errors = compare_files(&m, &files, &also);
         if !errors.is_empty() {
             return Err(errors.join("\n"));
         }
     }
     rest.sort_by(|a, b| a.name.cmp(&b.name));
     result.extend(rest);
-    Ok(result)
+    Ok((result, image))
 }
 
-fn compare_files(artifacts: &[WorkflowArtifact], files: &BTreeMap<String, Vec<u8>>) -> Vec<String> {
+/// `also`: files checked elsewhere that are not release assets (the image
+/// archives and their sidecars).
+fn compare_files(
+    artifacts: &[WorkflowArtifact],
+    files: &BTreeMap<String, Vec<u8>>,
+    also: &BTreeSet<String>,
+) -> Vec<String> {
     let mut errors = Vec::new();
-    let mut expected = BTreeSet::new();
+    let mut expected = also.clone();
     for a in artifacts {
         let p = path(a);
         expected.insert(p.clone());
