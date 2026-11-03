@@ -1,0 +1,1111 @@
+{
+  "batching": {
+    "max_items": 3,
+    "window_ms": 2000
+  },
+  "bindings": {
+    "batched": "sha256:28d21a9ef3b4183305b3ddead49692801f356a436f5e45111bf94dfec1bd2e65",
+    "unbatched": "sha256:28d21a9ef3b4183305b3ddead49692801f356a436f5e45111bf94dfec1bd2e65"
+  },
+  "exchanges_by_member_count": {
+    "batched": {
+      "3": 16
+    },
+    "unbatched": {
+      "1": 48
+    }
+  },
+  "head": {
+    "accepted_versions": [],
+    "decision": {
+      "batching": "off",
+      "limits": {
+        "max_input_bytes": 49152,
+        "max_request_bytes": 262144,
+        "max_response_bytes": 1048576,
+        "on_excess": "refuse"
+      },
+      "mapping_version": "rustev-jev-mapping/2 (direct shapes of 022 stage 2)",
+      "model": "typesafe-ai/jev",
+      "option_descriptions": {},
+      "provider_options": {
+        "only": [
+          "typesafe-ai"
+        ],
+        "zero_data_retention": true
+      },
+      "schema": "rustev.jev-binding/1",
+      "transport": "direct",
+      "version_pin": "jev-1.14.0"
+    },
+    "facts": {
+      "api_version": "v1",
+      "connections_reused": false,
+      "credential_custody_class": "host-callback",
+      "endpoint": "https://api.typesafe.ai/v1/systemone",
+      "follow_redirects": false,
+      "host_certificate_pinning": false,
+      "input_usd_per_million": "0.042",
+      "isolation_key": "one-connection-per-attempt",
+      "output_usd_per_million": "0",
+      "per_response_charge_reported": false,
+      "phases": {
+        "cancellation_ack_ms": 1000,
+        "connect_ms": 5000,
+        "first_response_byte_ms": 30000,
+        "request_write_ms": 5000,
+        "resolution_ms": 5000,
+        "response_body_ms": 10000,
+        "secure_handshake_ms": 5000
+      },
+      "price_source": {
+        "recorded_on": "2026-10-29",
+        "reference": "https://docs.typesafe.ai/models.md: jev-1.13.0 and jev-1.14.0 at USD 42 per billion input tokens, output tokens free",
+        "valid_through": "2026-11-28"
+      },
+      "privacy_terms": {
+        "recorded_on": "2026-10-29",
+        "reference": "https://typesafe.ai/privacy (last updated 2025-11-19); https://docs.typesafe.ai/legal.md (zero data retention for enterprise customers only); hosted in the United States",
+        "valid_through": "2026-11-28"
+      },
+      "retention_terms": "personal data retained \"for as long as reasonably necessary to provide you with the Services\"; no stated period for API inputs (TypeSafe Privacy Policy, last updated 2025-11-19)",
+      "retries": 0,
+      "root_store": "webpki",
+      "tls_minimum": "TLS1.2",
+      "training_terms": "\"We will not train or fine tune any artificial intelligence or machine learning models on your prompts or other Input.\" (TypeSafe Privacy Policy, last updated 2025-11-19)",
+      "units_per_usd": 1000000000,
+      "zero_retention_options": null
+    },
+    "gateway_pinning": null,
+    "mapping": "rustev-jev-mapping/2 (direct shapes of 022 stage 2)",
+    "schema": "rustev.jev-binding/2",
+    "usage": "production"
+  },
+  "head_identity": "sha256:12897cdf3796818833af333769e913d1a1f65a267532ea4de2ec3b144fd40bd4",
+  "journal": {
+    "cap": 5000000000,
+    "committed_after": 24998300,
+    "lines_from": 1037,
+    "lines_to": 1228,
+    "reserved_units": 1659252
+  },
+  "provenance": "live direct-API calls (TypeSafe /v1/systemone, pin jev-1.14.0) under spec 044 3.8 stage 2 for the remote-http adapter, owner-authorized 2026-10-29 and 2026-11-03, within R-29's testing cap and the shared testing journal; the rustev-pkg-support-routing package's 16 SYNTHETIC tickets, three questions each. A loopback RemoteServer hosts the Jev backend on spec 022 stage 3's direct binding (batching off), built through new_qualification; the unbatched client and the batched client (3 items, 2,000 ms) bind it, unbatched first per ticket.",
+  "recorded_at": "2026-11-03",
+  "stage2": {
+    "pairs": [
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "false": 0.020000000000000018,
+              "true": 0.98
+            }
+          }
+        },
+        "case": "sr-t01.explicit_deadline",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "false": 0.020000000000000018,
+              "true": 0.98
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "calm": 0.33,
+              "frustrated": 0.67,
+              "very_angry": 0.0
+            }
+          }
+        },
+        "case": "sr-t01.frustration",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "calm": 0.35,
+              "frustrated": 0.65,
+              "very_angry": 0.0
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "account_access": 0.0,
+              "billing": 1.0,
+              "integration_defect": 0.0,
+              "other": 0.0
+            }
+          }
+        },
+        "case": "sr-t01.topic",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "account_access": 0.0,
+              "billing": 1.0,
+              "integration_defect": 0.0,
+              "other": 0.0
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "false": 0.95,
+              "true": 0.05
+            }
+          }
+        },
+        "case": "sr-t02.explicit_deadline",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "false": 0.95,
+              "true": 0.05
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "calm": 0.62,
+              "frustrated": 0.38,
+              "very_angry": 0.0
+            }
+          }
+        },
+        "case": "sr-t02.frustration",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "calm": 0.64,
+              "frustrated": 0.36,
+              "very_angry": 0.0
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "account_access": 0.0,
+              "billing": 0.0,
+              "integration_defect": 1.0,
+              "other": 0.0
+            }
+          }
+        },
+        "case": "sr-t02.topic",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "account_access": 0.0,
+              "billing": 0.0,
+              "integration_defect": 1.0,
+              "other": 0.0
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "false": 0.97,
+              "true": 0.03
+            }
+          }
+        },
+        "case": "sr-t03.explicit_deadline",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "false": 0.97,
+              "true": 0.03
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "calm": 0.17,
+              "frustrated": 0.83,
+              "very_angry": 0.0
+            }
+          }
+        },
+        "case": "sr-t03.frustration",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "calm": 0.21,
+              "frustrated": 0.79,
+              "very_angry": 0.0
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "account_access": 1.0,
+              "billing": 0.0,
+              "integration_defect": 0.0,
+              "other": 0.0
+            }
+          }
+        },
+        "case": "sr-t03.topic",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "account_access": 1.0,
+              "billing": 0.0,
+              "integration_defect": 0.0,
+              "other": 0.0
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "false": 0.98,
+              "true": 0.02
+            }
+          }
+        },
+        "case": "sr-t04.explicit_deadline",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "false": 0.98,
+              "true": 0.02
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "calm": 1.0,
+              "frustrated": 0.0,
+              "very_angry": 0.0
+            }
+          }
+        },
+        "case": "sr-t04.frustration",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "calm": 1.0,
+              "frustrated": 0.0,
+              "very_angry": 0.0
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "account_access": 0.0,
+              "billing": 0.94,
+              "integration_defect": 0.0,
+              "other": 0.06
+            }
+          }
+        },
+        "case": "sr-t04.topic",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "account_access": 0.0,
+              "billing": 0.94,
+              "integration_defect": 0.0,
+              "other": 0.06
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "false": 0.96,
+              "true": 0.04
+            }
+          }
+        },
+        "case": "sr-m01.explicit_deadline",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "false": 0.97,
+              "true": 0.03
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "calm": 0.98,
+              "frustrated": 0.02,
+              "very_angry": 0.0
+            }
+          }
+        },
+        "case": "sr-m01.frustration",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "calm": 0.97,
+              "frustrated": 0.03,
+              "very_angry": 0.0
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "account_access": 0.0,
+              "billing": 1.0,
+              "integration_defect": 0.0,
+              "other": 0.0
+            }
+          }
+        },
+        "case": "sr-m01.topic",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "account_access": 0.0,
+              "billing": 1.0,
+              "integration_defect": 0.0,
+              "other": 0.0
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "false": 0.98,
+              "true": 0.02
+            }
+          }
+        },
+        "case": "sr-m02.explicit_deadline",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "false": 0.98,
+              "true": 0.02
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "calm": 0.0,
+              "frustrated": 0.32,
+              "very_angry": 0.68
+            }
+          }
+        },
+        "case": "sr-m02.frustration",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "calm": 0.0,
+              "frustrated": 0.35,
+              "very_angry": 0.65
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "account_access": 0.0,
+              "billing": 0.0,
+              "integration_defect": 0.99,
+              "other": 0.01
+            }
+          }
+        },
+        "case": "sr-m02.topic",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "account_access": 0.0,
+              "billing": 0.0,
+              "integration_defect": 0.99,
+              "other": 0.01
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "false": 0.98,
+              "true": 0.02
+            }
+          }
+        },
+        "case": "sr-m03.explicit_deadline",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "false": 0.98,
+              "true": 0.02
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "calm": 0.8,
+              "frustrated": 0.2,
+              "very_angry": 0.0
+            }
+          }
+        },
+        "case": "sr-m03.frustration",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "calm": 0.79,
+              "frustrated": 0.21,
+              "very_angry": 0.0
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "account_access": 1.0,
+              "billing": 0.0,
+              "integration_defect": 0.0,
+              "other": 0.0
+            }
+          }
+        },
+        "case": "sr-m03.topic",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "account_access": 1.0,
+              "billing": 0.0,
+              "integration_defect": 0.0,
+              "other": 0.0
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "false": 0.98,
+              "true": 0.02
+            }
+          }
+        },
+        "case": "sr-m04.explicit_deadline",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "false": 0.98,
+              "true": 0.02
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "calm": 1.0,
+              "frustrated": 0.0,
+              "very_angry": 0.0
+            }
+          }
+        },
+        "case": "sr-m04.frustration",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "calm": 1.0,
+              "frustrated": 0.0,
+              "very_angry": 0.0
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "account_access": 0.0,
+              "billing": 0.0,
+              "integration_defect": 0.0,
+              "other": 1.0
+            }
+          }
+        },
+        "case": "sr-m04.topic",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "account_access": 0.0,
+              "billing": 0.0,
+              "integration_defect": 0.0,
+              "other": 1.0
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "false": 0.97,
+              "true": 0.03
+            }
+          }
+        },
+        "case": "sr-c01.explicit_deadline",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "false": 0.97,
+              "true": 0.03
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "calm": 0.62,
+              "frustrated": 0.38,
+              "very_angry": 0.0
+            }
+          }
+        },
+        "case": "sr-c01.frustration",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "calm": 0.59,
+              "frustrated": 0.41,
+              "very_angry": 0.0
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "account_access": 0.0,
+              "billing": 0.98,
+              "integration_defect": 0.02,
+              "other": 0.0
+            }
+          }
+        },
+        "case": "sr-c01.topic",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "account_access": 0.0,
+              "billing": 0.98,
+              "integration_defect": 0.02,
+              "other": 0.0
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "false": 0.030000000000000027,
+              "true": 0.97
+            }
+          }
+        },
+        "case": "sr-c02.explicit_deadline",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "false": 0.030000000000000027,
+              "true": 0.97
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "calm": 0.47,
+              "frustrated": 0.53,
+              "very_angry": 0.0
+            }
+          }
+        },
+        "case": "sr-c02.frustration",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "calm": 0.47,
+              "frustrated": 0.53,
+              "very_angry": 0.0
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "account_access": 0.0,
+              "billing": 0.0,
+              "integration_defect": 1.0,
+              "other": 0.0
+            }
+          }
+        },
+        "case": "sr-c02.topic",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "account_access": 0.0,
+              "billing": 0.0,
+              "integration_defect": 1.0,
+              "other": 0.0
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "false": 0.98,
+              "true": 0.02
+            }
+          }
+        },
+        "case": "sr-c03.explicit_deadline",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "false": 0.98,
+              "true": 0.02
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "calm": 1.0,
+              "frustrated": 0.0,
+              "very_angry": 0.0
+            }
+          }
+        },
+        "case": "sr-c03.frustration",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "calm": 1.0,
+              "frustrated": 0.0,
+              "very_angry": 0.0
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "account_access": 0.99,
+              "billing": 0.0,
+              "integration_defect": 0.0,
+              "other": 0.01
+            }
+          }
+        },
+        "case": "sr-c03.topic",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "account_access": 0.99,
+              "billing": 0.0,
+              "integration_defect": 0.0,
+              "other": 0.01
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "false": 0.98,
+              "true": 0.02
+            }
+          }
+        },
+        "case": "sr-c04.explicit_deadline",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "false": 0.98,
+              "true": 0.02
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "calm": 1.0,
+              "frustrated": 0.0,
+              "very_angry": 0.0
+            }
+          }
+        },
+        "case": "sr-c04.frustration",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "calm": 1.0,
+              "frustrated": 0.0,
+              "very_angry": 0.0
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "account_access": 0.03,
+              "billing": 0.0,
+              "integration_defect": 0.0,
+              "other": 0.97
+            }
+          }
+        },
+        "case": "sr-c04.topic",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "account_access": 0.03,
+              "billing": 0.0,
+              "integration_defect": 0.0,
+              "other": 0.97
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "false": 0.98,
+              "true": 0.02
+            }
+          }
+        },
+        "case": "sr-f01.explicit_deadline",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "false": 0.98,
+              "true": 0.02
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "calm": 0.0,
+              "frustrated": 0.42,
+              "very_angry": 0.58
+            }
+          }
+        },
+        "case": "sr-f01.frustration",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "calm": 0.0,
+              "frustrated": 0.42,
+              "very_angry": 0.58
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "account_access": 0.0,
+              "billing": 1.0,
+              "integration_defect": 0.0,
+              "other": 0.0
+            }
+          }
+        },
+        "case": "sr-f01.topic",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "account_access": 0.0,
+              "billing": 1.0,
+              "integration_defect": 0.0,
+              "other": 0.0
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "false": 0.97,
+              "true": 0.03
+            }
+          }
+        },
+        "case": "sr-f02.explicit_deadline",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "false": 0.97,
+              "true": 0.03
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "calm": 0.92,
+              "frustrated": 0.08,
+              "very_angry": 0.0
+            }
+          }
+        },
+        "case": "sr-f02.frustration",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "calm": 0.92,
+              "frustrated": 0.08,
+              "very_angry": 0.0
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "account_access": 0.0,
+              "billing": 0.0,
+              "integration_defect": 1.0,
+              "other": 0.0
+            }
+          }
+        },
+        "case": "sr-f02.topic",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "account_access": 0.0,
+              "billing": 0.0,
+              "integration_defect": 1.0,
+              "other": 0.0
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "false": 0.030000000000000027,
+              "true": 0.97
+            }
+          }
+        },
+        "case": "sr-f03.explicit_deadline",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "false": 0.030000000000000027,
+              "true": 0.97
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "calm": 0.05,
+              "frustrated": 0.95,
+              "very_angry": 0.0
+            }
+          }
+        },
+        "case": "sr-f03.frustration",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "calm": 0.05,
+              "frustrated": 0.95,
+              "very_angry": 0.0
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "account_access": 1.0,
+              "billing": 0.0,
+              "integration_defect": 0.0,
+              "other": 0.0
+            }
+          }
+        },
+        "case": "sr-f03.topic",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "account_access": 1.0,
+              "billing": 0.0,
+              "integration_defect": 0.0,
+              "other": 0.0
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "false": 0.98,
+              "true": 0.02
+            }
+          }
+        },
+        "case": "sr-f04.explicit_deadline",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "false": 0.98,
+              "true": 0.02
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "calm": 1.0,
+              "frustrated": 0.0,
+              "very_angry": 0.0
+            }
+          }
+        },
+        "case": "sr-f04.frustration",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "calm": 1.0,
+              "frustrated": 0.0,
+              "very_angry": 0.0
+            }
+          }
+        }
+      },
+      {
+        "batched": {
+          "output": {
+            "distribution": {
+              "account_access": 0.0,
+              "billing": 0.0,
+              "integration_defect": 0.0,
+              "other": 1.0
+            }
+          }
+        },
+        "case": "sr-f04.topic",
+        "unbatched": {
+          "output": {
+            "distribution": {
+              "account_access": 0.0,
+              "billing": 0.0,
+              "integration_defect": 0.0,
+              "other": 1.0
+            }
+          }
+        }
+      }
+    ],
+    "spend": {
+      "estimated_units": 1414728,
+      "observed_units": 0,
+      "unknown_settlements": 0
+    }
+  }
+}

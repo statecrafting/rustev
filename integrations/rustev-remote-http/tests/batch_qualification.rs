@@ -627,3 +627,78 @@ async fn stage_1_passes_and_the_report_stays_unknown_without_stage_2() {
     // The identity a production binding would cite (spec 044, 3.8 item 4).
     assert!(report.record_digest().is_ok());
 }
+
+/// Spec 044 3.8 stage 2's bound, declared before the run (A-64): `top_label`
+/// agreement at 19 of 20 over at least 20 comparable pairs.
+const STAGE_2_BOUND: AgreementBound = AgreementBound {
+    criterion: Agreement::TopLabel,
+    min_agreeing: Ratio {
+        numerator: 19,
+        denominator: 20,
+    },
+};
+const STAGE_2_MINIMUM: u64 = 20;
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn stage_2_on_the_hosted_jev_head_measures_qualified() {
+    // Spec 044 3.8 stage 2, recorded live on 2026-11-03: a loopback server
+    // hosting the Jev backend on spec 022 stage 3's direct binding (batching
+    // off), asked each of the support-routing package's 16 SYNTHETIC tickets'
+    // three questions through an unbatched client and a batched one (3
+    // items, 2,000 ms). The server sends each batched item to the head as
+    // its own attempt (spec 009 3.10.4), so a disagreement is the model's
+    // run-to-run variation through batched against unbatched exchanges.
+    let recorded: Json = serde_json::from_slice(
+        &std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("tests/fixtures/recorded-044-remote-stage2.json"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        recorded["head_identity"],
+        "sha256:12897cdf3796818833af333769e913d1a1f65a267532ea4de2ec3b144fd40bd4"
+    );
+    let bindings: Bindings = serde_json::from_value(recorded["bindings"].clone()).unwrap();
+    // The remote binding does not hold the adapter-scoped switch.
+    assert_eq!(bindings.batched, bindings.unbatched);
+    assert_eq!(
+        recorded["batching"],
+        json!({"max_items": BATCHING.max_items, "window_ms": BATCHING.window_ms})
+    );
+    let stage2: rustev_eval::batch_qualification::Stage2 =
+        serde_json::from_value(recorded["stage2"].clone()).unwrap();
+    assert_eq!(stage2.pairs.len(), 48, "16 tickets, three questions each");
+    let report = BatchQualification::new(
+        "rustev-remote-http",
+        bindings,
+        BatchingConfig {
+            max_items: BATCHING.max_items,
+            window_ms: BATCHING.window_ms,
+        },
+        STAGE_2_BOUND,
+        STAGE_2_MINIMUM,
+        stage1().await,
+        Some(stage2),
+    )
+    .unwrap();
+    assert!(
+        report
+            .stage1
+            .iter()
+            .all(|r| r.outcome == CaseOutcome::Passed)
+    );
+    assert_eq!(
+        recorded["exchanges_by_member_count"],
+        json!({"batched": {"3": 16}, "unbatched": {"1": 48}}),
+        "every batched exchange carried one ticket's three questions"
+    );
+    // 48 of 48 agree on the top label: at least 19 of 20 over at least 20,
+    // so qualified. Citing it grants nothing; enabling adapter-scoped
+    // batching in production stays the owner's act (R-28).
+    assert_eq!(report.agreement(), Some((48, 48)));
+    assert_eq!(report.verdict, Verdict::Qualified);
+    let bytes = report.record_canonical().unwrap();
+    assert_eq!(BatchQualification::parse(&bytes).unwrap(), report);
+}
