@@ -255,13 +255,21 @@ async fn exported_mode_resolves_after_export_and_errors_on_failure() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn failing_hanging_and_panicking_exporters_are_counted_and_conserved() {
-    for (b, reason) in [
-        (Behavior::Fail, loss::EXPORT_FAILED),
-        (Behavior::Hang, loss::EXPORT_TIMEOUT),
-        (Behavior::Panic, loss::EXPORTER_PANICKED),
+    // Only the hanging exporter needs the deadline to expire. A failing or
+    // panicking export returns at once, but on a loaded runner unwinding
+    // can outlast a short deadline and be counted as `export_timeout`
+    // (#363), so those two run under a deadline no runner reaches.
+    for (b, reason, timeout_ms) in [
+        (Behavior::Fail, loss::EXPORT_FAILED, 10_000),
+        (Behavior::Hang, loss::EXPORT_TIMEOUT, 200),
+        (Behavior::Panic, loss::EXPORTER_PANICKED, 10_000),
     ] {
         let ex = TestExporter::new(b);
-        let s = sink(config(), ex.clone());
+        let c = SinkConfig {
+            export_timeout_ms: timeout_ms,
+            ..config()
+        };
+        let s = sink(c, ex.clone());
         let rec = record("support");
         for _ in 0..3 {
             s.deliver(&rec).await.unwrap();

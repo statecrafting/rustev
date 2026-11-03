@@ -1264,6 +1264,15 @@ transport paths are not exercised by a test (increment 6); the two new
 documents have no emitted JSON Schema (increment 2); spans, attributes and
 goldens of later #76 features arrive with their specs (3.5.6).
 
+**2026-11-03, test only (no claim of this spec changes).** The sink test
+`failing_hanging_and_panicking_exporters_are_counted_and_conserved` ran
+every exporter under a 200 ms export deadline, so on a loaded runner a
+panicking export's unwind could outlast it and be counted as
+`export_timeout`, the outcome the sink observes first (#363, merge-queue
+run 40719812627). Only the hanging exporter needs the deadline to expire;
+the failing and panicking cases now run under 10,000 ms, which they never
+approach, and the test asserts the class it names.
+
 ## Decisions at approval
 
 Each open point of #70 and of the work order, with the answer this spec
