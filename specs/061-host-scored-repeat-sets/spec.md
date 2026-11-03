@@ -556,6 +556,47 @@ report and a host-cases document), byte copies, untouched inputs,
 re-assembly over the written output, no clobber, the refusal rows of
 section 5 through the CLI with nothing written, and the command path.
 
+**Increment 4 (2026-11-03): host baselines, reproducibility and selection,
+in the library.** `crates/rustev-eval/src/host_select.rs` holds
+`provenance` and `one_provenance`, which tell host documents from
+Rustev-evaluated ones by schema and refuse a mix (`mixed-provenance`,
+I-1); `rustev.host-baseline/1` and `record`, which re-assembles the set
+(3.3.4) and binds 029 3.8.1's members with the host identities in place
+of plan, dataset, evaluator configuration version and adapter rules;
+`reproducibility` (3.7.2), with "same configuration" as 3.7.2 states and
+spec 029 3.9's comparison itself, now `baseline::stability`, which both
+checks call; and `rustev.host-selection/1` with `evaluate_selection`
+(3.7.3 to 3.7.6). Spec 029's clause, verdict and ranking code moved,
+unchanged in behavior, into `selection::judge` and `sort_ranks` over a
+`Side` (cohorts, split role, held-out record, opaque metrics, and
+whether the side is a host set), which spec 029's `evaluate_selection`
+and the host one both call; every existing selection, comparison and
+diff test passes unchanged, and the eval mutation seed "unknown selection
+qualifies" names the moved line. A host metric reads as the side's own
+observation: `observation: "host"` is the candidate's, never historical
+(3.5.3), and `value` treats the `host/` latency and cost metrics as
+observed metrics. Host preconditions are 3.7.4's: the baseline
+re-records from its set, each candidate re-assembles (`reconcile`
+otherwise), and equal host system, dataset, split, case list and order,
+evaluator and repeat configurations and cost unit; flow and flow version
+may differ, and stable cohorts are not compared (decision 4). The
+coverage clauses of 3.7.5 are `<side>.runs[<r>].comparable_coverage`
+(`1 - host/failed_rate`) and `<side>.runs[<r>].labeled_coverage`
+(`host/scored_rate`), with spec 029's integer arithmetic. Decisions
+within the spec: equal run counts are not a host precondition, since
+3.7.4 does not list them and a candidate with N = 1 is meant to reach
+its unknown `k_sd` band (section 5); candidate names follow spec 029
+3.13.5's rule through the same check (`check_name_list`); a bad baseline
+name or a baseline that does not re-record is refused with code
+`baseline`. Tests: `crates/rustev-eval/tests/host_select.rs`
+(provenance, the baseline's bindings, reproducibility exactly at the
+band, one ulp beyond it and under another flow version, selection that
+qualifies on latency and on cost with ranking, rejects on a slice and on
+coverage, and is unknown for an N = 1 band, an unknown latency, another
+cost unit, an opaque scorer, a held-out set and a candidate changed
+after import, with exit codes 0, 11 and 12); the shared fixture gains a
+latency base and extra failed cases.
+
 ## Decisions at approval
 
 Decided in this text, with the reason beside each: separate host schema

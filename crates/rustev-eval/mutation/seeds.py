@@ -338,8 +338,8 @@ SEEDS += [
         "spec 029",
         'unknown selection qualifies',
         E + 'selection.rs',
-        '            Verdict::Unknown { clause }',
-        '            { let _ = clause; Verdict::Qualifies }',
+        '        Verdict::Unknown { clause }',
+        '        { let _ = clause; Verdict::Qualifies }',
         EVAL,
     ),
     (

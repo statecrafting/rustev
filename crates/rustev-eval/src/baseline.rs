@@ -230,9 +230,21 @@ pub fn reproducibility(
     {
         reasons.push("the repeat set's dataset, split, evaluator configuration, repeat configuration or plan is not the baseline's".into());
     }
+    stability(reasons, &baseline.cohorts, &run.cohorts, config)
+}
+
+/// The comparison of 3.9.1 and 3.9.2 over every stability metric in every
+/// baseline cohort, after the configuration `reasons`; spec 061's host
+/// check uses it unchanged.
+pub(crate) fn stability(
+    mut reasons: Vec<String>,
+    base: &[BaselineCohort],
+    run: &[crate::repeat::CohortReport],
+    config: &RepeatConfig,
+) -> Reproducibility {
     let mut exceedances = vec![];
-    for bc in &baseline.cohorts {
-        let rc = run.cohorts.iter().find(|c| c.name == bc.name);
+    for bc in base {
+        let rc = run.iter().find(|c| c.name == bc.name);
         for metric in &config.stability_metrics {
             let base = bc.metrics.iter().find(|m| &m.name == metric);
             let now = rc.and_then(|c| c.metrics.iter().find(|m| &m.name == metric));
