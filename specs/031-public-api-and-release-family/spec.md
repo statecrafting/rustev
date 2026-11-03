@@ -1088,6 +1088,29 @@ The `semver` job of `release-checks.yml` installs the wasm32 target and
 wasm-bindgen 0.2.129 (cached under a root named by its version), so the
 staging runs in CI.
 
+**The image built and checked, not released (2026-11-02, 3.9, layer 7).**
+`release.yml` builds the `rustev-serve` image of spec 042 3.16 in every
+run, a dry run included: `image` builds `linux/amd64` and `linux/arm64`
+twice each on native runners (`artifacts.sh build-image`, a BuildKit
+builder pinned by digest, no cache, the commit's source date, timestamps
+clamped, an OCI archive checked by spec 042's `image/check.sh`), and
+`image-checks` requires identical archives per platform (3.9.3,
+`compare-image`), writes each platform's CycloneDX 1.5 SBOM with syft
+1.54.1 and the crate's with `cargo-cyclonedx` 0.5.9 (3.9.1), and audits
+the crate with `cargo deny` (advisories, licenses and sources gating,
+bans reported while the image is absent) and the base layers with grype
+0.120.1 over the SBOM (3.9.2). Both tools are downloaded by version and checked
+against their published SHA-256. The image stays `absent` in the release
+set, with its reason updated: 058 3.3.4 gives no job `packages: write`,
+and the owner decided on 2026-11-02 that 0.4.0 ships without the image.
+So no image is attested, signed, pushed or named in the manifest, no
+publication job needs these jobs, `qualify` waits for them without
+depending on their result, and while the image is absent the
+scan's findings and the crate's bans are recorded, not gating. Pushing by digest, the signed
+SBOM attestation, provenance and 3.9.7 (c) belong to a draft amendment
+of 058 and 053 for 0.4.1, with an owner-approved, expiry-bounded
+exception rule for image findings (3.9.2).
+
 ## Decisions at approval
 
 1. **Crate and package names** (left to the implementer by #58): decided

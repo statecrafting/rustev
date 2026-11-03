@@ -57,7 +57,7 @@
     {
       "kind": "image",
       "name": "ghcr.io/statecrafting/rustev-serve",
-      "reason": "the rustev-serve crate is not released, and the candidate workflow does not build its image definition (spec 042 3.16) yet"
+      "reason": "the rustev-serve crate is not released, and no release job may push an image (spec 058 3.3.4); the release workflow builds, checks and scans the image of spec 042 3.16 without publishing it"
     },
     {
       "kind": "crate",

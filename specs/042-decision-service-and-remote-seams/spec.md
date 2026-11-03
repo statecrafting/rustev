@@ -1606,6 +1606,41 @@ depth is 2. The client counts a call in its depth when it dispatches it,
 so the source's call count could still read 0, and the test failed
 intermittently in the merge queue. No behavior changes.
 
+**Increment 9: the image built under the candidate workflow
+(2026-11-02).** Spec 031's release workflow now builds the image of
+3.16.1 (031 3.9, layer 7): its `image` job builds each of `linux/amd64`
+(on `ubuntu-24.04`) and `linux/arm64` (on `ubuntu-24.04-arm`) twice, a
+release build and a rebuild on their own runners, through
+`tools/rustev-release/artifacts.sh build-image`: no cache, a fresh
+BuildKit builder pinned by digest, the commit's source date with every
+layer's timestamps clamped to it, an OCI archive, then `image/check.sh`
+on the loaded image (platform, user and group 65532, entrypoint, no
+shell, start on a read-only root). `image-checks` compares the two
+builds of each platform byte for byte (`compare-image`, naming each
+differing archive entry), writes a CycloneDX 1.5 SBOM of each platform's
+archive with syft 1.54.1 and the crate's own with `cargo-cyclonedx`
+0.5.9, runs `cargo deny` 0.20.2 over the crate with the release policy
+(advisories, licenses and sources gating; bans reported while the image
+is absent, because the crate's duplicate versions and version-less path
+dependencies belong to its admission to the family), and scans each
+platform's SBOM with grype 0.120.1. Nothing is attested
+or pushed: 058 3.3.4 allows no job `packages: write`, the release set
+still lists the image as absent (owner, 2026-11-02: 0.4.0 ships without
+it), and no publication job needs these jobs; `qualify`, the last job
+(058 3.4.2), waits for them without depending on their result. Pushing the image is a
+draft amendment of 058 and 053 for 0.4.1. With the image absent, the
+scan records its findings without failing; once the image is a member,
+any finding fails `scan-image` until an exception rule for image
+findings exists. A dry run of the workflow (run 41566109051) built each
+platform twice on separate runners with identical archives
+(`linux/amd64` `sha256:ce15f7e20b0ccd7b53dbb2b88365e270a29fca3a9caafd860f6eadad8352dbc8`,
+`linux/arm64` `sha256:f9cbe36c3f4a28a85751270b9f402cead958509ab3121abc9e5ff48ec4e84a43`),
+and `check.sh` passed for both: non-root 65532, the entrypoint, no
+shell, a start on a read-only root. The crate's advisories, licenses and
+sources passed; its bans (two duplicate versions and five wildcard path
+dependencies, first seen in run 41557841721) and grype's 61 findings per
+platform in the base layers were recorded without gating.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child
