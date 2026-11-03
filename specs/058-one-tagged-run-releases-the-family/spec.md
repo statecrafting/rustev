@@ -2,7 +2,7 @@
 id: "058-one-tagged-run-releases-the-family"
 title: "One tagged run releases the family (amends 021, 031, 053 and 056)"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-10-28"
 summary: >
   A proposed amendment of approved specs 021 (3.1, 3.8 to 3.10), 031 (3.9,
@@ -585,6 +585,18 @@ with them fixed, fails `npm` only on missing verified provenance, which
 056 3.3 requires. So 0.3.0 is `released`, not `qualified`, and its npm
 packages carry no provenance: the Acceptance's closing release is still
 to come, once npm accepts the immutable subject.
+
+**0.3.0 qualified (2026-11-03, closing).** The owner accepted npm packages
+without provenance while npm refuses the repository's immutable OIDC
+subject (#450, A-74), and 056 3.5 lets a later run of
+`.github/workflows/qualify.yml` against the published tag record the
+lifecycle. Run 41580879690, with the default branch's harness against
+`v0.3.0`, passed on all seven platforms and recorded `0.3.0` as
+`qualified` (056's record). The closing release is therefore 0.3.0: tag
+`v0.3.0` on `6a864fc`, published by tagged run 40804954767 (its npm
+packages by the owner from that run's attested tarballs, 3.3.2), release
+https://github.com/statecrafting/rustev/releases/tag/v0.3.0, qualified by
+run 41580879690. This spec's acceptance is met.
 
 ## Open questions for the owner
 

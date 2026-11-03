@@ -40,7 +40,7 @@
       }
     ],
     "id": "056-release-0-1-1-and-consumer-qualification",
-    "implementation": "in-progress",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-1-the-version-command",
@@ -83,7 +83,7 @@
       }
     ],
     "sectionDigests": {
-      "056-the-next-family-release-a-cli-version-command-declared-consumer-examples-and-the-fresh-consumer-qualification-amends-006-007-and-031": "789368eb8af8f7068d148f8a112244e0c3667fdf974d144f82ae3d25e6aeab7a",
+      "056-the-next-family-release-a-cli-version-command-declared-consumer-examples-and-the-fresh-consumer-qualification-amends-006-007-and-031": "a1c6e128f15be31403f7df63f564a8531dbab7eb8f5aa7ed6cf0a6c7cd566ee4",
       "1-purpose": "e666644f03c77644b46a2bd02ace58cdbd73be6d7e4397624b05524b8f5f68ef",
       "2-territory": "d1e67fd8bf2a11d632549b038fbb3114765c09f0c6c2f2db542db45e56186cc8",
       "3-1-the-version-command": "aa334437072a5f0fb26d0c09fdad49b79ec84864250b19b0079b1941b4d3ac76",
@@ -94,7 +94,7 @@
       "3-behavior": "c936a011591e58d9aa907caf008b6b179119883d2d56557e1c76a7ec0d91b09b",
       "4-observable-negative-cases": "0df72f58239bf70e5706092ee42d806986c6331d541a12e6c3c5e301222bb6a2",
       "acceptance": "a6556b3b5a3318913f575cc505f5caa1ea18dbbf601c629f09a10a51ad405ac1",
-      "implementation-record": "84dabbc8250208065e530ac6f8e9d9ce33a72233ce19bdccb93d94b25d9f18f8",
+      "implementation-record": "41a2acd39b00a3f31f4c9b755b4caa757719b1ba4e25cc1f3d025803a771ddf6",
       "verification": "ebfde5012a3ce6fe2f5cd618fa73b5053358437d02e051982896bd93a65323a8"
     },
     "sectionHeadings": [
@@ -117,6 +117,6 @@
     "summary": "A narrow amendment of approved specs 006, 007 and 031, written after `v0.1.0` was published to crates.io, npm and GitHub on 2026-10-26 but could not be qualified (021 3.10, 031 3.9.7). The CLI has no version command; the support-routing package declares no runnable offline example (its SYNTHETIC rules program is a test fixture of the rules backend); no harness runs the registry-only consumer across the platform matrix; and the npm packages carry no provenance. This spec adds `rustev version`, ships the package's SYNTHETIC example as package data, adds the qualification harness and its workflow, and defines how the owner authorizes a release after `0.1.0`, so that the next family version is published through the existing pipeline and qualified. Ratified by the owner on 2026-10-26 (A-58). Revised the same day (A-59): the work is folded into the next family version (`0.2.0`); there is no separate `0.1.1`.\n",
     "title": "The next family release: a CLI version command, declared consumer examples and the fresh-consumer qualification (amends 006, 007 and 031)"
   },
-  "shardHash": "2629380f7b9f58d07fb0c5270caedc315a7e4c4a9712d19a35090584d265f5d1",
+  "shardHash": "98b6773976e798f9133a1a8ef95b8dc5d051b648de53c6961be7a3b2967b706c",
   "specVersion": "1.10.0"
 }

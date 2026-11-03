@@ -2,7 +2,7 @@
 id: "056-release-0-1-1-and-consumer-qualification"
 title: "The next family release: a CLI version command, declared consumer examples and the fresh-consumer qualification (amends 006, 007 and 031)"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-10-26"
 summary: >
   A narrow amendment of approved specs 006, 007 and 031, written after
@@ -382,3 +382,16 @@ a process starts only by its full path. The harness now resolves each
 command's program on the consumer environment's `PATH` before starting it,
 for the steps' commands and for the identity probes (`uname`, `rustc`,
 `node`) alike; the recorded commands are unchanged.
+
+**0.3.0 qualified (2026-11-03, 3.5, A-74; closing).** Run 41580879690 of
+`.github/workflows/qualify.yml`, dispatched on `main` at `595e352` with
+`tag: v0.3.0` and `harness_from_default_branch: true`, passed every
+qualification step (`crates`, `npm`, `cli`; `image` excluded, the signed
+manifest naming no container image) on all seven platforms against the
+published `v0.3.0` (commit `6a864fc`, manifest SHA-256 `8104aedc...66f8`),
+and its `record` job's `rustev-release qualify` recorded the lifecycle
+`qualified` (`qualification.json`, SHA-256 `efc687cb...4692`, the run's
+`qualification` artifact). The earlier dispatch, run 41569419802, passed on
+six platforms and failed `npm` on win32-x64-msvc, fixed by #463. With the
+version command, the declared examples and a qualified later release, this
+spec's acceptance is met.
