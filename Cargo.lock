@@ -4467,6 +4467,7 @@ dependencies = [
  "ort",
  "rustev-backend-embed-linear",
  "rustev-contract",
+ "rustev-core",
  "serde",
  "serde_json",
  "sha2 0.10.9",
