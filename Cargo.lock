@@ -4466,8 +4466,12 @@ version = "0.3.0"
 dependencies = [
  "ort",
  "rustev-backend-embed-linear",
+ "rustev-backend-rules",
  "rustev-contract",
  "rustev-core",
+ "rustev-eval",
+ "rustev-pkg-support-routing",
+ "rustev-runtime",
  "serde",
  "serde_json",
  "sha2 0.10.9",

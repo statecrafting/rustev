@@ -798,3 +798,6 @@ fn tokenizer_bytes() -> Vec<u8> {
 
 #[path = "backend/mod.rs"]
 mod backend;
+
+#[path = "support_routing/mod.rs"]
+mod support_routing;
