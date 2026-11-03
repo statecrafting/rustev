@@ -11,8 +11,8 @@ homepage.workspace = true
 readme.workspace = true
 # Not in the release family until spec 031 admits it (spec 011, 3.17.4).
 publish = false
-# examples/feasibility.rs is the stage 2 to 4 probe as measured on
-# 2026-10-22, bound by SHA-256 in qualification/feasibility.json. It reads
+# examples/feasibility.rs is the stage 2 to 4 probe, bound by SHA-256 in
+# qualification/feasibility.json (macOS 2026-10-22, Linux 2026-11-02). It reads
 # the runtime version through dlopen, which the workspace's
 # `unsafe_code = "forbid"` refuses, so it is kept as evidence and not built.
 autoexamples = false

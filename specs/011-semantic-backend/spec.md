@@ -941,6 +941,33 @@ probe as measured, is kept byte-identical and not built: it reads the
 runtime version through `dlopen`, which the workspace's
 `unsafe_code = "forbid"` refuses.
 
+**Stage 4 on `linux-aarch64-gnu` (2026-11-02, 3.2).** The encoder was
+measured on `linux-aarch64-gnu` with the 3.13 protocol of the
+`macos-aarch64` measurement: one process, one request at a time, 256-token
+inputs, 50 warm-ups, 1,000 timed requests, CPU provider, one intra-op and
+one inter-op thread. The host is a Docker Desktop Linux virtual machine on
+an Apple M5 Pro (Debian 12, glibc 2.36, kernel 7.0.14-linuxkit, 18
+virtual CPUs), not a dedicated Linux server; the record says so. The
+runtime is `libonnxruntime.so.1.31.0` from the official release tarball,
+verified against its published digest. Cold setup 383.9 ms, peak RSS
+282,726,400 bytes, p95 59.6 ms and p99 60.3 ms: every encoder limit of 3.3
+is met. All 19 inferred fixtures agree with the reference, bitwise
+repeatable in process, with exact token ids. Stages 1 to 3 pass there
+(stage 3's `make boundaries` with the 3.18 rules at `4c8edd61`); stage 4
+still refuses, for the complete-backend items of 3.13 that were not
+measured, and the platform is not qualified (the Node `local-embed` build
+has not run). To run on Linux, `examples/feasibility.rs` reads the runtime
+version through `dlopen` on any Unix and checks a per-platform runtime
+digest, and `measure.py` names its outputs by the platform key and
+converts Linux's KiB; the record binds their new bytes and keeps the
+digests `macos-aarch64` was measured with. `rerecord_linux.py` adds the
+platform to the A-73 record; the contract digest is now
+`sha256:5213cc048ef44c8452ae6d03d4b87c6252b0de9db08e47aa2e7a15e6f74cc464`.
+`tests/feasibility_record.rs` checks stages 1 to 3 on both measured
+platforms, every encoder limit on `linux-aarch64-gnu`, and that
+`linux-x86_64-gnu` is still not measured: no native x86_64 Linux host was
+available, and an emulated measurement would not be one.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

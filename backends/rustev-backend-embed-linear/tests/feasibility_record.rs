@@ -93,19 +93,48 @@ fn every_evidence_file_matches_its_recorded_length_and_digest() {
     }
 }
 
+fn stage_verdicts(record: &FeasibilityRecord, platform: &str) -> Vec<Value> {
+    record.platforms[platform]["stages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| s["verdict"].clone())
+        .collect()
+}
+
 #[test]
-fn no_platform_is_qualified_and_stages_one_to_three_pass_on_macos() {
+fn no_platform_is_qualified_and_stages_one_to_three_pass_on_two_platforms() {
     let (_, record) = record();
     for platform in PLATFORMS {
         assert_eq!(record.verdict[platform]["verdict"], "refuse", "{platform}");
     }
     let verdicts: Vec<_> = record.stages.iter().map(|s| s["verdict"].clone()).collect();
     assert_eq!(verdicts, ["pass", "pass", "pass", "refuse"]);
-    let mac: Vec<_> = record.platforms["macos-aarch64"]["stages"]
+    assert_eq!(stage_verdicts(&record, "macos-aarch64"), verdicts);
+    assert_eq!(stage_verdicts(&record, "linux-aarch64-gnu"), verdicts);
+    assert_eq!(
+        stage_verdicts(&record, "linux-x86_64-gnu"),
+        ["refuse", "refuse", "refuse", "refuse"]
+    );
+    assert_eq!(
+        record.verdict["linux-x86_64-gnu"]["reasons"],
+        serde_json::json!(["not measured on this host"])
+    );
+}
+
+#[test]
+fn encoder_limits_are_met_on_linux_aarch64_and_refused_on_macos() {
+    let (_, record) = record();
+    let linux = &record.measurements["platform_measurements"]["linux-aarch64-gnu"]["measured_encoder_limits"];
+    for limit in ["cold_setup_ms", "p95_ms", "p99_ms", "peak_rss_bytes"] {
+        assert_eq!(linux[limit]["verdict"], "pass", "{limit}");
+    }
+    let mac = &record.measurements["measured_encoder_limits"];
+    assert_eq!(mac["p95_ms"]["verdict"], "refuse");
+    // A Linux stage 4 refusal names only the unmeasured complete-backend
+    // items: no encoder limit is exceeded there.
+    let reasons = record.platforms["linux-aarch64-gnu"]["stages"][3]["reasons"]
         .as_array()
-        .unwrap()
-        .iter()
-        .map(|s| s["verdict"].clone())
-        .collect();
-    assert_eq!(mac, verdicts);
+        .unwrap();
+    assert_eq!(reasons.len(), 1);
 }
