@@ -332,6 +332,7 @@
         "src/eval.rs",
         "src/explain.rs",
         "src/host.rs",
+        "src/host_sets.rs",
         "src/io.rs",
         "src/lib.rs",
         "src/live.rs",

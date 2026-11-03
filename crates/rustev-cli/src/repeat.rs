@@ -78,27 +78,27 @@ pub fn validate(p: &Parsed) -> Result<usize, Usage> {
     }
 }
 
-struct Session<'a> {
-    command: String,
-    reads: &'a Reads,
+pub(crate) struct Session<'a> {
+    pub(crate) command: String,
+    pub(crate) reads: &'a Reads,
 }
 impl Session<'_> {
-    fn invalid(&self, input: &str, e: impl std::fmt::Display) -> Done {
+    pub(crate) fn invalid(&self, input: &str, e: impl std::fmt::Display) -> Done {
         Done::invalid(&self.command, input, e.to_string())
     }
-    fn doc<T: Document>(&self, path: &str) -> Result<T, Done> {
+    pub(crate) fn doc<T: Document>(&self, path: &str) -> Result<T, Done> {
         read_doc(&self.command, self.reads, path, REPLAY_V1.max_bytes)
     }
-    fn bytes(
+    pub(crate) fn bytes(
         &self,
         r: Result<Vec<u8>, rustev_contract::canonical::CanonicalError>,
     ) -> Result<Vec<u8>, Done> {
         r.map_err(|e| self.invalid("output", e))
     }
-    fn absent(&self, path: &str) -> Result<(), Done> {
+    pub(crate) fn absent(&self, path: &str) -> Result<(), Done> {
         io::ensure_absent(path).map_err(|e| Done::io(&self.command, e))
     }
-    fn write(&self, files: &[(String, Vec<u8>)]) -> Result<(), Done> {
+    pub(crate) fn write(&self, files: &[(String, Vec<u8>)]) -> Result<(), Done> {
         self.reads
             .write_all(files)
             .map_err(|e| Done::io(&self.command, e))
@@ -312,7 +312,11 @@ fn directories(s: &Session<'_>, dir: &str) -> Result<Vec<(String, String)>, Done
     Ok(result)
 }
 
-fn dependency_files(s: &Session<'_>, dir: &str, max: usize) -> Result<Vec<String>, Done> {
+pub(crate) fn dependency_files(
+    s: &Session<'_>,
+    dir: &str,
+    max: usize,
+) -> Result<Vec<String>, Done> {
     let entries = match std::fs::read_dir(dir) {
         Ok(e) => e,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(vec![]),
@@ -695,7 +699,7 @@ pub(crate) fn publish_live_outputs(
 
 // Stage the entire set before publishing. Hard links provide the no-clobber
 // publication required by spec 006, including when a path appears after preflight.
-fn publish_outputs(
+pub(crate) fn publish_outputs(
     files: &[(String, Vec<u8>)],
     dirs: &[String],
     mut publish: impl FnMut(&std::path::Path, &str) -> std::io::Result<()>,
