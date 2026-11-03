@@ -463,6 +463,21 @@ build without them and the boundary check passes; no live qualification
 was authorized or run. Spec 042's image (3.16) and shared conformance
 cases (3.17) are 042's own remaining work, not 010's.
 
+
+**`rustev-serve` base image moved to Debian 13 (2026-11-03).** On the
+owner's decision of 2026-11-03 (spec 060 decision 2), the base image row
+of the `rustev-serve` binding record names
+`gcr.io/distroless/cc-debian13:nonroot`, index
+`sha256:08476c244888bfb425bae1ae4dd7c17f093e972aab8426883d97f3c6f280f7c1`. The cc-debian12 index the
+record named on 2026-10-21 was still what its tag resolved to on
+2026-11-03, so no refresh within Debian 12 existed; its `libssl3` lacked
+Debian's fixes. Spec 060's findings for the new base (grype 0.120.1 over
+each platform's SBOM) are the owner's to rule on as image exceptions. The
+builder is unchanged (`rust:1.98.1-bookworm`, glibc 2.36); the binary needs
+only `libc.so.6`, `libm.so.6`, `libgcc_s.so.1` and the loader, which
+trixie's glibc 2.41 and `libgcc-s1` 14.2 provide with the older symbol
+versions. Spec 042's record has the local build and `check.sh` run.
+
 ## Questions settled by R-34
 
 The owner accepted the recommendations below when approving this spec. Each
@@ -579,13 +594,15 @@ and signature crates and the base image.
 | 042 2.2: Unix socket permissions | As item 3. | pass |
 | 042 2.2: Ed25519 crate | `ring` 0.17.14, as item 1. | pass |
 | 042 2.2: Sigstore crate, bundle media type, trusted root | Media type `application/vnd.dev.sigstore.bundle.v0.3+json` (`Bundle.media_type` in `protos/sigstore_bundle.proto` of `sigstore/protobuf-specs`). Amended 2026-10-22: the crate is `sigstore-verify` 0.15.0 (Apache-2.0, `8d81887abe3161d7f0d04f224236e14390f782ce6f3b5e2717819ef2d7b452cb`, MSRV 1.86, `sigstore/sigstore-rust`) with `default-features = false, features = ["aws-lc-rs"]`. Its `verify(artifact, bundle, policy, trusted_root)` checks a v0.3 bundle against a `TrustedRoot` the host supplies (`TrustedRoot::from_json`), offline: with the `tuf`, `rustls` and `native-tls` features off, the resolved tree has no HTTP client, no `reqwest`, no `tokio` and no TUF fetcher (`sigstore-trust-root` 0.15.0 makes TUF and its TLS optional; checked with `cargo tree` on 2026-10-22). Crypto is `aws-lc-rs` 1.18.2 (`faac5829c2b74c28f830747e7818ccfb684261b5f48a1118b1e2a13d36dfab13`, ISC AND (Apache-2.0 OR ISC)) over `aws-lc-sys` 0.46.0 (`f1622d8446a2d4b2ce0c7eefc73dd43a99779028d5ee5c2dd8073a658ba8a2bc`), the provider `sigstore-crypto` uses by default; without it no provider is installed and verification panics, and a `ring`-backed provider would be security-sensitive code of Rustev's own. `aws-lc-sys` builds C with a C compiler and CMake on the build host and the image's builder stage. The crate is used only inside `rustev-serve` (042 3.18). | pass |
-| 042 2.2: base image | `gcr.io/distroless/cc-debian12:nonroot`, index `sha256:9dac0a79194e45a7da0158a9c6da57b217585af0786db3845d1f0ec1a0dd182f` (amd64 `sha256:777e96cf322c46bc32aca926c263624c4dc8d7cf37e2fa65ba2c7e697318ebbb`, arm64 `sha256:9ae6393649d0c55122c66fe6d4803b0d85b2d7b60b2b09b690ce80c086f40a83`), resolved from the registry on 2026-10-21. `cc` rather than `static`, because the binary links glibc. User and group 65532. | pass |
+| 042 2.2: base image | Amended 2026-11-03 (spec 060 decision 2, the owner's decision of that day): `gcr.io/distroless/cc-debian13:nonroot`, index `sha256:08476c244888bfb425bae1ae4dd7c17f093e972aab8426883d97f3c6f280f7c1` (amd64 `sha256:65af2e9e44e71de2df28245f6814301775d3ef04436b7d563f240d86fedf24aa`, arm64 `sha256:1026089ebb266c264cfa1828860332f25160079615ee146d159a7d1f3a701bd3`), resolved from the registry on 2026-11-03. It replaces `gcr.io/distroless/cc-debian12:nonroot`, index `sha256:9dac0a79194e45a7da0158a9c6da57b217585af0786db3845d1f0ec1a0dd182f`, resolved on 2026-10-21, which distroless had not rebuilt since (its `libssl3` stayed `3.0.20-1~deb12u2`). `cc` rather than `static`, because the binary links glibc. User and group 65532. The builder stays `rust:1.98.1-bookworm`: a binary linked against bookworm's glibc 2.36 runs on trixie's glibc 2.41, which keeps its older symbol versions. | pass |
 | 042 2.2: platforms | `linux/amd64` and `linux/arm64`. | pass |
 
-Result (amended 2026-10-22): every row **pass**. The 2026-10-21 record
+Result (amended 2026-10-22 and 2026-11-03): every row **pass**. The 2026-10-21 record
 refused item 2 (spec 042's documents did not exist) and left the Sigstore
 row unverified; both are amended above with the evidence that resolves
 them. The owner reviewed and approved this amended text on 2026-10-22
 (A-47), so `rustev-serve` may be implemented under 3.4. The approval is
 for implementation only; it approves no live call, deployment, image
 publication, spend or real-user data.
+The 2026-11-03 amendment changes only the base-image row, by the owner's
+decision of that day (spec 060 decision 2); every row still passes.
