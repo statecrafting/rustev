@@ -379,5 +379,6 @@ harness.
 platforms; on win32-x64-msvc `npm` failed before npm ran, with `[WinError 2]`,
 as it had in the `v0.3.0` tag run. Windows installs npm as `npm.cmd`, which
 a process starts only by its full path. The harness now resolves each
-command's program on the consumer environment's `PATH` before starting it;
-the recorded commands are unchanged.
+command's program on the consumer environment's `PATH` before starting it,
+for the steps' commands and for the identity probes (`uname`, `rustc`,
+`node`) alike; the recorded commands are unchanged.

@@ -138,7 +138,8 @@ class Harness:
 
     def identity(self, *cmd):
         try:
-            p = subprocess.run(cmd, cwd=self.work, env=self.env, capture_output=True, text=True, check=False)
+            p = subprocess.run([self.program(cmd[0]), *cmd[1:]], cwd=self.work, env=self.env,
+                               capture_output=True, text=True, check=False)
             return p.stdout.strip() if p.returncode == 0 else 'unavailable: ' + ' '.join(cmd)
         except FileNotFoundError:
             return 'unavailable: ' + cmd[0]
