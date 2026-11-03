@@ -30,7 +30,7 @@
     {
       "name": "support.plan.json",
       "path": "tools/rustev-conformance/fixtures/cli/support.run/support.plan.json",
-      "sha256": "92a5cc1f2341384e1e83c6921fb76b85d71b21295674a715dd925fccb14e293c"
+      "sha256": "991e813afeee5b73a212861f0f4e5f5d08a0f515b87830afe3ec5fce945f347d"
     },
     {
       "name": "support.rules.json",
@@ -54,7 +54,7 @@
       "normalize": [
         "receipt"
       ],
-      "sha256": "0c968485111223f3b6c12a3cd84ad1d52b8f791edd6e541871dbb280d36b1ca1",
+      "sha256": "93afc06a7ba334d0f4bdca9f89a9550368896bfcccb765f2053102b63a1a4589",
       "stream": "stdout"
     },
     {
@@ -63,7 +63,7 @@
       "normalize": [
         "timing"
       ],
-      "sha256": "74b80419e355c3004810ba3f82deab4bff3c232480d4b80596a8a7edf18927a4"
+      "sha256": "3147964464e8bac04c50a53fd07c142ad0a9d5c2f469ef204436f8cf4b7a9071"
     }
   ],
   "surfaces": [

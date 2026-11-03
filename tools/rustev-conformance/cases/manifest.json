@@ -32,7 +32,7 @@
         {
           "name": "actionable.plan.json",
           "path": "tools/rustev-conformance/fixtures/cli/actionable.run-needs/actionable.plan.json",
-          "sha256": "1091ed71ebd964ad0ca33f8c987d4dff0ee7bdef47b5e9f4af2b6529dd485fa4"
+          "sha256": "5a005afa77ef1d8d4b53686bfeb3d1840bb4580ab76734761bc8a2b09cf0c06a"
         },
         {
           "name": "needs.snapshot.json",
@@ -56,7 +56,7 @@
           "normalize": [
             "receipt"
           ],
-          "sha256": "02fbc21b17436ef74423ea02c7e8eff8fb4a59f583843e351f63ef7def13d6c3",
+          "sha256": "1af715df35123a00baddf005fdae36184ab46c63d9f039c232824389553bb859",
           "stream": "stdout"
         }
       ],
@@ -99,7 +99,7 @@
         {
           "name": "actionable.plan.json",
           "path": "tools/rustev-conformance/fixtures/cli/actionable.run-propose/actionable.plan.json",
-          "sha256": "1091ed71ebd964ad0ca33f8c987d4dff0ee7bdef47b5e9f4af2b6529dd485fa4"
+          "sha256": "5a005afa77ef1d8d4b53686bfeb3d1840bb4580ab76734761bc8a2b09cf0c06a"
         },
         {
           "name": "propose.snapshot.json",
@@ -123,7 +123,7 @@
           "normalize": [
             "receipt"
           ],
-          "sha256": "d0bbb786a4bd24f06a61920e7ece7add78c50f28633f62beb02771990b853aa3",
+          "sha256": "c56d98742ef0e1721d2051b6c96fd4d0df852ee02b158fc73c37d1599ee12a65",
           "stream": "stdout"
         }
       ],
@@ -166,7 +166,7 @@
         {
           "name": "actionable.plan.json",
           "path": "tools/rustev-conformance/fixtures/cli/actionable.run-refused/actionable.plan.json",
-          "sha256": "1091ed71ebd964ad0ca33f8c987d4dff0ee7bdef47b5e9f4af2b6529dd485fa4"
+          "sha256": "5a005afa77ef1d8d4b53686bfeb3d1840bb4580ab76734761bc8a2b09cf0c06a"
         },
         {
           "name": "refused.snapshot.json",
@@ -190,7 +190,7 @@
           "normalize": [
             "receipt"
           ],
-          "sha256": "3b4bc878e8226334be2b8eab5a21f46dc6f481ef439c57cac42dd9de62daec24",
+          "sha256": "e177132480cc5d67d4f4ce93385b9d8b5fbe9e258c3d048e281cbd12130d117d",
           "stream": "stdout"
         }
       ],
@@ -233,7 +233,7 @@
         {
           "name": "actionable.plan.json",
           "path": "tools/rustev-conformance/fixtures/cli/actionable.run-unresolved/actionable.plan.json",
-          "sha256": "1091ed71ebd964ad0ca33f8c987d4dff0ee7bdef47b5e9f4af2b6529dd485fa4"
+          "sha256": "5a005afa77ef1d8d4b53686bfeb3d1840bb4580ab76734761bc8a2b09cf0c06a"
         },
         {
           "name": "support.rules.json",
@@ -257,7 +257,7 @@
           "normalize": [
             "receipt"
           ],
-          "sha256": "dd79a1e2a1cd33528be7faa51ded836ac81951069714d3d2b2bab717b343eaf3",
+          "sha256": "6d4b0a7ddd8543ae3752f0a26717b10d7862f11afa7e00ae4dc0dff0aa690e8f",
           "stream": "stdout"
         }
       ],
@@ -293,7 +293,7 @@
         {
           "name": "actionable.plan.json",
           "path": "tools/rustev-conformance/fixtures/cli/actionable.show/actionable.plan.json",
-          "sha256": "1091ed71ebd964ad0ca33f8c987d4dff0ee7bdef47b5e9f4af2b6529dd485fa4"
+          "sha256": "5a005afa77ef1d8d4b53686bfeb3d1840bb4580ab76734761bc8a2b09cf0c06a"
         },
         {
           "name": "support.rules.json",
@@ -310,7 +310,7 @@
         {
           "golden": "crates/rustev-cli/tests/golden/actionable.show.json",
           "normalize": [],
-          "sha256": "2068d0249e76f24db7bfb3b4bb6230ad4f5025e610e110ae69a533365476ce4e",
+          "sha256": "29a6df9228227973d81fee943edbc064ca82ef481c7b7785eee573489723155c",
           "stream": "stdout"
         }
       ],
@@ -7817,7 +7817,7 @@
         {
           "golden": "crates/rustev-cli/tests/golden/lodging.check.json",
           "normalize": [],
-          "sha256": "c141f78da505412d9f2d99cdc48d27a71443185c10104f461d017994d44475ee",
+          "sha256": "4b08c1f69e77b022ac45f1a6f3c4dbd01da7225e38ddb02b98ce06a0cafc8e71",
           "stream": "stdout"
         }
       ],
@@ -7864,7 +7864,7 @@
         {
           "golden": "crates/rustev-cli/tests/golden/lodging.compile.json",
           "normalize": [],
-          "sha256": "a37964cd4a7de7c1f502def41dd13c59c8b22af9b2f4bdc00723db6ff387cce1",
+          "sha256": "10774b14f6147cd9ce99a680b53d6ff55225632259e709e021a308c24df60930",
           "stream": "stdout"
         }
       ],
@@ -7896,14 +7896,14 @@
         {
           "name": "lodging-emb.bundle.json",
           "path": "tools/rustev-conformance/fixtures/cli/lodging.replay/lodging-emb.bundle.json",
-          "sha256": "d029ae7f6eff71ad2c1cfe490c9af809029a1fb559a0bc372e8c4d7047731f7e"
+          "sha256": "7d91023fd6bd46055c9ce41568abd242a87cd49750b9c7248ba8d7ea15d118f5"
         }
       ],
       "outputs": [
         {
           "golden": "crates/rustev-cli/tests/golden/lodging.replay.json",
           "normalize": [],
-          "sha256": "bf7ae1aa27b105756df1f987bfbc1938f2d2a4c8a66f86b37dc1920d507372de",
+          "sha256": "771a81cb3c7f05b42ecff462f5dc3c481e0d073341cee19b6d81a63f52a795f7",
           "stream": "stdout"
         }
       ],
@@ -7943,7 +7943,7 @@
         {
           "name": "lodging.plan.json",
           "path": "tools/rustev-conformance/fixtures/cli/lodging.run/lodging.plan.json",
-          "sha256": "769f0eafd12a697543f54c85796db50ddfcec1fc9a905582a8d1377efbc12a90"
+          "sha256": "dd145a278ddbc9f1783a21556018378ec373eed82b88b69f817b003e33464944"
         },
         {
           "name": "lodging.rules.json",
@@ -7962,7 +7962,7 @@
           "normalize": [
             "receipt"
           ],
-          "sha256": "f1d0d16cdd175ffad5f25fe8cbd667494da217a682896e032b22dcd5ed1b3b2d",
+          "sha256": "490e92b2a5d653eea9efd9c7ceb35cac301b3d6657a4ac541e6eca7a9ef31e06",
           "stream": "stdout"
         },
         {
@@ -7971,7 +7971,7 @@
           "normalize": [
             "timing"
           ],
-          "sha256": "826dc0b43e9855885e4e59d2d687dddeb24a2ae727b1bea30b0926e63997242c"
+          "sha256": "68c16b592d1fa37cf94def2aae4a914a29815a00935c9a162e927445e7a10cad"
         }
       ],
       "surfaces": [
@@ -8004,7 +8004,7 @@
         {
           "name": "lodging.plan.json",
           "path": "tools/rustev-conformance/fixtures/cli/lodging.show/lodging.plan.json",
-          "sha256": "769f0eafd12a697543f54c85796db50ddfcec1fc9a905582a8d1377efbc12a90"
+          "sha256": "dd145a278ddbc9f1783a21556018378ec373eed82b88b69f817b003e33464944"
         },
         {
           "name": "lodging.rules.json",
@@ -8016,7 +8016,7 @@
         {
           "golden": "crates/rustev-cli/tests/golden/lodging.show.json",
           "normalize": [],
-          "sha256": "21604b88c3ea345c7dfc0fe14b779f8a444e40733efbe0ea2e9f0210de9399ac",
+          "sha256": "5f72f7f434875bed09f630241b4c4321ee6dd73dbc5d104ef3a7539f6a45ea41",
           "stream": "stdout"
         }
       ],
@@ -8055,7 +8055,7 @@
         {
           "golden": "crates/rustev-cli/tests/golden/parameterized.all-variants.json",
           "normalize": [],
-          "sha256": "2a4c35ef617b74fec5ce0008ea956e56ed84649fc198a35034e46c256ffda6a6",
+          "sha256": "6e20dfa8ed67be45993cf9a29373685a4f8456b9cc62ec4dba6eaa01263af298",
           "stream": "stdout"
         }
       ],
@@ -8082,26 +8082,26 @@
         {
           "name": "left",
           "path": "tools/rustev-conformance/fixtures/cli/parameterized.binding/left",
-          "sha256": "cf1818f81abc78f43797382589e533074502e5f5864779f051c29576c438bd42"
+          "sha256": "ce1ce09d7d07a6c1ff52fb81224a582d1a1a4488dcfdbd2afc3885117f6f7fbb"
         },
         {
           "name": "right",
           "path": "tools/rustev-conformance/fixtures/cli/parameterized.binding/right",
-          "sha256": "94fb980a2ba93ca1e2617729366f1ccf8028829cb17644c98ae2c300c3a544f3"
+          "sha256": "62ca3fbe7659b2688ec1cb14c28ecfbbc416f90cf503d0f0f38a012839c936ed"
         }
       ],
       "outputs": [
         {
           "golden": "crates/rustev-cli/tests/golden/parameterized.binding.json",
           "normalize": [],
-          "sha256": "f757c38b3326584ddf26692b9b6c0199a7a874c79f6480debc0ec2788a419b14",
+          "sha256": "086a2540cd6adfae85a1ffd96fc84906fa83f1a05fff377aa74ca289a0aaa345",
           "stream": "stdout"
         },
         {
           "file": "diff",
           "golden": "crates/rustev-cli/tests/golden/parameterized.binding.document.json",
           "normalize": [],
-          "sha256": "cacab28be8da8949768a54c7a351e0e8a9c1654c9e6c12569bc067712455d9b6"
+          "sha256": "5823466e0fc4b15f2cc4cc278ebb19e64ccc8ff6d9489c870b274b46e2c8cb39"
         }
       ],
       "surfaces": [
@@ -8148,7 +8148,7 @@
         {
           "golden": "crates/rustev-cli/tests/golden/parameterized.compile.json",
           "normalize": [],
-          "sha256": "a5ac86c995268398075584452f5655407d978809bdd167ae9c7c4039aa036ab5",
+          "sha256": "7bf0164a9fd362501bd88990ad6d184d304ca146754cc2f5f4940e4e8f7489e0",
           "stream": "stdout"
         }
       ],
@@ -8239,14 +8239,14 @@
         {
           "golden": "crates/rustev-cli/tests/golden/parameterized.defaults.json",
           "normalize": [],
-          "sha256": "7f5d566a51f270f515c45c28034331e23c0897757bc5090e73c6282c3a39a9f2",
+          "sha256": "8f257037c67af3dda0a6eccf5c19e1958859c79ea5d86d2031855509c4d6bf4d",
           "stream": "stdout"
         },
         {
           "file": "diff",
           "golden": "crates/rustev-cli/tests/golden/parameterized.defaults.document.json",
           "normalize": [],
-          "sha256": "3432bfa3c9ba6a9bf4be3ec4a1efbc0c4655006ccf1e0f86cd61eb7483470ebe"
+          "sha256": "df102b02cfbf39aec12dea5d0237f605c5ec21ecea5f0660adb3ded952243f37"
         }
       ],
       "surfaces": [
@@ -8316,14 +8316,14 @@
         {
           "golden": "crates/rustev-cli/tests/golden/parameterized.definitions-binding.json",
           "normalize": [],
-          "sha256": "796c9f2f6a38044bddb62fc3804e3c8d441528a59c507643d2d9713439bb8ef6",
+          "sha256": "e1cd428a528d1e70b16e724d8864cc7232cd535ebbf5433447454d2046ebde2e",
           "stream": "stdout"
         },
         {
           "file": "diff",
           "golden": "crates/rustev-cli/tests/golden/parameterized.definitions-binding.document.json",
           "normalize": [],
-          "sha256": "4d92a481331b56e09a51f6628651916937770c6da58af0646829b50ff54693ff"
+          "sha256": "c3c45bc31c11de31120e43a4633ba4ec6d6d836403897b5dea5c25bbff4c95c0"
         }
       ],
       "surfaces": [
@@ -8379,14 +8379,14 @@
         {
           "golden": "crates/rustev-cli/tests/golden/parameterized.definitions-changed.json",
           "normalize": [],
-          "sha256": "330fdd795709b1108ef523814aed22f10a85f4d0b73f1e3eaea67ae3975c57b0",
+          "sha256": "c70f9382dcad91848b26c7c8a2c47a0a3a9fbde0a3dfed75ef04295512c376db",
           "stream": "stdout"
         },
         {
           "file": "diff",
           "golden": "crates/rustev-cli/tests/golden/parameterized.definitions-changed.document.json",
           "normalize": [],
-          "sha256": "4d5dd99da6d48bc1967918131d6a1ce978ba52bf577e7efc616839cb9e0216dd"
+          "sha256": "5f10950e4afaa7f4304f56f9d72ccbdd83cbb8028382b40bc6b890e62e8f8e4d"
         }
       ],
       "surfaces": [
@@ -8437,14 +8437,14 @@
         {
           "golden": "crates/rustev-cli/tests/golden/parameterized.definitions-identical.json",
           "normalize": [],
-          "sha256": "55a488bf9fcce01917b8dffc4f0a4c3134cc07e6425949228c3a2ffaa66eaf96",
+          "sha256": "19a8aa7cccbeef245b329937667fc104abbd0816b2c9533278b66aaec23304fa",
           "stream": "stdout"
         },
         {
           "file": "diff",
           "golden": "crates/rustev-cli/tests/golden/parameterized.definitions-identical.document.json",
           "normalize": [],
-          "sha256": "d98b27df3bbd71ae8308938df5877a746c5ae9fc3b5ab00fc81da2d61dba2ba8"
+          "sha256": "32b5e08086760d08801e574c5090aee93b2d7daef7268ae61e6b8236dfb67f9f"
         }
       ],
       "surfaces": [
@@ -8495,14 +8495,14 @@
         {
           "golden": "crates/rustev-cli/tests/golden/parameterized.definitions-pruned.json",
           "normalize": [],
-          "sha256": "da9c8c604fe4153b0c976916b725329cc49187a6341201a7a01d1092522c609b",
+          "sha256": "2c0980f8bddcfdf039a8b8cf80c047971748d1f0c245c5adfd3d0e1a343f12cb",
           "stream": "stdout"
         },
         {
           "file": "diff",
           "golden": "crates/rustev-cli/tests/golden/parameterized.definitions-pruned.document.json",
           "normalize": [],
-          "sha256": "bd34731df75e41afbeada02b8eaccb0f6181c1891b55b8255785f5c165cbb666"
+          "sha256": "7253d3fcfc89ac6e430d593e741dbbe17ef7ed359ad9c1f6a29275d305940205"
         }
       ],
       "surfaces": [
@@ -8558,14 +8558,14 @@
         {
           "golden": "crates/rustev-cli/tests/golden/parameterized.definitions-truncated.json",
           "normalize": [],
-          "sha256": "6dcf64915e59287e9f9c949c969099144632efda5e4d70411c8eb1ecc3f76e74",
+          "sha256": "f59801a6ebbc1caed4a510bbef4fae673226484031fc384826c13139a0363768",
           "stream": "stdout"
         },
         {
           "file": "diff",
           "golden": "crates/rustev-cli/tests/golden/parameterized.definitions-truncated.document.json",
           "normalize": [],
-          "sha256": "274a729d7b1e70709594ceb7c61a1d70ab3fbf38cbbf16d3cf30f893fa856533"
+          "sha256": "5a49bccbf5f1c62d8c0b47cb5a3ea3336f80fb8b7bde54fcc1467bc43ed9b5cb"
         }
       ],
       "surfaces": [
@@ -8608,7 +8608,7 @@
         {
           "golden": "crates/rustev-cli/tests/golden/parameterized.plan-dangling.json",
           "normalize": [],
-          "sha256": "149f891ea146650a4df85997785be3e73e03e602fbd1332951b381c7a3290bf6",
+          "sha256": "8e8584421fa3217d34fbcad13718dfc2c0b03c51cf1092a7734b2ccadb9fd521",
           "stream": "stdout"
         }
       ],
@@ -8635,26 +8635,26 @@
         {
           "name": "left",
           "path": "tools/rustev-conformance/fixtures/cli/parameterized.plans-changed/left",
-          "sha256": "cf1818f81abc78f43797382589e533074502e5f5864779f051c29576c438bd42"
+          "sha256": "ce1ce09d7d07a6c1ff52fb81224a582d1a1a4488dcfdbd2afc3885117f6f7fbb"
         },
         {
           "name": "right",
           "path": "tools/rustev-conformance/fixtures/cli/parameterized.plans-changed/right",
-          "sha256": "339e18f9e9be64367e56b1c924590535d10f49a2139c3c4f6e718fb02d32b082"
+          "sha256": "296cb4e6b7f9991f9ce19bac48c8f08660f7fcb1c4e0a1a970bce3e23be59012"
         }
       ],
       "outputs": [
         {
           "golden": "crates/rustev-cli/tests/golden/parameterized.plans-changed.json",
           "normalize": [],
-          "sha256": "330fdd795709b1108ef523814aed22f10a85f4d0b73f1e3eaea67ae3975c57b0",
+          "sha256": "c70f9382dcad91848b26c7c8a2c47a0a3a9fbde0a3dfed75ef04295512c376db",
           "stream": "stdout"
         },
         {
           "file": "diff",
           "golden": "crates/rustev-cli/tests/golden/parameterized.plans-changed.document.json",
           "normalize": [],
-          "sha256": "4d5dd99da6d48bc1967918131d6a1ce978ba52bf577e7efc616839cb9e0216dd"
+          "sha256": "5f10950e4afaa7f4304f56f9d72ccbdd83cbb8028382b40bc6b890e62e8f8e4d"
         }
       ],
       "surfaces": [
@@ -8680,21 +8680,21 @@
         {
           "name": "left",
           "path": "tools/rustev-conformance/fixtures/cli/parameterized.plans-identical/left",
-          "sha256": "cf1818f81abc78f43797382589e533074502e5f5864779f051c29576c438bd42"
+          "sha256": "ce1ce09d7d07a6c1ff52fb81224a582d1a1a4488dcfdbd2afc3885117f6f7fbb"
         }
       ],
       "outputs": [
         {
           "golden": "crates/rustev-cli/tests/golden/parameterized.plans-identical.json",
           "normalize": [],
-          "sha256": "55a488bf9fcce01917b8dffc4f0a4c3134cc07e6425949228c3a2ffaa66eaf96",
+          "sha256": "19a8aa7cccbeef245b329937667fc104abbd0816b2c9533278b66aaec23304fa",
           "stream": "stdout"
         },
         {
           "file": "diff",
           "golden": "crates/rustev-cli/tests/golden/parameterized.plans-identical.document.json",
           "normalize": [],
-          "sha256": "d98b27df3bbd71ae8308938df5877a746c5ae9fc3b5ab00fc81da2d61dba2ba8"
+          "sha256": "32b5e08086760d08801e574c5090aee93b2d7daef7268ae61e6b8236dfb67f9f"
         }
       ],
       "surfaces": [
@@ -8720,26 +8720,26 @@
         {
           "name": "batch",
           "path": "tools/rustev-conformance/fixtures/cli/parameterized.plans-pruned/batch",
-          "sha256": "739ee5d24fdf4af14c6cf2c26d166ae5abd0733d7e1d17735f741a0f07cbcda1"
+          "sha256": "c0e47e4d04ab762857224fad5c86b1f6f59e50c943b3d01a186439295214a4e0"
         },
         {
           "name": "left",
           "path": "tools/rustev-conformance/fixtures/cli/parameterized.plans-pruned/left",
-          "sha256": "cf1818f81abc78f43797382589e533074502e5f5864779f051c29576c438bd42"
+          "sha256": "ce1ce09d7d07a6c1ff52fb81224a582d1a1a4488dcfdbd2afc3885117f6f7fbb"
         }
       ],
       "outputs": [
         {
           "golden": "crates/rustev-cli/tests/golden/parameterized.plans-pruned.json",
           "normalize": [],
-          "sha256": "da9c8c604fe4153b0c976916b725329cc49187a6341201a7a01d1092522c609b",
+          "sha256": "2c0980f8bddcfdf039a8b8cf80c047971748d1f0c245c5adfd3d0e1a343f12cb",
           "stream": "stdout"
         },
         {
           "file": "diff",
           "golden": "crates/rustev-cli/tests/golden/parameterized.plans-pruned.document.json",
           "normalize": [],
-          "sha256": "bd34731df75e41afbeada02b8eaccb0f6181c1891b55b8255785f5c165cbb666"
+          "sha256": "7253d3fcfc89ac6e430d593e741dbbe17ef7ed359ad9c1f6a29275d305940205"
         }
       ],
       "surfaces": [
@@ -8918,7 +8918,7 @@
         {
           "golden": "crates/rustev-cli/tests/golden/parameterized.selected.json",
           "normalize": [],
-          "sha256": "f4b2b1962560223e7953189091c550b21ce7d1cd3f6e22a0beeac98c41946965",
+          "sha256": "3f6fb7ca9c85a6c7d42c152240e2f2744be0b886ff80dd91dc2ec6e4368a2a0d",
           "stream": "stdout"
         }
       ],
@@ -8948,14 +8948,14 @@
         {
           "name": "plan",
           "path": "tools/rustev-conformance/fixtures/cli/parameterized.show/plan",
-          "sha256": "cf1818f81abc78f43797382589e533074502e5f5864779f051c29576c438bd42"
+          "sha256": "ce1ce09d7d07a6c1ff52fb81224a582d1a1a4488dcfdbd2afc3885117f6f7fbb"
         }
       ],
       "outputs": [
         {
           "golden": "crates/rustev-cli/tests/golden/parameterized.show.json",
           "normalize": [],
-          "sha256": "ec69d6573b433bb2270d4521ed322dbd19138a28504f4391b48da2f262d1038d",
+          "sha256": "c2b934d950f6fd966d93bb71f8fe900623223d4e711a1640cee3684c339b7e1a",
           "stream": "stdout"
         }
       ],
@@ -8982,26 +8982,26 @@
         {
           "name": "left",
           "path": "tools/rustev-conformance/fixtures/cli/parameterized.truncated/left",
-          "sha256": "5bd2d23866617fd58157a1bcd392b927753783451aab37ec565d7138a038b368"
+          "sha256": "37967e1393b70be52d7a9b51f48e5a62297cfbea8263707cbdcc6cc2b4105ee2"
         },
         {
           "name": "right",
           "path": "tools/rustev-conformance/fixtures/cli/parameterized.truncated/right",
-          "sha256": "c14ecd4429b084360c0e7afac61b8a44883b932be263eb6780a326d67871549b"
+          "sha256": "b3f6866671a7c359e9493bc05fb4f853146d25a4b7ff3e12ee2cc4b5907f3adb"
         }
       ],
       "outputs": [
         {
           "golden": "crates/rustev-cli/tests/golden/parameterized.truncated.json",
           "normalize": [],
-          "sha256": "d404b9915a4ed85782c65e2dda7e122274e053c6091e3e4c786ea7a3970d5e5b",
+          "sha256": "538f679c3798cec8d93f039394fbd37ad74b6467ff862036d123b844332bf165",
           "stream": "stdout"
         },
         {
           "file": "diff",
           "golden": "crates/rustev-cli/tests/golden/parameterized.truncated.document.json",
           "normalize": [],
-          "sha256": "a8e1fbd13701ff7f5c608d414685fc927397aa83da7d96aa57c6088b0912e672"
+          "sha256": "069b6237d006bbeb40befb23633f20befd967dd435ae7a93e36328b014e915d5"
         }
       ],
       "surfaces": [
@@ -10010,42 +10010,42 @@
         {
           "name": "bundles/s-1.json",
           "path": "tools/rustev-conformance/fixtures/cli/repeat-compared.stdout/bundles/s-1.json",
-          "sha256": "f5aa52642816ab71b68ac9e6c9ea3d2e93cf373494dba6af562d012e3c32f8ee"
+          "sha256": "81dea52225f972813a493fca9f3c043ab98e181aca02e5d1517e2de291c89b1a"
         },
         {
           "name": "bundles/s-2.json",
           "path": "tools/rustev-conformance/fixtures/cli/repeat-compared.stdout/bundles/s-2.json",
-          "sha256": "d36d08628d0f0fc5419b3daeff871f23aa246c6f69ec1838d2e4412c1fd81603"
+          "sha256": "712624cf167d246f5d58ea05d04fb2c4b2c4d8ae1996a0cf864435b2f4d3905f"
         },
         {
           "name": "bundles/s-3.json",
           "path": "tools/rustev-conformance/fixtures/cli/repeat-compared.stdout/bundles/s-3.json",
-          "sha256": "12c0b4e8f130a39a20c07284819301afa7f23ab77b2e3a7527d166010994a074"
+          "sha256": "5dc677a0e797e71ae2d21f2ab68b01b813209006e0d9d0bbb74710c20d2baa95"
         },
         {
           "name": "bundles/s-4.json",
           "path": "tools/rustev-conformance/fixtures/cli/repeat-compared.stdout/bundles/s-4.json",
-          "sha256": "a269c6a98939d952ed8f7860f3cb590f0ff00de398b58c15e0d8a8cd8749d8a4"
+          "sha256": "5785bce675ed36e65f973764de38ca8ecda5e7a6d61f45099d411bc97ecc2524"
         },
         {
           "name": "bundles/s-5.json",
           "path": "tools/rustev-conformance/fixtures/cli/repeat-compared.stdout/bundles/s-5.json",
-          "sha256": "899f9991029cc3b0706ba1d65b4c90aa4e66707fa9742e8c06d722772c90e33b"
+          "sha256": "7a25cec4b38c61b25a0f33794acb631543057a801eb53fe75e61461955699878"
         },
         {
           "name": "bundles/s-6.json",
           "path": "tools/rustev-conformance/fixtures/cli/repeat-compared.stdout/bundles/s-6.json",
-          "sha256": "caede553df3bb70e9c1f2ce87690d1b032b9610615c80143dcf29df76593d78a"
+          "sha256": "7a0e97c14684358d918c81dc0bfc9b346a7a9e29ebdc260c61d9905a08f06d13"
         },
         {
           "name": "bundles/s-7.json",
           "path": "tools/rustev-conformance/fixtures/cli/repeat-compared.stdout/bundles/s-7.json",
-          "sha256": "d19e7e6dc1a78235e837642dc64cd8867e0b88dee5ef6bff67a8dcbc36b6758a"
+          "sha256": "cce22647bbb846561e45dfb48525888db674fa7823d377e22204d0aa4235981d"
         },
         {
           "name": "bundles/s-8.json",
           "path": "tools/rustev-conformance/fixtures/cli/repeat-compared.stdout/bundles/s-8.json",
-          "sha256": "8565b54465c065c6744e01da66cb90cb5f8a1646e6f1b2dd9baf65fbfe1b4d01"
+          "sha256": "76340033cbe29004c3bd97307a679fe1bd3b664388d7e5a05a0e0e7e99790d83"
         },
         {
           "name": "comparison/.keep",
@@ -10080,7 +10080,7 @@
         {
           "name": "variants/z/plan.json",
           "path": "tools/rustev-conformance/fixtures/cli/repeat-compared.stdout/variants/z/plan.json",
-          "sha256": "92a5cc1f2341384e1e83c6921fb76b85d71b21295674a715dd925fccb14e293c"
+          "sha256": "991e813afeee5b73a212861f0f4e5f5d08a0f515b87830afe3ec5fce945f347d"
         },
         {
           "name": "variants/z/rules/rules.json",
@@ -10099,7 +10099,7 @@
           "file": "comparison/comparison.json",
           "golden": "crates/rustev-cli/tests/golden/repeat-comparison.json",
           "normalize": [],
-          "sha256": "415d6d9767f1ae46c331642140fd8c215c0f50f4146a2417b01b9e4aeb99af99"
+          "sha256": "ab0398bfdbc2505e525750ea92ab397a1cabc36c2e3fbb29b1468841ffa5285a"
         },
         {
           "file": "comparison/comparison.md",
@@ -10592,42 +10592,42 @@
         {
           "name": "bundles/s-1.json",
           "path": "tools/rustev-conformance/fixtures/cli/repeat-reported.stdout/bundles/s-1.json",
-          "sha256": "f5aa52642816ab71b68ac9e6c9ea3d2e93cf373494dba6af562d012e3c32f8ee"
+          "sha256": "81dea52225f972813a493fca9f3c043ab98e181aca02e5d1517e2de291c89b1a"
         },
         {
           "name": "bundles/s-2.json",
           "path": "tools/rustev-conformance/fixtures/cli/repeat-reported.stdout/bundles/s-2.json",
-          "sha256": "d36d08628d0f0fc5419b3daeff871f23aa246c6f69ec1838d2e4412c1fd81603"
+          "sha256": "712624cf167d246f5d58ea05d04fb2c4b2c4d8ae1996a0cf864435b2f4d3905f"
         },
         {
           "name": "bundles/s-3.json",
           "path": "tools/rustev-conformance/fixtures/cli/repeat-reported.stdout/bundles/s-3.json",
-          "sha256": "12c0b4e8f130a39a20c07284819301afa7f23ab77b2e3a7527d166010994a074"
+          "sha256": "5dc677a0e797e71ae2d21f2ab68b01b813209006e0d9d0bbb74710c20d2baa95"
         },
         {
           "name": "bundles/s-4.json",
           "path": "tools/rustev-conformance/fixtures/cli/repeat-reported.stdout/bundles/s-4.json",
-          "sha256": "a269c6a98939d952ed8f7860f3cb590f0ff00de398b58c15e0d8a8cd8749d8a4"
+          "sha256": "5785bce675ed36e65f973764de38ca8ecda5e7a6d61f45099d411bc97ecc2524"
         },
         {
           "name": "bundles/s-5.json",
           "path": "tools/rustev-conformance/fixtures/cli/repeat-reported.stdout/bundles/s-5.json",
-          "sha256": "899f9991029cc3b0706ba1d65b4c90aa4e66707fa9742e8c06d722772c90e33b"
+          "sha256": "7a25cec4b38c61b25a0f33794acb631543057a801eb53fe75e61461955699878"
         },
         {
           "name": "bundles/s-6.json",
           "path": "tools/rustev-conformance/fixtures/cli/repeat-reported.stdout/bundles/s-6.json",
-          "sha256": "caede553df3bb70e9c1f2ce87690d1b032b9610615c80143dcf29df76593d78a"
+          "sha256": "7a0e97c14684358d918c81dc0bfc9b346a7a9e29ebdc260c61d9905a08f06d13"
         },
         {
           "name": "bundles/s-7.json",
           "path": "tools/rustev-conformance/fixtures/cli/repeat-reported.stdout/bundles/s-7.json",
-          "sha256": "d19e7e6dc1a78235e837642dc64cd8867e0b88dee5ef6bff67a8dcbc36b6758a"
+          "sha256": "cce22647bbb846561e45dfb48525888db674fa7823d377e22204d0aa4235981d"
         },
         {
           "name": "bundles/s-8.json",
           "path": "tools/rustev-conformance/fixtures/cli/repeat-reported.stdout/bundles/s-8.json",
-          "sha256": "8565b54465c065c6744e01da66cb90cb5f8a1646e6f1b2dd9baf65fbfe1b4d01"
+          "sha256": "76340033cbe29004c3bd97307a679fe1bd3b664388d7e5a05a0e0e7e99790d83"
         },
         {
           "name": "repeat-config.json",
@@ -10654,14 +10654,14 @@
         {
           "golden": "crates/rustev-cli/tests/golden/repeat-reported.stdout",
           "normalize": [],
-          "sha256": "eb4ddeea12ceb97ebc3533d28fb4aba111f507d747dcfe4f14be270892e82cd4",
+          "sha256": "07d6072784eba156223e9de2612d9394eeb178862b214e999206aa4ad5ff81f7",
           "stream": "stdout"
         },
         {
           "file": "b/repeat.json",
           "golden": "crates/rustev-cli/tests/golden/repeat-report.json",
           "normalize": [],
-          "sha256": "3228fa5954935b98b660f32aa272f3fac4d567773daa3799ec7bbc0b80b3cf74"
+          "sha256": "fef0dd0fded80e04c02cd92804b6a050f634c56ad7df0a3d45c140bcf4e4faf5"
         }
       ],
       "surfaces": [
@@ -11290,7 +11290,7 @@
         {
           "name": "support.plan.json",
           "path": "tools/rustev-conformance/fixtures/runtime/support.plan.json",
-          "sha256": "8831155fb0c218abd612bb32212678138fd9959e819348a218e040153710e2e8"
+          "sha256": "5876af7dd1477029c64dfc6647dc8f7373c986a3b20768ba5d90e196fa1b2d66"
         },
         {
           "name": "support.snapshot.json",
@@ -11329,7 +11329,7 @@
           "file": "d1.record.json",
           "golden": "tools/rustev-conformance/expected/runtime/runtime.admission/d1.record.json",
           "normalize": [],
-          "sha256": "c3dbbf27d84f995465e81f95d4286f0d241759eafdd0efa3723edd42e5b757c2"
+          "sha256": "0828ed154d917a77daf89d4cdf372de1af02db614f98ec1ac83922ba3a535993"
         },
         {
           "file": "d1.result.json",
@@ -11341,7 +11341,7 @@
           "file": "d2.record.json",
           "golden": "tools/rustev-conformance/expected/runtime/runtime.admission/d2.record.json",
           "normalize": [],
-          "sha256": "6fa916ae51e8a2fce6986a6eb31135fbffed0b69b75a538ff1cebbf400287d16"
+          "sha256": "25dd61a4e8d49a623d69218a762ea8a51d037bae7dc369a89b47d4b47dea38ce"
         },
         {
           "file": "d2.result.json",
@@ -11512,7 +11512,7 @@
         {
           "name": "budget.plan.json",
           "path": "tools/rustev-conformance/fixtures/runtime/budget.plan.json",
-          "sha256": "049698376ad065a673d0cc5b3fb6ac625fe17160539164c8c95b17224c996101"
+          "sha256": "b6e71b91240b157229822ed534627c1421014d0bc8cf487d593a01a65b8757d7"
         },
         {
           "name": "support.snapshot.json",
@@ -11551,7 +11551,7 @@
           "file": "d1.record.json",
           "golden": "tools/rustev-conformance/expected/runtime/runtime.budget/d1.record.json",
           "normalize": [],
-          "sha256": "73e54631e58cb4aa15789cd2342e7fff4136e8bc5344b386899a95573d652ba1"
+          "sha256": "87c713801739967e2a9d14c08069227cecf0559395ad04587367d314730ca6e4"
         },
         {
           "file": "d1.result.json",
@@ -11667,7 +11667,7 @@
         {
           "name": "support.plan.json",
           "path": "tools/rustev-conformance/fixtures/runtime/support.plan.json",
-          "sha256": "8831155fb0c218abd612bb32212678138fd9959e819348a218e040153710e2e8"
+          "sha256": "5876af7dd1477029c64dfc6647dc8f7373c986a3b20768ba5d90e196fa1b2d66"
         },
         {
           "name": "support.snapshot.json",
@@ -11706,7 +11706,7 @@
           "file": "d1.record.json",
           "golden": "tools/rustev-conformance/expected/runtime/runtime.cancel/d1.record.json",
           "normalize": [],
-          "sha256": "75dff228dcdf6674389eb923484f6f0679c2dbd3ea194302d97e5b14ae814400"
+          "sha256": "21dfb6be93d33e873c80cc42fade9341645329e9f4dabeb48a0be555e7af9ff3"
         },
         {
           "file": "d1.result.json",
@@ -11794,7 +11794,7 @@
         {
           "name": "support.plan.json",
           "path": "tools/rustev-conformance/fixtures/runtime/support.plan.json",
-          "sha256": "8831155fb0c218abd612bb32212678138fd9959e819348a218e040153710e2e8"
+          "sha256": "5876af7dd1477029c64dfc6647dc8f7373c986a3b20768ba5d90e196fa1b2d66"
         },
         {
           "name": "support.snapshot.json",
@@ -11833,7 +11833,7 @@
           "file": "d1.record.json",
           "golden": "tools/rustev-conformance/expected/runtime/runtime.cancel-stop/d1.record.json",
           "normalize": [],
-          "sha256": "f42cc4c4bcc975e095a33ac75a4e915d926bbd31dfc90bdb617a77b07d7eaf7c"
+          "sha256": "4914e11f35836f93512f66f984907ff469531b58dc95dd8b8796e736ebb244d5"
         },
         {
           "file": "d1.result.json",
@@ -11928,7 +11928,7 @@
         {
           "name": "support.plan.json",
           "path": "tools/rustev-conformance/fixtures/runtime/support.plan.json",
-          "sha256": "8831155fb0c218abd612bb32212678138fd9959e819348a218e040153710e2e8"
+          "sha256": "5876af7dd1477029c64dfc6647dc8f7373c986a3b20768ba5d90e196fa1b2d66"
         },
         {
           "name": "support.snapshot.json",
@@ -11967,7 +11967,7 @@
           "file": "d1.record.json",
           "golden": "tools/rustev-conformance/expected/runtime/runtime.deadline/d1.record.json",
           "normalize": [],
-          "sha256": "e5d5f1956f85be48edbe3701637d8145ad69b4f7364e628a8eb5a5b6491438d0"
+          "sha256": "0997cc75d7f7ded41c32d5ee71227391db60e9e50b3a3c999063b572601eb5d8"
         },
         {
           "file": "d1.result.json",
@@ -12056,7 +12056,7 @@
         {
           "name": "retry.plan.json",
           "path": "tools/rustev-conformance/fixtures/runtime/retry.plan.json",
-          "sha256": "088b53aac97d8f4f5492429ae9fd1e749c98235787bcda30e7a1f3bc577221ce"
+          "sha256": "fb638a3fb24f1f500e85a34792b1f39bc6baa17f6101d2d7f19fb60fc701e3c4"
         },
         {
           "name": "support.snapshot.json",
@@ -12095,7 +12095,7 @@
           "file": "d1.record.json",
           "golden": "tools/rustev-conformance/expected/runtime/runtime.retry/d1.record.json",
           "normalize": [],
-          "sha256": "8c8a3255b1329fb93ecacf50065ff6e3c3a0f7cadb8ad660915642935fc12e23"
+          "sha256": "c95ab0fe65452e5515df7df1839ced708abb38b5bb4849be8bcbaa8a43657c70"
         },
         {
           "file": "d1.result.json",
@@ -12284,7 +12284,7 @@
         {
           "golden": "crates/rustev-cli/tests/golden/support.check.json",
           "normalize": [],
-          "sha256": "74711df643f9835d58be613ae9ff9dca6d83d68ec257b45310ec76be10255e47",
+          "sha256": "8f8c1ba2ec42a068c67d87ed73858c745134ed34b889c5d9c01f37ac2a58488c",
           "stream": "stdout"
         }
       ],
@@ -12338,7 +12338,7 @@
         {
           "golden": "crates/rustev-cli/tests/golden/support.compile.json",
           "normalize": [],
-          "sha256": "3ce34ed29cd6ebc5a078e61b917a3c3d2f292675f218865ff7c9f2f4aad3b3fc",
+          "sha256": "4848ef1858f262aacb4d65f898eb6fca98d5967617ccc9cf175aac345bcd861e",
           "stream": "stdout"
         }
       ],
@@ -12370,14 +12370,14 @@
         {
           "name": "support-emb.bundle.json",
           "path": "tools/rustev-conformance/fixtures/cli/support.replay/support-emb.bundle.json",
-          "sha256": "1f0e3b1716bf8c99ae0cd07827cc3353336cf4cf814ca4d560902e084741a7e4"
+          "sha256": "15c7cdf500a314a949e74e7319728fa134fae7ffb5fe11affe3ac82056f77498"
         }
       ],
       "outputs": [
         {
           "golden": "crates/rustev-cli/tests/golden/support.replay.json",
           "normalize": [],
-          "sha256": "90293e3afa00d8fc55a0ad2037caac8b70fa0b241f66e7026b1d16cc5da7937b",
+          "sha256": "d4c422d19ff078b174a423c7ce0a765b27a4a680e609e1b557cc50196ed9eae8",
           "stream": "stdout"
         }
       ],
@@ -12419,7 +12419,7 @@
         {
           "name": "support.plan.json",
           "path": "tools/rustev-conformance/fixtures/cli/support.run/support.plan.json",
-          "sha256": "92a5cc1f2341384e1e83c6921fb76b85d71b21295674a715dd925fccb14e293c"
+          "sha256": "991e813afeee5b73a212861f0f4e5f5d08a0f515b87830afe3ec5fce945f347d"
         },
         {
           "name": "support.rules.json",
@@ -12443,7 +12443,7 @@
           "normalize": [
             "receipt"
           ],
-          "sha256": "0c968485111223f3b6c12a3cd84ad1d52b8f791edd6e541871dbb280d36b1ca1",
+          "sha256": "93afc06a7ba334d0f4bdca9f89a9550368896bfcccb765f2053102b63a1a4589",
           "stream": "stdout"
         },
         {
@@ -12452,7 +12452,7 @@
           "normalize": [
             "timing"
           ],
-          "sha256": "74b80419e355c3004810ba3f82deab4bff3c232480d4b80596a8a7edf18927a4"
+          "sha256": "3147964464e8bac04c50a53fd07c142ad0a9d5c2f469ef204436f8cf4b7a9071"
         }
       ],
       "surfaces": [
@@ -12487,7 +12487,7 @@
         {
           "name": "support.plan.json",
           "path": "tools/rustev-conformance/fixtures/cli/support.show/support.plan.json",
-          "sha256": "92a5cc1f2341384e1e83c6921fb76b85d71b21295674a715dd925fccb14e293c"
+          "sha256": "991e813afeee5b73a212861f0f4e5f5d08a0f515b87830afe3ec5fce945f347d"
         },
         {
           "name": "support.rules.json",
@@ -12504,7 +12504,7 @@
         {
           "golden": "crates/rustev-cli/tests/golden/support.show.json",
           "normalize": [],
-          "sha256": "7bc9139fea9f4fd94c40c09779582db2eab7612459a68983490b64afccc81d1e",
+          "sha256": "377fcc72267ae1f9e4caa93819a283486c7adbf5bad2a7e42ff5b7033ecab4bf",
           "stream": "stdout"
         }
       ],

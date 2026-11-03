@@ -180,7 +180,7 @@
         "src/wait.rs"
       ],
       "max_archive_bytes": 163840,
-      "max_unpacked_bytes": 524288
+      "max_unpacked_bytes": 589824
     },
     "rustev-eval": {
       "files": [
@@ -243,7 +243,7 @@
         "src/testdata/lodging-emb.record.json"
       ],
       "max_archive_bytes": 196608,
-      "max_unpacked_bytes": 720896
+      "max_unpacked_bytes": 786432
     },
     "rustev-backend-rules": {
       "files": [
