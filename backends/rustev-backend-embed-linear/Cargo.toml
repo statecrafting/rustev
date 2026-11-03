@@ -38,6 +38,10 @@ ort = { version = "=2.0.0-rc.15", default-features = false, features = ["std", "
 tokenizers = { version = "=1.0.0-rc.3", default-features = false, features = ["serialize", "normalizers", "wordpiece", "regex"] }
 
 [dev-dependencies]
+rustev-runtime.workspace = true
+rustev-eval.workspace = true
+rustev-backend-rules.workspace = true
+rustev-pkg-support-routing.workspace = true
 rustev-backend-embed-linear = { path = ".", features = ["synthetic"] }
 
 [lints]
