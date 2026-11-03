@@ -13,8 +13,9 @@ summary: >
   journal of spec 012, generalized to any backend with a cost model and
   moved into `rustev-live`. A runtime spend gate durably reserves every
   attempt's full worst-case exposure before any byte is sent and refuses
-  an attempt that would pass the run cap or the journal's cap (R-29: USD 5
-  in total for all testing across providers). Acquisitions are declared
+  an attempt that would pass the run cap or the journal's cap (R-29: USD 10
+  in total for all testing across providers since A-75 raised it from
+  USD 5). Acquisitions are declared
   live or captured per source; a probe checks reachability and served
   identity of every candidate binding before any dataset case is sent;
   scheduling is bounded per binding; runs resume from a checkpoint without
@@ -348,8 +349,10 @@ plans without acquisitions.
 4. **Budget.** Live evaluation is testing under R-29 ("smoke,
    qualification and evaluation runs together"), so the journal must be a
    `testing` journal; any other header is refused (`journal-budget`). Its
-   cap is the header's (USD 5 in total, 5 000 000 000 units); this spec
-   raises nothing.
+   cap is the header's: USD 10 in total, 10 000 000 000 units, since the
+   owner raised R-29's testing cap on 2026-11-03 (A-75: "as we reach the $5
+   spend, to ensure we have further budget, we can spend another $5 (so
+   total overall spend can be $10 now)"). This spec raises nothing itself.
 5. **One writer.** A journal another process holds is `io_error`
    (`journal-locked`), before any work. A backend that keeps its own
    journal on the same file cannot open it while a run holds the lock, so
@@ -358,6 +361,18 @@ plans without acquisitions.
    which its own check confirms that the runtime's reservation for the
    attempt id exists instead of making a second one (no reservation, no
    send); its default construction is unchanged.
+6. **Header migration (A-75).** A `testing` journal whose header names the
+   superseded cap (USD 5, 5 000 000 000 units) under the same schema is
+   accepted once: under the lock, after every line has replayed, the
+   header line is replaced by the current one by writing a sibling file
+   holding the new header followed by every later byte unchanged,
+   `fsync`, rename over the journal (its permissions kept) and a
+   directory `fsync`. A crash leaves the old file or the new one, never a
+   mix, and the old file migrates at the next open. Entries, sequence
+   numbers and unsettled reservations are untouched, and the migration
+   writes no entry. A journal refused for a later line is left unchanged.
+   Any other header that differs (another schema, budget or cap, or the
+   superseded cap on a `production` journal) is still refused.
 
 ### 3.6 Spend gate and refusal before sending
 
@@ -512,7 +527,11 @@ plans without acquisitions.
    by writing a temporary file in the same directory, `fsync`, and rename.
 2. `--resume` with the same `--out` reopens the checkpoint. Any binding
    above that differs is refused (`checkpoint-mismatch`) before the
-   journal is opened.
+   journal is opened, except one: a journal header digest equal to the
+   testing header under the superseded cap (3.5.6) is accepted as the same
+   journal before its migration, and the checkpoint is rewritten with the
+   current header digest, so a run stopped by the USD 5 cap can complete
+   under A-75 (3.10.5).
 3. A `completed` item is never re-sent; its per-case files are kept.
 4. A work item with a journal reservation but no checkpointed result
    (the process ended while it was in flight) is `interrupted`. Its
@@ -1158,6 +1177,23 @@ recorded above. Tests: `crates/rustev-live/tests/run.rs`
 `crates/rustev-cli/tests/eval_live.rs`
 (`final_test_is_refused_before_reads_with_valid_ledger_flags`).
 
+**Testing cap raised to USD 10; header migration (2026-11-03, A-75).**
+`TESTING_CAP_UNITS` is now 10,000,000,000 nano-USD and the superseded
+5,000,000,000 is kept as `SUPERSEDED_TESTING_CAP_UNITS`; the production cap
+is unchanged. `SpendJournal::open` migrates a testing header that names the
+superseded cap as 3.5.6 states, after the replay and before any entry is
+written, so the recorded testing journal opens under the new cap with its
+entries, sequence numbers and liability as they were. A checkpoint that
+binds the superseded header digest
+(`SpendJournal::superseded_testing_header_digest()`) resumes and is
+rewritten with the current one (3.10.2). Every other header mismatch is
+refused as before. Tests: `crates/rustev-live/tests/journal.rs`
+(`superseded_header_migrates_once_keeping_entries_and_liability`,
+`other_header_mismatches_are_refused_unchanged`,
+`superseded_header_with_a_corrupt_line_is_refused_unchanged`) and
+`crates/rustev-live/tests/run.rs`
+(`checkpoint_under_superseded_header_resumes_after_migration`).
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child
@@ -1215,7 +1251,8 @@ decided by the implementer within this spec, as written:
     the persistent spend journal, and refuse before sending any call that
     would exceed the cap." Live runs under this spec are therefore
     limited to that scope, held by the journal of 3.5, and refused before
-    sending over the cap.
+    sending over the cap. The owner raised that cap in writing on
+    2026-11-03 to USD 10 in total (A-75; 3.5.4).
 13. **Exit codes.** Three new, distinct statuses (`spend_capped`,
     `probe_failed`, `interrupted`), numbered 14, 15 and 16 provisionally;
     under the #76 coordination rule the numbers become the next free

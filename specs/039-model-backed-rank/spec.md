@@ -1050,4 +1050,5 @@ Decided within the binding principles under the work order.
 17. **Metrics.** Backfill rate per position is spec 041's metric over the
     origin this spec records; this spec adds none.
 18. **Paid live calls** for Bedrock `rank` follow spec 030 Decision 18 and
-    R-29's USD 5 total testing cap; no other spend is authorized.
+    R-29's total testing cap (USD 10 since A-75 raised it from USD 5); no
+    other spend is authorized.

@@ -17,8 +17,8 @@
 //!   A-66): `AI_GATEWAY_API_KEY` for the Gateway transports and
 //!   `TYPESAFE_API_KEY` for `direct`, never from the environment. It is
 //!   never printed, logged or written; every written byte is checked for it.
-//! - Every attempt reserves against the persistent testing journal (USD 5
-//!   in total, R-29) before dispatch; a refusal stops the run.
+//! - Every attempt reserves against the persistent testing journal (USD 10
+//!   in total, R-29 as raised by A-75) before dispatch; a refusal stops the run.
 //! - Only SYNTHETIC fixtures are sent. The binding keeps the provider
 //!   allowlist `["typesafe-ai"]` and omits zero data retention, which the
 //!   Gateway refuses on the Hobby plan (R-30, C-11).

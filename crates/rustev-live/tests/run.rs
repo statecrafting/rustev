@@ -13,7 +13,7 @@ use rustev_live::documents::{
     CasePurpose, CaseSettlement, CaseSource, CaseSpend, CostUnit, EvaluationTime, ItemState,
     LiveCaseDocument, LiveCheckpoint, LiveConfig, Mode,
 };
-use rustev_live::journal::{BudgetKind, SetClock, SpendJournal};
+use rustev_live::journal::{BudgetKind, SetClock, SpendJournal, TESTING_CAP_UNITS};
 use rustev_live::probe::ProbeSnapshot;
 use rustev_live::*;
 use rustev_runtime::{DispatchAnswer, LiveAuthorizer};
@@ -384,7 +384,7 @@ async fn spend_refusal_stops_admission_and_keeps_unsent_items_pending() {
             .any(|l| l.contains("live/run/a/"))
     );
     assert_eq!(j.run_spend("run"), 3);
-    assert!(j.reserve("over", 5_000_000_000).is_err());
+    assert!(j.reserve("over", TESTING_CAP_UNITS).is_err());
     assert_eq!(std::fs::read(j.path()).unwrap(), bytes);
 }
 
@@ -2060,4 +2060,46 @@ async fn comparison_observes_retention_after_execution_and_is_unused_without_fla
             assert_eq!(live.comparison, ComparisonSection::NotRequested);
         }
     }
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn checkpoint_under_superseded_header_resumes_after_migration() {
+    let dir = Dir::new();
+    drop(prepare(spec(), dir.options()).unwrap());
+    let path = dir.0.join("out/checkpoint.json");
+    let mut cp = dir.checkpoint();
+    assert_eq!(
+        cp.bindings.journal_header_digest,
+        SpendJournal::testing_header_digest()
+    );
+    // Any other header digest is still a mismatch.
+    cp.bindings.journal_header_digest =
+        rustev_contract::ids::ContentDigest::parse(&format!("sha256:{}", "b".repeat(64))).unwrap();
+    cp.write_atomic(&path).unwrap();
+    let mut opts = dir.options();
+    opts.resume = true;
+    let err = prepare(spec(), opts.clone()).err().unwrap();
+    assert_eq!(err.subject, "checkpoint-mismatch");
+    // A run checkpointed against the USD 5 testing header (A-75).
+    cp.bindings.journal_header_digest = SpendJournal::superseded_testing_header_digest();
+    cp.write_atomic(&path).unwrap();
+    std::fs::write(
+        dir.0.join("journal"),
+        "{\"schema\":\"rustev-jev.spend-journal/1\",\"budget\":\"testing\",\"cap\":5000000000}\n",
+    )
+    .unwrap();
+    let head = answering(linear_head());
+    let r = rig(config(8, 0, 1), &[(head.clone(), 8)]);
+    let j = dir.journal();
+    assert_eq!(j.summary().cap, TESTING_CAP_UNITS);
+    let out = prepare(spec(), opts)
+        .unwrap()
+        .execute(&r.rt, j, &Host(None), &r.clock, &CancelSignal::new())
+        .await
+        .unwrap();
+    assert_eq!(out.status, RunStatus::EvaluatedLive);
+    assert_eq!(
+        dir.checkpoint().bindings.journal_header_digest,
+        SpendJournal::testing_header_digest()
+    );
 }

@@ -2,8 +2,8 @@
 //! shared cost ledger that outlives a run (spec 003, 3.5.2), kept by the
 //! host outside any repository.
 //!
-//! Two budgets: `testing`, USD 5 in total (5,000,000,000 units of one
-//! nano-USD, never reset), and `production`, USD 25 per UTC calendar month
+//! Two budgets: `testing`, USD 10 in total (10,000,000,000 units of one
+//! nano-USD, never reset; A-75 raised it from R-29's USD 5), and `production`, USD 25 per UTC calendar month
 //! (25,000,000,000 units per month). Before dispatch the adapter reserves
 //! its estimate; the journal refuses (a hard stop, nothing is sent) when
 //! observed + estimated + liability + outstanding reservations + this
@@ -17,6 +17,15 @@
 //! one of `reserve`, `settle`, `reconcile` or `release`, keyed by a
 //! reservation sequence number. The state is the replay of the lines. A
 //! reservation is durable before its request can be sent.
+//!
+//! **Header migration (A-75).** A testing journal whose header names the
+//! superseded cap ([`SUPERSEDED_TESTING_CAP_UNITS`]) is opened under the
+//! lock and its header is replaced by the current one: a copy holding the
+//! new header followed by every later byte unchanged is written beside the
+//! journal, `fsync`ed and renamed over it, and the directory is `fsync`ed.
+//! A crash leaves either the old file or the new one, never a mix. Entries,
+//! sequence numbers and unsettled reservations are untouched. Any other
+//! header that differs from the expected one is still refused.
 //!
 //! **Crash safety.** A final line without its newline was never completed:
 //! it is cut off at open. Since a reservation is fsynced before sending, a
@@ -44,8 +53,12 @@ use rustev_runtime::Ledger;
 use serde::{Deserialize, Serialize};
 
 pub const JOURNAL_SCHEMA: &str = "rustev-jev.spend-journal/1";
-/// R-29: USD 5 in total for testing, in nano-USD.
-pub const TESTING_CAP_UNITS: u64 = 5_000_000_000;
+/// R-29 as raised by A-75 (2026-11-03): USD 10 in total for testing, in
+/// nano-USD.
+pub const TESTING_CAP_UNITS: u64 = 10_000_000_000;
+/// R-29's original testing cap, USD 5, in nano-USD. A testing journal whose
+/// header names it is migrated to [`TESTING_CAP_UNITS`] when opened.
+pub const SUPERSEDED_TESTING_CAP_UNITS: u64 = 5_000_000_000;
 /// R-29: USD 25 per calendar month for production, in nano-USD.
 pub const PRODUCTION_CAP_UNITS: u64 = 25_000_000_000;
 
@@ -365,8 +378,10 @@ fn append(file: &mut File, line: &[u8]) -> std::io::Result<()> {
 
 impl SpendJournal {
     /// Open the journal at `path`, creating it with a header for `kind` if
-    /// it does not exist. Refuses a journal of another budget, a journal
-    /// another writer holds, and complete lines that do not parse.
+    /// it does not exist. Migrates a testing header that names the
+    /// superseded cap (see the module documentation). Refuses a journal of
+    /// another budget, cap or schema, a journal another writer holds, and
+    /// complete lines that do not parse.
     pub fn open(
         path: impl AsRef<Path>,
         kind: BudgetKind,
@@ -418,13 +433,17 @@ impl SpendJournal {
             text.truncate(keep);
         }
         file.seek(SeekFrom::End(0)).map_err(io)?;
-        let mut lines = text.lines().enumerate();
-        let first = lines.next().map(|(_, l)| l).unwrap_or_default();
+        let first = text.lines().next().unwrap_or_default();
         let found: Header = serde_json::from_str(first).map_err(|e| JournalError::Corrupt {
             line: 1,
             detail: format!("header: {e}"),
         })?;
-        if found != header {
+        let superseded = Header {
+            cap: SUPERSEDED_TESTING_CAP_UNITS,
+            ..header.clone()
+        };
+        let migrate = kind == BudgetKind::Testing && found == superseded;
+        if !migrate && found != header {
             return Err(JournalError::Mismatch(format!(
                 "the journal holds {:?} with cap {} under {}, not {:?} with cap {}",
                 found.budget,
@@ -436,7 +455,7 @@ impl SpendJournal {
         }
         let mut res = BTreeMap::new();
         let mut next_seq = 1;
-        for (i, l) in lines {
+        for (i, l) in text.lines().enumerate().skip(1) {
             let corrupt = |detail: String| JournalError::Corrupt {
                 line: i + 1,
                 detail,
@@ -483,6 +502,20 @@ impl SpendJournal {
                     r.state = ResState::Released;
                 }
             }
+        }
+        // Every line replayed; only now is the superseded header replaced,
+        // so a journal refused for a later line is left as it was.
+        if migrate {
+            let first_len = text.find('\n').map(|i| i + 1).unwrap_or(text.len());
+            let mut bytes =
+                serde_json::to_vec(&header).map_err(|e| JournalError::Io(e.to_string()))?;
+            bytes.push(b'\n');
+            bytes.extend_from_slice(&text.as_bytes()[first_len..]);
+            // Only the old file's handle is closed here: the writer lock is
+            // `<journal>.lock`, held by `lock` until this journal drops, so
+            // no other process can open the journal across the rename.
+            drop(file);
+            file = migrate_header(&path, &bytes).map_err(io)?;
         }
         // Left unsettled by a process that ended: the request may have been
         // sent, so it is liability until reconciled.
@@ -792,18 +825,13 @@ impl SpendJournal {
 
     /// Schema-tagged digest of the serialized testing header, including newline.
     pub fn testing_header_digest() -> rustev_contract::ids::ContentDigest {
-        let header = Header {
-            schema: JOURNAL_SCHEMA.into(),
-            budget: BudgetKind::Testing,
-            cap: BudgetKind::Testing.cap(),
-        };
-        let mut bytes = serde_json::to_vec(&header).expect("header serializes");
-        bytes.push(b'\n');
-        rustev_contract::ids::ContentDigest::parse(&rustev_contract::canonical::tagged_digest(
-            JOURNAL_SCHEMA,
-            &bytes,
-        ))
-        .expect("computed digest")
+        header_digest(TESTING_CAP_UNITS)
+    }
+
+    /// [`Self::testing_header_digest`] of a testing journal under the
+    /// superseded cap, before its header was migrated (A-75).
+    pub fn superseded_testing_header_digest() -> rustev_contract::ids::ContentDigest {
+        header_digest(SUPERSEDED_TESTING_CAP_UNITS)
     }
 
     /// Units still available in the current period.
@@ -827,6 +855,53 @@ impl SpendJournal {
     pub fn shared_runtime_ledger(&self) -> Arc<Ledger> {
         Arc::new(Ledger::new(self.runtime_cost_policy()))
     }
+}
+
+fn header_digest(cap: u64) -> rustev_contract::ids::ContentDigest {
+    let header = Header {
+        schema: JOURNAL_SCHEMA.into(),
+        budget: BudgetKind::Testing,
+        cap,
+    };
+    let mut bytes = serde_json::to_vec(&header).expect("header serializes");
+    bytes.push(b'\n');
+    rustev_contract::ids::ContentDigest::parse(&rustev_contract::canonical::tagged_digest(
+        JOURNAL_SCHEMA,
+        &bytes,
+    ))
+    .expect("computed digest")
+}
+
+/// Replace the journal at `path` with `bytes` atomically: write a sibling
+/// file, `fsync` it, rename it over the journal (through a symbolic link,
+/// to its target) and `fsync` the directory. The caller holds
+/// `<journal>.lock`, which is a separate file and survives the rename.
+/// Returns the new file opened for reading and appending.
+fn migrate_header(path: &Path, bytes: &[u8]) -> std::io::Result<File> {
+    let target = std::fs::canonicalize(path)?;
+    let mut tmp = target.as_os_str().to_owned();
+    tmp.push(".migrate");
+    let tmp = PathBuf::from(tmp);
+    let permissions = std::fs::metadata(&target)?.permissions();
+    {
+        let mut f = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(&tmp)?;
+        f.set_permissions(permissions)?;
+        f.write_all(bytes)?;
+        f.sync_all()?;
+    }
+    std::fs::rename(&tmp, &target)?;
+    if let Some(dir) = target.parent()
+        && let Ok(d) = File::open(dir)
+    {
+        d.sync_all()?;
+    }
+    let mut file = OpenOptions::new().read(true).append(true).open(&target)?;
+    file.seek(SeekFrom::End(0))?;
+    Ok(file)
 }
 
 fn run_total(res: &BTreeMap<u64, Res>, run_id: &str) -> u64 {

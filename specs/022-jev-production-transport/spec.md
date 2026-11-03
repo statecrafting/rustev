@@ -74,8 +74,9 @@ version. They are confirmed against the provider's documentation and
 recorded as facts in the decisions record at implementation time (3.7 stage
 2); until then the mapping stays unverified. No stage of section 3.7 ran as
 part of approving this spec. Live stages run only on synthetic data or data
-admitted under spec 023, inside R-29's USD 5 testing cap, with the persistent
-spend journal refusing before any call that would exceed it.
+admitted under spec 023, inside R-29's testing cap (USD 10 in total since
+A-75 raised it from USD 5), with the persistent spend journal refusing
+before any call that would exceed it.
 
 ## 1. Purpose
 
@@ -620,5 +621,6 @@ order and tracking issue #76 (OD-1, child C3):
    023 only. Production data classes remain a separate owner decision (spec
    012 3.1.3).
 4. **Requalification dataset.** As 3.8.7.
-5. **Testing spend.** Charged to R-29's USD 5 testing cap, shared by all
-   providers, until the owner raises it in writing.
+5. **Testing spend.** Charged to R-29's testing cap, shared by all
+   providers: USD 5 until the owner raised it in writing on 2026-11-03 to
+   USD 10 in total (A-75).

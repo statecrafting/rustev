@@ -16,8 +16,9 @@ summary: >
   recorded, never treated as calibrated. `rank` is not declared. No Jev
   wire-compatible surface is exposed. Paid inference for smoke and
   qualification is authorized by R-27 (zero data retention, synthetic and
-  independently labeled data only); testing is capped at USD 5 in total and
-  production at USD 25 per month (R-29), and production requires a pinned
+  independently labeled data only); testing is capped at USD 10 in total
+  (R-29, raised from USD 5 by A-75) and production at USD 25 per month
+  (R-29), and production requires a pinned
   model version (R-28). Approved (A-09); implemented.
 establishes:
   - { kind: directory, path: "integrations/rustev-jev/" }
@@ -63,7 +64,7 @@ obligations:
     anchor: "3-3-questions-and-the-descriptor"
   - id: "R-2"
     kind: requirement
-    text: "Live calls and paid inference happen only within R-27: smoke and qualification of this spec, key read from the owner's file at runtime and never copied, zero data retention requested, synthetic or independently labeled data only, within R-29's USD 5 total testing cap, enforced as a hard stop before dispatch; no quality claim precedes the R-04 dataset."
+    text: "Live calls and paid inference happen only within R-27: smoke and qualification of this spec, key read from the owner's file at runtime and never copied, zero data retention requested, synthetic or independently labeled data only, within R-29's total testing cap, USD 10 since A-75 raised it from USD 5, enforced as a hard stop before dispatch; no quality claim precedes the R-04 dataset."
     anchor: "3-8-qualification-plan"
   - id: "I-6"
     kind: invariant
@@ -314,9 +315,11 @@ id locally. Exchange records are digest-only by default under R-19.
 Three stages. Stages 2 and 3 are authorized by R-27 within its scope: the
 Gateway transport, zero data retention and the provider allowlist on every
 request, the key read at runtime from the owner's file, only synthetic or
-independently labeled data. Spend caps are the owner's (R-29): USD 5 in
-total for all testing (smoke, qualification and evaluation runs together)
-and USD 25 per calendar month for production use. Each cap is held by a
+independently labeled data. Spend caps are the owner's (R-29): USD 10 in
+total for all testing (smoke, qualification and evaluation runs together),
+raised from USD 5 by A-75 on 2026-11-03 ("as we reach the $5 spend, to
+ensure we have further budget, we can spend another $5 (so total overall
+spend can be $10 now)"), and USD 25 per calendar month for production use. Each cap is held by a
 shared cost ledger that persists across runs (spec 003, 3.5.2), and the
 adapter's accounting stops before dispatch any attempt whose reservation
 would take the ledger over its cap: a hard stop, recorded as
@@ -753,7 +756,8 @@ Decided by the owner on 2026-09-24:
    retention (R-28).
 6. Batching: off by default until qualified (R-28, 3.5).
 7. Spend caps: USD 5 total for testing, USD 25 per month for production,
-   hard stop in the adapter's accounting plus a Gateway budget (R-29).
+   hard stop in the adapter's accounting plus a Gateway budget (R-29). The
+   owner raised the testing cap to USD 10 in total on 2026-11-03 (A-75).
 
 8. Zero data retention: the Gateway flag may be omitted for synthetic data
    while the team is on the Hobby plan; the provider allowlist stays (R-30).

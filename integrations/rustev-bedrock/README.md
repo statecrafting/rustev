@@ -65,7 +65,7 @@ The host must refresh declarations against the profile for its source region.
 
 No smoke runs under tests. Use synthetic fixtures or spec 023 admitted data and the SAME persistent testing
 journal already used by other providers. Do not create a new journal to obtain
-another budget. R-29's cap is USD 5 total across providers; unknown charges retain
+another budget. R-29's cap is USD 10 total across providers (A-75); unknown charges retain
 liability. Production budgeting belongs to the host runtime.
 
 The `aws-config` feature reads credentials only from `AWS_ACCESS_KEY_ID`,
