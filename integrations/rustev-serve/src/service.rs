@@ -158,6 +158,7 @@ pub struct Service {
     pub(crate) stream_drops: Arc<AtomicU64>,
     pub(crate) invalidation: Mutex<BTreeMap<String, crate::invalidations::Source>>,
     pub(crate) erasures_while_retained: AtomicU64,
+    decision_task_panics: AtomicU64,
     pub(crate) blocking: Arc<Semaphore>,
     pub(crate) blocking_slots: Arc<Semaphore>,
 }
@@ -288,6 +289,7 @@ impl Service {
             stream_drops: Arc::new(AtomicU64::new(0)),
             invalidation: Mutex::new(BTreeMap::new()),
             erasures_while_retained: AtomicU64::new(0),
+            decision_task_panics: AtomicU64::new(0),
             blocking: Arc::new(Semaphore::new(config.blocking_threads.get() as usize)),
             blocking_slots: Arc::new(Semaphore::new(
                 (config.blocking_threads.get() + config.blocking_queue.get()) as usize,
@@ -570,6 +572,7 @@ impl Service {
         let service = self.clone();
         let task_key = key.clone();
         let progress = Progress { running, events };
+        let (panic_key, panic_finished) = (key.clone(), finished.clone());
         tokio::spawn(async move {
             let reply = service
                 .run(
@@ -610,12 +613,17 @@ impl Service {
         })
         .await
         .unwrap_or_else(|_| {
-            self.begin_shutdown();
-            Reply {
-                status: 500,
-                body: vec![],
-                content_type: "application/json",
+            // Spec 042 3.7.2: a decision task that panics still ends with an
+            // answer, `internal_error` as for a runtime invariant failure. The
+            // entry is released as for any refusal, and the service keeps serving.
+            self.decision_task_panics.fetch_add(1, Ordering::Relaxed);
+            let mut state = lock(&self.state);
+            if state.entries.remove(&panic_key).is_some() {
+                state.bytes = state.entries.values().map(|e| e.bytes).sum();
             }
+            drop(state);
+            panic_finished.notify_waiters();
+            self.refuse(RefusalCode::InternalError)
         })
     }
     #[allow(clippy::too_many_arguments)]
@@ -1047,6 +1055,10 @@ impl Service {
             (
                 "context_erasures_while_retained_total",
                 self.erasures_while_retained.load(Ordering::Relaxed),
+            ),
+            (
+                "decision_task_panics_total",
+                self.decision_task_panics.load(Ordering::Relaxed),
             ),
         ];
         let mut body = String::new();

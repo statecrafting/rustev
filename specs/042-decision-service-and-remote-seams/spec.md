@@ -468,7 +468,7 @@ may be implemented before that record; `rustev-serve` may not.
    | `headers_too_large` | 431 | `RESOURCE_EXHAUSTED` | 3.5.3 |
    | `unsupported_media_type` | 415 | `INVALID_ARGUMENT` | 3.1.3 |
    | `compile_refused`, `plan_id_mismatch`, `binding_unknown`, `profile_unsupported`, `bundle_tampered`, `signature_invalid`, `signature_untrusted`, `unsigned_refused` | 422 | `FAILED_PRECONDITION` | 3.3 |
-   | `internal_error` | 500 | `INTERNAL` | A runtime invariant failure with no run-record termination (spec 037 3.12.6, a generation invariant); no decision record and no `detail` beyond the code |
+   | `internal_error` | 500 | `INTERNAL` | A runtime invariant failure with no run-record termination (spec 037 3.12.6, a generation invariant), or a panic in the decision task (3.7.2); no decision record and no `detail` beyond the code |
 
    Each code has exactly one HTTP status and one gRPC code, while several
    codes may share either, as the three 503 codes and `context_unavailable`
@@ -578,7 +578,12 @@ may be implemented before that record; `rustev-serve` may not.
    and `field` events are dropped and counted, never blocking the decision;
    `final` is never dropped and carries `events_dropped`: the service
    handler, not the observer, writes it after the decision ends, into a
-   slot each stream reserves for it outside the event queue.
+   slot each stream reserves for it outside the event queue. A decision
+   task that panics still ends with an answer: `internal_error` (3.5), as
+   the response or as the stream's `final` event, as for a runtime
+   invariant failure. The panic is counted
+   (`rustev_decision_task_panics_total`), the decision's retained entry is
+   released as for any refusal, and the service keeps serving.
 3. **Progress observer.** `rustev-runtime` gains an optional observer
    registered per decision: a synchronous callback invoked after a step's
    result is recorded, receiving only the data of 3.7.1 `step`. It must not
@@ -1014,6 +1019,7 @@ workflows; deployment; live provider calls or spend; real-user data.
 | Stream consumer stalls | `step` events dropped and counted; `final` delivered with the count. |
 | HTTP and gRPC give different bytes for a case | Transport-differential check fails. |
 | Explain before D2 is implemented | `endpoint_unavailable`. |
+| Decision task panics | `internal_error` (500, `INTERNAL`), as the response or the stream's one `final` event; counted; a resubmission is answered again; the service keeps serving (3.7.2). |
 | Shutdown with records still queued after `flush_ms` | Listed as unflushed in the shutdown report; exit 3. |
 | A crate outside `integrations/` depends on `tonic` or `sigstore` | `make boundaries` fails. |
 
@@ -1640,6 +1646,24 @@ shell, a start on a read-only root. The crate's advisories, licenses and
 sources passed; its bans (two duplicate versions and five wildcard path
 dependencies, first seen in run 41557841721) and grype's 61 findings per
 platform in the base layers were recorded without gating.
+
+**A panicking decision task answers `internal_error` (2026-11-03).**
+Spec 010's record left this open against 042: a decision task that
+panicked ended its stream without `final`, the non-streaming call answered
+an empty HTTP 500, and the service began shutting down. The owner chose
+to treat the panic as the runtime invariant failure already is (3.5,
+`internal_error`) rather than add a refusal code that claims a decision
+ran. `rustev-serve` now catches the task's failure, answers
+`internal_error` (HTTP 500, gRPC `INTERNAL`, no detail) as the response
+or as the stream's `final` event, counts it in
+`rustev_decision_task_panics_total`, releases the decision's retained
+entry so a resubmission is answered again rather than left
+`decision_in_progress`, and keeps serving (3.7.2 and the `internal_error`
+row amended). No contract type changes. Tests:
+`integrations/rustev-serve/tests/handlers.rs`
+(`panicking_decision_task_answers_internal_error_and_keeps_serving`, a
+SYNTHETIC context source that panics, over the handler and an HTTP
+stream).
 
 ## Decisions at approval
 
