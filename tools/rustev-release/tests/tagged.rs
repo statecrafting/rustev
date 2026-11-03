@@ -582,6 +582,42 @@ fn the_github_release_is_created_once_and_never_replaced() {
     assert_eq!(gh.creates.len(), 1);
 }
 
+#[test]
+fn qualification_assets_beside_a_release_are_ignored_never_published() {
+    let (_root, m, dir) = release();
+    let assets = tagged::verify_assets(&m, &dir).unwrap();
+    let notes = tagged::notes(&m, &assets).unwrap();
+    let mut gh = Gh::default();
+    tagged::publish_release(&mut gh, "v0.3.0", &notes, &assets, false).unwrap();
+    // 060 3.7.2: the owner attaches the qualification evidence; a rerun
+    // still finds the release present and uploads nothing.
+    let present = gh.present.as_mut().unwrap();
+    present
+        .assets
+        .insert("qualification-v0.3.0.json".into(), sha256_hex(b"{}"));
+    present.assets.insert(
+        "qualification-v0.3.0-linux-x64-gnu.tar.gz".into(),
+        sha256_hex(b"bundle"),
+    );
+    let o = tagged::publish_release(&mut gh, "v0.3.0", &notes, &assets, false).unwrap();
+    assert_eq!((o, gh.creates.len()), (Outcome::Present, 1));
+    // Any other extra asset still fails and replaces nothing.
+    gh.present
+        .as_mut()
+        .unwrap()
+        .assets
+        .insert("extra.txt".into(), sha256_hex(b"x"));
+    let err = tagged::publish_release(&mut gh, "v0.3.0", &notes, &assets, false).unwrap_err();
+    assert!(err.contains("058 3.5.2"), "{err}");
+    // A run's own asset set never names qualification evidence.
+    let mut own = assets.clone();
+    own.insert("qualification-v0.3.0.json".into(), b"{}".to_vec());
+    let mut fresh = Gh::default();
+    let err = tagged::publish_release(&mut fresh, "v0.3.0", &notes, &own, false).unwrap_err();
+    assert!(err.contains("060 3.7.2"), "{err}");
+    assert!(fresh.creates.is_empty());
+}
+
 // 3.4.2 ------------------------------------------------------------------
 
 fn steps(m: &ReleaseManifest, dir: &Path) {
