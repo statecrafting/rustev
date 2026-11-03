@@ -270,3 +270,52 @@ impl HostRunDocs {
         }
     }
 }
+
+/// The repeat configuration of the host fixture: both slices, a `k_sd`
+/// band, and the stability metrics a host gate reads.
+pub fn repeat_config_json() -> Value {
+    json!({
+        "schema": "rustev.repeat-config/1",
+        "bootstrap": {"method": "percentile-cluster/1", "prng": "xoshiro256starstar-splitmix64/1",
+                      "level": "0.95", "resamples": 1000, "seed": "61"},
+        "noise": {"rule": {"k_sd": {"k": "2"}}, "floor": "0", "overrides": {}},
+        "slices": [{"name": "north", "min_cases": 2}, {"name": "south", "min_cases": 2}],
+        "stability_metrics": ["rubric/brevity", "host/latency_ms/p0.5"],
+        "top_k": null
+    })
+}
+
+pub fn repeat_config() -> rustev_eval::repeat_config::RepeatConfig {
+    rustev_eval::repeat_config::RepeatConfig::parse(
+        &serde_json::to_vec(&repeat_config_json()).unwrap(),
+    )
+    .unwrap()
+}
+
+/// A host set's documents: one per run spec.
+pub fn set_docs(config: &EvaluatorConfig, specs: &[RunSpec]) -> Vec<HostRunDocs> {
+    specs.iter().map(|s| HostRunDocs::new(config, s)).collect()
+}
+
+/// The fixture's three runs; run 1 has an unknown latency on c2.
+pub fn three_runs() -> Vec<RunSpec> {
+    (0..3)
+        .map(|r| RunSpec {
+            unknown_latency: (r == 1).then_some("c2"),
+            ..RunSpec::new(r)
+        })
+        .collect()
+}
+
+pub fn import(
+    config: &EvaluatorConfig,
+    repeat: &rustev_eval::repeat_config::RepeatConfig,
+    docs: &[HostRunDocs],
+) -> Result<rustev_eval::host_repeat::HostSet, rustev_eval::host_run::HostError> {
+    let runs: Vec<HostRunInputs<'_>> = docs.iter().map(HostRunDocs::inputs).collect();
+    rustev_eval::host_repeat::import(&rustev_eval::host_repeat::HostSetInputs {
+        config: repeat,
+        evaluator: config,
+        runs: &runs,
+    })
+}

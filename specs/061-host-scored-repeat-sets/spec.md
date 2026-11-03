@@ -487,6 +487,48 @@ scores file over other views and a case count differing from
 `crates/rustev-eval/tests/host_support/mod.rs`, which later increments
 and the CLI tests share.
 
+**Increment 2 (2026-11-03): host repeat reports, in the library.** The
+plan's second increment is split in two: this one is the library, and
+`rustev eval repeat import` follows as increment 3, so the later
+increments move up by one (six in all).
+`crates/rustev-eval/src/host_repeat.rs` holds
+`rustev.host-repeat-report/1` and `import`, which binds and measures
+every run (a refusal names its run), then refuses runs that differ in
+host system, flow, flow version, dataset, split, cost unit, case list or
+order, or the views' `dataset` and `plan` members (`mixed-runs`), a
+repeated `host.run` (`mixed-runs`, detail `duplicate-run`), a repeat
+configuration with `top_k` (`repeat-config`, detail
+`top-k-not-observed`), and N outside 1 to 64. The cohort loop of spec
+029's `repeat` moved, unchanged, into `cohort_reports` in `repeat.rs`,
+which both sets call: per-case metrics through the same `metric_cases`,
+`run_stats`, `intervals` and `band`, with `deterministic` false for a
+host set (3.4.3), so `deterministic_replay` is never its basis. The
+report carries `assertion` and `source` `host`, the host identities,
+per run its record digest, `host.run` handle, host-cases digest and
+`seed: null`, per scorer `scorer_reproduction: "not_checked"` (and
+`judge_runs: "not_checked"` for a model scorer), the stable cohort of
+cases not `failed` in any run, `held_out` unknown with
+`host-ledger-unsupported` on `final_test` (3.8), and per metric its
+derivation, `observation: "host"` on latency and cost, and the cost unit
+beside `host/cost_per_1000` (`unit`). `reassemble` rebuilds the set and
+refuses any byte difference in the report or a case document, and any
+document that cannot be canonicalized, never comparing two such failures
+as equal (`reconcile`). Decisions within the spec: runs must also agree on each
+case's subgroups (`mixed-runs`), since slices read them; `host/` metrics
+come first, then the score metrics in spec 041 3.2.4's order; a metric
+with no per-case measure (`qwk`) takes each run's value from spec 041's
+function and has no interval (`not-case-decomposable`), as in a Rustev
+set; a run figure that is unknown because of one case names it (`case
+<id>: <reason>`), for every metric, not only latency; with no cost unit,
+every figure of `host/cost_per_1000` is unknown with reason
+`cost-not-declared`. Tests: `crates/rustev-eval/tests/host_repeat.rs`
+(labels, the unknown latency naming its case, `cost-not-declared`, the
+statistics equal bit for bit to 029's functions over the same measures
+arranged as a `captured` set, an N = 1 `k_sd` band unknown, the section
+5 rows on mixed runs, `duplicate-run` and `top-k-not-observed`, a
+below-minimum slice, a held-out set, and re-assembly), and every
+existing spec 029 eval test, unchanged, for the moved loop.
+
 ## Decisions at approval
 
 Decided in this text, with the reason beside each: separate host schema
