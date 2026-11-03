@@ -2,7 +2,7 @@
 id: "043-live-re-execution-at-scale"
 title: "Live re-execution at dataset scale with spend caps (amends 026 and 006)"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-10-17"
 summary: >
   An amendment of approved spec 026 (live re-execution) and of spec 006
@@ -290,9 +290,13 @@ plans without acquisitions.
    `real` dataset needs `--admission <file>` (the spec 023 admission
    record), whose digest is recorded; without it the run is refused
    (`data-not-admitted`) before any journal is opened. Rustev checks
-   presence and bounds, not the record's truth (spec 023 3.1). The
-   `final_test` split needs spec 029 3.7's ledger flags; a live send of a
-   final-test case is recorded as exposure under spec 023 3.2.
+   presence and bounds, not the record's truth (spec 023 3.1). No
+   `final_test` case is sent live. The engine counts no exposure a host
+   could record under spec 023 3.2, so `rustev_live::run::prepare` refuses
+   a `final_test` split (`invalid_input`, `live-config`) and `rustev eval
+   live --split final_test` is a usage error (exit 2) even with spec 029
+   3.7's ledger flags, both before any journal is opened. Recording
+   final-test exposure for live runs is left to a later spec.
 
 ### 3.4 Live or captured acquisitions
 
@@ -673,6 +677,7 @@ objective API (#76 future).
 | Bundle input whose `run` and `supplies` hold outputs | Outputs never read; the new judgment comes only from new backend output. |
 | Expired source bundle | Case `unavailable`, not restored. |
 | Live run of the source plan with captured acquisitions and a backend scripted to return the source outputs | Proposal equal to replay's; only run observations differ. |
+| `final_test` split, through the CLI with valid ledger flags or through `prepare` | CLI usage error, exit 2; `prepare` `invalid_input`, `live-config`; no journal opened, nothing sent (3.3.5). |
 | `real` dataset without `--admission` | `invalid_input`, `data-not-admitted`, no journal opened. |
 | Authorization rule absent for a binding | `authorization_refused` per attempt, nothing sent, run continues. |
 | `rate_limited` with retry-after above the cap | Deferred (3.8.2, A-67): no pause until a retry-after seam exists; retry reserved anew. |
@@ -1135,6 +1140,23 @@ usage. The R-29 testing journal moved from estimated 3,722,662 to 4,087,202
 nano-USD, with observed 1,421,364, liability 18,075,006 and headroom
 4,976,416,428 of the USD 5 cap after the run. The run shows a provider
 backend driven end to end by the live engine; it is not a quality claim.
+
+**Final test refused; complete (2026-11-03).** The owner chose to narrow
+3.3.5 rather than build exposure counting into the engine: no
+`final_test` case is sent live. `rustev_live::run::prepare` now refuses a
+`final_test` split (`invalid_input`, `live-config`) before any journal is
+opened, so host programs composing the engine get the refusal the CLI
+already gave (a usage error since increment 7 part a). Section 5 gains
+the row. Recording final-test exposure for live runs is left to a later
+spec. The rate-limit pause of 3.8.2 stays deferred (A-67). Every
+acceptance item is met: the deterministic tests of section 5, spend,
+resumption, captured acquisitions (spec 036 is complete, and increment
+12 tests the run of 3.4.4 against offline replay), evidence, separation,
+the journal move, reports, compatibility, and the live provider stage
+recorded above. Tests: `crates/rustev-live/tests/run.rs`
+(`input_refusals_precede_journal_creation`) and
+`crates/rustev-cli/tests/eval_live.rs`
+(`final_test_is_refused_before_reads_with_valid_ledger_flags`).
 
 ## Decisions at approval
 

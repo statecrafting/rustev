@@ -753,6 +753,7 @@ fn input_refusals_precede_journal_creation() {
         (2, "probe-snapshot"),
         (3, "out"),
         (4, "checkpoint-mismatch"),
+        (5, "live-config"),
     ] {
         let dir = Dir::new();
         let mut s = spec();
@@ -785,6 +786,7 @@ fn input_refusals_precede_journal_creation() {
                 opts.resume = true;
                 s.config.evaluation_time = EvaluationTime::Fixed { ms: ts(NOW) };
             }
+            5 => s.split = "final_test".into(),
             _ => unreachable!(),
         }
         let e = prepare(s, opts).err().expect("refused");
