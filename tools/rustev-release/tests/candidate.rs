@@ -105,7 +105,8 @@ fn workflow_write_permissions_are_confined() {
         if line.starts_with("  ") && !line.starts_with("   ") && line.ends_with(':') {
             job = line.trim().trim_end_matches(':');
         }
-        assert!(!line.contains("packages: write"));
+        // 060 3.3.1: `publish-image` alone may push the image.
+        assert!(!line.contains("packages: write") || job == "publish-image");
         if line.contains("contents: write") {
             writes += 1;
             // 058 3.3.3: the pre-release is created by `github-release`.

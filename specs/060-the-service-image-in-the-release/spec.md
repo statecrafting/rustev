@@ -325,6 +325,46 @@ the expired entry and the unused entry of section 5, and the other
 refusals. No exception is added here: the exceptions for the remaining
 "won't fix" findings are decided with the base refresh (decision 2).
 
+**Increment 4b, 2026-11-03 (3.3.3, 3.4.2, the registry).**
+`image_registry::ImageRegistry` reads a manifest or index by tag or
+digest; tests drive it with a fake, and `Ghcr` reads `ghcr.io`'s registry
+API through the system `curl`, exchanging `GH_TOKEN` (when set) for a pull
+token on curl's standard input, never its command line, and accepting only
+an `X.Y.Z` tag or a `sha256:` digest as a reference. `verify` (`rustev-release
+verify-image <release-dir>`) requires the tag to name the manifest's index
+digest, the index bytes to be the index of the manifest's platform
+descriptors, and each platform manifest to be present by its digest with
+its size; a failed lookup fails, never passes. A manifest naming no image
+passes with nothing to check. `tag_state` (`rustev-release image-tag
+<release-dir> <index-out>`) writes the index bytes to push and prints
+`absent` or `present` (the run's index), and fails when the tag names
+another digest (3.3.3); neither command pushes. The tests in
+`tools/rustev-release/tests/image_registry.rs` cover section 5's rows for
+the tag naming another index and the registry's index or platform digest
+differing from the manifest. The `Ghcr` adapter has not yet met the live
+registry; the workflow change of `publish-image` and `verify-release`
+runs it first in a release run. Attestation verification against the
+store (`gh attestation verify oci://...`) belongs to that workflow change.
+The workflow tests now admit `packages: write` on a job named
+`publish-image` only, with exactly `contents: read`, `packages: write`,
+`id-token: write` and `attestations: write`
+(`only_github_release_writes_contents_and_nothing_writes_packages`,
+`workflow_write_permissions_are_confined`), and
+`publish_image_runs_only_for_a_member_release_tag_after_npm` requires,
+once that job exists, that it follow `approve`, `image-checks`,
+`manifest`, `publish-crates` and `publish-npm`, that `github-release`
+follow it, that it run only when `tag` decided a push, and that it write
+no `latest` tag. Each passes on the current workflow, which has no such
+job. For a check by hand, `rustev-release image-plan <amd64.oci.tar>
+<arm64.oci.tar> <tag> <out-dir>` writes the image entry (`image.json`) and
+the index bytes (`index.json`) the manifest job would derive, and
+`verify-image` also reads such an `image.json`, with an optional
+repository that replaces the image's for the registry read (a scratch
+package); the release workflow passes neither. On the archives of the
+dry run 41628699504, `image-plan` read both buildx OCI archives and gave
+the platform digests their own `index.json` names
+(`sha256:af46746d...` amd64, `sha256:321fdd73...` arm64).
+
 ## Decisions at approval
 
 Ratified by the owner on 2026-11-03 (A-76: "I ratify 060"), as proposed:

@@ -143,11 +143,20 @@ fn only_github_release_writes_contents_and_nothing_writes_packages() {
         .0;
     assert_eq!(top.trim(), "contents: read");
     for (name, job) in jobs(WORKFLOW) {
-        assert_ne!(
-            job.permissions.get("packages").map(String::as_str),
-            Some("write"),
-            "{name}"
-        );
+        if job.permissions.get("packages").map(String::as_str) == Some("write") {
+            // 060 3.3.1: only `publish-image`, beside what attestation needs.
+            assert_eq!(name, "publish-image");
+            let want: BTreeMap<String, String> = [
+                ("contents", "read"),
+                ("packages", "write"),
+                ("id-token", "write"),
+                ("attestations", "write"),
+            ]
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+            assert_eq!(job.permissions, want);
+        }
         let contents = job.permissions.get("contents").map(String::as_str);
         assert_eq!(
             contents == Some("write"),
@@ -191,4 +200,46 @@ fn publication_is_gated_by_its_environments_and_trusted_publishing() {
     }
     assert!(WORKFLOW.contains("rust-lang/crates-io-auth-action@"));
     assert!(WORKFLOW.contains("publish-npm \"$RUNNER_TEMP/release\""));
+}
+
+/// The text of job `name`, up to the next job.
+fn job_text(text: &str, name: &str) -> Option<String> {
+    let body = text.split_once("\njobs:\n")?.1;
+    let header = format!("  {name}:");
+    let mut lines = body.lines().skip_while(|l| *l != header);
+    let first = lines.next()?;
+    let rest =
+        lines.take_while(|l| !(l.starts_with("  ") && !l.starts_with("   ") && l.ends_with(':')));
+    Some(
+        std::iter::once(first)
+            .chain(rest)
+            .collect::<Vec<_>>()
+            .join("\n"),
+    )
+}
+
+#[test]
+fn publish_image_runs_only_for_a_member_release_tag_after_npm() {
+    let all: BTreeMap<String, Job> = jobs(WORKFLOW).into_iter().collect();
+    // 060 3.3.1: until the job exists there is nothing to push.
+    let Some(text) = job_text(WORKFLOW, "publish-image") else {
+        return;
+    };
+    let by_ref: BTreeMap<String, &Job> = all.iter().map(|(n, j)| (n.clone(), j)).collect();
+    let before = closure(&by_ref, "publish-image");
+    for j in [
+        "approve",
+        "image-checks",
+        "manifest",
+        "publish-crates",
+        "publish-npm",
+    ] {
+        assert!(before.contains(j), "publish-image does not follow {j}");
+    }
+    // Layer 8 (the GitHub release) follows layer 7.
+    assert!(closure(&by_ref, "github-release").contains("publish-image"));
+    // Skipped unless `tag` decided a push: a release tag (never a candidate
+    // or dry run) whose release set names the image.
+    assert!(text.contains("needs.tag.outputs.image == 'true'"), "{text}");
+    assert!(!text.contains("latest"), "060 3.1.2: no other tag");
 }
