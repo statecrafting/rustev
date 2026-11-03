@@ -1215,6 +1215,15 @@ against their schemas in their own contract tests.
   untested on any platform. The label `statecraft:stacked-ci` runs all
   seven on a pull request. The platform list moved from the `native`
   matrix into the `scope` job of `bindings.yml`, unchanged.
+- 2026-11-02 (CI only, no claim of this spec changes): a pull request's own
+  run leaves out every `bindings.yml` job when it changes none of their
+  inputs: `rustev-node`, `rustev-wasm`, `rustev-fp-corpus` and the workspace
+  packages they depend on, `tools/rustev-conformance/`, the workflow and the
+  workspace-wide files (spec 001's `affected.py`). About 4 in 10 pull
+  requests merged 2026-10-20 to 11-02 touched none. The merge queue and every
+  push to `main` run all seven platforms, as do pull requests with the label
+  `statecraft:stacked-ci`; a final `bindings` job accepts a skip only when
+  `scope` chose it.
 - 2026-10-28: `make conformance-harvest` (3.12.2) removed
   `tools/rustev-conformance/cases/cli`, which also holds the 152 `explain.*`
   cases, and regenerated only the CLI cases, so it left the explain cases

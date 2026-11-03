@@ -30,6 +30,8 @@ env:
 jobs:
   wasm:
     name: wasm
+    needs: scope
+    if: needs.scope.outputs.run == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
@@ -98,6 +100,8 @@ jobs:
 
   node-versions:
     name: node ${{ matrix.node }}
+    needs: scope
+    if: needs.scope.outputs.run == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     strategy:
@@ -155,7 +159,39 @@ jobs:
     timeout-minutes: 5
     outputs:
       native: ${{ steps.scope.outputs.native }}
+      run: ${{ steps.affected.outputs.run }}
     steps:
+      # A pull request's own run (unless labelled `statecraft:stacked-ci`)
+      # leaves the bindings jobs out when it changes none of their inputs:
+      # the binding packages, every workspace package they depend on, the
+      # conformance tooling, this workflow and the workspace-wide files
+      # (scripts/acceptance/affected.py). The merge queue and every push to
+      # main run them all. Any doubt runs them.
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: affected
+        env:
+          EVENT: ${{ github.event_name }}
+          STACKED_CI: ${{ contains(github.event.pull_request.labels.*.name, 'statecraft:stacked-ci') }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          # Reading the manifests needs no pinned toolchain; the image's
+          # stable cargo avoids installing it here.
+          RUSTUP_TOOLCHAIN: stable
+        run: |
+          if [ "$EVENT" = pull_request ] && [ "$STACKED_CI" != true ]; then
+            run=$(python3 scripts/acceptance/affected.py --base "$BASE_SHA" \
+              --package rustev-node --package rustev-wasm --package rustev-fp-corpus \
+              --path tools/rustev-conformance/ --path .github/workflows/bindings.yml \
+              --path scripts/acceptance/affected.py)
+          else
+            run=true
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+          if [ "$run" = false ]; then
+            echo "This pull request changes no bindings input; the bindings jobs run in the merge queue." >> "$GITHUB_STEP_SUMMARY"
+          fi
       - id: scope
         env:
           EVENT: ${{ github.event_name }}
@@ -185,6 +221,7 @@ jobs:
   native:
     name: native ${{ matrix.platform }}
     needs: scope
+    if: needs.scope.outputs.run == 'true'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     strategy:
@@ -250,3 +287,22 @@ jobs:
           name: rustev-${{ matrix.platform }}
           path: integrations/rustev-node/npm/${{ matrix.platform }}/rustev.${{ matrix.platform }}.node
           if-no-files-found: error
+
+  # As verify.yml's `verify`: the caller's result is this job's, and a
+  # skipped bindings job passes only when `scope` chose to leave it out.
+  bindings:
+    name: bindings
+    if: always()
+    needs: [scope, wasm, node-versions, native]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every bindings job
+        env:
+          SCOPE: ${{ needs.scope.result }}
+          RUN: ${{ needs.scope.outputs.run }}
+          RESULTS: ${{ needs.wasm.result }} ${{ needs.node-versions.result }} ${{ needs.native.result }}
+        run: |
+          test "$SCOPE" = success
+          want=success; [ "$RUN" = false ] && want=skipped
+          for r in $RESULTS; do test "$r" = "$want" || { echo "a bindings job is $r, expected $want"; exit 1; }; done

@@ -20,8 +20,48 @@ env:
   CARGO_TERM_COLOR: never
 
 jobs:
+  # A pull request's own run (unless labelled `statecraft:stacked-ci`)
+  # leaves the release checks out when it changes no workspace package, no
+  # workspace-wide file, no conformance JavaScript tooling and not this
+  # workflow (scripts/acceptance/affected.py): a change to specs or
+  # documents alone. The merge queue and every push to main run them all.
+  # Any doubt runs them.
+  scope:
+    name: scope
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.affected.outputs.run }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: affected
+        env:
+          EVENT: ${{ github.event_name }}
+          STACKED_CI: ${{ contains(github.event.pull_request.labels.*.name, 'statecraft:stacked-ci') }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          # Reading the manifests needs no pinned toolchain; the image's
+          # stable cargo avoids installing it here.
+          RUSTUP_TOOLCHAIN: stable
+        run: |
+          if [ "$EVENT" = pull_request ] && [ "$STACKED_CI" != true ]; then
+            run=$(python3 scripts/acceptance/affected.py --base "$BASE_SHA" --all-packages \
+              --path tools/rustev-conformance/js/ --path .github/workflows/release-checks.yml \
+              --path scripts/acceptance/affected.py)
+          else
+            run=true
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+          if [ "$run" = false ]; then
+            echo "This pull request changes no release-check input; the release checks run in the merge queue." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   adoption:
     name: adoption ${{ matrix.subset }}
+    needs: scope
+    if: needs.scope.outputs.run == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     strategy:
@@ -59,6 +99,8 @@ jobs:
 
   msrv:
     name: msrv
+    needs: scope
+    if: needs.scope.outputs.run == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
@@ -95,6 +137,8 @@ jobs:
 
   semver:
     name: semver
+    needs: scope
+    if: needs.scope.outputs.run == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -173,3 +217,22 @@ jobs:
           name: semver-report
           path: target/semver.txt
           if-no-files-found: error
+
+  # As verify.yml's `verify`: the caller's result is this job's, and a
+  # skipped release check passes only when `scope` chose to leave it out.
+  release-checks:
+    name: release-checks
+    if: always()
+    needs: [scope, adoption, msrv, semver]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every release check
+        env:
+          SCOPE: ${{ needs.scope.result }}
+          RUN: ${{ needs.scope.outputs.run }}
+          RESULTS: ${{ needs.adoption.result }} ${{ needs.msrv.result }} ${{ needs.semver.result }}
+        run: |
+          test "$SCOPE" = success
+          want=success; [ "$RUN" = false ] && want=skipped
+          for r in $RESULTS; do test "$r" = "$want" || { echo "a release check is $r, expected $want"; exit 1; }; done

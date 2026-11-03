@@ -245,6 +245,15 @@ sh -c 'for d in crates tools; do [ -d "$d" ] || continue; if grep -rnE "(struct|
   checkout), the MSRV job keeps only registry and git (its target was 4 GB),
   and verify restores the preflight job's spec-spine binary instead of
   racing four saves of its own.
+- 2026-11-02: `verify.yml`'s acceptance groups first remove preinstalled
+  toolchains no group uses (dotnet, Android, GHC, CodeQL) and record `df`
+  before and after: "Disk quota exceeded" failed merge-queue entries that
+  day. `scripts/acceptance/affected.py` answers whether a pull request
+  changes a job's inputs (named workspace packages and their path
+  dependencies, given prefixes, the workspace-wide files); any doubt answers
+  yes. Spec 027's `bindings.yml` and spec 031's `release-checks.yml` use it
+  on a pull request's own run only; the merge queue and every push to
+  `main` still run every job.
 - 2026-10-27: 040 moves from `integrations-core` (34 minutes measured) to
   `integrations-base` (17), about 25 minutes each. Same commands, every
   spec still exactly once.
