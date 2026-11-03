@@ -5,7 +5,8 @@
 //! This crate holds, so far, the parts that need no real artifact: the
 //! `rustev.embed-linear/1` manifest and its checks ([`manifest`]), bundle
 //! verification against it ([`verify_bundle`]), the descriptor derived from
-//! it ([`derive_descriptor`]), pooling and head arithmetic ([`head`]), and,
+//! it ([`derive_descriptor`]), pooling and head arithmetic ([`head`]),
+//! the in-process embedding cache ([`cache`]), and,
 //! behind the `synthetic` feature, the synthetic encoder of 3.19. The ONNX
 //! encoder and its inference dependencies wait on the feasibility gate
 //! (3.2.3).
@@ -16,6 +17,7 @@
 #![forbid(unsafe_code)]
 
 pub mod bundle;
+pub mod cache;
 pub mod head;
 pub mod manifest;
 #[cfg(feature = "synthetic")]
