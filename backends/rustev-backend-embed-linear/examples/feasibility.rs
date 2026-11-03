@@ -17,7 +17,7 @@ use tokenizers::pipeline::{EncodeOptions, Override, PipelineTokenizer};
 
 type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
 
-#[cfg(target_os = "macos")]
+#[cfg(unix)]
 fn runtime_version(path: &str) -> Result<String> {
     use std::ffi::{CStr, CString, c_char, c_void};
     unsafe extern "C" {
@@ -53,9 +53,9 @@ fn runtime_version(path: &str) -> Result<String> {
     }
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(unix))]
 fn runtime_version(_: &str) -> Result<String> {
-    Err("this probe's runtime-version reader is macOS only".into())
+    Err("this probe's runtime-version reader needs dlopen (Unix only)".into())
 }
 
 fn tokens(tokenizer: &PipelineTokenizer, text: &str) -> Result<Vec<u32>> {
@@ -119,7 +119,16 @@ fn main() -> Result<()> {
         return Err("graph digest differs from stage 2".into());
     }
     let runtime_sha = format!("{:x}", Sha256::digest(fs::read(&args[2])?));
-    if runtime_sha != "2a50a63e7f41f8d4d551d3ee47248df3864f6540109fce8ad520ca3b51af4b70" {
+    // The pinned ONNX Runtime 1.31.0 library of each measured platform: the
+    // macOS dylib of 2026-10-22, and for linux-aarch64-gnu the
+    // libonnxruntime.so.1.31.0 of the official release tarball, verified
+    // against its published digest. A platform is added when it is measured.
+    let expected = match (std::env::consts::OS, std::env::consts::ARCH) {
+        ("macos", "aarch64") => "2a50a63e7f41f8d4d551d3ee47248df3864f6540109fce8ad520ca3b51af4b70",
+        ("linux", "aarch64") => "595c7f7a6775f5c7b3d567c3ed94c04f722092575abcc092560f5208a54daf99",
+        _ => return Err("runtime_digest_unknown_platform".into()),
+    };
+    if runtime_sha != expected {
         return Err("runtime_digest_mismatch".into());
     }
     let tokenizer_bytes = fs::read_to_string(Path::new(&args[1]).join("tokenizer.json"))?;

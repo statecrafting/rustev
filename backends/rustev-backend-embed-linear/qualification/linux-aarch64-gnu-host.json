@@ -1,0 +1,18 @@
+{
+  "hardware": "Apple Mac17,9 (Apple M5 Pro host), Docker Desktop 29.8.2 Linux virtual machine",
+  "cpu": "Apple M5 Pro: 6 performance and 12 efficiency cores; the guest sees 18 virtual CPUs and cannot choose between them",
+  "cores": "18 virtual CPUs (nproc); the probe runs one intra-op and one inter-op thread",
+  "memory": "8,317,267,968 bytes guest memory (MemTotal 8,122,332 kB)",
+  "os": "Debian GNU/Linux 12 (bookworm), the pinned rust:1.98.1-bookworm image by digest sha256:93ce27a88655056a51dbdd8f5f2d7ddc071c7b0070fb288a37b5a285fc83971e",
+  "kernel": "7.0.14-linuxkit aarch64",
+  "c_library": "GNU libc 2.36 (Debian GLIBC 2.36-9+deb12u14)",
+  "runtime_library": {
+    "name": "libonnxruntime.so.1.31.0",
+    "bytes": 25266408,
+    "sha256": "595c7f7a6775f5c7b3d567c3ed94c04f722092575abcc092560f5208a54daf99",
+    "release_tarball": "onnxruntime-linux-aarch64-1.31.0.tgz",
+    "release_tarball_sha256": "c5b8b3cca31f3d643a3b313b8f42e2d0f16a4fcefd02cda343d97bd5306afaab",
+    "release_tarball_digest_source": "the v1.31.0 GitHub release's published asset digest, verified before extraction"
+  },
+  "environment": "A virtualized Linux guest on Apple silicon, not a dedicated Linux server: the host scheduler may place the guest's vCPUs on performance or efficiency cores. The probe was built in the same image (rustc 1.98.1, release profile) from examples/feasibility.rs copied into a crate without the workspace lints, with ort 2.0.0-rc.15 and tokenizers 1.0.0-rc.3 as pinned. The checkpoint files were downloaded at the recorded revision and each matched the record's SHA-256."
+}

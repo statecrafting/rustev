@@ -1,5 +1,19 @@
 # Spec 011 feasibility measurement, 2026-10-22
 
+**`linux-aarch64-gnu` added 2026-11-02** by `rerecord_linux.py` from
+`sha256:6a85fb28eba4222e75d1efde7cbd25c1869eda60403d695a6d137c12d09899e5`.
+Every encoder limit is met there (p95 59.6 ms, p99 60.3 ms, cold setup
+383.9 ms, peak RSS 269.6 MiB), and stages 1 to 3 pass. Stage 4 still
+refuses for the unmeasured complete-backend items, and the platform is not
+qualified. The host was a Docker Desktop Linux VM on an Apple M5 Pro, not
+a dedicated Linux server (`linux-aarch64-gnu-host.json`). To run on Linux,
+the probe reads the runtime version through `dlopen` on any Unix and checks
+a per-platform runtime digest, and `measure.py` names its outputs by
+platform key; the record binds their new bytes and keeps the digests
+macos-aarch64 was measured with (`macos_aarch64_measured_with`).
+`linux-x86_64-gnu` is still not measured: no native x86_64 Linux host was
+available.
+
 **Re-recorded 2026-11-02 under A-73** by `rerecord.py` from
 `sha256:3a2cf3bb7e785476e7e976f39345fc4fdf05762ab21bb9faaac29dee3827b86a`,
 with no new measurement. A-73 moved the Node binding's `local-embed` build
@@ -8,8 +22,8 @@ dependency-graph check was repeated with the 3.18 boundary rules. Stage 3
 now passes on macos-aarch64, so stages 1 to 3 pass for one platform and the
 inference dependencies may enter (3.2.3). The platform's verdict stays
 `refuse`: stage 4 refuses on p95 and the Node build has not run.
-`examples/feasibility.rs` is kept byte-identical as measured; it uses
-`dlopen` and is not built under the workspace's `unsafe_code = "forbid"`.
+`examples/feasibility.rs` uses `dlopen` and is not built under the
+workspace's `unsafe_code = "forbid"`.
 
 `feasibility.json` is the authoritative `rustev.embed-feasibility/1` record.
 All three platforms have verdict `refuse`. Both Linux platforms say
@@ -94,7 +108,11 @@ Successful runtime cache-directory diagnostics are retained verbatim in stderr.
   newline. Decimal measurements are strings.
 - `rerecord.py BOUNDARIES_COMMIT` applies the 2026-11-02 re-recording under
   A-73 to the 2026-10-22 record and rewrites the digest.
-- The probe example is kept byte-identical as measured and is not built
+- On Linux, `measure.py` writes `<platform>.json`, `-resource.json` and
+  `-stderr.txt` for `linux-aarch64-gnu` or `linux-x86_64-gnu`; with a
+  hand-written `<platform>-host.json`, `rerecord_linux.py PLATFORM
+  BOUNDARIES_COMMIT DATE` adds that platform to the A-73 record.
+- The probe example is not built
   (`autoexamples = false`): it reads the runtime version through `dlopen`,
   which the workspace's `unsafe_code = "forbid"` refuses. To rebuild it,
   copy it into a crate without the workspace lints.
