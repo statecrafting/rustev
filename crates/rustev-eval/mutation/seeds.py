@@ -41,7 +41,7 @@ REQUIRED = [
 # run them a second time in CI; `seeds.sh "spec 023"`, `live-comparison` and
 # `"spec 029"` still run and require every one. A spec whose acceptance
 # starts filtering its own seeds joins this list.
-OWN_RUNS = ("spec 023", "live-comparison", "spec 029", "spec 040", "spec 035", "spec 036", "spec 037", "spec 041")
+OWN_RUNS = ("spec 023", "live-comparison", "spec 029", "spec 040", "spec 035", "spec 036", "spec 037", "spec 041", "spec 061")
 # Generous: a new test binary can wait on the OS before it starts.
 TEST_TIMEOUT_S = 1800
 
@@ -698,6 +698,69 @@ SEEDS += [
     ),
 ]
 
+
+
+# Spec 061's acceptance seeds (`seeds.sh "spec 061"`).
+SEEDS += [
+    (
+        "spec 061",
+        "mixed provenance accepted",
+        E + "host_select.rs",
+        "            Some(q) if q != p => {",
+        "            Some(q) if q != p && false => {",
+        EVAL,
+    ),
+    (
+        "spec 061",
+        "an unknown latency skipped",
+        E + "host_run.rs",
+        "            if !failed {",
+        "            if !failed && !matches!(c.latency_us, HostLatency::Unknown(_)) {",
+        EVAL,
+    ),
+    (
+        "spec 061",
+        "unknown cost counted as zero",
+        E + "host_run.rs",
+        """                Some(HostCost::Unknown(u)) => CaseMeasure::Unknown {
+                    reason: format!("cost unknown: {}", u.unknown),
+                },""",
+        """                Some(HostCost::Unknown(_)) => CaseMeasure::Mean { num: 0.0, den: 1 },""",
+        EVAL,
+    ),
+    (
+        "spec 061",
+        "failed cases included in latency",
+        E + "host_run.rs",
+        "            if !failed {",
+        "            if true {",
+        EVAL,
+    ),
+    (
+        "spec 061",
+        "stable cohorts compared for host sets",
+        E + "host_select.rs",
+        "    if br.cost_unit != cr.cost_unit {",
+        "    if br.cost_unit != cr.cost_unit || br.stable_cohort != cr.stable_cohort {",
+        EVAL,
+    ),
+    (
+        "spec 061",
+        "observation host treated as historical",
+        E + "host_select.rs",
+        ".map(|HostObservation::Host| Observation::Candidate),",
+        ".map(|HostObservation::Host| Observation::Historical),",
+        EVAL,
+    ),
+    (
+        "spec 061",
+        "a duplicate host.run accepted",
+        E + "host_repeat.rs",
+        "        if !handles.insert(r.host.run.clone()) {",
+        "        if false && !handles.insert(r.host.run.clone()) {",
+        EVAL,
+    ),
+]
 
 def run(cmd, cwd, env, timeout=None):
     # A session of its own, so a timeout kills the test binaries too.

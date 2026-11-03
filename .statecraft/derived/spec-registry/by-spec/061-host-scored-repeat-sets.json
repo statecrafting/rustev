@@ -36,10 +36,26 @@
           "kind": "directory",
           "path": "tools/rustev-release/"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "directory",
+          "path": "scripts/acceptance/"
+        }
       }
     ],
     "id": "061-host-scored-repeat-sets",
-    "implementation": "pending",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-6-provenance-separation",
@@ -76,7 +92,7 @@
       }
     ],
     "sectionDigests": {
-      "061-host-scored-repeat-sets-for-the-selection-gate-amends-029-and-041": "962f4a333119c21a72cecd28e3e26027f697d9644f90ad0639edcfe80a4a93e1",
+      "061-host-scored-repeat-sets-for-the-selection-gate-amends-029-and-041": "328611f96ce64b84d69e571f60146054389b81b5121a27c70209cfb14af308a6",
       "1-purpose": "e0e945acfb149dd3823a4e0cdd70f3833c1dadd08482a4c3f1730be68a88bb95",
       "2-1-binding-principles": "fef8a7d588d20a51b226a36b2ca83239449dafec22cc2b9c2534682596ce17ae",
       "2-territory": "5838886673898938359c85b02bd20efad963b0563751f0ef620f4613d578520b",
@@ -95,8 +111,8 @@
       "5-observable-negative-cases": "7c1307b592cf9ca928a1bd2fa0d4ee3e3061d0a2ce86ecd490c8ca2f0c190b4d",
       "acceptance": "ec4bf9213fa93afddf3b3eaf4cb4a28de7277961d8f2dc6654b6307143fb21ca",
       "decisions-at-approval": "8a8d71a91897b90df809f4f67d7fcb888bdca1d7699c380b8148c5b1481bc3dd",
-      "implementation-record": "388c159d957efca8a97ce802ba840fd245fd0f4a268f4df9e536605ec6d96652",
-      "verification": "fa130e8566775681fc7afdf639cc0d96f97b7d78717fac592702a1819a399e21"
+      "implementation-record": "9e38b439fbe9915145a1d601df940d904722da4850d5d3bb7767b62fd92b939c",
+      "verification": "ef831759065371950ae3bad69ceae4edaefc25c0a31595dd1897e379cc51b590"
     },
     "sectionHeadings": [
       "061: Host-scored repeat sets for the selection gate (amends 029 and 041)",
@@ -126,6 +142,6 @@
     "summary": "A proposed amendment of approved specs 029 and 041 (and of spec 006's command table through 029 3.13), for release 0.4.1. Today `rustev gate select` reads only repeat sets Rustev evaluated itself: every run is a spec 004 evaluation of a Rustev plan over a Rustev dataset manifest. A host whose baseline and candidate runs execute in its own runtime, and whose outputs are scored through `scoreViews` into `rustev.scores/1`, has no supported way in. This spec adds a host run record (`rustev.host-run/1`) carrying host dataset, flow, version and run identities with per-case outcomes, latency and cost; an import command, `rustev eval repeat import`, that verifies the host's views and scores and builds a host repeat set with spec 029's statistics; a host baseline; and selection over host sets. Host documents have their own schema names, so no existing document changes bytes or meaning and a host set can never be compared with a Rustev-evaluated one. Every figure is labeled host-asserted. Ratified (A-77) for release 0.4.1.\n",
     "title": "Host-scored repeat sets for the selection gate (amends 029 and 041)"
   },
-  "shardHash": "3e34bf138d257f58c09ee58cfcdd5f24414e4dccb2c70293e6f8bb020430893d",
+  "shardHash": "90332998be3b25981e17bec375f01882e6a32bab3d27057069a25d1b417a33c0",
   "specVersion": "1.10.0"
 }

@@ -2,7 +2,7 @@
 id: "061-host-scored-repeat-sets"
 title: "Host-scored repeat sets for the selection gate (amends 029 and 041)"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-11-03"
 summary: >
   A proposed amendment of approved specs 029 and 041 (and of spec 006's
@@ -29,6 +29,10 @@ extends:
   # Each new source file of a release member joins the reviewed archive
   # list (spec 021, 3.5).
   - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
+  # Adds 061 to `make verify` at completion.
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  # Adds 061 to CI's `cli-backends` acceptance group.
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
 depends_on:
   - "004-evaluation-and-replay"
   - "006-cli-surface"
@@ -422,9 +426,23 @@ document, identity, plan or golden.
 
 ## Verification
 
-Pending with implementation. At completion: `cargo test -p rustev-eval
---locked`, `cargo test -p rustev-cli --locked` and the mutation seeds,
-under `make verify`.
+Run by `make verify` (061 is in `VERIFIED_SPECS`, in CI's `cli-backends`
+acceptance group beside 029 and 041, the specs it amends). Every command
+is repository-local and deterministic over the synthetic host fixture
+(R-04: mechanics, never a quality claim).
+
+```verify:cli
+# 3.1 to 3.8 and section 5: host run records, measures, repeat sets, the
+# bit-for-bit statistics check, baselines, reproducibility and selection;
+# with every spec 029 and 041 eval test, unchanged, for the shared code.
+cargo test -p rustev-eval --locked
+# 3.2, 3.6.2, 3.7 and 3.9 through the CLI, with the goldens under
+# tests/golden/host/; every existing CLI and plan golden byte-identical.
+cargo test -p rustev-cli --locked
+cargo clippy -p rustev-eval -p rustev-cli --all-targets --locked -- -D warnings
+# Negative control: each acceptance seed must be detected.
+sh crates/rustev-eval/mutation/seeds.sh "spec 061"
+```
 
 ## Implementation record
 
@@ -626,6 +644,23 @@ coverage (exit 11), unknown with an N = 1 candidate (exit 12), and a
 candidate changed after import (unknown, `reconcile`); and every
 `mixed-provenance` row of section 5 for `gate select`, `eval
 reproducibility` and `baseline record`, in both directions.
+
+**Increment 6 (2026-11-03): seeds, declared verification and closure.**
+`crates/rustev-eval/mutation/seeds.py` gains the seven acceptance seeds
+under the filter `spec 061` (which joins `OWN_RUNS`, so spec 004's
+unfiltered run leaves them out): mixed provenance accepted, an unknown
+latency skipped, unknown cost counted as zero, failed cases included in
+latency, stable cohorts compared for host sets, `observation: "host"`
+treated as historical, and a duplicate `host.run` accepted; each is
+detected. `tests/host_run.rs` adds the unknown-cost case the third seed
+needs. The Verification block above is declared, 061 joins
+`VERIFIED_SPECS` in the `Makefile` and the `cli-backends` group in
+`scripts/acceptance/verify.py`, with `extends` edges on both (001,
+additive), and the implementation is complete: every acceptance item is
+met by the tests named in increments 1 to 5 and the seeds. Compatibility
+holds by construction and by test: no existing document, schema,
+identity or plan changed, and every existing eval, CLI, spec 029 and
+plan golden passes unchanged.
 
 ## Decisions at approval
 

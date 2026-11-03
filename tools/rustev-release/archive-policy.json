@@ -246,7 +246,7 @@
         "src/testdata/lodging-emb.record.json"
       ],
       "max_archive_bytes": 196608,
-      "max_unpacked_bytes": 786432
+      "max_unpacked_bytes": 851968
     },
     "rustev-backend-rules": {
       "files": [

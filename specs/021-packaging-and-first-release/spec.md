@@ -955,3 +955,10 @@ unchanged; no other member was over a bound.
 |---|---|---|---|---|
 | `rustev-runtime` | 542,825 | 524,288 (512 KiB) | 589,824 (576 KiB) | 128,868 (160 KiB) |
 | `rustev-eval` (with #479) | 724,041 | 720,896 (704 KiB) | 786,432 (768 KiB) | 180,011 (192 KiB) |
+
+2026-11-04 (spec 061, host-scored repeat sets): with all six 061
+increments, `rustev-eval` unpacks to 787,933 bytes against its bound of
+786,432, measured with `cargo package -p rustev-eval --no-verify` at
+the stack's tip; the bound becomes 851,968 (832 KiB). Its archive
+(195,423 bytes against 192 KiB) and its file list, which the 061
+increments extend, are unchanged. No other bound changes.
