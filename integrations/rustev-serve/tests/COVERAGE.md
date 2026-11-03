@@ -36,6 +36,7 @@ The optional runtime observer has byte-equivalence and panic-containment tests i
 | HTTP/gRPC differential | `grpc_differential` covers success, refusals, retained streaming and evidence failure/lookup over HTTP/2 in memory and loopback; `grpc::tests` checks all 31 refusal mappings. Shared family conformance remains separate. |
 | Explain unavailable | No longer reachable: spec 040 (D2) is implemented and `POST /v1/explain` is served; `grpc_differential::every_explain_golden_through_both_transports`, `grpc_differential::explain_checks_scope_and_resolves_references_under_roots` |
 | Shutdown unflushed records | `immediate_shutdown_reports_every_pending_record`, `queued_sink_policies_preserve_tickets_drops_and_shutdown_accounting` |
+| Decision task panics | `panicking_decision_task_answers_internal_error_and_keeps_serving` |
 | Forbidden dependency families | `make boundaries` |
 
 ## Spec 010 section 5 acceptance map

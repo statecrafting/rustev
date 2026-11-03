@@ -839,6 +839,100 @@ async fn context_extra_fields_and_failed_fetch_never_dispatch_a_decision() {
 }
 
 #[tokio::test]
+async fn panicking_decision_task_answers_internal_error_and_keeps_serving() {
+    use rustev_core::seams::{CallContext, ContextSource};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    struct Panics;
+    impl ContextSource for Panics {
+        fn fetch<'a>(
+            &'a self,
+            _: &'a [String],
+            _: &'a CallContext,
+        ) -> BoxFuture<'a, Result<rustev_contract::snapshot::Snapshot, String>> {
+            Box::pin(async { panic!("SYNTHETIC context source panic") })
+        }
+    }
+    let mut cfg = config_value();
+    cfg["context_sources"] = json!({"context":{
+        "address":"https://localhost:9443", "credentials_file":"none",
+        "max_in_flight":1, "queue_capacity":1, "readiness_affecting":true
+    }});
+    let sink = Arc::new(Sink::default());
+    let s = Service::new(
+        ServeConfig::parse(&serde_json::to_vec(&cfg).unwrap()).unwrap(),
+        Host {
+            backends: BTreeMap::new(),
+            contexts: BTreeMap::from([(
+                "context".into(),
+                Arc::new(Panics) as Arc<dyn ContextSource>,
+            )]),
+            acquisitions: BTreeMap::new(),
+            sink: sink.clone(),
+            replay_scopes: BTreeMap::new(),
+        },
+    )
+    .unwrap();
+    let id = register(&s);
+    let mut req: Value = serde_json::from_slice(&body("panics")).unwrap();
+    req.as_object_mut().unwrap().remove("snapshot");
+    req["context"] = json!({"source":"context"});
+    let payload = serde_json::to_vec(&req).unwrap();
+    // A resubmission is answered again, never `decision_in_progress`: the
+    // entry is released as for any refusal.
+    for _ in 0..2 {
+        let reply = s.decide(&id, b"a".to_vec(), &payload, None).await;
+        assert_eq!(reply.status, 500);
+        code(&reply, RefusalCode::InternalError);
+        let refusal = ServeRefusal::parse(&reply.body).unwrap();
+        assert_eq!(refusal.detail.as_str(), "");
+        code(&s.lookup(b"a", "panics"), RefusalCode::DecisionNotFound);
+    }
+    assert!(!s.is_stopping());
+    assert_eq!(sink.calls.load(Ordering::SeqCst), 0);
+    let metrics = String::from_utf8(s.metrics().body).unwrap();
+    assert!(
+        metrics.contains("rustev_decision_task_panics_total 2\n"),
+        "{metrics}"
+    );
+    // The stream's `final` event carries the same refusal (3.7.2).
+    let payload = String::from_utf8(payload).unwrap();
+    let request = format!(
+        "POST /v1/plans/{id}/decisions?stream=1 HTTP/1.1\r\nHost: local\r\nConnection: close\r\nrustev-principal: YQ\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{payload}",
+        payload.len()
+    );
+    let (server, mut client) = tokio::io::duplex(65536);
+    let listener = s.config.listeners.as_slice()[0].clone();
+    let task = tokio::spawn(rustev_serve::transport::serve_authenticated_connection(
+        server,
+        s.clone(),
+        listener,
+        None,
+        None,
+    ));
+    client.write_all(request.as_bytes()).await.unwrap();
+    let mut answer = vec![];
+    tokio::time::timeout(Duration::from_secs(2), client.read_to_end(&mut answer))
+        .await
+        .unwrap()
+        .unwrap();
+    task.await.unwrap();
+    let answer = String::from_utf8(answer).unwrap();
+    assert!(answer.starts_with("HTTP/1.1 200"), "{answer}");
+    assert_eq!(answer.matches("event: final\n").count(), 1, "{answer}");
+    assert!(answer.contains(r#""code":"internal_error""#), "{answer}");
+    // The service keeps serving after the panics.
+    let reply = s
+        .decide(&id, b"a".to_vec(), &body("after-panic"), None)
+        .await;
+    assert_eq!(
+        reply.status,
+        200,
+        "{}",
+        String::from_utf8_lossy(&reply.body)
+    );
+}
+
+#[tokio::test]
 async fn lookup_and_cancel_distinguish_queued_running_and_finished() {
     let pause = Arc::new(tokio::sync::Semaphore::new(0));
     let sink = Arc::new(Sink {
