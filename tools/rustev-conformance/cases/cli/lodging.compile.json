@@ -35,7 +35,7 @@
     {
       "golden": "crates/rustev-cli/tests/golden/lodging.compile.json",
       "normalize": [],
-      "sha256": "a37964cd4a7de7c1f502def41dd13c59c8b22af9b2f4bdc00723db6ff387cce1",
+      "sha256": "10774b14f6147cd9ce99a680b53d6ff55225632259e709e021a308c24df60930",
       "stream": "stdout"
     }
   ],

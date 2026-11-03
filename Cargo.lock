@@ -4429,7 +4429,7 @@ dependencies = [
 
 [[package]]
 name = "rustev"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "rustev-backend-rules",
  "rustev-contract",
@@ -4462,7 +4462,7 @@ dependencies = [
 
 [[package]]
 name = "rustev-backend-embed-linear"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "ort",
  "rustev-backend-embed-linear",
@@ -4480,7 +4480,7 @@ dependencies = [
 
 [[package]]
 name = "rustev-backend-rules"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "rustev-contract",
  "rustev-core",
@@ -4529,7 +4529,7 @@ dependencies = [
 
 [[package]]
 name = "rustev-cli"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "libc",
  "rustev-backend-rules",
@@ -4547,7 +4547,7 @@ dependencies = [
 
 [[package]]
 name = "rustev-conformance"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "rustev-cli",
  "rustev-contract",
@@ -4561,7 +4561,7 @@ dependencies = [
 
 [[package]]
 name = "rustev-contract"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "hmac 0.12.1",
  "jsonschema",
@@ -4573,7 +4573,7 @@ dependencies = [
 
 [[package]]
 name = "rustev-core"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "libm",
  "rustev-contract",
@@ -4583,7 +4583,7 @@ dependencies = [
 
 [[package]]
 name = "rustev-eval"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "rustev-backend-rules",
  "rustev-contract",
@@ -4596,7 +4596,7 @@ dependencies = [
 
 [[package]]
 name = "rustev-fp-corpus"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "rustev-core",
  "sha2 0.10.9",
@@ -4630,7 +4630,7 @@ dependencies = [
 
 [[package]]
 name = "rustev-live"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "rustev-contract",
  "rustev-core",
@@ -4643,7 +4643,7 @@ dependencies = [
 
 [[package]]
 name = "rustev-live-crash"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "rustev-contract",
  "rustev-core",
@@ -4656,7 +4656,7 @@ dependencies = [
 
 [[package]]
 name = "rustev-node"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "napi",
  "napi-build",
@@ -4674,7 +4674,7 @@ dependencies = [
 
 [[package]]
 name = "rustev-otel"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "bytes",
  "h2",
@@ -4702,7 +4702,7 @@ dependencies = [
 
 [[package]]
 name = "rustev-pkg-lodging"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "rustev-backend-rules",
  "rustev-cli",
@@ -4716,7 +4716,7 @@ dependencies = [
 
 [[package]]
 name = "rustev-pkg-support-routing"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "rustev-backend-rules",
  "rustev-cli",
@@ -4752,7 +4752,7 @@ dependencies = [
 
 [[package]]
 name = "rustev-remote-http"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "http-body-util",
  "hyper",
@@ -4773,7 +4773,7 @@ dependencies = [
 
 [[package]]
 name = "rustev-runtime"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "rustev-contract",
  "rustev-core",
@@ -4814,7 +4814,7 @@ dependencies = [
 
 [[package]]
 name = "rustev-surface"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "rustev-backend-rules",
  "rustev-contract",
@@ -4826,7 +4826,7 @@ dependencies = [
 
 [[package]]
 name = "rustev-wasm"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "js-sys",
  "rustev-contract",

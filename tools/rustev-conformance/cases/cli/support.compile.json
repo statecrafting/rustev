@@ -42,7 +42,7 @@
     {
       "golden": "crates/rustev-cli/tests/golden/support.compile.json",
       "normalize": [],
-      "sha256": "3ce34ed29cd6ebc5a078e61b917a3c3d2f292675f218865ff7c9f2f4aad3b3fc",
+      "sha256": "4848ef1858f262aacb4d65f898eb6fca98d5967617ccc9cf175aac345bcd861e",
       "stream": "stdout"
     }
   ],

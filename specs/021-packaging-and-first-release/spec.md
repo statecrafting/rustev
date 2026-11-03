@@ -934,3 +934,24 @@ release set) and spec 058, as noted per item.
 
 Declared verification is added above; 021 joins `make verify` and CI's
 `integrations-core` group. `implementation: complete`.
+
+**Candidate run, 2026-11-03, before 0.4.0.** Release dry run 41628699504
+(at `972b23d`) refused one member in its `crates` job, and the local
+candidate at the 0.4.0 version move refused the same one, nothing else.
+`rustev-runtime` unpacks to 542,825 bytes against its reviewed bound of
+524,288 (512 KiB), after spec 044's decision cache over acquisition,
+widening, generation and extraction steps, its refresh policies and
+production batching posture, and spec 043's live or captured
+acquisitions; the bound becomes 589,824 (576 KiB). Its archive (128,868
+bytes against 160 KiB) and its file list are unchanged. `rustev-eval`
+unpacks to 719,021 of its 720,896 here, and #479 (spec 029's exact-decimal
+comparison in `src/selection.rs`, which grows from 22,563 to 27,583 bytes)
+takes it to 724,041, measured by packaging the release set with that file
+applied; its bound becomes 786,432 (768 KiB), and its archive (180,011
+bytes against 192 KiB) and file list are unchanged. Every other bound is
+unchanged; no other member was over a bound.
+
+| Member | Unpacked | Old bound | New bound | Archive (bound) |
+|---|---|---|---|---|
+| `rustev-runtime` | 542,825 | 524,288 (512 KiB) | 589,824 (576 KiB) | 128,868 (160 KiB) |
+| `rustev-eval` (with #479) | 724,041 | 720,896 (704 KiB) | 786,432 (768 KiB) | 180,011 (192 KiB) |

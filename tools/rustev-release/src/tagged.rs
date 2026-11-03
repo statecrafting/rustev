@@ -565,9 +565,15 @@ pub fn released(m: &ReleaseManifest, record: &[u8]) -> Result<Record, String> {
     Ok(r)
 }
 
+/// Spec 060 3.7.1: the prefix of the qualification evidence a release keeps
+/// beside its own assets.
+pub const QUALIFICATION_ASSET_PREFIX: &str = "qualification-";
+
 /// 3.3.3, 3.5.2: create the release `tag` once with `assets`; one already
 /// present with exactly these assets and flag is success, any difference
-/// fails and replaces nothing.
+/// fails and replaces nothing. Present `qualification-` assets are left out
+/// of the comparison, and the run's own assets never carry that prefix
+/// (060 3.7.2).
 pub fn publish_release(
     api: &mut dyn Releases,
     tag: &str,
@@ -578,11 +584,22 @@ pub fn publish_release(
     if assets.is_empty() || assets.keys().any(|n| !crate::family_artifacts::plain(n)) {
         return Err("058 3.3.3: missing assets or invalid asset name".into());
     }
+    if let Some(n) = assets
+        .keys()
+        .find(|n| n.starts_with(QUALIFICATION_ASSET_PREFIX))
+    {
+        return Err(format!(
+            "060 3.7.2: {n} is qualification evidence, never a release asset"
+        ));
+    }
     let digests: BTreeMap<String, String> = assets
         .iter()
         .map(|(n, b)| (n.clone(), sha256_hex(b)))
         .collect();
-    if let Some(present) = api.lookup(tag)? {
+    if let Some(mut present) = api.lookup(tag)? {
+        present
+            .assets
+            .retain(|n, _| !n.starts_with(QUALIFICATION_ASSET_PREFIX));
         if present.prerelease != prerelease || present.assets != digests {
             return Err(format!(
                 "058 3.5.2: the release {tag} exists with other assets or flag; nothing is replaced"

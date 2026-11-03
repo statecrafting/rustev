@@ -1,12 +1,12 @@
 ---
 id: "060-the-service-image-in-the-release"
-title: "The service image in the release (amends 031 and 058)"
-status: draft
-implementation: pending
+title: "The service image in the release (amends 031, 056 and 058)"
+status: approved
+implementation: in-progress
 created: "2026-11-02"
 summary: >
-  A proposed amendment of approved specs 031 (3.1 layer 7, 3.9) and 058
-  (3.3.4), for the release after 0.4.0. Spec 042 3.16's `rustev-serve`
+  An amendment of approved specs 031 (3.1 layer 7, 3.9), 056 (3.3) and
+  058 (3.3.4, 3.5.2), ratified (A-76) for the release after 0.4.0. Spec 042 3.16's `rustev-serve`
   image is built, checked, compared, described and scanned in every
   release run, and is not published: 058 3.3.4 gives no job
   `packages: write`, and the owner decided on 2026-11-02 that 0.4.0
@@ -19,9 +19,12 @@ summary: >
   each platform's SBOM. The manifest names the index and platform
   digests, the vulnerability scan gates through an owner-approved,
   expiry-bounded exception file, and qualification runs 031 3.9.7 (c).
-  Spec 053's candidate refusals are unchanged.
+  Spec 053's candidate refusals are unchanged. A release also keeps its
+  qualification evidence as `qualification-` assets, which the release
+  comparison ignores (3.7).
 amends:
   - "031-public-api-and-release-family"
+  - "056-release-0-1-1-and-consumer-qualification"
   - "058-one-tagged-run-releases-the-family"
 extends:
   # The release tooling this spec changes (031's unit).
@@ -58,11 +61,11 @@ obligations:
     anchor: "3-4-manifest-verification-and-qualification"
 ---
 
-# 060: The service image in the release (amends 031 and 058)
+# 060: The service image in the release (amends 031, 056 and 058)
 
-Draft: a proposal for the release after 0.4.0, never a claim about code.
-Ratification is the owner's act. The approved texts of 031 and 058 are
-not edited; this spec records what it replaces in them.
+Approved by the owner on 2026-11-03 (A-76) for the release after 0.4.0;
+3.7 may land before it. The approved texts of 031, 056 and 058 are not
+edited; this spec records what it replaces in them.
 
 ## 1. Purpose
 
@@ -171,6 +174,27 @@ are pushed again by digest on the rerun.
 058 I-3 holds for the image. Candidates never push (053 3.4.2). The
 image definition, its base and `check.sh` are 042's.
 
+### 3.7 Qualification evidence on the release
+
+1. Spec 021 3.10 requires the fresh consumer's evidence to be retained.
+   A release keeps its qualification record and each platform's evidence
+   bundle as assets of its GitHub release, named
+   `qualification-vX.Y.Z.json` and `qualification-vX.Y.Z-<platform>.tar.gz`,
+   as the owner had done by hand for `v0.3.0` on 2026-11-03 (spec 021's
+   record).
+2. Those assets are not release assets of 058 3.3.3. `publish_release`
+   leaves every present asset whose name starts with `qualification-` out
+   of its comparison (058 3.5.2), and refuses an asset set of its own
+   holding such a name. `verify_assets` reads only the names the manifest
+   implies, so an attached record never fails it. A rerun of a tagged run
+   whose release holds qualification assets then succeeds as before.
+3. Once 3.7.2 is implemented, `qualify.yml` attaches the record and the
+   bundles of a run that recorded `qualified` to the tag's release, from
+   one job that alone holds `contents: write`; it uploads only names not
+   yet present and never replaces an asset. Until then they are attached
+   by hand on the owner's instruction. The workflow change needs the
+   owner's approval of the `statecraft-review-exception` Environment.
+
 ## 4. Out of scope
 
 Other registries, a `latest` or floating tag, image signing with a
@@ -187,6 +211,9 @@ long-lived key, Build Level 3, and deployment.
 | The two builds of a platform differ | `image-checks` fails (031 3.9.3). |
 | A manifest names an image without its digests or SBOMs | `manifest` refuses. |
 | The registry's index or platform digest differs from the manifest | `verify-release` fails. |
+| A present release holds the run's assets and `qualification-` assets | `publish_release` reports it present (3.7.2). |
+| A present release holds any other extra or differing asset | `publish_release` fails; nothing replaced. |
+| A run's own asset set names a `qualification-` file | `publish_release` refuses before any upload. |
 
 ## Acceptance
 
@@ -197,6 +224,8 @@ long-lived key, Build Level 3, and deployment.
 - The manifest, `verify-release` and qualification cover the image as
   3.4 states, with tests for each refusal of section 5.
 - A release whose run pushes, attests, verifies and qualifies the image.
+- `publish_release` tests for each row of section 5 on `qualification-`
+  assets (3.7.2), and a `qualify.yml` change that attaches them (3.7.3).
 - `make code`, declared verification and `make gate` pass.
 
 ## Verification
@@ -205,16 +234,28 @@ Pending with implementation.
 
 ## Implementation record
 
-None. Draft.
+**Increment 1, 2026-11-03 (3.7.2).** `tagged::publish_release` leaves a
+present release's `qualification-` assets out of its comparison and
+refuses a run's own asset named with that prefix
+(`QUALIFICATION_ASSET_PREFIX`); `verify_assets` is unchanged. The test
+`qualification_assets_beside_a_release_are_ignored_never_published` in
+`tools/rustev-release/tests/tagged.rs` covers the three rows of section 5
+on those assets. A rerun of `v0.3.0`'s tagged run, whose release now
+holds its `qualification-` assets, would find the release present again.
+3.7.3 (`qualify.yml`) follows in its own pull request; the image (3.1 to
+3.5) follows for the release after 0.4.0.
 
 ## Decisions at approval
 
-Open for the owner:
+Ratified by the owner on 2026-11-03 (A-76: "I ratify 060"), as proposed:
 
-1. Whether the keyless attestations of 3.3.4 satisfy 031 3.9.5's
-   "signature" for the image, or a separate `cosign sign` is wanted.
-2. The base refresh before the first image release: take the current
-   `distroless/cc-debian12:nonroot` digest through spec 010's binding
-   record, and decide the exceptions for the remaining "won't fix"
-   findings.
-3. The 90-day bound on an image exception.
+1. The keyless attestations of 3.3.4 are the image's signature under 031
+   3.9.5; no separate `cosign sign`.
+2. The base refresh is decided before the first image release, through
+   spec 010's binding record, with the exceptions for the remaining
+   "won't fix" findings as owner decision rows (3.2.1).
+3. An image exception expires at most 90 days after its decision row
+   (3.2.1).
+4. 3.7 records the owner's decision of 2026-11-03 that a release keeps
+   its qualification evidence as `qualification-` assets and that the
+   release tooling ignores them.

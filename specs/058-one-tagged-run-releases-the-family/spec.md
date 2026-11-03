@@ -598,6 +598,30 @@ packages by the owner from that run's attested tarballs, 3.3.2), release
 https://github.com/statecrafting/rustev/releases/tag/v0.3.0, qualified by
 run 41580879690. This spec's acceptance is met.
 
+**The 0.4.0 version move (2026-11-03).** The next release after the
+closing one is `0.4.0`. Its scope was decided by the owner on 2026-11-02:
+it ships without the service image (031's and 042's records; image
+publication is 060's, for the release after 0.4.0) and without spec 011.
+On 2026-11-03 the owner approved everything necessary for the 0.4.0
+release, which covers this move. It is a minor step, as 0.3.0 was: for a
+`0.x` family a minor version may change the API incompatibly, so `cargo
+semver-checks` against 0.3.0 reports rather than refuses, and no patch
+is attempted. Every release-set crate and npm package moves from `0.3.0`
+to `0.4.0` in lockstep, in the same sites as the 0.3.0 move: the
+workspace version and its internal `=` pins, `Cargo.lock`, the nine npm
+`package.json` files and `tools/rustev-release/release-set.json`
+(version and tag). Every PlanId embeds the compiler identity
+`rustev-core/<crate version>` (002 3.3.4), so the goldens, conformance
+cases and fixtures that carry one, including those added since 0.3.0,
+are regenerated through their bless and harvest paths, with byte copies
+where a file mirrors another, and the `rustev-serve` Sigstore fixture is
+re-signed with its throwaway keys. No behavior changes. For consumers,
+the move changes every PlanId from 0.3.0 to 0.4.0, even for an unchanged
+definition (a breaking change under 031 3.6.4, which the 0.4.0 changelog
+states for each reference plan): anything keyed by a PlanId, such as
+evaluation baselines, ledgers and cache keys, must be re-derived with
+0.4.0 when upgrading.
+
 ## Open questions for the owner
 
 Settled at ratification (A-61): the `release` Environment has no
