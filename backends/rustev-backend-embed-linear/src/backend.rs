@@ -16,10 +16,14 @@ use rustev_core::seams::{
     DecisionBackend, RemoteEnd,
 };
 
+use crate::cache::{
+    CacheConfig, CacheLimits, CacheLookup, CacheMiss, CacheStats, EmbeddingCache,
+    RepeatabilityEvidence, RunOutcome,
+};
 use crate::manifest::EncoderKind;
 use crate::{EmbedSetupError, PlanMismatch, PreparedRequest, RequestPreparer, SetupCode};
 
-/// Host settings for this increment. The embedding cache is not implemented.
+/// The host's configuration (3.7.1). None of it is identity (3.5.2).
 #[derive(Debug, Clone)]
 pub struct EmbedConfig {
     pub bundle_dir: PathBuf,
@@ -28,16 +32,22 @@ pub struct EmbedConfig {
     pub expected_artifact: ArtifactId,
     pub workers: usize,
     pub max_queued: usize,
+    /// The in-process embedding cache (3.14), off when `None`. Enabling it
+    /// where in-process bitwise repeatability is not shown is refused
+    /// `cache_not_equivalent`.
+    pub embedding_cache: Option<CacheLimits>,
 }
 
 type Run = dyn Fn(&[u32], &CancelSignal) -> Result<Vec<f32>, ()> + Send + Sync;
 type Output = Result<RawOutput, (AdapterFailure, String)>;
+type Cache = Option<Arc<Mutex<EmbeddingCache>>>;
 
 /// Local logits over a verified bundle, with bounded outstanding work.
 pub struct EmbedLinearBackend {
     preparer: Arc<RequestPreparer>,
     descriptor: BackendDescriptor,
     pool: Arc<Pool>,
+    cache: Cache,
 }
 
 fn setup(code: SetupCode, item: &str, detail: &str) -> EmbedSetupError {
@@ -51,7 +61,8 @@ fn setup(code: SetupCode, item: &str, detail: &str) -> EmbedSetupError {
 impl EmbedLinearBackend {
     pub fn open(config: EmbedConfig) -> Result<Self, EmbedSetupError> {
         let preparer = Self::prepare(&config)?;
-        Self::start(config, preparer.clone(), default_run(&preparer)?)
+        let run = default_run(&preparer)?;
+        Self::start(config, preparer, run)
     }
 
     /// Synthetic fixtures only: substitute a controllable token-vector run.
@@ -92,6 +103,7 @@ impl EmbedLinearBackend {
         preparer: Arc<RequestPreparer>,
         run: Arc<Run>,
     ) -> Result<Self, EmbedSetupError> {
+        let cache = open_cache(&config, &preparer)?;
         let pool = Arc::new(Pool {
             state: Mutex::new(State {
                 queue: VecDeque::new(),
@@ -108,13 +120,18 @@ impl EmbedLinearBackend {
             ),
             preparer,
             pool,
+            cache,
         };
         for n in 0..config.workers {
-            let (pool, preparer, run) =
-                (backend.pool.clone(), backend.preparer.clone(), run.clone());
+            let (pool, preparer, run, cache) = (
+                backend.pool.clone(),
+                backend.preparer.clone(),
+                run.clone(),
+                backend.cache.clone(),
+            );
             std::thread::Builder::new()
                 .name(format!("rustev-embed-{n}"))
-                .spawn(move || worker(pool, preparer, run))
+                .spawn(move || worker(pool, preparer, run, cache))
                 .map_err(|_| {
                     setup(
                         SetupCode::GraphRejected,
@@ -129,6 +146,55 @@ impl EmbedLinearBackend {
     pub fn check_plan(&self, plan: &Plan) -> Result<(), Vec<PlanMismatch>> {
         self.preparer.check_plan(plan)
     }
+
+    /// The embedding cache's counters (3.14.6); all zero when it is off.
+    pub fn cache_stats(&self) -> CacheStats {
+        self.cache
+            .as_ref()
+            .map_or_else(CacheStats::default, |c| lock(c).cache_stats())
+    }
+
+    /// Remove every cached embedding (3.14.5). A run that started before
+    /// this call is not stored.
+    pub fn clear_cache(&self) {
+        if let Some(cache) = &self.cache {
+            lock(cache).clear();
+        }
+    }
+
+    /// Remove every cached embedding of this principal handle before
+    /// returning (3.14.5). A run of any principal that started before this
+    /// call is not stored.
+    pub fn erase_principal(&self, handle: &[u8]) {
+        if let Some(cache) = &self.cache {
+            lock(cache).erase_principal(handle);
+        }
+    }
+}
+
+/// The cache of 3.14, when configured. Only the synthetic encoder carries
+/// in-process bitwise repeatability evidence today (3.19.1); an `onnx`
+/// bundle has none bound to its artifact, so enabling it there is refused.
+fn open_cache(config: &EmbedConfig, preparer: &RequestPreparer) -> Result<Cache, EmbedSetupError> {
+    let Some(limits) = config.embedding_cache else {
+        return Ok(None);
+    };
+    let manifest = &preparer.bundle().manifest;
+    let evidence = match manifest.encoder.kind {
+        #[cfg(feature = "synthetic")]
+        EncoderKind::Synthetic => RepeatabilityEvidence::Synthetic,
+        _ => RepeatabilityEvidence::Unproven,
+    };
+    // No measured evidence is used, so no platform key is compared.
+    let cache = EmbeddingCache::new(
+        CacheConfig {
+            embedding_cache: Some(limits),
+        },
+        manifest,
+        "",
+        &evidence,
+    )?;
+    Ok(Some(Arc::new(Mutex::new(cache))))
 }
 
 impl Drop for EmbedLinearBackend {
@@ -163,8 +229,29 @@ impl DecisionBackend for EmbedLinearBackend {
                 return cancelled(0, false);
             }
             let cost = &self.preparer.bundle().manifest.cost;
+            // 3.14.2: the key is the post-truncation sequence and the
+            // principal handle; heads apply after the lookup.
+            let miss = match &self.cache {
+                None => None,
+                Some(cache) => match lock(cache).lookup(
+                    &call.cx.principal_handle,
+                    &request.ids,
+                    &request.attention_mask,
+                ) {
+                    CacheLookup::Miss(miss) => Some(miss),
+                    CacheLookup::Hit(embedding) => {
+                        // 3.11.4: a hit is charged the per-call part only.
+                        let output = head_output(self.preparer.bundle(), request.head, &embedding)
+                            .map_err(|code| {
+                                (AdapterFailure::Permanent, format!("embed:{code}:head"))
+                            });
+                        return report(output, cost.units_per_call, false);
+                    }
+                },
+            };
             let units = cost.units_per_call + cost.units_per_token * request.ids.len() as u64;
             let job = Arc::new(Mutex::new(Job {
+                miss,
                 request: Some(request),
                 phase: Phase::Queued,
                 result: None,
@@ -214,6 +301,8 @@ enum Phase {
     Done,
 }
 struct Job {
+    /// The cache ticket of a miss; the run's embedding is admitted with it.
+    miss: Option<CacheMiss>,
     request: Option<PreparedRequest>,
     phase: Phase,
     result: Option<Output>,
@@ -269,9 +358,9 @@ impl Drop for Pending<'_> {
     }
 }
 
-fn worker(pool: Arc<Pool>, preparer: Arc<RequestPreparer>, run: Arc<Run>) {
+fn worker(pool: Arc<Pool>, preparer: Arc<RequestPreparer>, run: Arc<Run>, cache: Cache) {
     loop {
-        let (job, request, cancel) = {
+        let (job, request, cancel, miss) = {
             let mut state = lock(&pool.state);
             while state.queue.is_empty() && !state.shutdown {
                 state = pool.ready.wait(state).unwrap_or_else(|e| e.into_inner());
@@ -298,9 +387,10 @@ fn worker(pool: Arc<Pool>, preparer: Arc<RequestPreparer>, run: Arc<Run>) {
             j.phase = Phase::Running;
             let request = j.request.take().expect("queued request");
             let cancel = j.cancel.clone();
+            let miss = j.miss.take();
             state.running += 1;
             drop(j);
-            (job, request, cancel)
+            (job, request, cancel, miss)
         };
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             let vectors = run(&request.ids, &cancel).map_err(|_| "runtime_error")?;
@@ -312,38 +402,60 @@ fn worker(pool: Arc<Pool>, preparer: Arc<RequestPreparer>, run: Arc<Run>) {
                 bundle.manifest.pooling.normalize,
             )
             .ok_or("non_finite")?;
-            let logits = bundle.heads[request.head]
-                .logits(&embedding)
-                .ok_or("non_finite")?;
-            Ok(RawOutput::Logits(
-                bundle.manifest.heads[request.head]
-                    .options
-                    .iter()
-                    .cloned()
-                    .zip(logits)
-                    .collect(),
-            ))
+            let output = head_output(bundle, request.head, &embedding)?;
+            Ok((output, embedding))
         }))
         .unwrap_or(Err("runtime_error"))
         .map_err(|code| (AdapterFailure::Permanent, format!("embed:{code}:encoder")));
-        drop(cancel);
         let wake = {
             let mut state = lock(&pool.state);
             let mut j = lock(&job);
             state.running -= 1;
             j.phase = Phase::Done;
+            let result = result.map(|(output, embedding)| {
+                // 3.14.4: only a completed run whose attempt neither was
+                // cancelled nor abandoned is admitted; the cache refuses a
+                // ticket from before a `clear` or `erase_principal` (3.14.5).
+                if let (Some(cache), Some(miss)) = (&cache, miss) {
+                    let outcome = if j.abandoned || cancel.is_raised() {
+                        RunOutcome::Cancelled
+                    } else {
+                        RunOutcome::Completed
+                    };
+                    lock(cache).admit(miss, &embedding, outcome);
+                }
+                output
+            });
             if !j.abandoned {
                 j.result = Some(result);
             }
             let wake = j.waker.take();
             drop(j);
             drop(job);
+            drop(cancel);
             wake
         };
         if let Some(w) = wake {
             w.wake();
         }
     }
+}
+
+/// The head product over a pooled embedding, keyed by every option (3.9.3).
+fn head_output(
+    bundle: &crate::VerifiedBundle,
+    head: usize,
+    embedding: &[f32],
+) -> Result<RawOutput, &'static str> {
+    let logits = bundle.heads[head].logits(embedding).ok_or("non_finite")?;
+    Ok(RawOutput::Logits(
+        bundle.manifest.heads[head]
+            .options
+            .iter()
+            .cloned()
+            .zip(logits)
+            .collect(),
+    ))
 }
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {

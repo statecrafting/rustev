@@ -10,7 +10,8 @@
 //! behind the `synthetic` feature, the synthetic encoder of 3.19. The ONNX
 //! encoder remains pending. [`RequestPreparer`] adds text assembly, task
 //! matching, offline tokenization and host-side plan checks (3.8, 3.10.4);
-//! [`EmbedLinearBackend`] dispatches prepared requests to bounded std workers.
+//! [`EmbedLinearBackend`] dispatches prepared requests to bounded std workers,
+//! consulting the embedding cache when the host configures one (3.14).
 //!
 //! Nothing here is authorization or an input fact (3.1): every value the
 //! backend will supply is `model-derived` logits over a head's trained
@@ -37,6 +38,7 @@ use rustev_contract::schema;
 
 pub use backend::{EmbedConfig, EmbedLinearBackend};
 pub use bundle::{EmbedSetupError, SetupCode, VerifiedBundle, verify_bundle};
+pub use cache::{CacheLimits, CacheStats};
 pub use check::{PlanMismatch, PlanMismatchKind};
 pub use manifest::{EmbedManifest, ManifestError};
 pub use request::{PreparedRequest, RequestCode, RequestError, RequestPreparer};
