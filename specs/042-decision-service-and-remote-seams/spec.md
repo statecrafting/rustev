@@ -39,6 +39,8 @@ extends:
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.toml" }, nature: additive }
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.lock" }, nature: additive }
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  # 042 in exactly one acceptance group at completion (scripts/acceptance/verify.py).
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
   - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-node/" }, nature: additive }
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-wasm/" }, nature: additive }
@@ -1060,8 +1062,27 @@ workflows; deployment; live provider calls or spend; real-user data.
 
 ## Verification
 
-Pending with implementation. Approval satisfies no acceptance item and
-approves no binding record.
+Run by `make verify` (042 is in `VERIFIED_SPECS`, in CI's
+`integrations-base` group beside 010, whose serving record it extends).
+Every command is offline, beyond loopback sockets: shared conformance over
+`serve-http` and `serve-grpc`, the transport differential, the callback
+protocol, shutdown under load, signed bundles, admission, bounded queues,
+the progress observer's byte equivalence, the `.proto` and schema drift
+checks, and section 5 (`integrations/rustev-serve/tests/COVERAGE.md`). The
+image item (3.16) is checked by the release workflow's dry run (spec 031's
+candidate workflow), not by declared verification.
+
+```verify:cli
+# 3.1 to 3.15 and 3.17, and section 5: handlers, transports, conformance,
+# callbacks, signatures, profiles, the generated gRPC surface, the image
+# inputs.
+cargo test -p rustev-serve --locked
+# 3.2 and 3.18: the service and remote documents against their schemas.
+cargo test -p rustev-contract --locked --test 042_serve_documents --test 042_remote_documents
+# 3.7.3: the runtime's progress observer.
+cargo test -p rustev-runtime --locked --test progress
+cargo clippy -p rustev-serve --all-targets --locked -- -D warnings
+```
 
 ## Implementation record
 
