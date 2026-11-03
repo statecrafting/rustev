@@ -321,7 +321,20 @@ pub fn prepare(mut spec: RunSpec, opts: RunOptions) -> Result<PreparedRun, LiveE
                 detail: "no checkpoint exists; nothing was sent because the journal is opened only after the checkpoint exists; a fresh run without resume is safe after removing --out or choosing a new --out".into(),
             });
         }
-        let saved = LiveCheckpoint::read(&path, &checkpoint.bindings)?;
+        let saved = match LiveCheckpoint::read(&path, &checkpoint.bindings) {
+            Ok(saved) => saved,
+            // A checkpoint bound to the testing header under the superseded
+            // cap names the same journal before its header migration (A-75):
+            // accept it and bind the current header from now on.
+            Err(e) if e.subject == "checkpoint-mismatch" => {
+                let mut legacy = checkpoint.bindings.clone();
+                legacy.journal_header_digest = SpendJournal::superseded_testing_header_digest();
+                let mut saved = LiveCheckpoint::read(&path, &legacy).map_err(|_| e)?;
+                saved.bindings = checkpoint.bindings.clone();
+                saved
+            }
+            Err(e) => return Err(e),
+        };
         if saved.items.len() != checkpoint.items.len()
             || saved.items.iter().zip(&checkpoint.items).any(|(a, b)| {
                 (&a.candidate, a.repeat, &a.case_id) != (&b.candidate, b.repeat, &b.case_id)

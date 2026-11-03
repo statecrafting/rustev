@@ -64,7 +64,7 @@ capability. Spec 022 section 3.8.4 is conditional on that seam being delivered.
 Live stage 2 and stage 3 are ignored tests with explicit reasons. Enabling them
 requires owner-supplied access and credentials, recorded direct request and
 response shapes, a verified mapping, data admission or the stated synthetic
-limitation, and the shared USD 5 testing cap. Production privacy decisions,
+limitation, and the shared USD 10 testing cap (R-29 as raised by A-75). Production privacy decisions,
 production spend authority, and deployment approval remain separate owner acts.
 Spec 022 declares its verification (`spec-spine verify 022`, part of
 `make verify`) and records stages 2 and 3 as externally blocked.

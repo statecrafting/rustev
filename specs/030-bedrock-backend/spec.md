@@ -20,8 +20,8 @@ summary: >
   only by adding a cloud SDK dependency family to the boundary check.
   Approved (A-26) under the 2026-10-16 delivery work order; implementation
   is complete, with a recorded live exchange on each wire. The work order authorizes paid Bedrock smoke and probe calls
-  on synthetic or spec 023 admitted data within R-29's USD 5 total testing
-  cap across all providers; the owner supplies AWS credentials, whose
+  on synthetic or spec 023 admitted data within R-29's total testing cap
+  across all providers (USD 10 since A-75 raised it from USD 5); the owner supplies AWS credentials, whose
   absence blocks only the live stage. Approval makes no quality,
   residency-compliance or production claim.
 amends:
@@ -937,7 +937,8 @@ except where the issue or an approved spec already settles it.
 9. **Reserved members** for later operations, Guardrails, log-probabilities
    and spec 020 policies keep binding identity stable (3.12).
 10. **Refusal charges** are `unknown` until a fact establishes otherwise.
-11. **Testing cap.** R-29's USD 5 testing cap is one cap across providers:
+11. **Testing cap.** R-29's testing cap (USD 10 in total since A-75
+    raised it from USD 5 on 2026-11-03) is one cap across providers:
     Bedrock's live calls reserve against the same persistent testing journal
     that already holds the spec 012 spend.
 12. **Served identity.** Converse: `unknown`; Responses: an echo of the
@@ -960,6 +961,7 @@ except where the issue or an approved spec already settles it.
     spend journal, and refuse before sending any call that would exceed the
     cap." Paid Bedrock smoke and probe calls (3.11, 3.14) are therefore
     authorized within that scope, reserved against the persistent testing
-    journal and refused unsent over the cap. AWS credentials and model
-    access are supplied by the owner; their absence only blocks the live
-    stage.
+    journal and refused unsent over the cap. The owner raised that cap in
+    writing on 2026-11-03 to USD 10 in total (A-75). AWS credentials and
+    model access are supplied by the owner; their absence only blocks the
+    live stage.

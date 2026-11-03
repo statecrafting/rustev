@@ -3,7 +3,10 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use rustev_contract::run::Charge;
-use rustev_live::journal::{BudgetKind, JournalError, SetClock, SpendJournal};
+use rustev_live::journal::{
+    BudgetKind, JournalError, SUPERSEDED_TESTING_CAP_UNITS, SetClock, SpendJournal,
+    TESTING_CAP_UNITS,
+};
 
 struct Fixture(PathBuf);
 
@@ -47,19 +50,30 @@ const LEGACY: &str = concat!(
     "{\"op\":\"release\",\"seq\":3}\n",
 );
 
+// The header A-75 writes: the same schema and budget, cap USD 10.
+const HEADER: &str =
+    "{\"schema\":\"rustev-jev.spend-journal/1\",\"budget\":\"testing\",\"cap\":10000000000}\n";
+
+/// `LEGACY` with its header migrated: every entry byte unchanged.
+fn migrated() -> String {
+    format!("{HEADER}{}", &LEGACY[LEGACY.find('\n').unwrap() + 1..])
+}
+
 #[test]
 fn legacy_bytes_open_continue_and_match_new_writes() {
     let fixture = Fixture::new();
     std::fs::write(fixture.path(), LEGACY).unwrap();
     let j = fixture.open();
     assert_eq!(j.summary().observed, 8);
+    assert_eq!(j.summary().cap, TESTING_CAP_UNITS);
     assert_eq!(j.run_spend("old"), 3);
-    assert_eq!(std::fs::read(fixture.path()).unwrap(), LEGACY.as_bytes());
+    assert_eq!(std::fs::read_to_string(fixture.path()).unwrap(), migrated());
     let r = j.reserve("next", 9).unwrap();
     assert_eq!(r.seq, 4);
     j.settle(r, Charge::Estimated { units: 7 });
     let expected = format!(
-        "{LEGACY}{}{}",
+        "{}{}{}",
+        migrated(),
         "{\"op\":\"reserve\",\"seq\":4,\"period\":\"total\",\"attempt\":\"next\",\"units\":9,\"at_ms\":0}\n",
         "{\"op\":\"settle\",\"seq\":4,\"charge\":{\"estimated\":{\"units\":7}}}\n"
     );
@@ -73,7 +87,115 @@ fn legacy_bytes_open_continue_and_match_new_writes() {
     assert!(new.reconcile(b.seq, 3));
     let c = new.reserve("released", 30).unwrap();
     new.release(c);
-    assert_eq!(std::fs::read_to_string(fresh.path()).unwrap(), LEGACY);
+    assert_eq!(std::fs::read_to_string(fresh.path()).unwrap(), migrated());
+}
+
+#[test]
+fn superseded_header_migrates_once_keeping_entries_and_liability() {
+    let fixture = Fixture::new();
+    // SYNTHETIC: a reservation a previous process left unsettled, and a
+    // torn final line.
+    let unsettled = "{\"op\":\"reserve\",\"seq\":4,\"period\":\"total\",\"attempt\":\"live/old/b\",\"units\":40,\"at_ms\":0}\n";
+    std::fs::write(
+        fixture.path(),
+        format!("{LEGACY}{unsettled}{{\"op\":\"settle\",\"seq\":4"),
+    )
+    .unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(fixture.path(), std::fs::Permissions::from_mode(0o600)).unwrap();
+    }
+    let j = fixture.open();
+    let after = format!("{}{unsettled}", migrated());
+    assert_eq!(std::fs::read_to_string(fixture.path()).unwrap(), after);
+    // The writer lock outlives the migration's rename.
+    assert!(matches!(
+        SpendJournal::open(
+            fixture.path(),
+            BudgetKind::Testing,
+            Arc::new(SetClock::new(0))
+        ),
+        Err(JournalError::Locked(_))
+    ));
+    let summary = j.summary();
+    assert_eq!((summary.observed, summary.liability), (8, 40));
+    assert_eq!(summary.headroom, TESTING_CAP_UNITS - 48);
+    assert_eq!(j.run_spend("old"), 43);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = std::fs::metadata(fixture.path())
+            .unwrap()
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o777, 0o600);
+    }
+    drop(j);
+    let names: Vec<_> = std::fs::read_dir(&fixture.0)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().into_string().unwrap())
+        .collect();
+    assert_eq!(names, vec!["journal.jsonl".to_string()]);
+    // A second open finds the current header and changes nothing.
+    let j = fixture.open();
+    assert_eq!(std::fs::read_to_string(fixture.path()).unwrap(), after);
+    assert_eq!(j.reserve("next", 1).unwrap().seq, 5);
+}
+
+#[test]
+fn other_header_mismatches_are_refused_unchanged() {
+    let testing = |cap: u64| {
+        format!(
+            "{{\"schema\":\"rustev-jev.spend-journal/1\",\"budget\":\"testing\",\"cap\":{cap}}}\n"
+        )
+    };
+    let production = |cap: u64| {
+        format!(
+            "{{\"schema\":\"rustev-jev.spend-journal/1\",\"budget\":\"production\",\"cap\":{cap}}}\n"
+        )
+    };
+    for (bytes, kind) in [
+        (testing(7_000_000_000), BudgetKind::Testing),
+        (testing(4_999_999_999), BudgetKind::Testing),
+        (
+            production(SUPERSEDED_TESTING_CAP_UNITS),
+            BudgetKind::Testing,
+        ),
+        (
+            production(SUPERSEDED_TESTING_CAP_UNITS),
+            BudgetKind::Production,
+        ),
+        (LEGACY.to_string(), BudgetKind::Production),
+        (HEADER.to_string(), BudgetKind::Production),
+        (
+            LEGACY.replace("spend-journal/1", "spend-journal/2"),
+            BudgetKind::Testing,
+        ),
+    ] {
+        let fixture = Fixture::new();
+        std::fs::write(fixture.path(), &bytes).unwrap();
+        let opened = SpendJournal::open(fixture.path(), kind, Arc::new(SetClock::new(0)));
+        assert!(
+            matches!(opened, Err(JournalError::Mismatch(_))),
+            "{bytes} {kind:?}"
+        );
+        assert_eq!(std::fs::read_to_string(fixture.path()).unwrap(), bytes);
+    }
+}
+
+#[test]
+fn superseded_header_with_a_corrupt_line_is_refused_unchanged() {
+    let fixture = Fixture::new();
+    let bytes = format!("{LEGACY}{{\"op\":\"settle\",\"seq\":99,\"charge\":\"unknown\"}}\n");
+    std::fs::write(fixture.path(), &bytes).unwrap();
+    let opened = SpendJournal::open(
+        fixture.path(),
+        BudgetKind::Testing,
+        Arc::new(SetClock::new(0)),
+    );
+    assert!(matches!(opened, Err(JournalError::Corrupt { line: 9, .. })));
+    assert_eq!(std::fs::read_to_string(fixture.path()).unwrap(), bytes);
 }
 
 #[test]
@@ -198,4 +320,19 @@ fn testing_header_digest_matches_the_written_header_including_newline() {
     let bytes = std::fs::read(j.path()).unwrap();
     let digest = rustev_contract::canonical::tagged_digest("rustev-jev.spend-journal/1", &bytes);
     assert_eq!(SpendJournal::testing_header_digest().as_str(), digest);
+}
+
+#[test]
+fn superseded_testing_header_digest_matches_the_legacy_header() {
+    let header = &LEGACY[..LEGACY.find('\n').unwrap() + 1];
+    let digest =
+        rustev_contract::canonical::tagged_digest("rustev-jev.spend-journal/1", header.as_bytes());
+    assert_eq!(
+        SpendJournal::superseded_testing_header_digest().as_str(),
+        digest
+    );
+    assert_ne!(
+        SpendJournal::superseded_testing_header_digest(),
+        SpendJournal::testing_header_digest()
+    );
 }

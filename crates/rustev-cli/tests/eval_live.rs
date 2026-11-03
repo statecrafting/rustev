@@ -188,7 +188,7 @@ fn two_cases_publish_records_and_one_summary_line_with_zero_spend() {
     // Rules cost units measure work, not money: cost_unit none spends zero even with a cap of 1.
     assert_eq!(
         String::from_utf8(result.stdout).unwrap(),
-        "evaluated_live synthetic run_spend=0 headroom=5000000000 completed=2 unavailable=0 refused=0 interrupted=0 pending=0\n"
+        "evaluated_live synthetic run_spend=0 headroom=10000000000 completed=2 unavailable=0 refused=0 interrupted=0 pending=0\n"
     );
     assert!(f.s.exists("out/checkpoint.json"));
     let entries: Vec<_> = std::fs::read_dir(f.s.path("out/cases"))
