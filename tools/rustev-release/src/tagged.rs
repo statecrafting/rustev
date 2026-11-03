@@ -6,7 +6,9 @@
 //! (3.5.4). [`publish_release`] creates the run's GitHub release once
 //! (3.3.3), and [`verify_assets`] checks a release directory against the
 //! run's manifest (3.4.1). [`qualify`] records the lifecycle from the run's
-//! manifest and publication record, with no instruction or journal (3.4.2).
+//! manifest and publication record, with no instruction or journal (3.4.2),
+//! and [`attach_qualification`] keeps that record and its evidence on the
+//! release (spec 060 3.7.3).
 //!
 //! Registry and release state come through [`Publisher`] and
 //! [`Releases`], so tests drive every rule offline. Nothing here reads a
@@ -609,6 +611,91 @@ pub fn publish_release(
     }
     api.create_release(tag, notes, assets, prerelease)?;
     Ok(Outcome::Created)
+}
+
+/// 060 3.7.1: the qualification evidence a release of `tag` keeps: the
+/// record, then one bundle per platform of the release set's matrix.
+pub fn qualification_asset_names(tag: &str) -> Vec<String> {
+    std::iter::once(format!("{QUALIFICATION_ASSET_PREFIX}{tag}.json"))
+        .chain(
+            crate::family_artifacts::PLATFORMS
+                .iter()
+                .map(|p| format!("{QUALIFICATION_ASSET_PREFIX}{tag}-{p}.tar.gz")),
+        )
+        .collect()
+}
+
+/// What [`attach_qualification`] did with one asset.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Attached {
+    Uploaded,
+    /// Present with these bytes.
+    Present,
+    /// Present with other bytes (an earlier qualification); left unchanged.
+    PresentOther,
+}
+
+/// 060 3.7.3: attach a qualified run's record and bundles to the release
+/// `tag`. `assets` holds exactly [`qualification_asset_names`]; the record
+/// must be this tag's and `qualified`. Every check runs before any upload.
+/// Only names not present are uploaded; a present asset is never replaced.
+pub fn attach_qualification(
+    api: &mut dyn crate::prerelease::AssetUploads,
+    tag: &str,
+    assets: &Assets,
+) -> Result<Vec<(String, Attached)>, String> {
+    let (version, rc) = parse_tag(tag)?;
+    if rc.is_some() {
+        return Err(format!(
+            "060 3.7.3: {tag} is a candidate; it is never qualified"
+        ));
+    }
+    let names = qualification_asset_names(tag);
+    let given: Vec<&String> = assets.keys().collect();
+    let mut wanted: Vec<&String> = names.iter().collect();
+    wanted.sort();
+    if given != wanted {
+        return Err(format!(
+            "060 3.7.3: the assets must be exactly {}",
+            names.join(", ")
+        ));
+    }
+    let q: Qualification = serde_json::from_slice(&assets[&names[0]])
+        .map_err(|e| format!("060 3.7.3: {}: {e}", names[0]))?;
+    if q.schema != QUALIFICATION_SCHEMA || q.tag != tag || q.version != version {
+        return Err(format!("060 3.7.3: {} is not {tag}'s record", names[0]));
+    }
+    if q.state != State::Qualified {
+        return Err(format!(
+            "060 3.7.3: {tag} recorded {:?}, not qualified; nothing is attached",
+            q.state
+        ));
+    }
+    for name in &names[1..] {
+        if !assets[name].starts_with(&[0x1f, 0x8b]) {
+            return Err(format!("060 3.7.3: {name} is not a gzip archive"));
+        }
+    }
+    let present = match api.lookup(tag)? {
+        Some(r) if !r.prerelease => r.assets,
+        Some(_) => return Err(format!("060 3.7.3: {tag} is a pre-release")),
+        None => return Err(format!("060 3.7.3: {tag} has no release to attach to")),
+    };
+    let mut done = Vec::new();
+    for name in names {
+        let bytes = &assets[&name];
+        let outcome = match present.get(&name) {
+            Some(d) if *d == sha256_hex(bytes) => Attached::Present,
+            Some(_) => Attached::PresentOther,
+            None => {
+                api.upload_asset(tag, &name, bytes)
+                    .map_err(|e| format!("060 3.7.3: {e}; a rerun uploads only what is missing"))?;
+                Attached::Uploaded
+            }
+        };
+        done.push((name, outcome));
+    }
+    Ok(done)
 }
 
 /// The release notes: the changelog, or a candidate's limitation (053 3.4.3).

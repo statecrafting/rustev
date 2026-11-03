@@ -21,6 +21,11 @@ pub trait Releases {
         prerelease: bool,
     ) -> Result<(), String>;
 }
+/// Spec 060 3.7.3: one asset added to a present release. An implementation
+/// never replaces an asset already present under `name`.
+pub trait AssetUploads: Releases {
+    fn upload_asset(&mut self, tag: &str, name: &str, bytes: &[u8]) -> Result<(), String>;
+}
 #[derive(Debug, PartialEq, Eq)]
 pub enum Outcome {
     Created,
@@ -100,6 +105,26 @@ impl Releases for Gh {
         let out = cmd.output().map_err(|e| e.to_string())?;
         if !out.status.success() {
             return Err("053 3.3.4: pre-release creation failed; inspect before retrying".into());
+        }
+        Ok(())
+    }
+}
+impl AssetUploads for Gh {
+    fn upload_asset(&mut self, tag: &str, name: &str, bytes: &[u8]) -> Result<(), String> {
+        let scratch = crate::repro::fresh_dir("rustev-attach")?;
+        let path = scratch.join(name);
+        std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+        // No `--clobber`: `gh` refuses a name already present.
+        let out = Command::new(&self.executable)
+            .args(["release", "upload", tag, "--repo", repository()?])
+            .arg(&path)
+            .output()
+            .map_err(|e| e.to_string())?;
+        if !out.status.success() {
+            return Err(format!(
+                "uploading {name} failed: {}",
+                String::from_utf8_lossy(&out.stderr).trim()
+            ));
         }
         Ok(())
     }

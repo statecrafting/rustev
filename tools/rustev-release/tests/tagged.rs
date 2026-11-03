@@ -12,7 +12,7 @@ use rustev_release::archive::sha256_hex;
 use rustev_release::family_artifacts as fa;
 use rustev_release::lifecycle::{Lookup, State};
 use rustev_release::manifest::{self, Inputs, ReleaseManifest, Toolchain};
-use rustev_release::prerelease::{Assets, Outcome, Release, Releases};
+use rustev_release::prerelease::{AssetUploads, Assets, Outcome, Release, Releases};
 use rustev_release::qualification::{KINDS, SCHEMA, Status, Step, required};
 use rustev_release::repro::{Scratch, fresh_dir};
 use rustev_release::tagged::{self, Item, Publisher, Record};
@@ -716,4 +716,169 @@ fn an_npm_artifact_without_package_or_integrity_is_refused() {
             "{field}: {err}"
         );
     }
+}
+
+/// 060 3.7.3: a release that accepts uploads. Every upload lands, unless
+/// `fail_on` names it; `gh release upload` without `--clobber` refuses a
+/// present name, so the fake does too.
+#[derive(Default)]
+struct Attach {
+    present: Option<Release>,
+    uploads: Vec<String>,
+    fail_on: Option<String>,
+}
+
+impl Releases for Attach {
+    fn lookup(&mut self, _: &str) -> Result<Option<Release>, String> {
+        Ok(self.present.clone())
+    }
+    fn create_release(&mut self, _: &str, _: &str, _: &Assets, _: bool) -> Result<(), String> {
+        panic!("attaching never creates a release")
+    }
+}
+
+impl AssetUploads for Attach {
+    fn upload_asset(&mut self, _: &str, name: &str, bytes: &[u8]) -> Result<(), String> {
+        if self.fail_on.as_deref() == Some(name) {
+            return Err(format!("{name}: HTTP 502"));
+        }
+        let release = self.present.as_mut().expect("a release");
+        assert!(
+            release
+                .assets
+                .insert(name.into(), sha256_hex(bytes))
+                .is_none(),
+            "{name} replaced"
+        );
+        self.uploads.push(name.into());
+        Ok(())
+    }
+}
+
+fn qualification_assets(tag: &str, state: State) -> Assets {
+    let record = tagged::Qualification {
+        schema: tagged::QUALIFICATION_SCHEMA.into(),
+        version: tag.trim_start_matches('v').into(),
+        tag: tag.into(),
+        commit: "0".repeat(40),
+        manifest_sha256: "1".repeat(64),
+        state,
+        evidence: BTreeMap::new(),
+    };
+    let names = tagged::qualification_asset_names(tag);
+    let mut assets = Assets::new();
+    assets.insert(names[0].clone(), serde_json::to_vec(&record).unwrap());
+    for (i, n) in names[1..].iter().enumerate() {
+        assets.insert(n.clone(), vec![0x1f, 0x8b, 8, i as u8]);
+    }
+    assets
+}
+
+fn published_release() -> Attach {
+    let mut assets = BTreeMap::new();
+    assets.insert("release-manifest.json".into(), sha256_hex(b"m"));
+    Attach {
+        present: Some(Release {
+            prerelease: false,
+            assets,
+        }),
+        ..Attach::default()
+    }
+}
+
+#[test]
+fn qualification_evidence_is_attached_once_and_never_replaced() {
+    let tag = "v0.5.0";
+    let names = tagged::qualification_asset_names(tag);
+    assert_eq!(names.len(), 1 + fa::PLATFORMS.len());
+    assert_eq!(names[0], "qualification-v0.5.0.json");
+    assert!(names.contains(&"qualification-v0.5.0-win32-x64-msvc.tar.gz".to_string()));
+    let assets = qualification_assets(tag, State::Qualified);
+
+    // A partial upload resumes: the rerun uploads only what is missing.
+    let mut gh = published_release();
+    gh.fail_on = Some(names[3].clone());
+    let err = tagged::attach_qualification(&mut gh, tag, &assets).unwrap_err();
+    assert!(
+        err.contains("060 3.7.3") && err.contains("HTTP 502"),
+        "{err}"
+    );
+    assert_eq!(gh.uploads, names[..3]);
+    gh.fail_on = None;
+    let done = tagged::attach_qualification(&mut gh, tag, &assets).unwrap();
+    assert_eq!(gh.uploads, names);
+    assert_eq!(
+        done.iter().map(|(_, o)| o.clone()).collect::<Vec<_>>(),
+        [
+            vec![tagged::Attached::Present; 3],
+            vec![tagged::Attached::Uploaded; names.len() - 3]
+        ]
+        .concat()
+    );
+    // The release's own assets are untouched.
+    assert!(
+        gh.present
+            .as_ref()
+            .unwrap()
+            .assets
+            .contains_key("release-manifest.json")
+    );
+
+    // A second qualification of the tag finds every name present: the first
+    // record and bundles are kept, never replaced.
+    let mut again = qualification_assets(tag, State::Qualified);
+    again.insert(names[1].clone(), vec![0x1f, 0x8b, 8, 99]);
+    let done = tagged::attach_qualification(&mut gh, tag, &again).unwrap();
+    assert_eq!(gh.uploads.len(), names.len());
+    assert_eq!(done[1], (names[1].clone(), tagged::Attached::PresentOther));
+    assert_eq!(done[0].1, tagged::Attached::Present);
+}
+
+#[test]
+fn qualification_evidence_is_refused_before_any_upload() {
+    let tag = "v0.5.0";
+    let names = tagged::qualification_asset_names(tag);
+    let refused = |gh: &mut Attach, tag: &str, assets: &Assets| {
+        let err = tagged::attach_qualification(gh, tag, assets).unwrap_err();
+        assert!(gh.uploads.is_empty(), "{err}");
+        err
+    };
+    // Only a run that recorded `qualified`.
+    let err = refused(
+        &mut published_release(),
+        tag,
+        &qualification_assets(tag, State::Released),
+    );
+    assert!(err.contains("not qualified"), "{err}");
+    // Another tag's record.
+    let mut other = qualification_assets("v0.4.0", State::Qualified);
+    let bundles: Vec<(String, Vec<u8>)> = qualification_assets(tag, State::Qualified)
+        .into_iter()
+        .filter(|(n, _)| *n != names[0])
+        .collect();
+    other = std::iter::once((
+        names[0].clone(),
+        other.remove("qualification-v0.4.0.json").unwrap(),
+    ))
+    .chain(bundles)
+    .collect();
+    let err = refused(&mut published_release(), tag, &other);
+    assert!(err.contains("is not v0.5.0's record"), "{err}");
+    // A missing bundle, an extra file, a bundle that is not gzip.
+    let mut missing = qualification_assets(tag, State::Qualified);
+    missing.remove(&names[2]);
+    assert!(refused(&mut published_release(), tag, &missing).contains("exactly"));
+    let mut extra = qualification_assets(tag, State::Qualified);
+    extra.insert("qualification-v0.5.0-notes.txt".into(), b"x".to_vec());
+    assert!(refused(&mut published_release(), tag, &extra).contains("exactly"));
+    let mut plain = qualification_assets(tag, State::Qualified);
+    plain.insert(names[4].clone(), b"tar".to_vec());
+    assert!(refused(&mut published_release(), tag, &plain).contains("not a gzip"));
+    // A candidate, a missing release and a pre-release.
+    let good = qualification_assets(tag, State::Qualified);
+    assert!(refused(&mut published_release(), "v0.5.0-rc.1", &good).contains("candidate"));
+    assert!(refused(&mut Attach::default(), tag, &good).contains("no release"));
+    let mut pre = published_release();
+    pre.present.as_mut().unwrap().prerelease = true;
+    assert!(refused(&mut pre, tag, &good).contains("pre-release"));
 }
