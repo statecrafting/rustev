@@ -2,7 +2,7 @@
 id: "021-packaging-and-first-release"
 title: "Packaging and first public release"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-26"
 summary: >
   Defines the intended first public Rustev crate family, its lockstep pre-1.0
@@ -41,6 +41,8 @@ extends:
   # The release tool spec 031 plans; this spec's candidate machinery lives
   # there (031, 2.2).
   - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
+  # 021 in exactly one acceptance group at completion (scripts/acceptance/verify.py).
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "002-decision-contract-and-pure-core"
@@ -80,6 +82,9 @@ Approved (A-20, 2026-09-26) as its own reviewable change before any code
 create or push a tag, publish a crate, create a hosted release, use a registry
 credential, or claim that a consumer can obtain Rustev. The current `0.1.0`
 and `publish = false` manifests remain unreleased source identities.
+
+The paragraph above is the approval-time statement. Implementation is
+complete (2026-11-03): see the Implementation record's acceptance audit.
 
 ## 1. Purpose
 
@@ -408,11 +413,28 @@ a permanent availability guarantee.
 
 ## Verification
 
-Pending with implementation and release. Approval authorizes work on
-manifests, checks and candidate evidence only. Commands that create or push a
-tag, upload to a registry, create a hosted release, yank a version, access a
-credential or make a public availability claim remain outside that authority
-until the owner gives the exact instruction required by 3.9.
+Run by `make verify` (021 is in `VERIFIED_SPECS`, in CI's
+`integrations-core` group beside 031, which amends it). Every command is
+offline: the release tooling's tests use scripted registries, throwaway
+keys and committed fixtures, and none uploads, pushes a tag, creates a
+hosted release or reads a credential. Publication and the registry-only
+consumer of 3.10 are release evidence (the tagged run and the qualify run
+recorded below), never part of declared verification. The targets overlap
+spec 031's, which runs the whole crate.
+
+```verify:cli
+# 2, 3.2 to 3.4: the release-set file against cargo metadata, manifests, the release closure.
+cargo test -p rustev-release --locked --test manifests --test family
+# 3.5: the archive allowlists, bounds and scan; embedded files the archive must carry.
+cargo test -p rustev-release --locked --test archives --test embedded_files
+# 3.6 and 3.7: the audit report and exceptions, the two-build comparison and the unpacked check.
+cargo test -p rustev-release --locked --test audit --test repro --test candidate
+# 3.1, 3.8, 3.9 as amended by 058: the lifecycle, the signed tag, the asset check and idempotent publication.
+cargo test -p rustev-release --locked --test lifecycle --test tagged --test cratesio
+# 3.10: the qualification harness's refusals (needs Python 3.11 or later).
+cargo test -p rustev-release --locked --test qualify_harness
+cargo clippy -p rustev-release --all-targets --locked -- -D warnings
+```
 
 ## Implementation record
 
@@ -808,3 +830,107 @@ shared slot, memory and persistent tiers and spec 039's rank dispatch; the
 bound becomes 524,288 (512 KiB). Their archives (290,313 bytes against 384
 KiB; 118,242 against 160 KiB), file lists and every other bound are
 unchanged; no other member was over a bound.
+
+**Acceptance audit and completion (2026-11-03, `v0.3.0`).** Every
+Acceptance item is met, read with the amendments of spec 031 (the family
+is more than the original eight packages; every check covers the whole
+release set) and spec 058, as noted per item.
+
+1. *Release-set file.* `tools/rustev-release/release-set.json` and
+   `tests/manifests.rs` (increment 1, R-49 paragraph).
+2. *Manifest tests.* `tests/manifests.rs` and `tests/family.rs`.
+3. *Each archive.* The tagged run 40804954767 for `v0.3.0` at `6a864fc`
+   (`6a864fcd892ca1cb6fc61d6669791f49a4d36165`, #380, which raised the
+   two bounds the `c97a5f8` run refused) passed its `archive`, `pack
+   release`, `pack rebuild`, `crates` (`candidate.sh`: the archive policy
+   and the unpacked tests), `crates-rebuild`, `reproducibility`, `audit`
+   and `sbom` jobs.
+4. *Matrix and gates.* The same run's `rebuild` and `cli` jobs on seven
+   platforms, and the unpacked tests on the pinned toolchain and the MSRV
+   1.88 (058 3.2.1); CI's `release-checks / msrv` passed on `main` at
+   `6a864fc` (item 9's run). No expected failure was waived.
+5. *Dry-run state machine.* `tests/lifecycle.rs`:
+   `every_transition_in_order_reaches_qualified` and
+   `no_state_is_skipped_or_reported_as_another`.
+6. *Signature fixtures: met as amended by 058.* 058 3.2.5 reads: "These
+   attestations replace the owner's detached signatures over the manifest
+   and `SHA256SUMS` (021 3.8, 031 3.9.5); the owner's signature is on the
+   tag." 058's increment 3 part d (#368) removed the detached signatures
+   and `tests/signing.rs` with them. The tag binding is tested in
+   `tests/tagged.rs` (`the_documented_owner_identity_is_the_committed_allowed_signer`,
+   `a_signed_annotated_tag_on_main_with_a_green_gate_passes`,
+   `each_rule_of_3_1_1_refuses_once`) and the asset binding in
+   `verify_assets_names_a_missing_bundle_a_changed_byte_and_an_unrecorded_package`;
+   the `v0.3.0` run's `verify-release` job passed.
+7. *Fake-registry harness: met as amended by 058.* 058 3.5.2 reads:
+   "Every publication step is idempotent against public state. A crate or
+   npm version already present is skipped when its registry checksum
+   (crates.io index `cksum`, npm `dist.integrity`) equals the run's
+   artifact, and fails the run otherwise." and 058 3.5.4: "The outside-Git
+   publication journal of 021 3.9 is replaced by `publication.json`". The
+   scripted registry of `tests/tagged.rs` covers upload in order
+   (`absent_items_are_published_in_order_and_recorded`), a present equal
+   version (`present_and_equal_is_skipped_without_an_upload`), a present
+   different one (`present_and_different_fails_and_republishes_nothing`,
+   `a_listing_with_another_checksum_fails_before_the_next_item`) and
+   refusal, unknown state and no visibility
+   (`unknown_state_a_refused_upload_or_no_visibility_fails`).
+8. *Registry-only consumer, evidence retained.* The tagged run's own
+   `qualify` stage failed on every platform, leaving the lifecycle at
+   `released` (058 3.4.3). Run 41580879690 of `qualify.yml`, dispatched on
+   `main` at `595e352` with `tag: v0.3.0` and
+   `harness_from_default_branch: true`, then passed `crates`, `npm` and
+   `cli` on all seven platforms (`image` excluded: the manifest names
+   none) and recorded `qualified` (spec 056's record). Against 3.10: a new
+   temporary directory and empty Cargo home, registry tokens removed, a
+   Cargo configuration with `patch`, `source` or `registries` refused, and
+   exact `=0.3.0` requirements. Item 1: every family crate fetched, with
+   its registry checksum recorded. Item 2: the consumer library over
+   contract, core, runtime and the rules backend built, ran and passed
+   `cargo test --locked --offline`. Item 3:
+   `declared_synthetic_example` reproduced the support-routing package's
+   declared judgment. Item 4: the loopback `RemoteServer` and client
+   example compiled. Item 5: `cargo install rustev-cli --version =0.3.0
+   --locked`, then `version`, `--version`, `--help`, `plan check`, `plan
+   compile` and one bounded `run`. Item 6: all of it on 1.98.1 and the
+   MSRV 1.88.0 on seven platforms. Weakness: the offline steps ran inside
+   a network sandbox (`sandbox-exec`) on macOS only; on Linux and Windows
+   the harness found none usable and relied on Cargo's `--offline`.
+   All 28 evidence digests in `qualification.json` matched the downloaded
+   files. The run's artifacts expire after 90 days (2027-02-01), so, on
+   the owner's instruction of 2026-11-03, the record and each platform's
+   evidence are attached to the release
+   (https://github.com/statecrafting/rustev/releases/tag/v0.3.0) as
+   assets prefixed `qualification-`, never release members:
+   - `qualification-v0.3.0.json` (the record, byte-identical):
+     `efc687cb998abb6b46f9104110406d07a581b8aa43326cea27b2266a19c34692`
+   - `qualification-v0.3.0-darwin-arm64.tar.gz`:
+     `acd8921006040e5ef1448f65e1de5ea106ee1352cd4fb577ed4455384cfff21d`
+   - `qualification-v0.3.0-darwin-x64.tar.gz`:
+     `8508880b9c2ffd00333801c893588ffe93fd432a5644120702d237156f5537b6`
+   - `qualification-v0.3.0-linux-arm64-gnu.tar.gz`:
+     `eaa26cbf50635ea54ad1db785b66fb010ea9507e7171f83210631bd4582aae87`
+   - `qualification-v0.3.0-linux-arm64-musl.tar.gz`:
+     `7321bf5c6739cbb306f0db43376ff3d24fdf6d275a9db769cee5ec7a6013aede`
+   - `qualification-v0.3.0-linux-x64-gnu.tar.gz`:
+     `539768a1073a993c428f6e261a73024efdd74cfa40097b89ad7cb4875488a2c5`
+   - `qualification-v0.3.0-linux-x64-musl.tar.gz`:
+     `7705ed5daadf88e3ff6dcc50381e056a90568a95a75a58f0dd4fe850ecdc252e`
+   - `qualification-v0.3.0-win32-x64-msvc.tar.gz`:
+     `2398d218b8f5272280670c27cd7f151e706eb6b5baf79780632a83e73e3ab4ca`
+
+   Each archive holds that platform's `qualify-<platform>` artifact
+   unchanged. The release-manifest SHA-256 the record names is
+   `8104aedcf52536d96768d9498b5ccf26e3897acc7cf139519478011adb6d66f8`.
+   A later rerun of the `v0.3.0` tagged run's `github-release` job would
+   now fail, because `publish_release` requires a present release to hold
+   exactly the run's assets; 0.3.0 is fully published and the owner
+   accepted that.
+9. *Gates at the candidate commit.* CI's push run 40804863495 on `main`
+   at `6a864fc` passed governance (`make gate`'s checks), code (`make
+   code`), `verify / verify` with every acceptance group (`make verify`)
+   and `ci-gate`; the merge-queue run 40801770296 passed the same. 058
+   3.1.1 item 5 requires `ci-gate` success on the tagged commit.
+
+Declared verification is added above; 021 joins `make verify` and CI's
+`integrations-core` group. `implementation: complete`.
