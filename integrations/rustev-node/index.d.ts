@@ -99,6 +99,8 @@ export interface EngineOptions {
   /** Required; there is no default sink. */
   sink: EvidenceSink;
   rulesBackends?: { program: DocumentInput; maxConcurrency: number }[];
+  /** Opened local semantic backends (spec 011, 3.17.1). */
+  localEmbedBackends?: { backend: LocalEmbedBackend; maxConcurrency: number }[];
   backends?: DecisionBackend[];
   contextSource?: ContextSource;
   clock?: 'system' | 'manual';
@@ -241,6 +243,39 @@ export declare class SeamFailure extends Error {
 }
 
 export declare function version(): string;
+
+/** What this build of the addon contains. */
+export declare function features(): { localEmbed: boolean };
+
+/** The configuration of spec 011, 3.7.1, as the host provisions it. */
+export interface LocalEmbedConfig {
+  /** An absolute path to the bundle directory. */
+  bundleDir: string;
+  /** An absolute path to the ONNX Runtime library; unused by a synthetic bundle. */
+  runtimePath?: string;
+  /** The bundle's expected `ArtifactId`, `sha256:<hex>`. */
+  expectedArtifact: string;
+  /** 1 to 16. */
+  workers: number;
+  /** 0 to 1,024. */
+  maxQueued: number;
+}
+
+/** The local semantic backend of spec 011 (3.17.1): a Rust backend
+ * registered like the rules backend. Its logits are `model-derived` and
+ * never authorization. Without the `local-embed` build feature `open`
+ * rejects with `ConfigRefused` (`feature_disabled`). */
+export declare class LocalEmbedBackend {
+  private constructor();
+  /** A setup refusal is `ConfigRefused` whose code is the setup code
+   * (`digest_mismatch`, `artifact_mismatch`, `unqualified_platform`, ...)
+   * and whose detail names the item. */
+  static open(config: LocalEmbedConfig): Promise<LocalEmbedBackend>;
+  /** The descriptor derived from the bundle's manifest, canonical bytes. */
+  readonly descriptor: Uint8Array;
+  /** The bundle's `ArtifactId`. */
+  readonly artifact: string;
+}
 
 /** 049 3.2: Explicit JSONL or allowlisted OTLP/HTTP telemetry. */
 export interface TelemetryOptions {

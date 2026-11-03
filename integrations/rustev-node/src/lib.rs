@@ -11,6 +11,7 @@
 //! export runs inside `catch_unwind` and a panic becomes `InternalError`.
 
 mod errors;
+pub mod local_embed;
 mod seams;
 mod telemetry;
 
@@ -113,6 +114,9 @@ impl Engine {
         backends: Vec<seams::BackendSeam>,
         context_source: Option<seams::ContextSeam>,
         telemetry: Option<telemetry::Options>,
+        // Last and optional, so a native caller that predates spec 011's
+        // local backends keeps its argument positions (049 3.4.2's test).
+        local_embed: Option<&local_embed::LocalEmbedSet>,
     ) -> Result<Engine> {
         guard(|| {
             let workers = range("workerThreads", config.worker_threads, 1, 64)?;
@@ -151,6 +155,11 @@ impl Engine {
                 let backend = rustev_backend_rules::RulesBackend::from_bytes(&r.program)
                     .map_err(|e| fail("InvalidDocument", "invalid_document", e.to_string()))?;
                 registrations.push((Arc::new(backend), r.max_concurrency as usize));
+            }
+            // Spec 011, 3.17.1: opened local backends register like the rules
+            // backend; the set is empty in a build without `local-embed`.
+            if let Some(set) = local_embed {
+                registrations.extend(set.entries.iter().cloned());
             }
             for h in host_backends {
                 stats.push(h.stats.clone());

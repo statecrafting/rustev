@@ -1237,6 +1237,21 @@ against their schemas in their own contract tests.
   consumers lost the package's types in 0.2.0. The re-exports now name
   `./rustev_wasm.js`, which every resolution mode accepts; spec 031's
   declaration comparison found it.
+- 2026-11-03 (spec 011 increment 6, additive; no text of this spec
+  changes): the native package gains spec 011's optional `local-embed`
+  feature (011 3.17.1): `LocalEmbedBackend`, `features()` and the
+  `localEmbedBackends` option of `Engine.create`, which registers an opened
+  local backend like a rules backend. Its setup refusals are `ConfigRefused`
+  with spec 011's setup codes (3.4.1's table names the class; the codes are
+  011 3.7.2's). The prebuilt packages are built without it, so on every
+  matrix target `open` rejects `feature_disabled`. The suite gains
+  `local-embed` cases (`cases/local-embed/`, aggregated into the manifest
+  with a `local_embed` block), run on the Rust API by the backend's tests
+  and on the native binding by `run.mjs native` (`--local-embed` on a build
+  with the feature, which `make bindings` makes last); 3.14 holds: the
+  suite takes the opened backend as a seam and never depends on the
+  backend crate, and the binding reaches it only through the optional
+  dependency spec 001 3.4.6 allows.
 - 2026-11-04: `make conformance-harvest` (3.12.2) was not reproducible
   (#362). The `support.replay` and `lodging.replay` cases take as input a
   replay bundle the harvest captures afresh, and the run record retained in

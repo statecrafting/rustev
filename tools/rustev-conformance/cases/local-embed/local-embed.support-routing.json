@@ -1,0 +1,224 @@
+{
+  "command": "decide",
+  "id": "local-embed.support-routing",
+  "inputs": [
+    {
+      "name": "bundle/graph.bin",
+      "path": "backends/rustev-backend-embed-linear/tests/fixtures/support-routing/graph.bin",
+      "sha256": "e47a4085c2b9501d92bbd8495c7a5896137dcc6ba54ba026c4b472fab512162c"
+    },
+    {
+      "name": "bundle/heads/explicit_deadline.bin",
+      "path": "backends/rustev-backend-embed-linear/tests/fixtures/support-routing/heads/explicit_deadline.bin",
+      "sha256": "e086f6b71e5835e696a05c82e5f69b69b6b68ad5c3db749908a464fe97b1d7ce"
+    },
+    {
+      "name": "bundle/heads/frustration.bin",
+      "path": "backends/rustev-backend-embed-linear/tests/fixtures/support-routing/heads/frustration.bin",
+      "sha256": "0b84c8c89bcb3ddbb0b1ab8b32a14c8669f2dd7f6e0855bd1086d188e09f2d47"
+    },
+    {
+      "name": "bundle/heads/topic.bin",
+      "path": "backends/rustev-backend-embed-linear/tests/fixtures/support-routing/heads/topic.bin",
+      "sha256": "bb7fe238dacea69d921cddf944b8ada6308afdf4cd90488b73ef3d62f0eea266"
+    },
+    {
+      "name": "bundle/manifest.json",
+      "path": "backends/rustev-backend-embed-linear/tests/fixtures/support-routing/manifest.json",
+      "sha256": "374245873cb075aa5d37e36655d6e15ba1713f0cd04d6be9293a679d6901d0dc"
+    },
+    {
+      "name": "bundle/tokenizer.json",
+      "path": "backends/rustev-backend-embed-linear/tests/fixtures/support-routing/tokenizer.json",
+      "sha256": "36d74297e5778e78a297526256b28287d84adf9967d7abed1afbee6a5c9724ce"
+    },
+    {
+      "name": "SYNTHETIC.blank-message.snapshot.json",
+      "path": "tools/rustev-conformance/fixtures/local-embed/SYNTHETIC.blank-message.snapshot.json",
+      "sha256": "d9b60e089a804541e3781f9097b36b6731f32ba29d341f04c386460881733f7b"
+    },
+    {
+      "name": "sr-c01.snapshot.json",
+      "path": "tools/rustev-conformance/fixtures/local-embed/sr-c01.snapshot.json",
+      "sha256": "86b66ad4ed65935e190916176a43832e9620e5b2ef08c3a8bcf1930ddf60056f"
+    },
+    {
+      "name": "sr-f01.snapshot.json",
+      "path": "tools/rustev-conformance/fixtures/local-embed/sr-f01.snapshot.json",
+      "sha256": "6e4d13fa8baf5b86c0df9f701416fdb834b740e0d83303b5f2fd8b3b5ecaa914"
+    },
+    {
+      "name": "sr-m01.snapshot.json",
+      "path": "tools/rustev-conformance/fixtures/local-embed/sr-m01.snapshot.json",
+      "sha256": "88cb942f241e0a8f84892c08c957f7f6c01a285e7a0f0e16210a98cd709d80bd"
+    },
+    {
+      "name": "sr-t01.snapshot.json",
+      "path": "tools/rustev-conformance/fixtures/local-embed/sr-t01.snapshot.json",
+      "sha256": "2ed5b72377c3117ac81ed165c6bc61a4dfa0c8788e2801ba1184615571fc41de"
+    },
+    {
+      "name": "support-routing.descriptor.json",
+      "path": "tools/rustev-conformance/fixtures/local-embed/support-routing.descriptor.json",
+      "sha256": "8d159211a7b1c90afdaba7bac3760a7ee16d3167708808d4d395aceadd08de1c"
+    },
+    {
+      "name": "support.plan.json",
+      "path": "tools/rustev-conformance/fixtures/local-embed/support.plan.json",
+      "sha256": "8d8d42bf717db56802e1c053ac5a574ac20ba6962c9f521d1509cad2a00b15d7"
+    },
+    {
+      "name": "topic.calibration.json",
+      "path": "tools/rustev-conformance/fixtures/local-embed/topic.calibration.json",
+      "sha256": "3b477e15a20fd30aab61bbaa500f00beef6583365bf2c4d31e474eeff64eedd5"
+    }
+  ],
+  "local_embed": {
+    "bundle": "backends/rustev-backend-embed-linear/tests/fixtures/support-routing",
+    "calibrations": [
+      "topic.calibration.json"
+    ],
+    "config": {
+      "max_in_flight": 1,
+      "max_parallel_requests": 3,
+      "max_queued": 0,
+      "sink_timeout_ms": 1000
+    },
+    "descriptors": [
+      "support-routing.descriptor.json"
+    ],
+    "expected_artifact": "sha256:3df0cca6cecca390defa52fc057bb6c07fb1b69585f968afe4de455a676a28c3",
+    "max_concurrency": 3,
+    "max_queued": 2,
+    "plan": "support.plan.json",
+    "requests": [
+      {
+        "decision_id": "SYNTHETIC.sr-c01",
+        "evaluation_time_ms": 1790164800000,
+        "principal_handle": "SYNTHETIC-tenant/scope-p",
+        "snapshot": "sr-c01.snapshot.json"
+      },
+      {
+        "decision_id": "SYNTHETIC.sr-f01",
+        "evaluation_time_ms": 1790164800000,
+        "principal_handle": "SYNTHETIC-tenant/scope-p",
+        "snapshot": "sr-f01.snapshot.json"
+      },
+      {
+        "decision_id": "SYNTHETIC.sr-m01",
+        "evaluation_time_ms": 1790164800000,
+        "principal_handle": "SYNTHETIC-tenant/scope-p",
+        "snapshot": "sr-m01.snapshot.json"
+      },
+      {
+        "decision_id": "SYNTHETIC.sr-t01",
+        "evaluation_time_ms": 1790164800000,
+        "principal_handle": "SYNTHETIC-tenant/scope-p",
+        "snapshot": "sr-t01.snapshot.json"
+      },
+      {
+        "decision_id": "SYNTHETIC.blank-message",
+        "evaluation_time_ms": 1790164800000,
+        "principal_handle": "SYNTHETIC-tenant/scope-p",
+        "snapshot": "SYNTHETIC.blank-message.snapshot.json"
+      }
+    ],
+    "workers": 1
+  },
+  "outputs": [
+    {
+      "file": "SYNTHETIC.blank-message.judgment.json",
+      "golden": "tools/rustev-conformance/expected/local-embed/local-embed.support-routing/SYNTHETIC.blank-message.judgment.json",
+      "normalize": [],
+      "sha256": "3247cfc5fe88652ae1c6a0e983184f10b997abc8f111ce42c0ca29c5123e77c8"
+    },
+    {
+      "file": "SYNTHETIC.blank-message.record.json",
+      "golden": "tools/rustev-conformance/expected/local-embed/local-embed.support-routing/SYNTHETIC.blank-message.record.json",
+      "normalize": [],
+      "sha256": "7967b432ff8ea073cda9995d99ca2c9b5f476b798eeb7416d1e99e254e3c8974"
+    },
+    {
+      "file": "SYNTHETIC.blank-message.result.json",
+      "golden": "tools/rustev-conformance/expected/local-embed/local-embed.support-routing/SYNTHETIC.blank-message.result.json",
+      "normalize": [],
+      "sha256": "17aa9e74ec2dda0536cfaaa24efe67e0f837e92d4acae4f62db5da0776f02ba5"
+    },
+    {
+      "file": "SYNTHETIC.sr-c01.judgment.json",
+      "golden": "tools/rustev-conformance/expected/local-embed/local-embed.support-routing/SYNTHETIC.sr-c01.judgment.json",
+      "normalize": [],
+      "sha256": "ddfdb164a16cd8a7d8120432d324ce91e58752b02767d0b5267763c78676e6fb"
+    },
+    {
+      "file": "SYNTHETIC.sr-c01.record.json",
+      "golden": "tools/rustev-conformance/expected/local-embed/local-embed.support-routing/SYNTHETIC.sr-c01.record.json",
+      "normalize": [],
+      "sha256": "dfb085db93c141a3b3aa537e1592fe7e7450da376cee44c3f88f54409938fe4c"
+    },
+    {
+      "file": "SYNTHETIC.sr-c01.result.json",
+      "golden": "tools/rustev-conformance/expected/local-embed/local-embed.support-routing/SYNTHETIC.sr-c01.result.json",
+      "normalize": [],
+      "sha256": "2a1c786a60f38cfe188ce0d4f0a2f8a8ff41348c13122ae29cde37bda71500b4"
+    },
+    {
+      "file": "SYNTHETIC.sr-f01.judgment.json",
+      "golden": "tools/rustev-conformance/expected/local-embed/local-embed.support-routing/SYNTHETIC.sr-f01.judgment.json",
+      "normalize": [],
+      "sha256": "cc8321853c90581a19687aa0b58416ac21005f4c5a72bb3f69875bdd1b3d0822"
+    },
+    {
+      "file": "SYNTHETIC.sr-f01.record.json",
+      "golden": "tools/rustev-conformance/expected/local-embed/local-embed.support-routing/SYNTHETIC.sr-f01.record.json",
+      "normalize": [],
+      "sha256": "3a560c72ddaf64e7b97a44c56589090863c877abf96eae15a703932ad5ccf92d"
+    },
+    {
+      "file": "SYNTHETIC.sr-f01.result.json",
+      "golden": "tools/rustev-conformance/expected/local-embed/local-embed.support-routing/SYNTHETIC.sr-f01.result.json",
+      "normalize": [],
+      "sha256": "ea36c12247206300977ab6079a9ca72d94ebc014b6d55baa83e2d07ba88f4296"
+    },
+    {
+      "file": "SYNTHETIC.sr-m01.judgment.json",
+      "golden": "tools/rustev-conformance/expected/local-embed/local-embed.support-routing/SYNTHETIC.sr-m01.judgment.json",
+      "normalize": [],
+      "sha256": "13e4cd751a572c7e43edf1f5d786b6680872654e24a701c38967f099f0ba8e22"
+    },
+    {
+      "file": "SYNTHETIC.sr-m01.record.json",
+      "golden": "tools/rustev-conformance/expected/local-embed/local-embed.support-routing/SYNTHETIC.sr-m01.record.json",
+      "normalize": [],
+      "sha256": "ab8183c59629a7cd9dcfbc4b94c9bf8e719ec376ddac55bc6bf4fd8847ffcea8"
+    },
+    {
+      "file": "SYNTHETIC.sr-m01.result.json",
+      "golden": "tools/rustev-conformance/expected/local-embed/local-embed.support-routing/SYNTHETIC.sr-m01.result.json",
+      "normalize": [],
+      "sha256": "bde6b8cd9ed55ecb9601cf4e9e9940b3fb0eb85a3280f340ae70409bf5ecfa5c"
+    },
+    {
+      "file": "SYNTHETIC.sr-t01.judgment.json",
+      "golden": "tools/rustev-conformance/expected/local-embed/local-embed.support-routing/SYNTHETIC.sr-t01.judgment.json",
+      "normalize": [],
+      "sha256": "a1da9e3ec3382f91f9cf0ec0eb855d385dd18729e30b6ccfe7c7841c4082f984"
+    },
+    {
+      "file": "SYNTHETIC.sr-t01.record.json",
+      "golden": "tools/rustev-conformance/expected/local-embed/local-embed.support-routing/SYNTHETIC.sr-t01.record.json",
+      "normalize": [],
+      "sha256": "48e4f9a038521b2a8a27986ddb5a47784ecb8c73d67aa9f0507c6393eefe217e"
+    },
+    {
+      "file": "SYNTHETIC.sr-t01.result.json",
+      "golden": "tools/rustev-conformance/expected/local-embed/local-embed.support-routing/SYNTHETIC.sr-t01.result.json",
+      "normalize": [],
+      "sha256": "47bb3240de8493174b05ed417a77f5f7d44aa6bdf9f40b276476530001dfe7e3"
+    }
+  ],
+  "surfaces": [
+    "rust-api",
+    "native"
+  ]
+}

@@ -42,6 +42,8 @@ rustev-runtime.workspace = true
 rustev-eval.workspace = true
 rustev-backend-rules.workspace = true
 rustev-pkg-support-routing.workspace = true
+# The shared conformance suite's local-embed runner (spec 011, 3.17.5).
+rustev-conformance = { path = "../../tools/rustev-conformance" }
 rustev-backend-embed-linear = { path = ".", features = ["synthetic"] }
 
 [lints]

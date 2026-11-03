@@ -30,6 +30,7 @@ use rustev_runtime::{
     RuntimeConfig, SinkPolicy,
 };
 
+mod conformance;
 mod evaluation;
 mod fixtures;
 

@@ -432,6 +432,7 @@ class Engine {
             (options.backends ?? []).map(backendSeam),
             options.contextSource ? contextSeam(options.contextSource) : undefined,
             telemetryOptions(options.telemetry),
+            localEmbedSet(options.localEmbedBackends),
           ),
         ),
     );
@@ -670,6 +671,68 @@ class Engine {
   }
 }
 
+// ---- the local semantic backend (spec 011, 3.17.1) ------------------------
+
+/** Each opened local backend's native handle, out of reach of code using it. */
+const localHandles = new WeakMap();
+const localToken = Symbol('LocalEmbedBackend');
+
+/** The local semantic backend of spec 011, opened from a bundle directory
+ * the host provisioned. It registers on an engine like a rules backend
+ * (`localEmbedBackends`); it is a Rust backend, not a host seam. In a build
+ * without the `local-embed` feature `open` rejects with `ConfigRefused`
+ * `feature_disabled`, and `features().localEmbed` is false. */
+class LocalEmbedBackend {
+  constructor(token, handle) {
+    if (token !== localToken) throw new TypeError('LocalEmbedBackend is made by LocalEmbedBackend.open');
+    localHandles.set(this, handle);
+  }
+
+  /** Verify the bundle and start the workers (011 3.7.1), off the
+   * JavaScript thread. A setup refusal is `ConfigRefused` whose code is the
+   * 3.7.2 setup code and whose detail names the item. */
+  static async open(config) {
+    if (config === null || typeof config !== 'object' || Array.isArray(config)) {
+      throw new classes.ConfigRefused('out_of_range', { field: 'localEmbed' });
+    }
+    try {
+      return new LocalEmbedBackend(localToken, await native.openLocalEmbed(config));
+    } catch (e) {
+      throw typed(e);
+    }
+  }
+
+  /** The descriptor derived from the bundle's manifest, canonical bytes. */
+  get descriptor() {
+    return localHandles.get(this).descriptor;
+  }
+
+  /** The bundle's `ArtifactId`. */
+  get artifact() {
+    return localHandles.get(this).artifact;
+  }
+}
+
+function localEmbedSet(registrations) {
+  const set = new native.LocalEmbedSet();
+  for (const [i, r] of (registrations ?? []).entries()) {
+    const handle = r !== null && typeof r === 'object' ? localHandles.get(r.backend) : undefined;
+    if (handle === undefined) {
+      throw new classes.ConfigRefused('out_of_range', { field: `localEmbedBackends[${i}].backend` });
+    }
+    if (!Number.isInteger(r.maxConcurrency) || r.maxConcurrency < 0 || r.maxConcurrency > 0xffff_ffff) {
+      throw new classes.ConfigRefused('out_of_range', { field: `localEmbedBackends[${i}].maxConcurrency` });
+    }
+    set.add(handle, r.maxConcurrency);
+  }
+  return set;
+}
+
+/** What this build of the addon contains. */
+function features() {
+  return native.features();
+}
+
 // 049 3.2: documents and secret bytes cross separately from option JSON.
 function telemetryOptions(t) {
   if (t === undefined) return undefined;
@@ -712,6 +775,8 @@ function named(inputs) {
 module.exports = {
   Engine,
   PlanHandle,
+  LocalEmbedBackend,
+  features,
   RustevError,
   SeamFailure,
   version: native.version,

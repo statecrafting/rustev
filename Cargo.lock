@@ -4467,6 +4467,7 @@ dependencies = [
  "ort",
  "rustev-backend-embed-linear",
  "rustev-backend-rules",
+ "rustev-conformance",
  "rustev-contract",
  "rustev-core",
  "rustev-eval",
@@ -4661,6 +4662,7 @@ dependencies = [
  "napi",
  "napi-build",
  "napi-derive",
+ "rustev-backend-embed-linear",
  "rustev-backend-rules",
  "rustev-contract",
  "rustev-core",
@@ -4668,6 +4670,7 @@ dependencies = [
  "rustev-otel",
  "rustev-runtime",
  "rustev-surface",
+ "serde",
  "serde_json",
  "tokio",
 ]
