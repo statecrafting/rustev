@@ -1,0 +1,39 @@
+{
+  "mapping": {
+    "amends": [
+      "027-node-and-wasm-bindings",
+      "031-public-api-and-release-family",
+      "056-release-0-1-1-and-consumer-qualification",
+      "058-one-tagged-run-releases-the-family"
+    ],
+    "dependsOn": [
+      "006-cli-surface",
+      "027-node-and-wasm-bindings",
+      "031-public-api-and-release-family",
+      "053-signed-release-candidates",
+      "054-npm-rustev-scope",
+      "056-release-0-1-1-and-consumer-qualification",
+      "058-one-tagged-run-releases-the-family"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "docs/decisions/00-founding-decisions.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "specId": "062-cli-npm-bin",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "28438f8eedf48f5b8512a105297f56f566af7e2a93172aa71b5223d7d5463e52"
+}

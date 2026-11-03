@@ -1,0 +1,101 @@
+{
+  "record": {
+    "amends": [
+      "027-node-and-wasm-bindings",
+      "031-public-api-and-release-family",
+      "056-release-0-1-1-and-consumer-qualification",
+      "058-one-tagged-run-releases-the-family"
+    ],
+    "created": "2026-11-03",
+    "dependsOn": [
+      "006-cli-surface",
+      "027-node-and-wasm-bindings",
+      "031-public-api-and-release-family",
+      "053-signed-release-candidates",
+      "054-npm-rustev-scope",
+      "056-release-0-1-1-and-consumer-qualification",
+      "058-one-tagged-run-releases-the-family"
+    ],
+    "id": "062-cli-npm-bin",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-3-same-bytes-as-the-archive",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "The CLI binary in each platform package is byte-identical to the executable member of the same release's CLI archive for that platform; the run fails before publication on any difference, and no step builds, strips, signs or rewrites the binary for npm."
+      },
+      {
+        "anchor": "3-2-the-launcher",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "The launcher passes arguments, standard input, output and error through unchanged, writes nothing to standard output, and ends with the binary's exit code, or re-raises the binary's terminating signal; it never maps, adds or suppresses a status of spec 006 3.2."
+      },
+      {
+        "anchor": "3-1-where-the-binary-lives",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "No npm package of the family gains an install script, an install-time or run-time download, a new dependency or a new package name; the launcher executes only the binary of the platform package at exactly its own version."
+      },
+      {
+        "anchor": "3-5-qualification",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "Qualification's npm step runs, on every platform of the npm matrix, `npx --no-install rustev version`, `--help` and the declared example's plan check through the installed bin, and requires the reported version and the check output equal to the CLI step's."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "062-the-cli-as-an-npm-bin-of-rustev-rustev-amends-027-031-056-and-058": "1a0febce957d933ec9c8c6351c64a0c8a94d6ed0f8b908434eef376244268e93",
+      "1-purpose": "bd2bf9ea66fc5a0f085d695137fcb96111e48c18f88f6d7a1e39fe09db9833e6",
+      "2-territory": "27c3f39b0ccc71c677035185412f313fc1946cff419b02c65ef92267a1237157",
+      "3-1-where-the-binary-lives": "06f78af9a9b495489c77c5ec6ff8281c625d925edcae768308fbcd62d6dc5bc6",
+      "3-2-the-launcher": "f7a0c5b175d54c0004d1eb1b4ef0b6d7a054675f46009bc68311dfbdf96d6d34",
+      "3-3-same-bytes-as-the-archive": "e6e6f49cfc3d1afcbc5a3bde7cb4076564ec6b01169ef885b4ddcb698e0c3eec",
+      "3-4-sbom-and-audit": "a62f6a3beb55d79e0edb6de2470d80104c58fb180af1fb5b8dc140cb7f396a1f",
+      "3-5-qualification": "fc046e3add1e6c3a475584a71b34c3b8b018b44e852f9e73566408c1bf335f3e",
+      "3-6-the-glibc-floor": "844419135eb966c4681831ed8dcfbf646b18db9a85a71132e8ab4a55efc5fb8f",
+      "3-7-what-stays": "145d0029ffc4aff4394edd5a1fdf86f2cd41811c6eb18a215ea0e9bc89c663bf",
+      "3-behavior": "8d60963dfb375c15b0500ce81cb9adcb2ee23f232c97df939715fae434f46c08",
+      "4-out-of-scope": "7c84487d494ab936f083d122870ba9223277c004a0d62cba868df2b677e95ce9",
+      "5-observable-negative-cases": "dc2a3892465587fd2d6e76f5e4db2fac75848060891aa213f91b950181d5fb8f",
+      "acceptance": "6c5187fa09d9bcdf1bcd5c79108bdbc7e24447ddf98ed268e16d48f0bb469006",
+      "decisions-at-approval": "632a997a6bf45b55848720e7e2d4e1a65f1aa0edeab427d8da82a9a202fc5565",
+      "implementation-record": "e7a203dd040d8ba2c677d5302bbbd2e868a805dcd4f2e12b281fe6c27a8ae757",
+      "verification": "c07c212e4d5120b529ad13ed99f699c32436c6bbe65405332576fb397bfc629d"
+    },
+    "sectionHeadings": [
+      "062: The CLI as an npm bin of @rustev/rustev (amends 027, 031, 056 and 058)",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 Where the binary lives",
+      "3.2 The launcher",
+      "3.3 Same bytes as the archive",
+      "3.4 SBOM and audit",
+      "3.5 Qualification",
+      "3.6 The glibc floor",
+      "3.7 What stays",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Implementation record",
+      "Decisions at approval"
+    ],
+    "specPath": "specs/062-cli-npm-bin/spec.md",
+    "status": "draft",
+    "summary": "A proposed amendment of approved specs 027 (3.13), 031 (3.1, 3.9), 056 (3.3) and 058 (3.2), for release 0.4.1. A Node consumer that gates its flows with `rustev gate select` today installs `@rustev/rustev` from npm and, separately, downloads a checksum-pinned CLI archive from the GitHub release, and must keep the two pins in step. This spec ships the CLI inside the npm family: each per-platform package `@rustev/rustev-<platform>` carries the release's `rustev` binary for its platform beside the Node-API addon, byte-identical to that platform's CLI archive member, and `@rustev/rustev` declares a `rustev` bin, a small JavaScript launcher that resolves the installed platform package and executes its binary with arguments, standard streams, exit code and signals passed through unchanged. One npm pin then names the binding and the CLI. No npm name is added, no install script runs, the CLI archives stay on the release, and the command surface of spec 006 does not change. Draft: nothing is implemented until ratified.\n",
+    "title": "The CLI as an npm bin of @rustev/rustev (amends 027, 031, 056 and 058)"
+  },
+  "shardHash": "28438f8eedf48f5b8512a105297f56f566af7e2a93172aa71b5223d7d5463e52",
+  "specVersion": "1.10.0"
+}
