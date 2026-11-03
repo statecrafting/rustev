@@ -433,6 +433,42 @@ oci://...` can read its attestations while the package is still private
 call grants `packages: read` as that job's ceiling. No job gains a write
 permission.
 
+**Increment 4c, 2026-11-03 (3.3, 3.4.2, workflow).** release.yml's `tag`
+job decides, after 058 3.1.1, whether the manifest names the image
+(`image_member`: the release set names it and the tag is not a
+candidate) and whether the run pushes it (`image`: also a pushed release
+tag), and otherwise names why in a notice (absent from the release set, a
+candidate, or a dry run). `manifest` now also waits for `image-checks`
+and, with the image a member, takes the two `image-release-*` archives
+with their sidecars and the two image SBOMs from `image-evidence`, so
+`run-manifest` names the image (increment 4a); `image-checks` gates the
+manifest only then. The new `publish-image` job follows `manifest`,
+`approve`, `image-checks` and `publish-npm`, requires each of them (and
+`manifest`) to have succeeded, runs only when `tag` decided a push, and is the only job with `packages: write`, beside `contents: read`,
+`id-token: write` and `attestations: write`. It installs oras 1.3.6 by its
+release tarball's SHA-256, checks each archive against its sidecar, and
+runs `rustev-release image-tag`: a tag naming another index fails the run,
+a tag already naming the run's index skips the push (058 3.5), and an
+absent tag is pushed: each platform by digest from its OCI archive (`oras
+cp --from-oci-layout <archive>@<digest>`, no tag), then the manifest's
+index bytes under `X.Y.Z` (`oras manifest push`), after which the tag must
+name the manifest's index. It then attests the index digest with
+`actions/attest-build-provenance` v4.2.2 and each platform digest with its
+SBOM with `actions/attest-sbom` v4.1.0 (commit
+`c604332985a26aa8cf1bdc465b92731239ec6b9e`), both `push-to-registry:
+true`; a rerun attests again, which only adds. `github-release` follows
+`publish-image` whenever the run pushes the image. `verify-release` gains
+`packages: read` and, when the run pushed the image, runs `rustev-release
+verify-image` and `gh attestation verify oci://...` for the index's
+provenance and each platform's CycloneDX SBOM against the attestation
+store. Nothing changes while the release set lists the image as absent:
+`image_member` and `image` are false, `publish-image` is skipped, and the
+manifest names no image. Neither oras step has run against ghcr.io yet;
+the first release with the image runs them. A new organization package on
+ghcr.io starts private; the owner decided on 2026-11-03 to make
+`ghcr.io/statecrafting/rustev-serve` public by hand after its first push,
+so anonymous consumers (and 3.4.3's qualification) can pull it.
+
 ## Decisions at approval
 
 Ratified by the owner on 2026-11-03 (A-76: "I ratify 060"), as proposed:

@@ -41,17 +41,22 @@
 # - `publish-crates`, `publish-npm`: idempotent publication in the release
 #   set's order, through crates.io and npm trusted publishing (OIDC), npm with
 #   provenance; `publication.json` records each item.
+# - `publish-image`: layer 7 (spec 060 3.3), only for a release tag whose
+#   release set names the image: each platform's verified OCI archive pushed
+#   by digest with the pinned oras, then the OCI index the manifest names
+#   under the tag `X.Y.Z`, then its provenance and each platform's SBOM
+#   attested. The only job that writes packages.
 # - `github-release`: the release (a candidate: the pre-release), created
-#   once; the only job of this file that writes contents. No job writes
-#   packages.
+#   once; the only job of this file that writes contents.
 # - `verify-release`: the downloaded release against the manifest, every
 #   attestation against its bundle and the attestation store, and the
 #   registries against the manifest.
 # - `image`, `image-checks`: the rustev-serve image of 042 3.16, built twice
-#   per platform, checked, compared, with SBOMs and a scan (031 3.9). The
-#   image is absent from the release set: nothing is attested or pushed,
-#   no publication job needs these, and `qualify` waits for them without
-#   depending on their result.
+#   per platform, checked, compared, with SBOMs and a scan (031 3.9). While
+#   the release set lists the image as absent nothing is attested or pushed,
+#   no publication job depends on their result, and `qualify` waits for them
+#   without depending on it. Once it is a member (060 3.1), `manifest` names
+#   the image from their archives and SBOMs and `publish-image` pushes it.
 # - `qualify`: qualify.yml, the last stage; its failure fails the run and
 #   leaves the lifecycle at `released`. Its `contents: write` reaches only
 #   qualify.yml's `attach`, which adds the `qualification-` assets to the
@@ -87,6 +92,10 @@ jobs:
       version: ${{ steps.tag.outputs.version }}
       epoch: ${{ steps.tag.outputs.epoch }}
       candidate: ${{ steps.tag.outputs.candidate }}
+      # 060 3.1, 3.3.1: whether the manifest names the image (a member, not a
+      # candidate), and whether this run pushes it (also a release tag).
+      image_member: ${{ steps.image.outputs.member }}
+      image: ${{ steps.image.outputs.push }}
     steps:
       - name: A tag run is a vX.Y.Z or vX.Y.Z-rc.N tag (058 3.1.1)
         if: github.event_name == 'push'
@@ -123,6 +132,29 @@ jobs:
           test "$(sed -n 's/^commit=//p' "$RUNNER_TEMP/tag.txt")" = "$(git rev-parse HEAD)" \
             || { echo "058 3.1.1: the checkout is not the tagged commit" >&2; exit 1; }
           cat "$RUNNER_TEMP/tag.txt" >> "$GITHUB_OUTPUT"
+      - name: Whether this run names and pushes the image, and why not (060 3.3.1)
+        id: image
+        env:
+          EVENT: ${{ github.event_name }}
+          CANDIDATE: ${{ steps.tag.outputs.candidate }}
+        run: |
+          set -eu
+          member=false push=false
+          if ! jq -e '.image' tools/rustev-release/release-set.json >/dev/null; then
+            reason='the release set lists the image as absent'
+          elif [ "$CANDIDATE" = true ]; then
+            reason='a candidate never names or pushes the image (053 3.4.2)'
+          elif [ "$EVENT" != push ]; then
+            member=true reason='a dry run pushes nothing (058 3.1.5)'
+          else
+            member=true push=true reason=
+          fi
+          printf 'member=%s\npush=%s\n' "$member" "$push" >> "$GITHUB_OUTPUT"
+          if [ "$push" = true ]; then
+            echo "060 3.3.1: the image is a member; publish-image pushes it"
+          else
+            echo "::notice title=publish-image skipped::$reason"
+          fi
 
   bindings:
     name: bindings
@@ -597,7 +629,15 @@ jobs:
 
   manifest:
     name: manifest
-    needs: [tag, crates, archive, pack, reproducibility, sbom, audit]
+    needs: [tag, crates, archive, pack, reproducibility, sbom, audit, image-checks]
+    # The image's checks gate the manifest only once the manifest names the
+    # image (060 3.4.1).
+    if: >-
+      !cancelled() && needs.tag.result == 'success' && needs.crates.result == 'success' &&
+      needs.archive.result == 'success' && needs.pack.result == 'success' &&
+      needs.reproducibility.result == 'success' && needs.sbom.result == 'success' &&
+      needs.audit.result == 'success' &&
+      (needs.tag.outputs.image_member != 'true' || needs.image-checks.result == 'success')
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -625,6 +665,24 @@ jobs:
         with:
           name: sbom
           path: ${{ runner.temp }}/artifacts/sbom
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: needs.tag.outputs.image_member == 'true'
+        with:
+          pattern: image-release-*
+          path: ${{ runner.temp }}/artifacts/image
+          merge-multiple: true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: needs.tag.outputs.image_member == 'true'
+        with:
+          name: image-evidence
+          path: ${{ runner.temp }}/image-evidence
+      - name: The image's SBOMs beside the others (060 3.4.1)
+        if: needs.tag.outputs.image_member == 'true'
+        run: |
+          set -eu
+          for arch in amd64 arm64; do
+            cp "$RUNNER_TEMP/image-evidence/rustev-serve-linux-$arch.oci.tar.cdx.json" "$RUNNER_TEMP/artifacts/sbom/"
+          done
       - name: The manifest and SHA256SUMS from this run's artifacts (058 3.2.4)
         env:
           EVENT: ${{ github.event_name }}
@@ -795,13 +853,116 @@ jobs:
           if-no-files-found: ignore
           overwrite: true
 
+  publish-image:
+    name: publish-image
+    needs: [tag, manifest, approve, image, image-checks, publish-crates, publish-npm]
+    # 060 3.3.1: layer 7 after layer 6, only when `tag` decided a push (a
+    # release tag whose release set names the image); a candidate or a dry
+    # run skips it, and `tag` names why.
+    if: >-
+      !cancelled() && needs.tag.outputs.image == 'true' && needs.manifest.result == 'success' &&
+      needs.approve.result == 'success' && needs.image-checks.result == 'success' &&
+      needs.publish-crates.result == 'success' && needs.publish-npm.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # The only job that writes packages; attestation needs the other two.
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      IMAGE: ghcr.io/statecrafting/rustev-serve
+      VERSION: ${{ needs.tag.outputs.version }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.tag.outputs.commit }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release
+          path: ${{ runner.temp }}/release
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: image-release-*
+          path: ${{ runner.temp }}/image
+          merge-multiple: true
+      - name: The pinned copy tool, oras 1.3.6 (060 3.3.2)
+        run: |
+          set -eu
+          mkdir -p "$HOME/oras" && cd "$HOME/oras"
+          file=oras_1.3.6_linux_amd64.tar.gz
+          curl -sSfL -o "$file" "https://github.com/oras-project/oras/releases/download/v1.3.6/$file"
+          echo "66fb0ad7206f3f6fa77ed5b552049d364ccf4b50b1684554f731f76302b52ca0  $file" | sha256sum -c -
+          tar -xzf "$file" oras
+          echo "$HOME/oras" >> "$GITHUB_PATH"
+      - name: The archives are the bytes the run built, compared and scanned (060 I-1)
+        run: |
+          set -eu
+          cd "$RUNNER_TEMP/image"
+          for arch in amd64 arm64; do sha256sum -c "rustev-serve-linux-$arch.oci.tar.sha256"; done
+      - name: The tag is absent or already the run's index; another fails (060 3.3.3)
+        id: state
+        run: |
+          set -eu
+          state=$(cargo run --quiet --locked -p rustev-release -- image-tag "$RUNNER_TEMP/release" "$RUNNER_TEMP/index.json")
+          echo "$IMAGE:$VERSION is $state"
+          echo "state=$state" >> "$GITHUB_OUTPUT"
+      - name: Push each platform by digest, then the index under X.Y.Z (060 3.3.2)
+        if: steps.state.outputs.state == 'absent'
+        run: |
+          set -eu
+          printf '%s' "$GH_TOKEN" | oras login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          manifest="$RUNNER_TEMP/release/release-manifest.json"
+          for arch in amd64 arm64; do
+            digest=$(jq -r --arg p "linux/$arch" '.image.platforms[] | select(.platform == $p) | .digest' "$manifest")
+            # By digest from the run's archive, never rebuilt; no tag.
+            oras cp --from-oci-layout "$RUNNER_TEMP/image/rustev-serve-linux-$arch.oci.tar@$digest" "$IMAGE"
+            oras manifest fetch --descriptor "$IMAGE@$digest" >/dev/null
+          done
+          oras manifest push --media-type application/vnd.oci.image.index.v1+json "$IMAGE:$VERSION" "$RUNNER_TEMP/index.json"
+          test "$(cargo run --quiet --locked -p rustev-release -- image-tag "$RUNNER_TEMP/release" "$RUNNER_TEMP/index.json")" = present \
+            || { echo "060 3.3.2: $IMAGE:$VERSION does not name the manifest's index after the push" >&2; exit 1; }
+      - name: The index and platform digests to attest
+        id: digests
+        run: |
+          set -eu
+          manifest="$RUNNER_TEMP/release/release-manifest.json"
+          {
+            echo "index=$(jq -r '.image.index_digest' "$manifest")"
+            echo "amd64=$(jq -r '.image.platforms[] | select(.platform == "linux/amd64") | .digest' "$manifest")"
+            echo "arm64=$(jq -r '.image.platforms[] | select(.platform == "linux/arm64") | .digest' "$manifest")"
+          } >> "$GITHUB_OUTPUT"
+      # 060 3.3.4: keyless Sigstore attestations, the image's signature
+      # (031 3.9.5); Build Level 2. A rerun attests again, which only adds.
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.digests.outputs.index }}
+          push-to-registry: true
+      - uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.digests.outputs.amd64 }}
+          sbom-path: ${{ runner.temp }}/release/rustev-serve-linux-amd64.oci.tar.cdx.json
+          push-to-registry: true
+      - uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.digests.outputs.arm64 }}
+          sbom-path: ${{ runner.temp }}/release/rustev-serve-linux-arm64.oci.tar.cdx.json
+          push-to-registry: true
+
   github-release:
     name: github-release
-    needs: [tag, bindings, cli, rebuild, crates, crates-rebuild, archive, pack, reproducibility, sbom, audit, manifest, approve, publish-crates, publish-npm]
-    # A release after npm; a candidate straight after `manifest` (3.7).
+    needs: [tag, bindings, cli, rebuild, crates, crates-rebuild, archive, pack, reproducibility, sbom, audit, manifest, approve, publish-crates, publish-npm, publish-image]
+    # A release after npm and, once a member, the image (060 3.3.1); a
+    # candidate straight after `manifest` (3.7).
     if: >-
       !cancelled() && github.event_name == 'push' && needs.manifest.result == 'success' &&
-      (needs.tag.outputs.candidate == 'true' || needs.publish-npm.result == 'success')
+      (needs.tag.outputs.candidate == 'true' || (needs.publish-npm.result == 'success' &&
+      (needs.tag.outputs.image != 'true' || needs.publish-image.result == 'success')))
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     # The only job of this workflow that may write contents (058 3.3.3).
@@ -831,10 +992,12 @@ jobs:
     if: ${{ !cancelled() && needs.github-release.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    # attestations: read, for `gh attestation verify` against the store.
+    # attestations: read, for `gh attestation verify` against the store;
+    # packages: read, to read the image's registry state (060 3.4.2).
     permissions:
       contents: read
       attestations: read
+      packages: read
     env:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
@@ -879,6 +1042,21 @@ jobs:
           # shellcheck disable=SC2086 # one argument per package
           npm install --ignore-scripts --force --no-audit --no-fund $names
           npm audit signatures
+      - name: The registry holds the manifest's image, and its attestations verify (060 3.4.2)
+        if: needs.tag.outputs.image == 'true'
+        env:
+          IMAGE: ghcr.io/statecrafting/rustev-serve
+        run: |
+          set -eu
+          manifest="$RUNNER_TEMP/published/release-manifest.json"
+          cargo run --quiet --locked -p rustev-release -- verify-image "$RUNNER_TEMP/published"
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          gh attestation verify "oci://$IMAGE@$(jq -r '.image.index_digest' "$manifest")" --repo "$REPO" \
+            --signer-workflow "$REPO/.github/workflows/release.yml" --source-ref "refs/tags/$TAG"
+          for digest in $(jq -r '.image.platforms[].digest' "$manifest"); do
+            gh attestation verify "oci://$IMAGE@$digest" --repo "$REPO" --predicate-type https://cyclonedx.org/bom \
+              --signer-workflow "$REPO/.github/workflows/release.yml" --source-ref "refs/tags/$TAG"
+          done
 
   qualify:
     name: qualify
