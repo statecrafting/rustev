@@ -142,6 +142,14 @@ pub struct RunOutcome {
 
 /// Validate all resolved inputs before the caller opens a journal.
 pub fn prepare(mut spec: RunSpec, opts: RunOptions) -> Result<PreparedRun, LiveError> {
+    // Spec 043 3.3.5: live sends of final_test cases are refused, because the
+    // engine counts no exposure a host could record under spec 023 3.2.
+    if spec.split == "final_test" {
+        return Err(LiveError::invalid(
+            "live-config",
+            "final_test cases are not sent live",
+        ));
+    }
     probe::check_acquisitions(&spec.config, &spec.candidates)?;
     for (i, page) in spec.acquisition_pages.iter().enumerate() {
         let key = format!("live-acquisition-capture/{i}");

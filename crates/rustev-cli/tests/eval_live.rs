@@ -236,6 +236,28 @@ fn real_declaration_without_admission_is_rejected_before_journal() {
     assert!(!f.s.exists("out"));
 }
 #[test]
+fn final_test_is_refused_before_reads_with_valid_ledger_flags() {
+    let f = Fixture::new();
+    let mut args = f.args.clone();
+    let i = args.iter().position(|s| s == "training").unwrap();
+    args[i] = "final_test".into();
+    for (flag, file) in [
+        ("lineage", "lineage.json"),
+        ("ledger-new", "ledger.json"),
+        ("ledger-out", "ledger-out.json"),
+    ] {
+        args.extend([
+            format!("--{flag}"),
+            f.s.path(file).to_str().unwrap().to_owned(),
+        ]);
+    }
+    let result = execute(&args, &Context::default());
+    assert_eq!(result.code, 2, "{result:?}");
+    assert!(!f.s.exists("journal.jsonl"));
+    assert!(!f.s.exists("out"));
+    assert!(!f.s.exists("ledger-out.json"));
+}
+#[test]
 fn missing_snapshot_is_unavailable_but_identity_mismatch_is_pre_journal() {
     let f = Fixture::new();
     std::fs::remove_file(f.s.path("snapshots/one.json")).unwrap();
