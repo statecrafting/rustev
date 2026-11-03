@@ -60,6 +60,15 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
+      # 2026-11-02: "Disk quota exceeded" failed acceptance groups in the
+      # merge queue (rustc output, the seed workers' target copies). The
+      # preinstalled toolchains no group uses are removed first; the df
+      # lines before and after are the record.
+      - name: Free runner disk
+        run: |
+          df -h / /tmp | sed 's/^/before: /'
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL || true
+          df -h / /tmp | sed 's/^/after: /'
       # The managed preflight job, which gates this one, saves the pinned
       # binary under this key on every ref; restoring it here avoids four
       # jobs racing to save their own copy and a 2-minute install on a miss.

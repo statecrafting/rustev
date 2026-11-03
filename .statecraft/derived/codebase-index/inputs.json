@@ -4,7 +4,7 @@
       "contentHash": "1ccc0c5f65043cfb26e4f0988fa922da7659a3e9df023835ee37bb03d149049e"
     },
     ".github/workflows/bindings.yml": {
-      "contentHash": "7f7ba8e6c5f55001e38c204fbeda9f842ee35cf1349a4fa38974850d2084da6a"
+      "contentHash": "e8a118d2702ad871f0a4351ebf8f4c24a07be7aa51d911a2af9baab77926b872"
     },
     ".github/workflows/boundaries.yml": {
       "contentHash": "5da4d3c3f91a1fa6998458fcd41df060c53431a6e8ffabcbc57b1586e18c77a4"
@@ -13,7 +13,7 @@
       "contentHash": "153b7fb43ea73339b59c61f6019eb4293044d668e8652d001c969939ecdeacea"
     },
     ".github/workflows/release-checks.yml": {
-      "contentHash": "56e5062db0d8e68db8aef02db53933cea93b36d81660873d32fa600d0ed653d2"
+      "contentHash": "1afec06c15e920a8e8d2b6a4148a556dcb9cf104bb8cf25ccedbf6e26aa72517"
     },
     ".github/workflows/release.yml": {
       "contentHash": "3e9a57dc1defe8655bf071bfeb559c79e5bceea9c5bac9e027a108a4fe272457"
@@ -25,7 +25,7 @@
       "contentHash": "bede732e7b06486451c7c08844bce094b37405bf5879cb5f2a50dc1d7615bc3f"
     },
     ".github/workflows/verify.yml": {
-      "contentHash": "b12c25bae4366863390487890e18399bba6aa381270fc47d3ef42b9c93e23389"
+      "contentHash": "9df7770612b3eb9076736e83655e34dc8c2ff074864e900302e7d82624239f24"
     },
     ".gitignore": {
       "contentHash": "218b76a5e1c09226bf9d0f4b5fd2f5ef13c7d8419386e4ca3907b422f50e1bef"

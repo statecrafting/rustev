@@ -1021,6 +1021,14 @@ everywhere and save on a push to main, msrv caches registry and git only (its
 target was 4 GB), and workspace crates' artifacts are dropped before saving,
 because Cargo rebuilds them after any checkout.
 
+**2026-11-02, CI only (no claim of this spec changes).** A pull request's own
+run leaves out the `release-checks.yml` jobs when it changes no workspace
+package, no workspace-wide file, no `tools/rustev-conformance/js/` file and
+not the workflow (spec 001's `affected.py`): a specs-only or documents-only
+change. The merge queue and every push to `main` run every check, as do pull
+requests with the label `statecraft:stacked-ci`; a final `release-checks` job
+accepts a skip only when `scope` chose it.
+
 **First publication, 2026-10-26, `v0.1.0` at `9dbf8e0`.** The tagged run
 40351642532 bound every artifact to the signed manifest. With all twelve
 crates public (spec 021's record), run 40379390061 passed bind and the
