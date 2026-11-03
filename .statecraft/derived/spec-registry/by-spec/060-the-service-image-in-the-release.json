@@ -68,7 +68,7 @@
       }
     ],
     "sectionDigests": {
-      "060-the-service-image-in-the-release-amends-031-056-and-058": "2bbb3a21338ef2a1817abf88c1e471b7fd6c01ae05ac14de2f68e08975e08dba",
+      "060-the-service-image-in-the-release-amends-031-056-and-058": "e551d5250864fab2d9b1014aa7dbb482b130ecb2589540e8ac4cb0a82cd7ed1d",
       "1-purpose": "7b419ba5ed5b51d61f71b8c0d718274a3c1b803b4bbc61a66becb98b3b743db3",
       "2-territory": "18bb5251eba599178422b44c5c74fa4ef6b61bdba0ca354a9e7b0db711c78a83",
       "3-1-membership": "d2d7140280c9042bb19994825d4bef2565e3c35c055827bad4ef9a0d18d78fa7",
@@ -83,7 +83,7 @@
       "5-observable-negative-cases": "b1481be8e83226a82a17ca7f4e6ca48a077b49fcf31759c874a43e82d9f2da15",
       "acceptance": "d5e766e95ac7bc869bdd89a8d00c9423c373735498b35ab5b9565bd6e3c01b9b",
       "decisions-at-approval": "71b88f06e129837878e2e6b9f0d687f10b34f015afdf361dc0227aa77ee0a384",
-      "implementation-record": "2af78818eb8361fdca18e22f6f28d8c98e54241fb429d03b8dd6ae5d8a955706",
+      "implementation-record": "9d4e5a2133ce7737f51b927c09bb3f1f0fec67075a3acde71d56e9a7ec3b31fb",
       "verification": "3bf4b8ec88d123be805a717a1c93492d47f532b1373a4411d8227fc4448b746b"
     },
     "sectionHeadings": [
@@ -110,6 +110,6 @@
     "summary": "An amendment of approved specs 031 (3.1 layer 7, 3.9), 056 (3.3) and 058 (3.3.4, 3.5.2), ratified (A-76) for the release after 0.4.0. Spec 042 3.16's `rustev-serve` image is built, checked, compared, described and scanned in every release run, and is not published: 058 3.3.4 gives no job `packages: write`, and the owner decided on 2026-11-02 that 0.4.0 ships without the image. This spec admits the image as a release member. One job, `publish-image`, holds `packages: write` and runs only for a release tag, never for a candidate or a dry run. It pushes the run's verified OCI archives by digest to `ghcr.io/statecrafting/rustev-serve`, joins them in one index tagged with the family version, and attests the SLSA build provenance and each platform's SBOM. The manifest names the index and platform digests, the vulnerability scan gates through an owner-approved, expiry-bounded exception file, and qualification runs 031 3.9.7 (c). Spec 053's candidate refusals are unchanged. A release also keeps its qualification evidence as `qualification-` assets, which the release comparison ignores (3.7).\n",
     "title": "The service image in the release (amends 031, 056 and 058)"
   },
-  "shardHash": "5fc2f01f06f14ecb2f695394568f304f80593a52cd4b8c55f2bddfc9353c2a74",
+  "shardHash": "2578ea688f22dfa380aec216298f7859ce678aa3edee0ca076eb6decee2db0e2",
   "specVersion": "1.10.0"
 }
