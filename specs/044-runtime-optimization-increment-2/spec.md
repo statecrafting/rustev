@@ -2,7 +2,7 @@
 id: "044-runtime-optimization-increment-2"
 title: "Runtime optimization increment 2: duplicate suppression, persistent and decision-result caches, batching qualification (amends 017, 003, 002, 009, 012 and 020)"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-10-17"
 summary: >
   An amendment of approved spec 017 (and, through it, of spec 003's
@@ -825,7 +825,7 @@ cargo test -p rustev-runtime --locked --test acquisition --test generation --tes
 # 3.7, 3.10.5: per-item isolation on every batching path; the spec 017 batching and memory tier tests, unchanged.
 cargo test -p rustev-runtime --locked --test optimization
 cargo test -p rustev-remote-http --locked --test isolation
-# 3.8 items 1 and 3: the report, and stage 1 for the remote-http and Jev adapters.
+# 3.8 items 1 to 3: the report, stage 1 for the remote-http and Jev adapters, and stage 2 from each recorded fixture.
 cargo test -p rustev-eval --locked --lib batch_qualification
 cargo test -p rustev-remote-http --locked --test batch_qualification
 cargo test -p rustev-jev --locked --test batch_qualification
@@ -838,15 +838,15 @@ cargo test -p rustev-runtime --locked --test optimization_benchmark_044 -- --ign
 The spec 009, 012 and 017 tests are unchanged (3.10.5) and run under
 those specs' own declared verification.
 
-Open, reported as such and never as passed:
-- Stage 2 of 3.8 (item 2) for the remote-http adapter, whose report keeps
-  the verdict `unknown`. The Jev adapter's stage 2 ran on 2026-10-29 and
-  measured `not_qualified` (below).
+Stage 2 of 3.8 (item 2) ran live for both adapters and is checked from
+its recorded fixtures by the `batch_qualification` targets above: the Jev
+adapter measured `not_qualified` (43 of 46, 2026-10-29) and the remote-http
+adapter `qualified` (48 of 48, 2026-11-03), both below. No live call is
+part of declared verification.
 
 3.8 item 4, R-2's construction check `batch_unqualified` and section 5's
 row "A production binding enables batching without a qualified report"
-landed in increment 8 (below). This spec stays `in-progress` until stage 2
-for the remote-http adapter lands.
+landed in increment 8 (below).
 
 **Owner decision A-49 (2026-10-23): dependencies.** Spec 022 is no longer
 a declared dependency of this spec; spec 012 remains one. Only the
@@ -2189,6 +2189,76 @@ Verification block:
 `production_without_batching_ignores_a_report_and_records_none`.
 `production_refuses_each_ineligible_binding_before_credentials` keeps its
 batching case, now refused as `batch_unqualified` with no report cited.
+
+**Stage 2 of 3.8 for the remote-http adapter (2026-11-03).** Run live
+under the owner's authorization of 2026-10-29 ("stage 2 is authorized as
+is stage 3 and anything else thats needed") and the owner's choices of
+2026-11-03, within R-29's testing cap (the journal's hard stop at USD
+5) and the one persistent testing journal.
+- **Head.** Spec 009's adapter has no provider of its own. A loopback
+  `RemoteServer`, with shared-state batching allowed (3 items), hosts the
+  Jev backend on spec 022 stage 3's direct binding
+  `sha256:12897cdf3796818833af333769e913d1a1f65a267532ea4de2ec3b144fd40bd4`
+  (pin `jev-1.14.0`, batching off), built through `new_qualification`.
+  Two remote-http clients bind it: one with adapter-scoped batching at
+  stage 1's configuration (3 items, 2,000 ms) and one without. Both have
+  the binding identity
+  `sha256:28d21a9ef3b4183305b3ddead49692801f356a436f5e45111bf94dfec1bd2e65`,
+  because `rustev.remote-binding/1` does not hold the switch.
+- **What it measures.** Remote-http batching sends each item to the model
+  as its own attempt: the server spawns one attempt per item of a batched
+  request (`server.rs`, `spawn_attempt` per item), so the head never sees
+  the batch. A disagreement here is therefore the model's run-to-run
+  variation through batched against unbatched exchanges, not a change in
+  what the model is asked.
+- **Set.** The `rustev-pkg-support-routing` package's 16 SYNTHETIC
+  tickets (R-04), each decided through the package's plan (topic declared
+  uncalibrated, as in the spec 016 swap), unbatched first and then
+  batched. Each ticket asks three questions on one state (topic,
+  frustration, deadline), so 48 pairs. The owner chose this in-repository
+  set over spec 012's stage 3 set. No spec 023 dataset is involved.
+- **Bound.** A-64's: `top_label` agreement at 19 of 20 over at least 20
+  comparable pairs, declared in the test (`STAGE_2_BOUND`,
+  `STAGE_2_MINIMUM`) before the run.
+- **Result.** Every call answered. The batched arm sent 16 exchanges of
+  three members, and the unbatched arm sent 48 single-item exchanges. 48
+  of 48 pairs agree on the top label, so the verdict is `qualified`. One
+  run, no rerun.
+- **Spend.** 96 reservations (1,659,252 units), settled at 1,414,728 units
+  estimated, nothing observed and no unknown settlement: about USD
+  0.0014. The journal's committed total went from 23,583,572 to
+  24,998,300 units.
+- **Harness.** Kept outside the repository, as the Jev stage 2 harness
+  was. Its source digests: `src/main.rs`
+  `9119405f3027d49b9b180cff2ffed2d2a66e8b8499e9ae435b7680cce617b4f3`,
+  `Cargo.toml`
+  `690b290cd8b0a55d786523150237c6c25859deb39b3f6ea23366ca884cfe446f`,
+  `Cargo.lock` (this repository's at `cf3ae8d7`)
+  `d733dedb742e83faa80d53f838f6f4b4525ee0508efa6800993f994bdf946251`.
+  It ran as `RUSTEV_044_LIVE=1 cargo run --release -- --journal <testing
+  journal> --key-file <owner's key file> --binding
+  integrations/rustev-jev/tests/fixtures/recorded-044-direct-stage2.json
+  --out <fixture>`, built against this repository at `cf3ae8d7`. The key
+  was read into the credential callback only and checked absent from the
+  output.
+- **Recorded.** The pairs, both binding identities, the head binding and
+  the exchange counts are in
+  `integrations/rustev-remote-http/tests/fixtures/recorded-044-remote-stage2.json`
+  (case ids and distributions only).
+  `stage_2_on_the_hosted_jev_head_measures_qualified` in
+  `integrations/rustev-remote-http/tests/batch_qualification.rs` runs
+  stage 1, derives the report from both stages, and asserts `(48, 48)` and
+  `qualified`.
+- **Posture.** Citing this report grants nothing. 3.8 item 4's
+  construction check belongs to spec 022's production binding, and
+  enabling adapter-scoped batching in production stays the owner's act
+  (R-28). No binding enables it.
+
+`crates/rustev-runtime/tests/acceptance-044.md` now maps both stage 2
+tests. Its row 14 and item 4's `recompute` entry also name the increment
+5 part d2 tests, which they still listed as open. Every Acceptance item
+and section 5 row is met, increment 8's production posture included, so
+this spec is `complete`.
 
 ## Decisions at approval
 
