@@ -475,8 +475,11 @@ binding record) and ruled on its findings on 2026-11-03: "accept all 44"
 (A-80). `tools/rustev-release/image-exceptions.json` lists the 44
 (vulnerability, package) pairs grype 0.120.1 reported on both platforms of
 that base, each naming A-80 and expiring on 2027-02-01, 90 days after the
-row. 43 are not reached (the binary links only libc, libm and libgcc_s,
-and TLS is statically linked rustls); CVE-2026-8674 in libc6 is reachable
+row. 43 are not reached, each entry saying why: the binary links only
+libc, libm and libgcc_s (TLS is statically linked rustls), imports none
+of the affected glibc functions, is neither setuid nor setgid, and
+imports no C++ symbol, and the gcc-14 findings are in libstdc++ code;
+CVE-2026-8674 in libc6 is reachable
 only through the container's `resolv.conf` or `LOCALDOMAIN`, which the
 operator controls, and the `rustev-serve` README says so. The same day the
 owner amended 3.4.3 ("amend 3.4.3 as recommended", A-79). Both rows are in
