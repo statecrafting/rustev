@@ -990,6 +990,53 @@ platforms, every encoder limit on `linux-aarch64-gnu`, and that
 `linux-x86_64-gnu` is still not measured: no native x86_64 Linux host was
 available, and an emulated measurement would not be one.
 
+**After the gate, part 2 (2026-11-03): runtime loading, the platform
+table and the ONNX encoder (3.6, 3.8.3, 3.8.4, 3.9.1).** `src/runtime.rs`
+holds the platform key of the compilation target (3.6.3) and the
+qualified-platform table, which is the committed record's `pass` verdicts
+and therefore empty; `tests/feasibility_record.rs` checks that the two
+agree. An `onnx` bundle is refused `unqualified_platform` before its
+runtime path is read. Loading (3.6.1) refuses a missing or relative path
+(`runtime_missing`), reads and hashes the file and compares it with the
+manifest's entry for the platform (`runtime_digest_mismatch`), and refuses
+a second digest in the process (`runtime_conflict`, 3.6.2); an equal
+digest reuses the loaded runtime. The reported version is read through
+`ort::util::probe`, which returns the minor number of a 1.x library: the
+patch number cannot be read without `unsafe`, which the workspace forbids,
+so the digest binds the exact bytes whose full version the record
+observed, and a library reporting no or another version is refused
+`runtime_version_mismatch`. A manifest naming another `ort` than the
+pinned one is `manifest_invalid`. `src/onnx.rs` creates one session from
+the verified graph bytes, which are then released: CPU only, no
+environment execution providers, the manifest's optimization level
+(`all` is ONNX Runtime's `ORT_ENABLE_ALL`) and thread counts. It checks
+the graph's inputs, their int64 type, the output's name, float type and
+hidden size (`graph_rejected`, `graph_signature_mismatch`). A run feeds
+`input_ids`, `attention_mask` and, when declared, `token_type_ids` of
+zeros (3.9.1). The workers share the session and their runs on it are
+serialized, since `ort` runs need exclusive access. A raised attempt
+signal requests termination through the run's options (3.12.2).
+Tokenization and truncation were part a's; with this part they run on the
+real tokenizer. Default tests (`tests/runtime/mod.rs`) reach every runtime
+code but `runtime_conflict` with no library and with a synthetic
+non-library file; the conflict decision has a unit test. The hand test
+`tests/runtime/hand.rs` (ignored; `RUSTEV_EMBED_CHECKPOINT` and
+`RUSTEV_EMBED_RUNTIME`) assembles an `onnx` bundle from the pinned graph
+and tokenizer with one generated head. On 2026-11-03 on `macos-aarch64`
+(the record's library, `2a50a63e...`, from the release tarball whose
+digest the record holds) it passed: all 21 reference token-id sequences
+reproduced (19 inferred, one `text_empty`, one `too_many_tokens`); every
+pooled embedding within the 3.3 bounds of the reference (largest
+component difference 0.00000028312206268310547, the probe's), and bitwise
+repeatable in process; `runtime_version_mismatch`, `runtime_conflict`,
+`graph_rejected` and `graph_signature_mismatch` with the real library; a
+raised signal ending a 256-token run after 2.9 ms against 78.6 ms
+uncancelled; and the backend still refusing the platform. That run is
+evidence for a later record entry, not a stage 4 measurement and not
+declared verification. Not yet done: a platform in the table (stage 4 of
+the complete backend and the Node `local-embed` build, 3.2.3), an `onnx`
+bundle's cache evidence (3.14.3), and `011` in `make verify`.
+
 **Increment 3 part a (2026-11-02): text, tasks, tokenization and
 `check_plan`.** `src/request.rs` prepares a request on the caller before
 any handoff: the projection's byte bound, task matching on operation,

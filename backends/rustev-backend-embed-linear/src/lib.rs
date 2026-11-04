@@ -6,10 +6,11 @@
 //! `rustev.embed-linear/1` manifest and its checks ([`manifest`]), bundle
 //! verification against it ([`verify_bundle`]), the descriptor derived from
 //! it ([`derive_descriptor`]), pooling and head arithmetic ([`head`]),
-//! the in-process embedding cache ([`cache`]), and,
-//! behind the `synthetic` feature, the synthetic encoder of 3.19. The ONNX
-//! encoder remains pending. [`RequestPreparer`] adds text assembly, task
-//! matching, offline tokenization and host-side plan checks (3.8, 3.10.4);
+//! the in-process embedding cache ([`cache`]), runtime loading and the
+//! qualified-platform table ([`runtime`]), the ONNX encoder ([`onnx`]),
+//! and, behind the `synthetic` feature, the synthetic encoder of 3.19.
+//! [`RequestPreparer`] adds text assembly, task matching, offline
+//! tokenization and host-side plan checks (3.8, 3.10.4);
 //! [`EmbedLinearBackend`] dispatches prepared requests to bounded std workers,
 //! consulting the embedding cache when the host configures one (3.14).
 //!
@@ -24,7 +25,9 @@ pub mod cache;
 mod check;
 pub mod head;
 pub mod manifest;
+pub mod onnx;
 pub mod request;
+pub mod runtime;
 #[cfg(feature = "synthetic")]
 pub mod synthetic;
 
