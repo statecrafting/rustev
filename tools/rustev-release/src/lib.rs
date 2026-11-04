@@ -21,6 +21,7 @@ pub mod changelog;
 pub mod cratesio;
 pub mod family_artifacts;
 pub mod hosted;
+pub mod image;
 pub mod lifecycle;
 pub mod manifest;
 pub mod npm;
@@ -53,6 +54,9 @@ pub struct ReleaseSet {
     pub npm: Vec<npm::NpmPackage>,
     /// Spec 031 3.1: planned members not in this release, each with why.
     pub absent: Vec<npm::Absent>,
+    /// Spec 060 3.1.1: the `rustev-serve` image, once it is a member.
+    #[serde(default)]
+    pub image: Option<image::ImageMember>,
     pub excluded: Vec<Excluded>,
 }
 
@@ -293,6 +297,9 @@ pub fn check_set(set: &ReleaseSet) -> Vec<Violation> {
             "schema is {:?}, not {RELEASE_SET_SCHEMA:?}",
             set.schema
         ));
+    }
+    if let Err(e) = image::member(set) {
+        bad(e);
     }
     let numeric = set.version.split('.').collect::<Vec<_>>();
     if numeric.len() != 3

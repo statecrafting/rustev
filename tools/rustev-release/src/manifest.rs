@@ -43,6 +43,10 @@ pub struct ReleaseManifest {
     pub upload_order: Vec<String>,
     pub packages: Vec<PackageArtifact>,
     pub artifacts: Vec<WorkflowArtifact>,
+    /// Spec 060 3.4.1: the image at layer 7, when it is a member; absent in
+    /// every manifest before it and in a candidate's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image: Option<crate::image::ImageRelease>,
     pub registries: Vec<String>,
     pub plan_ids: BTreeMap<String, String>,
     pub plan_ids_changed: PlanChanges,
@@ -168,6 +172,7 @@ pub fn build(set: &ReleaseSet, crates: &Path, inputs: Inputs) -> Result<ReleaseM
         upload_order: set.upload_order.clone(),
         packages,
         artifacts: Vec::new(),
+        image: None,
         registries: vec![
             set.registry.clone(),
             "https://registry.npmjs.org".into(),

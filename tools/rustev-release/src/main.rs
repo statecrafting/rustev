@@ -800,8 +800,11 @@ fn manifest(
                     .collect(),
             )
         };
-        m.artifacts =
-            rustev_release::family_artifacts::collect(set, dir, artifacts_dir.map(Path::new))?;
+        (m.artifacts, m.image) = rustev_release::family_artifacts::collect_family(
+            set,
+            dir,
+            artifacts_dir.map(Path::new),
+        )?;
         if artifacts_dir.is_none() {
             m.limitations
                 .push(rustev_release::family_artifacts::MISSING.into());
