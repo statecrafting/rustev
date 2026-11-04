@@ -476,6 +476,7 @@ async function nativeAdapter() {
   async function runtimeCaseWith(c, files, ignored) {
     const rt = c.runtime;
     const gates = rt.backends.map(() => new Map());
+    let backendCalls = 0;
     const engine = await rustev.Engine.create({
       runtime: {
         maxInFlight: rt.config.max_in_flight,
@@ -491,7 +492,7 @@ async function nativeAdapter() {
         costBound: b.cost_bound,
         maxConcurrency: b.max_concurrency,
         queueCapacity: 65_536,
-        infer: (call) => scripted(b, gates[bi], call, ignored),
+        infer: (call) => { backendCalls++; return scripted(b, gates[bi], call, ignored); },
       })),
     });
     const plan = await engine.compile({
@@ -524,7 +525,9 @@ async function nativeAdapter() {
             plan
               .decide(
                 { decisionId: r.decision_id, snapshot: files.get(r.snapshot), evaluationTimeMs: r.evaluation_time_ms },
-                { signal: controllers[i].signal, deadlineMs: r.deadline_ms },
+                { signal: controllers[i].signal, deadlineMs: r.deadline_ms,
+                  ...(rt.capture ? { capture: { scope: rt.capture.scope, maxBytes: rt.capture.max_bytes,
+                    createdAtMs: rt.capture.created_at_ms, retain: rt.capture.retain[r.decision_id] } } : {}) },
               )
               .then(
                 (v) => ({ ok: v }),
@@ -571,7 +574,24 @@ async function nativeAdapter() {
     }
     const out = new Map();
     const done = await Promise.all(running);
-    done.forEach((d, i) => settled(out, rt.requests[i].decision_id, d));
+    for (const [i, d] of done.entries()) {
+      const id = rt.requests[i].decision_id;
+      settled(out, id, d);
+      if (rt.capture) {
+        const captured = d.ok?.capture;
+        if (!captured?.bundle || captured.error) throw new Error(`${id}: capture failed`);
+        out.set(`${id}.bundle.json`, Buffer.from(captured.bundle));
+        const inputs = { 'b.json': captured.bundle };
+        for (const [ref, bytes] of Object.entries(captured.items ?? {})) inputs[`items/${ref}`] = bytes;
+        const calls = backendCalls;
+        const replay = await engine.replay(inputs, { bundle: 'b.json', scope: rt.capture.scope,
+          nowMs: rt.capture.created_at_ms, store: 'items' });
+        if (replay.code !== 0 || JSON.parse(Buffer.from(replay.out)).status !== 'reproduced' || backendCalls !== calls) {
+          throw new Error(`${id}: offline replay failed`);
+        }
+        out.set(`${id}.replay.json`, Buffer.from(replay.out));
+      }
+    }
     await compareOutputs(c, out);
   }
 

@@ -47,6 +47,8 @@ pub struct RuntimeCase {
     pub backends: Vec<BackendScript>,
     pub requests: Vec<Request>,
     pub drive: Vec<Step>,
+    #[serde(default)]
+    pub capture: Option<crate::capture::Settings>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -288,12 +290,12 @@ impl DecisionBackend for Handle {
             .next()
             .and_then(|x| x.parse().ok())
             .unwrap_or(1usize);
-        // Every projection a plan sends names its task; one that does not is
-        // a broken fixture, stopped here by name rather than surfacing as an
-        // unexplained `permanent` failure.
+        // Semantic projections name a task; generation uses a typed request
+        // and the explicit wildcard script.
         let task = serde_json::from_slice::<Json>(call.projection)
             .ok()
             .and_then(|p| p["task"].as_str().map(str::to_string))
+            .or_else(|| s.script.answers.contains_key("*").then(|| "*".into()))
             .unwrap_or_else(|| {
                 panic!(
                     "attempt {id}: the projection names no task: {}",
@@ -487,9 +489,26 @@ pub fn run(case: &RuntimeCase, inputs: &Inputs) -> Result<Outputs, String> {
                     let req = next.next().ok_or("no request left to start")?;
                     let i = running.len();
                     let (rt, plan, cancel) = (rt.clone(), prepared.clone(), signals[i].clone());
-                    running.push(tokio::spawn(
-                        async move { rt.decide(&plan, req, &cancel).await },
-                    ));
+                    let capture = case.capture.clone();
+                    running.push(tokio::spawn(async move {
+                        if let Some(c) = capture {
+                            let captured = rt
+                                .decide_with_capture(
+                                    &plan,
+                                    req,
+                                    &cancel,
+                                    &rustev_runtime::CaptureConfig {
+                                        scope: c.scope,
+                                        max_bytes: c.max_bytes,
+                                    },
+                                )
+                                .await
+                                .expect("valid capture fixture");
+                            (captured.result, Some(captured.capture))
+                        } else {
+                            (rt.decide(&plan, req, &cancel).await, None)
+                        }
+                    }));
                     tokio::task::yield_now().await;
                 }
                 Step::WaitGated { backend, count } => {
@@ -532,6 +551,30 @@ pub fn run(case: &RuntimeCase, inputs: &Inputs) -> Result<Outputs, String> {
                 .await
                 .map_err(|_| format!("{id} never finished"))?
                 .map_err(|e| format!("{id}: {e}"))?;
+            let (r, captured) = r;
+            if let (
+                Some(settings),
+                Some(rustev_runtime::CaptureOutcome::Captured(capture)),
+                Ok(d),
+            ) = (&case.capture, &captured, &r)
+            {
+                let snapshot = doc::<Snapshot>(inputs, &case.requests[i].snapshot)?;
+                let input = rustev_eval::assemble::AssemblyInput {
+                    capture: Some(capture),
+                    scope: &settings.scope,
+                    plan: &plan,
+                    descriptors: &descriptors,
+                    calibrations: &calibrations,
+                    snapshot: &snapshot,
+                    run: &d.record,
+                    evaluation_time: Timestamp::from_ms(case.requests[i].evaluation_time_ms)
+                        .unwrap(),
+                    created_at_ms: settings.created_at_ms,
+                };
+                for (name, bytes) in crate::capture::outputs(&input, &settings.retain[id])? {
+                    out.insert(format!("{id}.{name}"), bytes);
+                }
+            }
             let (status, record) = match r {
                 Ok(d) => (
                     result_line(

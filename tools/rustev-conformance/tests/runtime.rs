@@ -474,9 +474,152 @@ fn the_manifest_runtime_cases_pass_through_the_runner() {
         assert!(
             c.mirrors
                 .as_deref()
-                .is_some_and(|m| m.starts_with("crates/rustev-runtime/tests/"))
+                .is_some_and(|m| m.starts_with("crates/rustev-runtime/tests/")
+                    || m.starts_with("crates/rustev-eval/tests/"))
         );
         ran += 1;
     }
     assert!(ran >= 6, "{ran} runtime cases");
+}
+
+/// Only the new capture expectations are blessed by this test.
+#[test]
+fn capture_cases() {
+    use rustev_contract::Identified;
+    use rustev_contract::descriptor::{OutputKind, TextStructure};
+    let mut fx = fixtures();
+    let mut definition = support_routing();
+    definition.schema = "rustev.definition/2".into();
+    definition.inputs.clear();
+    definition.policy = serde_json::from_value(json!({"on_unresolved":[],"rules":[{"id":"default","when":"always","then":{"propose":{"action":"recommend","params":[]}}}],"adjustments":[]})).unwrap();
+    let template: rustev_contract::generation::PromptTemplate = serde_json::from_value(json!({"schema":"rustev.prompt-template/1","id":"item-text","version":"1.0.0","instructions":"Describe the item.","params":[]})).unwrap();
+    let mut step: Json = serde_json::from_str(include_str!(
+        "../../../crates/rustev-contract/tests/fixtures/generate-step.json"
+    ))
+    .unwrap();
+    let body = &mut step["body"]["generate"];
+    body["for_each"] = json!("none");
+    body["template"]["params"] = json!({});
+    body["template"]["digest"] = json!(template.id().unwrap());
+    body["projection"] = json!([]);
+    body["carry"] = json!([]);
+    body["backstop"]["fields"] =
+        json!({"headline":{"text":"An option"},"why":{"text":"A useful choice."}});
+    definition.steps = vec![serde_json::from_value(step).unwrap()];
+    let mut backend = linear_head();
+    backend.operations = vec![support(
+        rustev_contract::definition::Operation::Generate,
+        OutputKind::TextRecord {
+            structure: TextStructure::JsonSchema,
+            max_output_bytes: 4096,
+            languages: vec!["en-GB".into()],
+            streaming: true,
+        },
+        32,
+    )];
+    let compiled = rustev_core::compile_with_templates(
+        &definition,
+        &[backend.clone()],
+        &[],
+        &[],
+        None,
+        &[template],
+    )
+    .unwrap();
+    fx.insert(
+        "capture-generation.plan.json".into(),
+        line(compiled.canonical()),
+    );
+    fx.insert(
+        "capture-generation.descriptor.json".into(),
+        line(backend.canonical().unwrap()),
+    );
+    fx.insert(
+        "capture-generation.snapshot.json".into(),
+        line(snapshot(vec![]).canonical().unwrap()),
+    );
+    // Existing fixtures are read and checked, never rewritten by capture blessing.
+    for (name, bytes) in &fx {
+        if name.starts_with("capture-") {
+            keep(&format!("fixtures/runtime/{name}"), bytes);
+        } else {
+            assert_eq!(
+                std::fs::read(root().join(DIR).join("fixtures/runtime").join(name)).unwrap(),
+                *bytes
+            );
+        }
+    }
+    for generation in [false, true] {
+        let id = if generation {
+            "runtime.capture-generation"
+        } else {
+            "runtime.capture-replay"
+        };
+        let mut block = json!({
+            "plan": "support.plan.json", "descriptors": DESCRIPTORS,
+            "calibrations": ["topic.calibration.json"], "config": config(2, 0, 1),
+            "backends": [head(every(|t| json!([output(t, 1)])), json!({}), json!("ignore"), 1)],
+            "requests": [request("embedded", None), request("external", None)],
+            "drive": ["start", "start"],
+            "capture": {"scope": {"mode":"principal","tenant":"tenant","context_revision":"revision","principal_scope":"scope"},
+                "max_bytes":16777216, "created_at_ms":NOW,
+                "retain":{"embedded":"embedded","external":"external"}}
+        });
+        if generation {
+            block["plan"] = json!("capture-generation.plan.json");
+            block["descriptors"] = json!(["capture-generation.descriptor.json"]);
+            block["calibrations"] = json!([]);
+            block["backends"][0]["descriptor"] = json!("capture-generation.descriptor.json");
+            block["backends"][0]["answers"] = json!({"*": [{"output":{"output":{"text_record":{
+                "headline":{"text":"Hello synthetic reader"},"why":{"text":"A useful choice"},"tags":{"list":["quiet"]}}},"charge":{"observed":{"units":1}}}}]});
+            for r in block["requests"].as_array_mut().unwrap() {
+                r["snapshot"] = json!("capture-generation.snapshot.json");
+            }
+        }
+        let case: RuntimeCase = serde_json::from_value(block.clone()).unwrap();
+        let mut names = vec![case.plan.clone()];
+        names.extend(case.descriptors.clone());
+        names.extend(case.calibrations.clone());
+        names.extend(case.requests.iter().map(|r| r.snapshot.clone()));
+        names.sort();
+        names.dedup();
+        let inputs = names.iter().map(|n| (n.clone(), fx[n].clone())).collect();
+        let out = runtime::run(&case, &inputs).unwrap();
+        let mut outputs = vec![];
+        for (file, bytes) in out {
+            if generation && file.ends_with("record.json") {
+                let r: Json = serde_json::from_slice(&bytes).unwrap();
+                assert_eq!(
+                    r["core"]["recorded"]["generation"][0]["counts"]["generated"],
+                    3
+                );
+                assert_eq!(r["requests"][0]["attempts"][0]["end"], "output");
+            }
+            if file.ends_with("bundle.json") {
+                let b: Json = serde_json::from_slice(&bytes).unwrap();
+                assert_eq!(b["capture"], "complete");
+                assert_eq!(
+                    b["supplies"].as_array().unwrap().len(),
+                    if generation { 1 } else { 3 }
+                );
+            }
+            if file.ends_with("replay.json") {
+                assert_eq!(
+                    serde_json::from_slice::<Json>(&bytes).unwrap()["status"],
+                    "reproduced"
+                );
+            }
+            let rel = format!("expected/runtime/{id}/{file}");
+            keep(&rel, &bytes);
+            outputs.push(json!({"file":file,"golden":format!("{DIR}/{rel}"),"sha256":sha256_hex(&bytes),"normalize":[]}));
+        }
+        let c = json!({"id":id,"command":"decide","surfaces":["rust-api","native"],
+            "mirrors":if generation {"crates/rustev-eval/tests/generation_replay.rs"} else {"crates/rustev-eval/tests/acquisition_replay.rs::five_acquisitions_two_paged_reproduce_without_source_calls"},
+            "inputs":names.iter().map(|n| json!({"name":n,"path":format!("{DIR}/fixtures/runtime/{n}"),"sha256":sha256_hex(&fx[n])})).collect::<Vec<_>>(),
+            "runtime":block,"outputs":outputs});
+        keep(
+            &format!("cases/runtime/{id}.json"),
+            &line(serde_json::to_vec_pretty(&c).unwrap()),
+        );
+    }
 }

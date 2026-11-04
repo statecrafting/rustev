@@ -250,3 +250,5 @@ pub fn compare(case: &Case, exit: i32, stdout: &[u8], dir: &Path) -> Vec<String>
     }
     v
 }
+
+pub mod capture;

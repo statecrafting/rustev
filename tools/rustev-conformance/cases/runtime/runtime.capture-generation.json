@@ -1,0 +1,162 @@
+{
+  "command": "decide",
+  "id": "runtime.capture-generation",
+  "inputs": [
+    {
+      "name": "capture-generation.descriptor.json",
+      "path": "tools/rustev-conformance/fixtures/runtime/capture-generation.descriptor.json",
+      "sha256": "7cbb083f6dc689dd9da2d0b0886df2304171f685545b1e84f8dd4f4b546f43fd"
+    },
+    {
+      "name": "capture-generation.plan.json",
+      "path": "tools/rustev-conformance/fixtures/runtime/capture-generation.plan.json",
+      "sha256": "3615133efadebdeb809df94f47df5049a83902f628c202471f79806514ad90b5"
+    },
+    {
+      "name": "capture-generation.snapshot.json",
+      "path": "tools/rustev-conformance/fixtures/runtime/capture-generation.snapshot.json",
+      "sha256": "b34d8feb906cb18dfe773a01c18e3645ae091132b99060eed8787e148ceddf82"
+    }
+  ],
+  "mirrors": "crates/rustev-eval/tests/generation_replay.rs",
+  "outputs": [
+    {
+      "file": "embedded.bundle.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.capture-generation/embedded.bundle.json",
+      "normalize": [],
+      "sha256": "ad151c0c8c91053676575e242b8ad1af97d4c821b7312123d8dfe3e41acb9af7"
+    },
+    {
+      "file": "embedded.record.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.capture-generation/embedded.record.json",
+      "normalize": [],
+      "sha256": "5190fbf07ba4aeb73e5c38f9ff2a89aa88ebeca516bb94aaeccb5d1a4abad3fc"
+    },
+    {
+      "file": "embedded.replay.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.capture-generation/embedded.replay.json",
+      "normalize": [],
+      "sha256": "c6c9284516a4d8428f748882c9a416f03307a675b8f0afcaedc45d44f702c197"
+    },
+    {
+      "file": "embedded.result.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.capture-generation/embedded.result.json",
+      "normalize": [],
+      "sha256": "a0c5d9c5e45bd7c7f3892bf3a29726e5136c2a0e06a0abe971e563c5f271b3c5"
+    },
+    {
+      "file": "external.bundle.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.capture-generation/external.bundle.json",
+      "normalize": [],
+      "sha256": "c71fe1be19e8c8c66e87c35b3d2105384316de48d88327096136bfcaaa6851a8"
+    },
+    {
+      "file": "external.record.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.capture-generation/external.record.json",
+      "normalize": [],
+      "sha256": "28e4cb21e82d60fd392ca488ea323f8678ba7a9c6ced60e01602ce63178ed0c2"
+    },
+    {
+      "file": "external.replay.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.capture-generation/external.replay.json",
+      "normalize": [],
+      "sha256": "9828134d012db31d47792be8c182296b3a24866fd5b9fc23b30e1e478368aeac"
+    },
+    {
+      "file": "external.result.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.capture-generation/external.result.json",
+      "normalize": [],
+      "sha256": "a05cbb7cabf6f209b9841168f8b1446ffe94a6c824e8632b3fb3911119724efc"
+    }
+  ],
+  "runtime": {
+    "backends": [
+      {
+        "answers": {
+          "*": [
+            {
+              "output": {
+                "charge": {
+                  "observed": {
+                    "units": 1
+                  }
+                },
+                "output": {
+                  "text_record": {
+                    "headline": {
+                      "text": "Hello synthetic reader"
+                    },
+                    "tags": {
+                      "list": [
+                        "quiet"
+                      ]
+                    },
+                    "why": {
+                      "text": "A useful choice"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "cost_bound": {
+          "bounded": {
+            "max_units": 1
+          }
+        },
+        "cost_model": "bounded",
+        "descriptor": "capture-generation.descriptor.json",
+        "max_concurrency": 8,
+        "on_cancel": "ignore",
+        "on_release": {},
+        "remote": "finished"
+      }
+    ],
+    "calibrations": [],
+    "capture": {
+      "created_at_ms": 1790164800000,
+      "max_bytes": 16777216,
+      "retain": {
+        "embedded": "embedded",
+        "external": "external"
+      },
+      "scope": {
+        "context_revision": "revision",
+        "mode": "principal",
+        "principal_scope": "scope",
+        "tenant": "tenant"
+      }
+    },
+    "config": {
+      "max_in_flight": 2,
+      "max_parallel_requests": 1,
+      "max_queued": 0,
+      "sink_timeout_ms": 1000
+    },
+    "descriptors": [
+      "capture-generation.descriptor.json"
+    ],
+    "drive": [
+      "start",
+      "start"
+    ],
+    "plan": "capture-generation.plan.json",
+    "requests": [
+      {
+        "decision_id": "embedded",
+        "evaluation_time_ms": 1790164800000,
+        "snapshot": "capture-generation.snapshot.json"
+      },
+      {
+        "decision_id": "external",
+        "evaluation_time_ms": 1790164800000,
+        "snapshot": "capture-generation.snapshot.json"
+      }
+    ]
+  },
+  "surfaces": [
+    "rust-api",
+    "native"
+  ]
+}
