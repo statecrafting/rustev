@@ -103,8 +103,22 @@ jobs:
     if: needs.scope.outputs.run == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    # As the managed code job: a fresh runner never reuses incremental state,
+    # and line tables keep file:line in panics at a fraction of full
+    # debuginfo. Both shrink the target directory this job fills.
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      # 2026-11-04: "No space left on device" failed this job (rustc output,
+      # 19 GB free at the start). The preinstalled toolchains it never uses
+      # are removed first, as in verify.yml; the df lines are the record.
+      - name: Free runner disk
+        run: |
+          df -h / | sed 's/^/before: /'
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL || true
+          df -h / | sed 's/^/after: /'
       # Restored everywhere, saved only from main (as in verify.yml): saves
       # from pull requests and merge-queue branches, which nothing else can
       # read, evicted main's entries from the 10 GB repository limit.
@@ -126,6 +140,11 @@ jobs:
           rustup toolchain install "$msrv" --profile minimal
       - name: Release members at the MSRV (031 3.6.7)
         run: make msrv
+      - name: Record runner disk
+        if: always()
+        run: |
+          df -h / | sed 's/^/end: /'
+          du -sh target 2>/dev/null | sed 's/^/end: target /' || true
       - name: Save the cache (main only)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

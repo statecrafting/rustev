@@ -13,7 +13,7 @@
       "contentHash": "3335b747ef4b1b221aec3913bf09ffd604db8c4fec457d6b0045f14b52262d61"
     },
     ".github/workflows/release-checks.yml": {
-      "contentHash": "1afec06c15e920a8e8d2b6a4148a556dcb9cf104bb8cf25ccedbf6e26aa72517"
+      "contentHash": "a6fba126a9c0b5970f2134d337f9176d4ff7bba12ceb8c836040a665ddeb5489"
     },
     ".github/workflows/release.yml": {
       "contentHash": "92201ec35587799296a46b85679ffdb6ccc5405aa31ea55d6fd4181f06f026ac"
@@ -25,7 +25,7 @@
       "contentHash": "bede732e7b06486451c7c08844bce094b37405bf5879cb5f2a50dc1d7615bc3f"
     },
     ".github/workflows/verify.yml": {
-      "contentHash": "9df7770612b3eb9076736e83655e34dc8c2ff074864e900302e7d82624239f24"
+      "contentHash": "f8617c2fdcd399b61f33e9c6bf1b13b26704f644362c7d70bcdd637993048cf4"
     },
     ".gitignore": {
       "contentHash": "218b76a5e1c09226bf9d0f4b5fd2f5ef13c7d8419386e4ca3907b422f50e1bef"
