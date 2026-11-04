@@ -322,6 +322,12 @@ sh -c 'for d in crates tools; do [ -d "$d" ] || continue; if grep -rnE "(struct|
   unconfirmed checker reported seven paths ending `rand_core -> getrandom`
   (and `js-sys`) for the pure crates and the bindings that none of their
   own builds hold. Approved by the owner on 2026-10-21.
+- 2026-11-04 (build only, no claim of this spec changes): the workspace
+  `Cargo.toml` gives dependencies no debug data in dev and test builds
+  (`[profile.dev.package."*"] debug = false`); the workspace's own crates
+  keep the profile's setting. Full runner disks ("No space left on device",
+  and `ld` ending on SIGBUS) failed `code`, `verify` and `msrv` jobs from
+  2026-11-02 to 11-04. Release and WebAssembly profiles are unchanged.
 
 ## Profile upgrade record (2026-10-02)
 

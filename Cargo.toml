@@ -112,6 +112,14 @@ opentelemetry-otlp = { version = "0.33", default-features = false, features = ["
 [workspace.lints.rust]
 unsafe_code = "forbid"
 
+# Dependencies carry no debug data in dev and test builds; the workspace's
+# own crates keep the profile's setting (CI sets line tables, so a panic
+# still names its file and line). Dependency debuginfo was most of the
+# target directory, and full runner disks failed code, verify and msrv jobs
+# (2026-11-02 to 11-04). A package override outranks CARGO_PROFILE_DEV_DEBUG.
+[profile.dev.package."*"]
+debug = false
+
 # The WebAssembly module's build (spec 027, 3.10): size first, one codegen
 # unit, link-time optimization, no unwinding, no debug data. Only
 # `make bindings` uses it; every other build keeps the default profiles.
