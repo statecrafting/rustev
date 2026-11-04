@@ -1145,21 +1145,32 @@ fn check_scores(
     views: &ScoreViews,
 ) -> Result<(), EvalError> {
     let digest = views.record_digest().map_err(|_| EvalError::NotCanonical)?;
+    scores_refusal(declared, scores, views, &digest).map_err(|c| EvalError::Scores(c.into()))
+}
+
+/// [`check_scores`] over views whose record digest is `digest`, returning
+/// the refusal code; spec 061 applies it to a host run's own views.
+pub(crate) fn scores_refusal(
+    declared: &Declarations<'_>,
+    scores: &[Scores],
+    views: &ScoreViews,
+    digest: &ContentDigest,
+) -> Result<(), &'static str> {
     let mut seen = BTreeSet::new();
     for d in scores {
         if !declared.scorers.contains(&d.scorer) {
-            return Err(EvalError::Scores("scorer-undeclared".into()));
+            return Err("scorer-undeclared");
         }
         if !seen.insert(d.scorer.id.as_str()) {
-            return Err(EvalError::Scores("scores-duplicate".into()));
+            return Err("scores-duplicate");
         }
         let same_entries = d.entries.len() == views.cases.len()
             && d.entries
                 .iter()
                 .zip(&views.cases)
                 .all(|(s, v)| s.case == v.case && s.subject == v.subject);
-        if d.schema != SCORES || d.views != digest || !same_entries {
-            return Err(EvalError::Scores("scores-mismatch".into()));
+        if d.schema != SCORES || d.views != *digest || !same_entries {
+            return Err("scores-mismatch");
         }
     }
     Ok(())
