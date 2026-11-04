@@ -512,6 +512,5 @@ with a new golden, in place of the lodging reference plan. The standalone
 `rustev-serve` image installs no semantic backends (its binary serves
 exact plans; ecosystem backends are host supplied or remote), so the
 lodging plan's semantic steps cannot be decided in the image alone, and
-the remote-backend path is covered by spec 042's tests (3.17). The
-decisions file is unchanged here; a decision row for this amendment, if
-needed, is added separately.
+the remote-backend path is covered by spec 042's tests (3.17). Decision
+row A-79 records this amendment.
