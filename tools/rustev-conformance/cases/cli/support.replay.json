@@ -20,7 +20,7 @@
     {
       "name": "support-emb.bundle.json",
       "path": "tools/rustev-conformance/fixtures/cli/support.replay/support-emb.bundle.json",
-      "sha256": "15c7cdf500a314a949e74e7319728fa134fae7ffb5fe11affe3ac82056f77498"
+      "sha256": "e51cb730c262477dd9907c5f21ae9a894f5300b0057aa8a4bc2f117f9d1afe91"
     }
   ],
   "outputs": [

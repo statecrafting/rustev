@@ -1237,6 +1237,18 @@ against their schemas in their own contract tests.
   consumers lost the package's types in 0.2.0. The re-exports now name
   `./rustev_wasm.js`, which every resolution mode accepts; spec 031's
   declaration comparison found it.
+- 2026-11-04: `make conformance-harvest` (3.12.2) was not reproducible
+  (#362). The `support.replay` and `lodging.replay` cases take as input a
+  replay bundle the harvest captures afresh, and the run record retained in
+  it carried the capture run's real attempt `dispatched_ms`/`ended_ms` and
+  `elapsed_ms`, so each harvest could move them by a millisecond and with
+  them the bundle's SHA-256 in the case and the manifest. The CLI replay
+  test now applies the goldens' `timing` normalization (3.12.3) to that
+  retained record and re-digests it before the replay that is harvested;
+  replay reproduces the judgment, never the timing, so the bundle still
+  reproduces and its golden is unchanged. A harvest on a clean tree now
+  leaves it unchanged. The two bundle fixtures and their digests changed
+  once; no case comparison and no other case changes.
 
 ## Decisions at approval
 

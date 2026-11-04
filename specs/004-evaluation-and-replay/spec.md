@@ -735,6 +735,13 @@ retained record from `src/testdata/lodging-emb.record.json`, which the
 archive carries; `tests/packaged_fixtures.rs` keeps it equal to the
 fixture's bytes. No test or behavior changed.
 
+**2026-11-04, packaged test fixture refreshed (test only, no claim of
+this spec changes).** The conformance harvest now zeroes the attempt and
+elapsed times of the run record retained in the replay bundle fixtures
+(spec 027, #362), so `src/testdata/lodging-emb.record.json` is refreshed to
+the fixture's new bytes, as `tests/packaged_fixtures.rs` requires. The
+`why_order` test reads only the record's ranking entries; it is unchanged.
+
 ## Tooling compatibility record (2026-10-02)
 
 Mutation seed copies exclude the managed `.bin` engine directory introduced
