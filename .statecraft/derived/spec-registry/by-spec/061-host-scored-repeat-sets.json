@@ -1,0 +1,123 @@
+{
+  "record": {
+    "amends": [
+      "029-evaluation-repeatability",
+      "041-ranking-and-rubric-metrics"
+    ],
+    "created": "2026-11-03",
+    "dependsOn": [
+      "004-evaluation-and-replay",
+      "006-cli-surface",
+      "029-evaluation-repeatability",
+      "031-public-api-and-release-family",
+      "041-ranking-and-rubric-metrics"
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "004-evaluation-and-replay",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-eval/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "006-cli-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-cli/"
+        }
+      }
+    ],
+    "id": "061-host-scored-repeat-sets",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-6-provenance-separation",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "A host repeat set, host baseline or host selection is never combined with, compared against or verified as a Rustev-evaluated repeat set, baseline or selection; any command given both refuses with `invalid_input`, `mixed-provenance`, and writes nothing."
+      },
+      {
+        "anchor": "3-5-derivation-lineage-and-labels",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "Every host document states `assertion: \"host\"`, and every figure in it is reported as computed by Rustev from host-asserted observations; no host figure is presented as a Rustev observation or carries a Rustev `PlanId` or `DatasetId` as its identity."
+      },
+      {
+        "anchor": "3-1-the-host-run-record",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "A host latency, cost, score or outcome that is missing, unknown or malformed is unknown or refused, never zero, never a default, and never dropped without a count."
+      },
+      {
+        "anchor": "3-7-host-baselines-and-selection",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "`rustev gate select` over a host baseline and host candidate sets applies spec 029 3.12's clauses, verdicts, ranking and exit codes 0, 11 and 12 unchanged, with the precondition substitutions of 3.7 and no others."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "061-host-scored-repeat-sets-for-the-selection-gate-amends-029-and-041": "b658115f73ebf31f9aeb3a582157c3913265b179112a5ed7660da54d1f5bada8",
+      "1-purpose": "e0e945acfb149dd3823a4e0cdd70f3833c1dadd08482a4c3f1730be68a88bb95",
+      "2-1-binding-principles": "fef8a7d588d20a51b226a36b2ca83239449dafec22cc2b9c2534682596ce17ae",
+      "2-territory": "5838886673898938359c85b02bd20efad963b0563751f0ef620f4613d578520b",
+      "3-1-the-host-run-record": "d858a993bb5faa3c190cf6bb51e59a22b7547c2dfc6eecd27da75ce912481ffa",
+      "3-10-library-and-bindings": "f24007ba284c615ef37d2b40691b776e17965ba3bf7e0cec8ed0b96bbba35736",
+      "3-2-import-rustev-eval-repeat-import": "e2265c4f51c013ec5579ddca0d211b4c910930a45ea4e7fd5d925f01ca9e4220",
+      "3-3-measures": "a3cbdbac5a1c084a7993975510a82da7856de80b51078b6f1e1d724bc6eb5dc6",
+      "3-4-statistics-sources-and-bands": "8eef387b5f9cb93f1da61b3cd1ca5875f3d2b6526a8846f753a7c218f80b718a",
+      "3-5-derivation-lineage-and-labels": "14467d59b9a83eaa4641c35f9c17364a96ec70afd9223e72688e8577de8f9a25",
+      "3-6-provenance-separation": "2fa3a1cc188f57ccf68be8b82447695aded787302acc043a3c1620b31e5df20f",
+      "3-7-host-baselines-and-selection": "91eac7a97fd93a6775d3ea7242c4eccb2e22b6a39716fa419077fdb6af39d7bc",
+      "3-8-held-out-splits": "76058e472c153e76a8692c61290a960aee716f3f398bed9c9bebfc4942076195",
+      "3-9-exit-codes": "039ebdc686271e806a3723468c30827049d1b64288bf327afd05e6af4d4426fb",
+      "3-behavior": "8050d85f8ba9f198ba09ed2ffc1c18e5d9c58f8d57155f1239ee3d46ffda4edc",
+      "4-out-of-scope": "29677a62b3eaf4f5bcad021a42d77080a19d4b2faa9c0a30258491f39ed5d56b",
+      "5-observable-negative-cases": "7c1307b592cf9ca928a1bd2fa0d4ee3e3061d0a2ce86ecd490c8ca2f0c190b4d",
+      "acceptance": "ec4bf9213fa93afddf3b3eaf4cb4a28de7277961d8f2dc6654b6307143fb21ca",
+      "decisions-at-approval": "8a8d71a91897b90df809f4f67d7fcb888bdca1d7699c380b8148c5b1481bc3dd",
+      "implementation-record": "2f595b55fc0d6b4210907e4e92decd9bdc779e156cf80ff12cb4ac624e1d198f",
+      "verification": "fa130e8566775681fc7afdf639cc0d96f97b7d78717fac592702a1819a399e21"
+    },
+    "sectionHeadings": [
+      "061: Host-scored repeat sets for the selection gate (amends 029 and 041)",
+      "1. Purpose",
+      "2. Territory",
+      "2.1 Binding principles",
+      "3. Behavior",
+      "3.1 The host run record",
+      "3.2 Import: `rustev eval repeat import`",
+      "3.3 Measures",
+      "3.4 Statistics, sources and bands",
+      "3.5 Derivation, lineage and labels",
+      "3.6 Provenance separation",
+      "3.7 Host baselines and selection",
+      "3.8 Held-out splits",
+      "3.9 Exit codes",
+      "3.10 Library and bindings",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Implementation record",
+      "Decisions at approval"
+    ],
+    "specPath": "specs/061-host-scored-repeat-sets/spec.md",
+    "status": "approved",
+    "summary": "A proposed amendment of approved specs 029 and 041 (and of spec 006's command table through 029 3.13), for release 0.4.1. Today `rustev gate select` reads only repeat sets Rustev evaluated itself: every run is a spec 004 evaluation of a Rustev plan over a Rustev dataset manifest. A host whose baseline and candidate runs execute in its own runtime, and whose outputs are scored through `scoreViews` into `rustev.scores/1`, has no supported way in. This spec adds a host run record (`rustev.host-run/1`) carrying host dataset, flow, version and run identities with per-case outcomes, latency and cost; an import command, `rustev eval repeat import`, that verifies the host's views and scores and builds a host repeat set with spec 029's statistics; a host baseline; and selection over host sets. Host documents have their own schema names, so no existing document changes bytes or meaning and a host set can never be compared with a Rustev-evaluated one. Every figure is labeled host-asserted. Ratified (A-77) for release 0.4.1.\n",
+    "title": "Host-scored repeat sets for the selection gate (amends 029 and 041)"
+  },
+  "shardHash": "1e4f630248839a5f3cd6e8c82941aefd50edd5c53e0f2dfd101fe9e1dff7f226",
+  "specVersion": "1.10.0"
+}
