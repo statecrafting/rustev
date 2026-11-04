@@ -77,7 +77,7 @@ fn runtime_base_is_the_binding_records_distroless_index() {
     let stages = stages();
     let runtime = image_of(&stages[1][0]);
     assert!(
-        runtime.starts_with("gcr.io/distroless/cc-debian12:nonroot@sha256:"),
+        runtime.starts_with("gcr.io/distroless/cc-debian13:nonroot@sha256:"),
         "{runtime}"
     );
     let digest = digest_of(runtime);

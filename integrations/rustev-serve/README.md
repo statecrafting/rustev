@@ -134,7 +134,7 @@ These gaps are not claims of spec acceptance:
 ## Image
 
 `image/Dockerfile` builds the binary on the pinned Rust toolchain image and
-copies it alone onto the pinned `gcr.io/distroless/cc-debian12:nonroot` base,
+copies it alone onto the pinned `gcr.io/distroless/cc-debian13:nonroot` base,
 as user and group 65532, with entrypoint
 `/usr/local/bin/rustev-serve --config /etc/rustev/serve.json`. Mount the
 configuration there; the root filesystem can be read-only. From the

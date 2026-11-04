@@ -1716,6 +1716,24 @@ is spec 060's, for a later version). Item by item:
 - `make code`, `make conformance`, declared verification (#468) and
   `make gate`: CI push run 41669913327 on `main` at `cf3ae8d7` passed.
 
+**Image base moved to Debian 13 (2026-11-03).** On the owner's decision
+of 2026-11-03 (spec 060 decision 2), the runtime stage of
+`integrations/rustev-serve/image/Dockerfile` is
+`gcr.io/distroless/cc-debian13:nonroot`, pinned by its index digest
+`sha256:08476c244888bfb425bae1ae4dd7c17f093e972aab8426883d97f3c6f280f7c1`,
+the base of spec 010's amended binding record row; the cc-debian12 tag
+still resolved to the digest pinned since 2026-10-21, whose `libssl3` had
+not taken Debian's fixes. The builder stays `rust:1.98.1-bookworm`: the
+binary links only `libc.so.6`, `libm.so.6` and `libgcc_s.so.1`, and
+trixie's glibc 2.41 keeps the symbol versions a glibc 2.36 build uses.
+`tests/image.rs` now requires the `cc-debian13:nonroot` prefix and the
+binding record's index, and the README names the new base. Built locally
+with `artifacts.sh build-image` for `linux/arm64` and (emulated)
+`linux/amd64`, both images passed `image/check.sh` (platform, user 65532,
+entrypoint, no shell, start on a read-only root), and the arm64 image,
+started read-only with no network and a configuration on a Unix socket,
+registered an exact synthetic plan and answered a decision `judged`.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child
