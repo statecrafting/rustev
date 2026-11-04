@@ -1,0 +1,175 @@
+{
+  "record": {
+    "amends": [
+      "027-node-and-wasm-bindings",
+      "029-evaluation-repeatability",
+      "034-parameterized-definitions",
+      "036-mid-plan-acquisition",
+      "044-runtime-optimization-increment-2"
+    ],
+    "created": "2026-11-03",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "003-runtime-execution-and-evidence",
+      "004-evaluation-and-replay",
+      "006-cli-surface",
+      "027-node-and-wasm-bindings",
+      "029-evaluation-repeatability",
+      "034-parameterized-definitions",
+      "036-mid-plan-acquisition",
+      "044-runtime-optimization-increment-2",
+      "061-host-scored-repeat-sets",
+      "050-wasm-without-parameterized-definitions",
+      "031-public-api-and-release-family"
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "027-node-and-wasm-bindings",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-node/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "027-node-and-wasm-bindings",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-surface/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "027-node-and-wasm-bindings",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-conformance/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "006-cli-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-cli/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-public-api-and-release-family",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-release/"
+        }
+      }
+    ],
+    "id": "063-node-binding-parity",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-4-host-callbacks-promises-deadlines-and-threads",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "A host-implemented acquisition source or store obeys every rule of spec 027 3.6 and section 3.4 here (asynchronous Promise callbacks through a threadsafe function, bounded queue with a typed refusal, remaining deadline and cancellation passed in, a late or never-settling Promise discarded and counted); an acquisition failure reaches the judgment only as spec 036's unresolved or skipped outcome, and a store failure only as a miss or a refusal under the plan's on_store_failure policy, never as a defaulted value."
+      },
+      {
+        "anchor": "3-13-conformance",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "For the same inputs, the binding's compile with a profile or variant, profileCheck, planDiff, repeatability commands and captured replay bundles produce the bytes, PlanId and exit code the CLI or the Rust API produces, under only the comparison each shared conformance case declares."
+      },
+      {
+        "anchor": "2-1-binding-principles",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "No binding API accepts a cache key, store scope or generation from the host, or selects a profile or variant from a principal, tenant or request; Rustev derives every key and the host names the profile and variant explicitly."
+      },
+      {
+        "anchor": "3-8-capture-on-decide",
+        "id": "I-4",
+        "kind": "invariant",
+        "text": "Capture is off unless the caller passes it, retains content only by explicit choice, and its bundle and items reach only the caller's decide result; nothing captured is sent to the evidence sink, telemetry, gauges or an error message, and no principal handle, credential or trace header enters a bundle; embedded and external bundles carry unredacted inputs, model outputs and pages, which spec 028's redaction policy does not cover and the host must protect as personal data."
+      },
+      {
+        "anchor": "3-12-webassembly-position",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "The WebAssembly package gains none of these surfaces; its import allowlist, budgets and parameterized-feature exclusion are unchanged."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "063-node-binding-parity-acquisition-source-profiles-and-variants-store-seam-capture-repeatability-commands-amends-027-029-034-036-and-044": "f347da3f7dbe8c36053fe421d53114505063fa4e6c4d1ddd48006b1b1e852710",
+      "1-purpose": "d79ee35c9bdf4438636611ea104b6fb87ffd76f404a8e8fe1f729d7a1ca9cc7d",
+      "2-1-binding-principles": "d5b27b6ecd77b6f971c8b9478f6afd4f67110c300d61c402950db609edd6c798",
+      "2-territory": "2767765aad52000db13c436fd756856f2621d560b07fcb9bbfdd2166b1f5b918",
+      "3-1-what-is-bound-today-and-what-this-spec-adds": "3c9123ba136d4dddb0d8892756dfe0871257e4f6dd613c66e28161930108fec2",
+      "3-10-errors": "b02a6ad040049cd62628f49e7246ce1d3692aeb164f34bb700f86e84ca9e5d85",
+      "3-11-gauges-shutdown-and-declarations": "2a549647a68ce12931d0a555255c1926260309f20a5c9ede59bb7203da8bdcf1",
+      "3-12-webassembly-position": "4803d2de6a33c3afb578f2b899f3332697449b0bda5b52f8dba21736dea5c674",
+      "3-13-conformance": "cef410c2686862326f59355ec8a11188695ef94ef3c18ce4e77e29a6d1d41751",
+      "3-14-what-changes-in-specs-027-029-034-036-and-044": "8b24ceb114aa2833c851ef0f1af76e421ca9d70b07d22b3757870fbae06eaf87",
+      "3-15-relation-to-spec-011": "509f35aeb6cdc7e4dc5d6753f90527ea642c4f664a9f9b309ad232522d19acbe",
+      "3-2-profiles-and-variants-on-compile": "4ece908ae50daa1cb86b14f7d03d289f00bd68b404380f7e3bf85120bc2e7067",
+      "3-3-profile-check-and-plan-diff": "62e49f7164c99a422db6861bbab24d0bdfc181711453058847b7dd9fe27e3319",
+      "3-4-host-callbacks-promises-deadlines-and-threads": "3711694076f263adb5d9c73a6ec00bd552e4fbb6f276f5b8640138605441411e",
+      "3-5-the-acquisition-source-seam": "f3d8c6b9a6f32fd9851e93bbf2b517cc4a2b2258da8174e18ebbb09cf42a5641",
+      "3-6-the-store-seam-and-invalidation": "7855f498c55c2d0341be0e4eacbc03167fb5ce4746bcead9b552d61b1991e69d",
+      "3-7-store-atomicity-contract": "f88bdd8926a4929c01db0bf16f3a884242833a764c422b0d7b29caa88409c9f8",
+      "3-8-capture-on-decide": "ba8c3a488c5292c646fd7835c0e2e82fbb3dd61d96eea6c396fc5028402d9fc9",
+      "3-9-repeatability-commands": "1560e4a4f1211123d198a2de6367efe36db4f8e55ab243bd62b5f8e493c1166d",
+      "3-behavior": "2cd826cf02fd0be924450747e6d24c362c41beb013fafa62445c7cb65b2baa21",
+      "4-out-of-scope": "846f3c419fd7ea8c21e837b91d4d278672ad6df86b31fad5f5e047dc5d53a8ed",
+      "5-observable-negative-cases": "98988265428e2350059cc78d6c7fc5308ecfc6e7fbe79ce5928f93bc65777154",
+      "acceptance": "71e67e924bd8ca75042bc1780c9fc7384bdc43422ed21ea72a6a9b10a6dca525",
+      "decisions-at-approval": "3d5fdf05abdc538b1d881bb831cd92dcd142af63b0267f79522f9a897701153f",
+      "implementation-record": "ad817a0229bafefa616233431a3b3b8c4603b35f47df1f7fe0686c85aad49abb",
+      "planned-increments": "cefa7862e3fe85b451ab56e54ebb18b503b952d1a548fa1a655e9bf8f73e3f09",
+      "verification": "28ee800c8eb90c13b983f95dd9da6204cc5fe17ba688d60968270b3513dc5648"
+    },
+    "sectionHeadings": [
+      "063: Node binding parity: acquisition source, profiles and variants, store seam, capture, repeatability commands (amends 027, 029, 034, 036 and 044)",
+      "1. Purpose",
+      "2. Territory",
+      "2.1 Binding principles",
+      "3. Behavior",
+      "3.1 What is bound today and what this spec adds",
+      "3.2 Profiles and variants on compile",
+      "3.3 Profile check and plan diff",
+      "3.4 Host callbacks: Promises, deadlines and threads",
+      "3.5 The acquisition source seam",
+      "3.6 The store seam and invalidation",
+      "3.7 Store atomicity contract",
+      "3.8 Capture on decide",
+      "3.9 Repeatability commands",
+      "3.10 Errors",
+      "3.11 Gauges, shutdown and declarations",
+      "3.12 WebAssembly position",
+      "3.13 Conformance",
+      "3.14 What changes in specs 027, 029, 034, 036 and 044",
+      "3.15 Relation to spec 011",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Planned increments",
+      "Implementation record",
+      "Decisions at approval"
+    ],
+    "specPath": "specs/063-node-binding-parity/spec.md",
+    "status": "approved",
+    "summary": "An amendment of approved spec 027, closing the Node exposure that specs 029, 034, 036 and 044 left out of scope (#56, with #62 and #73), for release 0.5.0. `@rustev/rustev` gains a host-implemented acquisition source for 036's `acquire` and `widen` steps; profile, variant and base-profile inputs on `compile`, with `profileCheck` and `planDiff`; a host `RuntimeStore` for 044's persistent tier, with a stated atomicity contract and invalidation; opt-in capture on `decide` that returns a replay bundle, because the evidence a host sink receives cannot replay a decision; and 029's repeatability commands with 061's host import, in process. Each uses 027's seam rules, the Rust API the CLI calls and the shared conformance suite; the WebAssembly package gains none. Ratified by the owner on 2026-11-03 (A-78).\n",
+    "title": "Node binding parity: acquisition source, profiles and variants, store seam, capture, repeatability commands (amends 027, 029, 034, 036 and 044)"
+  },
+  "shardHash": "db43aa4bd5b0e93aebd3659c842d6664052d04a4e4b8ce299fcec53e37f7a05e",
+  "specVersion": "1.10.0"
+}
