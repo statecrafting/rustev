@@ -2,7 +2,7 @@
 id: "053-signed-release-candidates"
 title: "Signed release candidates published only as GitHub pre-releases (amends 031)"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-10-25"
 summary: >
   A narrow amendment of approved spec 031 (3.9, 3.11, 3.12). It adds a release candidate: an owner-signed
@@ -240,6 +240,25 @@ Environment (decision 1) and creates the pre-release through
 `pending` to `in-progress`, which increments 1 and 2 above already were.
 The owner's signed candidate run (recorded here with its run id, tag and
 pre-release URL) and closure remain.
+
+**Complete (2026-11-04): the signed candidate run.** The owner's signed
+annotated tag `v0.4.0-rc.1` on `main` commit
+`983b4ac4ef4707b314b0ecf5b3edb158cceb1f6f` (the 0.4.0 version bump, #480;
+verified against `tools/rustev-release/allowed_signers`) started release
+workflow run 41747016345, which succeeded and created the pre-release
+https://github.com/statecrafting/rustev/releases/tag/v0.4.0-rc.1, marked
+as a pre-release and not the latest release (the latest stays `v0.3.0`).
+Its assets are the run's own: the CLI archives and npm tarballs versioned
+`0.4.0-rc.1` (3.2.3), `SHA256SUMS`, the CycloneDX SBOMs, the release
+manifest and their build-provenance attestations (3.3.2, 3.3.3). Its
+`qualify`, `publish-crates` and `publish-npm` jobs were skipped, so
+nothing reached crates.io, npm or a container registry (3.4). The run
+followed spec 058 3.7, which removed 3.1, 3.2.1's
+`release-manifest-sha256:` line and 3.3.1's manifest input and `bind`
+job; the acceptance bullet naming `v0.1.0-rc.1` on `release/next` is met
+in that amended form, by this candidate of the current release set's
+version. The local `candidate.sh` (031 increment 9) passed on the same
+commit. With the tooling of increments 1 and 2 this closes the spec.
 
 ## Decisions at approval
 
