@@ -46,6 +46,14 @@
 //! <assets-dir>` adds a qualified record and its platform bundles to the
 //! tag's release, uploading only names not present (spec 060 3.7.3).
 //!
+//! Spec 060's image: `verify-image <release-dir>` checks the registry
+//! against the manifest's image (3.4.2); `image-tag <release-dir>
+//! <index-out>` writes the OCI index to push and prints whether the tag is
+//! `absent` or already `present` with the run's index, failing on another
+//! (3.3.2, 3.3.3). `image-plan <amd64.oci.tar> <arm64.oci.tar> <tag>
+//! <out-dir>` writes the image entry and index for a check by hand, which
+//! `verify-image <image.json> [<repository>]` reads. None of them pushes.
+//!
 //! `rustev-release exceptions <YYYY-MM-DD>` exits 1 unless every advisory
 //! `deny.toml` ignores has an owner-approved exception unexpired on that
 //! date (3.6).
@@ -1081,6 +1089,90 @@ fn attach_qualification_cmd(tag: &str, dir: &str) -> Result<(), String> {
     Ok(())
 }
 
+// Spec 060 3.4.2: the registry holds the manifest's image; a manifest that
+// names none passes with nothing to check. `source` is a release directory
+// or an `image.json` that `image-plan` wrote. `repository`, given only by
+// hand (a scratch package), replaces the repository the registry is read
+// from; the release workflow never passes it.
+fn verify_image_cmd(source: &str, repository: Option<&str>) -> Result<(), String> {
+    let path = Path::new(source);
+    let mut image = if path.is_dir() {
+        let m = release_manifest(path)?;
+        let Some(image) = m.image else {
+            println!("{}: the manifest names no image", m.tag);
+            return Ok(());
+        };
+        image
+    } else {
+        let bytes = std::fs::read(path).map_err(|e| format!("{source}: {e}"))?;
+        serde_json::from_slice::<rustev_release::image::ImageRelease>(&bytes)
+            .map_err(|e| format!("{source}: {e}"))?
+    };
+    if let Some(r) = repository {
+        image.repository = r.to_string();
+    }
+    let mut ghcr = rustev_release::image_registry::Ghcr::from_env();
+    let problems = rustev_release::image_registry::verify(&mut ghcr, &image);
+    if !problems.is_empty() {
+        return Err(problems.join("\n"));
+    }
+    println!(
+        "{}:{} names {} with the manifest's platform digests",
+        image.repository, image.tag, image.index_digest
+    );
+    Ok(())
+}
+
+// Spec 060 3.3.2: the image entry and index bytes the manifest job would
+// derive from two verified OCI archives, written to `<out>/image.json` and
+// `<out>/index.json`, for a check by hand. Reads only the archives.
+fn image_plan_cmd(amd64: &str, arm64: &str, tag: &str, out: &str) -> Result<(), String> {
+    let a = std::fs::read(amd64).map_err(|e| format!("{amd64}: {e}"))?;
+    let b = std::fs::read(arm64).map_err(|e| format!("{arm64}: {e}"))?;
+    let image = rustev_release::image::release(tag, &[("linux/amd64", &a), ("linux/arm64", &b)])?;
+    let out = Path::new(out);
+    std::fs::write(
+        out.join("image.json"),
+        serde_json::to_vec_pretty(&image).map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| e.to_string())?;
+    std::fs::write(
+        out.join("index.json"),
+        rustev_release::image::index_bytes(&image.platforms),
+    )
+    .map_err(|e| e.to_string())?;
+    println!("{}", image.index_digest);
+    Ok(())
+}
+
+// Spec 060 3.3.2 and 3.3.3: the index bytes to push, and whether the tag is
+// absent (print `absent`), already the run's index (print `present`), or
+// another index (fail; nothing is moved).
+fn image_tag_cmd(dir: &str, index_out: &str) -> Result<(), String> {
+    use rustev_release::image_registry::{Ghcr, TagState, tag_state};
+    let m = release_manifest(Path::new(dir))?;
+    let image = m
+        .image
+        .as_ref()
+        .ok_or("060 3.3.2: the manifest names no image; nothing is pushed")?;
+    std::fs::write(
+        index_out,
+        rustev_release::image::index_bytes(&image.platforms),
+    )
+    .map_err(|e| format!("{index_out}: {e}"))?;
+    match tag_state(&mut Ghcr::from_env(), image)? {
+        TagState::Absent => println!("absent"),
+        TagState::Same => println!("present"),
+        TagState::Other(d) => {
+            return Err(format!(
+                "060 3.3.3: {}:{} names {d}, not the run's index {}; nothing is moved",
+                image.repository, image.tag, image.index_digest
+            ));
+        }
+    }
+    Ok(())
+}
+
 // Spec 058 3.4.2: qualification from the run's release, no instruction or journal.
 fn qualify_cmd(dir: &str, evidence: &str) -> Result<(), String> {
     let m = release_manifest(Path::new(dir))?;
@@ -1152,6 +1244,10 @@ fn main() -> ExitCode {
         ["publish-npm", dir, record] => verdict(publish_cmd(dir, record, "npm")),
         ["github-release", dir] => verdict(github_release_cmd(dir)),
         ["verify-assets", dir] => verdict(verify_assets_cmd(dir)),
+        ["verify-image", source] => verdict(verify_image_cmd(source, None)),
+        ["verify-image", source, repository] => verdict(verify_image_cmd(source, Some(repository))),
+        ["image-plan", amd64, arm64, tag, out] => verdict(image_plan_cmd(amd64, arm64, tag, out)),
+        ["image-tag", dir, index_out] => verdict(image_tag_cmd(dir, index_out)),
         ["observe-registries", manifest] => verdict(observe_registries(manifest)),
         ["qualify", dir, evidence] => verdict(qualify_cmd(dir, evidence)),
         ["attach-qualification", tag, dir] => verdict(attach_qualification_cmd(tag, dir)),
@@ -1163,7 +1259,7 @@ fn main() -> ExitCode {
         ["unpacked", dir, work, toolchain] => unpacked(&set, dir, work, Some(toolchain)),
         _ => {
             eprintln!(
-                "usage: rustev-release [--candidate <tag>] manifest|npm-audit|main-sbom|sbom-check|compare-artifacts ... | candidate-version <tag> | manifests | archives <dir> | compare <dir-a> <dir-b> | field <name> | unpacked <dir> <work> [<toolchain>] | deps | exceptions <YYYY-MM-DD> | image-scan <YYYY-MM-DD> <platform>=<grype.json>... | changelog <out.md> [<previous tag>] | manifest <evidence-dir> [<artifacts-dir>] (PREVIOUS=<tag> after the first release) | tag <tag> <main-ref> <check-runs.json> | run-manifest <evidence-dir> <artifacts-dir> <tag> | publish-crates <release-dir> <publication.json> | publish-npm <release-dir> <publication.json> | github-release <release-dir> | verify-assets <release-dir> | observe-registries <manifest> | qualify <release-dir> <evidence-dir> | attach-qualification <tag> <assets-dir>"
+                "usage: rustev-release [--candidate <tag>] manifest|npm-audit|main-sbom|sbom-check|compare-artifacts ... | candidate-version <tag> | manifests | archives <dir> | compare <dir-a> <dir-b> | field <name> | unpacked <dir> <work> [<toolchain>] | deps | exceptions <YYYY-MM-DD> | image-scan <YYYY-MM-DD> <platform>=<grype.json>... | changelog <out.md> [<previous tag>] | manifest <evidence-dir> [<artifacts-dir>] (PREVIOUS=<tag> after the first release) | tag <tag> <main-ref> <check-runs.json> | run-manifest <evidence-dir> <artifacts-dir> <tag> | publish-crates <release-dir> <publication.json> | publish-npm <release-dir> <publication.json> | github-release <release-dir> | verify-assets <release-dir> | verify-image <release-dir|image.json> [<repository>] | image-plan <amd64.oci.tar> <arm64.oci.tar> <tag> <out-dir> | image-tag <release-dir> <index-out> | observe-registries <manifest> | qualify <release-dir> <evidence-dir> | attach-qualification <tag> <assets-dir>"
             );
             ExitCode::from(2)
         }
