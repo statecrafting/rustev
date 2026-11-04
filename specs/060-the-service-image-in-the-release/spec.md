@@ -159,8 +159,12 @@ registry, and any change of decision behavior.
 3. Qualification (056 3.3) runs 031 3.9.7 (c) on an amd64 and an arm64
    runner: pull by index digest, `gh attestation verify` for provenance
    and SBOM, then start the image on a read-only root with a test
-   configuration on a Unix socket and serve one synthetic decision of the
-   lodging reference plan, comparing its document with the golden.
+   configuration on a Unix socket, register a small exact-only synthetic
+   plan unsigned, and serve one decision of it, comparing its judgment
+   with the golden. (Amended 2026-11-03 on the owner's decision of that
+   day: the text first named the lodging reference plan; the standalone
+   image installs no semantic backends, so it cannot decide that plan, and
+   the remote-backend path is covered by spec 042's tests.)
 
 ### 3.5 Failure and resume
 
@@ -365,6 +369,34 @@ dry run 41628699504, `image-plan` read both buildx OCI archives and gave
 the platform digests their own `index.json` names
 (`sha256:af46746d...` amd64, `sha256:321fdd73...` arm64).
 
+**Increment 6a, 2026-11-03 (3.4.3 as amended, harness).** 3.4.3 now
+decides an exact-only synthetic plan instead of the lodging reference plan
+(the owner's amendment of that day, under Decisions at approval).
+`qualification::required` reads a named image from the manifest's `image`
+(no artifact is of kind `image`), and `required_on` requires the image
+step on `linux-x64-gnu` and `linux-arm64-gnu` only
+(`qualification::IMAGE_PLATFORMS`); elsewhere it must be excluded with a
+reason. The harness's `image` step (`tools/rustev-release/qualify/harness.py`)
+pulls the image by its index digest and requires that digest, verifies
+the index's provenance and the platform manifest's CycloneDX SBOM
+attestations with `gh attestation verify oci://...` (signer workflow
+release.yml, source ref the tag), runs spec 042's `check.sh`, takes the
+plan ID from the release's verified CLI (`plan compile` of
+`qualify/image/definition.json`), starts the image read-only with no
+network, `qualify/image/serve.json` mounted read-only and its socket in a
+private directory owned by 65532, registers the plan unsigned, decides
+`qualify/image/decide.json` once and requires `judged` and a judgment
+equal to `qualify/image/judgment.json` with the plan ID filled in. The
+configuration drops evidence with a count (`drop_counted`), since the
+image has no sink. Locally, on the Debian 13 image built for
+`linux/arm64` from this tree, the configuration, registration and
+decision answered `judged` with a judgment equal to the golden (the
+service's socket was on a Docker volume there, because Docker Desktop's
+host mounts cannot hold a Unix socket; GitHub's Linux runners bind-mount
+it as the harness does). `a_named_image_is_qualified_on_amd64_and_arm64_linux_only`
+in `tests/image.rs` covers the per-platform rule. `qualify.yml`'s change
+(the registry login and `packages: read`) follows in its own pull request.
+
 ## Decisions at approval
 
 Ratified by the owner on 2026-11-03 (A-76: "I ratify 060"), as proposed:
@@ -379,3 +411,13 @@ Ratified by the owner on 2026-11-03 (A-76: "I ratify 060"), as proposed:
 4. 3.7 records the owner's decision of 2026-11-03 that a release keeps
    its qualification evidence as `qualification-` assets and that the
    release tooling ignores them.
+
+Owner amendment of 2026-11-03, after ratification: 3.4.3's decision is
+one of a small exact-only synthetic plan registered unsigned, compared
+with a new golden, in place of the lodging reference plan. The standalone
+`rustev-serve` image installs no semantic backends (its binary serves
+exact plans; ecosystem backends are host supplied or remote), so the
+lodging plan's semantic steps cannot be decided in the image alone, and
+the remote-backend path is covered by spec 042's tests (3.17). The
+decisions file is unchanged here; a decision row for this amendment, if
+needed, is added separately.

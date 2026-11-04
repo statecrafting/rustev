@@ -45,8 +45,19 @@ kinds become `not_run` with reason `dry run`, absent kinds become `excluded`, an
 the process exits nonzero. These records deliberately fail the qualification
 validator. Missing required tools/toolchains and unsupported hosts also produce
 `not_run`. Verification or execution errors produce `failed` with captured output.
-An image named by a future manifest remains `not_run`: its consumer is not defined
-by this release. An absent image uses the mandated exclusion reason.
+An image the manifest names (spec 060 3.4.3) is qualified on `linux-x64-gnu` and
+`linux-arm64-gnu` only, and excluded with that reason elsewhere. The step pulls it
+by its index digest, verifies the provenance attestation of the index and the
+CycloneDX SBOM attestation of the platform manifest, runs spec 042's
+`image/check.sh`, compiles `image/definition.json` (an exact-only synthetic plan)
+with the release's own verified CLI from the `cli` step for its plan ID, then
+starts the image with `--read-only --network none`, `image/serve.json` mounted
+read-only at `/etc/rustev` and its Unix socket in a private directory owned by
+65532, registers the plan unsigned, decides `image/decide.json` once and requires
+status `judged` and a judgment equal to `image/judgment.json` with the plan ID
+filled in. The socket belongs to 65532, so the host's requests use `sudo -n curl`
+(GitHub's Linux runners allow it). An absent image uses the mandated exclusion
+reason.
 
 The example template references the part-a API names `EXAMPLE_RULES`,
 `EXAMPLE_CALIBRATION`, `EXAMPLE_SNAPSHOT` and `EXAMPLE_JUDGMENT`. They are not

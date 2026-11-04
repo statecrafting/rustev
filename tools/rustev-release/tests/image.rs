@@ -373,3 +373,91 @@ fn the_release_set_names_the_image_once_with_its_fixed_repository_and_platforms(
     one.image.as_mut().unwrap().platforms.pop();
     assert!(!check_set(&one).is_empty());
 }
+
+/// One qualification step for `m` (056 3.3), passed or excluded.
+fn step(m: &ReleaseManifest, platform: &str, kind: &str, passed: bool) -> Vec<u8> {
+    use rustev_release::qualification::{SCHEMA, Status, Step};
+    serde_json::to_vec(&Step {
+        schema: SCHEMA.into(),
+        manifest_sha256: m.digest(),
+        platform: platform.into(),
+        kind: kind.into(),
+        command: vec!["consumer-check".into()],
+        exit_status: Some(0),
+        output_digest: sha256_hex(b"output"),
+        lockfile_or_install_record: "records".into(),
+        checksums: BTreeMap::from([("artifact".into(), sha256_hex(b"artifact"))]),
+        host: "fixture-host".into(),
+        os: "fixture-os".into(),
+        architecture: "fixture-arch".into(),
+        toolchain: "rustc fixture".into(),
+        node: "node fixture".into(),
+        status: if passed {
+            Status::Passed
+        } else {
+            Status::Excluded {
+                reason: "the image is qualified on linux/amd64 and linux/arm64 only".into(),
+            }
+        },
+    })
+    .unwrap()
+}
+
+#[test]
+fn a_named_image_is_qualified_on_amd64_and_arm64_linux_only() {
+    use rustev_release::qualification as q;
+    let (root, set) = member_fixture();
+    let m = manifest_of(&set, &root).unwrap();
+    let files = q::required_files(&m);
+    assert!(files.contains(&"linux-x64-gnu.image.json".to_string()));
+    assert!(files.contains(&"linux-arm64-gnu.image.json".to_string()));
+    assert!(
+        !files
+            .iter()
+            .any(|f| f.ends_with(".image.json") && !f.starts_with("linux-"))
+    );
+    assert!(!files.contains(&"linux-x64-musl.image.json".to_string()));
+    let write_all = |dir: &Path| {
+        std::fs::create_dir_all(dir).unwrap();
+        for p in fa::PLATFORMS {
+            for k in q::KINDS {
+                let passed = q::required_on(&m, k, p);
+                std::fs::write(dir.join(format!("{p}.{k}.json")), step(&m, p, k, passed)).unwrap();
+            }
+        }
+    };
+    let dir = root.join("qualification");
+    write_all(&dir);
+    q::evidence(&m, &dir).unwrap();
+    // An excluded image on a qualifying platform fails.
+    std::fs::write(
+        dir.join("linux-arm64-gnu.image.json"),
+        step(&m, "linux-arm64-gnu", "image", false),
+    )
+    .unwrap();
+    assert!(
+        q::evidence(&m, &dir)
+            .unwrap_err()
+            .contains("linux-arm64-gnu.image.json")
+    );
+    // A missing image step on a qualifying platform fails.
+    write_all(&dir);
+    std::fs::remove_file(dir.join("linux-x64-gnu.image.json")).unwrap();
+    assert!(
+        q::evidence(&m, &dir)
+            .unwrap_err()
+            .contains("linux-x64-gnu.image.json")
+    );
+    // Elsewhere the image step must be excluded with a reason.
+    write_all(&dir);
+    std::fs::write(
+        dir.join("darwin-arm64.image.json"),
+        step(&m, "darwin-arm64", "image", true),
+    )
+    .unwrap();
+    assert!(
+        q::evidence(&m, &dir)
+            .unwrap_err()
+            .contains("darwin-arm64.image.json")
+    );
+}

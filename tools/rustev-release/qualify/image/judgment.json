@@ -1,0 +1,21 @@
+{
+  "derivation": "exact-derived",
+  "evaluation_time_ms": 0,
+  "lineage": {
+    "inputs": [],
+    "steps": []
+  },
+  "notices": [],
+  "outcome": {
+    "propose": {
+      "action": "review",
+      "params": {}
+    }
+  },
+  "plan_id": "<plan_id>",
+  "schema": "rustev.judgment/1",
+  "snapshot_id": "sha256:c18bca60aef4870ec684066228cb447b7c875c6977c988e0216f13fe747c1400",
+  "trace": [
+    "rule:review"
+  ]
+}

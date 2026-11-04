@@ -10,6 +10,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import time
 import tomllib
 
 HERE = Path(__file__).resolve().parent
@@ -21,6 +22,8 @@ if not (RELEASE_TREE / 'tools/rustev-release/release-set.json').is_file():
     sys.exit('qualify: RUSTEV_QUALIFY_RELEASE_TREE is not a checkout of a released tree')
 INDEX = 'registry+https://github.com/rust-lang/crates.io-index'
 REPO = 'statecrafting/rustev'
+# Spec 060 3.4.3: the image is qualified on these hosts, as these platforms.
+IMAGE_PLATFORMS = {'linux-x64-gnu': 'linux/amd64', 'linux-arm64-gnu': 'linux/arm64'}
 
 
 def digest(path):
@@ -370,23 +373,142 @@ class Harness:
         self.run(binary, '--help')
         self.cli_smoke(binary, self.example())
 
+    def image_serve(self, ref, platform, plan_id, work):
+        """Start `ref` on a read-only root with no network, its configuration
+        mounted read-only and its Unix socket in a private directory, register
+        the synthetic plan unsigned and decide it once (060 3.4.3). Returns
+        the decision document. The socket belongs to user 65532, so the
+        host's requests go through `sudo curl`."""
+        config, sock = work / 'config', work / 'sock'
+        config.mkdir()
+        sock.mkdir(mode=0o700)
+        shutil.copyfile(HERE / 'image/serve.json', config / 'serve.json')
+        config.chmod(0o755)
+        (config / 'serve.json').chmod(0o644)
+        self.run('sudo', '-n', 'chown', '65532:65532', sock)
+        definition = read(HERE / 'image/definition.json')
+        report = dict(command='plan compile', out='plan.json', plan_id=plan_id, status='compiled')
+        write(work / 'register.json', dict(
+            schema='rustev.serve-register/1', signature='none',
+            bundle=dict(schema='rustev.plan-bundle/1', definition=definition, execution_policy='none',
+                        calibrations=[], bindings={}, compile_report=report)))
+        name = 'rustev-qualify-' + platform.replace('/', '-')
+        try:
+            # Inside the try: once the socket directory belongs to 65532, a
+            # failed start still reaches the cleanup below.
+            self.run('docker', 'run', '-d', '--name', name, '--platform', platform, '--read-only', '--network', 'none',
+                     '-v', f'{config}:/etc/rustev:ro', '-v', f'{sock}:/run/rustev', ref)
+            socket = sock / 'serve.sock'
+            for _ in range(60):
+                if subprocess.run(['sudo', '-n', 'test', '-S', str(socket)], check=False).returncode == 0:
+                    break
+                time.sleep(1)
+            else:
+                raise ValueError('the service did not open its socket within 60 s')
+
+            def call(method, path, body, expected):
+                out = work / 'response.json'
+                # Relative to the socket's directory: a Unix socket path is
+                # limited to about 100 bytes. The directory is 0700 and owned
+                # by 65532, so the change into it happens under sudo too.
+                argv = ['sudo', '-n', 'sh', '-c', 'cd "$1" && shift && exec "$@"', 'sh', str(sock), 'curl', '-sS', '--max-time', '60', '--unix-socket', socket.name, '-X', method,
+                        '-H', 'Content-Type: application/json', '-H', 'rustev-principal: cXVhbGlmaWNhdGlvbg',
+                        '--data-binary', '@' + str(body), '-o', str(out), '-w', '%{http_code}',
+                        'http://localhost' + path]
+                self.commands.append(' '.join(argv))
+                self.log.write(('$ ' + self.commands[-1] + '\n').encode())
+                http = subprocess.run(argv, env=self.env, capture_output=True, text=True, check=True)
+                self.log.write(f'HTTP {http.stdout}\n{http.stderr}'.encode())
+                document = read(out)
+                if http.stdout.strip() != '200':
+                    raise ValueError(f'{method} {path} answered HTTP {http.stdout.strip()}: {document}')
+                if document.get('schema') == 'rustev.serve-refusal/1':
+                    raise ValueError(f'{method} {path} refused: {document}')
+                if expected and document.get('schema') != expected:
+                    raise ValueError(f'{method} {path} answered {document.get("schema")}')
+                return document
+
+            registration = call('PUT', f'/v1/plans/{plan_id}', work / 'register.json', 'rustev.plan-registration/1')
+            if registration.get('plan_id') != plan_id or registration.get('signer') != 'unsigned':
+                raise ValueError('the registration is not the synthetic plan, unsigned')
+            return call('POST', f'/v1/plans/{plan_id}/decisions', HERE / 'image/decide.json', 'rustev.serve-decision/1')
+        finally:
+            subprocess.run(['docker', 'stop', '-t', '10', name], stdout=self.log, stderr=subprocess.STDOUT, check=False)
+            subprocess.run(['docker', 'logs', name], stdout=self.log, stderr=subprocess.STDOUT, check=False)
+            subprocess.run(['docker', 'rm', '-f', name], stdout=self.log, stderr=subprocess.STDOUT, check=False)
+            # The socket directory belongs to 65532; the work tree is removed later.
+            subprocess.run(['sudo', '-n', 'rm', '-rf', str(sock)], stdout=self.log, stderr=subprocess.STDOUT, check=False)
+
+    def image(self):
+        """Spec 060 3.4.3 (031 3.9.7 (c)): pull the image by its index digest,
+        verify its provenance and SBOM attestations, check it with 042's
+        check.sh and serve one decision of an exact-only synthetic plan,
+        whose judgment must equal the golden."""
+        self.need('docker', 'gh', 'curl', 'sudo')
+        image = self.m.get('image')
+        platform = IMAGE_PLATFORMS.get(self.platform)
+        if not image or not platform:
+            raise ValueError('image qualification on a host that needs none')
+        entry = next((p for p in image['platforms'] if p['platform'] == platform), None)
+        if entry is None:
+            raise ValueError(f'the manifest names no {platform} image')
+        repository, index = image['repository'], image['index_digest']
+        ref = f'{repository}@{index}'
+        self.run('docker', 'pull', '--platform', platform, ref)
+        got = subprocess.run(['docker', 'image', 'inspect', '--format', '{{json .RepoDigests}}', ref],
+                             capture_output=True, text=True, check=True).stdout
+        if ref not in json.loads(got):
+            raise ValueError(f'the pulled image is not {ref}')
+        signer = ['--repo', REPO, '--signer-workflow', REPO + '/.github/workflows/release.yml',
+                  '--source-ref', 'refs/tags/' + self.m['tag']]
+        self.run('gh', 'attestation', 'verify', 'oci://' + ref, *signer)
+        self.run('gh', 'attestation', 'verify', f'oci://{repository}@{entry["digest"]}',
+                 '--predicate-type', 'https://cyclonedx.org/bom', *signer)
+        self.run('sh', RELEASE_TREE / 'integrations/rustev-serve/image/check.sh', ref, platform)
+        # The plan's identity from the release's own verified CLI (the cli step).
+        cli = self.work / 'cli' / f'rustev-{self.version}-{self.platform}' / 'rustev'
+        if not cli.is_file():
+            raise ValueError('the cli step did not leave the verified CLI')
+        work = self.work / 'image'
+        work.mkdir()
+        shutil.copyfile(HERE / 'image/definition.json', work / 'definition.json')
+        compiled = subprocess.run([str(cli), 'plan', 'compile', '--definition', 'definition.json', '--out', 'plan.json'],
+                                  cwd=work, env=self.env, capture_output=True, check=True)
+        self.log.write(compiled.stdout)
+        plan_id = json.loads(compiled.stdout)['plan_id']
+        decision = self.image_serve(ref, platform, plan_id, work)
+        write(work / 'decision.json', decision)
+        expected = read(HERE / 'image/judgment.json')
+        expected['plan_id'] = plan_id
+        if decision.get('status') != 'judged' or decision.get('plan_id') != plan_id:
+            raise ValueError(f'the decision is {decision.get("status")}, not judged for the plan')
+        if decision.get('judgment') != expected:
+            raise ValueError('the judgment differs from the golden')
+        self.checksums[f'{repository}@{platform}'] = entry['digest'].removeprefix('sha256:')
+        self.checksums[repository] = index.removeprefix('sha256:')
+
     def execute(self):
         failed = False
         for kind in ('crates', 'npm', 'cli', 'image'):
-            required = bool(self.m['packages']) if kind == 'crates' else any(
-                a['kind'] == ('binary' if kind == 'cli' else kind) for a in self.m['artifacts'])
+            if kind == 'crates':
+                required = bool(self.m['packages'])
+            elif kind == 'image':
+                # 060 3.4.3: a named image is qualified on amd64 and arm64 Linux.
+                required = bool(self.m.get('image')) and self.platform in IMAGE_PLATFORMS
+            else:
+                required = any(a['kind'] == ('binary' if kind == 'cli' else kind) for a in self.m['artifacts'])
             prefix = self.evidence / f'{self.platform}.{kind}'
             self.commands, self.checksums = [], {}
             status, code = None, None
             with Path(str(prefix) + '.log').open('wb') as self.log:
                 try:
-                    if not required:
+                    if not required and kind == 'image' and self.m.get('image'):
+                        status = {'excluded': {'reason': 'the image is qualified on linux/amd64 and linux/arm64 only (060 3.4.3)'}}
+                    elif not required:
                         named = {'image': 'container image', 'cli': 'binary artifact', 'npm': 'npm artifact'}.get(kind, kind)
                         status = {'excluded': {'reason': 'the signed manifest names no ' + named}}
                     elif os.environ.get('RUSTEV_QUALIFY_DRY') == '1':
                         raise NotRun('dry run')
-                    elif kind == 'image':
-                        raise NotRun('container qualification is not implemented')
                     elif self.platform.startswith('unsupported'):
                         raise NotRun('unsupported host platform')
                     else:
@@ -400,7 +522,7 @@ class Harness:
                     self.log.write((str(e) + '\n').encode())
             records = Path(str(prefix) + '.records')
             records.mkdir(exist_ok=True)
-            for pattern in ('**/Cargo.lock', '**/package-lock.json', '**/audit.json', '**/.crates*.json', '**/.crates.toml', 'example/*.json', 'example/time.txt', 'cli/*.sha256'):
+            for pattern in ('**/Cargo.lock', '**/package-lock.json', '**/audit.json', '**/.crates*.json', '**/.crates.toml', 'example/*.json', 'example/time.txt', 'cli/*.sha256', 'image/*.json'):
                 for source in self.work.glob(pattern):
                     dest = records / source.relative_to(self.work)
                     dest.parent.mkdir(parents=True, exist_ok=True)
