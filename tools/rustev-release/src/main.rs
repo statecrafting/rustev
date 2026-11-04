@@ -49,6 +49,10 @@
 //! `rustev-release exceptions <YYYY-MM-DD>` exits 1 unless every advisory
 //! `deny.toml` ignores has an owner-approved exception unexpired on that
 //! date (3.6).
+//!
+//! `rustev-release image-scan <YYYY-MM-DD> <platform>=<grype.json>...` exits
+//! 1 unless every finding of the image scan is covered by an unexpired entry
+//! of `image-exceptions.json` and every entry is used (spec 060 3.2).
 
 use std::path::Path;
 use std::process::{Command, ExitCode};
@@ -60,6 +64,8 @@ const SET: &str = include_str!("../release-set.json");
 const POLICY: &str = include_str!("../archive-policy.json");
 const DENY: &str = include_str!("../deny.toml");
 const EXCEPTIONS: &str = include_str!("../advisory-exceptions.json");
+const IMAGE_EXCEPTIONS: &str = include_str!("../image-exceptions.json");
+const DECISIONS: &str = include_str!("../../../docs/decisions/00-founding-decisions.md");
 const LOCK: &str = include_str!("../../../Cargo.lock");
 
 fn metadata() -> Result<Metadata, String> {
@@ -415,6 +421,45 @@ fn utc_today() -> String {
         .map(|d| d.as_secs())
         .unwrap_or(0);
     rustev_release::audit::civil_date(secs)
+}
+
+// Spec 060 3.2: every image finding covered by an unexpired exception, and
+// every exception used. Each argument is `<platform>=<grype JSON report>`.
+fn image_scan(today: &str, reports: &[&str]) -> Result<(), String> {
+    let utc = utc_today();
+    if today != utc {
+        return Err(format!(
+            "060 3.2: image-scan takes today's UTC date as YYYY-MM-DD ({utc}), not {today:?}"
+        ));
+    }
+    if reports.is_empty() {
+        return Err("060 3.2: image-scan needs at least one <platform>=<report>".into());
+    }
+    let mut found = Vec::new();
+    for arg in reports {
+        let (platform, path) = arg
+            .split_once('=')
+            .ok_or_else(|| format!("060 3.2: {arg:?} is not <platform>=<report>"))?;
+        let bytes = std::fs::read(path).map_err(|e| format!("{path}: {e}"))?;
+        match rustev_release::image_scan::db_built(&bytes) {
+            Some(built) => println!("{platform}: scanned with the database built {built}"),
+            None => println!("{platform}: the report names no database build date"),
+        }
+        found.extend(rustev_release::image_scan::findings(platform, &bytes)?);
+    }
+    let ex = rustev_release::image_scan::ImageExceptions::parse(IMAGE_EXCEPTIONS.as_bytes())?;
+    let rows = rustev_release::image_scan::decision_dates(DECISIONS);
+    let v = rustev_release::image_scan::check(&ex, &rows, &found, today);
+    if v.is_empty() {
+        println!(
+            "060 3.2: {} finding(s), each under an unexpired exception; {} exception(s), each used",
+            found.len(),
+            ex.exceptions.len()
+        );
+        Ok(())
+    } else {
+        Err(v.join("\n"))
+    }
 }
 
 fn exceptions(today: &str) -> ExitCode {
@@ -1111,13 +1156,14 @@ fn main() -> ExitCode {
         ["qualify", dir, evidence] => verdict(qualify_cmd(dir, evidence)),
         ["attach-qualification", tag, dir] => verdict(attach_qualification_cmd(tag, dir)),
         ["exceptions", today] => exceptions(today),
+        ["image-scan", today, ref reports @ ..] => verdict(image_scan(today, reports)),
         ["changelog", out] => changelog_cmd(&set, out, None),
         ["changelog", out, previous] => changelog_cmd(&set, out, Some(previous)),
         ["unpacked", dir, work] => unpacked(&set, dir, work, None),
         ["unpacked", dir, work, toolchain] => unpacked(&set, dir, work, Some(toolchain)),
         _ => {
             eprintln!(
-                "usage: rustev-release [--candidate <tag>] manifest|npm-audit|main-sbom|sbom-check|compare-artifacts ... | candidate-version <tag> | manifests | archives <dir> | compare <dir-a> <dir-b> | field <name> | unpacked <dir> <work> [<toolchain>] | deps | exceptions <YYYY-MM-DD> | changelog <out.md> [<previous tag>] | manifest <evidence-dir> [<artifacts-dir>] (PREVIOUS=<tag> after the first release) | tag <tag> <main-ref> <check-runs.json> | run-manifest <evidence-dir> <artifacts-dir> <tag> | publish-crates <release-dir> <publication.json> | publish-npm <release-dir> <publication.json> | github-release <release-dir> | verify-assets <release-dir> | observe-registries <manifest> | qualify <release-dir> <evidence-dir> | attach-qualification <tag> <assets-dir>"
+                "usage: rustev-release [--candidate <tag>] manifest|npm-audit|main-sbom|sbom-check|compare-artifacts ... | candidate-version <tag> | manifests | archives <dir> | compare <dir-a> <dir-b> | field <name> | unpacked <dir> <work> [<toolchain>] | deps | exceptions <YYYY-MM-DD> | image-scan <YYYY-MM-DD> <platform>=<grype.json>... | changelog <out.md> [<previous tag>] | manifest <evidence-dir> [<artifacts-dir>] (PREVIOUS=<tag> after the first release) | tag <tag> <main-ref> <check-runs.json> | run-manifest <evidence-dir> <artifacts-dir> <tag> | publish-crates <release-dir> <publication.json> | publish-npm <release-dir> <publication.json> | github-release <release-dir> | verify-assets <release-dir> | observe-registries <manifest> | qualify <release-dir> <evidence-dir> | attach-qualification <tag> <assets-dir>"
             );
             ExitCode::from(2)
         }

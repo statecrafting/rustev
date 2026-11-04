@@ -285,10 +285,11 @@ case "${1:-}" in
     # 031 3.9.2: the compiled crate through cargo deny, and the base layers
     # through a pinned grype over each platform's SBOM. While the release
     # set lists the image as absent, cargo deny's bans and the scan's
-    # findings are reported and recorded without failing; once the image
-    # is a member, they fail, and an image finding passes only under an
-    # owner-approved, unexpired exception, which this command does not yet
-    # read.
+    # verdict are reported and recorded without failing; once the image is
+    # a member, they fail. The verdict is `release image-scan` (060 3.2):
+    # every finding under an unexpired entry of image-exceptions.json, and
+    # every entry used. Each JSON report names the scanner database's
+    # build date (060 3.2.3).
     test "$#" = 2 || fail 'scan-image <image-dir>'
     dir=$2
     grype version | grep -qx 'Version: *0\.120\.1' || fail 'grype 0.120.1 required'
@@ -317,7 +318,7 @@ case "${1:-}" in
       test "$member" = no || fail '031 3.9.2: rustev-serve fails the bans policy'
       echo '031 3.9.2: rustev-serve fails the bans policy; recorded, not gating while the release set lists the image as absent'
     fi
-    total=0
+    total=0 reports=
     for arch in amd64 arm64; do
       sbom="$dir/rustev-serve-linux-$arch.oci.tar.cdx.json"
       test -f "$sbom" || fail "missing $sbom"
@@ -328,9 +329,11 @@ case "${1:-}" in
       n=$(python3 -c 'import json,sys; print(len(json.load(open(sys.argv[1]))["matches"]))' "$dir/rustev-serve-linux-$arch.vulnerabilities.json")
       echo "linux/$arch: $n finding(s)"
       total=$((total + n))
+      reports="$reports linux/$arch=$dir/rustev-serve-linux-$arch.vulnerabilities.json"
     done
-    if [ "$total" != 0 ]; then
-      test "$member" = no || fail "031 3.9.2: $total image finding(s) and no exception rule for image findings yet"
+    # shellcheck disable=SC2086 # one argument per platform report
+    if ! release image-scan "$(date -u +%Y-%m-%d)" $reports; then
+      test "$member" = no || fail "060 3.2.2: the image scan fails its exceptions ($total finding(s)); nothing is published"
       echo "031 3.9.2: $total image finding(s) recorded; not gating while the release set lists the image as absent"
     fi
     ;;

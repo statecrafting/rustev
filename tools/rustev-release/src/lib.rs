@@ -22,6 +22,7 @@ pub mod cratesio;
 pub mod family_artifacts;
 pub mod hosted;
 pub mod image;
+pub mod image_scan;
 pub mod lifecycle;
 pub mod manifest;
 pub mod npm;

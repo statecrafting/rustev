@@ -301,6 +301,30 @@ and each refusal. The `qualify.yml` change that runs the command, with
 the workflow tests that check its permissions, follows in its own pull
 request.
 
+**Increment 3, 2026-11-03 (3.2, the scan gate).**
+`tools/rustev-release/image-exceptions.json`
+(`rustev.image-exceptions/1`) is committed empty. An entry names the
+vulnerability `id` and `package` as grype reports them, the owner's
+`decision` row, the last day it holds (`expires`) and a `reason`; there is
+no separate decision date, because the row's date is read from
+`docs/decisions/00-founding-decisions.md` (embedded at build time) and
+`expires` may be at most 90 days after it. `rustev-release image-scan
+<today> <platform>=<grype.json>...` (`image_scan::check`) fails on a
+finding that no unexpired entry for its id and package covers, on an
+expired entry, on an entry that matches no finding, and on an entry with
+no decision row, more than 90 days, a malformed date, an empty field or a
+duplicate; `<today>` must be today's UTC date, as for `exceptions`. It
+prints each report's scanner database build date
+(`descriptor.db.status.built`); the JSON reports are already part of the
+`image-evidence` artifact (3.2.3). `artifacts.sh scan-image` now runs it
+after the scan in place of its own count: while the release set lists the
+image as absent a failing verdict is recorded and does not gate, as
+before; once the image is a member it fails `image-checks`. The tests in
+`tools/rustev-release/tests/image_scan.rs` cover the uncovered finding,
+the expired entry and the unused entry of section 5, and the other
+refusals. No exception is added here: the exceptions for the remaining
+"won't fix" findings are decided with the base refresh (decision 2).
+
 ## Decisions at approval
 
 Ratified by the owner on 2026-11-03 (A-76: "I ratify 060"), as proposed:
