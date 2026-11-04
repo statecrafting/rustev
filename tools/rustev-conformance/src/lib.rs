@@ -4,6 +4,7 @@
 //! case's expected bytes under only the comparison the case declares.
 #![forbid(unsafe_code)]
 
+pub mod local_embed;
 pub mod normalize;
 pub mod runtime;
 
@@ -46,6 +47,10 @@ pub struct Case {
     pub mirrors: Option<String>,
     #[serde(default)]
     pub runtime: Option<serde_json::Value>,
+    /// A local-embed case (spec 011, 3.17.5): decisions answered by the
+    /// local semantic backend over a SYNTHETIC bundle ([`local_embed`]).
+    #[serde(default)]
+    pub local_embed: Option<serde_json::Value>,
     /// A retained explanation call, compared byte for byte.
     #[serde(default)]
     pub explain: Option<serde_json::Value>,
@@ -103,12 +108,13 @@ pub fn sha256_hex(b: &[u8]) -> String {
         .collect()
 }
 
-/// The manifest the case files make: every `cases/cli/*.json` (harvested)
-/// and `cases/runtime/*.json` (authored), sorted by id, as canonical
-/// pretty JSON.
+/// The manifest the case files make: every `cases/cli/*.json` (harvested),
+/// `cases/runtime/*.json` (authored) and `cases/local-embed/*.json`
+/// (blessed by the local backend's tests, spec 011 3.17.5), sorted by id,
+/// as canonical pretty JSON.
 pub fn aggregate() -> Result<Vec<u8>, String> {
     let mut cases = vec![];
-    for dir in ["cli", "runtime"] {
+    for dir in ["cli", "local-embed", "runtime"] {
         let d = root().join("tools/rustev-conformance/cases").join(dir);
         // Each case directory exists whenever the suite does; a missing one
         // is an error naming it, never a silently smaller manifest.

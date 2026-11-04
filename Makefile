@@ -102,6 +102,9 @@ semver:
 conformance:
 	cargo test -p rustev-conformance --locked
 	cargo test -p rustev-serve --locked --lib conformance::
+	@# Spec 011, 3.17.5: the local-embed cases through the Rust API, run by
+	@# the backend's tests (the suite takes the opened backend as a seam).
+	cargo test -p rustev-backend-embed-linear --locked --test bundle support_routing::conformance::
 
 # Spec 027, 3.12.2: rebuild the CLI cases and their fixtures from the CLI
 # tests that pin each golden (`RUSTEV_HARVEST`), then the explain cases from
@@ -179,3 +182,10 @@ bindings:
 	node tools/rustev-conformance/js/platform-packages.mjs stage "$(CARGO_TARGET)"
 	node tools/rustev-conformance/js/platform-packages.mjs fresh "$(BINDINGS_OUT)/native-fresh" > "$(BINDINGS_OUT)/native-fresh.path"
 	node tools/rustev-conformance/js/run.mjs native "$$(cat "$(BINDINGS_OUT)/native-fresh.path")"
+	@# Spec 011, 3.17: last, after the platform package is staged, the binding
+	@# built from source with `local-embed` as a host builds it; its tests,
+	@# and the local-embed cases byte for byte against the Rust API (3.17.5).
+	cargo build -p rustev-node --locked --release --features local-embed
+	node tools/rustev-conformance/js/copy-addon.mjs "$(CARGO_TARGET)" integrations/rustev-node
+	node --test integrations/rustev-node/test/local-embed.test.mjs
+	node tools/rustev-conformance/js/run.mjs native integrations/rustev-node --local-embed

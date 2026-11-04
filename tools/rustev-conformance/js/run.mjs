@@ -7,22 +7,27 @@
 //   node run.mjs wasm <wasm package dir>
 //   node run.mjs chromium <wasm package dir>   (the same cases in headless Chromium)
 //   node run.mjs native <native package dir>
+//   node run.mjs native <native package dir> --local-embed
+//     (only the local-embed cases, on a build with the `local-embed`
+//     feature: spec 011, 3.17.5; without the flag, a build without the
+//     feature must refuse them `feature_disabled`, 3.17.1)
 //
 // What a surface does not print is CLI presentation (3.1.3, 3.12.3): exit
 // codes and the `run` envelope's paths and receipt. A native `run` case is
 // therefore compared on the judgment and run-record bytes the envelope
 // carries; a pure command's output is compared whole, exit code included.
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../../..');
-const [surface, pkg] = process.argv.slice(2);
-if (!['wasm', 'chromium', 'native'].includes(surface) || !pkg) {
-  console.error('usage: node run.mjs wasm|chromium|native <package dir>');
+const [surface, pkg, flag] = process.argv.slice(2);
+const localEmbedOnly = flag === '--local-embed';
+if (!['wasm', 'chromium', 'native'].includes(surface) || !pkg || (flag !== undefined && !(localEmbedOnly && surface === 'native'))) {
+  console.error('usage: node run.mjs wasm|chromium|native <package dir> [--local-embed (native)]');
   process.exit(2);
 }
 
@@ -566,27 +571,35 @@ async function nativeAdapter() {
     }
     const out = new Map();
     const done = await Promise.all(running);
-    done.forEach((d, i) => {
-      const id = rt.requests[i].decision_id;
-      let status;
-      let record = null;
-      if (d.ok) {
-        status = { decision_id: id, status: d.ok.completion };
-        record = d.ok.raw.evidence;
-      } else if (d.err.name === 'SinkFailure') {
-        status = { decision_id: id, status: 'evidence_not_delivered' };
-        record = d.err.record;
-      } else {
-        const kinds = {
-          AdmissionRejected: d.err.code,
-          DeadlineExceeded: 'queue_deadline',
-          CancelledBeforeAdmission: 'cancelled',
-        };
-        status = { decision_id: id, rejection: kinds[d.err.name] ?? d.err.name, status: 'rejected' };
-      }
-      out.set(`${id}.result.json`, Buffer.from(JSON.stringify(status) + '\n'));
-      if (record) out.set(`${id}.record.json`, Buffer.concat([Buffer.from(record), Buffer.from('\n')]));
-    });
+    done.forEach((d, i) => settled(out, rt.requests[i].decision_id, d));
+    await compareOutputs(c, out);
+  }
+
+  /** A decision's outputs, as the Rust runner writes them: its result and,
+   * when one was produced, its run record. */
+  function settled(out, id, d) {
+    let status;
+    let record = null;
+    if (d.ok) {
+      status = { decision_id: id, status: d.ok.completion };
+      record = d.ok.raw.evidence;
+    } else if (d.err.name === 'SinkFailure') {
+      status = { decision_id: id, status: 'evidence_not_delivered' };
+      record = d.err.record;
+    } else {
+      const kinds = {
+        AdmissionRejected: d.err.code,
+        DeadlineExceeded: 'queue_deadline',
+        CancelledBeforeAdmission: 'cancelled',
+      };
+      status = { decision_id: id, rejection: kinds[d.err.name] ?? d.err.name, status: 'rejected' };
+    }
+    out.set(`${id}.result.json`, Buffer.from(JSON.stringify(status) + '\n'));
+    if (record) out.set(`${id}.record.json`, Buffer.concat([Buffer.from(record), Buffer.from('\n')]));
+  }
+
+  /** Every output against its golden, and no output the case does not pin. */
+  async function compareOutputs(c, out) {
     if (process.env.RUSTEV_CONFORMANCE_DUMP) {
       const { mkdirSync, writeFileSync } = await import('node:fs');
       // Plain names only: a case id or output name cannot leave the dump
@@ -605,6 +618,74 @@ async function nativeAdapter() {
       if (!got || !got.equals(golden)) failures.push(`${c.id}: ${o.file} differs from ${o.golden}`);
     }
     if (out.size !== c.outputs.length) failures.push(`${c.id}: ${out.size} outputs, expected ${c.outputs.length}`);
+  }
+
+  /** A local-embed case (spec 011, 3.17.5): the local semantic backend
+   * opened from the case's SYNTHETIC bundle, registered like a rules
+   * backend, deciding the requests one after another on a manual clock. */
+  async function localEmbedCase(c, files) {
+    const le = c.local_embed;
+    const config = {
+      bundleDir: realpathSync(join(root, le.bundle)),
+      expectedArtifact: le.expected_artifact,
+      workers: le.workers,
+      maxQueued: le.max_queued,
+    };
+    if (!rustev.features().localEmbed) {
+      // 3.17.1: a build without the feature refuses, typed, and opens nothing.
+      let refusal;
+      try {
+        await rustev.LocalEmbedBackend.open(config);
+      } catch (e) {
+        refusal = e;
+      }
+      if (!(refusal instanceof rustev.ConfigRefused) || refusal.code !== 'feature_disabled') {
+        failures.push(`${c.id}: a build without local-embed answered ${refusal ?? 'with a backend'}, not feature_disabled`);
+      }
+      return;
+    }
+    const backend = await rustev.LocalEmbedBackend.open(config);
+    // The descriptor the backend derives is the one the case pins.
+    if (!le.descriptors.some((d) => Buffer.from(files.get(d)).equals(Buffer.concat([Buffer.from(backend.descriptor), Buffer.from('\n')])))) {
+      failures.push(`${c.id}: the opened backend's descriptor is not among the case's`);
+    }
+    const engine = await rustev.Engine.create({
+      runtime: {
+        maxInFlight: le.config.max_in_flight,
+        maxQueued: le.config.max_queued,
+        maxParallelRequests: le.config.max_parallel_requests,
+        sinkTimeoutMs: le.config.sink_timeout_ms,
+      },
+      clock: 'manual',
+      sink: { queueCapacity: 64, acceptsRun3: true, deliver: async (_r, { decisionId }) => `ack:${decisionId}` },
+      localEmbedBackends: [{ backend, maxConcurrency: le.max_concurrency }],
+    });
+    try {
+      const plan = await engine.compile({
+        plan: files.get(le.plan),
+        descriptors: le.descriptors.map((d) => files.get(d)),
+        calibrations: (le.calibrations ?? []).map((x) => files.get(x)),
+      });
+      const out = new Map();
+      for (const r of le.requests) {
+        const d = await plan
+          .decide(
+            { decisionId: r.decision_id, snapshot: files.get(r.snapshot), evaluationTimeMs: r.evaluation_time_ms },
+            { principalHandle: Buffer.from(r.principal_handle, 'utf8') },
+          )
+          .then(
+            (v) => ({ ok: v }),
+            (e) => ({ err: e }),
+          );
+        if (d.ok?.raw.judgment) {
+          out.set(`${r.decision_id}.judgment.json`, Buffer.concat([Buffer.from(d.ok.raw.judgment), Buffer.from('\n')]));
+        }
+        settled(out, r.decision_id, d);
+      }
+      await compareOutputs(c, out);
+    } finally {
+      await engine.shutdown();
+    }
   }
 
   /** A scripted host backend from a runtime case's data (3.12.4).
@@ -665,6 +746,7 @@ async function nativeAdapter() {
   return async (c) => {
     if (c.explain) return compareWasm(c, await executeExplain(pure, explainCall(c), rustev));
     const { files, derived } = inputsOf(c);
+    if (c.local_embed) return localEmbedCase(c, files);
     if (c.runtime) return runtimeCase(c, files);
     const a = flags(c.argv);
     if (a.command === 'run') return runCase(c, a, files, derived);
@@ -739,7 +821,7 @@ const run =
 // The Chromium adapter runs the cases that name the WebAssembly surface.
 const named = surface === 'chromium' ? 'wasm' : surface;
 let ran = 0;
-let selected = manifest.cases.filter((c) => c.surfaces.includes(named));
+let selected = manifest.cases.filter((c) => c.surfaces.includes(named) && (!localEmbedOnly || c.local_embed));
 if (named === 'wasm') {
   const supported = selected.filter((c) => !requiresParameterized(c));
   console.log(`conformance ${surface}: skipped ${selected.length - supported.length} parameterized case(s)`);

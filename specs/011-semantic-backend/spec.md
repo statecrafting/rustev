@@ -37,6 +37,10 @@ extends:
   - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "tools/rustev-boundaries/" }, nature: additive }
   # The crate is excluded from the release set until spec 031 admits it (3.17.4).
   - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
+  # The Node binding's optional `local-embed` feature (3.17.1) and the shared
+  # suite's local-embed cases and runner (3.17.5), increment 6.
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-node/" }, nature: additive }
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "tools/rustev-conformance/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "002-decision-contract-and-pure-core"
@@ -1099,6 +1103,40 @@ The crate gains dev-dependencies on `rustev-runtime`, `rustev-eval`,
 `rustev-backend-rules` and `rustev-pkg-support-routing`; its normal graph
 is unchanged. Tests: `tests/support_routing/` (included by
 `tests/bundle.rs`).
+
+**Increment 6 (2026-11-03): the Node binding's `local-embed` feature and
+synthetic conformance parity (3.17.1, 3.17.5).** `rustev-node` gains the
+Cargo feature `local-embed`, off by default, an optional dependency on this
+crate with its `synthetic` feature, since a synthetic bundle constructs on
+any target (3.6.3, A-73); an `onnx` bundle is still refused
+`unqualified_platform`. The package exports `LocalEmbedBackend.open(config)`
+with the 3.7.1 members the backend takes today (`bundleDir`, `runtimePath`,
+`expectedArtifact`, `workers`, `maxQueued`), verifying the bundle off the
+JavaScript thread, and `features()`; an opened backend registers on
+`Engine.create` through `localEmbedBackends`, like the rules backend, as a
+Rust backend and not a host seam. A setup refusal is `ConfigRefused` whose
+code is the 3.7.2 code and whose detail names the item; without the feature
+`open` rejects `feature_disabled` and `features().localEmbed` is false. An
+unknown member is refused, never ignored, so `embeddingCache` is refused
+until the backend's configuration takes the cache (3.14). The prebuilt
+platform packages stay without the feature (Decision 10). The shared suite
+gains the case `local-embed.support-routing`: the committed synthetic
+support-routing bundle of increment 5, opened at its repository path, four
+package cases and one blank message (`text_empty`, supplied as
+`backend_unavailable`), each decided on a manual clock, with judgment and
+run record compared byte for byte on the Rust API and the native binding.
+The suite's runner (`tools/rustev-conformance/src/local_embed.rs`) takes the
+opened backend as a seam, so the suite never depends on this crate; the
+Rust API side runs in this crate's tests
+(`tests/support_routing/conformance.rs`, which also blesses the case), and
+`make conformance` runs it. `make bindings` builds the binding with the
+feature last, runs `test/local-embed.test.mjs` and the case
+(`run.mjs native --local-embed`); a build without the feature must refuse
+the case `feature_disabled`, which every native matrix target checks. Not
+yet done: the service transports join the case with 3.17.3; and the
+binding's build with `local-embed` on each native matrix target, which
+counts toward qualifying a platform (3.2.3), needs a change to the
+`bindings` workflow; only `darwin-arm64` was built here.
 
 ## Decisions at approval
 

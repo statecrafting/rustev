@@ -37,7 +37,15 @@
         "source": "spec-edge"
       },
       {
+        "path": "integrations/rustev-node/",
+        "source": "spec-edge"
+      },
+      {
         "path": "tools/rustev-boundaries/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "tools/rustev-conformance/",
         "source": "spec-edge"
       },
       {
@@ -62,6 +70,19 @@
       {
         "locations": [
           {
+            "file": "integrations/rustev-node/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-node/"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "tools/rustev-boundaries/"
           }
         ],
@@ -70,6 +91,19 @@
         "unit": {
           "kind": "directory",
           "path": "tools/rustev-boundaries/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "tools/rustev-conformance/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-conformance/"
         }
       },
       {
@@ -168,5 +202,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "9e8d2c4b0760f9c80ebbd240617197cd9b8a726fea7944a1374b29260c3d52ae"
+  "shardHash": "d9e757f119c2366a001fc42d9383ac6b9437de626e434280052335fa394dd26e"
 }
