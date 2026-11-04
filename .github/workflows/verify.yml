@@ -106,6 +106,13 @@ jobs:
         env:
           ACCEPTANCE_GROUP: ${{ matrix.group }}
         run: python3 scripts/acceptance/verify.py "$ACCEPTANCE_GROUP"
+      # What the group left on the disk, pass or fail: the measure for the
+      # next disk budget decision.
+      - name: Record runner disk
+        if: always()
+        run: |
+          df -h / | sed 's/^/end: /'
+          du -sh target 2>/dev/null | sed 's/^/end: target /' || true
       # Cargo fingerprints workspace sources by mtime, which a fresh checkout
       # resets, so workspace crates always rebuild: their artifacts are dead
       # weight in the cache. Only dependencies are kept.
