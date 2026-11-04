@@ -220,6 +220,7 @@ fn embed(dir: &Path) -> EmbedLinearBackend {
         runtime_path: None,
         workers: 1,
         max_queued: 2,
+        embedding_cache: None,
     })
     .unwrap()
 }

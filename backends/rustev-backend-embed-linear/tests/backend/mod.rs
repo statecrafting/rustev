@@ -20,6 +20,7 @@ fn config(b: &Bundle, workers: usize, max_queued: usize) -> EmbedConfig {
         runtime_path: None,
         workers,
         max_queued,
+        embedding_cache: None,
     }
 }
 fn projection() -> Vec<u8> {
@@ -538,3 +539,5 @@ fn truncated_input_is_charged_only_for_tokens_handed_to_encoder() {
     assert_charge(&r, 7);
     assert_eq!(backend.cost_bound(&p), CostBound::Bounded { max_units: 7 });
 }
+
+mod cache;

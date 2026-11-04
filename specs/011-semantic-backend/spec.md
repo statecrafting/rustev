@@ -913,6 +913,28 @@ erasure removes every entry of the handle before returning.
 `cache_stats()` reports `hits`, `misses`, `admitted`, `evicted`, `bytes`
 and `invalidations`. Tests in `tests/bundle.rs` (`cache_tests`).
 
+**Increment 4 wiring (2026-11-03): the embedding cache in the backend
+(3.14, 3.7.1).** `EmbedConfig` gains `embedding_cache`, off when absent;
+the backend constructs the cache of increment 4 at setup, with the
+synthetic encoder's repeatability evidence for a synthetic bundle and none
+otherwise, so an `onnx` bundle with a cache configured would be refused
+`cache_not_equivalent` (it is refused `unqualified_platform` first today).
+Each prepared request is looked up on the caller by its principal handle
+and post-truncation token ids and mask, before any handoff; a hit applies
+the head to the stored embedding on the caller, reaches no worker and is
+charged `observed{units_per_call}` (3.11.4); a miss carries its ticket to
+the worker, which admits the embedding only for a run that completed and
+whose attempt was neither cancelled nor abandoned, so a late result is
+never cached (3.12.3, 3.14.4). `cache_stats()`, `clear_cache()` and
+`erase_principal(handle)` are methods of `EmbedLinearBackend`; with the
+cache off the counters stay zero. No file under `src/cache.rs` changed.
+Tests in `tests/backend/cache.rs`: off by default, a hit's logits bitwise
+equal to the miss's and to an uncached backend's, principal isolation,
+eviction by entries and by bytes, `clear_cache` and `erase_principal`,
+`erase_principal` racing an in-flight run, cancelled, failed and abandoned
+runs not admitted, and the configuration leaving the descriptor and cost
+bound unchanged (3.5.2).
+
 **After the gate, part 1 (2026-11-02): the feasibility record and the
 inference dependencies (3.2).** Decision 4 of the owner's 2026-11-01
 answers commits the record. `backends/rustev-backend-embed-linear/qualification/`
