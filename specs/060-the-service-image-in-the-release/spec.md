@@ -424,6 +424,15 @@ top-level permissions to read only and only its `attach` job to hold
 `workflow_write_permissions_are_confined` in `tests/candidate.rs` skips
 comment lines and admits that call beside `github-release`.
 
+**Increment 6b, 2026-11-03 (3.4.3, workflow).** `qualify.yml`'s `qualify`
+job also holds `packages: read`, and on the Linux gnu runners logs in to
+ghcr.io with the job's token before the harness runs, so the image step
+(increment 6a) can pull the image by digest and `gh attestation verify
+oci://...` can read its attestations while the package is still private
+(the owner makes it public after its first push). release.yml's `qualify`
+call grants `packages: read` as that job's ceiling. No job gains a write
+permission.
+
 ## Decisions at approval
 
 Ratified by the owner on 2026-11-03 (A-76: "I ratify 060"), as proposed:

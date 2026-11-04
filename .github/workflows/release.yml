@@ -892,6 +892,7 @@ jobs:
     permissions:
       contents: write
       attestations: read
+      packages: read
     uses: ./.github/workflows/qualify.yml
     with:
       tag: ${{ github.ref_name }}
