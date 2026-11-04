@@ -280,6 +280,27 @@ the candidate refusal. `verify-release` against the registry follows in
 its own pull request; the workflow that hands `manifest` the image files
 follows with `publish-image`.
 
+**Increment 2a, 2026-11-03 (3.7.3, tooling).** `rustev-release
+attach-qualification <tag> <assets-dir>` (`tagged::attach_qualification`
+through `prerelease::AssetUploads`) attaches a qualified run's evidence to
+the tag's release. The directory must hold exactly
+`qualification-vX.Y.Z.json` and one `qualification-vX.Y.Z-<platform>.tar.gz`
+per platform of the release matrix (`qualification_asset_names`); the
+record must be `rustev.qualification-record/1` for that tag and version in
+state `qualified`, every bundle a gzip stream, and the release present and
+not a pre-release. All of that is checked before the first upload. A name
+already present is never uploaded again: with the same bytes it is
+reported present, with other bytes (an earlier qualification of the tag)
+it is kept and the command prints a warning. `gh release upload` runs
+without `--clobber`, so a present name is refused there too. A failed
+upload fails the command, and a rerun uploads only the missing names. The
+tests `qualification_evidence_is_attached_once_and_never_replaced` and
+`qualification_evidence_is_refused_before_any_upload` in
+`tools/rustev-release/tests/tagged.rs` cover the resume, the kept record
+and each refusal. The `qualify.yml` change that runs the command, with
+the workflow tests that check its permissions, follows in its own pull
+request.
+
 ## Decisions at approval
 
 Ratified by the owner on 2026-11-03 (A-76: "I ratify 060"), as proposed:

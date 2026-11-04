@@ -42,7 +42,9 @@
 //! and `npm` read; `github-release <release-dir>` creates the release once;
 //! `verify-assets <release-dir>` and `observe-registries <manifest>` check
 //! what was published; `qualify <release-dir> <evidence-dir>` records the
-//! lifecycle with no instruction or journal.
+//! lifecycle with no instruction or journal; `attach-qualification <tag>
+//! <assets-dir>` adds a qualified record and its platform bundles to the
+//! tag's release, uploading only names not present (spec 060 3.7.3).
 //!
 //! `rustev-release exceptions <YYYY-MM-DD>` exits 1 unless every advisory
 //! `deny.toml` ignores has an owner-approved exception unexpired on that
@@ -1011,6 +1013,29 @@ fn observe_registries(manifest: &str) -> Result<(), String> {
     }
 }
 
+// Spec 060 3.7.3: a qualified run's record and bundles kept on its release.
+fn attach_qualification_cmd(tag: &str, dir: &str) -> Result<(), String> {
+    let mut assets = rustev_release::prerelease::Assets::new();
+    for entry in std::fs::read_dir(dir).map_err(|e| format!("{dir}: {e}"))? {
+        let entry = entry.map_err(|e| format!("{dir}: {e}"))?;
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let bytes = std::fs::read(entry.path()).map_err(|e| format!("{name}: {e}"))?;
+        assets.insert(name, bytes);
+    }
+    let mut gh = rustev_release::prerelease::Gh {
+        executable: "gh".into(),
+    };
+    for (name, outcome) in rustev_release::tagged::attach_qualification(&mut gh, tag, &assets)? {
+        match outcome {
+            rustev_release::tagged::Attached::PresentOther => println!(
+                "::warning::{name} is already attached with other bytes; it is kept, never replaced"
+            ),
+            other => println!("{name}: {other:?}"),
+        }
+    }
+    Ok(())
+}
+
 // Spec 058 3.4.2: qualification from the run's release, no instruction or journal.
 fn qualify_cmd(dir: &str, evidence: &str) -> Result<(), String> {
     let m = release_manifest(Path::new(dir))?;
@@ -1084,6 +1109,7 @@ fn main() -> ExitCode {
         ["verify-assets", dir] => verdict(verify_assets_cmd(dir)),
         ["observe-registries", manifest] => verdict(observe_registries(manifest)),
         ["qualify", dir, evidence] => verdict(qualify_cmd(dir, evidence)),
+        ["attach-qualification", tag, dir] => verdict(attach_qualification_cmd(tag, dir)),
         ["exceptions", today] => exceptions(today),
         ["changelog", out] => changelog_cmd(&set, out, None),
         ["changelog", out, previous] => changelog_cmd(&set, out, Some(previous)),
@@ -1091,7 +1117,7 @@ fn main() -> ExitCode {
         ["unpacked", dir, work, toolchain] => unpacked(&set, dir, work, Some(toolchain)),
         _ => {
             eprintln!(
-                "usage: rustev-release [--candidate <tag>] manifest|npm-audit|main-sbom|sbom-check|compare-artifacts ... | candidate-version <tag> | manifests | archives <dir> | compare <dir-a> <dir-b> | field <name> | unpacked <dir> <work> [<toolchain>] | deps | exceptions <YYYY-MM-DD> | changelog <out.md> [<previous tag>] | manifest <evidence-dir> [<artifacts-dir>] (PREVIOUS=<tag> after the first release) | tag <tag> <main-ref> <check-runs.json> | run-manifest <evidence-dir> <artifacts-dir> <tag> | publish-crates <release-dir> <publication.json> | publish-npm <release-dir> <publication.json> | github-release <release-dir> | verify-assets <release-dir> | observe-registries <manifest> | qualify <release-dir> <evidence-dir>"
+                "usage: rustev-release [--candidate <tag>] manifest|npm-audit|main-sbom|sbom-check|compare-artifacts ... | candidate-version <tag> | manifests | archives <dir> | compare <dir-a> <dir-b> | field <name> | unpacked <dir> <work> [<toolchain>] | deps | exceptions <YYYY-MM-DD> | changelog <out.md> [<previous tag>] | manifest <evidence-dir> [<artifacts-dir>] (PREVIOUS=<tag> after the first release) | tag <tag> <main-ref> <check-runs.json> | run-manifest <evidence-dir> <artifacts-dir> <tag> | publish-crates <release-dir> <publication.json> | publish-npm <release-dir> <publication.json> | github-release <release-dir> | verify-assets <release-dir> | observe-registries <manifest> | qualify <release-dir> <evidence-dir> | attach-qualification <tag> <assets-dir>"
             );
             ExitCode::from(2)
         }
