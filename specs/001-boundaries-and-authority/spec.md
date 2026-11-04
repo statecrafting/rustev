@@ -329,9 +329,9 @@ sh -c 'for d in crates tools; do [ -d "$d" ] || continue; if grep -rnE "(struct|
   and `ld` ending on SIGBUS) failed `code`, `verify` and `msrv` jobs from
   2026-11-02 to 11-04. Release and WebAssembly profiles are unchanged.
 - 2026-11-04 (build only, no claim of this spec changes): `Cargo.lock`
-  records `rustev-conformance`'s new path dependency on `rustev-eval`, so
-  the conformance suite's capture cases assemble replay bundles (spec 063
-  increment 1). No external crate is added; `make boundaries` is unchanged.
+  records `rustev-conformance`'s new path dependencies on `rustev-eval`
+  and `rustev-surface`, so the conformance suite's capture cases assemble
+  and replay bundles (spec 063 increment 1). No external crate is added; `make boundaries` is unchanged.
 
 ## Profile upgrade record (2026-10-02)
 
