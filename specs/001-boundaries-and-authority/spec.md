@@ -333,6 +333,14 @@ sh -c 'for d in crates tools; do [ -d "$d" ] || continue; if grep -rnE "(struct|
   and `rustev-surface`, so the conformance suite's capture cases assemble
   and replay bundles (spec 063 increment 1). No external crate is added; `make boundaries` is unchanged.
 
+- 2026-11-04 (build only, no claim of this spec changes): the acceptance
+  partition (`scripts/acceptance/verify.py`) records free disk before each
+  spec and, below 20 GiB (`ACCEPTANCE_DISK_FLOOR_GIB`), drops incremental
+  artifacts and then, if still below, runs `cargo clean`. The
+  integrations-base group ran out of disk with 41 GB free after the
+  workflow's cleanup, because its specs build into one growing target
+  directory. Commands, groups and results are unchanged.
+
 ## Profile upgrade record (2026-10-02)
 
 The Statecraft github-actions-rust profile moves to revision 13 before the
