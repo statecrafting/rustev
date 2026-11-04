@@ -9,6 +9,7 @@ use common::*;
 use rustev_contract::Document;
 use rustev_contract::replay::ReplayBundle;
 use rustev_contract::retention::Retention;
+use rustev_contract::run::RunRecord;
 use serde_json::Value as Json;
 
 const WALL_ARG: &str = "1800000000000";
@@ -64,6 +65,25 @@ fn capture(s: &Scratch, task: &str, name: &str, scope: &[String], retain: &[&str
     s.rustev_owned(&a).expect(0, "judged")
 }
 
+/// Zero the wall-clock timing of the run record retained in
+/// `<name>.bundle.json` (the golden `timing` normalization, spec 027,
+/// 3.12.3) and re-digest it, so the bundle a case is harvested from is the
+/// same bytes on every run (#362). Replay reproduces the judgment, never the
+/// timing, so the bundle still reproduces.
+fn normalize_bundle_timing(s: &Scratch, name: &str) {
+    let file = format!("{name}.bundle.json");
+    let mut b = ReplayBundle::parse(&s.read(&file)).unwrap();
+    let Retention::Retained { bytes, digest, .. } = &mut b.run.retention else {
+        panic!("{file}: the run record is not retained");
+    };
+    let mut record: Json = serde_json::from_str(bytes).unwrap();
+    normalize_timing(&mut record);
+    let record = RunRecord::parse(&serde_json::to_vec(&record).unwrap()).unwrap();
+    *bytes = String::from_utf8(record.record_canonical().unwrap()).unwrap();
+    *digest = record.record_digest().unwrap();
+    s.write(&file, &b.record_canonical().unwrap());
+}
+
 fn replay(s: &Scratch, name: &str, scope: &[String], extra: &[&str]) -> Ran {
     let mut a: Vec<String> = [
         "replay",
@@ -102,6 +122,7 @@ fn every_retention_mode_writes_a_bundle_and_only_retained_bytes_reproduce() {
         let run = capture(&s, task, &emb, &scope, &["--retain", "embedded"]);
         assert_eq!(run["capture"]["status"], "complete");
         assert_eq!(run["bundle"], format!("{emb}.bundle.json"));
+        normalize_bundle_timing(&s, &emb);
         let r = replay(&s, &emb, &scope, &[]);
         let j = r.expect(0, "reproduced");
         // The reproduced judgment is byte-identical to the run's.
