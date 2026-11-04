@@ -541,7 +541,9 @@ fn capture_cases() {
     // Existing fixtures are read and checked, never rewritten by capture blessing.
     for (name, bytes) in &fx {
         if name.starts_with("capture-") {
-            keep(&format!("fixtures/runtime/{name}"), bytes);
+            // Beside, not in, fixtures/runtime: rustev-contract's
+            // ranking_wire test counts that directory's descriptors.
+            keep(&format!("fixtures/{}", fixture(name)), bytes);
         } else {
             assert_eq!(
                 std::fs::read(root().join(DIR).join("fixtures/runtime").join(name)).unwrap(),
@@ -615,11 +617,20 @@ fn capture_cases() {
         }
         let c = json!({"id":id,"command":"decide","surfaces":["rust-api","native"],
             "mirrors":if generation {"crates/rustev-eval/tests/generation_replay.rs"} else {"crates/rustev-eval/tests/acquisition_replay.rs::five_acquisitions_two_paged_reproduce_without_source_calls"},
-            "inputs":names.iter().map(|n| json!({"name":n,"path":format!("{DIR}/fixtures/runtime/{n}"),"sha256":sha256_hex(&fx[n])})).collect::<Vec<_>>(),
+            "inputs":names.iter().map(|n| json!({"name":n,"path":format!("{DIR}/fixtures/{}", fixture(n)),"sha256":sha256_hex(&fx[n])})).collect::<Vec<_>>(),
             "runtime":block,"outputs":outputs});
         keep(
             &format!("cases/runtime/{id}.json"),
             &line(serde_json::to_vec_pretty(&c).unwrap()),
         );
+    }
+}
+
+/// A capture fixture's path under `fixtures/`.
+fn fixture(name: &str) -> String {
+    if name.starts_with("capture-") {
+        format!("capture/{name}")
+    } else {
+        format!("runtime/{name}")
     }
 }

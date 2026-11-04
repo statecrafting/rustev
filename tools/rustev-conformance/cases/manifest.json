@@ -12151,17 +12151,17 @@
       "inputs": [
         {
           "name": "capture-generation.descriptor.json",
-          "path": "tools/rustev-conformance/fixtures/runtime/capture-generation.descriptor.json",
+          "path": "tools/rustev-conformance/fixtures/capture/capture-generation.descriptor.json",
           "sha256": "7cbb083f6dc689dd9da2d0b0886df2304171f685545b1e84f8dd4f4b546f43fd"
         },
         {
           "name": "capture-generation.plan.json",
-          "path": "tools/rustev-conformance/fixtures/runtime/capture-generation.plan.json",
+          "path": "tools/rustev-conformance/fixtures/capture/capture-generation.plan.json",
           "sha256": "3615133efadebdeb809df94f47df5049a83902f628c202471f79806514ad90b5"
         },
         {
           "name": "capture-generation.snapshot.json",
-          "path": "tools/rustev-conformance/fixtures/runtime/capture-generation.snapshot.json",
+          "path": "tools/rustev-conformance/fixtures/capture/capture-generation.snapshot.json",
           "sha256": "b34d8feb906cb18dfe773a01c18e3645ae091132b99060eed8787e148ceddf82"
         }
       ],
