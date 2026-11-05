@@ -424,3 +424,21 @@ fn with_no_cost_unit_every_cost_is_not_declared() {
         );
     }
 }
+
+#[test]
+fn an_unknown_cost_is_unknown_never_zero() {
+    let c = config();
+    let mut d = docs();
+    d.record.cases[2].cost = Some(rustev_eval::host_run::HostCost::Unknown(
+        rustev_eval::host_run::Unobserved {
+            unknown: "billing_lag".into(),
+        },
+    ));
+    let m = measure(&c, &d.inputs()).unwrap();
+    assert_eq!(
+        m.cases.cases[2].measures.get(metric::COST_PER_1000),
+        Some(&CaseMeasure::Unknown {
+            reason: "cost unknown: billing_lag".into()
+        })
+    );
+}
