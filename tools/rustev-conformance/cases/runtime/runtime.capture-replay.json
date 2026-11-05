@@ -1,0 +1,215 @@
+{
+  "command": "decide",
+  "id": "runtime.capture-replay",
+  "inputs": [
+    {
+      "name": "support.plan.json",
+      "path": "tools/rustev-conformance/fixtures/runtime/support.plan.json",
+      "sha256": "4133c00f8d2f6fbe26cfc853bcd878dedafdeba8e5e43cacbf638f65136ee6b8"
+    },
+    {
+      "name": "support.snapshot.json",
+      "path": "tools/rustev-conformance/fixtures/runtime/support.snapshot.json",
+      "sha256": "8009ccb469d24cae5f07b0cd3bbb91682f03b53856369a4f57ac9052156f8064"
+    },
+    {
+      "name": "synthetic-label-only.descriptor.json",
+      "path": "tools/rustev-conformance/fixtures/runtime/synthetic-label-only.descriptor.json",
+      "sha256": "57ef7512d8516439419ee66b281e234454d563ce928f896f7c4e2ae3ee6cc680"
+    },
+    {
+      "name": "synthetic-linear-head-replica.descriptor.json",
+      "path": "tools/rustev-conformance/fixtures/runtime/synthetic-linear-head-replica.descriptor.json",
+      "sha256": "bfea4d82292a03bbb6d7c63511d31b5ed49b816b057ebaaa17048fbdc810797d"
+    },
+    {
+      "name": "synthetic-linear-head.descriptor.json",
+      "path": "tools/rustev-conformance/fixtures/runtime/synthetic-linear-head.descriptor.json",
+      "sha256": "a95460744b245b084df38c6552019a0d36e7be25d477689b44e85d72e8d6ae74"
+    },
+    {
+      "name": "synthetic-other-head.descriptor.json",
+      "path": "tools/rustev-conformance/fixtures/runtime/synthetic-other-head.descriptor.json",
+      "sha256": "128d5ac80328e3ff1687826f6462be9b6e144be72c813fd1b27424d9cc1f2e81"
+    },
+    {
+      "name": "topic.calibration.json",
+      "path": "tools/rustev-conformance/fixtures/runtime/topic.calibration.json",
+      "sha256": "2313edf2bf75c4e9a9f248f9e4533d485ced06acd09e97dbbe1b4919ce148072"
+    }
+  ],
+  "mirrors": "crates/rustev-eval/tests/acquisition_replay.rs::five_acquisitions_two_paged_reproduce_without_source_calls",
+  "outputs": [
+    {
+      "file": "embedded.bundle.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.capture-replay/embedded.bundle.json",
+      "normalize": [],
+      "sha256": "aa269fdef6e47126d6579bc23ba5e91ee4f18cdbab09c8f96f9dd8d0ddf0c219"
+    },
+    {
+      "file": "embedded.record.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.capture-replay/embedded.record.json",
+      "normalize": [],
+      "sha256": "d4e844fb43b5b065bd7338b26b962d84204fcb8e9dd6b594975f3c2d52e6bf07"
+    },
+    {
+      "file": "embedded.replay.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.capture-replay/embedded.replay.json",
+      "normalize": [],
+      "sha256": "b628babf38ab5ec1bb865cce7b788e99f671c4ea34d118c04c8413f6f5446d45"
+    },
+    {
+      "file": "embedded.result.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.capture-replay/embedded.result.json",
+      "normalize": [],
+      "sha256": "a0c5d9c5e45bd7c7f3892bf3a29726e5136c2a0e06a0abe971e563c5f271b3c5"
+    },
+    {
+      "file": "external.bundle.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.capture-replay/external.bundle.json",
+      "normalize": [],
+      "sha256": "9130e107abe5ad784f6483420afb1bcdaa308d14317dbfe5408417406a700dff"
+    },
+    {
+      "file": "external.record.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.capture-replay/external.record.json",
+      "normalize": [],
+      "sha256": "cd90fe8e4ad3076f347e3a622b6dd4459ac7fc1a9e9f9fa3e18248473777345e"
+    },
+    {
+      "file": "external.replay.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.capture-replay/external.replay.json",
+      "normalize": [],
+      "sha256": "6010976861438abcbacd397773e8aadb515bbe85ea25fbe4850a0c8c0fa4e2f1"
+    },
+    {
+      "file": "external.result.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.capture-replay/external.result.json",
+      "normalize": [],
+      "sha256": "a05cbb7cabf6f209b9841168f8b1446ffe94a6c824e8632b3fb3911119724efc"
+    }
+  ],
+  "runtime": {
+    "backends": [
+      {
+        "answers": {
+          "support.deadline": [
+            {
+              "output": {
+                "charge": {
+                  "observed": {
+                    "units": 1
+                  }
+                },
+                "output": {
+                  "logits": {
+                    "false": 3.0,
+                    "true": 0.0
+                  }
+                }
+              }
+            }
+          ],
+          "support.frustration": [
+            {
+              "output": {
+                "charge": {
+                  "observed": {
+                    "units": 1
+                  }
+                },
+                "output": {
+                  "logits": {
+                    "calm": 3.0,
+                    "frustrated": 0.0,
+                    "very_angry": 0.0
+                  }
+                }
+              }
+            }
+          ],
+          "support.topic": [
+            {
+              "output": {
+                "charge": {
+                  "observed": {
+                    "units": 1
+                  }
+                },
+                "output": {
+                  "logits": {
+                    "account_access": 0.0,
+                    "billing": 4.0,
+                    "integration_defect": 0.0,
+                    "other": 0.0
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "cost_bound": {
+          "bounded": {
+            "max_units": 1
+          }
+        },
+        "cost_model": "bounded",
+        "descriptor": "synthetic-linear-head.descriptor.json",
+        "max_concurrency": 8,
+        "on_cancel": "ignore",
+        "on_release": {},
+        "remote": "finished"
+      }
+    ],
+    "calibrations": [
+      "topic.calibration.json"
+    ],
+    "capture": {
+      "created_at_ms": 1790164800000,
+      "max_bytes": 16777216,
+      "retain": {
+        "embedded": "embedded",
+        "external": "external"
+      },
+      "scope": {
+        "context_revision": "revision",
+        "mode": "principal",
+        "principal_scope": "scope",
+        "tenant": "tenant"
+      }
+    },
+    "config": {
+      "max_in_flight": 2,
+      "max_parallel_requests": 1,
+      "max_queued": 0,
+      "sink_timeout_ms": 1000
+    },
+    "descriptors": [
+      "synthetic-linear-head.descriptor.json",
+      "synthetic-label-only.descriptor.json",
+      "synthetic-linear-head-replica.descriptor.json",
+      "synthetic-other-head.descriptor.json"
+    ],
+    "drive": [
+      "start",
+      "start"
+    ],
+    "plan": "support.plan.json",
+    "requests": [
+      {
+        "decision_id": "embedded",
+        "evaluation_time_ms": 1790164800000,
+        "snapshot": "support.snapshot.json"
+      },
+      {
+        "decision_id": "external",
+        "evaluation_time_ms": 1790164800000,
+        "snapshot": "support.snapshot.json"
+      }
+    ]
+  },
+  "surfaces": [
+    "rust-api",
+    "native"
+  ]
+}

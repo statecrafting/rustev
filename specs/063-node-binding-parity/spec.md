@@ -489,7 +489,8 @@ capture?: {
    and producing attempt; and runtime-reason documents for supplied
    failures. Request projections are not embedded; replay recomputes them.
 3. **Retention.** `digest_only` (default) keeps digests only, so the
-   bundle is not replayable (`incomparable{content-not-retained}`);
+   bundle is not replayable (`incomparable`: 004's `missing` for an
+   item, 036's `content-not-retained` for an acquisition page);
    `embedded` keeps bytes inside the bundle; `external` returns each
    item's bytes in `items` under a reference equal to its tagged digest,
    which the host stores and later supplies to replay. Lifetime defaults
@@ -677,7 +678,7 @@ document, identity, golden, `rustev-core`, `rustev-runtime` or
 | `decide` without `capture` | No bundle; result unchanged. |
 | `capture` with `maxBytes` 0, above 16 MiB, or a lifetime above 30 days | `CaptureConfigRefused` before admission. |
 | A capture exceeding `maxBytes` | `status: 'limit_exceeded'`, no payload; decision and delivery unchanged. |
-| `retain: 'digest_only'` bundle replayed | `incomparable{content-not-retained}`, never `reproduced`. |
+| `retain: 'digest_only'` bundle replayed | `incomparable{missing}` (`content-not-retained` for an acquisition page), never `reproduced`. |
 | An `external` item withheld at replay | `incomparable` naming the item; zero backend or source calls. |
 | `embedded` capture under a telemetry redaction policy that drops a snapshot field | The field's canary is present in the bundle (unredacted, 3.8.4) and absent from telemetry. |
 | A canary in the snapshot and in the principal handle | Snapshot canary only in the bundle; principal canary nowhere; neither in sink, telemetry or gauges. |
@@ -751,7 +752,24 @@ The last increment to land adds `verify:cli` and `VERIFIED_SPECS`.
 
 ## Implementation record
 
-None yet.
+**Increment 1, 2026-11-04 (3.8, capture on decide).** `decide` takes
+`capture` and returns `capture` (`integrations/rustev-node/src/capture.rs`,
+`index.d.ts`, `index.js`): options are checked before the context fetch
+and admission (`CaptureConfigRefused`: `zero_limit`, `limit_too_large`,
+`invalid_scope`, `out_of_range`), the decision runs through
+`Runtime::decide_with_capture`, and the bundle is assembled with
+`assemble_with_sources` from the plan handle's retained plan, descriptors
+and calibrations. `external` returns each item under its tagged digest. A
+captured `SinkFailure` carries `capture` beside `record`; the native error
+message holds no captured byte. `test/capture.test.mjs` covers the capture
+rows of section 5 and `SinkFailure`. The conformance cases
+`runtime.capture-replay` (embedded and external, semantic steps) and
+`runtime.capture-generation` run on `rust-api` and `native` with
+identical bytes. Acquisition pages join with increment 3: until then no
+binding plan has a source, and source descriptors are passed empty. The
+digest-only reason in 3.8.3 and section 5 now names 004's `missing` for an
+item, as replay has always reported, and 036's `content-not-retained` only
+for an acquisition page; no behavior changed.
 
 ## Decisions at approval
 

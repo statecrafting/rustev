@@ -358,12 +358,19 @@ class PlanHandle {
           evaluationTimeMs: request.evaluationTimeMs,
           deadlineMs: options.deadlineMs ?? request.deadlineMs,
           principalHandle: options.principalHandle,
+          capture: options.capture,
         },
         cancel,
       );
+      if (r.failure != null) {
+        const error = typed(new Error(r.failure));
+        if (r.capture != null) error.capture = r.capture;
+        throw error;
+      }
       const judgment = r.judgment ?? null;
       return {
         completion: r.completion,
+        ...(r.capture == null ? {} : { capture: r.capture }),
         ...(r.trace == null ? {} : { trace: r.trace }),
         judgment: judgment && JSON.parse(Buffer.from(judgment).toString('utf8')),
         evidence: JSON.parse(Buffer.from(r.evidence).toString('utf8')),

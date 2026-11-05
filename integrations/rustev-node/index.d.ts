@@ -115,7 +115,24 @@ export interface DecisionRequest {
   deadlineMs?: number;
 }
 
+/** Captured content is unredacted personal data. The host owns protection,
+ * expiry and erasure of every copy, including embedded bundle copies. */
+export interface CaptureOptions {
+  scope: import('./types/rustev-documents').RustevReplay1.Scope;
+  maxBytes: number;
+  createdAtMs: number;
+  retain?: 'digest_only' | 'embedded' | 'external';
+  lifetimeMs?: number;
+  hostCapMs?: number;
+}
+export interface CaptureResult {
+  status: 'complete' | 'limit_exceeded' | 'cancelled' | 'abandoned';
+  bundle?: Uint8Array;
+  items?: Record<string, Uint8Array>;
+  error?: { code: string; detail: unknown };
+}
 export interface DecideOptions {
+  capture?: CaptureOptions;
   /** 049 3.4.2: printable ASCII, at most 512 bytes, with traceparent. */
   tracestate?: string;
   signal?: AbortSignal;
@@ -128,6 +145,7 @@ export interface DecideOptions {
 }
 
 export interface DecideResult {
+  capture?: CaptureResult;
   trace?: { traceId: string; rootSpanId: string };
   completion: 'judged' | 'cancelled';
   /** The parsed judgment; null when cancelled. An unresolved outcome is a
@@ -215,6 +233,7 @@ export declare class AdmissionRejected extends RustevError {}
 export declare class DeadlineExceeded extends RustevError {}
 export declare class CancelledBeforeAdmission extends RustevError {}
 export declare class SinkFailure extends RustevError {
+  capture?: CaptureResult;
   /** The run record: evidence, not a result to act on. */
   readonly record?: Uint8Array;
 }

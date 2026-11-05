@@ -10,6 +10,7 @@
 //! into the exported `RustevError` subclass (3.4.1). No panic crosses: every
 //! export runs inside `catch_unwind` and a panic becomes `InternalError`.
 
+mod capture;
 mod errors;
 pub mod local_embed;
 mod seams;
@@ -305,6 +306,8 @@ impl Engine {
                 plan: Arc::new(prepared),
                 plan_id,
                 raw,
+                descriptors: Arc::new(ds),
+                calibrations: Arc::new(cs),
             })
         })
     }
@@ -370,6 +373,8 @@ impl Engine {
                 plan: Arc::new(prepared),
                 plan_id,
                 raw,
+                descriptors: Arc::new(ds),
+                calibrations: Arc::new(cs),
             })
         })
     }
@@ -770,6 +775,7 @@ impl CancelHandle {
 /// A decision request (3.3).
 #[napi(object)]
 pub struct Request {
+    pub capture: Option<serde_json::Value>,
     pub decision_id: String,
     /// Absent only when the engine has a context source (3.3.6).
     pub snapshot: Option<Uint8Array>,
@@ -789,6 +795,8 @@ pub struct PlanHandle {
     plan: Arc<PreparedPlan>,
     plan_id: String,
     raw: Vec<u8>,
+    descriptors: Arc<Vec<BackendDescriptor>>,
+    calibrations: Arc<Vec<CalibrationArtifact>>,
 }
 
 fn integer(v: f64, what: &str) -> Result<u64> {
@@ -826,6 +834,13 @@ impl PlanHandle {
         // and until the task ends, however it ends (a panic unwinding the
         // task drops the guard too): either shutdown waits for this decision
         // or the decision refuses; it never runs unseen.
+        let capture = guard(|| {
+            request
+                .capture
+                .clone()
+                .map(capture::Options::parse)
+                .transpose()
+        })?;
         let counted = InFlight::enter(self.engine.clone());
         if self.engine.shut.load(Ordering::SeqCst) {
             return Err(fail(
@@ -935,6 +950,9 @@ impl PlanHandle {
         let plan = self.plan.clone();
         let signal = cancel.signal.clone();
         let telemetry = self.engine.telemetry.clone();
+        let dependencies = capture
+            .as_ref()
+            .map(|_| (self.descriptors.clone(), self.calibrations.clone()));
         let task = self.engine.rt.spawn(async move {
             let _counted = counted;
             // 049 3.4: begin immediately before admission; abandon on every exit.
@@ -953,10 +971,63 @@ impl PlanHandle {
                     (None, None)
                 })
             })?;
-            let r = runtime.decide(&plan, req, &signal).await;
+            let (r, captured) = if let Some(options) = capture {
+                let snapshot = req.snapshot.clone();
+                let evaluation_time = req.evaluation_time;
+                let captured = runtime
+                    .decide_with_capture(&plan, req, &signal, &options.config)
+                    .await
+                    .map_err(|_| {
+                        fail(
+                            "CaptureConfigRefused",
+                            "out_of_range",
+                            serde_json::Value::Null,
+                        )
+                    })?;
+                let outcome = guard(|| {
+                    let run = match &captured.result {
+                        Ok(d) => &d.record,
+                        Err(DecideError::EvidenceNotDelivered { record, .. }) => record,
+                        _ => return Ok(None),
+                    };
+                    let (ds, cs) = dependencies.as_ref().expect("capture dependencies");
+                    Ok(Some(options.assemble(
+                        &rustev_eval::assemble::AssemblyInput {
+                            capture: capture::captured(&captured.capture),
+                            scope: &options.config.scope,
+                            plan: &plan.compiled().plan,
+                            descriptors: ds,
+                            calibrations: cs,
+                            snapshot: &snapshot,
+                            run,
+                            evaluation_time,
+                            created_at_ms: options.created,
+                        },
+                    )))
+                })?;
+                (captured.result, outcome)
+            } else {
+                (runtime.decide(&plan, req, &signal).await, None)
+            };
             drop(trace);
             guard(|| {
+                // A captured sink failure crosses as data, never in the native
+                // error message or detail. JavaScript attaches it beside record.
+                if captured.is_some() && matches!(&r, Err(DecideError::EvidenceNotDelivered { .. }))
+                {
+                    let error = decided(r).err().expect("sink failure");
+                    return Ok(DecideResult {
+                        completion: "cancelled".into(),
+                        judgment: None,
+                        evidence: Uint8Array::new(vec![]),
+                        delivery: "null".into(),
+                        trace: None,
+                        capture: captured,
+                        failure: Some(error.reason),
+                    });
+                }
                 let mut result = decided(r)?;
+                result.capture = captured;
                 result.trace = begun.map(
                     |b| serde_json::json!({"traceId": b.trace_id, "rootSpanId": b.root_span_id}),
                 );
@@ -1045,6 +1116,8 @@ impl Drop for Trace {
 /// A decision's result (3.3.3): bytes are the contract's canonical bytes.
 #[napi(object)]
 pub struct DecideResult {
+    pub capture: Option<capture::Outcome>,
+    pub failure: Option<String>,
     /// `judged` or `cancelled`.
     pub completion: String,
     /// The judgment's record canonical bytes; absent when cancelled.
@@ -1085,6 +1158,8 @@ fn decided(r: std::result::Result<rustev_runtime::Decided, DecideError>) -> Resu
                 evidence: Uint8Array::new(bytes(d.record.record_canonical())?),
                 delivery: delivery.to_string(),
                 trace: None,
+                capture: None,
+                failure: None,
             })
         }
         // Spec 027 3.4.1 gives the in-process host the invariant description in `detail`;
