@@ -67,7 +67,8 @@ fn jobs(text: &str) -> Vec<(String, Job)> {
                         .collect();
                 }
                 "environment" => job.environment = Some(value.to_string()),
-                "uses" => job.uses = Some(value.to_string()),
+                // A trailing YAML comment (a lint waiver) is not part of the target.
+                "uses" => job.uses = Some(value.split(" #").next().unwrap().trim().to_string()),
                 _ => {}
             }
         } else if in_permissions && let Some(rest) = line.strip_prefix("      ") {
