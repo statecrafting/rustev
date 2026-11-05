@@ -1,5 +1,5 @@
-# Rendered by Statecraft from profile github-actions-rust revision 20
-# (identity 90804dbe62b2b1c1515d42c39cd9d75b851c7c5bcf91d892e23db7cd6ebfc4c2). A managed file and a member of this
+# Rendered by Statecraft from profile github-actions-rust revision 26
+# (identity 39e2a7a244759e35b35b089449054b69062d619d9d418b94a6e83a2accdd3b88). A managed file and a member of this
 # repository's authority set. Called by statecraft-ci.yml only; it declares
 # the two credentials it may use by name (revision 8: the API key when set,
 # else the OAuth token) and is never given `secrets: inherit`.
@@ -19,6 +19,9 @@ on:
       release_candidate:
         description: whether the head ref matches the release branch pattern
         value: ${{ jobs.review.outputs.release_candidate }}
+      answered:
+        description: true when every finding is low and other and answered by a review note for this head (spec 068)
+        value: ${{ jobs.review.outputs.answered }}
 
 permissions:
   contents: read
@@ -31,9 +34,11 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+      checks: write
     outputs:
       result: ${{ steps.review.outputs.result }}
       release_candidate: ${{ steps.review.outputs.release_candidate }}
+      answered: ${{ steps.answered.outputs.answered }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -62,7 +67,8 @@ jobs:
           EXCLUDE: '.statecraft/derived crates/rustev-contract/schema integrations/rustev-node/types integrations/rustev-wasm/types backends/rustev-backend-embed-linear/qualification tools/rustev-conformance/cases'
           RELEASE_PATTERN: 'release/*'
           CLAUDE_CLI_VERSION: '2.1.116'
-          PROFILE_IDENTITY: '90804dbe62b2b1c1515d42c39cd9d75b851c7c5bcf91d892e23db7cd6ebfc4c2'
+          PROFILE_IDENTITY: '39e2a7a244759e35b35b089449054b69062d619d9d418b94a6e83a2accdd3b88'
+          REUSE_RECORDED: ${{ github.event.action == 'edited' }}
         run: |
           script="${RUNNER_TEMP}/statecraft-ai-review.sh"
           # Revision 12: only a readable base without the script is the
@@ -85,3 +91,37 @@ jobs:
           name: statecraft-ai-review-${{ github.event.pull_request.head.sha }}
           path: ${{ steps.review.outputs.evidence }}
           if-no-files-found: error
+      - name: Publish the verdict check run
+        if: steps.review.outputs.evidence != '' && github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          EVIDENCE_DIR: ${{ steps.review.outputs.evidence }}
+        run: |
+          script="${RUNNER_TEMP}/statecraft-ai-review.sh"
+          if ! grep -qxF '# statecraft-ai-review: publish-check' "$script"; then
+            echo "ai-review.sh at the base predates revision 21: no check run is published for this head (the upgrade)"
+            exit 0
+          fi
+          bash "$script" publish-check
+      # Revision 26 (spec 068): whether every finding is low and other and
+      # answered by a review note for this head, read from the pull request's
+      # body now. A base script without the mode answers nothing.
+      - name: Read the review notes
+        id: answered
+        if: steps.review.outputs.result == 'findings'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EVIDENCE_DIR: ${{ steps.review.outputs.evidence }}
+        run: |
+          script="${RUNNER_TEMP}/statecraft-ai-review.sh"
+          if ! grep -qxF '# statecraft-ai-review: answered' "$script"; then
+            echo "ai-review.sh at the base predates revision 26: no review note is read for this head"
+            exit 0
+          fi
+          bash "$script" answered

@@ -108,6 +108,7 @@ jobs:
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
+          persist-credentials: false
       - name: The signed tag authorizes this commit (058 3.1.1), or a dry run (3.1.5)
         id: tag
         env:
@@ -165,7 +166,7 @@ jobs:
     # addons are attested here, in `pack`, not there.
     permissions:
       contents: read
-    uses: ./.github/workflows/bindings.yml
+    uses: ./.github/workflows/bindings.yml # zizmor: ignore[self-repository]
 
   cli:
     name: cli ${{ matrix.platform }}
@@ -196,6 +197,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.tag.outputs.commit }}
+          persist-credentials: false
       - name: Build and smoke test the CLI (031 3.9.7d; 021 3.7)
         # The CLI has no version command (spec 006), so 3.9.7d's version
         # step is the archive name here; help and a reference plan check
@@ -228,6 +230,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.tag.outputs.commit }}
+          persist-credentials: false
       - name: Build the CLI and the addon a second time (031 3.9.3)
         env:
           PLATFORM: ${{ matrix.platform }}
@@ -248,6 +251,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.tag.outputs.commit }}
+          persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: cli-raw-*
@@ -290,8 +294,11 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.tag.outputs.commit }}
+          persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
+          # No dependency cache in a release job (cache poisoning).
+          package-manager-cache: false
           node-version: 22
       - name: Install the pinned WebAssembly tools (027 3.10.2)
         run: |
@@ -342,6 +349,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.tag.outputs.commit }}
+          persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: cli-raw-*
@@ -407,6 +415,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.tag.outputs.commit }}
+          persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: cli
@@ -438,6 +447,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.tag.outputs.commit }}
+          persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: npm
@@ -473,6 +483,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.tag.outputs.commit }}
+          persist-credentials: false
       - name: Build and check the image (042 3.16.1; 031 3.9.3)
         env:
           ARCH: ${{ matrix.arch }}
@@ -493,6 +504,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.tag.outputs.commit }}
+          persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: image-release-*
@@ -550,8 +562,11 @@ jobs:
         with:
           ref: ${{ needs.tag.outputs.commit }}
           fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
+          # No dependency cache in a release job (cache poisoning).
+          package-manager-cache: false
           node-version: 22
       # The changelog is generated from the governed corpus (031 3.10).
       - name: Read the spec-spine pin
@@ -607,6 +622,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.tag.outputs.commit }}
+          persist-credentials: false
       - name: Package every crate a second time, on its own runner, at the commit time (021 3.7; 058 3.2.2)
         env:
           EPOCH: ${{ needs.tag.outputs.epoch }}
@@ -649,6 +665,7 @@ jobs:
         with:
           ref: ${{ needs.tag.outputs.commit }}
           fetch-depth: 0
+          persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: crates
@@ -772,6 +789,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.tag.outputs.commit }}
+          persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: release
@@ -815,8 +833,11 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.tag.outputs.commit }}
+          persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
+          # No dependency cache in a release job (cache poisoning).
+          package-manager-cache: false
           node-version: 22
       # Trusted publishing authenticates with the job's OIDC token and needs
       # npm 11.5.1 or later; Node 22 bundles npm 10. No registry-url is set,
@@ -826,11 +847,12 @@ jobs:
         # integrity recorded here for npm 11.21.0 before it is installed.
         env:
           NPM_INTEGRITY: sha512-Zov8KhamNneiLdELtj5YALtNmJW4L4fCLTzjfpzXG2w6MSHcf0UxgdlK5uloCuksWT+7mGUU7wi79cO6RqivPg==
-        run: |
+        run: | # zizmor: ignore[adhoc-packages]
           set -eu
           curl -fsSL -o "$RUNNER_TEMP/npm-11.21.0.tgz" https://registry.npmjs.org/npm/-/npm-11.21.0.tgz
           got="sha512-$(openssl dgst -sha512 -binary "$RUNNER_TEMP/npm-11.21.0.tgz" | base64 -w0)"
           test "$got" = "$NPM_INTEGRITY" || { echo "031 3.12: npm tarball integrity $got is not $NPM_INTEGRITY" >&2; exit 1; }
+          # The tarball is pinned by its sha512 integrity, checked above.
           npm install -g --ignore-scripts "$RUNNER_TEMP/npm-11.21.0.tgz"
           test "$(npm --version)" = 11.21.0
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -879,6 +901,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.tag.outputs.commit }}
+          persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: release
@@ -972,6 +995,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.tag.outputs.commit }}
+          persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: release
@@ -1006,8 +1030,11 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.tag.outputs.commit }}
+          persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
+          # No dependency cache in a release job (cache poisoning).
+          package-manager-cache: false
           node-version: 22
       - name: Every asset is present and equals the manifest and SHA256SUMS (058 3.4.1)
         run: |
@@ -1032,7 +1059,7 @@ jobs:
         if: needs.tag.outputs.candidate == 'false'
         env:
           VERSION: ${{ needs.tag.outputs.version }}
-        run: |
+        run: | # zizmor: ignore[adhoc-packages]
           set -eu
           cargo run --quiet --locked -p rustev-release -- observe-registries "$RUNNER_TEMP/published/release-manifest.json"
           names=$(jq -r --arg v "$VERSION" '.npm[].name + "@" + $v' tools/rustev-release/release-set.json)
@@ -1040,6 +1067,7 @@ jobs:
           npm init -y >/dev/null
           # Every platform package, whatever this host's platform.
           # shellcheck disable=SC2086 # one argument per package
+          # The just-published packages, checked by `npm audit signatures` next.
           npm install --ignore-scripts --force --no-audit --no-fund $names
           npm audit signatures
       - name: The registry holds the manifest's image, and its attestations verify (060 3.4.2)
@@ -1071,6 +1099,6 @@ jobs:
       contents: write
       attestations: read
       packages: read
-    uses: ./.github/workflows/qualify.yml
+    uses: ./.github/workflows/qualify.yml # zizmor: ignore[self-repository]
     with:
       tag: ${{ github.ref_name }}

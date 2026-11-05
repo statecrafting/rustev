@@ -2,12 +2,12 @@
   "version": 2,
   "pins": {
     "product": "0.0.0",
-    "spec_spine": "0.31.0",
+    "spec_spine": "0.32.0",
     "adapters": {},
     "producer": {
       "name": "spec-spine-core",
-      "version": "0.31.0",
-      "checksum": "de002551d95919c9f136900a402f1ed5b462f6f8f7a5338cf54a2e70e89215e2"
+      "version": "0.32.0",
+      "checksum": "973e77cfb443aa4de15fd98149a34ebd10756b8818f8aef0490e5eeb03f257e0"
     }
   },
   "entries": [
@@ -16,33 +16,33 @@
       "class": "managed",
       "source": {
         "kind": "template",
-        "identity": "statecraft-setup:github-actions-rust@20"
+        "identity": "statecraft-setup:github-actions-rust@26"
       },
-      "digest": "e887bb653e6b1e67de3a198513ccc59f749af21722e5adc214d01e946a5d69c8",
-      "bytes": 686,
-      "written_at": "2026-10-25T22:05:44Z"
+      "digest": "68d30f47af6058030b7d0b7398810621f3f3a3cc72c3b8d01b2c0512d2420cc7",
+      "bytes": 823,
+      "written_at": "2026-11-05T19:28:34Z"
     },
     {
       "path": ".github/workflows/statecraft-ai-review.yml",
       "class": "managed",
       "source": {
         "kind": "template",
-        "identity": "statecraft-setup:github-actions-rust@20"
+        "identity": "statecraft-setup:github-actions-rust@26"
       },
-      "digest": "6e7f35c7bdbe7a7d9b7f08b0f4d222428f7bef1283e8dc7f71f5732562a9eeec",
-      "bytes": 3853,
-      "written_at": "2026-11-02T04:32:36Z"
+      "digest": "e558acdf35dce9232603f561ecef07a3f905f410e94dd1103856c4388a313023",
+      "bytes": 5901,
+      "written_at": "2026-11-05T19:28:34Z"
     },
     {
       "path": ".github/workflows/statecraft-ci.yml",
       "class": "managed",
       "source": {
         "kind": "template",
-        "identity": "statecraft-setup:github-actions-rust@20"
+        "identity": "statecraft-setup:github-actions-rust@26"
       },
-      "digest": "3fa843630f4fca3a0b6fc6035835afbc163e24b9b90d704d5fdaf0580ee32b19",
-      "bytes": 24679,
-      "written_at": "2026-10-25T22:05:44Z"
+      "digest": "b0763a599f424a0e32af99684780a4f795c0486e3ce706a972086be59b6041b9",
+      "bytes": 38842,
+      "written_at": "2026-11-05T19:28:34Z"
     },
     {
       "path": ".statecraft/AGENTS.md",
@@ -56,70 +56,103 @@
       "written_at": "2026-09-23T16:56:12Z"
     },
     {
+      "path": ".statecraft/REVIEW.md",
+      "class": "managed",
+      "source": {
+        "kind": "template",
+        "identity": "statecraft-setup:github-actions-rust@26"
+      },
+      "digest": "c77e40ec8d1b82c6d397f2fb8766c29edf356454eeb7db3bdddef5d847789f1d",
+      "bytes": 2731,
+      "written_at": "2026-11-05T19:28:34Z"
+    },
+    {
       "path": ".statecraft/setup/github-actions-rust.json",
       "class": "managed",
       "source": {
         "kind": "template",
-        "identity": "statecraft-setup:github-actions-rust@20"
+        "identity": "statecraft-setup:github-actions-rust@26"
       },
-      "digest": "5b7ddb6f25abe5cdc9314719ad81a7b75bacf68791945ff33d3eec670f63cf50",
-      "bytes": 17217,
-      "written_at": "2026-11-02T04:32:36Z"
+      "digest": "a0f49f7c657d165f68ff967f42a1c6ca45d693c6e088729b6a117c496758d497",
+      "bytes": 23658,
+      "written_at": "2026-11-05T19:28:34Z"
     },
     {
       "path": ".statecraft/setup/github-actions-rust.remote.json",
       "class": "managed",
       "source": {
         "kind": "template",
-        "identity": "statecraft-setup:github-actions-rust@20"
+        "identity": "statecraft-setup:github-actions-rust@26"
       },
-      "digest": "77060b751c80f977b5fad9ee026b97d6ff9062aa813b8416d5ec7616fac859a7",
-      "bytes": 1847,
-      "written_at": "2026-10-25T22:05:44Z"
+      "digest": "eea04e851348085bd38effd87676475df4bbf99b3989da1abd28fc09729377e2",
+      "bytes": 1981,
+      "written_at": "2026-11-05T19:28:34Z"
     },
     {
       "path": "scripts/statecraft/ai-review.sh",
       "class": "managed",
       "source": {
         "kind": "template",
-        "identity": "statecraft-setup:github-actions-rust@20"
+        "identity": "statecraft-setup:github-actions-rust@26"
       },
-      "digest": "32c38ec65f29045c5a91c03abd8d44a8e46b11faf546dd3650ff9e90fd539660",
-      "bytes": 32753,
-      "written_at": "2026-10-25T22:05:44Z"
+      "digest": "2ac3e5ff12ec4356f40887df2b9ec6ac0b9ed014d973bfce907c43c01bc63ca1",
+      "bytes": 43507,
+      "written_at": "2026-11-05T19:28:34Z"
     },
     {
       "path": "scripts/statecraft/ci-gate.sh",
       "class": "managed",
       "source": {
         "kind": "template",
-        "identity": "statecraft-setup:github-actions-rust@20"
+        "identity": "statecraft-setup:github-actions-rust@26"
       },
-      "digest": "9740fe90b45ccb319289f9da184c2305625d02a1009a58ee73ea1087ba1435cc",
-      "bytes": 20697,
-      "written_at": "2026-10-25T22:05:44Z"
+      "digest": "35bfc682c69110d8c61bc365e5f3bfd358af0459fbce6cfb48e69766092d1e41",
+      "bytes": 24338,
+      "written_at": "2026-11-05T19:28:34Z"
     },
     {
       "path": "scripts/statecraft/gate.sh",
       "class": "managed",
       "source": {
         "kind": "template",
-        "identity": "statecraft-setup:github-actions-rust@20"
+        "identity": "statecraft-setup:github-actions-rust@26"
       },
-      "digest": "87f52e663a8361e9eab94dfac1b2611c49e9720a5f7af7d64eae670d65eaa72b",
+      "digest": "d534e0c664e44c2c657e333ce71103b0901d4ba95cba887ce67d66d626973dc6",
       "bytes": 25643,
-      "written_at": "2026-10-25T22:05:44Z"
+      "written_at": "2026-11-05T19:28:34Z"
+    },
+    {
+      "path": "scripts/statecraft/guard-policy-files.sh",
+      "class": "managed",
+      "source": {
+        "kind": "template",
+        "identity": "statecraft-setup:github-actions-rust@26"
+      },
+      "digest": "81dd194218a8faa04cbe02902c772530d6ff80ce6c7ac473120cf2730e46c70c",
+      "bytes": 5614,
+      "written_at": "2026-11-05T19:28:34Z"
     },
     {
       "path": "scripts/statecraft/install-spec-spine.sh",
       "class": "managed",
       "source": {
         "kind": "template",
-        "identity": "statecraft-setup:github-actions-rust@20"
+        "identity": "statecraft-setup:github-actions-rust@26"
       },
-      "digest": "ab1c540063fb900a88ab3e7fa6d9b7dd994ed4c68e76035c48e83bb215d187b6",
+      "digest": "bd0d4c18a3328cbee58ade411f37fd49457794f362965e0f757337a81eee6091",
       "bytes": 3121,
-      "written_at": "2026-10-25T22:05:44Z"
+      "written_at": "2026-11-05T19:28:34Z"
+    },
+    {
+      "path": "scripts/statecraft/verify-action-pins.sh",
+      "class": "managed",
+      "source": {
+        "kind": "template",
+        "identity": "statecraft-setup:github-actions-rust@26"
+      },
+      "digest": "67e79ad90bdf432e5d4f5f04feb827ef38c874a98e9ba2498a5cc2239c137f55",
+      "bytes": 4911,
+      "written_at": "2026-11-05T19:28:34Z"
     },
     {
       "path": "specs/000-bootstrap/spec.md",
@@ -148,33 +181,33 @@
       "class": "managed",
       "source": {
         "kind": "template",
-        "identity": "spec-spine-core@0.31.0"
+        "identity": "spec-spine-core@0.32.0"
       },
       "digest": "483dc81218c08798fb56adc8a7a809927759291da50a145f1735c3f849380782",
       "bytes": 2682,
-      "written_at": "2026-10-21T17:12:33Z"
+      "written_at": "2026-11-05T19:28:34Z"
     },
     {
       "path": "standards/spec/templates/constitution-template.md",
       "class": "managed",
       "source": {
         "kind": "template",
-        "identity": "spec-spine-core@0.31.0"
+        "identity": "spec-spine-core@0.32.0"
       },
       "digest": "882ffc058fc35cee7b588a4efafca2ca6d7b8086c21f16c7dc44580d92fce2c6",
       "bytes": 821,
-      "written_at": "2026-10-21T17:12:33Z"
+      "written_at": "2026-11-05T19:28:34Z"
     },
     {
       "path": "standards/spec/templates/spec-template.md",
       "class": "managed",
       "source": {
         "kind": "template",
-        "identity": "spec-spine-core@0.31.0"
+        "identity": "spec-spine-core@0.32.0"
       },
       "digest": "f03da87b8a8b5e929f51753ef4d0ff4a2b969ef799125ca124d2eeeb280c8a02",
       "bytes": 952,
-      "written_at": "2026-10-21T17:12:33Z"
+      "written_at": "2026-11-05T19:28:34Z"
     }
   ],
   "modifications": [
@@ -195,9 +228,10 @@
     },
     "setup": {
       "profile": "github-actions-rust",
-      "revision": 20,
-      "identity": "90804dbe62b2b1c1515d42c39cd9d75b851c7c5bcf91d892e23db7cd6ebfc4c2",
+      "revision": 26,
+      "identity": "39e2a7a244759e35b35b089449054b69062d619d9d418b94a6e83a2accdd3b88",
       "parameters": {
+        "ci.code.free_disk": true,
         "ci.extra_required_jobs": [
           {
             "job": "bindings",
@@ -241,7 +275,7 @@
       },
       "remoteState": {
         "path": ".statecraft/setup/github-actions-rust.remote.json",
-        "digest": "77060b751c80f977b5fad9ee026b97d6ff9062aa813b8416d5ec7616fac859a7",
+        "digest": "eea04e851348085bd38effd87676475df4bbf99b3989da1abd28fc09729377e2",
         "schema": "statecraft/remote-desired-state/1"
       }
     }

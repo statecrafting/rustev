@@ -368,3 +368,44 @@ After the revision 13 bridge, the repository exact pin moves to spec-spine
 0.28.0. The registry and index are regenerated with the pinned engine,
 including the committed codebase-index input manifest. The CI profile and
 required reusable jobs remain revision 13.
+
+## Profile and engine upgrade record (2026-11-05)
+
+The owner decided on 2026-11-05 to adopt the github-actions-rust profile at
+revision 26, upgrading from revision 20. The spec-spine pin moves to 0.32.0
+in the same change, because revision 26 requires it. The registry and index
+are regenerated with the pinned engine. What changes for rustev:
+
+- Revision 22 adds the required `supply-chain` job, which runs `cargo deny
+  --locked check all` against a root `deny.toml`. That file is the workspace
+  policy, adopted with the owner's decision of the same date:
+  - Five advisories are ignored with reasons, to be revisited by 2027-02-05.
+    None reaches a release-set crate.
+  - Zlib, BSL-1.0 and MPL-2.0 licenses are allowed.
+  - The Aicortex git source is allowed.
+  - Duplicate versions warn instead of failing.
+  - Path wildcards are allowed.
+
+  The release family's stricter policy, `tools/rustev-release/deny.toml`
+  (spec 021 3.6), is unchanged.
+- Revision 22 also adds the required `workflow-lint` job (zizmor and
+  actionlint over every workflow). To pass it, rustev's own workflows
+  (`bindings.yml`, `boundaries.yml`, `qualify.yml`, `release.yml`,
+  `release-checks.yml` and `verify.yml`) change in three ways, none of which
+  changes what they check or publish. The repository is public, so tags
+  still fetch without credentials.
+  - Every checkout sets `persist-credentials: false`.
+  - The release jobs' `setup-node` keeps no dependency cache.
+  - Two pinned npm installs, and the two local reusable-workflow calls,
+    carry inline zizmor ignores, as the managed workflow's calls do.
+- Revision 23 delivers the managed review guide `.statecraft/REVIEW.md`.
+- Revision 24 (statecraft-cli spec 067): with the merge queue required, a
+  push to `main` runs only the cache saves and `ci-gate`. That `ci-gate`
+  admits the push by the queue run at the same commit. The declared extra
+  workflows receive `post_merge` (this spec's record entry of this date).
+  A release tag still requires `ci-gate` success on its commit (spec 058),
+  so the time from merge to release shrinks by one full CI run.
+- Revision 25: `ci.code.free_disk` is set, so the managed `code` job frees
+  runner disk before the build.
+- Revision 26 (statecraft-cli spec 068): AI review findings carry a
+  severity, and answered low-severity findings need no exception.
