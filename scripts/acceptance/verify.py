@@ -70,7 +70,8 @@ def free_bytes(path):
 
 def ensure_disk(floor=FLOOR):
     """Free rebuildable output when free space is below `floor`; returns the
-    step taken ("none", "incremental" or "clean") for the log."""
+    step taken ("none", "incremental", "clean" or "clean_failed") for the
+    log. A failed clean is reported, never fatal: the spec still runs."""
     target = target_dir()
     free = free_bytes(target)
     print(f"acceptance disk: {free / 2**30:.1f} GiB free, floor {floor / 2**30:.0f} GiB", flush=True)
@@ -82,9 +83,10 @@ def ensure_disk(floor=FLOOR):
     print(f"acceptance disk: {free / 2**30:.1f} GiB free after dropping incremental artifacts", flush=True)
     if free >= floor:
         return "incremental"
-    subprocess.run(["cargo", "clean"], cwd=ROOT, check=False)
-    print(f"acceptance disk: {free_bytes(target) / 2**30:.1f} GiB free after cargo clean", flush=True)
-    return "clean"
+    cleaned = subprocess.run(["cargo", "clean"], cwd=ROOT, check=False)
+    step = "clean" if cleaned.returncode == 0 else "clean_failed"
+    print(f"acceptance disk: {free_bytes(target) / 2**30:.1f} GiB free after cargo clean ({step})", flush=True)
+    return step
 
 
 def run_group(specs):

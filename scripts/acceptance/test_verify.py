@@ -56,9 +56,17 @@ class DiskFloorTests(unittest.TestCase):
 
     @patch.object(verify.subprocess, "run")
     def test_still_below_the_floor_cleans_the_target(self, run):
+        run.return_value = subprocess.CompletedProcess([], 0)
         with patch.object(verify, "free_bytes", return_value=1):
             self.assertEqual(verify.ensure_disk(floor=5), "clean")
         self.assertEqual(run.call_args.args[0], ["cargo", "clean"])
+        self.assertEqual(run.call_args.kwargs["cwd"], verify.ROOT)
+
+    @patch.object(verify.subprocess, "run")
+    def test_a_failed_clean_is_reported(self, run):
+        run.return_value = subprocess.CompletedProcess([], 101)
+        with patch.object(verify, "free_bytes", return_value=1):
+            self.assertEqual(verify.ensure_disk(floor=5), "clean_failed")
 
     @patch.dict(verify.os.environ, {}, clear=True)
     @patch.object(verify.subprocess, "run")
