@@ -1,6 +1,6 @@
 {
   "name": "@rustev/rustev-linux-arm64-gnu",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": true,
   "description": "Rustev's Node-API addon for linux-arm64-gnu; installed through @rustev/rustev, never directly.",
   "license": "Apache-2.0",
