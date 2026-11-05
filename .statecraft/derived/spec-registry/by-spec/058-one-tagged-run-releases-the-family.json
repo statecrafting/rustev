@@ -129,5 +129,5 @@
     "title": "One tagged run releases the family (amends 021, 031, 053 and 056)"
   },
   "shardHash": "a98b47516610bd75936fd555bb2bf65d8177b6477d5b279a8e73952291efbfb9",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

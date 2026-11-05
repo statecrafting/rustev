@@ -4,6 +4,7 @@
       "031-public-api-and-release-family"
     ],
     "created": "2026-10-20",
+    "declaresAcceptance": true,
     "dependsOn": [
       "027-node-and-wasm-bindings",
       "031-public-api-and-release-family"
@@ -83,5 +84,5 @@
     "title": "The command surface in the release family (amends 031)"
   },
   "shardHash": "cf3ff312a846472c66bffd0437f00d3db6875ec9c4ad0d466c6ce99f20789835",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

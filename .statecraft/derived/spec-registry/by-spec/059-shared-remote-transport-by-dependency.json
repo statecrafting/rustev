@@ -8,6 +8,7 @@
       "049-opentelemetry-through-the-node-binding"
     ],
     "created": "2026-10-29",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "009-remote-adapter-protocol",
@@ -150,5 +151,5 @@
     "title": "Shared remote transport by dependency, not by source link (amends 001, 010, 012, 030 and 049)"
   },
   "shardHash": "5ac57da3a44f4a7f53dee55f640fc6c937b7ff6537e7ecaac497ee6eb8a6c3dc",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

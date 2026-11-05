@@ -5,6 +5,7 @@
       "006-cli-surface"
     ],
     "created": "2026-10-16",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core",
@@ -204,5 +205,5 @@
     "title": "OpenTelemetry evidence sink and redaction policy"
   },
   "shardHash": "a8f33918e4e5e336f84b01b02329878244aa2b3015d2eafe3fc09ec969dd51f2",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

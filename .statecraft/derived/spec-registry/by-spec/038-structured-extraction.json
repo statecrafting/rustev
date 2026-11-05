@@ -6,6 +6,7 @@
       "036-mid-plan-acquisition"
     ],
     "created": "2026-10-17",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core",
@@ -304,5 +305,5 @@
     "title": "Structured extraction step and the model-derived input pattern (amends 002, 003 and 036)"
   },
   "shardHash": "ce3dffa7da5c545e90bddcb7886b1ad5a5ddd0b97a03993ee4291b3e8a045c33",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

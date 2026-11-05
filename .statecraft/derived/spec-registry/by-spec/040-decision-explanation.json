@@ -5,6 +5,7 @@
       "006-cli-surface"
     ],
     "created": "2026-10-17",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core",
@@ -230,5 +231,5 @@
     "title": "Decision explanation API and `rustev explain` (amends 004 and 006)"
   },
   "shardHash": "55528fafdf682d51029f9e2aebda379a888ab23182e5f84fbe4082001a29320c",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

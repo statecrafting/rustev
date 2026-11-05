@@ -6,6 +6,7 @@
       "004-evaluation-and-replay"
     ],
     "created": "2026-10-17",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core",
@@ -273,5 +274,5 @@
     "title": "Mid-plan context acquisition and tiered widening (amends 002, 003 and 004)"
   },
   "shardHash": "f60fb0290402905af30318b2938d4026cbf59b8e64e83bf4796f348d00251fe0",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

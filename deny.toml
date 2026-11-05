@@ -1,0 +1,57 @@
+# The workspace supply-chain policy that the setup profile's `supply-chain`
+# job checks (statecraft-cli profile revision 22, `cargo deny --locked check
+# all`). It covers every workspace crate, including the integrations and
+# backends outside the release set. The release family's own, stricter
+# policy is `tools/rustev-release/deny.toml` (spec 021 3.6), which the
+# release candidate checks and which this file does not relax.
+# Adopted with the owner's decision of 2026-11-05.
+
+[graph]
+all-features = false
+no-default-features = false
+exclude-dev = true
+
+[advisories]
+unmaintained = "all"
+unsound = "all"
+yanked = "deny"
+# Each entry: none reaches a release-set crate (the release policy has no
+# ignore). Reviewed 2026-11-05; revisit by 2027-02-05.
+ignore = [
+  { id = "RUSTSEC-2025-0141", reason = "bincode unmaintained; via hiqlite and cryptr in rustev-aicortex and rustev-rahi only. Revisit by 2027-02-05." },
+  { id = "RUSTSEC-2025-0057", reason = "fxhash unmaintained; via ptr_hash in tk-encode, rustev-backend-embed-linear only. Revisit by 2027-02-05." },
+  { id = "RUSTSEC-2026-0194", reason = "quick-xml quadratic start tags; via s3-simple in rustev-aicortex and rustev-rahi only, parsing the configured storage endpoint's responses. Revisit by 2027-02-05." },
+  { id = "RUSTSEC-2026-0195", reason = "quick-xml namespace allocation; via s3-simple in rustev-aicortex and rustev-rahi only, parsing the configured storage endpoint's responses. Revisit by 2027-02-05." },
+]
+
+[licenses]
+allow = [
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-3-Clause",
+  "BSL-1.0",
+  "CDLA-Permissive-2.0",
+  "ISC",
+  "MIT",
+  "MPL-2.0",
+  "Unicode-3.0",
+  "Unlicense",
+  "Zlib",
+]
+confidence-threshold = 0.93
+unused-allowed-license = "allow"
+
+[bans]
+# Duplicate versions across the integrations' dependency trees are reported,
+# not refused; the release policy still refuses them for release members.
+multiple-versions = "warn"
+wildcards = "deny"
+# Workspace path dependencies carry no version.
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+# The Aicortex integration (spec 010) pins this repository by revision.
+allow-git = ["https://github.com/statecrafting/aicortex"]

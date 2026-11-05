@@ -6,6 +6,7 @@
       "004-evaluation-and-replay"
     ],
     "created": "2026-10-17",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core",
@@ -292,5 +293,5 @@
     "title": "Generation steps with deterministic backstops and per-field origin (amends 002, 003 and 004)"
   },
   "shardHash": "b46ea0d7eec9e6d37afe3d03cafd25acadd799731a36943c1938c91bdcc2631b",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

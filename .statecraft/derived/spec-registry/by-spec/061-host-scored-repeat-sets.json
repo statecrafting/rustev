@@ -5,6 +5,7 @@
       "041-ranking-and-rubric-metrics"
     ],
     "created": "2026-11-03",
+    "declaresAcceptance": true,
     "dependsOn": [
       "004-evaluation-and-replay",
       "006-cli-surface",
@@ -143,5 +144,5 @@
     "title": "Host-scored repeat sets for the selection gate (amends 029 and 041)"
   },
   "shardHash": "90332998be3b25981e17bec375f01882e6a32bab3d27057069a25d1b417a33c0",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

@@ -6,6 +6,7 @@
       "004-evaluation-and-replay"
     ],
     "created": "2026-09-26",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core",
@@ -159,5 +160,5 @@
     "title": "Dynamic questions as a narrow evaluated class"
   },
   "shardHash": "6eb409ed4bbb5b69d8ebe8d0142ff87c51a1aaf7ba86421d867ba125fce3dc1f",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

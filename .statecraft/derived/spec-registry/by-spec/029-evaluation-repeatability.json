@@ -5,6 +5,7 @@
       "006-cli-surface"
     ],
     "created": "2026-10-16",
+    "declaresAcceptance": true,
     "dependsOn": [
       "002-decision-contract-and-pure-core",
       "004-evaluation-and-replay",
@@ -181,5 +182,5 @@
     "title": "Evaluation repeatability, baselines, diffs and selection gates (amends 004 and 006)"
   },
   "shardHash": "0d43c76a7f0728bd6cc09f3f1eee38d95db37a3408740a5e9c2a717bc651f1a4",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

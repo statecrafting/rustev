@@ -1,6 +1,7 @@
 {
   "record": {
     "created": "2026-09-23",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core",
@@ -112,5 +113,5 @@
     "title": "Deterministic rules backend"
   },
   "shardHash": "9f68468193da5f6969ea72e3dfb6c72b42a66911bd3005d426e5c66df172eef5",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

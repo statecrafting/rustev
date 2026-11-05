@@ -1,6 +1,7 @@
 {
   "record": {
     "created": "2026-10-16",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core",
@@ -238,5 +239,5 @@
     "title": "Node-API binding and WebAssembly build"
   },
   "shardHash": "50ebf5a5334013f510643b629267a23d6bc034399e221ec584e7fbbbcc1dccd4",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

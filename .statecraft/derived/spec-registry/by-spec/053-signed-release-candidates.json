@@ -89,5 +89,5 @@
     "title": "Signed release candidates published only as GitHub pre-releases (amends 031)"
   },
   "shardHash": "2aaa2cbc695c8b8a386897f86b9f94dc3c88eabaaf9388ca0a935ea21fdf4512",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

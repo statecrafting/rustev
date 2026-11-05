@@ -171,5 +171,5 @@
     "title": "Node binding parity: acquisition source, profiles and variants, store seam, capture, repeatability commands (amends 027, 029, 034, 036 and 044)"
   },
   "shardHash": "02cb24d28eb68fc2908286d51cdd66d6c3e46ac155b42824c6ced5df447a7a88",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

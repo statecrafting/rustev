@@ -6,6 +6,7 @@
       "009-remote-adapter-protocol"
     ],
     "created": "2026-10-17",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core",
@@ -288,5 +289,5 @@
     "title": "Untrusted-text screening seam (amends 002, 003 and 009)"
   },
   "shardHash": "f1011280a16176153d59b9c7a5244a283917687d8b1fa81949a85009dab37097",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

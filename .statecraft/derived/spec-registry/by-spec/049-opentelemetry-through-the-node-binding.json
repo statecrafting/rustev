@@ -7,6 +7,7 @@
       "028-opentelemetry-evidence-sink"
     ],
     "created": "2026-10-23",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "010-integrations",
@@ -148,5 +149,5 @@
     "title": "OpenTelemetry export through the Node binding (amends 001, 010, 027 and 028)"
   },
   "shardHash": "af2e558f3389895fdee799f8450ff471ea8fa9170c5d5f7339f41675334d3cad",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

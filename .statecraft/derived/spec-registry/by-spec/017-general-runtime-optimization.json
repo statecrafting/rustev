@@ -4,6 +4,7 @@
       "003-runtime-execution-and-evidence"
     ],
     "created": "2026-09-26",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core",
@@ -144,5 +145,5 @@
     "title": "General runtime batching, duplicate suppression, and caches"
   },
   "shardHash": "40d3d2870f2be1da3bc18b88d4a747bf4dff476db59065475cf474984ed88795",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

@@ -67,5 +67,5 @@
     "title": "The WebAssembly module's gzip and uncompressed budgets for specs 035 to 037 (amends 027)"
   },
   "shardHash": "f0af359c7017cce966d638f968aba1517c83c880a49d4754ab54ef09e98270cf",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

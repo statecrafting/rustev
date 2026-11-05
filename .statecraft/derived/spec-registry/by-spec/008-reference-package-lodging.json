@@ -1,6 +1,7 @@
 {
   "record": {
     "created": "2026-09-26",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core",
@@ -122,5 +123,5 @@
     "title": "Reference package: lodging recommendation"
   },
   "shardHash": "b204168e5eee7aeed0d188cd30de250df07f7765df83f3cab8e4e3a27469afa5",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

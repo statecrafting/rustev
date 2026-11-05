@@ -1,6 +1,7 @@
 {
   "record": {
     "created": "2026-09-27",
+    "declaresAcceptance": true,
     "dependsOn": [
       "004-evaluation-and-replay",
       "005-reference-backends",
@@ -103,5 +104,5 @@
     "title": "Semantic quality and calibration qualification on real labeled data"
   },
   "shardHash": "71d6c01e87b230553ad4dc79c24385f67d83d7487d2ccd20e451c8d7e8e500eb",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

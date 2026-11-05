@@ -5,6 +5,7 @@
       "006-cli-surface"
     ],
     "created": "2026-10-17",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core",
@@ -232,5 +233,5 @@
     "title": "Parameterized definitions, variants and tenant profiles (amends 002 and 006)"
   },
   "shardHash": "1aba8424a419c21943b450bdf0d6ed1aff2aef5795b7d5f9e59a5d8fec019833",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }
