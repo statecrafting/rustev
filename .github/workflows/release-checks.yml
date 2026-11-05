@@ -12,6 +12,12 @@ name: release-checks
 
 on:
   workflow_call:
+    # Profile revision 24 (statecraft-cli spec 067): true on a push to main,
+    # which the merge queue already judged at the same tree.
+    inputs:
+      post_merge:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -21,11 +27,9 @@ env:
 
 jobs:
   # A pull request's own run (unless labelled `statecraft:stacked-ci`)
-  # leaves the release checks out when it changes no workspace package, no
-  # workspace-wide file, no conformance JavaScript tooling and not this
-  # workflow (scripts/acceptance/affected.py): a change to specs or
-  # documents alone. The merge queue and every push to main run them all.
-  # Any doubt runs them.
+  # leaves the release checks out: the merge queue runs them all against
+  # the latest main. A push to main, which the queue already judged, runs
+  # them only when Cargo.lock or the toolchain changed, to refresh caches.
   scope:
     name: scope
     runs-on: ubuntu-24.04
@@ -41,22 +45,19 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           STACKED_CI: ${{ contains(github.event.pull_request.labels.*.name, 'statecraft:stacked-ci') }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          # Reading the manifests needs no pinned toolchain; the image's
-          # stable cargo avoids installing it here.
-          RUSTUP_TOOLCHAIN: stable
+          POST_MERGE: ${{ inputs.post_merge }}
         run: |
-          if [ "$EVENT" = pull_request ] && [ "$STACKED_CI" != true ]; then
-            run=$(python3 scripts/acceptance/affected.py --base "$BASE_SHA" --all-packages \
-              --path tools/rustev-conformance/js/ --path .github/workflows/release-checks.yml \
-              --path scripts/acceptance/affected.py)
+          if [ "$POST_MERGE" = true ]; then
+            # A push the queue already judged: run only to refresh main's
+            # caches, which change only with Cargo.lock or the toolchain.
+            if git diff --quiet HEAD~1 HEAD -- Cargo.lock rust-toolchain.toml; then run=false; else run=true; fi
+          elif [ "$EVENT" = pull_request ] && [ "$STACKED_CI" != true ]; then
+            run=false
+            echo "The release checks run in the merge queue for this pull request." >> "$GITHUB_STEP_SUMMARY"
           else
             run=true
           fi
           echo "run=$run" >> "$GITHUB_OUTPUT"
-          if [ "$run" = false ]; then
-            echo "This pull request changes no release-check input; the release checks run in the merge queue." >> "$GITHUB_STEP_SUMMARY"
-          fi
 
   adoption:
     name: adoption ${{ matrix.subset }}

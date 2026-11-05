@@ -1169,6 +1169,14 @@ later version. Item by item:
 
 The image build checks of 3.9 for layer 7 run in `release.yml` (#459).
 
+**2026-11-05, CI only (no claim of this spec changes).** A pull request's own
+run leaves out the `release-checks.yml` jobs whatever it changes; the merge
+queue runs every check against the latest `main`, as do pull requests with
+the label `statecraft:stacked-ci`. A push to `main` with `post_merge` (spec
+001's record of this date) runs them only when `Cargo.lock` or
+`rust-toolchain.toml` changed. The final `release-checks` job still accepts a
+skip only when `scope` chose it.
+
 ## Decisions at approval
 
 1. **Crate and package names** (left to the implementer by #58): decided

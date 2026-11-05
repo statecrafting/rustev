@@ -5,6 +5,12 @@ name: boundaries
 
 on:
   workflow_call:
+    # Profile revision 24 (statecraft-cli spec 067): true on a push to main,
+    # which the merge queue already judged at the same tree.
+    inputs:
+      post_merge:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -30,7 +36,10 @@ jobs:
           key: boundaries-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
           restore-keys: |
             boundaries-${{ runner.os }}-
+      # A push to main the queue already judged runs the check only to
+      # refresh the cache, which changes only with Cargo.lock or the toolchain.
       - name: Dependency boundaries
+        if: ${{ !inputs.post_merge || steps.cargo-cache.outputs.cache-hit != 'true' }}
         run: make boundaries
       # Cargo fingerprints workspace sources by mtime, which a fresh checkout
       # resets, so workspace crates always rebuild: their artifacts are dead

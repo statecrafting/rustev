@@ -20,6 +20,12 @@ name: bindings
 
 on:
   workflow_call:
+    # Profile revision 24 (statecraft-cli spec 067): true on a push to main,
+    # which the merge queue already judged at the same tree.
+    inputs:
+      post_merge:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -162,11 +168,10 @@ jobs:
       run: ${{ steps.affected.outputs.run }}
     steps:
       # A pull request's own run (unless labelled `statecraft:stacked-ci`)
-      # leaves the bindings jobs out when it changes none of their inputs:
-      # the binding packages, every workspace package they depend on, the
-      # conformance tooling, this workflow and the workspace-wide files
-      # (scripts/acceptance/affected.py). The merge queue and every push to
-      # main run them all. Any doubt runs them.
+      # leaves the bindings jobs out: the merge queue runs them all against
+      # the latest main. A push to main, which the queue already judged,
+      # runs them only when Cargo.lock or the toolchain changed, to refresh
+      # caches.
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
@@ -175,23 +180,19 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           STACKED_CI: ${{ contains(github.event.pull_request.labels.*.name, 'statecraft:stacked-ci') }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          # Reading the manifests needs no pinned toolchain; the image's
-          # stable cargo avoids installing it here.
-          RUSTUP_TOOLCHAIN: stable
+          POST_MERGE: ${{ inputs.post_merge }}
         run: |
-          if [ "$EVENT" = pull_request ] && [ "$STACKED_CI" != true ]; then
-            run=$(python3 scripts/acceptance/affected.py --base "$BASE_SHA" \
-              --package rustev-node --package rustev-wasm --package rustev-fp-corpus \
-              --path tools/rustev-conformance/ --path .github/workflows/bindings.yml \
-              --path scripts/acceptance/affected.py)
+          if [ "$POST_MERGE" = true ]; then
+            # A push the queue already judged: run only to refresh main's
+            # caches, which change only with Cargo.lock or the toolchain.
+            if git diff --quiet HEAD~1 HEAD -- Cargo.lock rust-toolchain.toml; then run=false; else run=true; fi
+          elif [ "$EVENT" = pull_request ] && [ "$STACKED_CI" != true ]; then
+            run=false
+            echo "The bindings jobs run in the merge queue for this pull request." >> "$GITHUB_STEP_SUMMARY"
           else
             run=true
           fi
           echo "run=$run" >> "$GITHUB_OUTPUT"
-          if [ "$run" = false ]; then
-            echo "This pull request changes no bindings input; the bindings jobs run in the merge queue." >> "$GITHUB_STEP_SUMMARY"
-          fi
       - id: scope
         env:
           EVENT: ${{ github.event_name }}

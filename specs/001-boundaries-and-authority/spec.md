@@ -341,6 +341,19 @@ sh -c 'for d in crates tools; do [ -d "$d" ] || continue; if grep -rnE "(struct|
   workflow's cleanup, because its specs build into one growing target
   directory. Commands, groups and results are unchanged.
 
+- 2026-11-05 (CI only, no claim of this spec changes): the owner decided
+  that a change is tested in full once, in the merge queue. A pull
+  request's own run already left the acceptance groups to the queue; the
+  four declared extra workflows (`boundaries.yml`, `verify.yml`,
+  `bindings.yml`, `release-checks.yml`) now also declare the boolean
+  `workflow_call` input `post_merge` that profile revision 24
+  (statecraft-cli spec 067) passes on a push to `main`. With it, `verify`,
+  `bindings` and `release-checks` run on a push only when `Cargo.lock` or
+  `rust-toolchain.toml` changed (their caches' keys), and `boundaries`
+  skips its check when its cache hits. Until the profile passes the input
+  it defaults to false and nothing changes on a push. The label
+  `statecraft:stacked-ci` still runs everything on a pull request.
+
 ## Profile upgrade record (2026-10-02)
 
 The Statecraft github-actions-rust profile moves to revision 13 before the
