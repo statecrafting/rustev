@@ -9,6 +9,12 @@ name: verify
 
 on:
   workflow_call:
+    # Profile revision 24 (statecraft-cli spec 067): true on a push to main,
+    # which the merge queue already judged at the same tree.
+    inputs:
+      post_merge:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -22,6 +28,8 @@ jobs:
       run: ${{ steps.partition.outputs.run }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 2
       - name: Test acceptance partition controls
         run: python3 -m unittest discover -s scripts/acceptance -p 'test_*.py'
       - name: Check complete coverage and plan groups
@@ -29,15 +37,21 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           STACKED_CI: ${{ contains(github.event.pull_request.labels.*.name, 'statecraft:stacked-ci') }}
+          POST_MERGE: ${{ inputs.post_merge }}
         run: |
           matrix=$(python3 scripts/acceptance/verify.py --matrix)
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
-          if [ "$EVENT" = pull_request ] && [ "$STACKED_CI" != true ]; then
-            echo "run=false" >> "$GITHUB_OUTPUT"
+          if [ "$POST_MERGE" = true ]; then
+            # A push the queue already judged: run only to refresh main's
+            # caches, which change only with Cargo.lock or the toolchain.
+            if git diff --quiet HEAD~1 HEAD -- Cargo.lock rust-toolchain.toml; then run=false; else run=true; fi
+          elif [ "$EVENT" = pull_request ] && [ "$STACKED_CI" != true ]; then
+            run=false
             echo "Declared acceptance runs in the merge queue for this pull request." >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "run=true" >> "$GITHUB_OUTPUT"
+            run=true
           fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
 
   acceptance:
     name: acceptance (${{ matrix.group }})

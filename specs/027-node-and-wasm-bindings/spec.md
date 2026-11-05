@@ -1265,6 +1265,14 @@ against their schemas in their own contract tests.
   leaves it unchanged. The two bundle fixtures and their digests changed
   once; no case comparison and no other case changes.
 
+- 2026-11-05 (CI only, no claim of this spec changes): a pull request's own
+  run leaves out every `bindings.yml` job, whatever it changes; the merge
+  queue runs all seven platforms against the latest `main`, as do pull
+  requests with the label `statecraft:stacked-ci`. A push to `main` with
+  `post_merge` (spec 001's record of this date) runs them only when
+  `Cargo.lock` or `rust-toolchain.toml` changed. The final `bindings` job
+  still accepts a skip only when `scope` chose it.
+
 ## Decisions at approval
 
 1. **npm package names and scope** (left to the implementer by #56; decided
