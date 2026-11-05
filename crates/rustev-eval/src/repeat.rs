@@ -422,23 +422,127 @@ pub fn repeat(inputs: &RepeatInputs<'_>) -> Result<RepeatReport, RepeatError> {
         })
         .collect();
     let deterministic = inputs.source == Source::Replay;
-    let bootstrap = Bootstrap {
-        seed: config.bootstrap.seed.clone(),
-        level_units: config.level_units(),
-        resamples: config.bootstrap.resamples,
-    };
     let all_names: Vec<&str> = names
         .iter()
         .copied()
         .chain(derived_names.iter().copied())
         .collect();
 
+    let subgroups: Vec<&[String]> = split_cases.iter().map(|c| c.subgroups.as_slice()).collect();
+    let form = |m: &str| form_in(m, &docs);
+    let observe = |m: &str| observation(m, candidate);
+    // Across-run statistics from the run reports only: a total, or a
+    // metric without a per-case measure.
+    let across = |m: &str| -> Option<Vec<Figure>> {
+        (!derived(m)).then(|| {
+            runs.iter()
+                .map(|r| {
+                    match r
+                        .evaluated
+                        .report
+                        .metrics
+                        .iter()
+                        .find(|x| x.name == *m)
+                        .map(|x| &x.value)
+                    {
+                        Some(MetricValue::Measured { value, .. }) if value.is_finite() => {
+                            Figure::Known(*value)
+                        }
+                        Some(MetricValue::Unknown { reason }) => Figure::Unknown {
+                            reason: reason.clone(),
+                        },
+                        _ => Figure::Unknown {
+                            reason: "non-finite value".into(),
+                        },
+                    }
+                })
+                .collect()
+        })
+    };
+    let cohorts = cohort_reports(&CohortPlan {
+        config,
+        n,
+        deterministic,
+        subgroups: &subgroups,
+        stable: &stable,
+        names: &all_names,
+        docs: &docs,
+        form: &form,
+        observation: &observe,
+        across: &across,
+    })?;
+
+    let digest = |d: Result<ContentDigest, _>| {
+        d.map_err(|_| RepeatError::Shape("a document has no record digest".into()))
+    };
+    let mut run_refs = vec![];
+    for (r, run) in runs.iter().enumerate() {
+        run_refs.push(RunRef {
+            report: digest(run.evaluated.report.record_digest())?,
+            detail: digest(run.evaluated.detail.record_digest())?,
+            cases: digest(run.cases.record_digest())?,
+            seed: run_seed(&config.bootstrap.seed, r).to_string(),
+        });
+    }
+    Ok(RepeatReport {
+        schema: REPEAT_REPORT.into(),
+        source: inputs.source,
+        repeat_config: config
+            .id()
+            .map_err(|_| RepeatError::Shape("the repeat configuration is not canonical".into()))?,
+        dataset,
+        split,
+        split_role: split_role(split),
+        provenance: first.report.dataset.provenance.clone(),
+        evaluator_config: first.report.evaluator_config.clone(),
+        adapter_rules: first.config.adapter.rules.clone(),
+        plan: first.report.plan.clone(),
+        candidate,
+        runs: run_refs,
+        stable_cohort: stable.iter().map(|&c| split_cases[c].id.clone()).collect(),
+        held_out: (split_role(split) == SplitRole::HeldOut).then(|| HeldOut::Unknown {
+            reason: "no ledger supplied".into(),
+        }),
+        cohorts,
+    })
+}
+
+/// What one repeat set's cohorts are computed from (3.3 to 3.6): its
+/// cases' subgroups and stable cohort, its metric names in report order,
+/// its case documents, and how each metric decomposes, is observed and,
+/// without a per-case measure, takes its per-run values. Spec 061's host
+/// sets use it unchanged.
+pub(crate) struct CohortPlan<'a> {
+    pub config: &'a RepeatConfig,
+    pub n: usize,
+    pub deterministic: bool,
+    /// Per case, in case order.
+    pub subgroups: &'a [&'a [String]],
+    pub stable: &'a [usize],
+    pub names: &'a [&'a str],
+    pub docs: &'a [&'a EvalCases],
+    pub form: &'a dyn Fn(&str) -> Option<repeat_stats::Form>,
+    pub observation: &'a dyn Fn(&str) -> Option<Observation>,
+    /// For the cohort `all` only; none for a metric with no run values.
+    pub across: &'a dyn Fn(&str) -> Option<Vec<Figure>>,
+}
+
+/// Every cohort's report: `all`, then each declared slice (3.6).
+pub(crate) fn cohort_reports(p: &CohortPlan<'_>) -> Result<Vec<CohortReport>, RepeatError> {
+    let (config, n, deterministic, stable) = (p.config, p.n, p.deterministic, p.stable);
+    let all_names = p.names;
+    let docs = p.docs;
+    let bootstrap = Bootstrap {
+        seed: config.bootstrap.seed.clone(),
+        level_units: config.level_units(),
+        resamples: config.bootstrap.resamples,
+    };
     let mut cohorts = vec![];
     let mut cohort_specs: Vec<(String, Vec<usize>, Option<u64>)> =
-        vec![("all".into(), (0..split_cases.len()).collect(), None)];
+        vec![("all".into(), (0..p.subgroups.len()).collect(), None)];
     for s in &config.slices {
-        let members = (0..split_cases.len())
-            .filter(|&c| split_cases[c].subgroups.contains(&s.name))
+        let members = (0..p.subgroups.len())
+            .filter(|&c| p.subgroups[c].contains(&s.name))
             .collect();
         cohort_specs.push((s.name.clone(), members, Some(s.min_cases)));
     }
@@ -447,21 +551,16 @@ pub fn repeat(inputs: &RepeatInputs<'_>) -> Result<RepeatReport, RepeatError> {
         let below = min_cases.is_some_and(|m| stable_cases < m);
         let mut metrics = vec![];
         if below {
-            for m in &all_names {
-                metrics.push(unknown_metric(
-                    m,
-                    observation(m, candidate),
-                    n,
-                    "below_minimum",
-                ));
+            for m in all_names {
+                metrics.push(unknown_metric(m, (p.observation)(m), n, "below_minimum"));
             }
         } else {
             // Every case-decomposable metric of the cohort shares its
             // resamples (3.4.5).
             let mut decomposable: Vec<MetricCases> = vec![];
-            for m in &all_names {
-                if let Some(form) = form_in(m, &docs) {
-                    let full = metric_cases(m, form, &docs).map_err(RepeatError::MixedRuns)?;
+            for m in all_names {
+                if let Some(form) = (p.form)(m) {
+                    let full = metric_cases(m, form, docs).map_err(RepeatError::MixedRuns)?;
                     decomposable.push(MetricCases {
                         cases: members.iter().map(|&c| full.cases[c].clone()).collect(),
                         ..full
@@ -476,9 +575,9 @@ pub fn repeat(inputs: &RepeatInputs<'_>) -> Result<RepeatReport, RepeatError> {
                     StatsError::Shape(s) => RepeatError::Shape(s),
                 },
             )?;
-            for m in &all_names {
+            for m in all_names {
                 let (rule, floor) = config.band_for(m);
-                let obs = observation(m, candidate);
+                let obs = (p.observation)(m);
                 let report = if let Some(i) = decomposable.iter().position(|d| d.name == *m) {
                     let s = run_stats(&decomposable[i], n, deterministic)
                         .map_err(|e| RepeatError::Shape(e.to_string()))?;
@@ -495,32 +594,7 @@ pub fn repeat(inputs: &RepeatInputs<'_>) -> Result<RepeatReport, RepeatError> {
                         interval: interval(&intervals[i]),
                         band: band_doc(&b),
                     }
-                } else if name == "all" && !derived(m) {
-                    // Across-run statistics from the run reports only: a
-                    // total, or a metric without a per-case measure.
-                    let values: Vec<Figure> = runs
-                        .iter()
-                        .map(|r| {
-                            match r
-                                .evaluated
-                                .report
-                                .metrics
-                                .iter()
-                                .find(|x| x.name == *m)
-                                .map(|x| &x.value)
-                            {
-                                Some(MetricValue::Measured { value, .. }) if value.is_finite() => {
-                                    Figure::Known(*value)
-                                }
-                                Some(MetricValue::Unknown { reason }) => Figure::Unknown {
-                                    reason: reason.clone(),
-                                },
-                                _ => Figure::Unknown {
-                                    reason: "non-finite value".into(),
-                                },
-                            }
-                        })
-                        .collect();
+                } else if let Some(values) = (name == "all").then(|| (p.across)(m)).flatten() {
                     let (mean, sd, min, max) = across_runs(&values, deterministic);
                     let no_interval = Interval::Unknown {
                         reason: "not-case-decomposable".into(),
@@ -559,39 +633,7 @@ pub fn repeat(inputs: &RepeatInputs<'_>) -> Result<RepeatReport, RepeatError> {
         });
     }
 
-    let digest = |d: Result<ContentDigest, _>| {
-        d.map_err(|_| RepeatError::Shape("a document has no record digest".into()))
-    };
-    let mut run_refs = vec![];
-    for (r, run) in runs.iter().enumerate() {
-        run_refs.push(RunRef {
-            report: digest(run.evaluated.report.record_digest())?,
-            detail: digest(run.evaluated.detail.record_digest())?,
-            cases: digest(run.cases.record_digest())?,
-            seed: run_seed(&config.bootstrap.seed, r).to_string(),
-        });
-    }
-    Ok(RepeatReport {
-        schema: REPEAT_REPORT.into(),
-        source: inputs.source,
-        repeat_config: config
-            .id()
-            .map_err(|_| RepeatError::Shape("the repeat configuration is not canonical".into()))?,
-        dataset,
-        split,
-        split_role: split_role(split),
-        provenance: first.report.dataset.provenance.clone(),
-        evaluator_config: first.report.evaluator_config.clone(),
-        adapter_rules: first.config.adapter.rules.clone(),
-        plan: first.report.plan.clone(),
-        candidate,
-        runs: run_refs,
-        stable_cohort: stable.iter().map(|&c| split_cases[c].id.clone()).collect(),
-        held_out: (split_role(split) == SplitRole::HeldOut).then(|| HeldOut::Unknown {
-            reason: "no ledger supplied".into(),
-        }),
-        cohorts,
-    })
+    Ok(cohorts)
 }
 
 /// The host's held-out inputs (3.7.3): its lineage handle, its ledger or
