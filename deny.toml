@@ -20,7 +20,6 @@ yanked = "deny"
 ignore = [
   { id = "RUSTSEC-2025-0141", reason = "bincode unmaintained; via hiqlite and cryptr in rustev-aicortex and rustev-rahi only. Revisit by 2027-02-05." },
   { id = "RUSTSEC-2025-0057", reason = "fxhash unmaintained; via ptr_hash in tk-encode, rustev-backend-embed-linear only. Revisit by 2027-02-05." },
-  { id = "RUSTSEC-2026-0385", reason = "ctutils non-constant-time mask; via digest 0.11 in rustev-aicortex, rustev-bedrock and rustev-rahi only, no secret comparison of ours. Revisit by 2027-02-05." },
   { id = "RUSTSEC-2026-0194", reason = "quick-xml quadratic start tags; via s3-simple in rustev-aicortex and rustev-rahi only, parsing the configured storage endpoint's responses. Revisit by 2027-02-05." },
   { id = "RUSTSEC-2026-0195", reason = "quick-xml namespace allocation; via s3-simple in rustev-aicortex and rustev-rahi only, parsing the configured storage endpoint's responses. Revisit by 2027-02-05." },
 ]
