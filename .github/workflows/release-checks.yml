@@ -71,6 +71,8 @@ jobs:
         subset: [documents, embedded, evaluation, remote-http, runtime, rules, remote-http-alone, otel]
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
       # Restored everywhere, saved only from main (as in verify.yml): saves
       # from pull requests and merge-queue branches, which nothing else can
       # read, evicted main's entries from the 10 GB repository limit.
@@ -112,6 +114,8 @@ jobs:
       CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
       # 2026-11-04: "No space left on device" failed this job (rustc output,
       # 19 GB free at the start). The preinstalled toolchains it never uses
       # are removed first, as in verify.yml; the df lines are the record.
@@ -163,6 +167,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
       # Restored everywhere, saved only from main (as in verify.yml): saves
       # from pull requests and merge-queue branches, which nothing else can
       # read, evicted main's entries from the 10 GB repository limit.

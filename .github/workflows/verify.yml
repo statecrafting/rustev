@@ -30,6 +30,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 2
+          persist-credentials: false
       - name: Test acceptance partition controls
         run: python3 -m unittest discover -s scripts/acceptance -p 'test_*.py'
       - name: Check complete coverage and plan groups
@@ -74,6 +75,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
+          persist-credentials: false
       # 2026-11-02: "Disk quota exceeded" failed acceptance groups in the
       # merge queue (rustc output, the seed workers' target copies). The
       # preinstalled toolchains no group uses are removed first; the df

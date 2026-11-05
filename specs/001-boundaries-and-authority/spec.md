@@ -388,6 +388,16 @@ are regenerated with the pinned engine. What changes for rustev:
 
   The release family's stricter policy, `tools/rustev-release/deny.toml`
   (spec 021 3.6), is unchanged.
+- Revision 22 also adds the required `workflow-lint` job (zizmor and
+  actionlint over every workflow). To pass it, rustev's own workflows
+  (`bindings.yml`, `boundaries.yml`, `qualify.yml`, `release.yml`,
+  `release-checks.yml` and `verify.yml`) change in three ways, none of which
+  changes what they check or publish. The repository is public, so tags
+  still fetch without credentials.
+  - Every checkout sets `persist-credentials: false`.
+  - The release jobs' `setup-node` keeps no dependency cache.
+  - Two pinned npm installs, and the two local reusable-workflow calls,
+    carry inline zizmor ignores, as the managed workflow's calls do.
 - Revision 23 delivers the managed review guide `.statecraft/REVIEW.md`.
 - Revision 24 (statecraft-cli spec 067): with the merge queue required, a
   push to `main` runs only the cache saves and `ci-gate`. That `ci-gate`
