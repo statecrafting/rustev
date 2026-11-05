@@ -1,6 +1,7 @@
 {
   "record": {
     "created": "2026-09-24",
+    "declaresAcceptance": true,
     "dependsOn": [
       "002-decision-contract-and-pure-core",
       "003-runtime-execution-and-evidence",
@@ -170,5 +171,5 @@
     "title": "Jev integration (remote decision backend)"
   },
   "shardHash": "fea3a5d1d2930ad79fea74f0a380921c1b4fd331f5a362b19173c25df6641657",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

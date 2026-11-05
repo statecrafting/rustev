@@ -5,6 +5,7 @@
       "004-evaluation-and-replay"
     ],
     "created": "2026-09-26",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core",
@@ -145,5 +146,5 @@
     "title": "Live re-execution with fresh observations"
   },
   "shardHash": "cc9f52600a69ca9cadc56345542950aea986fdd9508d4c98c00494e8892670b3",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

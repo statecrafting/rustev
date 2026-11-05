@@ -5,6 +5,7 @@
       "005-reference-backends"
     ],
     "created": "2026-10-17",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core",
@@ -286,5 +287,5 @@
     "title": "Model-backed rank and deterministic backfill (amends 002 and 005)"
   },
   "shardHash": "5af67d4b87dee78403e13e29ce2c901cab15532770365eb5092ae6fbfca6da39",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

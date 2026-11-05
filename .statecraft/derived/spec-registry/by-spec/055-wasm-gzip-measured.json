@@ -67,5 +67,5 @@
     "title": "The WebAssembly module's gzip size is recorded, not gated (amends 027)"
   },
   "shardHash": "9085ee876d001f34c4d59eba36955fee0053956050cf3ff97b25343d64360f02",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

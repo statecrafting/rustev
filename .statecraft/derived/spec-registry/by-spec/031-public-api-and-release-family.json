@@ -7,6 +7,7 @@
       "021-packaging-and-first-release"
     ],
     "created": "2026-10-16",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core",
@@ -327,5 +328,5 @@
     "title": "Public API facade, compatibility policy and release family (amends 021)"
   },
   "shardHash": "83ad9c99a7ac70eab1021619e475590afcdfab52d57acb7ae637e49a84fc8cfa",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

@@ -111,5 +111,5 @@
     "title": "The service image in the release (amends 031, 056 and 058)"
   },
   "shardHash": "95777d070336e16fe5ae42dc22d79375ee3794680c50a9220acc476f79887b40",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

@@ -118,5 +118,5 @@
     "title": "The next family release: a CLI version command, declared consumer examples and the fresh-consumer qualification (amends 006, 007 and 031)"
   },
   "shardHash": "98b6773976e798f9133a1a8ef95b8dc5d051b648de53c6961be7a3b2967b706c",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

@@ -1,6 +1,7 @@
 {
   "record": {
     "created": "2026-09-26",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core",
@@ -166,5 +167,5 @@
     "title": "Optional ecosystem integrations and serving boundary"
   },
   "shardHash": "c8dacf4baa0de0f5f8b491d402dd99599249f33f91b5e43049efe0137c99efbd",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

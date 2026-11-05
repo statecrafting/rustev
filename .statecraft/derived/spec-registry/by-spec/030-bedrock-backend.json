@@ -4,6 +4,7 @@
       "001-boundaries-and-authority"
     ],
     "created": "2026-10-16",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core",
@@ -233,5 +234,5 @@
     "title": "Hosted model platform backend: AWS Bedrock"
   },
   "shardHash": "717d39a214e8a1b8b449ced74833ad005cfa8f53db9b463697a03e61ad1be81a",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

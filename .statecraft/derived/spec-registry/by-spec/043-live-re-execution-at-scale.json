@@ -5,6 +5,7 @@
       "006-cli-surface"
     ],
     "created": "2026-10-17",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core",
@@ -240,5 +241,5 @@
     "title": "Live re-execution at dataset scale with spend caps (amends 026 and 006)"
   },
   "shardHash": "0b967da3823d5f283e4e54ec95833d8fe80ed7b8b4f9ec4486189e82ba4f3deb",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

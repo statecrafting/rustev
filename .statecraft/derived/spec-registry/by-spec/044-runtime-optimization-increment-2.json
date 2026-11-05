@@ -9,6 +9,7 @@
       "020-remote-protocol-refinements"
     ],
     "created": "2026-10-17",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core",
@@ -290,5 +291,5 @@
     "title": "Runtime optimization increment 2: duplicate suppression, persistent and decision-result caches, batching qualification (amends 017, 003, 002, 009, 012 and 020)"
   },
   "shardHash": "7ee9a6e0b9f48ddfad5a4e058839cf707b30b891b1875cf7f00b2d8f6d9890f2",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

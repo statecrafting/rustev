@@ -6,6 +6,7 @@
       "029-evaluation-repeatability"
     ],
     "created": "2026-10-17",
+    "declaresAcceptance": true,
     "dependsOn": [
       "002-decision-contract-and-pure-core",
       "004-evaluation-and-replay",
@@ -211,5 +212,5 @@
     "title": "Ranking, constraint-match and rubric metrics; pluggable scorers (amends 004, 014 and 029)"
   },
   "shardHash": "bfa5387295a24043f95d15195535573ecb793df9c518283e960e601310ab0e5b",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

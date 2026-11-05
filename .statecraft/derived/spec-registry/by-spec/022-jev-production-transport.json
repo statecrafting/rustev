@@ -4,6 +4,7 @@
       "012-jev-integration"
     ],
     "created": "2026-09-27",
+    "declaresAcceptance": true,
     "dependsOn": [
       "002-decision-contract-and-pure-core",
       "003-runtime-execution-and-evidence",
@@ -136,5 +137,5 @@
     "title": "Production transport and served identity for the Jev adapter (amends 012)"
   },
   "shardHash": "e6a284c3e6391283d5e73aa2b93ae7c020d278f3113af0c3558b7020cf9c3f2f",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

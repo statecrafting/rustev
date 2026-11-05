@@ -7,6 +7,7 @@
       "012-jev-integration"
     ],
     "created": "2026-09-26",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core",
@@ -194,5 +195,5 @@
     "title": "Remote protocol and evidence refinements"
   },
   "shardHash": "d7de0ac937b78f25ec1430a9954022d86f13443835e808b9ae84b0a2dabb46e7",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

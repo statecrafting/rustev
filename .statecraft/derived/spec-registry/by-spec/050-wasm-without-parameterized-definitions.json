@@ -239,5 +239,5 @@
     "title": "The WebAssembly module without parameterized definitions (amends 027)"
   },
   "shardHash": "935d22f92692c9947284512eecf44f408224533d79be47d2760bfb2ae63e472e",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

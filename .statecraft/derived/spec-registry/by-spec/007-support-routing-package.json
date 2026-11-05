@@ -1,6 +1,7 @@
 {
   "record": {
     "created": "2026-09-25",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core",
@@ -115,5 +116,5 @@
     "title": "Reference package: support routing"
   },
   "shardHash": "f22da493acc92fab67606c5999e657d048f130871c8f5b6588bb85b81f0bfb60",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

@@ -4,6 +4,7 @@
       "010-integrations"
     ],
     "created": "2026-10-17",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core",
@@ -281,5 +282,5 @@
     "title": "Decision service sidecar and remote context and sink protocols (amends 010)"
   },
   "shardHash": "eb7697d49baf4df6888f75856f299c6053a2e683023251aaa0d5f3e3011cb2f7",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }
