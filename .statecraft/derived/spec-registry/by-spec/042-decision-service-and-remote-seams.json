@@ -210,7 +210,7 @@
       }
     ],
     "sectionDigests": {
-      "042-decision-service-sidecar-and-remote-context-and-sink-protocols-amends-010": "19ac32bc2d76d9f245c5bd6498743be8f7e72a10d66aa1f3c7ac45400e75f6f5",
+      "042-decision-service-sidecar-and-remote-context-and-sink-protocols-amends-010": "82f8150d5f2ba607865302280b84a2d146e650394a8aa20bf1e246b18eb040c2",
       "1-purpose": "ff7983dfa100f7656f25eca5742c5a2871bed14513bce1a1b61748760a6b2840",
       "2-1-binding-principles-of-76": "fb78e4bf06930e7788cf73a75e3943a4e9ebe77673de71b2eec54f5ce6127896",
       "2-2-relation-to-spec-010-and-the-binding-record-gate": "686daeca68b7adec5084445de04ac9aa275c36c9fc1ca680756c6ba5a97c0059",
@@ -239,7 +239,7 @@
       "5-observable-negative-cases": "5db3d183804ca0b6c7f8fee127b835c4fad3a4c028b6a79216994b3c3530f4e4",
       "acceptance": "cf6a6046487b594adf5d88d0cdb5e5fd8cc7e0b249ec1546afaff2f765667458",
       "decisions-at-approval": "b2cc55ca8f777ed1ccf05f15c22b44845b99c34e7792a010e727b7dd1ff2fe04",
-      "implementation-record": "e949a8cdf934cb94c7d531ca75fdf601b131182daa1eb0ba8d458a43bad080f4",
+      "implementation-record": "59a092ea03f5c0e6b799c7766a1f8d500218fc62f2caa168b13498efbf2f290b",
       "verification": "0a75bf7b4443e8a178a5e74bfc3009053ed6c1f9d5a7aed7395cee55575f71cd"
     },
     "sectionHeadings": [
@@ -280,6 +280,6 @@
     "summary": "An amendment of approved spec 010 (R-16), for #76 child A2 (#57). Makes the `rustev-serve` service API concrete as `rustev.serve/1`: plan registration by content identity from plain or signed plan bundles, decisions, cancellation, lookup, server-sent event streaming, offline replay, evaluation and explanation, health, readiness and OpenMetrics, served over HTTP/1.1 and HTTP/2 with JSON and over gRPC from one handler layer, on TCP and Unix domain socket listeners. Defines two new transport-neutral callback protocols with an HTTP binding, `rustev.remote-context/1` (describe, fetch, acquire, cancel and invalidation by push or poll) and `rustev.remote-sink/1` (describe and deliver with receipts), behind bounded queues with deadlines, cancellation and typed refusals when full. Adds no plan construct: every `PlanId`, run record and judgment byte is unchanged. Approved (A-39) under the 2026-10-16 delivery work order; implementation is complete (2026-11-03), after the owner approved `rustev-serve`'s spec 010 section 3.4 binding record (R-44).\n",
     "title": "Decision service sidecar and remote context and sink protocols (amends 010)"
   },
-  "shardHash": "9aa751200561e693bc4f43d1a7af0c14cbfb5f26123ae539c06bccb1d3d8b1b6",
+  "shardHash": "eb7697d49baf4df6888f75856f299c6053a2e683023251aaa0d5f3e3011cb2f7",
   "specVersion": "1.10.0"
 }

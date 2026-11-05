@@ -55,13 +55,46 @@ fn report(matches: &[(&str, &str)]) -> Vec<u8> {
 }
 
 #[test]
-fn the_committed_file_starts_empty_and_passes_a_clean_scan() {
+fn the_committed_exceptions_name_owner_rows_and_cover_their_findings() {
     let ex = ImageExceptions::parse(FILE.as_bytes()).unwrap();
     assert_eq!(ex.schema, SCHEMA);
-    assert!(ex.exceptions.is_empty());
     let rows = decision_dates(DECISIONS);
     assert_eq!(rows.get("A-76").map(String::as_str), Some("2026-11-03"));
-    assert!(check(&ex, &rows, &[], "2026-11-03").is_empty());
+    // 060 3.2.1: each entry names a decision row that exists, at most 90
+    // days before its expiry (A-80, accept all 44 on the Debian 13 base).
+    assert_eq!(ex.exceptions.len(), 44);
+    for e in &ex.exceptions {
+        assert_eq!(e.decision, "A-80", "{}", e.id);
+        assert!(
+            rows.contains_key(&e.decision),
+            "{}: no row {}",
+            e.id,
+            e.decision
+        );
+    }
+    // Every entry covers its own finding on the row's date and its last day,
+    // and none is unused or past 90 days.
+    let found: Vec<Finding> = ex
+        .exceptions
+        .iter()
+        .flat_map(|e| ["linux/amd64", "linux/arm64"].map(|p| finding(p, &e.id, &e.package)))
+        .collect();
+    assert!(
+        check(&ex, &rows, &found, "2026-11-03").is_empty(),
+        "{:?}",
+        check(&ex, &rows, &found, "2026-11-03")
+    );
+    assert!(check(&ex, &rows, &found, "2027-02-01").is_empty());
+    // The day after, every entry has expired and nothing is covered.
+    let v = check(&ex, &rows, &found, "2027-02-02");
+    assert_eq!(
+        v.iter()
+            .filter(|m| m.contains("expired on 2027-02-01"))
+            .count(),
+        44
+    );
+    // An empty scan leaves every entry unused.
+    assert_eq!(check(&ex, &rows, &[], "2026-11-03").len(), 44);
 }
 
 #[test]

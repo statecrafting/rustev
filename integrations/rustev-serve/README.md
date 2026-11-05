@@ -137,7 +137,11 @@ These gaps are not claims of spec acceptance:
 copies it alone onto the pinned `gcr.io/distroless/cc-debian13:nonroot` base,
 as user and group 65532, with entrypoint
 `/usr/local/bin/rustev-serve --config /etc/rustev/serve.json`. Mount the
-configuration there; the root filesystem can be read-only. From the
+configuration there; the root filesystem can be read-only. Keep the
+container's `/etc/resolv.conf` and `LOCALDOMAIN` under the operator's control:
+glibc's resolver aborts the process when its search list holds a domain of
+about 200 characters or more (CVE-2026-8674, accepted as an image exception
+until 2027-02-01, A-80). From the
 repository root:
 
 ```sh
