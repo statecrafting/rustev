@@ -3,6 +3,7 @@ import collections
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import time
@@ -49,10 +50,50 @@ def validate(expected, groups):
         raise ValueError("acceptance groups must cover VERIFIED_SPECS exactly once")
 
 
+# 2026-11-04: integrations-base ran out of disk with 41 GB free after the
+# workflow's cleanup: its thirteen specs build different features and test
+# targets into one target directory, which only grows. Before each spec the
+# free space is recorded and, below the floor, rebuildable output is
+# dropped: incremental artifacts first, then the whole target directory.
+FLOOR = int(os.environ.get("ACCEPTANCE_DISK_FLOOR_GIB", "20")) * 2**30
+
+
+def target_dir():
+    return Path(os.environ.get("CARGO_TARGET_DIR") or ROOT / "target")
+
+
+def free_bytes(path):
+    while not path.exists():
+        path = path.parent
+    return shutil.disk_usage(path).free
+
+
+def ensure_disk(floor=FLOOR):
+    """Free rebuildable output when free space is below `floor`; returns the
+    step taken ("none", "incremental", "clean" or "clean_failed") for the
+    log. A failed clean is reported, never fatal: the spec still runs."""
+    target = target_dir()
+    free = free_bytes(target)
+    print(f"acceptance disk: {free / 2**30:.1f} GiB free, floor {floor / 2**30:.0f} GiB", flush=True)
+    if free >= floor:
+        return "none"
+    for profile in ("debug", "release"):
+        shutil.rmtree(target / profile / "incremental", ignore_errors=True)
+    free = free_bytes(target)
+    print(f"acceptance disk: {free / 2**30:.1f} GiB free after dropping incremental artifacts", flush=True)
+    if free >= floor:
+        return "incremental"
+    cleaned = subprocess.run(["cargo", "clean"], cwd=ROOT, check=False)
+    step = "clean" if cleaned.returncode == 0 else "clean_failed"
+    print(f"acceptance disk: {free_bytes(target) / 2**30:.1f} GiB free after cargo clean ({step})", flush=True)
+    return step
+
+
 def run_group(specs):
     rows = ["| Spec | Seconds | Result |", "|---|---:|---|"]
     try:
         for spec in specs:
+            ensure_disk()
             start = time.monotonic()
             print(f"::group::Acceptance {spec}", flush=True)
             result = subprocess.run(
