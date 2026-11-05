@@ -13,7 +13,7 @@ use crate::comparison::{
 };
 use crate::config::Direction;
 use crate::repeat::{
-    BandDoc, CohortStatus, FigureDoc, HeldOut, MetricReport, Observation, RepeatReport, SplitRole,
+    BandDoc, CohortReport, CohortStatus, FigureDoc, HeldOut, MetricReport, Observation, SplitRole,
 };
 
 pub const SELECTION_GATE: &str = "rustev.selection-gate/1";
@@ -315,110 +315,30 @@ pub fn evaluate_selection(
                 }
             }
         }
-        for (group, list) in [
-            ("require", gate.require.as_slice()),
-            ("and_any", gate.and_any.as_deref().unwrap_or(&[])),
-        ] {
-            for (i, clause) in list.iter().enumerate() {
-                let label = format!("{group}[{i}]");
-                let opaque_side = clause_metric(clause).and_then(|m| {
-                    [("baseline", baseline_evidence), ("candidate", &c.evidence)]
-                        .into_iter()
-                        .find(|(_, e)| opaque(e, m))
-                        .map(|(side, _)| (side, m))
-                });
-                clauses.push(match (&precondition_reason, opaque_side) {
-                    (Some(r), _) => result(label, unknown(format!("precondition: {r}"))),
-                    // Spec 041, 3.12.2: an opaque scorer's identity names
-                    // code whose change no digest shows.
-                    (None, Some((side, m))) => result(
-                        label,
-                        unknown(format!("the {side}'s `{m}` comes from an opaque scorer")),
-                    ),
-                    (None, None) => evaluate_clause(
-                        label,
-                        clause,
-                        gate,
-                        baseline_evidence.report,
-                        c.evidence.report,
-                    ),
-                });
-            }
-        }
-        if let Some(any) = &gate.and_any {
-            let members: Vec<_> = clauses
-                .iter()
-                .filter(|r| r.clause.starts_with("and_any["))
-                .map(|r| &r.result)
-                .collect();
-            debug_assert_eq!(members.len(), any.len());
-            let v = if members
-                .iter()
-                .any(|r| matches!(r, ClauseOutcome::Pass { .. }))
-            {
-                pass("at least one clause passes")
-            } else if members
-                .iter()
-                .all(|r| matches!(r, ClauseOutcome::Fail { .. }))
-            {
-                fail("every clause fails")
-            } else {
-                unknown("no clause passes and at least one is unknown")
-            };
-            clauses.push(result("and_any".into(), v));
-        }
-        // Individual OR members do not act as required clauses.
-        let relevant: Vec<_> = clauses
-            .iter()
-            .filter(|r| !r.clause.starts_with("and_any["))
-            .collect();
-        let verdict = if let Some(r) = relevant
-            .iter()
-            .find(|r| matches!(r.result, ClauseOutcome::Fail { .. }))
-        {
-            Verdict::Rejected {
-                clause: r.clause.clone(),
-            }
-        } else if let Some(r) = relevant
-            .iter()
-            .find(|r| matches!(r.result, ClauseOutcome::Unknown { .. }))
-        {
-            let clause = if r.clause == "and_any" {
-                clauses
-                    .iter()
-                    .find(|r| {
-                        r.clause.starts_with("and_any[")
-                            && matches!(r.result, ClauseOutcome::Unknown { .. })
-                    })
-                    .expect("an unknown disjunction has an unknown member")
-                    .clause
-                    .clone()
-            } else {
-                r.clause.clone()
-            };
-            Verdict::Unknown { clause }
-        } else {
-            Verdict::Qualifies
+        let base_side = Side {
+            cohorts: &baseline_evidence.report.cohorts,
+            split_role: baseline_evidence.report.split_role,
+            held_out: baseline_evidence.report.held_out.as_ref(),
+            opaque: &|m: &str| opaque(baseline_evidence, m),
+            host: false,
         };
-        if verdict == Verdict::Qualifies {
-            let values: Result<Vec<_>, String> = gate
-                .rank_by
-                .iter()
-                .map(|m| {
-                    if opaque(&c.evidence, m) || opaque(baseline_evidence, m) {
-                        return Err(format!("`{m}` comes from an opaque scorer"));
-                    }
-                    metric(c.evidence.report, "all", m).and_then(|m| value(m, true))
-                })
-                .collect();
-            match values {
-                Ok(values) => ranks.push((c.name.to_string(), values)),
-                Err(reason) => unranked.push(Unranked {
-                    name: c.name.into(),
-                    reason,
-                }),
-            }
-        }
+        let cand_side = Side {
+            cohorts: &c.evidence.report.cohorts,
+            split_role: c.evidence.report.split_role,
+            held_out: c.evidence.report.held_out.as_ref(),
+            opaque: &|m: &str| opaque(&c.evidence, m),
+            host: false,
+        };
+        let (verdict, clauses) = judge(
+            gate,
+            &base_side,
+            &cand_side,
+            precondition_reason.as_deref(),
+            clauses,
+            c.name,
+            &mut ranks,
+            &mut unranked,
+        );
         decisions.push(CandidateSelection {
             name: c.name.into(),
             repeat_report: c
@@ -430,6 +350,147 @@ pub fn evaluate_selection(
             clauses,
         });
     }
+    sort_ranks(gate, &mut ranks);
+    let doc = Selection {
+        schema: SELECTION.into(),
+        gate: gate.id().map_err(|e| e.to_string())?,
+        baseline: baseline.record_digest().map_err(|e| e.to_string())?,
+        candidates: decisions,
+        ranked: ranks.into_iter().map(|(n, _)| n).collect(),
+        unranked,
+    };
+    Selection::parse(&doc.record_canonical().map_err(|e| e.to_string())?).map_err(|e| e.to_string())
+}
+
+/// One side of a selection as its clauses read it (spec 029, 3.12; spec
+/// 061, 3.7): its cohorts, split role, held-out record, which metrics an
+/// opaque scorer produces, and whether it is a host set.
+pub(crate) struct Side<'a> {
+    pub cohorts: &'a [CohortReport],
+    pub split_role: SplitRole,
+    pub held_out: Option<&'a HeldOut>,
+    pub opaque: &'a dyn Fn(&str) -> bool,
+    pub host: bool,
+}
+
+/// A candidate's clause results after its preconditions and coverage
+/// clauses, its verdict, and its rank values when it qualifies (3.12.3 to
+/// 3.12.6).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn judge(
+    gate: &SelectionGate,
+    base: &Side<'_>,
+    cand: &Side<'_>,
+    precondition_reason: Option<&str>,
+    mut clauses: Vec<ClauseResult>,
+    name: &str,
+    ranks: &mut Vec<(String, Vec<f64>)>,
+    unranked: &mut Vec<Unranked>,
+) -> (Verdict, Vec<ClauseResult>) {
+    for (group, list) in [
+        ("require", gate.require.as_slice()),
+        ("and_any", gate.and_any.as_deref().unwrap_or(&[])),
+    ] {
+        for (i, clause) in list.iter().enumerate() {
+            let label = format!("{group}[{i}]");
+            let opaque_side = clause_metric(clause).and_then(|m| {
+                [("baseline", base), ("candidate", cand)]
+                    .into_iter()
+                    .find(|(_, e)| (e.opaque)(m))
+                    .map(|(side, _)| (side, m))
+            });
+            clauses.push(match (&precondition_reason, opaque_side) {
+                (Some(r), _) => result(label, unknown(format!("precondition: {r}"))),
+                // Spec 041, 3.12.2: an opaque scorer's identity names
+                // code whose change no digest shows.
+                (None, Some((side, m))) => result(
+                    label,
+                    unknown(format!("the {side}'s `{m}` comes from an opaque scorer")),
+                ),
+                (None, None) => evaluate_clause(label, clause, gate, base, cand),
+            });
+        }
+    }
+    if let Some(any) = &gate.and_any {
+        let members: Vec<_> = clauses
+            .iter()
+            .filter(|r| r.clause.starts_with("and_any["))
+            .map(|r| &r.result)
+            .collect();
+        debug_assert_eq!(members.len(), any.len());
+        let v = if members
+            .iter()
+            .any(|r| matches!(r, ClauseOutcome::Pass { .. }))
+        {
+            pass("at least one clause passes")
+        } else if members
+            .iter()
+            .all(|r| matches!(r, ClauseOutcome::Fail { .. }))
+        {
+            fail("every clause fails")
+        } else {
+            unknown("no clause passes and at least one is unknown")
+        };
+        clauses.push(result("and_any".into(), v));
+    }
+    // Individual OR members do not act as required clauses.
+    let relevant: Vec<_> = clauses
+        .iter()
+        .filter(|r| !r.clause.starts_with("and_any["))
+        .collect();
+    let verdict = if let Some(r) = relevant
+        .iter()
+        .find(|r| matches!(r.result, ClauseOutcome::Fail { .. }))
+    {
+        Verdict::Rejected {
+            clause: r.clause.clone(),
+        }
+    } else if let Some(r) = relevant
+        .iter()
+        .find(|r| matches!(r.result, ClauseOutcome::Unknown { .. }))
+    {
+        let clause = if r.clause == "and_any" {
+            clauses
+                .iter()
+                .find(|r| {
+                    r.clause.starts_with("and_any[")
+                        && matches!(r.result, ClauseOutcome::Unknown { .. })
+                })
+                .expect("an unknown disjunction has an unknown member")
+                .clause
+                .clone()
+        } else {
+            r.clause.clone()
+        };
+        Verdict::Unknown { clause }
+    } else {
+        Verdict::Qualifies
+    };
+    if verdict == Verdict::Qualifies {
+        let values: Result<Vec<_>, String> = gate
+            .rank_by
+            .iter()
+            .map(|m| {
+                if (cand.opaque)(m) || (base.opaque)(m) {
+                    return Err(format!("`{m}` comes from an opaque scorer"));
+                }
+                metric(cand, "all", m).and_then(|m| value(m, true, cand.host))
+            })
+            .collect();
+        match values {
+            Ok(values) => ranks.push((name.to_string(), values)),
+            Err(reason) => unranked.push(Unranked {
+                name: name.into(),
+                reason,
+            }),
+        }
+    }
+    (verdict, clauses)
+}
+
+/// Rank qualifying candidates (3.12.6): by `rank_by` lexicographically in
+/// each metric's direction, ties by name in byte order.
+pub(crate) fn sort_ranks(gate: &SelectionGate, ranks: &mut [(String, Vec<f64>)]) {
     ranks.sort_by(|(an, av), (bn, bv)| {
         for ((a, b), m) in av.iter().zip(bv).zip(&gate.rank_by) {
             // Numeric equality includes both signs of zero. All values finite.
@@ -444,15 +505,6 @@ pub fn evaluate_selection(
         }
         an.as_bytes().cmp(bn.as_bytes())
     });
-    let doc = Selection {
-        schema: SELECTION.into(),
-        gate: gate.id().map_err(|e| e.to_string())?,
-        baseline: baseline.record_digest().map_err(|e| e.to_string())?,
-        candidates: decisions,
-        ranked: ranks.into_iter().map(|(n, _)| n).collect(),
-        unranked,
-    };
-    Selection::parse(&doc.record_canonical().map_err(|e| e.to_string())?).map_err(|e| e.to_string())
 }
 
 fn stable(b: &RepeatEvidence<'_>, c: &RepeatEvidence<'_>) -> Result<(), String> {
@@ -490,7 +542,7 @@ fn stable(b: &RepeatEvidence<'_>, c: &RepeatEvidence<'_>) -> Result<(), String> 
     Ok(())
 }
 
-fn metric<'a>(r: &'a RepeatReport, cohort: &str, name: &str) -> Result<&'a MetricReport, String> {
+fn metric<'a>(r: &Side<'a>, cohort: &str, name: &str) -> Result<&'a MetricReport, String> {
     let c = r
         .cohorts
         .iter()
@@ -504,8 +556,15 @@ fn metric<'a>(r: &'a RepeatReport, cohort: &str, name: &str) -> Result<&'a Metri
         .find(|m| m.name == name)
         .ok_or_else(|| format!("metric {name} not reported in {cohort}"))
 }
-fn value(m: &MetricReport, candidate: bool) -> Result<f64, String> {
-    if candidate && observed(&m.name) && m.observation != Some(Observation::Candidate) {
+fn value(m: &MetricReport, candidate: bool, host: bool) -> Result<f64, String> {
+    // A host set's latency and cost are its own observations (spec 061,
+    // 3.5.3), named under `host/`.
+    let observation = if host {
+        crate::host_repeat::observed(&m.name)
+    } else {
+        observed(&m.name)
+    };
+    if candidate && observation && m.observation != Some(Observation::Candidate) {
         return Err(format!(
             "{}: historical or missing candidate observation",
             m.name
@@ -630,15 +689,15 @@ fn add_digits(acc: &mut Vec<u8>, m: &[u8]) {
 fn metric_clause(
     clause: &MetricClause,
     gate: &SelectionGate,
-    b: &RepeatReport,
-    c: &RepeatReport,
+    b: &Side<'_>,
+    c: &Side<'_>,
     cohort: &str,
 ) -> ClauseOutcome {
     let compare = || -> Result<bool, String> {
         let bm = metric(b, cohort, clause.metric())?;
         let cm = metric(c, cohort, clause.metric())?;
-        let bv = value(bm, false)?;
-        let cv = value(cm, true)?;
+        let bv = value(bm, false, b.host)?;
+        let cv = value(cm, true, c.host)?;
         let higher = gate.metrics[clause.metric()] == Direction::HigherIsBetter;
         let better = matches!(clause, MetricClause::Better { .. });
         // Spec 029, 3.12.3: every band, a noise band or an absolute
@@ -674,8 +733,8 @@ fn evaluate_clause(
     label: String,
     clause: &Clause,
     gate: &SelectionGate,
-    b: &RepeatReport,
-    c: &RepeatReport,
+    b: &Side<'_>,
+    c: &Side<'_>,
 ) -> ClauseResult {
     match clause {
         Clause::Metric(m) => result(label, metric_clause(m, gate, b, c, "all")),
@@ -684,7 +743,7 @@ fn evaluate_clause(
             if c.split_role != SplitRole::HeldOut {
                 pass("nothing is held out")
             } else {
-                match &c.held_out {
+                match c.held_out {
                     Some(HeldOut::Counted(r))
                         if r.count > 0
                             && r.plan_count > 0

@@ -71,12 +71,17 @@ pub struct ComparisonMetric {
 }
 
 pub(crate) fn check_names(candidates: &[NamedCandidate<'_>]) -> Result<(), String> {
+    check_name_list(&candidates.iter().map(|c| c.name).collect::<Vec<_>>())
+}
+
+/// 1 to 64 candidates named by the case id rule, unique ignoring ASCII
+/// case; spec 061's host candidates follow it too.
+pub(crate) fn check_name_list(candidates: &[&str]) -> Result<(), String> {
     if candidates.is_empty() || candidates.len() > MAX_CANDIDATES {
         return Err("expected 1 to 64 candidates".into());
     }
     let mut names = BTreeSet::new();
-    for c in candidates {
-        let n = c.name;
+    for &n in candidates {
         if n.is_empty()
             || n.len() > MAX_CANDIDATE_NAME
             || !n.as_bytes()[0].is_ascii_alphanumeric()

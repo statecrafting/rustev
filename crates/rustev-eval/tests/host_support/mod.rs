@@ -97,6 +97,9 @@ pub struct RunSpec {
     pub run: String,
     pub flow: String,
     pub flow_version: String,
+    /// Each case's latency is this times its position (1 to 6), plus 337
+    /// microseconds and the shift.
+    pub latency_base: u64,
     /// Added to every latency, in microseconds.
     pub latency_shift: u64,
     /// The case whose latency is unknown, if any.
@@ -107,6 +110,8 @@ pub struct RunSpec {
     /// Added to every `length` score, kept inside `[0, 1]`.
     pub score_shift: f64,
     pub split: Split,
+    /// Cases that fail in this run besides c6.
+    pub extra_failed: Vec<&'static str>,
 }
 
 impl RunSpec {
@@ -115,17 +120,22 @@ impl RunSpec {
             run: format!("run-{r}"),
             flow: "support".into(),
             flow_version: "v1".into(),
+            latency_base: 1000,
             latency_shift: 100 * r as u64,
             unknown_latency: None,
             cost_unit: Some("usd".into()),
             cost_shift: 1_000_000 * r as i128,
             score_shift: 0.05 * r as f64,
             split: Split::ModelSelection,
+            extra_failed: vec![],
         }
     }
 }
 
-pub fn outcome(case: &str) -> HostOutcome {
+pub fn outcome(spec: &RunSpec, case: &str) -> HostOutcome {
+    if spec.extra_failed.contains(&case) {
+        return HostOutcome::Failed("timeout".into());
+    }
     match case {
         "c5" => HostOutcome::Abstained,
         "c6" => HostOutcome::Failed("timeout".into()),
@@ -158,13 +168,13 @@ pub fn record(spec: &RunSpec, views: &ScoreViews, scores: &[Scores]) -> HostRun 
             .map(|(i, c)| HostCase {
                 case: (*c).into(),
                 subgroups: subgroups(c),
-                outcome: outcome(c),
+                outcome: outcome(spec, c),
                 latency_us: if spec.unknown_latency == Some(*c) {
                     HostLatency::Unknown(Unobserved {
                         unknown: "clock_skew".into(),
                     })
                 } else {
-                    HostLatency::Us(1000 * (i as u64 + 1) + 337 + spec.latency_shift)
+                    HostLatency::Us(spec.latency_base * (i as u64 + 1) + 337 + spec.latency_shift)
                 },
                 cost: spec.cost_unit.as_ref().map(|_| {
                     HostCost::Value(Decimal::from_units(
@@ -179,7 +189,7 @@ pub fn record(spec: &RunSpec, views: &ScoreViews, scores: &[Scores]) -> HostRun 
 pub fn views(config: &EvaluatorConfig, spec: &RunSpec) -> ScoreViews {
     let cases = CASES
         .iter()
-        .filter(|c| outcome(c) == HostOutcome::Answered)
+        .filter(|c| outcome(spec, c) == HostOutcome::Answered)
         .map(|c| {
             let proposal_view = ProposalView {
                 action: "reply".into(),
@@ -224,9 +234,9 @@ pub fn scores(config: &EvaluatorConfig, views: &ScoreViews, spec: &RunSpec) -> V
                 .enumerate()
                 .map(|(i, e)| {
                     let outcome = match d.id.as_str() {
-                        "length" => {
-                            ScoreOutcome::Score((0.2 + 0.1 * i as f64 + spec.score_shift).min(1.0))
-                        }
+                        "length" => ScoreOutcome::Score(
+                            (0.2 + 0.1 * i as f64 + spec.score_shift).clamp(0.0, 1.0),
+                        ),
                         // c4 is unscored by the judge.
                         "judge" if e.case == "c4" => ScoreOutcome::Unscored("refused".into()),
                         _ => ScoreOutcome::Score(((i + 1) % 3) as f64),
