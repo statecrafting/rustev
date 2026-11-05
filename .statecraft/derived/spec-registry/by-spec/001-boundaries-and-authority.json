@@ -43,7 +43,7 @@
     "id": "001-boundaries-and-authority",
     "implementation": "complete",
     "sectionDigests": {
-      "001-ecosystem-boundaries-proposals-versus-authority-and-product-principles": "0d503f8332760cd2ec6f6381cc3a79498c9822785de084b776342a889d4d9e7c",
+      "001-ecosystem-boundaries-proposals-versus-authority-and-product-principles": "6a884bad6b087ccd8cdb32a4a14f5b89d4faf910b3b26cd3fb1f8570f2fed174",
       "1-purpose": "23d9fbfd79c7d53855467fa3936d5b3587d0827055ec39dc204addca739a071f",
       "2-territory": "c011c575f7bd83c135b1913052b322c24e052219daaba432722e5187a695a5c7",
       "3-1-responsibilities": "9239843abb6815deae05a2316acdf2bccb66d4c1a40ba6272b5163b0714aaa28",
@@ -58,8 +58,9 @@
       "5-observable-negative-cases": "ed4f8a5dc1222abdb7b175f801fe1fff4affd9f10758ff1aeee33d3194125af3",
       "acceptance": "6745eef13e379ef3665bc3d6f9153896b02a987b6d493e3b6920797347a3e5f8",
       "decision-history": "379986528b3a49c1870bba9bef52d8802914986af81bf3552deeb74ee5a6a452",
-      "engine-upgrade-record-2026-10-02": "61612c1be943f9a3f40b63cc0a1cd451a7f6718965e4731c1e316f23904310fc",
+      "engine-upgrade-record-2026-10-02": "8cfcc682ca909b50cbf09611e2b7364ad69cf404c792c633ddc5e4ff20bb1937",
       "implementation-record": "52419cd7b88d1b024a3d22f2d0d0ef6f4b538f4bd4846122dedc955cbeeb9d41",
+      "profile-and-engine-upgrade-record-2026-11-05": "7ee8cb1ed462461498c4d2475b2a75f75043ff3d69f0dccd39cc1ec8fa49841a",
       "profile-upgrade-record-2026-10-02": "6c81fa3739f224dfdb744b86aaef78dc0d1fea39886b759607741736c9f0e027",
       "verification": "e7c72eb6207c95ccc8e643cad92aa8d980aad37cfa4195b7cc4c06e41bc33bbe"
     },
@@ -82,13 +83,14 @@
       "Implementation record",
       "Decision history",
       "Profile upgrade record (2026-10-02)",
-      "Engine upgrade record (2026-10-02)"
+      "Engine upgrade record (2026-10-02)",
+      "Profile and engine upgrade record (2026-11-05)"
     ],
     "specPath": "specs/001-boundaries-and-authority/spec.md",
     "status": "approved",
     "summary": "What Rustev owns and refuses to own within the ecosystem (spec-spine, Aicortex, Rahi, statecraft-cli, applications), the rule that Rustev produces proposals and never grants, the provenance classes of Rustev outputs, the dependency layout that keeps contracts transport-neutral and the core free of integrations, and the product principles that are the constitution's principles VI onward. Owns the workspace manifest, the Makefile and the boundary check that enforces the dependency rules.\n",
     "title": "Ecosystem boundaries, proposals versus authority, and product principles"
   },
-  "shardHash": "4460dcb3325ec5df2e2dbd963c8a45067fda6442421ddfcf31603f6e520db64d",
+  "shardHash": "09ceae9e778c2453a16970ec4c45fd113243ffd1e53c682bd2414501162c60c5",
   "specVersion": "1.11.0"
 }
