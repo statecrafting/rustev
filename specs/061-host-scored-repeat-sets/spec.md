@@ -597,6 +597,36 @@ cost unit, an opaque scorer, a held-out set and a candidate changed
 after import, with exit codes 0, 11 and 12); the shared fixture gains a
 latency base and extra failed cases.
 
+**Increment 5 (2026-11-03): host baselines, reproducibility and
+selection in the CLI.** `baseline record`, `eval reproducibility` and
+`gate select` first read the schema strings of their inputs (the
+baseline file, each set's `repeat.json`, and for `baseline record` its
+first `run-0.cases.json`) without parsing the documents; a mix of host
+and Rustev-evaluated schemas is `invalid_input`, `mixed-provenance`,
+before any comparison and with nothing written (3.6.2, I-1). All host
+inputs take the host path in `crates/rustev-cli/src/host_sets.rs`; any
+other inputs take spec 029's path, unchanged, so its outputs keep their
+bytes. The host path reads an import output back (every document of
+3.2.5; a scores file per declared scorer when present), verifies the
+host baseline against its import output in both `eval reproducibility`
+and `gate select` (a baseline that does not bind it is `invalid_input`,
+nothing written, as in spec 029's commands), re-assembles a reproducibility
+run (refused, `reconcile`, as 029 refuses an unverified run), and leaves
+a candidate that does not re-assemble to the library, which makes it
+`unknown` (`reconcile`) rather than refusing the command. Stdout keeps
+029's statuses and exit codes (0, 11, 12 and 13) and adds `assertion:
+"host-asserted"`, also on each exceedance. `eval diff` refuses a host
+baseline by its schema, as before. Tests in
+`crates/rustev-cli/tests/host_sets.rs`, with goldens under
+`tests/golden/host/`: the recorded baseline and its stdout; reproducible
+(exit 0), beyond the band (exit 13) and another flow version (exit 12);
+a tampered baseline refused by both commands; selection that qualifies on latency and
+cost (exit 0, the selection document), none qualified on a slice and on
+coverage (exit 11), unknown with an N = 1 candidate (exit 12), and a
+candidate changed after import (unknown, `reconcile`); and every
+`mixed-provenance` row of section 5 for `gate select`, `eval
+reproducibility` and `baseline record`, in both directions.
+
 ## Decisions at approval
 
 Decided in this text, with the reason beside each: separate host schema

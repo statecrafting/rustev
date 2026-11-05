@@ -4,15 +4,20 @@
 use crate::args::{Parsed, Usage, usage};
 use crate::io::{Reads, join};
 use crate::out::{Done, Out, Res};
-use crate::repeat::{Session, dependency_files, publish_outputs};
+use crate::repeat::{NOT_REPRODUCIBLE, Session, dependency_files, publish_outputs};
 use rustev_contract::Document;
 use rustev_contract::canonical::record_canonical_bytes;
 use rustev_contract::limits::REPLAY_V1;
+use rustev_eval::baseline::Reproducibility;
 use rustev_eval::config::EvaluatorConfig;
 use rustev_eval::host_repeat::{
     HostCohortReport, HostObservation, HostRepeatReport, HostSetInputs, import as import_set,
+    reassemble,
 };
-use rustev_eval::host_run::{HostError, HostRun, HostRunInputs, MAX_SCORES};
+use rustev_eval::host_run::{HostCases, HostError, HostRun, HostRunInputs, MAX_SCORES};
+use rustev_eval::host_select::{
+    self, HostBaseline, HostSetEvidence, NamedHostCandidate, Provenance, one_provenance,
+};
 use rustev_eval::repeat::{BandDoc, CohortStatus, FigureDoc, IntervalDoc};
 use rustev_eval::repeat_config::RepeatConfig;
 use rustev_eval::scores::{ScoreViews, Scores};
@@ -210,6 +215,298 @@ pub fn import(p: &Parsed) -> Result<Res, Usage> {
                     "cohorts",
                     s.bytes(record_canonical_bytes(&cohorts_out(&report.cohorts)))?,
                 ),
+        ))
+    })())
+}
+
+/// A schema string, read without the document's own rules, so a command
+/// can tell host and Rustev-evaluated documents apart before parsing
+/// either (3.6.2); none when the file is absent or has no schema string.
+fn schema_of(s: &Session<'_>, path: &str) -> Result<Option<String>, Done> {
+    #[derive(Deserialize)]
+    struct Schema {
+        schema: String,
+    }
+    let Some(bytes) = s
+        .reads
+        .read_bounded(path, REPLAY_V1.max_bytes.saturating_add(1))
+        .map_err(|e| Done::io(&s.command, e))?
+    else {
+        return Ok(None);
+    };
+    // Every document these commands read has the replay limits, so a file
+    // over them is refused here rather than left out of the provenance.
+    if bytes.len() > REPLAY_V1.max_bytes {
+        return Err(s.invalid(path, "the document exceeds the replay size limit"));
+    }
+    Ok(
+        rustev_contract::bounded::parse_bounded::<Schema>(&bytes, &REPLAY_V1)
+            .ok()
+            .map(|d| d.schema),
+    )
+}
+
+/// The one provenance of the documents at `paths`, or `invalid_input`
+/// `mixed-provenance` with nothing written (I-1).
+fn provenance_of(s: &Session<'_>, paths: &[String]) -> Result<Option<Provenance>, Done> {
+    let mut schemas = vec![];
+    for p in paths {
+        schemas.extend(schema_of(s, p)?);
+    }
+    let refs: Vec<&str> = schemas.iter().map(String::as_str).collect();
+    one_provenance(&refs).map_err(|e| s.invalid("provenance", e))
+}
+
+/// An import output read back (3.2.5), owning every document.
+struct ImportFiles {
+    repeat: RepeatConfig,
+    config: EvaluatorConfig,
+    report: HostRepeatReport,
+    records: Vec<HostRun>,
+    views: Vec<Option<ScoreViews>>,
+    scores: Vec<Vec<Scores>>,
+    cases: Vec<HostCases>,
+}
+
+impl ImportFiles {
+    fn read(s: &Session<'_>, dir: &str) -> Result<ImportFiles, Done> {
+        let report: HostRepeatReport = s.doc(&join(dir, "repeat.json"))?;
+        if !(1..=64).contains(&report.runs.len()) {
+            return Err(s.invalid(dir, "expected 1 to 64 runs"));
+        }
+        let config: EvaluatorConfig = s.doc(&join(dir, "config.json"))?;
+        let ids: Vec<String> = config
+            .scorers
+            .iter()
+            .flatten()
+            .map(|d| d.id.clone())
+            .collect();
+        let mut files = ImportFiles {
+            repeat: s.doc(&join(dir, "repeat-config.json"))?,
+            config,
+            report,
+            records: vec![],
+            views: vec![],
+            scores: vec![],
+            cases: vec![],
+        };
+        for r in 0..files.report.runs.len() {
+            let f = |k: &str| join(dir, &format!("run-{r}.{k}.json"));
+            files.records.push(s.doc(&f("host-run"))?);
+            let views = f("views");
+            files.views.push(if std::path::Path::new(&views).exists() {
+                Some(s.doc(&views)?)
+            } else {
+                None
+            });
+            let mut scores = vec![];
+            for id in &ids {
+                let path = f(&format!("scores-{id}"));
+                if std::path::Path::new(&path).exists() {
+                    scores.push(s.doc(&path)?);
+                }
+            }
+            files.scores.push(scores);
+            files.cases.push(s.doc(&f("cases"))?);
+        }
+        Ok(files)
+    }
+
+    fn runs(&self) -> Vec<HostRunInputs<'_>> {
+        self.records
+            .iter()
+            .zip(&self.views)
+            .zip(&self.scores)
+            .map(|((record, views), scores)| HostRunInputs {
+                record,
+                views: views.as_ref(),
+                scores,
+            })
+            .collect()
+    }
+
+    fn evidence<'a>(&'a self, runs: &'a [HostRunInputs<'a>]) -> HostSetEvidence<'a> {
+        HostSetEvidence {
+            report: &self.report,
+            cases: &self.cases,
+            inputs: HostSetInputs {
+                config: &self.repeat,
+                evaluator: &self.config,
+                runs,
+            },
+        }
+    }
+}
+
+/// `baseline record` over an import output, when its documents are a
+/// host set's (3.7.1); none for a Rustev-evaluated `--eval`.
+pub fn baseline(p: &Parsed, now: i64) -> Option<Res> {
+    let reads = Reads::default();
+    let s = Session {
+        command: p.name(),
+        reads: &reads,
+    };
+    let dir = p.req("eval");
+    let route = provenance_of(
+        &s,
+        &[join(dir, "repeat.json"), join(dir, "run-0.cases.json")],
+    );
+    match route {
+        Err(done) => return Some(Err(done)),
+        Ok(Some(Provenance::Host)) => {}
+        Ok(_) => return None,
+    }
+    Some((|| {
+        s.absent(p.req("out"))?;
+        let set = ImportFiles::read(&s, dir)?;
+        let runs = set.runs();
+        let b = host_select::record(p.req("name"), &set.evidence(&runs), now)
+            .map_err(|e| s.invalid(dir, e))?;
+        s.write(&[(p.req("out").into(), s.bytes(b.record_canonical())?)])?;
+        Ok(Done::ok(
+            Out::new(&s.command, "recorded")
+                .set(
+                    "baseline_digest",
+                    &b.record_digest().map_err(|e| s.invalid("baseline", e))?,
+                )
+                .set("assertion", HOST_ASSERTED),
+        ))
+    })())
+}
+
+/// The host baseline and its import output, verified (3.7.4).
+fn bound_baseline(s: &Session<'_>, p: &Parsed) -> Result<(HostBaseline, ImportFiles), Done> {
+    let b: HostBaseline = s.doc(p.req("baseline"))?;
+    let set = ImportFiles::read(s, p.req("baseline-eval"))?;
+    let runs = set.runs();
+    host_select::verify_baseline(&b, &set.evidence(&runs))
+        .map_err(|e| s.invalid(p.req("baseline"), e))?;
+    Ok((b, set))
+}
+
+/// `eval reproducibility` over host sets (3.7.2); none for Rustev inputs.
+pub fn reproducibility(p: &Parsed) -> Option<Res> {
+    let reads = Reads::default();
+    let s = Session {
+        command: p.name(),
+        reads: &reads,
+    };
+    let paths = [
+        p.req("baseline").to_string(),
+        join(p.req("baseline-eval"), "repeat.json"),
+        join(p.req("run"), "repeat.json"),
+    ];
+    match provenance_of(&s, &paths) {
+        Err(done) => return Some(Err(done)),
+        Ok(Some(Provenance::Host)) => {}
+        Ok(_) => return None,
+    }
+    Some((|| {
+        let (baseline, base) = bound_baseline(&s, p)?;
+        let run = ImportFiles::read(&s, p.req("run"))?;
+        let runs = run.runs();
+        let e = run.evidence(&runs);
+        reassemble(&e.inputs, e.report, e.cases).map_err(|e| s.invalid(p.req("run"), e))?;
+        let out = match host_select::reproducibility(&baseline, &run.report, &base.repeat) {
+            Reproducibility::Reproducible => {
+                Done::ok(Out::new(&s.command, "reproducible").set("assertion", HOST_ASSERTED))
+            }
+            Reproducibility::Unknown { reasons } => {
+                Done::new(12, Out::new(&s.command, "unknown").set("reasons", &reasons))
+            }
+            Reproducibility::NotReproducible { exceedances } => {
+                let values: Vec<_> = exceedances
+                    .iter()
+                    .map(|e| {
+                        serde_json::json!({"cohort": e.cohort, "metric": e.metric,
+                        "delta": e.delta, "band": e.band, "assertion": HOST_ASSERTED})
+                    })
+                    .collect();
+                Done::new(
+                    NOT_REPRODUCIBLE,
+                    Out::new(&s.command, "not_reproducible").set("exceedances", &values),
+                )
+            }
+        };
+        Ok(out)
+    })())
+}
+
+/// `gate select` over host sets (3.7.3); none for Rustev inputs. Each
+/// immediate subdirectory of `--candidates` is one candidate's import
+/// output. A candidate that does not re-assemble is the library's
+/// `unknown`, never a refusal here.
+pub fn select(p: &Parsed) -> Option<Res> {
+    let reads = Reads::default();
+    let s = Session {
+        command: p.name(),
+        reads: &reads,
+    };
+    let dirs = match crate::repeat::directories(&s, p.req("candidates")) {
+        Ok(d) => d,
+        // Not a host selection's concern; the Rustev path reports it.
+        Err(_) => return None,
+    };
+    let mut paths = vec![
+        p.req("baseline").to_string(),
+        join(p.req("baseline-eval"), "repeat.json"),
+    ];
+    paths.extend(dirs.iter().map(|(_, d)| join(d, "repeat.json")));
+    match provenance_of(&s, &paths) {
+        Err(done) => return Some(Err(done)),
+        Ok(Some(Provenance::Host)) => {}
+        Ok(_) => return None,
+    }
+    Some((|| {
+        s.absent(p.req("out"))?;
+        let gate = rustev_surface::eval::read_doc(
+            &s.command,
+            &reads,
+            p.req("selection-gate"),
+            rustev_contract::limits::DESCRIPTOR_V1.max_bytes,
+        )?;
+        // A baseline that does not bind its import output is refused, as in
+        // the reproducibility check and spec 029's `gate select`.
+        let (baseline, base) = bound_baseline(&s, p)?;
+        let sets: Vec<ImportFiles> = dirs
+            .iter()
+            .map(|(_, d)| ImportFiles::read(&s, d))
+            .collect::<Result<_, _>>()?;
+        let base_runs = base.runs();
+        let runs: Vec<Vec<HostRunInputs<'_>>> = sets.iter().map(ImportFiles::runs).collect();
+        let candidates: Vec<NamedHostCandidate<'_>> = dirs
+            .iter()
+            .zip(&sets)
+            .zip(&runs)
+            .map(|(((name, _), set), runs)| NamedHostCandidate {
+                name,
+                evidence: set.evidence(runs),
+            })
+            .collect();
+        let selection = host_select::evaluate_selection(
+            &gate,
+            &baseline,
+            &base.evidence(&base_runs),
+            &candidates,
+        )
+        .map_err(|e| s.invalid("selection", e))?;
+        let code = selection.exit_code();
+        let status = match code {
+            0 => "selected",
+            11 => "none_qualified",
+            _ => "unknown",
+        };
+        s.write(&[(p.req("out").into(), s.bytes(selection.record_canonical())?)])?;
+        Ok(Done::new(
+            code,
+            Out::new(&s.command, status)
+                .set("assertion", HOST_ASSERTED)
+                .raw(
+                    "candidates",
+                    s.bytes(record_canonical_bytes(&selection.candidates))?,
+                )
+                .set("ranked", &selection.ranked)
+                .set("unranked", &selection.unranked),
         ))
     })())
 }

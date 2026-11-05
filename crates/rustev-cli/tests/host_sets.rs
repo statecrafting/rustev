@@ -23,6 +23,15 @@ fn golden(name: &str, bytes: &[u8]) {
     assert_eq!(std::fs::read(&path).unwrap(), bytes, "{}", path.display());
 }
 
+fn golden_bytes(name: &str) -> Vec<u8> {
+    std::fs::read(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/golden/host")
+            .join(name),
+    )
+    .unwrap()
+}
+
 /// Write one host run directory: `host-run.json`, `views.json` and one
 /// file per scores document under `scores/`.
 fn write_run(s: &Scratch, dir: &str, d: &HostRunDocs) {
@@ -232,4 +241,292 @@ fn import_is_its_own_command_path() {
     }
     let r = s.rustev(&args);
     assert_eq!(r.code, 2, "{}", r.stderr);
+}
+
+/// Import `specs` into `out` through the CLI, returning `out`.
+fn imported(s: &Scratch, out: &str, specs: &[RunSpec]) -> String {
+    let docs = set_docs(&config(), specs);
+    let runs = write_inputs(s, &format!("in-{}/", out.replace('/', "-")), &docs);
+    std::fs::create_dir_all(s.path(out)).unwrap();
+    s.rustev(&import_args(&runs, out)).expect(0, "imported");
+    out.to_string()
+}
+
+fn base_specs() -> Vec<RunSpec> {
+    (0..3).map(RunSpec::new).collect()
+}
+
+fn candidate(edit: impl Fn(&mut RunSpec)) -> Vec<RunSpec> {
+    (0..3)
+        .map(|r| {
+            let mut s = RunSpec::new(r);
+            s.flow_version = "v2".into();
+            edit(&mut s);
+            s
+        })
+        .collect()
+}
+
+/// The consumer's gate of 3.7.6.
+fn write_gate(s: &Scratch) {
+    let gate = serde_json::json!({
+        "schema": "rustev.selection-gate/1", "gate": "host-flow", "per": "variant",
+        "metrics": {
+            "rubric/brevity": "higher_is_better",
+            "host/latency_ms/p0.5": "lower_is_better",
+            "host/latency_ms/p0.95": "lower_is_better",
+            "host/cost_per_1000": "lower_is_better"
+        },
+        "min_comparable_coverage": "0.8", "min_labeled_coverage": "0.4",
+        "require": [
+            {"all_slices": {"metric": "rubric/brevity", "not_worse_than": "baseline", "within": "noise"}}
+        ],
+        "and_any": [
+            {"metric": "host/latency_ms/p0.5", "better_than": "baseline"},
+            {"metric": "host/latency_ms/p0.95", "better_than": "baseline"},
+            {"metric": "host/cost_per_1000", "better_than": "baseline"}
+        ],
+        "rank_by": ["host/cost_per_1000"]
+    });
+    s.write("gate.json", &serde_json::to_vec(&gate).unwrap());
+}
+
+fn record_baseline(s: &Scratch) {
+    imported(s, "base", &base_specs());
+    let r = s.rustev(&[
+        "baseline",
+        "record",
+        "--name",
+        "base",
+        "--eval",
+        "base",
+        "--now-ms",
+        "0",
+        "--out",
+        "baseline.json",
+    ]);
+    r.expect(0, "recorded");
+    golden("recorded.stdout", &r.stdout);
+    golden("baseline.json", &s.read("baseline.json"));
+}
+
+#[test]
+fn a_host_baseline_and_its_reproducibility() {
+    let s = Scratch::new("host-baseline");
+    record_baseline(&s);
+    let check = |run: &str| {
+        s.rustev(&[
+            "eval",
+            "reproducibility",
+            "--baseline",
+            "baseline.json",
+            "--baseline-eval",
+            "base",
+            "--run",
+            run,
+        ])
+    };
+    let r = check("base");
+    r.expect(0, "reproducible");
+    golden("reproducible.stdout", &r.stdout);
+    let drift: Vec<RunSpec> = base_specs()
+        .into_iter()
+        .map(|s| RunSpec {
+            score_shift: s.score_shift + 0.2,
+            ..s
+        })
+        .collect();
+    imported(&s, "drift", &drift);
+    let r = check("drift");
+    r.expect(13, "not_reproducible");
+    golden("not-reproducible.stdout", &r.stdout);
+    imported(&s, "v2", &candidate(|_| {}));
+    check("v2").expect(12, "unknown");
+    // A tampered baseline does not bind its import output.
+    let mut b: serde_json::Value = serde_json::from_slice(&s.read("baseline.json")).unwrap();
+    b["cohorts"][0]["metrics"][0]["pooled"] = serde_json::json!({"value": 0.25});
+    s.write("tampered.json", &serde_json::to_vec(&b).unwrap());
+    s.rustev(&[
+        "eval",
+        "reproducibility",
+        "--baseline",
+        "tampered.json",
+        "--baseline-eval",
+        "base",
+        "--run",
+        "base",
+    ])
+    .expect(4, "invalid_input");
+}
+
+fn select(s: &Scratch, candidates: &str, out: &str) -> common::Ran {
+    s.rustev(&[
+        "gate",
+        "select",
+        "--selection-gate",
+        "gate.json",
+        "--baseline",
+        "baseline.json",
+        "--baseline-eval",
+        "base",
+        "--candidates",
+        candidates,
+        "--out",
+        out,
+    ])
+}
+
+#[test]
+fn host_selection_exit_codes() {
+    let s = Scratch::new("host-select");
+    record_baseline(&s);
+    write_gate(&s);
+    imported(&s, "good/faster", &candidate(|c| c.latency_base = 500));
+    imported(
+        &s,
+        "good/cheaper",
+        &candidate(|c| c.cost_shift -= 2_400_000),
+    );
+    let r = select(&s, "good", "selected.json");
+    let out = r.expect(0, "selected");
+    golden("selected.stdout", &r.stdout);
+    golden("selection.json", &s.read("selected.json"));
+    assert_eq!(out["ranked"], serde_json::json!(["cheaper", "faster"]));
+    assert_eq!(out["assertion"], "host-asserted");
+    select(&s, "good", "selected.json").expect(3, "io_error");
+    // A tampered baseline is refused before any selection, nothing written.
+    let mut b: serde_json::Value = serde_json::from_slice(&s.read("baseline.json")).unwrap();
+    b["cohorts"][0]["metrics"][0]["pooled"] = serde_json::json!({"value": 0.25});
+    s.write("baseline.json", &serde_json::to_vec(&b).unwrap());
+    select(&s, "good", "tampered.json").expect(4, "invalid_input");
+    assert!(!s.exists("tampered.json"));
+    s.write("baseline.json", &golden_bytes("baseline.json"));
+
+    imported(
+        &s,
+        "bad/worse",
+        &candidate(|c| {
+            c.latency_base = 500;
+            c.score_shift -= 0.15;
+        }),
+    );
+    imported(
+        &s,
+        "bad/failing",
+        &candidate(|c| {
+            c.latency_base = 500;
+            c.extra_failed = vec!["c4"];
+        }),
+    );
+    let r = select(&s, "bad", "rejected.json");
+    r.expect(11, "none_qualified");
+    golden("none-qualified.stdout", &r.stdout);
+
+    imported(&s, "open/single", &candidate(|c| c.latency_base = 500)[..1]);
+    imported(&s, "open/faster", &candidate(|c| c.latency_base = 500));
+    let r = select(&s, "open", "unknown.json");
+    r.expect(12, "unknown");
+    golden("unknown.stdout", &r.stdout);
+
+    // A candidate changed after import is unknown, not refused.
+    imported(&s, "changed/faster", &candidate(|c| c.latency_base = 500));
+    let mut rec: serde_json::Value =
+        serde_json::from_slice(&s.read("changed/faster/run-0.host-run.json")).unwrap();
+    rec["recorded_at_ms"] = serde_json::json!(5);
+    s.write(
+        "changed/faster/run-0.host-run.json",
+        &serde_json::to_vec(&rec).unwrap(),
+    );
+    let out = select(&s, "changed", "changed.json").expect(12, "unknown");
+    assert!(out.to_string().contains("reconcile"), "{out}");
+}
+
+#[test]
+fn host_and_rustev_documents_are_never_mixed() {
+    let s = Scratch::new("host-mixed");
+    record_baseline(&s);
+    write_gate(&s);
+    // Rustev-evaluated documents, refused by schema before any parse.
+    s.write("rustev-baseline.json", br#"{"schema":"rustev.baseline/1"}"#);
+    s.write(
+        "rustev/repeat.json",
+        br#"{"schema":"rustev.repeat-report/1"}"#,
+    );
+    s.write(
+        "rustev-cands/a/repeat.json",
+        br#"{"schema":"rustev.repeat-report/1"}"#,
+    );
+    imported(&s, "host-cands/a", &candidate(|c| c.latency_base = 500));
+    let mixed = |args: &[&str]| {
+        let r = s.rustev(args);
+        let out = r.expect(4, "invalid_input");
+        assert!(out.to_string().contains("mixed-provenance"), "{out}");
+    };
+    // A host baseline with Rustev candidates, and the reverse.
+    let sel = |b: &str, be: &str, c: &str| {
+        mixed(&[
+            "gate",
+            "select",
+            "--selection-gate",
+            "gate.json",
+            "--baseline",
+            b,
+            "--baseline-eval",
+            be,
+            "--candidates",
+            c,
+            "--out",
+            "sel.json",
+        ])
+    };
+    sel("baseline.json", "base", "rustev-cands");
+    sel("rustev-baseline.json", "rustev", "host-cands");
+    // A Rustev baseline where a host baseline is expected.
+    sel("rustev-baseline.json", "base", "host-cands");
+    assert!(!s.exists("sel.json"));
+    mixed(&[
+        "eval",
+        "reproducibility",
+        "--baseline",
+        "baseline.json",
+        "--baseline-eval",
+        "base",
+        "--run",
+        "rustev",
+    ]);
+    mixed(&[
+        "eval",
+        "reproducibility",
+        "--baseline",
+        "rustev-baseline.json",
+        "--baseline-eval",
+        "base",
+        "--run",
+        "base",
+    ]);
+    s.write("halfway/repeat.json", &s.read("base/repeat.json"));
+    s.write(
+        "halfway/run-0.cases.json",
+        br#"{"schema":"rustev.eval-cases/1"}"#,
+    );
+    mixed(&[
+        "baseline", "record", "--name", "x", "--eval", "halfway", "--now-ms", "0", "--out",
+        "x.json",
+    ]);
+    assert!(!s.exists("x.json"));
+    // `eval diff` refuses a host document by schema.
+    std::fs::create_dir(s.path("diff")).unwrap();
+    s.rustev(&[
+        "eval",
+        "diff",
+        "--baseline",
+        "baseline.json",
+        "--baseline-eval",
+        "base",
+        "--run",
+        "base",
+        "--out",
+        "diff",
+    ])
+    .expect(4, "invalid_input");
 }
