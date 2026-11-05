@@ -529,6 +529,33 @@ arranged as a `captured` set, an N = 1 `k_sd` band unknown, the section
 below-minimum slice, a held-out set, and re-assembly), and every
 existing spec 029 eval test, unchanged, for the moved loop.
 
+**Increment 3 (2026-11-03): `rustev eval repeat import`.**
+`crates/rustev-cli/src/host_sets.rs` reads `--repeat-config`, `--config`
+and each `--run` directory (`host-run.json`; `views.json`, whose absence
+the library refuses as `host-binding`; and every regular file of
+`scores/` in byte order of its name, at most 16), hands them to
+`host_repeat::import`, and writes the import output of 3.2.5 all or
+none through spec 029's staged, no-clobber publication: the two
+configurations in canonical form, per run byte copies of the record,
+views and scores (`run-<r>.scores-<scorer>.json`), its
+`rustev.host-cases/1`, and `repeat.json`. A refusal is `invalid_input`
+naming the run directory and code. Stdout is `imported` with the
+report's digest, N, `assertion: "host-asserted"` and per cohort each
+metric's `pooled`, interval and band, each with `assertion:
+"host-asserted"`, its observation and unit. `args.rs` declares the
+command path (matched before `eval`, 029 3.13) and the help text lists
+it; `repeat.rs` makes its session, directory listing and publication
+helpers crate-visible, unchanged. In the library, a pooled figure that is
+unknown because of one case now names the run and case as well (`run 1:
+case c2: ...`). Decision within the spec: the host goldens live under
+`crates/rustev-cli/tests/golden/host/`, outside the conformance suite's
+harvested top-level goldens, since no binding surface runs host
+commands (3.10). Tests: `crates/rustev-cli/tests/host_sets.rs`, with the
+import goldens over the three-run fixture (stdout, the host repeat
+report and a host-cases document), byte copies, untouched inputs,
+re-assembly over the written output, no clobber, the refusal rows of
+section 5 through the CLI with nothing written, and the command path.
+
 ## Decisions at approval
 
 Decided in this text, with the reason beside each: separate host schema

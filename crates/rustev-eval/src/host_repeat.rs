@@ -406,7 +406,7 @@ fn host_cohort(
                 sd,
                 min,
                 max,
-                pooled,
+                mut pooled,
                 interval,
                 band,
                 ..
@@ -422,6 +422,18 @@ fn host_cohort(
                 {
                     *figure = FigureDoc::Unknown(why);
                 }
+            }
+            // The pooled figure names the first run and case too.
+            if let FigureDoc::Unknown(_) = pooled
+                && !not_declared
+                && let Some(why) = (0..runs.len()).find_map(|r| {
+                    Some(format!(
+                        "run {r}: {}",
+                        first_unknown(cases, r, &members, &name)?
+                    ))
+                })
+            {
+                pooled = FigureDoc::Unknown(why);
             }
             HostMetricReport {
                 observation: observed(&name).then_some(HostObservation::Host),

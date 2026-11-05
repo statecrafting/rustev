@@ -76,7 +76,7 @@
       }
     ],
     "sectionDigests": {
-      "061-host-scored-repeat-sets-for-the-selection-gate-amends-029-and-041": "02d66c88a0efaa7f0a05838741e8c431592df6410b76b77ad092a65e9508e827",
+      "061-host-scored-repeat-sets-for-the-selection-gate-amends-029-and-041": "79f0a7df3dda3b23b895abf8388f89cac7e2f394fcfe8af1fd00ad02c1d6313c",
       "1-purpose": "e0e945acfb149dd3823a4e0cdd70f3833c1dadd08482a4c3f1730be68a88bb95",
       "2-1-binding-principles": "fef8a7d588d20a51b226a36b2ca83239449dafec22cc2b9c2534682596ce17ae",
       "2-territory": "5838886673898938359c85b02bd20efad963b0563751f0ef620f4613d578520b",
@@ -95,7 +95,7 @@
       "5-observable-negative-cases": "7c1307b592cf9ca928a1bd2fa0d4ee3e3061d0a2ce86ecd490c8ca2f0c190b4d",
       "acceptance": "ec4bf9213fa93afddf3b3eaf4cb4a28de7277961d8f2dc6654b6307143fb21ca",
       "decisions-at-approval": "8a8d71a91897b90df809f4f67d7fcb888bdca1d7699c380b8148c5b1481bc3dd",
-      "implementation-record": "9abf4cf47170c8ebcaa71b2c02653ae07838e8d9fd36e2092b87db1777ac222c",
+      "implementation-record": "10cadf5da3a2b31685732ad8ae8c1dc0bdbb338f0cb79eba771dea21614fa3ff",
       "verification": "fa130e8566775681fc7afdf639cc0d96f97b7d78717fac592702a1819a399e21"
     },
     "sectionHeadings": [
@@ -126,6 +126,6 @@
     "summary": "A proposed amendment of approved specs 029 and 041 (and of spec 006's command table through 029 3.13), for release 0.4.1. Today `rustev gate select` reads only repeat sets Rustev evaluated itself: every run is a spec 004 evaluation of a Rustev plan over a Rustev dataset manifest. A host whose baseline and candidate runs execute in its own runtime, and whose outputs are scored through `scoreViews` into `rustev.scores/1`, has no supported way in. This spec adds a host run record (`rustev.host-run/1`) carrying host dataset, flow, version and run identities with per-case outcomes, latency and cost; an import command, `rustev eval repeat import`, that verifies the host's views and scores and builds a host repeat set with spec 029's statistics; a host baseline; and selection over host sets. Host documents have their own schema names, so no existing document changes bytes or meaning and a host set can never be compared with a Rustev-evaluated one. Every figure is labeled host-asserted. Ratified (A-77) for release 0.4.1.\n",
     "title": "Host-scored repeat sets for the selection gate (amends 029 and 041)"
   },
-  "shardHash": "bc1eb011baca8f1461d90b9285f03ac9482b798a105d97410a21366485475428",
+  "shardHash": "a195c10306966a96eb2fe79f82bfd86420157e3f9d5271e6a0e32f1170cd5fe9",
   "specVersion": "1.10.0"
 }

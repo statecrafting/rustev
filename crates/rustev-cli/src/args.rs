@@ -71,6 +71,12 @@ pub const COMMANDS: &[CommandSpec] = &[
         flags: flags!("name": One, "eval": One, "now-ms": One, "out": One),
         required: &["name", "eval", "now-ms", "out"],
     },
+    // Spec 061, 3.2: a host repeat set from host run records.
+    CommandSpec {
+        path: &["eval", "repeat", "import"],
+        flags: flags!("repeat-config": One, "config": One, "run": Many, "out": One),
+        required: &["repeat-config", "config", "run", "out"],
+    },
     CommandSpec {
         path: &["eval", "reproducibility"],
         flags: flags!("baseline": One, "baseline-eval": One, "run": One),
@@ -484,6 +490,7 @@ rustev: compile, inspect, run, replay and evaluate Rustev decision plans.
   rustev eval judge   --config F --views F --judge-plan F [--descriptor F]... [--rules F]...
                       [--calibration F]... --bundles DIR --scorer ID
                       --now-ms MS|system SCOPE --out F [--store DIR] [--host-cap-ms N]
+  rustev eval repeat import --repeat-config F --config F --run DIR... --out DIR
   rustev baseline record --name NAME --eval DIR --now-ms MS|system --out F
   rustev eval reproducibility --baseline F --baseline-eval DIR --run DIR
   rustev eval diff    --baseline F --baseline-eval DIR --run DIR --out DIR
