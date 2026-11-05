@@ -622,6 +622,21 @@ states for each reference plan): anything keyed by a PlanId, such as
 evaluation baselines, ledgers and cache keys, must be re-derived with
 0.4.0 when upgrading.
 
+**The 0.4.1 version move (2026-11-05).** The owner decided on 2026-11-03
+that 0.4.1 ships spec 061 (host-scored repeat sets, complete) and #362
+(replay bundle fixtures harvested on the manual clock), and authorized
+its tag on 2026-11-04. It is a patch step: every change since 0.4.0 adds
+API, so `cargo semver-checks` against 0.4.0 must pass. Every release-set
+crate and npm package moves from `0.4.0` to `0.4.1` in lockstep, in the
+same sites as the 0.4.0 move, and every fixture carrying a PlanId is
+regenerated through the same bless and harvest paths, with the
+`rustev-serve` Sigstore fixture re-signed with its throwaway keys. No
+behavior changes. For consumers, the move changes every PlanId from 0.4.0
+to 0.4.1, even for an unchanged definition (031 3.6.4, which the 0.4.1
+changelog states for each reference plan): anything keyed by a PlanId,
+such as evaluation baselines, ledgers and cache keys, must be re-derived
+with 0.4.1 when upgrading.
+
 ## Open questions for the owner
 
 Settled at ratification (A-61): the `release` Environment has no
