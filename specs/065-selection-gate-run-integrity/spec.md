@@ -1,12 +1,12 @@
 ---
 id: "065-selection-gate-run-integrity"
 title: "Selection gate: run integrity failures void the comparison instead of rejecting (amends 029 and 061)"
-status: draft
+status: approved
 implementation: pending
 created: "2026-11-06"
 summary: >
-  A proposed amendment of approved specs 029 (3.12) and 061 (3.7), for
-  release 0.5.1 (#538). A run with integrity failures (results the
+  An amendment of approved specs 029 (3.12) and 061 (3.7), for release
+  0.5.1 (#538), ratified by the owner on 2026-11-06 (A-84). A run with integrity failures (results the
   evaluator could not score, cases a backend or source failed on) is not a
   measurement, yet today it can only lower coverage and reject the
   candidate, which reads as a verdict about the candidate when the run is
@@ -21,6 +21,13 @@ summary: >
 amends:
   - "029-evaluation-repeatability"
   - "061-host-scored-repeat-sets"
+extends:
+  # The gate member, the counts and the precondition in the shared selection code.
+  - { spec: "004-evaluation-and-replay", unit: { kind: directory, path: "crates/rustev-eval/" }, nature: amending }
+  # `gate select` prints the integrity results; no new flag.
+  - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: amending }
+  # One CLI conformance case for a void candidate.
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "tools/rustev-conformance/" }, nature: additive }
 depends_on:
   - "002-decision-contract-and-pure-core"
   - "004-evaluation-and-replay"
@@ -49,9 +56,9 @@ obligations:
 
 # 065: Selection gate: run integrity failures void the comparison instead of rejecting (amends 029 and 061)
 
-Draft: a proposal for release 0.5.1, never a claim about code.
-Ratification is the owner's act. The approved texts of 029 and 061 are
-not edited; this spec records what it adds to them.
+Approved: ratified by the owner on 2026-11-06 (A-84) for release 0.5.1;
+the implementation is pending. The approved texts of 029 and 061 are not
+edited; this spec records what it adds to them.
 
 ## 1. Purpose
 
@@ -72,9 +79,8 @@ ones (029 3.12.5). The host keeps this check outside Rustev today.
 This spec makes integrity a declared precondition. A precondition is
 evaluated before coverage and clauses, and a failed one already makes a
 candidate `unknown` with every clause unknown (029 3.12.2), which is what
-"void" means: no statement about the candidate is made. Whether the
-selection should also name this outcome with a fourth verdict is open
-question 1.
+"void" means: no statement about the candidate is made. No fourth verdict
+is added: the outcome is `unknown` with an integrity reason (3.4).
 
 ## 2. Territory
 
@@ -86,15 +92,15 @@ flag; `gate select` stdout prints the integrity results. The conformance
 suite `tools/rustev-conformance/` (027): one CLI case for a void
 candidate.
 
-Edges proposed for ratification (none is declared by this draft):
-`crates/rustev-eval/` (004, amending), `crates/rustev-cli/` (006,
-amending), `tools/rustev-conformance/` (027, additive), and at completion
-`Makefile` and `scripts/acceptance/` (001, additive).
+Ratification added the `extends` edges to `crates/rustev-eval/` (004,
+amending), `crates/rustev-cli/` (006, amending) and
+`tools/rustev-conformance/` (027, additive); the edges to `Makefile` and
+`scripts/acceptance/` (001, additive) are added by the change that
+completes this spec.
 
 Unchanged: every plan, definition, `PlanId` and plan golden; every run,
 case, repeat, baseline and host document; the contract crate, its schemas
-and the generated binding types; exit codes (under the recommended answer
-to open question 1). No new dependency, no I/O in eval, no clock.
+and the generated binding types; exit codes. No new dependency, no I/O in eval, no clock.
 
 ### 2.1 Binding principles
 
@@ -139,7 +145,7 @@ output), after the binding preconditions of 029 3.12.2 or 061 3.7.4 hold.
    `judge_bundle_missing`, `judge_not_reproduced`, `subject_mismatch`,
    `scorer_failed` and `scorer_overloaded`), as the run's verified report
    counts them. The run's invalid count is the largest of these per-scorer
-   counts (open question 3). With `max_invalid` declared, a configuration
+   counts. With `max_invalid` declared, a configuration
    that declares no scorer, or a declared scorer whose metrics are unknown
    with `scores-missing`, makes the count unestablished
    (`invalid-uncountable`).
@@ -151,9 +157,9 @@ output), after the binding preconditions of 029 3.12.2 or 061 3.7.4 hold.
    `historical-runtime-failure` (spec 004 3.4.5). `budget_exhausted` is
    not counted: it reports a declared limit reached (002 3.10.3, 036's
    acquisition call and cost budgets), which the candidate's plan
-   determines (open question 4). A runtime failure that the plan's policy
+   determines. A runtime failure that the plan's policy
    handled (escalated, or read `as_unmet`) does not reach the outcome key
-   and is not counted here (open question 6).
+   and is not counted here.
 3. **Invalid results, host runs (amends 061).** For each declared scorer,
    the number of `answered` cases its scores document marks `unscored`;
    the run's count is the largest (as 3.2.1). A declared scorer with no
@@ -161,7 +167,7 @@ output), after the binding preconditions of 029 3.12.2 or 061 3.7.4 hold.
    unestablished.
 4. **Upstream failures, host runs (amends 061).** The number of cases
    whose outcome is `{ failed: reason }` in the run's host run record, for
-   any reason (open question 5). This is the numerator of
+   any reason. This is the numerator of
    `host/failed_rate` (061 3.3.3).
 5. A count that the verified documents do not determine, for any reason,
    is unestablished, and the run is treated as in breach (I-2).
@@ -226,8 +232,7 @@ nothing.
    without it.
 2. `rustev.selection/1` keeps its name: the integrity entries are
    written only when the gate declares `integrity`, so every selection
-   over a gate without it is byte-identical (R-1). Under open question 1's
-   alternative, a new verdict would change this.
+   over a gate without it is byte-identical (R-1).
 3. No plan construct changes, so no `PlanId` and no plan golden changes.
    Every existing eval, CLI, 029, 061 and conformance golden is
    byte-identical.
@@ -288,7 +293,7 @@ Pending with implementation.
 
 ## Implementation record
 
-None. Draft.
+None yet.
 
 ## Decisions at approval
 
@@ -299,39 +304,24 @@ in breach voids every candidate (3.3.3, the issue); bounds are per run on
 each side (3.1.3, the issue); a count equal to its bound holds (3.3.1, "at
 most"); coverage minimums keep rejecting when integrity holds (3.3.4).
 
-Open for the owner, each with a recommendation:
+Ratified by the owner on 2026-11-06 (A-84), with every question the
+draft left open answered as recommended:
 
-1. **Verdict.** `unknown` naming the breached run, with the `integrity`
-   reason codes and `void` printed on stdout (recommended: `unknown`
-   already never becomes qualifies, the exit code stays 12, and no
-   verdict, status or exit code is added to 029 3.14); or a fourth verdict
-   `void` with a new status `void` and a new exit code (14), which lets CI
-   tell "repeat the run" from other unknowns by exit code alone, but
-   changes `rustev.selection/1`'s verdict set and 029 3.14's table.
-2. **Document versions.** Keep `rustev.selection-gate/1` and
-   `rustev.selection/1`, with `integrity` and its entries written only
-   when declared (recommended, as spec 036 added optional members to
-   shared versions; an older reader refuses a new gate); or name `/2` of
-   both, which starts 031 3.6.2's support window for version 1. Under
-   question 1's `void`, `rustev.selection/2` is recommended.
-3. **Invalid count across scorers.** The largest per-scorer count
-   (recommended: computable from each run's verified report, which counts
-   unscored cases per scorer metric, with no new per-case member); or the
-   number of distinct cases any scorer left unscored, which needs a new
-   per-case member in `rustev.eval-cases/1`.
-4. **Which abstentions are upstream.** `backend_unavailable`,
+1. **Verdict.** A breach makes the candidate `unknown` naming the
+   breached run, with the integrity reason codes and `void: repeat the
+   run` on stdout; no fourth verdict, status or exit code (3.3.5, 3.4).
+2. **Document versions.** `rustev.selection-gate/1` and
+   `rustev.selection/1` keep their names; `integrity` and its entries are
+   written only when declared (3.6).
+3. **Invalid count across scorers.** The largest per-scorer unscored
+   count of the run (3.2.1, 3.2.3).
+4. **Upstream abstentions.** `backend_unavailable`,
    `invalid_backend_output` and `deadline_exceeded`, plus
-   `historical-runtime-failure` (recommended); or also
-   `budget_exhausted`, which the issue's "backend or source error" does
-   not cover and which a plan declares.
-5. **Host `failed` reasons.** Count every `failed` case (recommended for
-   0.5.1: the record's reason is host-asserted and not a closed set); or
-   add an optional `upstream_reasons: [reason]` to the gate so that only
-   listed reasons count and other failures stay flow outcomes gated
-   through `host/failed_rate`.
-6. **Failures the policy handled.** Count only failures visible in the
-   case's outcome key (recommended for 0.5.1: the key is already verified
-   and reconciled, 029 3.2.6); or count every failed backend or source
-   attempt in the retained run record, which also sees failures a policy
-   escalated or read `as_unmet`, at the cost of reading run records in
-   selection.
+   `historical-runtime-failure`; `budget_exhausted` is not counted
+   (3.2.2).
+5. **Host `failed` reasons.** Every `failed` case counts (3.2.4).
+6. **Failures the policy handled.** Only failures visible in the case's
+   outcome key count (3.2.2).
+7. **No declared scorer.** `max_invalid` under a configuration that
+   declares no scorer makes the count unestablished
+   (`invalid-uncountable`) and voids the comparison (3.2.1).
