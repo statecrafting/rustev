@@ -61,10 +61,22 @@ fn the_committed_exceptions_name_owner_rows_and_cover_their_findings() {
     let rows = decision_dates(DECISIONS);
     assert_eq!(rows.get("A-76").map(String::as_str), Some("2026-11-03"));
     // 060 3.2.1: each entry names a decision row that exists, at most 90
-    // days before its expiry (A-80, accept all 44 on the Debian 13 base).
-    assert_eq!(ex.exceptions.len(), 44);
+    // days before its expiry (A-80, accept all 44 on the Debian 13 base;
+    // A-82, CVE-2026-76844 in zlib1g, first reported in v0.5.0-rc.2).
+    assert_eq!(ex.exceptions.len(), 45);
+    assert_eq!(
+        ex.exceptions
+            .iter()
+            .filter(|e| e.decision == "A-80")
+            .count(),
+        44
+    );
     for e in &ex.exceptions {
-        assert_eq!(e.decision, "A-80", "{}", e.id);
+        assert!(
+            e.decision == "A-80" || (e.decision == "A-82" && e.id == "CVE-2026-76844"),
+            "{}",
+            e.id
+        );
         assert!(
             rows.contains_key(&e.decision),
             "{}: no row {}",
@@ -80,9 +92,9 @@ fn the_committed_exceptions_name_owner_rows_and_cover_their_findings() {
         .flat_map(|e| ["linux/amd64", "linux/arm64"].map(|p| finding(p, &e.id, &e.package)))
         .collect();
     assert!(
-        check(&ex, &rows, &found, "2026-11-03").is_empty(),
+        check(&ex, &rows, &found, "2026-11-06").is_empty(),
         "{:?}",
-        check(&ex, &rows, &found, "2026-11-03")
+        check(&ex, &rows, &found, "2026-11-06")
     );
     assert!(check(&ex, &rows, &found, "2027-02-01").is_empty());
     // The day after, every entry has expired and nothing is covered.
@@ -91,10 +103,10 @@ fn the_committed_exceptions_name_owner_rows_and_cover_their_findings() {
         v.iter()
             .filter(|m| m.contains("expired on 2027-02-01"))
             .count(),
-        44
+        45
     );
     // An empty scan leaves every entry unused.
-    assert_eq!(check(&ex, &rows, &[], "2026-11-03").len(), 44);
+    assert_eq!(check(&ex, &rows, &[], "2026-11-06").len(), 45);
 }
 
 #[test]
