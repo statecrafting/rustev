@@ -663,7 +663,11 @@ pub fn run(case: &RuntimeCase, inputs: &Inputs) -> Result<Outputs, String> {
                         .unwrap(),
                     created_at_ms: settings.created_at_ms,
                 };
-                for (name, bytes) in crate::capture::outputs(&input, &settings.retain[id])? {
+                for (name, bytes) in crate::capture::outputs_with_sources(
+                    &input,
+                    &settings.retain[id],
+                    &source_descriptors,
+                )? {
                     out.insert(format!("{id}.{name}"), bytes);
                 }
             }

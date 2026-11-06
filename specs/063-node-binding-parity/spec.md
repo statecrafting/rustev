@@ -837,6 +837,13 @@ host cannot panic the runtime), and in `runtime.acquire-window` the source
 never answers, so both runners record `not_observed`, since a host's
 cancellation answer crosses threads and cannot be ready when the runtime
 polls once (the reason `runtime.cancel-stop` excludes `native`).
+Increment 1's acquisition coverage, which runs through increment 3's
+source seam, is the case
+`runtime.capture-replay-acquire` (`rust-api`, `native`, identical bytes),
+beside `runtime.capture-replay` because a case holds one plan: five
+acquisitions, two of them paged, captured embedded and external with the
+plan's source descriptors (`capture::outputs_with_sources`), and replayed
+`reproduced` from the seven captured pages with no source call.
 
 **Increment 4, 2026-11-06 (3.4, 3.6, 3.7, store and invalidation).**
 `EngineOptions.store` installs the host store with `RuntimeBuilder::store`
