@@ -449,6 +449,12 @@ class Engine {
    * blocking pool (3.5.2); given `plan` instead, load that compiled plan
    * against the descriptors and calibrations, as the CLI's `run` does. */
   async compile({ definition, plan, descriptors = [], calibrations = [], sources }) {
+    const profiled = profileInputs(arguments[0]);
+    if (profiled) {
+      try {
+        return new PlanHandle(this, await natives.get(this).prepareProfileAsync(profiled.inputs, profiled.args));
+      } catch (e) { throw typed(e); }
+    }
     // Refused here, as `compileSync` refuses it, before any native call.
     if ((definition == null) === (plan == null)) {
       throw new classes.InvalidDocument('invalid_document', 'compile takes exactly one of a definition and a plan');
@@ -470,6 +476,8 @@ class Engine {
   /** `compile` on the calling thread: blocking, bounded by the same parse
    * limits (3.5.2). */
   compileSync({ definition, plan, descriptors = [], calibrations = [], sources }) {
+    const profiled = profileInputs(arguments[0]);
+    if (profiled) return wrap(() => new PlanHandle(this, natives.get(this).prepareProfile(profiled.inputs, profiled.args)));
     return wrap(() => {
       if ((definition == null) === (plan == null)) {
         throw new classes.InvalidDocument('invalid_document', 'compile takes exactly one of a definition and a plan');
@@ -498,6 +506,15 @@ class Engine {
   /** A pure command on the calling thread (blocking). */
   commandSync(name, inputs, args) {
     return wrap(() => natives.get(this).command(name, named(inputs), args));
+  }
+
+  /** `profile check` (pure, synchronous) and `plan diff` (blocking pool),
+   * through `profile::check` and `plan_diff::diff` (063 3.3). */
+  profileCheck(inputs, args) {
+    return this.commandSync('profileCheck', inputs, args);
+  }
+  planDiff(inputs, args) {
+    return this.command('planDiff', inputs, args);
   }
 
   /** `plan check` and `plan show`: pure, synchronous (3.3). */
@@ -791,3 +808,34 @@ module.exports = {
   version: native.version,
   ...classes,
 };
+
+// Spec 063: usage is checked before serializing any supplied document.
+function profileInputs(a) {
+  const has = k => a[k] !== undefined && a[k] !== null;
+  const invalid = field => { throw new classes.InvalidDocument('invalid_document', field); };
+  if (has('definition') && has('definitions')) invalid('definitions with definition');
+  const withPlan = ['definitions', 'profile', 'profileBases', 'variant', 'definitionVersion'].find(has);
+  if (has('plan') && withPlan) invalid(`plan with ${withPlan}`);
+  if (!has('profile')) {
+    for (const k of ['profileBases', 'definitionVersion']) if (has(k)) invalid(k);
+    if (Array.isArray(a.definitions) && a.definitions.length > 1) invalid('definitions requires profile');
+  }
+  for (const k of ['definitions', 'profileBases']) {
+    if (has(k) && (!Array.isArray(a[k]) || a[k].length < 1 || a[k].length > 64)) invalid(k);
+  }
+  for (const k of ['variant', 'definitionVersion']) if (has(k) && typeof a[k] !== 'string') invalid(k);
+  if (has('plan')) return null;
+  if (!has('definition') && !has('definitions')) invalid('definition or definitions required');
+  const inputs = {}, args = {};
+  for (const k of ['definition', 'profile', 'execution']) {
+    if (has(k)) { inputs[k] = bytes(a[k]); args[k] = k; }
+  }
+  for (const k of ['definitions', 'profileBases', 'descriptors', 'calibrations', 'sources']) {
+    if (has(k)) {
+      if (!Array.isArray(a[k])) invalid(k);
+      args[k] = a[k].map((d, i) => { const key = `${k}/${i}`; inputs[key] = bytes(d); return key; });
+    }
+  }
+  for (const k of ['variant', 'definitionVersion']) if (has(k)) args[k] = a[k];
+  return { inputs, args };
+}

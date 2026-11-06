@@ -111,6 +111,9 @@ fn rules_hook(
 }
 
 pub fn run(name: &str, inputs: BTreeMap<String, Vec<u8>>, a: &Json) -> Result<CommandResult> {
+    if matches!(name, "check" | "compile" | "profileCheck" | "planDiff") {
+        return crate::profile::command(name, inputs, a);
+    }
     let host = Memory::new(inputs);
     let descriptors = list(a, "descriptors")?;
     let rules = list(a, "rules")?;
@@ -287,4 +290,12 @@ pub fn explain(
             markdown: result.markdown,
         })
     })
+}
+
+// Additive visibility bridge for the profile command renderer.
+pub(crate) fn profile_rules_hook(
+    name: &str,
+    bytes: &[u8],
+) -> std::result::Result<rustev_contract::descriptor::BackendDescriptor, String> {
+    rules_hook(name, bytes)
 }

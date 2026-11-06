@@ -771,6 +771,30 @@ digest-only reason in 3.8.3 and section 5 now names 004's `missing` for an
 item, as replay has always reported, and 036's `content-not-retained` only
 for an acquisition page; no behavior changed.
 
+**Increment 2, 2026-11-05 (3.2, 3.3, profiles and variants).** `compile`
+and `compileSync` take `definitions`, `execution`, `profile`,
+`profileBases`, `variant` and `definitionVersion`
+(`integrations/rustev-node/src/profile.rs`, `index.d.ts`, `index.js`):
+3.2.2's usage rules throw `InvalidDocument` naming the field before any
+document is serialized or parsed; a version 2 template or an
+instantiation field compiles through `compile_profiled_with`, anything
+else through `compile_with_sources`, so `execution` now reaches a plan
+with a persistent tier. An instantiation refusal is `CompileRefusal` with
+the 034 code in snake case and the surface's `stage`, `code`, `subject`
+and `detail`; a later compile refusal keeps its category code with
+`stage: "compile"` and `parameters` (3.10). `command('check' | 'compile')`
+routes through `plan_command`; `profileCheck` and `planDiff` call
+`profile::check` and `plan_diff::diff` and join `command`, with 034
+3.14.4's checks (a) to (d) in order. The declarations are written by hand
+(3.11). `test/profile.test.mjs` covers each usage rule, both refusal
+kinds with their detail objects, `PlanId` and plan bytes equal to `rustev
+plan compile`'s, `execution` reaching a persistent tier (refused
+`store_missing` at prepare without a store), base chains and version pins,
+and both commands' happy and refusal paths. The 23 `parameterized.*`
+cases run on `cli` and `native` with unchanged expected bytes (3.13.1);
+only `manifest.json` was re-blessed. `sources` (increment 3a) reach both
+compile paths, profiled or not.
+
 **Increment 3a, 2026-11-06 (3.5.2, sources on compile and load).**
 `compile` and `compileSync` take `sources` (`integrations/rustev-node/src/source.rs`,
 `index.d.ts`, `index.js`): a definition compiles through
