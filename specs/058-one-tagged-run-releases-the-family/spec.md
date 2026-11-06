@@ -637,6 +637,26 @@ changelog states for each reference plan): anything keyed by a PlanId,
 such as evaluation baselines, ledgers and cache keys, must be re-derived
 with 0.4.1 when upgrading.
 
+**The 0.5.0 version move (2026-11-06).** The owner set release 0.5.0 as
+the sprint goal on 2026-11-05, within the approval of 2026-11-03 extended
+through the final release. The move lands ahead of the 0.5.0 feature
+freeze because 031 3.8's npm declaration check classes a new required
+member of the Node binding's `Engine` (spec 063's `planDiff` and
+`profileCheck`, among others) as breaking, and refuses it until the
+version moves to the breaking position over the 0.4.1 baseline; before
+1.0 that is the minor number. It is therefore a breaking-position step:
+every release-set crate and npm package moves from `0.4.1` to `0.5.0` in
+lockstep, in the same sites as the 0.4.1 move, and every fixture carrying
+a PlanId is regenerated through the same bless and harvest paths, with
+the `rustev-serve` Sigstore fixture re-signed with its throwaway keys. The
+move itself changes no behavior. For consumers, every PlanId changes from
+0.4.1 to 0.5.0, even for an unchanged definition (031 3.6.4, which the
+0.5.0 changelog states for each reference plan): anything keyed by a
+PlanId, such as evaluation baselines, ledgers and cache keys, must be
+re-derived with 0.5.0 when upgrading. The npm `Engine` gains required
+members over 0.4.1 (031 3.8), so a TypeScript type that implements or
+mocks `Engine` must add them.
+
 ## Open questions for the owner
 
 Settled at ratification (A-61): the `release` Environment has no
