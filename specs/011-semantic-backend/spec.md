@@ -825,6 +825,9 @@ cargo test -p rustev-backend-embed-linear --locked --test feasibility_record
 # local-embed conformance case through the Rust API.
 cargo test -p rustev-backend-embed-linear --locked --test bundle
 cargo test -p rustev-backend-embed-linear --locked --lib
+# Offline: no source file of the crate names a network API, and its
+# manifest declares no network client, model hub or download feature.
+cargo test -p rustev-backend-embed-linear --locked --test offline
 # 3.18: the boundary check's rule unit tests, then the real workspace (no
 # local inference family outside this crate, no hf-hub or download feature).
 cargo test -p rustev-boundaries --locked
@@ -1240,8 +1243,15 @@ two keys and for each changed setting; through setup, an `onnx` bundle
 with a cache and unmeasured settings is `cache_not_equivalent` with no
 runtime on the qualified target and `unqualified_platform` elsewhere; and
 this target's own decision follows the record. A real bundle with the
-cache on was not run. `## Verification` now declares the crate's default
-tests and the boundary check, and `011` is in `make verify`.
+cache on was not run. `tests/offline.rs` asserts the Offline item's
+absence of network access: no source file under `src/` names a network
+API or client (`std::net`, its socket types, `tokio::net`, `hyper`,
+`reqwest`, `ureq`, `curl`, `hf_hub`, or a URL), and the crate's
+`Cargo.toml` declares no network client, `tokio`, `hf-hub` or download
+feature, with `ort` loading dynamically; `make boundaries` still checks
+the resolved graph. `## Verification` now declares the crate's default
+tests, the offline test and the boundary check, and `011` is in
+`make verify`.
 `implementation` stays `pending`: the Node binding is not yet built with
 `local-embed` on every spec 027 native matrix target in CI (only the two
 Linux GNU keys in the measurement run and `darwin-arm64` by hand), and the
