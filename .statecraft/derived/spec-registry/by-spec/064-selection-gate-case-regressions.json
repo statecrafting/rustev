@@ -14,6 +14,32 @@
       "061-host-scored-repeat-sets",
       "063-node-binding-parity"
     ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "004-evaluation-and-replay",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-eval/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "006-cli-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-cli/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "027-node-and-wasm-bindings",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-conformance/"
+        }
+      }
+    ],
     "id": "064-selection-gate-case-regressions",
     "implementation": "pending",
     "obligations": [
@@ -46,23 +72,23 @@
       }
     ],
     "sectionDigests": {
-      "064-selection-gate-a-clause-on-per-case-regressions-against-the-baseline-amends-029-and-061": "489c79c0e61725e4c6fa1856aac2a070b7e53d50593b3122f7ae6a3871c02dbb",
+      "064-selection-gate-a-clause-on-per-case-regressions-against-the-baseline-amends-029-and-061": "29146c99172ce2e93e4a813e6c2b4f985127df1bcd7cd17e82694eb9e8f55706",
       "1-purpose": "1c4f3057bea220ff992063b48e440131066d9a92e957ab51cdf13e8ef76e36e7",
       "2-1-binding-principles": "4b763b68254ab4a95cfefd7667dcc85c9b6f710523d02582ebb21b9891a815f2",
-      "2-territory": "cea2f6286eea6356d73c1491f362afc46a10867d9349b65c868edbec4335be99",
-      "3-1-the-clause": "d4b129772a2368eba06e72a2310bdb9c143492e972f74f672c0f090cb45049ae",
-      "3-2-the-per-case-value": "2e516a6558b8f64454bb03868954ff3bb5a6205204c0eb486316a6265677df49",
+      "2-territory": "6625940894eee99f38a7cbed108fdaa68e3d8a9169d6477788c9e8fbe15746a1",
+      "3-1-the-clause": "672ac9fbb2b98cf348a45abc33e47b7ad52874a868ce96f007ad44fb5d184532",
+      "3-2-the-per-case-value": "d7df36e4c567cefcf3beb0e5d5544e74bbe9a21974347c306c5ce0c0ace95a53",
       "3-3-regression-of-one-case": "932e3d7e7277e9d0424f42390312a925f351d46e3ad2eb0ffc8364e77b132df9",
       "3-4-clause-result": "5664549244643f79f418625d423efae31a19684e6248e64841998a067f9dd6cb",
       "3-5-output": "c7a155e0d320794c628db4e37e664bf3345ea0dce2bb5e94b4cd62b4cb065697",
       "3-6-host-sets-amends-061": "9e25b5e93d6383e8b7abc5253d8c8c568a36a596cb646e0898c841a50b351701",
-      "3-7-compatibility": "8035a45478218972bdeb20f249b6343594db669b1bf9c1cef7b566a4704bbd4d",
-      "3-behavior": "2bff1879bd27adb2185f8ff32d89b912dbe747cc4bb12618a367955bd26db64e",
+      "3-7-compatibility": "2ccb2dbc83efc5c71decdcc459f7adf18dba7bbb28136a1cbab2b9d0cfeb8e65",
+      "3-behavior": "56b54afba5ee1b6c3d0ff1eb5fb10287458f3781d06b6019d22e63dd374ea8ed",
       "4-out-of-scope": "e3605202e83d0fc4c17b89773271aa5200223541f0993c65ff7648f3cdd0a497",
       "5-observable-negative-cases": "d8f6be3de79d5736175e31fa5c66205da6e616efe78aa547daba097021191663",
       "acceptance": "a6ee4f0e4991a0ea030e5dca07719f3a20c49a3393f6633dda786336d8c821a5",
-      "decisions-at-approval": "de4af0ed231b4ef8a1d095d72e877d8db758b6199c1f3a8518a44db1cf7609cc",
-      "implementation-record": "44ee58b9bede8fc5c77c3e104eab1a16492087c704443fbc0131acd08aae3cb0",
+      "decisions-at-approval": "375f699feca321708ef5f383aa3b6fb9e57f4849a89aceff18a4e6227b4b87b2",
+      "implementation-record": "1e7e93457faa884418b7e947d20aef4114599bc8e359edfb667d98072651e104",
       "verification": "c7ac0201edeadf0f18ae020513901cbdc70dafde13de774915fe601b43d5355a"
     },
     "sectionHeadings": [
@@ -86,10 +112,10 @@
       "Decisions at approval"
     ],
     "specPath": "specs/064-selection-gate-case-regressions/spec.md",
-    "status": "draft",
-    "summary": "A proposed amendment of approved specs 029 (3.12) and 061 (3.7), for release 0.5.1 (#537). Every selection clause today compares `pooled` values of the cohort `all` or of each slice, so a candidate that improves most cases and collapses on a few passes `not_worse_than`. This spec adds one clause to `rustev.selection-gate/1`, `case_regressions`, which counts the dataset cases whose candidate value is worse than their baseline value by at least a declared absolute amount, in the metric's declared direction, and fails when more than a declared number regress. A case's value is 029 3.3.3's `pooled` computation restricted to that case, read from the per-case documents the baseline and each candidate already bind (`rustev.eval-cases/1`, or 061's `rustev.host-cases/1`), so no baseline document changes. The boundary is compared in exact decimal; a missing, partial or unknown case value makes the clause unknown, never a pass; `rustev.selection/1` lists the regressing cases. Gates and selections that do not use the clause keep their bytes and identities.\n",
+    "status": "approved",
+    "summary": "An amendment of approved specs 029 (3.12) and 061 (3.7), for release 0.5.1 (#537), ratified by the owner on 2026-11-06 (A-83). Every selection clause today compares `pooled` values of the cohort `all` or of each slice, so a candidate that improves most cases and collapses on a few passes `not_worse_than`. This spec adds one clause to `rustev.selection-gate/1`, `case_regressions`, which counts the dataset cases whose candidate value is worse than their baseline value by at least a declared absolute amount, in the metric's declared direction, and fails when more than a declared number regress. A case's value is 029 3.3.3's `pooled` computation restricted to that case, read from the per-case documents the baseline and each candidate already bind (`rustev.eval-cases/1`, or 061's `rustev.host-cases/1`), so no baseline document changes. The boundary is compared in exact decimal; a missing, partial or unknown case value makes the clause unknown, never a pass; `rustev.selection/1` lists the regressing cases. Gates and selections that do not use the clause keep their bytes and identities.\n",
     "title": "Selection gate: a clause on per-case regressions against the baseline (amends 029 and 061)"
   },
-  "shardHash": "dd7e23b8278b20cfe69eee4262886bb6d34385df642d07b54b5188cdaf5d855e",
+  "shardHash": "6ed56e771ee3049f580118ef695454e4c733a241faa0ae3afa9ab9168e133f6a",
   "specVersion": "1.11.0"
 }

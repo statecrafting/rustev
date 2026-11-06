@@ -1,12 +1,12 @@
 ---
 id: "064-selection-gate-case-regressions"
 title: "Selection gate: a clause on per-case regressions against the baseline (amends 029 and 061)"
-status: draft
+status: approved
 implementation: pending
 created: "2026-11-06"
 summary: >
-  A proposed amendment of approved specs 029 (3.12) and 061 (3.7), for
-  release 0.5.1 (#537). Every selection clause today compares `pooled`
+  An amendment of approved specs 029 (3.12) and 061 (3.7), for release
+  0.5.1 (#537), ratified by the owner on 2026-11-06 (A-83). Every selection clause today compares `pooled`
   values of the cohort `all` or of each slice, so a candidate that improves
   most cases and collapses on a few passes `not_worse_than`. This spec adds
   one clause to `rustev.selection-gate/1`, `case_regressions`, which counts
@@ -23,6 +23,13 @@ summary: >
 amends:
   - "029-evaluation-repeatability"
   - "061-host-scored-repeat-sets"
+extends:
+  # The clause, its check and evaluation in the shared selection code.
+  - { spec: "004-evaluation-and-replay", unit: { kind: directory, path: "crates/rustev-eval/" }, nature: amending }
+  # `gate select` prints the clause result; no new flag.
+  - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: amending }
+  # One CLI conformance case for the clause.
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "tools/rustev-conformance/" }, nature: additive }
 depends_on:
   - "004-evaluation-and-replay"
   - "006-cli-surface"
@@ -50,9 +57,9 @@ obligations:
 
 # 064: Selection gate: a clause on per-case regressions against the baseline (amends 029 and 061)
 
-Draft: a proposal for release 0.5.1, never a claim about code.
-Ratification is the owner's act. The approved texts of 029 and 061 are
-not edited; this spec records what it adds to them.
+Approved: ratified by the owner on 2026-11-06 (A-83) for release 0.5.1;
+the implementation is pending. The approved texts of 029 and 061 are not
+edited; this spec records what it adds to them.
 
 ## 1. Purpose
 
@@ -82,10 +89,11 @@ selection code that 029's and 061's selections share. The CLI
 stdout of `gate select` prints the new clause result. The conformance
 suite `tools/rustev-conformance/` (027): one CLI case for the clause.
 
-Edges proposed for ratification (none is declared by this draft):
-`crates/rustev-eval/` (004, amending), `crates/rustev-cli/` (006,
-amending), `tools/rustev-conformance/` (027, additive), and at completion
-`Makefile` and `scripts/acceptance/` (001, additive).
+Ratification added the `extends` edges to `crates/rustev-eval/` (004,
+amending), `crates/rustev-cli/` (006, amending) and
+`tools/rustev-conformance/` (027, additive); the edges to `Makefile` and
+`scripts/acceptance/` (001, additive) are added by the change that
+completes this spec.
 
 Unchanged: every plan, definition, `PlanId` and plan golden;
 `rustev.repeat-config/1`, `rustev.eval-cases/1`, `rustev.host-cases/1`,
@@ -126,7 +134,7 @@ I/O in eval, no clock.
    to 1 000 000. Unknown fields and duplicate keys are refused, as for the
    rest of the document. A `case_regressions` clause may appear in
    `require` and in `and_any`; it is refused inside `all_slices`
-   (`invalid_input`, `case-regressions-in-slices`; open question 3).
+   (`invalid_input`, `case-regressions-in-slices`).
 3. `by` is wrapped (`{ absolute: ... }`) so that a relative amount can be
    added later without changing this form; no other wrapping is accepted
    here.
@@ -148,8 +156,7 @@ I/O in eval, no clock.
    (`latency_ms/*`, `queue_ms/*`, `host/latency_ms/*`), a total, or a
    metric with no per-case measure (029 3.2.3, `not-case-decomposable`),
    the clause is unknown with reason `not-case-comparable`, naming the
-   metric. A quantile of one case's samples is not offered (open question
-   4).
+   metric. A quantile of one case's samples is not offered.
 4. **Presence.** A case is **measured** on a side when every run of that
    side holds a measure of the metric for it; **unmeasured** when no run
    does; **partial** otherwise. A case value is **unknown** when any of its
@@ -251,8 +258,7 @@ I/O in eval, no clock.
    it is refused by earlier releases (unknown field), never misread.
    `rustev.selection/1` keeps its name: `cases` is written only for this
    clause, so every selection over a gate without it is byte-identical
-   (R-1). Whether a new clause warrants new version names is open question
-   1.
+   (R-1). No new version name is introduced.
 2. No plan construct changes, so no `PlanId` and no plan golden changes.
    Every existing eval, CLI, spec 029, spec 061 and conformance golden is
    byte-identical.
@@ -320,7 +326,7 @@ Pending with implementation.
 
 ## Implementation record
 
-None. Draft.
+None yet.
 
 ## Decisions at approval
 
@@ -330,29 +336,20 @@ uses"); no baseline document changes, since baselines bind the case
 documents (section 1); a case worse by exactly `by` regresses (3.3.2);
 a definite failure dominates unresolved cases (3.4.1, 029's rule).
 
-Open for the owner, each with a recommendation:
+Ratified by the owner on 2026-11-06 (A-83), with every question the
+draft left open answered as recommended:
 
-1. **Document versions.** Keep `rustev.selection-gate/1` and
-   `rustev.selection/1`, with the new clause and the `cases` member
-   written only when used (recommended: existing documents keep bytes and
-   identities, and an older reader refuses a new gate instead of misreading
-   it, as spec 036 added optional members to shared track versions); or
-   name `rustev.selection-gate/2` and `rustev.selection/2`, which starts
-   031 3.6.2's support window for version 1.
-2. **Partial cases.** Unknown when a side lacks a measure in some of its
-   runs (recommended: the issue's rule that a missing value is unknown,
-   and the clause names the case); or the `pooled` restriction over the
-   runs that do have a measure, which tolerates flaky abstentions in
-   captured or host sets but compares averages over different run counts.
-3. **Slices.** Refuse the clause inside `all_slices` in 0.5.1
-   (recommended: the issue asks for one count over the dataset, and a
-   per-slice `at_most` needs its own semantics); or allow it with
-   `at_most` applied per slice.
-4. **Sample metrics.** Unknown, `not-case-comparable` (recommended: a
-   per-case latency regression is a different question from a quantile,
-   and nearest rank over a case's N samples is not what `pooled` uses); or
-   define the case value as the nearest-rank median of its samples.
-5. **Unpaired cases as regressions.** Unknown (recommended, per the
-   issue); or count a case the candidate no longer answers, where the
-   baseline did, as a regression, which would let the clause pass with
-   such cases present but converts an absence into a value.
+1. **Document versions.** `rustev.selection-gate/1` and
+   `rustev.selection/1` keep their names; the clause and the `cases`
+   member are written only when used, so existing documents keep their
+   bytes and identities and an older reader refuses a new gate rather
+   than misreading it (3.7.1).
+2. **Partial cases.** A case whose side lacks a measure in some of its
+   runs is unresolved (`partial`) and makes the clause unknown unless it
+   already fails (3.2.4, 3.4.1).
+3. **Slices.** The clause is refused inside `all_slices` in 0.5.1
+   (3.1.2).
+4. **Sample metrics.** Unknown, `not-case-comparable`; no per-case
+   quantile (3.2.3).
+5. **Unpaired cases.** A case measured on one side only is unresolved
+   (`unpaired`), never counted as a regression (3.2.5).
