@@ -234,9 +234,17 @@ test('volatile-lru evicts only entries; generation keys survive, so an invalidat
   full.primary.set('{rx:n}:g', '1');
   assert.throws(() => full.primary.set('{rx:n}:b', '1'.repeat(64)), /OOM/);
   assert.deepEqual([...full.primary.keys.keys()], ['{rx:n}:g']);
-  // A script that fails part-way leaves nothing behind.
-  assert.throws(() => full.eval(full.primary, (n) => { n.set('{rx:n}:x', '1'); n.set('{rx:n}:b', '1'.repeat(64)); }), /OOM/);
-  assert.deepEqual([...full.primary.keys.keys()], ['{rx:n}:g']);
+  // A script that fails part-way leaves nothing behind: room for one more
+  // small key (25 bytes each), so the first write lands and the second is
+  // refused.
+  const room = new ValkeyCluster({ maxmemory: 60 });
+  room.primary.set('{rx:n}:g', '1');
+  assert.throws(() => room.eval(room.primary, (n) => {
+    n.set('{rx:n}:x', '1');
+    assert.ok(n.exists('{rx:n}:x'), 'the first write landed');
+    n.set('{rx:n}:b', '1'.repeat(64));
+  }), /OOM/);
+  assert.deepEqual([...room.primary.keys.keys()], ['{rx:n}:g']);
 });
 
 test('non-conforming variants: allkeys-lru and a reader endpoint serve stale hits Rustev cannot detect; split reads only miss', async (t) => {
