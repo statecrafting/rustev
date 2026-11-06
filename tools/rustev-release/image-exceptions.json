@@ -42,5 +42,6 @@
   {"id": "CVE-2026-115455", "package": "libstdc++6", "decision": "A-80", "expires": "2027-02-01", "reason": "not reached: libstdc++ code of the gcc-14 source package; the image's libgcc_s is only the unwinder, and rustev-serve imports no C++ symbol and does not load libstdc++ or libgomp"},
   {"id": "CVE-2026-95619", "package": "libstdc++6", "decision": "A-80", "expires": "2027-02-01", "reason": "not reached: libstdc++ code of the gcc-14 source package; the image's libgcc_s is only the unwinder, and rustev-serve imports no C++ symbol and does not load libstdc++ or libgomp"},
   {"id": "CVE-2026-27171", "package": "zlib1g", "decision": "A-80", "expires": "2027-02-01", "reason": "not reached: rustev-serve does not link zlib (it links only libc, libm and libgcc_s; TLS is statically linked rustls)"},
-  {"id": "CVE-2026-85091", "package": "zlib1g", "decision": "A-80", "expires": "2027-02-01", "reason": "not reached: rustev-serve does not link zlib (it links only libc, libm and libgcc_s; TLS is statically linked rustls)"}
+  {"id": "CVE-2026-85091", "package": "zlib1g", "decision": "A-80", "expires": "2027-02-01", "reason": "not reached: rustev-serve does not link zlib (it links only libc, libm and libgcc_s; TLS is statically linked rustls)"},
+  {"id": "CVE-2026-76844", "package": "zlib1g", "decision": "A-82", "expires": "2027-02-01", "reason": "not reached: rustev-serve does not link zlib (its DT_NEEDED is libgcc_s, libm, libc and the loader, and it contains no zlib symbol; TLS is statically linked rustls)"}
 ] }

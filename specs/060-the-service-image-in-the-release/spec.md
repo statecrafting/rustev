@@ -520,6 +520,20 @@ reasons, as it already skipped three others (`windows-sys`, `getrandom`,
 pins it; `ring` 0.17 uses 0.9). Advisories, licenses
 and sources are unchanged.
 
+**Increment 6, 2026-11-06 (3.2.1, one more exception).** The
+`v0.5.0-rc.2` release run (42201430434) failed `image checks` on a
+finding outside A-80's 44: CVE-2026-76844 in `zlib1g`
+(1:1.3.dfsg+really1.3.1-1+b1, High, no fixed Debian version). The owner
+accepted it on 2026-11-06 (A-82). `tools/rustev-release/image-exceptions.json`
+gains one entry naming A-82 and expiring on 2027-02-01, like A-80's: not
+reached, because the binary's `DT_NEEDED` is only `libgcc_s`, `libm`,
+`libc` and the loader and it contains no zlib symbol (checked on the rc.2
+`linux/amd64` image), the reason of A-80's two `zlib1g` entries.
+`the_committed_exceptions_name_owner_rows_and_cover_their_findings` now
+expects 45 entries, 44 naming A-80 and this one naming A-82, and checks
+that each covers its finding on 2026-11-06 (the later row's date) and on
+2027-02-01.
+
 ## Decisions at approval
 
 Ratified by the owner on 2026-11-03 (A-76: "I ratify 060"), as proposed:
