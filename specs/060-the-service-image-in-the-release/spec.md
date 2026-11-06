@@ -505,6 +505,20 @@ the image. Its conditions hold: the base is
 (increment 3b, A-80), 3.4.3's image qualification is in `qualify.yml`,
 and spec 042 is complete (#477), so 3.1.1's condition on it holds.
 
+**Increment 5 follow-up, 2026-11-06 (3.1, the bans policy once a member).**
+With the image a member, `artifacts.sh scan-image` gates on the bans
+check of `tools/rustev-release/deny.toml` (031 3.9.2), which the
+`v0.5.0-rc.1` run found failing: five wildcard path dependencies in
+`integrations/rustev-serve/Cargo.toml` and two transitive duplicates.
+The dependencies now name the workspace entries (`workspace = true`,
+each with its exact family version), in a pull request of their own
+because a manifest is a policy file. The duplicates cannot be unified
+from this tree, so the release `deny.toml` skips them with their reasons,
+as it already skips three: `base64` 0.22.1 (tonic 0.14 pins it; sigstore's
+`pem` 4 uses 0.23) and `untrusted` 0.7.1 (`aws-lc-rs` 1.18 under
+`sigstore-crypto` pins it; `ring` 0.17 uses 0.9). Advisories, licenses
+and sources are unchanged.
+
 ## Decisions at approval
 
 Ratified by the owner on 2026-11-03 (A-76: "I ratify 060"), as proposed:
