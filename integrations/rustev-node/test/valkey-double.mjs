@@ -118,9 +118,18 @@ export class ValkeyCluster {
   replicate() {
     this.replica.keys = this.primary.snapshot();
   }
-  /** A Lua script: runs to completion with no other command in between. */
+  /** A Lua script: runs to completion with no other command in between,
+   * and a script that fails (OOM) leaves the keyspace as it found it. */
   eval(node, script) {
-    return script(node);
+    const before = node.snapshot();
+    const evicted = node.evicted.length;
+    try {
+      return script(node);
+    } catch (e) {
+      node.keys = before;
+      node.evicted.length = evicted;
+      throw e;
+    }
   }
 }
 
@@ -186,10 +195,12 @@ export class ValkeyStore {
       const len = bytes.length;
       if (gen(n.get(`${t}:b:${terms.scope}`)) + len > terms.maxScopeBytes) return 'over_budget';
       if (gen(n.get(`${t}:b`)) + len > terms.maxNamespaceBytes) return 'over_budget';
-      n.hset(`${t}:e:${keyId}`, { bytes: Buffer.from(bytes), scope: terms.scope });
-      n.pexpire(`${t}:e:${keyId}`, this.options.entryTtlMs);
+      // Counters first and the entry last, so no eviction inside this
+      // script can take the entry it is storing.
       n.incrby(`${t}:b:${terms.scope}`, len);
       n.incrby(`${t}:b`, len);
+      n.hset(`${t}:e:${keyId}`, { bytes: Buffer.from(bytes), scope: terms.scope });
+      n.pexpire(`${t}:e:${keyId}`, this.options.entryTtlMs);
       return 'stored';
     };
     if (this.options.atomicPut) {
