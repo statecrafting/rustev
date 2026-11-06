@@ -330,7 +330,7 @@ fn hand_complete_backend() {
     let library = fs::read(&library_path).unwrap();
     let b = real_bundle(&checkpoint, platform, &library);
     drop(library);
-    let bundle = b.verify().unwrap();
+    let mut bundle = b.verify().unwrap();
     let mut bundle_files = vec![("manifest.json".to_string(), 0_u64)];
     bundle_files.extend(
         bundle
@@ -341,8 +341,8 @@ fn hand_complete_backend() {
     );
     bundle_files[0].1 = fs::metadata(b.dir.join("manifest.json")).unwrap().len();
     let bundle_bytes: u64 = bundle_files.iter().map(|(_, n)| n).sum();
-    let head = &bundle.heads[0];
     let options = bundle.manifest.heads[0].options.clone();
+    let head = bundle.heads.swap_remove(0);
 
     let reference: Value =
         serde_json::from_slice(&fs::read(qualification("reference.json")).unwrap()).unwrap();
