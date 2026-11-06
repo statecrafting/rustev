@@ -489,6 +489,8 @@ async function nativeAdapter() {
 
   async function runtimeCaseWith(c, files, ignored) {
     const rt = c.runtime;
+    // Spec 063 3.13.2: a store case runs its requests in order.
+    if (rt.store) return storeCaseWith(c, files, ignored);
     const gates = rt.backends.map(() => new Map());
     let backendCalls = 0;
     const engine = await rustev.Engine.create({
@@ -611,6 +613,145 @@ async function nativeAdapter() {
       }
     }
     await compareOutputs(c, out);
+  }
+
+  /** A store case (spec 063, 3.13.2): one scripted store shared by every
+   * engine of the case; each request runs to its end before the next. A
+   * restart is a new engine over the same store; an invalidation before a
+   * request is `plan.invalidate()`, its result written with sorted keys. */
+  async function storeCaseWith(c, files, ignored) {
+    const rt = c.runtime;
+    const store = scriptedStore(rt.store);
+    const engines = [];
+    const open = async () => {
+      const e = await rustev.Engine.create({
+        runtime: {
+          maxInFlight: rt.config.max_in_flight,
+          maxQueued: rt.config.max_queued,
+          maxParallelRequests: rt.config.max_parallel_requests,
+          sinkTimeoutMs: rt.config.sink_timeout_ms,
+        },
+        clock: 'manual',
+        sink: { queueCapacity: 64, acceptsRun3: true, deliver: async (_r, { decisionId }) => `ack:${decisionId}` },
+        backends: rt.backends.map((b) => ({
+          descriptor: files.get(b.descriptor),
+          costModel: b.cost_model,
+          costBound: b.cost_bound,
+          maxConcurrency: b.max_concurrency,
+          queueCapacity: 65_536,
+          infer: (call) => scripted(b, new Map(), call, ignored),
+        })),
+        store: store.seam,
+      });
+      engines.push(e);
+      return e;
+    };
+    const compile = (e, name) =>
+      e.compile({
+        plan: files.get(name),
+        descriptors: rt.descriptors.map((d) => files.get(d)),
+        calibrations: rt.calibrations.map((x) => files.get(x)),
+      });
+    const out = new Map();
+    try {
+      let engine = await open();
+      let current = rt.plan;
+      let plan = await compile(engine, current);
+      for (const r of rt.requests) {
+        const id = r.decision_id;
+        store.begin(id);
+        const name = rt.store.plan_for?.[id] ?? rt.plan;
+        if ((rt.store.restart_before ?? []).includes(id)) {
+          engine = await open();
+          plan = await compile(engine, name);
+        } else if (name !== current) {
+          plan = await compile(engine, name);
+        }
+        current = name;
+        if ((rt.store.invalidate_before ?? []).includes(id)) {
+          const v = await plan.invalidate();
+          const json =
+            v === null
+              ? 'null'
+              : JSON.stringify({
+                  complete: v.complete,
+                  generation: v.generation,
+                  persistent:
+                    v.persistent === null || typeof v.persistent === 'string'
+                      ? v.persistent
+                      : { generation: v.persistent.generation, removed: v.persistent.removed },
+                  removedBytes: v.removedBytes,
+                  removedEntries: v.removedEntries,
+                });
+          out.set(`${id}.invalidation.json`, Buffer.from(json + '\n'));
+        }
+        const d = await plan
+          .decide({ decisionId: id, snapshot: files.get(r.snapshot), evaluationTimeMs: r.evaluation_time_ms },
+            { deadlineMs: r.deadline_ms })
+          .then((v) => ({ ok: v }), (e) => ({ err: e }));
+        settled(out, id, d);
+      }
+    } finally {
+      for (const e of engines) await e.shutdown({ drainMs: 0 });
+    }
+    await compareOutputs(c, out);
+  }
+
+  /** The scripted store of a store case, as the Rust runner's: entries by
+   * namespace and key with their scope, namespace and scope generations,
+   * conditional put-if-absent writes, and failures from a request's start. */
+  function scriptedStore(script) {
+    const entries = new Map();
+    const nsGen = new Map();
+    const scopeGen = new Map();
+    const key = (a, b) => `${a}\u0000${b}`;
+    let f = {};
+    const failed = (what) => new Error(`SYNTHETIC ${what} failure`);
+    const generations = (ns, scope) => ({ namespace: nsGen.get(ns) ?? 0, scope: scopeGen.get(key(ns, scope)) ?? 0 });
+    const remove = script.remove_on_invalidate ?? true;
+    return {
+      begin(id) { f = script.failures?.[id] ?? {}; },
+      seam: {
+        contract: script.contract,
+        queueCapacity: 65_536,
+        async get({ namespace, scope, keyId }) {
+          if (f.fail_get) throw failed('get');
+          const e = entries.get(key(namespace, keyId));
+          return { bytes: e ? Buffer.from(e.bytes) : null, generations: generations(namespace, scope) };
+        },
+        async put({ namespace, keyId, bytes, terms }) {
+          if (f.fail_put) throw failed('put');
+          if (f.put_answer) return f.put_answer;
+          const now = generations(namespace, terms.scope);
+          if (now.namespace !== terms.generations.namespace || now.scope !== terms.generations.scope) return 'generation_advanced';
+          const k = key(namespace, keyId);
+          if (entries.has(k)) return 'conflict';
+          entries.set(k, { scope: terms.scope, bytes: Buffer.from(bytes) });
+          return 'stored';
+        },
+        async delete({ namespace, keyId }) {
+          entries.delete(key(namespace, keyId));
+        },
+        async invalidate({ namespace, selector }) {
+          if (f.fail_invalidate) throw failed('invalidate');
+          const before = entries.size;
+          let generation;
+          if (selector === 'namespace') {
+            if (remove) for (const k of [...entries.keys()]) if (k.startsWith(key(namespace, ''))) entries.delete(k);
+            generation = (nsGen.get(namespace) ?? 0) + 1;
+            nsGen.set(namespace, generation);
+          } else {
+            if (remove) {
+              for (const [k, e] of [...entries]) if (k.startsWith(key(namespace, '')) && e.scope === selector.scope) entries.delete(k);
+            }
+            const sk = key(namespace, selector.scope);
+            generation = (scopeGen.get(sk) ?? 0) + 1;
+            scopeGen.set(sk, generation);
+          }
+          return { generation, removed: before - entries.size };
+        },
+      },
+    };
   }
 
   /** A decision's outputs, as the Rust runner writes them: its result and,

@@ -8,6 +8,7 @@ pub mod acquire;
 pub mod local_embed;
 pub mod normalize;
 pub mod runtime;
+pub mod store;
 
 use std::path::{Path, PathBuf};
 

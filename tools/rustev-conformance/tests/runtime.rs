@@ -958,3 +958,306 @@ fn acquire_cases_produce_their_expected_bytes() {
         );
     }
 }
+
+// ---- spec 063 3.13.2: store cases ----------------------------------------
+
+/// The SYNTHETIC contract of `crates/rustev-runtime/tests/persistent.rs`.
+fn store_contract() -> rustev_contract::optimization::StoreContract {
+    let term = |t: &str| format!("SYNTHETIC {t} term");
+    rustev_contract::optimization::StoreContract {
+        schema: term("schema"),
+        namespace: term("namespace"),
+        durability: term("durability"),
+        encryption: term("encryption"),
+        atomicity: term("atomicity"),
+        conflict: "first writer wins".into(),
+        expiry: term("expiry"),
+        invalidation: term("invalidation"),
+        erasure: term("erasure"),
+    }
+}
+
+/// The mirrored test's `policy_with`: a persistent tier only.
+fn store_policy(
+    on_store_failure: rustev_contract::optimization::StoreFailurePolicy,
+    admission: rustev_contract::optimization::OptimizationAdmission,
+) -> rustev_contract::execution::ExecutionPolicy {
+    use rustev_contract::optimization::*;
+    let mut p = execution(CostPolicy::Hard { max_units: 100 }, vec![]);
+    p.optimization = Some(OptimizationPolicy {
+        key_schema_version: 1,
+        cache_namespace_version: 1,
+        admission,
+        expiry: ExpiryBasis::InjectedRuntimeTime,
+        batch: None,
+        memory_cache: None,
+        shared_calls: None,
+        persistent_cache: Some(PersistentCachePolicy {
+            store_contract: store_contract(),
+            max_entry_bytes: 16_384,
+            max_scope_bytes: 1_000_000,
+            max_namespace_bytes: 10_000_000,
+            ttl_ms: 60_000,
+            on_store_failure,
+        }),
+        decision_cache: None,
+    });
+    p
+}
+
+fn store_fixtures() -> BTreeMap<String, Vec<u8>> {
+    use rustev_contract::optimization::{OptimizationAdmission as A, StoreFailurePolicy as P};
+    let ds = descriptors_with_fallbacks();
+    let cal = vec![topic_calibration("1.5")];
+    let plan = |p| {
+        line(
+            rustev_core::compile_with(&support_routing(), &ds, &cal, &p)
+                .unwrap()
+                .canonical(),
+        )
+    };
+    BTreeMap::from([
+        (
+            "store.plan.json".into(),
+            plan(store_policy(P::ContinueWithoutCache, A::Refuse)),
+        ),
+        (
+            "store-closed.plan.json".into(),
+            plan(store_policy(P::FailClosed, A::Refuse)),
+        ),
+        (
+            "store-closed-independent.plan.json".into(),
+            plan(store_policy(P::FailClosed, A::ExecuteIndependent)),
+        ),
+    ])
+}
+
+/// The store cases: `(id, mirrored test, runtime block)`.
+fn store_cases() -> Vec<(&'static str, &'static str, Json)> {
+    let answers = every(|t| json!([output(t, 1)]));
+    let base = |requests: Vec<(&str, i64)>, store: Json| {
+        let n = requests.len();
+        let requests: Vec<Json> = requests
+            .into_iter()
+            .map(|(id, at)| json!({"decision_id": id, "snapshot": "support.snapshot.json", "evaluation_time_ms": at}))
+            .collect();
+        json!({ "plan": "store.plan.json", "descriptors": DESCRIPTORS,
+                "calibrations": ["topic.calibration.json"], "config": config(1, 0, 3),
+                "backends": [head(answers.clone(), json!({}), json!("ignore"), 1)],
+                "store": store, "requests": requests, "drive": vec!["start"; n] })
+    };
+    let contract = serde_json::to_value(store_contract()).unwrap();
+    const P: &str = "crates/rustev-runtime/tests/persistent.rs::";
+    vec![
+        (
+            "runtime.store-restart-hit",
+            "crates/rustev-runtime/tests/persistent.rs::a_restarted_runtime_hits_the_same_store",
+            base(
+                vec![("cold", NOW), ("warm", NOW + 1_000), ("after", NOW + 2_000)],
+                // Another process's invalidation between two runtimes: the
+                // generation advances and the entries stay (G2).
+                json!({"contract": contract, "restart_before": ["warm", "after"],
+                       "invalidate_before": ["after"], "remove_on_invalidate": false}),
+            ),
+        ),
+        (
+            "runtime.store-failure-policy",
+            "crates/rustev-runtime/tests/persistent.rs::store_failures_follow_the_failure_policy",
+            base(
+                vec![
+                    ("closed", NOW),
+                    ("independent", NOW),
+                    ("open", NOW),
+                    ("write", NOW),
+                ],
+                json!({"contract": contract,
+                       "plan_for": {"closed": "store-closed.plan.json",
+                                    "independent": "store-closed-independent.plan.json",
+                                    "write": "store-closed.plan.json"},
+                       "failures": {"closed": {"fail_get": true}, "independent": {"fail_get": true},
+                                    "open": {"fail_get": true}, "write": {"fail_put": true}}}),
+            ),
+        ),
+        (
+            "runtime.store-invalidation",
+            "crates/rustev-runtime/tests/persistent.rs::invalidation_reaches_every_tier",
+            base(
+                vec![
+                    ("cold", NOW),
+                    ("unavailable", NOW),
+                    ("after", NOW),
+                    ("warm", NOW),
+                ],
+                json!({"contract": contract, "invalidate_before": ["unavailable", "after"],
+                       "failures": {"unavailable": {"fail_invalidate": true}}}),
+            ),
+        ),
+    ]
+    .into_iter()
+    .map(|(id, m, b)| {
+        debug_assert!(m.starts_with(P));
+        (id, m, b)
+    })
+    .collect()
+}
+
+/// What each mirrored test asserts, on a store case's outputs.
+fn store_mirrors(id: &str, out: &BTreeMap<String, Vec<u8>>) {
+    use rustev_contract::judgment::Unresolved;
+    use rustev_contract::optimization::{OptimizationMechanism as M, OptimizationOutcome as O};
+    use rustev_contract::run::RequestResult;
+    let every_is = |d: &str, o: O| {
+        let r = record(out, d);
+        assert_eq!(r.requests.len(), 3, "{id} {d}");
+        r.requests.iter().all(|q| {
+            let x = q.optimization.as_ref().unwrap();
+            x.mechanism == M::PersistentCache && x.outcome == o
+        })
+    };
+    let diagnosed = |d: &str, needle: &str| {
+        record(out, d).requests.iter().all(|q| {
+            q.optimization
+                .as_ref()
+                .unwrap()
+                .diagnostics
+                .iter()
+                .any(|x| x.contains(needle))
+        })
+    };
+    let dispatched = |d: &str| {
+        record(out, d)
+            .requests
+            .iter()
+            .filter(|q| !q.attempts.is_empty())
+            .count()
+    };
+    let invalidation = |d: &str| -> Json {
+        serde_json::from_slice(&out[&format!("{d}.invalidation.json")]).unwrap()
+    };
+    match id {
+        "runtime.store-restart-hit" => {
+            assert!(every_is("cold", O::Miss));
+            assert_eq!(dispatched("cold"), 3);
+            assert!(every_is("warm", O::Hit));
+            assert_eq!(dispatched("warm"), 0);
+            let (cold, warm) = (record(out, "cold"), record(out, "warm"));
+            for (hit, source) in warm.requests.iter().zip(&cold.requests) {
+                let o = hit.optimization.as_ref().unwrap();
+                assert_eq!(hit.result, source.result);
+                assert_eq!(o.age_ms, 1_000);
+                assert_eq!(
+                    o.source_attempt_id.as_deref(),
+                    Some(source.attempts[0].attempt_id.as_str())
+                );
+            }
+            // The same proposal: only the decision and evaluation time differ.
+            let judgment = |r: &RunRecord| match &r.core {
+                rustev_contract::run::CoreEvidence::Recorded(e) => (
+                    e.judgment.outcome.clone(),
+                    e.judgment.derivation,
+                    e.judgment.lineage.clone(),
+                ),
+                _ => panic!("no evidence"),
+            };
+            assert_eq!(judgment(&warm), judgment(&cold));
+            assert!(every_is("after", O::Miss));
+            assert!(diagnosed("after", "generation_advanced"));
+            assert_eq!(dispatched("after"), 3);
+            let inv = invalidation("after");
+            assert_eq!(inv["persistent"], json!({"generation": 1, "removed": 0}));
+            assert_eq!(inv["complete"], json!(true));
+        }
+        "runtime.store-failure-policy" => {
+            assert!(every_is("closed", O::Refused));
+            assert!(diagnosed("closed", "store_failed"));
+            assert!(record(out, "closed").requests.iter().all(|q| matches!(&q.result,
+                RequestResult::Failed(Unresolved::BackendUnavailable { detail }) if detail.starts_with("store_failed"))));
+            assert_eq!(dispatched("closed"), 0);
+            for d in ["independent", "open"] {
+                assert!(every_is(d, O::Miss), "{d}");
+                assert!(diagnosed(d, "store_failed"), "{d}");
+            }
+            assert_eq!(status(out, "write")["status"], "judged");
+            assert!(every_is("write", O::Miss));
+            assert!(diagnosed("write", "store_failed: SYNTHETIC put failure"));
+        }
+        "runtime.store-invalidation" => {
+            assert!(every_is("cold", O::Miss));
+            let failed = invalidation("unavailable");
+            assert_eq!(
+                (&failed["persistent"], &failed["complete"]),
+                (&json!("pending"), &json!(false))
+            );
+            assert!(every_is("unavailable", O::Miss));
+            assert!(diagnosed(
+                "unavailable",
+                "persistent tier unavailable until invalidation completes"
+            ));
+            let done = invalidation("after");
+            assert_eq!(done["persistent"], json!({"generation": 1, "removed": 3}));
+            assert_eq!(done["complete"], json!(true));
+            assert!(every_is("after", O::Miss));
+            assert_eq!(dispatched("after"), 3);
+            assert!(every_is("warm", O::Hit));
+        }
+        other => panic!("no mirrored assertions for {other}"),
+    }
+}
+
+#[test]
+fn store_cases_produce_their_expected_bytes() {
+    let mut fx = store_fixtures();
+    for (name, bytes) in &fx {
+        keep(&format!("fixtures/store/{name}"), bytes);
+    }
+    let shared = fixtures();
+    for (id, mirrored, block) in store_cases() {
+        let case: RuntimeCase = serde_json::from_value(block.clone()).unwrap();
+        let mut names: Vec<&str> = vec![&case.plan];
+        let store = case.store.as_ref().unwrap();
+        names.extend(store.plan_for.values().map(String::as_str));
+        names.extend(case.descriptors.iter().map(String::as_str));
+        names.extend(case.calibrations.iter().map(String::as_str));
+        names.extend(case.requests.iter().map(|r| r.snapshot.as_str()));
+        names.sort();
+        names.dedup();
+        for n in &names {
+            if !fx.contains_key(*n) {
+                fx.insert(n.to_string(), shared[*n].clone());
+            }
+        }
+        let inputs: BTreeMap<String, Vec<u8>> = names
+            .iter()
+            .map(|n| (n.to_string(), fx[*n].clone()))
+            .collect();
+        let out = runtime::run(&case, &inputs).unwrap_or_else(|e| panic!("{id}: {e}"));
+        store_mirrors(id, &out);
+        let mut outputs = vec![];
+        for (file, bytes) in &out {
+            let rel = format!("expected/runtime/{id}/{file}");
+            keep(&rel, bytes);
+            outputs.push(json!({ "file": file, "golden": format!("{DIR}/{rel}"),
+                                 "sha256": sha256_hex(bytes), "normalize": [] }));
+        }
+        let dir = |n: &str| {
+            if n.starts_with("store") {
+                "store"
+            } else {
+                "runtime"
+            }
+        };
+        let case_file = json!({
+            "id": id, "command": "decide", "surfaces": ["rust-api", "native"],
+            "mirrors": mirrored,
+            "inputs": names.iter().map(|n| json!({
+                "path": format!("{DIR}/fixtures/{}/{n}", dir(n)), "name": n,
+                "sha256": sha256_hex(&fx[*n]) })).collect::<Vec<_>>(),
+            "runtime": block,
+            "outputs": outputs,
+        });
+        keep(
+            &format!("cases/runtime/{id}.json"),
+            &line(serde_json::to_vec_pretty(&case_file).unwrap()),
+        );
+    }
+}
