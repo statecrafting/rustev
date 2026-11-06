@@ -354,6 +354,15 @@ sh -c 'for d in crates tools; do [ -d "$d" ] || continue; if grep -rnE "(struct|
   it defaults to false and nothing changes on a push. The label
   `statecraft:stacked-ci` still runs everything on a pull request.
 
+- 2026-11-05 (CI only, no claim of this spec changes): with the runner
+  limit raised to 500 jobs, the acceptance groups over 25 minutes split in
+  two on that day's measured per-spec seconds: `cli-backends` (006, 014,
+  041) and `cli-repeat` (001, 005, 029, 061), `integrations-base` (002,
+  010, 033, 038, 040, 042) and `integrations-remote` (012, 015, 017, 019,
+  020, 030, 059), `integrations-core` (021, 036, 037, 045) and
+  `integrations-plans` (022, 031, 034, 035). Each group is at most about 21
+  minutes against 39 before. Commands and results are unchanged.
+
 ## Profile upgrade record (2026-10-02)
 
 The Statecraft github-actions-rust profile moves to revision 13 before the
