@@ -32,7 +32,7 @@ async function until(what, cond) {
 
 /** An engine over `store` with a backend answering every task; `calls`
  * counts the backend's dispatches across engines sharing it. */
-async function engine(t, store, { plan = 'store.plan.json', calls = { backend: 0 }, maxInFlight = 1 } = {}) {
+async function engine(t, store, { plan = 'store.plan.json', calls = { backend: 0 }, maxInFlight = 1, shutdown = true } = {}) {
   const e = await rustev.Engine.create({
     clock: 'manual', runtime: { maxInFlight, maxQueued: 0, maxParallelRequests: 3, sinkTimeoutMs: 20000 },
     sink: { queueCapacity: 8, deliver: async () => 'ack' },
@@ -41,7 +41,8 @@ async function engine(t, store, { plan = 'store.plan.json', calls = { backend: 0
       infer: async (call) => { calls.backend++; return { output: outputs[JSON.parse(Buffer.from(call.projection)).task], charge: { observed: { units: 1 } } }; } }],
     ...(store ? { store } : {}),
   });
-  t.after(() => e.shutdown({ drainMs: 1000 }));
+  // A test that shuts the engine down itself opts out of the cleanup one.
+  if (shutdown) t.after(() => e.shutdown({ drainMs: 1000 }));
   const dir = plan.startsWith('support') ? 'runtime' : 'store';
   const p = await e.compile({ plan: fx(dir, plan), descriptors, calibrations: [fx('runtime', 'topic.calibration.json')] });
   return { e, p, calls };
@@ -196,7 +197,7 @@ test('a store invalidation that throws leaves the selection pending; a later cal
 
 test('shutdown reports a pending store callback abandoned', async (t) => {
   const st = scripted({ get: () => new Promise(() => {}) });
-  const { e, p } = await engine(t, st);
+  const { e, p } = await engine(t, st, { shutdown: false });
   const r = decide(p, 'stuck').catch((err) => err);
   // One get per request, in parallel.
   await until('the gets', () => gauge(e).queueDepth === 3);
