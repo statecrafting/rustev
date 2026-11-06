@@ -240,6 +240,15 @@ fn measured_manifest(b: &Bundle) -> EmbedManifest {
     manifest
 }
 
+/// The measured manifest with the measured library accepted for
+/// `platform` instead: one entry, as a checked manifest has one per key.
+fn retarget(manifest: &mut EmbedManifest, platform: Platform) {
+    manifest.runtime.libraries = vec![Library {
+        platform,
+        sha256: IN_PROCESS_REPEATABILITY[0].runtime_sha256.into(),
+    }];
+}
+
 /// The cache decision as the backend makes it at setup (3.14.3).
 fn cache_on(manifest: &EmbedManifest, platform: Platform) -> Result<(), SetupCode> {
     let artifact = manifest.artifact_id().unwrap();
@@ -300,9 +309,7 @@ fn the_cache_is_refused_on_every_other_platform_and_for_every_other_setting() {
     // the platform is not qualified; macOS is neither.
     for platform in [Platform::LinuxAarch64Gnu, Platform::MacosAarch64] {
         let mut m = manifest.clone();
-        for l in &mut m.runtime.libraries {
-            l.platform = platform;
-        }
+        retarget(&mut m, platform);
         assert_eq!(
             cache_on(&m, platform),
             Err(SetupCode::CacheNotEquivalent),
@@ -379,9 +386,7 @@ fn this_targets_cache_decision_follows_the_record() {
         return; // No platform key: an `onnx` bundle is refused first.
     };
     let mut m = measured_manifest(&new_bundle());
-    for l in &mut m.runtime.libraries {
-        l.platform = platform;
-    }
+    retarget(&mut m, platform);
     let expected = if platform == Platform::LinuxX86_64Gnu {
         Ok(())
     } else {

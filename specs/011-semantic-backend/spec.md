@@ -33,6 +33,8 @@ extends:
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.lock" }, nature: additive }
   # Adds 011 to `make verify` once implemented.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  # 011's place in the acceptance partition (the cli-repeat group).
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
   # The local inference runtime family and placement rule (3.18).
   - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "tools/rustev-boundaries/" }, nature: additive }
   # The crate is excluded from the release set until spec 031 admits it (3.17.4).
