@@ -228,6 +228,11 @@ test('volatile-lru evicts only entries; generation keys survive, so an invalidat
   const r = await decide(p, 'after');
   assert.ok(every(r, 'miss'), outcomes(r));
   assert.equal(calls.backend, 6);
+  // With nothing evictable a write is refused with OOM and changes nothing.
+  const full = new ValkeyCluster({ maxmemory: 40 });
+  full.primary.set('{rx:n}:g', '1');
+  assert.throws(() => full.primary.set('{rx:n}:b', '1'.repeat(64)), /OOM/);
+  assert.deepEqual([...full.primary.keys.keys()], ['{rx:n}:g']);
 });
 
 test('non-conforming variants: allkeys-lru and a reader endpoint serve stale hits Rustev cannot detect; split reads only miss', async (t) => {

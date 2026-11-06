@@ -44,12 +44,19 @@ export class ValkeyNode {
     return n;
   }
 
-  /** Make room before a write, as Valkey does: evict by the policy, or
-   * refuse the write with OOM when nothing evictable is left. */
-  #room() {
+  /** Store `entry` under `k` only if room can be made, as Valkey does:
+   * evict by the policy (never `k` itself), or refuse the write with OOM
+   * when nothing evictable is left, leaving the keyspace as it was. */
+  #write(k, entry) {
+    const old = this.keys.get(k);
+    this.keys.set(k, entry);
     while (this.used() > this.maxmemory) {
-      const candidates = [...this.keys].filter(([, e]) => this.policy === 'allkeys-lru' || e.expiresAt != null);
-      if (candidates.length === 0) throw new Error('OOM command not allowed when used memory > maxmemory');
+      const candidates = [...this.keys].filter(([key, e]) => key !== k && (this.policy === 'allkeys-lru' || e.expiresAt != null));
+      if (candidates.length === 0) {
+        if (old) this.keys.set(k, old);
+        else this.keys.delete(k);
+        throw new Error('OOM command not allowed when used memory > maxmemory');
+      }
       candidates.sort((a, b) => a[1].lru - b[1].lru);
       this.keys.delete(candidates[0][0]);
       this.evicted.push(candidates[0][0]);
@@ -62,8 +69,7 @@ export class ValkeyNode {
   }
   set(k, v) {
     const old = this.keys.get(k);
-    this.keys.set(k, { type: 'string', value: Buffer.from(String(v)), expiresAt: old?.expiresAt ?? null, lru: ++this.tick });
-    this.#room();
+    this.#write(k, { type: 'string', value: Buffer.from(String(v)), expiresAt: old?.expiresAt ?? null, lru: ++this.tick });
   }
   incrby(k, by) {
     const n = Number(this.get(k) ?? 0) + by;
@@ -75,11 +81,11 @@ export class ValkeyNode {
     return e?.type === 'hash' ? (e.value.get(f) ?? null) : null;
   }
   hset(k, fields) {
-    const e = this.#live(k) ?? { type: 'hash', value: new Map(), expiresAt: null };
+    const cur = this.#live(k);
+    // A copy, so a refused write leaves the old hash untouched.
+    const e = { type: 'hash', value: new Map(cur?.value ?? []), expiresAt: cur?.expiresAt ?? null, lru: ++this.tick };
     for (const [f, v] of Object.entries(fields)) e.value.set(f, Buffer.from(v));
-    e.lru = ++this.tick;
-    this.keys.set(k, e);
-    this.#room();
+    this.#write(k, e);
   }
   exists(k) {
     return this.#live(k) !== undefined;
