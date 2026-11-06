@@ -1,0 +1,38 @@
+{
+  "mapping": {
+    "amends": [
+      "029-evaluation-repeatability",
+      "061-host-scored-repeat-sets"
+    ],
+    "dependsOn": [
+      "002-decision-contract-and-pure-core",
+      "004-evaluation-and-replay",
+      "006-cli-surface",
+      "029-evaluation-repeatability",
+      "031-public-api-and-release-family",
+      "041-ranking-and-rubric-metrics",
+      "061-host-scored-repeat-sets",
+      "063-node-binding-parity"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "docs/decisions/00-founding-decisions.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "specId": "065-selection-gate-run-integrity",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "05e2c295ae4af7b66bdd1d41abdafbefa904ac6127c4d639ffbf4dee40929234"
+}
