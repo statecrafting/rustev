@@ -1,12 +1,13 @@
 ---
 id: "067-node-live-repeat-runs"
 title: "Node binding: live repeat runs over host backends (amends 027, 043 and 063)"
-status: draft
+status: approved
 implementation: pending
 created: "2026-11-06"
 summary: >
-  A proposed amendment of approved specs 063 (3.9), 027 (3.3, 3.7) and 043
-  (section 2, 3.2.2), for release 0.5.1 (#539). A Node host whose model
+  An amendment of approved specs 063 (3.9), 027 (3.3, 3.7) and 043
+  (section 2, 3.2.2, 3.5.1, 3.11.4, 3.13), for release 0.5.1 (#539),
+  ratified by the owner on 2026-11-06 (A-86). A Node host whose model
   backends are TypeScript `DecisionBackend`s (027 3.6) cannot run fresh
   repeat runs of its plans through Rustev: the binding's repeat commands
   refuse the `live` source (063 3.9.4), and `rustev eval live` links only
@@ -31,6 +32,19 @@ amends:
   - "027-node-and-wasm-bindings"
   - "043-live-re-execution-at-scale"
   - "063-node-binding-parity"
+extends:
+  # `liveRun`, its options, rule authorizer, cancellation, shutdown and declarations.
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-node/" }, nature: amending }
+  # The `eval live` input resolution moves here behind `Host`.
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "crates/rustev-surface/" }, nature: amending }
+  # The CLI calls the moved resolution and gains `--require-existing-journal`.
+  - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: amending }
+  # Journal identity, the run report's `journal` member and the existing-journal check (3.4.5, 3.4.6).
+  - { spec: "043-live-re-execution-at-scale", unit: { kind: directory, path: "crates/rustev-live/" }, nature: amending }
+  # The live conformance cases (3.8).
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "tools/rustev-conformance/" }, nature: additive }
+  # Archive entries for moved source files.
+  - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "003-runtime-execution-and-evidence"
@@ -69,8 +83,8 @@ obligations:
 
 # 067: Node binding: live repeat runs over host backends (amends 027, 043 and 063)
 
-Draft: a proposal for release 0.5.1, never a claim about code.
-Ratification is the owner's act. The approved texts of 027, 043 and 063
+Approved: ratified by the owner on 2026-11-06 (A-86) for release 0.5.1;
+the implementation is pending. The approved texts of 027, 043 and 063
 are not edited; this spec records what changes in them (3.10). It
 authorizes no live run, provider call or spend, and raises no cap.
 
@@ -107,13 +121,13 @@ internal structure only): it calls the moved resolution; grammar, bytes,
 exit codes and goldens unchanged. `tools/rustev-conformance/` (027): the
 live cases of 3.8.
 
-Edges proposed for ratification (none is declared by this draft):
-`integrations/rustev-node/` and `crates/rustev-surface/` (027, amending),
-`crates/rustev-cli/` (006, amending), `crates/rustev-live/` (043,
-amending, for 3.4.5), `tools/rustev-conformance/` (027,
-additive), `tools/rustev-release/` (031, additive, archive entries for
-moved files), and at completion `Makefile` and `scripts/acceptance/`
-(001, additive).
+Ratification added the `extends` edges to `integrations/rustev-node/`
+and `crates/rustev-surface/` (027, amending), `crates/rustev-cli/` (006,
+amending), `crates/rustev-live/` (043, amending, for 3.4.5 and 3.4.6),
+`tools/rustev-conformance/` (027, additive) and `tools/rustev-release/`
+(031, additive, archive entries for moved files); the edges to
+`Makefile` and `scripts/acceptance/` (001, additive) are added by the
+change that completes this spec.
 
 Unchanged: `rustev-contract`, `rustev-core`, `rustev-runtime`,
 `rustev-eval`, and `rustev-live` behavior except 3.4.5's journal
@@ -202,7 +216,8 @@ integration crate, and `rustev-node` is under `integrations/`).
    3.6.7).
 2. The cost **unit** is the live configuration's per-binding `cost_unit`
    (043 3.2.1), keyed by the descriptor's backend and artifact identity,
-   so it is part of the `LiveConfigId` (open question 1). `nano_usd`
+   so it is part of the `LiveConfigId`; the backend registration
+   declares no unit of its own. `nano_usd`
    states that the backend's units are nano-USD; Rustev cannot verify it,
    and the run records the statement.
 3. Refused before the journal is opened (`invalid_input`): a backend whose
@@ -214,7 +229,7 @@ integration crate, and `rustev-node` is under `integrations/`).
 4. `cost_unit: none` is accepted on the host's declaration, as 043 3.6.3
    allows for the library, reserved at zero and recorded as
    `declared_no_spend` in every per-case document and in
-   `rustev.live-run/1` (open question 2).
+   `rustev.live-run/1`.
 5. **Charges.** The charge an attempt ends with settles its ticket: the
    charge the host's result reports, or the charge a thrown `SeamFailure`
    carries; any other throw, a rejection or a malformed value is charge
@@ -259,7 +274,7 @@ integration crate, and `rustev-node` is under `integrations/`).
      hex, and `created_at_ms`, read from the run's injected clock. Both are
      written once, at creation, and never change; the A-75 migration (043
      3.5.6) keeps them. The schema name stays `rustev-jev.spend-journal/1`
-     (open question 3). A journal created before this version has neither
+     and the members are optional. A journal created before this version has neither
      member; it is accepted, never stamped (no creation time is invented),
      and is reported as `legacy`.
    - **Run report.** `rustev.live-run/1` (043 3.11.4) already carries
@@ -468,7 +483,7 @@ Pending with implementation.
 
 ## Implementation record
 
-None. Draft.
+None yet.
 
 Planned increments, each a separately reviewed pull request from `main`
 of about 1,000 lines (the AI review times out near 1,000 to 1,800
@@ -507,18 +522,16 @@ outcomes are values with 043's statuses and exit codes (3.2.4, 063
 scripted backends only (R-1); the cap is per journal file and a new
 journal is made visible (3.4.4, 3.4.5).
 
-### Owner answers (2026-11-06)
-
-Answers to open questions of this draft. They are not ratification,
-which remains the owner's separate act; the normative text above states
+Ratified by the owner on 2026-11-06 (A-86), with every question the
+draft left open answered as follows; the normative text above states
 the adopted behavior.
 
 1. **Journal form: a file the binding opens** (3.4.1, 3.4.3). Live runs
    are evaluation jobs started by hand, locally or in CI, never inside a
    partner API service, so a local file fits; the cap holds per file,
    and a new journal is visible (3.4.4, 3.4.5).
-2. **`requireExistingJournal` / `--require-existing-journal`: adopted,**
-   off by default, the documented CI setting (3.4.6).
+2. **`requireExistingJournal` / `--require-existing-journal`,** off by
+   default, the documented CI setting (3.4.6).
 3. **The Node binding requires `authorize`** in the live configuration,
    reversing 043 3.2.2 for the binding only (3.5): it matches the owner's
    rule of approval before each paid run. No asynchronous host authorizer.
@@ -531,23 +544,12 @@ the adopted behavior.
    `liveRun` with `requireExistingJournal` in 2), so they ship first and
    in that order; increments 3 and 4 (resume, rerun, shutdown,
    conformance and closure) may follow.
-
-### Open for the owner
-
-Each with a recommendation:
-
-1. **Where the cost unit lives.** In the live configuration's binding
-   entry, as today (recommended: one source, inside the `LiveConfigId`);
-   or also on the backend registration (`costUnit`), refused when the two
-   differ.
-2. **`cost_unit: none` for host backends.** Accept on the host's
-   declaration, recorded as `declared_no_spend` (recommended, 043 3.6.3's
-   library rule); or refuse `none` for TypeScript backends, since a
-   callback can reach a paid provider and Rustev cannot see it, which
-   forces every host backend under the cap at some declared unit.
-3. **Header form.** Optional `journal_id` and `created_at_ms` members
-   under the unchanged schema name, written only at creation
-   (recommended, as the other drafts add optional members: existing
-   journals keep their bytes, an older release refuses a new journal
-   rather than misreading it); or a new journal schema name, which would
-   need a migration for the journal that holds the recorded testing spend.
+6. **The cost unit** lives only in the live configuration's binding
+   entry, inside the `LiveConfigId` (3.3.2).
+7. **`cost_unit: none` for host backends** is accepted on the host's
+   declaration and recorded as `declared_no_spend` (3.3.4, 043 3.6.3's
+   library rule).
+8. **Header form.** `journal_id` and `created_at_ms` are optional header
+   members under the unchanged schema name, written only at creation;
+   existing journals keep their bytes, and an older release refuses a new
+   journal rather than misreading it (3.4.5).
