@@ -862,6 +862,15 @@ restarted engine with entries kept, rather than editing the store, and the
 invalidation case starts from a failed `Runtime::invalidate`, since
 `invalidate_plan` has no Node equivalent; call counts the outputs do not
 show are not compared.
+`test/store.test.mjs` covers the store rows of section 5 and 3.13.3's
+host-seam cases for the store, over `test/valkey-double.mjs`, a reference
+Redis-shaped double that behaves like Valkey 8.1 with
+`maxmemory-policy volatile-lru` and primary-only reads (keys under one hash
+tag per namespace, `get`, `put` and `delete` each one script, `invalidate`
+an `INCR` of a generation key with no TTL), with no network access or
+wall-clock time; its non-atomic variants (split reads, check-then-write,
+a reader endpoint, `allkeys-lru`) show which failures are detected and
+which are not.
 
 ## Decisions at approval
 
