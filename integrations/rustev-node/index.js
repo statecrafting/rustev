@@ -508,13 +508,16 @@ class Engine {
     return wrap(() => natives.get(this).command(name, named(inputs), args));
   }
 
-  /** `plan check` and `plan show`: pure, synchronous (3.3). */
+  /** `profile check` (pure, synchronous) and `plan diff` (blocking pool),
+   * through `profile::check` and `plan_diff::diff` (063 3.3). */
   profileCheck(inputs, args) {
     return this.commandSync('profileCheck', inputs, args);
   }
   planDiff(inputs, args) {
     return this.command('planDiff', inputs, args);
   }
+
+  /** `plan check` and `plan show`: pure, synchronous (3.3). */
   check(inputs, args) {
     return this.commandSync('check', inputs, args);
   }

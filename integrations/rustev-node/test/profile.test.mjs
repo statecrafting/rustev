@@ -93,6 +93,7 @@ test('profileCheck and planDiff return happy and refusal results', async t => {
   const inputs = { template: fixture('compile', 'template'), on: fixture('compile', 'on'), descriptor };
   const p = e.profileCheck(inputs, { definitions: ['template'], profile: 'on', variant: 'interactive' });
   assert.equal(p.code, 0);
+  assert.equal(json(p.out).command, 'profile check');
   assert.equal(e.profileCheck(inputs, { definitions: ['template'], variant: 'absent' }).code, 5);
   const diff = await e.planDiff(inputs, { definitions: ['template'], leftProfile: 'on', rightProfile: 'on', leftVariant: 'interactive', rightVariant: 'interactive', descriptors: ['descriptor'], out: 'diff' });
   assert.equal(diff.code, 0); assert.equal(json(diff.out).identical, true); assert.ok(diff.artifacts.diff);
