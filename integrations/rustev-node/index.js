@@ -448,7 +448,7 @@ class Engine {
   /** Compile a definition and prepare the plan (3.3.1), on the engine's
    * blocking pool (3.5.2); given `plan` instead, load that compiled plan
    * against the descriptors and calibrations, as the CLI's `run` does. */
-  async compile({ definition, plan, descriptors = [], calibrations = [] }) {
+  async compile({ definition, plan, descriptors = [], calibrations = [], sources }) {
     // Refused here, as `compileSync` refuses it, before any native call.
     if ((definition == null) === (plan == null)) {
       throw new classes.InvalidDocument('invalid_document', 'compile takes exactly one of a definition and a plan');
@@ -459,6 +459,7 @@ class Engine {
         plan == null ? undefined : bytes(plan),
         descriptors.map(bytes),
         calibrations.map(bytes),
+        sources == null ? undefined : sources.map(bytes),
       );
       return new PlanHandle(this, p);
     } catch (e) {
@@ -468,17 +469,18 @@ class Engine {
 
   /** `compile` on the calling thread: blocking, bounded by the same parse
    * limits (3.5.2). */
-  compileSync({ definition, plan, descriptors = [], calibrations = [] }) {
+  compileSync({ definition, plan, descriptors = [], calibrations = [], sources }) {
     return wrap(() => {
       if ((definition == null) === (plan == null)) {
         throw new classes.InvalidDocument('invalid_document', 'compile takes exactly one of a definition and a plan');
       }
       const ds = descriptors.map(bytes);
       const cs = calibrations.map(bytes);
+      const ss = sources == null ? undefined : sources.map(bytes);
       const p =
         plan != null
-          ? natives.get(this).load(bytes(plan), ds, cs)
-          : natives.get(this).compile(bytes(definition), ds, cs);
+          ? natives.get(this).load(bytes(plan), ds, cs, ss)
+          : natives.get(this).compile(bytes(definition), ds, cs, ss);
       return new PlanHandle(this, p);
     });
   }

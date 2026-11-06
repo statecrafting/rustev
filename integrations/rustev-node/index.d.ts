@@ -182,6 +182,9 @@ export declare class Engine {
     plan?: DocumentInput;
     descriptors?: DocumentInput[];
     calibrations?: DocumentInput[];
+    /** `rustev.source/1` descriptors the plan binds (spec 063 3.5.2):
+     * never taken from the engine's installed sources. */
+    sources?: DocumentInput[];
   }): Promise<PlanHandle>;
   /** Like `compile`, on the calling thread (blocking). */
   compileSync(args: {
@@ -189,6 +192,9 @@ export declare class Engine {
     plan?: DocumentInput;
     descriptors?: DocumentInput[];
     calibrations?: DocumentInput[];
+    /** `rustev.source/1` descriptors the plan binds (spec 063 3.5.2):
+     * never taken from the engine's installed sources. */
+    sources?: DocumentInput[];
   }): PlanHandle;
   /** A pure command through the shared surface (`check`, `compile`,
    * `show`, `replay`, `eval`, `evalViews`, `gate`, `calibrateFit`,
