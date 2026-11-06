@@ -530,8 +530,9 @@ reached, because the binary's `DT_NEEDED` is only `libgcc_s`, `libm`,
 `libc` and the loader and it contains no zlib symbol (checked on the rc.2
 `linux/amd64` image), the reason of A-80's two `zlib1g` entries.
 `the_committed_exceptions_name_owner_rows_and_cover_their_findings` now
-expects 45 entries, 44 naming A-80 and this one naming A-82, each
-covering its finding from 2026-11-06 through 2027-02-01.
+expects 45 entries, 44 naming A-80 and this one naming A-82, and checks
+that each covers its finding on 2026-11-06 (the later row's date) and on
+2027-02-01.
 
 ## Decisions at approval
 
