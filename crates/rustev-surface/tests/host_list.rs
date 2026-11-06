@@ -32,4 +32,5 @@ fn memory_lists_immediate_input_names_in_byte_order_under_the_cap() {
     host.create("in/output", b"output").unwrap();
     assert_eq!(host.list("in", 100).unwrap(), ["B", "a", "z", "é"]);
     assert!(host.ensure_absent("in/a").is_err());
+    assert_eq!(host.list("in/z", 2).unwrap_err().detail, "not a directory");
 }
