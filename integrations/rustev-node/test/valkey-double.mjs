@@ -68,7 +68,8 @@ export class ValkeyNode {
     return e?.type === 'string' ? e.value : null;
   }
   set(k, v) {
-    const old = this.keys.get(k);
+    // INCR keeps a live key's TTL; an expired key is gone, TTL and all.
+    const old = this.#live(k);
     this.#write(k, { type: 'string', value: Buffer.from(String(v)), expiresAt: old?.expiresAt ?? null, lru: ++this.tick });
   }
   incrby(k, by) {
