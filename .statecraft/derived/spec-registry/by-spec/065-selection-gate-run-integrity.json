@@ -73,7 +73,7 @@
       }
     ],
     "sectionDigests": {
-      "065-selection-gate-run-integrity-failures-void-the-comparison-instead-of-rejecting-amends-029-and-061": "7356029404906823006d99e20135b971aed355974552516f4cb876900c3442ec",
+      "065-selection-gate-run-integrity-failures-void-the-comparison-instead-of-rejecting-amends-029-and-061": "ae0c68a06ad4b643265a87f09582537b5aecdeb1856f2f4667ae60058b604e04",
       "1-purpose": "47314b75af61f2f24c88ef53735518485af6fa68512cbb336b22e2903e3faa61",
       "2-1-binding-principles": "15e67398c2e2d9a5bdd50686d839c6fc1e132e52b80314d92a08a7ee85082b30",
       "2-territory": "48ef7e0910a65c0ead9f8e3509fc87b44325f481b61439bcbe9c468044fe9a46",
@@ -87,7 +87,7 @@
       "4-out-of-scope": "b7ade36c2267e6fb814bce4b984d862967a3b13ec0243504ee7571fe194c54b8",
       "5-observable-negative-cases": "c609effe2f2e5b7e089e54347421d21553f8f4487a9ad79289e42f0a8d97997d",
       "acceptance": "fd3de0c03a9a03642d291eb2c17dceb4b4ec3afb2c99f025d26df456c5c6e01f",
-      "decisions-at-approval": "4e45bda41de0e85a529d233f80ed844d0d93f1c81c3ac93814186865958c2efb",
+      "decisions-at-approval": "09c79c97815398fb25fc22deca36dd91a04750d8e5cfe8ccd327fa6a1db9170d",
       "implementation-record": "0436ad8b97e1ce4e610da89218ea0aa395a80391005b67fca85f34ae62e5559b",
       "verification": "08b0bec48cf6ffca73b439bc5db9e183b263229fe21d236c7c5f194bbbc09ba8"
     },
@@ -115,6 +115,6 @@
     "summary": "An amendment of approved specs 029 (3.12) and 061 (3.7), for release 0.5.1 (#538), ratified by the owner on 2026-11-06 (A-84). A run with integrity failures (results the evaluator could not score, cases a backend or source failed on) is not a measurement, yet today it can only lower coverage and reject the candidate, which reads as a verdict about the candidate when the run is the problem. This spec adds an optional integrity precondition to `rustev.selection-gate/1`, `integrity: { max_invalid, max_upstream_failures }`, counted per run on each side from documents the selection already verifies. A breach, or a count that cannot be established, voids the comparison: the candidate is `unknown` naming the run, no coverage minimum or clause is evaluated, and so it can never be rejected or qualify on a void run; a baseline run in breach voids every candidate. Gates without the member keep their bytes, identities and results.\n",
     "title": "Selection gate: run integrity failures void the comparison instead of rejecting (amends 029 and 061)"
   },
-  "shardHash": "9df7a03f52c8c64fc10afca77aa617beaaf3364be4eb0ccada60dd9655f32e5c",
+  "shardHash": "a266ed67c754e4bb96e3908df7a2fc811fa3736bc4e48bc23aab49833b6c2983",
   "specVersion": "1.11.0"
 }
