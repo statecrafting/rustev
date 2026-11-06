@@ -34,6 +34,16 @@ tonic.workspace = true
 tonic-prost.workspace = true
 prost.workspace = true
 webpki-roots.workspace = true
+# Spec 011, 3.17.3: the local embedding backend, registered from the host's
+# configuration at startup. Optional, so a build without `local-embed` has
+# no crate of the local inference family (011 3.20.2); `synthetic`, as in the
+# Node binding, since a synthetic bundle constructs on any target (3.6.3).
+rustev-backend-embed-linear = { workspace = true, optional = true, features = ["synthetic"] }
+
+[features]
+# Spec 011, 3.17.3. Off by default; the service image is built without it
+# (spec 060).
+local-embed = ["dep:rustev-backend-embed-linear"]
 
 [[bin]]
 name = "rustev-serve"
