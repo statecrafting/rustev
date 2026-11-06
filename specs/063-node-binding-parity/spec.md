@@ -771,6 +771,20 @@ digest-only reason in 3.8.3 and section 5 now names 004's `missing` for an
 item, as replay has always reported, and 036's `content-not-retained` only
 for an acquisition page; no behavior changed.
 
+**Increment 3a, 2026-11-06 (3.5.2, sources on compile and load).**
+`compile` and `compileSync` take `sources` (`integrations/rustev-node/src/source.rs`,
+`index.d.ts`, `index.js`): a definition compiles through
+`compile_with_sources` and a `plan` loads through
+`load_checked_with_sources`, each source parsed by the bounded
+`rustev.source/1` parser and never taken from the engine's installed set.
+A graded definition without its sources is `CompileRefusal`
+(`source_binding`); a graded plan loaded without them is `CompileRefusal`
+(`load`), as any load mismatch. Fact-only sources need no runtime adapter,
+so such a plan prepares on an engine with no installed source.
+`test/source.test.mjs` covers a synthetic graded-input definition. The
+acquisition seam, `denied`, gauges and the `runtime.acquire-*` cases are
+the rest of increment 3.
+
 ## Decisions at approval
 
 Decided in this text, with reasons: a separate `acquisitionSources` seam,

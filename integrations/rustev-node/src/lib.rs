@@ -14,6 +14,7 @@ mod capture;
 mod errors;
 pub mod local_embed;
 mod seams;
+mod source;
 mod telemetry;
 
 use std::collections::{BTreeMap, HashMap};
@@ -260,11 +261,12 @@ impl Engine {
         definition: Uint8Array,
         descriptors: Vec<Uint8Array>,
         calibrations: Vec<Uint8Array>,
+        sources: Option<Vec<Uint8Array>>,
     ) -> Result<PlanHandle> {
         // Counted, then checked, as on the blocking pool: a synchronous call
         // (from a worker thread too) is one shutdown waits for.
         let _counted = Blocking::enter(self.inner.clone());
-        self.compile_uncounted(definition, descriptors, calibrations)
+        self.compile_uncounted(definition, descriptors, calibrations, sources)
     }
 
     /// The work of `compile`, uncounted: for a caller that already counts
@@ -274,6 +276,7 @@ impl Engine {
         definition: Uint8Array,
         descriptors: Vec<Uint8Array>,
         calibrations: Vec<Uint8Array>,
+        sources: Option<Vec<Uint8Array>>,
     ) -> Result<PlanHandle> {
         guard(|| {
             self.live()?;
@@ -289,7 +292,10 @@ impl Engine {
                 .map(|c| CalibrationArtifact::parse(c))
                 .collect::<std::result::Result<Vec<_>, _>>()
                 .map_err(|e| fail("InvalidDocument", "invalid_document", e.to_string()))?;
-            let compiled = rustev_core::compile(&def, &ds, &cs).map_err(errors::refusal)?;
+            // 063 3.5.2: compiled against the sources named, never the installed set.
+            let ss = source::parse_sources(sources.as_deref())?;
+            let compiled = rustev_core::compile_with_sources(&def, &ds, &cs, &ss, None)
+                .map_err(errors::refusal)?;
             // 049 3.5.1: register every compiled or loaded plan.
             if let Some(t) = &self.inner.telemetry {
                 t.register_plan(&compiled.plan);
@@ -320,11 +326,12 @@ impl Engine {
         plan: Uint8Array,
         descriptors: Vec<Uint8Array>,
         calibrations: Vec<Uint8Array>,
+        sources: Option<Vec<Uint8Array>>,
     ) -> Result<PlanHandle> {
         // Counted, then checked, as on the blocking pool: a synchronous call
         // (from a worker thread too) is one shutdown waits for.
         let _counted = Blocking::enter(self.inner.clone());
-        self.load_uncounted(plan, descriptors, calibrations)
+        self.load_uncounted(plan, descriptors, calibrations, sources)
     }
 
     /// The work of `load`, uncounted: for a caller that already counts
@@ -334,6 +341,7 @@ impl Engine {
         plan: Uint8Array,
         descriptors: Vec<Uint8Array>,
         calibrations: Vec<Uint8Array>,
+        sources: Option<Vec<Uint8Array>>,
     ) -> Result<PlanHandle> {
         guard(|| {
             self.live()?;
@@ -350,7 +358,10 @@ impl Engine {
                 .map(|c| CalibrationArtifact::parse(c))
                 .collect::<std::result::Result<Vec<_>, _>>()
                 .map_err(|e| invalid(e.to_string()))?;
-            let compiled = rustev_core::Compiled::load_checked(&plan, &ds, &cs).map_err(|e| {
+            // 063 3.5.2: loaded against the sources named, never the installed set.
+            let ss = source::parse_sources(sources.as_deref())?;
+            let compiled = rustev_core::Compiled::load_checked_with_sources(&plan, &ds, &cs, &ss)
+                .map_err(|e| {
                 fail(
                     "CompileRefusal",
                     "load",
@@ -389,6 +400,7 @@ impl Engine {
         plan: Option<Uint8Array>,
         descriptors: Vec<Uint8Array>,
         calibrations: Vec<Uint8Array>,
+        sources: Option<Vec<Uint8Array>>,
     ) -> Result<PlanHandle> {
         let engine = Engine {
             inner: self.inner.clone(),
@@ -396,6 +408,7 @@ impl Engine {
         let (definition, plan) = (definition.map(|d| d.to_vec()), plan.map(|p| p.to_vec()));
         let ds: Vec<Vec<u8>> = descriptors.iter().map(|d| d.to_vec()).collect();
         let cs: Vec<Vec<u8>> = calibrations.iter().map(|c| c.to_vec()).collect();
+        let ss: Option<Vec<Vec<u8>>> = sources.map(|v| v.iter().map(|s| s.to_vec()).collect());
         // As for a command: counted, then checked, so shutdown either waits
         // for this compile or it refuses before reaching the pool.
         let counted = Blocking::enter(self.inner.clone());
@@ -409,9 +422,10 @@ impl Engine {
                 guard(|| {
                     let ds = ds.into_iter().map(Uint8Array::new).collect();
                     let cs = cs.into_iter().map(Uint8Array::new).collect();
+                    let ss = ss.map(|v| v.into_iter().map(Uint8Array::new).collect());
                     match (definition, plan) {
-                        (None, Some(p)) => engine.load_uncounted(Uint8Array::new(p), ds, cs),
-                        (Some(d), None) => engine.compile_uncounted(Uint8Array::new(d), ds, cs),
+                        (None, Some(p)) => engine.load_uncounted(Uint8Array::new(p), ds, cs, ss),
+                        (Some(d), None) => engine.compile_uncounted(Uint8Array::new(d), ds, cs, ss),
                         (None, None) => Err(fail(
                             "InvalidDocument",
                             "invalid_document",
