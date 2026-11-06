@@ -1,12 +1,12 @@
 ---
 id: "066-segment-ancestry-predicate"
 title: "Definition predicate: segment ancestry on a declared separator (amends 002 and 032)"
-status: draft
+status: approved
 implementation: pending
 created: "2026-11-06"
 summary: >
-  A proposed amendment of approved specs 002 (3.8, 3.9) and 032 (3.1,
-  3.12), for release 0.5.1 (#509). A partner rule needs "this location
+  An amendment of approved specs 002 (3.8, 3.9) and 032 (3.1, 3.12), for
+  release 0.5.1 (#509), ratified by the owner on 2026-11-06 (A-85). A partner rule needs "this location
   slug sits under that city slug", for example `us:ny:new-york:soho` under
   `us:ny:new-york`; today the host projects the slug's parent into the
   snapshot and the rule compares with `member_ref`. This spec adds one
@@ -21,6 +21,14 @@ summary: >
 amends:
   - "002-decision-contract-and-pure-core"
   - "032-evidence-quality"
+extends:
+  # The predicate in the definition and plan types and the regenerated schemas.
+  - { spec: "002-decision-contract-and-pure-core", unit: { kind: directory, path: "crates/rustev-contract/" }, nature: amending }
+  # Builder, compilation, evaluation, grade propagation and the site rule.
+  - { spec: "002-decision-contract-and-pure-core", unit: { kind: directory, path: "crates/rustev-core/" }, nature: amending }
+  # The generated TypeScript declarations gain one predicate member.
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-node/types/" }, nature: additive }
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-wasm/types/" }, nature: additive }
 depends_on:
   - "002-decision-contract-and-pure-core"
   - "027-node-and-wasm-bindings"
@@ -47,9 +55,9 @@ obligations:
 
 # 066: Definition predicate: segment ancestry on a declared separator (amends 002 and 032)
 
-Draft: a proposal for release 0.5.1, never a claim about code.
-Ratification is the owner's act. The approved texts of 002 and 032 are
-not edited; this spec records what it adds to them.
+Approved: ratified by the owner on 2026-11-06 (A-85) for release 0.5.1;
+the implementation is pending. The approved texts of 002 and 032 are not
+edited; this spec records what it adds to them.
 
 ## 1. Purpose
 
@@ -79,11 +87,12 @@ the parameter-site rule. Generated binding types
 regenerate with one added predicate member; neither binding's code
 changes.
 
-Edges proposed for ratification (none is declared by this draft):
-`crates/rustev-contract/` and `crates/rustev-core/` (002, amending); the
-generated type directories under `integrations/rustev-node/` and
-`integrations/rustev-wasm/` (027, additive); and at completion `Makefile`
-and `scripts/acceptance/` (001, additive).
+Ratification added the `extends` edges to `crates/rustev-contract/` and
+`crates/rustev-core/` (002, amending) and to the generated type
+directories `integrations/rustev-node/types/` and
+`integrations/rustev-wasm/types/` (027, additive); the edges to
+`Makefile` and `scripts/acceptance/` (001, additive) are added by the
+change that completes this spec.
 
 Unchanged: `rustev.definition/1`, `rustev.plan/2`, `rustev.exact/1`;
 every existing operator and predicate; snapshot, evidence, run and
@@ -149,8 +158,8 @@ refusal category and its phase order.
    ancestor's segments equals the value's segment at the same position,
    byte for byte. Equivalently: the value's bytes begin with the
    ancestor's bytes followed immediately by the separator byte.
-3. **Not under itself.** Equal operands give false (strict ancestry; open
-   question 1). "At or under" is written `any: [under, cmp eq]`.
+3. **Not under itself.** Equal operands give false (strict
+   ancestry). "At or under" is written `any: [under, cmp eq]`.
 4. **No normalization.** Bytes are compared as given: no case folding, no
    Unicode normalization, no trimming of whitespace, no percent or escape
    decoding. `US:NY` is not an ancestor of `us:ny:soho`. A definition that
@@ -198,7 +207,7 @@ refusal category and its phase order.
    operand makes the result at most `hint`.
 2. The positions of `under` are not parameter sites (034 3.3.3): `value`
    and `ancestor` are expressions whose references are never sites, and
-   `separator` is a fixed literal (open question 3).
+   `separator` is a fixed literal.
 3. The typed builder in `rustev-core` gains `under` and emits the same
    document the JSON parser accepts (002 3.9.2).
 
@@ -231,7 +240,7 @@ refusal category and its phase order.
 
 ## 4. Out of scope
 
-A plain text prefix predicate (open question 2); case-insensitive or
+A plain text prefix predicate; case-insensitive or
 normalized comparison; multi-byte or definition-chosen separators outside
 the closed set; extracting a parent, a depth or a segment as a value;
 ancestry over lists or maps; spec 005's rules language; a new registry or
@@ -282,7 +291,7 @@ Pending with implementation.
 
 ## Implementation record
 
-None. Draft.
+None yet.
 
 ## Decisions at approval
 
@@ -294,21 +303,12 @@ comparison with no normalization (3.2.4, the issue); empty segments and
 empty operands are `invalid_input` (3.2.1, 3.3.2); registry
 `rustev.exact/2` with no new document version (3.5.1, 036's precedent).
 
-Open for the owner, each with a recommendation:
+Ratified by the owner on 2026-11-06 (A-85), with every question the
+draft left open answered as recommended:
 
-1. **Is a slug under itself?** No: strict ancestry (recommended: the
-   issue's rule is "sits under that city", and "at or under" is one
-   `any` with `cmp eq` away, while a non-strict predicate cannot express
-   strict without `not` over a value that may be handled `as_unmet`); or
-   true, or a required member `self: "excluded" | "included"` so each
-   definition states it.
-2. **A plain text prefix predicate.** Not added (recommended: a byte
-   prefix is the `new-york-city` error the issue names, and `under` covers
-   the rule); or add `starts_with{value, prefix}` beside it for
-   non-hierarchical codes.
-3. **The separator.** A literal from the closed set `:`, `/`, `|`, `.`
-   (recommended: the same set as `compose_key@1`, one byte, no escaping
-   rules); or any single printable ASCII byte, or an expression, which
-   would make the separator a runtime value outside the `PlanId`.
-4. **Operand types.** `text` only (recommended); or also `enum`, compared
-   by option name as `compose_key@1`'s `exact` normalization does.
+1. **A slug is not under itself.** Strict ancestry; "at or under" is
+   `any: [under, cmp eq]` (3.2.3).
+2. **No plain text prefix predicate** (section 4).
+3. **The separator** is a literal from the closed set `:`, `/`, `|`,
+   `.` (3.1.3).
+4. **Operand types:** `text` only (3.1.2).
