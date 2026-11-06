@@ -10,6 +10,7 @@
 //! into the exported `RustevError` subclass (3.4.1). No panic crosses: every
 //! export runs inside `catch_unwind` and a panic becomes `InternalError`.
 
+mod callback;
 mod capture;
 mod errors;
 pub mod local_embed;
@@ -110,6 +111,9 @@ pub struct Engine {
 impl Engine {
     /// `Engine.create` (3.3): every refusal happens before any thread starts.
     #[napi(factory)]
+    // Positional, as the JavaScript layer passes them; each later seam is a
+    // trailing optional argument (063 3.5, 3.6).
+    #[allow(clippy::too_many_arguments)]
     pub fn create(
         config: EngineConfig,
         sink: seams::SinkSeam,
@@ -120,6 +124,8 @@ impl Engine {
         // Last and optional, so a native caller that predates spec 011's
         // local backends keeps its argument positions (049 3.4.2's test).
         local_embed: Option<&local_embed::LocalEmbedSet>,
+        // 063 3.5: last and optional, as `local_embed`.
+        acquisition_sources: Option<Vec<source::SourceSeam>>,
     ) -> Result<Engine> {
         guard(|| {
             let workers = range("workerThreads", config.worker_threads, 1, 64)?;
@@ -135,6 +141,15 @@ impl Engine {
                 .map(|b| seams::HostBackend::new(b, traces.clone()))
                 .collect::<Result<Vec<_>>>()?;
             let context = context_source.map(seams::HostContext::new).transpose()?;
+            // 063 3.5.1: every source parsed and bounded before any thread.
+            let mut host_sources: Vec<(Arc<dyn rustev_core::seams::AcquisitionSource>, usize)> =
+                vec![];
+            for s in acquisition_sources.unwrap_or_default() {
+                let s = source::HostSource::new(s, traces.clone())?;
+                stats.push(s.stats.clone());
+                let max = s.max_concurrency;
+                host_sources.push((Arc::new(s), max));
+            }
             if let Some(c) = &context {
                 stats.push(c.stats.clone());
             }
@@ -184,6 +199,9 @@ impl Engine {
                 );
                 for (backend, max) in &registrations {
                     b = b.backend(backend.clone(), *max);
+                }
+                for (s, max) in &host_sources {
+                    b = b.acquisition_source(s.clone(), *max);
                 }
                 b.build().map_err(errors::config_error)
             };
@@ -315,6 +333,7 @@ impl Engine {
                 raw,
                 descriptors: Arc::new(ds),
                 calibrations: Arc::new(cs),
+                sources: Arc::new(ss),
             })
         })
     }
@@ -387,6 +406,7 @@ impl Engine {
                 raw,
                 descriptors: Arc::new(ds),
                 calibrations: Arc::new(cs),
+                sources: Arc::new(ss),
             })
         })
     }
@@ -812,6 +832,9 @@ pub struct PlanHandle {
     raw: Vec<u8>,
     descriptors: Arc<Vec<BackendDescriptor>>,
     calibrations: Arc<Vec<CalibrationArtifact>>,
+    /// The source descriptors it was compiled or loaded against (063
+    /// 3.5.2), for capture assembly (3.8).
+    sources: Arc<Vec<rustev_contract::source::SourceDescriptor>>,
 }
 
 fn integer(v: f64, what: &str) -> Result<u64> {
@@ -968,6 +991,7 @@ impl PlanHandle {
         let dependencies = capture
             .as_ref()
             .map(|_| (self.descriptors.clone(), self.calibrations.clone()));
+        let sources = self.sources.clone();
         let task = self.engine.rt.spawn(async move {
             let _counted = counted;
             // 049 3.4: begin immediately before admission; abandon on every exit.
@@ -1018,6 +1042,7 @@ impl PlanHandle {
                             evaluation_time,
                             created_at_ms: options.created,
                         },
+                        &sources,
                     )))
                 })?;
                 (captured.result, outcome)

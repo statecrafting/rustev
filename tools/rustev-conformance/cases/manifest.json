@@ -11532,6 +11532,564 @@
     },
     {
       "command": "decide",
+      "id": "runtime.acquire-page",
+      "inputs": [
+        {
+          "name": "acquire-retry.plan.json",
+          "path": "tools/rustev-conformance/fixtures/acquire/acquire-retry.plan.json",
+          "sha256": "75ee4399c9d63fa9f6baa94b2759b9a03ac51d607a474d72f76c412c99ba734a"
+        },
+        {
+          "name": "catalog.source.json",
+          "path": "tools/rustev-conformance/fixtures/acquire/catalog.source.json",
+          "sha256": "82c468f0fb521efce7c0cb30a19c4b79ef5825663965944f838e3adc9490f53c"
+        },
+        {
+          "name": "empty.snapshot.json",
+          "path": "tools/rustev-conformance/fixtures/acquire/empty.snapshot.json",
+          "sha256": "b34d8feb906cb18dfe773a01c18e3645ae091132b99060eed8787e148ceddf82"
+        }
+      ],
+      "mirrors": "crates/rustev-runtime/tests/acquisition.rs::retries_only_named_classes_denied_never_retried_and_panics_contained",
+      "outputs": [
+        {
+          "file": "overloaded.record.json",
+          "golden": "tools/rustev-conformance/expected/runtime/runtime.acquire-page/overloaded.record.json",
+          "normalize": [],
+          "sha256": "dc4c71cea7aebbb32b902651b704393ee1cc8f8420cb83bb25bf3f62d9cab132"
+        },
+        {
+          "file": "overloaded.result.json",
+          "golden": "tools/rustev-conformance/expected/runtime/runtime.acquire-page/overloaded.result.json",
+          "normalize": [],
+          "sha256": "8a1801496467b9624d11c95c2c6b7c750a085ebcb057f9b1c232cd307d793dd5"
+        },
+        {
+          "file": "transient.record.json",
+          "golden": "tools/rustev-conformance/expected/runtime/runtime.acquire-page/transient.record.json",
+          "normalize": [],
+          "sha256": "842f83172322d5ceaae97d99bc4961942a07384d33263c66df8d44ac04812f68"
+        },
+        {
+          "file": "transient.result.json",
+          "golden": "tools/rustev-conformance/expected/runtime/runtime.acquire-page/transient.result.json",
+          "normalize": [],
+          "sha256": "00181a0e5001f9c116321e328b90dc6e9dab6141b0ceb48901fcef6a09ce8f68"
+        }
+      ],
+      "runtime": {
+        "backends": [],
+        "calibrations": [],
+        "config": {
+          "max_in_flight": 1,
+          "max_parallel_requests": 2,
+          "max_queued": 2,
+          "sink_timeout_ms": 1000
+        },
+        "descriptors": [],
+        "drive": [
+          "start",
+          "start"
+        ],
+        "plan": "acquire-retry.plan.json",
+        "requests": [
+          {
+            "decision_id": "transient",
+            "evaluation_time_ms": 1000,
+            "snapshot": "empty.snapshot.json"
+          },
+          {
+            "decision_id": "overloaded",
+            "evaluation_time_ms": 1000,
+            "snapshot": "empty.snapshot.json"
+          }
+        ],
+        "sources": [
+          {
+            "answers": {
+              "overloaded": [
+                {
+                  "fail": {
+                    "charge": {
+                      "observed": {
+                        "units": 1
+                      }
+                    },
+                    "class": "overloaded",
+                    "detail": "scripted"
+                  }
+                },
+                {
+                  "page": {
+                    "as_of_ms": 900,
+                    "charge": {
+                      "observed": {
+                        "units": 1
+                      }
+                    },
+                    "items": [
+                      {
+                        "id": 1
+                      }
+                    ],
+                    "next": "none"
+                  }
+                }
+              ],
+              "transient": [
+                {
+                  "fail": {
+                    "charge": {
+                      "observed": {
+                        "units": 1
+                      }
+                    },
+                    "class": "transient",
+                    "detail": "scripted"
+                  }
+                },
+                {
+                  "page": {
+                    "as_of_ms": 900,
+                    "charge": {
+                      "observed": {
+                        "units": 1
+                      }
+                    },
+                    "items": [
+                      {
+                        "id": 1
+                      }
+                    ],
+                    "next": {
+                      "offset": {
+                        "integer": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "page": {
+                    "as_of_ms": 900,
+                    "charge": {
+                      "observed": {
+                        "units": 1
+                      }
+                    },
+                    "items": [
+                      {
+                        "id": 2
+                      }
+                    ],
+                    "next": "none"
+                  }
+                }
+              ]
+            },
+            "descriptor": "catalog.source.json",
+            "max_concurrency": 1
+          }
+        ]
+      },
+      "surfaces": [
+        "rust-api",
+        "native"
+      ]
+    },
+    {
+      "command": "decide",
+      "id": "runtime.acquire-retry-denied",
+      "inputs": [
+        {
+          "name": "acquire-denied.plan.json",
+          "path": "tools/rustev-conformance/fixtures/acquire/acquire-denied.plan.json",
+          "sha256": "3e2dac953f3e689f3c7ced7a7b78594e24a3edd58aa793c18af87df05927211e"
+        },
+        {
+          "name": "catalog.source.json",
+          "path": "tools/rustev-conformance/fixtures/acquire/catalog.source.json",
+          "sha256": "82c468f0fb521efce7c0cb30a19c4b79ef5825663965944f838e3adc9490f53c"
+        },
+        {
+          "name": "empty.snapshot.json",
+          "path": "tools/rustev-conformance/fixtures/acquire/empty.snapshot.json",
+          "sha256": "b34d8feb906cb18dfe773a01c18e3645ae091132b99060eed8787e148ceddf82"
+        }
+      ],
+      "mirrors": "crates/rustev-runtime/tests/acquisition.rs::retries_only_named_classes_denied_never_retried_and_panics_contained",
+      "outputs": [
+        {
+          "file": "denied.record.json",
+          "golden": "tools/rustev-conformance/expected/runtime/runtime.acquire-retry-denied/denied.record.json",
+          "normalize": [],
+          "sha256": "62c833c92bf5061a2a2fc36d550e4309f7b8cd6a92b5e78bbc7eea4d057738b8"
+        },
+        {
+          "file": "denied.result.json",
+          "golden": "tools/rustev-conformance/expected/runtime/runtime.acquire-retry-denied/denied.result.json",
+          "normalize": [],
+          "sha256": "179f8e2adecdaa1c8fc69a9bfd42b273590f34d74b4b1b158f5c8ae6ad2bd983"
+        },
+        {
+          "file": "invalid.record.json",
+          "golden": "tools/rustev-conformance/expected/runtime/runtime.acquire-retry-denied/invalid.record.json",
+          "normalize": [],
+          "sha256": "b50c6abe96889e623e6ade3a1826c691e226c2f15b5ec6ccb429469b736c1714"
+        },
+        {
+          "file": "invalid.result.json",
+          "golden": "tools/rustev-conformance/expected/runtime/runtime.acquire-retry-denied/invalid.result.json",
+          "normalize": [],
+          "sha256": "c0c12e43c680e4724eaf460d49f292982ca9692eda6da6bd38137f045812f4d6"
+        },
+        {
+          "file": "unnamed.record.json",
+          "golden": "tools/rustev-conformance/expected/runtime/runtime.acquire-retry-denied/unnamed.record.json",
+          "normalize": [],
+          "sha256": "0bbf9cbae1b91a2dc516d7b3fc1b46db3eeb44fff4e6796c5f0970d5d723b5c5"
+        },
+        {
+          "file": "unnamed.result.json",
+          "golden": "tools/rustev-conformance/expected/runtime/runtime.acquire-retry-denied/unnamed.result.json",
+          "normalize": [],
+          "sha256": "d2d8e5d0ec16946d02fd2e77bfaccbbba5b804d5cd435673538bf631d867665c"
+        }
+      ],
+      "runtime": {
+        "backends": [],
+        "calibrations": [],
+        "config": {
+          "max_in_flight": 1,
+          "max_parallel_requests": 2,
+          "max_queued": 3,
+          "sink_timeout_ms": 1000
+        },
+        "descriptors": [],
+        "drive": [
+          "start",
+          "start",
+          "start"
+        ],
+        "plan": "acquire-denied.plan.json",
+        "requests": [
+          {
+            "decision_id": "denied",
+            "evaluation_time_ms": 1000,
+            "snapshot": "empty.snapshot.json"
+          },
+          {
+            "decision_id": "unnamed",
+            "evaluation_time_ms": 1000,
+            "snapshot": "empty.snapshot.json"
+          },
+          {
+            "decision_id": "invalid",
+            "evaluation_time_ms": 1000,
+            "snapshot": "empty.snapshot.json"
+          }
+        ],
+        "sources": [
+          {
+            "answers": {
+              "denied": [
+                {
+                  "fail": {
+                    "charge": {
+                      "observed": {
+                        "units": 1
+                      }
+                    },
+                    "class": "denied",
+                    "detail": "scripted"
+                  }
+                },
+                {
+                  "page": {
+                    "as_of_ms": 900,
+                    "charge": {
+                      "observed": {
+                        "units": 1
+                      }
+                    },
+                    "items": [
+                      {
+                        "id": 1
+                      }
+                    ],
+                    "next": "none"
+                  }
+                }
+              ],
+              "invalid": [
+                {
+                  "invalid": {
+                    "charge": {
+                      "observed": {
+                        "units": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "page": {
+                    "as_of_ms": 900,
+                    "charge": {
+                      "observed": {
+                        "units": 1
+                      }
+                    },
+                    "items": [
+                      {
+                        "id": 1
+                      }
+                    ],
+                    "next": "none"
+                  }
+                }
+              ],
+              "unnamed": [
+                {
+                  "fail": {
+                    "charge": {
+                      "observed": {
+                        "units": 1
+                      }
+                    },
+                    "class": "overloaded",
+                    "detail": "scripted"
+                  }
+                },
+                {
+                  "page": {
+                    "as_of_ms": 900,
+                    "charge": {
+                      "observed": {
+                        "units": 1
+                      }
+                    },
+                    "items": [
+                      {
+                        "id": 1
+                      }
+                    ],
+                    "next": "none"
+                  }
+                }
+              ]
+            },
+            "descriptor": "catalog.source.json",
+            "max_concurrency": 1
+          }
+        ]
+      },
+      "surfaces": [
+        "rust-api",
+        "native"
+      ]
+    },
+    {
+      "command": "decide",
+      "id": "runtime.acquire-widen",
+      "inputs": [
+        {
+          "name": "acquire-widen.plan.json",
+          "path": "tools/rustev-conformance/fixtures/acquire/acquire-widen.plan.json",
+          "sha256": "a9fcce4b3919354c1b735246f0fb8ff2964177c5f03107dd612726fb19f3fdff"
+        },
+        {
+          "name": "catalog.source.json",
+          "path": "tools/rustev-conformance/fixtures/acquire/catalog.source.json",
+          "sha256": "82c468f0fb521efce7c0cb30a19c4b79ef5825663965944f838e3adc9490f53c"
+        },
+        {
+          "name": "empty.snapshot.json",
+          "path": "tools/rustev-conformance/fixtures/acquire/empty.snapshot.json",
+          "sha256": "b34d8feb906cb18dfe773a01c18e3645ae091132b99060eed8787e148ceddf82"
+        },
+        {
+          "name": "other.source.json",
+          "path": "tools/rustev-conformance/fixtures/acquire/other.source.json",
+          "sha256": "d201e7dd2fea330277c27ba253b4641edbb8e0a80161dd9365a972b38b2ebab6"
+        }
+      ],
+      "mirrors": "crates/rustev-runtime/tests/acquisition.rs::widening_switches_sources_keeps_protected_fields_and_dedupes",
+      "outputs": [
+        {
+          "file": "widen.record.json",
+          "golden": "tools/rustev-conformance/expected/runtime/runtime.acquire-widen/widen.record.json",
+          "normalize": [],
+          "sha256": "cc3f817bcbf04de67c8f52d60211ec42973c7fa444497a862fef0b824191fb7a"
+        },
+        {
+          "file": "widen.result.json",
+          "golden": "tools/rustev-conformance/expected/runtime/runtime.acquire-widen/widen.result.json",
+          "normalize": [],
+          "sha256": "5f2239f18e9a1a54d6c4692fe95e210dc1bc1a41ad0750c0c7351d3d0884ac9a"
+        }
+      ],
+      "runtime": {
+        "backends": [],
+        "calibrations": [],
+        "config": {
+          "max_in_flight": 1,
+          "max_parallel_requests": 2,
+          "max_queued": 1,
+          "sink_timeout_ms": 1000
+        },
+        "descriptors": [],
+        "drive": [
+          "start"
+        ],
+        "plan": "acquire-widen.plan.json",
+        "requests": [
+          {
+            "decision_id": "widen",
+            "evaluation_time_ms": 1000,
+            "snapshot": "empty.snapshot.json"
+          }
+        ],
+        "sources": [
+          {
+            "answers": {
+              "widen": [
+                {
+                  "page": {
+                    "as_of_ms": 900,
+                    "charge": {
+                      "observed": {
+                        "units": 1
+                      }
+                    },
+                    "items": [
+                      {
+                        "id": 1
+                      },
+                      {
+                        "id": 2
+                      }
+                    ],
+                    "next": "none"
+                  }
+                }
+              ]
+            },
+            "descriptor": "catalog.source.json",
+            "max_concurrency": 1
+          },
+          {
+            "answers": {
+              "widen": [
+                {
+                  "page": {
+                    "as_of_ms": 900,
+                    "charge": {
+                      "observed": {
+                        "units": 1
+                      }
+                    },
+                    "items": [
+                      {
+                        "other_id": 1
+                      },
+                      {
+                        "other_id": 3
+                      }
+                    ],
+                    "next": "none"
+                  }
+                }
+              ]
+            },
+            "descriptor": "other.source.json",
+            "max_concurrency": 1
+          }
+        ]
+      },
+      "surfaces": [
+        "rust-api",
+        "native"
+      ]
+    },
+    {
+      "command": "decide",
+      "id": "runtime.acquire-window",
+      "inputs": [
+        {
+          "name": "acquire-window.plan.json",
+          "path": "tools/rustev-conformance/fixtures/acquire/acquire-window.plan.json",
+          "sha256": "f8bd94f86ffd46ebc10670662188eb6c4153aa8c0ea81161584f56fc8f68a8d6"
+        },
+        {
+          "name": "catalog.source.json",
+          "path": "tools/rustev-conformance/fixtures/acquire/catalog.source.json",
+          "sha256": "82c468f0fb521efce7c0cb30a19c4b79ef5825663965944f838e3adc9490f53c"
+        },
+        {
+          "name": "empty.snapshot.json",
+          "path": "tools/rustev-conformance/fixtures/acquire/empty.snapshot.json",
+          "sha256": "b34d8feb906cb18dfe773a01c18e3645ae091132b99060eed8787e148ceddf82"
+        }
+      ],
+      "mirrors": "crates/rustev-runtime/tests/acquisition.rs::window_expiry_cancels_and_queued_pages_do_not_dispatch",
+      "outputs": [
+        {
+          "file": "expiry.record.json",
+          "golden": "tools/rustev-conformance/expected/runtime/runtime.acquire-window/expiry.record.json",
+          "normalize": [],
+          "sha256": "acaaf782713f6dbf693dfc03ae2d1f4290de4b5754c1e4eefaf636c005fdde44"
+        },
+        {
+          "file": "expiry.result.json",
+          "golden": "tools/rustev-conformance/expected/runtime/runtime.acquire-window/expiry.result.json",
+          "normalize": [],
+          "sha256": "daa2b3d45833e7b096443d30235d4df801cfe530bf261ba6534728b244f5ad89"
+        }
+      ],
+      "runtime": {
+        "backends": [],
+        "calibrations": [],
+        "config": {
+          "max_in_flight": 1,
+          "max_parallel_requests": 1,
+          "max_queued": 1,
+          "sink_timeout_ms": 1000
+        },
+        "descriptors": [],
+        "drive": [
+          "start",
+          {
+            "advance_timer": {
+              "delay_ms": 20
+            }
+          }
+        ],
+        "plan": "acquire-window.plan.json",
+        "requests": [
+          {
+            "decision_id": "expiry",
+            "evaluation_time_ms": 1000,
+            "snapshot": "empty.snapshot.json"
+          }
+        ],
+        "sources": [
+          {
+            "answers": {
+              "expiry": [
+                "ignore"
+              ]
+            },
+            "descriptor": "catalog.source.json",
+            "max_concurrency": 1
+          }
+        ]
+      },
+      "surfaces": [
+        "rust-api",
+        "native"
+      ]
+    },
+    {
+      "command": "decide",
       "id": "runtime.admission",
       "inputs": [
         {

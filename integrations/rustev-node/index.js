@@ -42,7 +42,8 @@ for (const name of [
 /** A host seam's typed failure (3.6.5): its class, the charge it observed
  * and the remote end it knows. */
 class SeamFailure extends Error {
-  /** `failureClass` is `transient`, `overloaded`, `permanent` or, answering
+  /** `failureClass` is `transient`, `overloaded`, `permanent`, `denied`
+   * (an acquisition source only, spec 063 3.5.5; never retried) or, answering
    * a cancellation, `cancelled` with `cancel` `stopped` (the default) or
    * `unconfirmed`. */
   constructor({ failureClass, charge, remote, cancel, detail = '' }) {
@@ -257,6 +258,54 @@ function backendSeam(b) {
   };
 }
 
+/** A host acquisition source (spec 063, 3.5). Its `acquire` is called as
+ * an asynchronous host callback (3.4): a synchronous throw is a rejection,
+ * a non-Promise value a resolved Promise. A page crosses unchanged (an
+ * object serialized with JSON.stringify) and the core validates it; a
+ * thrown `SeamFailure` keeps its class (`transient`, `overloaded`,
+ * `permanent`, `denied`), charge and, after an abort, its `cancel`. */
+function sourceSeam(s) {
+  const calls = aborts();
+  return {
+    descriptor: bytes(s.descriptor),
+    maxConcurrency: s.maxConcurrency,
+    queueCapacity: s.queueCapacity,
+    acquire: async (call) => {
+      const signal = calls.start(call.attemptId);
+      try {
+        const answer = await s.acquire({
+          decisionId: call.decisionId,
+          operation: call.operation,
+          request: call.request,
+          requestId: call.requestId,
+          attemptId: call.attemptId,
+          remainingMs: call.remainingMs,
+          principalHandle: call.principalHandle,
+          signal,
+          traceparent: call.traceparent ?? undefined,
+        });
+        return {
+          page: answer?.page == null ? undefined : bytes(answer.page),
+          charge: answer?.charge === undefined ? undefined : JSON.stringify(answer.charge),
+        };
+      } catch (e) {
+        if (e instanceof SeamFailure) {
+          return {
+            failure: String(e.failureClass),
+            detail: e.message,
+            charge: e.charge === undefined ? undefined : JSON.stringify(e.charge),
+            cancel: e.cancel ?? undefined,
+          };
+        }
+        throw e;
+      } finally {
+        calls.end(call.attemptId);
+      }
+    },
+    abort: (attemptId) => calls.abort(attemptId),
+  };
+}
+
 const utf8 = (b) => Buffer.from(b).toString('utf8');
 
 /** A host scorer (spec 041, 3.9.1). It is given the parsed case and
@@ -440,6 +489,7 @@ class Engine {
             options.contextSource ? contextSeam(options.contextSource) : undefined,
             telemetryOptions(options.telemetry),
             localEmbedSet(options.localEmbedBackends),
+            options.acquisitionSources ? options.acquisitionSources.map(sourceSeam) : undefined,
           ),
         ),
     );
@@ -693,7 +743,9 @@ class Engine {
     try { telemetryUnflushed = await natives.get(this).shutdownTelemetry(Math.max(0, until - Date.now())); }
     catch (e) { throw typed(e); }
     // The late settlements discarded during this shutdown.
-    return { telemetryUnflushed, drained: active === 0, cancelled, lateDiscarded: lateCount() - lateBefore, stillRunning: remaining };
+    // 063 3.4.6: host callbacks of cancelled decisions still unsettled.
+    const abandonedPending = this.gauges().seams.reduce((n, s) => n + (s.abandonedPending ?? 0), 0);
+    return { telemetryUnflushed, drained: active === 0, cancelled, lateDiscarded: lateCount() - lateBefore, stillRunning: remaining, abandonedPending };
   }
 }
 

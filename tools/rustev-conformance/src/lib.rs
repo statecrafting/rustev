@@ -4,6 +4,7 @@
 //! case's expected bytes under only the comparison the case declares.
 #![forbid(unsafe_code)]
 
+pub mod acquire;
 pub mod local_embed;
 pub mod normalize;
 pub mod runtime;

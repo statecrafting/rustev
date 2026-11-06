@@ -634,3 +634,327 @@ fn fixture(name: &str) -> String {
         format!("runtime/{name}")
     }
 }
+
+// ---- spec 063 3.13.2: acquisition source cases --------------------------
+
+/// The SYNTHETIC source of `crates/rustev-runtime/tests/acquisition.rs`,
+/// named `name` with its item field `field`.
+fn acquire_source(name: &str, field: &str) -> rustev_contract::source::SourceDescriptor {
+    serde_json::from_value(
+        json!({"schema":"rustev.source/1","name":name,"version":"1.0.0",
+        "operations":[{"name":"search","cancellation":"acknowledges",
+        "request":[{"name":"q","type":{"text":{"max_bytes":512}},"required":true},
+                   {"name":"optional","type":"integer","required":false}],"max_request_bytes":2048,
+        "item":[{"name":field,"type":"integer","provenance":"system-of-record",
+        "max_grade":"cached","reliability":"reliable","freshness":"not_required"}],
+        "max_page_items":4,"max_page_bytes":1024,"paging":"offset",
+        "cost":{"bounded":{"max_units":3}},"idempotent":true,"cache":"not_cacheable"}]}),
+    )
+    .unwrap()
+}
+
+/// The mirrored test's definition: one `acquire` step `lookup` with a 100
+/// ms deadline and a 0.2 window share.
+fn acquire_definition(
+    max_attempts: u32,
+    retry_on: &[&str],
+) -> rustev_contract::definition::Definition {
+    let mut d = support_routing();
+    d.schema = "rustev.definition/2".into();
+    d.inputs.clear();
+    d.limits.deadline_ms = 100;
+    d.policy = serde_json::from_value(json!({"on_unresolved":[],"rules":[{"id":"fallback","when":"always","then":{"escalate":{"reason":"review"}}}],"adjustments":[]})).unwrap();
+    d.steps = vec![serde_json::from_value(json!({"id":"lookup","body":{"acquire":{
+        "source":"catalog","operation":"search","request":{"q":{"lit":{"text":"tea"}}},"when":"always",
+        "limits":{"max_pages":2,"max_items":5,"max_attempts":max_attempts,"retry_on":retry_on,"delay":"none","deadline_share":"0.2","as_of_skew_ms":100},
+        "stop":"none","on_failure":"unresolved"}}})).unwrap()];
+    d.limits.acquisition = Some(
+        serde_json::from_value(json!({"max_calls":8,"max_items":20,"max_bytes":16384})).unwrap(),
+    );
+    d
+}
+
+/// The mirrored widening definition, with the second tier on `other`.
+fn widen_definition() -> rustev_contract::definition::Definition {
+    let mut d = acquire_definition(1, &[]);
+    d.steps = vec![serde_json::from_value(json!({"id":"pool","body":{"widen":{
+        "item":{"fields":[{"name":"id","type":"integer"}]},
+        "sources":[{"source":"catalog","operation":"search","map":{"id":"id"}},
+                   {"source":"other","operation":"search","map":{"id":"other_id"}}],
+        "base_request":{"q":{"lit":{"text":"protected"}},"optional":{"lit":{"integer":7}}},
+        "groups":{"scope":["q"],"preferences":["optional"]},"protected":["scope"],
+        "tiers":[{"name":"specific","source_index":0,"request_patch":{},"when":"always","relax":[]},
+                 {"name":"broad","source_index":1,"request_patch":{},"when":"always","relax":["preferences"]}],
+        "max_tiers":2,"dedupe_key":"id","order":"tier_then_source_rank",
+        "stop":{"unique_at_least":{"lit":{"integer":3}}},"on_tier_failure":"continue",
+        "limits":{"max_pages":2,"max_items":5,"max_attempts":1,"retry_on":[],"delay":"none","deadline_share":"0.2","as_of_skew_ms":100}
+    }}})).unwrap()];
+    d
+}
+
+fn acquire_fixtures() -> BTreeMap<String, Vec<u8>> {
+    let catalog = acquire_source("catalog", "id");
+    let other = acquire_source("other", "other_id");
+    let plan = |d: &rustev_contract::definition::Definition,
+                s: &[rustev_contract::source::SourceDescriptor]| {
+        line(
+            rustev_core::compile_with_sources(d, &[], &[], s, None)
+                .unwrap()
+                .canonical(),
+        )
+    };
+    let one = std::slice::from_ref(&catalog);
+    let mut window = acquire_definition(1, &[]);
+    let mut second = window.steps[0].clone();
+    second.id = "other".into();
+    window.steps.push(second);
+    BTreeMap::from([
+        (
+            "catalog.source.json".into(),
+            line(catalog.canonical().unwrap()),
+        ),
+        ("other.source.json".into(), line(other.canonical().unwrap())),
+        (
+            "acquire-retry.plan.json".into(),
+            plan(&acquire_definition(2, &["transient", "overloaded"]), one),
+        ),
+        (
+            "acquire-denied.plan.json".into(),
+            plan(&acquire_definition(2, &["transient"]), one),
+        ),
+        ("acquire-window.plan.json".into(), plan(&window, one)),
+        (
+            "acquire-widen.plan.json".into(),
+            plan(&widen_definition(), &[catalog.clone(), other.clone()]),
+        ),
+        (
+            "empty.snapshot.json".into(),
+            line(snapshot(vec![]).canonical().unwrap()),
+        ),
+    ])
+}
+
+fn page(ids: &[i64], field: &str, next: Json) -> Json {
+    json!({"page":{"items":ids.iter().map(|i| json!({field: i})).collect::<Vec<_>>(),
+        "next":next,"as_of_ms":900,"charge":{"observed":{"units":1}}}})
+}
+
+fn fail(class: &str) -> Json {
+    json!({"fail":{"class":class,"detail":"scripted","charge":{"observed":{"units":1}}}})
+}
+
+fn source_script(descriptor: &str, answers: Json) -> Json {
+    json!({"descriptor": descriptor, "max_concurrency": 1, "answers": answers})
+}
+
+/// The acquisition cases: `(id, mirrored test, runtime block)`.
+fn acquire_cases() -> Vec<(&'static str, &'static str, Json)> {
+    const RETRY: &str = "crates/rustev-runtime/tests/acquisition.rs::retries_only_named_classes_denied_never_retried_and_panics_contained";
+    let base = |plan: &str, parallel: usize, sources: Json, ids: &[&str], drive: Json| {
+        let requests: Vec<Json> = ids
+            .iter()
+            .map(|id| {
+                json!({"decision_id": id,
+            "snapshot": "empty.snapshot.json", "evaluation_time_ms": 1000})
+            })
+            .collect();
+        json!({"plan": plan, "descriptors": [], "calibrations": [],
+               "config": config(1, ids.len(), parallel), "backends": [],
+               "sources": sources, "requests": requests, "drive": drive})
+    };
+    let starts = |n: usize| json!(vec!["start"; n]);
+    vec![
+        (
+            "runtime.acquire-page",
+            RETRY,
+            base(
+                "acquire-retry.plan.json",
+                2,
+                json!([source_script(
+                    "catalog.source.json",
+                    json!({
+                        // A named transient is retried; the page then pages on.
+                        "transient": [fail("transient"), page(&[1], "id", json!({"offset":{"integer":1}})), page(&[2], "id", json!("none"))],
+                        // A named overloaded is retried.
+                        "overloaded": [fail("overloaded"), page(&[1], "id", json!("none"))],
+                    })
+                )]),
+                &["transient", "overloaded"],
+                starts(2),
+            ),
+        ),
+        (
+            "runtime.acquire-retry-denied",
+            RETRY,
+            base(
+                "acquire-denied.plan.json",
+                2,
+                json!([source_script(
+                    "catalog.source.json",
+                    json!({
+                        "denied": [fail("denied"), page(&[1], "id", json!("none"))],
+                        "unnamed": [fail("overloaded"), page(&[1], "id", json!("none"))],
+                        "invalid": [{"invalid":{"charge":{"observed":{"units":1}}}}, page(&[1], "id", json!("none"))],
+                    })
+                )]),
+                &["denied", "unnamed", "invalid"],
+                starts(3),
+            ),
+        ),
+        (
+            "runtime.acquire-window",
+            "crates/rustev-runtime/tests/acquisition.rs::window_expiry_cancels_and_queued_pages_do_not_dispatch",
+            base(
+                "acquire-window.plan.json",
+                1,
+                json!([source_script(
+                    "catalog.source.json",
+                    json!({
+                        "expiry": ["ignore"],
+                    })
+                )]),
+                &["expiry"],
+                // The window's timer (0.2 of 100 ms), armed at dispatch; the
+                // decision's own deadline timer is 100 ms and never matches.
+                json!(["start", {"advance_timer": {"delay_ms": 20}}]),
+            ),
+        ),
+        (
+            "runtime.acquire-widen",
+            "crates/rustev-runtime/tests/acquisition.rs::widening_switches_sources_keeps_protected_fields_and_dedupes",
+            base(
+                "acquire-widen.plan.json",
+                2,
+                json!([
+                    source_script(
+                        "catalog.source.json",
+                        json!({"widen": [page(&[1, 2], "id", json!("none"))]})
+                    ),
+                    source_script(
+                        "other.source.json",
+                        json!({"widen": [page(&[1, 3], "other_id", json!("none"))]})
+                    ),
+                ]),
+                &["widen"],
+                starts(1),
+            ),
+        ),
+    ]
+}
+
+/// What each mirrored test asserts, on an acquisition case's outputs.
+fn acquire_mirrors(id: &str, out: &BTreeMap<String, Vec<u8>>) {
+    use rustev_contract::acquisition_record::{AcquisitionAttemptEnd as End, AcquisitionResult};
+    use rustev_contract::judgment::Unresolved;
+    use rustev_contract::run::CoreEvidence;
+    let records = |d: &str| record(out, d).acquisitions.clone().unwrap();
+    let ends = |d: &str| -> Vec<Vec<End>> {
+        records(d)
+            .iter()
+            .map(|r| r.attempts.iter().map(|a| a.end.clone()).collect())
+            .collect()
+    };
+    for f in out.keys().filter(|f| f.ends_with(".result.json")) {
+        assert_eq!(
+            status(out, f.trim_end_matches(".result.json"))["status"],
+            "judged",
+            "{id} {f}"
+        );
+    }
+    match id {
+        "runtime.acquire-page" => {
+            assert_eq!(
+                ends("transient"),
+                [vec![End::Transient, End::Page], vec![End::Page]]
+            );
+            let r = records("transient");
+            assert_eq!((r[1].tier, r[1].page), (0, 1));
+            assert_eq!(r[1].attempts[0].attempt_id, "transient/lookup/0,1/1");
+            assert!(r[0].attempts[1].attempt_id.ends_with("/lookup/0,0/2"));
+            assert_eq!(ends("overloaded"), [vec![End::Overloaded, End::Page]]);
+        }
+        "runtime.acquire-retry-denied" => {
+            assert_eq!(ends("denied"), [vec![End::Denied]]);
+            assert_eq!(
+                records("denied")[0].result,
+                AcquisitionResult::Failed(Unresolved::missing(["lookup".into()]))
+            );
+            assert_eq!(ends("unnamed"), [vec![End::Overloaded]]);
+            assert_eq!(ends("invalid"), [vec![End::InvalidPage]]);
+        }
+        "runtime.acquire-window" => {
+            let r = records("expiry");
+            for a in &r {
+                assert_eq!(
+                    a.result,
+                    AcquisitionResult::Failed(Unresolved::DeadlineExceeded)
+                );
+            }
+            assert_eq!(r[0].attempts.len(), 1);
+            assert_eq!(r[0].attempts[0].end, End::Deadline);
+            assert!(r[1].attempts.is_empty(), "a queued page never dispatches");
+        }
+        "runtime.acquire-widen" => {
+            let rec = record(out, "widen");
+            assert_eq!(
+                rec.acquisitions
+                    .as_ref()
+                    .unwrap()
+                    .iter()
+                    .map(|r| r.tier)
+                    .collect::<Vec<_>>(),
+                [0, 1]
+            );
+            let CoreEvidence::Recorded(e) = &rec.core else {
+                panic!("no evidence")
+            };
+            let a = &e.acquisitions.as_ref().unwrap()[0];
+            assert_eq!(a.items.len(), 3);
+            assert_eq!(a.tiers[1].duplicates, 1);
+            assert_eq!(a.items[2].origin.as_ref().unwrap().source, "other");
+        }
+        other => panic!("no mirrored assertions for {other}"),
+    }
+}
+
+#[test]
+fn acquire_cases_produce_their_expected_bytes() {
+    let fx = acquire_fixtures();
+    for (name, bytes) in &fx {
+        keep(&format!("fixtures/acquire/{name}"), bytes);
+    }
+    for (id, mirrored, block) in acquire_cases() {
+        let case: RuntimeCase = serde_json::from_value(block.clone()).unwrap();
+        let mut names: Vec<&str> = vec![&case.plan];
+        names.extend(case.sources.iter().map(|s| s.descriptor.as_str()));
+        names.extend(case.requests.iter().map(|r| r.snapshot.as_str()));
+        names.sort();
+        names.dedup();
+        let inputs: BTreeMap<String, Vec<u8>> = names
+            .iter()
+            .map(|n| (n.to_string(), fx[*n].clone()))
+            .collect();
+        let out = runtime::run(&case, &inputs).unwrap_or_else(|e| panic!("{id}: {e}"));
+        acquire_mirrors(id, &out);
+        let mut outputs = vec![];
+        for (file, bytes) in &out {
+            let rel = format!("expected/runtime/{id}/{file}");
+            keep(&rel, bytes);
+            outputs.push(json!({ "file": file, "golden": format!("{DIR}/{rel}"),
+                                 "sha256": sha256_hex(bytes), "normalize": [] }));
+        }
+        let case_file = json!({
+            "id": id, "command": "decide", "surfaces": ["rust-api", "native"],
+            "mirrors": mirrored,
+            "inputs": names.iter().map(|n| json!({
+                "path": format!("{DIR}/fixtures/acquire/{n}"), "name": n,
+                "sha256": sha256_hex(&fx[*n]) })).collect::<Vec<_>>(),
+            "runtime": block,
+            "outputs": outputs,
+        });
+        keep(
+            &format!("cases/runtime/{id}.json"),
+            &line(serde_json::to_vec_pretty(&case_file).unwrap()),
+        );
+    }
+}

@@ -809,6 +809,35 @@ so such a plan prepares on an engine with no installed source.
 acquisition seam, `denied`, gauges and the `runtime.acquire-*` cases are
 the rest of increment 3.
 
+**Increment 3, 2026-11-06 (3.4, 3.5, acquisition source).**
+`EngineOptions.acquisitionSources` installs each host source with
+`RuntimeBuilder::acquisition_source` (`integrations/rustev-node/src/source.rs`):
+a descriptor that does not parse, or a repeated name, is `ConfigRefused`
+(`invalid_source`) and a bound out of range `out_of_range`, before any
+thread. Each attempt is an asynchronous host callback
+(`src/callback.rs`): enqueued through a non-blocking threadsafe function,
+awaited on a one-shot channel, its queue slot held by the waiting side and
+released when the runtime stops waiting; an unsettled Promise is counted in
+`abandonedPending` until it settles and its late settlement in
+`lateResolutionsDiscarded`. The cost bound comes from the operation's
+declared `cost`; a page is copied up to 4 MiB and validated by the core; a
+`SeamFailure` keeps its class, including `denied`, and its `cancel` only
+after an abort; anything else is `permanent` with an unknown charge.
+`gauges().seams` gains `acquisition:<name>` with `abandonedPending`, and
+`shutdown` resolves with `abandonedPending`. Capture assembly receives the
+plan handle's source descriptors. `test/source.test.mjs` covers the source
+rows of section 5 and 3.13.3's host-seam cases (full queue, never-settling
+and late Promises, a synchronous throw, a non-Promise page, `denied`, the
+abort at the window's close, shutdown with a pending callback). The cases
+`runtime.acquire-page`, `runtime.acquire-retry-denied`,
+`runtime.acquire-window` and `runtime.acquire-widen` run on `rust-api` and
+`native` with identical bytes from scripted `sources` in both runners. Two
+differences from the mirrored tests: the adapter-panic row is left out (a
+host cannot panic the runtime), and in `runtime.acquire-window` the source
+never answers, so both runners record `not_observed`, since a host's
+cancellation answer crosses threads and cannot be ready when the runtime
+polls once (the reason `runtime.cancel-stop` excludes `native`).
+
 ## Decisions at approval
 
 Decided in this text, with reasons: a separate `acquisitionSources` seam,

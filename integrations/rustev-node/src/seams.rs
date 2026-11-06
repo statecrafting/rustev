@@ -89,7 +89,7 @@ impl<T> Drop for Reply<T> {
 /// to every host seam call of that decision, never into a record.
 pub type Traces = Arc<std::sync::Mutex<std::collections::HashMap<String, String>>>;
 
-fn trace_of(traces: &Traces, decision: &str) -> Option<String> {
+pub(crate) fn trace_of(traces: &Traces, decision: &str) -> Option<String> {
     traces.lock().ok().and_then(|t| t.get(decision).cloned())
 }
 
@@ -103,6 +103,12 @@ pub struct SeamStats {
     pub depth: AtomicUsize,
     pub refused_full: AtomicU64,
     pub late_resolutions_discarded: AtomicU64,
+    /// Spec 063 3.4.5: whether the seam's calls are asynchronous host
+    /// callbacks (acquisition sources, the store), whose gauges add
+    /// `abandonedPending`: calls the runtime stopped waiting on whose
+    /// Promise has not settled yet.
+    pub callbacks: bool,
+    pub abandoned_pending: AtomicU64,
 }
 
 impl SeamStats {
@@ -114,16 +120,20 @@ impl SeamStats {
     }
 
     pub fn json(&self) -> serde_json::Value {
-        serde_json::json!({
+        let mut v = serde_json::json!({
             "name": self.name,
             "queueDepth": self.depth.load(Ordering::SeqCst),
             "refusedFull": self.refused_full.load(Ordering::SeqCst),
             "lateResolutionsDiscarded": self.late_resolutions_discarded.load(Ordering::SeqCst),
-        })
+        });
+        if self.callbacks {
+            v["abandonedPending"] = self.abandoned_pending.load(Ordering::SeqCst).into();
+        }
+        v
     }
 
     /// Take a queue slot, or refuse when `capacity` are taken.
-    fn admit(self: &Arc<Self>, capacity: usize) -> Option<Slot> {
+    pub(crate) fn admit(self: &Arc<Self>, capacity: usize) -> Option<Slot> {
         let mut d = self.depth.load(Ordering::SeqCst);
         loop {
             if d >= capacity {
@@ -142,7 +152,7 @@ impl SeamStats {
 }
 
 /// A taken queue slot, released when the call ends or is dropped.
-struct Slot(Arc<SeamStats>);
+pub(crate) struct Slot(Arc<SeamStats>);
 
 impl Drop for Slot {
     fn drop(&mut self) {
@@ -150,7 +160,7 @@ impl Drop for Slot {
     }
 }
 
-fn capacity(field: &str, v: u32) -> Result<usize> {
+pub(crate) fn capacity(field: &str, v: u32) -> Result<usize> {
     if v == 0 || v > MAX_QUEUE {
         return Err(fail(
             "ConfigRefused",
@@ -522,7 +532,7 @@ impl HostContext {
 
 /// A seam failure's reason: what JavaScript gave, or, when it gave none,
 /// the status, so a refusal never reaches a record without a diagnostic.
-fn why(e: &napi::Error) -> String {
+pub(crate) fn why(e: &napi::Error) -> String {
     if e.reason.is_empty() {
         format!("the host seam failed without a reason ({})", e.status)
     } else {

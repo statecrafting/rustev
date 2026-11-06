@@ -94,6 +94,42 @@ export interface Scorer {
   score(caseView: unknown, proposalView: unknown, call: ScoreCall): Promise<ScoreAnswer>;
 }
 
+/** One acquisition attempt as a host source receives it (spec 063, 3.5). */
+export interface AcquireCall {
+  decisionId: string;
+  operation: string;
+  /** `rustev.acquisition-request/1` canonical bytes. */
+  request: Uint8Array;
+  /** Its `AcquisitionRequestId`. */
+  requestId: string;
+  /** The idempotency key spec 036 3.14.2 assigns. */
+  attemptId: string;
+  /** Until the step's acquisition window closes. */
+  remainingMs: number;
+  principalHandle: Uint8Array;
+  /** Aborted at the window's close, on cancellation or at shutdown. */
+  signal: AbortSignal;
+  traceparent?: string;
+}
+
+/** A page (`rustev.acquisition-page/1`, at most 4 MiB) and its charge. */
+export interface AcquireAnswer {
+  page: DocumentInput;
+  charge: Charge;
+}
+
+/** A host acquisition source (spec 063, 3.5). `acquire` is an asynchronous
+ * host callback (3.4); a thrown `SeamFailure` keeps its class (`denied` is
+ * never retried), anything else is `permanent` with an unknown charge. */
+export interface AcquisitionSource {
+  /** A `rustev.source/1` descriptor declaring `operations`. */
+  descriptor: DocumentInput;
+  /** 1 to 65,536 each; there is no default. */
+  maxConcurrency: number;
+  queueCapacity: number;
+  acquire(call: AcquireCall): Promise<AcquireAnswer>;
+}
+
 export interface EngineOptions {
   runtime: RuntimeConfig;
   /** Required; there is no default sink. */
@@ -105,6 +141,9 @@ export interface EngineOptions {
   contextSource?: ContextSource;
   clock?: 'system' | 'manual';
   telemetry?: TelemetryOptions;
+  /** Spec 063 3.5: installed by descriptor name; never what a plan binds
+   * (plans bind the `sources` named on compile). */
+  acquisitionSources?: AcquisitionSource[];
 }
 
 export interface DecisionRequest {
@@ -238,7 +277,7 @@ export declare class Engine {
   gauges(): EngineGauges;
   recordExchange(record: DocumentInput): void;
   flushTelemetryMetrics(): Promise<{ outcome: 'exported' | 'not_taken' | 'lost'; reason?: string }>;
-  shutdown(options?: { drainMs?: number }): Promise<{ drained: boolean; cancelled: number; lateDiscarded: number; stillRunning: number; telemetryUnflushed: number }>;
+  shutdown(options?: { drainMs?: number }): Promise<{ drained: boolean; cancelled: number; lateDiscarded: number; stillRunning: number; telemetryUnflushed: number; abandonedPending: number }>;
 }
 
 export declare class RustevError extends Error {
@@ -268,12 +307,12 @@ export declare class PlatformPackageMissing extends RustevError {}
 
 /** A host seam's typed failure (3.6.5). */
 export declare class SeamFailure extends Error {
-  readonly failureClass: 'transient' | 'overloaded' | 'permanent' | 'cancelled';
+  readonly failureClass: 'transient' | 'overloaded' | 'permanent' | 'denied' | 'cancelled';
   readonly charge: Charge;
   readonly remote: RemoteEnd;
   readonly cancel?: 'stopped' | 'unconfirmed';
   constructor(args: {
-    failureClass: 'transient' | 'overloaded' | 'permanent' | 'cancelled';
+    failureClass: 'transient' | 'overloaded' | 'permanent' | 'denied' | 'cancelled';
     charge: Charge;
     remote: RemoteEnd;
     cancel?: 'stopped' | 'unconfirmed';
@@ -358,7 +397,9 @@ export interface EngineGauges {
   inFlight: number; queued: number; rejected: number; abandoned: number;
   backendInFlight: Record<string, number>;
   sink: { acknowledged: number; failed: number; timedOut: number; dropped: number; queued: number; inDelivery: number };
-  seams: { name: string; queueDepth: number; refusedFull: number; lateResolutionsDiscarded: number }[];
+  seams: { name: string; queueDepth: number; refusedFull: number; lateResolutionsDiscarded: number;
+    /** Acquisition sources and the store only (spec 063 3.11). */
+    abandonedPending?: number }[];
   telemetry?: TelemetryGauges;
 }
 

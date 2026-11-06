@@ -1,0 +1,123 @@
+{
+  "command": "decide",
+  "id": "runtime.acquire-widen",
+  "inputs": [
+    {
+      "name": "acquire-widen.plan.json",
+      "path": "tools/rustev-conformance/fixtures/acquire/acquire-widen.plan.json",
+      "sha256": "a9fcce4b3919354c1b735246f0fb8ff2964177c5f03107dd612726fb19f3fdff"
+    },
+    {
+      "name": "catalog.source.json",
+      "path": "tools/rustev-conformance/fixtures/acquire/catalog.source.json",
+      "sha256": "82c468f0fb521efce7c0cb30a19c4b79ef5825663965944f838e3adc9490f53c"
+    },
+    {
+      "name": "empty.snapshot.json",
+      "path": "tools/rustev-conformance/fixtures/acquire/empty.snapshot.json",
+      "sha256": "b34d8feb906cb18dfe773a01c18e3645ae091132b99060eed8787e148ceddf82"
+    },
+    {
+      "name": "other.source.json",
+      "path": "tools/rustev-conformance/fixtures/acquire/other.source.json",
+      "sha256": "d201e7dd2fea330277c27ba253b4641edbb8e0a80161dd9365a972b38b2ebab6"
+    }
+  ],
+  "mirrors": "crates/rustev-runtime/tests/acquisition.rs::widening_switches_sources_keeps_protected_fields_and_dedupes",
+  "outputs": [
+    {
+      "file": "widen.record.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.acquire-widen/widen.record.json",
+      "normalize": [],
+      "sha256": "cc3f817bcbf04de67c8f52d60211ec42973c7fa444497a862fef0b824191fb7a"
+    },
+    {
+      "file": "widen.result.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.acquire-widen/widen.result.json",
+      "normalize": [],
+      "sha256": "5f2239f18e9a1a54d6c4692fe95e210dc1bc1a41ad0750c0c7351d3d0884ac9a"
+    }
+  ],
+  "runtime": {
+    "backends": [],
+    "calibrations": [],
+    "config": {
+      "max_in_flight": 1,
+      "max_parallel_requests": 2,
+      "max_queued": 1,
+      "sink_timeout_ms": 1000
+    },
+    "descriptors": [],
+    "drive": [
+      "start"
+    ],
+    "plan": "acquire-widen.plan.json",
+    "requests": [
+      {
+        "decision_id": "widen",
+        "evaluation_time_ms": 1000,
+        "snapshot": "empty.snapshot.json"
+      }
+    ],
+    "sources": [
+      {
+        "answers": {
+          "widen": [
+            {
+              "page": {
+                "as_of_ms": 900,
+                "charge": {
+                  "observed": {
+                    "units": 1
+                  }
+                },
+                "items": [
+                  {
+                    "id": 1
+                  },
+                  {
+                    "id": 2
+                  }
+                ],
+                "next": "none"
+              }
+            }
+          ]
+        },
+        "descriptor": "catalog.source.json",
+        "max_concurrency": 1
+      },
+      {
+        "answers": {
+          "widen": [
+            {
+              "page": {
+                "as_of_ms": 900,
+                "charge": {
+                  "observed": {
+                    "units": 1
+                  }
+                },
+                "items": [
+                  {
+                    "other_id": 1
+                  },
+                  {
+                    "other_id": 3
+                  }
+                ],
+                "next": "none"
+              }
+            }
+          ]
+        },
+        "descriptor": "other.source.json",
+        "max_concurrency": 1
+      }
+    ]
+  },
+  "surfaces": [
+    "rust-api",
+    "native"
+  ]
+}
