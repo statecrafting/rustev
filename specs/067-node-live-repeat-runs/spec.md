@@ -21,7 +21,10 @@ summary: >
   model and bound it already declares (027 3.6.1); an `unknown` model is
   refused. Probe-only, resume and rerun-interrupted are 043's; an
   `AbortSignal` or `shutdown` ends the run `interrupted` with every
-  reserved, unsettled attempt kept as liability. Tests use scripted host
+  reserved, unsettled attempt kept as liability. The cumulative cap holds
+  per journal file, so CI must persist the file; a journal created by a
+  run records an id and creation time, and the run report names them, so
+  a fresh journal is visible, never silent. Tests use scripted host
   backends only; CI makes no live or paid call. This fulfills 043 section
   2's "the Node binding exposes it in its own spec".
 amends:
@@ -54,6 +57,10 @@ obligations:
     kind: invariant
     text: "For the same inputs, scripted backends and clock, `liveRun` writes the same documents, bytes, status and exit code as `rustev_live::run` called from Rust, and the binding adds no authority: its authorizer is 043 3.12's declarative rule list, and no binding value is a permission."
     anchor: "3-2-the-entry-point"
+  - id: "I-4"
+    kind: invariant
+    text: "A journal created by a live run records a stable `journal_id` and `created_at_ms` in its header, and every `rustev.live-run/1` names the journal's id, creation time, whether this run created it, and the cumulative spend before the run, so a run that started its cumulative cap at zero on a new file is visible and never silent."
+    anchor: "3-4-the-journal-and-the-output-directory-are-file-paths"
   - id: "R-1"
     kind: requirement
     text: "Every test and conformance case of this spec uses scripted host backends and a temporary `testing` journal; no CI job makes a live or paid provider call, and the WebAssembly package gains nothing."
@@ -102,15 +109,18 @@ live cases of 3.8.
 
 Edges proposed for ratification (none is declared by this draft):
 `integrations/rustev-node/` and `crates/rustev-surface/` (027, amending),
-`crates/rustev-cli/` (006, amending), `tools/rustev-conformance/` (027,
+`crates/rustev-cli/` (006, amending), `crates/rustev-live/` (043,
+amending, for 3.4.5), `tools/rustev-conformance/` (027,
 additive), `tools/rustev-release/` (031, additive, archive entries for
 moved files), and at completion `Makefile` and `scripts/acceptance/`
 (001, additive).
 
 Unchanged: `rustev-contract`, `rustev-core`, `rustev-runtime`,
-`rustev-eval` and `rustev-live` behavior (every function used exists);
-the journal format, header and lock (043 3.5); every document, schema,
-generated declaration, `PlanId` and golden; `rustev eval live`; the
+`rustev-eval`, and `rustev-live` behavior except 3.4.5's journal
+identity and run report member (every other function used exists); the
+journal's line format, existing headers and lock (043 3.5); every other
+document, schema, generated declaration, `PlanId` and golden; `rustev
+eval live` apart from 3.4.5; the
 WebAssembly package; `make boundaries` (`rustev-live` is not an
 integration crate, and `rustev-node` is under `integrations/`).
 
@@ -232,6 +242,54 @@ integration crate, and `rustev-node` is under `integrations/`).
    (open question 1) would need a synchronous durable reservation the
    binding cannot obtain from JavaScript (027 3.6.1), so it is not
    offered.
+4. **The total cap is per journal file.** The journal's cap (043 3.5.4)
+   is cumulative only over the lines of one file. A new file starts the
+   cumulative spend at zero. A host running live jobs in CI must keep the
+   journal on persistent storage (a persistent runner, or durable storage
+   the job restores before the run and saves after it, lock released) or
+   accept that each fresh journal restarts the cumulative cap at zero.
+   Rustev cannot tell a lost journal from a first one; it makes the
+   difference visible (3.4.5) and can refuse to create one (open question
+   6).
+5. **A new journal is visible (amends 043 3.5.1 and 3.11.4).**
+   - **Header.** A journal created by this version records two members
+     in its header line, beside `schema`, `budget` and `cap`:
+     `journal_id`, the `tagged_digest("rustev.spend-journal-id/1",
+     created_at_ms || 0x00 || run_id)` of the creating run, as lowercase
+     hex, and `created_at_ms`, read from the run's injected clock. Both are
+     written once, at creation, and never change; the A-75 migration (043
+     3.5.6) keeps them. The schema name stays `rustev-jev.spend-journal/1`
+     (open question 7). A journal created before this version has neither
+     member; it is accepted, never stamped (no creation time is invented),
+     and is reported as `legacy`.
+   - **Run report.** `rustev.live-run/1` (043 3.11.4) already carries
+     `journal_before` and `journal_after`, the journal's cumulative
+     observed, estimated, liability and outstanding units and its cap
+     before and after the run; they are kept. It gains one member,
+     `journal: { id: hex | null, created_at_ms: integer | null, created:
+     "this_run" | "earlier" | "legacy" }`: the header's identity, and
+     whether this run created the file. A host or reviewer reading a run
+     that reports `created: "this_run"` with zero `journal_before` spend
+     sees that the cumulative cap started at zero for it.
+   - **Result.** `LiveRunResult` gains `journal: { id, createdAtMs,
+     created, spendBefore }` from the same values, and the stdout line
+     (043 3.13.4) gains `new_journal` when `created` is `this_run`, for
+     the CLI and the binding alike.
+   - **Resume.** The checkpoint already binds the journal header digest
+     (043 3.10.1). Today every fresh `testing` header has the same digest,
+     so a resume against a replaced journal is not detected; with
+     `journal_id` in the header it is `checkpoint-mismatch` before the
+     journal is used. 043 3.10.2's superseded-cap exception keeps working
+     for a header that differs only in its cap.
+   - **Compatibility.** The members are written only for journals created
+     by this version and the run report's `journal` member is new, so
+     existing journal files, run reports and checkpoints keep their
+     bytes. A journal created by this version is refused by an earlier
+     release (unknown header member), never read as a journal without an
+     identity. `rustev eval live` goldens that create a journal gain the
+     header members, the `journal` member and `new_journal`, and are
+     re-blessed in the change that implements this; no `PlanId`, plan
+     golden or other document changes.
 
 ### 3.5 Authorization
 
@@ -325,7 +383,9 @@ integration crate, and `rustev-node` is under `integrations/`).
 2. **043:** section 2's "the Node and WebAssembly bindings ... expose it
    in their own specs" is fulfilled for Node by this spec; 3.2.2's
    "`authorize` ... the library requires absent" does not apply to the
-   Node binding (3.5.2).
+   Node binding (3.5.2); 3.5.1's "header ... unchanged" gains the two
+   creation members for new journals, and 3.11.4's `rustev.live-run/1`
+   gains `journal` (3.4.5), for the CLI and the binding alike.
 3. **063:** 3.9.1's table gains `liveRun`; 3.9.4's `live` refusal stands
    for `eval` with `repeatConfig` (3.1).
 
@@ -358,6 +418,10 @@ raising any cap; any live or paid provider call in CI; quality claims.
 | `resume` over a completed item | Not re-sent. |
 | An interrupted item without `rerunInterrupted` | Incomparable, `live-interrupted`. |
 | `eval` with `repeatConfig` naming the `live` source | Still `live-source-unavailable` (3.1). |
+| A run on a journal path that does not exist | Journal created with `journal_id` and `created_at_ms`; `live-run.json` reports `created: "this_run"` and zero `journal_before` spend; stdout `new_journal`. |
+| A run on an existing journal | `created: "earlier"` with the header's id and creation time and the prior cumulative spend. |
+| A journal created before this version | Accepted; `created: "legacy"`, id and creation time null; header not rewritten. |
+| `resume` after the journal file was replaced by a fresh one | `code` 4, `checkpoint-mismatch`. |
 
 ## Acceptance
 
@@ -369,6 +433,16 @@ raising any cap; any live or paid provider call in CI; quality claims.
 - Cancellation, deadline and shutdown as 3.6 states, with liability kept
   and late settlements discarded.
 - Probe-only, resume and rerun-interrupted as 3.7 states.
+- Journal visibility (3.4.5), with scripted backends and a `ManualClock`
+  only: a first run on a missing path reports `created: "this_run"`,
+  the id and creation time, zero `journal_before` spend and
+  `new_journal`; a second run on the same file reports `earlier`, the
+  same id and the first run's spend before it; a run on a fresh file
+  after deleting the first reports a new id and zero spend; a legacy
+  journal reports `legacy` and keeps its header bytes; a resume against a
+  replaced journal is `checkpoint-mismatch`; and, if open question 6 is
+  adopted, `requireExistingJournal` on a missing path refuses with
+  `journal-missing` and creates no file.
 - The conformance and host-seam cases of 3.8; every row of section 5 has
   a test; no test makes a live or paid call.
 - Compatibility: every CLI, eval, live and conformance golden and every
@@ -393,7 +467,9 @@ increment that satisfies it.
    depends on `rustev-live`; the host backend cost rules of 3.3 checked
    against a live configuration, the journal opened by path under 3.4,
    and the rule authorizer of 3.5, as Rust functions of the binding with
-   tests over scripted backends; no JavaScript method yet.
+   tests over scripted backends; no JavaScript method yet. The journal
+   identity and report members of 3.4.5 land here, in `rustev-live`, with
+   the re-blessed `eval live` goldens.
 2. **The entry point.** The input resolution moved into `rustev-surface`
    (the CLI calls it, goldens unchanged); `engine.liveRun` for full and
    probe-only runs, outcomes, documents and declarations (3.2, 3.7.1);
@@ -412,11 +488,17 @@ cost model and bound a host backend already declares (3.3.1, 027 3.6.1);
 outcomes are values with 043's statuses and exit codes (3.2.4, 063
 3.9.2); `out` is a real directory (3.4.2, checkpoint durability);
 `eval` with `repeatConfig` still refuses `live` (3.1); tests use
-scripted backends only (R-1).
+scripted backends only (R-1); the journal is a file path (owner input
+on open question 1, below), with the cap per file and a new journal made
+visible (3.4.4, 3.4.5).
 
 Open for the owner, each with a recommendation:
 
-1. **Journal form.** A file path the binding opens (recommended: 043
+1. **Journal form.** Owner input (2026-11-06): agreed, a file path. Live
+   runs are evaluation jobs started by hand, locally or in CI, never
+   inside a partner API service, so a local file fits; the caveat that the
+   cap holds only while the file persists is 3.4.4 and 3.4.5. The
+   original choice was: a file path the binding opens (recommended: 043
    3.5's durability, lock and reserve-before-send rules hold unchanged,
    and spec 012's adapter can share the handle); or a host journal seam,
    which needs a synchronous durable `reserve` that a JavaScript callback
@@ -441,3 +523,16 @@ Open for the owner, each with a recommendation:
    reviewed alone); or ship increments 1 and 2 (no resume) in 0.5.1 and
    the rest in the next release, which leaves an interrupted run
    resumable only through Rust.
+6. **Refuse to create a journal.** An option `requireExistingJournal`
+   (CLI `--require-existing-journal`) that refuses a missing journal path
+   (`invalid_input`, `journal-missing`, before any file is created), so a
+   CI job pointed at a persisted file that was not restored fails instead
+   of starting a fresh cap. Recommended: adopt it, default off (a first
+   local run must be able to create the journal), and document it as the
+   setting for CI jobs; or rely on the visibility of 3.4.5 alone.
+7. **Header form.** Optional `journal_id` and `created_at_ms` members
+   under the unchanged schema name, written only at creation
+   (recommended, as the other drafts add optional members: existing
+   journals keep their bytes, an older release refuses a new journal
+   rather than misreading it); or a new journal schema name, which would
+   need a migration for the journal that holds the recorded testing spend.
