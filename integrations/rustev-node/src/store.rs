@@ -348,18 +348,22 @@ impl RuntimeStore for HostStore {
 /// leaves the selection pending, `complete: false`, never an exception.
 pub fn invalidation_json(r: &rustev_runtime::InvalidationResult) -> serde_json::Value {
     use rustev_runtime::PersistentInvalidation as P;
+    // 3.6.3: every number crossing to JavaScript is a safe integer.
+    let cap = |v: u64| v.min(MAX_SAFE);
     let persistent = match &r.persistent {
         None => serde_json::Value::Null,
         Some(P::Done {
             generation,
             removed,
-        }) => serde_json::json!({ "generation": generation, "removed": removed }),
+        }) => {
+            serde_json::json!({ "generation": cap(*generation), "removed": cap(*removed) })
+        }
         Some(_) => "pending".into(),
     };
     serde_json::json!({
-        "generation": r.generation,
-        "removedEntries": r.removed_entries,
-        "removedBytes": r.removed_bytes,
+        "generation": cap(r.generation),
+        "removedEntries": cap(r.removed_entries),
+        "removedBytes": cap(r.removed_bytes),
         "persistent": persistent,
         "complete": r.complete,
     })
