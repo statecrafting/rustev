@@ -13,6 +13,7 @@
 mod capture;
 mod errors;
 pub mod local_embed;
+mod profile;
 mod seams;
 mod source;
 mod telemetry;
@@ -1214,5 +1215,75 @@ fn decided(r: std::result::Result<rustev_runtime::Decided, DecideError>) -> Resu
                     .collect::<String>(),
             }),
         )),
+    }
+}
+
+#[napi]
+impl Engine {
+    #[napi]
+    pub fn prepare_profile(
+        &self,
+        inputs: HashMap<String, Uint8Array>,
+        args: serde_json::Value,
+    ) -> Result<PlanHandle> {
+        let _counted = Blocking::enter(self.inner.clone());
+        let inputs = inputs.into_iter().map(|(k, v)| (k, v.to_vec())).collect();
+        self.profile_uncounted(inputs, args)
+    }
+
+    #[napi]
+    pub async fn prepare_profile_async(
+        &self,
+        inputs: HashMap<String, Uint8Array>,
+        args: serde_json::Value,
+    ) -> Result<PlanHandle> {
+        let counted = Blocking::enter(self.inner.clone());
+        self.live()?;
+        let inputs = inputs.into_iter().map(|(k, v)| (k, v.to_vec())).collect();
+        let engine = Engine {
+            inner: self.inner.clone(),
+        };
+        self.inner
+            .rt
+            .spawn_blocking(move || {
+                let _counted = counted;
+                engine.profile_uncounted(inputs, args)
+            })
+            .await
+            .map_err(|e| fail("InternalError", "internal", e.to_string()))?
+    }
+}
+impl Engine {
+    fn profile_uncounted(
+        &self,
+        inputs: BTreeMap<String, Vec<u8>>,
+        args: serde_json::Value,
+    ) -> Result<PlanHandle> {
+        guard(|| {
+            self.live()?;
+            let profile::PreparedInputs {
+                compiled,
+                descriptors,
+                calibrations,
+            } = profile::compile(&inputs, &args)?;
+            if let Some(t) = &self.inner.telemetry {
+                t.register_plan(&compiled.plan);
+            }
+            let raw = compiled.canonical();
+            let plan_id = compiled.id.to_string();
+            let prepared = self
+                .inner
+                .runtime
+                .prepare(compiled)
+                .map_err(errors::prepare_error)?;
+            Ok(PlanHandle {
+                engine: self.inner.clone(),
+                plan: Arc::new(prepared),
+                plan_id,
+                raw,
+                descriptors: Arc::new(descriptors),
+                calibrations: Arc::new(calibrations),
+            })
+        })
     }
 }

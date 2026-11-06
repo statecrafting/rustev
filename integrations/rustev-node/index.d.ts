@@ -178,6 +178,12 @@ export declare class Engine {
   /** Compile a definition, or load a compiled `plan`, and prepare it:
    * exactly one of the two, or `InvalidDocument`. */
   compile(args: {
+    definitions?: DocumentInput[];
+    execution?: DocumentInput;
+    profile?: DocumentInput;
+    profileBases?: DocumentInput[];
+    variant?: string;
+    definitionVersion?: string;
     definition?: DocumentInput;
     plan?: DocumentInput;
     descriptors?: DocumentInput[];
@@ -188,6 +194,12 @@ export declare class Engine {
   }): Promise<PlanHandle>;
   /** Like `compile`, on the calling thread (blocking). */
   compileSync(args: {
+    definitions?: DocumentInput[];
+    execution?: DocumentInput;
+    profile?: DocumentInput;
+    profileBases?: DocumentInput[];
+    variant?: string;
+    definitionVersion?: string;
     definition?: DocumentInput;
     plan?: DocumentInput;
     descriptors?: DocumentInput[];
@@ -202,6 +214,8 @@ export declare class Engine {
    * on the engine's blocking pool. */
   command(name: string, inputs: Record<string, DocumentInput>, args: object): Promise<CommandResult>;
   commandSync(name: string, inputs: Record<string, DocumentInput>, args: object): CommandResult;
+  profileCheck(inputs: Record<string, DocumentInput>, args: ProfileCheckArgs): CommandResult;
+  planDiff(inputs: Record<string, DocumentInput>, args: PlanDiffArgs): Promise<CommandResult>;
   check(inputs: Record<string, DocumentInput>, args: object): CommandResult;
   show(inputs: Record<string, DocumentInput>, args: object): CommandResult;
   replay(inputs: Record<string, DocumentInput>, args: object): Promise<CommandResult>;
@@ -362,3 +376,16 @@ export interface ExplainOptions {
 }
 export interface ExplainResult { explanation: Uint8Array; markdown: string }
 export declare class InvalidInput extends RustevError {}
+
+export interface ProfileCheckArgs {
+  definitions: string[];
+  profile?: string;
+  profileBases?: string[];
+  variant?: string;
+  definitionVersion?: string;
+}
+export type PlanDiffArgs = { leftPlan: string; rightPlan: string; out: string }
+  | { definitions: string[]; leftProfile?: string; rightProfile?: string;
+      leftVariant?: string; rightVariant?: string; profileBases?: string[];
+      definitionVersion?: string; descriptors?: string[]; rules?: string[];
+      calibrations?: string[]; execution?: string; out: string };

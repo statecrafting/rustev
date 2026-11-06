@@ -370,6 +370,8 @@ async function nativeAdapter() {
   // takes the derived descriptor in its place.
   async function pureCase(c, a, files) {
     const names = {
+      'profile check': 'profileCheck',
+      'plan diff': 'planDiff',
       'plan check': 'check',
       'plan compile': 'compile',
       'plan show': 'show',
@@ -386,6 +388,18 @@ async function nativeAdapter() {
       bundle: a.one('bundle'),
       store: a.one('store'),
     };
+    if (c.id.startsWith('parameterized.')) {
+      delete args.definition;
+      if (a.many('definition').length) args.definitions = a.many('definition');
+      if (a.many('profile-base').length) args.profileBases = a.many('profile-base');
+      for (const [flag, key] of [['profile', 'profile'], ['variant', 'variant'],
+        ['definition-version', 'definitionVersion'], ['left-plan', 'leftPlan'],
+        ['right-plan', 'rightPlan'], ['left-profile', 'leftProfile'],
+        ['right-profile', 'rightProfile'], ['left-variant', 'leftVariant'], ['right-variant', 'rightVariant']]) {
+        if (a.one(flag) !== undefined) args[key] = a.one(flag);
+      }
+      for (const key of ['descriptors', 'rules', 'calibrations']) if (!args[key].length) delete args[key];
+    }
     if (a.command === 'replay') {
       // An object: the native command takes its arguments as JSON and reads
       // `scope` from it (the WebAssembly binding takes a string instead).

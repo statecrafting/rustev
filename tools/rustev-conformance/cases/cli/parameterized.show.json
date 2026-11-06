@@ -32,6 +32,7 @@
     }
   ],
   "surfaces": [
-    "cli"
+    "cli",
+    "native"
   ]
 }
