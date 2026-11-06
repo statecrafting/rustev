@@ -541,6 +541,48 @@ fn spec_spine() -> Result<String, String> {
     Ok(bin)
 }
 
+/// The previous tag's tree, extracted into a private directory, gets this
+/// commit's spec-spine pin (031 3.10): the release reads both corpora with
+/// the one pinned binary, and a pin moved between releases (0.31.0 at
+/// v0.4.1, 0.32.0 since) must not refuse the listing. Only the private
+/// copy's `[meta] required_version` line changes; the specs are read as
+/// tagged.
+fn repin(dir: &std::path::Path) -> Result<String, String> {
+    let current =
+        std::fs::read_to_string("spec-spine.toml").map_err(|e| format!("spec-spine.toml: {e}"))?;
+    let line = current
+        .lines()
+        .find(|l| {
+            l.split_once('=')
+                .is_some_and(|(k, _)| k.trim() == "required_version")
+        })
+        .ok_or("spec-spine.toml pins no required_version")?;
+    let path = dir.join("spec-spine.toml");
+    let previous =
+        std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let mut found = false;
+    let mut text: String = previous
+        .lines()
+        .map(|l| {
+            if l.split_once('=')
+                .is_some_and(|(k, _)| k.trim() == "required_version")
+            {
+                found = true;
+                line
+            } else {
+                l
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    if !found {
+        return Err(format!("{} pins no required_version", path.display()));
+    }
+    text.push('\n');
+    std::fs::write(&path, text).map_err(|e| format!("{}: {e}", path.display()))?;
+    Ok(String::new())
+}
+
 /// The registry listing of the corpus at `repo`.
 fn registry(repo: &str) -> Result<Vec<rustev_release::changelog::Spec>, String> {
     let text = command_line(
@@ -597,6 +639,7 @@ fn changelog(set: &ReleaseSet, previous: Option<&str>) -> Result<String, String>
             // so a failing `git archive` or `tar` leaves nothing behind.
             let r = command_line("git", &["archive", "--output", &archive, tag])
                 .and_then(|_| command_line("tar", &["-xf", &archive, "-C", &dir_s]))
+                .and_then(|_| repin(&dir))
                 .and_then(|_| registry(&dir_s));
             let _ = std::fs::remove_dir_all(&dir);
             r?
