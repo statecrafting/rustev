@@ -30,7 +30,7 @@
     {
       "name": "actionable.plan.json",
       "path": "tools/rustev-conformance/fixtures/cli/actionable.run-refused/actionable.plan.json",
-      "sha256": "e093ad673cccf73cd0b02abeed5b97a5fb6bbc83234b71995eae26c1fbd8170e"
+      "sha256": "47bde96f5dd4008b529423b442215b2013eec47a0afe53884d031b92150f5216"
     },
     {
       "name": "refused.snapshot.json",
@@ -54,7 +54,7 @@
       "normalize": [
         "receipt"
       ],
-      "sha256": "e472ecde3633f1a0e54fb960a73566be28c153f17ebf59aa381a04cae2eeab68",
+      "sha256": "b2f61533260a6fb8a591e388b6ba380c3577e5e007d11f9432c4c41edfb717d1",
       "stream": "stdout"
     }
   ],

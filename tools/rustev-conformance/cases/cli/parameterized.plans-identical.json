@@ -17,21 +17,21 @@
     {
       "name": "left",
       "path": "tools/rustev-conformance/fixtures/cli/parameterized.plans-identical/left",
-      "sha256": "f689d0d511de0d5952177f624e11eb0c6c47b773643e42809f461f8ae2717023"
+      "sha256": "3fd24ddec5efd28e863ef04058705a8f53dad57b2db84ba6c649d8cafe4e02d1"
     }
   ],
   "outputs": [
     {
       "golden": "crates/rustev-cli/tests/golden/parameterized.plans-identical.json",
       "normalize": [],
-      "sha256": "9dafe4b6e43d52ffaa32189ca21cdd4ba75037ed68ae0dc0b3dc33b1bf21dd9f",
+      "sha256": "6a344455eb271c3c15ee5762f6c85939e3d5883c9087adc5f65daabb9519a5b0",
       "stream": "stdout"
     },
     {
       "file": "diff",
       "golden": "crates/rustev-cli/tests/golden/parameterized.plans-identical.document.json",
       "normalize": [],
-      "sha256": "78b9b8bed6c5ce50102572a339002536e3dcf2790e109fef1f73bcdb8c92dd57"
+      "sha256": "c35fbe022542830b39bd38181d809ea68bb508df579dc82a7aed8f7de9378489"
     }
   ],
   "surfaces": [
