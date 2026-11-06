@@ -2,7 +2,7 @@
 id: "011-semantic-backend"
 title: "Local semantic backend: frozen embeddings and a linear head"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-23"
 summary: >
   The first local model backend, `backends/rustev-backend-embed-linear/`:
@@ -22,7 +22,7 @@ summary: >
   a local inference runtime family and one placement rule to the boundary
   check. Ratified (A-28) under R-36, which amends R-17 for this spec;
   R-43 authorizes the feasibility stages and pins the revision that ships
-  an ONNX graph; implementation is pending.
+  an ONNX graph; implemented and complete (2026-11-06).
 amends:
   - "001-boundaries-and-authority"
 establishes:
@@ -104,7 +104,7 @@ obligations:
 
 Ratified by the owner (A-28, under the 2026-10-16 delivery work order and
 R-36) as its own reviewable change before any code (R-16); implementation
-is pending. It implements #76 child C4 (#69) and backlog items RUSTEV-001
+is complete (2026-11-06). It implements #76 child C4 (#69) and backlog items RUSTEV-001
 to RUSTEV-003. R-36 (OD-1 of #76) amends R-17 for this spec: R-17's
 prohibition of an `ort` dependency and of semantic inference is lifted for
 spec 011 only, within this contract and its feasibility gate (3.2). R-01's
@@ -833,6 +833,10 @@ cargo test -p rustev-backend-embed-linear --locked --lib
 # Offline: no source file of the crate names a network API, and its
 # manifest declares no network client, model hub or download feature.
 cargo test -p rustev-backend-embed-linear --locked --test offline
+# 3.17.3, 3.17.5: the service's local-embed feature, its configuration and
+# the local-embed case through the service transports.
+cargo test -p rustev-serve --locked --features local-embed --lib local_embed
+cargo clippy -p rustev-serve --locked --all-targets --features local-embed -- -D warnings
 # 3.18: the boundary check's rule unit tests, then the real workspace (no
 # local inference family outside this crate, no hf-hub or download feature).
 cargo test -p rustev-boundaries --locked
@@ -1062,9 +1066,7 @@ repeatable in process; `runtime_version_mismatch`, `runtime_conflict`,
 raised signal ending a 256-token run after 2.9 ms against 78.6 ms
 uncancelled; and the backend still refusing the platform. That run is
 evidence for a later record entry, not a stage 4 measurement and not
-declared verification. Not yet done: a platform in the table (stage 4 of
-the complete backend and the Node `local-embed` build, 3.2.3), an `onnx`
-bundle's cache evidence (3.14.3), and `011` in `make verify`.
+declared verification.
 
 **Increment 3 part a (2026-11-02): text, tasks, tokenization and
 `check_plan`.** `src/request.rs` prepares a request on the caller before
@@ -1157,11 +1159,7 @@ Rust API side runs in this crate's tests
 `make conformance` runs it. `make bindings` builds the binding with the
 feature last, runs `test/local-embed.test.mjs` and the case
 (`run.mjs native --local-embed`); a build without the feature must refuse
-the case `feature_disabled`, which every native matrix target checks. Not
-yet done: the service transports join the case with 3.17.3; and the
-binding's build with `local-embed` on each native matrix target, which
-counts toward qualifying a platform (3.2.3), needs a change to the
-`bindings` workflow; only `darwin-arm64` was built here.
+the case `feature_disabled`, which every native matrix target checks.
 
 **The service's `local-embed` feature and the service transports in the
 local-embed case (2026-11-06, 3.17.3, 3.17.5).** `rustev-serve` gains the
@@ -1253,10 +1251,6 @@ harness as run. `tests/feasibility_record.rs` checks the qualification,
 every limit on `linux-x86_64-gnu` and the refusals elsewhere; the default
 tests expect an `onnx` bundle to reach the runtime-path check on the
 qualified target and `unqualified_platform` elsewhere. No limit changed.
-Not yet done: an `onnx` bundle's cache evidence wired into the backend
-(3.14.3; the record now shows bitwise repeatability on
-`linux-x86_64-gnu`, but enabling the cache on an `onnx` bundle is still
-refused `cache_not_equivalent`), and `011` in `make verify`.
 
 **An `onnx` bundle's cache evidence, and declared verification
 (2026-11-06, 3.13.2, 3.14.3).** `src/runtime.rs` gains
@@ -1296,12 +1290,29 @@ feature, with `ort` loading dynamically; `make boundaries` still checks
 the resolved graph. `## Verification` now declares the crate's default
 tests, the offline test and the boundary check, and `011` is in
 `make verify`.
-`implementation` stays `pending`: the Node binding is not yet built with
-`local-embed` on every spec 027 native matrix target in CI (only the two
-Linux GNU keys in the measurement run and `darwin-arm64` by hand), and the
-service's `local-embed` feature (3.17.3) and the local-embed conformance
-case through the service transports (3.17.5), which now exist, are not
-done.
+
+**Closing (2026-11-06): `local-embed` on every native target, and
+`implementation: complete`.** The `native` job of `.github/workflows/bindings.yml`
+now also builds `rustev-node` with `--features local-embed` on each of the
+seven platforms of spec 027 3.13.1, in the platform's own build environment
+(the Debian bookworm image for the GNU legs, the Alpine image for the musl
+legs, the runner for darwin and win32), after the prebuilt addon is
+uploaded, so the published addon stays without the feature (Decision 10).
+The build is compile and link only: ONNX Runtime is loaded dynamically and
+is absent there. Run 42283606100 built it on `linux-x64-gnu`,
+`linux-arm64-gnu`, `linux-x64-musl`, `linux-arm64-musl`, `darwin-arm64`,
+`darwin-x64` and `win32-x64-msvc`. With #533 (an `onnx` bundle's cache
+evidence, the offline test and `011` in `make verify`), #534 and #535 (the
+service's `local-embed` feature and the service transports in the
+local-embed case, 3.17.3 and 3.17.5) and this change, every Acceptance item
+is met: Partial adoption (the binding builds with `local-embed` on every
+native matrix target), Binding parity (the Rust API, the native binding and
+both service transports byte-identical on the case) and Offline, the items
+earlier paragraphs left open. `## Verification` gains the service's
+`local-embed` tests and its clippy run. The facade's `rustev::local_embed`
+re-export (3.17.4) is spec 031's act on admitting the crate to the release
+family, not this spec's, and is not claimed here; neither is a real bundle
+with the cache on, which no default test needs (3.19.3).
 
 ## Decisions at approval
 

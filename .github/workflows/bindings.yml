@@ -15,7 +15,8 @@
 #   runs the corpus, stages the addon into its platform package, installs
 #   both packages into a fresh project from their tarballs and runs the
 #   native conformance suite there on Node 22 (load, compile, decide with
-#   the rules backend, replay). The addon is uploaded.
+#   the rules backend, replay). The addon is uploaded. Then each platform
+#   also builds the addon with spec 011's `local-embed` feature (3.17.1).
 name: bindings
 
 on:
@@ -294,6 +295,28 @@ jobs:
           name: rustev-${{ matrix.platform }}
           path: integrations/rustev-node/npm/${{ matrix.platform }}/rustev.${{ matrix.platform }}.node
           if-no-files-found: error
+      # Spec 011 3.17.1 and its Partial adoption item: the binding also
+      # builds and links with `local-embed` on every platform. ONNX Runtime
+      # is loaded dynamically, so no runtime is present or needed here. This
+      # runs after the upload, so the prebuilt addon stays without the
+      # feature (Decision 10), in the same image as the platform's build.
+      - name: Build the addon with local-embed (011 3.17.1) in Debian bookworm
+        if: endsWith(matrix.platform, '-gnu')
+        run: |
+          docker run --rm -v "$PWD":/w -w /w "${{ matrix.image }}" sh -euc '
+            cargo build -p rustev-node --locked --release --features local-embed
+          '
+          sudo chown -R "$(id -u):$(id -g)" target
+      - name: Build the addon with local-embed (011 3.17.1) in Alpine (musl)
+        if: endsWith(matrix.platform, '-musl')
+        run: |
+          docker run --rm -v "$PWD":/w -w /w -e RUSTFLAGS="-C target-feature=-crt-static" "${{ matrix.image }}" sh -euc '
+            cargo build -p rustev-node --locked --release --features local-embed
+          '
+          sudo chown -R "$(id -u):$(id -g)" target
+      - name: Build the addon with local-embed (011 3.17.1)
+        if: startsWith(matrix.platform, 'darwin') || startsWith(matrix.platform, 'win32')
+        run: cargo build -p rustev-node --locked --release --features local-embed
 
   # As verify.yml's `verify`: the caller's result is this job's, and a
   # skipped bindings job passes only when `scope` chose to leave it out.
