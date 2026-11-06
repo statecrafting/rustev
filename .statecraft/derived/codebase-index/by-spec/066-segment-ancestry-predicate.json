@@ -1,0 +1,36 @@
+{
+  "mapping": {
+    "amends": [
+      "002-decision-contract-and-pure-core",
+      "032-evidence-quality"
+    ],
+    "dependsOn": [
+      "002-decision-contract-and-pure-core",
+      "027-node-and-wasm-bindings",
+      "031-public-api-and-release-family",
+      "032-evidence-quality",
+      "034-parameterized-definitions",
+      "036-mid-plan-acquisition"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "docs/decisions/00-founding-decisions.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "specId": "066-segment-ancestry-predicate",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "537c9a6d8ff0e34a2f0460b72ee15ce63ed794046ff9f2bd1c8fe3ccb918fe5f"
+}
