@@ -26,8 +26,50 @@ pub fn missing(label: &str) -> IoFail {
     }
 }
 
+/// An input entry, inspected without following a symbolic link.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EntryKind {
+    Missing,
+    File,
+    Directory,
+    Symlink,
+    Other,
+}
+
+/// The file-count caps of spec 006, 3.3.2.
+pub const MAX_RULES_FILES: usize = 64;
+pub const MAX_DESCRIPTOR_FILES: usize = 4096;
+pub const MAX_CALIBRATION_FILES: usize = 4096;
+
 /// The host of one command.
 pub trait Host {
+    /// Immediate entry names in byte order, at most `max`. A missing
+    /// directory is an error. Hosts without directory commands refuse.
+    fn list(&self, dir: &str, _max: usize) -> Result<Vec<String>, IoFail> {
+        Err(IoFail {
+            path: dir.into(),
+            detail: "directory listing unavailable".into(),
+        })
+    }
+
+    /// Inspect an entry without following links. Prefix hosts derive
+    /// directories from input labels, including their immediate children.
+    fn entry_kind(&self, label: &str) -> Result<EntryKind, IoFail> {
+        Err(IoFail {
+            path: label.into(),
+            detail: "entry inspection unavailable".into(),
+        })
+    }
+
+    /// Publish a set with newly created candidate directories, all or
+    /// none. Hosts with virtual directories need only preflight them.
+    fn write_all_in(&self, files: &[(String, Vec<u8>)], dirs: &[String]) -> Result<(), IoFail> {
+        for dir in dirs {
+            self.ensure_absent(dir)?;
+        }
+        self.write_all(files)
+    }
+
     /// Read `label`, at most `max` bytes of it; `None` when it does not
     /// exist. A failure of the input is told from an exhausted command
     /// budget, which depends on read order rather than on the input.

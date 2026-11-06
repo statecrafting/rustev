@@ -14,7 +14,6 @@ mod deps;
 mod eval;
 mod explain;
 mod host;
-mod host_sets;
 pub mod io;
 mod live;
 /// Command output, shared with every host (spec 027, 3.1).
@@ -113,7 +112,7 @@ fn dispatch(p: &Parsed, cx: &Context) -> Result<Done, args::Usage> {
         ["eval", "views"] => eval::views(p)?,
         ["eval", "judge"] => eval::judge(p)?,
         ["eval", "candidates"] => repeat::eval(p)?,
-        ["eval", "repeat", "import"] => host_sets::import(p)?,
+        ["eval", "repeat", "import"] => repeat::import(p)?,
         ["baseline", "record"] => repeat::baseline(p)?,
         ["eval", "reproducibility"] | ["eval", "diff"] => repeat::compare(p),
         ["gate", "select"] => repeat::select(p),

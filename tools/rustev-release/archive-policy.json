@@ -313,6 +313,8 @@
         "src/plan.rs",
         "src/plan_diff.rs",
         "src/profile.rs",
+        "src/repeat.rs",
+        "src/repeat/host_sets.rs",
         "src/replay.rs",
         "src/run.rs"
       ],
@@ -333,7 +335,6 @@
         "src/eval.rs",
         "src/explain.rs",
         "src/host.rs",
-        "src/host_sets.rs",
         "src/io.rs",
         "src/lib.rs",
         "src/live.rs",
