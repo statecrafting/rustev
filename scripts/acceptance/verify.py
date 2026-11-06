@@ -31,6 +31,8 @@ ROOT = Path(__file__).resolve().parents[2]
 # 021 joins integrations-core beside 031, which amends it (its targets are a
 # subset of 031's, about 1 minute built, 2026-11-03).
 # 061 joins cli-backends beside 029 and 041, the specs it amends.
+# 011 joins cli-repeat beside 005, the other backend (about 1 minute built,
+# 2026-11-06).
 # 2026-11-05: the runner limit rose to 500 jobs, so the three groups over
 # 25 minutes split in two on that day's queue run (per-spec seconds:
 # cli-backends 2,200, integrations-base 2,172, integrations-core 1,611).
@@ -38,7 +40,7 @@ ROOT = Path(__file__).resolve().parents[2]
 GROUPS = {
     "evaluation": "004".split(),
     "cli-backends": "006 014 041".split(),
-    "cli-repeat": "001 005 029 061".split(),
+    "cli-repeat": "001 005 011 029 061".split(),
     "integrations-base": "002 010 033 038 040 042".split(),
     "integrations-remote": "012 015 017 019 020 030 059".split(),
     "integrations-core": "021 036 037 045".split(),

@@ -33,6 +33,8 @@ extends:
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.lock" }, nature: additive }
   # Adds 011 to `make verify` once implemented.
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  # 011's place in the acceptance partition (the cli-repeat group).
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
   # The local inference runtime family and placement rule (3.18).
   - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "tools/rustev-boundaries/" }, nature: additive }
   # The crate is excluded from the release set until spec 031 admits it (3.17.4).
@@ -808,11 +810,31 @@ byte was downloaded); re-confirmed in stage 1.
 
 ## Verification
 
-Pending with implementation. The implementing change adds `011` to `make
-verify` with deterministic, offline verification over synthetic bundles for
-every acceptance item that does not need the real artifacts; the
-feasibility record and hand-run real-bundle results are evidence, not
-declared verification.
+Deterministic and offline, over synthetic bundles: no network, checkpoint
+or runtime library. The feasibility record and the hand-run real-bundle
+results are evidence, not declared verification (3.19.3).
+
+```verify:cli
+# 3.2, 3.6.3, 3.14.3: the committed feasibility record, its evidence files
+# and contract digest, and the crate's qualified-platform and in-process
+# repeatability tables against it.
+cargo test -p rustev-backend-embed-linear --locked --test feasibility_record
+# 3.4 to 3.15, 3.17.5, 3.19, 3.20: manifest checks and limits, every setup
+# code, identity, the descriptor and check_plan, text and truncation,
+# resources, charges and cancellation, the embedding cache and its
+# equivalence decision, runtime loading with no library and with a
+# synthetic non-library file, evidence, replay, swap, plan goldens and the
+# local-embed conformance case through the Rust API.
+cargo test -p rustev-backend-embed-linear --locked --test bundle
+cargo test -p rustev-backend-embed-linear --locked --lib
+# Offline: no source file of the crate names a network API, and its
+# manifest declares no network client, model hub or download feature.
+cargo test -p rustev-backend-embed-linear --locked --test offline
+# 3.18: the boundary check's rule unit tests, then the real workspace (no
+# local inference family outside this crate, no hf-hub or download feature).
+cargo test -p rustev-boundaries --locked
+cargo run -p rustev-boundaries --locked --quiet
+```
 
 ## Implementation record
 
@@ -1193,6 +1215,51 @@ Not yet done: an `onnx` bundle's cache evidence wired into the backend
 (3.14.3; the record now shows bitwise repeatability on
 `linux-x86_64-gnu`, but enabling the cache on an `onnx` bundle is still
 refused `cache_not_equivalent`), and `011` in `make verify`.
+
+**An `onnx` bundle's cache evidence, and declared verification
+(2026-11-06, 3.13.2, 3.14.3).** `src/runtime.rs` gains
+`IN_PROCESS_REPEATABILITY`, the settings under which the committed record
+measured bitwise run-to-run repeatability in one process on a qualified
+platform: one entry, `linux-x86_64-gnu`, with the graph's SHA-256, ONNX
+Runtime 1.31.0 and the platform library's SHA-256, `ort` `2.0.0-rc.15`, the
+CPU provider, optimization level `all`, one intra-op and one inter-op
+thread, `f32`, and `mean_masked` pooling with `l2` normalization; and
+`FEASIBILITY_RECORD`, the record's contract digest. An `onnx` bundle's
+setup decides the cache after the platform check and before the runtime
+path is read: `repeatability_evidence` issues `Measured` evidence bound to
+the bundle's artifact only when the platform is qualified, the manifest
+names the committed record and every one of those settings equals the
+entry's; anywhere else, including `linux-aarch64-gnu` (whose measurements
+are bitwise repeatable but whose platform is not qualified) and
+`macos-aarch64`, enabling the cache stays `cache_not_equivalent`. Heads,
+labels, cost and the tokenizer are not compared, since the cache key is the
+post-truncation token sequence and they do not change its pooled
+embedding bits. `tests/feasibility_record.rs` checks that the table holds
+exactly the record's passing platforms with bitwise in-process
+repeatability, that each entry's settings are the record's (probe and
+complete backend), and that `FEASIBILITY_RECORD` is
+`feasibility.sha256`. `tests/runtime/mod.rs` checks the decision offline
+with no real graph or library: allowed for the measured settings on
+`linux-x86_64-gnu` (also with other heads and cost), refused on the other
+two keys and for each changed setting; through setup, an `onnx` bundle
+with a cache and unmeasured settings is `cache_not_equivalent` with no
+runtime on the qualified target and `unqualified_platform` elsewhere; and
+this target's own decision follows the record. A real bundle with the
+cache on was not run. `tests/offline.rs` asserts the Offline item's
+absence of network access: no source file under `src/` names a network
+API or client (`std::net`, its socket types, `tokio::net`, `hyper`,
+`reqwest`, `ureq`, `curl`, `hf_hub`, or a URL), and the crate's
+`Cargo.toml` declares no network client, `tokio`, `hf-hub` or download
+feature, with `ort` loading dynamically; `make boundaries` still checks
+the resolved graph. `## Verification` now declares the crate's default
+tests, the offline test and the boundary check, and `011` is in
+`make verify`.
+`implementation` stays `pending`: the Node binding is not yet built with
+`local-embed` on every spec 027 native matrix target in CI (only the two
+Linux GNU keys in the measurement run and `darwin-arm64` by hand), and the
+service's `local-embed` feature (3.17.3) and the local-embed conformance
+case through the service transports (3.17.5), which now exist, are not
+done.
 
 ## Decisions at approval
 

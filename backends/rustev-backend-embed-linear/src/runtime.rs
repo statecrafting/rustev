@@ -18,7 +18,13 @@ use std::sync::Mutex;
 use ort::environment::Environment;
 use sha2::{Digest, Sha256};
 
-use crate::manifest::{EmbedManifest, Platform};
+use rustev_contract::ids::ArtifactId;
+
+use crate::cache::RepeatabilityEvidence;
+use crate::manifest::{
+    EmbedManifest, EncoderKind, ExecutionProvider, GraphOptimization, Normalize, Platform,
+    PoolingMode, Precision,
+};
 use crate::{EmbedSetupError, SetupCode};
 
 /// The `ort` version this crate is built with; a manifest naming another is
@@ -33,6 +39,105 @@ pub const ORT_VERSION: &str = "2.0.0-rc.15";
 /// `tests/feasibility_record.rs` checks that this table equals the
 /// record's `pass` verdicts.
 pub const QUALIFIED_PLATFORMS: &[Platform] = &[Platform::LinuxX86_64Gnu];
+
+/// The contract digest of the committed feasibility record
+/// (`qualification/feasibility.sha256`); `tests/feasibility_record.rs`
+/// checks that the two agree.
+pub const FEASIBILITY_RECORD: &str =
+    "sha256:1ea76927c627c5ebfa8f39836f362f197dfd76c9fb40331dfab72691f792f4cd";
+
+/// The settings under which the committed record measured bitwise
+/// run-to-run repeatability in one process on a qualified platform (3.13.2,
+/// 3.14.3): the graph, the runtime library and its versions, the provider,
+/// the optimization level, the thread counts, the precision and the
+/// pooling. Heads, labels, cost and the tokenizer do not change the pooled
+/// embedding bits of a token sequence, which is the cache's key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InProcessRepeatability {
+    pub platform: Platform,
+    pub graph_sha256: &'static str,
+    pub onnxruntime: &'static str,
+    pub ort: &'static str,
+    pub runtime_sha256: &'static str,
+    pub execution_provider: ExecutionProvider,
+    pub graph_optimization: GraphOptimization,
+    pub intra_op_threads: u64,
+    pub inter_op_threads: u64,
+    pub precision: Precision,
+    pub pooling_mode: PoolingMode,
+    pub normalize: Normalize,
+}
+
+/// The record's in-process bitwise repeatability measurements on the
+/// qualified platforms: `linux-x86_64-gnu`, run 42139954158 (2026-11-06),
+/// the encoder probe's fixtures and the complete backend's fixtures and
+/// 1,000 warm requests. `tests/feasibility_record.rs` checks each entry
+/// against the record. Every other platform, and every other setting, has
+/// no evidence, so an embedding cache there is `cache_not_equivalent`.
+pub const IN_PROCESS_REPEATABILITY: &[InProcessRepeatability] = &[InProcessRepeatability {
+    platform: Platform::LinuxX86_64Gnu,
+    graph_sha256: "6fd5d72fe4589f189f8ebc006442dbb529bb7ce38f8082112682524616046452",
+    onnxruntime: "1.31.0",
+    ort: ORT_VERSION,
+    runtime_sha256: "469849977cb60744ea160927e1a3a0643fd4c55c0aff743251c6d293402e334e",
+    execution_provider: ExecutionProvider::Cpu,
+    graph_optimization: GraphOptimization::All,
+    intra_op_threads: 1,
+    inter_op_threads: 1,
+    precision: Precision::F32,
+    pooling_mode: PoolingMode::MeanMasked,
+    normalize: Normalize::L2,
+}];
+
+impl InProcessRepeatability {
+    /// Whether an `onnx` manifest on `platform` has exactly these settings
+    /// and names the committed record.
+    pub fn covers(&self, manifest: &EmbedManifest, platform: Platform) -> bool {
+        let (e, r, p) = (&manifest.encoder, &manifest.runtime, &manifest.pooling);
+        e.kind == EncoderKind::Onnx
+            && platform == self.platform
+            && QUALIFIED_PLATFORMS.contains(&platform)
+            && manifest.tolerance.feasibility_record == FEASIBILITY_RECORD
+            && e.graph.sha256 == self.graph_sha256
+            && e.precision == self.precision
+            && r.onnxruntime == self.onnxruntime
+            && r.ort == self.ort
+            && r.execution_provider == self.execution_provider
+            && r.graph_optimization == self.graph_optimization
+            && r.intra_op_threads == self.intra_op_threads
+            && r.inter_op_threads == self.inter_op_threads
+            && r.libraries
+                .iter()
+                .find(|l| l.platform == platform)
+                .is_some_and(|l| l.sha256 == self.runtime_sha256)
+            && p.mode == self.pooling_mode
+            && p.normalize == self.normalize
+    }
+}
+
+/// The repeatability evidence for an `onnx` bundle on `platform` (3.14.3):
+/// `Measured` with `bitwise_in_process` bound to the bundle's artifact when
+/// a measurement of [`IN_PROCESS_REPEATABILITY`] covers its settings,
+/// otherwise `Unproven`.
+pub fn repeatability_evidence(
+    manifest: &EmbedManifest,
+    artifact: &ArtifactId,
+    platform: Platform,
+) -> RepeatabilityEvidence {
+    if IN_PROCESS_REPEATABILITY
+        .iter()
+        .any(|m| m.covers(manifest, platform))
+    {
+        RepeatabilityEvidence::Measured {
+            artifact: artifact.clone(),
+            platform: platform.key().into(),
+            feasibility_record: FEASIBILITY_RECORD.into(),
+            bitwise_in_process: true,
+        }
+    } else {
+        RepeatabilityEvidence::Unproven
+    }
+}
 
 /// The platform key of the compilation target (3.6.3), or `None` for any
 /// target outside the three keys (musl, Windows, `darwin-x64`, ...).
