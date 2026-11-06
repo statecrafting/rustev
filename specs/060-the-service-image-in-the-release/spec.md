@@ -513,10 +513,11 @@ check of `tools/rustev-release/deny.toml` (031 3.9.2), which the
 The dependencies now name the workspace entries (`workspace = true`,
 each with its exact family version), in a pull request of their own
 because a manifest is a policy file. The duplicates cannot be unified
-from this tree, so the release `deny.toml` skips them with their reasons,
-as it already skips three: `base64` 0.22.1 (tonic 0.14 pins it; sigstore's
-`pem` 4 uses 0.23) and `untrusted` 0.7.1 (`aws-lc-rs` 1.18 under
-`sigstore-crypto` pins it; `ring` 0.17 uses 0.9). Advisories, licenses
+from this tree, so the release `deny.toml` now skips these two with their
+reasons, as it already skipped three others (`windows-sys`, `getrandom`,
+`syn`): `base64` 0.22.1 (tonic 0.14 pins it; sigstore's `pem` 4 uses
+0.23) and `untrusted` 0.7.1 (`aws-lc-rs` 1.18 under `sigstore-crypto`
+pins it; `ring` 0.17 uses 0.9). Advisories, licenses
 and sources are unchanged.
 
 ## Decisions at approval
