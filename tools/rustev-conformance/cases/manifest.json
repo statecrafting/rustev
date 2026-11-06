@@ -13105,6 +13105,376 @@
     },
     {
       "command": "decide",
+      "id": "runtime.capture-replay-acquire",
+      "inputs": [
+        {
+          "name": "capture-acquire.plan.json",
+          "path": "tools/rustev-conformance/fixtures/capture/capture-acquire.plan.json",
+          "sha256": "f99aa1c871766473449761fe1efe17eac07ec8e7b287524a5f379ea458122750"
+        },
+        {
+          "name": "capture-catalog.source.json",
+          "path": "tools/rustev-conformance/fixtures/capture/capture-catalog.source.json",
+          "sha256": "82c468f0fb521efce7c0cb30a19c4b79ef5825663965944f838e3adc9490f53c"
+        },
+        {
+          "name": "capture-generation.snapshot.json",
+          "path": "tools/rustev-conformance/fixtures/capture/capture-generation.snapshot.json",
+          "sha256": "b34d8feb906cb18dfe773a01c18e3645ae091132b99060eed8787e148ceddf82"
+        }
+      ],
+      "mirrors": "crates/rustev-eval/tests/acquisition_replay.rs::five_acquisitions_two_paged_reproduce_without_source_calls",
+      "outputs": [
+        {
+          "file": "embedded.bundle.json",
+          "golden": "tools/rustev-conformance/expected/runtime/runtime.capture-replay-acquire/embedded.bundle.json",
+          "normalize": [],
+          "sha256": "119b197920b99b6e0363a9eb3af4fb190c8047e4c48574cbd500a90179e30148"
+        },
+        {
+          "file": "embedded.record.json",
+          "golden": "tools/rustev-conformance/expected/runtime/runtime.capture-replay-acquire/embedded.record.json",
+          "normalize": [],
+          "sha256": "6f17ba7a11f0358cc906d34d278105d022d04a4c91dd7af75e19c107b8bd3fdf"
+        },
+        {
+          "file": "embedded.replay.json",
+          "golden": "tools/rustev-conformance/expected/runtime/runtime.capture-replay-acquire/embedded.replay.json",
+          "normalize": [],
+          "sha256": "c68cfa7179d7fe23cdf391dbeb84c2156a4ec86ea470265c8df04efd668da610"
+        },
+        {
+          "file": "embedded.result.json",
+          "golden": "tools/rustev-conformance/expected/runtime/runtime.capture-replay-acquire/embedded.result.json",
+          "normalize": [],
+          "sha256": "a0c5d9c5e45bd7c7f3892bf3a29726e5136c2a0e06a0abe971e563c5f271b3c5"
+        },
+        {
+          "file": "external.bundle.json",
+          "golden": "tools/rustev-conformance/expected/runtime/runtime.capture-replay-acquire/external.bundle.json",
+          "normalize": [],
+          "sha256": "929789cff44e5698a7be51f412d5ef2eeda14a7d5da75008a24ddaa2a3e1a262"
+        },
+        {
+          "file": "external.record.json",
+          "golden": "tools/rustev-conformance/expected/runtime/runtime.capture-replay-acquire/external.record.json",
+          "normalize": [],
+          "sha256": "62566fec931224cdf4f319941d88120c18876a86de80e26b7c9ebc8072bb2576"
+        },
+        {
+          "file": "external.replay.json",
+          "golden": "tools/rustev-conformance/expected/runtime/runtime.capture-replay-acquire/external.replay.json",
+          "normalize": [],
+          "sha256": "6bf177f35ed5d207fd909fd0dc34c5371d5e38d9ac993be3232c085d313a5ae7"
+        },
+        {
+          "file": "external.result.json",
+          "golden": "tools/rustev-conformance/expected/runtime/runtime.capture-replay-acquire/external.result.json",
+          "normalize": [],
+          "sha256": "a05cbb7cabf6f209b9841168f8b1446ffe94a6c824e8632b3fb3911119724efc"
+        }
+      ],
+      "runtime": {
+        "backends": [],
+        "calibrations": [],
+        "capture": {
+          "created_at_ms": 1790164800000,
+          "max_bytes": 16777216,
+          "retain": {
+            "embedded": "embedded",
+            "external": "external"
+          },
+          "scope": {
+            "context_revision": "revision",
+            "mode": "principal",
+            "principal_scope": "scope",
+            "tenant": "tenant"
+          }
+        },
+        "config": {
+          "max_in_flight": 2,
+          "max_parallel_requests": 1,
+          "max_queued": 0,
+          "sink_timeout_ms": 1000
+        },
+        "descriptors": [],
+        "drive": [
+          "start",
+          "start"
+        ],
+        "plan": "capture-acquire.plan.json",
+        "requests": [
+          {
+            "decision_id": "embedded",
+            "evaluation_time_ms": 1000,
+            "snapshot": "capture-generation.snapshot.json"
+          },
+          {
+            "decision_id": "external",
+            "evaluation_time_ms": 1000,
+            "snapshot": "capture-generation.snapshot.json"
+          }
+        ],
+        "sources": [
+          {
+            "answers": {
+              "embedded": [
+                {
+                  "page": {
+                    "as_of_ms": 900,
+                    "charge": {
+                      "observed": {
+                        "units": 1
+                      }
+                    },
+                    "items": [
+                      {
+                        "id": 1
+                      }
+                    ],
+                    "next": {
+                      "offset": {
+                        "integer": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "page": {
+                    "as_of_ms": 900,
+                    "charge": {
+                      "observed": {
+                        "units": 1
+                      }
+                    },
+                    "items": [
+                      {
+                        "id": 2
+                      }
+                    ],
+                    "next": {
+                      "offset": {
+                        "integer": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "page": {
+                    "as_of_ms": 900,
+                    "charge": {
+                      "observed": {
+                        "units": 1
+                      }
+                    },
+                    "items": [
+                      {
+                        "id": 3
+                      }
+                    ],
+                    "next": "none"
+                  }
+                },
+                {
+                  "page": {
+                    "as_of_ms": 900,
+                    "charge": {
+                      "observed": {
+                        "units": 1
+                      }
+                    },
+                    "items": [
+                      {
+                        "id": 4
+                      }
+                    ],
+                    "next": "none"
+                  }
+                },
+                {
+                  "page": {
+                    "as_of_ms": 900,
+                    "charge": {
+                      "observed": {
+                        "units": 1
+                      }
+                    },
+                    "items": [
+                      {
+                        "id": 5
+                      }
+                    ],
+                    "next": "none"
+                  }
+                },
+                {
+                  "page": {
+                    "as_of_ms": 900,
+                    "charge": {
+                      "observed": {
+                        "units": 1
+                      }
+                    },
+                    "items": [
+                      {
+                        "id": 6
+                      }
+                    ],
+                    "next": "none"
+                  }
+                },
+                {
+                  "page": {
+                    "as_of_ms": 900,
+                    "charge": {
+                      "observed": {
+                        "units": 1
+                      }
+                    },
+                    "items": [
+                      {
+                        "id": 7
+                      }
+                    ],
+                    "next": "none"
+                  }
+                }
+              ],
+              "external": [
+                {
+                  "page": {
+                    "as_of_ms": 900,
+                    "charge": {
+                      "observed": {
+                        "units": 1
+                      }
+                    },
+                    "items": [
+                      {
+                        "id": 1
+                      }
+                    ],
+                    "next": {
+                      "offset": {
+                        "integer": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "page": {
+                    "as_of_ms": 900,
+                    "charge": {
+                      "observed": {
+                        "units": 1
+                      }
+                    },
+                    "items": [
+                      {
+                        "id": 2
+                      }
+                    ],
+                    "next": {
+                      "offset": {
+                        "integer": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "page": {
+                    "as_of_ms": 900,
+                    "charge": {
+                      "observed": {
+                        "units": 1
+                      }
+                    },
+                    "items": [
+                      {
+                        "id": 3
+                      }
+                    ],
+                    "next": "none"
+                  }
+                },
+                {
+                  "page": {
+                    "as_of_ms": 900,
+                    "charge": {
+                      "observed": {
+                        "units": 1
+                      }
+                    },
+                    "items": [
+                      {
+                        "id": 4
+                      }
+                    ],
+                    "next": "none"
+                  }
+                },
+                {
+                  "page": {
+                    "as_of_ms": 900,
+                    "charge": {
+                      "observed": {
+                        "units": 1
+                      }
+                    },
+                    "items": [
+                      {
+                        "id": 5
+                      }
+                    ],
+                    "next": "none"
+                  }
+                },
+                {
+                  "page": {
+                    "as_of_ms": 900,
+                    "charge": {
+                      "observed": {
+                        "units": 1
+                      }
+                    },
+                    "items": [
+                      {
+                        "id": 6
+                      }
+                    ],
+                    "next": "none"
+                  }
+                },
+                {
+                  "page": {
+                    "as_of_ms": 900,
+                    "charge": {
+                      "observed": {
+                        "units": 1
+                      }
+                    },
+                    "items": [
+                      {
+                        "id": 7
+                      }
+                    ],
+                    "next": "none"
+                  }
+                }
+              ]
+            },
+            "descriptor": "capture-catalog.source.json",
+            "max_concurrency": 1
+          }
+        ]
+      },
+      "surfaces": [
+        "rust-api",
+        "native"
+      ]
+    },
+    {
+      "command": "decide",
       "id": "runtime.deadline",
       "inputs": [
         {

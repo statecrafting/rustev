@@ -1,5 +1,5 @@
-//! Capture cases use semantic and generation steps. Acquisition-page coverage
-//! joins with spec 063 increment 3, when the Node source seam is available.
+//! Capture cases use semantic, generation and (spec 063 increment 3)
+//! acquisition steps; a plan's source descriptors reach assembly.
 use rustev_contract::{Document, canonical::tagged_digest, scope::Scope, time::Timestamp};
 use rustev_eval::assemble::{AssemblyInput, Content, RetentionChoice, assemble_with_sources};
 use rustev_eval::replay::ReplayConfig;
@@ -27,6 +27,17 @@ impl Resolver for Items {
 }
 
 pub fn outputs(input: &AssemblyInput<'_>, retain: &str) -> Result<super::runtime::Outputs, String> {
+    outputs_with_sources(input, retain, &[])
+}
+
+/// [`outputs`] for a plan bound to acquisition sources (spec 063 3.8):
+/// assembly receives their descriptors, and replay reuses the captured
+/// pages without a source call.
+pub fn outputs_with_sources(
+    input: &AssemblyInput<'_>,
+    retain: &str,
+    sources: &[rustev_contract::source::SourceDescriptor],
+) -> Result<super::runtime::Outputs, String> {
     let items = RefCell::new(BTreeMap::new());
     let external = |_, bytes: &[u8]| {
         let doc: serde_json::Value = serde_json::from_slice(bytes).unwrap();
@@ -44,7 +55,7 @@ pub fn outputs(input: &AssemblyInput<'_>, retain: &str) -> Result<super::runtime
             },
             ..Default::default()
         },
-        &[],
+        sources,
     )
     .map_err(|e| e.to_string())?;
     let bytes = bundle.record_canonical().map_err(|e| e.to_string())?;

@@ -1261,3 +1261,123 @@ fn store_cases_produce_their_expected_bytes() {
         );
     }
 }
+
+// ---- spec 063 3.13.2: capture with acquisition pages -----------------------
+
+/// `runtime.capture-replay`'s acquisition coverage (063 increments 1 and 3):
+/// the mirrored test's five acquisitions, two of them paged, captured
+/// embedded and external, and replayed without a source call. Its own case,
+/// `runtime.capture-replay-acquire`, since a case holds one plan and
+/// `runtime.capture-replay`'s is the semantic support plan.
+#[test]
+fn capture_acquire_case() {
+    const ID: &str = "runtime.capture-replay-acquire";
+    let catalog = acquire_source("catalog", "id");
+    let mut definition = acquire_definition(1, &[]);
+    let lookup = definition.steps[0].clone();
+    definition.steps = (0..5)
+        .map(|i| {
+            let mut s = lookup.clone();
+            s.id = format!("lookup{i}");
+            s
+        })
+        .collect();
+    // Five steps of at most two pages each: a worst case of ten calls.
+    definition.limits.acquisition = Some(
+        serde_json::from_value(json!({"max_calls":10,"max_items":25,"max_bytes":32768})).unwrap(),
+    );
+    let compiled = rustev_core::compile_with_sources(
+        &definition,
+        &[],
+        &[],
+        std::slice::from_ref(&catalog),
+        None,
+    )
+    .unwrap();
+    let fx = BTreeMap::from([
+        (
+            "capture-acquire.plan.json".to_string(),
+            line(compiled.canonical()),
+        ),
+        (
+            "capture-catalog.source.json".to_string(),
+            line(catalog.canonical().unwrap()),
+        ),
+        (
+            "capture-generation.snapshot.json".to_string(),
+            line(snapshot(vec![]).canonical().unwrap()),
+        ),
+    ]);
+    for (name, bytes) in &fx {
+        keep(&format!("fixtures/{}", fixture(name)), bytes);
+    }
+    // One source permit, granted in request order: the five first pages
+    // in step order, then the second pages of the two that page on.
+    let answers = json!([
+        page(&[1], "id", json!({"offset":{"integer":1}})),
+        page(&[2], "id", json!({"offset":{"integer":1}})),
+        page(&[3], "id", json!("none")),
+        page(&[4], "id", json!("none")),
+        page(&[5], "id", json!("none")),
+        page(&[6], "id", json!("none")),
+        page(&[7], "id", json!("none"))
+    ]);
+    let block = json!({
+        "plan": "capture-acquire.plan.json", "descriptors": [], "calibrations": [],
+        "config": config(2, 0, 1), "backends": [],
+        "sources": [source_script("capture-catalog.source.json", json!({"embedded": answers, "external": answers}))],
+        "requests": [
+            {"decision_id": "embedded", "snapshot": "capture-generation.snapshot.json", "evaluation_time_ms": 1000},
+            {"decision_id": "external", "snapshot": "capture-generation.snapshot.json", "evaluation_time_ms": 1000}],
+        "drive": ["start", "start"],
+        "capture": {"scope": {"mode":"principal","tenant":"tenant","context_revision":"revision","principal_scope":"scope"},
+            "max_bytes":16777216, "created_at_ms":NOW,
+            "retain":{"embedded":"embedded","external":"external"}}
+    });
+    let case: RuntimeCase = serde_json::from_value(block.clone()).unwrap();
+    let names: Vec<String> = fx.keys().cloned().collect();
+    let out = runtime::run(&case, &fx).unwrap();
+    let mut outputs = vec![];
+    for (file, bytes) in out {
+        if file.ends_with("bundle.json") {
+            let b: Json = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(b["capture"], "complete");
+            let pages = b["acquisition_pages"]
+                .as_array()
+                .expect("acquisition pages");
+            assert_eq!(pages.len(), 7, "{file}");
+            for step in ["lookup0", "lookup1"] {
+                let per: Vec<&Json> = pages.iter().filter(|p| p["step"] == step).collect();
+                assert_eq!(per.len(), 2, "{file} {step}");
+                assert_eq!(
+                    (per[0]["page"].as_u64(), per[1]["page"].as_u64()),
+                    (Some(0), Some(1))
+                );
+                assert_ne!(per[0]["request"], per[1]["request"]);
+                assert!(per[0]["sequence"].as_u64() < per[1]["sequence"].as_u64());
+            }
+        }
+        if file.ends_with("replay.json") {
+            assert_eq!(
+                serde_json::from_slice::<Json>(&bytes).unwrap()["status"],
+                "reproduced"
+            );
+        }
+        let rel = format!("expected/runtime/{ID}/{file}");
+        keep(&rel, &bytes);
+        outputs.push(json!({"file":file,"golden":format!("{DIR}/{rel}"),"sha256":sha256_hex(&bytes),"normalize":[]}));
+    }
+    assert_eq!(
+        outputs.len(),
+        8,
+        "record, result, bundle and replay for both decisions"
+    );
+    let c = json!({"id":ID,"command":"decide","surfaces":["rust-api","native"],
+        "mirrors":"crates/rustev-eval/tests/acquisition_replay.rs::five_acquisitions_two_paged_reproduce_without_source_calls",
+        "inputs":names.iter().map(|n| json!({"name":n,"path":format!("{DIR}/fixtures/{}", fixture(n)),"sha256":sha256_hex(&fx[n])})).collect::<Vec<_>>(),
+        "runtime":block,"outputs":outputs});
+    keep(
+        &format!("cases/runtime/{ID}.json"),
+        &line(serde_json::to_vec_pretty(&c).unwrap()),
+    );
+}
