@@ -98,7 +98,7 @@ jobs:
           from pathlib import Path
           record, model, log = sys.argv[1], Path(sys.argv[2]), Path(sys.argv[3])
           rev = os.environ["REVISION"]
-          files = json.load(open(record))["candidate"]["files"]
+          files = json.load(open(record))["candidate"]["checkpoint"]["files"]
           lines = []
           for f in files:
               url = f"https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/{rev}/{f['name']}"
