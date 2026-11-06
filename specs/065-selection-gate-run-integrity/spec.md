@@ -324,4 +324,6 @@ draft left open answered as recommended:
    outcome key count (3.2.2).
 7. **No declared scorer.** `max_invalid` under a configuration that
    declares no scorer makes the count unestablished
-   (`invalid-uncountable`) and voids the comparison (3.2.1).
+   (`invalid-uncountable`) and voids the comparison (3.2.1). The owner
+   accepted this explicitly on 2026-11-06: the owner's gate always
+   declares scorers.
