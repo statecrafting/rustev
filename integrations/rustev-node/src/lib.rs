@@ -1290,6 +1290,7 @@ impl Engine {
                 compiled,
                 descriptors,
                 calibrations,
+                sources,
             } = profile::compile(&inputs, &args)?;
             if let Some(t) = &self.inner.telemetry {
                 t.register_plan(&compiled.plan);
@@ -1308,6 +1309,7 @@ impl Engine {
                 raw,
                 descriptors: Arc::new(descriptors),
                 calibrations: Arc::new(calibrations),
+                sources: Arc::new(sources),
             })
         })
     }
