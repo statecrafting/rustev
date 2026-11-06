@@ -322,17 +322,20 @@ mod tests {
         assert!(ensure_absent(&f).is_err());
         let _ = std::fs::remove_dir_all(&d);
     }
-}
 
-#[cfg(test)]
-mod listing_tests {
-    use super::*;
-    use rustev_surface::host::{EntryKind, Host};
+    /// Removes a scratch directory even when an assertion fails.
+    struct Cleanup(std::path::PathBuf);
+    impl Drop for Cleanup {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
 
     #[test]
     fn filesystem_lists_immediate_names_in_byte_order_under_the_cap() {
-        let root = std::env::temp_dir().join(format!("rustev-host-list-{}", std::process::id()));
-        std::fs::create_dir(&root).unwrap();
+        use rustev_surface::host::{EntryKind, Host};
+        let root = scratch("list");
+        let _cleanup = Cleanup(root.clone());
         for name in ["z", "é", "B"] {
             std::fs::write(root.join(name), b"").unwrap();
         }
@@ -359,6 +362,5 @@ mod listing_tests {
                 EntryKind::Symlink
             );
         }
-        std::fs::remove_dir_all(root).unwrap();
     }
 }
