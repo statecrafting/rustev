@@ -1177,6 +1177,19 @@ the label `statecraft:stacked-ci`. A push to `main` with `post_merge` (spec
 `rust-toolchain.toml` changed. The final `release-checks` job still accepts a
 skip only when `scope` chose it.
 
+**2026-11-05, CI only (no claim of this spec changes).** `release-checks.yml`
+gains the job `archives`, spec 021 3.5 as amended by A-81: it packages the
+release set with `cargo package --locked --no-verify` and runs
+`rustev-release archives` over the `.crate` files, the archive check
+`candidate.sh` and the release run apply (file lists, archive, unpacked and
+per-file byte bounds, prohibited-content scan), with a per-member table in
+the job summary. Unlike the other release checks it runs on every pull
+request as well as in the merge queue, so the change that crosses a bound
+raises it; a push to `main` with `post_merge` runs it only when `Cargo.lock`
+or `rust-toolchain.toml` changed, as the others do. It restores main's
+`adoption` registry cache and saves none. The final `release-checks` job
+requires it, accepting a skip only when `scope` chose it.
+
 ## Decisions at approval
 
 1. **Crate and package names** (left to the implementer by #58): decided

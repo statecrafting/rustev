@@ -13,7 +13,7 @@
       "contentHash": "fa8449648fe8406aa12e3aff653271d96fc37b28671d360f6edf217807398d42"
     },
     ".github/workflows/release-checks.yml": {
-      "contentHash": "47ddf27e48e959e5b484ba7b3335e9956e01a029e0b1f0da084ea97850fd8afe"
+      "contentHash": "1a5d827da3ca69ee20e21a7443d87d2a68db83d877ffdb40b712f5b05381dbc4"
     },
     ".github/workflows/release.yml": {
       "contentHash": "4640b5231289fc60d3ea72da9149da9cb4bd5a46d8da4b1025b55e9389bbcbad"

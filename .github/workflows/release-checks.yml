@@ -8,6 +8,9 @@
 #   (3.6.7).
 # - `semver`: cargo-semver-checks against the previous release, or
 #   `no-baseline` when none exists, recorded as not applicable (3.8, R-3).
+# - `archives`: the release set packaged and checked against spec 021's
+#   archive policy (file lists, byte bounds, content scan; 021 3.5 as
+#   amended by A-81), on every pull request as well as the merge queue.
 name: release-checks
 
 on:
@@ -36,6 +39,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       run: ${{ steps.affected.outputs.run }}
+      archives: ${{ steps.affected.outputs.archives }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -57,7 +61,13 @@ jobs:
           else
             run=true
           fi
+          # 021 3.5 (A-81): the archive check is cheap and runs on every
+          # pull request, so the change that crosses a bound raises it; a
+          # post-merge push follows `run`.
+          archives=$run
+          if [ "$POST_MERGE" != true ]; then archives=true; fi
           echo "run=$run" >> "$GITHUB_OUTPUT"
+          echo "archives=$archives" >> "$GITHUB_OUTPUT"
 
   adoption:
     name: adoption ${{ matrix.subset }}
@@ -244,12 +254,60 @@ jobs:
           path: target/semver.txt
           if-no-files-found: error
 
+  # Spec 021 3.5 as amended by A-81: each member's `.crate`, packaged
+  # without the verification build (the archive bytes are the same), is
+  # checked by `rustev-release archives`, the check candidate.sh and the
+  # release run apply. A violation names the member, the bound and the size.
+  archives:
+    name: archives
+    needs: scope
+    if: needs.scope.outputs.archives == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      # Restore only, from main's adoption entries (the same registry), so
+      # this job adds no cache entry of its own.
+      - name: Restore cargo registry and git
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: adoption-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: |
+            adoption-${{ runner.os }}-
+      - name: Package the release set and check each archive (021 3.5)
+        run: |
+          cargo build --quiet --locked -p rustev-release
+          release=target/debug/rustev-release
+          version=$("$release" field version)
+          packages=$("$release" field packages)
+          test -n "$packages"
+          flags=""
+          for p in $packages; do flags="$flags -p $p"; done
+          # shellcheck disable=SC2086
+          cargo package --locked --no-verify $flags
+          mkdir -p target/archive-check
+          for p in $packages; do cp "target/package/$p-$version.crate" target/archive-check/; done
+          if "$release" archives target/archive-check > target/archives.json; then status=pass; else status=fail; fi
+          {
+            echo '### Archive check (spec 021 3.5)'
+            echo
+            echo '| Member | Archive bytes | Unpacked bytes | Violations |'
+            echo '|---|---|---|---|'
+            jq -r '.[] | "| `\(.package)` | \(.archive_bytes) | \(.unpacked_bytes) | \(.violations | length) |"' target/archives.json
+          } >> "$GITHUB_STEP_SUMMARY"
+          test "$status" = pass
+
   # As verify.yml's `verify`: the caller's result is this job's, and a
   # skipped release check passes only when `scope` chose to leave it out.
   release-checks:
     name: release-checks
     if: always()
-    needs: [scope, adoption, msrv, semver]
+    needs: [scope, adoption, msrv, semver, archives]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -258,7 +316,11 @@ jobs:
           SCOPE: ${{ needs.scope.result }}
           RUN: ${{ needs.scope.outputs.run }}
           RESULTS: ${{ needs.adoption.result }} ${{ needs.msrv.result }} ${{ needs.semver.result }}
+          ARCHIVES_RUN: ${{ needs.scope.outputs.archives }}
+          ARCHIVES: ${{ needs.archives.result }}
         run: |
           test "$SCOPE" = success
           want=success; [ "$RUN" = false ] && want=skipped
           for r in $RESULTS; do test "$r" = "$want" || { echo "a release check is $r, expected $want"; exit 1; }; done
+          want=success; [ "$ARCHIVES_RUN" = false ] && want=skipped
+          test "$ARCHIVES" = "$want" || { echo "the archive check is $ARCHIVES, expected $want"; exit 1; }
