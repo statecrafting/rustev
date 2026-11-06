@@ -1190,6 +1190,15 @@ or `rust-toolchain.toml` changed, as the others do. It restores main's
 `adoption` registry cache and saves none. The final `release-checks` job
 requires it, accepting a skip only when `scope` chose it.
 
+**The changelog across a spec-spine pin move, 2026-11-06 (3.10).** The
+0.5.0 candidates found `rustev-release changelog` refusing the previous
+release's corpus: v0.4.1's tree pins spec-spine 0.31.0, and the pinned
+binary is 0.32.0 since #514, so `registry list` on the extracted tag
+refused the version. The extracted copy, a private temporary directory,
+now gets this commit's `[meta] required_version` line before it is
+listed, so one pinned binary reads both corpora; the specs are read as
+tagged and nothing in the repository changes.
+
 ## Decisions at approval
 
 1. **Crate and package names** (left to the implementer by #58): decided
