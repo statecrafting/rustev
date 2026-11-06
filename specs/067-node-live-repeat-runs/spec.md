@@ -406,9 +406,10 @@ integration crate, and `rustev-node` is under `integrations/`).
 1. **027:** 3.3's API gains `liveRun`; section 4's "remote backends linked
    into the binding" is unchanged (host backends are TypeScript objects).
 2. **043:** section 2's "the Node and WebAssembly bindings ... expose it
-   in their own specs" is fulfilled for Node by this spec; 3.2.2's
-   "`authorize` ... the library requires absent" does not apply to the
-   Node binding (3.5.2); 3.5.1's "header ... unchanged" gains the two
+   in their own specs" is fulfilled for Node by this spec; 3.2.2 is
+   reversed for the Node binding only: its "`authorize` ... the library
+   requires absent" does not apply to the binding, which requires
+   `authorize` (3.5.2), while a Rust host keeps 3.2.2; 3.5.1's "header ... unchanged" gains the two
    creation members for new journals, and 3.11.4's `rustev.live-run/1`
    gains `journal` (3.4.5), for the CLI and the binding alike; 3.13 gains
    `--require-existing-journal` (3.4.6).
@@ -505,7 +506,9 @@ increment that satisfies it.
    with `requireExistingJournal`; abort and run deadline (3.6.1 to
    3.6.3); `node --test` cases. Increments 1 and 2 together hold the
    journal and the Node entry point, the part that must ship in 0.5.1 if
-   not all four fit (owner answer 5).
+   not all four fit (decision 5 at approval). The order is fixed: the
+   journal (increment 1) first, then `liveRun` (increment 2), which is
+   what the owner's TMD-282 evaluation jobs need.
 3. **Resume, rerun and shutdown.** `resume`, `rerunInterrupted` (3.7.2,
    3.7.3), shutdown during a run (3.6.4), and the conformance cases of
    3.8.2 with both runners.
@@ -532,9 +535,11 @@ the adopted behavior.
    and a new journal is visible (3.4.4, 3.4.5).
 2. **`requireExistingJournal` / `--require-existing-journal`,** off by
    default, the documented CI setting (3.4.6).
-3. **The Node binding requires `authorize`** in the live configuration,
-   reversing 043 3.2.2 for the binding only (3.5): it matches the owner's
-   rule of approval before each paid run. No asynchronous host authorizer.
+3. **The Node binding requires `authorize`** in the live configuration.
+   This knowingly reverses 043 3.2.2 for the binding only (3.5.2, 3.10.2),
+   as the owner confirmed explicitly on 2026-11-06: it matches the owner's
+   rule of approval before each paid run. A Rust host calling the library
+   keeps 043 3.2.2. No asynchronous host authorizer.
 4. **The memory host is refused for `liveRun`** (3.4.2): the owner's
    evaluation jobs run on a real filesystem.
 5. **Release scope.** All four increments are targeted for 0.5.1. If
@@ -542,7 +547,8 @@ the adopted behavior.
    the journal: increments 1 and 2 of the plan already contain both (the
    journal, its visibility and `--require-existing-journal` in 1;
    `liveRun` with `requireExistingJournal` in 2), so they ship first and
-   in that order; increments 3 and 4 (resume, rerun, shutdown,
+   in that order, journal then `liveRun`, as the owner confirmed on
+   2026-11-06 for the TMD-282 evaluation jobs; increments 3 and 4 (resume, rerun, shutdown,
    conformance and closure) may follow.
 6. **The cost unit** lives only in the live configuration's binding
    entry, inside the `LiveConfigId` (3.3.2).
