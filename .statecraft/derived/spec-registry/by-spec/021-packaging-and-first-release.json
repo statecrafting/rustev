@@ -238,7 +238,7 @@
       }
     ],
     "sectionDigests": {
-      "021-packaging-and-first-public-release": "b18560859a9d31a58a5b7cfccfb972a1248aa3ed48cc6db9cc1e1491f4466a6d",
+      "021-packaging-and-first-public-release": "28ceb3b9aaded7613d96a9c3e18677ed0766fd944ef462782ed06023efe8b6d0",
       "1-purpose": "06117bd1d659705227fb77273ed1f536626be5f1c2d876bab4dafcc2508e6b0d",
       "2-first-release-scope": "9f6956ecfcb382633ecc39fbd98c6426d77e53c16b92b539239ad0f02a03ee38",
       "3-1-lifecycle-and-authority": "b641fd2242e1d0d5cbe9c3aee40c8b79d901a9464843d1424cadb54c4c5f86de",
@@ -246,16 +246,16 @@
       "3-2-version-policy": "63b0f058db61aa83eaa09972e3c3aeec4024b49ad6cb7c6a5e30c1add063ca62",
       "3-3-public-metadata-and-features": "494d0f65e5333c35d5ecb2176009aa68029e43aaab06a8db9f899874d6a1a90a",
       "3-4-manifests-and-dependency-closure": "5e87390226c75741275fc8450ba516e42e41c6afbdc88b643ae259bbdd71fc00",
-      "3-5-registry-contents": "ef7feb1223579fc6bf37a5b555250851f72b8d7d59278a453b17fdfe98cdd55e",
+      "3-5-registry-contents": "0efd3d3f29d1f22f4587cb468497b6acd6e02b9a237255bd80b049bc6f96f930",
       "3-6-dependency-license-and-advisory-audit": "074359466440773f4a48541ddf2dbc9b3c00b02d6a2928040e7b6c9aa3e5d175",
       "3-7-reproducible-package-verification": "cf4bd113cb42ff8160d9a831de1bf985724b9c34dabbd6203d2ddcd525b97d52",
       "3-8-signed-release-identity-and-artifacts": "e2661906cbd764a99b349a844e72bce7250b83a4d25343533415c68ec2bad453",
       "3-9-publication-procedure-and-failure": "8bdcbbb080831070166446b216ccb6c76e7e4402d2ac900a45a47c72f4603579",
-      "3-contract": "629692eef60a9edb68042fec8f73e254ec3ff04631e5518fe60e17a1fb7359e3",
+      "3-contract": "4a1b0798d60ae8e34bf27a6be7e86706fb625d57d5878bc7dcd2c9851160a73e",
       "4-observable-negative-cases": "2a6c8bba48ed4102c220ab54c57c63d551cd1b3c907731a6b68f9e18c1735d96",
       "acceptance": "3fb6e446eb21f0958276d7c92ec302874efd13434dc99b9734f897319414bcdf",
       "implementation-record": "14bd48314b3df90bdf07dc74de0ec14dbe941d1996bf627b28e9b8b2f34d2e91",
-      "questions-settled-by-r-34": "5ffcdc0d1dea4c068ebd338818be052d8fd148ed5ebeb39eb738f19fd9f6e0ab",
+      "questions-settled-by-r-34": "c4dc39f10922086301a05d962f4ee93e001fa1b17f025da8ebb29868ff9b42ac",
       "verification": "5ced55e79d8beddc863a8954342bfeed41b7126edadabe3450200eb4764f0b5b"
     },
     "sectionHeadings": [
@@ -284,6 +284,6 @@
     "summary": "Defines the intended first public Rustev crate family, its lockstep pre-1.0 version policy, registry contents and features, internal dependency pins, license and dependency audit, reproducible package checks, signed release identity, publication journal, and fresh registry-only consumer proof. Candidate construction, owner publication authorization, registry upload, public availability, and consumer qualification are distinct lifecycle states. Approval authorizes candidate implementation only: no crate is publishable yet and no release, tag, upload, name reservation, or availability claim is authorized or made.\n",
     "title": "Packaging and first public release"
   },
-  "shardHash": "0ecfe8202dfea393c647508f977852f6061f2ffd3dbe2de6802d629ebdbe1740",
+  "shardHash": "22719de0981a758396b7b066e83da9c4ec45fe2026c1d85284395196824a9b13",
   "specVersion": "1.11.0"
 }

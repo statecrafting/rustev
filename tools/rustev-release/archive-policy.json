@@ -6,7 +6,7 @@
     "Cargo.lock",
     "Cargo.toml"
   ],
-  "max_file_bytes": 196608,
+  "max_file_bytes": 327680,
   "packages": {
     "rustev-contract": {
       "files": [
@@ -73,8 +73,8 @@
         "src/trace_fields.rs",
         "src/version.rs"
       ],
-      "max_archive_bytes": 229376,
-      "max_unpacked_bytes": 917504
+      "max_archive_bytes": 376832,
+      "max_unpacked_bytes": 1638400
     },
     "rustev-core": {
       "files": [
@@ -147,8 +147,8 @@
         "src/value.rs",
         "src/widening_eval.rs"
       ],
-      "max_archive_bytes": 393216,
-      "max_unpacked_bytes": 1376256
+      "max_archive_bytes": 589824,
+      "max_unpacked_bytes": 2637824
     },
     "rustev-runtime": {
       "files": [
@@ -179,8 +179,8 @@
         "src/testdata/scripted.rs",
         "src/wait.rs"
       ],
-      "max_archive_bytes": 163840,
-      "max_unpacked_bytes": 589824
+      "max_archive_bytes": 262144,
+      "max_unpacked_bytes": 1097728
     },
     "rustev-eval": {
       "files": [
@@ -245,8 +245,8 @@
         "src/selection.rs",
         "src/testdata/lodging-emb.record.json"
       ],
-      "max_archive_bytes": 196608,
-      "max_unpacked_bytes": 851968
+      "max_archive_bytes": 393216,
+      "max_unpacked_bytes": 1589248
     },
     "rustev-backend-rules": {
       "files": [
@@ -291,8 +291,8 @@
         "src/taxonomy.rs",
         "src/wire.rs"
       ],
-      "max_archive_bytes": 163840,
-      "max_unpacked_bytes": 393216
+      "max_archive_bytes": 196608,
+      "max_unpacked_bytes": 737280
     },
     "rustev-surface": {
       "files": [
@@ -317,7 +317,7 @@
         "src/run.rs"
       ],
       "max_archive_bytes": 131072,
-      "max_unpacked_bytes": 262144
+      "max_unpacked_bytes": 278528
     },
     "rustev-cli": {
       "files": [
@@ -347,7 +347,7 @@
         "tests/golden/support.record.json"
       ],
       "max_archive_bytes": 131072,
-      "max_unpacked_bytes": 262144
+      "max_unpacked_bytes": 442368
     },
     "rustev-pkg-support-routing": {
       "files": [
@@ -388,7 +388,7 @@
         "src/lib.rs"
       ],
       "max_archive_bytes": 65536,
-      "max_unpacked_bytes": 131072
+      "max_unpacked_bytes": 163840
     },
     "rustev-pkg-lodging": {
       "files": [
@@ -429,7 +429,7 @@
         "src/run.rs"
       ],
       "max_archive_bytes": 98304,
-      "max_unpacked_bytes": 327680
+      "max_unpacked_bytes": 376832
     },
     "rustev-otel": {
       "files": [
@@ -451,8 +451,8 @@
         "src/project.rs",
         "src/sink.rs"
       ],
-      "max_archive_bytes": 65536,
-      "max_unpacked_bytes": 262144
+      "max_archive_bytes": 131072,
+      "max_unpacked_bytes": 458752
     },
     "rustev": {
       "files": [

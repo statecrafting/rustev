@@ -243,6 +243,25 @@ as generated. Every file, archive and unpacked byte total is bounded in the
 candidate policy and measured before signing; exceeding a reviewed bound is a
 failure, not an automatic bound increase.
 
+**Amendment (2026-11-03, A-81).** The owner decided that the archive check
+of this section (each member's reviewed file list, its archive and unpacked
+byte bounds, the per-file bound and the prohibited-content scan of
+`tools/rustev-release/archive-policy.json`) also runs in pull-request CI, in
+the `release-checks` workflow that spec 031 owns, on each pull request and
+merge-queue entry. The change that crosses a bound therefore fails there and
+raises the bound by review, with its reason, rather than the release run
+finding it. Each member's archive and unpacked bounds are generous headroom:
+about twice the member's measured size, rounded up to a multiple of 16 KiB,
+far below the registry's 10 MB limit; the per-file bound is likewise about
+twice the largest packaged file. A bound already above twice its measured
+size stays as it is, never lowered by this rule. Exceeding a reviewed bound is still a failure,
+never an automatic bound increase. The exact file lists and the
+prohibited-content scan are unchanged. Why: the check ran only in release
+runs, so crate growth surfaced at release time for 0.2.0, 0.3.0 and 0.4.0
+(`rustev-runtime`, `rustev-eval`), costing a fix of one and a half to two
+hours each time. The bounds this sets are recorded in the implementation
+record below.
+
 The candidate performs a prohibited-content and secret-pattern scan over the
 exact unpacked archives. A scanner pass is evidence only for its ruleset and
 version. It is not proof that arbitrary secrets cannot exist.
@@ -962,3 +981,33 @@ increments, `rustev-eval` unpacks to 787,933 bytes against its bound of
 the stack's tip; the bound becomes 851,968 (832 KiB). Its archive
 (195,423 bytes against 192 KiB) and its file list, which the 061
 increments extend, are unchanged. No other bound changes.
+
+**Archive check in pull-request CI, 2026-11-05 (A-81, the amendment of
+3.5).** The release set at `origin/main` `fabfc5f` (version 0.4.1) was
+packaged with `cargo package --locked --no-verify` over every member and
+checked with `rustev-release archives`, the check `candidate.sh` runs; every
+member passed. Each archive and unpacked bound becomes the larger of its
+reviewed bound and twice the measured size, rounded up to a multiple of
+16 KiB. The per-file bound becomes 327,680 bytes (320 KiB), twice the
+largest packaged file (`rustev-core`'s 156,535 bytes), from 196,608
+(192 KiB). `rustev-surface`'s new unpacked bound also leaves room for the
+move of `rustev-cli`'s `src/repeat.rs` (39,321 bytes) into it: 131,461 plus
+that file is about 171,000 bytes against 278,528. The file lists and the
+scan are unchanged. Running the check in `release-checks` is spec 031's
+record.
+
+| Member | Archive | Old bound | New bound | Unpacked | Old bound | New bound |
+|---|---|---|---|---|---|---|
+| `rustev-contract` | 186,188 | 229,376 (224 KiB) | 376,832 (368 KiB) | 811,810 | 917,504 (896 KiB) | 1,638,400 (1,600 KiB) |
+| `rustev-core` | 290,485 | 393,216 (384 KiB) | 589,824 (576 KiB) | 1,313,269 | 1,376,256 (1,344 KiB) | 2,637,824 (2,576 KiB) |
+| `rustev-runtime` | 128,877 | 163,840 (160 KiB) | 262,144 (256 KiB) | 542,825 | 589,824 (576 KiB) | 1,097,728 (1,072 KiB) |
+| `rustev-backend-rules` | 23,529 | 98,304 (96 KiB) | 98,304 (96 KiB) | 82,217 | 196,608 (192 KiB) | 196,608 (192 KiB) |
+| `rustev-eval` | 195,438 | 196,608 (192 KiB) | 393,216 (384 KiB) | 787,933 | 851,968 (832 KiB) | 1,589,248 (1,552 KiB) |
+| `rustev-live` | 46,465 | 98,304 (96 KiB) | 98,304 (96 KiB) | 183,195 | 327,680 (320 KiB) | 376,832 (368 KiB) |
+| `rustev-otel` | 60,083 | 65,536 (64 KiB) | 131,072 (128 KiB) | 224,563 | 262,144 (256 KiB) | 458,752 (448 KiB) |
+| `rustev-remote-http` | 91,951 | 163,840 (160 KiB) | 196,608 (192 KiB) | 364,288 | 393,216 (384 KiB) | 737,280 (720 KiB) |
+| `rustev-surface` | 35,938 | 131,072 (128 KiB) | 131,072 (128 KiB) | 131,461 | 262,144 (256 KiB) | 278,528 (272 KiB) |
+| `rustev-cli` | 57,731 | 131,072 (128 KiB) | 131,072 (128 KiB) | 220,510 | 262,144 (256 KiB) | 442,368 (432 KiB) |
+| `rustev-pkg-support-routing` | 21,958 | 65,536 (64 KiB) | 65,536 (64 KiB) | 80,658 | 131,072 (128 KiB) | 163,840 (160 KiB) |
+| `rustev-pkg-lodging` | 18,185 | 65,536 (64 KiB) | 65,536 (64 KiB) | 70,624 | 196,608 (192 KiB) | 196,608 (192 KiB) |
+| `rustev` | 14,125 | 65,536 (64 KiB) | 65,536 (64 KiB) | 42,697 | 131,072 (128 KiB) | 131,072 (128 KiB) |
