@@ -249,8 +249,8 @@ pub fn golden(name: &str, bytes: &[u8]) {
                                  "sha256": hex(&d) }));
         }
         // Shared surface commands run natively too; pure commands also on
-        // WebAssembly (spec 027, 3.12.4). Spec 029 repeat commands are
-        // currently implemented by the CLI host.
+        // WebAssembly (spec 027, 3.12.4). Spec 029 repeat commands run on
+        // the CLI and the native binding (spec 063, 3.9 and 3.13.1).
         let repeat = seen.args.iter().any(|a| a == "--repeat-config")
             || matches!(
                 command_of(&seen.args).as_str(),
@@ -259,8 +259,10 @@ pub fn golden(name: &str, bytes: &[u8]) {
         // Spec 034 increment 5 exposes parameterized commands only through
         // the CLI; binding exposure belongs to a later increment.
         let parameterized = name.starts_with("parameterized.");
-        let mut surfaces = if repeat || parameterized {
+        let mut surfaces = if parameterized {
             json!(["cli"])
+        } else if repeat {
+            json!(["cli", "native"])
         } else if pure {
             json!(["cli", "native", "wasm"])
         } else {

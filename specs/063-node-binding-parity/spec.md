@@ -922,9 +922,8 @@ imports them with the CLI's host goldens. That test covers each command's
 happy path, its usage and result refusals, `not_reproducible`,
 `none_qualified` and `unknown` as results, and section 5's
 `mixed-provenance` row. The CLI harvest
-(`crates/rustev-cli/tests/common/harvest.rs`) still lists the repeat and
-parameterized cases as `cli` only, so `make conformance-harvest` would
-write them back without `native` until that list is updated.
+(`crates/rustev-cli/tests/common/harvest.rs`) now gives the repeat cases
+`cli` and `native`, so a fresh harvest keeps them.
 
 ## Decisions at approval
 

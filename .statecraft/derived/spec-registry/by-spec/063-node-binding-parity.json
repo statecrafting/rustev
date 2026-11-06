@@ -108,7 +108,7 @@
       }
     ],
     "sectionDigests": {
-      "063-node-binding-parity-acquisition-source-profiles-and-variants-store-seam-capture-repeatability-commands-amends-027-029-034-036-and-044": "7c3adec29e87d6461440d6636cf9b0f0501240856bf85ca94241482d432abdd6",
+      "063-node-binding-parity-acquisition-source-profiles-and-variants-store-seam-capture-repeatability-commands-amends-027-029-034-036-and-044": "19f6655e56424553b79721d26a3286abf5aa60a6deaf83f97b6ad35a07df0afb",
       "1-purpose": "d79ee35c9bdf4438636611ea104b6fb87ffd76f404a8e8fe1f729d7a1ca9cc7d",
       "2-1-binding-principles": "d5b27b6ecd77b6f971c8b9478f6afd4f67110c300d61c402950db609edd6c798",
       "2-territory": "2767765aad52000db13c436fd756856f2621d560b07fcb9bbfdd2166b1f5b918",
@@ -132,7 +132,7 @@
       "5-observable-negative-cases": "0ef1cf41ef49df27f73c9e7c4393ad54da69574fa42190c0e6b0b88ac2d6492c",
       "acceptance": "71e67e924bd8ca75042bc1780c9fc7384bdc43422ed21ea72a6a9b10a6dca525",
       "decisions-at-approval": "3d5fdf05abdc538b1d881bb831cd92dcd142af63b0267f79522f9a897701153f",
-      "implementation-record": "905b7e67c227f33cd2067675c159acf4939ecaef135a2a4c57cc1c7584255ec0",
+      "implementation-record": "3876a63e1719f48889d459379aed25e5e8a5b849c3ee2e030cdcacafe747582f",
       "planned-increments": "cefa7862e3fe85b451ab56e54ebb18b503b952d1a548fa1a655e9bf8f73e3f09",
       "verification": "28ee800c8eb90c13b983f95dd9da6204cc5fe17ba688d60968270b3513dc5648"
     },
@@ -170,6 +170,6 @@
     "summary": "An amendment of approved spec 027, closing the Node exposure that specs 029, 034, 036 and 044 left out of scope (#56, with #62 and #73), for release 0.5.0. `@rustev/rustev` gains a host-implemented acquisition source for 036's `acquire` and `widen` steps; profile, variant and base-profile inputs on `compile`, with `profileCheck` and `planDiff`; a host `RuntimeStore` for 044's persistent tier, with a stated atomicity contract and invalidation; opt-in capture on `decide` that returns a replay bundle, because the evidence a host sink receives cannot replay a decision; and 029's repeatability commands with 061's host import, in process. Each uses 027's seam rules, the Rust API the CLI calls and the shared conformance suite; the WebAssembly package gains none. Ratified by the owner on 2026-11-03 (A-78).\n",
     "title": "Node binding parity: acquisition source, profiles and variants, store seam, capture, repeatability commands (amends 027, 029, 034, 036 and 044)"
   },
-  "shardHash": "af5ab13d66aa785f75e5e9a3b83ea07a832d24e0acd5ee6f5e220721cc7ea1fe",
+  "shardHash": "04fce6e9854e3407cf3535ed93d1f028b48bbeffadbfe308bc5eaab5e172302a",
   "specVersion": "1.11.0"
 }
