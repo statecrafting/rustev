@@ -878,10 +878,6 @@ impl PlanHandle {
         Uint8Array::new(self.raw.clone())
     }
 
-    /// Decide one request (3.3.3, 3.4.2): the judgment (or the cancelled
-    /// completion), the run record and the delivery; an unresolved outcome
-    /// is a value, never a rejection. The decision runs on the engine's own
-    /// runtime; this promise only awaits it.
     /// `plan.invalidate` (063 3.6.4): `Runtime::invalidate`, memory tiers
     /// then the store, whose call is bounded by `timeoutMs` on the engine's
     /// clock. `null` for a plan without an optimization namespace.
@@ -916,6 +912,10 @@ impl PlanHandle {
             .map_err(|e| fail("InternalError", "internal", e.to_string()))
     }
 
+    /// Decide one request (3.3.3, 3.4.2): the judgment (or the cancelled
+    /// completion), the run record and the delivery; an unresolved outcome
+    /// is a value, never a rejection. The decision runs on the engine's own
+    /// runtime; this promise only awaits it.
     #[napi]
     pub async fn decide(&self, request: Request, cancel: &CancelHandle) -> Result<DecideResult> {
         // Counted before the shutdown check (both sequentially consistent),
