@@ -14,11 +14,11 @@ spec = "010-integrations"
 [dependencies]
 # Spec 009's Part A machinery (spec 059 3.2.1).
 rustev-remote-http.workspace = true
-rustev-contract = { path = "../../crates/rustev-contract" }
-rustev-core = { path = "../../crates/rustev-core", features = ["parameterized"] }
-rustev-runtime = { path = "../../crates/rustev-runtime" }
-rustev-surface = { path = "../../crates/rustev-surface", features = ["parameterized"] }
-rustev-eval = { path = "../../crates/rustev-eval", features = ["parameterized"] }
+rustev-contract = { workspace = true }
+rustev-core = { workspace = true, features = ["parameterized"] }
+rustev-runtime = { workspace = true }
+rustev-surface = { workspace = true, features = ["parameterized"] }
+rustev-eval = { workspace = true, features = ["parameterized"] }
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
