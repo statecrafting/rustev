@@ -43,7 +43,7 @@
     "id": "001-boundaries-and-authority",
     "implementation": "complete",
     "sectionDigests": {
-      "001-ecosystem-boundaries-proposals-versus-authority-and-product-principles": "db9ab5551e3e1f2984907ab5330e0464d3a63583758991211a2ee6ecd6ab42a5",
+      "001-ecosystem-boundaries-proposals-versus-authority-and-product-principles": "a26833507256030b0b9592f3f2b6d71420ce9f6f9a9372b49d430f6e874816d0",
       "1-purpose": "23d9fbfd79c7d53855467fa3936d5b3587d0827055ec39dc204addca739a071f",
       "2-territory": "c011c575f7bd83c135b1913052b322c24e052219daaba432722e5187a695a5c7",
       "3-1-responsibilities": "9239843abb6815deae05a2316acdf2bccb66d4c1a40ba6272b5163b0714aaa28",
@@ -57,7 +57,7 @@
       "4-out-of-scope": "30a6983b336dcd6d618d6c7c0e79c40ca2f613a405388db45671aea9b51e4b46",
       "5-observable-negative-cases": "ed4f8a5dc1222abdb7b175f801fe1fff4affd9f10758ff1aeee33d3194125af3",
       "acceptance": "6745eef13e379ef3665bc3d6f9153896b02a987b6d493e3b6920797347a3e5f8",
-      "decision-history": "379986528b3a49c1870bba9bef52d8802914986af81bf3552deeb74ee5a6a452",
+      "decision-history": "290b32470f411830c8c23ba474bf852737e93d757acbfc6d4f6dff00875cac2a",
       "engine-upgrade-record-2026-10-02": "8cfcc682ca909b50cbf09611e2b7364ad69cf404c792c633ddc5e4ff20bb1937",
       "implementation-record": "52419cd7b88d1b024a3d22f2d0d0ef6f4b538f4bd4846122dedc955cbeeb9d41",
       "profile-and-engine-upgrade-record-2026-11-05": "be9319ab3156174e09f09b4e742fb5f23313661ec25282eedd6638210df6352d",
@@ -91,6 +91,6 @@
     "summary": "What Rustev owns and refuses to own within the ecosystem (spec-spine, Aicortex, Rahi, statecraft-cli, applications), the rule that Rustev produces proposals and never grants, the provenance classes of Rustev outputs, the dependency layout that keeps contracts transport-neutral and the core free of integrations, and the product principles that are the constitution's principles VI onward. Owns the workspace manifest, the Makefile and the boundary check that enforces the dependency rules.\n",
     "title": "Ecosystem boundaries, proposals versus authority, and product principles"
   },
-  "shardHash": "c3dd9d44ebe5ee6d9ea7284d0f17bf688401cfd4e536ad191fde69a4bde476db",
+  "shardHash": "f6ac0bac1a39aa9d1f376621bb8a353d5ef311d81e98c6c79a49599771d4a73c",
   "specVersion": "1.11.0"
 }
