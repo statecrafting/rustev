@@ -5,7 +5,7 @@
     {
       "name": "acquire-denied.plan.json",
       "path": "tools/rustev-conformance/fixtures/acquire/acquire-denied.plan.json",
-      "sha256": "3e2dac953f3e689f3c7ced7a7b78594e24a3edd58aa793c18af87df05927211e"
+      "sha256": "7cf427e8285cdcc24cb1bf9905806d5ba2ffe7ca033cdde18bc8a77938912025"
     },
     {
       "name": "catalog.source.json",
@@ -24,7 +24,7 @@
       "file": "denied.record.json",
       "golden": "tools/rustev-conformance/expected/runtime/runtime.acquire-retry-denied/denied.record.json",
       "normalize": [],
-      "sha256": "62c833c92bf5061a2a2fc36d550e4309f7b8cd6a92b5e78bbc7eea4d057738b8"
+      "sha256": "aa65d1ee9c838b9f558f6683ed5fca2561358a1510a2a252548f0630cff4a22c"
     },
     {
       "file": "denied.result.json",
@@ -36,7 +36,7 @@
       "file": "invalid.record.json",
       "golden": "tools/rustev-conformance/expected/runtime/runtime.acquire-retry-denied/invalid.record.json",
       "normalize": [],
-      "sha256": "b50c6abe96889e623e6ade3a1826c691e226c2f15b5ec6ccb429469b736c1714"
+      "sha256": "4486fe34bb7051fa441aa20e45d72e6eb6c3eec0bcd8f4e0fca871e1a4f17a97"
     },
     {
       "file": "invalid.result.json",
@@ -48,7 +48,7 @@
       "file": "unnamed.record.json",
       "golden": "tools/rustev-conformance/expected/runtime/runtime.acquire-retry-denied/unnamed.record.json",
       "normalize": [],
-      "sha256": "0bbf9cbae1b91a2dc516d7b3fc1b46db3eeb44fff4e6796c5f0970d5d723b5c5"
+      "sha256": "80f3cb40a54bd5888f2ac73347dafda13d121397189e8dd3dc72c317f4fecdbd"
     },
     {
       "file": "unnamed.result.json",
