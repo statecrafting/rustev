@@ -4796,6 +4796,7 @@ dependencies = [
  "prost",
  "rcgen",
  "ring",
+ "rustev-backend-embed-linear",
  "rustev-backend-rules",
  "rustev-conformance",
  "rustev-contract",
