@@ -363,5 +363,3 @@ pub fn invalidation_json(r: &rustev_runtime::InvalidationResult) -> serde_json::
         "complete": r.complete,
     })
 }
-
-use std::future::Future;
