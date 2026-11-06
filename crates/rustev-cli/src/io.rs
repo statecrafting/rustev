@@ -13,7 +13,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 /// The most bytes one command reads, store items included.
 pub const MAX_TOTAL_BYTES: usize = 256 * 1024 * 1024;
 /// The most files of each dependency kind one command reads.
-pub use rustev_surface::host::{MAX_CALIBRATION_FILES, MAX_DESCRIPTOR_FILES, MAX_RULES_FILES};
+pub const MAX_RULES_FILES: usize = rustev_surface::host::MAX_RULES_FILES;
+pub const MAX_DESCRIPTOR_FILES: usize = rustev_surface::host::MAX_DESCRIPTOR_FILES;
+pub const MAX_CALIBRATION_FILES: usize = rustev_surface::host::MAX_CALIBRATION_FILES;
 
 pub use rustev_surface::host::{IoFail, ReadFail};
 

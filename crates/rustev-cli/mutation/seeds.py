@@ -301,32 +301,34 @@ SEEDS = [
 
 
 # Spec 029: host decisions, in addition to the library's statistical seeds.
+# The renderings live in the surface (spec 063, 3.9.3); the CLI keeps its
+# usage rules and the filesystem publication.
 SEEDS += [
-    ("no-clobber", "repeat029 compare bypasses staged publication", S + "repeat.rs",
-     '    publish_outputs(files, &[], publish).map_err(|e| Done::io(&s.command, e))',
-     '    let _ = publish; s.write(files)', CLI),
+    ("no-clobber", "repeat029 compare bypasses staged publication", U + "repeat.rs",
+     's.publish(&files)?;', 's.write(&files)?;', CLI_AND_SURFACE),
     ("no-clobber", "repeat029 skips rollback", S + "repeat.rs",
      '        rollback_outputs(&mut error, &placed, &temporary, &created);',
      '        let _ = (&mut error, &placed, &temporary, &created);', CLI),
-    ("adapter correctness", "repeat029 skips candidate set verification", S + "repeat.rs",
+    ("adapter correctness", "repeat029 skips candidate set verification", U + "repeat.rs",
      '        set.verify(&s)?;\n    }\n    let br = base.runs();',
-     '        let _ = set;\n    }\n    let br = base.runs();', CLI),
-    ("exit-code mapping", "repeat029 drift uses gate failure", S + "repeat.rs",
-     "const NOT_REPRODUCIBLE: u8 = 13;", "const NOT_REPRODUCIBLE: u8 = 11;", CLI),
+     '        let _ = set;\n    }\n    let br = base.runs();', CLI_AND_SURFACE),
+    ("exit-code mapping", "repeat029 drift uses gate failure", U + "repeat.rs",
+     "const NOT_REPRODUCIBLE: u8 = 13;", "const NOT_REPRODUCIBLE: u8 = 11;", CLI_AND_SURFACE),
     ("scope flag handling", "repeat029 allows optimization on held-out data", S + "repeat.rs",
      'if purpose == "optimization" {', 'if purpose == "disabled" {', CLI),
     ("scope flag handling", "repeat029 accepts unequal captured count", S + "repeat.rs",
      'dirs > 64 || n.is_some_and(|n| n != dirs)', 'dirs > 64', CLI),
     ("scope flag handling", "repeat029 skips ledger exclusivity", S + "repeat.rs",
      'if p.has("ledger") == p.has("ledger-new") {', 'if false {', CLI),
-    ("no-clobber", "repeat029 skips preflight", S + "repeat.rs",
-     'io::ensure_absent(path).map_err(|e| Done::io(&self.command, e))', 'let _ = path; Ok(())', CLI),
-    ("exit-code mapping", "repeat029 selection unknown becomes success", S + "repeat.rs",
-     'let code = selection.exit_code();', 'let code = if selection.exit_code() == 12 { 0 } else { selection.exit_code() };', CLI),
-    ("adapter correctness", "repeat029 skips baseline verification", S + "repeat.rs",
-     'if set.record(s, &b.name, b.recorded_at_ms)? != b {', 'if false {', CLI),
-    ("scope flag handling", "repeat029 captured treated as replay", S + "repeat.rs",
-     'Source::Captured\n        };', 'Source::Replay\n        };', CLI),
+    ("no-clobber", "repeat029 skips preflight", U + "repeat.rs",
+     '        self.reads\n            .ensure_absent(path)\n            .map_err(|e| Done::io(&self.command, e))',
+     '        let _ = path;\n        Ok(())', CLI_AND_SURFACE),
+    ("exit-code mapping", "repeat029 selection unknown becomes success", U + "repeat.rs",
+     'let code = selection.exit_code();', 'let code = if selection.exit_code() == 12 { 0 } else { selection.exit_code() };', CLI_AND_SURFACE),
+    ("adapter correctness", "repeat029 skips baseline verification", U + "repeat.rs",
+     'if set.record(s, &b.name, b.recorded_at_ms)? != b {', 'if false {', CLI_AND_SURFACE),
+    ("scope flag handling", "repeat029 captured treated as replay", U + "repeat.rs",
+     'Source::Captured\n        };', 'Source::Replay\n        };', CLI_AND_SURFACE),
 ]
 
 

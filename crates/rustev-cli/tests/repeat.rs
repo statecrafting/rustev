@@ -171,6 +171,81 @@ fn diff_documents_and_markdown_have_stable_bytes_and_unknowns() {
     s.rustev(&args).expect(12, "unknown");
     golden("diff-unknown.md", &s.read("diff/diff.md"));
 }
+/// A host that accepts only staged sets: `write_all` refuses, so a command
+/// that publishes a multi-file set one file at a time fails here.
+struct StagedOnly(rustev_surface::host::Memory);
+impl rustev_surface::host::Host for StagedOnly {
+    fn read_classified(
+        &self,
+        label: &str,
+        max: usize,
+    ) -> Result<Option<Vec<u8>>, rustev_surface::host::ReadFail> {
+        self.0.read_classified(label, max)
+    }
+    fn ensure_absent(&self, label: &str) -> Result<(), rustev_surface::host::IoFail> {
+        self.0.ensure_absent(label)
+    }
+    fn create(&self, label: &str, bytes: &[u8]) -> Result<(), rustev_surface::host::IoFail> {
+        self.0.create(label, bytes)
+    }
+    fn write_all(&self, files: &[(String, Vec<u8>)]) -> Result<(), rustev_surface::host::IoFail> {
+        Err(rustev_surface::host::IoFail {
+            path: files.first().map(|f| f.0.clone()).unwrap_or_default(),
+            detail: "unstaged publication".into(),
+        })
+    }
+    fn write_all_in(
+        &self,
+        files: &[(String, Vec<u8>)],
+        dirs: &[String],
+    ) -> Result<(), rustev_surface::host::IoFail> {
+        assert!(dirs.is_empty());
+        self.0.write_all(files)
+    }
+    fn join(&self, dir: &str, name: &str) -> String {
+        self.0.join(dir, name)
+    }
+}
+
+#[test]
+fn diff_publishes_its_documents_as_one_staged_set() {
+    // Spec 029 3.13.4 and spec 006's no-clobber rule: `diff.json` and
+    // `diff.md` are one set, all or none, through the host's staged write.
+    let s = Scratch::new("diff-staged");
+    let mut f = setup(&s);
+    f.loss(false, 0.75, 0.25);
+    write_set(&s, "run", &f, false);
+    let mut inputs = std::collections::BTreeMap::new();
+    for dir in ["base", "run"] {
+        for entry in std::fs::read_dir(s.path(dir)).unwrap() {
+            let name = entry.unwrap().file_name().into_string().unwrap();
+            inputs.insert(format!("{dir}/{name}"), s.read(&format!("{dir}/{name}")));
+        }
+    }
+    inputs.insert("baseline.json".into(), s.read("baseline.json"));
+    let host = StagedOnly(rustev_surface::host::Memory::new(inputs));
+    let done = rustev_surface::repeat::diff(
+        "eval diff",
+        &host,
+        rustev_surface::repeat::CompareArgs {
+            baseline: "baseline.json",
+            baseline_eval: "base",
+            run: "run",
+        },
+        "diff",
+    )
+    .unwrap();
+    assert_eq!(done.code, 0);
+    for file in ["diff.json", "diff.md"] {
+        let golden = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/golden")
+            .join(format!("repeat-{file}"));
+        assert_eq!(
+            host.0.output(&format!("diff/{file}")).unwrap(),
+            std::fs::read(golden).unwrap()
+        );
+    }
+}
 #[test]
 fn selection_all_verdicts_and_mixed_unknown_are_golden() {
     let s = Scratch::new("selection");
