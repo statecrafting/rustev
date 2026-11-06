@@ -323,3 +323,42 @@ mod tests {
         let _ = std::fs::remove_dir_all(&d);
     }
 }
+
+#[cfg(test)]
+mod listing_tests {
+    use super::*;
+    use rustev_surface::host::{EntryKind, Host};
+
+    #[test]
+    fn filesystem_lists_immediate_names_in_byte_order_under_the_cap() {
+        let root = std::env::temp_dir().join(format!("rustev-host-list-{}", std::process::id()));
+        std::fs::create_dir(&root).unwrap();
+        for name in ["z", "é", "B"] {
+            std::fs::write(root.join(name), b"").unwrap();
+        }
+        std::fs::create_dir(root.join("a")).unwrap();
+        std::fs::write(root.join("a/one"), b"").unwrap();
+        let host = Reads::default();
+        let dir = root.to_str().unwrap();
+        assert_eq!(host.list(dir, 0).unwrap(), Vec::<String>::new());
+        assert_eq!(host.list(dir, 2).unwrap(), ["B", "a"]);
+        assert_eq!(host.list(dir, 4).unwrap(), ["B", "a", "z", "é"]);
+        assert_eq!(host.list(dir, 100).unwrap(), ["B", "a", "z", "é"]);
+        assert_eq!(
+            host.entry_kind(&host.join(dir, "a")).unwrap(),
+            EntryKind::Directory
+        );
+        assert!(host.list(&host.join(dir, "missing"), 2).is_err());
+        assert!(host.list(root.join("z").to_str().unwrap(), 2).is_err());
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(root.join("a"), root.join("link")).unwrap();
+            assert_eq!(
+                host.entry_kind(root.join("link").to_str().unwrap())
+                    .unwrap(),
+                EntryKind::Symlink
+            );
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+}
