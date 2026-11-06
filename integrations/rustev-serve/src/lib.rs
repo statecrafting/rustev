@@ -12,6 +12,9 @@ pub mod subjects;
 
 pub mod health;
 
+// Spec 011, 3.17.3: local backends from the host's configuration.
+pub mod local_embed;
+
 pub mod stream;
 
 // Spec 009's Part A machinery, by dependency on `rustev-remote-http` (spec

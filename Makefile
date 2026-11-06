@@ -105,6 +105,12 @@ conformance:
 	@# Spec 011, 3.17.5: the local-embed cases through the Rust API, run by
 	@# the backend's tests (the suite takes the opened backend as a seam).
 	cargo test -p rustev-backend-embed-linear --locked --test bundle support_routing::conformance::
+	@# Spec 011, 3.17.3 and 3.17.5: the same cases through the service's
+	@# transports, built with its `local-embed` feature. `--lib`: the
+	@# service's conformance runner, `tests/conformance/local_embed.rs`
+	@# included, is a unit-test module of the library (src/lib.rs includes
+	@# it by path, spec 042 increment 5), as the line above runs it.
+	cargo test -p rustev-serve --locked --features local-embed --lib local_embed
 
 # Spec 027, 3.12.2: rebuild the CLI cases and their fixtures from the CLI
 # tests that pin each golden (`RUSTEV_HARVEST`), then the explain cases from

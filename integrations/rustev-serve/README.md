@@ -128,6 +128,19 @@ These gaps are not claims of spec acceptance:
   a source whose describe fails is installed as unavailable and reported not
   described. Ecosystem backends still require host construction. OpenTelemetry startup is refused
   because no exporter feature is built.
+- Local backends (spec 011 3.17.3): built with the Cargo feature `local-embed`
+  (off by default; the image is built without it), `rustev-serve --config FILE
+  --local-embed FILE` opens spec 011's local embedding backend once per entry
+  of the second file, a JSON object from binding name to `bundle_dir`,
+  optional `runtime_path`, `expected_artifact`, `workers` and `max_queued`
+  (absolute paths; unknown members refused). Each name must be a
+  `backend_bindings` entry whose backend is `{"compiled": {"feature":
+  "local-embed"}}`, and every such binding must be configured. Bundles are
+  verified before any listener starts; a setup refusal stops startup with its
+  011 3.7.2 code. Only the host names a bundle, path or runtime; no request
+  can. Without the feature a configured local backend is refused
+  `feature_disabled`. Hosts embedding the crate use `local_embed::open_all`
+  with `sinks::standalone_with_backends`.
 - The shared conformance suite, remote HTTP context bindings, and specs 034/036
   integration are not implemented yet.
 

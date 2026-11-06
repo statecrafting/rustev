@@ -180,9 +180,9 @@ fn every_local_embed_case_produces_its_expected_bytes() {
     let case_file = json!({
         "id": ID,
         "command": "decide",
-        // The decision service's transports join with its own `local-embed`
+        // The decision service's transports, with its own `local-embed`
         // feature (011 3.17.3).
-        "surfaces": ["rust-api", "native"],
+        "surfaces": ["rust-api", "native", "serve-http", "serve-grpc"],
         "local_embed": block,
         "inputs": inputs,
         "outputs": outputs,

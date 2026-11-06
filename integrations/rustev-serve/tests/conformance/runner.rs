@@ -24,6 +24,11 @@ mod callback;
 #[path = "acquire.rs"]
 mod acquire;
 
+// Spec 011 3.17.5: the local-embed cases through the service, with the
+// service's own `local-embed` feature (011 3.17.3).
+#[path = "local_embed.rs"]
+mod local_embed;
+
 use crate::grpc::generated::Document as Envelope;
 use http_body_util::{BodyExt, Full};
 use hyper::{Request, body::Bytes};
@@ -417,8 +422,15 @@ async fn exchange(
                 "application/json"
             },
         )
-        .header("rustev-principal", PRINCIPAL);
-    for (name, value) in extra {
+        // A case's own principal, when it names one, replaces the default.
+        .header(
+            "rustev-principal",
+            extra
+                .iter()
+                .find(|(n, _)| *n == "rustev-principal")
+                .map_or(PRINCIPAL, |(_, v)| v.as_str()),
+        );
+    for (name, value) in extra.iter().filter(|(n, _)| *n != "rustev-principal") {
         request = request.header(*name, value);
     }
     if grpc {
@@ -901,13 +913,14 @@ fn every_serve_case_is_a_run_or_a_runtime_case() {
     let cases = serve_cases();
     for c in &cases {
         assert!(
-            c.command == "run" || c.runtime.is_some(),
+            c.command == "run" || c.runtime.is_some() || c.local_embed.is_some(),
             "{}: names a serve surface the runner has no driver for",
             c.id
         );
     }
     assert!(cases.iter().filter(|c| c.command == "run").count() >= 5);
     assert!(cases.iter().filter(|c| c.runtime.is_some()).count() >= 6);
+    assert!(cases.iter().any(|c| c.local_embed.is_some()));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
