@@ -2,7 +2,7 @@
 id: "063-node-binding-parity"
 title: "Node binding parity: acquisition source, profiles and variants, store seam, capture, repeatability commands (amends 027, 029, 034, 036 and 044)"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-11-03"
 summary: >
   An amendment of approved spec 027, closing the Node exposure
@@ -35,6 +35,9 @@ extends:
   - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: amending }
   # Archive entries for moved source files.
   - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
+  # 063 joins `make verify` and the `runtime-evidence` acceptance group.
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "003-runtime-execution-and-evidence"
@@ -76,7 +79,8 @@ obligations:
 # 063: Node binding parity: acquisition source, profiles and variants, store seam, capture, repeatability commands (amends 027, 029, 034, 036 and 044)
 
 Approved: ratified by the owner on 2026-11-03 (decision A-78); the
-implementation is pending. The approved texts of 027, 029, 034, 036 and 044 are not edited; this
+implementation is complete (increments 1 to 6, the Implementation
+record). The approved texts of 027, 029, 034, 036 and 044 are not edited; this
 spec records what changes in them (3.14). It authorizes no release,
 publication, live provider call or spend.
 
@@ -707,11 +711,22 @@ document, identity, golden, `rustev-core`, `rustev-runtime` or
 
 ## Verification
 
-Pending with implementation. At completion a `verify:cli` block runs
-`cargo test -p rustev-conformance --locked`, `cargo test -p rustev-surface
---locked --all-features` and `cargo test -p rustev-cli --locked`; 063
-joins `make verify` and the `runtime-evidence` group. Binding behavior is
-tested by `make bindings` and the CI `bindings` job, as for 049.
+Run by `make verify` (063 is in `VERIFIED_SPECS`, in CI's
+`runtime-evidence` acceptance group). Binding behavior is tested by `make
+bindings` and the CI `bindings` job, as for 049: `node --test` over
+`integrations/rustev-node/test/*.test.mjs` and the native conformance
+runner.
+
+```verify:cli
+# 3.13: every conformance case through the Rust runners (the cases that
+# gain `native` keep their expected bytes), the runtime and capture cases,
+# and the host-import fixtures.
+cargo test -p rustev-conformance --locked
+# 3.9.3 and 3.9.4: the moved renderings and `Host::list` on both hosts.
+cargo test -p rustev-surface --locked --all-features
+# 3.9.3: the CLI's goldens and the `repeat-*` bytes, unchanged.
+cargo test -p rustev-cli --locked
+```
 
 ## Planned increments
 
@@ -894,6 +909,39 @@ host's `write_all_in`), and calls the moved functions with its filesystem
 host. CLI goldens and the `repeat-*` expected bytes are unchanged without
 re-blessing. The two new source files join `rustev-surface`'s archive
 list (`tools/rustev-release/archive-policy.json`). No binding changed.
+The memory host derives `list` and `entry_kind` from input labels under
+`<dir>/`, and refuses an output over an existing prefix as over a file.
+`tests/host_list.rs` and the CLI's `io.rs` test check byte order and the
+cap on both hosts; `tests/repeat.rs` runs `import` and `baseline` on the
+memory host against the CLI's host goldens.
+
+**Increment 6, 2026-11-06 (3.9.1, 3.9.2, repeatability commands).**
+`evaluate` with `repeatConfig`, `evalCandidates`, `baselineRecord`,
+`evalReproducibility`, `evalDiff`, `gateSelect` and `evalRepeatImport`
+call the moved renderings on the memory host
+(`integrations/rustev-node/src/repeat.rs`, `index.js`, `index.d.ts`) and
+join `command`. Arguments are the CLI's flags in camel case, with
+`bundles` one prefix or a list, `ledgerNew` a boolean and `runs` 1 to 64
+prefixes; the scope is the object `replay` takes. 029 3.13.1's usage
+rules, and a repeat-only argument without `repeatConfig`, throw
+`InvalidDocument` naming the rule before any input is read; every other
+outcome is a result with the CLI's code and bytes, an absent input or an
+output over an input included (`io_error`, code 3), and no bundles prefix
+is `live-source-unavailable`. The declarations are written by hand
+(3.11). The 11 `repeat-*` cases run on `cli` and `native` with unchanged
+expected bytes (3.13.1); only `manifest.json` was re-blessed. 061's
+synthetic host runs are kept as files under
+`tools/rustev-conformance/fixtures/host-import/`, checked against the
+shared builder by `tests/host_import.rs`, and `test/repeat.test.mjs`
+imports them with the CLI's host goldens. That test covers each command's
+happy path, its usage and result refusals, `not_reproducible`,
+`none_qualified` and `unknown` as results, and section 5's
+`mixed-provenance` row. The CLI harvest
+(`crates/rustev-cli/tests/common/harvest.rs`) now gives the repeat cases
+`cli` and `native`, as it now does the `parameterized.*` cases, so a fresh
+harvest keeps them. This increment adds the `verify:cli` block, 063 to
+`VERIFIED_SPECS` and to the `runtime-evidence` acceptance group. With it every
+acceptance item is met, and 063's implementation is complete.
 
 ## Decisions at approval
 

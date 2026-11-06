@@ -322,4 +322,45 @@ mod tests {
         assert!(ensure_absent(&f).is_err());
         let _ = std::fs::remove_dir_all(&d);
     }
+
+    /// Removes a scratch directory even when an assertion fails.
+    struct Cleanup(std::path::PathBuf);
+    impl Drop for Cleanup {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn filesystem_lists_immediate_names_in_byte_order_under_the_cap() {
+        use rustev_surface::host::{EntryKind, Host};
+        let root = scratch("list");
+        let _cleanup = Cleanup(root.clone());
+        for name in ["z", "é", "B"] {
+            std::fs::write(root.join(name), b"").unwrap();
+        }
+        std::fs::create_dir(root.join("a")).unwrap();
+        std::fs::write(root.join("a/one"), b"").unwrap();
+        let host = Reads::default();
+        let dir = root.to_str().unwrap();
+        assert_eq!(host.list(dir, 0).unwrap(), Vec::<String>::new());
+        assert_eq!(host.list(dir, 2).unwrap(), ["B", "a"]);
+        assert_eq!(host.list(dir, 4).unwrap(), ["B", "a", "z", "é"]);
+        assert_eq!(host.list(dir, 100).unwrap(), ["B", "a", "z", "é"]);
+        assert_eq!(
+            host.entry_kind(&host.join(dir, "a")).unwrap(),
+            EntryKind::Directory
+        );
+        assert!(host.list(&host.join(dir, "missing"), 2).is_err());
+        assert!(host.list(root.join("z").to_str().unwrap(), 2).is_err());
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(root.join("a"), root.join("link")).unwrap();
+            assert_eq!(
+                host.entry_kind(root.join("link").to_str().unwrap())
+                    .unwrap(),
+                EntryKind::Symlink
+            );
+        }
+    }
 }

@@ -710,6 +710,28 @@ class Engine {
   calibrateQualify(inputs, args) {
     return this.command('calibrateQualify', inputs, args);
   }
+  /** Spec 063, 3.9: the repeatability commands, each the CLI command of
+   * the same name; `evaluate` with `repeatConfig` is `eval --repeat-config`.
+   * Directories are input prefixes, outputs artifacts, `nowMs` an argument;
+   * `not_reproducible`, `none_qualified` and `unknown` are results. */
+  evalCandidates(inputs, args) {
+    return this.command('evalCandidates', inputs, args);
+  }
+  baselineRecord(inputs, args) {
+    return this.command('baselineRecord', inputs, args);
+  }
+  evalReproducibility(inputs, args) {
+    return this.command('evalReproducibility', inputs, args);
+  }
+  evalDiff(inputs, args) {
+    return this.command('evalDiff', inputs, args);
+  }
+  gateSelect(inputs, args) {
+    return this.command('gateSelect', inputs, args);
+  }
+  evalRepeatImport(inputs, args) {
+    return this.command('evalRepeatImport', inputs, args);
+  }
 
   /** Explain retained evidence without executing a decision (040 3.15.2). */
   async explain(evidence, query, options = {}) {
