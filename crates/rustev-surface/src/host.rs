@@ -146,8 +146,15 @@ impl Memory {
 
 impl Host for Memory {
     fn list(&self, dir: &str, max: usize) -> Result<Vec<String>, IoFail> {
-        if self.entry_kind(dir)? != EntryKind::Directory {
-            return Err(missing(dir));
+        match self.entry_kind(dir)? {
+            EntryKind::Directory => {}
+            EntryKind::Missing => return Err(missing(dir)),
+            _ => {
+                return Err(IoFail {
+                    path: dir.into(),
+                    detail: "not a directory".into(),
+                });
+            }
         }
         let prefix = if dir.is_empty() {
             String::new()
