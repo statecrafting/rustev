@@ -33,8 +33,8 @@ ROOT = Path(__file__).resolve().parents[2]
 # 061 joins cli-backends beside 029 and 041, the specs it amends.
 # 011 joins cli-repeat beside 005, the other backend (about 1 minute built,
 # 2026-11-06).
-# 063 joins runtime-evidence beside 027, the spec it amends (its three
-# crate test runs, 2026-11-06).
+# 063 joins runtime-evidence beside 027, the spec it amends (about 94
+# seconds locally with its test targets built, 2026-11-06).
 # 2026-11-05: the runner limit rose to 500 jobs, so the three groups over
 # 25 minutes split in two on that day's queue run (per-spec seconds:
 # cli-backends 2,200, integrations-base 2,172, integrations-core 1,611).

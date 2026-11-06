@@ -2,7 +2,7 @@
 id: "063-node-binding-parity"
 title: "Node binding parity: acquisition source, profiles and variants, store seam, capture, repeatability commands (amends 027, 029, 034, 036 and 044)"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-11-03"
 summary: >
   An amendment of approved spec 027, closing the Node exposure
@@ -79,7 +79,8 @@ obligations:
 # 063: Node binding parity: acquisition source, profiles and variants, store seam, capture, repeatability commands (amends 027, 029, 034, 036 and 044)
 
 Approved: ratified by the owner on 2026-11-03 (decision A-78); the
-implementation is pending. The approved texts of 027, 029, 034, 036 and 044 are not edited; this
+implementation is complete (increments 1 to 6, the Implementation
+record). The approved texts of 027, 029, 034, 036 and 044 are not edited; this
 spec records what changes in them (3.14). It authorizes no release,
 publication, live provider call or spend.
 
@@ -939,7 +940,8 @@ happy path, its usage and result refusals, `not_reproducible`,
 (`crates/rustev-cli/tests/common/harvest.rs`) now gives the repeat cases
 `cli` and `native`, as it now does the `parameterized.*` cases, so a fresh
 harvest keeps them. This increment adds the `verify:cli` block, 063 to
-`VERIFIED_SPECS` and to the `runtime-evidence` acceptance group.
+`VERIFIED_SPECS` and to the `runtime-evidence` acceptance group. With it every
+acceptance item is met, and 063's implementation is complete.
 
 ## Decisions at approval
 
