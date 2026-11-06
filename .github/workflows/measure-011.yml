@@ -1,0 +1,208 @@
+# Spec 011 stage 4 measurement on GitHub-hosted native Linux runners
+# (3.2.2, 3.3, 3.13). Runs only on a push to a `measure/011-*` branch; it is
+# never merged and never part of CI. Every evidence file is uploaded as an
+# artifact, and the record change commits them by hand. A GitHub-hosted
+# runner is a virtual machine on shared hardware; the host description says
+# so. Downloads are the pinned checkpoint revision's files and the official
+# ONNX Runtime 1.31.0 release tarball, each verified by SHA-256 (3.2.5).
+name: measure-011
+
+on:
+  push:
+    branches: ["measure/011-*"]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: never
+  REVISION: 1110a243fdf4706b3f48f1d95db1a4f5529b4d41
+  BOOKWORM: rust:1.98.1-bookworm@sha256:93ce27a88655056a51dbdd8f5f2d7ddc071c7b0070fb288a37b5a285fc83971e
+
+jobs:
+  measure:
+    name: measure ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x86_64-gnu
+            node_platform: linux-x64-gnu
+            runner: ubuntu-24.04
+            ort_tarball: onnxruntime-linux-x64-1.31.0
+            ort_tarball_sha256: cc5c72baf5ae5c8238a6841f0897227be2d02826b9cf98eaf02fdefaeeb03a57
+            ort_library_sha256: 469849977cb60744ea160927e1a3a0643fd4c55c0aff743251c6d293402e334e
+          - platform: linux-aarch64-gnu
+            node_platform: linux-arm64-gnu
+            runner: ubuntu-24.04-arm
+            ort_tarball: onnxruntime-linux-aarch64-1.31.0
+            ort_tarball_sha256: c5b8b3cca31f3d643a3b313b8f42e2d0f16a4fcefd02cda343d97bd5306afaab
+            ort_library_sha256: 595c7f7a6775f5c7b3d567c3ed94c04f722092575abcc092560f5208a54daf99
+    defaults:
+      run:
+        shell: bash
+    env:
+      KEY: ${{ matrix.platform }}
+      Q: backends/rustev-backend-embed-linear/qualification
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: Directories and the Rust toolchain
+        run: |
+          echo "WORK=$RUNNER_TEMP/m" >> "$GITHUB_ENV"
+          echo "OUT=$RUNNER_TEMP/m/evidence" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/m/evidence" "$RUNNER_TEMP/m/model" "$RUNNER_TEMP/m/ort"
+          if ! command -v rustup >/dev/null; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain none
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          fi
+      - name: Host description (raw)
+        run: |
+          {
+            echo "## date"; date -u +%Y-%m-%dT%H:%M:%SZ
+            echo "## runner"; echo "label=${{ matrix.runner }} ImageOS=${ImageOS:-} ImageVersion=${ImageVersion:-} RUNNER_ENVIRONMENT=${RUNNER_ENVIRONMENT:-} RUNNER_ARCH=${RUNNER_ARCH:-}"
+            echo "## uname"; uname -a
+            echo "## os-release"; cat /etc/os-release
+            echo "## glibc"; ldd --version | head -1; getconf GNU_LIBC_VERSION
+            echo "## nproc"; nproc
+            echo "## lscpu"; lscpu
+            echo "## meminfo"; head -5 /proc/meminfo
+            echo "## dmi"; for f in sys_vendor product_name product_version board_vendor; do printf '%s: ' "$f"; sudo cat "/sys/class/dmi/id/$f" 2>/dev/null || echo unavailable; done
+            echo "## virtualization"; systemd-detect-virt || true
+            echo "## rustc"; rustc --version; cargo --version
+            echo "## node"; node --version
+            echo "## python"; python3 --version
+          } > "$OUT/$KEY-host-raw.txt" 2>&1
+          cat "$OUT/$KEY-host-raw.txt"
+      - name: ONNX Runtime 1.31.0 from the release tarball, verified
+        run: |
+          cd "$WORK/ort"
+          curl -sSfLo ort.tgz "https://github.com/microsoft/onnxruntime/releases/download/v1.31.0/${{ matrix.ort_tarball }}.tgz"
+          echo "${{ matrix.ort_tarball_sha256 }}  ort.tgz" | sha256sum -c -
+          tar -xzf ort.tgz
+          lib="$WORK/ort/${{ matrix.ort_tarball }}/lib/libonnxruntime.so.1.31.0"
+          echo "${{ matrix.ort_library_sha256 }}  $lib" | sha256sum -c -
+          echo "RUNTIME=$lib" >> "$GITHUB_ENV"
+          stat -c '%s %n' "$lib" > "$OUT/$KEY-runtime.txt"
+          sha256sum "$lib" ort.tgz >> "$OUT/$KEY-runtime.txt"
+      - name: Checkpoint files at the pinned revision, verified against the record
+        run: |
+          python3 -I - "$Q/feasibility.json" "$WORK/model" "$OUT/$KEY-checkpoint.txt" <<'PY'
+          import hashlib, json, os, sys, urllib.request
+          from pathlib import Path
+          record, model, log = sys.argv[1], Path(sys.argv[2]), Path(sys.argv[3])
+          rev = os.environ["REVISION"]
+          files = json.load(open(record))["candidate"]["files"]
+          lines = []
+          for f in files:
+              url = f"https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/{rev}/{f['name']}"
+              dest = model / f["name"]
+              dest.parent.mkdir(parents=True, exist_ok=True)
+              with urllib.request.urlopen(url) as r:
+                  data = r.read()
+              digest = hashlib.sha256(data).hexdigest()
+              assert len(data) == f["bytes"] and digest == f["sha256"], (f["name"], len(data), digest)
+              dest.write_bytes(data)
+              lines.append(f"{digest}  {len(data)}  {f['name']}")
+          log.write_text("revision " + rev + "\n" + "\n".join(lines) + "\n")
+          print(log.read_text())
+          PY
+      - name: Build the encoder probe outside the workspace lints
+        run: |
+          p="$WORK/probe"
+          mkdir -p "$p/src"
+          cp backends/rustev-backend-embed-linear/examples/feasibility.rs "$p/src/main.rs"
+          cat > "$p/Cargo.toml" <<'TOML'
+          [package]
+          name = "feasibility-probe"
+          version = "0.0.0"
+          edition = "2024"
+          publish = false
+
+          [workspace]
+
+          [dependencies]
+          ort = { version = "=2.0.0-rc.15", default-features = false, features = ["std", "load-dynamic", "api-31"] }
+          tokenizers = { version = "=1.0.0-rc.3", default-features = false, features = ["serialize", "normalizers", "wordpiece", "regex"] }
+          serde_json = { version = "1", features = ["float_roundtrip"] }
+          sha2 = { version = "0.10", default-features = false }
+
+          [profile.release]
+          debug = false
+          TOML
+          cp Cargo.lock "$p/Cargo.lock"
+          cp rust-toolchain.toml "$p/"
+          (cd "$p" && cargo build --release && cargo tree -e normal,build > "$OUT/$KEY-probe-tree.txt")
+          cp "$p/Cargo.toml" "$OUT/$KEY-probe-Cargo.toml"
+          echo "PROBE=$p/target/release/feasibility-probe" >> "$GITHUB_ENV"
+      - name: Encoder probe (3.13 protocol, measure.py)
+        run: |
+          python3 "$Q/measure.py" "$PROBE" "$WORK/model" "$RUNTIME"
+          cp "$Q/$KEY.json" "$Q/$KEY-resource.json" "$Q/$KEY-stderr.txt" "$OUT/"
+          python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print({k: d[k] for k in ('cold_setup_ms','p95_ms','p99_ms')})" "$OUT/$KEY.json"
+          cat "$OUT/$KEY-resource.json"
+      - name: Support-routing plan decisions with the synthetic bundle (3.13.3)
+        run: |
+          cargo test -p rustev-backend-embed-linear --locked --release --test bundle support_routing 2>&1 | tee "$OUT/$KEY-decisions.txt"
+          test "${PIPESTATUS[0]}" = 0
+      - name: Complete backend in a measurement build (3.2.2 stage 4, 3.3, 3.13)
+        run: |
+          # The measurement build only: the platform enters the table so that
+          # EmbedLinearBackend::open constructs the onnx bundle it measures.
+          f=backends/rustev-backend-embed-linear/src/runtime.rs
+          sed -i 's/^pub const QUALIFIED_PLATFORMS: &\[Platform\] = &\[\];$/pub const QUALIFIED_PLATFORMS: \&[Platform] = \&[Platform::LinuxX86_64Gnu, Platform::LinuxAarch64Gnu];/' "$f"
+          git diff -- "$f" | tee "$OUT/$KEY-stage4-measurement-build.diff"
+          test -s "$OUT/$KEY-stage4-measurement-build.diff"
+          bin=$(cargo test -p rustev-backend-embed-linear --locked --release --test bundle --no-run --message-format=json \
+            | python3 -c "import json,sys; print([m['executable'] for m in map(json.loads, sys.stdin) if m.get('reason')=='compiler-artifact' and m.get('executable') and m['target']['name']=='bundle'][0])")
+          echo "test binary: $bin"
+          python3 -I - "$bin" "$OUT" <<'PY'
+          import hashlib, json, os, resource, subprocess, sys
+          binary, out = sys.argv[1], sys.argv[2]
+          key = os.environ["KEY"]
+          env = dict(os.environ, RUSTEV_EMBED_CHECKPOINT=os.environ["WORK"] + "/model",
+                     RUSTEV_EMBED_RUNTIME=os.environ["RUNTIME"],
+                     RUSTEV_EMBED_STAGE4_OUT=f"{out}/{key}-stage4.json")
+          with open(f"{out}/{key}-stage4-stdout.txt", "w") as o, open(f"{out}/{key}-stage4-stderr.txt", "w") as e:
+              r = subprocess.run([binary, "--ignored", "--exact", "--nocapture", "--test-threads=1",
+                                  "runtime_loading::hand::hand_complete_backend"],
+                                 stdout=o, stderr=e, env=env, check=False)
+          u = resource.getrusage(resource.RUSAGE_CHILDREN)
+          json.dump({"exit_code": r.returncode, "peak_rss_bytes": u.ru_maxrss * 1024,
+                     "user_seconds": str(u.ru_utime), "system_seconds": str(u.ru_stime),
+                     "collector": "resource.getrusage(RUSAGE_CHILDREN); fresh parent, one child (the test binary running only hand_complete_backend); Linux KiB times 1024",
+                     "test_binary_sha256": hashlib.sha256(open(binary, "rb").read()).hexdigest()},
+                    open(f"{out}/{key}-stage4-resource.json", "w"), indent=2)
+          print(open(f"{out}/{key}-stage4-resource.json").read())
+          sys.exit(r.returncode)
+          PY
+          python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print({k: d[k] for k in ('cold_setup_ms','p95_ms','p99_ms','bundle_bytes','fixtures_agree_and_repeatable','warm_bitwise_equal_to_first','max_abs_logit_difference_from_reference_head')})" "$OUT/$KEY-stage4.json"
+          git checkout -- "$f"
+      - name: Node binding with local-embed on the native matrix target (3.2.3, 3.17.1)
+        run: |
+          docker run --rm -v "$PWD":/w -w /w "$BOOKWORM" sh -euc '
+            rustc --version
+            ldd --version | head -1
+            cargo build -p rustev-node --locked --release --features local-embed
+          ' 2>&1 | tee "$OUT/$KEY-node-local-embed.txt"
+          test "${PIPESTATUS[0]}" = 0
+          sudo chown -R "$(id -u):$(id -g)" target
+          {
+            node tools/rustev-conformance/js/copy-addon.mjs target integrations/rustev-node
+            node --test integrations/rustev-node/test/local-embed.test.mjs
+            node tools/rustev-conformance/js/run.mjs native integrations/rustev-node --local-embed
+          } 2>&1 | tee -a "$OUT/$KEY-node-local-embed.txt"
+          test "${PIPESTATUS[0]}" = 0
+      - name: Upload the evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: measure-011-${{ matrix.platform }}
+          path: ${{ runner.temp }}/m/evidence/
+          if-no-files-found: error
