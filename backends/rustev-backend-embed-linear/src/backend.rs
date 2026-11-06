@@ -20,7 +20,7 @@ use crate::cache::{
     CacheConfig, CacheLimits, CacheLookup, CacheMiss, CacheStats, EmbeddingCache,
     RepeatabilityEvidence, RunOutcome,
 };
-use crate::manifest::EncoderKind;
+use crate::manifest::{EmbedManifest, EncoderKind, Platform};
 use crate::onnx::OnnxEncoder;
 use crate::{
     EmbedSetupError, PlanMismatch, PreparedRequest, RequestPreparer, SetupCode, VerifiedBundle,
@@ -45,6 +45,8 @@ pub struct EmbedConfig {
 type Run = dyn Fn(&[u32], &CancelSignal) -> Result<Vec<f32>, ()> + Send + Sync;
 type Output = Result<RawOutput, (AdapterFailure, String)>;
 type Cache = Option<Arc<Mutex<EmbeddingCache>>>;
+/// An `onnx` bundle's encoder run and the cache its setup decided.
+type OnnxSetup = (Arc<Run>, Cache);
 
 /// Local logits over a verified bundle, with bounded outstanding work.
 pub struct EmbedLinearBackend {
@@ -65,11 +67,11 @@ fn setup(code: SetupCode, item: &str, detail: &str) -> EmbedSetupError {
 impl EmbedLinearBackend {
     pub fn open(config: EmbedConfig) -> Result<Self, EmbedSetupError> {
         let (preparer, onnx) = Self::prepare(&config)?;
-        let run = match onnx {
-            Some(run) => run,
-            None => default_run(&preparer)?,
+        let (run, cache) = match onnx {
+            Some((run, cache)) => (run, Some(cache)),
+            None => (default_run(&preparer)?, None),
         };
-        Self::start(config, preparer, run)
+        Self::start(config, preparer, run, cache)
     }
 
     /// Synthetic fixtures only: substitute a controllable token-vector run.
@@ -80,13 +82,16 @@ impl EmbedLinearBackend {
         config: EmbedConfig,
         runner: impl Fn(&[u32], &CancelSignal) -> Result<Vec<f32>, ()> + Send + Sync + 'static,
     ) -> Result<Self, EmbedSetupError> {
-        let (preparer, _) = Self::prepare(&config)?;
-        Self::start(config, preparer, Arc::new(runner))
+        let (preparer, onnx) = Self::prepare(&config)?;
+        let cache = onnx.map(|(_, cache)| cache);
+        Self::start(config, preparer, Arc::new(runner), cache)
     }
 
+    /// Verify the bundle; for an `onnx` bundle also decide the cache and
+    /// load the encoder (`onnx_run`).
     fn prepare(
         config: &EmbedConfig,
-    ) -> Result<(Arc<RequestPreparer>, Option<Arc<Run>>), EmbedSetupError> {
+    ) -> Result<(Arc<RequestPreparer>, Option<OnnxSetup>), EmbedSetupError> {
         if !(1..=16).contains(&config.workers) || config.max_queued > 1024 {
             return Err(setup(
                 SetupCode::ManifestInvalid,
@@ -102,12 +107,18 @@ impl EmbedLinearBackend {
         Ok((Arc::new(RequestPreparer::new(bundle)?), onnx))
     }
 
+    /// Start the workers. `cache` is the one an `onnx` bundle's setup
+    /// decided; a synthetic bundle's is opened here.
     fn start(
         config: EmbedConfig,
         preparer: Arc<RequestPreparer>,
         run: Arc<Run>,
+        cache: Option<Cache>,
     ) -> Result<Self, EmbedSetupError> {
-        let cache = open_cache(&config, &preparer)?;
+        let cache = match cache {
+            Some(cache) => cache,
+            None => open_cache(&config, &preparer.bundle().manifest, None)?,
+        };
         let pool = Arc::new(Pool {
             state: Mutex::new(State {
                 queue: VecDeque::new(),
@@ -176,26 +187,37 @@ impl EmbedLinearBackend {
     }
 }
 
-/// The cache of 3.14, when configured. Only the synthetic encoder carries
-/// in-process bitwise repeatability evidence today (3.19.1); an `onnx`
-/// bundle has none bound to its artifact, so enabling it there is refused.
-fn open_cache(config: &EmbedConfig, preparer: &RequestPreparer) -> Result<Cache, EmbedSetupError> {
+/// The cache of 3.14, when configured. The synthetic encoder is bitwise
+/// repeatable by construction (3.19.1). An `onnx` bundle on the qualified
+/// `platform` has evidence only when the committed record measured bitwise
+/// in-process repeatability for its settings
+/// ([`crate::runtime::repeatability_evidence`]); anywhere else, or with no
+/// platform, enabling the cache is refused `cache_not_equivalent`.
+fn open_cache(
+    config: &EmbedConfig,
+    manifest: &EmbedManifest,
+    platform: Option<Platform>,
+) -> Result<Cache, EmbedSetupError> {
     let Some(limits) = config.embedding_cache else {
         return Ok(None);
     };
-    let manifest = &preparer.bundle().manifest;
-    let evidence = match manifest.encoder.kind {
+    let evidence = match (manifest.encoder.kind, platform) {
         #[cfg(feature = "synthetic")]
-        EncoderKind::Synthetic => RepeatabilityEvidence::Synthetic,
+        (EncoderKind::Synthetic, _) => RepeatabilityEvidence::Synthetic,
+        (EncoderKind::Onnx, Some(platform)) => {
+            let artifact = manifest
+                .artifact_id()
+                .map_err(|e| setup(SetupCode::ManifestInvalid, "manifest", &e.to_string()))?;
+            crate::runtime::repeatability_evidence(manifest, &artifact, platform)
+        }
         _ => RepeatabilityEvidence::Unproven,
     };
-    // No measured evidence is used, so no platform key is compared.
     let cache = EmbeddingCache::new(
         CacheConfig {
             embedding_cache: Some(limits),
         },
         manifest,
-        "",
+        platform.map_or("", Platform::key),
         &evidence,
     )?;
     Ok(Some(Arc::new(Mutex::new(cache))))
@@ -498,24 +520,27 @@ fn cancelled(units: u64, running: bool) -> AttemptReport {
 }
 
 /// The ONNX encoder of an `onnx` bundle (3.6, 3.9.1): the platform must be
-/// in the qualified table before any runtime is touched, then the runtime
-/// is verified and loaded and the session created from the verified graph
-/// bytes, which are released afterwards. A single unpadded sequence has an
-/// attention mask of ones.
+/// in the qualified table before any runtime is touched; a configured cache
+/// is decided next (3.14.3), so `cache_not_equivalent` needs no runtime;
+/// then the runtime is verified and loaded and the session created from the
+/// verified graph bytes, which are released afterwards. A single unpadded
+/// sequence has an attention mask of ones.
 fn onnx_run(
     config: &EmbedConfig,
     bundle: &mut VerifiedBundle,
-) -> Result<Arc<Run>, EmbedSetupError> {
+) -> Result<OnnxSetup, EmbedSetupError> {
     let platform = crate::runtime::qualified_platform()?;
+    let cache = open_cache(config, &bundle.manifest, Some(platform))?;
     let environment =
         crate::runtime::load(config.runtime_path.as_deref(), &bundle.manifest, platform)?;
     let encoder = OnnxEncoder::new(&environment, &bundle.graph, &bundle.manifest)?;
     bundle.graph = Vec::new();
-    Ok(Arc::new(move |ids, cancel| {
+    let run: Arc<Run> = Arc::new(move |ids, cancel| {
         encoder
             .encode(ids, &vec![1; ids.len()], cancel)
             .map_err(|_| ())
-    }))
+    });
+    Ok((run, cache))
 }
 
 fn default_run(preparer: &RequestPreparer) -> Result<Arc<Run>, EmbedSetupError> {

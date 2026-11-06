@@ -206,3 +206,70 @@ fn the_crates_platform_table_is_the_records_passing_verdicts() {
     table.sort();
     assert_eq!(table, passing, "3.6.3: the table is the record's");
 }
+
+#[test]
+fn the_crates_record_digest_is_the_committed_ones() {
+    let recorded = fs::read_to_string(qualification().join("feasibility.sha256")).unwrap();
+    assert_eq!(
+        rustev_backend_embed_linear::runtime::FEASIBILITY_RECORD,
+        recorded.trim()
+    );
+}
+
+/// 3.14.3: the cache's evidence table holds exactly the record's
+/// qualified platforms whose measurements show bitwise in-process
+/// repeatability, with the settings they were measured under.
+#[test]
+fn the_crates_cache_evidence_is_the_records_in_process_repeatability() {
+    let (_, record) = record();
+    let table = rustev_backend_embed_linear::runtime::IN_PROCESS_REPEATABILITY;
+    let mut platforms: Vec<&str> = table.iter().map(|m| m.platform.key()).collect();
+    platforms.sort_unstable();
+    let mut expected: Vec<&str> = record
+        .verdict
+        .iter()
+        .filter(|(p, v)| {
+            v["verdict"] == "pass"
+                && record.measurements["platform_measurements"][p.as_str()]
+                    ["bitwise_in_process_repeatability"]
+                    == true
+        })
+        .map(|(p, _)| p.as_str())
+        .collect();
+    expected.sort_unstable();
+    assert_eq!(platforms, expected);
+    let candidate = &record.candidate;
+    for m in table {
+        let x = &record.measurements["platform_measurements"][m.platform.key()];
+        let (probe, backend) = (&x["native_probe"], &x["complete_backend"]);
+        assert_eq!(x["bitwise_in_process_repeatability"], true);
+        assert_eq!(backend["warm_bitwise_equal_to_first"], true);
+        assert_eq!(backend["fixtures_agree_and_repeatable"], true);
+        let comparisons = probe["comparisons"].as_array().unwrap();
+        assert!(!comparisons.is_empty());
+        assert!(comparisons.iter().all(|c| c["bitwise_repeatable"] == true));
+        assert_eq!(probe["graph_sha256"], m.graph_sha256);
+        for run in [probe, backend] {
+            assert_eq!(run["runtime_sha256"], m.runtime_sha256);
+            assert_eq!(run["graph_optimization"], json(m.graph_optimization));
+            assert_eq!(run["intra_op_threads"], m.intra_op_threads);
+            assert_eq!(run["inter_op_threads"], m.inter_op_threads);
+        }
+        assert_eq!(probe["provider"], json(m.execution_provider));
+        assert_eq!(probe["runtime_reported_version"], m.onnxruntime);
+        assert_eq!(candidate["runtime"]["onnxruntime"], m.onnxruntime);
+        assert_eq!(candidate["runtime"]["ort"], m.ort);
+        assert_eq!(candidate["pooling"]["mode"], json(m.pooling_mode));
+        assert_eq!(candidate["pooling"]["normalize"], json(m.normalize));
+        assert!(
+            candidate["graph"]
+                .as_str()
+                .unwrap()
+                .contains(&format!("shipped {}", json(m.precision).as_str().unwrap()))
+        );
+    }
+}
+
+fn json(value: impl Serialize) -> Value {
+    serde_json::to_value(value).unwrap()
+}

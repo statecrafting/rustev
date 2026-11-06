@@ -263,6 +263,17 @@ pub enum Platform {
     MacosAarch64,
 }
 
+impl Platform {
+    /// The key as the manifest and the feasibility record spell it.
+    pub const fn key(self) -> &'static str {
+        match self {
+            Self::LinuxX86_64Gnu => "linux-x86_64-gnu",
+            Self::LinuxAarch64Gnu => "linux-aarch64-gnu",
+            Self::MacosAarch64 => "macos-aarch64",
+        }
+    }
+}
+
 /// A task-specific linear head (3.9).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
