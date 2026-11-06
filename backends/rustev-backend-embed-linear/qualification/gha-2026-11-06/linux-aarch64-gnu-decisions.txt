@@ -1,0 +1,146 @@
+    Updating crates.io index
+    Updating git repository `https://github.com/statecrafting/aicortex`
+ Downloading crates ...
+  Downloaded ref-cast v1.0.27
+  Downloaded dyn-clone v1.0.20
+  Downloaded hmac v0.12.1
+  Downloaded libm v0.2.16
+  Downloaded ref-cast-impl v1.0.27
+  Downloaded subtle v2.6.1
+  Downloaded schemars v1.2.3
+  Downloaded schemars_derive v1.2.3
+  Downloaded signal-hook-registry v1.4.8
+  Downloaded serde_derive_internals v0.30.0
+  Downloaded mio v1.2.3
+  Downloaded tokio v1.53.3
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.26
+   Compiling quote v1.0.47
+   Compiling libc v0.2.189
+   Compiling version_check v0.9.5
+   Compiling cfg-if v1.0.5
+   Compiling memchr v2.8.3
+   Compiling serde_core v1.0.229
+   Compiling generic-array v0.14.7
+   Compiling syn v3.0.6
+   Compiling serde v1.0.229
+   Compiling typenum v1.20.1
+   Compiling zmij v1.0.23
+   Compiling serde_json v1.0.151
+   Compiling itoa v1.0.18
+   Compiling ref-cast v1.0.27
+   Compiling subtle v2.6.1
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling digest v0.10.7
+   Compiling serde_derive_internals v0.30.0
+   Compiling cpufeatures v0.2.17
+   Compiling dyn-clone v1.0.20
+   Compiling libm v0.2.16
+   Compiling sha2 v0.10.9
+   Compiling hmac v0.12.1
+   Compiling serde_derive v1.0.229
+   Compiling ref-cast-impl v1.0.27
+   Compiling schemars_derive v1.2.3
+   Compiling zerocopy v0.8.63
+   Compiling rand_core v0.10.1
+   Compiling getrandom v0.4.3
+   Compiling bitflags v2.13.2
+   Compiling radium v0.7.0
+   Compiling rustix v1.1.5
+   Compiling schemars v1.2.3
+   Compiling syn v2.0.119
+   Compiling foldhash v0.2.0
+   Compiling getrandom v0.3.4
+   Compiling equivalent v1.0.3
+   Compiling thiserror v2.0.21
+   Compiling allocator-api2 v0.2.21
+   Compiling rustev-contract v0.4.1 (/home/runner/work/rustev/rustev/crates/rustev-contract)
+   Compiling tap v1.0.1
+   Compiling linux-raw-sys v0.12.1
+   Compiling once_cell v1.21.4
+   Compiling ppv-lite86 v0.2.21
+   Compiling wyz v0.5.1
+   Compiling mem_dbg-derive v0.3.4
+   Compiling hashbrown v0.16.1
+   Compiling chacha20 v0.10.2
+   Compiling thiserror-impl v2.0.21
+   Compiling errno v0.3.14
+   Compiling aho-corasick v1.1.5
+   Compiling ahash v0.8.12
+   Compiling funty v2.0.0
+   Compiling regex-syntax v0.8.11
+   Compiling arbitrary-chunks v0.4.1
+   Compiling fastrand v2.5.0
+   Compiling bit-vec v0.8.0
+   Compiling byteorder v1.5.0
+   Compiling either v1.19.0
+   Compiling minimal-lexical v0.2.1
+   Compiling partition v0.1.2
+   Compiling regex-automata v0.4.18
+   Compiling rdst v0.20.14
+   Compiling nom v7.1.3
+   Compiling itertools v0.15.0
+   Compiling fxhash v0.2.1
+   Compiling bit-set v0.8.0
+   Compiling tempfile v3.27.0
+   Compiling bitvec v1.1.1
+   Compiling signal-hook-registry v1.4.8
+   Compiling rand v0.10.3
+   Compiling mem_dbg v0.4.4
+   Compiling rand_chacha v0.10.0
+   Compiling mio v1.2.3
+   Compiling prefetch-index v0.2.1
+   Compiling log v0.4.34
+   Compiling unicode-segmentation v1.13.3
+   Compiling bytemuck v1.25.2
+   Compiling bitcannon v0.1.0-rc.3
+   Compiling xxhash-rust v0.8.19
+   Compiling base64 v0.13.1
+   Compiling pin-project-lite v0.2.17
+   Compiling colored v3.1.1
+   Compiling tinyvec v1.13.3
+   Compiling ptr_hash v2.1.3
+   Compiling unicode-normalization v0.1.25
+   Compiling tokio v1.53.3
+   Compiling spm_precompiled v0.1.4
+   Compiling wide v1.7.1
+   Compiling fancy-regex v0.19.2
+   Compiling unicode_categories v0.1.1
+   Compiling ort-sys v2.0.0-rc.15
+   Compiling yada v0.7.0
+   Compiling dary_heap v0.3.9
+   Compiling tk-encode v0.1.0-rc.3
+   Compiling hifijson v0.5.0
+   Compiling base64 v0.22.1
+   Compiling tk-convert v0.1.0-rc.3
+   Compiling tk-serialize v0.1.0-rc.3
+   Compiling libloading v0.9.0
+   Compiling smallvec v1.16.1
+   Compiling ort v2.0.0-rc.15
+   Compiling tokenizers v1.0.0-rc.3
+   Compiling rustev-core v0.4.1 (/home/runner/work/rustev/rustev/crates/rustev-core)
+   Compiling rustev-eval v0.4.1 (/home/runner/work/rustev/rustev/crates/rustev-eval)
+   Compiling rustev-runtime v0.4.1 (/home/runner/work/rustev/rustev/crates/rustev-runtime)
+   Compiling rustev-live v0.4.1 (/home/runner/work/rustev/rustev/crates/rustev-live)
+   Compiling rustev-surface v0.4.1 (/home/runner/work/rustev/rustev/crates/rustev-surface)
+   Compiling rustev-backend-rules v0.4.1 (/home/runner/work/rustev/rustev/backends/rustev-backend-rules)
+   Compiling rustev-cli v0.4.1 (/home/runner/work/rustev/rustev/crates/rustev-cli)
+   Compiling rustev-conformance v0.4.1 (/home/runner/work/rustev/rustev/tools/rustev-conformance)
+   Compiling rustev-pkg-support-routing v0.4.1 (/home/runner/work/rustev/rustev/packages/rustev-pkg-support-routing)
+   Compiling rustev-backend-embed-linear v0.4.1 (/home/runner/work/rustev/rustev/backends/rustev-backend-embed-linear)
+    Finished `release` profile [optimized] target(s) in 4m 04s
+     Running tests/bundle.rs (target/release/deps/bundle-15138512bfb9880b)
+
+running 8 tests
+test support_routing::fixtures::bless_support_routing_fixtures ... ignored, explicit fixture maintenance only; never runs in normal verification
+test support_routing::fixtures::committed_support_routing_fixtures_are_reproducible ... ok
+test support_routing::conformance::the_manifest_local_embed_cases_pass_through_the_rust_api ... ok
+test support_routing::conformance::every_local_embed_case_produces_its_expected_bytes ... ok
+test support_routing::support_routing_plan_and_descriptor_goldens_keep_rules_identity ... ok
+test support_routing::support_routing_evidence_and_offline_replay_without_bundle ... ok
+test support_routing::support_routing_each_semantic_step_keeps_projected_input_lineage ... ok
+test support_routing::evaluation::support_routing_swap_preserves_policy_and_evaluates_both_captures ... ok
+
+test result: ok. 7 passed; 0 failed; 1 ignored; 0 measured; 55 filtered out; finished in 0.23s
+

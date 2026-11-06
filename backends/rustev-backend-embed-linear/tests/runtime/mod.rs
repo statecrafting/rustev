@@ -1,8 +1,8 @@
 //! Runtime loading and the platform table (3.6), and the ONNX encoder
 //! (3.9.1). The default tests need no runtime library: the runtime codes are
 //! reached with no path and with a synthetic non-library file (3.19.3). The
-//! ignored test needs the pinned checkpoint and ONNX Runtime and runs by
-//! hand (`hand_real_encoder`).
+//! ignored tests need the pinned checkpoint and ONNX Runtime and run by
+//! hand (`hand_real_encoder`, `hand_complete_backend`).
 use super::*;
 use rustev_backend_embed_linear::manifest::{Library, Platform};
 use rustev_backend_embed_linear::runtime::{
@@ -115,9 +115,16 @@ fn a_verified_file_reporting_no_version_is_runtime_version_mismatch() {
 }
 
 #[test]
-fn the_platform_table_is_the_records_and_qualifies_nothing() {
-    assert!(QUALIFIED_PLATFORMS.is_empty());
-    assert_eq!(code(qualified_platform()), SetupCode::UnqualifiedPlatform);
+fn the_platform_table_is_the_records_and_qualifies_linux_x86_64_gnu() {
+    assert_eq!(QUALIFIED_PLATFORMS, [Platform::LinuxX86_64Gnu]);
+    match qualified_platform() {
+        Ok(p) => assert_eq!(Some(p), platform_key()),
+        Err(e) => assert_eq!(e.code, SetupCode::UnqualifiedPlatform),
+    }
+    assert_eq!(
+        qualified_platform().is_ok(),
+        platform_key() == Some(Platform::LinuxX86_64Gnu)
+    );
     let expected = if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
         Some(Platform::MacosAarch64)
     } else if cfg!(all(
@@ -139,6 +146,8 @@ fn the_platform_table_is_the_records_and_qualifies_nothing() {
 }
 
 #[test]
+/// On an unqualified target an `onnx` bundle is refused before its runtime
+/// path is read; on the qualified one the path is checked next (3.6.1).
 fn an_onnx_bundle_is_refused_before_its_runtime_path_is_read() {
     let mut b = new_bundle();
     let v = &mut b.manifest;
@@ -148,6 +157,9 @@ fn an_onnx_bundle_is_refused_before_its_runtime_path_is_read() {
     v["checkpoint"]["files"] =
         json!([{"name":"onnx/model.onnx", "sha256":v["encoder"]["graph"]["sha256"]}]);
     v["runtime"]["libraries"] = json!([{"platform":"macos-aarch64", "sha256":"a".repeat(64)}]);
+    // The pinned versions, so a qualified target reaches the path check.
+    v["runtime"]["ort"] = json!(ORT_VERSION);
+    v["runtime"]["onnxruntime"] = json!("1.31.0");
     v["tolerance"]["feasibility_record"] = json!(format!("sha256:{}", "b".repeat(64)));
     for h in v["heads"].as_array_mut().unwrap() {
         h["interpretation"] = json!("linear scores");
@@ -173,7 +185,11 @@ fn an_onnx_bundle_is_refused_before_its_runtime_path_is_read() {
         .unwrap();
         assert_eq!(
             (e.code, e.item.as_str()),
-            (SetupCode::UnqualifiedPlatform, "platform")
+            if qualified_platform().is_ok() {
+                (SetupCode::RuntimeMissing, "runtime_path")
+            } else {
+                (SetupCode::UnqualifiedPlatform, "platform")
+            }
         );
     }
 }

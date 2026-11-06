@@ -1,0 +1,15 @@
+# The project's gitleaks configuration (secret-scan, spec 044 section 3.6):
+# gitleaks' default rules, with one allowlist. Spec 011's feasibility record
+# and its evidence bind public files (checkpoint, tokenizer, runtime) by
+# SHA-256, and the generic-api-key rule reads a `"..._sha256": "<64 hex>"`
+# pair as a key. Only such digest pairs, only under the qualification
+# directory, are allowed; every other finding there still fails.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "SHA-256 digests in spec 011's feasibility record and evidence"
+condition = "AND"
+regexTarget = "match"
+paths = ['''^backends/rustev-backend-embed-linear/qualification/''']
+regexes = ['''sha256"\s*:\s*"[0-9a-f]{64}"''']

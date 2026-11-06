@@ -1,0 +1,13 @@
+diff --git a/backends/rustev-backend-embed-linear/src/runtime.rs b/backends/rustev-backend-embed-linear/src/runtime.rs
+index c5b7952..e1be73f 100644
+--- a/backends/rustev-backend-embed-linear/src/runtime.rs
++++ b/backends/rustev-backend-embed-linear/src/runtime.rs
+@@ -31,7 +31,7 @@ pub const ORT_VERSION: &str = "2.0.0-rc.15";
+ /// The record qualifies none, so every `onnx` bundle is refused
+ /// `unqualified_platform` (3.6.3). `tests/feasibility_record.rs` checks
+ /// that this table equals the record's `pass` verdicts.
+-pub const QUALIFIED_PLATFORMS: &[Platform] = &[];
++pub const QUALIFIED_PLATFORMS: &[Platform] = &[Platform::LinuxX86_64Gnu, Platform::LinuxAarch64Gnu];
+ 
+ /// The platform key of the compilation target (3.6.3), or `None` for any
+ /// target outside the three keys (musl, Windows, `darwin-x64`, ...).

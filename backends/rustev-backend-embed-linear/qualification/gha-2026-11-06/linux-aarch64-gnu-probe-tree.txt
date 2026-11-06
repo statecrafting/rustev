@@ -1,0 +1,139 @@
+feasibility-probe v0.0.0 (/home/runner/work/_temp/m/probe)
+├── ort v2.0.0-rc.15
+│   ├── libloading v0.9.0
+│   │   └── cfg-if v1.0.5
+│   ├── ort-sys v2.0.0-rc.15
+│   └── smallvec v1.16.1
+├── serde_json v1.0.151
+│   ├── itoa v1.0.18
+│   ├── memchr v2.8.3
+│   ├── serde_core v1.0.229
+│   └── zmij v1.0.23
+├── sha2 v0.10.9
+│   ├── cfg-if v1.0.5
+│   ├── cpufeatures v0.2.17
+│   │   └── libc v0.2.189
+│   └── digest v0.10.7
+│       ├── block-buffer v0.10.4
+│       │   └── generic-array v0.14.7
+│       │       └── typenum v1.20.1
+│       │       [build-dependencies]
+│       │       └── version_check v0.9.5
+│       └── crypto-common v0.1.7
+│           ├── generic-array v0.14.7 (*)
+│           └── typenum v1.20.1
+└── tokenizers v1.0.0-rc.3
+    ├── tk-convert v0.1.0-rc.3
+    │   ├── bitcannon v0.1.0-rc.3
+    │   ├── serde_json v1.0.151 (*)
+    │   └── thiserror v2.0.21
+    │       └── thiserror-impl v2.0.21 (proc-macro)
+    │           ├── proc-macro2 v1.0.107
+    │           │   └── unicode-ident v1.0.26
+    │           ├── quote v1.0.47
+    │           │   └── proc-macro2 v1.0.107 (*)
+    │           └── syn v3.0.6
+    │               ├── proc-macro2 v1.0.107 (*)
+    │               ├── quote v1.0.47 (*)
+    │               └── unicode-ident v1.0.26
+    ├── tk-encode v0.1.0-rc.3
+    │   ├── ahash v0.8.12
+    │   │   ├── cfg-if v1.0.5
+    │   │   ├── getrandom v0.3.4
+    │   │   │   ├── cfg-if v1.0.5
+    │   │   │   └── libc v0.2.189
+    │   │   ├── once_cell v1.21.4
+    │   │   └── zerocopy v0.8.63
+    │   │   [build-dependencies]
+    │   │   └── version_check v0.9.5
+    │   ├── bitcannon v0.1.0-rc.3
+    │   ├── dary_heap v0.3.9
+    │   ├── fancy-regex v0.19.2
+    │   │   ├── bit-set v0.8.0
+    │   │   │   └── bit-vec v0.8.0
+    │   │   ├── regex-automata v0.4.18
+    │   │   │   ├── aho-corasick v1.1.5
+    │   │   │   │   └── memchr v2.8.3
+    │   │   │   ├── memchr v2.8.3
+    │   │   │   └── regex-syntax v0.8.11
+    │   │   └── regex-syntax v0.8.11
+    │   ├── log v0.4.34
+    │   ├── memchr v2.8.3
+    │   ├── ptr_hash v2.1.3
+    │   │   ├── bitvec v1.1.1
+    │   │   │   ├── funty v2.0.0
+    │   │   │   ├── radium v0.7.0
+    │   │   │   ├── tap v1.0.1
+    │   │   │   └── wyz v0.5.1
+    │   │   │       └── tap v1.0.1
+    │   │   ├── colored v3.1.1
+    │   │   ├── fastrand v2.5.0
+    │   │   ├── fxhash v0.2.1
+    │   │   │   └── byteorder v1.5.0
+    │   │   ├── itertools v0.15.0
+    │   │   │   └── either v1.19.0
+    │   │   ├── log v0.4.34
+    │   │   ├── mem_dbg v0.4.4
+    │   │   │   ├── bitflags v2.13.2
+    │   │   │   ├── hashbrown v0.16.1
+    │   │   │   │   ├── allocator-api2 v0.2.21
+    │   │   │   │   ├── equivalent v1.0.3
+    │   │   │   │   └── foldhash v0.2.0
+    │   │   │   └── mem_dbg-derive v0.3.4 (proc-macro)
+    │   │   │       ├── proc-macro2 v1.0.107 (*)
+    │   │   │       ├── quote v1.0.47 (*)
+    │   │   │       └── syn v2.0.119
+    │   │   │           ├── proc-macro2 v1.0.107 (*)
+    │   │   │           ├── quote v1.0.47 (*)
+    │   │   │           └── unicode-ident v1.0.26
+    │   │   ├── prefetch-index v0.2.1
+    │   │   ├── rand v0.10.3
+    │   │   │   ├── chacha20 v0.10.2
+    │   │   │   │   ├── cfg-if v1.0.5
+    │   │   │   │   └── rand_core v0.10.1
+    │   │   │   ├── getrandom v0.4.3
+    │   │   │   │   ├── cfg-if v1.0.5
+    │   │   │   │   ├── libc v0.2.189
+    │   │   │   │   └── rand_core v0.10.1
+    │   │   │   └── rand_core v0.10.1
+    │   │   ├── rand_chacha v0.10.0
+    │   │   │   ├── ppv-lite86 v0.2.21
+    │   │   │   │   └── zerocopy v0.8.63
+    │   │   │   └── rand_core v0.10.1
+    │   │   ├── rdst v0.20.14
+    │   │   │   ├── arbitrary-chunks v0.4.1
+    │   │   │   └── partition v0.1.2
+    │   │   ├── tempfile v3.27.0
+    │   │   │   ├── fastrand v2.5.0
+    │   │   │   ├── getrandom v0.4.3 (*)
+    │   │   │   ├── once_cell v1.21.4
+    │   │   │   └── rustix v1.1.5
+    │   │   │       ├── bitflags v2.13.2
+    │   │   │       └── linux-raw-sys v0.12.1
+    │   │   └── xxhash-rust v0.8.19
+    │   ├── rand v0.10.3 (*)
+    │   ├── spm_precompiled v0.1.4
+    │   │   ├── base64 v0.13.1
+    │   │   ├── nom v7.1.3
+    │   │   │   ├── memchr v2.8.3
+    │   │   │   └── minimal-lexical v0.2.1
+    │   │   ├── serde v1.0.229
+    │   │   │   ├── serde_core v1.0.229
+    │   │   │   └── serde_derive v1.0.229 (proc-macro)
+    │   │   │       ├── proc-macro2 v1.0.107 (*)
+    │   │   │       ├── quote v1.0.47 (*)
+    │   │   │       └── syn v3.0.6 (*)
+    │   │   └── unicode-segmentation v1.13.3
+    │   ├── thiserror v2.0.21 (*)
+    │   ├── unicode-normalization v0.1.25
+    │   │   └── tinyvec v1.13.3
+    │   ├── unicode-segmentation v1.13.3
+    │   ├── unicode_categories v0.1.1
+    │   ├── wide v1.7.1
+    │   │   └── bytemuck v1.25.2
+    │   └── yada v0.7.0
+    └── tk-serialize v0.1.0-rc.3
+        ├── base64 v0.22.1
+        ├── bitcannon v0.1.0-rc.3
+        ├── hifijson v0.5.0
+        └── tk-encode v0.1.0-rc.3 (*)

@@ -1138,6 +1138,62 @@ binding's build with `local-embed` on each native matrix target, which
 counts toward qualifying a platform (3.2.3), needs a change to the
 `bindings` workflow; only `darwin-arm64` was built here.
 
+**Stage 4 of the complete backend on native Linux; `linux-x86_64-gnu`
+qualified (2026-11-06, 3.2, 3.6.3, 3.13).** Both Linux keys were measured
+on GitHub-hosted runners by a measurement workflow run from a branch and
+never merged (run 42139954158; the workflow's bytes are kept under
+`qualification/gha-2026-11-06/`). An earlier run of the same harness,
+whose bundle named only its runner's library and so was another artifact,
+drew an AMD EPYC 9V45 for `linux-x86_64-gnu` (complete-backend p95
+29.1 ms) and a Neoverse-N2 (142.4 ms); it is not recorded. Each runner is a
+Hyper-V virtual machine on shared Azure hardware, not a dedicated server,
+and the record says so: `ubuntu-24.04` drew an Intel Xeon Platinum 8370C
+(4 vCPUs, 16 GB, Ubuntu 24.04.5, glibc 2.39), `ubuntu-24.04-arm` an Arm
+Neoverse-N2 (4 vCPUs, 16 GB, same OS). Each downloaded the pinned
+checkpoint files (every length and SHA-256 equal to the record's) and the
+official ONNX Runtime 1.31.0 tarball, verified against the release's
+published digest. Per platform: the encoder probe through `measure.py`
+with the 3.13 protocol; the complete backend through
+`EmbedLinearBackend::open` and `DecisionBackend::infer`
+(`tests/runtime/hand.rs`, `hand_complete_backend`) on one `onnx` bundle of
+the pinned graph and tokenizer with one generated head, whose manifest
+accepts both Linux libraries so both platforms ran the same artifact,
+built with the platform in the qualified table (the measurement build's
+only difference, recorded as a diff): one process, one worker, one request
+at a time, the 256-token fixture, 50 warm-ups, 1,000 timed requests, CPU
+provider, one intra-op and one inter-op thread, peak RSS collected by the
+parent; the 19 inferred fixtures' logits twice each against the head over
+the stage 2 reference embedding; the support-routing plans with the
+synthetic bundle (3.13.3); and the Node binding built with `local-embed` in
+the native matrix target's image, its tests and the local-embed case.
+`linux-x86_64-gnu`: encoder cold setup 381.3 ms, p95 54.8 ms, p99 56.3 ms,
+peak RSS 278,925,312 bytes; complete backend bundle 90,876,712 bytes, cold
+setup 428.6 ms, p95 55.0 ms, p99 56.0 ms, peak RSS 267,022,336 bytes;
+logits within the 3.3 bounds of the reference head (largest difference
+0.0000014), bitwise repeatable in process across the fixtures and the
+1,000 warm requests; plan decisions and the conformance case unchanged;
+Node `local-embed` build and case pass. Every stage passes and it is the
+3.13.2 reference platform, so its verdict is `pass` and
+`QUALIFIED_PLATFORMS` is `[linux-x86_64-gnu]`. `linux-aarch64-gnu`:
+stages 1 to 3 pass, logits agree with `linux-x86_64-gnu` (largest
+difference 0.00000069, no decision change), plan decisions and the Node
+build pass, but encoder p95 140.0 ms and complete-backend p95 140.3 ms
+exceed 100 ms, so stage 4 and the platform refuse on this hardware; the
+2026-11-02 Docker VM measurement is kept as superseded with its evidence.
+`macos-aarch64` is unchanged (p95 105.4 ms). `rerecord_stage4.py` writes
+the record from the uploaded evidence; the contract digest is now
+`sha256:1ea76927c627c5ebfa8f39836f362f197dfd76c9fb40331dfab72691f792f4cd`.
+The probe gained the x86_64 runtime digest; the record keeps the digest of
+the bytes `linux-aarch64-gnu` was measured with on 2026-11-02, and of the
+harness as run. `tests/feasibility_record.rs` checks the qualification,
+every limit on `linux-x86_64-gnu` and the refusals elsewhere; the default
+tests expect an `onnx` bundle to reach the runtime-path check on the
+qualified target and `unqualified_platform` elsewhere. No limit changed.
+Not yet done: an `onnx` bundle's cache evidence wired into the backend
+(3.14.3; the record now shows bitwise repeatability on
+`linux-x86_64-gnu`, but enabling the cache on an `onnx` bundle is still
+refused `cache_not_equivalent`), and `011` in `make verify`.
+
 ## Decisions at approval
 
 The owner ratified in advance every spec implementing a #76 child

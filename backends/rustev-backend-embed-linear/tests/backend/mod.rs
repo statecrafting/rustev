@@ -480,7 +480,10 @@ fn dropping_queued_or_running_future_keeps_running_work_bounded() {
 }
 
 #[test]
-fn onnx_is_refused_before_runtime_loading_on_every_current_target() {
+/// Refused `unqualified_platform` before any runtime is loaded, except on
+/// the qualified `linux-x86_64-gnu`, where the absent runtime path is
+/// refused next (3.6.1, 3.6.3).
+fn onnx_is_refused_before_runtime_loading_on_every_unqualified_target() {
     let mut b = new_bundle();
     let v = &mut b.manifest;
     v["encoder"]["kind"] = json!("onnx");
@@ -489,6 +492,9 @@ fn onnx_is_refused_before_runtime_loading_on_every_current_target() {
     v["checkpoint"]["files"] =
         json!([{"name":"onnx/model.onnx", "sha256":v["encoder"]["graph"]["sha256"]}]);
     v["runtime"]["libraries"] = json!([{"platform":"macos-aarch64", "sha256":"a".repeat(64)}]);
+    // The pinned versions, so a qualified target reaches the path check.
+    v["runtime"]["ort"] = json!(rustev_backend_embed_linear::runtime::ORT_VERSION);
+    v["runtime"]["onnxruntime"] = json!("1.31.0");
     v["tolerance"]["feasibility_record"] = json!(format!("sha256:{}", "b".repeat(64)));
     for h in v["heads"].as_array_mut().unwrap() {
         h["interpretation"] = json!("linear scores");
@@ -496,8 +502,17 @@ fn onnx_is_refused_before_runtime_loading_on_every_current_target() {
     }
     b.write();
     let e = EmbedLinearBackend::open(config(&b, 1, 0)).err().unwrap();
-    assert_eq!(e.code, SetupCode::UnqualifiedPlatform);
-    assert_eq!(e.item, "platform");
+    if rustev_backend_embed_linear::runtime::qualified_platform().is_ok() {
+        assert_eq!(
+            (e.code, e.item.as_str()),
+            (SetupCode::RuntimeMissing, "runtime_path")
+        );
+    } else {
+        assert_eq!(
+            (e.code, e.item.as_str()),
+            (SetupCode::UnqualifiedPlatform, "platform")
+        );
+    }
 }
 
 #[test]
