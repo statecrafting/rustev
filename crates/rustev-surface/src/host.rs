@@ -204,18 +204,14 @@ impl Host for Memory {
     }
 
     fn ensure_absent(&self, label: &str) -> Result<(), IoFail> {
-        let detail = if self
-            .outputs
-            .borrow()
-            .keys()
-            .any(|p| p == label || p.starts_with(&format!("{label}/")))
-        {
+        // A trailing separator names the same entry, as in `list` and
+        // `entry_kind`.
+        let name = label.trim_end_matches('/');
+        let prefix = format!("{name}/");
+        let taken = |p: &String| p == name || p.starts_with(&prefix);
+        let detail = if self.outputs.borrow().keys().any(taken) {
             "already exists; outputs are never overwritten"
-        } else if self
-            .inputs
-            .keys()
-            .any(|p| p == label || p.starts_with(&format!("{label}/")))
-        {
+        } else if self.inputs.keys().any(taken) {
             // As on a file system, where an input is a file at that path and
             // the CLI's file host refuses to replace it: the same outcome on
             // every surface.
