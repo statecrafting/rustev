@@ -64,6 +64,8 @@ skip = [
   # other proc macros use syn 3; build-time only, nothing reaches the binary.
   # Reviewed 2026-10-26.
   { crate = "syn@2.0.119", reason = "prost-derive 0.14 pins syn 2; build-time proc-macro dependency only" },
+  { crate = "base64@0.22.1", reason = "tonic 0.14 pins base64 0.22; sigstore's pem 4 uses 0.23 (rustev-serve, 060)" },
+  { crate = "untrusted@0.7.1", reason = "aws-lc-rs 1.18 (sigstore-crypto) pins untrusted 0.7; ring 0.17 uses 0.9 (rustev-serve, 060)" },
 ]
 
 [sources]
