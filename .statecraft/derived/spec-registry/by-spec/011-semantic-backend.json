@@ -98,7 +98,7 @@
       }
     ],
     "id": "011-semantic-backend",
-    "implementation": "pending",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-1-position-authority-and-provenance",
@@ -179,7 +179,7 @@
       }
     ],
     "sectionDigests": {
-      "011-local-semantic-backend-frozen-embeddings-and-a-linear-head": "2b885e2455fb942bce8fbb9aaa1524fa5f98fa3ecacf9b8e749554bf842b979c",
+      "011-local-semantic-backend-frozen-embeddings-and-a-linear-head": "1cb9656ce2a435cc25ca693ee9dae67edd3417d29aecd00743d4e9a397f61fd6",
       "1-purpose": "0d3569d95796599deb0bc6feaa4e062fd4a3dfe85a184f8086c973c56415a386",
       "2-1-binding-principles-of-76": "e104a153715a456e6f6b0969c1f41c2c25e36a50e4544767fe3bae305d52a565",
       "2-territory": "5d61b2c53484919461ca3b3927123f08cd4559d0494401ba1fc4091c220e5b6a",
@@ -209,8 +209,8 @@
       "acceptance": "849036fd83aeafe74e21f0db8b8da9f224f5ae90b0e71ed9d346697f08bf549d",
       "decisions-at-approval": "435cac81a46634cef69c8e591961e4196f76d963734418943b475d7aaca664e4",
       "facts-relied-on": "d58aa3f7f5589622c6dbb96230f847757925403b900085a5ce72d2b4132ca18a",
-      "implementation-record": "f5976875831d82d842f117a5be2acc9cf275cbb85f5742ee3761b0df05eb888a",
-      "verification": "49335f9571e92ea1a81e1bcdaf93d018e4aa3a3007f569320041f91ed9265a86"
+      "implementation-record": "3e9b8ddd91cb6e85f67a6eec8c8d2de0c35e1ee281c6b03fc7a73dbbdb7ed18c",
+      "verification": "91fca467c4fc93b6b6b156a467b63c894f63fcc10b30e23fa33b1a267b6d7c60"
     },
     "sectionHeadings": [
       "011: Local semantic backend: frozen embeddings and a linear head",
@@ -248,9 +248,9 @@
     ],
     "specPath": "specs/011-semantic-backend/spec.md",
     "status": "approved",
-    "summary": "The first local model backend, `backends/rustev-backend-embed-linear/`: an ordinary `DecisionBackend` that embeds projected text with a frozen, host-provisioned sentence encoder run by ONNX Runtime through `ort`, and answers `classify`, `proposition` and `rubric` with logits from an externally produced, identified task-specific linear head. One canonical `rustev.embed-linear/1` manifest binds checkpoint, graph, tokenizer, preprocessing, truncation, pooling, precision, runtime, heads, labels, cost and tolerance into the artifact identity. Implementation is gated by a staged feasibility record (`rustev.embed-feasibility/1`) that passes or refuses each selection of #69 against measured limits before any inference dependency lands. No network, no download, no training, no provider; repeatability is a declared tolerance, not bitwise. Optional `local-embed` features in the Node binding, the service and the facade, and an opt-in in-process embedding cache. Amends spec 001 only by adding a local inference runtime family and one placement rule to the boundary check. Ratified (A-28) under R-36, which amends R-17 for this spec; R-43 authorizes the feasibility stages and pins the revision that ships an ONNX graph; implementation is pending.\n",
+    "summary": "The first local model backend, `backends/rustev-backend-embed-linear/`: an ordinary `DecisionBackend` that embeds projected text with a frozen, host-provisioned sentence encoder run by ONNX Runtime through `ort`, and answers `classify`, `proposition` and `rubric` with logits from an externally produced, identified task-specific linear head. One canonical `rustev.embed-linear/1` manifest binds checkpoint, graph, tokenizer, preprocessing, truncation, pooling, precision, runtime, heads, labels, cost and tolerance into the artifact identity. Implementation is gated by a staged feasibility record (`rustev.embed-feasibility/1`) that passes or refuses each selection of #69 against measured limits before any inference dependency lands. No network, no download, no training, no provider; repeatability is a declared tolerance, not bitwise. Optional `local-embed` features in the Node binding, the service and the facade, and an opt-in in-process embedding cache. Amends spec 001 only by adding a local inference runtime family and one placement rule to the boundary check. Ratified (A-28) under R-36, which amends R-17 for this spec; R-43 authorizes the feasibility stages and pins the revision that ships an ONNX graph; implemented and complete (2026-11-06).\n",
     "title": "Local semantic backend: frozen embeddings and a linear head"
   },
-  "shardHash": "a12dd847badd436ab2153fbc42dd35be8ca688df6a31a9b2ae20cd899d4d5c28",
+  "shardHash": "a6112ec53e46e4196064c70b395cff1bc453b45a20d92ad378f4d8ded736291e",
   "specVersion": "1.11.0"
 }
