@@ -5,17 +5,17 @@
     {
       "name": "store-closed-independent.plan.json",
       "path": "tools/rustev-conformance/fixtures/store/store-closed-independent.plan.json",
-      "sha256": "1777d5d31f0ba1dba9d0b75c3c37461a149df44d1d77372ce27ca2fa1ad9d111"
+      "sha256": "30f0c6a0b4f2885671d468dec88baa0b397ceee188e41d1bbd183de05fb04adb"
     },
     {
       "name": "store-closed.plan.json",
       "path": "tools/rustev-conformance/fixtures/store/store-closed.plan.json",
-      "sha256": "ef94239904729f33b4925d657f45e26e6a73c7a25fce0f4df0ae8b32e94c5bf7"
+      "sha256": "b7516b1fff305a09aeab9d886af7773d427ff861c047e59274f14a1034d5bc40"
     },
     {
       "name": "store.plan.json",
       "path": "tools/rustev-conformance/fixtures/store/store.plan.json",
-      "sha256": "53fbdc7bc655377f85a8c4a45919fc8e65b9bf7d24f80763d2094d29ae143051"
+      "sha256": "b63ef300d6aa58272280702df12f9df51830d825223559551500b6b1dded4511"
     },
     {
       "name": "support.snapshot.json",
@@ -54,7 +54,7 @@
       "file": "closed.record.json",
       "golden": "tools/rustev-conformance/expected/runtime/runtime.store-failure-policy/closed.record.json",
       "normalize": [],
-      "sha256": "dab7590644d92ff68461d07ef67c1ea43102a45fa2d22b9c5f25698a6bb00642"
+      "sha256": "c39e8f766899034004cf969fcbe8790543f5ff51d6a05cd983aebed414093fb9"
     },
     {
       "file": "closed.result.json",
@@ -66,7 +66,7 @@
       "file": "independent.record.json",
       "golden": "tools/rustev-conformance/expected/runtime/runtime.store-failure-policy/independent.record.json",
       "normalize": [],
-      "sha256": "16497d5c1dd84cea56e0d7ae2ec966bd1ae20f4b8aa367af63470c8f1aa4c0f4"
+      "sha256": "41bf976bf6837680f320608e6488db08e1259178c11966e57ae9f8b7113db0c4"
     },
     {
       "file": "independent.result.json",
@@ -78,7 +78,7 @@
       "file": "open.record.json",
       "golden": "tools/rustev-conformance/expected/runtime/runtime.store-failure-policy/open.record.json",
       "normalize": [],
-      "sha256": "db2e643c67b47473c3acead2b7e92be23533ad5694ce289dada6edf1681e35fa"
+      "sha256": "73cdb1261982018146d7b5b731c3d876d4405bb4815f98fed6e8c6393de708e9"
     },
     {
       "file": "open.result.json",
@@ -90,7 +90,7 @@
       "file": "write.record.json",
       "golden": "tools/rustev-conformance/expected/runtime/runtime.store-failure-policy/write.record.json",
       "normalize": [],
-      "sha256": "6bcbd47691f8369ab0e559a2e5e21e4998c9fdc8e8de37b1fb0a1aed4031df7a"
+      "sha256": "6a9488f3d14b6ef4621ee62301647f7de8a2c0e2da1d1fdc4601aa8c5895f57e"
     },
     {
       "file": "write.result.json",
