@@ -1,10 +1,10 @@
 //! File orchestration for spec 061's host sets. Every rule lives in eval;
 //! this module reads the host's files, hands them to the library and
 //! writes its documents, all or none.
-use crate::args::{Parsed, Usage, usage};
-use crate::io::{Reads, join};
+use super::{BaselineArgs, CompareArgs, SelectArgs};
+use crate::host::{EntryKind, Host};
 use crate::out::{Done, Out, Res};
-use crate::repeat::{NOT_REPRODUCIBLE, Session, dependency_files, publish_outputs};
+use crate::repeat::{NOT_REPRODUCIBLE, Session, dependency_files};
 use rustev_contract::Document;
 use rustev_contract::canonical::record_canonical_bytes;
 use rustev_contract::limits::REPLAY_V1;
@@ -46,8 +46,8 @@ fn read_doc<T: Document>(s: &Session<'_>, path: &str) -> Result<(T, Vec<u8>), Do
 /// `host-run.json`, `views.json` (absent is the library's `host-binding`)
 /// and every regular file of `scores/`, in byte order of their names.
 fn read_run(s: &Session<'_>, dir: &str) -> Result<RunFiles, Done> {
-    let record = read_doc(s, &join(dir, "host-run.json"))?;
-    let views_path = join(dir, "views.json");
+    let record = read_doc(s, &s.reads.join(dir, "host-run.json"))?;
+    let views_path = s.reads.join(dir, "views.json");
     let views = match s
         .reads
         .read_bounded(&views_path, REPLAY_V1.max_bytes.saturating_add(1))
@@ -60,7 +60,7 @@ fn read_run(s: &Session<'_>, dir: &str) -> Result<RunFiles, Done> {
         )),
     };
     let mut scores = vec![];
-    for path in dependency_files(s, &join(dir, "scores"), MAX_SCORES)? {
+    for path in dependency_files(s, &s.reads.join(dir, "scores"), MAX_SCORES)? {
         scores.push(read_doc(s, &path)?);
     }
     Ok(RunFiles {
@@ -121,24 +121,35 @@ pub(crate) fn cohorts_out(cohorts: &[HostCohortReport]) -> Vec<CohortOut> {
         .collect()
 }
 
+#[derive(Clone, Copy)]
+pub struct ImportArgs<'a> {
+    pub runs: &'a [String],
+    pub repeat_config: &'a str,
+    pub config: &'a str,
+    pub out: &'a str,
+}
+
 /// `rustev eval repeat import` (3.2).
-pub fn import(p: &Parsed) -> Result<Res, Usage> {
-    let dirs = p.many("run").to_vec();
-    if dirs.len() > 64 {
-        return usage("--run is given 1 to 64 times");
+pub fn import(command: &str, reads: &dyn Host, p: ImportArgs<'_>) -> Res {
+    let dirs = p.runs.to_vec();
+    if !(1..=64).contains(&dirs.len()) {
+        return Err(Done::invalid(
+            command,
+            "run",
+            "--run is given 1 to 64 times",
+        ));
     }
-    let reads = Reads::default();
     let s = Session {
-        command: p.name(),
-        reads: &reads,
+        command: command.into(),
+        reads,
     };
-    let out = p.req("out");
-    Ok((|| {
+    let out = p.out;
+    (|| {
         for name in ["repeat-config.json", "config.json", "repeat.json"] {
-            s.absent(&join(out, name))?;
+            s.absent(&s.reads.join(out, name))?;
         }
-        let repeat: RepeatConfig = s.doc(p.req("repeat-config"))?;
-        let config: EvaluatorConfig = s.doc(p.req("config"))?;
+        let repeat: RepeatConfig = s.doc(p.repeat_config)?;
+        let config: EvaluatorConfig = s.doc(p.config)?;
         let files: Vec<RunFiles> = dirs
             .iter()
             .map(|d| read_run(&s, d))
@@ -164,18 +175,24 @@ pub fn import(p: &Parsed) -> Result<Res, Usage> {
         .map_err(|e| refused(&s, &dirs, e))?;
         let mut written = vec![
             (
-                join(out, "repeat-config.json"),
+                s.reads.join(out, "repeat-config.json"),
                 s.bytes(repeat.canonical())?,
             ),
-            (join(out, "config.json"), s.bytes(config.canonical())?),
+            (
+                s.reads.join(out, "config.json"),
+                s.bytes(config.canonical())?,
+            ),
         ];
         for (r, (f, cases)) in files.iter().zip(&set.cases).enumerate() {
             written.push((
-                join(out, &format!("run-{r}.host-run.json")),
+                s.reads.join(out, &format!("run-{r}.host-run.json")),
                 f.record.1.clone(),
             ));
             if let Some((_, bytes)) = &f.views {
-                written.push((join(out, &format!("run-{r}.views.json")), bytes.clone()));
+                written.push((
+                    s.reads.join(out, &format!("run-{r}.views.json")),
+                    bytes.clone(),
+                ));
             }
             for (doc, bytes) in &f.scores {
                 // Import bound each scorer to a declared one, whose id is a
@@ -184,24 +201,24 @@ pub fn import(p: &Parsed) -> Result<Res, Usage> {
                     return Err(s.invalid("scores", "a scorer id is not a declared name"));
                 }
                 written.push((
-                    join(out, &format!("run-{r}.scores-{}.json", doc.scorer.id)),
+                    s.reads
+                        .join(out, &format!("run-{r}.scores-{}.json", doc.scorer.id)),
                     bytes.clone(),
                 ));
             }
             written.push((
-                join(out, &format!("run-{r}.cases.json")),
+                s.reads.join(out, &format!("run-{r}.cases.json")),
                 s.bytes(cases.record_canonical())?,
             ));
         }
         written.push((
-            join(out, "repeat.json"),
+            s.reads.join(out, "repeat.json"),
             s.bytes(set.report.record_canonical())?,
         ));
         for (path, _) in &written {
             s.absent(path)?;
         }
-        publish_outputs(&written, &[], |temp, path| std::fs::hard_link(temp, path))
-            .map_err(|e| Done::io(&s.command, e))?;
+        s.publish(&written)?;
         let report: &HostRepeatReport = &set.report;
         Ok(Done::ok(
             Out::new(&s.command, "imported")
@@ -216,7 +233,7 @@ pub fn import(p: &Parsed) -> Result<Res, Usage> {
                     s.bytes(record_canonical_bytes(&cohorts_out(&report.cohorts)))?,
                 ),
         ))
-    })())
+    })()
 }
 
 /// A schema string, read without the document's own rules, so a command
@@ -270,11 +287,11 @@ struct ImportFiles {
 
 impl ImportFiles {
     fn read(s: &Session<'_>, dir: &str) -> Result<ImportFiles, Done> {
-        let report: HostRepeatReport = s.doc(&join(dir, "repeat.json"))?;
+        let report: HostRepeatReport = s.doc(&s.reads.join(dir, "repeat.json"))?;
         if !(1..=64).contains(&report.runs.len()) {
             return Err(s.invalid(dir, "expected 1 to 64 runs"));
         }
-        let config: EvaluatorConfig = s.doc(&join(dir, "config.json"))?;
+        let config: EvaluatorConfig = s.doc(&s.reads.join(dir, "config.json"))?;
         let ids: Vec<String> = config
             .scorers
             .iter()
@@ -282,7 +299,7 @@ impl ImportFiles {
             .map(|d| d.id.clone())
             .collect();
         let mut files = ImportFiles {
-            repeat: s.doc(&join(dir, "repeat-config.json"))?,
+            repeat: s.doc(&s.reads.join(dir, "repeat-config.json"))?,
             config,
             report,
             records: vec![],
@@ -291,18 +308,28 @@ impl ImportFiles {
             cases: vec![],
         };
         for r in 0..files.report.runs.len() {
-            let f = |k: &str| join(dir, &format!("run-{r}.{k}.json"));
+            let f = |k: &str| s.reads.join(dir, &format!("run-{r}.{k}.json"));
             files.records.push(s.doc(&f("host-run"))?);
             let views = f("views");
-            files.views.push(if std::path::Path::new(&views).exists() {
-                Some(s.doc(&views)?)
-            } else {
-                None
-            });
+            files.views.push(
+                if s.reads
+                    .entry_kind(&views)
+                    .map_err(|e| Done::io(&s.command, e))?
+                    != EntryKind::Missing
+                {
+                    Some(s.doc(&views)?)
+                } else {
+                    None
+                },
+            );
             let mut scores = vec![];
             for id in &ids {
                 let path = f(&format!("scores-{id}"));
-                if std::path::Path::new(&path).exists() {
+                if s.reads
+                    .entry_kind(&path)
+                    .map_err(|e| Done::io(&s.command, e))?
+                    != EntryKind::Missing
+                {
                     scores.push(s.doc(&path)?);
                 }
             }
@@ -340,16 +367,23 @@ impl ImportFiles {
 
 /// `baseline record` over an import output, when its documents are a
 /// host set's (3.7.1); none for a Rustev-evaluated `--eval`.
-pub fn baseline(p: &Parsed, now: i64) -> Option<Res> {
-    let reads = Reads::default();
+pub(super) fn baseline(
+    command: &str,
+    reads: &dyn Host,
+    p: &BaselineArgs<'_>,
+    now: i64,
+) -> Option<Res> {
     let s = Session {
-        command: p.name(),
-        reads: &reads,
+        command: command.into(),
+        reads,
     };
-    let dir = p.req("eval");
+    let dir = p.eval;
     let route = provenance_of(
         &s,
-        &[join(dir, "repeat.json"), join(dir, "run-0.cases.json")],
+        &[
+            s.reads.join(dir, "repeat.json"),
+            s.reads.join(dir, "run-0.cases.json"),
+        ],
     );
     match route {
         Err(done) => return Some(Err(done)),
@@ -357,12 +391,12 @@ pub fn baseline(p: &Parsed, now: i64) -> Option<Res> {
         Ok(_) => return None,
     }
     Some((|| {
-        s.absent(p.req("out"))?;
+        s.absent(p.out)?;
         let set = ImportFiles::read(&s, dir)?;
         let runs = set.runs();
-        let b = host_select::record(p.req("name"), &set.evidence(&runs), now)
+        let b = host_select::record(p.name, &set.evidence(&runs), now)
             .map_err(|e| s.invalid(dir, e))?;
-        s.write(&[(p.req("out").into(), s.bytes(b.record_canonical())?)])?;
+        s.write(&[(p.out.into(), s.bytes(b.record_canonical())?)])?;
         Ok(Done::ok(
             Out::new(&s.command, "recorded")
                 .set(
@@ -375,26 +409,27 @@ pub fn baseline(p: &Parsed, now: i64) -> Option<Res> {
 }
 
 /// The host baseline and its import output, verified (3.7.4).
-fn bound_baseline(s: &Session<'_>, p: &Parsed) -> Result<(HostBaseline, ImportFiles), Done> {
-    let b: HostBaseline = s.doc(p.req("baseline"))?;
-    let set = ImportFiles::read(s, p.req("baseline-eval"))?;
+fn bound_baseline(
+    s: &Session<'_>,
+    p: &CompareArgs<'_>,
+) -> Result<(HostBaseline, ImportFiles), Done> {
+    let b: HostBaseline = s.doc(p.baseline)?;
+    let set = ImportFiles::read(s, p.baseline_eval)?;
     let runs = set.runs();
-    host_select::verify_baseline(&b, &set.evidence(&runs))
-        .map_err(|e| s.invalid(p.req("baseline"), e))?;
+    host_select::verify_baseline(&b, &set.evidence(&runs)).map_err(|e| s.invalid(p.baseline, e))?;
     Ok((b, set))
 }
 
 /// `eval reproducibility` over host sets (3.7.2); none for Rustev inputs.
-pub fn reproducibility(p: &Parsed) -> Option<Res> {
-    let reads = Reads::default();
+pub(super) fn reproducibility(command: &str, reads: &dyn Host, p: &CompareArgs<'_>) -> Option<Res> {
     let s = Session {
-        command: p.name(),
-        reads: &reads,
+        command: command.into(),
+        reads,
     };
     let paths = [
-        p.req("baseline").to_string(),
-        join(p.req("baseline-eval"), "repeat.json"),
-        join(p.req("run"), "repeat.json"),
+        p.baseline.to_string(),
+        s.reads.join(p.baseline_eval, "repeat.json"),
+        s.reads.join(p.run, "repeat.json"),
     ];
     match provenance_of(&s, &paths) {
         Err(done) => return Some(Err(done)),
@@ -403,10 +438,10 @@ pub fn reproducibility(p: &Parsed) -> Option<Res> {
     }
     Some((|| {
         let (baseline, base) = bound_baseline(&s, p)?;
-        let run = ImportFiles::read(&s, p.req("run"))?;
+        let run = ImportFiles::read(&s, p.run)?;
         let runs = run.runs();
         let e = run.evidence(&runs);
-        reassemble(&e.inputs, e.report, e.cases).map_err(|e| s.invalid(p.req("run"), e))?;
+        reassemble(&e.inputs, e.report, e.cases).map_err(|e| s.invalid(p.run, e))?;
         let out = match host_select::reproducibility(&baseline, &run.report, &base.repeat) {
             Reproducibility::Reproducible => {
                 Done::ok(Out::new(&s.command, "reproducible").set("assertion", HOST_ASSERTED))
@@ -436,38 +471,44 @@ pub fn reproducibility(p: &Parsed) -> Option<Res> {
 /// immediate subdirectory of `--candidates` is one candidate's import
 /// output. A candidate that does not re-assemble is the library's
 /// `unknown`, never a refusal here.
-pub fn select(p: &Parsed) -> Option<Res> {
-    let reads = Reads::default();
+pub(super) fn select(command: &str, reads: &dyn Host, p: &SelectArgs<'_>) -> Option<Res> {
     let s = Session {
-        command: p.name(),
-        reads: &reads,
+        command: command.into(),
+        reads,
     };
-    let dirs = match crate::repeat::directories(&s, p.req("candidates")) {
+    let dirs = match crate::repeat::directories(&s, p.candidates) {
         Ok(d) => d,
         // Not a host selection's concern; the Rustev path reports it.
         Err(_) => return None,
     };
     let mut paths = vec![
-        p.req("baseline").to_string(),
-        join(p.req("baseline-eval"), "repeat.json"),
+        p.baseline.to_string(),
+        s.reads.join(p.baseline_eval, "repeat.json"),
     ];
-    paths.extend(dirs.iter().map(|(_, d)| join(d, "repeat.json")));
+    paths.extend(dirs.iter().map(|(_, d)| s.reads.join(d, "repeat.json")));
     match provenance_of(&s, &paths) {
         Err(done) => return Some(Err(done)),
         Ok(Some(Provenance::Host)) => {}
         Ok(_) => return None,
     }
     Some((|| {
-        s.absent(p.req("out"))?;
-        let gate = rustev_surface::eval::read_doc(
+        s.absent(p.out)?;
+        let gate = crate::eval::read_doc(
             &s.command,
-            &reads,
-            p.req("selection-gate"),
+            reads,
+            p.selection_gate,
             rustev_contract::limits::DESCRIPTOR_V1.max_bytes,
         )?;
         // A baseline that does not bind its import output is refused, as in
         // the reproducibility check and spec 029's `gate select`.
-        let (baseline, base) = bound_baseline(&s, p)?;
+        let (baseline, base) = bound_baseline(
+            &s,
+            &CompareArgs {
+                baseline: p.baseline,
+                baseline_eval: p.baseline_eval,
+                run: "",
+            },
+        )?;
         let sets: Vec<ImportFiles> = dirs
             .iter()
             .map(|(_, d)| ImportFiles::read(&s, d))
@@ -496,7 +537,7 @@ pub fn select(p: &Parsed) -> Option<Res> {
             11 => "none_qualified",
             _ => "unknown",
         };
-        s.write(&[(p.req("out").into(), s.bytes(selection.record_canonical())?)])?;
+        s.write(&[(p.out.into(), s.bytes(selection.record_canonical())?)])?;
         Ok(Done::new(
             code,
             Out::new(&s.command, status)

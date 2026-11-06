@@ -13,9 +13,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 /// The most bytes one command reads, store items included.
 pub const MAX_TOTAL_BYTES: usize = 256 * 1024 * 1024;
 /// The most files of each dependency kind one command reads.
-pub const MAX_RULES_FILES: usize = 64;
-pub const MAX_DESCRIPTOR_FILES: usize = 4096;
-pub const MAX_CALIBRATION_FILES: usize = 4096;
+pub const MAX_RULES_FILES: usize = rustev_surface::host::MAX_RULES_FILES;
+pub const MAX_DESCRIPTOR_FILES: usize = rustev_surface::host::MAX_DESCRIPTOR_FILES;
+pub const MAX_CALIBRATION_FILES: usize = rustev_surface::host::MAX_CALIBRATION_FILES;
 
 pub use rustev_surface::host::{IoFail, ReadFail};
 
@@ -116,6 +116,50 @@ impl Reads {
 
 /// The file system as a command's host (spec 027, 3.1): labels are paths.
 impl rustev_surface::host::Host for Reads {
+    fn list(&self, dir: &str, max: usize) -> Result<Vec<String>, IoFail> {
+        let mut names = std::collections::BTreeSet::new();
+        let fail = |e: std::io::Error| IoFail {
+            path: dir.into(),
+            detail: e.to_string(),
+        };
+        for entry in std::fs::read_dir(dir).map_err(fail)? {
+            let name = entry
+                .map_err(fail)?
+                .file_name()
+                .into_string()
+                .map_err(|_| IoFail {
+                    path: dir.into(),
+                    detail: "non UTF-8 entry name".into(),
+                })?;
+            names.insert(name);
+            if names.len() > max {
+                names.pop_last();
+            }
+        }
+        Ok(names.into_iter().collect())
+    }
+
+    fn entry_kind(&self, label: &str) -> Result<rustev_surface::host::EntryKind, IoFail> {
+        use rustev_surface::host::EntryKind;
+        match std::fs::symlink_metadata(label) {
+            Ok(m) => Ok(if m.is_symlink() {
+                EntryKind::Symlink
+            } else if m.is_dir() {
+                EntryKind::Directory
+            } else if m.is_file() {
+                EntryKind::File
+            } else {
+                EntryKind::Other
+            }),
+            Err(e) if e.kind() == ErrorKind::NotFound => Ok(EntryKind::Missing),
+            Err(e) => fail(label, e.to_string()),
+        }
+    }
+
+    fn write_all_in(&self, files: &[(String, Vec<u8>)], dirs: &[String]) -> Result<(), IoFail> {
+        crate::repeat::publish_outputs(files, dirs, |temp, path| std::fs::hard_link(temp, path))
+    }
+
     fn read_classified(&self, label: &str, max: usize) -> Result<Option<Vec<u8>>, ReadFail> {
         Reads::read_classified(self, label, max)
     }

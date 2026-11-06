@@ -20,5 +20,6 @@ pub mod plan;
 pub mod plan_diff;
 #[cfg(feature = "parameterized")]
 pub mod profile;
+pub mod repeat;
 pub mod replay;
 pub mod run;

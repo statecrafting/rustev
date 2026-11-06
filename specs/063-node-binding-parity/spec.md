@@ -879,6 +879,22 @@ wall-clock time; its non-atomic variants (split reads, check-then-write,
 a reader endpoint, `allkeys-lru`) show which failures are detected and
 which are not.
 
+**Increment 5, 2026-11-05 (3.9.3, 3.9.4, repeatability move).** The
+renderings move from `crates/rustev-cli/src/repeat.rs` and `host_sets.rs`
+into `crates/rustev-surface/src/repeat.rs` and `src/repeat/host_sets.rs`
+behind `Host`: `eval` and `candidates` with a repeat configuration,
+`baseline`, `reproducibility`, `diff`, `select` and 061's `import`, each
+taking its arguments as a struct, `now_ms` among them. An empty `bundles`
+is `live-source-unavailable`. `Host` gains `list(dir, max)`, `entry_kind`
+(inspected without following a link) and `write_all_in` (a set with its
+new candidate directories, all or none); the defaults refuse listing and
+inspection. The CLI keeps its usage rules, the live path and the
+hard-link publication and rollback (`publish_outputs`, now the filesystem
+host's `write_all_in`), and calls the moved functions with its filesystem
+host. CLI goldens and the `repeat-*` expected bytes are unchanged without
+re-blessing. The two new source files join `rustev-surface`'s archive
+list (`tools/rustev-release/archive-policy.json`). No binding changed.
+
 ## Decisions at approval
 
 Decided in this text, with reasons: a separate `acquisitionSources` seam,
