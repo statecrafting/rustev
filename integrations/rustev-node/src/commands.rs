@@ -152,6 +152,15 @@ pub fn run(name: &str, inputs: BTreeMap<String, Vec<u8>>, a: &Json) -> Result<Co
             let config = replay_config(a)?;
             rustev_surface::replay::replay("replay", &host, s(a, "bundle")?, &store, &config)
         }
+        // Spec 063, 3.9: `eval` with `repeatConfig` and the repeatability
+        // commands, through the renderings the CLI calls.
+        "eval" if repeat::requested(a)? => repeat::run(name, &host, a, deps, &store, &mut hook)?,
+        "evalCandidates"
+        | "baselineRecord"
+        | "evalReproducibility"
+        | "evalDiff"
+        | "gateSelect"
+        | "evalRepeatImport" => repeat::run(name, &host, a, deps, &store, &mut hook)?,
         "eval" | "evalViews" => {
             let split = split_named(s(a, "split")?).ok_or_else(|| usage("split"))?;
             let config = replay_config(a)?;
@@ -299,3 +308,8 @@ pub(crate) fn profile_rules_hook(
 ) -> std::result::Result<rustev_contract::descriptor::BackendDescriptor, String> {
     rules_hook(name, bytes)
 }
+
+// Spec 063, 3.9: the repeatability commands, a child of this module (for
+// its argument helpers) kept in `src/` with the binding's other files.
+#[path = "repeat.rs"]
+mod repeat;

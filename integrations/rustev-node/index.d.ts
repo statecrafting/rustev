@@ -319,6 +319,14 @@ export declare class Engine {
   ): Promise<{ scores: unknown; raw: Uint8Array }>;
   calibrateFit(inputs: Record<string, DocumentInput>, args: object): Promise<CommandResult>;
   calibrateQualify(inputs: Record<string, DocumentInput>, args: object): Promise<CommandResult>;
+  /** Spec 063, 3.9: the repeatability commands. `evaluate` with
+   * `repeatConfig` (`EvalRepeatArgs`) is `eval --repeat-config`. */
+  evalCandidates(inputs: Record<string, DocumentInput>, args: EvalCandidatesArgs): Promise<CommandResult>;
+  baselineRecord(inputs: Record<string, DocumentInput>, args: BaselineRecordArgs): Promise<CommandResult>;
+  evalReproducibility(inputs: Record<string, DocumentInput>, args: EvalCompareArgs): Promise<CommandResult>;
+  evalDiff(inputs: Record<string, DocumentInput>, args: EvalCompareArgs & { out: string }): Promise<CommandResult>;
+  gateSelect(inputs: Record<string, DocumentInput>, args: GateSelectArgs): Promise<CommandResult>;
+  evalRepeatImport(inputs: Record<string, DocumentInput>, args: EvalRepeatImportArgs): Promise<CommandResult>;
   onGauges(cb: (gauges: EngineGauges) => void | Promise<void>, options: { everyMs: number }): () => void;
   advanceClock(ms: number): void;
   clockSleepers(): number;
@@ -479,3 +487,54 @@ export type PlanDiffArgs = { leftPlan: string; rightPlan: string; out: string }
       leftVariant?: string; rightVariant?: string; profileBases?: string[];
       definitionVersion?: string; descriptors?: string[]; rules?: string[];
       calibrations?: string[]; execution?: string; out: string };
+
+/** Spec 063, 3.9: the repeatability commands' arguments, the CLI's flags in
+ * camel case. Names are inputs; a directory is an input prefix; `out` names
+ * the artifact or artifact prefix written, all or none. */
+type RepeatScope = import('./types/rustev-documents').RustevReplay1.Scope;
+interface RepeatEvalCommon {
+  dataset: string;
+  split: 'training' | 'model_selection' | 'calibration' | 'final_test';
+  config: string;
+  adapter: string;
+  repeatConfig: string;
+  /** One input prefix (with `repeat`), or 2 to 64 in run order. */
+  bundles: string | string[];
+  repeat?: number;
+  purpose?: 'measurement' | 'optimization';
+  /** `final_test` only, with `ledgerOut` and one of `ledger` and `ledgerNew`. */
+  lineage?: string;
+  ledger?: string;
+  ledgerNew?: boolean;
+  ledgerOut?: string;
+  nowMs: number;
+  scope: RepeatScope;
+  hostCapMs?: number;
+  store?: string;
+  out: string;
+}
+export interface EvalRepeatArgs extends RepeatEvalCommon {
+  candidatePlan?: string;
+  descriptors?: string[];
+  rules?: string[];
+  calibrations?: string[];
+}
+export interface EvalCandidatesArgs extends RepeatEvalCommon {
+  candidates: string;
+}
+export interface BaselineRecordArgs { name: string; eval: string; out: string; nowMs: number }
+export interface EvalCompareArgs { baseline: string; baselineEval: string; run: string }
+export interface GateSelectArgs {
+  selectionGate: string;
+  baseline: string;
+  baselineEval: string;
+  candidates: string;
+  out: string;
+}
+export interface EvalRepeatImportArgs {
+  repeatConfig: string;
+  config: string;
+  /** 1 to 64 input prefixes, in run order. */
+  runs: string[];
+  out: string;
+}

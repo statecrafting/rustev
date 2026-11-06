@@ -900,6 +900,32 @@ The memory host derives `list` and `entry_kind` from input labels under
 cap on both hosts; `tests/repeat.rs` runs `import` and `baseline` on the
 memory host against the CLI's host goldens.
 
+**Increment 6, 2026-11-06 (3.9.1, 3.9.2, repeatability commands).**
+`evaluate` with `repeatConfig`, `evalCandidates`, `baselineRecord`,
+`evalReproducibility`, `evalDiff`, `gateSelect` and `evalRepeatImport`
+call the moved renderings on the memory host
+(`integrations/rustev-node/src/repeat.rs`, `index.js`, `index.d.ts`) and
+join `command`. Arguments are the CLI's flags in camel case, with
+`bundles` one prefix or a list, `ledgerNew` a boolean and `runs` 1 to 64
+prefixes; the scope is the object `replay` takes. 029 3.13.1's usage
+rules, and a repeat-only argument without `repeatConfig`, throw
+`InvalidDocument` naming the rule before any input is read; every other
+outcome is a result with the CLI's code and bytes, an absent input or an
+output over an input included (`io_error`, code 3), and no bundles prefix
+is `live-source-unavailable`. The declarations are written by hand
+(3.11). The 11 `repeat-*` cases run on `cli` and `native` with unchanged
+expected bytes (3.13.1); only `manifest.json` was re-blessed. 061's
+synthetic host runs are kept as files under
+`tools/rustev-conformance/fixtures/host-import/`, checked against the
+shared builder by `tests/host_import.rs`, and `test/repeat.test.mjs`
+imports them with the CLI's host goldens. That test covers each command's
+happy path, its usage and result refusals, `not_reproducible`,
+`none_qualified` and `unknown` as results, and section 5's
+`mixed-provenance` row. The CLI harvest
+(`crates/rustev-cli/tests/common/harvest.rs`) still lists the repeat and
+parameterized cases as `cli` only, so `make conformance-harvest` would
+write them back without `native` until that list is updated.
+
 ## Decisions at approval
 
 Decided in this text, with reasons: a separate `acquisitionSources` seam,

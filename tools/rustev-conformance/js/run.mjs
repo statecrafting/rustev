@@ -351,6 +351,18 @@ async function chromiumAdapter() {
 
 // ---- native ---------------------------------------------------------------
 
+// Spec 063, 3.9: the CLI's repeatability commands and their native names;
+// `eval` only with `--repeat-config`.
+const REPEAT_COMMANDS = {
+  eval: 'eval',
+  'eval candidates': 'evalCandidates',
+  'baseline record': 'baselineRecord',
+  'eval reproducibility': 'evalReproducibility',
+  'eval diff': 'evalDiff',
+  'gate select': 'gateSelect',
+  'eval repeat import': 'evalRepeatImport',
+};
+
 async function nativeAdapter() {
   const rustev = createRequire(import.meta.url)(resolve(pkg));
   // The engine for pure commands decides nothing, so its sink is never
@@ -406,6 +418,10 @@ async function nativeAdapter() {
       args.scope = scope(a);
       args.nowMs = Number(a.need('now-ms'));
       if (a.one('host-cap-ms') !== undefined) args.hostCapMs = Number(a.one('host-cap-ms'));
+    }
+    if (Object.hasOwn(REPEAT_COMMANDS, a.command) && (a.command !== 'eval' || a.one('repeat-config') !== undefined)) {
+      const r = await pure.command(REPEAT_COMMANDS[a.command], Object.fromEntries(files), repeatArgs(c.argv));
+      return comparePure(c, r.code, r.out, (name) => r.artifacts[name]);
     }
     const r = await pure.command(names[a.command], Object.fromEntries(files), args);
     comparePure(c, r.code, r.out, (name) => r.artifacts[name]);
@@ -1069,3 +1085,28 @@ await run.close?.();
 console.log(`conformance ${surface}: ${ran} case(s), ${failures.length} failure(s)`);
 for (const f of failures) console.error(f);
 process.exit(failures.length || ran === 0 ? 1 : 0);
+
+// Spec 063, 3.9: the repeatability commands on the native binding, their
+// CLI flags in camel case: repeated flags as lists (the import's `--run`
+// as `runs`), a single `--bundles` as one prefix, milliseconds and
+// `--repeat` as numbers, and the scope flags as the scope object.
+function repeatArgs(argv) {
+  const a = flags(argv);
+  const lists = { bundles: 'bundles', descriptor: 'descriptors', rules: 'rules', calibration: 'calibrations' };
+  // `--run` repeats only on the import; elsewhere it names one prefix.
+  if (a.command === 'eval repeat import') lists.run = 'runs';
+  const numbers = new Set(['now-ms', 'host-cap-ms', 'repeat']);
+  const scoped = new Set(['scope', 'tenant', 'context-revision', 'principal-scope']);
+  const camel = (k) => k.replace(/-([a-z])/g, (_, ch) => ch.toUpperCase());
+  const args = {};
+  for (let i = 0; i < argv.length; i++) {
+    if (!argv[i].startsWith('--')) continue;
+    const k = argv[i].slice(2);
+    if (scoped.has(k)) args.scope = scope(a);
+    else if (k === 'bundles') args.bundles = a.many(k).length === 1 ? a.one(k) : a.many(k);
+    else if (Object.hasOwn(lists, k)) args[lists[k]] = a.many(k);
+    else if (numbers.has(k)) args[camel(k)] = Number(a.one(k));
+    else args[camel(k)] = a.one(k);
+  }
+  return args;
+}
