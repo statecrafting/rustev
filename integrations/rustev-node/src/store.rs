@@ -186,6 +186,8 @@ impl HostStore {
             let mut abort = abort;
             let r = std::future::poll_fn(|cx| {
                 if let std::task::Poll::Ready(r) = std::pin::Pin::new(&mut pending).poll(cx) {
+                    // Settled, resolved or rejected: nothing left to abort.
+                    abort.armed = false;
                     return std::task::Poll::Ready(r.map_err(|e| failure(&e)));
                 }
                 if let Some(t) = timer.as_mut()
@@ -199,10 +201,7 @@ impl HostStore {
                 std::task::Poll::Pending
             })
             .await;
-            // Settled: nothing to abort. Otherwise the drop aborts it.
-            if r.is_ok() {
-                abort.armed = false;
-            }
+            // Unsettled at a timeout or cancellation: the drop aborts it.
             r
         })
     }
