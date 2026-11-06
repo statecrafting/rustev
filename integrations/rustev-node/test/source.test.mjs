@@ -180,6 +180,13 @@ test('a named class retries; a synchronous throw is permanent; a non-Promise pag
     assert.equal(calls.length, 2);
   }
   {
+    // A null charge on a page is a missing charge: permanent, never "null".
+    const { p } = await sourced(t, call => ({ page: pageFor(call), charge: null }));
+    const r = await decideOne(p);
+    assert.deepEqual(ends(r), ['permanent']);
+    assert.equal(acq(r).attempts[0].cost.charge, 'unknown');
+  }
+  {
     const { p } = await sourced(t, () => { throw new Error('boom'); }, { attempts: 2, retryOn: ['transient'] });
     const r = await decideOne(p);
     assert.deepEqual(ends(r), ['permanent']);

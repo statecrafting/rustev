@@ -286,14 +286,14 @@ function sourceSeam(s) {
         });
         return {
           page: answer?.page == null ? undefined : bytes(answer.page),
-          charge: answer?.charge === undefined ? undefined : JSON.stringify(answer.charge),
+          charge: answer?.charge == null ? undefined : JSON.stringify(answer.charge),
         };
       } catch (e) {
         if (e instanceof SeamFailure) {
           return {
             failure: String(e.failureClass),
             detail: e.message,
-            charge: e.charge === undefined ? undefined : JSON.stringify(e.charge),
+            charge: e.charge == null ? undefined : JSON.stringify(e.charge),
             cancel: e.cancel ?? undefined,
           };
         }
