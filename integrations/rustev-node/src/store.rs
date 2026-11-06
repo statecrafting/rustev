@@ -295,7 +295,8 @@ impl RuntimeStore for HostStore {
         js.scope_generation = Some(number(terms.generations.scope));
         js.max_scope_bytes = Some(number(terms.max_scope_bytes));
         js.max_namespace_bytes = Some(number(terms.max_namespace_bytes));
-        js.expires_ms = Some(terms.expires.as_ms() as f64);
+        let safe = MAX_SAFE as i64;
+        js.expires_ms = Some(terms.expires.as_ms().clamp(-safe, safe) as f64);
         let work = self.call(&self.put, js, call);
         Box::pin(async move {
             match work.await?.put.as_deref() {

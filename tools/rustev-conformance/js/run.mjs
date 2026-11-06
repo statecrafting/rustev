@@ -722,7 +722,11 @@ async function nativeAdapter() {
         },
         async put({ namespace, keyId, bytes, terms }) {
           if (f.fail_put) throw failed('put');
-          if (f.put_answer) return f.put_answer;
+          if (f.put_answer) {
+            // As the Rust scripted store: an unknown answer is a failure.
+            if (!['stored', 'generation_advanced', 'over_budget', 'conflict'].includes(f.put_answer)) throw failed(`unknown put answer ${f.put_answer}`);
+            return f.put_answer;
+          }
           const now = generations(namespace, terms.scope);
           if (now.namespace !== terms.generations.namespace || now.scope !== terms.generations.scope) return 'generation_advanced';
           const k = key(namespace, keyId);
