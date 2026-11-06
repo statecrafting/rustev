@@ -161,8 +161,9 @@ integration crate, and `rustev-node` is under `integrations/`).
    scope handles, `nowMs` (required), `repeatConfig`, `candidates`
    (043's candidate layout), exactly one of `snapshots` or `bundles`,
    optional `captures`, `admission`, spec 029's ledger options,
-   `runDeadlineMs`, the booleans `probeOnly`, `resume` and
-   `rerunInterrupted`, `out` (a directory path, 3.4), and `signal`
+   `runDeadlineMs`, the booleans `probeOnly`, `resume`,
+   `rerunInterrupted` and `requireExistingJournal` (3.4.6, default
+   false), `out` (a directory path, 3.4), and `signal`
    (`AbortSignal`, 3.6). `repeat` is refused, as `--repeat` is.
 2. Usage rules (043 3.13.1, 3.13), checked before any input is read,
    throw `InvalidDocument` naming the rule: `live` not `true`, a missing
@@ -201,7 +202,7 @@ integration crate, and `rustev-node` is under `integrations/`).
    3.6.7).
 2. The cost **unit** is the live configuration's per-binding `cost_unit`
    (043 3.2.1), keyed by the descriptor's backend and artifact identity,
-   so it is part of the `LiveConfigId` (open question 3). `nano_usd`
+   so it is part of the `LiveConfigId` (open question 1). `nano_usd`
    states that the backend's units are nano-USD; Rustev cannot verify it,
    and the run records the statement.
 3. Refused before the journal is opened (`invalid_input`): a backend whose
@@ -213,7 +214,7 @@ integration crate, and `rustev-node` is under `integrations/`).
 4. `cost_unit: none` is accepted on the host's declaration, as 043 3.6.3
    allows for the library, reserved at zero and recorded as
    `declared_no_spend` in every per-case document and in
-   `rustev.live-run/1` (open question 4).
+   `rustev.live-run/1` (open question 2).
 5. **Charges.** The charge an attempt ends with settles its ticket: the
    charge the host's result reports, or the charge a thrown `SeamFailure`
    carries; any other throw, a rejection or a malformed value is charge
@@ -238,10 +239,9 @@ integration crate, and `rustev-node` is under `integrations/`).
 3. **Reserve before send.** Whatever the journal's form, 043's I-2 holds:
    the reservation line is durable (written and `fsync`ed) before the
    attempt is enqueued to the host backend's threadsafe function, and an
-   attempt whose reservation fails is never enqueued. A host journal seam
-   (open question 1) would need a synchronous durable reservation the
-   binding cannot obtain from JavaScript (027 3.6.1), so it is not
-   offered.
+   attempt whose reservation fails is never enqueued. No host journal
+   seam is offered: it would need a synchronous durable reservation the
+   binding cannot obtain from JavaScript (027 3.6.1).
 4. **The total cap is per journal file.** The journal's cap (043 3.5.4)
    is cumulative only over the lines of one file. A new file starts the
    cumulative spend at zero. A host running live jobs in CI must keep the
@@ -249,8 +249,8 @@ integration crate, and `rustev-node` is under `integrations/`).
    the job restores before the run and saves after it, lock released) or
    accept that each fresh journal restarts the cumulative cap at zero.
    Rustev cannot tell a lost journal from a first one; it makes the
-   difference visible (3.4.5) and can refuse to create one (open question
-   6).
+   difference visible (3.4.5) and refuses to create one when asked
+   (3.4.6).
 5. **A new journal is visible (amends 043 3.5.1 and 3.11.4).**
    - **Header.** A journal created by this version records two members
      in its header line, beside `schema`, `budget` and `cap`:
@@ -259,7 +259,7 @@ integration crate, and `rustev-node` is under `integrations/`).
      hex, and `created_at_ms`, read from the run's injected clock. Both are
      written once, at creation, and never change; the A-75 migration (043
      3.5.6) keeps them. The schema name stays `rustev-jev.spend-journal/1`
-     (open question 7). A journal created before this version has neither
+     (open question 3). A journal created before this version has neither
      member; it is accepted, never stamped (no creation time is invented),
      and is reported as `legacy`.
    - **Run report.** `rustev.live-run/1` (043 3.11.4) already carries
@@ -290,6 +290,15 @@ integration crate, and `rustev-node` is under `integrations/`).
      header members, the `journal` member and `new_journal`, and are
      re-blessed in the change that implements this; no `PlanId`, plan
      golden or other document changes.
+6. **Requiring an existing journal (amends 043 3.13).** The option
+   `requireExistingJournal` (CLI `--require-existing-journal`, a switch),
+   off by default so that a first local run can create its journal,
+   refuses a journal path that does not exist (`invalid_input`,
+   `journal-missing`) before any file, lock or output is created and
+   before anything is sent. With it, a CI job pointed at a persisted
+   journal that was not restored fails instead of starting a fresh
+   cumulative cap. It is the documented setting for CI jobs. On an
+   existing journal it changes nothing.
 
 ### 3.5 Authorization
 
@@ -303,8 +312,9 @@ integration crate, and `rustev-node` is under `integrations/`).
 2. This amends 043 3.2.2 for the Node binding: like the CLI, `liveRun`
    requires `authorize` present, and a configuration without it is
    refused (`live-config`). A Rust host calling the library keeps 043's
-   rule (absent, host authorizer). An asynchronous host authorizer seam is
-   open question 2.
+   rule (absent, host authorizer). Requiring the rules in the
+   configuration makes the approval of each paid run an explicit, recorded
+   part of its `LiveConfigId`. No asynchronous host authorizer is offered.
 
 ### 3.6 Cancellation and shutdown
 
@@ -385,7 +395,8 @@ integration crate, and `rustev-node` is under `integrations/`).
    "`authorize` ... the library requires absent" does not apply to the
    Node binding (3.5.2); 3.5.1's "header ... unchanged" gains the two
    creation members for new journals, and 3.11.4's `rustev.live-run/1`
-   gains `journal` (3.4.5), for the CLI and the binding alike.
+   gains `journal` (3.4.5), for the CLI and the binding alike; 3.13 gains
+   `--require-existing-journal` (3.4.6).
 3. **063:** 3.9.1's table gains `liveRun`; 3.9.4's `live` refusal stands
    for `eval` with `repeatConfig` (3.1).
 
@@ -410,6 +421,7 @@ raising any cap; any live or paid provider call in CI; quality claims.
 | A non-`testing` journal | `code` 4, `journal-budget`. |
 | A journal locked by another run | `code` 3, `journal-locked`. |
 | The memory host | `InvalidDocument`, `durable-paths-required`. |
+| `requireExistingJournal: true` on a missing journal path | `code` 4, `journal-missing`; no file created, nothing sent. |
 | An attempt whose reservation would pass the run cap | Not enqueued; run ends `spend_capped`, `code` 14. |
 | A probe call failing | `probe_failed`, `code` 15; no dataset case sent. |
 | Abort with an attempt in flight whose Promise never settles | `interrupted`, `code` 16; its reservation stays liability; later settlement discarded. |
@@ -440,9 +452,10 @@ raising any cap; any live or paid provider call in CI; quality claims.
   same id and the first run's spend before it; a run on a fresh file
   after deleting the first reports a new id and zero spend; a legacy
   journal reports `legacy` and keeps its header bytes; a resume against a
-  replaced journal is `checkpoint-mismatch`; and, if open question 6 is
-  adopted, `requireExistingJournal` on a missing path refuses with
-  `journal-missing` and creates no file.
+  replaced journal is `checkpoint-mismatch`; `requireExistingJournal`
+  (and the CLI's `--require-existing-journal`) on a missing path refuses
+  with `journal-missing` and creates no file, and on an existing journal
+  runs as without it.
 - The conformance and host-seam cases of 3.8; every row of section 5 has
   a test; no test makes a live or paid call.
 - Compatibility: every CLI, eval, live and conformance golden and every
@@ -468,12 +481,16 @@ increment that satisfies it.
    against a live configuration, the journal opened by path under 3.4,
    and the rule authorizer of 3.5, as Rust functions of the binding with
    tests over scripted backends; no JavaScript method yet. The journal
-   identity and report members of 3.4.5 land here, in `rustev-live`, with
-   the re-blessed `eval live` goldens.
+   identity and report members of 3.4.5 and `--require-existing-journal`
+   (3.4.6) land here, in `rustev-live` and the CLI, with the re-blessed
+   `eval live` goldens.
 2. **The entry point.** The input resolution moved into `rustev-surface`
    (the CLI calls it, goldens unchanged); `engine.liveRun` for full and
-   probe-only runs, outcomes, documents and declarations (3.2, 3.7.1);
-   abort and run deadline (3.6.1 to 3.6.3); `node --test` cases.
+   probe-only runs, outcomes, documents and declarations (3.2, 3.7.1),
+   with `requireExistingJournal`; abort and run deadline (3.6.1 to
+   3.6.3); `node --test` cases. Increments 1 and 2 together hold the
+   journal and the Node entry point, the part that must ship in 0.5.1 if
+   not all four fit (owner answer 5).
 3. **Resume, rerun and shutdown.** `resume`, `rerunInterrupted` (3.7.2,
    3.7.3), shutdown during a run (3.6.4), and the conformance cases of
    3.8.2 with both runners.
@@ -486,51 +503,49 @@ increment that satisfies it.
 Decided in this text, with the reason beside each: the exposure is the
 cost model and bound a host backend already declares (3.3.1, 027 3.6.1);
 outcomes are values with 043's statuses and exit codes (3.2.4, 063
-3.9.2); `out` is a real directory (3.4.2, checkpoint durability);
-`eval` with `repeatConfig` still refuses `live` (3.1); tests use
-scripted backends only (R-1); the journal is a file path (owner input
-on open question 1, below), with the cap per file and a new journal made
-visible (3.4.4, 3.4.5).
+3.9.2); `eval` with `repeatConfig` still refuses `live` (3.1); tests use
+scripted backends only (R-1); the cap is per journal file and a new
+journal is made visible (3.4.4, 3.4.5).
 
-Open for the owner, each with a recommendation:
+### Owner answers (2026-11-06)
 
-1. **Journal form.** Owner input (2026-11-06): agreed, a file path. Live
-   runs are evaluation jobs started by hand, locally or in CI, never
-   inside a partner API service, so a local file fits; the caveat that the
-   cap holds only while the file persists is 3.4.4 and 3.4.5. The
-   original choice was: a file path the binding opens (recommended: 043
-   3.5's durability, lock and reserve-before-send rules hold unchanged,
-   and spec 012's adapter can share the handle); or a host journal seam,
-   which needs a synchronous durable `reserve` that a JavaScript callback
-   cannot provide under 027 3.6.1, so it would need its own amendment of
-   027 and of 043's gate.
-2. **Authorizer.** 043 3.12's declarative rules in the live configuration
-   (recommended: synchronous, identity-bearing, the CLI's proven path);
-   or an asynchronous host authorizer callback, which needs
-   `LiveAuthorizer` to become asynchronous in `rustev-runtime` (an
-   amendment of 003 and 026).
-3. **Where the cost unit lives.** In the live configuration's binding
+Answers to open questions of this draft. They are not ratification,
+which remains the owner's separate act; the normative text above states
+the adopted behavior.
+
+1. **Journal form: a file the binding opens** (3.4.1, 3.4.3). Live runs
+   are evaluation jobs started by hand, locally or in CI, never inside a
+   partner API service, so a local file fits; the cap holds per file,
+   and a new journal is visible (3.4.4, 3.4.5).
+2. **`requireExistingJournal` / `--require-existing-journal`: adopted,**
+   off by default, the documented CI setting (3.4.6).
+3. **The Node binding requires `authorize`** in the live configuration,
+   reversing 043 3.2.2 for the binding only (3.5): it matches the owner's
+   rule of approval before each paid run. No asynchronous host authorizer.
+4. **The memory host is refused for `liveRun`** (3.4.2): the owner's
+   evaluation jobs run on a real filesystem.
+5. **Release scope.** All four increments are targeted for 0.5.1. If
+   only part fits, the shipped part must contain the Node entry point and
+   the journal: increments 1 and 2 of the plan already contain both (the
+   journal, its visibility and `--require-existing-journal` in 1;
+   `liveRun` with `requireExistingJournal` in 2), so they ship first and
+   in that order; increments 3 and 4 (resume, rerun, shutdown,
+   conformance and closure) may follow.
+
+### Open for the owner
+
+Each with a recommendation:
+
+1. **Where the cost unit lives.** In the live configuration's binding
    entry, as today (recommended: one source, inside the `LiveConfigId`);
    or also on the backend registration (`costUnit`), refused when the two
    differ.
-4. **`cost_unit: none` for host backends.** Accept on the host's
+2. **`cost_unit: none` for host backends.** Accept on the host's
    declaration, recorded as `declared_no_spend` (recommended, 043 3.6.3's
    library rule); or refuse `none` for TypeScript backends, since a
    callback can reach a paid provider and Rustev cannot see it, which
    forces every host backend under the cap at some declared unit.
-5. **Release scope.** Land the four increments for 0.5.1 if they fit the
-   review cap (recommended, with increment 1 first so the spend rules are
-   reviewed alone); or ship increments 1 and 2 (no resume) in 0.5.1 and
-   the rest in the next release, which leaves an interrupted run
-   resumable only through Rust.
-6. **Refuse to create a journal.** An option `requireExistingJournal`
-   (CLI `--require-existing-journal`) that refuses a missing journal path
-   (`invalid_input`, `journal-missing`, before any file is created), so a
-   CI job pointed at a persisted file that was not restored fails instead
-   of starting a fresh cap. Recommended: adopt it, default off (a first
-   local run must be able to create the journal), and document it as the
-   setting for CI jobs; or rely on the visibility of 3.4.5 alone.
-7. **Header form.** Optional `journal_id` and `created_at_ms` members
+3. **Header form.** Optional `journal_id` and `created_at_ms` members
    under the unchanged schema name, written only at creation
    (recommended, as the other drafts add optional members: existing
    journals keep their bytes, an older release refuses a new journal
