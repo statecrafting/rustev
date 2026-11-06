@@ -103,40 +103,84 @@ fn stage_verdicts(record: &FeasibilityRecord, platform: &str) -> Vec<Value> {
 }
 
 #[test]
-fn no_platform_is_qualified_and_stages_one_to_three_pass_on_two_platforms() {
+fn linux_x86_64_gnu_is_qualified_and_the_other_platforms_refuse() {
     let (_, record) = record();
-    for platform in PLATFORMS {
+    assert_eq!(record.verdict["linux-x86_64-gnu"]["verdict"], "pass");
+    for platform in ["linux-aarch64-gnu", "macos-aarch64"] {
         assert_eq!(record.verdict[platform]["verdict"], "refuse", "{platform}");
     }
     let verdicts: Vec<_> = record.stages.iter().map(|s| s["verdict"].clone()).collect();
-    assert_eq!(verdicts, ["pass", "pass", "pass", "refuse"]);
-    assert_eq!(stage_verdicts(&record, "macos-aarch64"), verdicts);
-    assert_eq!(stage_verdicts(&record, "linux-aarch64-gnu"), verdicts);
+    assert_eq!(verdicts, ["pass", "pass", "pass", "pass"]);
+    assert_eq!(stage_verdicts(&record, "linux-x86_64-gnu"), verdicts);
+    for platform in ["linux-aarch64-gnu", "macos-aarch64"] {
+        assert_eq!(
+            stage_verdicts(&record, platform),
+            ["pass", "pass", "pass", "refuse"],
+            "{platform}"
+        );
+    }
+}
+
+fn limits_verdicts(limits: &Value) -> BTreeMap<String, String> {
+    limits
+        .as_object()
+        .unwrap()
+        .iter()
+        .map(|(k, v)| (k.clone(), v["verdict"].as_str().unwrap().to_owned()))
+        .collect()
+}
+
+#[test]
+fn every_limit_and_numerics_item_is_met_on_linux_x86_64_gnu() {
+    let (_, record) = record();
+    let x86 = &record.measurements["platform_measurements"]["linux-x86_64-gnu"];
+    for set in ["measured_encoder_limits", "measured_backend_limits"] {
+        let verdicts = limits_verdicts(&x86[set]);
+        assert!(verdicts.len() >= 4, "{set}");
+        assert!(
+            verdicts.values().all(|v| v == "pass"),
+            "{set}: {verdicts:?}"
+        );
+    }
     assert_eq!(
-        stage_verdicts(&record, "linux-x86_64-gnu"),
-        ["refuse", "refuse", "refuse", "refuse"]
+        x86["measured_backend_limits"].as_object().unwrap().len(),
+        5,
+        "bundle bytes, cold setup, p95, p99 and peak RSS of the complete backend"
     );
+    assert_eq!(x86["bitwise_in_process_repeatability"], true);
     assert_eq!(
-        record.verdict["linux-x86_64-gnu"]["reasons"],
-        serde_json::json!(["not measured on this host"])
+        x86["logits_vs_reference_head"]["within_bounds_and_bitwise_repeatable"],
+        true
+    );
+    assert_eq!(x86["logits_vs_reference_platform"]["within_bounds"], true);
+    assert_eq!(x86["node_local_embed"], "pass");
+    assert!(
+        x86["support_routing_plan_decisions"]
+            .as_str()
+            .unwrap()
+            .starts_with("unchanged")
     );
 }
 
 #[test]
-fn encoder_limits_are_met_on_linux_aarch64_and_refused_on_macos() {
+fn linux_aarch64_gnu_refuses_on_its_measured_p95_and_macos_on_the_encoders() {
     let (_, record) = record();
-    let linux = &record.measurements["platform_measurements"]["linux-aarch64-gnu"]["measured_encoder_limits"];
-    for limit in ["cold_setup_ms", "p95_ms", "p99_ms", "peak_rss_bytes"] {
-        assert_eq!(linux[limit]["verdict"], "pass", "{limit}");
+    let measurements = &record.measurements;
+    let arm = &measurements["platform_measurements"]["linux-aarch64-gnu"];
+    // The native runner: numerics agree with the reference platform, the
+    // warm latency does not meet 3.3.
+    assert_eq!(arm["logits_vs_reference_platform"]["within_bounds"], true);
+    for set in ["measured_encoder_limits", "measured_backend_limits"] {
+        assert_eq!(arm[set]["p95_ms"]["verdict"], "refuse", "{set}");
     }
-    let mac = &record.measurements["measured_encoder_limits"];
-    assert_eq!(mac["p95_ms"]["verdict"], "refuse");
-    // A Linux stage 4 refusal names only the unmeasured complete-backend
-    // items: no encoder limit is exceeded there.
-    let reasons = record.platforms["linux-aarch64-gnu"]["stages"][3]["reasons"]
-        .as_array()
-        .unwrap();
-    assert_eq!(reasons.len(), 1);
+    // The superseded Docker VM measurement met every encoder limit.
+    let vm = &measurements["superseded_platform_measurements"]["linux-aarch64-gnu"]["measurement"];
+    let verdicts = limits_verdicts(&vm["measured_encoder_limits"]);
+    assert!(verdicts.values().all(|v| v == "pass"));
+    assert_eq!(
+        measurements["measured_encoder_limits"]["p95_ms"]["verdict"],
+        "refuse"
+    );
 }
 
 #[test]

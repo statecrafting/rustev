@@ -1,0 +1,19 @@
+{
+  "runner": "ubuntu-24.04-arm",
+  "hardware": "GitHub-hosted runner ubuntu-24.04-arm (image ubuntu24-arm64 20261101.172.1): a Microsoft Hyper-V virtual machine (Hyper-V UEFI Release v4.1) on shared Azure hardware",
+  "cpu": "Arm Neoverse-N2; the guest sees 4 cores, one thread each (128 MiB L3)",
+  "cores": "4 virtual CPUs (nproc); the probe and the backend run one intra-op and one inter-op thread",
+  "memory": "16,715,927,552 bytes guest memory (MemTotal 16,324,148 kB)",
+  "kernel": "7.0.0-1017-azure aarch64",
+  "runtime_library": {
+    "name": "libonnxruntime.so.1.31.0",
+    "bytes": 25266408,
+    "sha256": "595c7f7a6775f5c7b3d567c3ed94c04f722092575abcc092560f5208a54daf99",
+    "release_tarball": "onnxruntime-linux-aarch64-1.31.0.tgz",
+    "release_tarball_sha256": "c5b8b3cca31f3d643a3b313b8f42e2d0f16a4fcefd02cda343d97bd5306afaab",
+    "release_tarball_digest_source": "the v1.31.0 GitHub release's published asset digest, verified before extraction"
+  },
+  "os": "Ubuntu 24.04.5 LTS (Noble Numbat)",
+  "c_library": "GNU libc 2.39 (Ubuntu GLIBC 2.39-0ubuntu8.9)",
+  "environment": "A GitHub-hosted runner: a fresh virtual machine on shared Azure hardware, not a dedicated Linux server; other tenants may share the physical host, and the runner label does not fix the CPU model (an earlier run of the same workflow on this label drew a different CPU). The probe was built on the runner (rustc 1.98.1, release profile) from examples/feasibility.rs copied into a crate without the workspace lints, with ort 2.0.0-rc.15 and tokenizers 1.0.0-rc.3 as pinned; the complete backend ran in the crate's release-profile test binary. The checkpoint files were downloaded at the recorded revision and each matched the record's length and SHA-256. The Node binding with local-embed was built in the native matrix target's image (rust:1.98.1-bookworm by digest, GNU libc 2.36) and tested on the runner's Node 22."
+}

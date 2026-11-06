@@ -1,0 +1,469 @@
+Unable to find image 'rust:1.98.1-bookworm@sha256:93ce27a88655056a51dbdd8f5f2d7ddc071c7b0070fb288a37b5a285fc83971e' locally
+docker.io/library/rust@sha256:93ce27a88655056a51dbdd8f5f2d7ddc071c7b0070fb288a37b5a285fc83971e: Pulling from library/rust
+eaac70c68abd: Pulling fs layer
+7b2de2423ebd: Pulling fs layer
+81578410df16: Pulling fs layer
+de9e8d0a0071: Pulling fs layer
+47495189b361: Pulling fs layer
+de9e8d0a0071: Waiting
+47495189b361: Waiting
+7b2de2423ebd: Verifying Checksum
+7b2de2423ebd: Download complete
+81578410df16: Verifying Checksum
+81578410df16: Download complete
+eaac70c68abd: Verifying Checksum
+eaac70c68abd: Download complete
+de9e8d0a0071: Verifying Checksum
+de9e8d0a0071: Download complete
+47495189b361: Verifying Checksum
+47495189b361: Download complete
+eaac70c68abd: Pull complete
+7b2de2423ebd: Pull complete
+81578410df16: Pull complete
+de9e8d0a0071: Pull complete
+47495189b361: Pull complete
+Digest: sha256:93ce27a88655056a51dbdd8f5f2d7ddc071c7b0070fb288a37b5a285fc83971e
+Status: Downloaded newer image for rust@sha256:93ce27a88655056a51dbdd8f5f2d7ddc071c7b0070fb288a37b5a285fc83971e
+info: syncing channel updates for 1.98.1-x86_64-unknown-linux-gnu
+info: latest update on 2026-09-03 for version 1.98.1 (48a229cea 2026-09-01)
+info: downloading 2 components
+rustc 1.98.1 (48a229cea 2026-09-01)
+ldd (Debian GLIBC 2.36-9+deb12u14) 2.36
+    Updating crates.io index
+    Updating git repository `https://github.com/statecrafting/aicortex`
+ Downloading crates ...
+  Downloaded anyhow v1.0.104
+  Downloaded allocator-api2 v0.2.21
+  Downloaded errno v0.3.14
+  Downloaded funty v2.0.0
+  Downloaded fxhash v0.2.1
+  Downloaded ahash v0.8.12
+  Downloaded generic-array v0.14.7
+  Downloaded fnv v1.0.7
+  Downloaded futures-core v0.3.34
+  Downloaded arbitrary-chunks v0.4.1
+  Downloaded fastrand v2.5.0
+  Downloaded nohash-hasher v0.2.0
+  Downloaded atomic-waker v1.1.2
+  Downloaded cfg-if v1.0.5
+  Downloaded foldhash v0.2.0
+  Downloaded http-body v1.1.0
+  Downloaded futures-task v0.3.34
+  Downloaded castaway v0.2.4
+  Downloaded cpufeatures v0.2.17
+  Downloaded futures-sink v0.3.34
+  Downloaded httpdate v1.0.3
+  Downloaded itoa v1.0.18
+  Downloaded napi-sys v3.4.0
+  Downloaded futures-executor v0.3.34
+  Downloaded napi-build v2.6.0
+  Downloaded cpufeatures v0.3.1
+  Downloaded equivalent v1.0.3
+  Downloaded futures-io v0.3.34
+  Downloaded bit-set v0.8.0
+  Downloaded find-msvc-tools v0.1.13
+  Downloaded futures-channel v0.3.34
+  Downloaded block-buffer v0.10.4
+  Downloaded dyn-clone v1.0.20
+  Downloaded partition v0.1.2
+  Downloaded mem_dbg-derive v0.3.4
+  Downloaded napi-derive v3.6.12
+  Downloaded crossbeam-deque v0.8.8
+  Downloaded num-integer v0.1.47
+  Downloaded bit-vec v0.8.0
+  Downloaded http-body-util v0.1.5
+  Downloaded byteorder v1.5.0
+  Downloaded napi-derive-backend v6.1.5
+  Downloaded opentelemetry-http v0.33.1
+  Downloaded rayon-cond v0.4.0
+  Downloaded async-trait v0.1.92
+  Downloaded prefetch-index v0.2.1
+  Downloaded chacha20 v0.10.2
+  Downloaded digest v0.10.7
+  Downloaded either v1.19.0
+  Downloaded futures v0.3.34
+  Downloaded getrandom v0.2.17
+  Downloaded hifijson v0.5.0
+  Downloaded libloading v0.9.0
+  Downloaded crypto-common v0.1.7
+  Downloaded futures-macro v0.3.34
+  Downloaded autocfg v1.5.1
+  Downloaded hmac v0.12.1
+  Downloaded rand_core v0.10.1
+  Downloaded ctor v1.0.13
+  Downloaded num-complex v0.4.6
+  Downloaded colored v3.1.1
+  Downloaded convert_case v0.12.0
+  Downloaded crossbeam-epoch v0.9.21
+  Downloaded bytes v1.12.1
+  Downloaded dary_heap v0.3.9
+  Downloaded httparse v1.10.1
+  Downloaded base64 v0.13.1
+  Downloaded getrandom v0.4.3
+  Downloaded num-traits v0.2.19
+  Downloaded bitflags v2.13.2
+  Downloaded crossbeam-utils v0.8.23
+  Downloaded prost v0.14.4
+  Downloaded getrandom v0.3.4
+  Downloaded log v0.4.34
+  Downloaded matrixmultiply v0.3.11
+  Downloaded schemars_derive v1.2.3
+  Downloaded once_cell v1.21.4
+  Downloaded proc-macro2 v1.0.107
+  Downloaded base64 v0.22.1
+  Downloaded bytemuck v1.25.2
+  Downloaded minimal-lexical v0.2.1
+  Downloaded rustversion v1.0.23
+  Downloaded slab v0.4.12
+  Downloaded compact_str v0.9.1
+  Downloaded opentelemetry v0.33.1
+  Downloaded bitcannon v0.1.0-rc.3
+  Downloaded hyper-util v0.1.21
+  Downloaded memchr v2.8.3
+  Downloaded mem_dbg v0.4.4
+  Downloaded serde_derive v1.0.229
+  Downloaded tokio-rustls v0.26.5
+  Downloaded cc v1.4.7
+  Downloaded http v1.5.0
+  Downloaded mio v1.2.3
+  Downloaded shlex v2.0.1
+  Downloaded thiserror-impl v2.0.21
+  Downloaded indexmap v2.14.2
+  Downloaded nom v7.1.3
+  Downloaded aho-corasick v1.1.5
+  Downloaded itertools v0.15.0
+  Downloaded h2 v0.4.20
+  Downloaded hashbrown v0.16.1
+  Downloaded hashbrown v0.17.1
+  Downloaded hyper v1.11.1
+  Downloaded itertools v0.14.0
+  Downloaded pin-project-lite v0.2.17
+  Downloaded futures-util v0.3.34
+  Downloaded tk-serialize v0.1.0-rc.3
+  Downloaded libm v0.2.16
+  Downloaded bitvec v1.1.1
+  Downloaded fancy-regex v0.19.2
+  Downloaded napi v3.14.2
+  Downloaded ndarray v0.17.2
+  Downloaded opentelemetry-proto v0.33.1
+  Downloaded tower-service v0.3.3
+  Downloaded ptr_hash v2.1.3
+  Downloaded syn v3.0.6
+  Downloaded unicode-segmentation v1.13.3
+  Downloaded tokio-util v0.7.20
+  Downloaded rustix v1.1.5
+  Downloaded ref-cast-impl v1.0.27
+  Downloaded serde_core v1.0.229
+  Downloaded subtle v2.6.1
+  Downloaded opentelemetry_sdk v0.33.1
+  Downloaded thiserror v2.0.21
+  Downloaded tokio-stream v0.1.19
+  Downloaded want v0.3.1
+  Downloaded libc v0.2.189
+  Downloaded ort-sys v2.0.0-rc.15
+  Downloaded regex-automata v0.4.18
+  Downloaded rustls-pki-types v1.15.1
+  Downloaded webpki-roots v1.0.10
+  Downloaded ppv-lite86 v0.2.21
+  Downloaded quote v1.0.47
+  Downloaded serde_derive_internals v0.30.0
+  Downloaded tracing v0.1.44
+  Downloaded percent-encoding v2.3.2
+  Downloaded rayon v1.12.0
+  Downloaded rustls v0.23.46
+  Downloaded rand_chacha v0.9.0
+  Downloaded schemars v1.2.3
+  Downloaded semver v1.0.28
+  Downloaded rand_chacha v0.10.0
+  Downloaded smallvec v1.16.1
+  Downloaded ort v2.0.0-rc.15
+  Downloaded serde_json v1.0.151
+  Downloaded sha2 v0.10.9
+  Downloaded tinyvec v1.13.3
+  Downloaded serde v1.0.229
+  Downloaded version_check v0.9.5
+  Downloaded zerocopy-derive v0.8.63
+  Downloaded socket2 v0.6.5
+  Downloaded tokio v1.53.3
+  Downloaded linux-raw-sys v0.12.1
+  Downloaded tap v1.0.1
+  Downloaded static_assertions v1.1.0
+  Downloaded rustc-hash v2.1.3
+  Downloaded rawpointer v0.2.1
+  Downloaded radium v0.7.0
+  Downloaded untrusted v0.9.0
+  Downloaded try-lock v0.2.5
+  Downloaded ref-cast v1.0.27
+  Downloaded xxhash-rust v0.8.19
+  Downloaded zeroize v1.9.0
+  Downloaded wyz v0.5.1
+  Downloaded prost-derive v0.14.4
+  Downloaded tk-convert v0.1.0-rc.3
+  Downloaded rand_core v0.9.5
+  Downloaded yada v0.7.0
+  Downloaded tempfile v3.27.0
+  Downloaded unicode-ident v1.0.26
+  Downloaded zmij v1.0.23
+  Downloaded tokenizers v1.0.0-rc.3
+  Downloaded rdst v0.20.14
+  Downloaded ryu v1.0.23
+  Downloaded opentelemetry-otlp v0.33.1
+  Downloaded tracing-core v0.1.36
+  Downloaded rayon-core v1.13.0
+  Downloaded tk-train v0.1.0-rc.3
+  Downloaded unicode_categories v0.1.1
+  Downloaded rand v0.9.5
+  Downloaded rustls-webpki v0.103.16
+  Downloaded safe_arch v1.2.0
+  Downloaded rand v0.10.3
+  Downloaded typenum v1.20.1
+  Downloaded unicode-normalization v0.1.25
+  Downloaded wide v1.7.1
+  Downloaded tk-encode v0.1.0-rc.3
+  Downloaded syn v2.0.119
+  Downloaded zerocopy v0.8.63
+  Downloaded regex-syntax v0.8.11
+  Downloaded spm_precompiled v0.1.4
+  Downloaded ring v0.17.14
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.26
+   Compiling quote v1.0.47
+   Compiling libc v0.2.189
+   Compiling cfg-if v1.0.5
+   Compiling memchr v2.8.3
+   Compiling version_check v0.9.5
+   Compiling itoa v1.0.18
+   Compiling pin-project-lite v0.2.17
+   Compiling serde_core v1.0.229
+   Compiling bytes v1.12.1
+   Compiling syn v3.0.6
+   Compiling futures-core v0.3.34
+   Compiling once_cell v1.21.4
+   Compiling serde v1.0.229
+   Compiling zerocopy v0.8.63
+   Compiling generic-array v0.14.7
+   Compiling futures-sink v0.3.34
+   Compiling zmij v1.0.23
+   Compiling mio v1.2.3
+   Compiling socket2 v0.6.5
+   Compiling typenum v1.20.1
+   Compiling serde_json v1.0.151
+   Compiling equivalent v1.0.3
+   Compiling getrandom v0.3.4
+   Compiling tokio v1.53.3
+   Compiling thiserror v2.0.21
+   Compiling subtle v2.6.1
+   Compiling serde_derive v1.0.229
+   Compiling thiserror-impl v2.0.21
+   Compiling ppv-lite86 v0.2.21
+   Compiling syn v2.0.119
+   Compiling slab v0.4.12
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling futures-channel v0.3.34
+   Compiling ref-cast v1.0.27
+   Compiling digest v0.10.7
+   Compiling ref-cast-impl v1.0.27
+   Compiling futures-macro v0.3.34
+   Compiling serde_derive_internals v0.30.0
+   Compiling futures-io v0.3.34
+   Compiling rand_core v0.10.1
+   Compiling futures-task v0.3.34
+   Compiling shlex v2.0.1
+   Compiling futures-util v0.3.34
+   Compiling bitflags v2.13.2
+   Compiling schemars_derive v1.2.3
+   Compiling dyn-clone v1.0.20
+   Compiling getrandom v0.4.3
+   Compiling find-msvc-tools v0.1.13
+   Compiling libm v0.2.16
+   Compiling cpufeatures v0.2.17
+   Compiling sha2 v0.10.9
+   Compiling schemars v1.2.3
+   Compiling cc v1.4.7
+   Compiling hmac v0.12.1
+   Compiling http v1.5.0
+   Compiling radium v0.7.0
+   Compiling rustix v1.1.5
+   Compiling ring v0.17.14
+   Compiling rustev-contract v0.4.1 (/w/crates/rustev-contract)
+   Compiling tracing-core v0.1.36
+   Compiling allocator-api2 v0.2.21
+   Compiling cpufeatures v0.3.1
+   Compiling anyhow v1.0.104
+   Compiling foldhash v0.2.0
+   Compiling tap v1.0.1
+   Compiling httparse v1.10.1
+   Compiling smallvec v1.16.1
+   Compiling linux-raw-sys v0.12.1
+   Compiling hashbrown v0.17.1
+   Compiling wyz v0.5.1
+   Compiling indexmap v2.14.2
+   Compiling hashbrown v0.16.1
+   Compiling chacha20 v0.10.2
+   Compiling tracing v0.1.44
+   Compiling http-body v1.1.0
+   Compiling futures-executor v0.3.34
+   Compiling mem_dbg-derive v0.3.4
+   Compiling tokio-util v0.7.20
+   Compiling rand_core v0.9.5
+   Compiling aho-corasick v1.1.5
+   Compiling ahash v0.8.12
+   Compiling zeroize v1.9.0
+   Compiling funty v2.0.0
+   Compiling atomic-waker v1.1.2
+   Compiling byteorder v1.5.0
+   Compiling either v1.19.0
+   Compiling bytemuck v1.25.2
+   Compiling regex-syntax v0.8.11
+   Compiling try-lock v0.2.5
+   Compiling minimal-lexical v0.2.1
+   Compiling fnv v1.0.7
+   Compiling partition v0.1.2
+   Compiling fastrand v2.5.0
+   Compiling arbitrary-chunks v0.4.1
+   Compiling bit-vec v0.8.0
+   Compiling tempfile v3.27.0
+   Compiling bit-set v0.8.0
+   Compiling rdst v0.20.14
+   Compiling itertools v0.15.0
+   Compiling nom v7.1.3
+   Compiling h2 v0.4.20
+   Compiling want v0.3.1
+   Compiling regex-automata v0.4.18
+   Compiling safe_arch v1.2.0
+   Compiling itertools v0.14.0
+   Compiling fxhash v0.2.1
+   Compiling bitvec v1.1.1
+   Compiling rustls-pki-types v1.15.1
+   Compiling rand_chacha v0.9.0
+   Compiling mem_dbg v0.4.4
+   Compiling rand v0.10.3
+   Compiling rand_chacha v0.10.0
+   Compiling opentelemetry v0.33.1
+   Compiling getrandom v0.2.17
+   Compiling log v0.4.34
+   Compiling colored v3.1.1
+   Compiling bitcannon v0.1.0-rc.3
+   Compiling xxhash-rust v0.8.19
+   Compiling untrusted v0.9.0
+   Compiling base64 v0.13.1
+   Compiling unicode-segmentation v1.13.3
+   Compiling tinyvec v1.13.3
+   Compiling prefetch-index v0.2.1
+   Compiling napi-build v2.6.0
+   Compiling unicode-normalization v0.1.25
+   Compiling ptr_hash v2.1.3
+   Compiling spm_precompiled v0.1.4
+   Compiling hyper v1.11.1
+   Compiling prost-derive v0.14.4
+   Compiling rand v0.9.5
+   Compiling fancy-regex v0.19.2
+   Compiling wide v1.7.1
+   Compiling tokio-stream v0.1.19
+   Compiling libloading v0.9.0
+   Compiling tower-service v0.3.3
+   Compiling ort-sys v2.0.0-rc.15
+   Compiling rustls v0.23.46
+   Compiling percent-encoding v2.3.2
+   Compiling dary_heap v0.3.9
+   Compiling unicode_categories v0.1.1
+   Compiling yada v0.7.0
+   Compiling opentelemetry_sdk v0.33.1
+   Compiling rustev-core v0.4.1 (/w/crates/rustev-core)
+   Compiling tk-encode v0.1.0-rc.3
+   Compiling hyper-util v0.1.21
+   Compiling prost v0.14.4
+   Compiling rustls-webpki v0.103.16
+   Compiling http-body-util v0.1.5
+   Compiling async-trait v0.1.92
+   Compiling hifijson v0.5.0
+   Compiling napi-sys v3.4.0
+   Compiling base64 v0.22.1
+   Compiling tk-serialize v0.1.0-rc.3
+   Compiling convert_case v0.12.0
+   Compiling opentelemetry-http v0.33.1
+   Compiling opentelemetry-proto v0.33.1
+   Compiling napi v3.14.2
+   Compiling tk-convert v0.1.0-rc.3
+   Compiling httpdate v1.0.3
+   Compiling semver v1.0.28
+   Compiling napi-derive-backend v6.1.5
+   Compiling opentelemetry-otlp v0.33.1
+   Compiling tokenizers v1.0.0-rc.3
+   Compiling ort v2.0.0-rc.15
+   Compiling tokio-rustls v0.26.5
+   Compiling rustev-eval v0.4.1 (/w/crates/rustev-eval)
+   Compiling rustev-runtime v0.4.1 (/w/crates/rustev-runtime)
+   Compiling rustev-node v0.4.1 (/w/integrations/rustev-node)
+   Compiling webpki-roots v1.0.10
+   Compiling futures v0.3.34
+   Compiling ctor v1.0.13
+   Compiling rustc-hash v2.1.3
+   Compiling nohash-hasher v0.2.0
+   Compiling napi-derive v3.6.12
+   Compiling rustev-otel v0.4.1 (/w/integrations/rustev-otel)
+   Compiling rustev-surface v0.4.1 (/w/crates/rustev-surface)
+   Compiling rustev-backend-embed-linear v0.4.1 (/w/backends/rustev-backend-embed-linear)
+   Compiling rustev-backend-rules v0.4.1 (/w/backends/rustev-backend-rules)
+    Finished `release` profile [optimized] target(s) in 5m 23s
+copied rustev.linux-x64-gnu.node
+TAP version 13
+# Subtest: features() reports the build
+ok 1 - features() reports the build
+  ---
+  duration_ms: 1.420833
+  type: 'test'
+  ...
+# Subtest: a build without local-embed rejects open with feature_disabled
+ok 2 - a build without local-embed rejects open with feature_disabled # SKIP
+  ---
+  duration_ms: 0.119655
+  type: 'test'
+  ...
+# Subtest: LocalEmbedBackend is made by open only
+ok 3 - LocalEmbedBackend is made by open only
+  ---
+  duration_ms: 0.411809
+  type: 'test'
+  ...
+# Subtest: the synthetic bundle opens with its derived descriptor
+ok 4 - the synthetic bundle opens with its derived descriptor
+  ---
+  duration_ms: 5.006302
+  type: 'test'
+  ...
+# Subtest: setup refusals are ConfigRefused with the 3.7.2 code and the item
+ok 5 - setup refusals are ConfigRefused with the 3.7.2 code and the item
+  ---
+  duration_ms: 4.79593
+  type: 'test'
+  ...
+# Subtest: an unknown configuration member is refused, never ignored
+ok 6 - an unknown configuration member is refused, never ignored
+  ---
+  duration_ms: 0.852009
+  type: 'test'
+  ...
+# Subtest: a registration that is not an opened backend is refused before any thread
+ok 7 - a registration that is not an opened backend is refused before any thread
+  ---
+  duration_ms: 0.986965
+  type: 'test'
+  ...
+# Subtest: the backend registers like a rules backend and answers model-derived
+ok 8 - the backend registers like a rules backend and answers model-derived
+  ---
+  duration_ms: 7.700077
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 1
+# todo 0
+# duration_ms 123.015457
+conformance native: 1 case(s), 0 failure(s)

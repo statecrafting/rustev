@@ -1,0 +1,16 @@
+[package]
+name = "feasibility-probe"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+ort = { version = "=2.0.0-rc.15", default-features = false, features = ["std", "load-dynamic", "api-31"] }
+tokenizers = { version = "=1.0.0-rc.3", default-features = false, features = ["serialize", "normalizers", "wordpiece", "regex"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+sha2 = { version = "0.10", default-features = false }
+
+[profile.release]
+debug = false

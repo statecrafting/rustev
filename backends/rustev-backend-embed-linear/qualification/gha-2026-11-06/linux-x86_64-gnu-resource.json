@@ -1,0 +1,8 @@
+{
+  "exit_code": 0,
+  "peak_rss_bytes": 278925312,
+  "user_seconds": "55.170672",
+  "system_seconds": "0.157996",
+  "collector": "resource.getrusage(RUSAGE_CHILDREN); fresh parent, one child; Linux KiB times 1024",
+  "probe_sha256": "e68fb4a1ea51b5d80ee2ec6fe884a4ae11b0f89beb0256ea4848831541a14736"
+}

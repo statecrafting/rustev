@@ -1,5 +1,25 @@
 # Spec 011 feasibility measurement, 2026-10-22
 
+**`linux-x86_64-gnu` qualified 2026-11-06** by `rerecord_stage4.py` from
+`sha256:5213cc048ef44c8452ae6d03d4b87c6252b0de9db08e47aa2e7a15e6f74cc464`,
+with the evidence of GitHub Actions run 42139954158 in `gha-2026-11-06/`
+(its workflow, `measure-011.yml`, ran from a `measure/011-*` branch and is
+kept there, not merged). Both Linux keys ran on GitHub-hosted runners,
+virtual machines on shared Azure hardware (`<key>-host.json`,
+`<key>-host-raw.txt`): the encoder probe through `measure.py`, the complete
+backend through `EmbedLinearBackend` (`tests/runtime/hand.rs`,
+`hand_complete_backend`) in a measurement build whose only difference is
+the platform table (`<key>-stage4-measurement-build.diff`), the
+support-routing plan decisions, and the Node `local-embed` build on the
+native matrix target's image. `linux-x86_64-gnu` (Intel Xeon Platinum
+8370C) meets every limit (complete backend p95 55.0 ms, p99 56.0 ms, cold
+setup 428.6 ms, peak RSS 254.7 MiB, bundle 86.7 MiB) and is the 3.13.2
+reference platform: verdict `pass`. `linux-aarch64-gnu` on Neoverse-N2
+agrees numerically with it but refuses on p95 (140.3 ms); the Docker VM
+measurement of 2026-11-02 is kept as superseded. To reproduce, push the
+workflow to a `measure/011-*` branch, then run `rerecord_stage4.py RUN_DIR
+DATE BOUNDARIES_COMMIT RUN_URL` with a hand-written `<key>-host.json`.
+
 **`linux-aarch64-gnu` added 2026-11-02** by `rerecord_linux.py` from
 `sha256:6a85fb28eba4222e75d1efde7cbd25c1869eda60403d695a6d137c12d09899e5`.
 Every encoder limit is met there (p95 59.6 ms, p99 60.3 ms, cold setup

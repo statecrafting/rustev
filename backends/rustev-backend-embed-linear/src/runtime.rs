@@ -28,10 +28,11 @@ pub const ORT_VERSION: &str = "2.0.0-rc.15";
 /// The platforms qualified under 3.2.3 by the committed feasibility record
 /// (`qualification/feasibility.json`): all four stages pass and the Node
 /// binding builds with `local-embed` on the platform's native matrix target.
-/// The record qualifies none, so every `onnx` bundle is refused
-/// `unqualified_platform` (3.6.3). `tests/feasibility_record.rs` checks
-/// that this table equals the record's `pass` verdicts.
-pub const QUALIFIED_PLATFORMS: &[Platform] = &[];
+/// The record qualifies `linux-x86_64-gnu` (2026-11-06); an `onnx` bundle
+/// on any other target is refused `unqualified_platform` (3.6.3).
+/// `tests/feasibility_record.rs` checks that this table equals the
+/// record's `pass` verdicts.
+pub const QUALIFIED_PLATFORMS: &[Platform] = &[Platform::LinuxX86_64Gnu];
 
 /// The platform key of the compilation target (3.6.3), or `None` for any
 /// target outside the three keys (musl, Windows, `darwin-x64`, ...).
@@ -269,7 +270,7 @@ mod tests {
     }
 
     #[test]
-    fn this_target_has_a_platform_key_and_none_is_qualified() {
+    fn this_target_has_a_platform_key_and_only_linux_x86_64_gnu_is_qualified() {
         if cfg!(any(
             all(target_os = "macos", target_arch = "aarch64"),
             all(
@@ -280,9 +281,13 @@ mod tests {
         )) {
             assert!(platform_key().is_some());
         }
-        assert_eq!(
-            qualified_platform().unwrap_err().code,
-            SetupCode::UnqualifiedPlatform
-        );
+        if platform_key() == Some(Platform::LinuxX86_64Gnu) {
+            assert_eq!(qualified_platform().unwrap(), Platform::LinuxX86_64Gnu);
+        } else {
+            assert_eq!(
+                qualified_platform().unwrap_err().code,
+                SetupCode::UnqualifiedPlatform
+            );
+        }
     }
 }
