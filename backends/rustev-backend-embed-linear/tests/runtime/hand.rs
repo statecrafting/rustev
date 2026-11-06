@@ -328,7 +328,25 @@ fn hand_complete_backend() {
     let out = PathBuf::from(std::env::var("RUSTEV_EMBED_STAGE4_OUT").unwrap());
     let platform = platform_key().expect("a platform key");
     let library = fs::read(&library_path).unwrap();
-    let b = real_bundle(&checkpoint, platform, &library);
+    let mut b = real_bundle(&checkpoint, platform, &library);
+    // One bundle, so one artifact, on every Linux platform measured (3.13.2):
+    // it accepts each platform's release-tarball library.
+    let linux = json!([
+        {"platform": "linux-aarch64-gnu",
+         "sha256": "595c7f7a6775f5c7b3d567c3ed94c04f722092575abcc092560f5208a54daf99"},
+        {"platform": "linux-x86_64-gnu",
+         "sha256": "469849977cb60744ea160927e1a3a0643fd4c55c0aff743251c6d293402e334e"},
+    ]);
+    assert!(
+        linux
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|l| l["sha256"] == sha256_hex(&library)),
+        "a measured platform's library"
+    );
+    b.manifest["runtime"]["libraries"] = linux;
+    b.write();
     drop(library);
     let mut bundle = b.verify().unwrap();
     let mut bundle_files = vec![("manifest.json".to_string(), 0_u64)];
