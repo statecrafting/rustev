@@ -704,7 +704,8 @@ async function nativeAdapter() {
     const entries = new Map();
     const nsGen = new Map();
     const scopeGen = new Map();
-    const key = (a, b) => `${a}\u0000${b}`;
+    // Typed as a JSON pair, so no namespace or key id can alias another.
+    const key = (a, b) => JSON.stringify([a, b]);
     let f = {};
     const failed = (what) => new Error(`SYNTHETIC ${what} failure`);
     const generations = (ns, scope) => ({ namespace: nsGen.get(ns) ?? 0, scope: scopeGen.get(key(ns, scope)) ?? 0 });
@@ -726,7 +727,7 @@ async function nativeAdapter() {
           if (now.namespace !== terms.generations.namespace || now.scope !== terms.generations.scope) return 'generation_advanced';
           const k = key(namespace, keyId);
           if (entries.has(k)) return 'conflict';
-          entries.set(k, { scope: terms.scope, bytes: Buffer.from(bytes) });
+          entries.set(k, { namespace, scope: terms.scope, bytes: Buffer.from(bytes) });
           return 'stored';
         },
         async delete({ namespace, keyId }) {
@@ -737,12 +738,12 @@ async function nativeAdapter() {
           const before = entries.size;
           let generation;
           if (selector === 'namespace') {
-            if (remove) for (const k of [...entries.keys()]) if (k.startsWith(key(namespace, ''))) entries.delete(k);
+            if (remove) for (const [k, e] of [...entries]) if (e.namespace === namespace) entries.delete(k);
             generation = (nsGen.get(namespace) ?? 0) + 1;
             nsGen.set(namespace, generation);
           } else {
             if (remove) {
-              for (const [k, e] of [...entries]) if (k.startsWith(key(namespace, '')) && e.scope === selector.scope) entries.delete(k);
+              for (const [k, e] of [...entries]) if (e.namespace === namespace && e.scope === selector.scope) entries.delete(k);
             }
             const sk = key(namespace, selector.scope);
             generation = (scopeGen.get(sk) ?? 0) + 1;
