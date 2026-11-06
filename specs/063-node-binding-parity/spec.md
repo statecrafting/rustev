@@ -894,6 +894,11 @@ host's `write_all_in`), and calls the moved functions with its filesystem
 host. CLI goldens and the `repeat-*` expected bytes are unchanged without
 re-blessing. The two new source files join `rustev-surface`'s archive
 list (`tools/rustev-release/archive-policy.json`). No binding changed.
+The memory host derives `list` and `entry_kind` from input labels under
+`<dir>/`, and refuses an output over an existing prefix as over a file.
+`tests/host_list.rs` and the CLI's `io.rs` test check byte order and the
+cap on both hosts; `tests/repeat.rs` runs `import` and `baseline` on the
+memory host against the CLI's host goldens.
 
 ## Decisions at approval
 

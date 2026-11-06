@@ -145,6 +145,47 @@ impl Memory {
 }
 
 impl Host for Memory {
+    fn list(&self, dir: &str, max: usize) -> Result<Vec<String>, IoFail> {
+        if self.entry_kind(dir)? != EntryKind::Directory {
+            return Err(missing(dir));
+        }
+        let prefix = if dir.is_empty() {
+            String::new()
+        } else {
+            format!("{}/", dir.trim_end_matches('/'))
+        };
+        let mut names = std::collections::BTreeSet::new();
+        for label in self
+            .inputs
+            .keys()
+            .filter_map(|label| label.strip_prefix(&prefix))
+        {
+            if let Some(name) = label.split('/').next().filter(|n| !n.is_empty()) {
+                names.insert(name.to_owned());
+                if names.len() > max {
+                    names.pop_last();
+                }
+            }
+        }
+        Ok(names.into_iter().collect())
+    }
+
+    fn entry_kind(&self, label: &str) -> Result<EntryKind, IoFail> {
+        if self.inputs.contains_key(label) {
+            return Ok(EntryKind::File);
+        }
+        let prefix = if label.is_empty() {
+            String::new()
+        } else {
+            format!("{}/", label.trim_end_matches('/'))
+        };
+        Ok(if self.inputs.keys().any(|p| p.starts_with(&prefix)) {
+            EntryKind::Directory
+        } else {
+            EntryKind::Missing
+        })
+    }
+
     // At most `max` bytes, as the CLI's file host reads: a caller that must
     // tell an oversized input asks for its limit plus one byte and compares
     // lengths.
@@ -156,9 +197,18 @@ impl Host for Memory {
     }
 
     fn ensure_absent(&self, label: &str) -> Result<(), IoFail> {
-        let detail = if self.outputs.borrow().contains_key(label) {
+        let detail = if self
+            .outputs
+            .borrow()
+            .keys()
+            .any(|p| p == label || p.starts_with(&format!("{label}/")))
+        {
             "already exists; outputs are never overwritten"
-        } else if self.inputs.contains_key(label) {
+        } else if self
+            .inputs
+            .keys()
+            .any(|p| p == label || p.starts_with(&format!("{label}/")))
+        {
             // As on a file system, where an input is a file at that path and
             // the CLI's file host refuses to replace it: the same outcome on
             // every surface.
