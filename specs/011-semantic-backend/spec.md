@@ -43,6 +43,9 @@ extends:
   # suite's local-embed cases and runner (3.17.5), increment 6.
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-node/" }, nature: additive }
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "tools/rustev-conformance/" }, nature: additive }
+  # The service's optional `local-embed` feature and its transports joining
+  # the local-embed case (3.17.3, 3.17.5).
+  - { spec: "010-integrations", unit: { kind: directory, path: "integrations/rustev-serve/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "002-decision-contract-and-pure-core"
@@ -1159,6 +1162,45 @@ yet done: the service transports join the case with 3.17.3; and the
 binding's build with `local-embed` on each native matrix target, which
 counts toward qualifying a platform (3.2.3), needs a change to the
 `bindings` workflow; only `darwin-arm64` was built here.
+
+**The service's `local-embed` feature and the service transports in the
+local-embed case (2026-11-06, 3.17.3, 3.17.5).** `rustev-serve` gains the
+Cargo feature `local-embed`, off by default, an optional dependency on this
+crate with its `synthetic` feature, as the Node binding has; the crate gets
+a workspace dependency entry with its exact version and stays outside the
+release family (3.17.4). The host registers local backends from
+configuration at startup: `rustev-serve --config FILE --local-embed FILE`,
+whose second file maps a binding name to the 3.7.1 members the backend
+takes today (`bundle_dir`, `runtime_path`, `expected_artifact`, `workers`,
+`max_queued`; unknown members refused, so `embedding_cache` is refused
+until the configuration takes the cache). Each name must be a
+`backend_bindings` entry of `rustev.serve-config/1` whose backend is the
+compiled feature `local-embed`, every such binding must be configured, and
+the service checks the opened backend's descriptor against the binding's
+expected `DescriptorId` as for any compiled backend. Every bundle is
+verified on a blocking thread before any listener starts; a setup refusal
+stops startup naming the binding with its 3.7.2 code and item. Hosts
+embedding the crate call `local_embed::open_all` and pass the result to
+`sinks::standalone_with_backends`. A request never names a bundle, path or
+runtime: registration binds a plan's backend id to a binding name, and the
+service documents refuse unknown members. Without the feature a configured
+local backend is refused `feature_disabled`, and the service's resolved
+graph holds no crate of the 3.18 family (3.20.2); the image is built
+without it. The case `local-embed.support-routing` now names `serve-http`
+and `serve-grpc`; the service's conformance runner opens the committed
+bundle through the same `local_embed::open`, binds it under the compiled
+feature, registers the plan with its calibration, decides the five
+requests one after another on the manual clock over the mutual-TLS TCP
+listener and the Unix socket, and compares each result, judgment and
+delivered run record byte for byte with the case's (the bytes the Rust API
+and the native binding produce); per listener the HTTP and gRPC answers
+are byte-identical. Without the feature the runner checks the case's
+backend is refused `feature_disabled`. `make conformance` runs the
+service's tests with the feature (`cargo test -p rustev-serve --locked
+--features local-embed --lib local_embed`). Tests:
+`integrations/rustev-serve/src/local_embed.rs` and
+`tests/conformance/local_embed.rs`. This closes the service half of 3.17.5
+and 3.17.3.
 
 **Stage 4 of the complete backend on native Linux; `linux-x86_64-gnu`
 qualified (2026-11-06, 3.2, 3.6.3, 3.13).** Both Linux keys were measured

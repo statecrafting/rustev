@@ -219,6 +219,8 @@
   ],
   "surfaces": [
     "rust-api",
-    "native"
+    "native",
+    "serve-http",
+    "serve-grpc"
   ]
 }

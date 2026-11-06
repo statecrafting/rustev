@@ -10,15 +10,33 @@ async fn main() {
 }
 async fn run() -> Result<(), String> {
     let args: Vec<_> = std::env::args().skip(1).collect();
-    if args.len() != 2 || args[0] != "--config" {
-        return Err("usage: rustev-serve --config FILE".into());
-    }
+    let usage = "usage: rustev-serve --config FILE [--local-embed FILE]";
+    let local = match args.as_slice() {
+        [c, _] if c == "--config" => None,
+        [c, _, l, file] if c == "--config" && l == "--local-embed" => Some(file.clone()),
+        _ => return Err(usage.into()),
+    };
     let config = ServeConfig::parse(&rustev_serve::transport::read_file(
         &args[1],
         4 * 1024 * 1024,
     )?)
     .map_err(|e| e.to_string())?;
-    let service = rustev_serve::sinks::standalone(config).await?;
+    // Spec 011, 3.17.3: the host's local backends, opened and verified before
+    // any listener starts; only this file names a bundle, path or runtime.
+    let local = match local {
+        Some(file) => rustev_serve::local_embed::parse(&rustev_serve::transport::read_file(
+            &file,
+            rustev_serve::local_embed::MAX_CONFIG_BYTES,
+        )?)?,
+        None => Default::default(),
+    };
+    let backends = {
+        let config = config.clone();
+        tokio::task::spawn_blocking(move || rustev_serve::local_embed::open_all(&config, &local))
+            .await
+            .map_err(|e| e.to_string())??
+    };
+    let service = rustev_serve::sinks::standalone_with_backends(config, backends).await?;
     let mut tasks = tokio::task::JoinSet::new();
     for listener in service.config.listeners.as_slice() {
         let service = service.clone();
