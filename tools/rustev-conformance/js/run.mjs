@@ -1090,7 +1090,10 @@ process.exit(failures.length || ran === 0 ? 1 : 0);
 // CLI flags in camel case: repeated flags as lists (the import's `--run`
 // as `runs`), a single `--bundles` as one prefix, milliseconds and
 // `--repeat` as numbers, and the scope flags as the scope object.
-function repeatArgs(argv) {
+function repeatArgs(all) {
+  // `--ledger-new` is the one switch: it takes no value, so it is read
+  // here as `true` and the rest parsed as value flags.
+  const argv = all.filter((x) => x !== '--ledger-new');
   const a = flags(argv);
   const lists = { bundles: 'bundles', descriptor: 'descriptors', rules: 'rules', calibration: 'calibrations' };
   // `--run` repeats only on the import; elsewhere it names one prefix.
@@ -1108,5 +1111,6 @@ function repeatArgs(argv) {
     else if (numbers.has(k)) args[camel(k)] = Number(a.one(k));
     else args[camel(k)] = a.one(k);
   }
+  if (argv.length !== all.length) args.ledgerNew = true;
   return args;
 }
