@@ -838,6 +838,31 @@ never answers, so both runners record `not_observed`, since a host's
 cancellation answer crosses threads and cannot be ready when the runtime
 polls once (the reason `runtime.cancel-stop` excludes `native`).
 
+**Increment 4, 2026-11-06 (3.4, 3.6, 3.7, store and invalidation).**
+`EngineOptions.store` installs the host store with `RuntimeBuilder::store`
+(`integrations/rustev-node/src/store.rs`): the contract is parsed as the
+closed `StoreContract`, nine non-empty strings, or `ConfigRefused`
+(`invalid_store_contract`), before any thread. Each method is an
+asynchronous host callback under 3.4 (`src/callback.rs`, shared with
+increment 3). Generations and counts must be safe integers, `get` bytes at
+most 4 MiB and a `put` answer one of its four words; anything else, a
+throw, a full queue (`host_seam_queue_full`), a deadline, a cancellation
+or a late settlement is a `StoreFailure`. `plan.invalidate` calls
+`Runtime::invalidate`; its store call, which has no decision deadline, is
+bounded by `timeoutMs` on the engine's clock, aborted at the timeout, and a
+failed or timed-out call resolves `persistent: 'pending'`,
+`complete: false`. `gauges().seams` gains `store` with `abandonedPending`.
+The cases `runtime.store-restart-hit`, `runtime.store-failure-policy` and
+`runtime.store-invalidation` run on `rust-api` and `native` with identical
+bytes from a scripted `store` in both runners, which declares per-decision
+failures, restarts (a new runtime or engine over the same store) and
+invalidations before a decision. Differences from the mirrored tests: the
+restart case advances the generation through `plan.invalidate` on a
+restarted engine with entries kept, rather than editing the store, and the
+invalidation case starts from a failed `Runtime::invalidate`, since
+`invalidate_plan` has no Node equivalent; call counts the outputs do not
+show are not compared.
+
 ## Decisions at approval
 
 Decided in this text, with reasons: a separate `acquisitionSources` seam,

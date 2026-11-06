@@ -130,6 +130,51 @@ export interface AcquisitionSource {
   acquire(call: AcquireCall): Promise<AcquireAnswer>;
 }
 
+/** What every store call carries (spec 063, 3.6). */
+export interface StoreCall {
+  /** Until the decision's deadline; absent for `plan.invalidate`. */
+  remainingMs?: number;
+  signal: AbortSignal;
+  traceparent?: string;
+}
+
+/** A namespace and a scope generation, safe integers. */
+export interface Generations {
+  namespace: number;
+  scope: number;
+}
+
+/** A host store behind the persistent tier (spec 063, 3.6), honoring the
+ * atomicity contract of 3.7 (G1 to G5). `namespace`, `scope` and `keyId`
+ * are Rustev-derived opaque strings the host stores and never computes. */
+export interface RuntimeStore {
+  /** Nine non-empty terms, recorded as given. */
+  contract: {
+    schema: string; namespace: string; durability: string; encryption: string;
+    atomicity: string; conflict: string; expiry: string; invalidation: string; erasure: string;
+  };
+  /** 1 to 65,536; there is no default. */
+  queueCapacity: number;
+  get(call: StoreCall & { namespace: string; scope: string; keyId: string }):
+    Promise<{ bytes: Uint8Array | null; generations: Generations }>;
+  put(call: StoreCall & { namespace: string; keyId: string; bytes: Uint8Array;
+    terms: { scope: string; generations: Generations; maxScopeBytes: number;
+             maxNamespaceBytes: number; expiresMs: number } }):
+    Promise<'stored' | 'generation_advanced' | 'over_budget' | 'conflict'>;
+  delete(call: StoreCall & { namespace: string; keyId: string }): Promise<void>;
+  invalidate(call: StoreCall & { namespace: string; selector: 'namespace' | { scope: string } }):
+    Promise<{ generation: number; removed: number }>;
+}
+
+/** `plan.invalidate`'s result (spec 063, 3.6.4). */
+export interface InvalidationResult {
+  generation: number;
+  removedEntries: number;
+  removedBytes: number;
+  persistent: null | 'pending' | { generation: number; removed: number };
+  complete: boolean;
+}
+
 export interface EngineOptions {
   runtime: RuntimeConfig;
   /** Required; there is no default sink. */
@@ -144,6 +189,8 @@ export interface EngineOptions {
   /** Spec 063 3.5: installed by descriptor name; never what a plan binds
    * (plans bind the `sources` named on compile). */
   acquisitionSources?: AcquisitionSource[];
+  /** Spec 063 3.6: the store behind a plan's persistent tier. */
+  store?: RuntimeStore;
 }
 
 export interface DecisionRequest {
@@ -201,6 +248,8 @@ export declare class PlanHandle {
   readonly planId: string;
   readonly raw: Uint8Array;
   decide(request: DecisionRequest, options?: DecideOptions): Promise<DecideResult>;
+  /** Spec 063 3.6.4: per process; `null` without an optimization namespace. */
+  invalidate(options?: { principalHandle?: Uint8Array; timeoutMs?: number }): Promise<InvalidationResult | null>;
 }
 
 export interface CommandResult {

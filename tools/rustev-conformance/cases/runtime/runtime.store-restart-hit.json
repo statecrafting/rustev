@@ -1,0 +1,222 @@
+{
+  "command": "decide",
+  "id": "runtime.store-restart-hit",
+  "inputs": [
+    {
+      "name": "store.plan.json",
+      "path": "tools/rustev-conformance/fixtures/store/store.plan.json",
+      "sha256": "b63ef300d6aa58272280702df12f9df51830d825223559551500b6b1dded4511"
+    },
+    {
+      "name": "support.snapshot.json",
+      "path": "tools/rustev-conformance/fixtures/runtime/support.snapshot.json",
+      "sha256": "8009ccb469d24cae5f07b0cd3bbb91682f03b53856369a4f57ac9052156f8064"
+    },
+    {
+      "name": "synthetic-label-only.descriptor.json",
+      "path": "tools/rustev-conformance/fixtures/runtime/synthetic-label-only.descriptor.json",
+      "sha256": "57ef7512d8516439419ee66b281e234454d563ce928f896f7c4e2ae3ee6cc680"
+    },
+    {
+      "name": "synthetic-linear-head-replica.descriptor.json",
+      "path": "tools/rustev-conformance/fixtures/runtime/synthetic-linear-head-replica.descriptor.json",
+      "sha256": "bfea4d82292a03bbb6d7c63511d31b5ed49b816b057ebaaa17048fbdc810797d"
+    },
+    {
+      "name": "synthetic-linear-head.descriptor.json",
+      "path": "tools/rustev-conformance/fixtures/runtime/synthetic-linear-head.descriptor.json",
+      "sha256": "a95460744b245b084df38c6552019a0d36e7be25d477689b44e85d72e8d6ae74"
+    },
+    {
+      "name": "synthetic-other-head.descriptor.json",
+      "path": "tools/rustev-conformance/fixtures/runtime/synthetic-other-head.descriptor.json",
+      "sha256": "128d5ac80328e3ff1687826f6462be9b6e144be72c813fd1b27424d9cc1f2e81"
+    },
+    {
+      "name": "topic.calibration.json",
+      "path": "tools/rustev-conformance/fixtures/runtime/topic.calibration.json",
+      "sha256": "2313edf2bf75c4e9a9f248f9e4533d485ced06acd09e97dbbe1b4919ce148072"
+    }
+  ],
+  "mirrors": "crates/rustev-runtime/tests/persistent.rs::a_restarted_runtime_hits_the_same_store",
+  "outputs": [
+    {
+      "file": "after.invalidation.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.store-restart-hit/after.invalidation.json",
+      "normalize": [],
+      "sha256": "a228b7dc9b8358ba390009496e56401f304b29d7691ca562a21b2d8ad79682b3"
+    },
+    {
+      "file": "after.record.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.store-restart-hit/after.record.json",
+      "normalize": [],
+      "sha256": "8e0111fe26b6dcb273ecbd957cc2ce3f663beaf513778d3041357c9162dbb5fb"
+    },
+    {
+      "file": "after.result.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.store-restart-hit/after.result.json",
+      "normalize": [],
+      "sha256": "32e659c5af405c9a511c5d4380a809928acbe03f08cb62d9c277e9a198ef8f94"
+    },
+    {
+      "file": "cold.record.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.store-restart-hit/cold.record.json",
+      "normalize": [],
+      "sha256": "489d646267174a20134237971ca38e09d047550b19d1a96d8ed63eda71522637"
+    },
+    {
+      "file": "cold.result.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.store-restart-hit/cold.result.json",
+      "normalize": [],
+      "sha256": "862472e1097542f3f34845fab7f4b526600176291e28fadad3c4b2689280ac7e"
+    },
+    {
+      "file": "warm.record.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.store-restart-hit/warm.record.json",
+      "normalize": [],
+      "sha256": "8bdcd66e0a619e6e3248e8d1ee79477776eacac1fb0127f38427741db4e6e062"
+    },
+    {
+      "file": "warm.result.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.store-restart-hit/warm.result.json",
+      "normalize": [],
+      "sha256": "7f3a030a959510788d4a102a81ef0f6b55934e5325f570f0d55606a47bf22ce4"
+    }
+  ],
+  "runtime": {
+    "backends": [
+      {
+        "answers": {
+          "support.deadline": [
+            {
+              "output": {
+                "charge": {
+                  "observed": {
+                    "units": 1
+                  }
+                },
+                "output": {
+                  "logits": {
+                    "false": 3.0,
+                    "true": 0.0
+                  }
+                }
+              }
+            }
+          ],
+          "support.frustration": [
+            {
+              "output": {
+                "charge": {
+                  "observed": {
+                    "units": 1
+                  }
+                },
+                "output": {
+                  "logits": {
+                    "calm": 3.0,
+                    "frustrated": 0.0,
+                    "very_angry": 0.0
+                  }
+                }
+              }
+            }
+          ],
+          "support.topic": [
+            {
+              "output": {
+                "charge": {
+                  "observed": {
+                    "units": 1
+                  }
+                },
+                "output": {
+                  "logits": {
+                    "account_access": 0.0,
+                    "billing": 4.0,
+                    "integration_defect": 0.0,
+                    "other": 0.0
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "cost_bound": {
+          "bounded": {
+            "max_units": 1
+          }
+        },
+        "cost_model": "bounded",
+        "descriptor": "synthetic-linear-head.descriptor.json",
+        "max_concurrency": 8,
+        "on_cancel": "ignore",
+        "on_release": {},
+        "remote": "finished"
+      }
+    ],
+    "calibrations": [
+      "topic.calibration.json"
+    ],
+    "config": {
+      "max_in_flight": 1,
+      "max_parallel_requests": 3,
+      "max_queued": 0,
+      "sink_timeout_ms": 1000
+    },
+    "descriptors": [
+      "synthetic-linear-head.descriptor.json",
+      "synthetic-label-only.descriptor.json",
+      "synthetic-linear-head-replica.descriptor.json",
+      "synthetic-other-head.descriptor.json"
+    ],
+    "drive": [
+      "start",
+      "start",
+      "start"
+    ],
+    "plan": "store.plan.json",
+    "requests": [
+      {
+        "decision_id": "cold",
+        "evaluation_time_ms": 1790164800000,
+        "snapshot": "support.snapshot.json"
+      },
+      {
+        "decision_id": "warm",
+        "evaluation_time_ms": 1790164801000,
+        "snapshot": "support.snapshot.json"
+      },
+      {
+        "decision_id": "after",
+        "evaluation_time_ms": 1790164802000,
+        "snapshot": "support.snapshot.json"
+      }
+    ],
+    "store": {
+      "contract": {
+        "atomicity": "SYNTHETIC atomicity term",
+        "conflict": "first writer wins",
+        "durability": "SYNTHETIC durability term",
+        "encryption": "SYNTHETIC encryption term",
+        "erasure": "SYNTHETIC erasure term",
+        "expiry": "SYNTHETIC expiry term",
+        "invalidation": "SYNTHETIC invalidation term",
+        "namespace": "SYNTHETIC namespace term",
+        "schema": "SYNTHETIC schema term"
+      },
+      "invalidate_before": [
+        "after"
+      ],
+      "remove_on_invalidate": false,
+      "restart_before": [
+        "warm",
+        "after"
+      ]
+    }
+  },
+  "surfaces": [
+    "rust-api",
+    "native"
+  ]
+}

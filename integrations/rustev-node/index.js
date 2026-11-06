@@ -306,6 +306,65 @@ function sourceSeam(s) {
   };
 }
 
+/** The host store (spec 063, 3.6). Each method is an asynchronous host
+ * callback (3.4) given an `AbortSignal`; the native layer bounds every
+ * answer, and a throw, a rejection or an answer out of bounds is a
+ * `StoreFailure` under the plan's `on_store_failure`, never a hit. */
+function storeSeam(st) {
+  const calls = aborts();
+  const method = (fn) => async (call) => {
+    const signal = calls.start(call.callId);
+    try {
+      return await fn(call, { remainingMs: call.remainingMs ?? undefined, signal });
+    } finally {
+      calls.end(call.callId);
+    }
+  };
+  const bytesOrNull = (b) => {
+    if (b == null) return undefined;
+    if (!(b instanceof Uint8Array)) throw new TypeError('get resolved bytes that are not a Uint8Array or null');
+    return b;
+  };
+  return {
+    contract: JSON.stringify(st.contract ?? null),
+    queueCapacity: st.queueCapacity,
+    get: method(async (c, base) => {
+      const a = await st.get({ ...base, namespace: c.namespace, scope: c.scope, keyId: c.keyId });
+      return {
+        bytes: bytesOrNull(a?.bytes),
+        namespaceGeneration: a?.generations?.namespace,
+        scopeGeneration: a?.generations?.scope,
+      };
+    }),
+    put: method(async (c, base) => {
+      const answer = await st.put({
+        ...base,
+        namespace: c.namespace,
+        keyId: c.keyId,
+        bytes: c.bytes,
+        terms: {
+          scope: c.scope,
+          generations: { namespace: c.namespaceGeneration, scope: c.scopeGeneration },
+          maxScopeBytes: c.maxScopeBytes,
+          maxNamespaceBytes: c.maxNamespaceBytes,
+          expiresMs: c.expiresMs,
+        },
+      });
+      return { put: typeof answer === 'string' ? answer : undefined };
+    }),
+    delete: method(async (c, base) => {
+      await st.delete({ ...base, namespace: c.namespace, keyId: c.keyId });
+      return {};
+    }),
+    invalidate: method(async (c, base) => {
+      const selector = c.selectorScope == null ? 'namespace' : { scope: c.selectorScope };
+      const a = await st.invalidate({ ...base, namespace: c.namespace, selector });
+      return { generation: a?.generation, removed: a?.removed };
+    }),
+    abort: (callId) => calls.abort(callId),
+  };
+}
+
 const utf8 = (b) => Buffer.from(b).toString('utf8');
 
 /** A host scorer (spec 041, 3.9.1). It is given the parsed case and
@@ -378,6 +437,26 @@ class PlanHandle {
   get raw() {
     return this.#native.raw;
   }
+  /** Invalidate this plan's reusable results in every tier (spec 063,
+   * 3.6.4), or one authorized scope of them with `principalHandle`. The
+   * store call is bounded by `timeoutMs` (1 to 600,000, default 30,000);
+   * a failed or timed-out store call resolves `complete: false` with
+   * `persistent: 'pending'`. `null` for a plan without an optimization
+   * namespace. */
+  async invalidate({ principalHandle, timeoutMs = 30_000 } = {}) {
+    if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 600_000) {
+      throw new classes.ConfigRefused('out_of_range', { field: 'timeoutMs', min: 1, max: 600_000 });
+    }
+    begin();
+    try {
+      return (await this.#native.invalidate(principalHandle == null ? undefined : bytes(principalHandle), timeoutMs)) ?? null;
+    } catch (e) {
+      throw typed(e);
+    } finally {
+      end();
+    }
+  }
+
   /** Decide one request (3.3.3); an unresolved outcome is a value. */
   async decide(request, options = {}) {
     if (options.traceparent !== undefined && !TRACEPARENT.test(options.traceparent)) {
@@ -490,6 +569,7 @@ class Engine {
             telemetryOptions(options.telemetry),
             localEmbedSet(options.localEmbedBackends),
             options.acquisitionSources ? options.acquisitionSources.map(sourceSeam) : undefined,
+            options.store ? storeSeam(options.store) : undefined,
           ),
         ),
     );

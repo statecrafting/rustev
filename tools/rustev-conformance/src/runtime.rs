@@ -53,6 +53,10 @@ pub struct RuntimeCase {
     /// are the sources the plan is loaded against.
     #[serde(default)]
     pub sources: Vec<crate::acquire::SourceScript>,
+    /// A scripted store (spec 063, 3.13.2): its requests run in order,
+    /// each to its end before the next starts.
+    #[serde(default)]
+    pub store: Option<crate::store::StoreScript>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -470,8 +474,52 @@ pub fn run(case: &RuntimeCase, inputs: &Inputs) -> Result<Outputs, String> {
         let source = crate::acquire::ScriptedSource::new(d.clone(), s.clone());
         builder = builder.acquisition_source(source, s.max_concurrency);
     }
+    let store = case.store.clone().map(crate::store::ScriptedStore::new);
+    if let Some(s) = &store {
+        builder = builder.store(s.clone());
+    }
     let rt = Arc::new(builder.build().map_err(|e| format!("{e:?}"))?);
     let prepared = Arc::new(rt.prepare(compiled).map_err(|e| format!("{e:?}"))?);
+    // 063 3.13.2: a restart is a new runtime over the same store and the
+    // same scripted seams.
+    let restart = || -> Result<Arc<Runtime>, String> {
+        let mut b = Runtime::builder(
+            Arc::new(clock.clone()),
+            Arc::new(Ack),
+            RuntimeConfig {
+                max_in_flight: case.config.max_in_flight,
+                max_queued: case.config.max_queued,
+                max_parallel_requests: case.config.max_parallel_requests,
+                sink: SinkPolicy::FailDecision {
+                    timeout_ms: case.config.sink_timeout_ms,
+                },
+            },
+        );
+        for (s, script) in scripted.iter().zip(&case.backends) {
+            b = b.backend(s.backend(), script.max_concurrency);
+        }
+        for (s, d) in case.sources.iter().zip(&source_descriptors) {
+            let source = crate::acquire::ScriptedSource::new(d.clone(), s.clone());
+            b = b.acquisition_source(source, s.max_concurrency);
+        }
+        if let Some(s) = &store {
+            b = b.store(s.clone());
+        }
+        Ok(Arc::new(b.build().map_err(|e| format!("{e:?}"))?))
+    };
+    let load = |name: &str| -> Result<Compiled, String> {
+        Compiled::load_checked_with_sources(
+            &doc::<Plan>(inputs, name)?,
+            &descriptors,
+            &calibrations,
+            &source_descriptors,
+        )
+        .map_err(|e| format!("load {name}: {e}"))
+    };
+    let mut rt = rt;
+    let mut prepared = prepared;
+    let mut current_plan = case.plan.clone();
+    let mut invalidations = Outputs::new();
     let mut requests = vec![];
     for r in &case.requests {
         requests.push(DecisionRequest {
@@ -504,6 +552,28 @@ pub fn run(case: &RuntimeCase, inputs: &Inputs) -> Result<Outputs, String> {
         for step in &case.drive {
             match step {
                 Step::Start => {
+                    if let (Some(store), Some(r)) = (&store, case.requests.get(running.len())) {
+                        let id = &r.decision_id;
+                        let script = store.script();
+                        store.begin(id);
+                        let name = script.plan_for.get(id).unwrap_or(&case.plan).clone();
+                        if script.restart_before.contains(id) {
+                            rt = restart()?;
+                            prepared =
+                                Arc::new(rt.prepare(load(&name)?).map_err(|e| format!("{e:?}"))?);
+                        } else if name != current_plan {
+                            prepared =
+                                Arc::new(rt.prepare(load(&name)?).map_err(|e| format!("{e:?}"))?);
+                        }
+                        current_plan = name;
+                        if script.invalidate_before.contains(id) {
+                            let r = rt.invalidate(&prepared, None).await;
+                            invalidations.insert(
+                                format!("{id}.invalidation.json"),
+                                crate::store::invalidation_bytes(r.as_ref()),
+                            );
+                        }
+                    }
                     let req = next.next().ok_or("no request left to start")?;
                     let i = running.len();
                     let (rt, plan, cancel) = (rt.clone(), prepared.clone(), signals[i].clone());
@@ -528,6 +598,10 @@ pub fn run(case: &RuntimeCase, inputs: &Inputs) -> Result<Outputs, String> {
                         }
                     }));
                     tokio::task::yield_now().await;
+                    if store.is_some() {
+                        let h = running.last().expect("just started");
+                        until("the decision's end", || h.is_finished()).await?;
+                    }
                 }
                 Step::WaitGated { backend, count } => {
                     let s = scripted.get(*backend).ok_or("no such backend")?;
@@ -631,6 +705,7 @@ pub fn run(case: &RuntimeCase, inputs: &Inputs) -> Result<Outputs, String> {
                 out.insert(format!("{id}.record.json"), b);
             }
         }
+        out.extend(invalidations);
         Ok(out)
     })
 }

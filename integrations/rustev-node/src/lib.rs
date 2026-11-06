@@ -17,6 +17,7 @@ pub mod local_embed;
 mod profile;
 mod seams;
 mod source;
+mod store;
 mod telemetry;
 
 use std::collections::{BTreeMap, HashMap};
@@ -126,6 +127,8 @@ impl Engine {
         local_embed: Option<&local_embed::LocalEmbedSet>,
         // 063 3.5: last and optional, as `local_embed`.
         acquisition_sources: Option<Vec<source::SourceSeam>>,
+        // 063 3.6: last and optional, as `acquisition_sources`.
+        store: Option<store::StoreSeam>,
     ) -> Result<Engine> {
         guard(|| {
             let workers = range("workerThreads", config.worker_threads, 1, 64)?;
@@ -168,6 +171,16 @@ impl Engine {
                     ));
                 }
             };
+            // 063 3.6.1: the contract checked before any thread; a call with
+            // no decision deadline is bounded on the engine's clock.
+            let host_store: Option<Arc<dyn rustev_runtime::RuntimeStore>> = match store {
+                Some(s) => {
+                    let s = store::HostStore::new(s, clock.clone())?;
+                    stats.push(s.stats.clone());
+                    Some(Arc::new(s))
+                }
+                None => None,
+            };
             let mut registrations: Vec<(Arc<dyn DecisionBackend>, usize)> = vec![];
             for r in rules {
                 let backend = rustev_backend_rules::RulesBackend::from_bytes(&r.program)
@@ -202,6 +215,9 @@ impl Engine {
                 }
                 for (s, max) in &host_sources {
                     b = b.acquisition_source(s.clone(), *max);
+                }
+                if let Some(s) = &host_store {
+                    b = b.store(s.clone());
                 }
                 b.build().map_err(errors::config_error)
             };
@@ -860,6 +876,40 @@ impl PlanHandle {
     #[napi(getter)]
     pub fn raw(&self) -> Uint8Array {
         Uint8Array::new(self.raw.clone())
+    }
+
+    /// `plan.invalidate` (063 3.6.4): `Runtime::invalidate`, memory tiers
+    /// then the store, whose call is bounded by `timeoutMs` on the engine's
+    /// clock. `null` for a plan without an optimization namespace.
+    #[napi]
+    pub async fn invalidate(
+        &self,
+        principal_handle: Option<Uint8Array>,
+        timeout_ms: u32,
+    ) -> Result<Option<serde_json::Value>> {
+        let counted = InFlight::enter(self.engine.clone());
+        if self.engine.shut.load(Ordering::SeqCst) {
+            return Err(fail(
+                "EngineShutDown",
+                "engine_shut_down",
+                serde_json::Value::Null,
+            ));
+        }
+        let runtime = self.engine.runtime.clone();
+        let plan = self.plan.clone();
+        let principal = principal_handle.map(|p| p.to_vec());
+        let work = store::INVALIDATE_TIMEOUT_MS.scope(u64::from(timeout_ms), async move {
+            let _counted = counted;
+            runtime
+                .invalidate(&plan, principal.as_deref())
+                .await
+                .map(|r| store::invalidation_json(&r))
+        });
+        self.engine
+            .rt
+            .spawn(work)
+            .await
+            .map_err(|e| fail("InternalError", "internal", e.to_string()))
     }
 
     /// Decide one request (3.3.3, 3.4.2): the judgment (or the cancelled
