@@ -1,0 +1,78 @@
+{
+  "command": "decide",
+  "id": "runtime.acquire-window",
+  "inputs": [
+    {
+      "name": "acquire-window.plan.json",
+      "path": "tools/rustev-conformance/fixtures/acquire/acquire-window.plan.json",
+      "sha256": "cfc6fb46a1bd3ab57c6635c7ff929ab3a696cad79bc9f9d59b3d43abfea1ab77"
+    },
+    {
+      "name": "catalog.source.json",
+      "path": "tools/rustev-conformance/fixtures/acquire/catalog.source.json",
+      "sha256": "82c468f0fb521efce7c0cb30a19c4b79ef5825663965944f838e3adc9490f53c"
+    },
+    {
+      "name": "empty.snapshot.json",
+      "path": "tools/rustev-conformance/fixtures/acquire/empty.snapshot.json",
+      "sha256": "b34d8feb906cb18dfe773a01c18e3645ae091132b99060eed8787e148ceddf82"
+    }
+  ],
+  "mirrors": "crates/rustev-runtime/tests/acquisition.rs::window_expiry_cancels_and_queued_pages_do_not_dispatch",
+  "outputs": [
+    {
+      "file": "expiry.record.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.acquire-window/expiry.record.json",
+      "normalize": [],
+      "sha256": "53f3104d2674c6d3c6a7dc716c65c882003b008e89f81e5595f83ca96047ab1e"
+    },
+    {
+      "file": "expiry.result.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.acquire-window/expiry.result.json",
+      "normalize": [],
+      "sha256": "daa2b3d45833e7b096443d30235d4df801cfe530bf261ba6534728b244f5ad89"
+    }
+  ],
+  "runtime": {
+    "backends": [],
+    "calibrations": [],
+    "config": {
+      "max_in_flight": 1,
+      "max_parallel_requests": 1,
+      "max_queued": 1,
+      "sink_timeout_ms": 1000
+    },
+    "descriptors": [],
+    "drive": [
+      "start",
+      {
+        "advance_timer": {
+          "delay_ms": 20
+        }
+      }
+    ],
+    "plan": "acquire-window.plan.json",
+    "requests": [
+      {
+        "decision_id": "expiry",
+        "evaluation_time_ms": 1000,
+        "snapshot": "empty.snapshot.json"
+      }
+    ],
+    "sources": [
+      {
+        "answers": {
+          "expiry": [
+            "ignore"
+          ]
+        },
+        "descriptor": "catalog.source.json",
+        "max_concurrency": 1
+      }
+    ]
+  },
+  "surfaces": [
+    "rust-api",
+    "native"
+  ]
+}

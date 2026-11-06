@@ -76,7 +76,11 @@ impl Options {
         })
     }
 
-    pub fn assemble(&self, input: &AssemblyInput<'_>) -> Outcome {
+    pub fn assemble(
+        &self,
+        input: &AssemblyInput<'_>,
+        sources: &[rustev_contract::source::SourceDescriptor],
+    ) -> Outcome {
         let status = match input.capture.map(|c| c.status) {
             Some(CaptureStatus::Complete) => "complete",
             Some(CaptureStatus::LimitExceeded) => "limit_exceeded",
@@ -114,8 +118,8 @@ impl Options {
                 _ => Content::DigestOnly,
             },
         };
-        // Acquisition source descriptors join with increment 3.
-        match assemble_with_sources(input, &choice, &[]) {
+        // 063 3.8: the plan handle's source descriptors (3.5.2).
+        match assemble_with_sources(input, &choice, sources) {
             Ok(bundle) => match bundle.record_canonical() {
                 Ok(bytes) => {
                     out.bundle = Some(Uint8Array::new(bytes));

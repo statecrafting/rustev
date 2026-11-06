@@ -508,11 +508,15 @@ async function nativeAdapter() {
         queueCapacity: 65_536,
         infer: (call) => { backendCalls++; return scripted(b, gates[bi], call, ignored); },
       })),
+      // Spec 063 3.13.2: scripted acquisition sources, answering per
+      // decision in call order as the Rust runner's do.
+      acquisitionSources: (rt.sources ?? []).map((s) => scriptedSource(s, files.get(s.descriptor), ignored)),
     });
     const plan = await engine.compile({
       plan: files.get(rt.plan),
       descriptors: rt.descriptors.map((d) => files.get(d)),
       calibrations: rt.calibrations.map((x) => files.get(x)),
+      sources: (rt.sources ?? []).map((s) => files.get(s.descriptor)),
     });
     const controllers = rt.requests.map(() => new AbortController());
     const running = [];
@@ -775,6 +779,51 @@ async function nativeAdapter() {
         }
       });
     });
+  }
+
+  /** A scripted acquisition source from a runtime case's data (spec 063,
+   * 3.13.2): per decision, the answer of each call in order (the last
+   * repeats). A page is written with its keys sorted at every level, the
+   * bytes the Rust runner writes. `ignore` never answers while the case
+   * runs: it resolves when the case ends, a late settlement the engine
+   * discards. */
+  function scriptedSource(s, descriptor, ignored) {
+    const calls = new Map();
+    const sorted = (v) =>
+      Array.isArray(v)
+        ? `[${v.map(sorted).join(',')}]`
+        : v !== null && typeof v === 'object'
+          ? `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${sorted(v[k])}`).join(',')}}`
+          : JSON.stringify(v);
+    return {
+      descriptor,
+      maxConcurrency: s.max_concurrency,
+      queueCapacity: 65_536,
+      acquire: (call) => {
+        const n = (calls.get(call.decisionId) ?? 0) + 1;
+        calls.set(call.decisionId, n);
+        const list = s.answers[call.decisionId] ?? [];
+        const a = list.length ? list[Math.min(n, list.length) - 1] : null;
+        if (a === 'ignore') {
+          return new Promise((resolveP) => {
+            ignored.push(() => resolveP({ page: 'late', charge: { observed: { units: 0 } } }));
+          });
+        }
+        return Promise.resolve().then(() => {
+          if (a === null) {
+            throw new rustev.SeamFailure({ failureClass: 'permanent', charge: { observed: { units: 0 } }, detail: `no scripted answer for ${call.decisionId}` });
+          }
+          if (a.page) {
+            const { items, next, as_of_ms: asOf, charge } = a.page;
+            const page = { as_of_ms: asOf, items, next, request: call.requestId, schema: 'rustev.acquisition-page/1' };
+            return { page: sorted(page), charge };
+          }
+          if (a.invalid) return { page: 'invalid page', charge: a.invalid.charge };
+          if (a.fail) throw new rustev.SeamFailure({ failureClass: a.fail.class, charge: a.fail.charge, detail: a.fail.detail });
+          throw new Error(`unknown source answer ${JSON.stringify(a)}`);
+        });
+      },
+    };
   }
 
   return async (c) => {

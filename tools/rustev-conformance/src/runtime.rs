@@ -49,6 +49,10 @@ pub struct RuntimeCase {
     pub drive: Vec<Step>,
     #[serde(default)]
     pub capture: Option<crate::capture::Settings>,
+    /// Scripted acquisition sources (spec 063, 3.13.2); their descriptors
+    /// are the sources the plan is loaded against.
+    #[serde(default)]
+    pub sources: Vec<crate::acquire::SourceScript>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -431,8 +435,18 @@ pub fn run(case: &RuntimeCase, inputs: &Inputs) -> Result<Outputs, String> {
         .iter()
         .map(|n| doc(inputs, n))
         .collect::<Result<_, _>>()?;
-    let compiled = Compiled::load_checked(&plan, &descriptors, &calibrations)
-        .map_err(|e| format!("load: {e}"))?;
+    let source_descriptors: Vec<rustev_contract::source::SourceDescriptor> = case
+        .sources
+        .iter()
+        .map(|s| doc(inputs, &s.descriptor))
+        .collect::<Result<_, _>>()?;
+    let compiled = Compiled::load_checked_with_sources(
+        &plan,
+        &descriptors,
+        &calibrations,
+        &source_descriptors,
+    )
+    .map_err(|e| format!("load: {e}"))?;
     let clock = ManualClock::new();
     let mut builder = Runtime::builder(
         Arc::new(clock.clone()),
@@ -451,6 +465,10 @@ pub fn run(case: &RuntimeCase, inputs: &Inputs) -> Result<Outputs, String> {
         let s = Scripted::new(doc(inputs, &b.descriptor)?, b.clone());
         builder = builder.backend(s.backend(), b.max_concurrency);
         scripted.push(s);
+    }
+    for (s, d) in case.sources.iter().zip(&source_descriptors) {
+        let source = crate::acquire::ScriptedSource::new(d.clone(), s.clone());
+        builder = builder.acquisition_source(source, s.max_concurrency);
     }
     let rt = Arc::new(builder.build().map_err(|e| format!("{e:?}"))?);
     let prepared = Arc::new(rt.prepare(compiled).map_err(|e| format!("{e:?}"))?);

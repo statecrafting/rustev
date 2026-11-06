@@ -248,6 +248,8 @@ pub struct PreparedInputs {
     pub compiled: Compiled,
     pub descriptors: Vec<BackendDescriptor>,
     pub calibrations: Vec<CalibrationArtifact>,
+    /// 063 3.5.2: the sources compiled against, kept for capture (3.8).
+    pub sources: Vec<SourceDescriptor>,
 }
 pub fn compile(inputs: &BTreeMap<String, Vec<u8>>, a: &Value) -> Result<PreparedInputs> {
     validate("compile", a)?;
@@ -323,5 +325,6 @@ pub fn compile(inputs: &BTreeMap<String, Vec<u8>>, a: &Value) -> Result<Prepared
         compiled,
         descriptors,
         calibrations,
+        sources,
     })
 }

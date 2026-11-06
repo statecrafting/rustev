@@ -1,0 +1,166 @@
+{
+  "command": "decide",
+  "id": "runtime.acquire-page",
+  "inputs": [
+    {
+      "name": "acquire-retry.plan.json",
+      "path": "tools/rustev-conformance/fixtures/acquire/acquire-retry.plan.json",
+      "sha256": "a9d2ac97e0424d7bc24522077d3524231bba5d031e0dc3139566e71fb6b18aaf"
+    },
+    {
+      "name": "catalog.source.json",
+      "path": "tools/rustev-conformance/fixtures/acquire/catalog.source.json",
+      "sha256": "82c468f0fb521efce7c0cb30a19c4b79ef5825663965944f838e3adc9490f53c"
+    },
+    {
+      "name": "empty.snapshot.json",
+      "path": "tools/rustev-conformance/fixtures/acquire/empty.snapshot.json",
+      "sha256": "b34d8feb906cb18dfe773a01c18e3645ae091132b99060eed8787e148ceddf82"
+    }
+  ],
+  "mirrors": "crates/rustev-runtime/tests/acquisition.rs::retries_only_named_classes_denied_never_retried_and_panics_contained",
+  "outputs": [
+    {
+      "file": "overloaded.record.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.acquire-page/overloaded.record.json",
+      "normalize": [],
+      "sha256": "9ea817affdb85cfbb7c6f04ccc42b7262fb040d7a45e54c69b26b8bf7ba05aa8"
+    },
+    {
+      "file": "overloaded.result.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.acquire-page/overloaded.result.json",
+      "normalize": [],
+      "sha256": "8a1801496467b9624d11c95c2c6b7c750a085ebcb057f9b1c232cd307d793dd5"
+    },
+    {
+      "file": "transient.record.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.acquire-page/transient.record.json",
+      "normalize": [],
+      "sha256": "1ca78fd09004cc5828eb050e7163940c70d980c5879d17a4ba8aaee9660a8313"
+    },
+    {
+      "file": "transient.result.json",
+      "golden": "tools/rustev-conformance/expected/runtime/runtime.acquire-page/transient.result.json",
+      "normalize": [],
+      "sha256": "00181a0e5001f9c116321e328b90dc6e9dab6141b0ceb48901fcef6a09ce8f68"
+    }
+  ],
+  "runtime": {
+    "backends": [],
+    "calibrations": [],
+    "config": {
+      "max_in_flight": 1,
+      "max_parallel_requests": 2,
+      "max_queued": 2,
+      "sink_timeout_ms": 1000
+    },
+    "descriptors": [],
+    "drive": [
+      "start",
+      "start"
+    ],
+    "plan": "acquire-retry.plan.json",
+    "requests": [
+      {
+        "decision_id": "transient",
+        "evaluation_time_ms": 1000,
+        "snapshot": "empty.snapshot.json"
+      },
+      {
+        "decision_id": "overloaded",
+        "evaluation_time_ms": 1000,
+        "snapshot": "empty.snapshot.json"
+      }
+    ],
+    "sources": [
+      {
+        "answers": {
+          "overloaded": [
+            {
+              "fail": {
+                "charge": {
+                  "observed": {
+                    "units": 1
+                  }
+                },
+                "class": "overloaded",
+                "detail": "scripted"
+              }
+            },
+            {
+              "page": {
+                "as_of_ms": 900,
+                "charge": {
+                  "observed": {
+                    "units": 1
+                  }
+                },
+                "items": [
+                  {
+                    "id": 1
+                  }
+                ],
+                "next": "none"
+              }
+            }
+          ],
+          "transient": [
+            {
+              "fail": {
+                "charge": {
+                  "observed": {
+                    "units": 1
+                  }
+                },
+                "class": "transient",
+                "detail": "scripted"
+              }
+            },
+            {
+              "page": {
+                "as_of_ms": 900,
+                "charge": {
+                  "observed": {
+                    "units": 1
+                  }
+                },
+                "items": [
+                  {
+                    "id": 1
+                  }
+                ],
+                "next": {
+                  "offset": {
+                    "integer": 1
+                  }
+                }
+              }
+            },
+            {
+              "page": {
+                "as_of_ms": 900,
+                "charge": {
+                  "observed": {
+                    "units": 1
+                  }
+                },
+                "items": [
+                  {
+                    "id": 2
+                  }
+                ],
+                "next": "none"
+              }
+            }
+          ]
+        },
+        "descriptor": "catalog.source.json",
+        "max_concurrency": 1
+      }
+    ]
+  },
+  "surfaces": [
+    "rust-api",
+    "native"
+  ]
+}
