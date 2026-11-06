@@ -256,12 +256,9 @@ pub fn golden(name: &str, bytes: &[u8]) {
                 command_of(&seen.args).as_str(),
                 "baseline record" | "eval reproducibility" | "eval diff" | "gate select"
             );
-        // Spec 034 increment 5 exposes parameterized commands only through
-        // the CLI; binding exposure belongs to a later increment.
+        // Spec 063 (3.13.1) runs the parameterized cases natively too.
         let parameterized = name.starts_with("parameterized.");
-        let mut surfaces = if parameterized {
-            json!(["cli"])
-        } else if repeat {
+        let mut surfaces = if repeat || parameterized {
             json!(["cli", "native"])
         } else if pure {
             json!(["cli", "native", "wasm"])

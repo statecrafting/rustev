@@ -35,6 +35,9 @@ extends:
   - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: amending }
   # Archive entries for moved source files.
   - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
+  # 063 joins `make verify` and the `runtime-evidence` acceptance group.
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "003-runtime-execution-and-evidence"
@@ -707,11 +710,22 @@ document, identity, golden, `rustev-core`, `rustev-runtime` or
 
 ## Verification
 
-Pending with implementation. At completion a `verify:cli` block runs
-`cargo test -p rustev-conformance --locked`, `cargo test -p rustev-surface
---locked --all-features` and `cargo test -p rustev-cli --locked`; 063
-joins `make verify` and the `runtime-evidence` group. Binding behavior is
-tested by `make bindings` and the CI `bindings` job, as for 049.
+Run by `make verify` (063 is in `VERIFIED_SPECS`, in CI's
+`runtime-evidence` acceptance group). Binding behavior is tested by `make
+bindings` and the CI `bindings` job, as for 049: `node --test` over
+`integrations/rustev-node/test/*.test.mjs` and the native conformance
+runner.
+
+```verify:cli
+# 3.13: every conformance case through the Rust runners (the cases that
+# gain `native` keep their expected bytes), the runtime and capture cases,
+# and the host-import fixtures.
+cargo test -p rustev-conformance --locked
+# 3.9.3 and 3.9.4: the moved renderings and `Host::list` on both hosts.
+cargo test -p rustev-surface --locked --all-features
+# 3.9.3: the CLI's goldens and the `repeat-*` bytes, unchanged.
+cargo test -p rustev-cli --locked
+```
 
 ## Planned increments
 
@@ -923,7 +937,9 @@ happy path, its usage and result refusals, `not_reproducible`,
 `none_qualified` and `unknown` as results, and section 5's
 `mixed-provenance` row. The CLI harvest
 (`crates/rustev-cli/tests/common/harvest.rs`) now gives the repeat cases
-`cli` and `native`, so a fresh harvest keeps them.
+`cli` and `native`, as it now does the `parameterized.*` cases, so a fresh
+harvest keeps them. This increment adds the `verify:cli` block, 063 to
+`VERIFIED_SPECS` and to the `runtime-evidence` acceptance group.
 
 ## Decisions at approval
 
