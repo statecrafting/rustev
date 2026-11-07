@@ -249,7 +249,9 @@ fn rollback_outputs(
         report(path, std::fs::remove_file(path));
     }
     for dir in created.iter().rev() {
-        report(std::path::Path::new(dir), std::fs::remove_dir_all(dir));
+        // Our own files are removed above; anything else left here is
+        // reported, never deleted.
+        report(std::path::Path::new(dir), std::fs::remove_dir(dir));
     }
 }
 
