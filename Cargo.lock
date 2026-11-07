@@ -4554,6 +4554,7 @@ dependencies = [
  "rustev-contract",
  "rustev-core",
  "rustev-eval",
+ "rustev-live",
  "rustev-runtime",
  "rustev-surface",
  "serde",
