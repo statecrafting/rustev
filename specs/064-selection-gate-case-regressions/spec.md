@@ -2,7 +2,7 @@
 id: "064-selection-gate-case-regressions"
 title: "Selection gate: a clause on per-case regressions against the baseline (amends 029 and 061)"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-11-06"
 summary: >
   An amendment of approved specs 029 (3.12) and 061 (3.7), for release
@@ -30,6 +30,16 @@ extends:
   - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: amending }
   # One CLI conformance case for the clause.
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "tools/rustev-conformance/" }, nature: additive }
+  # `gate select`'s stdout is rendered by the shared surface crate that the
+  # CLI and the Node binding call; it switches to the clause's summary.
+  - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "crates/rustev-surface/" }, nature: amending }
+  # The new source file of `rustev-eval` joins the reviewed archive list
+  # (spec 021, 3.5).
+  - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
+  # Adds 064 to `make verify` at completion.
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  # Adds 064 to CI's `cli-repeat` acceptance group.
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
 depends_on:
   - "004-evaluation-and-replay"
   - "006-cli-surface"
@@ -58,7 +68,7 @@ obligations:
 # 064: Selection gate: a clause on per-case regressions against the baseline (amends 029 and 061)
 
 Approved: ratified by the owner on 2026-11-06 (A-83) for release 0.6.0;
-the implementation is pending. The approved texts of 029 and 061 are not
+implemented in full by one change (see the implementation record). The approved texts of 029 and 061 are not
 edited; this spec records what it adds to them.
 
 ## 1. Purpose
@@ -323,11 +333,86 @@ tests over case deltas.
 
 ## Verification
 
-Pending with implementation.
+Run by `make verify` (064 is in `VERIFIED_SPECS`, in CI's `cli-repeat`
+acceptance group beside 029 and 061, the specs it amends). Every command
+is repository-local and deterministic over synthetic fixtures.
+
+```verify:cli
+# 3.1 to 3.6 and section 5: the clause's grammar and refusals, the per-case
+# value (bit for bit against `pooled` over one case), the exact-decimal
+# boundary, every unresolved reason, truncation and the host-set path; with
+# every spec 029, 041 and 061 eval test, unchanged, for the shared code.
+cargo test -p rustev-eval --locked
+# 3.5 through `gate select`: the qualifying, rejected and unknown goldens;
+# every existing CLI and plan golden byte-identical (R-1).
+cargo test -p rustev-cli --locked
+# The stdout summary of 3.5.3, rendered by the shared surface crate.
+cargo test -p rustev-surface --locked
+# The CLI conformance case for the clause; every other case unchanged.
+cargo test -p rustev-conformance --locked
+cargo clippy -p rustev-eval -p rustev-cli -p rustev-surface --all-targets --locked -- -D warnings
+# Negative control: each acceptance seed must be detected.
+sh crates/rustev-eval/mutation/seeds.sh "spec 064"
+```
 
 ## Implementation record
 
-None yet.
+**Complete (2026-11-07), in one change.** The clause lives in
+`crates/rustev-eval/src/selection.rs` (grammar and refusals, 3.1) and the
+new module `crates/rustev-eval/src/selection/case_regressions.rs`
+(3.2 to 3.5), shared by 029's and 061's selections; host sets read their
+`rustev.host-cases/1` documents through the same per-case view as
+`rustev.eval-cases/1` (3.6).
+
+- **Value.** A case value is `run_stats`'s `pooled` over a one-case
+  cohort, the same function that computes `pooled` (3.2.2); a case with a
+  measure in some runs only is `partial` and never computed over the runs
+  that have one; a zero denominator, an `unknown` contribution or a
+  non-finite result is `unknown` (3.2.4).
+- **Kinds.** Only count-ratio and mean forms are compared; a sample or
+  total metric, or one with no per-case form, is unknown with
+  `not-case-comparable: <metric>` before any case is read (3.2.3). A
+  `historical` candidate observation and an `opaque` scorer make the clause
+  unknown as for every metric clause, with `cases: null` (3.4.2, 3.5.2).
+- **Boundary.** `b - c >= t` (or `c - b >= t`) is decided by the exact
+  decimal comparison 029 uses for `not_worse_than`, over the shortest
+  round-trip decimals; `drop` is that exact difference (3.3).
+- **Result.** A definite failure (`R > at_most`) dominates unresolved cases;
+  otherwise the first unresolved case in manifest order and its reason make
+  the clause unknown (3.4.1). `partial` and `unknown` take precedence over
+  `unpaired`; a case unresolved on both sides names the baseline. If either
+  side has no case documents or the two sides list different cases, the
+  clause is unknown rather than read.
+- **Output.** `rustev.selection/1` carries the full `cases` member of
+  3.5.1 (lists bounded at 10 000, `total` and `truncated` exact). Stdout
+  of `gate select` (rendered in `crates/rustev-surface/`, which the CLI and
+  the Node binding share) replaces it, for this clause only, with
+  `{ regressions: R, at_most, unresolved: U, first }`, `first` holding the
+  first ten regressing cases with their drops (3.5.3); host stdout keeps
+  `assertion: "host-asserted"`. Every other clause's stdout is the record
+  unchanged.
+- **Territory.** Two edges beyond those named in section 2: the stdout
+  renderer sits in `crates/rustev-surface/` (027, amending), and the new
+  source file joins `tools/rustev-release/archive-policy.json` (031,
+  additive).
+
+Evidence: `crates/rustev-eval/tests/case_regressions.rs` and
+`crates/rustev-eval/tests/host_select.rs` cover every section 5 row
+(field refusals, exactly `by`, one decimal unit below `by` and a pair whose
+binary64 difference rounds across it, each unresolved reason on each side,
+failure with unresolved cases, `not-case-comparable` for
+`latency_ms/p0.95` and `host/latency_ms/p0.5`, opaque and historical
+metrics, truncation of both lists, a host case `failed` in one run, and
+unchanged identities of gates without the clause); the module's unit tests
+check the case value bit for bit against `pooled` for a count ratio and a
+mean at N = 1 and N = 3. `crates/rustev-cli/tests/repeat.rs` holds the
+qualifying, rejected and unknown `gate select` goldens
+(`tests/golden/repeat-case-regressions*`) and harvests the conformance case
+`cli/repeat-case-regressions-rejected.stdout`; `tests/host_sets.rs` runs
+the clause over host sets. Every existing eval, CLI, 029, 061,
+conformance and plan golden, every schema and every binding type is
+byte-identical. The five acceptance seeds are the `"spec 064"` group of
+`crates/rustev-eval/mutation/seeds.py`, each detected.
 
 ## Decisions at approval
 

@@ -243,6 +243,7 @@
         "src/scores.rs",
         "src/scoring.rs",
         "src/selection.rs",
+        "src/selection/case_regressions.rs",
         "src/testdata/lodging-emb.record.json"
       ],
       "max_archive_bytes": 393216,
