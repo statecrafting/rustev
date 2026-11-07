@@ -6,7 +6,7 @@ implementation: pending
 created: "2026-11-06"
 summary: >
   An amendment of approved specs 029 (3.12) and 061 (3.7), for release
-  0.5.1 (#538), ratified by the owner on 2026-11-06 (A-84). A run with integrity failures (results the
+  0.6.0 (#538), ratified by the owner on 2026-11-06 (A-84). A run with integrity failures (results the
   evaluator could not score, cases a backend or source failed on) is not a
   measurement, yet today it can only lower coverage and reject the
   candidate, which reads as a verdict about the candidate when the run is
@@ -56,7 +56,7 @@ obligations:
 
 # 065: Selection gate: run integrity failures void the comparison instead of rejecting (amends 029 and 061)
 
-Approved: ratified by the owner on 2026-11-06 (A-84) for release 0.5.1;
+Approved: ratified by the owner on 2026-11-06 (A-84) for release 0.6.0;
 the implementation is pending. The approved texts of 029 and 061 are not
 edited; this spec records what it adds to them.
 
