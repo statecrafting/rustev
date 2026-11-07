@@ -528,6 +528,28 @@ Node-API symbols dynamically (a `napi` dev-dependency feature), so the
 shipped addon is unchanged. Increment 2 calls these functions from
 `engine.liveRun`. No acceptance item is claimed yet.
 
+**Increment 2a (2026-11-07): the input resolution moves into the
+surface.** `crates/rustev-surface/src/live.rs` (`rustev_surface::live`)
+now holds the input resolution `rustev eval live` does, written against
+`&dyn Host` (section 2): the digest-binding read wrapper `Inputs` (each
+input's SHA-256, refusing an input that changed while loading), and two
+phases in the CLI's check order. `resolve_inputs` reads the live
+configuration (parsed by the caller, so the surface stays free of
+`rustev-live`, `rustev-runtime` and any executor), the dataset, admission,
+evaluator configuration, adapter, repeat configuration, candidates
+(plans, dependencies, sources, compile, conflicting descriptors, file
+caps) and captures; the caller then builds its runtime and checks each
+binding's cost model; `resolve_cases` reads bundles or snapshots, builds
+the per-case inputs with the `identity-mismatch` checks (decision ids from
+a caller closure) and reads the probe snapshot. Directory listings go
+through `Host::list` and `Host::entry_kind`. The SHA-256 is the caller's
+function, so the surface's dependencies are unchanged and `make
+boundaries` passes. The CLI calls both phases and maps the surface's case types onto
+`rustev_live::run`'s; its grammar, bytes, exit codes and goldens are
+unchanged (full `rustev-cli`, `rustev-live`, `rustev-conformance` and
+`rustev-release` suites pass). The archive policy lists the new file. No
+acceptance item is claimed: the binding entry point is increment 2b.
+
 Planned increments, each a separately reviewed pull request from `main`
 of about 1,000 lines (the AI review times out near 1,000 to 1,800
 reviewed lines), so this spec's 0.6.0 risk is its size: four increments

@@ -13,6 +13,8 @@ pub mod deps;
 pub mod eval;
 pub mod explain;
 pub mod host;
+/// Host-generic live input resolution.
+pub mod live;
 pub mod out;
 pub mod plan;
 // Spec 034 3.12 to 3.14; compiled only with `parameterized` (spec 050).

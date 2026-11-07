@@ -61,8 +61,6 @@ pub fn validate(p: &Parsed) -> Result<usize, Usage> {
     }
 }
 
-pub use rustev_surface::repeat::candidate_files;
-
 pub fn eval(p: &Parsed) -> Result<Res, Usage> {
     let n = validate(p)?;
     let split = crate::eval::split(p)?;

@@ -310,6 +310,7 @@
         "src/explain.rs",
         "src/host.rs",
         "src/lib.rs",
+        "src/live.rs",
         "src/out.rs",
         "src/plan.rs",
         "src/plan_diff.rs",

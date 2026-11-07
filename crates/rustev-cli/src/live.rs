@@ -1,23 +1,15 @@
 //! File host for spec 043. The live engine owns probing and execution.
-use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use rustev_contract::eval_report::{DatasetProvenance, Split};
+use rustev_contract::eval_report::Split;
 use rustev_contract::ids::ContentDigest;
-use rustev_contract::limits::{DESCRIPTOR_V1, REPLAY_V1, SNAPSHOT_V1};
 use rustev_contract::live::{AuthorizationReference, AuthorizationRequest};
 use rustev_contract::run::{CostModel, RunRecord};
 use rustev_contract::scope::Handle;
-use rustev_contract::snapshot::Snapshot;
 use rustev_contract::{Document, Identified};
 use rustev_core::seams::{BoxFuture, EvidenceSink};
-use rustev_eval::bundle::BundleInput;
-use rustev_eval::config::EvaluatorConfig;
-use rustev_eval::dataset::DatasetManifest;
 use rustev_eval::metrics::TaskAdapter;
-use rustev_eval::repeat_config::RepeatConfig;
-use rustev_eval::resolve::{Budget, ItemFailure, resolve_item};
 use rustev_live::documents::{CostUnit, EvaluationTime, LiveConfig, LiveError, Mode};
 use rustev_live::journal::{BudgetKind, JournalError, SpendJournal, SystemClock};
 use rustev_live::probe::ProbeSnapshot;
@@ -28,17 +20,20 @@ use rustev_live::run::{
 use rustev_runtime::{
     DispatchAnswer, LiveAuthorizer, Runtime, RuntimeConfig, SinkPolicy, TokioClock,
 };
-use rustev_surface::adapter::TaskAdapterDoc;
-use rustev_surface::eval::{check_case_ids, read_bundles, read_doc};
-use rustev_surface::host::{Host, IoFail, ReadFail};
-use sha2::{Digest, Sha256};
+use rustev_surface::host::IoFail;
+use rustev_surface::live;
 
 use crate::args::{Parsed, Usage, usage};
-use crate::io::{Reads, join};
+use crate::io::Reads;
 use crate::out::Done;
 use crate::{Context, Exit};
 
 const COMMAND: &str = "eval live";
+
+fn sha256(bytes: &[u8]) -> ContentDigest {
+    use sha2::{Digest, Sha256};
+    ContentDigest::parse(&format!("sha256:{:x}", Sha256::digest(bytes))).expect("SHA-256 digest")
+}
 fn invalid(subject: &str, detail: impl std::fmt::Display) -> Done {
     Done::invalid(COMMAND, subject, detail.to_string())
 }
@@ -53,43 +48,6 @@ fn live_error(e: LiveError) -> Done {
         )
     } else {
         invalid(e.subject, e.detail)
-    }
-}
-
-// Bind exactly the bytes consumed by the loaders, without reopening inputs.
-#[derive(Default)]
-struct Inputs {
-    reads: Reads,
-    digests: RefCell<BTreeMap<String, ContentDigest>>,
-}
-impl Host for Inputs {
-    fn read_classified(&self, path: &str, max: usize) -> Result<Option<Vec<u8>>, ReadFail> {
-        let bytes = self.reads.read_classified(path, max)?;
-        if let Some(bytes) = &bytes {
-            let digest = ContentDigest::parse(&format!("sha256:{:x}", Sha256::digest(bytes)))
-                .expect("SHA-256 digest");
-            let mut digests = self.digests.borrow_mut();
-            if digests.get(path).is_some_and(|old| old != &digest) {
-                return Err(ReadFail::File(IoFail {
-                    path: path.into(),
-                    detail: "input changed while loading".into(),
-                }));
-            }
-            digests.insert(path.into(), digest);
-        }
-        Ok(bytes)
-    }
-    fn ensure_absent(&self, path: &str) -> Result<(), IoFail> {
-        self.reads.ensure_absent(path)
-    }
-    fn create(&self, path: &str, bytes: &[u8]) -> Result<(), IoFail> {
-        self.reads.create(path, bytes)
-    }
-    fn write_all(&self, files: &[(String, Vec<u8>)]) -> Result<(), IoFail> {
-        self.reads.write_all(files)
-    }
-    fn join(&self, dir: &str, name: &str) -> String {
-        join(dir, name)
     }
 }
 
@@ -225,148 +183,43 @@ pub fn run(p: &Parsed, cx: &Context) -> Result<Exit, Usage> {
         p.need(&["resume"], "with --rerun-interrupted")?;
     }
     let result = (|| -> Result<Exit, Done> {
-        let inputs = Inputs::default();
-        let bytes = inputs
-            .read(p.req("live-config"), REPLAY_V1.max_bytes + 1)
-            .map_err(|e| invalid("live-config", e.detail))?;
-        let config = LiveConfig::parse(&bytes).map_err(live_error)?;
-        if p.has("snapshots") && config.evaluation_time == EvaluationTime::Source {
-            return Err(invalid(
-                "evaluation-time-unavailable",
-                "snapshot files carry no source time",
-            ));
-        }
-        if p.has("snapshots") && config.compare_with_source {
-            return Err(invalid("live-config", "source comparison needs --bundles"));
-        }
-        let manifest: DatasetManifest =
-            read_doc(COMMAND, &inputs, p.req("dataset"), REPLAY_V1.max_bytes)?;
-        if matches!(manifest.provenance, DatasetProvenance::Real { .. }) && !p.has("admission") {
-            return Err(invalid(
-                "data-not-admitted",
-                "a real dataset requires --admission",
-            ));
-        }
-        if let Some(path) = p.one("admission") {
-            let bytes = inputs
-                .read(path, REPLAY_V1.max_bytes + 1)
-                .map_err(|e| invalid("data-not-admitted", e.detail))?;
-            if bytes.is_empty() || bytes.len() > REPLAY_V1.max_bytes {
-                return Err(invalid(
-                    "data-not-admitted",
-                    "admission record is empty or oversized",
-                ));
-            }
-        }
-        let evaluator: EvaluatorConfig =
-            read_doc(COMMAND, &inputs, p.req("config"), REPLAY_V1.max_bytes)?;
-        evaluator.check().map_err(|e| invalid("config", e))?;
-        let adapter: TaskAdapterDoc =
-            read_doc(COMMAND, &inputs, p.req("adapter"), DESCRIPTOR_V1.max_bytes)?;
-        adapter.check().map_err(|e| invalid("adapter", e))?;
-        if evaluator.adapter.reference() != adapter.adapter()
-            || evaluator
-                .adapter
-                .rules
-                .as_ref()
-                .is_some_and(|r| *r != adapter.rules())
-            || (evaluator.declarations().is_some()
-                && adapter.schema != rustev_eval::measures::TASK_ADAPTER_V2)
-        {
-            return Err(invalid("adapter", "configuration and adapter disagree"));
-        }
-        manifest
-            .check(&adapter.adapter(), |l| adapter.check_label(l))
-            .map_err(|e| invalid("dataset", e))?;
-        check_case_ids(COMMAND, "live-config", manifest.cases.iter())?;
-        let repeat: RepeatConfig = read_doc(
-            COMMAND,
+        let reads = Reads::default();
+        let inputs = live::Inputs::new(&reads, sha256);
+        let args = live::Args {
+            split,
+            run_id: p.req("run-id"),
+            live_config: p.req("live-config"),
+            dataset: p.req("dataset"),
+            admission: p.one("admission"),
+            config: p.req("config"),
+            adapter: p.req("adapter"),
+            repeat_config: p.req("repeat-config"),
+            candidates: p.req("candidates"),
+            captures: p.one("captures"),
+            snapshots: p.one("snapshots"),
+            bundles: p.one("bundles"),
+        };
+        let mut rules = vec![];
+        let mut resolved = live::resolve_inputs(
             &inputs,
-            p.req("repeat-config"),
-            REPLAY_V1.max_bytes,
+            &args,
+            |bytes| {
+                let config = LiveConfig::parse(bytes).map_err(live_error)?;
+                Ok(live::Config {
+                    source_time: config.evaluation_time == EvaluationTime::Source,
+                    compare_with_source: config.compare_with_source,
+                    repeats: config.repeats,
+                    probe_snapshot: config.probe.snapshot.clone(),
+                    parsed: config,
+                })
+            },
+            &mut crate::deps::rules_hook(&mut rules),
         )?;
-        repeat.check().map_err(|e| invalid("repeat-config", e))?;
-        let files =
-            crate::repeat::candidate_files(COMMAND, &inputs.reads, p.req("candidates"), None)
-                .map_err(|e| invalid("live-config", String::from_utf8_lossy(&e.out.bytes())))?;
-        for (count, cap) in [
-            (
-                files.iter().map(|c| c.rules.len()).sum::<usize>(),
-                crate::io::MAX_RULES_FILES,
-            ),
-            (
-                files.iter().map(|c| c.descriptors.len()).sum(),
-                crate::io::MAX_DESCRIPTOR_FILES,
-            ),
-            (
-                files.iter().map(|c| c.calibrations.len()).sum(),
-                crate::io::MAX_CALIBRATION_FILES,
-            ),
-        ] {
-            if count > cap {
-                return Err(Done::io(
-                    COMMAND,
-                    IoFail {
-                        path: "candidates".into(),
-                        detail: format!("more than {cap} dependency files"),
-                    },
-                ));
-            }
-        }
-        let mut sources_by_name = BTreeMap::new();
-        let mut candidates = BTreeMap::new();
-        let mut backends = BTreeMap::new();
         let mut rules_by_id = BTreeMap::new();
-        for c in files {
-            let mut rules = vec![];
-            let deps = rustev_surface::deps::load(
-                &inputs,
-                c.deps(),
-                &mut crate::deps::rules_hook(&mut rules),
-            )
-            .map_err(|e| invalid("live-config", format!("{e:?}")))?;
-            let plan = rustev_surface::plan::read_plan(COMMAND, &inputs, &c.plan)?;
-            let sources = documents::<rustev_contract::source::SourceDescriptor>(
-                &inputs,
-                &join(&join(p.req("candidates"), &c.name), "sources"),
-                DESCRIPTOR_V1.max_bytes,
-                crate::io::MAX_DESCRIPTOR_FILES,
-                true,
-            )?;
-            let compiled = rustev_core::Compiled::load_checked_with_sources(
-                &plan,
-                &deps.descriptors,
-                &deps.calibrations,
-                &sources,
-            )
-            .map_err(|e| invalid("live-config", format!("{e:?}")))?;
-            for source in sources {
-                if sources_by_name
-                    .insert(source.name.clone(), source.clone())
-                    .is_some_and(|old| old != source)
-                {
-                    return Err(invalid("live-config", "conflicting source descriptors"));
-                }
-            }
-            for backend in rules {
-                use rustev_core::seams::DecisionBackend;
-                let id = backend.descriptor().backend_id.clone();
-                if backends
-                    .insert(id, backend.descriptor().clone())
-                    .is_some_and(|old| old != *backend.descriptor())
-                {
-                    return Err(invalid("live-config", "conflicting backend descriptors"));
-                }
-                // Identical programs shared by candidates register only once below.
-                rules_by_id.insert(backend.descriptor().backend_id.clone(), backend);
-            }
-            candidates.insert(c.name, compiled);
+        for backend in rules {
+            use rustev_core::seams::DecisionBackend;
+            rules_by_id.insert(backend.descriptor().backend_id.clone(), backend);
         }
-        let acquisition_pages = p
-            .one("captures")
-            .map(|dir| documents(&inputs, dir, SNAPSHOT_V1.max_bytes, 4096, false))
-            .transpose()?
-            .unwrap_or_default();
         let tokio = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
@@ -391,7 +244,7 @@ pub fn run(p: &Parsed, cx: &Context) -> Result<Exit, Usage> {
                     sink: SinkPolicy::FailDecision { timeout_ms: 5_000 },
                 },
             );
-            for source in sources_by_name.into_values() {
+            for source in std::mem::take(&mut resolved.sources_by_name).into_values() {
                 builder = builder.acquisition_source(Arc::new(RetainedSource(source)), 64);
             }
             for backend in rules_by_id.into_values() {
@@ -400,7 +253,7 @@ pub fn run(p: &Parsed, cx: &Context) -> Result<Exit, Usage> {
             let runtime = builder
                 .build()
                 .map_err(|e| invalid("live-config", format!("{e:?}")))?;
-            for binding in &config.bindings {
+            for binding in &resolved.config.parsed.bindings {
                 let subject = if binding.cost_unit == CostUnit::None {
                     "spend-unit"
                 } else {
@@ -413,109 +266,64 @@ pub fn run(p: &Parsed, cx: &Context) -> Result<Exit, Usage> {
                     return Err(invalid("spend-unit", "unknown cost model"));
                 }
             }
-            let bundles = if let Some(dir) = p.one("bundles") {
-                read_bundles(COMMAND, &inputs, dir, manifest.split(split))?
-            } else {
-                BTreeMap::new()
-            };
             let resolver = crate::replay::resolver(p);
-            let mut cases = vec![];
-            for case in manifest.split(split) {
-                let unavailable = |reason: &str| CaseInput::Unavailable {
-                    reason: reason.into(),
-                };
-                let input = if let Some(dir) = p.one("snapshots") {
-                    match inputs.read_classified(
-                        &join(dir, &format!("{}.json", case.id)),
-                        SNAPSHOT_V1.max_bytes + 1,
-                    ) {
-                        Ok(Some(bytes)) => CaseInput::Available {
-                            source: CaseOrigin::DatasetCase,
-                            bundle: None,
-                            snapshot_bytes: bytes,
-                            snapshot_id: case.snapshot.clone(),
-                            source_time: None,
-                            scope: Some(scope.clone()),
+            let (cases, probe_bytes) = live::resolve_cases(
+                &inputs,
+                &args,
+                &resolved,
+                &replay,
+                resolver.as_ref(),
+                |run, name, repeat, case| {
+                    rustev_live::documents::decision_id(run, name, repeat, case, None)
+                        .map_err(live_error)
+                },
+            )?;
+            let live::Resolved {
+                config,
+                manifest,
+                evaluator,
+                adapter,
+                repeat,
+                candidates,
+                acquisition_pages,
+                ..
+            } = resolved;
+            let config = config.parsed;
+            let cases = cases
+                .into_iter()
+                .map(|case| LiveCase {
+                    case_id: case.case_id,
+                    input: match case.input {
+                        live::CaseInput::Unavailable { reason } => {
+                            CaseInput::Unavailable { reason }
+                        }
+                        live::CaseInput::Available {
+                            source,
+                            bundle,
+                            snapshot_bytes,
+                            snapshot_id,
+                            source_time,
+                            scope,
+                        } => CaseInput::Available {
+                            source: match source {
+                                live::CaseOrigin::DatasetCase => CaseOrigin::DatasetCase,
+                                live::CaseOrigin::ReplayBundle {
+                                    bundle_digest,
+                                    decision_id,
+                                } => CaseOrigin::ReplayBundle {
+                                    bundle_digest,
+                                    decision_id,
+                                },
+                            },
+                            bundle,
+                            snapshot_bytes,
+                            snapshot_id,
+                            source_time,
+                            scope,
                         },
-                        Ok(None) => unavailable("snapshot-missing"),
-                        Err(ReadFail::File(e) | ReadFail::Budget(e)) => {
-                            return Err(Done::io(COMMAND, e));
-                        }
-                    }
-                } else {
-                    match bundles.get(&case.id) {
-                        None => unavailable("bundle-missing"),
-                        Some(BundleInput::Failed(f)) => unavailable(f.kind.code()),
-                        Some(BundleInput::Loaded(b)) => {
-                            if b.scope != scope {
-                                unavailable("scope-mismatch")
-                            } else if b.check(None).is_err() {
-                                unavailable("invalid-bundle")
-                            } else if now >= b.expires_at_ms {
-                                unavailable("expired")
-                            } else {
-                                for name in candidates.keys() {
-                                    for repeat in 1..=config.repeats {
-                                        let id = rustev_live::documents::decision_id(
-                                            p.req("run-id"),
-                                            name,
-                                            repeat,
-                                            &case.id,
-                                            None,
-                                        )
-                                        .map_err(live_error)?;
-                                        if id == b.decision_id {
-                                            return Err(invalid(
-                                                "identity-mismatch",
-                                                "source and live decision ids coincide",
-                                            ));
-                                        }
-                                    }
-                                }
-                                if b.snapshot_id != case.snapshot {
-                                    return Err(invalid(
-                                        "identity-mismatch",
-                                        "bundle and case snapshot identities differ",
-                                    ));
-                                }
-                                match resolve_item::<Snapshot>(
-                                    &b.snapshot,
-                                    now,
-                                    resolver.as_ref(),
-                                    &mut Budget::default(),
-                                ) {
-                                    Ok(snapshot) => CaseInput::Available {
-                                        source: CaseOrigin::ReplayBundle {
-                                            bundle_digest: b
-                                                .record_digest()
-                                                .map_err(|e| invalid("identity-mismatch", e))?,
-                                            decision_id: b.decision_id.clone(),
-                                        },
-                                        bundle: Some(b.clone()),
-                                        snapshot_bytes: snapshot
-                                            .record_canonical()
-                                            .map_err(|e| invalid("identity-mismatch", e))?,
-                                        snapshot_id: b.snapshot_id.clone(),
-                                        source_time: Some(b.evaluation_time_ms),
-                                        scope: Some(b.scope.clone()),
-                                    },
-                                    Err(ItemFailure::Oversized) => unavailable("oversized"),
-                                    Err(ItemFailure::Unavailable(a)) => unavailable(a.name()),
-                                }
-                            }
-                        }
-                    }
-                };
-                cases.push(LiveCase {
-                    case_id: case.id.clone(),
-                    input,
-                });
-            }
-            // Use the bounded host rather than File::open in ProbeSnapshot::load:
-            // a special file must never block, and reads share the command budget.
-            let probe_bytes = inputs
-                .read(&config.probe.snapshot, SNAPSHOT_V1.max_bytes + 1)
-                .map_err(|e| invalid("probe-snapshot", e.detail))?;
+                    },
+                })
+                .collect();
             let case_ids: Vec<_> = manifest.cases.iter().map(|c| c.snapshot.clone()).collect();
             let probe_snapshot = ProbeSnapshot::from_bytes(&config.probe, &probe_bytes, &case_ids)
                 .map_err(live_error)?;
@@ -560,7 +368,7 @@ pub fn run(p: &Parsed, cx: &Context) -> Result<Exit, Usage> {
                 principal_handle: vec![],
                 subject: Handle::new("cli").expect("static handle"),
                 scope,
-                input_digests: inputs.digests.into_inner(),
+                input_digests: inputs.into_digests(),
             };
             let prepared = prepare(
                 spec,
@@ -641,40 +449,4 @@ pub fn run(p: &Parsed, cx: &Context) -> Result<Exit, Usage> {
         stdout: e.out.bytes(),
         stderr: String::new(),
     }))
-}
-
-// Directory names are only labels; page request identities come from parsed documents.
-fn documents<T: Document>(
-    inputs: &Inputs,
-    dir: &str,
-    max_bytes: usize,
-    max_files: usize,
-    optional: bool,
-) -> Result<Vec<T>, Done> {
-    let entries = match std::fs::read_dir(dir) {
-        Ok(entries) => entries,
-        Err(e) if optional && e.kind() == std::io::ErrorKind::NotFound => return Ok(vec![]),
-        Err(e) => return Err(invalid(dir, e)),
-    };
-    let mut paths = Vec::new();
-    for entry in entries {
-        let entry = entry.map_err(|e| invalid(dir, e))?;
-        if !entry.file_type().map_err(|e| invalid(dir, e))?.is_file() {
-            return Err(invalid(dir, "expected regular document files"));
-        }
-        let path = entry
-            .path()
-            .into_os_string()
-            .into_string()
-            .map_err(|_| invalid(dir, "non UTF-8 document name"))?;
-        paths.push(path);
-        if paths.len() > max_files {
-            return Err(invalid(dir, "too many documents"));
-        }
-    }
-    paths.sort();
-    paths
-        .iter()
-        .map(|path| read_doc(COMMAND, inputs, path, max_bytes))
-        .collect()
 }
