@@ -145,7 +145,12 @@ pub fn expr_refs(e: &Expr, out: &mut Vec<String>) {
 
 pub fn predicate_refs(p: &Predicate, out: &mut Vec<String>) {
     match p {
-        Predicate::Cmp { left, right, .. } => {
+        Predicate::Cmp { left, right, .. }
+        | Predicate::Under {
+            value: left,
+            ancestor: right,
+            ..
+        } => {
             expr_refs(left, out);
             expr_refs(right, out);
         }
@@ -182,7 +187,9 @@ pub fn expr_uses_v2(e: &Expr) -> bool {
 /// Whether a predicate uses a construct of `rustev.exact/2`.
 pub fn predicate_uses_v2(p: &Predicate) -> bool {
     match p {
-        Predicate::MemberRef { .. } | Predicate::IsConstructed { .. } => true,
+        Predicate::MemberRef { .. } | Predicate::IsConstructed { .. } | Predicate::Under { .. } => {
+            true
+        }
         Predicate::Cmp { left, right, .. } => expr_uses_v2(left) || expr_uses_v2(right),
         Predicate::All(ps) | Predicate::Any(ps) => ps.iter().any(predicate_uses_v2),
         Predicate::Not(p) => predicate_uses_v2(p),
@@ -232,7 +239,12 @@ pub fn expr_structure(e: &Expr) -> Result<(), String> {
 
 pub fn predicate_structure(p: &Predicate) -> Result<(), String> {
     match p {
-        Predicate::Cmp { left, right, .. } => {
+        Predicate::Cmp { left, right, .. }
+        | Predicate::Under {
+            value: left,
+            ancestor: right,
+            ..
+        } => {
             expr_structure(left)?;
             expr_structure(right)
         }
@@ -263,6 +275,14 @@ pub fn predicate_structure(p: &Predicate) -> Result<(), String> {
 }
 
 fn field_ty<'t>(ty: &'t Ty, path: &[String]) -> Result<&'t Ty, String> {
+    field_ty_mode(ty, path, false)
+}
+
+fn field_ty_mode<'t>(
+    ty: &'t Ty,
+    path: &[String],
+    preserve_nullable: bool,
+) -> Result<&'t Ty, String> {
     let unwrap = |t: &'t Ty| match t {
         // Reading a nullable field yields its type; `null` is missing.
         Ty::Nullable(inner) => inner.as_ref(),
@@ -271,7 +291,7 @@ fn field_ty<'t>(ty: &'t Ty, path: &[String]) -> Result<&'t Ty, String> {
     // A root is never nullable (`nullable` is a record field type only,
     // spec 032 3.4.1), so only a field read is unwrapped.
     let mut cur = ty;
-    for f in path {
+    for (index, f) in path.iter().enumerate() {
         if f.is_empty() {
             return Err("a path has an empty field name".into());
         }
@@ -282,7 +302,9 @@ fn field_ty<'t>(ty: &'t Ty, path: &[String]) -> Result<&'t Ty, String> {
                     .find(|(n, _)| n == f)
                     .map(|(_, t)| t)
                     .ok_or_else(|| format!("no field {f:?}"))?;
-                cur = unwrap(cur);
+                if !preserve_nullable || index + 1 < path.len() {
+                    cur = unwrap(cur);
+                }
             }
             other => return Err(format!("{} has no field {f:?}", other.name())),
         }
@@ -451,8 +473,51 @@ fn operand_fits(e: &Expr, t_other: &Ty, t_self: &Ty) -> bool {
     }
 }
 
+/// Validate segment ancestry operands in phase e, including policy positions.
+pub(crate) fn type_under(p: &Predicate, env: &TyEnv<'_>) -> Result<(), String> {
+    match p {
+        Predicate::Under { .. } => type_predicate(p, env),
+        Predicate::All(ps) | Predicate::Any(ps) => ps.iter().try_for_each(|p| type_under(p, env)),
+        Predicate::Not(p) => type_under(p, env),
+        _ => Ok(()),
+    }
+}
+
 pub fn type_predicate(p: &Predicate, env: &TyEnv<'_>) -> Result<(), String> {
     match p {
+        Predicate::Under {
+            value, ancestor, ..
+        } => {
+            for (name, expr) in [("value", value), ("ancestor", ancestor)] {
+                let ty = type_expr(expr, env)?;
+                let declared = if let Expr::Ref(r) | Expr::Graded { reference: r, .. } = expr {
+                    match Ref::parse(r)? {
+                        Ref::Input(n, path) => Some(field_ty_mode(&env.inputs[&n], &path, true)?),
+                        Ref::Item(path) => {
+                            let path = if env.v2 { split_item(path) } else { path };
+                            Some(field_ty_mode(env.item.unwrap(), &path, true)?)
+                        }
+                        Ref::Step(s) => {
+                            let (s, path) = if env.v2 { split_step(&s) } else { (s, vec![]) };
+                            match env.steps.get(&s) {
+                                Some(StepTy::Exact(t)) => Some(field_ty_mode(t, &path, true)?),
+                                _ => None,
+                            }
+                        }
+                        _ => None,
+                    }
+                } else {
+                    None
+                };
+                if declared.is_some_and(|t| matches!(t, Ty::Nullable(_))) {
+                    return Err(format!("under {name} requires non-nullable text"));
+                }
+                if !matches!(ty, Ty::Text { .. }) {
+                    return Err(format!("under {name} requires text, got {}", ty.name()));
+                }
+            }
+            Ok(())
+        }
         Predicate::Cmp { left, op, right } => {
             let (lt, rt) = (type_expr(left, env)?, type_expr(right, env)?);
             if matches!(lt, Ty::Maybe(_)) || matches!(rt, Ty::Maybe(_)) {
@@ -806,6 +871,34 @@ fn cmp_values(a: &Value, op: CmpOp, b: &Value) -> Result<bool, Fault> {
 
 pub fn eval_predicate(p: &Predicate, s: &Scope<'_>) -> Result<bool, Fault> {
     match p {
+        Predicate::Under {
+            value,
+            ancestor,
+            separator,
+        } => {
+            let value = eval_expr(value, s)?;
+            let ancestor = eval_expr(ancestor, s)?;
+            let sep = separator.as_byte();
+            for (name, operand) in [("value", &value), ("ancestor", &ancestor)] {
+                let Value::Text(text) = operand else {
+                    return Err(Fault::Invalid(format!("under {name} requires text")));
+                };
+                if text
+                    .as_bytes()
+                    .split(|b| *b == sep)
+                    .any(|part| part.is_empty())
+                {
+                    return Err(Fault::Invalid(format!("under {name} has an empty segment")));
+                }
+            }
+            let (Value::Text(value), Value::Text(ancestor)) = (value, ancestor) else {
+                unreachable!("validated text operands")
+            };
+            Ok(value
+                .as_bytes()
+                .strip_prefix(ancestor.as_bytes())
+                .is_some_and(|suffix| suffix.first() == Some(&sep)))
+        }
         Predicate::Cmp { left, op, right } => {
             cmp_values(&eval_expr(left, s)?, *op, &eval_expr(right, s)?)
         }

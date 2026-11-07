@@ -281,7 +281,12 @@ fn requirement_mins(e: &Expr, out: &mut Vec<Grade>) {
 
 fn predicate_mins(p: &Predicate, out: &mut Vec<Grade>) {
     match p {
-        Predicate::Cmp { left, right, .. } => {
+        Predicate::Cmp { left, right, .. }
+        | Predicate::Under {
+            value: left,
+            ancestor: right,
+            ..
+        } => {
             requirement_mins(left, out);
             requirement_mins(right, out);
         }
@@ -823,7 +828,12 @@ pub(crate) fn predicate_reads(
     out: &mut Vec<Read>,
 ) {
     match p {
-        Predicate::Cmp { left, right, .. } => {
+        Predicate::Cmp { left, right, .. }
+        | Predicate::Under {
+            value: left,
+            ancestor: right,
+            ..
+        } => {
             expr_reads(left, item, gate, out);
             expr_reads(right, item, gate, out);
         }

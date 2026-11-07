@@ -222,6 +222,17 @@ pub mod e {
             right: b,
         }
     }
+    pub fn under(
+        value: Expr,
+        ancestor: Expr,
+        separator: rustev_contract::definition::SegmentSeparator,
+    ) -> Predicate {
+        Predicate::Under {
+            value,
+            ancestor,
+            separator,
+        }
+    }
     pub fn all(ps: Vec<Predicate>) -> Predicate {
         Predicate::All(ps)
     }

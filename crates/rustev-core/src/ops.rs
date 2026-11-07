@@ -477,7 +477,12 @@ fn has_fx_expr(e: &Expr) -> bool {
 
 fn has_fx_pred(p: &Predicate) -> bool {
     match p {
-        Predicate::Cmp { left, right, .. } => has_fx_expr(left) || has_fx_expr(right),
+        Predicate::Cmp { left, right, .. }
+        | Predicate::Under {
+            value: left,
+            ancestor: right,
+            ..
+        } => has_fx_expr(left) || has_fx_expr(right),
         Predicate::All(ps) | Predicate::Any(ps) => ps.iter().any(has_fx_pred),
         Predicate::Not(p) => has_fx_pred(p),
         Predicate::Member { value, .. } | Predicate::MemberRef { value, .. } => has_fx_expr(value),
