@@ -240,6 +240,8 @@ struct Fake {
     /// Uploads that fail without landing.
     fails: Vec<String>,
     unknown: Vec<String>,
+    /// Names public without npm provenance (A-87), and uploads that land so.
+    unattested: Vec<String>,
     published: Vec<String>,
     lag: u32,
 }
@@ -252,6 +254,11 @@ impl Publisher for Fake {
             };
         }
         match self.public.get(&item.name) {
+            Some(c) if self.lag == 0 && self.unattested.contains(&item.name) => {
+                Lookup::Unattested {
+                    checksum: c.clone(),
+                }
+            }
             Some(c) if self.lag == 0 => Lookup::Visible {
                 checksum: c.clone(),
             },
@@ -351,6 +358,37 @@ fn present_and_different_fails_and_republishes_nothing() {
         );
         assert!(fake.published.is_empty() && r.entries.is_empty());
     }
+}
+
+#[test]
+fn present_without_provenance_fails_and_republishes_nothing() {
+    // A-87: an npm version published by hand from the run's own tarball has
+    // the run's integrity but no provenance; it is refused, not `present`.
+    let items = [item("npm", "a"), item("npm", "b")];
+    let mut fake = Fake::default();
+    fake.public.insert("a".into(), items[0].expected.clone());
+    fake.unattested.push("a".into());
+    let mut r = record();
+    let err = tagged::publish_items(&items, "0.3.0", 5, &mut fake, &mut r).unwrap_err();
+    assert!(
+        err.contains("A-87") && err.contains("without npm provenance"),
+        "{err}"
+    );
+    assert!(fake.published.is_empty() && r.entries.is_empty());
+}
+
+#[test]
+fn an_upload_that_lands_without_provenance_fails() {
+    let items = [item("npm", "a"), item("npm", "b")];
+    let mut fake = Fake {
+        unattested: vec!["a".into()],
+        ..Fake::default()
+    };
+    let mut r = record();
+    let err = tagged::publish_items(&items, "0.3.0", 5, &mut fake, &mut r).unwrap_err();
+    assert!(err.contains("A-87"), "{err}");
+    assert_eq!(fake.published, ["a"]);
+    assert!(r.entries.is_empty());
 }
 
 #[test]

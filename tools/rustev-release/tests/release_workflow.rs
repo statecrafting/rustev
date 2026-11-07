@@ -106,7 +106,20 @@ fn release_runs_on_a_pushed_tag_and_dispatch_is_the_dry_run() {
     assert!(on.contains("  workflow_dispatch:"), "{on}");
     // A dry run carries no inputs: no manifest, signature or publish switch.
     assert!(!on.contains("inputs:"), "{on}");
-    assert!(!WORKFLOW.contains("secrets."), "no registry secret is read");
+    // A-87: the one secret is npm's fallback token, read only by `publish-npm`
+    // (whose Environment holds it); no other job reads a registry secret.
+    let npm = job_text(WORKFLOW, "publish-npm").expect("publish-npm");
+    let reads = |t: &str| t.matches("secrets.").count();
+    assert_eq!(
+        reads(&WORKFLOW.replace(&npm, "")),
+        0,
+        "a secret outside publish-npm"
+    );
+    assert_eq!(
+        npm.matches("secrets.NPM_TOKEN").count(),
+        reads(&npm),
+        "{npm}"
+    );
 }
 
 #[test]

@@ -39,7 +39,8 @@
 #   bundle staged as `<file>.intoto.jsonl`.
 # - `approve`: the `release` Environment gate (no reviewer, A-61).
 # - `publish-crates`, `publish-npm`: idempotent publication in the release
-#   set's order, through crates.io and npm trusted publishing (OIDC), npm with
+#   set's order, through crates.io and npm trusted publishing (OIDC; npm falls
+#   back to a granular token when npm refuses the exchange, A-87), npm with
 #   provenance; `publication.json` records each item.
 # - `publish-image`: layer 7 (spec 060 3.3), only for a release tag whose
 #   release set names the image: each platform's verified OCI archive pushed
@@ -840,8 +841,11 @@ jobs:
           package-manager-cache: false
           node-version: 22
       # Trusted publishing authenticates with the job's OIDC token and needs
-      # npm 11.5.1 or later; Node 22 bundles npm 10. No registry-url is set,
-      # so no .npmrc expects a NODE_AUTH_TOKEN, and no token exists here.
+      # npm 11.5.1 or later; Node 22 bundles npm 10. No registry-url is set.
+      # A-87: when npm refuses the exchange (npm/cli#9969) npm falls back to
+      # the `npm-publish` Environment's granular token, written below only
+      # when that secret exists. Either way `--provenance` signs with the
+      # job's OIDC token, and the publisher refuses a version without it.
       - name: Install the pinned npm for trusted publishing
         # Pinned by content: the tarball's SHA-512 must equal the registry's
         # integrity recorded here for npm 11.21.0 before it is installed.
@@ -865,7 +869,21 @@ jobs:
           path: ${{ runner.temp }}
       - name: Build the publisher
         run: cargo build --quiet --locked -p rustev-release
+      - name: Configure the fallback token, used only when npm refuses trusted publishing (A-87)
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -eu
+          if [ -n "${NPM_TOKEN:-}" ]; then
+            # npm expands ${NPM_TOKEN} itself; the file never holds the value.
+            printf '%s\n' '//registry.npmjs.org/:_authToken=${NPM_TOKEN}' > "$RUNNER_TEMP/.npmrc"
+            echo "NPM_CONFIG_USERCONFIG=$RUNNER_TEMP/.npmrc" >> "$GITHUB_ENV"
+          else
+            echo "::notice title=no fallback token::trusted publishing only"
+          fi
       - name: Publish with provenance in the release set's order, after every crate is public (058 3.3.2, 3.5.2)
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: target/debug/rustev-release publish-npm "$RUNNER_TEMP/release" "$RUNNER_TEMP/publication.json"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
