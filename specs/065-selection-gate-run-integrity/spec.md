@@ -2,7 +2,7 @@
 id: "065-selection-gate-run-integrity"
 title: "Selection gate: run integrity failures void the comparison instead of rejecting (amends 029 and 061)"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-11-06"
 summary: >
   An amendment of approved specs 029 (3.12) and 061 (3.7), for release
@@ -28,6 +28,13 @@ extends:
   - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: amending }
   # One CLI conformance case for a void candidate.
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "tools/rustev-conformance/" }, nature: additive }
+  # The new source file of `rustev-eval` joins the reviewed archive list
+  # (spec 021, 3.5).
+  - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
+  # Adds 065 to `VERIFIED_SPECS`.
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  # Adds 065 to CI's `cli-repeat` acceptance group.
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
 depends_on:
   - "002-decision-contract-and-pure-core"
   - "004-evaluation-and-replay"
@@ -57,7 +64,7 @@ obligations:
 # 065: Selection gate: run integrity failures void the comparison instead of rejecting (amends 029 and 061)
 
 Approved: ratified by the owner on 2026-11-06 (A-84) for release 0.6.0;
-the implementation is pending. The approved texts of 029 and 061 are not
+implemented in full (see the Implementation record). The approved texts of 029 and 061 are not
 edited; this spec records what it adds to them.
 
 ## 1. Purpose
@@ -290,11 +297,56 @@ gate`, which keeps 004 3.5.8's behavior.
 
 ## Verification
 
-Pending with implementation.
+Run by `make verify` (065 is in `VERIFIED_SPECS`, in CI's `cli-repeat`
+acceptance group beside 029 and 061, the specs it amends). Every command
+is repository-local and deterministic over synthetic fixtures (R-04:
+mechanics, never a quality claim).
+
+```verify:cli
+# 3.1 to 3.5 and section 5 in the library: the gate member and its
+# refusals, the counts of 3.2 for Rustev-evaluated and host runs, and the
+# precondition over 029's and 061's selections; with every spec 029, 041
+# and 061 eval test, unchanged, for the shared code.
+cargo test -p rustev-eval --locked
+# 3.3.5 and 3.4 through `gate select`, with the goldens under
+# tests/golden/integrity/ and exit codes 0, 11 and 12; every existing CLI
+# and plan golden byte-identical (R-1).
+cargo test -p rustev-cli --locked
+# The CLI conformance case for a void candidate.
+cargo test -p rustev-conformance --locked
+cargo clippy -p rustev-eval -p rustev-cli -p rustev-conformance --all-targets --locked -- -D warnings
+# Negative control: each acceptance seed must be detected.
+sh crates/rustev-eval/mutation/seeds.sh "spec 065"
+```
 
 ## Implementation record
 
-None yet.
+Implemented in full in one change for release 0.6.0. `rustev-eval`
+gains the module `integrity` (3.5): the gate member `Integrity` with the
+field rules of 3.1 (at least one bound, each from 0 to 1 000 000, unknown
+fields refused), and the public, synchronous counts `evaluated_counts`
+(3.2.1, 3.2.2) and `host_counts` (3.2.3, 3.2.4), each naming the verified
+documents it read. The selections of 029 (`selection`) and 061
+(`host_select`) evaluate the precondition after the binding
+preconditions and before the coverage minimums, baseline runs first and
+computed once (3.3); a breach makes every clause unknown with reason
+`precondition: integrity`, and the verdict names the first breached
+entry (3.4.1, 3.4.2). `gate select` adds `notice: "void: repeat the run"`
+beside a void candidate's verdict on stdout (3.4.3); a gate without
+`integrity` writes the same selection bytes, stdout and exit code (R-1).
+One reading of 3.2.5: a declared scorer that feeds no rubric metric has
+no per-scorer unscored count in the verified report, so its run's invalid
+count is unestablished. Evidence: `crates/rustev-eval/tests/integrity.rs`
+and `tests/host_select.rs` (every row of section 5), the goldens under
+`crates/rustev-cli/tests/golden/integrity/` and
+`golden/integrity-void.*`, the conformance case
+`cli/integrity-void.stdout`, and the five acceptance seeds
+(`seeds.sh "spec 065"`), each detected. Every existing eval, CLI, 029,
+061, conformance and plan golden, `PlanId`, schema and binding type is
+byte-identical. The new file `src/integrity.rs` joins `rustev-eval`'s
+reviewed archive list in `tools/rustev-release/archive-policy.json`
+(spec 021, 3.5; the `extends` edge on `tools/rustev-release/`, 031,
+additive).
 
 ## Decisions at approval
 

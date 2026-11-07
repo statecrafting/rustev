@@ -5,6 +5,7 @@
       "061-host-scored-repeat-sets"
     ],
     "created": "2026-11-06",
+    "declaresAcceptance": true,
     "dependsOn": [
       "002-decision-contract-and-pure-core",
       "004-evaluation-and-replay",
@@ -39,10 +40,34 @@
           "kind": "directory",
           "path": "tools/rustev-conformance/"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-public-api-and-release-family",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-release/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "directory",
+          "path": "scripts/acceptance/"
+        }
       }
     ],
     "id": "065-selection-gate-run-integrity",
-    "implementation": "pending",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-3-a-breach-voids-the-comparison",
@@ -73,7 +98,7 @@
       }
     ],
     "sectionDigests": {
-      "065-selection-gate-run-integrity-failures-void-the-comparison-instead-of-rejecting-amends-029-and-061": "a701afd5e252b5e13aeacbd7685246437868d0065353fd334688b372017dee99",
+      "065-selection-gate-run-integrity-failures-void-the-comparison-instead-of-rejecting-amends-029-and-061": "2b807d33ec761a584b516cd0ce2f020232cfaea8d1111790985506a9e3fcd8ba",
       "1-purpose": "47314b75af61f2f24c88ef53735518485af6fa68512cbb336b22e2903e3faa61",
       "2-1-binding-principles": "15e67398c2e2d9a5bdd50686d839c6fc1e132e52b80314d92a08a7ee85082b30",
       "2-territory": "48ef7e0910a65c0ead9f8e3509fc87b44325f481b61439bcbe9c468044fe9a46",
@@ -88,8 +113,8 @@
       "5-observable-negative-cases": "c609effe2f2e5b7e089e54347421d21553f8f4487a9ad79289e42f0a8d97997d",
       "acceptance": "fd3de0c03a9a03642d291eb2c17dceb4b4ec3afb2c99f025d26df456c5c6e01f",
       "decisions-at-approval": "09c79c97815398fb25fc22deca36dd91a04750d8e5cfe8ccd327fa6a1db9170d",
-      "implementation-record": "0436ad8b97e1ce4e610da89218ea0aa395a80391005b67fca85f34ae62e5559b",
-      "verification": "08b0bec48cf6ffca73b439bc5db9e183b263229fe21d236c7c5f194bbbc09ba8"
+      "implementation-record": "703bcfa26f51e0ef16ce7dd12e07b1f6e717209d0ba9932d3be18006c7e244bb",
+      "verification": "3b4815532a3e10b3b455c8c702ce3131525b154f321f5964e14cb7c2beeee3ab"
     },
     "sectionHeadings": [
       "065: Selection gate: run integrity failures void the comparison instead of rejecting (amends 029 and 061)",
@@ -115,6 +140,6 @@
     "summary": "An amendment of approved specs 029 (3.12) and 061 (3.7), for release 0.6.0 (#538), ratified by the owner on 2026-11-06 (A-84). A run with integrity failures (results the evaluator could not score, cases a backend or source failed on) is not a measurement, yet today it can only lower coverage and reject the candidate, which reads as a verdict about the candidate when the run is the problem. This spec adds an optional integrity precondition to `rustev.selection-gate/1`, `integrity: { max_invalid, max_upstream_failures }`, counted per run on each side from documents the selection already verifies. A breach, or a count that cannot be established, voids the comparison: the candidate is `unknown` naming the run, no coverage minimum or clause is evaluated, and so it can never be rejected or qualify on a void run; a baseline run in breach voids every candidate. Gates without the member keep their bytes, identities and results.\n",
     "title": "Selection gate: run integrity failures void the comparison instead of rejecting (amends 029 and 061)"
   },
-  "shardHash": "9a55d392d11774172863a0ed67feac6c0f6218615cbadac9c425b52efd92d9cc",
+  "shardHash": "c0944450e3173687865bc1a7c5aa8d28b37ec1ab44aeb3355f2053d47097f0eb",
   "specVersion": "1.11.0"
 }

@@ -564,3 +564,58 @@ fn case_regressions_stdout_keeps_host_assertion_and_full_file_evidence() {
     assert_eq!(cases["unmeasured"], 2);
     assert!(cases["regressions"]["list"][0]["baseline"].is_number());
 }
+
+#[test]
+fn integrity_host_selection_stdout_marks_void_runs_and_preserves_assertions() {
+    let s = Scratch::new("host-integrity");
+    record_baseline(&s);
+    write_gate(&s);
+    imported(&s, "candidates/good", &candidate(|c| c.latency_base = 500));
+    imported(
+        &s,
+        "candidates/bad",
+        &candidate(|c| {
+            c.extra_failed = vec!["c4"];
+            c.score_shift -= 0.15;
+        }),
+    );
+    let mut g: serde_json::Value = serde_json::from_slice(&s.read("gate.json")).unwrap();
+    for (name, integrity) in [
+        ("mixed", serde_json::json!({"max_upstream_failures":1})),
+        ("baseline", serde_json::json!({"max_upstream_failures":0})),
+        ("invalid", serde_json::json!({"max_invalid":0})),
+    ] {
+        g["integrity"] = integrity;
+        s.write("gate.json", &serde_json::to_vec(&g).unwrap());
+        let r = select(&s, "candidates", &format!("integrity-{name}.json"));
+        let out = r.expect(12, "unknown");
+        assert_eq!(out["assertion"], "host-asserted");
+        for c in out["candidates"].as_array().unwrap() {
+            if c["verdict"].get("unknown").is_some() {
+                assert_eq!(c["notice"], "void: repeat the run");
+                assert!(
+                    c["clauses"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .all(|c| !c["clause"].as_str().unwrap().ends_with("coverage"))
+                );
+            }
+        }
+        if name == "mixed" {
+            assert_eq!(out["ranked"], serde_json::json!(["good"]));
+        }
+        for (suffix, bytes) in [
+            ("stdout", r.stdout),
+            ("json", s.read(&format!("integrity-{name}.json"))),
+        ] {
+            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join(format!("tests/golden/integrity/host-{name}.{suffix}"));
+            if std::env::var_os("UPDATE_INTEGRITY_GOLDENS").is_some() {
+                std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+                std::fs::write(&path, &bytes).unwrap();
+            }
+            assert_eq!(std::fs::read(path).unwrap(), bytes);
+        }
+    }
+}

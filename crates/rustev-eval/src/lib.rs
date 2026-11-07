@@ -29,6 +29,7 @@ pub mod holdout;
 pub mod host_repeat;
 pub mod host_run;
 pub mod host_select;
+pub mod integrity;
 pub mod judge;
 pub mod live;
 pub mod measured;

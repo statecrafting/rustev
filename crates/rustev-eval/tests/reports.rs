@@ -3008,6 +3008,26 @@ async fn version_3_scores_views_and_reports_rubric_metrics() {
     let (_, _, why) = count(&e3.detail, "rubric/tone_long");
     assert_eq!(why["unscored:invalid_score"], 1);
 
+    // Integrity reads the same verified report counts, across all scorers.
+    assert!(
+        rustev_eval::integrity::evaluated_counts(&e2)
+            .invalid
+            .is_err()
+    );
+    let complete_bad = [bad.clone(), size_scores.clone(), judge_scores.clone()];
+    let counted = evaluate_measured(
+        &inputs,
+        Measured {
+            adapter: &Lodging,
+            scores: &complete_bad,
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        rustev_eval::integrity::evaluated_counts(&counted).invalid,
+        Ok(1)
+    );
+
     // The refusals of 3.7.5.
     let refused = |scores: &[Scores]| match evaluate_measured(
         &inputs,

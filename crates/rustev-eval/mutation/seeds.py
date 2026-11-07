@@ -41,7 +41,7 @@ REQUIRED = [
 # run them a second time in CI; `seeds.sh "spec 023"`, `live-comparison` and
 # `"spec 029"` still run and require every one. A spec whose acceptance
 # starts filtering its own seeds joins this list.
-OWN_RUNS = ("spec 023", "live-comparison", "spec 029", "spec 040", "spec 035", "spec 036", "spec 037", "spec 041", "spec 061", "spec 064")
+OWN_RUNS = ("spec 023", "live-comparison", "spec 029", "spec 040", "spec 035", "spec 036", "spec 037", "spec 041", "spec 061", "spec 064", "spec 065")
 # Generous: a new test binary can wait on the OS before it starts.
 TEST_TIMEOUT_S = 1800
 
@@ -806,6 +806,50 @@ SEEDS += [
     ),
 ]
 
+
+# Spec 065's acceptance seeds (`seeds.sh "spec 065"`).
+SEEDS += [
+    (
+        "spec 065",
+        "a breach evaluated after the clauses",
+        E + "selection.rs",
+        """                precondition_reason = Some("integrity".into());""",
+        """                let _ = 0;""",
+        EVAL,
+    ),
+    (
+        "spec 065",
+        "an unestablished count taken as zero",
+        E + "integrity.rs",
+        'let d = run.config.declarations().ok_or("no declared scorer")?;',
+        "let Some(d) = run.config.declarations() else { return Ok(0) };",
+        EVAL,
+    ),
+    (
+        "spec 065",
+        "a count equal to the bound treated as a breach",
+        E + "integrity.rs",
+        "Ok(count) if count <= limit =>",
+        "Ok(count) if count < limit =>",
+        EVAL,
+    ),
+    (
+        "spec 065",
+        "a baseline breach applied to one candidate only",
+        E + "selection.rs",
+        "            clauses.extend(baseline_integrity.clone().unwrap_or_default());",
+        "            clauses.extend(baseline_integrity.clone().filter(|_| decisions.is_empty()).unwrap_or_default());",
+        EVAL,
+    ),
+    (
+        "spec 065",
+        "budget_exhausted counted as upstream",
+        E + "integrity.rs",
+        '                    | "abstention:deadline_exceeded"',
+        '                    | "abstention:deadline_exceeded" | "abstention:budget_exhausted"',
+        EVAL,
+    ),
+]
 
 def run(cmd, cwd, env, timeout=None):
     # A session of its own, so a timeout kills the test binaries too.
