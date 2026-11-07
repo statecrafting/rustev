@@ -23,7 +23,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::JournalGate;
 use crate::documents::*;
-use crate::journal::{RunSpend, SpendJournal, SpendSummary};
+use crate::journal::{
+    BudgetKind, JournalError, JournalIdentity, JournalOpening, RunSpend, SpendClock, SpendJournal,
+    SpendSummary,
+};
 use crate::probe::{self, ProbeInputs, ProbeReport, ProbeSnapshot, ProbeStatus};
 
 pub use crate::reports::ReportInputs;
@@ -86,8 +89,14 @@ pub enum CaseInput {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct RunOptions {
+    /// The journal whose actual header is bound before output creation.
+    pub journal_path: PathBuf,
+    /// Refuse a missing journal without creating a journal, lock or output.
+    pub require_existing_journal: bool,
+    /// Supplies creation time and the spend journal's accounting clock.
+    pub journal_clock: std::sync::Arc<dyn SpendClock>,
     pub out: PathBuf,
     pub resume: bool,
     pub rerun_interrupted: bool,
@@ -95,7 +104,22 @@ pub struct RunOptions {
     pub run_deadline_ms: Option<u64>,
 }
 
+impl std::fmt::Debug for RunOptions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RunOptions")
+            .field("journal_path", &self.journal_path)
+            .field("require_existing_journal", &self.require_existing_journal)
+            .field("out", &self.out)
+            .field("resume", &self.resume)
+            .field("rerun_interrupted", &self.rerun_interrupted)
+            .field("probe_only", &self.probe_only)
+            .field("run_deadline_ms", &self.run_deadline_ms)
+            .finish_non_exhaustive()
+    }
+}
+
 pub struct PreparedRun {
+    journal: JournalOpening,
     spec: RunSpec,
     opts: RunOptions,
     snapshots: BTreeMap<String, Snapshot>,
@@ -136,6 +160,7 @@ pub struct RunOutcome {
     /// Interrupted items have the reporting reason `live-interrupted`.
     pub items: Vec<(String, ItemState)>,
     pub run_spend: RunSpend,
+    pub journal: JournalIdentity,
     pub journal_before: SpendSummary,
     pub journal_after: SpendSummary,
 }
@@ -289,6 +314,14 @@ pub fn prepare(mut spec: RunSpec, opts: RunOptions) -> Result<PreparedRun, LiveE
             "the probe snapshot is a case snapshot",
         ));
     }
+    let journal = JournalOpening::prepare(
+        &opts.journal_path,
+        BudgetKind::Testing,
+        opts.journal_clock.clone(),
+        &spec.run_id,
+        opts.require_existing_journal,
+    )
+    .map_err(journal_error)?;
     let bindings = CheckpointBindings {
         run_id: spec.run_id.clone(),
         live_config_id: spec.config.id().map_err(LiveError::io)?,
@@ -303,7 +336,7 @@ pub fn prepare(mut spec: RunSpec, opts: RunOptions) -> Result<PreparedRun, LiveE
                 bindings: reached[name].clone(),
             })
             .collect(),
-        journal_header_digest: SpendJournal::testing_header_digest(),
+        journal_header_digest: journal.header_digest(),
         input_digests: spec.input_digests.clone(),
     };
     let mut checkpoint = LiveCheckpoint {
@@ -321,6 +354,12 @@ pub fn prepare(mut spec: RunSpec, opts: RunOptions) -> Result<PreparedRun, LiveE
                 detail: "no checkpoint exists; nothing was sent because the journal is opened only after the checkpoint exists; a fresh run without resume is safe after removing --out or choosing a new --out".into(),
             });
         }
+        if !opts.journal_path.try_exists().map_err(LiveError::io)? {
+            return Err(LiveError::invalid(
+                "checkpoint-mismatch",
+                "resume journal is missing",
+            ));
+        }
         let saved = match LiveCheckpoint::read(&path, &checkpoint.bindings) {
             Ok(saved) => saved,
             // A checkpoint bound to the testing header under the superseded
@@ -328,7 +367,7 @@ pub fn prepare(mut spec: RunSpec, opts: RunOptions) -> Result<PreparedRun, LiveE
             // accept it and bind the current header from now on.
             Err(e) if e.subject == "checkpoint-mismatch" => {
                 let mut legacy = checkpoint.bindings.clone();
-                legacy.journal_header_digest = SpendJournal::superseded_testing_header_digest();
+                legacy.journal_header_digest = journal.superseded_header_digest();
                 let mut saved = LiveCheckpoint::read(&path, &legacy).map_err(|_| e)?;
                 saved.bindings = checkpoint.bindings.clone();
                 saved
@@ -374,6 +413,7 @@ pub fn prepare(mut spec: RunSpec, opts: RunOptions) -> Result<PreparedRun, LiveE
         checkpoint.write_atomic(&path)?;
     }
     Ok(PreparedRun {
+        journal,
         spec,
         opts,
         snapshots,
@@ -434,7 +474,26 @@ fn pending(item: &CheckpointItem) -> bool {
 type Work<'a> =
     Pin<Box<dyn Future<Output = (usize, Result<(LiveResult, SourceOutcome), LiveRefusal>)> + 'a>>;
 
+fn journal_error(e: JournalError) -> LiveError {
+    match e {
+        JournalError::Missing => LiveError::invalid("journal-missing", e),
+        JournalError::Changed => LiveError::invalid("checkpoint-mismatch", e),
+        JournalError::Mismatch(_) => LiveError::invalid("journal-budget", e),
+        JournalError::Locked(_) => LiveError {
+            status: "io_error",
+            subject: "journal-locked",
+            detail: e.to_string(),
+        },
+        _ => LiveError::io(e),
+    }
+}
+
 impl PreparedRun {
+    /// Open only the journal whose header was checked before output preparation.
+    pub fn open_journal(&self) -> Result<SpendJournal, LiveError> {
+        self.journal.open().map_err(journal_error)
+    }
+
     fn save(&self) -> Result<(), LiveError> {
         self.checkpoint
             .write_atomic(self.opts.out.join("checkpoint.json"))
@@ -451,6 +510,12 @@ impl PreparedRun {
         clock: &dyn Clock,
         cancel: &CancelSignal,
     ) -> Result<RunOutcome, LiveError> {
+        if journal.header_digest() != &self.checkpoint.bindings.journal_header_digest {
+            return Err(LiveError::invalid(
+                "checkpoint-mismatch",
+                "opened journal differs",
+            ));
+        }
         let deadline = self
             .opts
             .run_deadline_ms
@@ -655,6 +720,7 @@ impl PreparedRun {
             probe: report.clone(),
             counts,
             run_spend: journal.run_split(&self.spec.run_id),
+            journal: Some(self.journal.identity()),
             journal_before: before.clone(),
             journal_after: journal.summary(),
             cases,
@@ -676,6 +742,7 @@ impl PreparedRun {
             repeat_reports,
             comparison,
             run_spend: live_run.run_spend.clone(),
+            journal: self.journal.identity(),
             journal_after: live_run.journal_after.clone(),
             live_run,
             status,

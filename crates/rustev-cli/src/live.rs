@@ -11,7 +11,7 @@ use rustev_contract::{Document, Identified};
 use rustev_core::seams::{BoxFuture, EvidenceSink};
 use rustev_eval::metrics::TaskAdapter;
 use rustev_live::documents::{CostUnit, EvaluationTime, LiveConfig, LiveError, Mode};
-use rustev_live::journal::{BudgetKind, JournalError, SpendJournal, SystemClock};
+use rustev_live::journal::{JournalCreated, SetClock};
 use rustev_live::probe::ProbeSnapshot;
 use rustev_live::run::{
     CaseInput, CaseOrigin, LiveCase, ReportInputs, RunOptions, RunSpec, RunStatus,
@@ -373,6 +373,9 @@ pub fn run(p: &Parsed, cx: &Context) -> Result<Exit, Usage> {
             let prepared = prepare(
                 spec,
                 RunOptions {
+                    journal_path: p.req("journal").into(),
+                    require_existing_journal: p.has("require-existing-journal"),
+                    journal_clock: Arc::new(SetClock::new(now.as_ms())),
                     out: p.req("out").into(),
                     resume: p.has("resume"),
                     rerun_interrupted: p.has("rerun-interrupted"),
@@ -381,25 +384,7 @@ pub fn run(p: &Parsed, cx: &Context) -> Result<Exit, Usage> {
                 },
             )
             .map_err(live_error)?;
-            let journal =
-                SpendJournal::open(p.req("journal"), BudgetKind::Testing, Arc::new(SystemClock))
-                    .map_err(|e| match e {
-                        JournalError::Mismatch(_) => invalid("journal-budget", e),
-                        JournalError::Locked(_) => Done::io(
-                            COMMAND,
-                            IoFail {
-                                path: "journal-locked".into(),
-                                detail: e.to_string(),
-                            },
-                        ),
-                        _ => Done::io(
-                            COMMAND,
-                            IoFail {
-                                path: "journal".into(),
-                                detail: e.to_string(),
-                            },
-                        ),
-                    })?;
+            let journal = prepared.open_journal().map_err(live_error)?;
             if cx.handle_signals {
                 let cancel = cx.cancel.clone();
                 tokio::spawn(async move {
@@ -437,9 +422,10 @@ pub fn run(p: &Parsed, cx: &Context) -> Result<Exit, Usage> {
             let counts = &outcome.live_run.counts;
             Ok(Exit {
                 code: exit_code(outcome.status), stderr: String::new(),
-                stdout: format!("{status} {} run_spend={} headroom={} completed={} unavailable={} refused={} interrupted={} pending={}\n",
+                stdout: format!("{status} {} run_spend={} headroom={} completed={} unavailable={} refused={} interrupted={} pending={}{}\n",
                     p.req("run-id"), journal.run_spend(p.req("run-id")), outcome.journal_after.headroom,
-                    counts["completed"], counts["unavailable"], counts["refused"], counts["interrupted"], counts["pending"]).into_bytes(),
+                    counts["completed"], counts["unavailable"], counts["refused"], counts["interrupted"], counts["pending"],
+                    if outcome.journal.created == JournalCreated::ThisRun { " new_journal" } else { "" }).into_bytes(),
             })
         };
         tokio.block_on(execution)

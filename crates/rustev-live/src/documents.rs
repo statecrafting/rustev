@@ -747,6 +747,8 @@ pub struct LiveRun {
     pub probe: crate::probe::ProbeReport,
     pub counts: BTreeMap<String, u64>,
     pub run_spend: crate::journal::RunSpend,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub journal: Option<crate::journal::JournalIdentity>,
     pub journal_before: crate::journal::SpendSummary,
     pub journal_after: crate::journal::SpendSummary,
     pub cases: Vec<LiveRunCase>,

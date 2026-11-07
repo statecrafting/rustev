@@ -37,7 +37,7 @@ mod host {
     use rustev_contract::{Document, Identified, schema};
     use rustev_core::seams::{BoxFuture, CancelSignal, DecisionBackend, EvidenceSink};
     use rustev_live::documents::{LiveConfig, Mode};
-    use rustev_live::journal::{BudgetKind, SpendJournal, SystemClock};
+    use rustev_live::journal::SystemClock;
     use rustev_live::probe::ProbeSnapshot;
     use rustev_live::run::{
         CaseInput, CaseOrigin, LiveCase, RunOptions, RunSpec, RunStatus, exit_code, prepare,
@@ -247,6 +247,9 @@ mod host {
         let prepared = prepare(
             spec,
             RunOptions {
+                journal_path: value("--journal")?.into(),
+                require_existing_journal: false,
+                journal_clock: Arc::new(SystemClock),
                 out: value("--out")?.into(),
                 resume,
                 rerun_interrupted: false,
@@ -255,12 +258,7 @@ mod host {
             },
         )
         .map_err(|e| format!("{e:?}"))?;
-        let journal = SpendJournal::open(
-            value("--journal")?,
-            BudgetKind::Testing,
-            Arc::new(SystemClock),
-        )
-        .map_err(|e| e.to_string())?;
+        let journal = prepared.open_journal().map_err(|e| format!("{e:?}"))?;
         let host = Host {
             backend_id: descriptor.backend_id.clone(),
             artifact: descriptor.artifact.clone(),

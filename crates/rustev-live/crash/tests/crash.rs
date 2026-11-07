@@ -243,21 +243,16 @@ fn run_to_end(dir: &Dir, head: std::sync::Arc<Scripted>, resume: bool, rerun: bo
         let mut opts = dir.options();
         opts.resume = resume;
         opts.rerun_interrupted = rerun;
+        let r = rig(config(8, 0, 1), &[(head, 8)]);
+        opts.journal_clock = std::sync::Arc::new(ReleaseClock {
+            clock: r.clock.clone(),
+            calls: std::sync::atomic::AtomicUsize::new(usize::from(
+                dir.0.join("journal").metadata().is_ok_and(|m| m.len() > 0),
+            )),
+        });
         let p = prepare(support::reporting_spec(), opts).unwrap();
         check_checkpoint(dir);
-        let r = rig(config(8, 0, 1), &[(head, 8)]);
-        let j = SpendJournal::open(
-            dir.0.join("journal"),
-            rustev_live::journal::BudgetKind::Testing,
-            std::sync::Arc::new(ReleaseClock {
-                clock: r.clock.clone(),
-                // An existing journal is not created, so it skips the creation read.
-                calls: std::sync::atomic::AtomicUsize::new(usize::from(
-                    dir.0.join("journal").metadata().is_ok_and(|m| m.len() > 0),
-                )),
-            }),
-        )
-        .unwrap();
+        let j = p.open_journal().unwrap();
         let host = Host(None);
         let cancel = CancelSignal::new();
         let mut run = Box::pin(p.execute(&r.rt, j.clone(), &host, &r.clock, &cancel));
@@ -509,7 +504,10 @@ fn assert_missing_checkpoint(error: rustev_live::documents::LiveError) {
 #[test]
 fn resume_discards_only_owned_temps_and_partial_staging() {
     let dir = Dir::new();
-    prepare(spec(), dir.options()).unwrap();
+    prepare(spec(), dir.options())
+        .unwrap()
+        .open_journal()
+        .unwrap();
     let out = dir.0.join("out");
     let checkpoint = std::fs::read(out.join("checkpoint.json")).unwrap();
     let evidence = out.join("cases/retained.json");
