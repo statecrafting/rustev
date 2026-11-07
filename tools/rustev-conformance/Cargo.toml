@@ -18,6 +18,8 @@ rustev-contract.workspace = true
 rustev-core = { workspace = true, features = ["parameterized"] }
 rustev-runtime.workspace = true
 rustev-eval.workspace = true
+# Spec 067 3.8.2: the live cases' Rust runner calls rustev_live::run.
+rustev-live.workspace = true
 rustev-surface.workspace = true
 tokio = { workspace = true, features = ["rt", "time", "sync"] }
 serde = { workspace = true, features = ["derive"] }
