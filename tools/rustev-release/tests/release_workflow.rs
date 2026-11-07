@@ -287,3 +287,105 @@ fn publish_image_runs_only_for_a_member_release_tag_after_npm() {
     assert!(text.contains("needs.tag.outputs.image == 'true'"), "{text}");
     assert!(!text.contains("latest"), "060 3.1.2: no other tag");
 }
+
+/// The `run: |` script of the step named `name` in `job`, unindented.
+fn step_script(job: &str, name: &str) -> String {
+    let header = format!("      - name: {name}");
+    let mut lines = job.lines().skip_while(|l| !l.starts_with(&header)).skip(1);
+    lines
+        .by_ref()
+        .find(|l| l.trim() == "run: |")
+        .unwrap_or_else(|| panic!("step {name:?} has no run block"));
+    lines
+        .take_while(|l| l.is_empty() || l.starts_with("          "))
+        .map(|l| l.get(10..).unwrap_or(""))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+#[test]
+fn publish_image_is_skipped_for_a_candidate_and_a_dry_run() {
+    // 060 3.3.1 and section 5's first row: `tag` decides whether the run
+    // names the image (`image_member`) and pushes it (`image`, the only
+    // condition `publish-image` runs on); the decision script runs here
+    // for each kind of run.
+    let tag = job_text(WORKFLOW, "tag").expect("a tag job");
+    assert!(
+        tag.contains("image_member: ${{ steps.image.outputs.member }}"),
+        "{tag}"
+    );
+    assert!(
+        tag.contains("image: ${{ steps.image.outputs.push }}"),
+        "{tag}"
+    );
+    let script = step_script(
+        &tag,
+        "Whether this run names and pushes the image, and why not (060 3.3.1)",
+    );
+    let root = std::env::temp_dir().join(format!("rustev-060-skip-{}", std::process::id()));
+    let set = root.join("tools/rustev-release");
+    std::fs::create_dir_all(&set).unwrap();
+    let decide = |image: bool, event: &str, candidate: &str| -> (String, String) {
+        let body = if image {
+            r#"{"image":{"repository":"ghcr.io/statecrafting/rustev-serve"}}"#
+        } else {
+            "{}"
+        };
+        std::fs::write(set.join("release-set.json"), body).unwrap();
+        let output = root.join("github-output");
+        std::fs::write(&output, "").unwrap();
+        let run = std::process::Command::new("sh")
+            .arg("-c")
+            .arg(&script)
+            .current_dir(&root)
+            .env("EVENT", event)
+            .env("CANDIDATE", candidate)
+            .env("GITHUB_OUTPUT", &output)
+            .output()
+            .expect("sh runs the decision");
+        assert!(run.status.success(), "{run:?}");
+        (
+            std::fs::read_to_string(&output).unwrap(),
+            String::from_utf8(run.stdout).unwrap(),
+        )
+    };
+    let cases = [
+        (
+            true,
+            "push",
+            "false",
+            "member=true\npush=true\n",
+            "pushes it",
+        ),
+        (
+            true,
+            "push",
+            "true",
+            "member=false\npush=false\n",
+            "a candidate never names or pushes the image",
+        ),
+        (
+            true,
+            "workflow_dispatch",
+            "false",
+            "member=true\npush=false\n",
+            "a dry run pushes nothing",
+        ),
+        (
+            false,
+            "push",
+            "false",
+            "member=false\npush=false\n",
+            "the release set lists the image as absent",
+        ),
+    ];
+    for (image, event, candidate, outputs, said) in cases {
+        let (got, stdout) = decide(image, event, candidate);
+        assert_eq!(got, outputs, "{image} {event} {candidate}");
+        assert!(
+            stdout.contains(said),
+            "{image} {event} {candidate}: {stdout}"
+        );
+    }
+    std::fs::remove_dir_all(&root).unwrap();
+}
