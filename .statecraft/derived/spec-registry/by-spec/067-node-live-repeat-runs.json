@@ -1,0 +1,168 @@
+{
+  "record": {
+    "amends": [
+      "006-cli-surface",
+      "027-node-and-wasm-bindings",
+      "043-live-re-execution-at-scale",
+      "063-node-binding-parity"
+    ],
+    "created": "2026-11-06",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "003-runtime-execution-and-evidence",
+      "006-cli-surface",
+      "012-jev-integration",
+      "026-live-re-execution",
+      "027-node-and-wasm-bindings",
+      "029-evaluation-repeatability",
+      "031-public-api-and-release-family",
+      "043-live-re-execution-at-scale",
+      "063-node-binding-parity"
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "027-node-and-wasm-bindings",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-node/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "027-node-and-wasm-bindings",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-surface/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "006-cli-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-cli/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "043-live-re-execution-at-scale",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-live/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "027-node-and-wasm-bindings",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-conformance/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-public-api-and-release-family",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-release/"
+        }
+      }
+    ],
+    "id": "067-node-live-repeat-runs",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-3-host-backend-cost-declarations",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "No attempt of a `liveRun` is handed to a host backend unless its full worst-case exposure, from the backend's declared cost model and bound, is durably reserved in the journal first and fits both the run cap and the journal's cap; a binding whose cost model is `unknown`, or that has no entry in the live configuration, is refused before the journal is opened."
+      },
+      {
+        "anchor": "3-6-cancellation-and-shutdown",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "Cancellation by `AbortSignal`, the run deadline or `shutdown` never releases a reservation for an attempt that was handed to a host backend and has not settled; its charge stays liability in the journal, its item is `interrupted`, and a late Promise settlement is discarded and never settles the ticket."
+      },
+      {
+        "anchor": "3-2-the-entry-point",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "For the same inputs, scripted backends and clock, `liveRun` writes the same documents, bytes, status and exit code as `rustev_live::run` called from Rust, and the binding adds no authority: its authorizer is 043 3.12's declarative rule list, and no binding value is a permission."
+      },
+      {
+        "anchor": "3-4-the-journal-and-the-output-directory-are-file-paths",
+        "id": "I-4",
+        "kind": "invariant",
+        "text": "A journal created by a live run records a stable `journal_id` and `created_at_ms` in its header, and every `rustev.live-run/1` names the journal's id, creation time, whether this run created it, and the cumulative spend before the run, so a run that started its cumulative cap at zero on a new file is visible and never silent."
+      },
+      {
+        "anchor": "3-8-tests-and-conformance",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "Every test and conformance case of this spec uses scripted host backends and a temporary `testing` journal; no CI job makes a live or paid provider call, and the WebAssembly package gains nothing."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "067-node-binding-live-repeat-runs-over-host-backends-amends-006-027-043-and-063": "279511c32f8662f6d29e88b32ad4f358132953bf122a2750b3238de5b76c4052",
+      "1-purpose": "57e6a402412cf1156a24a8dfcae6870689bda39c047dda94e0c5d84d700fccb5",
+      "2-1-binding-principles": "811ba3e04835b606e2af42de48191e93a779fc32167a273ac47c576298b9b268",
+      "2-territory": "52438ef94dae5b76ba9ae47cb8294ab22555a0e55207dbb53152fcf86e17acaa",
+      "3-1-what-changes-for-063-s-commands": "0cafb90294752a9d4c0d462d744eabdcbf135bdd5589933a5a9344069ab3696f",
+      "3-10-what-changes-in-specs-006-027-043-and-063": "6905e2e5ab9a3cac457caf4af2e9774f888d48e97a7ead6d1db38bae31319738",
+      "3-2-the-entry-point": "39072c3ffe0f82f23badd5c543b0160212b068468fe01199f38432537b296c5c",
+      "3-3-host-backend-cost-declarations": "043c043e2dc0104775f9ba4eadc2c93dc4151684b62bbcc5dbd75f86319c48aa",
+      "3-4-the-journal-and-the-output-directory-are-file-paths": "8201daf055f7589a8d8f38408d4eaff87c46acbe528b02c1b141518cff59cf61",
+      "3-5-authorization": "c07a5479bd98ece50deec309df53594ec359d8f5c970647800881b032bedcf39",
+      "3-6-cancellation-and-shutdown": "5ed9ff27f0d3d452dfaedf51a69b215e413a682c16b2f1b143014e85510cc6ea",
+      "3-7-probe-resume-and-rerun": "9ed4aac89e4f632511ea01c0ec3b1262133e9de45bcf59193eaf7eb8e72c6913",
+      "3-8-tests-and-conformance": "90d26cf6e66b300906286c7dda410049cdcec60d143503eb79765769eec1d817",
+      "3-9-errors-declarations-and-position": "45fcfff40144d16ad42f5c8c83fa52f45706ebe22937de86135f7e5270eb9254",
+      "3-behavior": "946113284ad4d31d4e6400ca75c82f4a7a6ae6219a26a44635e9e7417790bc07",
+      "4-out-of-scope": "ee7c7f807b4e3277af40a8f85191fdac61c499aec5eec228e8cfa2faf8fe4d0e",
+      "5-observable-negative-cases": "19e97fa796da6966017ece48cd24b35539f20f1caa126d83091f7b6720e6c5c8",
+      "acceptance": "21e1afe621152dd382a89cbc817ff3aae57223cbea84114a8e092fd8b25c0b6d",
+      "decisions-at-approval": "a9bbc8150bc0426696a79f74f2d45ba3938acf5f8d5158f94f54cecac067fd85",
+      "implementation-record": "6c8535301813acc9baa344aee89d0e34eede262121b6fa4b7fd49db4f466fbb6",
+      "verification": "edbdfbfc140a9dbe0750e36dbe411219b84099df6b258a9f2ac1677f76e1b387"
+    },
+    "sectionHeadings": [
+      "067: Node binding: live repeat runs over host backends (amends 006, 027, 043 and 063)",
+      "1. Purpose",
+      "2. Territory",
+      "2.1 Binding principles",
+      "3. Behavior",
+      "3.1 What changes for 063's commands",
+      "3.2 The entry point",
+      "3.3 Host backend cost declarations",
+      "3.4 The journal and the output directory are file paths",
+      "3.5 Authorization",
+      "3.6 Cancellation and shutdown",
+      "3.7 Probe, resume and rerun",
+      "3.8 Tests and conformance",
+      "3.9 Errors, declarations and position",
+      "3.10 What changes in specs 006, 027, 043 and 063",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Implementation record",
+      "Decisions at approval"
+    ],
+    "specPath": "specs/067-node-live-repeat-runs/spec.md",
+    "status": "approved",
+    "summary": "An amendment of approved specs 063 (3.9), 027 (3.3, 3.7) and 043 (section 2, 3.2.2, 3.5.1, 3.11.4, 3.13), for release 0.6.0 (#539), ratified by the owner on 2026-11-06 (A-86). A Node host whose model backends are TypeScript `DecisionBackend`s (027 3.6) cannot run fresh repeat runs of its plans through Rustev: the binding's repeat commands refuse the `live` source (063 3.9.4), and `rustev eval live` links only the rules backend (043 3.13.2). So the host keeps its own harness, outside Rustev's spend journal and caps. This spec adds `engine.liveRun`, an asynchronous method over `rustev_live::run` with the CLI's inputs, the engine's registered host backends and the same documents as `rustev eval live`, all or none for the final files. The journal is a file path the binding opens under 043 3.5's lock and durability rules, and no attempt is sent before its full worst-case exposure is durably reserved. A host backend's exposure is the cost model and bound it already declares (027 3.6.1); an `unknown` model is refused. Probe-only, resume and rerun-interrupted are 043's; an `AbortSignal` or `shutdown` ends the run `interrupted` with every reserved, unsettled attempt kept as liability. The cumulative cap holds per journal file, so CI must persist the file; a journal created by a run records an id and creation time, and the run report names them, so a fresh journal is visible, never silent. Tests use scripted host backends only; CI makes no live or paid call. This fulfills 043 section 2's \"the Node binding exposes it in its own spec\".\n",
+    "title": "Node binding: live repeat runs over host backends (amends 006, 027, 043 and 063)"
+  },
+  "shardHash": "3b935e8cbf62638131742d192e0e7c8c0513ef715d728207b9bb292e3789b1f7",
+  "specVersion": "1.11.0"
+}
