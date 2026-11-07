@@ -28,6 +28,9 @@ rustev-eval = { workspace = true, features = ["parameterized"] }
 rustev-surface = { workspace = true, features = ["parameterized"] }
 rustev-backend-rules.workspace = true
 serde_json.workspace = true
+# Spec 067, 3.2.3: `liveRun` binds the SHA-256 of every input it reads, as
+# `rustev eval live` does (the surface's resolution takes the caller's digest).
+sha2.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "time", "sync"] }
 # Node-API version 8 (spec 027, 3.13.1): Node 20, 22 and 24 provide it.
 napi = { version = "=3.14.2", default-features = false, features = ["napi8", "serde-json", "async"] }
