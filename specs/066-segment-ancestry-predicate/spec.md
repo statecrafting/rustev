@@ -6,7 +6,7 @@ implementation: pending
 created: "2026-11-06"
 summary: >
   An amendment of approved specs 002 (3.8, 3.9) and 032 (3.1, 3.12), for
-  release 0.5.1 (#509), ratified by the owner on 2026-11-06 (A-85). A partner rule needs "this location
+  release 0.6.0 (#509), ratified by the owner on 2026-11-06 (A-85). A partner rule needs "this location
   slug sits under that city slug", for example `us:ny:new-york:soho` under
   `us:ny:new-york`; today the host projects the slug's parent into the
   snapshot and the rule compares with `member_ref`. This spec adds one
@@ -55,7 +55,7 @@ obligations:
 
 # 066: Definition predicate: segment ancestry on a declared separator (amends 002 and 032)
 
-Approved: ratified by the owner on 2026-11-06 (A-85) for release 0.5.1;
+Approved: ratified by the owner on 2026-11-06 (A-85) for release 0.6.0;
 the implementation is pending. The approved texts of 002 and 032 are not
 edited; this spec records what it adds to them.
 
