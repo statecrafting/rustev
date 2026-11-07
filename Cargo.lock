@@ -4669,6 +4669,7 @@ dependencies = [
  "rustev-contract",
  "rustev-core",
  "rustev-eval",
+ "rustev-live",
  "rustev-otel",
  "rustev-runtime",
  "rustev-surface",
