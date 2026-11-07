@@ -92,8 +92,10 @@ fn examples_and_mutation_seeds_for_every_separator() {
             ("US:NY:SOHO", "us:ny", Some(false)),
             ("us:ny:soho", "US:NY", Some(false)),
             ("us:ny:soho", "us:ny ", Some(false)),
-            ("é:x", "é", Some(false)),
-            ("é:x", "é", Some(true)),
+            // Precomposed U+00E9 against decomposed "e" U+0301: no Unicode
+            // normalization, so only the byte-identical ancestor matches.
+            ("\u{e9}:x", "e\u{301}", Some(false)),
+            ("\u{e9}:x", "\u{e9}", Some(true)),
             ("us%3Any:soho", "us:ny", Some(false)),
             (" :x", " ", Some(true)),
         ] {
