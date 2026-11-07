@@ -13,6 +13,9 @@
 mod callback;
 mod capture;
 mod errors;
+// Increment 2 connects these preconditions to the live entry point.
+#[cfg_attr(not(test), allow(dead_code))]
+mod live;
 pub mod local_embed;
 mod profile;
 mod seams;
