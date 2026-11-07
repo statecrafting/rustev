@@ -1,6 +1,6 @@
 ---
 id: "067-node-live-repeat-runs"
-title: "Node binding: live repeat runs over host backends (amends 027, 043 and 063)"
+title: "Node binding: live repeat runs over host backends (amends 006, 027, 043 and 063)"
 status: approved
 implementation: pending
 created: "2026-11-06"
@@ -29,6 +29,7 @@ summary: >
   backends only; CI makes no live or paid call. This fulfills 043 section
   2's "the Node binding exposes it in its own spec".
 amends:
+  - "006-cli-surface"
   - "027-node-and-wasm-bindings"
   - "043-live-re-execution-at-scale"
   - "063-node-binding-parity"
@@ -81,10 +82,10 @@ obligations:
     anchor: "3-8-tests-and-conformance"
 ---
 
-# 067: Node binding: live repeat runs over host backends (amends 027, 043 and 063)
+# 067: Node binding: live repeat runs over host backends (amends 006, 027, 043 and 063)
 
 Approved: ratified by the owner on 2026-11-06 (A-86) for release 0.6.0;
-the implementation is pending. The approved texts of 027, 043 and 063
+the implementation is pending. The approved texts of 006, 027, 043 and 063
 are not edited; this spec records what changes in them (3.10). It
 authorizes no live run, provider call or spend, and raises no cap.
 
@@ -269,9 +270,16 @@ integration crate, and `rustev-node` is under `integrations/`).
 5. **A new journal is visible (amends 043 3.5.1 and 3.11.4).**
    - **Header.** A journal created by this version records two members
      in its header line, beside `schema`, `budget` and `cap`:
-     `journal_id`, the `tagged_digest("rustev.spend-journal-id/1",
-     created_at_ms || 0x00 || run_id)` of the creating run, as lowercase
-     hex, and `created_at_ms`, read from the run's injected clock. Both are
+     `journal_id` and `created_at_ms`. `created_at_ms` is read from the
+     run's injected clock. `journal_id` is the identity (`sha256:` and 64
+     lowercase hex digits, spec 002 3.3.2) `tagged_digest(
+     "rustev.spend-journal-id/1", canonical bytes of { created_at_ms,
+     run_id })`, over the canonical bytes (spec 002 3.3.1) of a record
+     holding the creation time as a JSON integer and the creating run's id
+     as a JSON string, the convention identities in this corpus use. The
+     record's keys, quoting and integer form make the encoding
+     unambiguous, so distinct `(created_at_ms, run_id)` pairs have
+     distinct inputs. Both are
      written once, at creation, and never change; the A-75 migration (043
      3.5.6) keeps them. The schema name stays `rustev-jev.spend-journal/1`
      and the members are optional. A journal created before this version has neither
@@ -409,11 +417,15 @@ integration crate, and `rustev-node` is under `integrations/`).
    this spec, so each increment's checks run at the breaking position
    (owner decision of 2026-11-07).
 
-### 3.10 What changes in specs 027, 043 and 063
+### 3.10 What changes in specs 006, 027, 043 and 063
 
-1. **027:** 3.3's API gains `liveRun`; section 4's "remote backends linked
+1. **006:** the `rustev eval live` command (043 3.13, which amends 006)
+   gains the switch `--require-existing-journal` (3.4.6), and its stdout
+   line gains `new_journal` (3.4.5); grammar, other flags and exit codes
+   are unchanged.
+2. **027:** 3.3's API gains `liveRun`; section 4's "remote backends linked
    into the binding" is unchanged (host backends are TypeScript objects).
-2. **043:** section 2's "the Node and WebAssembly bindings ... expose it
+3. **043:** section 2's "the Node and WebAssembly bindings ... expose it
    in their own specs" is fulfilled for Node by this spec; 3.2.2 is
    reversed for the Node binding only: its "`authorize` ... the library
    requires absent" does not apply to the binding, which requires
@@ -421,7 +433,7 @@ integration crate, and `rustev-node` is under `integrations/`).
    creation members for new journals, and 3.11.4's `rustev.live-run/1`
    gains `journal` (3.4.5), for the CLI and the binding alike; 3.13 gains
    `--require-existing-journal` (3.4.6).
-3. **063:** 3.9.1's table gains `liveRun`; 3.9.4's `live` refusal stands
+4. **063:** 3.9.1's table gains `liveRun`; 3.9.4's `live` refusal stands
    for `eval` with `repeatConfig` (3.1).
 
 ## 4. Out of scope
@@ -469,6 +481,12 @@ raising any cap; any live or paid provider call in CI; quality claims.
 - Cancellation, deadline and shutdown as 3.6 states, with liability kept
   and late settlements discarded.
 - Probe-only, resume and rerun-interrupted as 3.7 states.
+- Journal identity (3.4.5): two journals created with different
+  `(created_at_ms, run_id)` pairs have different `journal_id`s, including
+  pairs that collide under naive concatenation of the decimal time and the
+  id (for example `(1, "23.x")` and `(12, "3.x")`), and the id equals
+  `tagged_digest` over the canonical record computed independently in the
+  test.
 - Journal visibility (3.4.5), with scripted backends and a `ManualClock`
   only: a first run on a missing path reports `created: "this_run"`,
   the id and creation time, zero `journal_before` spend and
@@ -544,7 +562,7 @@ the adopted behavior.
 2. **`requireExistingJournal` / `--require-existing-journal`,** off by
    default, the documented CI setting (3.4.6).
 3. **The Node binding requires `authorize`** in the live configuration.
-   This knowingly reverses 043 3.2.2 for the binding only (3.5.2, 3.10.2),
+   This knowingly reverses 043 3.2.2 for the binding only (3.5.2, 3.10.3),
    as the owner confirmed explicitly on 2026-11-06: it matches the owner's
    rule of approval before each paid run. A Rust host calling the library
    keeps 043 3.2.2. No asynchronous host authorizer.
