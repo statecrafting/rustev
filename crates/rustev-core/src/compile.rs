@@ -1789,6 +1789,25 @@ fn compile_generation(
     // (e) continued: spec 033's checks and remediation parameters (3.8.1).
     crate::actionable::types(def, &input_tys, v2)?;
 
+    // Spec 066 checks policy ancestry operands in phase e as well as steps.
+    fn under_types(c: &Cond, env: &TyEnv<'_>) -> Result<(), String> {
+        match c {
+            Cond::Exact(p) => crate::expr::type_under(p, env),
+            Cond::All(cs) | Cond::Any(cs) => cs.iter().try_for_each(|c| under_types(c, env)),
+            Cond::Not(c) => under_types(c, env),
+            _ => Ok(()),
+        }
+    }
+    let env = TyEnv {
+        inputs: &input_tys,
+        steps: &step_tys,
+        item: None,
+        v2,
+    };
+    for (subject, cond) in quality::policy_conds(def) {
+        under_types(cond, &env).or_else(|e| refuse(C::KindMismatch, subject, e))?;
+    }
+
     // (e2) Grades (spec 032, 3.9.3): the static ceiling of every input path
     // and step value, then every requirement and hard gate, steps in
     // declaration order, then policy items.

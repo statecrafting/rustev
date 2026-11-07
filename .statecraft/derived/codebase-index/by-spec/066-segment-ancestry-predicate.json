@@ -5,7 +5,9 @@
       "032-evidence-quality"
     ],
     "dependsOn": [
+      "001-boundaries-and-authority",
       "002-decision-contract-and-pure-core",
+      "004-evaluation-and-replay",
       "027-node-and-wasm-bindings",
       "031-public-api-and-release-family",
       "032-evidence-quality",
@@ -13,6 +15,10 @@
       "036-mid-plan-acquisition"
     ],
     "implementingPaths": [
+      {
+        "path": "Makefile",
+        "source": "spec-edge"
+      },
       {
         "path": "crates/rustev-contract/",
         "source": "spec-edge"
@@ -22,11 +28,19 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/rustev-eval/mutation/",
+        "source": "spec-edge"
+      },
+      {
         "path": "integrations/rustev-node/types/",
         "source": "spec-edge"
       },
       {
         "path": "integrations/rustev-wasm/types/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "scripts/acceptance/",
         "source": "spec-edge"
       }
     ],
@@ -60,6 +74,19 @@
       {
         "locations": [
           {
+            "file": "crates/rustev-eval/mutation/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-eval/mutation/"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "integrations/rustev-node/types/"
           }
         ],
@@ -86,6 +113,32 @@
       {
         "locations": [
           {
+            "file": "scripts/acceptance/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "scripts/acceptance/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Makefile"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "docs/decisions/00-founding-decisions.md"
           }
         ],
@@ -101,5 +154,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "a3693e2b2751902e818b23f0f68bde70ef9a3c9bf0fa1f2be487e220ff068fb6"
+  "shardHash": "fb09b11424c7667afd09ab655306e9e42956dfd6c880a0717be0a36148aaa92d"
 }

@@ -677,6 +677,13 @@ export namespace RustevDefinition1 {
    */
   export type Predicate =
     | {
+        under: {
+          ancestor: Expr;
+          separator: SegmentSeparator;
+          value: Expr;
+        };
+      }
+    | {
         cmp: {
           left: Expr;
           op: CmpOp;
@@ -781,6 +788,10 @@ export namespace RustevDefinition1 {
     | {
         ms: number;
       };
+  /**
+   * The closed set of segment separators (spec 066).
+   */
+  export type SegmentSeparator = ":" | "/" | "|" | ".";
   export type CmpOp = "eq" | "ne" | "lt" | "le" | "gt" | "ge";
   /**
    * Input value types (spec 002, 3.7.2). Every record field is required.
@@ -2042,6 +2053,13 @@ export namespace RustevDefinition2 {
    */
   export type Predicate =
     | {
+        under: {
+          ancestor: Expr;
+          separator: SegmentSeparator;
+          value: Expr;
+        };
+      }
+    | {
         cmp: {
           left: Expr;
           op: CmpOp;
@@ -2146,6 +2164,10 @@ export namespace RustevDefinition2 {
     | {
         ms: number;
       };
+  /**
+   * The closed set of segment separators (spec 066).
+   */
+  export type SegmentSeparator = ":" | "/" | "|" | ".";
   export type CmpOp = "eq" | "ne" | "lt" | "le" | "gt" | "ge";
   /**
    * Input value types (spec 002, 3.7.2). Every record field is required.
@@ -9013,6 +9035,13 @@ export namespace RustevPlan2 {
    */
   export type Predicate =
     | {
+        under: {
+          ancestor: Expr;
+          separator: SegmentSeparator;
+          value: Expr;
+        };
+      }
+    | {
         cmp: {
           left: Expr;
           op: CmpOp;
@@ -9117,6 +9146,10 @@ export namespace RustevPlan2 {
     | {
         ms: number;
       };
+  /**
+   * The closed set of segment separators (spec 066).
+   */
+  export type SegmentSeparator = ":" | "/" | "|" | ".";
   export type CmpOp = "eq" | "ne" | "lt" | "le" | "gt" | "ge";
   /**
    * Input value types (spec 002, 3.7.2). Every record field is required.
@@ -11033,6 +11066,13 @@ export namespace RustevPlan3 {
    */
   export type Predicate =
     | {
+        under: {
+          ancestor: Expr;
+          separator: SegmentSeparator;
+          value: Expr;
+        };
+      }
+    | {
         cmp: {
           left: Expr;
           op: CmpOp;
@@ -11137,6 +11177,10 @@ export namespace RustevPlan3 {
     | {
         ms: number;
       };
+  /**
+   * The closed set of segment separators (spec 066).
+   */
+  export type SegmentSeparator = ":" | "/" | "|" | ".";
   export type CmpOp = "eq" | "ne" | "lt" | "le" | "gt" | "ge";
   /**
    * Input value types (spec 002, 3.7.2). Every record field is required.

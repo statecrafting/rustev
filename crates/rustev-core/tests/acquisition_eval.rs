@@ -1321,3 +1321,51 @@ fn widening_truncation_is_visible_even_when_an_earlier_failure_prevents_resoluti
             .any(|n| n.kind == rustev_contract::judgment::NoticeKind::Truncation)
     );
 }
+
+#[test]
+fn segment_ancestry_preserves_skipped_operand() {
+    for separator in [":", "/", "|", "."] {
+        let mut d = definition();
+        acquisition(&mut d).when = serde_json::from_value(
+            json!({"cmp":{"left":{"lit":{"integer":1}},"op":"eq","right":{"lit":{"integer":2}}}}),
+        )
+        .unwrap();
+        d.steps.push(exact(
+            "key",
+            "compose_key",
+            json!({"parts":[
+            {"value":{"lit":{"text":"us"}},"normalize":"exact"},
+            {"value":{"ref":"step:lookup/stopped_by"},"normalize":"exact"}
+        ],"separator":separator}),
+        ));
+        d.steps.push(serde_json::from_value(json!({"id":"verified","body":{"corroborate":{"claim":"step:key","upgrade_to":"authoritative","by":[{"predicate":{"all":[]},"on_false":"contradicts"}],"mode":"all","on_contradiction":"abstain"}}})).unwrap());
+        for (id, value, ancestor) in [
+            (
+                "under_value",
+                json!({"ref":"step:verified"}),
+                json!({"lit":{"text":"us"}}),
+            ),
+            (
+                "under_ancestor",
+                json!({"lit":{"text":"us:ny"}}),
+                json!({"ref":"step:verified"}),
+            ),
+        ] {
+            d.steps.push(exact(id, "compare", json!({"predicate":{"under":{"value":value,"ancestor":ancestor,"separator":separator}}})));
+        }
+        let c = compile(&d);
+        let e = start(&c);
+        assert!(e.pending_acquisitions().is_empty());
+        assert!(e.exact_value("under_value").is_none());
+        assert!(e.exact_value("under_ancestor").is_none());
+        let (_, evidence) = e.finish("ancestry-skipped").unwrap();
+        for id in ["under_value", "under_ancestor"] {
+            assert_eq!(
+                evidence.steps.iter().find(|s| s.step == id).unwrap().status,
+                StepStatus::Skipped {
+                    guard: "lookup".into()
+                }
+            );
+        }
+    }
+}

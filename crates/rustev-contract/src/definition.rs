@@ -555,10 +555,40 @@ pub enum CmpOp {
     Ge,
 }
 
+/// The closed set of segment separators (spec 066).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub enum SegmentSeparator {
+    #[serde(rename = ":")]
+    Colon,
+    #[serde(rename = "/")]
+    Slash,
+    #[serde(rename = "|")]
+    Pipe,
+    #[serde(rename = ".")]
+    Dot,
+}
+
+impl SegmentSeparator {
+    pub const fn as_byte(self) -> u8 {
+        match self {
+            Self::Colon => b':',
+            Self::Slash => b'/',
+            Self::Pipe => b'|',
+            Self::Dot => b'.',
+        }
+    }
+}
+
 /// Boolean predicates. `all([])` is true; `any([])` is false.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Predicate {
+    /// Registry 2: strict ancestry of non-empty segments, compared by bytes.
+    Under {
+        value: Expr,
+        ancestor: Expr,
+        separator: SegmentSeparator,
+    },
     Cmp {
         left: Expr,
         op: CmpOp,

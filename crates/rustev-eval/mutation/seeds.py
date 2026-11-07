@@ -41,7 +41,7 @@ REQUIRED = [
 # run them a second time in CI; `seeds.sh "spec 023"`, `live-comparison` and
 # `"spec 029"` still run and require every one. A spec whose acceptance
 # starts filtering its own seeds joins this list.
-OWN_RUNS = ("spec 023", "live-comparison", "spec 029", "spec 040", "spec 035", "spec 036", "spec 037", "spec 041", "spec 061", "spec 064", "spec 065")
+OWN_RUNS = ("spec 023", "live-comparison", "spec 029", "spec 040", "spec 035", "spec 036", "spec 037", "spec 041", "spec 061", "spec 064", "spec 065", "spec 066")
 # Generous: a new test binary can wait on the OS before it starts.
 TEST_TIMEOUT_S = 1800
 
@@ -427,6 +427,53 @@ SEEDS += [
      ["rustev-runtime"]),
 ]
 
+
+# Spec 066, Acceptance: the five segment ancestry seeds, each detected by
+# rustev-core's tests (tests/segment_ancestry.rs).
+SEEDS += [
+    (
+        "spec 066",
+        "a byte prefix accepted without the separator check",
+        C + "expr.rs",
+        ".is_some_and(|suffix| suffix.first() == Some(&sep)))",
+        ".is_some_and(|suffix| !suffix.is_empty()))",
+        ["rustev-core"],
+    ),
+    (
+        "spec 066",
+        "an empty segment evaluated as false",
+        C + "expr.rs",
+        'return Err(Fault::Invalid(format!("under {name} has an empty segment")));',
+        "{ let _ = name; return Ok(false); }",
+        ["rustev-core"],
+    ),
+    (
+        "spec 066",
+        "equal operands true",
+        C + "expr.rs",
+        ".is_some_and(|suffix| suffix.first() == Some(&sep)))",
+        ".is_some_and(|suffix| suffix.is_empty() || suffix.first() == Some(&sep)))",
+        ["rustev-core"],
+    ),
+    (
+        "spec 066",
+        "an unresolved operand evaluated as false",
+        # An exact step's unresolved operands fail it before the predicate
+        # runs, so the seed turns that failure into false for compare steps.
+        C + "evaluate.rs",
+        "let result = match unresolved {\n                            Some(u) => Err(u),",
+        "let result = match unresolved {\n                            Some(u) if !matches!(args, OpArgs::Compare(_)) => Err(u),\n                            Some(_) => Ok(Value::Bool(false)),",
+        ["rustev-core"],
+    ),
+    (
+        "spec 066",
+        "ASCII case folded",
+        C + "expr.rs",
+        "            Ok(value\n                .as_bytes()\n                .strip_prefix(ancestor.as_bytes())",
+        "            Ok(value\n                .to_ascii_lowercase()\n                .as_bytes()\n                .strip_prefix(ancestor.to_ascii_lowercase().as_bytes())",
+        ["rustev-core"],
+    ),
+]
 
 # Spec 036: each seed runs the crate that owns the affected acceptance.
 SEEDS += [

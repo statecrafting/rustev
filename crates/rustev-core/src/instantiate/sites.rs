@@ -232,8 +232,10 @@ pub fn reference_sites(v: &Value) -> Result<Vec<Site>, InstantiationRefusal> {
             let raw = exact_roots
                 .iter()
                 .any(|q| p == *q || p.starts_with(&format!("{q}/")));
-            // New graded/member_ref positions are never sites, including in args.
-            let excluded = p.split('/').any(|s| matches!(s, "graded" | "member_ref"));
+            // New graded/member_ref/under positions are never sites, including in args.
+            let excluded = p
+                .split('/')
+                .any(|s| matches!(s, "graded" | "member_ref" | "under"));
             let kind = if excluded {
                 None
             } else {
