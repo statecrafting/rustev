@@ -1,0 +1,121 @@
+{
+  "record": {
+    "amends": [
+      "029-evaluation-repeatability",
+      "061-host-scored-repeat-sets"
+    ],
+    "created": "2026-11-06",
+    "dependsOn": [
+      "004-evaluation-and-replay",
+      "006-cli-surface",
+      "029-evaluation-repeatability",
+      "031-public-api-and-release-family",
+      "041-ranking-and-rubric-metrics",
+      "061-host-scored-repeat-sets",
+      "063-node-binding-parity"
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "004-evaluation-and-replay",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-eval/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "006-cli-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-cli/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "027-node-and-wasm-bindings",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-conformance/"
+        }
+      }
+    ],
+    "id": "064-selection-gate-case-regressions",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-4-clause-result",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "A `case_regressions` clause passes only when every compared case has a known value on both sides and the number of regressing cases is at most `at_most`; a case with a measure on one side only, a measure missing from some run of a side, or an unknown or non-finite value makes the clause unknown unless the definite regressions already exceed `at_most`, and it is never counted as a pass, a non-regression or a regression by default."
+      },
+      {
+        "anchor": "3-3-regression-of-one-case",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "Whether a case regresses is decided in exact decimal: the baseline and candidate case values are taken as the shortest decimals that round-trip to their binary64 values and `by` as its exact decimal, and a case worse by exactly `by` regresses."
+      },
+      {
+        "anchor": "3-7-compatibility",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "A selection gate that does not use `case_regressions` has the same canonical bytes and identity as today, and `gate select` over it writes the same `rustev.selection/1` bytes, stdout and exit code."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "064-selection-gate-a-clause-on-per-case-regressions-against-the-baseline-amends-029-and-061": "858fb2434838662fde12cf14e785be1246ace180c6646e90991e778a0d39fa54",
+      "1-purpose": "1c4f3057bea220ff992063b48e440131066d9a92e957ab51cdf13e8ef76e36e7",
+      "2-1-binding-principles": "4b763b68254ab4a95cfefd7667dcc85c9b6f710523d02582ebb21b9891a815f2",
+      "2-territory": "6625940894eee99f38a7cbed108fdaa68e3d8a9169d6477788c9e8fbe15746a1",
+      "3-1-the-clause": "672ac9fbb2b98cf348a45abc33e47b7ad52874a868ce96f007ad44fb5d184532",
+      "3-2-the-per-case-value": "d7df36e4c567cefcf3beb0e5d5544e74bbe9a21974347c306c5ce0c0ace95a53",
+      "3-3-regression-of-one-case": "932e3d7e7277e9d0424f42390312a925f351d46e3ad2eb0ffc8364e77b132df9",
+      "3-4-clause-result": "5664549244643f79f418625d423efae31a19684e6248e64841998a067f9dd6cb",
+      "3-5-output": "c7a155e0d320794c628db4e37e664bf3345ea0dce2bb5e94b4cd62b4cb065697",
+      "3-6-host-sets-amends-061": "9e25b5e93d6383e8b7abc5253d8c8c568a36a596cb646e0898c841a50b351701",
+      "3-7-compatibility": "2ccb2dbc83efc5c71decdcc459f7adf18dba7bbb28136a1cbab2b9d0cfeb8e65",
+      "3-behavior": "56b54afba5ee1b6c3d0ff1eb5fb10287458f3781d06b6019d22e63dd374ea8ed",
+      "4-out-of-scope": "e3605202e83d0fc4c17b89773271aa5200223541f0993c65ff7648f3cdd0a497",
+      "5-observable-negative-cases": "203cd7ce4ba15e4f9d57417b02ddc076dda9acca5b84e610d106c6285e8e7187",
+      "acceptance": "a6ee4f0e4991a0ea030e5dca07719f3a20c49a3393f6633dda786336d8c821a5",
+      "decisions-at-approval": "3e1322d4fbd79531e13c8f35a9b9fe64d0149296c7e227c20b92ff3b706f6b88",
+      "implementation-record": "1e7e93457faa884418b7e947d20aef4114599bc8e359edfb667d98072651e104",
+      "verification": "c7ac0201edeadf0f18ae020513901cbdc70dafde13de774915fe601b43d5355a"
+    },
+    "sectionHeadings": [
+      "064: Selection gate: a clause on per-case regressions against the baseline (amends 029 and 061)",
+      "1. Purpose",
+      "2. Territory",
+      "2.1 Binding principles",
+      "3. Behavior",
+      "3.1 The clause",
+      "3.2 The per-case value",
+      "3.3 Regression of one case",
+      "3.4 Clause result",
+      "3.5 Output",
+      "3.6 Host sets (amends 061)",
+      "3.7 Compatibility",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Implementation record",
+      "Decisions at approval"
+    ],
+    "specPath": "specs/064-selection-gate-case-regressions/spec.md",
+    "status": "approved",
+    "summary": "An amendment of approved specs 029 (3.12) and 061 (3.7), for release 0.6.0 (#537), ratified by the owner on 2026-11-06 (A-83). Every selection clause today compares `pooled` values of the cohort `all` or of each slice, so a candidate that improves most cases and collapses on a few passes `not_worse_than`. This spec adds one clause to `rustev.selection-gate/1`, `case_regressions`, which counts the dataset cases whose candidate value is worse than their baseline value by at least a declared absolute amount, in the metric's declared direction, and fails when more than a declared number regress. A case's value is 029 3.3.3's `pooled` computation restricted to that case, read from the per-case documents the baseline and each candidate already bind (`rustev.eval-cases/1`, or 061's `rustev.host-cases/1`), so no baseline document changes. The boundary is compared in exact decimal; a missing, partial or unknown case value makes the clause unknown, never a pass; `rustev.selection/1` lists the regressing cases. Gates and selections that do not use the clause keep their bytes and identities.\n",
+    "title": "Selection gate: a clause on per-case regressions against the baseline (amends 029 and 061)"
+  },
+  "shardHash": "d8dbb4c7b29ae0495c7814922fee68c4eb0f9a6e6848ace714a8f699b4dabc14",
+  "specVersion": "1.11.0"
+}
