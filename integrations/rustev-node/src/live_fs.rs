@@ -276,9 +276,11 @@ pub(crate) fn publish_live_outputs(
         comparison::render_markdown(comparison).into_bytes(),
     ));
     // Resume accepts identical published files, but never overwrites conflicting evidence.
-    let reads = Reads::default();
     let mut pending = Vec::new();
     for (path, bytes) in files {
+        // Each comparison is bounded by its own expected size, never by a
+        // budget shared across candidates.
+        let reads = Reads::with_cap(bytes.len().saturating_add(1));
         match reads.read_classified(&path, bytes.len().saturating_add(1)) {
             Ok(Some(existing)) if existing == bytes => {}
             Ok(None) => pending.push((path, bytes)),
