@@ -2,7 +2,7 @@
 id: "060-the-service-image-in-the-release"
 title: "The service image in the release (amends 031, 056 and 058)"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-11-02"
 summary: >
   An amendment of approved specs 031 (3.1 layer 7, 3.9), 056 (3.3) and
@@ -29,6 +29,10 @@ amends:
 extends:
   # The release tooling this spec changes (031's unit).
   - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: amending }
+  # Adds 060 to `make verify` once implemented.
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  # 060's place in the acceptance partition (the integrations-core group).
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
 depends_on:
   - "010-integrations"
   - "031-public-api-and-release-family"
@@ -234,7 +238,33 @@ long-lived key, Build Level 3, and deployment.
 
 ## Verification
 
-Pending with implementation.
+Run by `make verify` (060 is in `VERIFIED_SPECS`, in CI's
+`integrations-core` group beside 021 and 045, the release family's other
+specs). Every command is offline: the registry is a fake, the scans and
+assets are committed fixtures or temporary files, and none pushes an
+image, uploads an asset or reads a credential. The push, the attestations,
+the registry check and the image's qualification are release evidence
+(the 0.5.0 run recorded below), never part of declared verification.
+
+```verify:cli
+# 3.2, 3.2.1: the scan gate and the committed exceptions (A-80, A-82).
+cargo test -p rustev-release --locked --test image_scan
+# 3.1.1, 3.3.2, 3.3.3, 3.4: the release set's image, the manifest's image,
+# the index digest, the registry check and the qualification platforms.
+cargo test -p rustev-release --locked --test image --test image_registry
+# 3.3.1, 3.7.3: only publish-image writes packages, its order and its skip
+# for a candidate and a dry run; only qualify.yml's attach writes contents.
+cargo test -p rustev-release --locked --test release_workflow --test candidate
+# 3.7.2, 3.7.3: qualification assets beside a release are ignored, never
+# published by the run, and attached once.
+cargo test -p rustev-release --locked --test tagged
+# 3.4.1, 3.4.3: an image is never a plain artifact; the qualification
+# record requires every platform's evidence.
+cargo test -p rustev-release --locked --test family
+# 3.4.3: the qualification harness's refusals (needs Python 3.11 or later).
+cargo test -p rustev-release --locked --test qualify_harness
+cargo clippy -p rustev-release --all-targets --locked -- -D warnings
+```
 
 ## Implementation record
 
@@ -533,6 +563,55 @@ reached, because the binary's `DT_NEEDED` is only `libgcc_s`, `libm`,
 expects 45 entries, 44 naming A-80 and this one naming A-82, and checks
 that each covers its finding on 2026-11-06 (the later row's date) and on
 2027-02-01.
+
+**Close, 2026-11-07 (the release).** Release 0.5.0 pushed, attested,
+verified and qualified the image. Tag `v0.5.0` is signed (verified) and
+names commit `27e717e12a14c4cbb5c3b7bd3aab625b311b31ff`, whose own push
+`ci-gate` passed (run 42309981455); `candidate.sh` on that commit passed
+locally. The release run 42310141322 (attempt 2, after the owner's npm
+publish by hand) completed with all 56 jobs successful. Attempt 1 built
+both images twice (`image release` and `image rebuild` for `linux/amd64`
+and `linux/arm64`), and `image checks` scanned both with the database
+built 2026-11-06 and reported "90 finding(s), each under an unexpired
+exception; 45 exception(s), each used" (A-80, A-82). `publish-image`
+pushed `ghcr.io/statecrafting/rustev-serve:0.5.0`, the index
+`sha256:26837cf1197be9e5327060c09bedeb3fbebcc3bdb4946e53ebf5203c734ef8a4`
+over `linux/amd64` `sha256:1c3122a2...` and `linux/arm64`
+`sha256:6c583b59...`, and attested the index's provenance and each
+platform's SBOM: the package holds the index under `0.5.0`, both
+platform manifests and the attestations' referrers. The release
+manifest's `image` names the same digests, each SBOM and SLSA build
+level 2. `verify-release` found that the tag names the manifest's index
+with its platform digests and verified the attestations; `qualify` passed
+on all seven platforms, its image step on `linux-x64-gnu` and
+`linux-arm64-gnu` pulling the index by digest, verifying its provenance
+and that platform's SBOM, running `check.sh` and serving the synthetic
+decision, and recording the exclusion (3.4.3) on the other five;
+`qualify / record` recorded `qualified` and `qualify / attach` attached
+the evidence. The GitHub release `v0.5.0` holds 142 assets, 8 of them
+`qualification-` assets (the record and one bundle per platform, 3.7).
+The candidate run of `v0.5.0-rc.3` (42274178796), with the image already
+a member, skipped `publish-image` with "a candidate never names or pushes
+the image (053 3.4.2)". This change adds
+`publish_image_is_skipped_for_a_candidate_and_a_dry_run` to
+`tools/rustev-release/tests/release_workflow.rs`, which runs the `tag`
+job's decision script for a release tag, a candidate, a dry run and an
+absent image, since no dry run has run with the image a member.
+
+Each Acceptance item is met: the exceptions file and its check by
+`tests/image_scan.rs` (increments 3, 3b and 6) and this release's gated
+scan; `publish-image` only for a release tag by `tests/release_workflow.rs`
+and `tests/candidate.rs` (increments 4b and 4c, and the test above), with
+`.github/workflows/release.yml`'s `tag` and `publish-image` jobs and the
+rc.3 skip; the manifest, `verify-release` and qualification by
+`tests/image.rs` and `tests/image_registry.rs` (increments 4a, 4b and 6a),
+`qualify.yml` (increment 6b) and this release; a release that pushes,
+attests, verifies and qualifies the image by 0.5.0 above;
+`publish_release` and the attachment by `tests/tagged.rs` (increments 1
+and 2a) and `qualify.yml`'s `attach` job (increment 2b), which attached
+this release's 8 `qualification-` assets; `make code`, declared
+verification and `make gate` by this change's checks, with 060 now in
+`VERIFIED_SPECS`. Implementation is complete.
 
 ## Decisions at approval
 
