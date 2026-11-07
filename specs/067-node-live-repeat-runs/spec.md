@@ -510,7 +510,23 @@ Pending with implementation.
 
 ## Implementation record
 
-None yet.
+Increment 1b: `rustev-node` gains a normal dependency on `rustev-live`
+(#547, alone because a manifest is a policy file) and a crate-private module of the binding's live preconditions, with no
+JavaScript method yet: a `LiveRefusal` outcome value (`code` 4 for
+`invalid_input`, 3 for I/O, 3.2.4); the configuration checked with the
+CLI's rules, so `authorize` is required (`live-config`, 3.5.2); a rule
+authorizer deciding as the CLI's (3.5.1); the host backend cost checks of
+3.3.3 against the engine's registered backends (`unknown` cost model
+`spend-unit`; unregistered, unreached or unconfigured bindings and a
+descriptor that differs from the binding entry `live-config`; `cost_unit:
+none` accepted), run before any journal is opened; the journal opened by
+path with the `testing` budget and the CLI's error mapping
+(`journal-budget` 4, `journal-locked` 3, 3.4.1); and the memory host
+refused `durable-paths-required` (3.4.2). Unit tests use scripted Rust
+backends, a temporary directory and `SetClock`; the test build resolves
+Node-API symbols dynamically (a `napi` dev-dependency feature), so the
+shipped addon is unchanged. Increment 2 calls these functions from
+`engine.liveRun`. No acceptance item is claimed yet.
 
 Planned increments, each a separately reviewed pull request from `main`
 of about 1,000 lines (the AI review times out near 1,000 to 1,800
