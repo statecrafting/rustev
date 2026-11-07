@@ -16,6 +16,10 @@ mod errors;
 // Increment 2 connects these preconditions to the live entry point.
 #[cfg_attr(not(test), allow(dead_code))]
 mod live;
+// Spec 067 increment 2b: the filesystem host `engine.liveRun` reads through;
+// the entry point that uses it lands in the next part of the increment.
+#[allow(dead_code)]
+mod live_fs;
 pub mod local_embed;
 mod profile;
 mod seams;

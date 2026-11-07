@@ -550,6 +550,20 @@ unchanged (full `rustev-cli`, `rustev-live`, `rustev-conformance` and
 `rustev-release` suites pass). The archive policy lists the new file. No
 acceptance item is claimed: the binding entry point is increment 2b.
 
+Increment 2b, part 1 (the binding's filesystem host): `rustev-node`
+gains `src/live_fs.rs`, the host `engine.liveRun` reads its inputs and
+writes its outputs through (3.4.2): a `rustev_surface::host::Host` over
+real paths with the CLI's per-file bound plus one byte, its 256 MiB run
+read budget, `list` in byte order, `entry_kind` without following links,
+never-overwriting all-or-none publication, the replay `Store` resolver and
+the publication of `eval live`'s repeat outputs. Without a new dependency
+it refuses a non-regular input by its metadata before and after opening;
+the CLI's non-blocking open also closes a swap between the two, a residual
+race the binding documents. Unit tests cover the read bound and budget,
+listing, link classification and the store's reference, size and link
+rules. Nothing calls it until part 2 adds `engine.liveRun`. No acceptance
+item is claimed.
+
 Planned increments, each a separately reviewed pull request from `main`
 of about 1,000 lines (the AI review times out near 1,000 to 1,800
 reviewed lines), so this spec's 0.6.0 risk is its size: four increments
