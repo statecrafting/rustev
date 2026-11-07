@@ -23,7 +23,7 @@
     {
       "name": "actionable.plan.json",
       "path": "tools/rustev-conformance/fixtures/cli/actionable.show/actionable.plan.json",
-      "sha256": "47bde96f5dd4008b529423b442215b2013eec47a0afe53884d031b92150f5216"
+      "sha256": "7b29f6e65d8ab647f003335f4e16a49346c80870567c53b61f985cbcfa75ff22"
     },
     {
       "name": "support.rules.json",
@@ -40,7 +40,7 @@
     {
       "golden": "crates/rustev-cli/tests/golden/actionable.show.json",
       "normalize": [],
-      "sha256": "8c05c0f8fd2bbbc656dbc01665026e579cdc9adc35a5bcaa30ad75df46fb5151",
+      "sha256": "1b11e0ba8e16cb3bb500fe30b13d28f33cc01c8aa0b235a3e495c1c2ffc048bd",
       "stream": "stdout"
     }
   ],

@@ -65,7 +65,7 @@
     {
       "name": "support.plan.json",
       "path": "tools/rustev-conformance/fixtures/local-embed/support.plan.json",
-      "sha256": "d46ebcb10b415cd93890ba972fa37d26dcb7e0518c6ad93f70c4b14b9f4a01a3"
+      "sha256": "8c953fdaf1a180e5048604c64548acba5b4009294f090d2bfde3b1b42f86e640"
     },
     {
       "name": "topic.calibration.json",
@@ -130,13 +130,13 @@
       "file": "SYNTHETIC.blank-message.judgment.json",
       "golden": "tools/rustev-conformance/expected/local-embed/local-embed.support-routing/SYNTHETIC.blank-message.judgment.json",
       "normalize": [],
-      "sha256": "03ceb37f3a08122e1b0871cd44f70448970a0800e20c10f443ac031cbdd8f0b3"
+      "sha256": "361a79d3f4d6191728ae4cc33a801a021d0d03957bf357d41ecd04083d4f4013"
     },
     {
       "file": "SYNTHETIC.blank-message.record.json",
       "golden": "tools/rustev-conformance/expected/local-embed/local-embed.support-routing/SYNTHETIC.blank-message.record.json",
       "normalize": [],
-      "sha256": "84d5c7f0cd4eec8c667ff9878c935d97773ea3cdcacb97d1f1a49d4e892771c6"
+      "sha256": "655a50c0c6b051310060c7fff18047eeb2138fea5ef4a9e026057d73cd162745"
     },
     {
       "file": "SYNTHETIC.blank-message.result.json",
@@ -148,13 +148,13 @@
       "file": "SYNTHETIC.sr-c01.judgment.json",
       "golden": "tools/rustev-conformance/expected/local-embed/local-embed.support-routing/SYNTHETIC.sr-c01.judgment.json",
       "normalize": [],
-      "sha256": "79a20874c651e460c87e3d2e65f5a16c8c20d3838bf358576277cd1bb0d271b4"
+      "sha256": "1abaf19732649d282b801af7ada3b494c5defc1cde58d63fb59978b89f97ca41"
     },
     {
       "file": "SYNTHETIC.sr-c01.record.json",
       "golden": "tools/rustev-conformance/expected/local-embed/local-embed.support-routing/SYNTHETIC.sr-c01.record.json",
       "normalize": [],
-      "sha256": "58948acbd9dd3794e386abd2a9876bebf2220ace14954d354e03090cbcfdb406"
+      "sha256": "82f199b3e7216f11c80b7e684266b24bf505b99446bbea43ff051acb2e9e9be0"
     },
     {
       "file": "SYNTHETIC.sr-c01.result.json",
@@ -166,13 +166,13 @@
       "file": "SYNTHETIC.sr-f01.judgment.json",
       "golden": "tools/rustev-conformance/expected/local-embed/local-embed.support-routing/SYNTHETIC.sr-f01.judgment.json",
       "normalize": [],
-      "sha256": "2906e4ffd6dfbc74c97ab597cd73f8d73de5b7136316dbfb271c81369d46d8ee"
+      "sha256": "cce25c374795bcdc610aec0c877930c133e7723f1655b531248f3ccc1286b4a3"
     },
     {
       "file": "SYNTHETIC.sr-f01.record.json",
       "golden": "tools/rustev-conformance/expected/local-embed/local-embed.support-routing/SYNTHETIC.sr-f01.record.json",
       "normalize": [],
-      "sha256": "e8ad6e3f50807a9ddcfc291af1f6c4626d6090de94cfa8e633c5e3963cc386c1"
+      "sha256": "903d59b50bca44da7ba62feedca23b4bb1f6830c275e6d17407f5b816c1ed374"
     },
     {
       "file": "SYNTHETIC.sr-f01.result.json",
@@ -184,13 +184,13 @@
       "file": "SYNTHETIC.sr-m01.judgment.json",
       "golden": "tools/rustev-conformance/expected/local-embed/local-embed.support-routing/SYNTHETIC.sr-m01.judgment.json",
       "normalize": [],
-      "sha256": "66c66fa7c73f899ab4d675c6dedb4fa05ab79caaaa73105252581c46ad7221ae"
+      "sha256": "fb1136097a462ae4c359c64c68b85a3d98ade9af6ca7102df45cf0ef97166044"
     },
     {
       "file": "SYNTHETIC.sr-m01.record.json",
       "golden": "tools/rustev-conformance/expected/local-embed/local-embed.support-routing/SYNTHETIC.sr-m01.record.json",
       "normalize": [],
-      "sha256": "86cdd4de8aa69c07115c10190c915cb0f240bf0b94321bbf55e10e50773cd100"
+      "sha256": "8d3269ebf1f93a45b3a4a4ca46312743874dd9887c77a843e25d18271343d259"
     },
     {
       "file": "SYNTHETIC.sr-m01.result.json",
@@ -202,13 +202,13 @@
       "file": "SYNTHETIC.sr-t01.judgment.json",
       "golden": "tools/rustev-conformance/expected/local-embed/local-embed.support-routing/SYNTHETIC.sr-t01.judgment.json",
       "normalize": [],
-      "sha256": "d046b935c9202a32a990c2af0914b24057e5cbaf4a27e0a3d92dfbba18485f69"
+      "sha256": "c4f2c495bcf9b6615b5b27e73a91a5152f68c5f8fbbf25b3d29b858064e31fc9"
     },
     {
       "file": "SYNTHETIC.sr-t01.record.json",
       "golden": "tools/rustev-conformance/expected/local-embed/local-embed.support-routing/SYNTHETIC.sr-t01.record.json",
       "normalize": [],
-      "sha256": "3a27aac0c126433521c4477f9e046627fbc0c97b0419a09fc12d1d11186d2e24"
+      "sha256": "e94dd29b39e881f1c687e166cb11414ce49b3883dbf3dd2550ac3ab85bd10077"
     },
     {
       "file": "SYNTHETIC.sr-t01.result.json",

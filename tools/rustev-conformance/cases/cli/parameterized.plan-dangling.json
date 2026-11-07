@@ -34,7 +34,7 @@
     {
       "golden": "crates/rustev-cli/tests/golden/parameterized.plan-dangling.json",
       "normalize": [],
-      "sha256": "51899ba782454f6954f9dafa2a416ad5e59dc80d1fc48390329d2e00814d18bd",
+      "sha256": "4d739c0e29b10e9df9383ddef65ffb95e2d1d2850198d72d7c57b58924de3295",
       "stream": "stdout"
     }
   ],

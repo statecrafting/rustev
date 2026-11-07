@@ -5,7 +5,7 @@
     {
       "name": "acquire-retry.plan.json",
       "path": "tools/rustev-conformance/fixtures/acquire/acquire-retry.plan.json",
-      "sha256": "a9d2ac97e0424d7bc24522077d3524231bba5d031e0dc3139566e71fb6b18aaf"
+      "sha256": "2c7618e6a6c3ce2aca2e434ec20e6c3802d47e20a8198f1fe56dae03ad19fca5"
     },
     {
       "name": "catalog.source.json",
@@ -24,7 +24,7 @@
       "file": "overloaded.record.json",
       "golden": "tools/rustev-conformance/expected/runtime/runtime.acquire-page/overloaded.record.json",
       "normalize": [],
-      "sha256": "9ea817affdb85cfbb7c6f04ccc42b7262fb040d7a45e54c69b26b8bf7ba05aa8"
+      "sha256": "ced9c6ca027cc03707ec5aaaa22a8ed4cf17b8f050cc582c3af33544519656b3"
     },
     {
       "file": "overloaded.result.json",
@@ -36,7 +36,7 @@
       "file": "transient.record.json",
       "golden": "tools/rustev-conformance/expected/runtime/runtime.acquire-page/transient.record.json",
       "normalize": [],
-      "sha256": "1ca78fd09004cc5828eb050e7163940c70d980c5879d17a4ba8aaee9660a8313"
+      "sha256": "25867b721b1b9c08aa254c3a0bac35678d1335d0f6449fa1f9f2178032c31a2d"
     },
     {
       "file": "transient.result.json",

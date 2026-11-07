@@ -1,7 +1,7 @@
 {
   "schema": "rustev.release-set/1",
-  "version": "0.5.0",
-  "tag": "v0.5.0",
+  "version": "0.6.0",
+  "tag": "v0.6.0",
   "registry": "crates-io",
   "index": "registry+https://github.com/rust-lang/crates.io-index",
   "layers": [
