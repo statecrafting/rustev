@@ -17,26 +17,26 @@
     {
       "name": "left",
       "path": "tools/rustev-conformance/fixtures/cli/parameterized.binding/left",
-      "sha256": "3fd24ddec5efd28e863ef04058705a8f53dad57b2db84ba6c649d8cafe4e02d1"
+      "sha256": "4dba462118e81a6c9d57a2113da2a101b89c8e7f19d0c8fd450e7de89481ae28"
     },
     {
       "name": "right",
       "path": "tools/rustev-conformance/fixtures/cli/parameterized.binding/right",
-      "sha256": "75b1bf951b0c66c23912d9b5d9a3fe53cf3c5f1c00b88c2658c25cb397ed96f8"
+      "sha256": "d26de5936bb84345ff758eb2067b1c5498a6c589d0e7d1e1449352a6c22bbd38"
     }
   ],
   "outputs": [
     {
       "golden": "crates/rustev-cli/tests/golden/parameterized.binding.json",
       "normalize": [],
-      "sha256": "0fb9bb89d304f42274f413d751a4e94ffdfbeb6e6937b64981d60c27aa361fb0",
+      "sha256": "7a249bd61386321291dd923ba614a7ba8680f37e5b38ff0c83f1a13ef7f2c073",
       "stream": "stdout"
     },
     {
       "file": "diff",
       "golden": "crates/rustev-cli/tests/golden/parameterized.binding.document.json",
       "normalize": [],
-      "sha256": "b86a879621014ddb92e725dcff3e94a763696f1b161b679255137772d2afb5dd"
+      "sha256": "7f89c27575ecea866d3f522e9243d1bd972988575dc2c57844b683863db4c212"
     }
   ],
   "surfaces": [

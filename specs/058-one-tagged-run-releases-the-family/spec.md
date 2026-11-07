@@ -657,6 +657,24 @@ re-derived with 0.5.0 when upgrading. The npm `Engine` gains required
 members over 0.4.1 (031 3.8), so a TypeScript type that implements or
 mocks `Engine` must add them.
 
+**The 0.6.0 version move (2026-11-07).** The owner decided on 2026-11-07
+that the release after 0.5.0 is 0.6.0, carrying specs 064 to 067. The
+move lands first in the cycle because spec 067 adds required members to
+the Node binding's `Engine`, which 031 3.8's npm declaration check
+classes as breaking and refuses until the version moves to the breaking
+position over the 0.5.0 baseline; before 1.0 that is the minor number.
+It is therefore a breaking-position step, as 0.5.0 was: every release-set
+crate and npm package moves from `0.5.0` to `0.6.0` in lockstep, in the
+same sites as the 0.5.0 move, and every fixture carrying a PlanId,
+including those added since 0.5.0, is regenerated through the same bless
+and harvest paths, with byte copies where a file mirrors another and the
+`rustev-serve` Sigstore fixture re-signed with its throwaway keys. The
+move itself changes no behavior. For consumers, every PlanId changes from
+0.5.0 to 0.6.0, even for an unchanged definition (031 3.6.4, which the
+0.6.0 changelog states for each reference plan): anything keyed by a
+PlanId, such as evaluation baselines, ledgers and cache keys, must be
+re-derived with 0.6.0 when upgrading.
+
 ## Open questions for the owner
 
 Settled at ratification (A-61): the `release` Environment has no

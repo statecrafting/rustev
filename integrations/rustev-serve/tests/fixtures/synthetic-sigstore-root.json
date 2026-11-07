@@ -5,14 +5,14 @@
       "baseUrl": "https://synthetic.rekor.example.invalid",
       "hashAlgorithm": "SHA2_256",
       "publicKey": {
-        "rawBytes": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE8SV6FNoRPxI6JCoGdNSvtVtGKuRl7yA6PGVYChTZ8a2KKM8973wAH68Zvi5JFxsYrIeAjkCUMdkBkedWX493zw==",
+        "rawBytes": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE4cPgoqjYfoRF6Uk6Z65S4J+SdXCx+iniI2wqczQzfKK6j7WJ6wlymJdQjy06jA5zzxXL/zbD2ynzUb6DiOEA+g==",
         "keyDetails": "PKIX_ECDSA_P256_SHA_256",
         "validFor": {
           "start": "2020-01-01T00:00:00Z"
         }
       },
       "logId": {
-        "keyId": "9inGjk/tl8yyKuoqUYcQASZOxmlwyQNGXLV3mWkT0wU="
+        "keyId": "8WJZMNPBbuzth3n2uKD1v7Vvx7goJlmxly8KsdgZBa4="
       }
     }
   ],
@@ -21,14 +21,14 @@
       "baseUrl": "https://synthetic.ct.example.invalid",
       "hashAlgorithm": "SHA2_256",
       "publicKey": {
-        "rawBytes": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEUSnUkfO1AXu8j1pXPKbiDK86/kpdHfnjxzAkPUVSfPAJw3S4oALBeo/7jIxFLlDVx074XhsJ0tbWTield+qIOg==",
+        "rawBytes": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE8PPEjuvKtWCjAos7lhm1FSypI2wNT9rd+G1tiE1g/HM2V/ubAweUGrDxoVq5b6MC8jjkKRLDrcmnkrMjsZnCPA==",
         "keyDetails": "PKIX_ECDSA_P256_SHA_256",
         "validFor": {
           "start": "2020-01-01T00:00:00Z"
         }
       },
       "logId": {
-        "keyId": "BlF/BDU9C5Mayxd7zjyl1MRGK2Qdi/ASfGQi5FMIaLs="
+        "keyId": "fMNde2sp8Fc/Pok8CXDcYM8dcBimKrZhD9JLjtmDOzI="
       }
     }
   ],
@@ -41,7 +41,7 @@
       "certChain": {
         "certificates": [
           {
-            "rawBytes": "MIIBiTCCAS6gAwIBAgIULyu7u06/WfkTLEmTBjiXpMs0inUwCgYIKoZIzj0EAwIwIjEgMB4GA1UEAwwXU3ludGhldGljIFJ1c3RldiBGdWxjaW8wHhcNMjYxMTA2MDUyNjM0WhcNMzYxMTAzMDUyNjM0WjAiMSAwHgYDVQQDDBdTeW50aGV0aWMgUnVzdGV2IEZ1bGNpbzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABBSBFoLwmCEJq/YyxSJenNWzPxfdO5ysEOCQaPeTLHoNlvRGyo55MORrOfGr21rhaODZlmHr8Z5SXrXUbwdXm0OjQjBAMB0GA1UdDgQWBBSQzRnQGfvSkBQLxNqSHyZ+xq8BdzAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAKBggqhkjOPQQDAgNJADBGAiEA7QKqglnDYVlxcFgby7dc++3OJcOhek3mhXL9BspSGEcCIQDMZtxsqa5sMZmUzdiGzsE3FgqDpYVX3Lyo6RCbbmrOFg=="
+            "rawBytes": "MIIBiTCCAS6gAwIBAgIUSekVdnDuw31PtQY8Wf5JkGMeWo0wCgYIKoZIzj0EAwIwIjEgMB4GA1UEAwwXU3ludGhldGljIFJ1c3RldiBGdWxjaW8wHhcNMjYxMTA3MDEzNDA5WhcNMzYxMTA0MDEzNDA5WjAiMSAwHgYDVQQDDBdTeW50aGV0aWMgUnVzdGV2IEZ1bGNpbzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABBVLwNcoRkWDy6yB/Lcn2lLgzvGahvOThGqS2ouGZGhOkR0PbXWyVmXTMK9ru7rDZOq4tc4Eey9j2uLrDMneZVijQjBAMB0GA1UdDgQWBBQKYrjIYjg8GaAl+x8L3po3pJN4iTAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAKBggqhkjOPQQDAgNJADBGAiEAoUlE1SMy4YY7umNVUoEYF3pQ5zFNJJTv8HR73mL93Y0CIQCfuaSknnh8kKjdqKrVm/lNgSVvWmwKx2/jh44GGgZ6oA=="
           }
         ]
       },
