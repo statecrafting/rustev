@@ -2,7 +2,7 @@
 id: "066-segment-ancestry-predicate"
 title: "Definition predicate: segment ancestry on a declared separator (amends 002 and 032)"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-11-06"
 summary: >
   An amendment of approved specs 002 (3.8, 3.9) and 032 (3.1, 3.12), for
@@ -29,8 +29,16 @@ extends:
   # The generated TypeScript declarations gain one predicate member.
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-node/types/" }, nature: additive }
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "integrations/rustev-wasm/types/" }, nature: additive }
+  # The Acceptance's five mutation seeds join the seeded-defect runner.
+  - { spec: "004-evaluation-and-replay", unit: { kind: directory, path: "crates/rustev-eval/mutation/" }, nature: additive }
+  # Adds 066 to `make verify` at completion.
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  # Adds 066 to CI's `integrations-plans` acceptance group.
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
 depends_on:
+  - "001-boundaries-and-authority"
   - "002-decision-contract-and-pure-core"
+  - "004-evaluation-and-replay"
   - "027-node-and-wasm-bindings"
   - "031-public-api-and-release-family"
   - "032-evidence-quality"
@@ -56,8 +64,9 @@ obligations:
 # 066: Definition predicate: segment ancestry on a declared separator (amends 002 and 032)
 
 Approved: ratified by the owner on 2026-11-06 (A-85) for release 0.6.0;
-the implementation is pending. The approved texts of 002 and 032 are not
-edited; this spec records what it adds to them.
+the implementation is complete (see the Implementation record). The
+approved texts of 002 and 032 are not edited; this spec records what it
+adds to them.
 
 ## 1. Purpose
 
@@ -92,7 +101,9 @@ Ratification added the `extends` edges to `crates/rustev-contract/` and
 directories `integrations/rustev-node/types/` and
 `integrations/rustev-wasm/types/` (027, additive); the edges to
 `Makefile` and `scripts/acceptance/` (001, additive) are added by the
-change that completes this spec.
+change that completes this spec, with an edge to
+`crates/rustev-eval/mutation/` (004, additive) for the
+Acceptance's mutation seeds.
 
 Unchanged: `rustev.definition/1`, `rustev.plan/2`, `rustev.exact/1`;
 every existing operator and predicate; snapshot, evidence, run and
@@ -287,11 +298,59 @@ document version.
 
 ## Verification
 
-Pending with implementation.
+Declared for `spec-spine verify 066`; 066 is in `make verify` and in CI's
+`integrations-plans` acceptance group. The regenerated binding types are
+checked by `gen-types --check` in `make bindings` (CI's `bindings` job).
+
+```verify:cli
+# 3.1, 3.5.3: the predicate's wire form, refusals and regenerated schemas.
+cargo test -p rustev-contract --locked --test segment_ancestry --test schemas
+# 3.1 to 3.5 and section 5: builder, compilation, evaluation, grades,
+# handler coverage, parameter sites and the synthetic package goldens.
+cargo test -p rustev-core --locked --test segment_ancestry
+# 3.3.1: a skipped operand in an exact step and a corroboration check.
+cargo test -p rustev-core --locked --test acquisition_eval
+# R-1: every committed definition, plan, judgment and evidence golden and
+# PlanId unchanged.
+cargo test -p rustev-core --locked --test reference_plans --test packaged_fixtures --test identity
+# The Acceptance's five seeds, each detected.
+sh crates/rustev-eval/mutation/seeds.sh "spec 066"
+```
 
 ## Implementation record
 
-None yet.
+**Complete (2026-11-07), one change.** `rustev.exact/2` gains `under`
+(`Predicate::Under` with the closed `SegmentSeparator` enum `:`, `/`, `|`,
+`.`, in `crates/rustev-contract/src/definition.rs`); the four definition
+and plan schemas and both bindings' generated declarations regenerate with
+the added member. In `rustev-core`, the builder gains `e::under`
+(`builder.rs`); `under` counts as a registry 2 construct, so a definition 1
+using it is refused in phase b, category 11 `invalid_definition`,
+requirement `requires_definition_2`; `value` and
+`ancestor` must be non-nullable `text`, checked in phase e for steps,
+corroboration checks and policy conditions alike (category 3, before
+handler coverage; `expr.rs`, `compile.rs`); evaluation splits both operands
+on the separator byte, refuses an empty operand or empty segment as
+`invalid_input` naming `under value` or `under ancestor`, and is true only
+when the value's bytes begin with the ancestor's followed by the separator
+(`expr.rs`). Reads, grade minimums and reads for grading (`quality.rs`),
+reference collection and the effects scan (`ops.rs`) treat its operands as
+`cmp`'s; `under` positions are never parameter sites
+(`instantiate/sites.rs`). A compare step's own reasons already include
+`invalid_input`, so handler coverage (3.3.3) needs no new rule. Evidence:
+`crates/rustev-contract/tests/segment_ancestry.rs` (round trip, unknown
+fields, duplicate keys, separators outside the set) and
+`crates/rustev-core/tests/segment_ancestry.rs` (every 3.2.5 example and
+section 5 row for each separator, unresolved operands in a step, a policy
+condition under `propagate` and `as_unmet` and a corroboration check, grade
+propagation, handler coverage, builder bytes, parameter sites), a skipped
+operand in `tests/acquisition_eval.rs`, and the synthetic package goldens
+`tests/golden/segment-ancestry.*` (definition, plan, `PlanId`, and
+judgments for under, not under, sibling prefix, missing and malformed
+slugs). No existing golden, plan or `PlanId` changed (R-1). The five
+Acceptance seeds are in `crates/rustev-eval/mutation/seeds.py` under
+`spec 066`, each detected by `rustev-core`'s tests. The WebAssembly module
+stays within 027's uncompressed budget (4,821,398 of 5,242,880 bytes).
 
 ## Decisions at approval
 
