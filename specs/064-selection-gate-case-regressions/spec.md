@@ -293,7 +293,8 @@ tests over case deltas.
 | The clause over `latency_ms/p0.95` or `host/latency_ms/p0.5` | Clause unknown, `not-case-comparable`. |
 | The clause over a metric of an `opaque` scorer | Clause unknown (041 3.12.2). |
 | The clause over a `historical` cost metric | Clause unknown (029 3.12.4). |
-| More than 10 000 regressing cases | `list` holds the first 10 000, `total` the count, `truncated: true`. |
+| More than 10 000 regressing cases | `regressions.list` holds the first 10 000 in manifest order, `regressions.total` the count, `regressions.truncated: true`. |
+| More than 10 000 unresolved cases | `unresolved.list` holds the first 10 000 in manifest order, `unresolved.total` the count, `unresolved.truncated: true`; clause unknown unless it already fails. |
 | A host candidate with a case `failed` in one run | That case `partial` for score metrics; clause unknown unless it already fails. |
 | A gate without the clause, on today's inputs | Byte-identical selection, stdout and exit code. |
 
