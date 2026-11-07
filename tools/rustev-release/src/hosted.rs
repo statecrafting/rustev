@@ -14,7 +14,9 @@ pub fn observe_crates(m: &ReleaseManifest, registry: &mut dyn Registry) -> Vec<S
             Lookup::Visible { checksum } if checksum == p.sha256 => None,
             Lookup::Visible { .. } => Some(format!("{}: checksum mismatch", p.name)),
             Lookup::Absent => Some(format!("{}: missing", p.name)),
-            Lookup::Unattested { .. } => Some(format!("{}: no provenance", p.name)),
+            // `Unattested` is npm's answer only (A-87); crates.io never gives it,
+            // and the match must still refuse it rather than take it for present.
+            Lookup::Unattested { .. } => Some(format!("{}: not a crates.io answer", p.name)),
             Lookup::Unknown { detail } => Some(format!(
                 "{}: unknown ({})",
                 p.name,

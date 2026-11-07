@@ -876,6 +876,7 @@ jobs:
           set -eu
           if [ -n "${NPM_TOKEN:-}" ]; then
             # npm expands ${NPM_TOKEN} itself; the file never holds the value.
+            # shellcheck disable=SC2016 # npm, not the shell, expands it
             printf '%s\n' '//registry.npmjs.org/:_authToken=${NPM_TOKEN}' > "$RUNNER_TEMP/.npmrc"
             echo "NPM_CONFIG_USERCONFIG=$RUNNER_TEMP/.npmrc" >> "$GITHUB_ENV"
           else
