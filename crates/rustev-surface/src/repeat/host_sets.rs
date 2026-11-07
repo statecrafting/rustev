@@ -544,7 +544,9 @@ pub(super) fn select(command: &str, reads: &dyn Host, p: &SelectArgs<'_>) -> Opt
                 .set("assertion", HOST_ASSERTED)
                 .raw(
                     "candidates",
-                    s.bytes(record_canonical_bytes(&selection.candidates))?,
+                    s.bytes(record_canonical_bytes(
+                        &rustev_eval::selection::stdout_candidates(&gate, &selection.candidates),
+                    ))?,
                 )
                 .set("ranked", &selection.ranked)
                 .set("unranked", &selection.unranked),

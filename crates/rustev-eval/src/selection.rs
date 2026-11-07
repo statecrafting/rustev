@@ -16,6 +16,9 @@ use crate::repeat::{
     BandDoc, CohortReport, CohortStatus, FigureDoc, HeldOut, MetricReport, Observation, SplitRole,
 };
 
+mod case_regressions;
+pub use case_regressions::{CaseList, CaseResults, Regression, UnresolvedCase, stdout_candidates};
+
 pub const SELECTION_GATE: &str = "rustev.selection-gate/1";
 pub const SELECTION: &str = "rustev.selection/1";
 /// Conservative declaration bounds, matching DESCRIPTOR_V1 collection sizes.
@@ -47,6 +50,10 @@ pub enum Per {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged, deny_unknown_fields)]
 pub enum MetricClause {
+    CaseRegressions {
+        metric: String,
+        case_regressions: CaseRegressionLimit,
+    },
     NotWorse {
         metric: String,
         not_worse_than: BaselineTarget,
@@ -61,6 +68,17 @@ pub enum MetricClause {
 #[serde(rename_all = "snake_case")]
 pub enum BaselineTarget {
     Baseline,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CaseRegressionLimit {
+    pub by: AbsoluteDrop,
+    pub at_most: u64,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AbsoluteDrop {
+    pub absolute: Decimal,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
@@ -84,7 +102,9 @@ pub struct HeldOutLimit {
 impl MetricClause {
     fn metric(&self) -> &str {
         match self {
-            Self::NotWorse { metric, .. } | Self::Better { metric, .. } => metric,
+            Self::NotWorse { metric, .. }
+            | Self::Better { metric, .. }
+            | Self::CaseRegressions { metric, .. } => metric,
         }
     }
 }
@@ -125,6 +145,21 @@ impl SelectionGate {
             };
             if !self.metrics.contains_key(m.metric()) {
                 return Err("clause metric has no declared direction".into());
+            }
+            if let MetricClause::CaseRegressions {
+                case_regressions: limit,
+                ..
+            } = m
+            {
+                if matches!(c, Clause::AllSlices { .. }) {
+                    return Err("case-regressions-in-slices".into());
+                }
+                if limit.by.absolute <= Decimal::ZERO || limit.at_most > 1_000_000 {
+                    return Err(
+                        "case_regressions needs positive by.absolute and at_most in [0, 1000000]"
+                            .into(),
+                    );
+                }
             }
             if let MetricClause::NotWorse {
                 within: Within::Absolute(t),
@@ -179,6 +214,12 @@ pub struct ClauseResult {
     pub result: ClauseOutcome,
     /// Each declared slice's result, retained even after a failure.
     pub slices: Vec<SliceResult>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "case_regressions::read_cases"
+    )]
+    pub cases: Option<Option<CaseResults>>,
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -236,6 +277,7 @@ fn result(clause: String, result: ClauseOutcome) -> ClauseResult {
         clause,
         result,
         slices: vec![],
+        cases: None,
     }
 }
 
@@ -321,6 +363,12 @@ pub fn evaluate_selection(
             held_out: baseline_evidence.report.held_out.as_ref(),
             opaque: &|m: &str| opaque(baseline_evidence, m),
             host: false,
+            cases: baseline_evidence
+                .inputs
+                .runs
+                .iter()
+                .map(|r| r.cases)
+                .collect(),
         };
         let cand_side = Side {
             cohorts: &c.evidence.report.cohorts,
@@ -328,6 +376,7 @@ pub fn evaluate_selection(
             held_out: c.evidence.report.held_out.as_ref(),
             opaque: &|m: &str| opaque(&c.evidence, m),
             host: false,
+            cases: c.evidence.inputs.runs.iter().map(|r| r.cases).collect(),
         };
         let (verdict, clauses) = judge(
             gate,
@@ -371,6 +420,7 @@ pub(crate) struct Side<'a> {
     pub held_out: Option<&'a HeldOut>,
     pub opaque: &'a dyn Fn(&str) -> bool,
     pub host: bool,
+    pub cases: Vec<&'a crate::eval_cases::EvalCases>,
 }
 
 /// A candidate's clause results after its preconditions and coverage
@@ -399,7 +449,7 @@ pub(crate) fn judge(
                     .find(|(_, e)| (e.opaque)(m))
                     .map(|(side, _)| (side, m))
             });
-            clauses.push(match (&precondition_reason, opaque_side) {
+            let mut entry = match (&precondition_reason, opaque_side) {
                 (Some(r), _) => result(label, unknown(format!("precondition: {r}"))),
                 // Spec 041, 3.12.2: an opaque scorer's identity names
                 // code whose change no digest shows.
@@ -408,7 +458,13 @@ pub(crate) fn judge(
                     unknown(format!("the {side}'s `{m}` comes from an opaque scorer")),
                 ),
                 (None, None) => evaluate_clause(label, clause, gate, base, cand),
-            });
+            };
+            if matches!(clause, Clause::Metric(MetricClause::CaseRegressions { .. }))
+                && entry.cases.is_none()
+            {
+                entry.cases = Some(None);
+            }
+            clauses.push(entry);
         }
     }
     if let Some(any) = &gate.and_any {
@@ -737,6 +793,12 @@ fn evaluate_clause(
     c: &Side<'_>,
 ) -> ClauseResult {
     match clause {
+        Clause::Metric(MetricClause::CaseRegressions {
+            metric,
+            case_regressions,
+        }) => {
+            case_regressions::evaluate(label, metric, case_regressions, gate.metrics[metric], b, c)
+        }
         Clause::Metric(m) => result(label, metric_clause(m, gate, b, c, "all")),
         Clause::HeldOut { held_out } => result(
             label,
@@ -791,6 +853,7 @@ fn evaluate_clause(
                 clause: label,
                 result: combined,
                 slices,
+                cases: None,
             }
         }
     }

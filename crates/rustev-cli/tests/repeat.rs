@@ -451,3 +451,53 @@ fn selection_refuses_inconsistent_candidate_binding() {
     );
     assert!(!s.exists("selection.json"));
 }
+
+#[test]
+fn case_regressions_064_cli_goldens() {
+    case_regression_golden("qualifies", 0.55, false, 0, "selected");
+    case_regression_golden("unknown", 0.5, true, 12, "unknown");
+}
+// A separate test lets the harvest capture exactly one new conformance case.
+#[test]
+fn case_regressions_064_conformance() {
+    case_regression_golden("rejected", 0.6, false, 11, "none_qualified");
+}
+fn case_regression_golden(name: &str, loss: f64, historical: bool, code: i32, status: &str) {
+    let s = Scratch::new(&format!("case-regressions-{name}"));
+    let mut f = setup(&s);
+    f.loss(true, loss, 0.5);
+    write_set(&s, "candidates/one", &f, true);
+    let mut v = serde_json::to_value(evidence::gate()).unwrap();
+    v["require"] = json!([{"metric":if historical {"cost_per_1000/observed"} else {"mean_log_loss"},"case_regressions":{"by":{"absolute":"0.1"},"at_most":0}}]);
+    let g = rustev_eval::SelectionGate::parse(&serde_json::to_vec(&v).unwrap()).unwrap();
+    s.write("gate.json", &g.canonical().unwrap());
+    let r = s.rustev(&[
+        "gate",
+        "select",
+        "--selection-gate",
+        "gate.json",
+        "--baseline",
+        "baseline.json",
+        "--baseline-eval",
+        "base",
+        "--candidates",
+        "candidates",
+        "--out",
+        "selection.json",
+    ]);
+    r.expect(code, status);
+    for (extension, bytes) in [("stdout", r.stdout), ("json", s.read("selection.json"))] {
+        if name == "rejected" {
+            golden(&format!("case-regressions-{name}.{extension}"), &bytes);
+        } else {
+            // Only the rejected outcome is a conformance case (064 acceptance).
+            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("tests/golden/repeat-case-regressions")
+                .join(format!("{name}.{extension}"));
+            if std::env::var_os("UPDATE_REPEAT_GOLDENS").is_some() {
+                std::fs::write(&path, &bytes).unwrap();
+            }
+            assert_eq!(std::fs::read(&path).unwrap(), bytes, "{}", path.display());
+        }
+    }
+}
