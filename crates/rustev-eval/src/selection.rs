@@ -38,6 +38,9 @@ pub struct SelectionGate {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub and_any: Option<Vec<Clause>>,
     pub rank_by: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(deserialize_with = "crate::integrity::present")]
+    pub integrity: Option<crate::integrity::Integrity>,
 }
 crate::doc::eval_document!(SelectionGate, SELECTION_GATE, DESCRIPTOR_V1, ContentDigest);
 
@@ -111,6 +114,9 @@ impl MetricClause {
 impl SelectionGate {
     /// Semantic checks accompany the strict document parser, as for RepeatConfig.
     pub fn check(&self) -> Result<(), String> {
+        if let Some(integrity) = &self.integrity {
+            integrity.check()?;
+        }
         if self.schema != SELECTION_GATE || !valid_name(&self.gate) {
             return Err("wrong schema or invalid gate name".into());
         }
@@ -314,6 +320,26 @@ pub fn evaluate_selection(
         .map_err(|e| e.to_string())?;
     check_names(candidates)?;
     let base = verify_baseline(baseline, baseline_evidence);
+    let baseline_integrity = gate
+        .integrity
+        .as_ref()
+        .filter(|_| base.is_ok())
+        .map(|bounds| {
+            baseline_evidence
+                .inputs
+                .runs
+                .iter()
+                .enumerate()
+                .map(|(r, run)| {
+                    crate::integrity::entry(
+                        "baseline",
+                        r,
+                        bounds,
+                        crate::integrity::evaluated_counts(run.evaluated),
+                    )
+                })
+                .collect::<Vec<_>>()
+        });
     let mut decisions = Vec::new();
     let mut ranks = Vec::new();
     let mut unranked = Vec::new();
@@ -324,7 +350,7 @@ pub fn evaluate_selection(
             .and_then(|()| verify(&c.evidence))
             .and_then(|()| stable(baseline_evidence, &c.evidence));
         let mut clauses = Vec::new();
-        let precondition_reason = precondition.err();
+        let mut precondition_reason = precondition.err();
         clauses.push(result(
             "preconditions".into(),
             match &precondition_reason {
@@ -332,6 +358,22 @@ pub fn evaluate_selection(
                 None => pass("bindings and cohorts verified"),
             },
         ));
+        if precondition_reason.is_none()
+            && let Some(bounds) = &gate.integrity
+        {
+            clauses.extend(baseline_integrity.clone().unwrap_or_default());
+            clauses.extend(c.evidence.inputs.runs.iter().enumerate().map(|(r, run)| {
+                crate::integrity::entry(
+                    "candidate",
+                    r,
+                    bounds,
+                    crate::integrity::evaluated_counts(run.evaluated),
+                )
+            }));
+            if crate::integrity::breached(&clauses) {
+                precondition_reason = Some("integrity".into());
+            }
+        }
         if precondition_reason.is_none() {
             for (side, e) in [("baseline", baseline_evidence), ("candidate", &c.evidence)] {
                 for (r, run) in e.inputs.runs.iter().enumerate() {

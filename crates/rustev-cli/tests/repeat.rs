@@ -501,3 +501,133 @@ fn case_regression_golden(name: &str, loss: f64, historical: bool, code: i32, st
         }
     }
 }
+
+#[test]
+fn integrity_selection_cli_goldens_and_exit_codes() {
+    let args = [
+        "gate",
+        "select",
+        "--selection-gate",
+        "gate.json",
+        "--baseline",
+        "baseline.json",
+        "--baseline-eval",
+        "base",
+        "--candidates",
+        "candidates",
+        "--out",
+        "selection.json",
+    ];
+    for (name, side, limit, loss, code, status) in [
+        ("void", true, 0, 0.9, 12, "unknown"),
+        ("holds", true, 1, 0.5, 0, "selected"),
+        ("reject", true, 1, 0.9, 11, "none_qualified"),
+        ("baseline", false, 0, 0.5, 12, "unknown"),
+    ] {
+        let s = Scratch::new(&format!("integrity-{name}"));
+        let mut f = fixture();
+        f.loss(true, loss, loss);
+        f.second_outcome(side, false);
+        let (e, cases) = if side {
+            (&mut f.c, &mut f.cc)
+        } else {
+            (&mut f.b, &mut f.bc)
+        };
+        e.detail.cases[1].outcome = "abstention:backend_unavailable".into();
+        cases.cases[1].outcome = e.detail.cases[1].outcome.clone();
+        Fixture::bind(e, cases);
+        write_set(&s, "base", &f, false);
+        s.write("baseline.json", &f.reports().0.record_canonical().unwrap());
+        write_set(&s, "candidates/one", &f, true);
+        let mut g = evidence::gate();
+        g.integrity = Some(rustev_eval::integrity::Integrity {
+            max_invalid: None,
+            max_upstream_failures: Some(limit),
+        });
+        s.write("gate.json", &g.canonical().unwrap());
+        let r = s.rustev(&args);
+        let out = r.expect(code, status);
+        if code == 12 {
+            assert_eq!(out["candidates"][0]["notice"], "void: repeat the run");
+        }
+        // Only the void case is harvested; the other goldens are nested.
+        let golden_name = if name == "void" {
+            "integrity-void".to_owned()
+        } else {
+            format!("integrity/{name}")
+        };
+        for (suffix, bytes) in [("stdout", r.stdout), ("json", s.read("selection.json"))] {
+            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("tests/golden")
+                .join(format!("{golden_name}.{suffix}"));
+            if std::env::var_os("UPDATE_INTEGRITY_GOLDENS").is_some() {
+                std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+                std::fs::write(&path, &bytes).unwrap();
+            }
+            assert_eq!(std::fs::read(path).unwrap(), bytes);
+            if name == "void" {
+                common::harvest::golden(&format!("{golden_name}.{suffix}"), &bytes);
+            }
+        }
+    }
+}
+
+#[test]
+fn integrity_cli_refuses_bad_bounds_and_voids_uncountable_scores() {
+    let s = Scratch::new("integrity-input");
+    let f = setup(&s);
+    write_set(&s, "candidates/one", &f, true);
+    for bounds in [
+        json!({}),
+        json!({"max_invalid":-1}),
+        json!({"max_upstream_failures":1000001}),
+        json!({"max_invalid":0.1}),
+        json!({"max_invalid":0,"extra":0}),
+    ] {
+        let mut g = serde_json::to_value(evidence::gate()).unwrap();
+        g["integrity"] = bounds;
+        s.write("gate.json", g.to_string().as_bytes());
+        s.rustev(&[
+            "gate",
+            "select",
+            "--selection-gate",
+            "gate.json",
+            "--baseline",
+            "baseline.json",
+            "--baseline-eval",
+            "base",
+            "--candidates",
+            "candidates",
+            "--out",
+            "selection.json",
+        ])
+        .expect(4, "invalid_input");
+        assert!(!s.exists("selection.json"));
+    }
+    let mut g = evidence::gate();
+    g.integrity = Some(rustev_eval::integrity::Integrity {
+        max_invalid: Some(0),
+        max_upstream_failures: None,
+    });
+    s.write("gate.json", &g.canonical().unwrap());
+    let r = s.rustev(&[
+        "gate",
+        "select",
+        "--selection-gate",
+        "gate.json",
+        "--baseline",
+        "baseline.json",
+        "--baseline-eval",
+        "base",
+        "--candidates",
+        "candidates",
+        "--out",
+        "selection.json",
+    ]);
+    r.expect(12, "unknown");
+    assert!(
+        String::from_utf8(r.stdout)
+            .unwrap()
+            .contains("invalid-uncountable")
+    );
+}

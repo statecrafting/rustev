@@ -457,6 +457,25 @@ pub fn evaluate_selection(
         .map_err(|e| e.to_string())?;
     crate::comparison::check_name_list(&candidates.iter().map(|c| c.name).collect::<Vec<_>>())?;
     let base_ok = verify_baseline(baseline, base).map_err(|e| e.to_string());
+    let baseline_integrity = gate
+        .integrity
+        .as_ref()
+        .filter(|_| base_ok.is_ok())
+        .map(|bounds| {
+            base.inputs
+                .runs
+                .iter()
+                .enumerate()
+                .map(|(r, run)| {
+                    crate::integrity::entry(
+                        "baseline",
+                        r,
+                        bounds,
+                        crate::integrity::host_counts(base.inputs.evaluator, run),
+                    )
+                })
+                .collect::<Vec<_>>()
+        });
     let base_cohorts = as_cohorts(&base.report.cohorts);
     let base_opaque = opaque_metrics(base);
     let base_cases: Vec<_> = base
@@ -485,7 +504,7 @@ pub fn evaluate_selection(
                     .map(|_| ())
                     .map_err(|e| e.to_string())
             });
-        let reason = precondition.err();
+        let mut reason = precondition.err();
         let mut clauses = vec![ClauseResult {
             clause: "preconditions".into(),
             result: match &reason {
@@ -497,6 +516,22 @@ pub fn evaluate_selection(
             slices: vec![],
             cases: None,
         }];
+        if reason.is_none()
+            && let Some(bounds) = &gate.integrity
+        {
+            clauses.extend(baseline_integrity.clone().unwrap_or_default());
+            clauses.extend(e.inputs.runs.iter().enumerate().map(|(r, run)| {
+                crate::integrity::entry(
+                    "candidate",
+                    r,
+                    bounds,
+                    crate::integrity::host_counts(e.inputs.evaluator, run),
+                )
+            }));
+            if crate::integrity::breached(&clauses) {
+                reason = Some("integrity".into());
+            }
+        }
         if reason.is_none() {
             clauses.extend(coverage(gate, "baseline", base));
             clauses.extend(coverage(gate, "candidate", e));

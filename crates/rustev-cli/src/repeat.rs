@@ -127,7 +127,7 @@ pub fn compare(p: &Parsed) -> Res {
 }
 
 pub fn select(p: &Parsed) -> Res {
-    rustev_surface::repeat::select(
+    let mut done = rustev_surface::repeat::select(
         &p.name(),
         &Reads::default(),
         rustev_surface::repeat::SelectArgs {
@@ -137,7 +137,30 @@ pub fn select(p: &Parsed) -> Res {
             candidates: p.req("candidates"),
             out: p.req("out"),
         },
-    )
+    )?;
+    // Keep legacy stdout bytes untouched. Only integrity-void verdicts gain
+    // the instruction to repeat the run; the clause entries carry its evidence.
+    if done.code == 12 {
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&done.out.bytes()).expect("command output is JSON");
+        if let Some(candidates) = value.get_mut("candidates").and_then(|v| v.as_array_mut()) {
+            let mut changed = false;
+            for candidate in candidates.iter_mut() {
+                if candidate
+                    .pointer("/verdict/unknown/clause")
+                    .and_then(|v| v.as_str())
+                    .is_some_and(|clause| clause.ends_with(".integrity"))
+                {
+                    candidate["notice"] = serde_json::json!("void: repeat the run");
+                    changed = true;
+                }
+            }
+            if changed {
+                done.out = done.out.set("candidates", candidates);
+            }
+        }
+    }
+    Ok(done)
 }
 
 /// `rustev eval repeat import` (spec 061, 3.2).

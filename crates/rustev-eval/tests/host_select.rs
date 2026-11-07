@@ -577,3 +577,107 @@ fn host_unknown_cost_is_unresolved_and_keeps_host_stdout_assertion() {
         1
     );
 }
+
+#[test]
+fn integrity_host_failures_void_before_coverage_and_clauses_per_run() {
+    let c = config();
+    let rc = repeat_config();
+    let base = Set::new(&c, &rc, &base_specs());
+    let good = Set::new(&c, &rc, &candidate(|s| s.latency_base = 500));
+    let mut specs = candidate(|s| s.score_shift -= 0.15);
+    specs[1].extra_failed = vec!["c4"];
+    let bad = Set::new(&c, &rc, &specs);
+    let mut v = gate_json();
+    v["integrity"] = json!({"max_upstream_failures":1});
+    let selected = select(&gate(&v), &base, &[("bad", &bad), ("good", &good)]);
+    assert_eq!(selected.exit_code(), 12);
+    assert_eq!(
+        verdict(&selected, "bad"),
+        &Verdict::Unknown {
+            clause: "candidate.runs[1].integrity".into()
+        }
+    );
+    assert_eq!(verdict(&selected, "good"), &Verdict::Qualifies);
+    assert_eq!(selected.ranked, ["good"]);
+    let bad = &selected.candidates[0];
+    assert_eq!(
+        bad.clauses
+            .iter()
+            .filter(|c| c.clause.ends_with(".integrity"))
+            .count(),
+        6
+    );
+    assert!(bad.clauses.iter().all(|c| !c.clause.ends_with("coverage")));
+    assert!(
+        bad.clauses
+            .iter()
+            .filter(|c| c.clause.starts_with("require[") || c.clause.starts_with("and_any["))
+            .all(|c| c.result
+                == ClauseOutcome::Unknown {
+                    reason: "precondition: integrity".into()
+                })
+    );
+    // Equality holds, so coverage can now reject the same measurement.
+    v["integrity"]["max_upstream_failures"] = json!(2);
+    let selected = select(&gate(&v), &base, &[("bad", &Set::new(&c, &rc, &specs))]);
+    assert!(
+        matches!(verdict(&selected, "bad"), Verdict::Rejected { clause } if clause.ends_with("coverage"))
+    );
+    // A baseline breach applies to every candidate and names the first run.
+    v["integrity"]["max_upstream_failures"] = json!(0);
+    let selected = select(&gate(&v), &base, &[("one", &good), ("two", &good)]);
+    for c in &selected.candidates {
+        assert_eq!(
+            c.verdict,
+            Verdict::Unknown {
+                clause: "baseline.runs[0].integrity".into()
+            }
+        );
+    }
+}
+
+#[test]
+fn integrity_host_missing_scores_and_maximum_invalid_are_preconditions() {
+    use rustev_eval::scores::ScoreOutcome;
+    let c = config();
+    let rc = repeat_config();
+    let base = Set::new(&c, &rc, &base_specs());
+    for missing in [false, true] {
+        let mut candidate = Set::new(&c, &rc, &candidate(|_| {}));
+        let run = &mut candidate.docs[1];
+        if missing {
+            run.scores.remove(0);
+        } else {
+            for (scores, n) in run.scores.iter_mut().take(2).zip([2, 3]) {
+                for entry in scores.entries.iter_mut().take(n) {
+                    entry.outcome = ScoreOutcome::Unscored("scorer_overloaded".into());
+                }
+            }
+        }
+        run.record.scores = run
+            .scores
+            .iter()
+            .map(|s| s.record_digest().unwrap())
+            .collect();
+        candidate.set = host_support::import(&c, &rc, &candidate.docs).unwrap();
+        let mut v = gate_json();
+        v["integrity"] = json!({"max_invalid":2});
+        let selected = select(&gate(&v), &base, &[("one", &candidate)]);
+        assert_eq!(
+            verdict(&selected, "one"),
+            &Verdict::Unknown {
+                clause: "candidate.runs[1].integrity".into()
+            }
+        );
+        let reason = unknown_reason(&selected, "one");
+        assert!(
+            reason.contains(if missing {
+                "invalid-uncountable"
+            } else {
+                "invalid-exceeded: count=3, limit=2"
+            }),
+            "{reason}"
+        );
+        assert!(reason.contains("host-asserted"));
+    }
+}

@@ -224,6 +224,7 @@
         "src/host_repeat.rs",
         "src/host_run.rs",
         "src/host_select.rs",
+        "src/integrity.rs",
         "src/judge.rs",
         "src/lib.rs",
         "src/live.rs",
