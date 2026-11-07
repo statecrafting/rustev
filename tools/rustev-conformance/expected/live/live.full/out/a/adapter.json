@@ -1,0 +1,1 @@
+{"labels":{"prefixes":[],"values":["yes"]},"name":"test","rules":[{"action":"route_ticket","label":"yes"}],"schema":"rustev.task-adapter/1","version":"1"}

@@ -1,0 +1,2 @@
+{"schema":"rustev-jev.spend-journal/1","budget":"testing","cap":10000000000}
+{"op":"reserve","seq":1,"period":"total","attempt":"prior/attempt","units":9999999997,"at_ms":1790164800000}

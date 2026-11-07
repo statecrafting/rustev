@@ -1,0 +1,13 @@
+{"schema":"rustev-jev.spend-journal/1","budget":"testing","cap":10000000000}
+{"op":"reserve","seq":1,"period":"total","attempt":"live/conformance/.probe/1/1/live%2Fconformance%2F.probe%2F1%2F1/topic//1","units":1,"at_ms":1790164800000}
+{"op":"settle","seq":1,"charge":{"observed":{"units":1}}}
+{"op":"reserve","seq":2,"period":"total","attempt":"live/conformance/.probe/1/1/live%2Fconformance%2F.probe%2F1%2F1/frustration//1","units":1,"at_ms":1790164800000}
+{"op":"settle","seq":2,"charge":{"observed":{"units":1}}}
+{"op":"reserve","seq":3,"period":"total","attempt":"live/conformance/.probe/1/1/live%2Fconformance%2F.probe%2F1%2F1/explicit_deadline//1","units":1,"at_ms":1790164800000}
+{"op":"settle","seq":3,"charge":{"observed":{"units":1}}}
+{"op":"reserve","seq":4,"period":"total","attempt":"live/conformance/a/1/x/live%2Fconformance%2Fa%2F1%2Fx/topic//1","units":1,"at_ms":1790164800000}
+{"op":"settle","seq":4,"charge":{"observed":{"units":1}}}
+{"op":"reserve","seq":5,"period":"total","attempt":"live/conformance/a/1/x/live%2Fconformance%2Fa%2F1%2Fx/frustration//1","units":1,"at_ms":1790164800000}
+{"op":"settle","seq":5,"charge":{"observed":{"units":1}}}
+{"op":"reserve","seq":6,"period":"total","attempt":"live/conformance/a/1/x/live%2Fconformance%2Fa%2F1%2Fx/explicit_deadline//1","units":1,"at_ms":1790164800000}
+{"op":"settle","seq":6,"charge":{"observed":{"units":1}}}
