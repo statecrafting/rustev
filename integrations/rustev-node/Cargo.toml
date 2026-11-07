@@ -23,6 +23,7 @@ rustev-otel = { workspace = true, features = ["otlp-http"] }
 rustev-contract.workspace = true
 rustev-core = { workspace = true, features = ["parameterized"] }
 rustev-runtime.workspace = true
+rustev-live.workspace = true
 rustev-eval = { workspace = true, features = ["parameterized"] }
 rustev-surface = { workspace = true, features = ["parameterized"] }
 rustev-backend-rules.workspace = true
@@ -43,6 +44,11 @@ rustev-backend-embed-linear = { path = "../../backends/rustev-backend-embed-line
 # Spec 011, 3.17.1. The prebuilt platform packages are built without it
 # (011 Decision 10); a host enables it by building from source.
 local-embed = ["dep:rustev-backend-embed-linear", "dep:serde"]
+
+# Spec 067 increment 1: plain Rust tests run outside Node. Resolve Node-API
+# symbols dynamically only for test builds; these tests call no Node API.
+[dev-dependencies]
+napi = { version = "=3.14.2", default-features = false, features = ["dyn-symbols"] }
 
 [build-dependencies]
 napi-build = "=2.6.0"
