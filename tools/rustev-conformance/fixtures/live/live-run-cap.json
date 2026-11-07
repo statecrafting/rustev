@@ -1,0 +1,45 @@
+{
+  "acquisitions": {},
+  "authorize": [
+    {
+      "artifact": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "backend_id": "synthetic-linear-head",
+      "max_exposure_units": 1,
+      "operations": [
+        "classify",
+        "proposition",
+        "rubric",
+        "rank"
+      ]
+    }
+  ],
+  "bindings": [
+    {
+      "case_deadline_ms": 2000,
+      "cost_unit": "nano_usd",
+      "identity": {
+        "artifact": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "backend_id": "synthetic-linear-head"
+      },
+      "max_in_flight": 1,
+      "min_interval_ms": 0,
+      "rate_limit_pause_max_ms": 0
+    }
+  ],
+  "budget": "testing",
+  "evaluation_time": {
+    "fixed": {
+      "ms": 1790164800000
+    }
+  },
+  "probe": {
+    "calls": 1,
+    "digest": "sha256:d731c4075f321bb09a36bd0ffadcc76cd06b81af37321bb55b2c48d049976eaf",
+    "interval_ms": 0,
+    "provenance": "synthetic",
+    "snapshot": "probe.json"
+  },
+  "repeats": 1,
+  "run_cap_units": 3,
+  "schema": "rustev.live-config/1"
+}

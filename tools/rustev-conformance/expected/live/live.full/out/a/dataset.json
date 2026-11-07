@@ -1,0 +1,1 @@
+{"adapter":{"name":"test","version":"1"},"cases":[{"id":"x","label":"missing","snapshot":"sha256:a0ed56bc3482189814e6b385e1f3ea7fec19f29428bcda997c531b6fb11277c4","source":"synthetic:x","split":"training","subgroups":[]}],"name":"SYNTHETIC live conformance","provenance":{"synthetic":{"generator":"conformance live fixtures"}},"schema":"rustev.dataset/1"}

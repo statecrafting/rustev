@@ -1,0 +1,432 @@
+{
+  "command": "eval live",
+  "id": "live.resume",
+  "inputs": [
+    {
+      "name": "adapter.json",
+      "path": "tools/rustev-conformance/fixtures/live/adapter.json",
+      "sha256": "669d078e9bfcdc16cc9e5968a9e69b18bb31650f453fe35353c8c6c1c6e86e53"
+    },
+    {
+      "name": "candidates/a/calibrations/topic.json",
+      "path": "tools/rustev-conformance/fixtures/live/candidates/a/calibrations/topic.json",
+      "sha256": "8e7f59b0b9d66c0cfde69438d800fb2e728c152548235e032cc8ac73d7cc4ae6"
+    },
+    {
+      "name": "candidates/a/descriptors/synthetic-linear-head.json",
+      "path": "tools/rustev-conformance/fixtures/live/candidates/a/descriptors/synthetic-linear-head.json",
+      "sha256": "5d861e23090bbf7d6f47572ca7cf4bb7d8aeda054baa90ec75a316d7622f0d28"
+    },
+    {
+      "name": "candidates/a/plan.json",
+      "path": "tools/rustev-conformance/fixtures/live/candidates/a/plan.json",
+      "sha256": "53d25b704b77c3d732e92d0ebbb878ec85fa6c6f1df187a754f98c521e5baa3a"
+    },
+    {
+      "name": "config.json",
+      "path": "tools/rustev-conformance/fixtures/live/config.json",
+      "sha256": "4261b405522e60432fabdb24124ae6d23f19e2575006a93b20a1201bf325f536"
+    },
+    {
+      "name": "dataset.json",
+      "path": "tools/rustev-conformance/fixtures/live/dataset-resume.json",
+      "sha256": "526ad57c9e01026454f768a78362ec1e2660233f3f9103f3aafafd25e637ba2c"
+    },
+    {
+      "name": "live.json",
+      "path": "tools/rustev-conformance/fixtures/live/live.json",
+      "sha256": "635fb8120adbe6ca33a06ffa25eb66ba19eed37d61b86ee98c78212f5f6da312"
+    },
+    {
+      "name": "probe.json",
+      "path": "tools/rustev-conformance/fixtures/live/probe.json",
+      "sha256": "bb5848f9c8573983d90034cedf5b0f65fb8b90c4dacc61f31ed871d79020eade"
+    },
+    {
+      "name": "repeat.json",
+      "path": "tools/rustev-conformance/fixtures/live/repeat.json",
+      "sha256": "1dcae07a2290c9f6227640bb436faf18b6f6050e986d34a0d58c0492b469d010"
+    },
+    {
+      "name": "snapshots/x.json",
+      "path": "tools/rustev-conformance/fixtures/live/snapshots/x.json",
+      "sha256": "00a5687785d9030cdd60ae92f23044d7a2f7f89c32166f28add45865e6d33f9f"
+    },
+    {
+      "name": "snapshots/y.json",
+      "path": "tools/rustev-conformance/fixtures/live/snapshots/x.json",
+      "sha256": "00a5687785d9030cdd60ae92f23044d7a2f7f89c32166f28add45865e6d33f9f"
+    }
+  ],
+  "live": {
+    "backends": [
+      {
+        "answers": {
+          "support.deadline": [
+            "gate"
+          ],
+          "support.frustration": [
+            "gate"
+          ],
+          "support.topic": [
+            "gate"
+          ]
+        },
+        "cost_bound": {
+          "bounded": {
+            "max_units": 1
+          }
+        },
+        "cost_model": "bounded",
+        "descriptor": "candidates/a/descriptors/synthetic-linear-head.json",
+        "max_concurrency": 1,
+        "on_cancel": "ignore",
+        "on_release": {
+          "support.deadline": {
+            "output": {
+              "charge": {
+                "observed": {
+                  "units": 1
+                }
+              },
+              "output": {
+                "logits": {
+                  "false": 3.0,
+                  "true": 0.0
+                }
+              }
+            }
+          },
+          "support.frustration": {
+            "output": {
+              "charge": {
+                "observed": {
+                  "units": 1
+                }
+              },
+              "output": {
+                "logits": {
+                  "calm": 3.0,
+                  "frustrated": 0.0,
+                  "very_angry": 0.0
+                }
+              }
+            }
+          },
+          "support.topic": {
+            "output": {
+              "charge": {
+                "observed": {
+                  "units": 1
+                }
+              },
+              "output": {
+                "logits": {
+                  "account_access": 0.0,
+                  "billing": 4.0,
+                  "integration_defect": 0.0,
+                  "other": 0.0
+                }
+              }
+            }
+          }
+        },
+        "remote": "finished"
+      }
+    ],
+    "runs": [
+      {
+        "drive": [
+          {
+            "wait_gated": {
+              "backend": 0,
+              "count": 1
+            }
+          },
+          {
+            "release_all": {
+              "backend": 0
+            }
+          },
+          {
+            "wait_gated": {
+              "backend": 0,
+              "count": 1
+            }
+          },
+          {
+            "release_all": {
+              "backend": 0
+            }
+          },
+          {
+            "wait_gated": {
+              "backend": 0,
+              "count": 1
+            }
+          },
+          {
+            "release_all": {
+              "backend": 0
+            }
+          },
+          {
+            "wait_gated": {
+              "backend": 0,
+              "count": 1
+            }
+          },
+          {
+            "release_all": {
+              "backend": 0
+            }
+          },
+          {
+            "wait_gated": {
+              "backend": 0,
+              "count": 1
+            }
+          },
+          {
+            "release_all": {
+              "backend": 0
+            }
+          },
+          {
+            "wait_gated": {
+              "backend": 0,
+              "count": 1
+            }
+          },
+          {
+            "release_all": {
+              "backend": 0
+            }
+          },
+          {
+            "wait_gated": {
+              "backend": 0,
+              "count": 1
+            }
+          },
+          "abort"
+        ],
+        "options": {
+          "adapter": "adapter.json",
+          "candidates": "candidates",
+          "config": "config.json",
+          "dataset": "dataset.json",
+          "journal": "journal.jsonl",
+          "live": true,
+          "liveConfig": "live.json",
+          "nowMs": 1790164800000,
+          "out": "out",
+          "probeOnly": false,
+          "repeatConfig": "repeat.json",
+          "rerunInterrupted": false,
+          "resume": false,
+          "runId": "conformance",
+          "scope": {
+            "context_revision": "1",
+            "mode": "tenant_only",
+            "tenant": "synthetic"
+          },
+          "snapshots": "snapshots",
+          "split": "training"
+        }
+      },
+      {
+        "drive": [
+          {
+            "wait_gated": {
+              "backend": 0,
+              "count": 1
+            }
+          },
+          {
+            "release_all": {
+              "backend": 0
+            }
+          },
+          {
+            "wait_gated": {
+              "backend": 0,
+              "count": 1
+            }
+          },
+          {
+            "release_all": {
+              "backend": 0
+            }
+          },
+          {
+            "wait_gated": {
+              "backend": 0,
+              "count": 1
+            }
+          },
+          {
+            "release_all": {
+              "backend": 0
+            }
+          }
+        ],
+        "options": {
+          "adapter": "adapter.json",
+          "candidates": "candidates",
+          "config": "config.json",
+          "dataset": "dataset.json",
+          "journal": "journal.jsonl",
+          "live": true,
+          "liveConfig": "live.json",
+          "nowMs": 1790164800000,
+          "out": "out",
+          "probeOnly": false,
+          "repeatConfig": "repeat.json",
+          "rerunInterrupted": false,
+          "resume": true,
+          "runId": "conformance",
+          "scope": {
+            "context_revision": "1",
+            "mode": "tenant_only",
+            "tenant": "synthetic"
+          },
+          "snapshots": "snapshots",
+          "split": "training"
+        }
+      }
+    ]
+  },
+  "mirrors": "crates/rustev-live/tests/run.rs::run_deadline_cancels_in_flight_and_leaves_a_resumable_checkpoint",
+  "outputs": [
+    {
+      "file": "journal.jsonl",
+      "golden": "tools/rustev-conformance/expected/live/live.resume/journal.jsonl",
+      "normalize": [],
+      "sha256": "dccd128055d12becf6731371e42642ca2ef9f213e29ed2da696c19da4d5bb300"
+    },
+    {
+      "file": "out/a/adapter.json",
+      "golden": "tools/rustev-conformance/expected/live/live.resume/out/a/adapter.json",
+      "normalize": [],
+      "sha256": "7f0e1ca49d0e5fbaabf6edf95fd012afaba404ee3b1c2179b81acab418744498"
+    },
+    {
+      "file": "out/a/config.json",
+      "golden": "tools/rustev-conformance/expected/live/live.resume/out/a/config.json",
+      "normalize": [],
+      "sha256": "0254c759abb77c1d11ae0c92ffc1a1cbb6b0fa73f98dd5f1f62751335cfeb8df"
+    },
+    {
+      "file": "out/a/dataset.json",
+      "golden": "tools/rustev-conformance/expected/live/live.resume/out/a/dataset.json",
+      "normalize": [],
+      "sha256": "63caf0341770b98d82959b01ddb01779406beb2b78b8fd859d0c9c5a9a997c29"
+    },
+    {
+      "file": "out/a/repeat-config.json",
+      "golden": "tools/rustev-conformance/expected/live/live.resume/out/a/repeat-config.json",
+      "normalize": [],
+      "sha256": "0bdb857b1d2adedc65f1c4ca1d5166a6bdd9bf2b01f7806f263138eadb90340f"
+    },
+    {
+      "file": "out/a/repeat.json",
+      "golden": "tools/rustev-conformance/expected/live/live.resume/out/a/repeat.json",
+      "normalize": [],
+      "sha256": "0433bd4583c4f12d89129c37e8c73ac5410b005aa7e6928b3336076acf789c4b"
+    },
+    {
+      "file": "out/a/run-0.cases.json",
+      "golden": "tools/rustev-conformance/expected/live/live.resume/out/a/run-0.cases.json",
+      "normalize": [],
+      "sha256": "9895d3d620a4c014342c558539159fc0669b168a1fd820a02b2487c3c3aa3677"
+    },
+    {
+      "file": "out/a/run-0.detail.json",
+      "golden": "tools/rustev-conformance/expected/live/live.resume/out/a/run-0.detail.json",
+      "normalize": [],
+      "sha256": "9f359b00b9defc0951775cac326cfa0ed2f8f4615c9c2ef6cb8227219913e646"
+    },
+    {
+      "file": "out/a/run-0.report.json",
+      "golden": "tools/rustev-conformance/expected/live/live.resume/out/a/run-0.report.json",
+      "normalize": [],
+      "sha256": "d91d97ca2ded33b06f42f3546110974f0a55786eea9f24d7237c5c8c0e919e71"
+    },
+    {
+      "file": "out/cases/a.1.x.case.json",
+      "golden": "tools/rustev-conformance/expected/live/live.resume/out/cases/a.1.x.case.json",
+      "normalize": [],
+      "sha256": "71dd3410ad29a4213a42180e2a276709c57a6839f38fe9439b87212d5f4876d7"
+    },
+    {
+      "file": "out/cases/a.1.x.live.json",
+      "golden": "tools/rustev-conformance/expected/live/live.resume/out/cases/a.1.x.live.json",
+      "normalize": [],
+      "sha256": "bbe3dae688643591d2cd9995f96869c8fe8b032af8a3e0cc8835b490fb446cc5"
+    },
+    {
+      "file": "out/cases/a.1.x.run.json",
+      "golden": "tools/rustev-conformance/expected/live/live.resume/out/cases/a.1.x.run.json",
+      "normalize": [],
+      "sha256": "10f27af5760dc46e1c67c5850d566bc7625555abbac0159eae4bf20298c1a5d4"
+    },
+    {
+      "file": "out/checkpoint.json",
+      "golden": "tools/rustev-conformance/expected/live/live.resume/out/checkpoint.json",
+      "normalize": [],
+      "sha256": "42fadb0e0e96e400f2e47a783fa3aeedde831fcf96dc9a1ea5df0b26f877499c"
+    },
+    {
+      "file": "out/comparison.json",
+      "golden": "tools/rustev-conformance/expected/live/live.resume/out/comparison.json",
+      "normalize": [],
+      "sha256": "9dc745b832680ed2b5e4b3d08a1125a0a48afeb336a0c7b4f2cf159107b47731"
+    },
+    {
+      "file": "out/comparison.md",
+      "golden": "tools/rustev-conformance/expected/live/live.resume/out/comparison.md",
+      "normalize": [],
+      "sha256": "61648f03b00689c0ff8923a107b52aea04461b9d74c899e4635cb2a8ae1ee910"
+    },
+    {
+      "file": "out/live-config.json",
+      "golden": "tools/rustev-conformance/expected/live/live.resume/out/live-config.json",
+      "normalize": [],
+      "sha256": "950abab4aa5b5de799819b2b5edbe7c162a78f507e0d7b1922ef8d8fafeca7f4"
+    },
+    {
+      "file": "out/live-run.json",
+      "golden": "tools/rustev-conformance/expected/live/live.resume/out/live-run.json",
+      "normalize": [],
+      "sha256": "5182c9af1ca43c151cf91a465385a957ff911e2b6b97e36d916b38fcbb4f41d6"
+    },
+    {
+      "file": "out/probe/1.1.case.json",
+      "golden": "tools/rustev-conformance/expected/live/live.resume/out/probe/1.1.case.json",
+      "normalize": [],
+      "sha256": "cc70e2aecfb0ed4e0390f5827a713454e56626f8aef0d8977883d39f2f985d3d"
+    },
+    {
+      "file": "out/probe/1.1.live.json",
+      "golden": "tools/rustev-conformance/expected/live/live.resume/out/probe/1.1.live.json",
+      "normalize": [],
+      "sha256": "3f73b58635395f08365e431fb454d0ba702a3ec23b225ab6a0158128097a3ecf"
+    },
+    {
+      "file": "out/probe/1.1.run.json",
+      "golden": "tools/rustev-conformance/expected/live/live.resume/out/probe/1.1.run.json",
+      "normalize": [],
+      "sha256": "ce72064456ccaf1f396b7b4bab2b00c4d42b71eedffeb7e65c4a7fdd98dea145"
+    },
+    {
+      "file": "status.json",
+      "golden": "tools/rustev-conformance/expected/live/live.resume/status.json",
+      "normalize": [],
+      "sha256": "14edcf1b4c7b0c0b909dac305f673cae95d8455c43365f210408f1a56f747dc9"
+    }
+  ],
+  "surfaces": [
+    "rust-api"
+  ]
+}

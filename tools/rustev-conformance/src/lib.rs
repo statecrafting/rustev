@@ -5,6 +5,7 @@
 #![forbid(unsafe_code)]
 
 pub mod acquire;
+pub mod live;
 pub mod local_embed;
 pub mod normalize;
 pub mod runtime;
@@ -49,6 +50,9 @@ pub struct Case {
     pub mirrors: Option<String>,
     #[serde(default)]
     pub runtime: Option<serde_json::Value>,
+    /// File-based live runs with scripted backends and manual time (spec 067).
+    #[serde(default)]
+    pub live: Option<serde_json::Value>,
     /// A local-embed case (spec 011, 3.17.5): decisions answered by the
     /// local semantic backend over a SYNTHETIC bundle ([`local_embed`]).
     #[serde(default)]
@@ -111,12 +115,13 @@ pub fn sha256_hex(b: &[u8]) -> String {
 }
 
 /// The manifest the case files make: every `cases/cli/*.json` (harvested),
-/// `cases/runtime/*.json` (authored) and `cases/local-embed/*.json`
+/// `cases/runtime/*.json`, `cases/live/*.json` (authored) and
+/// `cases/local-embed/*.json`
 /// (blessed by the local backend's tests, spec 011 3.17.5), sorted by id,
 /// as canonical pretty JSON.
 pub fn aggregate() -> Result<Vec<u8>, String> {
     let mut cases = vec![];
-    for dir in ["cli", "local-embed", "runtime"] {
+    for dir in ["cli", "live", "local-embed", "runtime"] {
         let d = root().join("tools/rustev-conformance/cases").join(dir);
         // Each case directory exists whenever the suite does; a missing one
         // is an error naming it, never a silently smaller manifest.

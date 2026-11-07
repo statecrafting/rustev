@@ -1,0 +1,245 @@
+{
+  "command": "eval live",
+  "id": "live.probe-failure",
+  "inputs": [
+    {
+      "name": "adapter.json",
+      "path": "tools/rustev-conformance/fixtures/live/adapter.json",
+      "sha256": "669d078e9bfcdc16cc9e5968a9e69b18bb31650f453fe35353c8c6c1c6e86e53"
+    },
+    {
+      "name": "candidates/a/calibrations/topic.json",
+      "path": "tools/rustev-conformance/fixtures/live/candidates/a/calibrations/topic.json",
+      "sha256": "8e7f59b0b9d66c0cfde69438d800fb2e728c152548235e032cc8ac73d7cc4ae6"
+    },
+    {
+      "name": "candidates/a/descriptors/synthetic-linear-head.json",
+      "path": "tools/rustev-conformance/fixtures/live/candidates/a/descriptors/synthetic-linear-head.json",
+      "sha256": "5d861e23090bbf7d6f47572ca7cf4bb7d8aeda054baa90ec75a316d7622f0d28"
+    },
+    {
+      "name": "candidates/a/plan.json",
+      "path": "tools/rustev-conformance/fixtures/live/candidates/a/plan.json",
+      "sha256": "53d25b704b77c3d732e92d0ebbb878ec85fa6c6f1df187a754f98c521e5baa3a"
+    },
+    {
+      "name": "config.json",
+      "path": "tools/rustev-conformance/fixtures/live/config.json",
+      "sha256": "4261b405522e60432fabdb24124ae6d23f19e2575006a93b20a1201bf325f536"
+    },
+    {
+      "name": "dataset.json",
+      "path": "tools/rustev-conformance/fixtures/live/dataset.json",
+      "sha256": "340e933e5872f1ef8fad459fbdc9d9c6cd3d37a52708039abf2fc18b3a4f5a29"
+    },
+    {
+      "name": "live.json",
+      "path": "tools/rustev-conformance/fixtures/live/live.json",
+      "sha256": "635fb8120adbe6ca33a06ffa25eb66ba19eed37d61b86ee98c78212f5f6da312"
+    },
+    {
+      "name": "probe.json",
+      "path": "tools/rustev-conformance/fixtures/live/probe.json",
+      "sha256": "bb5848f9c8573983d90034cedf5b0f65fb8b90c4dacc61f31ed871d79020eade"
+    },
+    {
+      "name": "repeat.json",
+      "path": "tools/rustev-conformance/fixtures/live/repeat.json",
+      "sha256": "1dcae07a2290c9f6227640bb436faf18b6f6050e986d34a0d58c0492b469d010"
+    },
+    {
+      "name": "snapshots/x.json",
+      "path": "tools/rustev-conformance/fixtures/live/snapshots/x.json",
+      "sha256": "00a5687785d9030cdd60ae92f23044d7a2f7f89c32166f28add45865e6d33f9f"
+    }
+  ],
+  "live": {
+    "backends": [
+      {
+        "answers": {
+          "support.deadline": [
+            {
+              "fail": {
+                "charge": {
+                  "observed": {
+                    "units": 0
+                  }
+                },
+                "class": "permanent",
+                "detail": "SYNTHETIC probe failure"
+              }
+            }
+          ],
+          "support.frustration": [
+            {
+              "fail": {
+                "charge": {
+                  "observed": {
+                    "units": 0
+                  }
+                },
+                "class": "permanent",
+                "detail": "SYNTHETIC probe failure"
+              }
+            }
+          ],
+          "support.topic": [
+            {
+              "fail": {
+                "charge": {
+                  "observed": {
+                    "units": 0
+                  }
+                },
+                "class": "permanent",
+                "detail": "SYNTHETIC probe failure"
+              }
+            }
+          ]
+        },
+        "cost_bound": {
+          "bounded": {
+            "max_units": 1
+          }
+        },
+        "cost_model": "bounded",
+        "descriptor": "candidates/a/descriptors/synthetic-linear-head.json",
+        "max_concurrency": 1,
+        "on_cancel": "ignore",
+        "on_release": {
+          "support.deadline": {
+            "output": {
+              "charge": {
+                "observed": {
+                  "units": 1
+                }
+              },
+              "output": {
+                "logits": {
+                  "false": 3.0,
+                  "true": 0.0
+                }
+              }
+            }
+          },
+          "support.frustration": {
+            "output": {
+              "charge": {
+                "observed": {
+                  "units": 1
+                }
+              },
+              "output": {
+                "logits": {
+                  "calm": 3.0,
+                  "frustrated": 0.0,
+                  "very_angry": 0.0
+                }
+              }
+            }
+          },
+          "support.topic": {
+            "output": {
+              "charge": {
+                "observed": {
+                  "units": 1
+                }
+              },
+              "output": {
+                "logits": {
+                  "account_access": 0.0,
+                  "billing": 4.0,
+                  "integration_defect": 0.0,
+                  "other": 0.0
+                }
+              }
+            }
+          }
+        },
+        "remote": "finished"
+      }
+    ],
+    "runs": [
+      {
+        "drive": [],
+        "options": {
+          "adapter": "adapter.json",
+          "candidates": "candidates",
+          "config": "config.json",
+          "dataset": "dataset.json",
+          "journal": "journal.jsonl",
+          "live": true,
+          "liveConfig": "live.json",
+          "nowMs": 1790164800000,
+          "out": "out",
+          "probeOnly": false,
+          "repeatConfig": "repeat.json",
+          "rerunInterrupted": false,
+          "resume": false,
+          "runId": "conformance",
+          "scope": {
+            "context_revision": "1",
+            "mode": "tenant_only",
+            "tenant": "synthetic"
+          },
+          "snapshots": "snapshots",
+          "split": "training"
+        }
+      }
+    ]
+  },
+  "mirrors": "crates/rustev-live/tests/run.rs::authorization_refusal_continues_and_probe_statuses_send_no_cases",
+  "outputs": [
+    {
+      "file": "journal.jsonl",
+      "golden": "tools/rustev-conformance/expected/live/live.probe-failure/journal.jsonl",
+      "normalize": [],
+      "sha256": "fdf10be1007db267eb6a5d49b45ac46ff98f3cbcaf83fa820e1a20f646caf7af"
+    },
+    {
+      "file": "out/checkpoint.json",
+      "golden": "tools/rustev-conformance/expected/live/live.probe-failure/out/checkpoint.json",
+      "normalize": [],
+      "sha256": "74e7898921b94daf349af8f80bde9985ac8cb30ba5956b496e994c3c25409ae2"
+    },
+    {
+      "file": "out/live-config.json",
+      "golden": "tools/rustev-conformance/expected/live/live.probe-failure/out/live-config.json",
+      "normalize": [],
+      "sha256": "950abab4aa5b5de799819b2b5edbe7c162a78f507e0d7b1922ef8d8fafeca7f4"
+    },
+    {
+      "file": "out/live-run.json",
+      "golden": "tools/rustev-conformance/expected/live/live.probe-failure/out/live-run.json",
+      "normalize": [],
+      "sha256": "73916ca6c08eb3ebb9e4ec4f9484c379ecbdf8908b7260f4428d993c95aacdec"
+    },
+    {
+      "file": "out/probe/1.1.case.json",
+      "golden": "tools/rustev-conformance/expected/live/live.probe-failure/out/probe/1.1.case.json",
+      "normalize": [],
+      "sha256": "655663cefebc251717856c344a2afbf07104f634fc81ac60c9995121f305c97f"
+    },
+    {
+      "file": "out/probe/1.1.live.json",
+      "golden": "tools/rustev-conformance/expected/live/live.probe-failure/out/probe/1.1.live.json",
+      "normalize": [],
+      "sha256": "d7787e75e1abd9cc5bc431e73df6beca9a3a8790f6f33b0df629924de8584326"
+    },
+    {
+      "file": "out/probe/1.1.run.json",
+      "golden": "tools/rustev-conformance/expected/live/live.probe-failure/out/probe/1.1.run.json",
+      "normalize": [],
+      "sha256": "61f0a6cc603ea4a59d9e2db4a094cf8fe7e2f37dee7f73f5fde6ec980f4791fc"
+    },
+    {
+      "file": "status.json",
+      "golden": "tools/rustev-conformance/expected/live/live.probe-failure/status.json",
+      "normalize": [],
+      "sha256": "0eb8748a3f13250ad2125f4940695b89df67e6044c29828cedf4266bd606a9dc"
+    }
+  ],
+  "surfaces": [
+    "rust-api"
+  ]
+}

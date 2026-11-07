@@ -103,6 +103,14 @@ fn every_case_pins_its_inputs_and_compares_its_plan_id() {
                 assert!(o.normalize.is_empty(), "{}", c.id);
                 continue;
             }
+            // Live journals pin each JSON line without normalization.
+            if o.golden.ends_with(".jsonl") {
+                assert!(o.normalize.is_empty(), "{}", c.id);
+                for line in std::str::from_utf8(&golden).unwrap().lines() {
+                    serde_json::from_str::<serde_json::Value>(line).unwrap();
+                }
+                continue;
+            }
             let v: serde_json::Value = serde_json::from_slice(&golden).unwrap();
             if let Some(id) = v.get("plan_id") {
                 let normalized =
