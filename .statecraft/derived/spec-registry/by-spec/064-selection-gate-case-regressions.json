@@ -72,7 +72,7 @@
       }
     ],
     "sectionDigests": {
-      "064-selection-gate-a-clause-on-per-case-regressions-against-the-baseline-amends-029-and-061": "29146c99172ce2e93e4a813e6c2b4f985127df1bcd7cd17e82694eb9e8f55706",
+      "064-selection-gate-a-clause-on-per-case-regressions-against-the-baseline-amends-029-and-061": "aab28f349b7dc2e75c2a205fe6c8a11f9b491c79a33e4236dfdceb11dca87680",
       "1-purpose": "1c4f3057bea220ff992063b48e440131066d9a92e957ab51cdf13e8ef76e36e7",
       "2-1-binding-principles": "4b763b68254ab4a95cfefd7667dcc85c9b6f710523d02582ebb21b9891a815f2",
       "2-territory": "6625940894eee99f38a7cbed108fdaa68e3d8a9169d6477788c9e8fbe15746a1",
@@ -87,7 +87,7 @@
       "4-out-of-scope": "e3605202e83d0fc4c17b89773271aa5200223541f0993c65ff7648f3cdd0a497",
       "5-observable-negative-cases": "d8f6be3de79d5736175e31fa5c66205da6e616efe78aa547daba097021191663",
       "acceptance": "a6ee4f0e4991a0ea030e5dca07719f3a20c49a3393f6633dda786336d8c821a5",
-      "decisions-at-approval": "375f699feca321708ef5f383aa3b6fb9e57f4849a89aceff18a4e6227b4b87b2",
+      "decisions-at-approval": "3e1322d4fbd79531e13c8f35a9b9fe64d0149296c7e227c20b92ff3b706f6b88",
       "implementation-record": "1e7e93457faa884418b7e947d20aef4114599bc8e359edfb667d98072651e104",
       "verification": "c7ac0201edeadf0f18ae020513901cbdc70dafde13de774915fe601b43d5355a"
     },
@@ -113,9 +113,9 @@
     ],
     "specPath": "specs/064-selection-gate-case-regressions/spec.md",
     "status": "approved",
-    "summary": "An amendment of approved specs 029 (3.12) and 061 (3.7), for release 0.5.1 (#537), ratified by the owner on 2026-11-06 (A-83). Every selection clause today compares `pooled` values of the cohort `all` or of each slice, so a candidate that improves most cases and collapses on a few passes `not_worse_than`. This spec adds one clause to `rustev.selection-gate/1`, `case_regressions`, which counts the dataset cases whose candidate value is worse than their baseline value by at least a declared absolute amount, in the metric's declared direction, and fails when more than a declared number regress. A case's value is 029 3.3.3's `pooled` computation restricted to that case, read from the per-case documents the baseline and each candidate already bind (`rustev.eval-cases/1`, or 061's `rustev.host-cases/1`), so no baseline document changes. The boundary is compared in exact decimal; a missing, partial or unknown case value makes the clause unknown, never a pass; `rustev.selection/1` lists the regressing cases. Gates and selections that do not use the clause keep their bytes and identities.\n",
+    "summary": "An amendment of approved specs 029 (3.12) and 061 (3.7), for release 0.6.0 (#537), ratified by the owner on 2026-11-06 (A-83). Every selection clause today compares `pooled` values of the cohort `all` or of each slice, so a candidate that improves most cases and collapses on a few passes `not_worse_than`. This spec adds one clause to `rustev.selection-gate/1`, `case_regressions`, which counts the dataset cases whose candidate value is worse than their baseline value by at least a declared absolute amount, in the metric's declared direction, and fails when more than a declared number regress. A case's value is 029 3.3.3's `pooled` computation restricted to that case, read from the per-case documents the baseline and each candidate already bind (`rustev.eval-cases/1`, or 061's `rustev.host-cases/1`), so no baseline document changes. The boundary is compared in exact decimal; a missing, partial or unknown case value makes the clause unknown, never a pass; `rustev.selection/1` lists the regressing cases. Gates and selections that do not use the clause keep their bytes and identities.\n",
     "title": "Selection gate: a clause on per-case regressions against the baseline (amends 029 and 061)"
   },
-  "shardHash": "6ed56e771ee3049f580118ef695454e4c733a241faa0ae3afa9ab9168e133f6a",
+  "shardHash": "b3fbf11ca7819183d36ec04b96a6ce9336650320765aa2e57da3b151d875ed31",
   "specVersion": "1.11.0"
 }
