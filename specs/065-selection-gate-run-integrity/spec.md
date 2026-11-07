@@ -147,7 +147,8 @@ output), after the binding preconditions of 029 3.12.2 or 061 3.7.4 hold.
    counts them. The run's invalid count is the largest of these per-scorer
    counts. With `max_invalid` declared, a configuration
    that declares no scorer, or a declared scorer whose metrics are unknown
-   with `scores-missing`, makes the count unestablished
+   with `scores-missing` (a declared scorer with no scores document, 041
+   3.7.5), makes the count unestablished
    (`invalid-uncountable`).
 2. **Upstream failures, Rustev-evaluated runs.** The number of cases
    whose detail outcome key (029 3.2.1) is `abstention:backend_unavailable`,
