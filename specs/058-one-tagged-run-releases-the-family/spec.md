@@ -218,18 +218,21 @@ Publication starts only after every job of 3.2 and `approve` pass.
    `npm-publish` Environment its publishers are bound to). It publishes
    the run's verified tarballs, never a repack. When npm refuses the
    trusted-publishing exchange (npm/cli#9969, open since 2026-10-28: the
-   immutable OIDC subject is rejected), the job fails before any upload;
-   the owner publishes the run's verified tarballs by hand, each checked
-   first against the manifest's SHA-512 integrity, and rerunning the failed
-   jobs records each as `present` (3.5.2). Those packages carry no npm
-   provenance, which is accepted (031 3.9.6, A-74); no npm token enters the
-   run.
+   immutable OIDC subject is rejected), npm falls back to a granular
+   publish token held only by the `npm-publish` Environment as `NPM_TOKEN`
+   and read only by this job; `--provenance` still signs with the job's
+   OIDC token, so every package carries npm provenance either way (A-87,
+   superseding A-74's hand publication for every release after 0.5.0).
+   Without that secret the job is trusted publishing only. A package is
+   never published by hand: one public with the run's integrity but
+   without a build-provenance attestation fails the run (3.5.2).
 3. **GitHub release.** `github-release` creates the release `vX.Y.Z`
    holding the CLI archives, the npm tarballs, the `.crate` archives,
    every SBOM and bundle, the manifest, `SHA256SUMS`, the changelog and
    `publication.json` (3.5). It is the only job with `contents: write`.
 4. No job holds `packages: write` (053 3.4.2) or a registry token other
-   than the OIDC tokens of trusted publishing.
+   than the OIDC tokens of trusted publishing and, in `publish-npm` only,
+   the fallback token of 3.3.2 (A-87).
 
 ### 3.4 Verification and qualification
 
@@ -261,7 +264,10 @@ Publication starts only after every job of 3.2 and `approve` pass.
 2. Every publication step is idempotent against public state. A crate or
    npm version already present is skipped when its registry checksum
    (crates.io index `cksum`, npm `dist.integrity`) equals the run's
-   artifact, and fails the run otherwise. A GitHub release already present
+   artifact, and fails the run otherwise. An npm version counts as present
+   only when its version document also names an SLSA build-provenance
+   attestation (`dist.attestations`); one without it fails the run and is
+   never republished (A-87). A GitHub release already present
    is accepted when its assets equal the run's, and the run fails without
    replacing anything otherwise (053 3.3.4's rule, now for every release).
 3. A full rerun rebuilds; reproducibility (3.2.2) makes its bytes equal,

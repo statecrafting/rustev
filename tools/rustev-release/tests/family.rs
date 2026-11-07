@@ -211,12 +211,25 @@ fn observations_report_all_missing_and_mismatched_and_npm_errors_stay_unknown() 
     let e = rustev_release::hosted::observe_crates(&m, &mut Index(absent));
     assert_eq!(e.len(), 2);
     assert!(e[0].contains("missing") && e[1].contains("mismatch"));
+    // A-87: integrity alone is a version published without provenance.
     assert_eq!(
         rustev_release::hosted::npm_response("200", r#"{"dist":{"integrity":"sha512-test"}}"#),
+        Lookup::Unattested {
+            checksum: "sha512-test".into()
+        }
+    );
+    let attested = r#"{"dist":{"integrity":"sha512-test","attestations":{"url":"https://registry.npmjs.org/-/npm/v1/attestations/x@1.0.0","provenance":{"predicateType":"https://slsa.dev/provenance/v1"}}}}"#;
+    assert_eq!(
+        rustev_release::hosted::npm_response("200", attested),
         Lookup::Visible {
             checksum: "sha512-test".into()
         }
     );
+    let other = attested.replace("slsa.dev/provenance/v1", "example.com/other");
+    assert!(matches!(
+        rustev_release::hosted::npm_response("200", &other),
+        Lookup::Unattested { .. }
+    ));
     for code in ["500", "403", "200"] {
         assert!(matches!(
             rustev_release::hosted::npm_response(code, "{}"),

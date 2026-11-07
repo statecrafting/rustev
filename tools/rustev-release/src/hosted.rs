@@ -14,6 +14,9 @@ pub fn observe_crates(m: &ReleaseManifest, registry: &mut dyn Registry) -> Vec<S
             Lookup::Visible { checksum } if checksum == p.sha256 => None,
             Lookup::Visible { .. } => Some(format!("{}: checksum mismatch", p.name)),
             Lookup::Absent => Some(format!("{}: missing", p.name)),
+            // `Unattested` is npm's answer only (A-87); crates.io never gives it,
+            // and the match must still refuse it rather than take it for present.
+            Lookup::Unattested { .. } => Some(format!("{}: not a crates.io answer", p.name)),
             Lookup::Unknown { detail } => Some(format!(
                 "{}: unknown ({})",
                 p.name,
@@ -23,7 +26,9 @@ pub fn observe_crates(m: &ReleaseManifest, registry: &mut dyn Registry) -> Vec<S
         .collect()
 }
 
-/// Spec 031 3.1: npm dist.integrity is the public visibility checksum.
+/// Spec 031 3.1: npm dist.integrity is the public visibility checksum, and
+/// (A-87) a version counts as `Visible` only with an SLSA build-provenance
+/// attestation; one without it is `Unattested`.
 pub fn npm_lookup(name: &str, version: &str) -> Lookup {
     if !name
         .strip_prefix(crate::npm::SCOPE)
@@ -53,17 +58,28 @@ pub fn npm_lookup(name: &str, version: &str) -> Lookup {
 pub fn npm_response(code: &str, body: &str) -> Lookup {
     match code {
         "404" => Lookup::Absent,
-        "200" => match serde_json::from_str::<serde_json::Value>(body)
-            .ok()
-            .and_then(|v| v["dist"]["integrity"].as_str().map(str::to_string))
-        {
-            Some(checksum) => Lookup::Visible { checksum },
-            None => Lookup::Unknown {
-                detail: "npm response lacks integrity".into(),
-            },
-        },
+        "200" => {
+            let v = serde_json::from_str::<serde_json::Value>(body).unwrap_or_default();
+            match v["dist"]["integrity"].as_str().map(str::to_string) {
+                Some(checksum) if npm_has_provenance(&v) => Lookup::Visible { checksum },
+                Some(checksum) => Lookup::Unattested { checksum },
+                None => Lookup::Unknown {
+                    detail: "npm response lacks integrity".into(),
+                },
+            }
+        }
         _ => Lookup::Unknown {
             detail: format!("npm HTTP {code}"),
         },
     }
+}
+
+/// A-87: the version document names an SLSA build-provenance attestation,
+/// which npm records only for a `--provenance` publish from a supported CI.
+fn npm_has_provenance(v: &serde_json::Value) -> bool {
+    let a = &v["dist"]["attestations"];
+    a["url"].as_str().is_some_and(|u| !u.is_empty())
+        && a["provenance"]["predicateType"]
+            .as_str()
+            .is_some_and(|t| t.starts_with("https://slsa.dev/provenance/"))
 }

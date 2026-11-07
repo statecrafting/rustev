@@ -260,6 +260,11 @@ pub fn publish_items(
         let id = format!("{} {}@{version}", item.kind, item.name);
         let outcome = match p.lookup(item, version) {
             Lookup::Visible { checksum } if checksum == item.expected => "present",
+            Lookup::Unattested { .. } => {
+                return Err(format!(
+                    "A-87: {id} is public without npm provenance, so it was published outside the run; nothing is republished"
+                ));
+            }
             Lookup::Visible { checksum } => {
                 return Err(format!(
                     "058 3.5.2: {id} is public with {checksum}, not the run's {}; nothing is republished",
@@ -282,6 +287,9 @@ pub fn publish_items(
                         Lookup::Visible { checksum } if checksum == item.expected => {
                             seen = Some(());
                             break;
+                        }
+                        Lookup::Unattested { .. } => {
+                            return Err(format!("A-87: {id} was published without npm provenance"));
                         }
                         Lookup::Visible { checksum } => {
                             return Err(format!(

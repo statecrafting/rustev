@@ -16,7 +16,7 @@
       "contentHash": "1a5d827da3ca69ee20e21a7443d87d2a68db83d877ffdb40b712f5b05381dbc4"
     },
     ".github/workflows/release.yml": {
-      "contentHash": "4640b5231289fc60d3ea72da9149da9cb4bd5a46d8da4b1025b55e9389bbcbad"
+      "contentHash": "94bd7590213e04ef217ec286c4065112ba40bd6cf1306d88582d2d3d4e034379"
     },
     ".github/workflows/statecraft-ai-review.yml": {
       "contentHash": "62d0cbcd4c7d64c0b7a519e525fb1362f7c85c58415228b93c7486c049089124"
@@ -70,7 +70,7 @@
       "contentHash": "896ccc486bd9f594e4b323e11fd1da0fd62b96f6da5018c26c75560bfa3ac9fc"
     },
     "docs/decisions/00-founding-decisions.md": {
-      "contentHash": "9f61180625a10aaa9447b0b1dab299be6d79d4bc774384b47aaab73163c2fbf6"
+      "contentHash": "b446496fd82c3f704fe6aa5b21a16060ff9250113f13669e513892625b96d89d"
     },
     "docs/design/001-decision-engine-architecture.md": {
       "contentHash": "97b0ab9aefbfcce74dc39e9c00fc786d18916d48f84ac7ef4cb26acc543d2a1f"

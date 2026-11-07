@@ -154,6 +154,12 @@ pub enum Lookup {
     Unknown {
         detail: String,
     },
+    /// npm only (A-87): public with `checksum`, but without a build-provenance
+    /// attestation, so it was published outside the run's provenance path. It
+    /// is refused wherever presence is checked, never taken for `Visible`.
+    Unattested {
+        checksum: String,
+    },
 }
 
 /// A registry's public state for a name and version.
