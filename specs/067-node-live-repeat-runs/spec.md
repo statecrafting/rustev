@@ -6,7 +6,7 @@ implementation: pending
 created: "2026-11-06"
 summary: >
   An amendment of approved specs 063 (3.9), 027 (3.3, 3.7) and 043
-  (section 2, 3.2.2, 3.5.1, 3.11.4, 3.13), for release 0.5.1 (#539),
+  (section 2, 3.2.2, 3.5.1, 3.11.4, 3.13), for release 0.6.0 (#539),
   ratified by the owner on 2026-11-06 (A-86). A Node host whose model
   backends are TypeScript `DecisionBackend`s (027 3.6) cannot run fresh
   repeat runs of its plans through Rustev: the binding's repeat commands
@@ -83,7 +83,7 @@ obligations:
 
 # 067: Node binding: live repeat runs over host backends (amends 027, 043 and 063)
 
-Approved: ratified by the owner on 2026-11-06 (A-86) for release 0.5.1;
+Approved: ratified by the owner on 2026-11-06 (A-86) for release 0.6.0;
 the implementation is pending. The approved texts of 027, 043 and 063
 are not edited; this spec records what changes in them (3.10). It
 authorizes no live run, provider call or spend, and raises no cap.
@@ -400,6 +400,14 @@ integration crate, and `rustev-node` is under `integrations/`).
    `index.d.ts`; no generated declaration changes.
 3. The WebAssembly package gains nothing: it has no runtime, backends or
    file system (027 3.10.1, 063 3.12).
+4. **Release position.** `liveRun` is a new required member of the Node
+   `Engine`, as is any other required binding member this spec adds.
+   031 3.8's npm declaration diff treats a new required member as a
+   break, so it passes only at a breaking version position (031 3.6.4,
+   3.6.5): this spec ships in 0.6.0, not in a 0.5.x patch. The family
+   version bump to 0.6.0 lands first in the cycle, before any increment of
+   this spec, so each increment's checks run at the breaking position
+   (owner decision of 2026-11-07).
 
 ### 3.10 What changes in specs 027, 043 and 063
 
@@ -488,7 +496,7 @@ None yet.
 
 Planned increments, each a separately reviewed pull request from `main`
 of about 1,000 lines (the AI review times out near 1,000 to 1,800
-reviewed lines), so this spec's 0.5.1 risk is its size: four increments
+reviewed lines), so this spec's 0.6.0 risk is its size: four increments
 must land in order. Nothing here claims an acceptance item before the
 increment that satisfies it.
 
@@ -505,7 +513,7 @@ increment that satisfies it.
    probe-only runs, outcomes, documents and declarations (3.2, 3.7.1),
    with `requireExistingJournal`; abort and run deadline (3.6.1 to
    3.6.3); `node --test` cases. Increments 1 and 2 together hold the
-   journal and the Node entry point, the part that must ship in 0.5.1 if
+   journal and the Node entry point, the part that must ship in 0.6.0 if
    not all four fit (decision 5 at approval). The order is fixed: the
    journal (increment 1) first, then `liveRun` (increment 2), which is
    what the owner's TMD-282 evaluation jobs need.
@@ -542,7 +550,7 @@ the adopted behavior.
    keeps 043 3.2.2. No asynchronous host authorizer.
 4. **The memory host is refused for `liveRun`** (3.4.2): the owner's
    evaluation jobs run on a real filesystem.
-5. **Release scope.** All four increments are targeted for 0.5.1. If
+5. **Release scope.** All four increments are targeted for 0.6.0. If
    only part fits, the shipped part must contain the Node entry point and
    the journal: increments 1 and 2 of the plan already contain both (the
    journal, its visibility and `--require-existing-journal` in 1;
