@@ -87,7 +87,11 @@ fn legacy_bytes_open_continue_and_match_new_writes() {
     assert!(new.reconcile(b.seq, 3));
     let c = new.reserve("released", 30).unwrap();
     new.release(c);
-    assert_eq!(std::fs::read_to_string(fresh.path()).unwrap(), migrated());
+    let fresh_bytes = std::fs::read_to_string(fresh.path()).unwrap();
+    assert_eq!(
+        fresh_bytes.split_once('\n').unwrap().1,
+        migrated().split_once('\n').unwrap().1
+    );
 }
 
 #[test]
@@ -319,7 +323,7 @@ fn testing_header_digest_matches_the_written_header_including_newline() {
     let j = fixture.open();
     let bytes = std::fs::read(j.path()).unwrap();
     let digest = rustev_contract::canonical::tagged_digest("rustev-jev.spend-journal/1", &bytes);
-    assert_eq!(SpendJournal::testing_header_digest().as_str(), digest);
+    assert_eq!(j.header_digest().as_str(), digest);
 }
 
 #[test]
@@ -335,4 +339,85 @@ fn superseded_testing_header_digest_matches_the_legacy_header() {
         SpendJournal::superseded_testing_header_digest(),
         SpendJournal::testing_header_digest()
     );
+}
+
+#[test]
+fn creation_identity_uses_canonical_record_and_survives_reopen_and_migration() {
+    use rustev_contract::canonical::{canonical_bytes, tagged_digest};
+    use rustev_live::journal::JournalCreated;
+    let mut ids = Vec::new();
+    for (time, run) in [(1, "23.x"), (12, "3.x"), (1, "3.x")] {
+        let f = Fixture::new();
+        let j = SpendJournal::open_for_run(
+            f.path(),
+            BudgetKind::Testing,
+            Arc::new(SetClock::new(time)),
+            run,
+        )
+        .unwrap();
+        let expected = tagged_digest(
+            "rustev.spend-journal-id/1",
+            &canonical_bytes(&serde_json::json!({"run_id": run, "created_at_ms": time})).unwrap(),
+        );
+        assert_eq!(j.identity().id.as_deref(), Some(expected.as_str()));
+        assert_eq!(j.identity().created_at_ms, Some(time));
+        assert_eq!(j.identity().created, JournalCreated::ThisRun);
+        ids.push(expected);
+        let bytes = std::fs::read(f.path()).unwrap();
+        drop(j);
+        let j = f.open();
+        assert_eq!(j.identity().created, JournalCreated::Earlier);
+        assert_eq!(std::fs::read(f.path()).unwrap(), bytes);
+        drop(j);
+        let old = String::from_utf8(bytes.clone())
+            .unwrap()
+            .replace("\"cap\":10000000000", "\"cap\":5000000000");
+        std::fs::write(f.path(), old).unwrap();
+        let j = f.open();
+        assert_eq!(j.identity().id, ids.last().cloned());
+        assert_eq!(j.identity().created_at_ms, Some(time));
+        assert_eq!(std::fs::read(f.path()).unwrap(), bytes);
+    }
+    assert_eq!(
+        ids.iter().collect::<std::collections::BTreeSet<_>>().len(),
+        3
+    );
+}
+
+#[test]
+fn legacy_header_is_never_stamped_and_actual_bytes_are_bound() {
+    use rustev_live::journal::JournalCreated;
+    let f = Fixture::new();
+    let header = "{ \"cap\":10000000000, \"budget\":\"testing\", \"schema\":\"rustev-jev.spend-journal/1\" }\n";
+    std::fs::write(f.path(), header).unwrap();
+    let j = f.open();
+    assert_eq!(j.identity().created, JournalCreated::Legacy);
+    assert_eq!(j.identity().id, None);
+    assert_eq!(j.identity().created_at_ms, None);
+    assert_eq!(
+        j.header_digest().as_str(),
+        rustev_contract::canonical::tagged_digest("rustev-jev.spend-journal/1", header.as_bytes())
+    );
+    assert_eq!(std::fs::read(f.path()).unwrap(), header.as_bytes());
+}
+
+#[test]
+fn interrupted_empty_creation_gets_identity_before_use() {
+    use rustev_live::journal::{JournalCreated, JournalOpening};
+    let f = Fixture::new();
+    std::fs::write(f.path(), []).unwrap();
+    let opening = JournalOpening::prepare(
+        f.path(),
+        BudgetKind::Testing,
+        Arc::new(SetClock::new(42)),
+        "run",
+        false,
+    )
+    .unwrap();
+    assert!(std::fs::read(f.path()).unwrap().is_empty());
+    let j = opening.open().unwrap();
+    assert_eq!(j.identity().created, JournalCreated::ThisRun);
+    assert_eq!(j.identity().created_at_ms, Some(42));
+    assert_eq!(j.header_digest(), &opening.header_digest());
+    assert!(j.identity().id.is_some());
 }

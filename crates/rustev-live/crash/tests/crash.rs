@@ -212,7 +212,7 @@ async fn drop_at_every_poll_boundary_then_resume_with_and_without_reruns() {
     }
 }
 
-// summary() reads once, then three probe reservations and three case
+// Creation and summary() read once each, then three probe reservations and three case
 // reservations follow. Expire the last case request inside its reservation,
 // so the actual runtime releases an unsent attempt after two successful calls.
 struct ReleaseClock {
@@ -221,7 +221,7 @@ struct ReleaseClock {
 }
 impl rustev_live::journal::SpendClock for ReleaseClock {
     fn now_ms(&self) -> i64 {
-        if self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == 6 {
+        if self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == 7 {
             self.clock.advance(2_001);
         }
         0
@@ -251,7 +251,10 @@ fn run_to_end(dir: &Dir, head: std::sync::Arc<Scripted>, resume: bool, rerun: bo
             rustev_live::journal::BudgetKind::Testing,
             std::sync::Arc::new(ReleaseClock {
                 clock: r.clock.clone(),
-                calls: std::sync::atomic::AtomicUsize::new(0),
+                // An existing journal is not created, so it skips the creation read.
+                calls: std::sync::atomic::AtomicUsize::new(usize::from(
+                    dir.0.join("journal").metadata().is_ok_and(|m| m.len() > 0),
+                )),
             }),
         )
         .unwrap();
