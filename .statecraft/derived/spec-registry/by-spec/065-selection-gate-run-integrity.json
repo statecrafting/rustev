@@ -73,7 +73,7 @@
       }
     ],
     "sectionDigests": {
-      "065-selection-gate-run-integrity-failures-void-the-comparison-instead-of-rejecting-amends-029-and-061": "ae0c68a06ad4b643265a87f09582537b5aecdeb1856f2f4667ae60058b604e04",
+      "065-selection-gate-run-integrity-failures-void-the-comparison-instead-of-rejecting-amends-029-and-061": "11e005079d0844584e66719366a2a6d18e8b90daf8df3b187e486f75ed9b75b5",
       "1-purpose": "47314b75af61f2f24c88ef53735518485af6fa68512cbb336b22e2903e3faa61",
       "2-1-binding-principles": "15e67398c2e2d9a5bdd50686d839c6fc1e132e52b80314d92a08a7ee85082b30",
       "2-territory": "48ef7e0910a65c0ead9f8e3509fc87b44325f481b61439bcbe9c468044fe9a46",
@@ -112,9 +112,9 @@
     ],
     "specPath": "specs/065-selection-gate-run-integrity/spec.md",
     "status": "approved",
-    "summary": "An amendment of approved specs 029 (3.12) and 061 (3.7), for release 0.5.1 (#538), ratified by the owner on 2026-11-06 (A-84). A run with integrity failures (results the evaluator could not score, cases a backend or source failed on) is not a measurement, yet today it can only lower coverage and reject the candidate, which reads as a verdict about the candidate when the run is the problem. This spec adds an optional integrity precondition to `rustev.selection-gate/1`, `integrity: { max_invalid, max_upstream_failures }`, counted per run on each side from documents the selection already verifies. A breach, or a count that cannot be established, voids the comparison: the candidate is `unknown` naming the run, no coverage minimum or clause is evaluated, and so it can never be rejected or qualify on a void run; a baseline run in breach voids every candidate. Gates without the member keep their bytes, identities and results.\n",
+    "summary": "An amendment of approved specs 029 (3.12) and 061 (3.7), for release 0.6.0 (#538), ratified by the owner on 2026-11-06 (A-84). A run with integrity failures (results the evaluator could not score, cases a backend or source failed on) is not a measurement, yet today it can only lower coverage and reject the candidate, which reads as a verdict about the candidate when the run is the problem. This spec adds an optional integrity precondition to `rustev.selection-gate/1`, `integrity: { max_invalid, max_upstream_failures }`, counted per run on each side from documents the selection already verifies. A breach, or a count that cannot be established, voids the comparison: the candidate is `unknown` naming the run, no coverage minimum or clause is evaluated, and so it can never be rejected or qualify on a void run; a baseline run in breach voids every candidate. Gates without the member keep their bytes, identities and results.\n",
     "title": "Selection gate: run integrity failures void the comparison instead of rejecting (amends 029 and 061)"
   },
-  "shardHash": "a266ed67c754e4bb96e3908df7a2fc811fa3736bc4e48bc23aab49833b6c2983",
+  "shardHash": "d4aa45d778ecd0df5310606cffeed9e44d55cf71a3e56efa087b7a946b2203a6",
   "specVersion": "1.11.0"
 }
