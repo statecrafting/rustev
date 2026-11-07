@@ -424,6 +424,7 @@ fn coverage(gate: &SelectionGate, side: &str, e: &HostSetEvidence<'_>) -> Vec<Cl
                 clause: format!("{side}.runs[{r}].{label}"),
                 result,
                 slices: vec![],
+                cases: None,
             });
         }
     }
@@ -458,12 +459,18 @@ pub fn evaluate_selection(
     let base_ok = verify_baseline(baseline, base).map_err(|e| e.to_string());
     let base_cohorts = as_cohorts(&base.report.cohorts);
     let base_opaque = opaque_metrics(base);
+    let base_cases: Vec<_> = base
+        .cases
+        .iter()
+        .map(crate::host_repeat::as_eval_cases)
+        .collect();
     let base_side = Side {
         cohorts: &base_cohorts,
         split_role: base.report.split_role,
         held_out: base.report.held_out.as_ref(),
         opaque: &|m: &str| base_opaque.iter().any(|x| x == m),
         host: true,
+        cases: base_cases.iter().collect(),
     };
     let mut decisions = vec![];
     let mut ranks = vec![];
@@ -488,6 +495,7 @@ pub fn evaluate_selection(
                 },
             },
             slices: vec![],
+            cases: None,
         }];
         if reason.is_none() {
             clauses.extend(coverage(gate, "baseline", base));
@@ -495,12 +503,18 @@ pub fn evaluate_selection(
         }
         let cohorts = as_cohorts(&e.report.cohorts);
         let opaque = opaque_metrics(e);
+        let case_docs: Vec<_> = e
+            .cases
+            .iter()
+            .map(crate::host_repeat::as_eval_cases)
+            .collect();
         let side = Side {
             cohorts: &cohorts,
             split_role: e.report.split_role,
             held_out: e.report.held_out.as_ref(),
             opaque: &|m: &str| opaque.iter().any(|x| x == m),
             host: true,
+            cases: case_docs.iter().collect(),
         };
         let (verdict, clauses) = judge(
             gate,

@@ -220,7 +220,7 @@ fn check_runs(runs: &[HostRunInputs<'_>]) -> Result<(), HostError> {
 
 /// A host case measures document as spec 029's per-case document, so its
 /// functions read it unchanged; internal, never written.
-fn as_eval_cases(c: &HostCases) -> EvalCases {
+pub(crate) fn as_eval_cases(c: &HostCases) -> EvalCases {
     EvalCases {
         schema: EVAL_CASES.into(),
         report: c.host_run.clone(),

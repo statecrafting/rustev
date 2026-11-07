@@ -41,7 +41,7 @@ REQUIRED = [
 # run them a second time in CI; `seeds.sh "spec 023"`, `live-comparison` and
 # `"spec 029"` still run and require every one. A spec whose acceptance
 # starts filtering its own seeds joins this list.
-OWN_RUNS = ("spec 023", "live-comparison", "spec 029", "spec 040", "spec 035", "spec 036", "spec 037", "spec 041", "spec 061")
+OWN_RUNS = ("spec 023", "live-comparison", "spec 029", "spec 040", "spec 035", "spec 036", "spec 037", "spec 041", "spec 061", "spec 064")
 # Generous: a new test binary can wait on the OS before it starts.
 TEST_TIMEOUT_S = 1800
 
@@ -761,6 +761,51 @@ SEEDS += [
         EVAL,
     ),
 ]
+
+# Spec 064 acceptance: each case-regression defect must be detected.
+SEEDS += [
+    (
+        "spec 064",
+        'a case worse by exactly by is not counted',
+        E + "selection/case_regressions.rs",
+        '.is_ge()',
+        '.is_gt()',
+        EVAL,
+    ),
+    (
+        "spec 064",
+        'an unpaired case counted as non-regressing',
+        E + "selection/case_regressions.rs",
+        'cases.unresolved.push(UnresolvedCase {',
+        'if reason == "unpaired" { continue; }\n                cases.unresolved.push(UnresolvedCase {',
+        EVAL,
+    ),
+    (
+        "spec 064",
+        'a partial case computed over the runs with a measure',
+        E + "selection/case_regressions.rs",
+        '    if present != runs.len() {\n        return CaseValue::Partial;\n    }',
+        '',
+        EVAL,
+    ),
+    (
+        "spec 064",
+        'the boundary compared in binary64',
+        E + "selection/case_regressions.rs",
+        'exact_sum_cmp(\n                    &[shortest(high).expect("finite")],\n                    &[shortest(low).expect("finite"), exact(limit.by.absolute)],\n                )\n                .is_ge()',
+        'high - low >= limit.by.absolute.to_f64_nearest()',
+        EVAL,
+    ),
+    (
+        "spec 064",
+        'a definite failure reported unknown because of an unresolved case',
+        E + "selection/case_regressions.rs",
+        'cases.regressions.total > limit.at_most {',
+        'cases.regressions.total > limit.at_most && cases.unresolved.total == 0 {',
+        EVAL,
+    ),
+]
+
 
 def run(cmd, cwd, env, timeout=None):
     # A session of its own, so a timeout kills the test binaries too.

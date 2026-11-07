@@ -530,3 +530,37 @@ fn host_and_rustev_documents_are_never_mixed() {
     ])
     .expect(4, "invalid_input");
 }
+
+#[test]
+fn case_regressions_stdout_keeps_host_assertion_and_full_file_evidence() {
+    let s = Scratch::new("host-case-regressions");
+    record_baseline(&s);
+    imported(&s, "candidates/worse", &candidate(|c| c.score_shift -= 0.1));
+    let gate = serde_json::json!({
+        "schema":"rustev.selection-gate/1","gate":"cases","per":"variant",
+        "metrics":{"rubric/brevity":"higher_is_better"},"min_comparable_coverage":"0","min_labeled_coverage":"0",
+        "require":[{"metric":"rubric/brevity","case_regressions":{"by":{"absolute":"0.05"},"at_most":0}}],"rank_by":[]
+    });
+    s.write("gate.json", &serde_json::to_vec(&gate).unwrap());
+    let r = select(&s, "candidates", "selection.json");
+    let out = r.expect(11, "none_qualified");
+    assert_eq!(out["assertion"], "host-asserted");
+    let summary = &out["candidates"][0]["clauses"]
+        .as_array()
+        .unwrap()
+        .last()
+        .unwrap()["cases"];
+    assert_eq!(summary["regressions"], 4);
+    assert_eq!(summary["at_most"], 0);
+    assert_eq!(summary["unresolved"], 0);
+    assert_eq!(summary["first"][0]["case"], "c1");
+    let file: serde_json::Value = serde_json::from_slice(&s.read("selection.json")).unwrap();
+    let cases = &file["candidates"][0]["clauses"]
+        .as_array()
+        .unwrap()
+        .last()
+        .unwrap()["cases"];
+    assert_eq!(cases["regressions"]["total"], 4);
+    assert_eq!(cases["unmeasured"], 2);
+    assert!(cases["regressions"]["list"][0]["baseline"].is_number());
+}

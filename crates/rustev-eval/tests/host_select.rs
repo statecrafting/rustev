@@ -444,3 +444,136 @@ fn a_candidate_changed_after_import_is_unknown() {
         "{sel:?}"
     );
 }
+
+fn case_gate(metric: &str, by: &str, at_most: u64) -> SelectionGate {
+    gate(&json!({
+        "schema":"rustev.selection-gate/1", "gate":"case-regressions", "per":"variant",
+        "metrics":{metric:"higher_is_better"}, "min_comparable_coverage":"0", "min_labeled_coverage":"0",
+        "require":[{"metric":metric,"case_regressions":{"by":{"absolute":by},"at_most":at_most}}], "rank_by":[]
+    }))
+}
+#[test]
+fn host_case_regressions_partial_unpaired_opaque_and_failure_precedence() {
+    let (c, rc) = (config(), repeat_config());
+    let base = Set::new(&c, &rc, &base_specs());
+    let mut specs = candidate(|s| s.score_shift -= 0.1);
+    specs[1].extra_failed.push("c1");
+    let partial = Set::new(&c, &rc, &specs);
+    let s = select(
+        &case_gate("rubric/brevity", "0.05", 3),
+        &base,
+        &[("partial", &partial)],
+    );
+    assert_eq!(s.exit_code(), 12);
+    let r = s.candidates[0].clauses.last().unwrap();
+    let cases = r.cases.as_ref().unwrap().as_ref().unwrap();
+    assert_eq!(cases.unmeasured, 2);
+    assert_eq!(cases.unresolved.list[0].case, "c1");
+    assert_eq!(cases.unresolved.list[0].reason, "partial");
+    assert_eq!(cases.unresolved.list[0].side, "candidate");
+    let s = select(
+        &case_gate("rubric/brevity", "0.05", 0),
+        &base,
+        &[("partial", &partial)],
+    );
+    assert_eq!(s.exit_code(), 11);
+    assert_eq!(
+        verdict(&s, "partial"),
+        &Verdict::Rejected {
+            clause: "require[0]".into()
+        }
+    );
+    let unpaired = Set::new(&c, &rc, &candidate(|s| s.extra_failed.push("c1")));
+    let s = select(
+        &case_gate("rubric/brevity", "0.05", 4),
+        &base,
+        &[("unpaired", &unpaired)],
+    );
+    assert_eq!(s.exit_code(), 12);
+    assert_eq!(
+        s.candidates[0]
+            .clauses
+            .last()
+            .unwrap()
+            .cases
+            .as_ref()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .unresolved
+            .list[0]
+            .reason,
+        "unpaired"
+    );
+    for metric in ["rubric/tone_index", "host/latency_ms/p0.5"] {
+        let s = select(&case_gate(metric, "0.05", 0), &base, &[("same", &base)]);
+        assert_eq!(s.exit_code(), 12);
+        let r = s.candidates[0].clauses.last().unwrap();
+        assert_eq!(r.cases, Some(None));
+        let expected = if metric.contains("tone") {
+            "opaque"
+        } else {
+            "not-case-comparable"
+        };
+        assert!(matches!(&r.result,ClauseOutcome::Unknown { reason } if reason.contains(expected)));
+    }
+    let s = select(
+        &case_gate("host/answered_rate", "1", 0),
+        &base,
+        &[("unpaired", &unpaired)],
+    );
+    assert_eq!(s.exit_code(), 11);
+    let r = s.candidates[0]
+        .clauses
+        .last()
+        .unwrap()
+        .cases
+        .as_ref()
+        .unwrap()
+        .as_ref()
+        .unwrap();
+    assert_eq!(r.regressions.total, 1);
+    assert_eq!(r.compared, 6);
+    assert_eq!(r.regressions.list[0].drop, "1");
+    let s = select(
+        &case_gate("host/cost_per_1000", "0.1", 0),
+        &base,
+        &[("same", &base)],
+    );
+    assert_eq!(s.exit_code(), 0);
+}
+#[test]
+fn host_unknown_cost_is_unresolved_and_keeps_host_stdout_assertion() {
+    use rustev_eval::host_run::{HostCost, Unobserved};
+    let (c, rc) = (config(), repeat_config());
+    let base = Set::new(&c, &rc, &base_specs());
+    let mut docs = set_docs(&c, &candidate(|_| {}));
+    docs[1].record.cases[0].cost = Some(HostCost::Unknown(Unobserved {
+        unknown: "unavailable".into(),
+    }));
+    let set = host_support::import(&c, &rc, &docs).unwrap();
+    let unknown = Set {
+        runs: docs.len(),
+        docs,
+        set,
+    };
+    let g = case_gate("host/cost_per_1000", "0.1", 0);
+    let s = select(&g, &base, &[("unknown", &unknown)]);
+    assert_eq!(s.exit_code(), 12);
+    let r = s.candidates[0]
+        .clauses
+        .last()
+        .unwrap()
+        .cases
+        .as_ref()
+        .unwrap()
+        .as_ref()
+        .unwrap();
+    assert_eq!(r.unresolved.list[0].reason, "unknown");
+    assert_eq!(r.unresolved.list[0].side, "candidate");
+    let projection = rustev_eval::selection::stdout_candidates(&g, &s.candidates);
+    assert_eq!(
+        projection[0]["clauses"].as_array().unwrap().last().unwrap()["cases"]["unresolved"],
+        1
+    );
+}
