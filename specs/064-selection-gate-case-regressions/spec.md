@@ -6,7 +6,7 @@ implementation: pending
 created: "2026-11-06"
 summary: >
   An amendment of approved specs 029 (3.12) and 061 (3.7), for release
-  0.5.1 (#537), ratified by the owner on 2026-11-06 (A-83). Every selection clause today compares `pooled`
+  0.6.0 (#537), ratified by the owner on 2026-11-06 (A-83). Every selection clause today compares `pooled`
   values of the cohort `all` or of each slice, so a candidate that improves
   most cases and collapses on a few passes `not_worse_than`. This spec adds
   one clause to `rustev.selection-gate/1`, `case_regressions`, which counts
@@ -57,7 +57,7 @@ obligations:
 
 # 064: Selection gate: a clause on per-case regressions against the baseline (amends 029 and 061)
 
-Approved: ratified by the owner on 2026-11-06 (A-83) for release 0.5.1;
+Approved: ratified by the owner on 2026-11-06 (A-83) for release 0.6.0;
 the implementation is pending. The approved texts of 029 and 061 are not
 edited; this spec records what it adds to them.
 
@@ -347,7 +347,7 @@ draft left open answered as recommended:
 2. **Partial cases.** A case whose side lacks a measure in some of its
    runs is unresolved (`partial`) and makes the clause unknown unless it
    already fails (3.2.4, 3.4.1).
-3. **Slices.** The clause is refused inside `all_slices` in 0.5.1
+3. **Slices.** The clause is refused inside `all_slices` in 0.6.0
    (3.1.2).
 4. **Sample metrics.** Unknown, `not-case-comparable`; no per-case
    quantile (3.2.3).
