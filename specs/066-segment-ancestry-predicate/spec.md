@@ -49,7 +49,7 @@ obligations:
     anchor: "3-3-unresolved-and-invalid-operands"
   - id: "R-1"
     kind: requirement
-    text: "Every committed definition, plan, judgment, evidence and run golden keeps its bytes and `PlanId`, and a `rustev.definition/1` using `under` is refused with category 11 `requires_definition_2`."
+    text: "Every committed definition, plan, judgment, evidence and run golden keeps its bytes and `PlanId`, and a `rustev.definition/1` using `under` is refused with category 11 `invalid_definition`, requirement `requires_definition_2`."
     anchor: "3-5-compatibility"
 ---
 
@@ -250,7 +250,7 @@ document version.
 
 | Case | Expected |
 |---|---|
-| `under` in a `rustev.definition/1` | Category 11, `requires_definition_2`, phase b. |
+| `under` in a `rustev.definition/1` | Category 11 `invalid_definition`, requirement `requires_definition_2`, phase b. |
 | `value` of type `integer`, `enum` or `nullable{text}` | Category 3 `kind_mismatch`, phase e. |
 | `separator: "-"` or `"::"` | Category 1 `parse`. |
 | A policy reading a step that uses `under` with no handler covering `invalid_input` | Category 8 `unhandled_unresolved`. |

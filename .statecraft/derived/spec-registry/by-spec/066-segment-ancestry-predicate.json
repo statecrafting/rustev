@@ -66,7 +66,7 @@
         "anchor": "3-5-compatibility",
         "id": "R-1",
         "kind": "requirement",
-        "text": "Every committed definition, plan, judgment, evidence and run golden keeps its bytes and `PlanId`, and a `rustev.definition/1` using `under` is refused with category 11 `requires_definition_2`."
+        "text": "Every committed definition, plan, judgment, evidence and run golden keeps its bytes and `PlanId`, and a `rustev.definition/1` using `under` is refused with category 11 `invalid_definition`, requirement `requires_definition_2`."
       }
     ],
     "references": [
@@ -79,7 +79,7 @@
       }
     ],
     "sectionDigests": {
-      "066-definition-predicate-segment-ancestry-on-a-declared-separator-amends-002-and-032": "d4945b914cb88a555a08a6a26384a2d3e6f51862ee7d550ba0246dc5b5798694",
+      "066-definition-predicate-segment-ancestry-on-a-declared-separator-amends-002-and-032": "24ee22a2a6a8a67e5b7aa88eab4970ae38a928496c4322babeafc91d6d377a7d",
       "1-purpose": "216a0fcd6a11a16969e99ed59a73dfa36eee59b16f5b890c57e9b7c87f31c332",
       "2-1-binding-principles": "28f5ef31419c14d3271624acd4c1948428f93eb7524510123d95d8f0f8a8ebb2",
       "2-territory": "acadc20569bdea0265866bbbd6e7f51f212309634a823178a4450dd2596ea1ee",
@@ -90,7 +90,7 @@
       "3-5-compatibility": "16f33000690aeba61f18b50086e60b7b71ecb42be25da9bf0770c9fc485323e1",
       "3-behavior": "6233aa6178e030e50ecccd94d7d3b9b7f2a8b42fa6b8a9bbbdf94ea2b780f704",
       "4-out-of-scope": "be9a771b2989cf91ef7211350fb7899c7e8de2077d156fd97a01423fa6cede68",
-      "5-observable-negative-cases": "ab2fdc9e1dd9c46f2ebe64d9adf947325442dde1420951ed7155554430fefce0",
+      "5-observable-negative-cases": "53af6be17649d6f6e6f80d1dd2840ebf22653f47f7d863755488cd2b4225aa08",
       "acceptance": "1afbc6c5e93e0314af1679873ac603a69e5d0e2db58d2fd0ec05efa75d9d95ab",
       "decisions-at-approval": "f7c81554ff84e670d5220f3b8e13ec148aff6021bb94e03e80a12adab50440a8",
       "implementation-record": "863bceb45f8756af70f9f7157a8caf8f20428d2ff2f95736af97698087d9b2e6",
@@ -119,6 +119,6 @@
     "summary": "An amendment of approved specs 002 (3.8, 3.9) and 032 (3.1, 3.12), for release 0.6.0 (#509), ratified by the owner on 2026-11-06 (A-85). A partner rule needs \"this location slug sits under that city slug\", for example `us:ny:new-york:soho` under `us:ny:new-york`; today the host projects the slug's parent into the snapshot and the rule compares with `member_ref`. This spec adds one predicate to the registry `rustev.exact/2`, `under{value, ancestor, separator}`, true when the ancestor's segments are a proper prefix of the value's segments on a separator the definition declares, so `us:ny:new-york-city` is not under `us:ny:new-york`. Comparison is by bytes with no normalization; an operand with an empty segment is `invalid_input`, and an unresolved operand makes the reading step unresolved, never false. Definition 1 refuses it; plans that do not use it keep their bytes and `PlanId`.\n",
     "title": "Definition predicate: segment ancestry on a declared separator (amends 002 and 032)"
   },
-  "shardHash": "29d3be159584c8bd32dbd93bef0a41c32d95095ef950349ecb2f818e5b07cf77",
+  "shardHash": "a3693e2b2751902e818b23f0f68bde70ef9a3c9bf0fa1f2be487e220ff068fb6",
   "specVersion": "1.11.0"
 }
