@@ -1,5 +1,5 @@
-# Rendered by Statecraft from profile github-actions-rust revision 26
-# (identity 39e2a7a244759e35b35b089449054b69062d619d9d418b94a6e83a2accdd3b88). A managed file and a member of this
+# Rendered by Statecraft from profile github-actions-rust revision 27
+# (identity 4dce5a037779c31a0f5dfb18ea1d47749102899d6231468ee8012801f3e9dd30). A managed file and a member of this
 # repository's authority set: an edit here changes the gate that judges every
 # pull request, and `statecraft doctor` names it. The policy the aggregate gate
 # enforces is .statecraft/setup/github-actions-rust.json, read at the base.
