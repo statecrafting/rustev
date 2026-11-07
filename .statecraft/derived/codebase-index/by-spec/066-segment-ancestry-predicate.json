@@ -1,0 +1,105 @@
+{
+  "mapping": {
+    "amends": [
+      "002-decision-contract-and-pure-core",
+      "032-evidence-quality"
+    ],
+    "dependsOn": [
+      "002-decision-contract-and-pure-core",
+      "027-node-and-wasm-bindings",
+      "031-public-api-and-release-family",
+      "032-evidence-quality",
+      "034-parameterized-definitions",
+      "036-mid-plan-acquisition"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/rustev-contract/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/rustev-core/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "integrations/rustev-node/types/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "integrations/rustev-wasm/types/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-contract/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-contract/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/rustev-core/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-core/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "integrations/rustev-node/types/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-node/types/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "integrations/rustev-wasm/types/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-wasm/types/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/decisions/00-founding-decisions.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "specId": "066-segment-ancestry-predicate",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "a3693e2b2751902e818b23f0f68bde70ef9a3c9bf0fa1f2be487e220ff068fb6"
+}
