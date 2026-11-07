@@ -1,0 +1,120 @@
+{
+  "record": {
+    "amends": [
+      "029-evaluation-repeatability",
+      "061-host-scored-repeat-sets"
+    ],
+    "created": "2026-11-06",
+    "dependsOn": [
+      "002-decision-contract-and-pure-core",
+      "004-evaluation-and-replay",
+      "006-cli-surface",
+      "029-evaluation-repeatability",
+      "031-public-api-and-release-family",
+      "041-ranking-and-rubric-metrics",
+      "061-host-scored-repeat-sets",
+      "063-node-binding-parity"
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "004-evaluation-and-replay",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-eval/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "006-cli-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-cli/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "027-node-and-wasm-bindings",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-conformance/"
+        }
+      }
+    ],
+    "id": "065-selection-gate-run-integrity",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-3-a-breach-voids-the-comparison",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "When a gate declares `integrity`, a candidate any of whose runs, or any baseline run, exceeds a declared bound or has a count that cannot be established is `unknown` naming that run, with every coverage minimum and clause unevaluated; such a candidate is never `rejected`, never `qualifies` and never ranked."
+      },
+      {
+        "anchor": "3-2-counting",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "An integrity count is computed only from documents the selection has verified; a count that is missing, unknown or cannot be derived (no declared scorer for `max_invalid`, a declared scorer without its scores) voids the comparison and is never taken as zero."
+      },
+      {
+        "anchor": "3-6-compatibility",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "A selection gate without `integrity` has the same canonical bytes and identity as today, and `gate select` over it writes the same `rustev.selection/1` bytes, stdout and exit code."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "065-selection-gate-run-integrity-failures-void-the-comparison-instead-of-rejecting-amends-029-and-061": "11e005079d0844584e66719366a2a6d18e8b90daf8df3b187e486f75ed9b75b5",
+      "1-purpose": "47314b75af61f2f24c88ef53735518485af6fa68512cbb336b22e2903e3faa61",
+      "2-1-binding-principles": "15e67398c2e2d9a5bdd50686d839c6fc1e132e52b80314d92a08a7ee85082b30",
+      "2-territory": "48ef7e0910a65c0ead9f8e3509fc87b44325f481b61439bcbe9c468044fe9a46",
+      "3-1-the-gate-member": "321555d84a5f2df9c8f9015e5d8e8b0592cc4295cb251d10bed4cf7c4051394c",
+      "3-2-counting": "7e4cf786041d696b2d83f51f5dfb4e41955f6c32ad0df8c1d77d6447a811916e",
+      "3-3-a-breach-voids-the-comparison": "e6c7b151a2f859c7318bc0cb4d6c029a1ed44e38958bbaeb4eba89a9937dd571",
+      "3-4-output": "85ac200f634e038025e0d70ae9256d2a92ed284ae8d733930d64d2d02ba7afa7",
+      "3-5-library-and-bindings": "d65cf16d75d38993f603dcefa300622c5f67ad86742d19a9f945202ac4c3d5d9",
+      "3-6-compatibility": "1b2a8900d2fdf217a60bfaa61cdc52126bcfb83dc42380d8ca2c1d85f3121751",
+      "3-behavior": "19363de9e6c8d97e79d78ea3b59d2db3253cc6d6d194d4f08c422e37f68b07c9",
+      "4-out-of-scope": "b7ade36c2267e6fb814bce4b984d862967a3b13ec0243504ee7571fe194c54b8",
+      "5-observable-negative-cases": "c609effe2f2e5b7e089e54347421d21553f8f4487a9ad79289e42f0a8d97997d",
+      "acceptance": "fd3de0c03a9a03642d291eb2c17dceb4b4ec3afb2c99f025d26df456c5c6e01f",
+      "decisions-at-approval": "09c79c97815398fb25fc22deca36dd91a04750d8e5cfe8ccd327fa6a1db9170d",
+      "implementation-record": "0436ad8b97e1ce4e610da89218ea0aa395a80391005b67fca85f34ae62e5559b",
+      "verification": "08b0bec48cf6ffca73b439bc5db9e183b263229fe21d236c7c5f194bbbc09ba8"
+    },
+    "sectionHeadings": [
+      "065: Selection gate: run integrity failures void the comparison instead of rejecting (amends 029 and 061)",
+      "1. Purpose",
+      "2. Territory",
+      "2.1 Binding principles",
+      "3. Behavior",
+      "3.1 The gate member",
+      "3.2 Counting",
+      "3.3 A breach voids the comparison",
+      "3.4 Output",
+      "3.5 Library and bindings",
+      "3.6 Compatibility",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Implementation record",
+      "Decisions at approval"
+    ],
+    "specPath": "specs/065-selection-gate-run-integrity/spec.md",
+    "status": "approved",
+    "summary": "An amendment of approved specs 029 (3.12) and 061 (3.7), for release 0.6.0 (#538), ratified by the owner on 2026-11-06 (A-84). A run with integrity failures (results the evaluator could not score, cases a backend or source failed on) is not a measurement, yet today it can only lower coverage and reject the candidate, which reads as a verdict about the candidate when the run is the problem. This spec adds an optional integrity precondition to `rustev.selection-gate/1`, `integrity: { max_invalid, max_upstream_failures }`, counted per run on each side from documents the selection already verifies. A breach, or a count that cannot be established, voids the comparison: the candidate is `unknown` naming the run, no coverage minimum or clause is evaluated, and so it can never be rejected or qualify on a void run; a baseline run in breach voids every candidate. Gates without the member keep their bytes, identities and results.\n",
+    "title": "Selection gate: run integrity failures void the comparison instead of rejecting (amends 029 and 061)"
+  },
+  "shardHash": "d4aa45d778ecd0df5310606cffeed9e44d55cf71a3e56efa087b7a946b2203a6",
+  "specVersion": "1.11.0"
+}
