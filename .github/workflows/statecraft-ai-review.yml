@@ -1,5 +1,5 @@
-# Rendered by Statecraft from profile github-actions-rust revision 26
-# (identity 39e2a7a244759e35b35b089449054b69062d619d9d418b94a6e83a2accdd3b88). A managed file and a member of this
+# Rendered by Statecraft from profile github-actions-rust revision 27
+# (identity 4dce5a037779c31a0f5dfb18ea1d47749102899d6231468ee8012801f3e9dd30). A managed file and a member of this
 # repository's authority set. Called by statecraft-ci.yml only; it declares
 # the two credentials it may use by name (revision 8: the API key when set,
 # else the OAuth token) and is never given `secrets: inherit`.
@@ -67,7 +67,7 @@ jobs:
           EXCLUDE: '.statecraft/derived crates/rustev-contract/schema integrations/rustev-node/types integrations/rustev-wasm/types backends/rustev-backend-embed-linear/qualification tools/rustev-conformance/cases'
           RELEASE_PATTERN: 'release/*'
           CLAUDE_CLI_VERSION: '2.1.116'
-          PROFILE_IDENTITY: '39e2a7a244759e35b35b089449054b69062d619d9d418b94a6e83a2accdd3b88'
+          PROFILE_IDENTITY: '4dce5a037779c31a0f5dfb18ea1d47749102899d6231468ee8012801f3e9dd30'
           REUSE_RECORDED: ${{ github.event.action == 'edited' }}
         run: |
           script="${RUNNER_TEMP}/statecraft-ai-review.sh"

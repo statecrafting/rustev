@@ -49,8 +49,8 @@
   },
   "profile": {
     "id": "github-actions-rust",
-    "identity": "39e2a7a244759e35b35b089449054b69062d619d9d418b94a6e83a2accdd3b88",
-    "revision": 26
+    "identity": "4dce5a037779c31a0f5dfb18ea1d47749102899d6231468ee8012801f3e9dd30",
+    "revision": 27
   },
   "requiredChecks": [
     {
