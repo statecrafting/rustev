@@ -1,0 +1,199 @@
+{
+  "record": {
+    "amends": [
+      "038-structured-extraction",
+      "032-evidence-quality"
+    ],
+    "created": "2026-11-08",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-decision-contract-and-pure-core",
+      "003-runtime-execution-and-evidence",
+      "005-reference-backends",
+      "027-node-and-wasm-bindings",
+      "032-evidence-quality",
+      "035-screening-seam",
+      "038-structured-extraction",
+      "057-wasm-raw-budget-for-spec-039"
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-contract/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "002-decision-contract-and-pure-core",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-core/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "003-runtime-execution-and-evidence",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-runtime/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "027-node-and-wasm-bindings",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-node/types/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "027-node-and-wasm-bindings",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-wasm/types/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "027-node-and-wasm-bindings",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-conformance/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "directory",
+          "path": "scripts/acceptance/"
+        }
+      }
+    ],
+    "id": "070-extract-rules-2",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-10-compatibility-and-identity",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "Every rustev.extract-rules/1 document keeps its bytes, its identity and its meaning; every committed definition, plan, evidence and judgment golden keeps its bytes and PlanId; a /1 document holding any /2 construct is refused at parse, never read as /2."
+      },
+      {
+        "anchor": "3-3-value-extractors",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "A value extractor yields exactly the bytes it matched, or nothing: a token longer than its declared bound, outside its charset or shape, or a calendar-invalid date makes the rule not apply; nothing is cut short, case-changed, trimmed, padded beyond the declared date rendering, or defaulted, and the produced value is validated by spec 038 3.4 like any fallback value."
+      },
+      {
+        "anchor": "3-4-exact-value-conditions",
+        "id": "I-3",
+        "kind": "invariant",
+        "text": "An `equals` or `one_of` condition reads only an input whose accepted provenance excludes `model-derived`, compares its core value exactly, and is never evaluated as false because its source is unresolved: the field stays absent with `source_unavailable`."
+      },
+      {
+        "anchor": "3-7-rules-first",
+        "id": "I-4",
+        "kind": "invariant",
+        "text": "Under `fill: rules_first`, a field the rules filled is never requested from or replaced by the backend; a request skipped because every required field was filled is recorded `skipped{rules_filled}` with no attempt, no reservation and no cost; and compile-time budgets count the request as before."
+      },
+      {
+        "anchor": "3-8-grade-of-vocabulary-capture",
+        "id": "I-5",
+        "kind": "invariant",
+        "text": "Every present value of an extract field that a `vocabulary_after` rule can fill carries grade `hint`, its static ceiling is `hint`, and only a spec 032 corroboration step can raise it; a hard gate or requirement reading it otherwise is refused with category 14 `uncorroborated_hint`."
+      },
+      {
+        "anchor": "3-6-evaluation-bounds-and-determinism",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "The /2 evaluator is pure, bounded and in rustev-core, gives byte-identical results on every target including wasm32, uses no regular expression engine, Unicode table, locale data, floating point or new dependency, and stays within the per-byte work bounds of 3.6."
+      },
+      {
+        "anchor": "3-11-webassembly-budget",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "The optimized WebAssembly module stays within spec 057's gated uncompressed budget; an increment of this spec that crosses 5,242,880 bytes raises the gate to 6,291,456 bytes in the same change, as 3.11 amends 027 3.10.4."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "070-extraction-rules-2-token-extractors-exact-value-conditions-declared-date-formats-and-rules-first-amends-038-and-032": "51b9c10e338ca5fd2c03bc4cbd6e8325ce5352f255cb4bf9f1f805a9900cf3de",
+      "1-purpose": "c27d666654080228bb42b54d7d4a519a115808f44be88e726e22c9e4795c196f",
+      "2-1-binding-principles": "730a089e011a10d9dffd324d744d8ff81340332a35875f5921ca1cf81a2695c5",
+      "2-territory": "8422c5c45faf6648154ee1468694a7467df2278072119da3ab2466c546a78805",
+      "3-1-the-document": "ec43c53a8bb7cd84e5e382adfe1aef9ad7369edde90542b9076152b4cfe73414",
+      "3-10-compatibility-and-identity": "2eef12983116a276577572908cd2adf70cd447c97024fa78ec6f24aedda9f5c4",
+      "3-11-webassembly-budget": "c0a1fb1600a9c5cb60ea49ed487f4707d4a4a4ff2579c8e1ec14f06f09f9bda3",
+      "3-12-what-a-match-means": "c84c9ee14441d64dab06e5f8ac61eb7ba15e998d09b01dac59fee8df4d1e50de",
+      "3-2-shared-text-rules": "8a1c3723071cb4463ef2c64f630a2b15cc15536894bd1803855c24ea1ab25507",
+      "3-3-value-extractors": "8b642cc32df6698eef40134e5b837a636dc134fd7c306ca5cc1240b3c72f26ba",
+      "3-4-exact-value-conditions": "b94f14499c9a8f73d46e9fd4bc10f333dc512c92eaac0a0cd090bab4d7d864cf",
+      "3-5-binding-amends-038-3-7-2": "35cd7acbc94c65c14acc45688c67f23a5e194168086bc93985080aba3b48ba5e",
+      "3-6-evaluation-bounds-and-determinism": "98ce153d0d631823fbf607e002d3d61fe283ea80b3e94a2067b0da84c20cf9f4",
+      "3-7-rules-first": "41e4b9d6af2c8f6da45f35ec7123e356864d7cd09f031a2fa96c669c3509016f",
+      "3-8-grade-of-vocabulary-capture": "883e7c57f5b588826cc0386fcb46e6fddaea88063969fb588ddd14ae9d9e7505",
+      "3-9-evidence-and-judgment-amends-038-3-12": "4082121797e5bcdc2151d4d2acee90eb528c5f8917b0f505cb81bc9041d1b68a",
+      "3-behavior": "4a02e4edcc3888316317fae0a552e9cbd49fab82f510570130e7af989e871673",
+      "4-out-of-scope": "fafc640544d023b9265738e5c317b78c92c3f38a676d885781f8ede0a131d829",
+      "5-observable-negative-cases": "7866b1ccf648893e1ac03a3892f9fbcc789f5b05ff7ff7a81d543fb65984886b",
+      "acceptance": "94bf9b999610f485446de1ae50844e60f138f0248e13c72aaf4b71b8d6760273",
+      "decisions-at-approval": "f6a8896774c4e3e286179bdf7b26ae7e36e4b9cc99f3f7afaae89c431e4b783e",
+      "implementation-record": "5978fe2ef41c4048c7f6864b4f9249579c229a12a83ec1ae9a60c1517a966453",
+      "increments": "9b48d54b050e75c77f393eecd04201225a4b197d8a06bba9ef0bb436176c75a8",
+      "verification": "f09d2ecfe0427f0790e7e18b53ef96c9fa64f2204dc26649b98e8ea7e9ab792b"
+    },
+    "sectionHeadings": [
+      "070: Extraction rules 2: token extractors, exact-value conditions, declared date formats and rules first (amends 038 and 032)",
+      "1. Purpose",
+      "2. Territory",
+      "2.1 Binding principles",
+      "3. Behavior",
+      "3.1 The document",
+      "3.2 Shared text rules",
+      "3.3 Value extractors",
+      "3.4 Exact-value conditions",
+      "3.5 Binding (amends 038 3.7.2)",
+      "3.6 Evaluation bounds and determinism",
+      "3.7 Rules first",
+      "3.8 Grade of vocabulary capture",
+      "3.9 Evidence and judgment (amends 038 3.12)",
+      "3.10 Compatibility and identity",
+      "3.11 WebAssembly budget",
+      "3.12 What a match means",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Increments",
+      "Acceptance",
+      "Verification",
+      "Implementation record",
+      "Decisions at approval"
+    ],
+    "specPath": "specs/070-extract-rules-2/spec.md",
+    "status": "approved",
+    "summary": "An amendment of approved specs 038 (3.3.3, 3.3.5, 3.5, 3.7, 3.11, 3.12, 3.14) and 032 (3.2.1, 3.9.3), for #572, ratified by the owner on 2026-11-08 (A-90) for release 0.7.0. A host that runs per-sender templates over forwarded booking emails cannot express them in `rustev.extract-rules/1`, so it runs them as a host backend and every templated field becomes `model-derived`. This spec adds the program schema `rustev.extract-rules/2`, a superset of /1: the value extractors `token_after` (a token from a declared ASCII charset after a term), `token_matching` (a token of a small structured shape, never a regular expression), `date` (a closed set of declared formats with month names from a table the program declares) and `vocabulary_after` (a token that is a member of a declared vocabulary, graded `hint` under spec 032); the conditions `equals` and `one_of` over an exact input value; and the extract step's `fill: rules_first`, which evaluates the program before the request is listed, skips the request when every required field is filled, and otherwise asks the backend only for the fields the rules left absent. Everything stays pure, bounded and evaluated in `rustev-core` with no new dependency. A rules match is evidence that this program produced this value from this text, never that the value is true. /1 programs, every existing plan and every `PlanId` keep their bytes.\n",
+    "title": "Extraction rules 2: token extractors, exact-value conditions, declared date formats and rules first (amends 038 and 032)"
+  },
+  "shardHash": "db5bc691e3ce95e0ee62ed27cfec4c10f61b7282ad07b0f65220dd8206137a37",
+  "specVersion": "1.11.0"
+}
