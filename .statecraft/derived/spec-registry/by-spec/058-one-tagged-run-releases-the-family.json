@@ -80,7 +80,7 @@
       }
     ],
     "sectionDigests": {
-      "058-one-tagged-run-releases-the-family-amends-021-031-053-and-056": "49ccd2db7bc7d0bb3116e0c842165841f5d9f6d78ecae812744fba2cab7f3788",
+      "058-one-tagged-run-releases-the-family-amends-021-031-053-and-056": "3f4958d304d7095f75ce50c0dff4b59eb6bbb66e19a909addaffb3e3a798fe6e",
       "1-1-the-motivating-case-0-2-0": "94939a1a7c5192274e8c337f145a89ecd40103e358860f6a1c6daf98b904eb2b",
       "1-2-the-model-spec-spine-s-release": "c3d479a0f70964682a836dac159fce29016ee7218e1eb712004f2d1051475e45",
       "1-purpose": "6b1418ca39229ddf1f9f6d1a615dcfa5d21ec12ec5bdc4eb9da4372a264b321a",
@@ -97,7 +97,7 @@
       "3-behavior": "dbaaf6f7139cd352f8111791a69b63788e0b24fff7a54c18122b1ce84bda6359",
       "4-observable-negative-cases": "6dd3e51a3c5b82b24ec69310d4a89ded1dd85d4a3cc8a7be687deb8ffb8e13bc",
       "acceptance": "5b542f1cac41653ea91b7dece56ac2a3a672f1752535575336f626a2ad6c9ef8",
-      "implementation-record": "83ec2f1f0ecbcbdf4e56e79263ab8f3e06dbb6cdb70b37204799f636af309c08",
+      "implementation-record": "85c1d6039992e40a7ff54e5bcbf7ee82eb5cd42ba2ce6a9357eea83473cc6365",
       "open-questions-for-the-owner": "468f92801a08692dbc9654eb538769ed1081275a24707c4218dc73f36ded283e",
       "verification": "c3b914429f4a3f4ab311c08f6af524ccc9453179ef4f42ab1f94d28c087c7c52"
     },
@@ -128,6 +128,6 @@
     "summary": "A proposed amendment of approved specs 021 (3.1, 3.8 to 3.10), 031 (3.9, 3.11, 3.12), 053 and 056 (3.3 to 3.5), modeled on spec-spine's tag-gated release. Pushing the owner's signed annotated tag `vX.Y.Z` on a commit of `main` starts one workflow run that builds every artifact once, checks reproducibility inside the run, generates and attests the manifest from what it built, publishes crates and npm packages through trusted publishing, creates and verifies the GitHub release, and ends with the fresh-consumer qualification. The rehearsal precondition, the owner-signed manifest, the second run, the signed publication instruction and its journal continuation are removed; release candidates become optional. Ratified by the owner on 2026-10-28 (A-61): the signed tag alone authorizes a release, and crates.io is published through trusted publishing.\n",
     "title": "One tagged run releases the family (amends 021, 031, 053 and 056)"
   },
-  "shardHash": "dd84f9bfc0203c62354b323ab38eeedfe8884b714b11fd71a81c9fffd2bca812",
+  "shardHash": "c0fefa281c2cf730d9ecfe7e5a264bb48f4fc5b87cd2c34b2ec2bb3adac3e8fb",
   "specVersion": "1.11.0"
 }

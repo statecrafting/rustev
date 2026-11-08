@@ -5,7 +5,7 @@
     {
       "name": "support.plan.json",
       "path": "tools/rustev-conformance/fixtures/runtime/support.plan.json",
-      "sha256": "6400ae22515bf09e96f122fc6e4b3e9dffc3bb6aff4ef9c047cd9ba5c709fe74"
+      "sha256": "43d2d7faa4fe910c2617081bd432dc3db4be4d5ca4fa3fa87f6e5a130f1b5a86"
     },
     {
       "name": "support.snapshot.json",
@@ -44,19 +44,19 @@
       "file": "embedded.bundle.json",
       "golden": "tools/rustev-conformance/expected/runtime/runtime.capture-replay/embedded.bundle.json",
       "normalize": [],
-      "sha256": "97da312891009009a6448625bc8683cc4ae082c9ae678336adae12048ebee74c"
+      "sha256": "b147d97dd6e78af4c3294f2b3468c696095769c41e5f96638410f5a0402ae727"
     },
     {
       "file": "embedded.record.json",
       "golden": "tools/rustev-conformance/expected/runtime/runtime.capture-replay/embedded.record.json",
       "normalize": [],
-      "sha256": "24cae69d0131176df0a70b3c682c7a2b560bf40318d4bfd5eea1a4f51aecf1c0"
+      "sha256": "394c12fa00ffc3285939fbde93b7da188c5626b6d987542d3af4a59fd77a652b"
     },
     {
       "file": "embedded.replay.json",
       "golden": "tools/rustev-conformance/expected/runtime/runtime.capture-replay/embedded.replay.json",
       "normalize": [],
-      "sha256": "0cd8003237f74d57119bd1583f0761f05fee0bb926786f565ee12c84f0dc3b38"
+      "sha256": "ae9f2d0cdc16a7976d1787e153a5583dc2dc37bb6dc5db5e4d1ff5f560152a98"
     },
     {
       "file": "embedded.result.json",
@@ -68,19 +68,19 @@
       "file": "external.bundle.json",
       "golden": "tools/rustev-conformance/expected/runtime/runtime.capture-replay/external.bundle.json",
       "normalize": [],
-      "sha256": "07a539daa29a4436fd08c118fc12dbcbf36db0e6bf357dd5d62f9ce2254ce712"
+      "sha256": "f7878f954921a230888d48559652065ef390890d882b197be110e564943294e5"
     },
     {
       "file": "external.record.json",
       "golden": "tools/rustev-conformance/expected/runtime/runtime.capture-replay/external.record.json",
       "normalize": [],
-      "sha256": "9bb7e5545c4432d13f18b3d0ff20f22fe22bc12f64334f90cc45336f41097ead"
+      "sha256": "83b3534dfd5a392a320c82e3d4600e8a9cfa26280628aa3dd3c07e931fe04c92"
     },
     {
       "file": "external.replay.json",
       "golden": "tools/rustev-conformance/expected/runtime/runtime.capture-replay/external.replay.json",
       "normalize": [],
-      "sha256": "da389c01a03575d6bcaac8fb431904657e52420159f618338c970815b1162f77"
+      "sha256": "1d51409c110486b1603b35b2619c1175412459e63f7089759e5d589e08cb24a9"
     },
     {
       "file": "external.result.json",

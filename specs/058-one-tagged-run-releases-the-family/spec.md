@@ -698,6 +698,25 @@ The npm bound keeps one package's full wait within half of the job's 60
 minutes, so the workflow is unchanged. `tests/tagged.rs`
 `registry_wait_bounds_follow_3_3` pins both bounds.
 
+**The 0.7.0 version move (2026-11-08).** The owner authorized on
+2026-11-08 opening the cycle of the release after 0.6.0 (tagged at
+`8e9599ac`) as 0.7.0, carrying spec 068's implementation and the later
+work of the cycle. The move lands first in the cycle, on a quiet `main`,
+so that a change in the cycle that 031 3.8's npm declaration check or
+`cargo semver-checks` classes as breaking over the 0.6.0 baseline is
+reported rather than refused; before 1.0 the breaking position is the
+minor number. It is therefore a breaking-position step, as 0.6.0 was:
+every release-set crate and npm package moves from `0.6.0` to `0.7.0` in
+lockstep, in the same sites as the 0.6.0 move, and every fixture carrying
+a PlanId, including those added since 0.6.0, is regenerated through the
+same bless and harvest paths, with byte copies where a file mirrors
+another and the `rustev-serve` Sigstore fixture re-signed with its
+throwaway keys. The move itself changes no behavior. For consumers, every
+PlanId changes from 0.6.0 to 0.7.0, even for an unchanged definition (031
+3.6.4, which the 0.7.0 changelog states for each reference plan):
+anything keyed by a PlanId, such as evaluation baselines, ledgers and
+cache keys, must be re-derived with 0.7.0 when upgrading.
+
 ## Open questions for the owner
 
 Settled at ratification (A-61): the `release` Environment has no

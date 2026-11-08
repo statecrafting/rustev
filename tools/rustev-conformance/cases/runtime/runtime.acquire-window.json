@@ -5,7 +5,7 @@
     {
       "name": "acquire-window.plan.json",
       "path": "tools/rustev-conformance/fixtures/acquire/acquire-window.plan.json",
-      "sha256": "b0f12e6e7f54b9691f98b5527adfb6e1567f9c22fa6b54f057d04e25a98b68d5"
+      "sha256": "f1a23dcfc35a498fa5e61129bbd137ea24dfd8e222706257c072a3adb186fb74"
     },
     {
       "name": "catalog.source.json",
@@ -24,7 +24,7 @@
       "file": "expiry.record.json",
       "golden": "tools/rustev-conformance/expected/runtime/runtime.acquire-window/expiry.record.json",
       "normalize": [],
-      "sha256": "d16cb4018b17c51ca0a490a047bc0760d4b3f529af679fda95fa6d05515b12e5"
+      "sha256": "ec4d9c0a1ec83929ffbaf1bcf1700e80c57fd4fc74f3534e0e4d8bf96750790f"
     },
     {
       "file": "expiry.result.json",
