@@ -1470,26 +1470,6 @@ fn required_and_rules_first_are_checked_before_binding() {
     }
 }
 
-/// Spec 070 increment 1: a /2 construct is carried by the contract but not
-/// bound by this build; a /2 program of /1 constructs binds.
-#[test]
-fn version_2_constructs_are_not_bound_by_this_build() {
-    let mut d = fixture();
-    fallback(&mut d);
-    let mut v2 = serde_json::to_value(program()).unwrap();
-    v2["schema"] = json!("rustev.extract-rules/2");
-    let plain: ExtractRules = serde_json::from_value(v2.clone()).unwrap();
-    let e = refusal(&d, &[plain]);
-    assert_ne!(e.category, C::InvalidExtraction, "{e:?}");
-    v2["fields"][0]["rules"][0]["when"] = json!({"equals":{"source":"text","value":"x"}});
-    let e = refusal(&d, &[serde_json::from_value(v2).unwrap()]);
-    assert_eq!(e.category, C::InvalidExtraction, "{e:?}");
-    assert!(
-        e.detail.contains("equals is not supported by this build"),
-        "{e:?}"
-    );
-}
-
 /// Spec 070 increment 2a: a /2 program with token and date extractors and a
 /// month table, its plan golden and `PlanId`, and the binding refusals in
 /// phase c with category `invalid_extraction`.

@@ -1184,6 +1184,45 @@ pub(crate) fn tree_at(trees: &BTreeMap<String, Ceil>, r: &str, extra: &[&str]) -
         .unwrap_or_else(|| Ceil::leaf(ValueGrade::Ungraded, false))
 }
 
+/// The static tree of an extract step (spec 070, 3.8.3): one `ungraded`
+/// leaf, or, when a `vocabulary_after` rule can fill some fields, a record
+/// of every declared field whose such fields (or record subfields) have the
+/// ceiling `hint` and the others `ungraded`.
+pub(crate) fn extract_tree(
+    schema: &rustev_contract::extraction::ExtractionSchema,
+    hints: &std::collections::BTreeSet<(String, Option<String>)>,
+) -> Ceil {
+    use rustev_contract::extraction::ExtractionType;
+    let ungraded = || Ceil::leaf(ValueGrade::Ungraded, false);
+    if hints.is_empty() {
+        return ungraded();
+    }
+    let hinted = |field: &str, sub: Option<&str>| {
+        hints.contains(&(field.to_string(), sub.map(str::to_string)))
+    };
+    let mut rec = ungraded();
+    for f in &schema.fields {
+        let node = if hinted(&f.name, None) {
+            Ceil::leaf(ValueGrade::Hint, false)
+        } else if let ExtractionType::Record { fields } = &f.ty {
+            let mut node = ungraded();
+            for sub in fields {
+                let g = if hinted(&f.name, Some(&sub.name)) {
+                    ValueGrade::Hint
+                } else {
+                    ValueGrade::Ungraded
+                };
+                node.fields.insert(sub.name.clone(), Ceil::leaf(g, false));
+            }
+            node.finish()
+        } else {
+            ungraded()
+        };
+        rec.fields.insert(f.name.clone(), node);
+    }
+    rec.finish()
+}
+
 /// The static tree of an exact step: one node, the combination of its
 /// reads, except a join (whose matched values keep their own ceilings) and a
 /// merge (one ceiling per field).

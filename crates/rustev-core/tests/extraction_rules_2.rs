@@ -482,3 +482,374 @@ fn every_extractor_is_byte_identical_over_a_fixed_corpus() {
     ];
     assert_eq!(got, expected);
 }
+
+// Spec 070 increment 2b: exact-value conditions and vocabulary capture.
+
+fn exact_inputs() -> Vec<InputDecl> {
+    let mut v = inputs();
+    v.extend(
+        serde_json::from_value::<Vec<InputDecl>>(json!([
+            {"name":"domain","type":{"text":{"max_bytes":64}},"provenance":["system-of-record"],"freshness":"not_required"},
+            {"name":"flag","type":"bool","provenance":["system-of-record"],"freshness":"not_required"},
+            {"name":"tier","type":{"enum":{"options":["gold","silver"]}},"provenance":["system-of-record"],"freshness":"not_required"},
+            {"name":"guess","type":{"text":{"max_bytes":64}},"provenance":["system-of-record","model-derived"],"freshness":"not_required"},
+            {"name":"rec","type":{"record":{"fields":[{"name":"code","type":"integer"},
+                {"name":"opt","type":{"nullable":{"type":"integer"}}}]}},"provenance":["system-of-record"],"freshness":"not_required"}
+        ]))
+        .unwrap(),
+    );
+    v
+}
+
+/// A program over `body` (projected) and the condition source `cond`,
+/// which need not be projected.
+fn cond_program(cond: &str, when: Json, then: Json) -> ExtractRules {
+    serde_json::from_value(json!({
+        "schema":"rustev.extract-rules/2", "name":"acme", "version":"2",
+        "sources":[{"name":"body","ref":"input:message"},{"name":"c","ref":cond}],
+        "fields":[{"field":"f","rules":[{"name":"r","when":when,"then":then},
+            {"name":"later","when":"always","then":{"literal":"later"}}]}]
+    }))
+    .unwrap()
+}
+
+fn cond_eval(cond: &str, when: Json, exact: Option<Source<'_>>) -> Result<FallbackField, String> {
+    let p = bind_in(
+        &cond_program(cond, when, json!({"literal":"hit"})),
+        &step(vec![("f", text(16))]),
+        &exact_inputs(),
+    )?;
+    let mut s = sources(b"body text");
+    if let Some(e) = exact {
+        s.insert(cond.into(), e);
+    }
+    Ok(p.evaluate(&s, &BTreeMap::new(), 4096).remove(0))
+}
+
+#[test]
+fn exact_value_conditions_compare_each_source_type_exactly() {
+    use rustev_contract::extraction_documents::Scalar;
+    let gold = Scalar::Text("gold".into());
+    let seven = Scalar::Integer(7);
+    let yes = Scalar::Bool(true);
+    let exact = |value| Source::Exact {
+        value,
+        derivation: D::ExactDerived,
+    };
+    let text = |bytes| Source::Readable {
+        bytes,
+        derivation: D::ExactDerived,
+    };
+    for (cond, when, source, hit) in [
+        // Section 5: no folding.
+        (
+            "input:domain",
+            json!({"equals":{"source":"c","value":"example.com"}}),
+            text(b"Example.com".as_slice()),
+            false,
+        ),
+        (
+            "input:domain",
+            json!({"equals":{"source":"c","value":"example.com"}}),
+            text(b"example.com".as_slice()),
+            true,
+        ),
+        (
+            "input:domain",
+            json!({"one_of":{"source":"c","values":["a.test","example.com"]}}),
+            text(b"example.com".as_slice()),
+            true,
+        ),
+        (
+            "input:domain",
+            json!({"equals":{"source":"c","value":"example.com"}}),
+            text(b"example.com ".as_slice()),
+            false,
+        ),
+        (
+            "input:count",
+            json!({"equals":{"source":"c","value":7}}),
+            exact(&seven),
+            true,
+        ),
+        (
+            "input:count",
+            json!({"one_of":{"source":"c","values":[1,2]}}),
+            exact(&seven),
+            false,
+        ),
+        (
+            "input:flag",
+            json!({"equals":{"source":"c","value":true}}),
+            exact(&yes),
+            true,
+        ),
+        (
+            "input:flag",
+            json!({"not":{"equals":{"source":"c","value":false}}}),
+            exact(&yes),
+            true,
+        ),
+        (
+            "input:tier",
+            json!({"equals":{"source":"c","value":"gold"}}),
+            exact(&gold),
+            true,
+        ),
+        (
+            "input:tier",
+            json!({"one_of":{"source":"c","values":["silver"]}}),
+            exact(&gold),
+            false,
+        ),
+        (
+            "input:rec/code",
+            json!({"equals":{"source":"c","value":7}}),
+            exact(&seven),
+            true,
+        ),
+    ] {
+        let f = cond_eval(cond, when.clone(), Some(source)).unwrap();
+        let expected = if hit { "hit" } else { "later" };
+        assert_eq!(f.field.value, s(expected), "{cond} {when}");
+        // A condition source is a read whether or not it held (3.4.4).
+        assert!(
+            f.sources_read.contains(&cond.to_string()),
+            "{cond}: {:?}",
+            f.sources_read
+        );
+        assert_eq!(f.field.evidence.derivation, Some(D::ExactDerived));
+    }
+    // A model-derived read makes the field mixed.
+    let f = cond_eval(
+        "input:count",
+        json!({"equals":{"source":"c","value":7}}),
+        Some(Source::Exact {
+            value: &seven,
+            derivation: D::MixedDerived,
+        }),
+    )
+    .unwrap();
+    assert_eq!(f.field.evidence.derivation, Some(D::MixedDerived));
+}
+
+#[test]
+fn an_unreadable_condition_source_leaves_the_field_source_unavailable() {
+    // Section 5: `not: {equals}` over a missing input; later rules are not
+    // tried and the condition is never true.
+    for exact in [None, Some(Source::Unavailable)] {
+        for when in [
+            json!({"not":{"equals":{"source":"c","value":7}}}),
+            json!({"equals":{"source":"c","value":7}}),
+            json!({"any":[{"one_of":{"source":"c","values":[7]}},"always"]}),
+        ] {
+            absent(
+                &cond_eval("input:count", when, exact).unwrap(),
+                R::SourceUnavailable,
+            );
+        }
+    }
+    // An over-bound text source is not read either.
+    let p = bind_in(
+        &cond_program(
+            "input:domain",
+            json!({"not":{"equals":{"source":"c","value":"x"}}}),
+            json!({"literal":"hit"}),
+        ),
+        &step(vec![("f", text(16))]),
+        &exact_inputs(),
+    )
+    .unwrap();
+    let mut s = sources(b"body");
+    s.insert(
+        "input:domain".into(),
+        Source::Readable {
+            bytes: b"abcdef",
+            derivation: D::ExactDerived,
+        },
+    );
+    absent(
+        &p.evaluate(&s, &BTreeMap::new(), 4).remove(0),
+        R::SourceUnavailable,
+    );
+}
+
+#[test]
+fn exact_value_condition_binding() {
+    let bad = |cond: &str, when: Json| cond_eval(cond, when, None).unwrap_err();
+    // Section 5: a source accepting model-derived.
+    assert!(
+        bad("input:guess", json!({"equals":{"source":"c","value":"x"}})).contains("model-derived")
+    );
+    // Section 5: an integer value over a text source, an enum value not
+    // among its options; a boolean over an integer; a nullable field; a
+    // list or record input; an undeclared input.
+    for (cond, when) in [
+        ("input:domain", json!({"equals":{"source":"c","value":1}})),
+        (
+            "input:tier",
+            json!({"equals":{"source":"c","value":"bronze"}}),
+        ),
+        (
+            "input:tier",
+            json!({"one_of":{"source":"c","values":["gold", 1]}}),
+        ),
+        ("input:count", json!({"equals":{"source":"c","value":true}})),
+        (
+            "input:flag",
+            json!({"equals":{"source":"c","value":"true"}}),
+        ),
+        ("input:rec/opt", json!({"equals":{"source":"c","value":1}})),
+        ("input:rec", json!({"equals":{"source":"c","value":1}})),
+        ("input:nope", json!({"equals":{"source":"c","value":1}})),
+    ] {
+        assert!(
+            bad(cond, when.clone()).contains("does not fit") || cond == "input:nope",
+            "{cond} {when}"
+        );
+    }
+    // Section 5: an `equals` source not in the projection binds (core-only
+    // read); the same source read by a text condition must be projected.
+    assert!(
+        cond_eval(
+            "input:domain",
+            json!({"equals":{"source":"c","value":"x"}}),
+            None
+        )
+        .is_ok()
+    );
+    let e = bad(
+        "input:domain",
+        json!({"all":[{"equals":{"source":"c","value":"x"}},{"contains_any":{"source":"c","terms":["x"]}}]}),
+    );
+    assert!(e.contains("projection"), "{e}");
+}
+
+fn vocab_program(then: Json) -> ExtractRules {
+    program(vec![(
+        "f",
+        vec![rule(then), rule(json!({"literal":"none"}))],
+    )])
+}
+
+fn airports(vocabulary: &str) -> Json {
+    json!({"vocabulary_after":{"source":"body","terms":["From"],"vocabulary":vocabulary}})
+}
+
+#[test]
+fn vocabulary_capture_is_exact_and_knows_an_unavailable_vocabulary() {
+    let vocabularies = BTreeMap::from([(
+        "feature_vocabulary".to_string(),
+        vec!["LHR".to_string(), "JFK".to_string()],
+    )]);
+    let run = |then: Json, text: &str, vocabularies: &BTreeMap<String, Vec<String>>, ty: T| {
+        let mut p = vocab_program(then);
+        p.fields[0].rules.pop();
+        bind_in(&p, &step(vec![("f", ty)]), &inputs())
+            .unwrap()
+            .evaluate(&sources(text.as_bytes()), vocabularies, 4096)
+            .remove(0)
+    };
+    let fv = || airports("feature_vocabulary");
+    assert_eq!(
+        run(fv(), "From: LHR to JFK", &vocabularies, text(8))
+            .field
+            .value,
+        s("LHR")
+    );
+    assert_eq!(
+        run(fv(), "from - JFK", &vocabularies, text(8)).field.value,
+        s("JFK")
+    );
+    let en = T::Enum {
+        vocabulary: "feature_vocabulary".into(),
+    };
+    assert_eq!(
+        run(fv(), "From LHR", &vocabularies, en.clone()).field.value,
+        Some(Value::Enum("LHR".into()))
+    );
+    // Section 5: `LHR` with vocabulary `[lhr]` does not apply; no folding.
+    let lower = BTreeMap::from([("feature_vocabulary".to_string(), vec!["lhr".to_string()])]);
+    absent(&run(fv(), "From: LHR", &lower, text(8)), R::FallbackNoMatch);
+    // A run of letters and digits only, 1 to 64 bytes.
+    absent(
+        &run(fv(), "From: LHR2", &vocabularies, text(8)),
+        R::FallbackNoMatch,
+    );
+    absent(
+        &run(fv(), "From: ", &vocabularies, text(8)),
+        R::FallbackNoMatch,
+    );
+    // Section 5: an unavailable input vocabulary and no other rule applies.
+    absent(
+        &run(fv(), "From: LHR", &BTreeMap::new(), text(8)),
+        R::VocabularyUnavailable,
+    );
+    // Another rule applying keeps its value.
+    let p = vocab_program(fv());
+    let f = bind_in(&p, &step(vec![("f", text(8))]), &inputs())
+        .unwrap()
+        .evaluate(&sources(b"From: LHR"), &BTreeMap::new(), 4096)
+        .remove(0);
+    assert_eq!(f.field.value, s("none"));
+}
+
+#[test]
+fn vocabulary_capture_binding() {
+    let en = |v: &str| T::Enum {
+        vocabulary: v.into(),
+    };
+    // A vocabulary the step does not declare.
+    let e = bind_in(
+        &vocab_program(airports("airports")),
+        &step(vec![("f", text(8))]),
+        &inputs(),
+    )
+    .unwrap_err();
+    assert!(e.contains("undeclared vocabulary"), "{e}");
+    // An enum field whose vocabulary is another one.
+    let mut s2 = step(vec![("f", en("other"))]);
+    s2.vocabularies.insert(
+        "other".into(),
+        s2.vocabularies["feature_vocabulary"].clone(),
+    );
+    let e = bind_in(
+        &vocab_program(airports("feature_vocabulary")),
+        &s2,
+        &inputs(),
+    )
+    .unwrap_err();
+    assert!(e.contains("incompatible"), "{e}");
+    // An integer field.
+    let e = bind_in(
+        &vocab_program(airports("feature_vocabulary")),
+        &step(vec![("f", T::Integer { bounds: [0, 9] })]),
+        &inputs(),
+    )
+    .unwrap_err();
+    assert!(e.contains("incompatible"), "{e}");
+}
+
+#[test]
+fn hint_paths_name_every_field_a_vocabulary_rule_can_fill() {
+    let p = program(vec![
+        ("a", vec![rule(airports("v")), rule(json!({"literal":"x"}))]),
+        (
+            "b",
+            vec![rule(
+                json!({"record":{"x":airports("v"),"y":{"literal":"y"}}}),
+            )],
+        ),
+        ("c", vec![rule(flight())]),
+    ]);
+    let paths: Vec<_> = rustev_core::extraction_fallback::hint_paths(&p)
+        .into_iter()
+        .collect();
+    assert_eq!(
+        paths,
+        [
+            ("a".to_string(), None),
+            ("b".to_string(), Some("x".to_string()))
+        ]
+    );
+}

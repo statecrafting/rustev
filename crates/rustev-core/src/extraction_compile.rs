@@ -100,6 +100,31 @@ pub(crate) fn resolve(def: &Definition, programs: &[ExtractRules]) -> Result<(),
     Ok(())
 }
 
+/// The output schema of extract step `id` and the fields its program's
+/// `vocabulary_after` rules can fill (spec 070, 3.8): none without a
+/// supplied rules program.
+pub(crate) fn hint_paths(
+    def: &Definition,
+    id: &str,
+    programs: &[ExtractRules],
+) -> (
+    rustev_contract::extraction::ExtractionSchema,
+    std::collections::BTreeSet<(String, Option<String>)>,
+) {
+    let Some(StepBody::Extract(e)) = def.steps.iter().find(|s| s.id == id).map(|s| &s.body) else {
+        unreachable!("an extract step's info names an extract step")
+    };
+    let hints = match &e.fallback {
+        Fallback::Rules(r) => programs
+            .iter()
+            .find(|p| format!("{}@{}", p.name, p.version) == r.rules_program)
+            .map(crate::extraction_fallback::hint_paths)
+            .unwrap_or_default(),
+        Fallback::None => Default::default(),
+    };
+    (e.output.clone(), hints)
+}
+
 /// Spec 070, 3.7.1 and 3.5.6: `required` is allowed only with `rules_first`
 /// and holds 1 to 32 distinct names of declared top-level fields.
 fn required(binding: &ExtractionRules, e: &Extract) -> Result<(), String> {

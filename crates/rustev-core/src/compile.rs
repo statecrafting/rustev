@@ -1822,7 +1822,11 @@ fn compile_generation(
         }
         for id in &order {
             let tree = match &infos[id] {
-                StepInfo::Ranking | StepInfo::Generate | StepInfo::Extract => {
+                StepInfo::Extract => {
+                    let (schema, hints) = crate::extraction_compile::hint_paths(def, id, programs);
+                    quality::extract_tree(&schema, &hints)
+                }
+                StepInfo::Ranking | StepInfo::Generate => {
                     quality::Ceil::leaf(rustev_contract::grade::ValueGrade::Ungraded, false)
                 }
                 StepInfo::Accept(a) => quality::tree_at(&trees, &a.field, &[]),
