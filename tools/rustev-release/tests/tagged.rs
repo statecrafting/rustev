@@ -425,6 +425,17 @@ fn unknown_state_a_refused_upload_or_no_visibility_fails() {
     assert!(err.contains("after 3 polls"), "{err}");
 }
 
+/// 3.3.2: npm is waited for at least 25 minutes per package (0.6.0's native
+/// packages took more than 15), crates.io 10 minutes, and one npm package's
+/// full wait leaves `publish-npm`'s 60-minute job at least half its time.
+#[test]
+fn registry_wait_bounds_follow_3_3() {
+    let minutes = |polls: u32| u64::from(polls) * tagged::WAIT_SECONDS / 60;
+    assert_eq!(minutes(tagged::CRATE_POLLS), 10);
+    assert_eq!(minutes(tagged::NPM_POLLS), 25);
+    assert!(minutes(tagged::NPM_POLLS) <= 30);
+}
+
 // The manifest from a run's artifacts (3.2.4) and the release ---------------
 
 /// A run's manifest at 0.3.0 built from its evidence and artifacts, staged

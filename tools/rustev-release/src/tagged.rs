@@ -241,8 +241,18 @@ pub trait Publisher {
     fn now(&mut self) -> String;
 }
 
-/// Polls of the registry after an upload before the run fails.
-pub const POLLS: u32 = 60;
+/// Seconds between two polls of a registry after an upload (3.3).
+pub const WAIT_SECONDS: u64 = 10;
+
+/// Polls of the crates.io index after an upload before the run fails:
+/// 10 minutes at [`WAIT_SECONDS`] (3.3.1).
+pub const CRATE_POLLS: u32 = 60;
+
+/// Polls of the npm registry after an upload before the run fails: 25
+/// minutes at [`WAIT_SECONDS`] (3.3.2). npm listed two of 0.6.0's native
+/// packages more than 15 minutes after accepting them; the bound leaves
+/// `publish-npm`'s 60-minute job room for the other packages.
+pub const NPM_POLLS: u32 = 150;
 
 /// Publish `items` in order (3.3), each idempotent against public state
 /// (3.5.2): present with the run's checksum is skipped, present with another
