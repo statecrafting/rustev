@@ -4,9 +4,10 @@
 //! its document's limit plus one byte, so an oversized file reaches the
 //! parser and is refused by the document's own bound, and one run reads at
 //! most [`MAX_TOTAL_BYTES`] in total. Outputs are created, never
-//! overwritten. With std only, a non-regular file is refused by its
-//! metadata before and after opening; a swap between the check and the
-//! open is a residual race the CLI closes with a non-blocking open.
+//! overwritten. A non-regular file is refused by its metadata before and
+//! after opening, and the open itself does not block (spec 069): a file
+//! swapped for a FIFO or device between the check and the open opens at
+//! once and the check on the handle refuses it, as in the CLI.
 
 use std::cell::Cell;
 use std::fs::File;
@@ -25,6 +26,29 @@ fn fail<T>(path: &str, detail: impl Into<String>) -> Result<T, IoFail> {
 
 fn file_fail<T>(path: &str, detail: impl Into<String>) -> Result<T, ReadFail> {
     fail(path, detail).map_err(ReadFail::File)
+}
+
+/// Open `path` without blocking and refuse a handle that is not a regular
+/// file (spec 069, 3.2.1): the code a file swapped after the metadata
+/// check reaches. `None` when the path does not exist.
+fn open_regular(path: &str) -> Result<Option<File>, IoFail> {
+    let file = match rustev_surface::host::open_input(std::path::Path::new(path), false) {
+        Ok(f) => f,
+        Err(e) if e.kind() == ErrorKind::NotFound => return Ok(None),
+        Err(e) => return fail(path, e.to_string()),
+    };
+    match file.metadata() {
+        Ok(m) if m.is_file() => Ok(Some(file)),
+        Ok(_) => fail(path, "not a regular file"),
+        Err(e) => fail(path, e.to_string()),
+    }
+}
+
+/// Open a store item without blocking or following a final symbolic link
+/// (spec 069, 3.2.2); `None` unless the handle is a regular file.
+fn open_item(path: &std::path::Path) -> Option<File> {
+    let file = rustev_surface::host::open_input(path, true).ok()?;
+    file.metadata().is_ok_and(|m| m.is_file()).then_some(file)
 }
 
 /// The per-command read budget.
@@ -51,24 +75,19 @@ impl Reads {
     /// which depends on read order rather than on
     /// the file (spec 015, 3.3.2).
     pub fn read_classified(&self, path: &str, max: usize) -> Result<Option<Vec<u8>>, ReadFail> {
-        // Check before opening and again on the handle. A swap between
-        // metadata and open remains a filesystem race in this std-only host.
+        // Check before opening and again on the handle; the open does not
+        // block on a FIFO swapped in between (spec 069, 3.2.1).
         match std::fs::metadata(path) {
             Ok(m) if m.is_file() => {}
             Ok(_) => return file_fail(path, "not a regular file"),
             Err(e) if e.kind() == ErrorKind::NotFound => return Ok(None),
             Err(e) => return file_fail(path, e.to_string()),
         }
-        let file = match File::open(path) {
-            Ok(f) => f,
-            Err(e) if e.kind() == ErrorKind::NotFound => return Ok(None),
-            Err(e) => return file_fail(path, e.to_string()),
+        let file = match open_regular(path) {
+            Ok(Some(f)) => f,
+            Ok(None) => return Ok(None),
+            Err(e) => return Err(ReadFail::File(e)),
         };
-        match file.metadata() {
-            Ok(m) if m.is_file() => {}
-            Ok(_) => return file_fail(path, "not a regular file"),
-            Err(e) => return file_fail(path, e.to_string()),
-        }
         let remaining = self.remaining.get();
         // One byte past the budget tells an exhausted budget from a file
         // that fits exactly.
@@ -339,14 +358,11 @@ impl Resolver for Store {
             Err(e) if e.kind() == ErrorKind::NotFound => return Resolution::Missing,
             Err(_) => return Resolution::Inaccessible,
         }
-        // The std-only check and open have the same residual swap race
-        // as document inputs.
-        let Ok(file) = std::fs::File::open(&path) else {
+        // The open neither blocks nor follows a link swapped in after the
+        // check (spec 069, 3.2.2).
+        let Some(file) = open_item(&path) else {
             return Resolution::Inaccessible;
         };
-        if !file.metadata().is_ok_and(|m| m.is_file()) {
-            return Resolution::Inaccessible;
-        }
         // One byte past the maximum reports an item past the budget, which
         // the library classes `oversized`; nothing is truncated.
         let mut bytes = Vec::new();
@@ -369,6 +385,42 @@ pub(crate) fn resolver(store: Option<&str>) -> Box<dyn Resolver> {
 
 #[cfg(test)]
 mod tests {
+
+    /// Spec 069, 3.3.1: a FIFO with no writer reached by the open, as a
+    /// swap after the metadata check would be, is refused at once, for a
+    /// document input and for a store item; a linked store item is refused.
+    #[cfg(unix)]
+    #[test]
+    fn a_fifo_reached_by_the_open_is_refused_without_blocking() {
+        let dir = std::env::temp_dir().join(format!("rustev-node-fifo-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let fifo = dir.join("input.json");
+        let made = std::process::Command::new("mkfifo")
+            .arg(&fifo)
+            .status()
+            .unwrap();
+        assert!(made.success());
+        let (tx, rx) = std::sync::mpsc::channel();
+        let (input, item) = (fifo.to_str().unwrap().to_owned(), fifo.clone());
+        std::thread::spawn(move || {
+            let input = open_regular(&input).map(|f| f.is_some());
+            let item = open_item(&item).is_some();
+            let _ = tx.send((input, item));
+        });
+        let (input, item) = rx
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .expect("the host's open blocked on a FIFO");
+        assert!(input.unwrap_err().detail.contains("not a regular file"));
+        assert!(!item);
+        let target = dir.join("target");
+        std::fs::write(&target, b"x").unwrap();
+        let link = dir.join("link");
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+        assert!(open_item(&link).is_none());
+        assert!(open_item(&target).is_some());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
     use super::*;
 
     #[test]
