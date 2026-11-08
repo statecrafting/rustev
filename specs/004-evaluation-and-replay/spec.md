@@ -521,6 +521,18 @@ sh crates/rustev-eval/mutation/seeds.sh
 
 ## Implementation record
 
+- 2026-11-07: the seed run starts from the job's dependencies. The first
+  worker's target directory is seeded with a copy of the registry and git
+  dependency artifacts the selected packages build, taken from the job's own
+  target directory (restored from the cache and built by the acceptance
+  before it), never a workspace crate's artifact, fingerprint or incremental
+  state; the directory itself is never shared. A seed's verdict now also
+  requires cargo to report the seeded crate compiled in that build (not
+  fresh), so an artifact of the unseeded source can never stand in for the
+  seed: such a seed is broken, not detected. A failed copy falls back to
+  building the dependencies. The run prints the copied size and the work
+  directory's size at the end. Seeds and verdict rules are otherwise
+  unchanged.
 - 2026-11-02: the parallel seed run fits the runner's disk. The warm
   target copy leaves out incremental state (it belongs to the workspace
   crates, which every worker rebuilds), and a copy that fails drops that
