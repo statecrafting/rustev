@@ -23,11 +23,11 @@ use serde_json::Value as Json;
 use crate::CommandResult;
 use crate::errors::fail;
 
-fn usage(detail: impl Into<String>) -> napi::Error {
+pub(crate) fn usage(detail: impl Into<String>) -> napi::Error {
     fail("InvalidDocument", "invalid_document", detail.into())
 }
 
-fn s<'a>(a: &'a Json, k: &str) -> Result<&'a str> {
+pub(crate) fn s<'a>(a: &'a Json, k: &str) -> Result<&'a str> {
     a[k].as_str()
         .ok_or_else(|| usage(format!("{k} must be a string")))
 }
@@ -53,7 +53,7 @@ fn list(a: &Json, k: &str) -> Result<Vec<String>> {
 
 /// A JavaScript number arrives as a float: an integral, non-negative one up
 /// to 2^53 is the integer it names.
-fn ms(a: &Json, k: &str) -> Result<Option<u64>> {
+pub(crate) fn ms(a: &Json, k: &str) -> Result<Option<u64>> {
     match &a[k] {
         Json::Null => Ok(None),
         v => v
@@ -86,7 +86,7 @@ impl Resolver for Store<'_> {
     }
 }
 
-fn replay_config(a: &Json) -> Result<ReplayConfig> {
+pub(crate) fn replay_config(a: &Json) -> Result<ReplayConfig> {
     let scope: Scope =
         serde_json::from_value(a["scope"].clone()).map_err(|e| usage(format!("scope: {e}")))?;
     let now = ms(a, "nowMs")?.ok_or_else(|| usage("nowMs is required"))?;
@@ -101,7 +101,7 @@ fn replay_config(a: &Json) -> Result<ReplayConfig> {
     })
 }
 
-fn rules_hook(
+pub(crate) fn rules_hook(
     _: &str,
     bytes: &[u8],
 ) -> std::result::Result<rustev_contract::descriptor::BackendDescriptor, String> {
