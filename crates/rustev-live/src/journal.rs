@@ -42,7 +42,7 @@
 use std::collections::BTreeMap;
 use std::fmt;
 use std::fs::{File, OpenOptions};
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -148,6 +148,226 @@ struct Header {
     schema: String,
     budget: BudgetKind,
     cap: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    journal_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    created_at_ms: Option<i64>,
+}
+
+/// The persistent identity and this run's relationship to the journal.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct JournalIdentity {
+    pub id: Option<String>,
+    pub created_at_ms: Option<i64>,
+    pub created: JournalCreated,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum JournalCreated {
+    ThisRun,
+    Earlier,
+    Legacy,
+}
+
+fn digest(bytes: &[u8]) -> rustev_contract::ids::ContentDigest {
+    rustev_contract::ids::ContentDigest::parse(&rustev_contract::canonical::tagged_digest(
+        JOURNAL_SCHEMA,
+        bytes,
+    ))
+    .expect("computed digest")
+}
+
+impl Header {
+    fn new(kind: BudgetKind, created_at_ms: i64, run_id: &str) -> Self {
+        let record = serde_json::json!({"created_at_ms": created_at_ms, "run_id": run_id});
+        let bytes = rustev_contract::canonical::canonical_bytes(&record).expect("identity record");
+        Self {
+            schema: JOURNAL_SCHEMA.into(),
+            budget: kind,
+            cap: kind.cap(),
+            journal_id: Some(rustev_contract::canonical::tagged_digest(
+                "rustev.spend-journal-id/1",
+                &bytes,
+            )),
+            created_at_ms: Some(created_at_ms),
+        }
+    }
+
+    fn bytes(&self) -> Vec<u8> {
+        let mut bytes = serde_json::to_vec(self).expect("header serializes");
+        bytes.push(b'\n');
+        bytes
+    }
+
+    fn parse(bytes: &[u8], kind: BudgetKind) -> Result<Self, JournalError> {
+        let header: Self = serde_json::from_slice(bytes).map_err(|e| JournalError::Corrupt {
+            line: 1,
+            detail: format!("header: {e}"),
+        })?;
+        if !bytes.ends_with(b"\n")
+            || header.journal_id.is_some() != header.created_at_ms.is_some()
+            || header
+                .journal_id
+                .as_ref()
+                .is_some_and(|id| rustev_contract::ids::ContentDigest::parse(id).is_err())
+        {
+            return Err(JournalError::Mismatch(
+                "invalid journal identity or incomplete header".into(),
+            ));
+        }
+        if header.schema != JOURNAL_SCHEMA
+            || header.budget != kind
+            || (header.cap != kind.cap()
+                && !(kind == BudgetKind::Testing && header.cap == SUPERSEDED_TESTING_CAP_UNITS))
+        {
+            return Err(JournalError::Mismatch(
+                "journal schema, budget or cap differs".into(),
+            ));
+        }
+        Ok(header)
+    }
+}
+
+fn read_header(path: &Path) -> Result<Option<Vec<u8>>, JournalError> {
+    let file = match File::open(path) {
+        Ok(file) => file,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(io(e)),
+    };
+    let mut bytes = Vec::new();
+    BufReader::new(file)
+        .read_until(b'\n', &mut bytes)
+        .map_err(io)?;
+    Ok(Some(bytes))
+}
+
+// Change only a plainly spelled top-level cap token in a validated header.
+// Skip entire strings, including escaped quotes, so their contents cannot
+// masquerade as member names. Escaped key spellings use the typed fallback.
+fn with_cap(bytes: &[u8], cap: u64) -> Vec<u8> {
+    let mut depth = 0;
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'{' | b'[' => depth += 1,
+            b'}' | b']' => depth -= 1,
+            b'"' => {
+                let start = i;
+                i += 1;
+                while i < bytes.len() && bytes[i] != b'"' {
+                    if bytes[i] == b'\\' {
+                        i += 1;
+                    }
+                    i += 1;
+                }
+                i = (i + 1).min(bytes.len());
+                if depth == 1 && &bytes[start..i] == br#""cap""# {
+                    let at = |n: usize| bytes.get(n).copied().unwrap_or(b'}');
+                    let mut next = i;
+                    while at(next).is_ascii_whitespace() {
+                        next += 1;
+                    }
+                    if at(next) == b':' {
+                        next += 1;
+                        while at(next).is_ascii_whitespace() {
+                            next += 1;
+                        }
+                        let value_start = next;
+                        while at(next).is_ascii_digit() {
+                            next += 1;
+                        }
+                        let mut result = bytes[..value_start].to_vec();
+                        result.extend_from_slice(cap.to_string().as_bytes());
+                        result.extend_from_slice(&bytes[next..]);
+                        return result;
+                    }
+                }
+                continue;
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    let mut header: Header = serde_json::from_slice(bytes).expect("validated header");
+    header.cap = cap;
+    header.bytes()
+}
+
+/// Read-only journal preparation. Opening checks these bytes again under the lock.
+#[derive(Clone)]
+pub struct JournalOpening {
+    path: PathBuf,
+    kind: BudgetKind,
+    clock: Arc<dyn SpendClock>,
+    original: Option<Vec<u8>>,
+    header: Header,
+}
+
+impl JournalOpening {
+    pub fn prepare(
+        path: impl AsRef<Path>,
+        kind: BudgetKind,
+        clock: Arc<dyn SpendClock>,
+        run_id: &str,
+        require_existing: bool,
+    ) -> Result<Self, JournalError> {
+        let path = path.as_ref().to_path_buf();
+        let original = read_header(&path)?;
+        if require_existing && original.is_none() {
+            return Err(JournalError::Missing);
+        }
+        let header = match &original {
+            Some(bytes) if !bytes.is_empty() => Header::parse(bytes, kind)?,
+            _ => Header::new(kind, clock.now_ms(), run_id),
+        };
+        Ok(Self {
+            path,
+            kind,
+            clock,
+            original,
+            header,
+        })
+    }
+
+    fn current_header_bytes(&self) -> Vec<u8> {
+        match &self.original {
+            Some(bytes) if bytes.is_empty() => self.header.bytes(),
+            Some(bytes) if self.header.cap != self.kind.cap() => with_cap(bytes, self.kind.cap()),
+            Some(bytes) => bytes.clone(),
+            None => self.header.bytes(),
+        }
+    }
+
+    pub fn header_digest(&self) -> rustev_contract::ids::ContentDigest {
+        digest(&self.current_header_bytes())
+    }
+
+    pub fn superseded_header_digest(&self) -> rustev_contract::ids::ContentDigest {
+        digest(&with_cap(
+            &self.current_header_bytes(),
+            SUPERSEDED_TESTING_CAP_UNITS,
+        ))
+    }
+
+    pub fn identity(&self) -> JournalIdentity {
+        JournalIdentity {
+            id: self.header.journal_id.clone(),
+            created_at_ms: self.header.created_at_ms,
+            created: if self.header.journal_id.is_none() {
+                JournalCreated::Legacy
+            } else if self.original.as_ref().is_none_or(Vec::is_empty) {
+                JournalCreated::ThisRun
+            } else {
+                JournalCreated::Earlier
+            },
+        }
+    }
+
+    pub fn open(&self) -> Result<SpendJournal, JournalError> {
+        SpendJournal::open_prepared(self)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -239,6 +459,8 @@ impl SpendSummary {
 /// Why a journal could not be opened.
 #[derive(Debug)]
 pub enum JournalError {
+    Missing,
+    Changed,
     Io(String),
     /// Another writer holds `<journal>.lock`.
     Locked(PathBuf),
@@ -254,6 +476,10 @@ pub enum JournalError {
 impl fmt::Display for JournalError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            JournalError::Missing => f.write_str("journal-missing"),
+            JournalError::Changed => {
+                f.write_str("checkpoint-mismatch: journal changed after preparation")
+            }
             JournalError::Io(e) => write!(f, "spend journal: {e}"),
             JournalError::Locked(p) => write!(
                 f,
@@ -323,6 +549,8 @@ impl Drop for Lock {
 }
 
 struct Inner {
+    identity: JournalIdentity,
+    header_digest: rustev_contract::ids::ContentDigest,
     path: PathBuf,
     kind: BudgetKind,
     clock: Arc<dyn SpendClock>,
@@ -381,13 +609,31 @@ impl SpendJournal {
     /// it does not exist. Migrates a testing header that names the
     /// superseded cap (see the module documentation). Refuses a journal of
     /// another budget, cap or schema, a journal another writer holds, and
-    /// complete lines that do not parse.
+    /// complete lines that do not parse. Standalone callers use the creation
+    /// name `standalone`; live runs use `PreparedRun::open_journal` to bind
+    /// their own run id before opening.
     pub fn open(
         path: impl AsRef<Path>,
         kind: BudgetKind,
         clock: Arc<dyn SpendClock>,
     ) -> Result<Self, JournalError> {
-        let path = path.as_ref().to_path_buf();
+        Self::open_for_run(path, kind, clock, "standalone")
+    }
+
+    /// Open a journal with the creating run's identity and injected clock.
+    pub fn open_for_run(
+        path: impl AsRef<Path>,
+        kind: BudgetKind,
+        clock: Arc<dyn SpendClock>,
+        run_id: &str,
+    ) -> Result<Self, JournalError> {
+        JournalOpening::prepare(path, kind, clock, run_id, false)?.open()
+    }
+
+    fn open_prepared(opening: &JournalOpening) -> Result<Self, JournalError> {
+        let path = opening.path.clone();
+        let kind = opening.kind;
+        let clock = opening.clock.clone();
         let lp = lock_path(&path);
         let mut lf = match OpenOptions::new().write(true).create_new(true).open(&lp) {
             Ok(f) => f,
@@ -400,21 +646,25 @@ impl SpendJournal {
         let _ = writeln!(lf, "{}", std::process::id());
         let _ = lf.sync_all();
 
-        let created = !path.exists();
+        if read_header(&path)? != opening.original {
+            return Err(JournalError::Changed);
+        }
+        let created = opening.original.is_none();
         let mut file = OpenOptions::new()
             .read(true)
             .append(true)
-            .create(true)
+            .create_new(created)
             .open(&path)
             .map_err(io)?;
         let header = Header {
-            schema: JOURNAL_SCHEMA.to_string(),
-            budget: kind,
             cap: kind.cap(),
+            ..opening.header.clone()
         };
         let mut text = String::new();
         file.read_to_string(&mut text).map_err(io)?;
-        if created || text.is_empty() {
+        // An empty file can remain after interruption before the first header
+        // write. It has no established identity or spend to preserve.
+        if text.is_empty() {
             let line = serde_json::to_vec(&header).map_err(|e| JournalError::Io(e.to_string()))?;
             append(&mut file, &line).map_err(io)?;
             file.sync_all().map_err(io)?;
@@ -434,25 +684,8 @@ impl SpendJournal {
         }
         file.seek(SeekFrom::End(0)).map_err(io)?;
         let first = text.lines().next().unwrap_or_default();
-        let found: Header = serde_json::from_str(first).map_err(|e| JournalError::Corrupt {
-            line: 1,
-            detail: format!("header: {e}"),
-        })?;
-        let superseded = Header {
-            cap: SUPERSEDED_TESTING_CAP_UNITS,
-            ..header.clone()
-        };
-        let migrate = kind == BudgetKind::Testing && found == superseded;
-        if !migrate && found != header {
-            return Err(JournalError::Mismatch(format!(
-                "the journal holds {:?} with cap {} under {}, not {:?} with cap {}",
-                found.budget,
-                found.cap,
-                found.schema,
-                kind,
-                kind.cap()
-            )));
-        }
+        let found = Header::parse(format!("{first}\n").as_bytes(), kind)?;
+        let migrate = found.cap != kind.cap();
         let mut res = BTreeMap::new();
         let mut next_seq = 1;
         for (i, l) in text.lines().enumerate().skip(1) {
@@ -507,9 +740,7 @@ impl SpendJournal {
         // so a journal refused for a later line is left as it was.
         if migrate {
             let first_len = text.find('\n').map(|i| i + 1).unwrap_or(text.len());
-            let mut bytes =
-                serde_json::to_vec(&header).map_err(|e| JournalError::Io(e.to_string()))?;
-            bytes.push(b'\n');
+            let mut bytes = opening.current_header_bytes();
             bytes.extend_from_slice(&text.as_bytes()[first_len..]);
             // Only the old file's handle is closed here: the writer lock is
             // `<journal>.lock`, held by `lock` until this journal drops, so
@@ -526,6 +757,8 @@ impl SpendJournal {
         }
         Ok(SpendJournal {
             inner: Arc::new(Inner {
+                identity: opening.identity(),
+                header_digest: opening.header_digest(),
                 path,
                 kind,
                 clock,
@@ -542,6 +775,14 @@ impl SpendJournal {
 
     fn lock(&self) -> std::sync::MutexGuard<'_, State> {
         self.inner.state.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    pub fn identity(&self) -> &JournalIdentity {
+        &self.inner.identity
+    }
+
+    pub fn header_digest(&self) -> &rustev_contract::ids::ContentDigest {
+        &self.inner.header_digest
     }
 
     pub fn budget(&self) -> BudgetKind {
@@ -862,6 +1103,8 @@ fn header_digest(cap: u64) -> rustev_contract::ids::ContentDigest {
         schema: JOURNAL_SCHEMA.into(),
         budget: BudgetKind::Testing,
         cap,
+        journal_id: None,
+        created_at_ms: None,
     };
     let mut bytes = serde_json::to_vec(&header).expect("header serializes");
     bytes.push(b'\n');
@@ -955,6 +1198,30 @@ fn totals(res: &BTreeMap<u64, Res>, kind: BudgetKind, period: &str) -> SpendSumm
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cap_scanner_preserves_other_bytes_and_falls_back_for_escaped_keys() {
+        for input in [
+            "{ \"budget\": \"testing\", \"cap\" : 5000000000, \"schema\": \"rustev-jev.spend-journal/1\" }\n",
+            r#"{"schema":"text \"cap\":5000000000 and \\","budget":"testing","cap":5000000000}"#,
+            r#"{"schema":"rustev-jev.spend-journal/1","journal_id":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","created_at_ms":42,"cap":5000000000,"budget":"testing"}"#,
+        ] {
+            // These fixtures also exercise strings containing escaped quotes
+            // and backslashes without treating their contents as keys.
+            let _: Header = serde_json::from_str(input).unwrap();
+            let at = input.rfind("5000000000").unwrap();
+            let mut expected = input.to_owned();
+            expected.replace_range(at..at + 10, "10000000000");
+            assert_eq!(
+                with_cap(input.as_bytes(), 10_000_000_000),
+                expected.as_bytes()
+            );
+        }
+        let escaped = br#"{ "schema":"rustev-jev.spend-journal/1", "budget":"testing", "c\u0061p":5000000000 }"#;
+        let mut header: Header = serde_json::from_slice(escaped).unwrap();
+        header.cap = 10_000_000_000;
+        assert_eq!(with_cap(escaped, header.cap), header.bytes());
+    }
 
     #[test]
     fn failed_settlement_and_release_keep_the_reservation() {

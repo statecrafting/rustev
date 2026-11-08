@@ -209,7 +209,7 @@
       "file": "journal.jsonl",
       "golden": "tools/rustev-conformance/expected/live/live.run-cap/journal.jsonl",
       "normalize": [],
-      "sha256": "ad9baf853a1ee0220ccc568de77676a93f3e19bfa637c2f3ba8eeacb64bb6dce"
+      "sha256": "a1065d69a8e137a0887638840afc4e73acd08dcdd4f3288a9b7956fddaac586a"
     },
     {
       "file": "out/checkpoint.json",
