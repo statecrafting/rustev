@@ -888,6 +888,95 @@ async function nativeAdapter() {
     }
   }
 
+  // Live paths stay relative in both runners: checkpoint input labels are evidence.
+  // Cases run sequentially, and cwd is restored after the engine has shut down.
+  async function liveCase(c, files) {
+    const { mkdtempSync, mkdirSync, writeFileSync, readdirSync, rmSync, existsSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const dir = mkdtempSync(join(tmpdir(), 'rustev-conformance-native-live-'));
+    const cwd = process.cwd();
+    const contained = name => {
+      if (typeof name !== 'string' || name.startsWith('/') || name.split(/[\\/]/).some(p => p === '..' || p === '')) throw new Error(`invalid live path: ${name}`);
+      return join(dir, name);
+    };
+    let engine;
+    const ignored = [];
+    try {
+      for (const [name, bytes] of files) {
+        const path = contained(name);
+        mkdirSync(dirname(path), { recursive: true });
+        writeFileSync(path, bytes);
+      }
+      const gates = c.live.backends.map(() => new Map());
+      engine = await rustev.Engine.create({
+        clock: 'manual',
+        runtime: { maxInFlight: 1, maxQueued: 0, maxParallelRequests: 1, sinkTimeoutMs: 1000 },
+        sink: { queueCapacity: 64, acceptsRun3: true, deliver: async (_r, { decisionId }) => `ack:${decisionId}` },
+        backends: c.live.backends.map((b, i) => ({
+          descriptor: files.get(b.descriptor), costModel: b.cost_model, costBound: b.cost_bound,
+          maxConcurrency: b.max_concurrency, queueCapacity: 64,
+          infer: call => scripted(b, gates[i], call, ignored),
+        })),
+      });
+      process.chdir(dir);
+      const out = new Map();
+      const statuses = [];
+      const collect = (name, prefix) => {
+        for (const entry of readdirSync(contained(name), { withFileTypes: true })) {
+          const path = `${name}/${entry.name}`;
+          if (entry.isDirectory()) collect(path, prefix);
+          else out.set(`${prefix}/${path}`, readFileSync(contained(path)));
+        }
+      };
+      for (const [index, run] of c.live.runs.entries()) {
+        const prefix = `run-${index + 1}`;
+        const controller = new AbortController();
+        let finished = false;
+        const pending = engine.liveRun({ ...run.options, signal: controller.signal });
+        // Observe rejection immediately while the drive waits for gates.
+        const result = pending.then(value => ({ value }), error => ({ error })).finally(() => { finished = true; });
+        try {
+          for (const step of run.drive) {
+            if (step.wait_gated) {
+              const { backend, count } = step.wait_gated;
+              const end = Date.now() + 30000;
+              while (gates[backend].size !== count) {
+                if (finished || Date.now() >= end) throw new Error('live drive ended before gate');
+                await new Promise(setImmediate);
+              }
+            } else if (step.release_all) {
+              const gate = gates[step.release_all.backend];
+              if (!gate.size) throw new Error('release found no gates');
+              const released = [...gate.values()];
+              gate.clear();
+              for (const g of released) g.release();
+            } else if (step === 'abort') controller.abort();
+            else throw new Error(`unknown live step: ${JSON.stringify(step)}`);
+          }
+          const r = await result;
+          if (r.error) throw r.error;
+          statuses.push({ code: r.value.code, status: r.value.status });
+          // A refusal before any output names its reason instead of a missing file.
+          if (!existsSync(contained(run.options.out)) || !existsSync(contained(run.options.journal))) {
+            throw new Error(`${prefix} ended ${r.value.status} (${r.value.code}): ${Buffer.from(r.value.out).toString('utf8').trim()}`);
+          }
+          collect(run.options.out, prefix);
+          out.set(`${prefix}/${run.options.journal}`, readFileSync(contained(run.options.journal)));
+        } finally {
+          controller.abort();
+          await result;
+        }
+      }
+      out.set('status.json', Buffer.from(JSON.stringify(statuses)));
+      await compareOutputs(c, out);
+    } finally {
+      if (engine) await engine.shutdown();
+      for (const settle of ignored) settle();
+      process.chdir(cwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
   /** A scripted host backend from a runtime case's data (3.12.4).
    * `ignored`: this case's settlements of attempts whose backend ignored
    * cancellation, run when the case ends. */
@@ -993,6 +1082,7 @@ async function nativeAdapter() {
     const { files, derived } = inputsOf(c);
     if (c.local_embed) return localEmbedCase(c, files);
     if (c.runtime) return runtimeCase(c, files);
+    if (c.live) return liveCase(c, files);
     const a = flags(c.argv);
     if (a.command === 'run') return runCase(c, a, files, derived);
     return pureCase(c, a, files);

@@ -2,7 +2,7 @@
 id: "067-node-live-repeat-runs"
 title: "Node binding: live repeat runs over host backends (amends 006, 027, 043 and 063)"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-11-06"
 summary: >
   An amendment of approved specs 063 (3.9), 027 (3.3, 3.7) and 043
@@ -46,6 +46,11 @@ extends:
   - { spec: "027-node-and-wasm-bindings", unit: { kind: directory, path: "tools/rustev-conformance/" }, nature: additive }
   # Archive entries for moved source files.
   - { spec: "031-public-api-and-release-family", unit: { kind: directory, path: "tools/rustev-release/" }, nature: additive }
+  # The Bedrock live example constructs `RunOptions`, which 3.4.6 changes (#550).
+  - { spec: "030-bedrock-backend", unit: { kind: directory, path: "integrations/rustev-bedrock/" }, nature: additive }
+  # 067 joins VERIFIED_SPECS and its own acceptance group (closure).
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "003-runtime-execution-and-evidence"
@@ -85,9 +90,10 @@ obligations:
 # 067: Node binding: live repeat runs over host backends (amends 006, 027, 043 and 063)
 
 Approved: ratified by the owner on 2026-11-06 (A-86) for release 0.6.0;
-the implementation is pending. The approved texts of 006, 027, 043 and 063
-are not edited; this spec records what changes in them (3.10). It
-authorizes no live run, provider call or spend, and raises no cap.
+implemented in full for 0.6.0 (see the implementation record). The
+approved texts of 006, 027, 043 and 063 are not edited; this spec
+records what changes in them (3.10). It authorizes no live run, provider
+call or spend, and raises no cap.
 
 ## 1. Purpose
 
@@ -506,7 +512,30 @@ raising any cap; any live or paid provider call in CI; quality claims.
 
 ## Verification
 
-Pending with implementation.
+Run by `make verify` (067 is in `VERIFIED_SPECS`, alone in CI's
+`node-live` acceptance group). Every command is deterministic, with
+scripted backends, a manual clock and temporary `testing` journals; none
+contacts a provider (R-1). The JavaScript side (`node --test` over
+`integrations/rustev-node/test/live.test.mjs` and the native conformance
+runner over the live cases) runs in `make bindings` and the CI `bindings`
+job, as for 063.
+
+```verify:cli
+# 3.2 to 3.7 and I-1 to I-3 in the binding: usage rules, cost checks, the
+# rule authorizer, the journal by path, the filesystem host, outcomes and
+# byte equality with rustev_live::run from Rust.
+cargo test -p rustev-node --locked
+# 3.8.2: the live conformance cases through the Rust runner, and every
+# other case unchanged.
+cargo test -p rustev-conformance --locked
+# 3.2.3: the moved input resolution.
+cargo test -p rustev-surface --locked --all-features
+# 3.4.5 and 3.4.6: journal identity, the run report's journal member and
+# the existing-journal check, in the library and in `rustev eval live`.
+cargo test -p rustev-live --locked
+cargo test -p rustev-cli --locked --test eval_live
+cargo clippy -p rustev-node -p rustev-conformance -p rustev-live --all-targets --locked -- -D warnings
+```
 
 ## Implementation record
 
@@ -563,6 +592,144 @@ race the binding documents. Unit tests cover the read bound and budget,
 listing, link classification and the store's reference, size and link
 rules. Nothing calls it until part 2 adds `engine.liveRun`. No acceptance
 item is claimed.
+
+Increment 1a, journal half (#551): `rustev-live`'s journal gains its identity (3.4.5). A journal created by this version writes `journal_id` (`tagged_digest("rustev.spend-journal-id/1", canonical bytes of { created_at_ms, run_id })`) and `created_at_ms` in its header; a journal without them is accepted, reported `legacy` and never stamped; the A-75 cap migration changes only the cap token, keeping every other header byte. `JournalOpening` reads and checks the header before anything is created and refuses, under the lock, a journal that changed in between; `SpendJournal::open_for_run` names the creating run, and `SpendJournal::open` creates journals under the run id `standalone`. The run binding (checkpoint digest, report member, CLI switch and stdout) is the other half of increment 1a (#550). Tests cover distinct ids for `(1, "23.x")` and `(12, "3.x")` against an independent digest, reopen, migration, legacy and empty-file headers; the crash suite's release clock counts the journal creation read.
+
+Increment 1a, run binding (#550): `prepare` reads the journal header through `JournalOpening` before any output exists, binds the digest of the actual header in the checkpoint (043 3.10.1), refuses a missing journal with `journal-missing` when `require_existing_journal` is set (3.4.6), and refuses a resume whose journal is missing or replaced (`checkpoint-mismatch`); the superseded-cap exception (043 3.10.2) is computed from the actual header. `PreparedRun::open_journal` opens exactly the checked journal, and `execute` refuses a journal whose header digest is not the bound one. `RunOptions` gains the journal path, the switch and the journal clock (a breaking library change, allowed at 0.6.0); `rustev.live-run/1` and `RunOutcome` gain `journal { id, created_at_ms, created }`; the CLI reads creation time from `--now-ms`, gains `--require-existing-journal` and prints `new_journal` when the run created the journal. The one moved golden is `eval live`'s inline stdout expectation. Tests cover first, second, fresh and legacy runs, replaced-journal resume, a journal changed between prepare and open, and the switch on missing and existing journals.
+
+Increment 2b, part 2 (the entry point): `engine.liveRun(options)` in
+`rustev-node` (`src/live_run.rs`, `index.js`, hand-written `index.d.ts`
+declarations `LiveRunOptions`, `LiveRunResult`, `LiveRunStatus`). Usage
+rules (3.2.2 and the CLI's other `eval live` rules) throw
+`InvalidDocument` before any input is read; an `inputs` map (the memory
+host) is refused `durable-paths-required` (3.4.2). Inputs are resolved
+through `rustev_surface::live` on the binding's filesystem host, in the
+CLI's check order; increment 1's `check_backends` runs the cost checks of
+3.3 against the engine's registered backends; `prepare` refuses before the
+journal opens; `PreparedRun::open_journal` opens the journal under 3.4.1
+with `requireExistingJournal` (3.4.6); execution runs on the engine's
+runtime, registered backends, sink and clock with the rule authorizer
+(3.5), on the blocking pool. Outcomes are values `{ code, out, status,
+journal }` (3.2.4, 3.4.5), `out` the CLI's stdout line including
+`new_journal`. `signal` (`AbortSignal`) and `runDeadlineMs` map to the
+run's cancel signal (3.6.1 to 3.6.3); an already-aborted signal throws
+`CancelledBeforeAdmission` with nothing written. Candidate acquisition
+sources are refused `live-config` (the engine's runtime has no retained
+source). Increment 1b's `open_journal` helper, superseded by
+`PreparedRun::open_journal`, is removed. Tests: Rust byte equality with
+`rustev_live::run` called directly (every file under `out`, status, exit
+code and stdout) for `evaluated_live`, `probed`, `probe_failed`,
+`spend_capped` and `interrupted` (I-3); `node --test` cases with scripted
+host backends and a `ManualClock`: full run and second run (`this_run`,
+`earlier`, same id, spend before, `new_journal`), probe-only and failing
+probe (no dataset case sent, thrown error kept as liability), `unknown`
+cost refused with no journal created, reservation present before the host
+observes the call, locked journal, journal cap, `requireExistingJournal`
+on a missing path, abort and run deadline with a never-settling attempt
+(liability kept, late settlement discarded), already-aborted signal,
+memory host, every usage rule, configuration refusals before the journal
+exists, legacy and non-`testing` headers.
+
+**Increment 3, part 1 (2026-11-07, #557): the live conformance cases and
+their Rust runner.** `tools/rustev-conformance` depends on `rustev-live`
+(#549, alone because a manifest is a policy file) and gains a live case
+kind (`live` beside `runtime` in the manifest, `cases/live/`, shared
+inputs under `fixtures/live/`, expected bytes under `expected/live/`),
+generated and blessed by `tests/live.rs` as the runtime cases are. A case
+holds the files `rustev eval live` and `liveRun` read, `liveRun`'s
+camel-case options, the runtime cases' scripted backend scripts and drive
+steps (`wait_gated`, `release_all`, `abort`), and sequential runs on one
+journal and output directory. The Rust runner (`src/live.rs`) resolves the
+inputs through `rustev_surface::live` over a real filesystem, prepares,
+opens a temporary `testing` journal and executes on a runtime with the
+Rust scripted backends, a manual clock and the configuration's rule
+authorizer; each case pins every file under `out`, the journal and each
+run's status and code, without normalization. The six cases of 3.8.2: a
+full run, probe-only, a probe failure, `spend_capped` by the run cap and
+by the journal cap, and a resume after a mid-run abort, each naming the
+`crates/rustev-live/tests/run.rs` test it mirrors and checked against what
+that test asserts. Their surface is `rust-api` in this part; part 2 adds
+the native runner over `engine.liveRun` (after increment 2b) and the
+`native` surface. No acceptance
+item is claimed yet: 3.8.2 needs both runners.
+
+**Increment 3, part A (2026-11-07, #563): resume, rerun and shutdown
+during a run.** `resume: true` with a checkpoint whose `LiveConfigId`
+differs is `code` 4, `checkpoint-mismatch`, before the journal is opened;
+the rest of 043 3.10.2 (completed items never re-sent, run spend read from
+the journal, a replaced journal refused by its `journal_id`) and 3.10.4's
+rerun (`<id>/rerun-<k>`, a new reservation, the old one kept as liability)
+are `rustev-live`'s, passed through unchanged (3.7.2, 3.7.3).
+`engine.shutdown({ drainMs })` raises cancellation for every running
+`liveRun` at once, waits up to `drainMs` for in-flight attempts and the
+checkpoint, and counts unsettled host backend calls in `abandonedPending`;
+the run resolves `interrupted` (16) with its checkpoint written and the
+journal lock released (3.6.4). `node --test` covers resume over completed
+and interrupted items, `rerunInterrupted`, another configuration, a
+replaced journal, a reached cap, and shutdown with `drainMs` 0 and 10,000
+followed by a resume on a new engine.
+
+**Increment 3, part 2, and increment 4: closure (2026-11-08, #563).** The
+live conformance cases gain the native runner: `js/run.mjs` writes each
+case's inputs to a temporary directory, creates a `ManualClock` engine
+with the cases' scripted host backends and calls `engine.liveRun` with the
+case's options, driving the abort with an `AbortSignal`; both runners
+snapshot every run's documents and journal under `run-<n>/`, so the
+interrupted run of `live.resume` is compared byte for byte too, not only
+its status, and the six cases run on `rust-api` and `native` with
+identical bytes (3.8.2, I-3). The host-seam cases left (3.8.3, 3.3): a
+`SeamFailure` charge settles its ticket without liability; a `cost_unit:
+none` binding reserves zero and is recorded `declared_no_spend`; an
+`estimated` bound is reserved in full before the host observes the call;
+a retry reserves anew; a full seam queue sends nothing and spends nothing;
+a run over a replay bundle with an admission record. 067 joins
+`VERIFIED_SPECS` and runs alone in the `node-live` acceptance group; the
+`extends` edges on `Makefile` and `scripts/acceptance/` (001) and on
+`integrations/rustev-bedrock/` (030, whose live example constructs the
+changed `RunOptions`) are added. Every Acceptance item and every row of
+section 5 has a test (audited against the merged code).
+
+Deviation, recorded rather than hidden: 3.3.5 says a full seam queue
+"releases its ticket". The host seam reports the refused attempt as
+overloaded with an observed charge of zero (027 3.6.2), and 043 3.6.6
+settles a ticket with the charge its attempt ends with, so the journal
+records a zero settlement instead of a release. Nothing is sent, nothing
+is spent and no liability remains, the same totals as a release; changing
+the line kind would need a `rustev-runtime` change outside this spec's
+territory. The test asserts the zero settlement.
+
+The native conformance run on the win32 package found that `rustev-live`'s
+atomic document write failed after its rename on Windows, because the
+standard library cannot open a directory there to sync its entry; every
+live run on Windows ended `code` 3 before its journal existed. The
+directory sync now runs where a directory can be opened (Unix) and the
+rename is the last step on Windows, which keeps 043 3.10.1's rule
+(temporary file, `fsync`, rename). The same run showed the binding's
+filesystem host joining input labels with the platform separator, so the
+checkpoint and `live-run.json` recorded `candidates\a\...` on Windows;
+the binding now joins labels with `/`, which every platform accepts, and
+writes the same bytes on every native platform (I-3). The CLI's own host
+keeps the platform separator; its Windows evidence is unchanged.
+
+Two differences from `rustev eval live`, both within this spec's scope:
+candidate acquisition sources are refused `live-config`, because the
+engine's runtime holds no retained acquisition source to serve them, and
+section 4 leaves live acquisitions through a host source beyond 063's
+source seam and 043 3.4 out of scope, so the refusal is explicit, never a
+silent run without them; and the binding's filesystem host opens inputs
+with the standard library's blocking open, so a regular file swapped for
+a FIFO or device between its metadata check and the open can block the
+call (the check after opening still refuses it, so nothing wrong is
+read), where the CLI's non-blocking open closes that window. Neither 063
+nor this spec requires the non-blocking open; the follow-up is #566.
+
+Two readings of the text, recorded: a refusal's `status` is the CLI's
+refusal status (`invalid_input` for `code` 4, `io_error` for `code` 3),
+beside 3.2.4's five run statuses, and its `journal` is `null` because no
+journal was opened; and an already-aborted `signal` (3.6.1) ends the call
+before the journal is opened by rejecting with the existing
+`CancelledBeforeAdmission` class, as a decision cancelled before admission
+does, so nothing is written and no new error class is added (3.9.1).
 
 Planned increments, each a separately reviewed pull request from `main`
 of about 1,000 lines (the AI review times out near 1,000 to 1,800

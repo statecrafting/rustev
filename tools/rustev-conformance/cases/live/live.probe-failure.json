@@ -191,44 +191,44 @@
   "mirrors": "crates/rustev-live/tests/run.rs::authorization_refusal_continues_and_probe_statuses_send_no_cases",
   "outputs": [
     {
-      "file": "journal.jsonl",
-      "golden": "tools/rustev-conformance/expected/live/live.probe-failure/journal.jsonl",
+      "file": "run-1/journal.jsonl",
+      "golden": "tools/rustev-conformance/expected/live/live.probe-failure/run-1/journal.jsonl",
       "normalize": [],
       "sha256": "dd253e3b5e1cc657ad0efcc1d76d827f359ab95af18c38a2bed7544dc1ed09ab"
     },
     {
-      "file": "out/checkpoint.json",
-      "golden": "tools/rustev-conformance/expected/live/live.probe-failure/out/checkpoint.json",
+      "file": "run-1/out/checkpoint.json",
+      "golden": "tools/rustev-conformance/expected/live/live.probe-failure/run-1/out/checkpoint.json",
       "normalize": [],
       "sha256": "612775845e59785f22a970c12557f452448f91afe1d18c172d51e5b78c401818"
     },
     {
-      "file": "out/live-config.json",
-      "golden": "tools/rustev-conformance/expected/live/live.probe-failure/out/live-config.json",
+      "file": "run-1/out/live-config.json",
+      "golden": "tools/rustev-conformance/expected/live/live.probe-failure/run-1/out/live-config.json",
       "normalize": [],
       "sha256": "950abab4aa5b5de799819b2b5edbe7c162a78f507e0d7b1922ef8d8fafeca7f4"
     },
     {
-      "file": "out/live-run.json",
-      "golden": "tools/rustev-conformance/expected/live/live.probe-failure/out/live-run.json",
+      "file": "run-1/out/live-run.json",
+      "golden": "tools/rustev-conformance/expected/live/live.probe-failure/run-1/out/live-run.json",
       "normalize": [],
       "sha256": "7c8ef0d909617abdd258d7f6729960093f97a1764fb82e79a8565bc5e857ca44"
     },
     {
-      "file": "out/probe/1.1.case.json",
-      "golden": "tools/rustev-conformance/expected/live/live.probe-failure/out/probe/1.1.case.json",
+      "file": "run-1/out/probe/1.1.case.json",
+      "golden": "tools/rustev-conformance/expected/live/live.probe-failure/run-1/out/probe/1.1.case.json",
       "normalize": [],
       "sha256": "655663cefebc251717856c344a2afbf07104f634fc81ac60c9995121f305c97f"
     },
     {
-      "file": "out/probe/1.1.live.json",
-      "golden": "tools/rustev-conformance/expected/live/live.probe-failure/out/probe/1.1.live.json",
+      "file": "run-1/out/probe/1.1.live.json",
+      "golden": "tools/rustev-conformance/expected/live/live.probe-failure/run-1/out/probe/1.1.live.json",
       "normalize": [],
       "sha256": "d7787e75e1abd9cc5bc431e73df6beca9a3a8790f6f33b0df629924de8584326"
     },
     {
-      "file": "out/probe/1.1.run.json",
-      "golden": "tools/rustev-conformance/expected/live/live.probe-failure/out/probe/1.1.run.json",
+      "file": "run-1/out/probe/1.1.run.json",
+      "golden": "tools/rustev-conformance/expected/live/live.probe-failure/run-1/out/probe/1.1.run.json",
       "normalize": [],
       "sha256": "61f0a6cc603ea4a59d9e2db4a094cf8fe7e2f37dee7f73f5fde6ec980f4791fc"
     },
@@ -240,6 +240,7 @@
     }
   ],
   "surfaces": [
-    "rust-api"
+    "rust-api",
+    "native"
   ]
 }

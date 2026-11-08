@@ -73,10 +73,15 @@ impl<T> std::future::Future for Reply<T> {
 impl<T> Drop for Reply<T> {
     fn drop(&mut self) {
         if let Some(mut rx) = self.rx.take() {
-            // Closed first, so a send racing this drop fails and is counted
-            // by the task, or lands before and is counted here: never both.
+            // Count before closing so the settling task can take it back.
+            if self.stats.callbacks {
+                self.stats.abandoned_pending.fetch_add(1, Ordering::SeqCst);
+            }
             rx.close();
             if rx.try_recv().is_ok() {
+                if self.stats.callbacks {
+                    self.stats.abandoned_pending.fetch_sub(1, Ordering::SeqCst);
+                }
                 self.stats
                     .late_resolutions_discarded
                     .fetch_add(1, Ordering::SeqCst);
@@ -309,7 +314,11 @@ impl HostBackend {
             cost_bound: serde_json::from_str(&s.cost_bound).map_err(|e| invalid(e.to_string()))?,
             max_concurrency: s.max_concurrency as usize,
             capacity: capacity("backend.queueCapacity", s.queue_capacity)?,
-            stats: SeamStats::new(format!("backend:{}", descriptor.backend_id)),
+            stats: Arc::new(SeamStats {
+                name: format!("backend:{}", descriptor.backend_id),
+                callbacks: true,
+                ..Default::default()
+            }),
             descriptor,
             infer: Arc::new(s.infer),
             abort: Arc::new(s.abort),
@@ -430,6 +439,10 @@ impl DecisionBackend for HostBackend {
             // The runtime finished the attempt first (deadline, cancellation,
             // shutdown): the value never reaches a record (3.6.4).
             if tx.send(r).is_err() {
+                // Counted as abandoned by `Reply::drop` under the same flag.
+                if stats.callbacks {
+                    stats.abandoned_pending.fetch_sub(1, Ordering::SeqCst);
+                }
                 stats
                     .late_resolutions_discarded
                     .fetch_add(1, Ordering::SeqCst);

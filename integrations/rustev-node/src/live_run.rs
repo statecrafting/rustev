@@ -8,10 +8,10 @@ use crate::{
 };
 use napi::bindgen_prelude::Uint8Array;
 use napi_derive::napi;
-use rustev_contract::Identified;
 use rustev_contract::scope::Handle;
+use rustev_contract::{Document, Identified};
 use rustev_eval::metrics::TaskAdapter;
-use rustev_live::documents::{EvaluationTime, LiveConfig, LiveError, Mode};
+use rustev_live::documents::{EvaluationTime, LiveCheckpoint, LiveConfig, LiveError, Mode};
 use rustev_live::journal::{JournalCreated, SetClock};
 use rustev_live::probe::ProbeSnapshot;
 use rustev_live::run::{
@@ -370,6 +370,25 @@ fn run(
 ) -> Result<LiveRunResult, Done> {
     let req = |key| a[key].as_str().expect("validated string");
     let (spec, options, adapter) = load(a, runtime)?;
+    // 067 3.7.2: reject another configuration before even reading the journal
+    // header. Only a readable checkpoint naming another configuration is
+    // decided here; anything else (absent, unreadable, oversized, malformed)
+    // is left to `prepare`, so those outcomes stay the library's.
+    if options.resume {
+        let path = options.out.join("checkpoint.json");
+        let saved = Reads::default()
+            .read_classified(
+                &path.to_string_lossy(),
+                LiveCheckpoint::LIMITS.max_bytes + 1,
+            )
+            .ok()
+            .flatten()
+            .and_then(|bytes| LiveCheckpoint::parse(&bytes).ok());
+        let config_id = spec.config.id().map_err(|e| invalid("live-config", e))?;
+        if saved.is_some_and(|saved| saved.bindings.live_config_id != config_id) {
+            return Err(invalid("checkpoint-mismatch", "live configuration differs"));
+        }
+    }
     let authorizer = RuleAuthorizer::new(spec.config.clone()).map_err(refusal)?;
     let prepared = prepare(spec, options).map_err(live_error)?;
     let journal = prepared.open_journal().map_err(live_error)?;

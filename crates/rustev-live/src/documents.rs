@@ -889,11 +889,27 @@ pub(crate) fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), LiveError> {
     #[cfg(feature = "fault-injection")]
     crate::fault_injection::point("atomic", &name, "before-directory-sync")
         .map_err(LiveError::io)?;
-    File::open(parent)
-        .and_then(|d| d.sync_all())
-        .map_err(LiveError::io)?;
+    sync_directory(parent).map_err(LiveError::io)?;
     #[cfg(feature = "fault-injection")]
     crate::fault_injection::point("atomic", &name, "after-directory-sync")
         .map_err(LiveError::io)?;
     Ok(())
+}
+
+/// The directory entry's sync after an atomic rename. 043 3.10.1's rule is
+/// a temporary file, `fsync` and rename; where the standard library can
+/// open a directory (Unix) its entry is synced as well. Windows cannot open
+/// a directory as a file without backup semantics, and NTFS journals the
+/// rename's metadata, so there the rename is the last step (spec 067, the
+/// Node binding's win32 package runs live runs).
+fn sync_directory(dir: &Path) -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        File::open(dir)?.sync_all()
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = dir;
+        Ok(())
+    }
 }

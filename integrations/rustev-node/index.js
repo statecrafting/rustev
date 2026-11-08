@@ -520,6 +520,8 @@ class PlanHandle {
  * here, out of reach of code using the engine, so nothing can drop one
  * before shutdown raises it. */
 const running = new WeakMap();
+// Live runs cancel before the drain window (067 3.6.4).
+const liveRuns = new WeakMap();
 
 /** Each engine's native binding, likewise out of reach: code using an
  * engine cannot replace what its plans decide through. */
@@ -532,6 +534,7 @@ class Engine {
   constructor(nativeEngine) {
     natives.set(this, nativeEngine);
     running.set(this, new Set());
+    liveRuns.set(this, new Set());
     scorerSeams.set(this, new WeakMap());
   }
 
@@ -628,6 +631,7 @@ class Engine {
     const { signal, ...args } = options;
     const cancel = wrap(() => natives.get(this).cancelHandle());
     running.get(this).add(cancel);
+    liveRuns.get(this).add(cancel);
     if (signal?.aborted) cancel.raise();
     const onAbort = () => cancel.raise();
     signal?.addEventListener('abort', onAbort, { once: true });
@@ -640,6 +644,7 @@ class Engine {
     } finally {
       end();
       running.get(this).delete(cancel);
+      liveRuns.get(this).delete(cancel);
       signal?.removeEventListener('abort', onAbort);
     }
   }
@@ -835,7 +840,7 @@ class Engine {
     return () => clearInterval(timer);
   }
 
-  /** Stop admission at once, wait for decisions in flight up to `drainMs`
+  /** Stop admission and cancel live runs at once; wait for decisions up to `drainMs`
    * (0 to 600,000), then raise cancellation on the rest, which end with
    * the runtime's honest cancellation evidence (3.9.2). */
   async shutdown({ drainMs = 0 } = {}) {
@@ -845,16 +850,18 @@ class Engine {
     const lateCount = () => this.gauges().seams.reduce((n, s) => n + s.lateResolutionsDiscarded, 0);
     const lateBefore = lateCount();
     let active = natives.get(this).shutdown();
+    const cancelledRuns = new Set(liveRuns.get(this));
+    for (const c of cancelledRuns) c.raise();
     const until = Date.now() + drainMs;
     while (active > 0 && Date.now() < until) {
       await new Promise((r) => setTimeout(r, 5));
       active = natives.get(this).shutdown();
     }
     const live = running.get(this);
-    const cancelled = live.size;
+    const cancelled = new Set([...cancelledRuns, ...live]).size;
     for (const c of live) c.raise();
-    // A cancelled decision ends once the runtime records its cancellation;
-    // the wait is bounded all the same, and what still runs is reported.
+    // Wait for cancellation to be recorded, including live checkpoints and
+    // abandoned host replies. Keep the existing bounded decision settle wait.
     const settleBy = Date.now() + 30_000;
     let remaining = natives.get(this).shutdown();
     while (remaining > 0 && Date.now() < settleBy) {
@@ -865,8 +872,7 @@ class Engine {
     let telemetryUnflushed;
     try { telemetryUnflushed = await natives.get(this).shutdownTelemetry(Math.max(0, until - Date.now())); }
     catch (e) { throw typed(e); }
-    // The late settlements discarded during this shutdown.
-    // 063 3.4.6: host callbacks of cancelled decisions still unsettled.
+    // Host replies still unsettled after their runtime attempts were abandoned.
     const abandonedPending = this.gauges().seams.reduce((n, s) => n + (s.abandonedPending ?? 0), 0);
     return { telemetryUnflushed, drained: active === 0, cancelled, lateDiscarded: lateCount() - lateBefore, stillRunning: remaining, abandonedPending };
   }

@@ -5,7 +5,7 @@
 //! The Rust runner resolves those files through the shared surface and uses
 //! a manual clock and declarative rule authorizer. Every output file, journal
 //! byte and per-run status/code is compared without normalization. Resume
-//! compares the final files after both calls. Tests own automated blessing.
+//! compares a snapshot after each call. Tests own automated blessing.
 
 use std::future::Future;
 use std::path::{Path, PathBuf};
@@ -419,7 +419,7 @@ async fn execute(case: &LiveCase, dir: &Path) -> Result<Outputs, String> {
     let runtime = builder.build().map_err(|e| format!("{e:?}"))?;
     let mut statuses = vec![];
     let mut outputs = Outputs::new();
-    for run in &case.runs {
+    for (index, run) in case.runs.iter().enumerate() {
         let o = &run.options;
         let (spec, authorizer, adapter) = resolve(o, &files)?;
         let out = dir.join(crate::contained(&o.out)?);
@@ -498,11 +498,15 @@ async fn execute(case: &LiveCase, dir: &Path) -> Result<Outputs, String> {
             }
         }
         statuses.push(json!({"status": outcome.status, "code": run::exit_code(outcome.status)}));
-        collect(dir, &out, &mut outputs)?;
-        outputs.insert(
+        let mut snapshot = Outputs::new();
+        collect(dir, &out, &mut snapshot)?;
+        snapshot.insert(
             o.journal.clone(),
             std::fs::read(dir.join(crate::contained(&o.journal)?)).map_err(err)?,
         );
+        for (path, bytes) in snapshot {
+            outputs.insert(format!("run-{}/{path}", index + 1), bytes);
+        }
     }
     outputs.insert(
         "status.json".into(),
