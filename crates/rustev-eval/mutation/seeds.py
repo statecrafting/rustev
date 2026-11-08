@@ -1071,13 +1071,18 @@ def seed_dependencies(base, dest, packages):
 
 
 def tree_bytes(path):
-    total = 0
+    """The bytes under `path`, each file counted once: cargo hard-links its
+    outputs into place, and a link takes no space of its own."""
+    total, seen = 0, set()
     for top, _, files in os.walk(path):
         for name in files:
             try:
-                total += os.lstat(os.path.join(top, name)).st_size
+                st = os.lstat(os.path.join(top, name))
             except OSError:
-                pass
+                continue
+            if (st.st_dev, st.st_ino) not in seen:
+                seen.add((st.st_dev, st.st_ino))
+                total += st.st_size
     return total
 
 
