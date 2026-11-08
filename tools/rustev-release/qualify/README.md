@@ -13,8 +13,24 @@ GitHub CLI and ssh-keygen are needed for the relevant live steps. The pinned Rus
 toolchain and manifest MSRV must already be installed. No toolchain is installed
 implicitly. npm must support `audit signatures --json --include-attestations`.
 Every installed `@rustev/*` package needs a verified registry signature and an
-integrity equal to the signed manifest; npm provenance is not required (056
-3.3, A-74).
+integrity equal to the signed manifest. Which npm rule applies is decided by
+the release version against the harness's own constant `0.5.0`, never by the
+release tree (spec 068 3.1):
+
+- **After 0.5.0** (068 3.2): each `@rustev/*` package needs npm provenance.
+  Its version document must name an SLSA build-provenance attestation
+  (`dist.attestations`, the predicate of `hosted.rs`'s `npm_has_provenance`),
+  `npm audit signatures` must verify it, and the attestation bundle's SLSA
+  statement must name `pkg:npm/%40rustev/<name>@X.Y.Z` with the manifest's
+  SHA-512 integrity, built by `.github/workflows/release.yml` of
+  `https://github.com/statecrafting/rustev` at `refs/tags/vX.Y.Z`. A missing,
+  unreadable, unverifiable or differently bound attestation fails the step.
+- **0.1.0 to 0.5.0** (A-74, 056 3.3): provenance is not required; an
+  attestation a package does carry is still verified by npm.
+
+The npm step records `npm_provenance` per package, `verified` or
+`not_required`, and `rustev-release qualify` refuses an npm step of a version
+after 0.5.0 unless every `@rustev/*` package records `verified` (068 3.3.3).
 
 To qualify an earlier tag with this harness, set `RUSTEV_QUALIFY_RELEASE_TREE`
 to a checkout of that tag: the release set, the adoption subsets and the

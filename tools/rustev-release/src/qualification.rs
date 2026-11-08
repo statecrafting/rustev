@@ -17,6 +17,32 @@ pub enum Status {
     Excluded { reason: String },
 }
 
+/// Spec 068 3.3.2: which npm rule a `@rustev/*` package passed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NpmProvenance {
+    /// The provenance rule (068 3.2) passed.
+    Verified,
+    /// A-74's rule applied (068 3.3.1), for `0.1.0` to `0.5.0`.
+    NotRequired,
+}
+
+/// Spec 068 3.1: every release version greater than this one needs npm
+/// provenance. A constant of the tool that runs, never read from a release.
+pub const PROVENANCE_AFTER: (u64, u64, u64) = (0, 5, 0);
+
+/// Spec 068 3.1: compare `X.Y.Z` numerically with [`PROVENANCE_AFTER`]. A
+/// pre-release or build suffix is ignored; a version whose core does not
+/// parse requires provenance, never less.
+pub fn provenance_required(version: &str) -> bool {
+    let core = version.split(['-', '+']).next().unwrap_or_default();
+    let parts: Vec<_> = core.split('.').map(str::parse::<u64>).collect();
+    match parts.as_slice() {
+        [Ok(x), Ok(y), Ok(z)] => (*x, *y, *z) > PROVENANCE_AFTER,
+        _ => true,
+    }
+}
+
 /// One kind's consumer run on one platform. Records bind the exact manifest.
 /// `lockfile_or_install_record` names the retained lockfile or install record.
 /// Unexecuted steps use null exit status and may leave execution fields empty.
@@ -38,6 +64,11 @@ pub struct Step {
     pub toolchain: String,
     pub node: String,
     pub status: Status,
+    /// Spec 068 3.3.2: the npm step's rule per installed `@rustev/*`
+    /// package. Absent from the other kinds and from steps of a harness
+    /// older than 068.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub npm_provenance: BTreeMap<String, NpmProvenance>,
 }
 
 pub fn required(m: &ReleaseManifest, kind: &str) -> bool {
@@ -152,9 +183,35 @@ pub fn evidence(m: &ReleaseManifest, dir: &Path) -> Result<BTreeMap<String, Stri
                 {
                     return Err(format!("{name}: incomplete execution evidence"));
                 }
+                if *kind == "npm" && provenance_required(&m.version) {
+                    npm_verified(&step).map_err(|e| format!("{name}: {e}"))?;
+                }
             }
             evidence.insert(name, sha256_hex(&bytes));
         }
     }
     Ok(evidence)
+}
+
+/// Spec 068 3.3.3: after 0.5.0 an npm step qualifies only when every
+/// `@rustev/*` package it lists, in its checksums or its provenance, records
+/// `verified`; a step of an older harness records none and is refused.
+fn npm_verified(step: &Step) -> Result<(), String> {
+    let packages: std::collections::BTreeSet<&str> = step
+        .checksums
+        .keys()
+        .chain(step.npm_provenance.keys())
+        .map(String::as_str)
+        .filter(|k| k.starts_with("@rustev/"))
+        .collect();
+    if packages.is_empty() {
+        return Err("the npm step lists no @rustev/* package (068 3.3.3)".into());
+    }
+    match packages
+        .iter()
+        .find(|p| step.npm_provenance.get(**p) != Some(&NpmProvenance::Verified))
+    {
+        Some(p) => Err(format!("npm provenance of {p} is not verified (068 3.3.3)")),
+        None => Ok(()),
+    }
 }

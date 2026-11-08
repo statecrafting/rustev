@@ -690,6 +690,7 @@ fn steps(m: &ReleaseManifest, dir: &Path) {
                 architecture: "a".into(),
                 toolchain: "t".into(),
                 node: "n".into(),
+                npm_provenance: BTreeMap::new(),
                 status: if passed {
                     Status::Passed
                 } else {

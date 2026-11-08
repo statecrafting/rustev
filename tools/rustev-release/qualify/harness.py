@@ -3,6 +3,7 @@
 Only public registries are consumed. No fixture bytes or workspace dependencies
 are supplied to the consumer. An incomplete run can never produce passed.
 """
+import base64
 import hashlib
 import json
 import os
@@ -12,6 +13,8 @@ import subprocess
 import sys
 import time
 import tomllib
+import urllib.error
+import urllib.request
 
 HERE = Path(__file__).resolve().parent
 # The release's own data (release set, adoption subsets, toolchain pin) come
@@ -24,6 +27,15 @@ INDEX = 'registry+https://github.com/rust-lang/crates.io-index'
 REPO = 'statecrafting/rustev'
 # Spec 060 3.4.3: the image is qualified on these hosts, as these platforms.
 IMAGE_PLATFORMS = {'linux-x64-gnu': 'linux/amd64', 'linux-arm64-gnu': 'linux/arm64'}
+# Spec 068 3.1: every release after this version needs npm provenance. A
+# constant of the harness that runs, never read from RELEASE_TREE or the
+# release's manifest, so an earlier tree cannot lower it (I-2).
+PROVENANCE_AFTER = (0, 5, 0)
+NPM_REGISTRY = 'https://registry.npmjs.org/'
+SLSA_PROVENANCE = 'https://slsa.dev/provenance/'
+# Spec 068 3.2.3: the build an attestation must name.
+PROVENANCE_REPOSITORY = 'https://github.com/' + REPO
+PROVENANCE_WORKFLOW = '.github/workflows/release.yml'
 
 
 def digest(path):
@@ -81,6 +93,161 @@ def lock_checks(lock, manifest, complete=False, root=None):
     return checksums
 
 
+def provenance_required(version):
+    """Spec 068 3.1: compare `X.Y.Z` with the boundary, component by
+    component, as `qualification::provenance_required` does: a pre-release
+    or build suffix is ignored, and a core that does not parse requires
+    provenance, never less."""
+    core = version.split('-', 1)[0].split('+', 1)[0].split('.')
+    if len(core) != 3 or not all(part.isascii() and part.isdigit() for part in core):
+        return True
+    return tuple(int(part) for part in core) > PROVENANCE_AFTER
+
+
+def member(value, *keys):
+    for key in keys:
+        value = value.get(key) if isinstance(value, dict) else None
+    return value
+
+
+def npm_named(document):
+    """Spec 068 3.2.1: the version document names an SLSA build-provenance
+    attestation. The predicate of `npm_has_provenance` in
+    tools/rustev-release/src/hosted.rs (A-87); the fixture
+    tests/fixtures/npm-provenance-documents.json keeps the two equal."""
+    url = member(document, 'dist', 'attestations', 'url')
+    kind = member(document, 'dist', 'attestations', 'provenance', 'predicateType')
+    return (isinstance(url, str) and url != ''
+            and isinstance(kind, str) and kind.startswith(SLSA_PROVENANCE))
+
+
+def registry_fetch(url):
+    """One JSON document from the public npm registry. Any network error,
+    other status or unparsable body raises (068 3.2.4)."""
+    if not url.startswith(NPM_REGISTRY):
+        raise ValueError('not the public npm registry: ' + url)
+    request = urllib.request.Request(url, headers={'Accept': 'application/json'})
+    try:
+        with urllib.request.urlopen(request, timeout=120) as response:
+            if response.status != 200:
+                raise ValueError(f'{url} answered HTTP {response.status}')
+            # A redirect must not leave the public registry.
+            if not response.geturl().startswith(NPM_REGISTRY):
+                raise ValueError(f'{url} redirected off the public npm registry')
+            body = response.read()
+    except urllib.error.HTTPError as error:
+        raise ValueError(f'{url} answered HTTP {error.code}') from error
+    except (urllib.error.URLError, OSError) as error:
+        raise ValueError(f'{url} could not be fetched: {error}') from error
+    try:
+        return json.loads(body)
+    except ValueError as error:
+        raise ValueError(f'{url} answered unparsable JSON') from error
+
+
+def npm_bound(bundle, name, version, integrity):
+    """Spec 068 3.2.3: the bundle's one SLSA provenance statement binds the
+    package to its manifest integrity and to this repository's release
+    workflow at `vX.Y.Z`. The signature is npm's to verify (3.2.2); the
+    statement is read only for the binding. Returns the first failed
+    check, or None."""
+    attestations = member(bundle, 'attestations')
+    if not isinstance(attestations, list):
+        return 'the bundle lists no attestations'
+    statements = []
+    for attestation in attestations:
+        kind = member(attestation, 'predicateType')
+        if not (isinstance(kind, str) and kind.startswith(SLSA_PROVENANCE)):
+            continue
+        envelope = member(attestation, 'bundle', 'dsseEnvelope')
+        payload = member(envelope, 'payload')
+        if member(envelope, 'payloadType') != 'application/vnd.in-toto+json' or not isinstance(payload, str):
+            return 'the provenance envelope is not an in-toto statement'
+        try:
+            statements.append(json.loads(base64.b64decode(payload, validate=True)))
+        except ValueError:
+            return 'the provenance statement is unparsable'
+    if len(statements) != 1:
+        return f'the bundle holds {len(statements)} SLSA provenance statements, not one'
+    statement = statements[0]
+    kind = member(statement, 'predicateType')
+    if not (isinstance(kind, str) and kind.startswith(SLSA_PROVENANCE)):
+        return 'the statement is not SLSA provenance'
+    if not (isinstance(integrity, str) and integrity.startswith('sha512-')):
+        return 'the manifest integrity is not SHA-512'
+    try:
+        expected = base64.b64decode(integrity.removeprefix('sha512-'), validate=True).hex()
+    except ValueError:
+        return 'the manifest integrity is not base64'
+    # The package URL percent-encodes the scope's `@` (purl's npm namespace).
+    purl = 'pkg:npm/' + name.replace('@', '%40', 1) + '@' + version
+    subjects = member(statement, 'subject')
+    if not (isinstance(subjects, list) and len(subjects) == 1
+            and member(subjects[0], 'name') == purl
+            and member(subjects[0], 'digest', 'sha512') == expected):
+        return f'the subject is not {purl} with the manifest integrity'
+    workflow = member(statement, 'predicate', 'buildDefinition', 'externalParameters', 'workflow')
+    for key, value in (('repository', PROVENANCE_REPOSITORY), ('path', PROVENANCE_WORKFLOW),
+                       ('ref', 'refs/tags/v' + version)):
+        if member(workflow, key) != value:
+            return f'the build workflow {key} is not {value}'
+    return None
+
+
+def npm_provenance(name, version, integrity, fetch):
+    """Spec 068 3.2.1 and 3.2.3 for one package; 3.2.2 is the caller's."""
+    try:
+        document = fetch(f'{NPM_REGISTRY}{name}/{version}')
+    except ValueError as error:
+        raise ValueError(f'npm provenance of {name}: version document: {error}') from error
+    if not npm_named(document):
+        raise ValueError(f'npm provenance of {name}: the version document names no SLSA provenance attestation')
+    url = document['dist']['attestations']['url']
+    if not url.startswith(NPM_REGISTRY):
+        raise ValueError(f'npm provenance of {name}: the attestation is not on the public npm registry: {url}')
+    try:
+        bundle = fetch(url)
+    except ValueError as error:
+        raise ValueError(f'npm provenance of {name}: attestation bundle: {error}') from error
+    failure = npm_bound(bundle, name, version, integrity)
+    if failure:
+        raise ValueError(f'npm provenance of {name}: binding: {failure}')
+    return 'verified'
+
+
+def npm_packages(path, version, manifest, report, fetch, checksums, provenance):
+    """The npm step's checks over an installed consumer at `path`, given the
+    `npm audit signatures --json --include-attestations` report. Fills
+    `checksums` and `provenance` (068 3.3.2) per `@rustev/*` package as each
+    passes, so a failing package records nothing."""
+    # `npm audit signatures --json` lists only failures; it exits nonzero on
+    # any, and every installed package is then signature-verified. npm also
+    # verifies every attestation a version document names (068 3.2.2).
+    unverified = {v.get('name') for key in ('invalid', 'missing') for v in report.get(key, [])}
+    artifacts = {a.get('package'): a for a in manifest['artifacts'] if a['kind'] == 'npm'}
+    required = provenance_required(version)
+    installed = set()
+    for location, p in read(path / 'package-lock.json')['packages'].items():
+        if not location or not (path / location).exists():
+            continue
+        name = read(path / location / 'package.json')['name']
+        if not p.get('resolved', '').startswith(NPM_REGISTRY):
+            raise ValueError('non-public npm source: ' + name)
+        if name.startswith('@rustev/'):
+            installed.add(name)
+            a = artifacts.get(name)
+            if not a or p['version'] != version or p['integrity'] != a['integrity']:
+                raise ValueError('npm manifest integrity mismatch: ' + name)
+            if name in unverified:
+                raise ValueError('npm registry signature or attestation not verified: ' + name)
+            # Spec 068 3.2 after 0.5.0; A-74's rule (056 3.3) up to it (3.3.1).
+            outcome = npm_provenance(name, version, a['integrity'], fetch) if required else 'not_required'
+            checksums[name] = p['integrity']
+            provenance[name] = outcome
+    if not {'@rustev/rustev', '@rustev/rustev-wasm'}.issubset(installed):
+        raise ValueError('required npm package is not installed')
+
+
 class NotRun(Exception):
     pass
 
@@ -136,7 +303,7 @@ class Harness:
             self.platform = 'win32-' + arch + '-msvc'
         else:
             self.platform = 'unsupported-' + arch
-        self.commands, self.checksums = [], {}
+        self.commands, self.checksums, self.provenance = [], {}, {}
         self.offline_prefix = None
 
     def identity(self, *cmd):
@@ -302,30 +469,9 @@ class Harness:
             subprocess.run([self.program('npm'), 'audit', 'signatures', '--json', '--include-attestations'], cwd=path,
                            env=self.env, stdout=output, stderr=self.log, check=True)
         self.log.write(audit.read_bytes())
-        # `npm audit signatures --json` lists only failures; it exits nonzero on
-        # any, and every installed package is then signature-verified.
-        report = read(audit)
-        unverified = {v.get('name') for key in ('invalid', 'missing') for v in report.get(key, [])}
-        artifacts = {a.get('package'): a for a in self.m['artifacts'] if a['kind'] == 'npm'}
-        installed = set()
-        for location, p in read(path / 'package-lock.json')['packages'].items():
-            if not location or not (path / location).exists():
-                continue
-            name = read(path / location / 'package.json')['name']
-            if not p.get('resolved', '').startswith('https://registry.npmjs.org/'):
-                raise ValueError('non-public npm source: ' + name)
-            if name.startswith('@rustev/'):
-                installed.add(name)
-                a = artifacts.get(name)
-                if not a or p['version'] != self.version or p['integrity'] != a['integrity']:
-                    raise ValueError('npm manifest integrity mismatch: ' + name)
-                # The registry signature must verify; npm provenance is not
-                # required (056 3.3, 031 3.9.6, A-74).
-                if name in unverified:
-                    raise ValueError('npm registry signature not verified: ' + name)
-                self.checksums[name] = p['integrity']
-        if not {'@rustev/rustev', '@rustev/rustev-wasm'}.issubset(installed):
-            raise ValueError('required npm package is not installed')
+        npm_packages(path, self.version, self.m, read(audit), registry_fetch, self.checksums, self.provenance)
+        for name, outcome in self.provenance.items():
+            self.log.write(f'{name}: npm provenance {outcome}\n'.encode())
         shutil.copyfile(HERE / 'smoke.cjs', path / 'smoke.cjs')
         self.offline_run('node', 'smoke.cjs', self.version, self.example(), cwd=path)
 
@@ -498,7 +644,7 @@ class Harness:
             else:
                 required = any(a['kind'] == ('binary' if kind == 'cli' else kind) for a in self.m['artifacts'])
             prefix = self.evidence / f'{self.platform}.{kind}'
-            self.commands, self.checksums = [], {}
+            self.commands, self.checksums, self.provenance = [], {}, {}
             status, code = None, None
             with Path(str(prefix) + '.log').open('wb') as self.log:
                 try:
@@ -527,12 +673,16 @@ class Harness:
                     dest = records / source.relative_to(self.work)
                     dest.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copyfile(source, dest)
-            write(Path(str(prefix) + '.json'), dict(
+            step = dict(
                 schema='rustev.qualification-step/1', manifest_sha256=digest(self.manifest_path), kind=kind,
                 platform=self.platform, command=self.commands, exit_status=code,
                 output_digest=digest(Path(str(prefix) + '.log')), lockfile_or_install_record=str(records),
                 checksums=self.checksums, host=self.identity('uname', '-n'), os=self.os, architecture=self.arch,
-                toolchain=self.identity('rustc', '--version'), node=self.identity('node', '--version'), status=status))
+                toolchain=self.identity('rustc', '--version'), node=self.identity('node', '--version'), status=status)
+            if kind == 'npm':
+                # Spec 068 3.3.2: per package, which rule applied and passed.
+                step['npm_provenance'] = self.provenance
+            write(Path(str(prefix) + '.json'), step)
             print(f'{self.platform}.{kind}: {status}')
             failed |= required and status != 'passed'
         return int(failed)
@@ -542,6 +692,27 @@ if __name__ == '__main__':
     try:
         if sys.argv[1] == 'lock':
             lock_checks(Path(sys.argv[2]), read(Path(sys.argv[3])))
+        elif sys.argv[1] == 'npm-check':
+            # The npm step's checks over a recorded consumer, its audit report
+            # and registry answers (068 Acceptance). It writes no step record,
+            # so it can never qualify a release.
+            version, manifest, recorded = sys.argv[2], read(Path(sys.argv[3])), Path(sys.argv[4])
+            answers = read(recorded / 'registry.json')
+
+            def fixture_fetch(url):
+                if url not in answers:
+                    raise ValueError(f'{url} could not be fetched: no answer')
+                answer = answers[url]
+                if answer['status'] != 200:
+                    raise ValueError(f'{url} answered HTTP {answer["status"]}')
+                try:
+                    return json.loads(answer['body'])
+                except ValueError as error:
+                    raise ValueError(f'{url} answered unparsable JSON') from error
+            checksums, provenance = {}, {}
+            npm_packages(recorded, version, manifest, read(recorded / 'audit.json'), fixture_fetch,
+                         checksums, provenance)
+            print(json.dumps({'checksums': checksums, 'npm_provenance': provenance}, sort_keys=True))
         else:
             sys.exit(Harness(sys.argv[1], Path(sys.argv[2]), Path(sys.argv[3]), Path(sys.argv[4])).execute())
     except (ValueError, OSError, KeyError) as error:

@@ -325,6 +325,106 @@ fn qualification_evidence_is_validated_for_every_platform() {
     }
 }
 
+/// Spec 068 Acceptance: hosted.rs's `npm_has_provenance` (through
+/// `npm_response`) agrees with the shared fixture the harness's `npm_named`
+/// is tested against (tests/qualify_harness.rs).
+#[test]
+fn npm_provenance_predicate_agrees_with_the_shared_fixture() {
+    let fixture: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/npm-provenance-documents.json")).unwrap();
+    let cases = fixture["cases"].as_array().unwrap();
+    assert!(cases.iter().any(|c| c["provenance"] == true));
+    assert!(cases.iter().any(|c| c["provenance"] == false));
+    for case in cases {
+        let document = &case["document"];
+        let checksum = document["dist"]["integrity"].as_str().unwrap().to_string();
+        let expected = if case["provenance"].as_bool().unwrap() {
+            Lookup::Visible { checksum }
+        } else {
+            Lookup::Unattested { checksum }
+        };
+        assert_eq!(
+            rustev_release::hosted::npm_response("200", &document.to_string()),
+            expected,
+            "{}",
+            case["case"]
+        );
+    }
+}
+
+/// Spec 068 3.3.3: after 0.5.0 an npm step qualifies only with
+/// `npm_provenance: verified` for every `@rustev/*` package it lists.
+#[test]
+fn npm_steps_after_0_5_0_need_verified_provenance() {
+    use rustev_release::qualification as q;
+    let sri = fa::integrity(b"package");
+    for (version, provenance, qualifies) in [
+        ("0.6.0", Some(&["verified", "verified"][..]), true),
+        ("0.5.1", Some(&["verified", "verified"][..]), true),
+        // A step of a harness older than 068 records no provenance.
+        ("0.6.0", None, false),
+        ("0.5.1", None, false),
+        ("1.0.0", None, false),
+        ("0.6.0", Some(&["verified", "not_required"][..]), false),
+        ("0.6.0", Some(&["verified"][..]), false),
+        ("0.6.0", Some(&["not_required", "not_required"][..]), false),
+        // Up to 0.5.0, A-74's rule: either value, or none, qualifies.
+        ("0.5.0", None, true),
+        ("0.3.0", Some(&["not_required", "not_required"][..]), true),
+        ("0.5.0", Some(&["verified", "not_required"][..]), true),
+    ] {
+        let (root, _, mut m) = fixture();
+        m.version = version.into();
+        m.tag = format!("v{version}");
+        let dir = root.join("qualification");
+        qualification_steps(&m, &dir);
+        for platform in fa::PLATFORMS {
+            let path = dir.join(format!("{platform}.npm.json"));
+            let mut step: serde_json::Value =
+                serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+            let names = ["@rustev/rustev", "@rustev/rustev-wasm"];
+            step["checksums"] = names
+                .iter()
+                .map(|n| (n.to_string(), serde_json::Value::from(sri.clone())))
+                .collect::<serde_json::Map<_, _>>()
+                .into();
+            if let Some(values) = provenance {
+                step["npm_provenance"] = names
+                    .iter()
+                    .zip(values)
+                    .map(|(n, v)| (n.to_string(), serde_json::Value::from(*v)))
+                    .collect::<serde_json::Map<_, _>>()
+                    .into();
+            }
+            std::fs::write(&path, serde_json::to_vec(&step).unwrap()).unwrap();
+        }
+        let result = q::evidence(&m, &dir);
+        assert_eq!(
+            result.is_ok(),
+            qualifies,
+            "{version} {provenance:?}: {result:?}"
+        );
+        if !qualifies {
+            assert!(result.unwrap_err().contains("068 3.3.3"));
+        }
+    }
+    // A value other than the two of 068 3.3.2 is not a step at all.
+    let (root, _, mut m) = fixture();
+    m.version = "0.5.0".into();
+    let dir = root.join("qualification");
+    qualification_steps(&m, &dir);
+    let path = dir.join("linux-x64-gnu.npm.json");
+    let mut step: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    step["npm_provenance"] = serde_json::json!({"@rustev/rustev": "assumed"});
+    std::fs::write(&path, serde_json::to_vec(&step).unwrap()).unwrap();
+    assert!(q::evidence(&m, &dir).is_err());
+    // The boundary is numeric; a version that does not parse needs provenance.
+    assert!(q::provenance_required("0.5.1") && q::provenance_required("0.6.0"));
+    assert!(!q::provenance_required("0.5.0") && !q::provenance_required("0.1.0"));
+    assert!(q::provenance_required("0.10.0") && q::provenance_required("not-a-version"));
+}
+
 fn qualification_steps(m: &ReleaseManifest, dir: &Path) {
     use rustev_release::qualification::{self as q, Status, Step};
     for platform in fa::PLATFORMS {
@@ -344,6 +444,7 @@ fn qualification_steps(m: &ReleaseManifest, dir: &Path) {
                 architecture: "fixture-arch".into(),
                 toolchain: "rustc fixture".into(),
                 node: "node fixture".into(),
+                npm_provenance: BTreeMap::new(),
                 status: if q::required(m, kind) {
                     Status::Passed
                 } else {

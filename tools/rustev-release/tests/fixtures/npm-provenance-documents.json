@@ -1,0 +1,131 @@
+{
+  "_comment": "Spec 068 Acceptance: version documents shared by hosted.rs npm_has_provenance (tests/family.rs) and the harness npm_named (tests/qualify_harness.rs); both must agree with `provenance`.",
+  "cases": [
+    {
+      "case": "SLSA provenance v1 attestation",
+      "provenance": true,
+      "document": {
+        "name": "@rustev/rustev",
+        "version": "0.6.0",
+        "dist": {
+          "integrity": "sha512-g0aYo1qBwH78z/Oq7fCYzCPLKlHxtvlwGwcs187ilbkzz8kS+LhcAcAu3Nl1N6dXsQ9pjI/I0avBd3gGRaL/3A==",
+          "attestations": {
+            "url": "https://registry.npmjs.org/-/npm/v1/attestations/@rustev%2frustev@0.6.0",
+            "provenance": {
+              "predicateType": "https://slsa.dev/provenance/v1"
+            }
+          }
+        }
+      }
+    },
+    {
+      "case": "a later SLSA provenance version",
+      "provenance": true,
+      "document": {
+        "name": "@rustev/rustev",
+        "version": "0.6.0",
+        "dist": {
+          "integrity": "sha512-g0aYo1qBwH78z/Oq7fCYzCPLKlHxtvlwGwcs187ilbkzz8kS+LhcAcAu3Nl1N6dXsQ9pjI/I0avBd3gGRaL/3A==",
+          "attestations": {
+            "url": "https://registry.npmjs.org/-/npm/v1/attestations/@rustev%2frustev@0.6.0",
+            "provenance": {
+              "predicateType": "https://slsa.dev/provenance/v2"
+            }
+          }
+        }
+      }
+    },
+    {
+      "case": "no attestations",
+      "provenance": false,
+      "document": {
+        "name": "@rustev/rustev",
+        "version": "0.6.0",
+        "dist": {
+          "integrity": "sha512-g0aYo1qBwH78z/Oq7fCYzCPLKlHxtvlwGwcs187ilbkzz8kS+LhcAcAu3Nl1N6dXsQ9pjI/I0avBd3gGRaL/3A=="
+        }
+      }
+    },
+    {
+      "case": "another predicate type",
+      "provenance": false,
+      "document": {
+        "name": "@rustev/rustev",
+        "version": "0.6.0",
+        "dist": {
+          "integrity": "sha512-g0aYo1qBwH78z/Oq7fCYzCPLKlHxtvlwGwcs187ilbkzz8kS+LhcAcAu3Nl1N6dXsQ9pjI/I0avBd3gGRaL/3A==",
+          "attestations": {
+            "url": "https://registry.npmjs.org/-/npm/v1/attestations/@rustev%2frustev@0.6.0",
+            "provenance": {
+              "predicateType": "https://github.com/npm/attestation/tree/main/specs/publish/v0.1"
+            }
+          }
+        }
+      }
+    },
+    {
+      "case": "an empty url",
+      "provenance": false,
+      "document": {
+        "name": "@rustev/rustev",
+        "version": "0.6.0",
+        "dist": {
+          "integrity": "sha512-g0aYo1qBwH78z/Oq7fCYzCPLKlHxtvlwGwcs187ilbkzz8kS+LhcAcAu3Nl1N6dXsQ9pjI/I0avBd3gGRaL/3A==",
+          "attestations": {
+            "url": "",
+            "provenance": {
+              "predicateType": "https://slsa.dev/provenance/v1"
+            }
+          }
+        }
+      }
+    },
+    {
+      "case": "no url",
+      "provenance": false,
+      "document": {
+        "name": "@rustev/rustev",
+        "version": "0.6.0",
+        "dist": {
+          "integrity": "sha512-g0aYo1qBwH78z/Oq7fCYzCPLKlHxtvlwGwcs187ilbkzz8kS+LhcAcAu3Nl1N6dXsQ9pjI/I0avBd3gGRaL/3A==",
+          "attestations": {
+            "provenance": {
+              "predicateType": "https://slsa.dev/provenance/v1"
+            }
+          }
+        }
+      }
+    },
+    {
+      "case": "no provenance member",
+      "provenance": false,
+      "document": {
+        "name": "@rustev/rustev",
+        "version": "0.6.0",
+        "dist": {
+          "integrity": "sha512-g0aYo1qBwH78z/Oq7fCYzCPLKlHxtvlwGwcs187ilbkzz8kS+LhcAcAu3Nl1N6dXsQ9pjI/I0avBd3gGRaL/3A==",
+          "attestations": {
+            "url": "https://registry.npmjs.org/-/npm/v1/attestations/@rustev%2frustev@0.6.0"
+          }
+        }
+      }
+    },
+    {
+      "case": "a predicate type that is not a string",
+      "provenance": false,
+      "document": {
+        "name": "@rustev/rustev",
+        "version": "0.6.0",
+        "dist": {
+          "integrity": "sha512-g0aYo1qBwH78z/Oq7fCYzCPLKlHxtvlwGwcs187ilbkzz8kS+LhcAcAu3Nl1N6dXsQ9pjI/I0avBd3gGRaL/3A==",
+          "attestations": {
+            "url": "https://registry.npmjs.org/-/npm/v1/attestations/@rustev%2frustev@0.6.0",
+            "provenance": {
+              "predicateType": 1
+            }
+          }
+        }
+      }
+    }
+  ]
+}
