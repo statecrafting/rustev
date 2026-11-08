@@ -2,7 +2,7 @@
 id: "069-node-host-nonblocking-open"
 title: "The Node binding's filesystem host opens inputs without blocking (amends 006, 027 and 067)"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-11-08"
 summary: >
   An amendment of approved specs 067 (3.4.2 and its implementation
@@ -30,6 +30,9 @@ extends:
   - { spec: "006-cli-surface", unit: { kind: directory, path: "crates/rustev-cli/" }, nature: amending }
   # `rustev-surface` gains a Unix-only `libc` dependency (3.1.2).
   - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Cargo.lock" }, nature: additive }
+  # 069 joins VERIFIED_SPECS and the node-live acceptance group.
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "Makefile" }, nature: additive }
+  - { spec: "001-boundaries-and-authority", unit: { kind: directory, path: "scripts/acceptance/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "006-cli-surface"
@@ -55,7 +58,7 @@ obligations:
 # 069: The Node binding's filesystem host opens inputs without blocking (amends 006, 027 and 067)
 
 Approved: ratified by the owner on 2026-11-08 (A-89) for the 0.7.0
-cycle; the implementation is pending. The approved texts of 006, 027 and
+cycle and implemented in the same cycle. The approved texts of 006, 027 and
 067 are not edited; this spec records what it changes in them.
 
 ## 1. Purpose
@@ -169,11 +172,39 @@ binding, which has no filesystem host.
 
 ## Verification
 
-Pending with implementation.
+Declared for `spec-spine verify 069`; 069 is in `make verify` and in CI's
+`node-live` acceptance group.
+
+```verify:cli
+# 3.1, 3.3.2: the shared open on a FIFO and on a symbolic link.
+cargo test -p rustev-surface --locked --lib open_tests
+# 3.2, 3.3.1, R-1: the Node host refuses a FIFO without blocking, for an
+# input and a store item, and refuses a linked store item.
+cargo test -p rustev-node --locked --lib live_fs
+# I-2: the CLI's non-blocking open behavior and its tests are unchanged.
+cargo test -p rustev-cli --locked
+```
 
 ## Implementation record
 
-None yet.
+**Implemented (2026-11-08).** `rustev_surface::host::open_input` is the
+CLI's former `open_input`, moved unchanged; `rustev-surface` takes `libc`
+for Unix only (#575, a dependency-only change the policy-isolation guard
+requires); `rustev-cli` keeps its own `libc` entry, now unused, until a
+later dependency-only change removes it, and re-exports
+the shared function as `rustev_cli::io::open_input` so `io.rs`, `trace.rs`
+and `replay.rs` are unchanged. In `integrations/rustev-node/src/live_fs.rs`,
+`open_regular` (inputs, 3.2.1) and `open_item` (store items, with
+`no_follow`, 3.2.2) hold the open and the check on the handle, and the
+residual-race comments are replaced. The CLI mutation seeds whose hunks sat
+in the moved function (`crates/rustev-cli/mutation/seeds.py`: "a FIFO
+passes the check before opening and the open blocks", "a FIFO swapped in
+after the check blocks the open", "a symbolic link swapped into the store
+is followed") now name `crates/rustev-surface/src/host.rs`. Tests:
+`rustev-surface` `open_tests` and `rustev-node`
+`a_fifo_reached_by_the_open_is_refused_without_blocking`, Unix only; the
+Node test calls `open_regular` and `open_item` directly, the code a swap
+after the metadata check reaches (3.3.1).
 
 ## Decisions at approval
 
