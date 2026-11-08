@@ -6,6 +6,7 @@
       "067-node-live-repeat-runs"
     ],
     "created": "2026-11-08",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "006-cli-surface",
@@ -44,10 +45,26 @@
           "kind": "file",
           "path": "Cargo.lock"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "directory",
+          "path": "scripts/acceptance/"
+        }
       }
     ],
     "id": "069-node-host-nonblocking-open",
-    "implementation": "pending",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-2-the-node-filesystem-host",
@@ -78,7 +95,7 @@
       }
     ],
     "sectionDigests": {
-      "069-the-node-binding-s-filesystem-host-opens-inputs-without-blocking-amends-006-027-and-067": "037cd449fa5501ab45b94241dff94cbcbefb9256dcae1f40abd4b57d8a707670",
+      "069-the-node-binding-s-filesystem-host-opens-inputs-without-blocking-amends-006-027-and-067": "8da5a0808f190baf5b5145129450bb11ead612fc9ece8895949ffc150c97e307",
       "1-purpose": "5b831d4ad500785e94e03b3b514e6d8711c2d43b960a0278922acc07f50d3e5a",
       "2-1-binding-principles": "aa61ac3edad07f5131fe6eb23ba048f607f73fb4d39bcf08b7bca16231f02fa7",
       "2-territory": "e66cc67d99020ef82010231cdd145c2222aa6777eedef1654cde5d5263d71eaf",
@@ -91,8 +108,8 @@
       "5-observable-negative-cases": "491afabfd786188b219c13f14e13ea8c949227c32837995707108534b9c38c9c",
       "acceptance": "101a359712ab9b37c410c0573185fb0927e1378c27b7ba921c31535e97507d41",
       "decisions-at-approval": "e3437c3498fd67fa45fcf9b49b76d401a4e5d041fe01d3f56a498c7ea185cef5",
-      "implementation-record": "23c6df46f2a00fa0af9e731f6f7ae25cca21a701c9049ca840b74b4b80cc8e5b",
-      "verification": "34c0dce8db22a9528ca6045433bcb2e16addc9622ca2e1409472bc5902edfe5f"
+      "implementation-record": "71adf05962bca068988614790acbf39bde37fccd470bc2a48eeb0484a0dc6fc2",
+      "verification": "3d8461886ab656ceddd7ebb6e5525c66a2e69b72a367c3d8b6cb7c068e93a45d"
     },
     "sectionHeadings": [
       "069: The Node binding's filesystem host opens inputs without blocking (amends 006, 027 and 067)",
@@ -116,6 +133,6 @@
     "summary": "An amendment of approved specs 067 (3.4.2 and its implementation record's residual race), 027 (the Node binding's host) and 006 (3.3.1's non-blocking open, which moves to a shared home), for #566, ratified by the owner on 2026-11-08 (A-89). The Node binding's filesystem host for `engine.liveRun` opens every input file and store item with the standard library's blocking open, so a regular file swapped for a FIFO or device between its metadata check and the open can block the call; the CLI closes that window with a non-blocking open. This spec moves the CLI's open into `rustev-surface`, has the CLI and the Node host both use it, and requires a test that a FIFO at an input path or store item is refused without blocking. Nothing read changes: the check on the open handle already refused a non-regular file.\n",
     "title": "The Node binding's filesystem host opens inputs without blocking (amends 006, 027 and 067)"
   },
-  "shardHash": "b4e096a9c6065930ec00a743fe1b51ab298d9131d3a314d8592d0e71ca976808",
+  "shardHash": "adc53fd218c35083471eb59e6136f136636b029972b8050713d9709029022a6d",
   "specVersion": "1.11.0"
 }

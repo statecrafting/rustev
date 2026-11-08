@@ -26,6 +26,29 @@ pub fn missing(label: &str) -> IoFail {
     }
 }
 
+/// Open a file for reading without blocking (spec 006, 3.3.1; spec 069,
+/// 3.1): a path swapped for a FIFO or device after the caller's
+/// regular-file check opens at once instead of waiting for a writer, and
+/// the caller's check on the handle refuses it. With `no_follow`, a final
+/// symbolic link is refused rather than followed. On other platforms this
+/// is a plain open.
+pub fn open_input(path: &std::path::Path, no_follow: bool) -> std::io::Result<std::fs::File> {
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        let mut flags = libc::O_NONBLOCK;
+        if no_follow {
+            flags |= libc::O_NOFOLLOW;
+        }
+        options.custom_flags(flags);
+    }
+    #[cfg(not(unix))]
+    let _ = no_follow;
+    options.open(path)
+}
+
 /// An input entry, inspected without following a symbolic link.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EntryKind {
@@ -253,5 +276,43 @@ impl Host for Memory {
         } else {
             format!("{dir}/{name}")
         }
+    }
+}
+
+#[cfg(all(test, unix))]
+mod open_tests {
+    use super::open_input;
+
+    // Spec 069, 3.3.2: a FIFO with no writer opens at once, and a final
+    // symbolic link is refused with `no_follow`.
+    #[test]
+    fn open_input_does_not_block_on_a_fifo_and_refuses_links_with_no_follow() {
+        let dir = std::env::temp_dir().join(format!("rustev-surface-open-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let fifo = dir.join("fifo");
+        let made = std::process::Command::new("mkfifo")
+            .arg(&fifo)
+            .status()
+            .unwrap();
+        assert!(made.success());
+        let (tx, rx) = std::sync::mpsc::channel();
+        let path = fifo.clone();
+        std::thread::spawn(move || {
+            let opened = open_input(&path, false).map(|f| f.metadata().unwrap().is_file());
+            let _ = tx.send(opened.ok());
+        });
+        let opened = rx
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .expect("open_input blocked on a FIFO");
+        assert_eq!(opened, Some(false), "the handle is not a regular file");
+
+        let target = dir.join("target");
+        std::fs::write(&target, b"x").unwrap();
+        let link = dir.join("link");
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+        assert!(open_input(&link, true).is_err());
+        assert!(open_input(&link, false).is_ok());
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

@@ -257,7 +257,8 @@ SEEDS = [
         "byte caps",
         # The check alone is now backed by the non-blocking open (3.3.1).
         "a FIFO passes the check before opening and the open blocks",
-        S + "io.rs",
+        # The open moved into rustev-surface (spec 069, 3.1).
+        [S + "io.rs", U + "host.rs"],
         [
             "        match std::fs::metadata(path) {\n            Ok(m) if m.is_file() => {}",
             "let mut flags = libc::O_NONBLOCK;",
@@ -268,7 +269,7 @@ SEEDS = [
     (
         "byte caps",
         "a FIFO swapped in after the check blocks the open",
-        S + "io.rs",
+        U + "host.rs",
         "let mut flags = libc::O_NONBLOCK;",
         "let mut flags = 0;",
         CLI,
@@ -276,7 +277,7 @@ SEEDS = [
     (
         "store confinement",
         "a symbolic link swapped into the store is followed",
-        S + "io.rs",
+        U + "host.rs",
         "            flags |= libc::O_NOFOLLOW;\n",
         "",
         CLI,
