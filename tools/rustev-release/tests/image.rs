@@ -389,6 +389,7 @@ fn step(m: &ReleaseManifest, platform: &str, kind: &str, passed: bool) -> Vec<u8
         architecture: "fixture-arch".into(),
         toolchain: "rustc fixture".into(),
         node: "node fixture".into(),
+        npm_provenance: BTreeMap::new(),
         status: if passed {
             Status::Passed
         } else {

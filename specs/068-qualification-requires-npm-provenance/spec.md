@@ -2,7 +2,7 @@
 id: "068-qualification-requires-npm-provenance"
 title: "Qualification requires npm provenance after 0.5.0 (amends 031, 056 and 058)"
 status: approved
-implementation: pending
+implementation: in-progress
 created: "2026-11-07"
 summary: >
   An amendment of approved specs 031 (3.9.6, 3.9.7 (b)), 056 (3.3)
@@ -52,7 +52,7 @@ obligations:
 # 068: Qualification requires npm provenance after 0.5.0 (amends 031, 056 and 058)
 
 Approved: ratified by the owner on 2026-11-08 (A-88) for the release
-after 0.6.0; the implementation is pending. The approved texts of 031,
+after 0.6.0; the implementation is in progress (increment 1 of 2). The approved texts of 031,
 056 and 058 are not edited; this spec records what it changes in them.
 
 ## 1. Purpose
@@ -264,11 +264,77 @@ attestations (031 3.9.5); the token fallback's removal (3.5).
 
 ## Verification
 
-Pending with implementation.
+Declared for `spec-spine verify 068`; 068 joins `make verify` at
+completion (its `Makefile` and `scripts/acceptance/` edge). Every command
+is offline: the registry's answers, the audit report and the attestation
+bundles are fixtures, and none reads a credential. The requalification
+runs of Acceptance are release evidence, recorded below, never part of
+declared verification.
+
+```verify:cli
+# 3.1 to 3.3 and every row of section 5 in the harness: the boundary
+# (0.5.0 grandfathered, 0.5.1 and 0.6.0 not), named, verified and bound,
+# registry failures, and an earlier release tree (I-2).
+cargo test -p rustev-release --locked --test qualify_harness
+# 3.2.1 and 3.3.3: the shared fixture through hosted.rs's
+# npm_has_provenance, and the step-file refusal and acceptance.
+cargo test -p rustev-release --locked --test family
+cargo clippy -p rustev-release --all-targets --locked -- -D warnings
+```
 
 ## Implementation record
 
-None yet.
+**In progress.** Planned increments, each a separately reviewed pull
+request; later parts append here and do not edit this list:
+
+1. **Harness and step check** (`tools/rustev-release/`): 3.1 to 3.3 in
+   `qualify/harness.py`, the `npm_provenance` member and the refusal of
+   3.3.3 in `src/qualification.rs`, the README, and the tests of
+   Acceptance over fixtures.
+2. **Closure**: the requalification of the first release after 0.5.0
+   (`verified` per package) and of `v0.5.0` (`not_required`) by
+   `qualify.yml`, their run ids recorded here; 068 joins `VERIFIED_SPECS`
+   in the `Makefile` and `scripts/acceptance/`.
+
+**Increment 1 (2026-11-08).**
+
+- `qualify/harness.py`: `PROVENANCE_AFTER = (0, 5, 0)` is a constant of
+  the harness; `provenance_required` compares `X.Y.Z` component by
+  component and never reads `RUSTEV_QUALIFY_RELEASE_TREE` (3.1, I-2).
+  The npm step's per-package checks move into `npm_packages`; after
+  0.5.0, `npm_provenance` fetches the version document from
+  `https://registry.npmjs.org/<name>/<version>`, requires `npm_named`
+  (3.2.1, the predicate of `hosted.rs`'s `npm_has_provenance`), fetches
+  the bundle from `dist.attestations.url` (refused unless it is on
+  `https://registry.npmjs.org/`), and requires exactly one SLSA
+  provenance statement with one subject and the binding of 3.2.3. The
+  subject's name is the package URL as npm writes it, with the scope's
+  `@` percent-encoded (`pkg:npm/%40rustev/rustev@0.6.0`), and its
+  `sha512` digest is the hex of the manifest's SRI integrity. Any network
+  error, non-200 answer, unparsable body or missing member fails the step
+  naming the package and the check (3.2.4). Up to 0.5.0 the registry is
+  not asked and each package records `not_required` (3.3.1); the audit
+  report's `invalid` and `missing` lists fail either rule (3.2.2).
+- The npm step's record gains `npm_provenance` (3.3.2), filled per
+  package only once that package passed. A test-only subcommand,
+  `harness.py npm-check <version> <manifest> <dir>`, runs the same checks
+  over a recorded consumer, its audit report and fixture registry answers;
+  it writes no step record, so it can never qualify a release.
+- `src/qualification.rs`: `Step` gains `npm_provenance` (absent from
+  other kinds and from older harnesses' steps), `NpmProvenance` admits
+  `verified` and `not_required` only, and `evidence` refuses a required
+  npm step of a version after 0.5.0 unless it lists at least one
+  `@rustev/*` package and every one, in its checksums or its provenance,
+  records `verified` (3.3.3).
+- `tests/fixtures/npm-provenance-documents.json` holds the shared version
+  documents; `tests/family.rs` runs them through `npm_response` and
+  `tests/qualify_harness.rs` through the harness, and both agree on each
+  case's `provenance`.
+- Checked by hand against the public registry (read only): the harness's
+  live path reports `verified` for `@rustev/rustev` and
+  `@rustev/rustev-wasm` 0.6.0, and would refuse both at 0.5.0, which
+  carry no provenance; hence 3.3.1.
+- No workflow edit: `qualify.yml` and `release.yml` are unchanged (2).
 
 ## Decisions at approval
 
