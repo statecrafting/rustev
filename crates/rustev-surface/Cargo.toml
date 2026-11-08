@@ -34,6 +34,10 @@ rustev-eval = { workspace = true }
 serde.workspace = true
 serde_json = { workspace = true, features = ["raw_value"] }
 
+# The non-blocking open's flags (spec 069, 3.1.2).
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 # The rules backend derives descriptors in tests only, as the CLI's host
 # does (spec 027, 3.3.2).
 [dev-dependencies]

@@ -4825,6 +4825,7 @@ dependencies = [
 name = "rustev-surface"
 version = "0.6.0"
 dependencies = [
+ "libc",
  "rustev-backend-rules",
  "rustev-contract",
  "rustev-core",
