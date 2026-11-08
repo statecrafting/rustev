@@ -1489,3 +1489,107 @@ fn version_2_constructs_are_not_bound_by_this_build() {
         "{e:?}"
     );
 }
+
+/// Spec 070 increment 2a: a /2 program with token and date extractors and a
+/// month table, its plan golden and `PlanId`, and the binding refusals in
+/// phase c with category `invalid_extraction`.
+fn program_v2() -> ExtractRules {
+    serde_json::from_value(json!({"schema":"rustev.extract-rules/2","name":"filters-fallback","version":"1",
+        "sources":[{"name":"text","ref":"input:message"}],
+        "month_tables":{"en":[["Jan"],["Feb"],["Mar"],["Apr"],["May"],["Jun"],["Jul"],["Aug"],["Sep"],["Oct"],["Nov"],["Dec"]]},
+        "fields":[
+            {"field":"area_name","rules":[{"name":"area","when":"always",
+                "then":{"token_after":{"source":"text","terms":["area"],"charset":["upper","lower"],"min_len":2,"max_len":32}}},
+                {"name":"code","when":"always","then":{"token_matching":{"source":"text","shape":[
+                    {"repeat":{"class":["upper"],"min":2,"max":3}},{"byte":"-"},{"repeat":{"class":["digit"],"min":1,"max":4}}]}}}]},
+            {"field":"window","rules":[{"name":"dates","when":"always","then":{"record":{
+                "start":{"date":{"source":"text","format":"dmy_name","months":"en","occurrence":1}},
+                "end":{"date":{"source":"text","format":"dmy_name","months":"en","occurrence":2}}}}}]}
+        ]})).unwrap()
+}
+
+#[test]
+fn version_2_program_plan_golden_and_identity() {
+    let mut d = fixture();
+    fallback(&mut d);
+    let p = prompt();
+    let b = descriptor();
+    let rules = program_v2();
+    let c = compiled(&d, &p, &b, std::slice::from_ref(&rules)).unwrap();
+    let rustev_contract::plan::PlanStepDetail::Extract(e) = &c.plan.steps[0].detail else {
+        panic!()
+    };
+    let rustev_contract::extraction_results::BoundExtractionFallback::Bound {
+        identity,
+        program,
+        ..
+    } = &e.fallback
+    else {
+        panic!()
+    };
+    assert_eq!(*identity, rules.id().unwrap());
+    assert!(program.is_v2());
+    assert_eq!(
+        rustev_core::Compiled::load(&c.plan, std::slice::from_ref(&b), &[])
+            .unwrap()
+            .id,
+        c.id
+    );
+    common::golden("extraction-rules-2.plan.json", &c.canonical());
+    common::golden("extraction-rules-2.plan.id", c.id.to_string().as_bytes());
+    // Every member of the program, including a month table, enters the PlanId.
+    for change in 0..3 {
+        let mut rules = program_v2();
+        match change {
+            0 => rules.month_tables.as_mut().unwrap().get_mut("en").unwrap()[10][0] = "Nv".into(),
+            1 => rules.schema = "rustev.extract-rules/1".into(),
+            _ => rules.fields[0].rules.reverse(),
+        }
+        match compiled(&d, &p, &b, &[rules]) {
+            Ok(other) => assert_ne!(other.id, c.id, "{change}"),
+            // A /1 schema with /2 members is refused, never read as /2.
+            Err(e) => {
+                assert_eq!(change, 1);
+                assert_eq!(e.category, C::InvalidExtraction, "{e:?}");
+                assert!(e.detail.contains("unknown member"), "{e:?}");
+            }
+        }
+    }
+}
+
+#[test]
+fn version_2_binding_refusals_are_invalid_extraction_in_phase_c() {
+    let mut d = fixture();
+    fallback(&mut d);
+    for (field, then, detail) in [
+        (
+            "area_name",
+            json!({"date":{"source":"text","format":"dmy_slash","months":"en","occurrence":1}}),
+            "takes no months",
+        ),
+        (
+            "party_size",
+            json!({"token_after":{"source":"text","terms":["x"],"charset":["digit"],"min_len":1,"max_len":2}}),
+            "incompatible",
+        ),
+        (
+            "features",
+            json!({"token_matching":{"source":"text","shape":[{"byte":"x"}]}}),
+            "literal",
+        ),
+    ] {
+        let mut v = serde_json::to_value(program_v2()).unwrap();
+        v["fields"] = json!([{"field":field,"rules":[{"name":"r","when":"always","then":then}]}]);
+        let bad: ExtractRules = serde_json::from_value(v).unwrap();
+        let e = refusal(&d, std::slice::from_ref(&bad));
+        assert_eq!(e.category, C::InvalidExtraction, "{e:?}");
+        assert_eq!(e.subject, "step:request_filters");
+        assert!(e.detail.contains(detail), "{e:?}");
+        // Phase c precedes phase e: an unscreened input, refused in phase e
+        // with the valid program, does not hide the binding refusal.
+        let mut later = d.clone();
+        later.inputs[0].provenance.push(P::UserSupplied);
+        assert_eq!(refusal(&later, &[program_v2()]).category, C::UnscreenedText);
+        assert_eq!(refusal(&later, &[bad]).category, C::InvalidExtraction);
+    }
+}

@@ -94,7 +94,8 @@ pub(crate) fn resolve(def: &Definition, programs: &[ExtractRules]) -> Result<(),
         let canonical = program.canonical().map_err(|err| bad(&step.id, err))?;
         ExtractRules::parse(&canonical).map_err(|err| bad(&step.id, err))?;
         program.id().map_err(|err| bad(&step.id, err))?;
-        crate::extraction_fallback::bind(program, e).map_err(|err| bad(&step.id, err))?;
+        crate::extraction_fallback::bind_in(program, e, &def.inputs)
+            .map_err(|err| bad(&step.id, err))?;
     }
     Ok(())
 }

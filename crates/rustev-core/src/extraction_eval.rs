@@ -403,8 +403,12 @@ impl Evaluation<'_> {
                 let rustev_contract::definition::StepBody::Extract(e) = &decl.body else {
                     unreachable!()
                 };
-                let bound =
-                    crate::extraction_fallback::bind(program, e).expect("compiled fallback");
+                let bound = crate::extraction_fallback::bind_in(
+                    program,
+                    e,
+                    &self.compiled.plan.definition.inputs,
+                )
+                .expect("compiled fallback");
                 let owned: BTreeMap<_, _> = program
                     .sources
                     .iter()
