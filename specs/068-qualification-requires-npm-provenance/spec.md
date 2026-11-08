@@ -280,8 +280,10 @@ those versions cannot be republished; the "named" predicate is #555's
 (3.2.1), so publication and qualification agree; the token fallback's
 removal is recorded, not specified (3.5), because it waits on upstream.
 
-Ratified by the owner on 2026-11-08 (A-88), with every question the
-draft left open answered as recommended:
+Ratified by the owner on 2026-11-08 (A-88: "I agree with all your
+recommendations"), adopting option A (ratified now, merged after the
+`v0.6.0` tag, implemented in the release after 0.6.0), with every
+question the draft left open answered as recommended:
 
 1. **The boundary** is a numeric comparison with `0.5.0`: every version
    greater than it requires provenance, with no list of grandfathered
