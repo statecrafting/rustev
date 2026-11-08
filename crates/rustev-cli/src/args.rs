@@ -490,7 +490,7 @@ rustev: compile, inspect, run, replay and evaluate Rustev decision plans.
                       [...eval inputs...] --repeat-config F --candidates DIR
                       (--snapshots DIR|--bundles DIR) --out DIR
                       [--require-existing-journal] [--probe-only] [--resume]
-                      [--rerun-interrupted] [--run-deadline-ms N]
+                      [--rerun-interrupted] [--run-deadline-ms N] [--host-cap-ms N]
   rustev eval views   [...eval inputs, one --bundles, no repeat or scores...] --out F
   rustev eval judge   --config F --views F --judge-plan F [--descriptor F]... [--rules F]...
                       [--calibration F]... --bundles DIR --scorer ID
