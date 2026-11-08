@@ -1023,7 +1023,9 @@ fn release_manifest(dir: &Path) -> Result<rustev_release::manifest::ReleaseManif
 
 // Spec 058 3.3.1, 3.3.2, 3.5: idempotent publication of one registry's items.
 fn publish_cmd(dir: &str, record: &str, kind: &str) -> Result<(), String> {
-    use rustev_release::tagged::{Cargo, Npm, POLLS, Publisher, Record, items, publish_items};
+    use rustev_release::tagged::{
+        CRATE_POLLS, Cargo, NPM_POLLS, Npm, Publisher, Record, WAIT_SECONDS, items, publish_items,
+    };
     let dir = Path::new(dir);
     let bytes = std::fs::read(dir.join("release-manifest.json")).map_err(|e| e.to_string())?;
     // 053 3.4.2: a candidate is refused before any registry contact.
@@ -1042,15 +1044,23 @@ fn publish_cmd(dir: &str, record: &str, kind: &str) -> Result<(), String> {
     }
     let path = Path::new(record);
     let mut r = Record::load(path, &m)?;
-    let mut publisher: Box<dyn Publisher> = if kind == "crate" {
-        Box::new(Cargo { wait_seconds: 10 })
+    let (mut publisher, polls): (Box<dyn Publisher>, u32) = if kind == "crate" {
+        (
+            Box::new(Cargo {
+                wait_seconds: WAIT_SECONDS,
+            }),
+            CRATE_POLLS,
+        )
     } else {
-        Box::new(Npm {
-            dir: dir.to_path_buf(),
-            wait_seconds: 10,
-        })
+        (
+            Box::new(Npm {
+                dir: dir.to_path_buf(),
+                wait_seconds: WAIT_SECONDS,
+            }),
+            NPM_POLLS,
+        )
     };
-    let result = publish_items(&list, &m.version, POLLS, publisher.as_mut(), &mut r);
+    let result = publish_items(&list, &m.version, polls, publisher.as_mut(), &mut r);
     // The record is written whatever happened, so a rerun's evidence and a
     // partial publication are both visible (3.5.4).
     r.write(path)?;

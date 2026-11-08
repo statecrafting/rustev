@@ -216,7 +216,13 @@ Publication starts only after every job of 3.2 and `approve` pass.
    first, then `@rustev/rustev` and `@rustev/rustev-wasm`), with
    `npm publish --provenance` through npm trusted publishing (OIDC, the
    `npm-publish` Environment its publishers are bound to). It publishes
-   the run's verified tarballs, never a repack. When npm refuses the
+   the run's verified tarballs, never a repack. After each upload it
+   polls the registry every 10 seconds for up to 25 minutes (crates.io's
+   index in 3.3.1: up to 10 minutes) until the package is listed with the
+   run's integrity; npm can list a large native package more than 15
+   minutes after accepting it (0.6.0). Past the bound the job fails, and
+   it is rerun only once the package is listed, since a rerun publishes
+   any package it still finds absent. When npm refuses the
    trusted-publishing exchange (npm/cli#9969, open since 2026-10-28: the
    immutable OIDC subject is rejected), npm falls back to a granular
    publish token held only by the `npm-publish` Environment as `NPM_TOKEN`
@@ -680,6 +686,17 @@ move itself changes no behavior. For consumers, every PlanId changes from
 0.6.0 changelog states for each reference plan): anything keyed by a
 PlanId, such as evaluation baselines, ledgers and cache keys, must be
 re-derived with 0.6.0 when upgrading.
+
+**npm visibility bound (2026-11-08).** The 0.6.0 run's `publish-npm`
+failed twice: npm accepted `darwin-x64` and then `linux-x64-musl` but
+listed neither within the shared 60 polls at 10 seconds, and each
+rerun was started only after the package appeared. 3.3.2 now states
+the bound: `tools/rustev-release/src/tagged.rs` splits `POLLS` into
+`CRATE_POLLS` (60, 10 minutes, unchanged) and `NPM_POLLS` (150, 25
+minutes) at `WAIT_SECONDS` (10), and `publish` picks the bound by kind.
+The npm bound keeps one package's full wait within half of the job's 60
+minutes, so the workflow is unchanged. `tests/tagged.rs`
+`registry_wait_bounds_follow_3_3` pins both bounds.
 
 ## Open questions for the owner
 
