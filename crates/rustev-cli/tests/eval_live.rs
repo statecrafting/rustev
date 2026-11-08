@@ -188,7 +188,7 @@ fn two_cases_publish_records_and_one_summary_line_with_zero_spend() {
     // Rules cost units measure work, not money: cost_unit none spends zero even with a cap of 1.
     assert_eq!(
         String::from_utf8(result.stdout).unwrap(),
-        "evaluated_live synthetic run_spend=0 headroom=10000000000 completed=2 unavailable=0 refused=0 interrupted=0 pending=0\n"
+        "evaluated_live synthetic run_spend=0 headroom=10000000000 completed=2 unavailable=0 refused=0 interrupted=0 pending=0 new_journal\n"
     );
     assert!(f.s.exists("out/checkpoint.json"));
     let entries: Vec<_> = std::fs::read_dir(f.s.path("out/cases"))
@@ -676,4 +676,110 @@ impl Fixture {
         });
         f
     }
+}
+
+fn set_flag(f: &mut Fixture, flag: &str, value: String) {
+    let i = f.args.iter().position(|arg| arg == flag).unwrap();
+    f.args[i + 1] = value;
+}
+
+#[test]
+fn require_existing_journal_is_a_pre_output_invalid_input_refusal() {
+    let mut f = Fixture::new();
+    f.args.push("--require-existing-journal".into());
+    expect(&f.run(), 4, "journal-missing");
+    for path in ["journal.jsonl", "journal.jsonl.lock", "out"] {
+        assert!(!f.s.exists(path), "{path}");
+    }
+    let help = execute(&["help".into()], &Context::default());
+    assert!(String::from_utf8_lossy(&help.stdout).contains("--require-existing-journal"));
+}
+
+#[test]
+fn journal_identity_visibility_and_existing_option() {
+    let mut f = Fixture::new();
+    expect(&f.run(), 0, "new_journal");
+    let first = f.json("out/live-run.json");
+    assert_eq!(first["journal"]["created"], "this_run");
+    assert_eq!(first["journal"]["created_at_ms"], common::NOW);
+    assert!(
+        first["journal"]["id"]
+            .as_str()
+            .unwrap()
+            .starts_with("sha256:")
+    );
+    let header = f.s.read("journal.jsonl");
+    std::fs::remove_dir_all(f.s.path("out")).unwrap();
+    f.args.push("--require-existing-journal".into());
+    let required = f.run();
+    expect(&required, 0, "evaluated_live");
+    assert!(!String::from_utf8_lossy(&required.stdout).contains("new_journal"));
+    let second = f.json("out/live-run.json");
+    assert_eq!(second["journal"]["created"], "earlier");
+    assert_eq!(second["journal"]["id"], first["journal"]["id"]);
+    assert_eq!(second["journal_before"], first["journal_after"]);
+    assert!(f.s.read("journal.jsonl").starts_with(&header));
+    std::fs::remove_dir_all(f.s.path("out")).unwrap();
+    f.args.pop();
+    let optional = f.run();
+    assert_eq!(optional.code, required.code);
+    assert_eq!(optional.stdout, required.stdout);
+    let third = f.json("out/live-run.json");
+    for key in [
+        "journal",
+        "journal_before",
+        "journal_after",
+        "run_spend",
+        "status",
+        "counts",
+    ] {
+        assert_eq!(third[key], second[key], "{key}");
+    }
+    std::fs::remove_dir_all(f.s.path("out")).unwrap();
+    std::fs::remove_file(f.s.path("journal.jsonl")).unwrap();
+    set_flag(&mut f, "--now-ms", (common::NOW + 1).to_string());
+    expect(&f.run(), 0, "new_journal");
+    assert_ne!(
+        f.json("out/live-run.json")["journal"]["id"],
+        first["journal"]["id"]
+    );
+}
+
+#[test]
+fn replaced_journal_is_refused_on_resume_without_modifying_evidence() {
+    let mut f = Fixture::new();
+    expect(&f.run(), 0, "evaluated_live");
+    let cp = f.s.read("out/checkpoint.json");
+    std::fs::remove_file(f.s.path("journal.jsonl")).unwrap();
+    drop(
+        SpendJournal::open_for_run(
+            f.s.path("journal.jsonl"),
+            BudgetKind::Testing,
+            Arc::new(rustev_live::journal::SetClock::new(1)),
+            "replacement",
+        )
+        .unwrap(),
+    );
+    let bytes = f.s.read("journal.jsonl");
+    f.args.push("--resume".into());
+    expect(&f.run(), 4, "checkpoint-mismatch");
+    assert_eq!(f.s.read("journal.jsonl"), bytes);
+    assert_eq!(f.s.read("out/checkpoint.json"), cp);
+    assert!(!f.s.exists("journal.jsonl.lock"));
+}
+
+#[test]
+fn legacy_journal_is_reported_without_rewriting_header() {
+    let f = Fixture::new();
+    let header =
+        b"{\"schema\":\"rustev-jev.spend-journal/1\",\"budget\":\"testing\",\"cap\":10000000000}\n";
+    f.s.write("journal.jsonl", header);
+    let result = f.run();
+    expect(&result, 0, "evaluated_live");
+    assert!(!String::from_utf8_lossy(&result.stdout).contains("new_journal"));
+    assert_eq!(
+        f.json("out/live-run.json")["journal"],
+        json!({"id":null,"created_at_ms":null,"created":"legacy"})
+    );
+    assert!(f.s.read("journal.jsonl").starts_with(header));
 }

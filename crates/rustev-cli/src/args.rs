@@ -166,7 +166,7 @@ pub const COMMANDS: &[CommandSpec] = &[
                       "bundles": One, "captures": One, "admission": One, "out": One,
                       "now-ms": One, "scope": One, "tenant": One, "context-revision": One,
                       "principal-scope": One, "store": One, "host-cap-ms": One, "run-deadline-ms": One,
-                      "probe-only": Switch, "resume": Switch, "rerun-interrupted": Switch,
+                      "require-existing-journal": Switch, "probe-only": Switch, "resume": Switch, "rerun-interrupted": Switch,
                       "repeat": One, "purpose": One, "lineage": One, "ledger": One,
                       "ledger-new": Switch, "ledger-out": One),
         required: &[
@@ -486,6 +486,11 @@ rustev: compile, inspect, run, replay and evaluate Rustev decision plans.
                       [--purpose measurement|optimization]
                       [--lineage H (--ledger F|--ledger-new) --ledger-out F]
                       [--scores F]...   (a version 3 configuration, at most 16)
+  rustev eval live    --live --live-config F --journal F --run-id ID
+                      [...eval inputs...] --repeat-config F --candidates DIR
+                      (--snapshots DIR|--bundles DIR) --out DIR
+                      [--require-existing-journal] [--probe-only] [--resume]
+                      [--rerun-interrupted] [--run-deadline-ms N] [--host-cap-ms N]
   rustev eval views   [...eval inputs, one --bundles, no repeat or scores...] --out F
   rustev eval judge   --config F --views F --judge-plan F [--descriptor F]... [--rules F]...
                       [--calibration F]... --bundles DIR --scorer ID

@@ -36,15 +36,19 @@ impl Dir {
         Self(path)
     }
     fn journal(&self) -> SpendJournal {
-        SpendJournal::open(
+        SpendJournal::open_for_run(
             self.0.join("journal"),
             BudgetKind::Testing,
             Arc::new(SetClock::new(0)),
+            "run",
         )
         .unwrap()
     }
     fn options(&self) -> RunOptions {
         RunOptions {
+            journal_path: self.0.join("journal"),
+            require_existing_journal: false,
+            journal_clock: Arc::new(SetClock::new(0)),
             out: self.0.join("out"),
             resume: false,
             rerun_interrupted: false,
@@ -2068,7 +2072,7 @@ async fn checkpoint_under_superseded_header_resumes_after_migration() {
     drop(prepare(spec(), dir.options()).unwrap());
     let path = dir.0.join("out/checkpoint.json");
     let mut cp = dir.checkpoint();
-    assert_eq!(
+    assert_ne!(
         cp.bindings.journal_header_digest,
         SpendJournal::testing_header_digest()
     );
@@ -2102,4 +2106,214 @@ async fn checkpoint_under_superseded_header_resumes_after_migration() {
         dir.checkpoint().bindings.journal_header_digest,
         SpendJournal::testing_header_digest()
     );
+}
+
+async fn identity_run(dir: &Dir, name: &str, time: i64, required: bool) -> RunOutcome {
+    let mut s = spec();
+    s.run_id = name.into();
+    let mut opts = dir.options();
+    opts.out = dir.0.join(name);
+    opts.require_existing_journal = required;
+    opts.journal_clock = Arc::new(SetClock::new(time));
+    let p = prepare(s, opts).unwrap();
+    let j = p.open_journal().unwrap();
+    let r = rig(config(8, 0, 1), &[(answering(linear_head()), 8)]);
+    p.execute(&r.rt, j, &Host(None), &r.clock, &CancelSignal::new())
+        .await
+        .unwrap()
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn journal_visibility_across_runs_replacement_and_legacy() {
+    use rustev_live::journal::JournalCreated::*;
+    let dir = Dir::new();
+    let first = identity_run(&dir, "first", 1, false).await;
+    assert_eq!(first.journal.created, ThisRun);
+    assert!(first.journal.id.is_some());
+    assert_eq!(first.journal.created_at_ms, Some(1));
+    assert_eq!(first.journal_before.committed(), 0);
+    assert!(first.journal_after.committed() > 0);
+    let second = identity_run(&dir, "second", 2, true).await;
+    assert_eq!(second.journal.created, Earlier);
+    assert_eq!(second.journal.id, first.journal.id);
+    assert_eq!(second.journal.created_at_ms, first.journal.created_at_ms);
+    assert_eq!(second.journal_before, first.journal_after);
+    let report: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(dir.0.join("second/live-run.json")).unwrap())
+            .unwrap();
+    assert_eq!(
+        report["journal"],
+        serde_json::to_value(&second.journal).unwrap()
+    );
+    std::fs::remove_file(dir.0.join("journal")).unwrap();
+    let fresh = identity_run(&dir, "fresh", 3, false).await;
+    assert_eq!(fresh.journal.created, ThisRun);
+    assert_ne!(fresh.journal.id, first.journal.id);
+    assert_eq!(fresh.journal_before.committed(), 0);
+    let legacy =
+        "{\"schema\":\"rustev-jev.spend-journal/1\",\"budget\":\"testing\",\"cap\":10000000000}\n";
+    std::fs::write(dir.0.join("journal"), legacy).unwrap();
+    let old = identity_run(&dir, "old", 4, true).await;
+    assert_eq!(old.journal.created, Legacy);
+    assert_eq!(old.journal.id, None);
+    assert_eq!(old.journal.created_at_ms, None);
+    assert!(
+        std::fs::read(dir.0.join("journal"))
+            .unwrap()
+            .starts_with(legacy.as_bytes())
+    );
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn resume_rejects_replacement_before_lock_or_output_changes() {
+    let dir = Dir::new();
+    identity_run(&dir, "run", 1, false).await;
+    let cp = std::fs::read(dir.0.join("run/checkpoint.json")).unwrap();
+    std::fs::remove_file(dir.0.join("journal")).unwrap();
+    drop(
+        SpendJournal::open_for_run(
+            dir.0.join("journal"),
+            BudgetKind::Testing,
+            Arc::new(SetClock::new(2)),
+            "replacement",
+        )
+        .unwrap(),
+    );
+    let bytes = std::fs::read(dir.0.join("journal")).unwrap();
+    let mut opts = dir.options();
+    opts.out = dir.0.join("run");
+    opts.resume = true;
+    let e = prepare(spec(), opts).err().unwrap();
+    assert_eq!(e.subject, "checkpoint-mismatch");
+    assert_eq!(std::fs::read(dir.0.join("journal")).unwrap(), bytes);
+    assert_eq!(
+        std::fs::read(dir.0.join("run/checkpoint.json")).unwrap(),
+        cp
+    );
+    assert!(!dir.0.join("journal.lock").exists());
+}
+
+#[test]
+fn require_existing_journal_refuses_without_creating_anything() {
+    let dir = Dir::new();
+    let mut opts = dir.options();
+    opts.require_existing_journal = true;
+    let e = prepare(spec(), opts).err().unwrap();
+    assert_eq!(e.status, "invalid_input");
+    assert_eq!(e.subject, "journal-missing");
+    assert_eq!(std::fs::read_dir(&dir.0).unwrap().count(), 0);
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn existing_journal_option_does_not_change_results() {
+    let a = Dir::new();
+    let b = Dir::new();
+    drop(a.journal());
+    std::fs::copy(a.0.join("journal"), b.0.join("journal")).unwrap();
+    let a = identity_run(&a, "same", 2, false).await;
+    let b = identity_run(&b, "same", 2, true).await;
+    assert_eq!(
+        serde_json::to_value(a).unwrap(),
+        serde_json::to_value(b).unwrap()
+    );
+}
+
+#[test]
+fn journal_changed_between_prepare_and_open_is_refused() {
+    let dir = Dir::new();
+    let p = prepare(spec(), dir.options()).unwrap();
+    drop(
+        SpendJournal::open_for_run(
+            dir.0.join("journal"),
+            BudgetKind::Testing,
+            Arc::new(SetClock::new(1)),
+            "replacement",
+        )
+        .unwrap(),
+    );
+    let e = p.open_journal().unwrap_err();
+    assert_eq!(e.subject, "checkpoint-mismatch");
+    assert!(!dir.0.join("journal.lock").exists());
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn identity_checkpoint_accepts_only_the_same_header_with_superseded_cap() {
+    for migrate_first in [false, true] {
+        let dir = Dir::new();
+        identity_run(&dir, "run", 1, false).await;
+        let path = dir.0.join("journal");
+        let bytes = std::fs::read_to_string(&path).unwrap();
+        let old = bytes.replace("\"cap\":10000000000", "\"cap\":5000000000");
+        let old_header = old.split_inclusive('\n').next().unwrap();
+        let cp_path = dir.0.join("run/checkpoint.json");
+        let mut cp = LiveCheckpoint::parse(&std::fs::read(&cp_path).unwrap()).unwrap();
+        let expected = cp.bindings.journal_header_digest.clone();
+        cp.bindings.journal_header_digest =
+            rustev_contract::ids::ContentDigest::parse(&rustev_contract::canonical::tagged_digest(
+                "rustev-jev.spend-journal/1",
+                old_header.as_bytes(),
+            ))
+            .unwrap();
+        cp.write_atomic(&cp_path).unwrap();
+        std::fs::write(&path, old).unwrap();
+        if migrate_first {
+            drop(dir.journal());
+        }
+        let mut opts = dir.options();
+        opts.out = dir.0.join("run");
+        opts.resume = true;
+        let p = prepare(spec(), opts).unwrap();
+        let j = p.open_journal().unwrap();
+        assert_eq!(j.header_digest(), &expected);
+        let r = rig(config(8, 0, 1), &[(answering(linear_head()), 8)]);
+        let out = p
+            .execute(&r.rt, j, &Host(None), &r.clock, &CancelSignal::new())
+            .await
+            .unwrap();
+        assert_eq!(out.live_run.identities.journal_header_digest, expected);
+    }
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn old_run_reports_round_trip_without_adding_journal() {
+    let dir = Dir::new();
+    let run = identity_run(&dir, "run", 0, false).await;
+    let mut old = serde_json::to_value(run.live_run).unwrap();
+    old.as_object_mut().unwrap().remove("journal");
+    let bytes = rustev_contract::canonical::canonical_bytes(&old).unwrap();
+    let parsed = rustev_live::documents::LiveRun::parse(&bytes).unwrap();
+    assert!(parsed.journal.is_none());
+    assert_eq!(parsed.record_canonical().unwrap(), bytes);
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn reusing_an_open_journal_reports_earlier_for_the_next_run() {
+    use rustev_live::journal::JournalCreated;
+    let dir = Dir::new();
+    let p = prepare(spec(), dir.options()).unwrap();
+    let j = p.open_journal().unwrap();
+    let r = rig(config(8, 0, 1), &[(answering(linear_head()), 8)]);
+    let first = p
+        .execute(
+            &r.rt,
+            j.clone(),
+            &Host(None),
+            &r.clock,
+            &CancelSignal::new(),
+        )
+        .await
+        .unwrap();
+    let mut s = spec();
+    s.run_id = "next".into();
+    let mut opts = dir.options();
+    opts.out = dir.0.join("next");
+    let next = prepare(s, opts)
+        .unwrap()
+        .execute(&r.rt, j, &Host(None), &r.clock, &CancelSignal::new())
+        .await
+        .unwrap();
+    assert_eq!(first.journal.created, JournalCreated::ThisRun);
+    assert_eq!(next.journal.created, JournalCreated::Earlier);
+    assert_eq!(next.journal.id, first.journal.id);
+    assert_eq!(next.journal_before, first.journal_after);
 }

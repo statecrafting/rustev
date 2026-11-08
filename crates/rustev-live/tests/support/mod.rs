@@ -32,15 +32,19 @@ impl Dir {
         Self(path)
     }
     pub fn journal(&self) -> SpendJournal {
-        SpendJournal::open(
+        SpendJournal::open_for_run(
             self.0.join("journal"),
             BudgetKind::Testing,
             Arc::new(SetClock::new(0)),
+            "run",
         )
         .unwrap()
     }
     pub fn options(&self) -> RunOptions {
         RunOptions {
+            journal_path: self.0.join("journal"),
+            require_existing_journal: false,
+            journal_clock: Arc::new(SetClock::new(0)),
             out: self.0.join("out"),
             resume: false,
             rerun_interrupted: false,
