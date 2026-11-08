@@ -218,7 +218,20 @@ const CASES: [(&str, &str); 6] = [
         "run_deadline_cancels_in_flight_and_leaves_a_resumable_checkpoint",
     ),
 ];
-fn mirrors(id: &str, out: &Outputs) {
+fn mirrors(id: &str, snapshots: &Outputs) {
+    let prefix = if id == "live.resume" {
+        "run-2/"
+    } else {
+        "run-1/"
+    };
+    let mut out: Outputs = snapshots
+        .iter()
+        .filter_map(|(path, bytes)| {
+            path.strip_prefix(prefix)
+                .map(|p| (p.to_owned(), bytes.clone()))
+        })
+        .collect();
+    out.insert("status.json".into(), snapshots["status.json"].clone());
     let doc: Value = serde_json::from_slice(&out["out/live-run.json"]).unwrap();
     let statuses: Value = serde_json::from_slice(&out["status.json"]).unwrap();
     let (status, code) = match id {
@@ -281,6 +294,20 @@ fn mirrors(id: &str, out: &Outputs) {
             );
         }
         "live.resume" => {
+            let interrupted: Value =
+                serde_json::from_slice(&snapshots["run-1/out/live-run.json"]).unwrap();
+            let checkpoint: Value =
+                serde_json::from_slice(&snapshots["run-1/out/checkpoint.json"]).unwrap();
+            assert_eq!(interrupted["status"], "interrupted");
+            assert_eq!(interrupted["journal_after"]["liability"], 1);
+            assert_eq!(interrupted["counts"]["interrupted"], 1);
+            assert!(checkpoint["items"].as_array().unwrap().iter().any(|item| {
+                item["states"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|state| state.get("interrupted").is_some())
+            }));
             assert_eq!(statuses[0], json!({"status":"interrupted","code":16}));
             assert_eq!(statuses.as_array().unwrap().len(), 2);
             // Completed x is not resent; y's sole unsettled reservation stays liability.
@@ -319,8 +346,7 @@ fn live_cases() {
             keep(&golden,b);
             json!({"file":file,"golden":format!("{DIR}/{golden}"),"sha256":sha256_hex(b),"normalize":[]})
         }).collect();
-        // `native` joins with the binding runner over `engine.liveRun` (part 2).
-        let case = json!({"id":id,"command":"eval live","surfaces":["rust-api"],
+        let case = json!({"id":id,"command":"eval live","surfaces":["rust-api", "native"],
             "mirrors":format!("crates/rustev-live/tests/run.rs::{mirrored}"),"live":block,
             "inputs":paths.iter().map(|(name,path)| json!({"path":format!("{DIR}/fixtures/live/{path}"),"name":name,"sha256":sha256_hex(&shared[path])})).collect::<Vec<_>>(),"outputs":outputs});
         keep(&format!("cases/live/{id}.json"), &bytes(&case));
@@ -364,7 +390,7 @@ fn the_manifest_live_cases_pass_through_the_runner() {
                 .unwrap()
                 .contains(&format!("fn {test}("))
         );
-        assert_eq!(case.surfaces, ["rust-api"]);
+        assert_eq!(case.surfaces, ["rust-api", "native"]);
         ran += 1;
     }
     assert_eq!(ran, 6);

@@ -11,7 +11,6 @@
 use std::cell::Cell;
 use std::fs::File;
 use std::io::{ErrorKind, Read};
-use std::path::Path;
 
 /// The most bytes one command reads, store items included.
 pub const MAX_TOTAL_BYTES: usize = 256 * 1024 * 1024;
@@ -168,9 +167,18 @@ pub fn ensure_absent(path: &str) -> Result<(), IoFail> {
     }
 }
 
-/// `dir/name`, as a string path.
+/// `dir/name`, as a string path. The separator is always `/`, which every
+/// platform's file APIs accept, so the input labels a checkpoint and
+/// `live-run.json` record are the same on every platform (067 I-3: the
+/// win32 package writes the bytes the other platforms do).
 pub fn join(dir: &str, name: &str) -> String {
-    Path::new(dir).join(name).to_string_lossy().into_owned()
+    if dir.is_empty() {
+        name.into()
+    } else if dir.ends_with('/') {
+        format!("{dir}{name}")
+    } else {
+        format!("{dir}/{name}")
+    }
 }
 
 pub(crate) fn publish_outputs(
@@ -362,6 +370,16 @@ pub(crate) fn resolver(store: Option<&str>) -> Box<dyn Resolver> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn labels_join_with_a_forward_slash_on_every_platform() {
+        assert_eq!(join("candidates", "a"), "candidates/a");
+        assert_eq!(join("candidates/", "a"), "candidates/a");
+        // A trailing backslash is kept as written on every platform.
+        assert_eq!(join("a\\", "n"), "a\\/n");
+        assert_eq!(join("a/", "n"), "a/n");
+        assert_eq!(join("", "a"), "a");
+    }
 
     #[test]
     fn filesystem_reads_are_bounded_and_classify_links_without_following() {
