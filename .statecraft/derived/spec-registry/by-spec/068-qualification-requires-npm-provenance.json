@@ -1,0 +1,98 @@
+{
+  "record": {
+    "amends": [
+      "031-public-api-and-release-family",
+      "056-release-0-1-1-and-consumer-qualification",
+      "058-one-tagged-run-releases-the-family"
+    ],
+    "created": "2026-11-07",
+    "dependsOn": [
+      "031-public-api-and-release-family",
+      "056-release-0-1-1-and-consumer-qualification",
+      "058-one-tagged-run-releases-the-family"
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "031-public-api-and-release-family",
+        "unit": {
+          "kind": "directory",
+          "path": "tools/rustev-release/"
+        }
+      }
+    ],
+    "id": "068-qualification-requires-npm-provenance",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-2-the-provenance-rule",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "For a release version greater than 0.5.0, the npm step passes only when every installed `@rustev/*` package's version document names an SLSA build-provenance attestation, `npm audit signatures --include-attestations` reports no invalid or missing signature or attestation for it, and the attestation's subject and build definition bind it to the package's manifest integrity and to `.github/workflows/release.yml` of this repository at the tag `vX.Y.Z`; a missing, unverifiable, unreadable or differently bound attestation fails the step and is never treated as not required."
+      },
+      {
+        "anchor": "3-1-which-rule-applies",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "Which rule applies is decided by comparing the release version with 0.5.0 inside the harness that runs, never by reading the release's own tree, so qualifying an earlier tag with the default-branch harness cannot loosen the rule for a version after 0.5.0."
+      },
+      {
+        "anchor": "3-3-grandfathered-versions-and-evidence",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "Versions 0.1.0 to 0.5.0 are qualified by A-74's npm rule unchanged (a verified registry signature and an integrity equal to the signed manifest), and the step evidence of every npm step records, per package, which rule applied and its outcome."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "068-qualification-requires-npm-provenance-after-0-5-0-amends-031-056-and-058": "c926b5e82c9e4a4bc1756daabdbd57ef376eebae115ab52476e09135c5a4ff3c",
+      "1-purpose": "69ee32eb375858a53d97fb1a1d6720150c6baa03922b26d919d2c1e2fc21d446",
+      "2-1-binding-principles": "6566942fbf0a4e305556981bb9d8867b1153a140fe4f11bff618648971c97239",
+      "2-territory": "6250f17dd27324462fa26f30cbd9e3ebc29aef49b4bcc8c822b6183f14ffc987",
+      "3-1-which-rule-applies": "7ceb39a087dfbb8e097e1dd47b1127c347e71f13ca089d35aa41f8ca793ab578",
+      "3-2-the-provenance-rule": "39d014e600a2e7f0e83b4cc7f44f8e36d7ab32de7a138de5b934ca67c5866d4e",
+      "3-3-grandfathered-versions-and-evidence": "ffde7de1f3eea06e9387c2ffd6a8a9fbbfd0b4b517e2b72b5630e5cf067ae721",
+      "3-4-what-the-amended-specs-now-say": "8fa83e1aff9aeaecf1b577711b30fa51b629b238d77c0e7eef802fe2b522e63c",
+      "3-5-recorded-follow-up-ending-the-publish-fallback": "fa950b6bf14b9e35a54088b598a35a0da9592fe2ca998d37b0538e3932af44ef",
+      "3-behavior": "60735e2e79a03e4c62127b5cfeb4501f95db95a6e081c2df05752279e2a9fbb5",
+      "4-out-of-scope": "8e239b97e1cb2a88913b13f5b58dcb13957a3a8d6fa59d54e121fed8975437ea",
+      "5-observable-negative-cases": "c890d38e082cd5e6c504093c2f3d5f5daeec01431f9ab331ff502fbb8bfaade0",
+      "acceptance": "66ee3d136af50891edd54cbd9101330f3500bef7fcff3b8834e71255612892e9",
+      "decisions-at-approval": "0531c2aeb27b0510b8241aa7d5084a68bc531c1c3a8406850c0dbeecd38b0dcf",
+      "implementation-record": "0c8061809981651e316278b92d0f7318e337dc3dc006bb767d010574e98ee7d1",
+      "verification": "a60c6958cd3822849159b0287dbd9a53acb35a4b9e1b91ef67889ab22117a469"
+    },
+    "sectionHeadings": [
+      "068: Qualification requires npm provenance after 0.5.0 (amends 031, 056 and 058)",
+      "1. Purpose",
+      "2. Territory",
+      "2.1 Binding principles",
+      "3. Behavior",
+      "3.1 Which rule applies",
+      "3.2 The provenance rule",
+      "3.3 Grandfathered versions and evidence",
+      "3.4 What the amended specs now say",
+      "3.5 Recorded follow-up: ending the publish fallback",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Implementation record",
+      "Decisions at approval"
+    ],
+    "specPath": "specs/068-qualification-requires-npm-provenance/spec.md",
+    "status": "approved",
+    "summary": "An amendment of approved specs 031 (3.9.6, 3.9.7 (b)), 056 (3.3) and 058 (3.4.2), for #559, ratified by the owner on 2026-11-08 (A-88). Owner decision A-87 (#555) makes every npm package of a release after 0.5.0 carry npm provenance and refuses an unattested version at publication, but the fresh-consumer qualification still follows A-74: its npm step accepts a verified registry signature in place of provenance, so a later version without provenance would still be recorded `qualified`. This spec makes the npm step require, for every release version after 0.5.0, an SLSA build-provenance attestation on each installed `@rustev/*` package, verified by npm and bound to this repository's release workflow at the release tag. Versions 0.1.0 to 0.5.0 keep A-74's rule, so the default-branch harness can still requalify them. It records, without specifying, the removal of A-87's `NPM_TOKEN` fallback once npm fixes npm/cli#9969 and one release has published through trusted publishing alone.\n",
+    "title": "Qualification requires npm provenance after 0.5.0 (amends 031, 056 and 058)"
+  },
+  "shardHash": "23aff38f9f96a797943eb8ddf36d5b479214465dee101fa50dc494cb0348fdd6",
+  "specVersion": "1.11.0"
+}
