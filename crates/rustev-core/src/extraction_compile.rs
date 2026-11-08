@@ -78,10 +78,6 @@ pub(crate) fn resolve(def: &Definition, programs: &[ExtractRules]) -> Result<(),
             continue;
         };
         required(binding, e).map_err(|err| bad(&step.id, err))?;
-        if binding.fill == Fill::RulesFirst {
-            // Spec 070 increment 1 carries rules_first in the contract only.
-            return Err(bad(&step.id, "rules_first is not supported by this build"));
-        }
         let mut matches = programs
             .iter()
             .filter(|p| format!("{}@{}", p.name, p.version) == binding.rules_program);

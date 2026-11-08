@@ -683,3 +683,193 @@ async fn a_decision_entry_serves_extracted_fields_with_their_origin() {
         }
     }
 }
+
+// Spec 070, 3.7.6: a skipped rules-first request is never admitted, reserved,
+// dispatched or captured; a partial request runs through the driver.
+
+fn rules_first_compiled(d: &Definition) -> Compiled {
+    let plan = fixture();
+    let PlanStepDetail::Extract(b) = &plan.steps[0].detail else {
+        panic!()
+    };
+    let rules = serde_json::from_value(
+        json!({"schema":"rustev.extract-rules/2","name":"booking","version":"1",
+        "sources":[{"name":"text","ref":"input:message"}],
+        "fields":[
+            {"field":"party_size","rules":[{"name":"party","when":"always",
+                "then":{"integer_after":{"source":"text","terms":["party"],"max_digits":2}}}]},
+            {"field":"area_name","rules":[{"name":"area","when":"always",
+                "then":{"token_after":{"source":"text","terms":["area"],"charset":["upper","lower"],
+                    "min_len":2,"max_len":32}}}]}]}),
+    )
+    .unwrap();
+    let mut d = d.clone();
+    extract(&mut d).fallback = serde_json::from_value(
+        json!({"rules_program":"booking@1","fill":"rules_first","required":["party_size","area_name"]}),
+    )
+    .unwrap();
+    compile_with_extraction_documents(
+        &d,
+        &[descriptor()],
+        &[],
+        &[],
+        Some(&execution(
+            CostPolicy::Hard { max_units: 10 },
+            vec![step_exec(STEP, 1, &[], Delay::None, &[], &[])],
+        )),
+        std::slice::from_ref(&b.template),
+        &[rules],
+    )
+    .unwrap()
+}
+
+fn rules_req(message: &str) -> DecisionRequest {
+    let mut r = request("extraction");
+    r.snapshot = snapshot(vec![entry(
+        "message",
+        json!(message),
+        ProvenanceClass::SystemOfRecord,
+        NOW,
+    )]);
+    r
+}
+
+#[tokio::test]
+async fn a_skipped_rules_first_request_is_never_reserved_dispatched_or_captured() {
+    let b = Scripted::new(descriptor(), |_| answer());
+    let (rt, _) = runtime(std::slice::from_ref(&b), 1);
+    let plan = rt.prepare(rules_first_compiled(&definition())).unwrap();
+    let cap = CaptureConfig {
+        scope: Scope::tenant_only(
+            ScopeHandle::new("tenant").unwrap(),
+            ScopeHandle::new("rev").unwrap(),
+        ),
+        max_bytes: 65536,
+    };
+    let out = rt
+        .decide_with_capture(
+            &plan,
+            rules_req("party 4 area Soho"),
+            &CancelSignal::new(),
+            &cap,
+        )
+        .await
+        .unwrap();
+    let d = out.result.unwrap();
+    assert!(b.dispatched().is_empty());
+    assert!(d.record.requests.is_empty());
+    assert_eq!(d.record.cost.observed, 0);
+    assert_eq!(d.record.cost.estimated, 0);
+    assert_eq!(d.record.cost.liability, 0);
+    let x = &evidence(&d).extraction.as_ref().unwrap()[0];
+    assert_eq!(
+        x.request_outcome,
+        ExtractionRequestOutcome::Skipped {
+            reason: rustev_contract::extraction_results::SkipReason::RulesFilled
+        }
+    );
+    let CaptureOutcome::Captured(capture) = out.capture else {
+        panic!()
+    };
+    assert!(capture.supplies.is_empty());
+    // Replay lists nothing either, and reproduces the evidence.
+    let ev = Evaluation::start(
+        plan.compiled(),
+        &rules_req("party 4 area Soho").snapshot,
+        ts(NOW),
+    )
+    .unwrap();
+    assert!(ev.pending().is_empty());
+    let (_, replayed) = ev.finish("extraction").unwrap();
+    assert_eq!(
+        replayed.record_canonical().unwrap(),
+        evidence(&d).record_canonical().unwrap()
+    );
+}
+
+#[tokio::test]
+async fn a_partial_rules_first_request_runs_through_the_driver() {
+    let b = Scripted::new(descriptor(), |call| {
+        let output = &call.projection["request"]["output"]["fields"];
+        let names: Vec<_> = output
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|f| f["name"].as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(names, ["window", "party_size", "features", "insufficient"]);
+        Answer::Output(
+            serde_json::from_value(json!({"typed_record": {
+                "fields": {"window":{"start":"2027-01-01","end":"2027-01-03"},
+                    "party_size":4,"features":["pool"],"insufficient":false},
+                "logprobs":[], "provider_reported":{}}}))
+            .unwrap(),
+            Charge::Observed { units: 1 },
+        )
+    });
+    let (rt, _) = runtime(std::slice::from_ref(&b), 1);
+    let plan = rt.prepare(rules_first_compiled(&definition())).unwrap();
+    let cap = CaptureConfig {
+        scope: Scope::tenant_only(
+            ScopeHandle::new("tenant").unwrap(),
+            ScopeHandle::new("rev").unwrap(),
+        ),
+        max_bytes: 65536,
+    };
+    // `party` has no number: only `area_name` is rules-filled.
+    let out = rt
+        .decide_with_capture(
+            &plan,
+            rules_req("party area Soho"),
+            &CancelSignal::new(),
+            &cap,
+        )
+        .await
+        .unwrap();
+    let d = out.result.unwrap();
+    assert_eq!(b.dispatched().len(), 1);
+    assert_eq!(d.record.requests.len(), 1);
+    assert_eq!(d.record.cost.observed, 1);
+    let x = &evidence(&d).extraction.as_ref().unwrap()[0];
+    assert_eq!(x.request_outcome, ExtractionRequestOutcome::Succeeded);
+    let origin = |n: &str| {
+        x.fields
+            .iter()
+            .find(|f| f.name == n)
+            .unwrap()
+            .origin
+            .clone()
+    };
+    assert_eq!(origin("area_name"), ExtractionOrigin::Fallback);
+    assert_eq!(origin("party_size"), ExtractionOrigin::Extracted);
+    // Replay lists the same subset and request identity and supplies the
+    // captured record.
+    let CaptureOutcome::Captured(capture) = out.capture else {
+        panic!()
+    };
+    assert_eq!(capture.supplies.len(), 1);
+    let mut ev = Evaluation::start(
+        plan.compiled(),
+        &rules_req("party area Soho").snapshot,
+        ts(NOW),
+    )
+    .unwrap();
+    let s = &capture.supplies[0];
+    assert_eq!(
+        ev.request_document(&s.step, &s.instance, s.target, &capture.scope)
+            .unwrap()
+            .id()
+            .unwrap(),
+        s.request
+    );
+    let CapturedValue::Output(o) = &s.value else {
+        panic!()
+    };
+    ev.supply(&s.step, &s.instance, Supplied::Output(o.output.clone()))
+        .unwrap();
+    let (_, replayed) = ev.finish("extraction").unwrap();
+    assert_eq!(
+        replayed.record_canonical().unwrap(),
+        evidence(&d).record_canonical().unwrap()
+    );
+}

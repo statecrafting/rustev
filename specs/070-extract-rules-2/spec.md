@@ -2,7 +2,7 @@
 id: "070-extract-rules-2"
 title: "Extraction rules 2: token extractors, exact-value conditions, declared date formats and rules first (amends 038 and 032)"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-11-08"
 summary: >
   An amendment of approved specs 038 (3.3.3, 3.3.5, 3.5, 3.7, 3.11, 3.12,
@@ -658,7 +658,31 @@ Any increment whose `bindings` run crosses 5,242,880 bytes carries
 
 ## Verification
 
-Pending with implementation.
+Declared for `spec-spine verify 070-extract-rules-2`; 070 is in `make
+verify` and in CI's `integrations-base` acceptance group. The regenerated
+binding types are checked by `gen-types --check` in `make bindings` (CI's
+`bindings` job), which also measures the WebAssembly module (3.11).
+
+```verify:cli
+# 3.1, 3.7.1, 3.9.1 and 3.10: the /2 document, its bounds and refusals,
+# rules_first and required, skipped, and the regenerated schemas.
+cargo test -p rustev-contract --locked --test extract_rules_2 --test extraction_documents --test schemas
+# 3.2 to 3.6 and section 5: extractors, conditions, vocabulary capture,
+# binding refusals, determinism.
+cargo test -p rustev-core --locked --test extraction_rules_2 --test extraction_compile --test extraction_fallback
+# 3.8: hint statically and dynamically, category 14, corroboration.
+cargo test -p rustev-core --locked --test extraction_rules_2_grade
+# 3.7 and 3.9: skipped, partial and full requests, the record-level fault,
+# request failure, replay and budgets.
+cargo test -p rustev-core --locked --test extraction_rules_first --test extraction_evaluate
+# I-1: every committed golden and PlanId unchanged.
+cargo test -p rustev-core --locked --test reference_plans --test packaged_fixtures --test identity
+# 3.7.6: no reservation, attempt or capture for a skipped request; the
+# partial request through the driver.
+cargo test -p rustev-runtime --locked --test extraction
+# Runtime conformance cases for a skipped and a partial request.
+cargo test -p rustev-conformance --locked --test runtime --test manifest
+```
 
 ## Implementation record
 
@@ -726,6 +750,25 @@ Pending with implementation.
   (each source type, no folding, unresolved sources under `not`, binding
   rows, vocabulary rows) and `tests/extraction_rules_2_grade.rs` (static
   refusal, corroboration, dynamic grade of a model and a rules value).
+- **Increment 3 (rules first and closure).** `rustev-core`: when a
+  `rules_first` step would be listed, the rules run first
+  (`evaluate_rules`); every required field filled completes the step with
+  `skipped{rules_filled}` and no request, attempt, reservation or
+  capture; otherwise one `rustev.extract-request/1` lists the absent
+  fields in declared order with its digest over that subset (byte-identical
+  to the `absent_fields` request when the rules filled nothing). The
+  output is validated against the requested subset, so a member for a
+  rules-filled field is a record-level `invalid_output` fault; on
+  completion the rules' fields stand, the requested fields take the model's
+  values or absence reasons (`request_failed{reason}` on failure), and the
+  rules are not evaluated again. Under `rules_first`, a rules-filled value
+  whose source runtime screening withholds from exact steps is absent
+  `source_unavailable`, per 038 3.7.5. Compilation accepts `rules_first`;
+  budgets count the request as before. Tests: `crates/rustev-core/tests/extraction_rules_first.rs`,
+  two runtime tests in `crates/rustev-runtime/tests/extraction.rs`, and the
+  conformance cases `runtime.rules-first-skipped` and
+  `runtime.rules-first-partial` (`tools/rustev-conformance/tests/runtime.rs`).
+  070 joins `make verify` and CI's `integrations-base` group.
 
 ## Decisions at approval
 
