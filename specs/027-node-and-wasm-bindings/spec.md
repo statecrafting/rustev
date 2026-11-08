@@ -1272,6 +1272,34 @@ against their schemas in their own contract tests.
   `post_merge` (spec 001's record of this date) runs them only when
   `Cargo.lock` or `rust-toolchain.toml` changed. The final `bindings` job
   still accepts a skip only when `scope` chose it.
+- 2026-11-08 (CI only, no claim of this spec changes): the darwin-arm64,
+  darwin-x64 and win32-x64-msvc legs of `native` each restore a dependency
+  cache of their own: `~/.cargo/registry/index`, `~/.cargo/registry/cache`,
+  `~/.cargo/git` and `target/release` with the workspace crates' artifacts
+  dropped, as the wasm and node jobs already do. The key is
+  `bindings-native-<platform>-<runner>-node-fp-corpus-local-embed-<hash of Cargo.lock and rust-toolchain.toml>`,
+  with no fallback key, so an entry is used only by its own platform,
+  runner and lockfile, and Cargo's fingerprints still judge each artifact.
+  The cache is saved only from a push to `main`, which now also runs the
+  bindings jobs when `bindings.yml` itself changes, so a change to what the
+  caches hold refreshes them; what is built and tested is unchanged, and
+  the four Linux legs are as before. Measured before, in the merge-queue
+  runs of #567 (42511840610) and #565 (42452908883), job seconds:
+  linux-x64-gnu 482 and 594, linux-arm64-gnu 449 and 446, linux-x64-musl
+  849 and 1186, linux-arm64-musl 1071 and 1032, darwin-arm64 834 and 696,
+  darwin-x64 1834 and 1082, win32-x64-msvc 1233 and 950. Cargo's three
+  builds take 90 to 96 per cent of each job. Dependencies are compiled only
+  until 74 s (linux-arm64-gnu), 82 s (linux-x64-gnu), 133 s
+  (linux-x64-musl), 144 s (linux-arm64-musl), 319 s (darwin-x64), 340 s
+  (darwin-arm64) and 421 s (win32-x64-msvc) into the first and local-embed
+  builds together, which bounds the saving; the workspace crates, compiled
+  one after another, take the rest and still rebuild in every run. The node
+  jobs, which already restore dependencies, built `rustev-node` in 4 min
+  41 s against 4 min 13 s uncached on linux-x64-gnu, so the Linux legs
+  would gain little: the repository's caches already held 12.1 GB against
+  GitHub's 10 GB limit (all on `main`), and only the three legs where up to
+  about 5 to 7 minutes per job can be saved are cached, an estimated 0.6 to
+  1.2 GB; GitHub evicts the least recently used.
 
 ## Decisions at approval
 
