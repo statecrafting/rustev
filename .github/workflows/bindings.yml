@@ -17,6 +17,8 @@
 #   native conformance suite there on Node 22 (load, compile, decide with
 #   the rules backend, replay). The addon is uploaded. Then each platform
 #   also builds the addon with spec 011's `local-embed` feature (3.17.1).
+#   The darwin and win32 legs restore a dependency cache of their own,
+#   saved only from main.
 name: bindings
 
 on:
@@ -175,8 +177,8 @@ jobs:
       # A pull request's own run (unless labelled `statecraft:stacked-ci`)
       # leaves the bindings jobs out: the merge queue runs them all against
       # the latest main. A push to main, which the queue already judged,
-      # runs them only when Cargo.lock or the toolchain changed, to refresh
-      # caches.
+      # runs them only when Cargo.lock, the toolchain or this workflow
+      # changed, to refresh caches (a change here can change what they hold).
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
@@ -189,8 +191,9 @@ jobs:
         run: |
           if [ "$POST_MERGE" = true ]; then
             # A push the queue already judged: run only to refresh main's
-            # caches, which change only with Cargo.lock or the toolchain.
-            if git diff --quiet HEAD~1 HEAD -- Cargo.lock rust-toolchain.toml; then run=false; else run=true; fi
+            # caches, which change only with Cargo.lock, the toolchain or
+            # this workflow.
+            if git diff --quiet HEAD~1 HEAD -- Cargo.lock rust-toolchain.toml .github/workflows/bindings.yml; then run=false; else run=true; fi
           elif [ "$EVENT" = pull_request ] && [ "$STACKED_CI" != true ]; then
             run=false
             echo "The bindings jobs run in the merge queue for this pull request." >> "$GITHUB_STEP_SUMMARY"
@@ -253,6 +256,26 @@ jobs:
         if: ${{ !endsWith(matrix.platform, '-musl') }}
         with:
           node-version: 22
+      # The darwin and win32 legs only: there dependencies compile for 5 to 7
+      # minutes per job; on the Linux legs about 1 to 2, which does not pay
+      # for the cache budget. Restored in every run, saved only from main (as
+      # in the jobs above), with no fallback key: an entry is this
+      # platform's, built on its runner, for exactly this Cargo.lock and
+      # toolchain, and holds only dependencies (registry, git and
+      # `target/release` without the workspace crates). Cargo's fingerprints
+      # still judge every artifact, so a restored dependency is reused only
+      # when its inputs match.
+      - name: Restore cargo registry, git and dependency artifacts
+        id: cargo-cache
+        if: startsWith(matrix.platform, 'darwin') || startsWith(matrix.platform, 'win32')
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git
+            target/release
+          key: bindings-native-${{ matrix.platform }}-${{ matrix.runner }}-node-fp-corpus-local-embed-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
       - name: Build the addon and run the corpus in Debian bookworm
         if: endsWith(matrix.platform, '-gnu')
         run: |
@@ -317,6 +340,27 @@ jobs:
       - name: Build the addon with local-embed (011 3.17.1)
         if: startsWith(matrix.platform, 'darwin') || startsWith(matrix.platform, 'win32')
         run: cargo build -p rustev-node --locked --release --features local-embed
+      # Cargo fingerprints workspace sources by mtime, which a fresh checkout
+      # resets, so workspace crates always rebuild: their artifacts are dead
+      # weight in the cache. Only dependencies are kept.
+      - name: Drop workspace artifacts before saving (main only)
+        if: (startsWith(matrix.platform, 'darwin') || startsWith(matrix.platform, 'win32')) && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        run: |
+          packages=$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[].name' | sed 's/^/-p /')
+          test -n "$packages"
+          # Word splitting of $packages is intended: one `-p <name>` per package.
+          # shellcheck disable=SC2086
+          cargo clean $packages
+      - name: Save the cache (main only)
+        if: (startsWith(matrix.platform, 'darwin') || startsWith(matrix.platform, 'win32')) && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git
+            target/release
+          key: ${{ steps.cargo-cache.outputs.cache-primary-key }}
 
   # As verify.yml's `verify`: the caller's result is this job's, and a
   # skipped bindings job passes only when `scope` chose to leave it out.
