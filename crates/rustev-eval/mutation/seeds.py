@@ -982,79 +982,67 @@ def try_seed(seed, src, env):
         open(f, "w", encoding="utf-8").write(original)
 
 
-def dependency_names(packages):
-    """What a dependency-only copy may take for `packages`' tests: the
-    registry and git packages they build (by package name, for the
-    `.fingerprint` and `build` directories) and those packages' target names
-    (for `deps`), minus every name a workspace package or target uses."""
-    meta = json.loads(subprocess.run(
-        ["cargo", "metadata", "--locked", "--format-version", "1"],
-        cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, check=True,
-    ).stdout)
-    pkgs = {p["id"]: p for p in meta["packages"]}
-    members = set(meta["workspace_members"])
-    nodes = {n["id"]: n for n in meta["resolve"]["nodes"]}
-    roots = [i for i in members if pkgs[i]["name"] in packages]
-    seen, todo = set(roots), list(roots)
-    while todo:
-        i = todo.pop()
-        for d in nodes[i]["deps"]:
-            # Development dependencies count only for the packages under test.
-            kinds = {k.get("kind") for k in d.get("dep_kinds", [{"kind": None}])}
-            if i not in roots and kinds <= {"dev"}:
-                continue
-            if d["pkg"] not in seen:
-                seen.add(d["pkg"])
-                todo.append(d["pkg"])
-    banned = set()
-    for i in members:
-        banned.add(pkgs[i]["name"])
-        banned.update(t["name"].replace("-", "_") for t in pkgs[i]["targets"])
-    allowed_pkgs, allowed_stems = set(), set()
-    for i in seen:
-        if i in members or pkgs[i].get("source") is None:
+def job_units(packages):
+    """The file-name digests of every unit `packages`' tests build in the
+    job's own tree and target directory, as cargo reports them after
+    building them there or finding them fresh; None when that build fails."""
+    build = subprocess.run(
+        ["cargo", "test", "--locked", "-q", "--no-run", "--message-format=json"]
+        + [a for p in packages for a in ("-p", p)],
+        cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
+    )
+    if build.returncode != 0:
+        return None
+    digests = set()
+    for line in build.stdout.splitlines():
+        try:
+            m = json.loads(line)
+        except ValueError:
             continue
-        allowed_pkgs.add(pkgs[i]["name"])
-        allowed_stems.update(t["name"].replace("-", "_") for t in pkgs[i]["targets"])
-    return allowed_pkgs - banned, allowed_stems - banned, banned
+        paths = []
+        if m.get("reason") == "compiler-artifact":
+            paths = m.get("filenames", [])
+        elif m.get("reason") == "build-script-executed" and m.get("out_dir"):
+            paths = [os.path.dirname(m["out_dir"])]
+        for path in paths:
+            # deps/<name>-<digest>.<ext>, or a build script's
+            # build/<package>-<digest>/build_script_build-<digest>.
+            digests.add(os.path.basename(path).split(".", 1)[0].rpartition("-")[2])
+            if os.path.basename(os.path.dirname(os.path.dirname(path))) == "build":
+                digests.add(os.path.basename(os.path.dirname(path)).rpartition("-")[2])
+    return digests
 
 
-def seed_dependencies(base, dest, packages):
-    """Copy the dependency artifacts `packages` build from the target
-    directory `base` (the one the job restored and built into) into the
-    empty target directory `dest`. Returns the bytes copied, or None when
-    nothing was copied.
+def seed_target(base, dest, packages):
+    """Copy the units `packages`' tests build from the job's target
+    directory `base` into the empty target directory `dest`. Returns the
+    bytes copied, or None when nothing was copied.
 
-    Only registry and git packages are copied, never a workspace crate's
-    artifact, fingerprint or incremental state: the workspace crates always
-    compile from the seed tree. Copies keep their modification times, which
-    cargo's fingerprints compare. A failure (a full disk) removes the partial
-    copy: the run then builds the dependencies itself, only slower."""
+    The units are the ones cargo reports for the job's own tree, which the
+    seed trees copy byte for byte, so each copied artifact was built from
+    the source a seed tree starts with. The copies keep their modification
+    times, so cargo finds them fresh; a seed's edit makes its file newer, so
+    cargo recompiles that crate and every crate depending on it, and
+    try_seed refuses a verdict if it did not. Incremental state is not
+    copied. A failure (a full disk) removes the partial copy: the run then
+    builds the units itself, only slower."""
     source = os.path.join(base, "debug")
     if not os.path.isdir(os.path.join(source, "deps")):
         return None
-    def stem_ok(fname):
-        name, _, digest = fname.split(".", 1)[0].rpartition("-")
-        if not name or not all(c in "0123456789abcdef" for c in digest):
-            return False
-        names = {name, name[3:] if name.startswith("lib") else name}
-        return bool(names & stems) and not names & banned
-
-    def dir_ok(dname):
-        name, _, digest = dname.rpartition("-")
-        return name in pkgs and all(c in "0123456789abcdef" for c in digest)
-
     target = os.path.join(dest, "debug")
     copied = 0
     try:
-        pkgs, stems, banned = dependency_names(packages)
-        for sub, ok in (("deps", stem_ok), (".fingerprint", dir_ok), ("build", dir_ok)):
+        digests = job_units(packages)
+        if not digests:
+            print("seeds: the job's own build of the selected packages failed; building them instead", flush=True)
+            return None
+        for sub in ("deps", ".fingerprint", "build"):
             here = os.path.join(source, sub)
             if not os.path.isdir(here):
                 continue
             os.makedirs(os.path.join(target, sub), exist_ok=True)
             for entry in os.scandir(here):
-                if not ok(entry.name):
+                if entry.name.split(".", 1)[0].rpartition("-")[2] not in digests:
                     continue
                 to = os.path.join(target, sub, entry.name)
                 if entry.is_dir(follow_symlinks=False):
@@ -1063,9 +1051,9 @@ def seed_dependencies(base, dest, packages):
                 elif entry.is_file(follow_symlinks=False):
                     shutil.copy2(entry.path, to)
                     copied += entry.stat(follow_symlinks=False).st_size
-    except (OSError, subprocess.CalledProcessError, ValueError, KeyError) as e:
+    except OSError as e:
         shutil.rmtree(dest, ignore_errors=True)
-        print(f"seeds: seeding the dependencies from {base} failed ({e}); building them instead", flush=True)
+        print(f"seeds: copying the job's units from {base} failed ({e}); building them instead", flush=True)
         return None
     return copied
 
@@ -1119,16 +1107,16 @@ def main():
     failures = []
     packages = sorted({p for x in chosen for p in x[5]})
     try:
-        # The job's own target directory already holds the dependencies,
-        # restored from the cache and built by the acceptance before this
-        # one; the first worker starts from a copy of those instead of an
-        # empty directory. Never the directory itself: the seed trees'
-        # workspace crates would share its artifacts.
+        # The job's own target directory already holds the units the seeds
+        # build, restored from the cache and built by the acceptance before
+        # this one; the first worker starts from a copy of those instead of
+        # an empty directory. Never the directory itself: a seed tree's
+        # builds would overwrite the job's artifacts.
         base = os.path.abspath(os.environ.get("CARGO_TARGET_DIR") or os.path.join(ROOT, "target"))
         start = time.monotonic()
-        seeded = seed_dependencies(base, trees[0][1]["CARGO_TARGET_DIR"], packages)
+        seeded = seed_target(base, trees[0][1]["CARGO_TARGET_DIR"], packages)
         if seeded is not None:
-            print(f"seeds: {seeded / 2**30:.2f} GiB of dependency artifacts copied from {base} "
+            print(f"seeds: {seeded / 2**30:.2f} GiB of the job's build copied from {base} "
                   f"in {time.monotonic() - start:.0f}s", flush=True)
         if n > 1:
             # Build the unseeded tree once, then give every worker a copy of
