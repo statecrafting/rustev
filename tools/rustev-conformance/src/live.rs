@@ -21,7 +21,7 @@ use rustev_contract::{Document, Identified, Timestamp};
 use rustev_core::seams::{BoxFuture, CancelSignal, EvidenceSink};
 use rustev_eval::replay::ReplayConfig;
 use rustev_live::documents::{EvaluationTime, LiveConfig, Mode};
-use rustev_live::journal::{BudgetKind, SetClock, SpendJournal};
+use rustev_live::journal::SetClock;
 use rustev_live::probe::ProbeSnapshot;
 use rustev_live::run::{
     self, CaseInput, CaseOrigin, LiveCase as ResolvedCase, ReportInputs, RunOptions, RunSpec,
@@ -426,6 +426,9 @@ async fn execute(case: &LiveCase, dir: &Path) -> Result<Outputs, String> {
         let prepared = run::prepare(
             spec,
             RunOptions {
+                journal_path: dir.join(crate::contained(&o.journal)?),
+                require_existing_journal: false,
+                journal_clock: Arc::new(SetClock::new(o.now_ms)),
                 out: out.clone(),
                 resume: o.resume,
                 rerun_interrupted: o.rerun_interrupted,
@@ -434,12 +437,7 @@ async fn execute(case: &LiveCase, dir: &Path) -> Result<Outputs, String> {
             },
         )
         .map_err(err)?;
-        let journal = SpendJournal::open(
-            dir.join(crate::contained(&o.journal)?),
-            BudgetKind::Testing,
-            Arc::new(SetClock::new(o.now_ms)),
-        )
-        .map_err(err)?;
+        let journal = prepared.open_journal().map_err(err)?;
         let cancel = CancelSignal::new();
         let driver = async {
             for step in &run.drive {

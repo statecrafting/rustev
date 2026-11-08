@@ -220,7 +220,7 @@
       "file": "out/checkpoint.json",
       "golden": "tools/rustev-conformance/expected/live/live.journal-cap/out/checkpoint.json",
       "normalize": [],
-      "sha256": "8faa0bf0366adefaf833f906a4f88fec2079001bbb5986741685e6efcd659983"
+      "sha256": "4196438494509bc5bf12f05ded62de47732d1d5d7bd380f4416084a5145df7c6"
     },
     {
       "file": "out/live-config.json",
@@ -232,7 +232,7 @@
       "file": "out/live-run.json",
       "golden": "tools/rustev-conformance/expected/live/live.journal-cap/out/live-run.json",
       "normalize": [],
-      "sha256": "36a12a626569dee6f2db0b75162ecd8ca1fd32eb74ab14b10a596d9665466425"
+      "sha256": "237d8f87a6a10b6d4f82ff00e824b0b426aa5f0c7aa0124974e78b1b54f4ef13"
     },
     {
       "file": "out/probe/1.1.case.json",

@@ -303,7 +303,7 @@
       "file": "journal.jsonl",
       "golden": "tools/rustev-conformance/expected/live/live.resume/journal.jsonl",
       "normalize": [],
-      "sha256": "6d0313272764d3bf4d02a08a377b0a0d42f08226156ef2c6f3618772dacd61e8"
+      "sha256": "64bfebe098dd77d694b21b84ff833dbe9bc4c24caf0b59d67e2d187c920329f8"
     },
     {
       "file": "out/a/adapter.json",
@@ -375,7 +375,7 @@
       "file": "out/checkpoint.json",
       "golden": "tools/rustev-conformance/expected/live/live.resume/out/checkpoint.json",
       "normalize": [],
-      "sha256": "42fadb0e0e96e400f2e47a783fa3aeedde831fcf96dc9a1ea5df0b26f877499c"
+      "sha256": "54113ff0614337878182233c4d5b4dea787e374ed31024970adef1480f34a49a"
     },
     {
       "file": "out/comparison.json",
@@ -399,7 +399,7 @@
       "file": "out/live-run.json",
       "golden": "tools/rustev-conformance/expected/live/live.resume/out/live-run.json",
       "normalize": [],
-      "sha256": "5182c9af1ca43c151cf91a465385a957ff911e2b6b97e36d916b38fcbb4f41d6"
+      "sha256": "9f49abf4ccadc633cb860f884e48e443a6f768b9f5ed1310d5d8f885320452c7"
     },
     {
       "file": "out/probe/1.1.case.json",
