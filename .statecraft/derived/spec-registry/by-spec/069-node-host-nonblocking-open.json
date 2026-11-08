@@ -1,0 +1,121 @@
+{
+  "record": {
+    "amends": [
+      "006-cli-surface",
+      "027-node-and-wasm-bindings",
+      "067-node-live-repeat-runs"
+    ],
+    "created": "2026-11-08",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "006-cli-surface",
+      "027-node-and-wasm-bindings",
+      "067-node-live-repeat-runs"
+    ],
+    "extends": [
+      {
+        "nature": "amending",
+        "spec": "027-node-and-wasm-bindings",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-surface/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "027-node-and-wasm-bindings",
+        "unit": {
+          "kind": "directory",
+          "path": "integrations/rustev-node/"
+        }
+      },
+      {
+        "nature": "amending",
+        "spec": "006-cli-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/rustev-cli/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      }
+    ],
+    "id": "069-node-host-nonblocking-open",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-2-the-node-filesystem-host",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "On Unix, every input file and store item the Node binding's filesystem host reads is opened with `O_NONBLOCK` (store items also with `O_NOFOLLOW`) through `rustev_surface::host::open_input`, so a FIFO or device swapped in after the metadata check opens at once and is refused by the check on the handle; no read through that host waits for a FIFO writer."
+      },
+      {
+        "anchor": "3-1-one-shared-open",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "The CLI and the Node host share one implementation of the non-blocking open; the CLI's `rustev_cli::io::open_input` behavior (006 3.3.1) is unchanged."
+      },
+      {
+        "anchor": "3-3-tests",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "A Unix test creates a FIFO with no writer at an input path and at a store item, and asserts that the Node host's read returns the not-a-regular-file refusal (input) or `Inaccessible` (store item) within a bounded time instead of blocking."
+      }
+    ],
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "sectionDigests": {
+      "069-the-node-binding-s-filesystem-host-opens-inputs-without-blocking-amends-006-027-and-067": "037cd449fa5501ab45b94241dff94cbcbefb9256dcae1f40abd4b57d8a707670",
+      "1-purpose": "5b831d4ad500785e94e03b3b514e6d8711c2d43b960a0278922acc07f50d3e5a",
+      "2-1-binding-principles": "aa61ac3edad07f5131fe6eb23ba048f607f73fb4d39bcf08b7bca16231f02fa7",
+      "2-territory": "e66cc67d99020ef82010231cdd145c2222aa6777eedef1654cde5d5263d71eaf",
+      "3-1-one-shared-open": "7a8b390f3e30bf25d98caa5e89901ab89f66195d7aa547d20be135e8181efde2",
+      "3-2-the-node-filesystem-host": "f9208fd7e6afbe85ebcb37016746baca5e3ed1ecad5e43996489f52ed7f0f3ce",
+      "3-3-tests": "4b10ce33a24249769a3358304eae139e72174b8c21de8599304a2bf0a2336179",
+      "3-4-what-the-amended-specs-now-say": "3d07a59889474dfca90a988112f5ccc2c40ce24261bb4db0ffaea279965a384f",
+      "3-behavior": "84a4645ecacf32853760a36fd4ea087872a641513081708ab75ecf69f1be139e",
+      "4-out-of-scope": "ef97c3962c2ff6fe25897f9766fd76850e070b26b06ec1c69150ea916e450054",
+      "5-observable-negative-cases": "491afabfd786188b219c13f14e13ea8c949227c32837995707108534b9c38c9c",
+      "acceptance": "101a359712ab9b37c410c0573185fb0927e1378c27b7ba921c31535e97507d41",
+      "decisions-at-approval": "e3437c3498fd67fa45fcf9b49b76d401a4e5d041fe01d3f56a498c7ea185cef5",
+      "implementation-record": "23c6df46f2a00fa0af9e731f6f7ae25cca21a701c9049ca840b74b4b80cc8e5b",
+      "verification": "34c0dce8db22a9528ca6045433bcb2e16addc9622ca2e1409472bc5902edfe5f"
+    },
+    "sectionHeadings": [
+      "069: The Node binding's filesystem host opens inputs without blocking (amends 006, 027 and 067)",
+      "1. Purpose",
+      "2. Territory",
+      "2.1 Binding principles",
+      "3. Behavior",
+      "3.1 One shared open",
+      "3.2 The Node filesystem host",
+      "3.3 Tests",
+      "3.4 What the amended specs now say",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Acceptance",
+      "Verification",
+      "Implementation record",
+      "Decisions at approval"
+    ],
+    "specPath": "specs/069-node-host-nonblocking-open/spec.md",
+    "status": "approved",
+    "summary": "An amendment of approved specs 067 (3.4.2 and its implementation record's residual race), 027 (the Node binding's host) and 006 (3.3.1's non-blocking open, which moves to a shared home), for #566, ratified by the owner on 2026-11-08 (A-89). The Node binding's filesystem host for `engine.liveRun` opens every input file and store item with the standard library's blocking open, so a regular file swapped for a FIFO or device between its metadata check and the open can block the call; the CLI closes that window with a non-blocking open. This spec moves the CLI's open into `rustev-surface`, has the CLI and the Node host both use it, and requires a test that a FIFO at an input path or store item is refused without blocking. Nothing read changes: the check on the open handle already refused a non-regular file.\n",
+    "title": "The Node binding's filesystem host opens inputs without blocking (amends 006, 027 and 067)"
+  },
+  "shardHash": "b4e096a9c6065930ec00a743fe1b51ab298d9131d3a314d8592d0e71ca976808",
+  "specVersion": "1.11.0"
+}
