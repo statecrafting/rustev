@@ -982,14 +982,15 @@ def try_seed(seed, src, env):
         open(f, "w", encoding="utf-8").write(original)
 
 
-def job_units(packages):
+def job_units(base, packages):
     """The file-name digests of every unit `packages`' tests build in the
-    job's own tree and target directory, as cargo reports them after
+    job's own tree and target directory `base`, as cargo reports them after
     building them there or finding them fresh; None when that build fails."""
     build = subprocess.run(
         ["cargo", "test", "--locked", "-q", "--no-run", "--message-format=json"]
         + [a for p in packages for a in ("-p", p)],
-        cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
+        cwd=ROOT, env=dict(os.environ, CARGO_TARGET_DIR=base),
+        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
     )
     if build.returncode != 0:
         return None
@@ -1032,7 +1033,7 @@ def seed_target(base, dest, packages):
     target = os.path.join(dest, "debug")
     copied = 0
     try:
-        digests = job_units(packages)
+        digests = job_units(base, packages)
         if not digests:
             print("seeds: the job's own build of the selected packages failed; building them instead", flush=True)
             return None
